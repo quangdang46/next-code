@@ -47,6 +47,12 @@ pub(crate) struct Args {
     #[arg(long, global = true, default_value = "true")]
     pub(crate) auto_update: bool,
 
+    /// Disable all startup network operations (update check, install/update telemetry,
+    /// provider model-list refresh). Provider API calls during the session itself are
+    /// not affected. Equivalent to setting `JCODE_OFFLINE=1`.
+    #[arg(long, global = true)]
+    pub(crate) offline: bool,
+
     /// Replace the built-in system prompt with the given text for this session.
     /// Higher priority than `.jcode/SYSTEM.md` and the `provider.system_prompt`
     /// config value. Equivalent to setting `JCODE_SYSTEM_PROMPT`.
