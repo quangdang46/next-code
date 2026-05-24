@@ -91,6 +91,7 @@ pub mod todo;
 pub mod tool;
 pub mod transport;
 pub mod tui;
+pub mod turborag;
 pub mod update;
 pub mod usage;
 pub mod util;
