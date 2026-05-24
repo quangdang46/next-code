@@ -77,7 +77,7 @@ use winit::window::{Fullscreen, Window, WindowBuilder};
 use workspace::{InputMode, KeyInput, KeyOutcome, PanelSizePreset, Workspace};
 
 use std::borrow::Cow;
-use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::ffi::OsString;
 use std::fs::{self, OpenOptions};
 use std::hash::{Hash, Hasher};
@@ -148,15 +148,14 @@ const SCROLL_MOMENTUM_DECAY_PER_SECOND: f32 = 7.0;
 const SCROLL_MOMENTUM_MAX_VELOCITY: f32 = 72.0;
 const SCROLL_MOMENTUM_STOP_VELOCITY: f32 = 0.08;
 const SCROLL_FRAME_MAX_DT_SECONDS: f32 = 0.050;
-const SINGLE_SESSION_BODY_TEXT_WINDOW_BEFORE_LINES: usize = 48;
-const SINGLE_SESSION_BODY_TEXT_WINDOW_AFTER_LINES: usize = 96;
+const SINGLE_SESSION_BODY_TEXT_WINDOW_BEFORE_LINES: usize = 8;
+const SINGLE_SESSION_BODY_TEXT_WINDOW_AFTER_LINES: usize = 16;
 const SINGLE_SESSION_STREAMING_BODY_TEXT_WINDOW_BEFORE_LINES: usize = 2;
 const SINGLE_SESSION_STREAMING_BODY_TEXT_WINDOW_AFTER_LINES: usize = 4;
 const STREAMING_TEXT_FADE_DURATION: Duration = Duration::from_millis(150);
 const STREAMING_TEXT_FADE_START_OPACITY: f32 = 0.4;
 const STREAMING_TEXT_RISE_START_OFFSET_PIXELS: f32 = 3.5;
 const DESKTOP_ASYNC_JOB_LIMIT: usize = 12;
-const DESKTOP_REASONING_EFFORT_DEBOUNCE: Duration = Duration::from_millis(45);
 const PRIMITIVE_VERTEX_BUFFER_MIN_CAPACITY: usize = 1024;
 const PRIMITIVE_VERTEX_BUFFER_SHRINK_RATIO: usize = 4;
 const WORKSPACE_BASE_VERTEX_CAPACITY_HINT: usize = 512;
@@ -269,13 +268,13 @@ fn run_desktop_reasoning_effort_request_queue(
         let mut coalesced = 0usize;
         let mut disconnected = false;
         loop {
-            match request_rx.recv_timeout(DESKTOP_REASONING_EFFORT_DEBOUNCE) {
+            match request_rx.try_recv() {
                 Ok(next_request) => {
                     request = next_request;
                     coalesced += 1;
                 }
-                Err(mpsc::RecvTimeoutError::Timeout) => break,
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                Err(mpsc::TryRecvError::Empty) => break,
+                Err(mpsc::TryRecvError::Disconnected) => {
                     disconnected = true;
                     break;
                 }
@@ -380,6 +379,14 @@ struct StreamingTextArrivalStyle {
 }
 
 fn streaming_text_arrival_style_for_elapsed(elapsed: Duration) -> StreamingTextArrivalStyle {
+    if animation::desktop_reduced_motion_enabled() {
+        return StreamingTextArrivalStyle {
+            opacity: 1.0,
+            y_offset_pixels: 0.0,
+            active: false,
+        };
+    }
+
     let progress =
         (elapsed.as_secs_f32() / STREAMING_TEXT_FADE_DURATION.as_secs_f32()).clamp(0.0, 1.0);
     if progress >= 1.0 {
@@ -1319,12 +1326,17 @@ async fn run() -> Result<()> {
                             let target_session_id = app.single_session_live_id();
                             match app.preview_single_session_reasoning_effort_set(&effort) {
                                 Some(effort) => {
-                                    if let Err(error) = reasoning_effort_queue.request(
-                                        effort,
-                                        target_session_id,
-                                        session_event_tx.clone(),
-                                    ) {
-                                        apply_single_session_error(&mut app, error);
+                                    if app
+                                        .set_reasoning_effort_via_active_session(effort.clone())
+                                        .is_err()
+                                    {
+                                        if let Err(error) = reasoning_effort_queue.request(
+                                            effort,
+                                            target_session_id,
+                                            session_event_tx.clone(),
+                                        ) {
+                                            apply_single_session_error(&mut app, error);
+                                        }
                                     }
                                 }
                                 None => app.set_single_session_status_label(
@@ -1561,7 +1573,7 @@ async fn run() -> Result<()> {
                 }
             }
             Event::UserEvent(DesktopUserEvent::CanvasReady(result)) => {
-                let DesktopCanvasInitResult { canvas, elapsed } = result;
+                let DesktopCanvasInitResult { canvas, elapsed } = *result;
                 match canvas {
                     Ok(mut ready_canvas) => {
                         startup_trace.mark(&format!(
@@ -1569,7 +1581,7 @@ async fn run() -> Result<()> {
                             elapsed.as_millis()
                         ));
                         ready_canvas.resize(window.inner_size());
-                        renderer = DesktopHostRendererState::GpuReady(ready_canvas);
+                        renderer = DesktopHostRendererState::GpuReady(Box::new(ready_canvas));
                         if let Some(handoff) = reload_startup_handoff.as_ref() {
                             handoff.signal_ready_and_wait_for_release();
                             window.set_visible(true);
@@ -2444,7 +2456,7 @@ async fn render_hero_frame_to_image(
 }
 
 enum DesktopUserEvent {
-    CanvasReady(DesktopCanvasInitResult),
+    CanvasReady(Box<DesktopCanvasInitResult>),
     SessionEvents(DesktopSessionEventBatch),
     SessionCardsLoaded {
         purpose: DesktopSessionCardsPurpose,
@@ -2472,7 +2484,7 @@ struct DesktopCanvasInitResult {
 enum DesktopHostRendererState {
     NoGpuBoot,
     GpuInitializing { _started_at: Instant },
-    GpuReady(Canvas),
+    GpuReady(Box<Canvas>),
     GpuFailed { _message: String },
 }
 
@@ -2499,7 +2511,7 @@ impl DesktopHostRendererState {
                     elapsed: started_at.elapsed(),
                 };
                 if event_loop_proxy
-                    .send_event(DesktopUserEvent::CanvasReady(result))
+                    .send_event(DesktopUserEvent::CanvasReady(Box::new(result)))
                     .is_err()
                 {
                     desktop_log::warn(format_args!(
@@ -2520,7 +2532,7 @@ impl DesktopHostRendererState {
 
     fn canvas_mut(&mut self) -> Option<&mut Canvas> {
         match self {
-            Self::GpuReady(canvas) => Some(canvas),
+            Self::GpuReady(canvas) => Some(canvas.as_mut()),
             Self::NoGpuBoot | Self::GpuInitializing { .. } | Self::GpuFailed { .. } => None,
         }
     }
@@ -6157,6 +6169,15 @@ impl DesktopApp {
         }
     }
 
+    fn set_reasoning_effort_via_active_session(&mut self, effort: String) -> anyhow::Result<()> {
+        match self {
+            Self::SingleSession(app) => app.set_reasoning_effort_via_active_session(effort),
+            Self::Workspace(_) => {
+                anyhow::bail!("reasoning effort changes require single-session mode")
+            }
+        }
+    }
+
     fn set_single_session_handle(&mut self, handle: session_launch::DesktopSessionHandle) {
         if let Self::SingleSession(app) = self {
             app.set_session_handle(handle);
@@ -7588,13 +7609,14 @@ struct DesktopFrameContext {
     primitive_geometry_cache_hit: bool,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct DesktopRenderFrameResult {
     animation_active: bool,
     content_ready: bool,
     frame_wall: Duration,
     frame_cpu: Duration,
     context: DesktopFrameContext,
+    stages: Vec<DesktopFrameStageProfile>,
 }
 
 #[derive(Clone)]
@@ -7817,6 +7839,10 @@ impl DesktopInteractionLatencyProfiler {
                 "text_area_count": frame.context.text_area_count,
                 "primitive_vertices": frame.context.primitive_vertices,
                 "text_prepared": frame.context.text_prepared,
+                "stages": frame.stages.iter().map(|stage| serde_json::json!({
+                    "name": stage.name,
+                    "ms": duration_ms(stage.duration),
+                })).collect::<Vec<_>>(),
             })
         );
     }
@@ -8158,6 +8184,9 @@ fn single_session_streaming_primitive_geometry_cache_key(
     spinner_tick: u64,
     smooth_scroll_lines: f32,
     welcome_hero_reveal_progress: f32,
+    tool_motion_cache_key: u64,
+    transcript_motion_cache_key: u64,
+    scrollbar_motion_cache_key: u64,
     body_key: Option<u64>,
     body_line_count: usize,
 ) -> Option<u64> {
@@ -8182,6 +8211,9 @@ fn single_session_streaming_primitive_geometry_cache_key(
     smooth_scroll_lines.to_bits().hash(&mut hasher);
     focus_pulse.to_bits().hash(&mut hasher);
     welcome_hero_reveal_progress.to_bits().hash(&mut hasher);
+    tool_motion_cache_key.hash(&mut hasher);
+    transcript_motion_cache_key.hash(&mut hasher);
+    scrollbar_motion_cache_key.hash(&mut hasher);
     spinner_tick.hash(&mut hasher);
     app.is_processing.hash(&mut hasher);
     app.status.hash(&mut hasher);
@@ -8220,8 +8252,13 @@ struct Canvas {
     surface_zero_sized: bool,
     viewport_animation: AnimatedViewport,
     surface_transitions: SurfaceTransitionAnimator,
+    workspace_surface_exit_cache: HashMap<u64, workspace::Surface>,
     focus_pulse: FocusPulse,
     status_color_transition: ColorTransition,
+    inline_widget_selection_motion: InlineWidgetSelectionMotionRegistry,
+    transcript_card_motion: TranscriptCardMotionRegistry,
+    tool_card_motion: ToolCardMotionRegistry,
+    single_session_scrollbar_motion: SingleSessionScrollbarMotionRegistry,
     primitive_vertex_buffer: Option<wgpu::Buffer>,
     primitive_vertex_capacity: usize,
     primitive_vertices_cache_key: Option<u64>,
@@ -8335,8 +8372,13 @@ impl Canvas {
             surface_zero_sized: !desktop_surface_size_is_renderable(initial_window_size),
             viewport_animation: AnimatedViewport::default(),
             surface_transitions: SurfaceTransitionAnimator::default(),
+            workspace_surface_exit_cache: HashMap::new(),
             focus_pulse: FocusPulse::default(),
             status_color_transition: ColorTransition::default(),
+            inline_widget_selection_motion: InlineWidgetSelectionMotionRegistry::default(),
+            transcript_card_motion: TranscriptCardMotionRegistry::default(),
+            tool_card_motion: ToolCardMotionRegistry::default(),
+            single_session_scrollbar_motion: SingleSessionScrollbarMotionRegistry::default(),
             primitive_vertex_buffer: None,
             primitive_vertex_capacity: 0,
             primitive_vertices_cache_key: None,
@@ -9007,6 +9049,7 @@ impl Canvas {
             text_prepared: false,
             primitive_geometry_cache_hit: false,
         };
+        let stages = frame_profile.stages.clone();
         self.frame_profiler.observe(frame_profile, context);
         Ok(DesktopRenderFrameResult {
             animation_active: true,
@@ -9014,6 +9057,7 @@ impl Canvas {
             frame_wall,
             frame_cpu,
             context,
+            stages,
         })
     }
 
@@ -9098,6 +9142,7 @@ impl Canvas {
             text_prepared: false,
             primitive_geometry_cache_hit: false,
         };
+        let stages = frame_profile.stages.clone();
         self.frame_profiler.observe(frame_profile, context);
         Ok(DesktopRenderFrameResult {
             animation_active: scene.metadata.animation_active,
@@ -9105,6 +9150,7 @@ impl Canvas {
             frame_wall,
             frame_cpu,
             context,
+            stages,
         })
     }
 
@@ -9157,6 +9203,11 @@ impl Canvas {
                 self.surface_transitions.frame(surface_targets, now),
                 self.surface_transitions.is_animating(),
             );
+            update_workspace_surface_exit_cache(
+                &mut self.workspace_surface_exit_cache,
+                workspace,
+                &surface_frames,
+            );
             let status_color = self
                 .status_color_transition
                 .frame(workspace_status_bar_target_color(workspace), now);
@@ -9167,6 +9218,7 @@ impl Canvas {
             )
         } else {
             self.surface_transitions.clear();
+            self.workspace_surface_exit_cache.clear();
             self.status_color_transition.clear();
             (None, None, None)
         };
@@ -9191,7 +9243,9 @@ impl Canvas {
             let (rendered_body_key, rendered_body_changed) =
                 self.cached_single_session_body_lines(single_session, spinner_tick);
             single_session_rendered_body_key = Some(rendered_body_key);
+            frame_profile.checkpoint("body_lines_cache");
             self.ensure_font_system();
+            frame_profile.checkpoint("font_system");
             self.refresh_cached_single_session_text_buffers(
                 single_session,
                 now,
@@ -9199,10 +9253,12 @@ impl Canvas {
                 rendered_body_key,
                 rendered_body_changed,
             );
+            frame_profile.checkpoint("text_buffers_cache");
         } else {
             self.single_session_text_cache_key = None;
             self.single_session_text_key = None;
             self.single_session_text_buffers.clear();
+            self.tool_card_motion.clear();
             self.single_session_streaming_text_key = None;
             self.single_session_streaming_text_start_line = None;
             self.single_session_streaming_text_end_line = None;
@@ -9420,8 +9476,40 @@ impl Canvas {
         let (mut vertices, animation_active): (Cow<'_, [Vertex]>, bool) = match app {
             DesktopApp::SingleSession(single_session) => {
                 let focus_pulse = self.focus_pulse.frame(1, now);
+                let inline_selection_motion = self
+                    .inline_widget_selection_motion
+                    .frame(single_session, now);
+                let tool_motion_lines = single_session_viewport
+                    .as_ref()
+                    .map(|viewport| viewport.lines.as_slice())
+                    .unwrap_or(self.single_session_body_lines.as_slice());
+                let transcript_line_height = {
+                    let typography =
+                        single_session_typography_for_scale(single_session.text_scale());
+                    typography.body_size * typography.body_line_height
+                };
+                let transcript_motion = self.transcript_card_motion.frame(
+                    tool_motion_lines,
+                    transcript_line_height,
+                    now,
+                );
+                let tool_motion = self
+                    .tool_card_motion
+                    .frame(tool_motion_lines, now, spinner_tick);
+                let scrollbar_motion = self.single_session_scrollbar_motion.frame(
+                    single_session,
+                    self.size,
+                    self.single_session_body_lines.len(),
+                    smooth_scroll_lines,
+                    now,
+                );
+                frame_profile.checkpoint("vertices_tool_motion");
                 let animation_active = self.focus_pulse.is_animating()
                     || single_session.has_background_work()
+                    || inline_selection_motion.is_active()
+                    || transcript_motion.is_active()
+                    || tool_motion.is_active()
+                    || scrollbar_motion.is_active()
                     || welcome_hero_reveal_active
                     || streaming_text_arrival_style.active;
                 let geometry_cache_key = single_session_streaming_primitive_geometry_cache_key(
@@ -9431,6 +9519,9 @@ impl Canvas {
                     spinner_tick,
                     smooth_scroll_lines,
                     welcome_hero_reveal_progress,
+                    tool_motion.cache_key(),
+                    transcript_motion.cache_key(),
+                    scrollbar_motion.cache_key(),
                     single_session_rendered_body_key,
                     self.single_session_body_lines.len(),
                 );
@@ -9439,7 +9530,28 @@ impl Canvas {
                         primitive_geometry_cache_hit = true;
                         Cow::Borrowed(self.primitive_vertices_cache.as_slice())
                     } else {
-                        let vertices = build_single_session_vertices_with_cached_body(
+                        let vertices =
+                            build_single_session_vertices_with_cached_body_and_tool_motion(
+                                single_session,
+                                self.size,
+                                focus_pulse,
+                                spinner_tick,
+                                smooth_scroll_lines,
+                                welcome_hero_reveal_progress,
+                                &self.single_session_body_lines,
+                                Some(&inline_selection_motion),
+                                Some(&transcript_motion),
+                                &tool_motion,
+                                Some(&scrollbar_motion),
+                            );
+                        self.primitive_vertices_cache_key = Some(cache_key);
+                        self.primitive_vertices_cache = vertices;
+                        Cow::Borrowed(self.primitive_vertices_cache.as_slice())
+                    }
+                } else {
+                    self.primitive_vertices_cache_key = None;
+                    Cow::Owned(
+                        build_single_session_vertices_with_cached_body_and_tool_motion(
                             single_session,
                             self.size,
                             focus_pulse,
@@ -9447,26 +9559,20 @@ impl Canvas {
                             smooth_scroll_lines,
                             welcome_hero_reveal_progress,
                             &self.single_session_body_lines,
-                        );
-                        self.primitive_vertices_cache_key = Some(cache_key);
-                        self.primitive_vertices_cache = vertices;
-                        Cow::Borrowed(self.primitive_vertices_cache.as_slice())
-                    }
-                } else {
-                    self.primitive_vertices_cache_key = None;
-                    Cow::Owned(build_single_session_vertices_with_cached_body(
-                        single_session,
-                        self.size,
-                        focus_pulse,
-                        spinner_tick,
-                        smooth_scroll_lines,
-                        welcome_hero_reveal_progress,
-                        &self.single_session_body_lines,
-                    ))
+                            Some(&inline_selection_motion),
+                            Some(&transcript_motion),
+                            &tool_motion,
+                            Some(&scrollbar_motion),
+                        ),
+                    )
                 };
+                frame_profile.checkpoint("vertices_geometry");
                 (vertices, animation_active)
             }
             DesktopApp::Workspace(workspace) => {
+                self.inline_widget_selection_motion.clear();
+                self.transcript_card_motion.clear();
+                self.single_session_scrollbar_motion.clear();
                 self.primitive_vertices_cache_key = None;
                 let render_layout = workspace_render_layout_for_frame
                     .unwrap_or_else(|| workspace_render_layout(workspace, self.size, monitor_size));
@@ -9485,15 +9591,19 @@ impl Canvas {
                 let status_color = workspace_status_color_for_frame
                     .unwrap_or_else(|| workspace_status_bar_target_color(workspace));
                 build_vertices_into(
-                    workspace,
-                    self.size,
-                    render_layout,
-                    focus_pulse,
-                    workspace_space_hold_progress,
-                    workspace_surface_frames_for_frame.as_ref(),
-                    status_color,
+                    WorkspaceVertexBuildParams {
+                        workspace,
+                        size: self.size,
+                        render_layout,
+                        focus_pulse,
+                        space_hold_progress: workspace_space_hold_progress,
+                        surface_frames: workspace_surface_frames_for_frame.as_ref(),
+                        exiting_surfaces: &self.workspace_surface_exit_cache,
+                        status_color,
+                    },
                     &mut self.primitive_workspace_vertices,
                 );
+                frame_profile.checkpoint("vertices_geometry");
                 (
                     Cow::Borrowed(self.primitive_workspace_vertices.as_slice()),
                     animation_active,
@@ -9658,6 +9768,7 @@ impl Canvas {
             text_prepared,
             primitive_geometry_cache_hit,
         };
+        let stages = frame_profile.stages.clone();
         self.frame_profiler.observe(frame_profile, context);
         Ok(DesktopRenderFrameResult {
             animation_active: animation_active
@@ -9667,6 +9778,7 @@ impl Canvas {
             frame_wall,
             frame_cpu,
             context,
+            stages,
         })
     }
 }
@@ -10514,13 +10626,16 @@ fn build_vertices(
 ) -> Vec<Vertex> {
     let mut vertices = Vec::with_capacity(workspace_vertex_capacity_hint(workspace));
     build_vertices_into(
-        workspace,
-        size,
-        render_layout,
-        focus_pulse,
-        space_hold_progress,
-        None,
-        workspace_status_bar_target_color(workspace),
+        WorkspaceVertexBuildParams {
+            workspace,
+            size,
+            render_layout,
+            focus_pulse,
+            space_hold_progress,
+            surface_frames: None,
+            exiting_surfaces: &HashMap::new(),
+            status_color: workspace_status_bar_target_color(workspace),
+        },
         &mut vertices,
     );
     vertices
@@ -10565,6 +10680,28 @@ impl WorkspaceSurfaceTransitionFrames {
             .copied()
             .find(|frame| frame.id == surface_id)
     }
+
+    fn exiting_frames(&self) -> impl Iterator<Item = SurfaceVisualFrame> + '_ {
+        self.frames.iter().copied().filter(|frame| frame.exiting)
+    }
+}
+
+fn update_workspace_surface_exit_cache(
+    cache: &mut HashMap<u64, workspace::Surface>,
+    workspace: &Workspace,
+    surface_frames: &WorkspaceSurfaceTransitionFrames,
+) {
+    for surface in &workspace.surfaces {
+        cache.insert(surface.id, surface.clone());
+    }
+
+    cache.retain(|surface_id, _| {
+        workspace
+            .surfaces
+            .iter()
+            .any(|surface| surface.id == *surface_id)
+            || surface_frames.frame_for_surface(*surface_id).is_some()
+    });
 }
 
 fn workspace_transitioned_surface_rect(
@@ -10890,16 +11027,28 @@ fn offset_text_bound(value: i32, offset: f32) -> i32 {
         .clamp(i32::MIN as f32, i32::MAX as f32) as i32
 }
 
-fn build_vertices_into(
-    workspace: &Workspace,
+struct WorkspaceVertexBuildParams<'a> {
+    workspace: &'a Workspace,
     size: PhysicalSize<u32>,
     render_layout: WorkspaceRenderLayout,
     focus_pulse: f32,
     space_hold_progress: Option<f32>,
-    surface_frames: Option<&WorkspaceSurfaceTransitionFrames>,
+    surface_frames: Option<&'a WorkspaceSurfaceTransitionFrames>,
+    exiting_surfaces: &'a HashMap<u64, workspace::Surface>,
     status_color: [f32; 4],
-    vertices: &mut Vec<Vertex>,
-) {
+}
+
+fn build_vertices_into(params: WorkspaceVertexBuildParams<'_>, vertices: &mut Vec<Vertex>) {
+    let WorkspaceVertexBuildParams {
+        workspace,
+        size,
+        render_layout,
+        focus_pulse,
+        space_hold_progress,
+        surface_frames,
+        exiting_surfaces,
+        status_color,
+    } = params;
     vertices.clear();
     let width = size.width as f32;
     let height = size.height as f32;
@@ -10980,6 +11129,7 @@ fn build_vertices_into(
         if let Some(progress) = space_hold_progress {
             push_space_hold_progress(vertices, progress, size);
         }
+        push_workspace_exiting_surfaces(vertices, surface_frames, exiting_surfaces, size);
         return;
     }
 
@@ -11019,8 +11169,32 @@ fn build_vertices_into(
         },
     );
 
+    push_workspace_exiting_surfaces(vertices, surface_frames, exiting_surfaces, size);
+
     if let Some(progress) = space_hold_progress {
         push_space_hold_progress(vertices, progress, size);
+    }
+}
+
+fn push_workspace_exiting_surfaces(
+    vertices: &mut Vec<Vertex>,
+    surface_frames: Option<&WorkspaceSurfaceTransitionFrames>,
+    exiting_surfaces: &HashMap<u64, workspace::Surface>,
+    size: PhysicalSize<u32>,
+) {
+    let Some(surface_frames) = surface_frames else {
+        return;
+    };
+
+    for frame in surface_frames.exiting_frames() {
+        let Some(surface) = exiting_surfaces.get(&frame.id) else {
+            continue;
+        };
+        let rect = rect_from_animated_rect(frame.visual_rect());
+        let start_index = vertices.len();
+        push_surface(vertices, rect, surface.color_index, false, 0.0, size);
+        push_panel_contents(vertices, surface, rect, size, false, 0, None);
+        multiply_vertex_alpha(&mut vertices[start_index..], frame.opacity);
     }
 }
 
