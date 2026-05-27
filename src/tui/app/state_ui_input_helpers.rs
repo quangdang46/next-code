@@ -358,7 +358,7 @@ fn parse_quoted_token(input: &str, start: usize, cursor: usize) -> Option<AtToke
     if cursor > token_end {
         return None;
     }
-    let inner_end = if closed { end } else { end };
+    let inner_end = end;
     Some(AtTokenMatch {
         query: &input[inner_start..inner_end],
         start,

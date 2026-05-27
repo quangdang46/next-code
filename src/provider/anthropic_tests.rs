@@ -275,6 +275,7 @@ fn test_anthropic_signed_thinking_replayed_in_request_blocks() {
 
 #[tokio::test]
 #[ignore = "live smoke: requires ANTHROPIC_API_KEY, or set JCODE_LIVE_ANTHROPIC_ALLOW_OAUTH=1 to use Claude OAuth credentials"]
+#[allow(clippy::await_holding_lock)]
 async fn live_anthropic_reasoning_smoke() -> Result<()> {
     let _env_lock = crate::storage::lock_test_env();
     let using_api_key = std::env::var_os("ANTHROPIC_API_KEY").is_some();
