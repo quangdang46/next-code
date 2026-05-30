@@ -258,6 +258,12 @@ pub(crate) struct Args {
     #[arg(long = "permission-mode", global = true, value_enum)]
     pub(crate) permission_mode: Option<PermissionModeArg>,
 
+    /// Skip all permission prompts (alias for `--permission-mode bypass-permissions`).
+    /// This is the Claude Code compatibility flag. When both this flag and
+    /// `--permission-mode` are set, the explicit `--permission-mode` wins.
+    #[arg(long = "dangerously-skip-permissions", global = true)]
+    pub(crate) dangerously_skip_permissions: bool,
+
     #[command(subcommand)]
     pub(crate) command: Option<Command>,
 }
