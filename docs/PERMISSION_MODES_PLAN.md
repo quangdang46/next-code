@@ -12,14 +12,15 @@
 |-------|----------|--------|
 | **Scope** | Match Claude Code — full 6-mode pipeline | Round 1 QA |
 | **Modes** | All 6: Default, Plan, AcceptEdits, DontAsk, Auto, BypassPermissions | Round 1 QA |
-| **Auto/YOLO classifier** | Yes, LLM-based (provider TBD, discuss further to keep dcg clean) | Round 1 QA |
+| **Auto/YOLO classifier** | Yes, LLM-based — **built in jcode only** (NOT dcg-core) | Round 1 QA + Discussion |
 | **Denial tracking** | Yes, match Claude Code: 3 consecutive / 20 total → fallback to prompt | Round 2 QA |
 | **Dangerous patterns** | Build in dcg-core, not jcode. Reduce jcode code by leveraging dcg | Round 2 QA |
 | **Safe command whitelist** | Yes, full whitelist (~50 commands like codex readOnlyCommandValidation) | Round 2 QA |
 | **Mode cycling** | Yes, full Shift+Tab cycle in TUI (6 modes) | Round 2 QA |
 | **Where to build missing features** | Build in dcg-core (keep clean, reusable, not jcode-specific) | Round 3 QA |
 | **OS sandboxing** | No, app-level only for now | Round 3 QA |
-| **YOLO LLM provider** | Needs further discussion — avoid making dcg dirty with jcode-specific logic | Round 3 QA |
+| **YOLO: why NOT in dcg-core** | dcg consumers use dcg as CLI hook (exit codes), not Rust library. Only jcode links dcg-core. A Rust trait in dcg-core is useless for TS/Go consumers. YOLO is consumer-specific. | Discussion |
+| **YOLO: where to build** | `src/yolo_classifier.rs` in jcode. Uses active LLM provider (Claude/Gemini/OpenAI). When Mode::Auto active, dcg_bridge asks YOLO before engine. | Discussion |
 | **Protected paths** | Claude Code defaults: ~/.ssh, ~/.aws, ~/.config/gh, .git, .env | Round 3 QA |
 | **Pack rules** | Yes, Phase 2 in dcg-core — integrate dcg-cli's 50+ security packs | Round 3 QA |
 | **Config format** | TOML (match dcg ecosystem) | Round 3 QA |
@@ -28,6 +29,7 @@
 | **Path-aware escalation** | Edit .env/secrets/ → auto escalate even in AcceptEdits mode | Discussion |
 | **Consumer-agnostic** | dcg-core exports generic Mode enum, each consumer maps own CLI flags | Discussion |
 | **Bypass safety net** | BypassPermissions should have iteration cap + audit log | Discussion |
+| **slb relationship** | SLB = two-person rule (peer review), complementary to dcg. No YOLO, no LLM, no Rust, Go-only, no library export. Not relevant for YOLO implementation. | Discussion |
 
 ---
 
@@ -40,11 +42,20 @@
 │  CLI flags: --permission-mode, --dangerously-skip-permissions   │
 │  Config: .jcode/config.toml (TOML → maps to dcg types)         │
 │  TUI: mode cycling (Shift+Tab), permission dialogs              │
-│  YOLO: implements dcg-core trait, injects active LLM provider  │
 │                                                                 │
+│  ┌───────────── yolo_classifier.rs (jcode-only) ──────────┐    │
+│  │  Uses active LLM provider (Claude/Gemini/OpenAI)        │    │
+│  │  Feeds transcript + command → get allow/deny            │    │
+│  │  Denial limits: 3 consecutive → fallback to prompt     │    │
+│  │  Only active when Mode::Auto is set                     │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                          │                                      │
 │  ┌─────────────────── dcg_bridge.rs ───────────────────────┐    │
 │  │  action_to_tool_call() → ToolCall + Effects             │    │
-│  │  classify() → Engine::evaluate() → BridgeDecision       │    │
+│  │  classify():                                            │    │
+│  │    if Mode::Auto → ask YOLO first                       │    │
+│  │    else → Engine::evaluate() directly                   │    │
+│  │    → BridgeDecision (Allow/Prompt/Deny)                 │    │
 │  │  set_mode() / current_mode()                            │    │
 │  └─────────────────────────────────────────────────────────┘    │
 │                          │                                      │
@@ -60,9 +71,12 @@
 │    ├─► [Phase 2] Pack rule evaluation (50+ security packs)     │
 │    ├─► Dangerous command patterns (26-50 regex)                 │
 │    ├─► Safe command whitelist (~50 read-only commands)          │
-│    ├─► [Phase 2] YOLO classifier trait (consumer implements)   │
 │    ├─► Denial escalation (3 consecutive / 20 total)            │
 │    └─► Decision: Allow / Prompt{reason,alternatives} / Deny   │
+│                                                                 │
+│  ❌ NO YOLO — YOLO is consumer-specific, built in jcode only    │
+│  ❌ NO LLM — dcg-core is pure rule-based engine                 │
+│  ❌ NO provider knowledge — consumer maps own CLI flags          │
 │                                                                 │
 │  Already has (v0.6.0-rc.1):                                     │
 │    Mode (6 variants + pre_check)                                │
@@ -79,7 +93,6 @@
 │    DenialEscalation (consecutive + total tracking)              │
 │    PathAwareEscalation (.env/secrets → auto Prompt)             │
 │    StrictMode (one-way tightening, cannot weaken)               │
-│    YoloClassifier trait (interface for consumer LLM)            │
 │    PackRuleEngine (from dcg-cli, Aho-Corasick matching)        │
 │    PerToolOverrides (TOML: allow/deny/prompt per tool pattern)  │
 │    NetworkPolicy (host allowlist/denylist)                      │
@@ -294,42 +307,11 @@ CLI flag > env var > project .jcode/config.toml > user ~/.jcode/config.toml > En
 - 20+ pack categories (core, database, cloud, kubernetes, containers, system...)
 - Allowlist system (project `.dcg/allowlist.toml`, user, system)
 
-#### 2.8 YOLO Classifier Trait [P2]
+#### 2.8 Network Policy [P3]
 
-**What:** Define trait interface in dcg-core, consumer implements with chosen LLM.
+**What:** Host allowlist/denylist for network calls.
 
-**Trait design (keep dcg clean):**
-```rust
-pub trait YoloClassifier: Send + Sync {
-    /// Classify whether a tool call should be auto-approved.
-    /// Returns None if classifier cannot determine (fallback to mode default).
-    fn classify(
-        &self,
-        session: &Session,
-        tool_call: &ToolCall,
-        effects: &[Effect],
-        mode: Mode,
-    ) -> Option<Result<YoloDecision, YoloError>>;
-}
-
-pub enum YoloDecision {
-    Allow,
-    Deny { reason: String },
-}
-
-pub enum YoloError {
-    Timeout,
-    ClassifierUnavailable,
-    TranscriptTooLong,
-}
-```
-
-**Consumer (jcode) implements:**
-- Uses active provider (Claude/Gemini/OpenAI) as subagent
-- Respects denial limits — 3 consecutive YOLO denials → fallback to interactive
-- Configurable model (fast: haiku, thorough: opus)
-
-**Open question:** Exact LLM provider strategy — reuse active vs dedicated cheap model? Need more discussion to keep dcg clean.
+**Future consideration** — not blocking for permission modes MVP.
 
 ---
 
@@ -391,14 +373,40 @@ CLI --permission-mode > JCODE_PERMISSION_MODE env > .jcode/config.toml > ~/.jcod
 
 #### 3.4 YOLO Classifier Implementation [P2]
 
-**What:** Implement `dcg_core::YoloClassifier` trait in jcode.
+**What:** Build YOLO auto-approval classifier in jcode. Uses active LLM provider to classify commands as safe/unsafe.
+
+**Why in jcode, NOT dcg-core:**
+- dcg consumers (Claude Code, Codex, Gemini) use dcg as CLI hook (exit codes), not Rust library
+- Only jcode links dcg-core as Cargo dependency — a Rust trait would be useless for TS/Go consumers
+- YOLO needs LLM integration — consumer-specific (each agent uses different provider)
+- Keeps dcg-core clean: pure rule-based engine, no LLM knowledge
 
 **Implementation:**
-- Create `src/yolo_classifier.rs`
+- Create `src/yolo_classifier.rs` — standalone module, no dcg-core trait dependency
 - Use active provider's chat completion API as subagent
 - Send transcript + action → get allow/deny decision
-- Respect denial limits (3 consecutive → stop calling YOLO, show prompt)
+- Respect denial limits (3 consecutive YOLO denials → stop calling YOLO, show interactive prompt)
 - Two-stage: fast check (small model) → thinking check (large model) if uncertain
+
+**Wiring in dcg_bridge:**
+```rust
+pub fn classify(action: &str) -> BridgeDecision {
+    let mode = current_mode();
+    if mode == Mode::Auto {
+        // Ask YOLO first (jcode-side)
+        match crate::yolo_classifier::classify(action) {
+            Some(YoloDecision::Allow) => return BridgeDecision::Allow,
+            Some(YoloDecision::Deny) => {
+                // Track denial, fallback to prompt if limit hit
+                return handle_yolo_deny(action);
+            }
+            None => {} // Classifier unavailable → fall through to engine
+        }
+    }
+    // All other modes → delegate to dcg-core engine
+    classify_via_dcg(action, mode)
+}
+```
 
 #### 3.5 Subagent Permission Restriction [P2]
 
@@ -435,10 +443,9 @@ Phase 3.3 Config Loading
     ▼
 Phase 2.6 Per-Tool Overrides (TOML) ──┐
 Phase 2.7 Pack Rule Integration ──────┤ (dcg-core, can run in parallel)
-Phase 2.8 YOLO Classifier Trait ──────┘
+Phase 3.4 YOLO Classifier (jcode) ────┘ ← jcode-only, NOT dcg-core
     │
     ▼
-Phase 3.4 YOLO Implementation
 Phase 3.5 Subagent Permissions
     │
     ▼
@@ -451,7 +458,7 @@ Phase 4 — MCP Permissions (future)
 
 | # | Question | Why it matters | Options |
 |---|----------|----------------|---------|
-| 1 | **YOLO classifier: trait in dcg-core vs all in jcode?** | Affects dcg-core's dependency surface. If dcg-core defines trait, it stays clean (no LLM dep). If jcode builds it, dcg-core stays minimal. | (a) Trait in dcg-core (Recommended) — dcg-core has `YoloClassifier` trait, jcode implements<br>(b) All in jcode — dcg-core only has mode enum, jcode handles YOLO<br>(c) Separate `dcg-yolo` crate — shared between consumers |
+| ~~1~~ | ~~YOLO: trait in dcg-core vs jcode?~~ | ~~RESOLVED~~ | ✅ **YOLO in jcode only.** dcg consumers use CLI hooks (exit codes), not Rust library. Only jcode links dcg-core. A Rust trait in dcg-core is useless for TS/Go consumers. YOLO needs LLM — consumer-specific. |
 | 2 | **YOLO: which LLM provider?** | Affects cost, latency, quality. | (a) Reuse active provider (zero extra cost)<br>(b) Dedicated cheap model (haiku/gpt-4o-mini)<br>(c) Configurable per-user |
 | 3 | **MCP permissions: unified or separate?** | MCP tools are dynamic (not known at startup). Different from builtin tools. | (a) Unified pipeline — MCP tools go through same Engine::evaluate<br>(b) Separate system — MCP has own allow/deny config<br>(c) Phase 4 — defer |
 | 4 | **Sandboxing future?** | App-level only for now, but codex proves OS-level is the gold standard. | (a) Phase 5 — bubblewrap (Linux) + Seatbelt (macOS)<>(b) Never — rely on app-level + user consent<br>(c) Container-based (Docker/Podman wrapper) |
