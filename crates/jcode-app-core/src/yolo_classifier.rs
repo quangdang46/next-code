@@ -107,6 +107,7 @@ enum Stage1Decision {
 }
 
 /// Stage 2 structured response.
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 struct Stage2Response {
     risk_level: String,
