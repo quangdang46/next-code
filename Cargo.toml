@@ -128,6 +128,12 @@ toml = "0.8"
 # CLI
 clap = { version = "4", features = ["derive"] }
 
+# Permission modes (Plan / AcceptEdits / BypassPermissions / DontAsk).
+# Git dep from the DCG repo (not crates.io, not local path).
+# v0.6.0-rc.1 ships the Mode + Effect + Engine + Session API;
+# pack-rule evaluation lands in Phase 2.
+dcg-core = { git = "https://github.com/quangdang46/destructive_command_guard", branch = "main" }
+
 # File operations
 glob = "0.3"
 ignore = "0.4"           # gitignore-aware file walking

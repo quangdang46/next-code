@@ -1704,231 +1704,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 
 [[package]]
-name = "dcp-compress"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
+name = "dcg-core"
+version = "0.6.0-rc.1"
+source = "git+https://github.com/quangdang46/destructive_command_guard?branch=main#bf314efba76209464baa2eaafacdf82c1e5f88e6"
 dependencies = [
- "dcp-protected",
- "dcp-state",
- "dcp-traits",
- "dcp-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-config"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-compress",
- "dcp-nudges",
- "dcp-prompts",
- "dcp-protected",
- "dcp-prune",
- "dcp-state",
- "dcp-types",
- "dirs",
- "json5 0.4.1",
- "schemars",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-core"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
+ "aho-corasick",
  "chrono",
- "dcp-compress",
- "dcp-config",
- "dcp-messages",
- "dcp-notification",
- "dcp-nudges",
- "dcp-permissions",
- "dcp-prompts",
- "dcp-protected",
- "dcp-prune",
- "dcp-state",
- "dcp-storage",
- "dcp-telemetry",
- "dcp-tokens",
- "dcp-traits",
- "dcp-types",
- "lazy_static",
+ "dirs 6.0.0",
+ "fancy-regex 0.18.0",
+ "memchr",
  "regex",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-messages"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "anyhow",
- "dcp-config",
- "dcp-prompts",
- "dcp-protected",
- "dcp-state",
- "dcp-tokens",
- "dcp-traits",
- "dcp-types",
- "regex",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-notification"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "anyhow",
- "dcp-compress",
- "dcp-config",
- "dcp-state",
- "dcp-tokens",
- "dcp-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-nudges"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-prompts",
- "dcp-state",
- "dcp-traits",
- "dcp-types",
- "lazy_static",
- "regex",
- "serde",
-]
-
-[[package]]
-name = "dcp-permissions"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "dcp-config",
- "dcp-state",
- "dcp-types",
- "regex",
-]
-
-[[package]]
-name = "dcp-prompts"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "serde",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-protected"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-traits",
- "dcp-types",
- "globset",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-prune"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-protected",
- "dcp-state",
- "dcp-traits",
- "dcp-types",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "dcp-state"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "chrono",
- "dcp-traits",
- "dcp-types",
- "once_cell",
- "regex",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-storage"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-traits",
- "dcp-types",
- "dirs",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-telemetry"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-traits",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "dcp-tokens"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-traits",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-traits"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-types",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "dcp-types"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
+ "sha2 0.11.0",
+ "smallvec",
 ]
 
 [[package]]
@@ -2050,7 +1839,16 @@ version = "5.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44c45a9d03d6676652bcb5e724c7e988de1acad23a711b5217ab9cbecbec2225"
 dependencies = [
- "dirs-sys",
+ "dirs-sys 0.4.1",
+]
+
+[[package]]
+name = "dirs"
+version = "6.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3e8aa94d75141228480295a7d0e7feb620b1a5ad9f12bc40be62411e38cce4e"
+dependencies = [
+ "dirs-sys 0.5.0",
 ]
 
 [[package]]
@@ -2061,8 +1859,20 @@ checksum = "520f05a5cbd335fae5a99ff7a6ab8627577660ee5cfd6a94a6a929b52ff0321c"
 dependencies = [
  "libc",
  "option-ext",
- "redox_users",
+ "redox_users 0.4.6",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "dirs-sys"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e01a3366d27ee9890022452ee61b2b63a67e6f13f58900b651ff5665f0bb1fab"
+dependencies = [
+ "libc",
+ "option-ext",
+ "redox_users 0.5.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2148,21 +1958,6 @@ name = "dyn-hash"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "15401da73a9ed8c80e3b2d4dc05fe10e7b72d7243b9f614e516a44fa99986e88"
-
-[[package]]
-name = "dynamic_context_pruning"
-version = "0.1.0"
-source = "git+https://github.com/quangdang46/dynamic_context_pruning?branch=main#5bf0196bfdbd6b9aa57d9975d959ef6f77f4d30b"
-dependencies = [
- "dcp-config",
- "dcp-core",
- "dcp-prompts",
- "dcp-storage",
- "dcp-telemetry",
- "dcp-tokens",
- "dcp-traits",
- "dcp-types",
-]
 
 [[package]]
 name = "ecdsa"
@@ -2326,6 +2121,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "fancy-regex"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1e1dacd0d2082dfcf1351c4bdd566bbe89a2b263235a2b50058f1e130a47277"
+dependencies = [
+ "bit-set 0.8.0",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
 name = "fast-srgb8"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2417,7 +2223,7 @@ dependencies = [
  "bindet",
  "blake3",
  "chrono",
- "dirs",
+ "dirs 5.0.1",
  "dunce",
  "fff-notify-debouncer-full",
  "ffs-grep",
@@ -3795,7 +3601,8 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm",
- "dirs",
+ "dcg-core",
+ "dirs 5.0.1",
  "ffs-search",
  "flate2",
  "futures",
@@ -3925,8 +3732,8 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm",
- "dirs",
- "dynamic_context_pruning",
+ "dcg-core",
+ "dirs 5.0.1",
  "flate2",
  "futures",
  "glob",
@@ -4057,7 +3864,8 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm",
- "dirs",
+ "dcg-core",
+ "dirs 5.0.1",
  "flate2",
  "futures",
  "glob",
@@ -4405,7 +4213,7 @@ dependencies = [
 name = "jcode-provider-openrouter"
 version = "0.1.0"
 dependencies = [
- "dirs",
+ "dirs 5.0.1",
  "serde",
  "serde_json",
 ]
@@ -4440,7 +4248,7 @@ name = "jcode-storage"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "dirs",
+ "dirs 5.0.1",
  "jcode-core",
  "libc",
  "rand 0.9.3",
@@ -4478,7 +4286,7 @@ name = "jcode-terminal-launch"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "dirs",
+ "dirs 5.0.1",
 ]
 
 [[package]]
@@ -4512,7 +4320,8 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "crossterm",
- "dirs",
+ "dcg-core",
+ "dirs 5.0.1",
  "ffs-search",
  "futures",
  "global-hotkey",
@@ -4591,7 +4400,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "crossterm",
- "dirs",
+ "dirs 5.0.1",
  "image",
  "jcode-tui-workspace",
  "mermaid-rs-renderer",
@@ -4741,17 +4550,6 @@ checksum = "464a3709c7f55f1f721e5389aa6ea4e3bc6aba669353300af094b29ffbdde1d8"
 dependencies = [
  "once_cell",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "json5"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96b0db21af676c1ce64250b5f40f3ce2cf27e4e47cb91ed91eb6fe9350b430c1"
-dependencies = [
- "pest",
- "pest_derive",
- "serde",
 ]
 
 [[package]]
@@ -5235,7 +5033,7 @@ dependencies = [
  "anyhow",
  "clap",
  "fontdb 0.23.0",
- "json5 1.3.1",
+ "json5",
  "once_cell",
  "regex",
  "resvg",
@@ -6785,6 +6583,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_users"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
+dependencies = [
+ "getrandom 0.2.16",
+ "libredox",
+ "thiserror 2.0.17",
+]
+
+[[package]]
 name = "ref-cast"
 version = "1.0.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6818,9 +6627,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.13"
+version = "0.4.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5276caf25ac86c8d810222b3dbb938e512c55c6831a10f3e6ed1c93b84041f1c"
+checksum = "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -7171,30 +6980,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "schemars"
-version = "0.8.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fbf2ae1b8bc8e02df939598064d22402220cd5bbcca1c76f7d6a310974d5615"
-dependencies = [
- "dyn-clone",
- "schemars_derive",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "schemars_derive"
-version = "0.8.22"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32e265784ad618884abaea0600a9adf15393368d840e0222d101a072f3f7534d"
-dependencies = [
- "proc-macro2",
- "quote",
- "serde_derive_internals",
- "syn 2.0.114",
-]
-
-[[package]]
 name = "scoped-tls"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7322,21 +7107,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_derive_internals"
-version = "0.29.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18d26a20a969b9e3fdf2fc2d9f21eda6c40e2de84c9408bb5d3b05d499aae711"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.114",
-]
-
-[[package]]
 name = "serde_json"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+checksum = "e8014e44b4736ed0538adeecded0fce2a272f22dc9578a7eb6b2d9993c74cfb9"
 dependencies = [
  "itoa",
  "memchr",

@@ -228,6 +228,23 @@ fn parse_and_prepare_args() -> Result<Args> {
         crate::env::set_var("JCODE_SANDBOX_ROOT", &canonical);
     }
 
+    // --permission-mode → dcg_bridge global mode. When unspecified we leave
+    // the default (`Mode::Default`, set by the bridge's LazyLock) untouched
+    // so behavior matches the legacy AUTO_ALLOWED-based classify.
+    //
+    // `--dangerously-skip-permissions` is the Claude Code compatibility alias
+    // for `--permission-mode bypass-permissions`. Explicit `--permission-mode`
+    // wins when both are set.
+    if let Some(mode) = args.permission_mode {
+        crate::dcg_bridge::set_mode(mode.into_dcg_mode());
+    } else if args.dangerously_skip_permissions {
+        crate::dcg_bridge::set_mode(dcg_core::Mode::BypassPermissions);
+    } else if let Ok(env_mode) = std::env::var("JCODE_PERMISSION_MODE") {
+        if let Some(mode) = dcg_core::Mode::parse(env_mode.trim()) {
+            crate::dcg_bridge::set_mode(mode);
+        }
+    }
+
     // JCODE_MODEL fallback: when --model is not passed on the CLI,
     // read JCODE_MODEL from the env so users can `export JCODE_MODEL=...`
     // in their shell profile and have it apply to every jcode invocation.
