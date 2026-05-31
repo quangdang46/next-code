@@ -151,17 +151,17 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
         // For Mode::Auto, non-legacy tools go through YOLO classifier.
         if mode == Mode::Auto {
             let (tool, effects) = action_to_tool_call(&lower);
-            let effect_strings: Vec<&str> = effects
+            let effect_strings: Vec<String> = effects
                 .iter()
                 .map(|e| match e {
-                    Effect::Read => "Read",
-                    Effect::Write => "Write",
-                    Effect::Spawn => "Spawn",
-                    Effect::Fs => "Fs",
-                    Effect::Irreversible => "Irreversible",
-                    Effect::Network => "Network",
-                    Effect::CredentialAccess => "CredentialAccess",
-                    Effect::PrivilegeEscalation => "PrivilegeEscalation",
+                    Effect::Read => "Read".to_string(),
+                    Effect::Write => "Write".to_string(),
+                    Effect::Spawn => "Spawn".to_string(),
+                    Effect::Fs => "Fs".to_string(),
+                    Effect::Irreversible => "Irreversible".to_string(),
+                    Effect::Network => "Network".to_string(),
+                    // CredentialAccess and PrivilegeEscalation are dcg-core Phase B
+                    other => format!("{:?}", other),
                 })
                 .collect();
 

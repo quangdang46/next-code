@@ -25,20 +25,18 @@
 //! [`YoloClassifier::reset_consecutive_denials()`] is called.
 
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, LazyLock, Mutex};
 
 use anyhow::Result;
 
 use crate::dcg_bridge::BridgeDecision;
 use crate::message::Message;
-use crate::provider::selection::ActiveProvider;
+use crate::provider::{MultiProvider, Provider};
 
 /// Global YOLO classifier instance used by `dcg_bridge` in Mode::Auto.
 /// Lazily initialized on first use.
-static YOLO_CLASSIFIER: std::sync::LazyLock<
-    std::sync::Mutex<Option<Arc<YoloClassifier>>>,
-> = std::sync::LazyLock::new(|| std::sync::Mutex::new(None));
+static YOLO_CLASSIFIER: LazyLock<Mutex<Option<Arc<YoloClassifier>>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 /// Maximum consecutive YOLO denials before circuit breaker trips.
 const CIRCUIT_BREAKER_THRESHOLD: u32 = 3;
@@ -80,7 +78,7 @@ Evaluate the action based on the provided context and command details.
 Respond with ONLY the JSON — no markdown, no explanation."#;
 
 /// Stage 2 user prompt template.
-fn stage2_user_prompt(action: &str, tool: &str, effects: &[&str]) -> String {
+fn stage2_user_prompt(action: &str, tool: &str, effects: &[String]) -> String {
     format!(
         r#"Action: {}
 Tool call type: {}
@@ -123,7 +121,7 @@ struct Stage2Response {
 /// a 2-stage approach for efficiency and a circuit breaker for safety.
 pub struct YoloClassifier {
     /// The multi-provider instance for making LLM calls.
-    provider: Arc<crate::provider::MultiProvider>,
+    provider: Arc<MultiProvider>,
     /// Consecutive denial counter for circuit breaker.
     consecutive_denials: AtomicU32,
     /// Whether the circuit breaker has tripped.
@@ -132,7 +130,7 @@ pub struct YoloClassifier {
 
 impl YoloClassifier {
     /// Create a new YoloClassifier with the given provider.
-    pub fn new(provider: Arc<crate::provider::MultiProvider>) -> Self {
+    pub fn new(provider: Arc<MultiProvider>) -> Self {
         Self {
             provider,
             consecutive_denials: AtomicU32::new(0),
@@ -150,9 +148,7 @@ impl YoloClassifier {
         }
 
         // Slow path: need to initialize
-        let classifier = Arc::new(YoloClassifier::new(Arc::new(
-            crate::provider::MultiProvider::new(),
-        )));
+        let classifier = Arc::new(YoloClassifier::new(Arc::new(MultiProvider::new())));
 
         if let Ok(mut guard) = YOLO_CLASSIFIER.lock() {
             if guard.is_none() {
@@ -169,8 +165,7 @@ impl YoloClassifier {
     pub fn reset_consecutive_denials(&self) {
         self.consecutive_denials
             .store(0, Ordering::SeqCst);
-        self.circuit_broken
-            .store(0, Ordering::SeqCst);
+        self.circuit_broken.store(0, Ordering::SeqCst);
     }
 
     /// Check if the circuit breaker has tripped.
@@ -182,8 +177,7 @@ impl YoloClassifier {
     fn record_denial(&self) {
         let new_count = self.consecutive_denials.fetch_add(1, Ordering::SeqCst) + 1;
         if new_count >= CIRCUIT_BREAKER_THRESHOLD {
-            self.circuit_broken
-                .store(1, Ordering::SeqCst);
+            self.circuit_broken.store(1, Ordering::SeqCst);
         }
     }
 
@@ -198,7 +192,7 @@ impl YoloClassifier {
     /// Returns `BridgeDecision::Allow` if YOLO says allow,
     /// `BridgeDecision::Prompt` if YOLO says block or error
     /// (fail-closed).
-    pub fn evaluate(&self, action: &str, tool: &str, effects: &[&str]) -> BridgeDecision {
+    pub fn evaluate(&self, action: &str, tool: &str, effects: &[String]) -> BridgeDecision {
         // Circuit breaker check
         if self.is_circuit_broken() {
             return BridgeDecision::Prompt;
@@ -243,28 +237,20 @@ impl YoloClassifier {
 
     /// Stage 1: Fast 64-token classification.
     fn stage1_classify(&self, action: &str) -> Result<Stage1Decision> {
-        let messages = vec![Message::user(&format!(
-            "Action: {}\n\n{}",
-            action, STAGE1_PROMPT
-        ))];
+        let messages = vec![Message::user(&format!("Action: {}\n\n{}", action, STAGE1_PROMPT))];
 
-        let system = "You are a binary security classifier. Reply with ONLY <block>yes</block> or <block>no</block>.";
+        let system =
+            "You are a binary security classifier. Reply with ONLY <block>yes</block> or <block>no</block>.";
 
         // Use block_in_place + block_on for the async call
         let rt = tokio::runtime::Handle::try_current();
         let stream = match rt {
-            Some(handle) => {
+            Ok(handle) => {
                 tokio::task::block_in_place(|| {
-                    handle.block_on(self.provider.complete_on_provider(
-                        self.provider.active_provider(),
-                        &messages,
-                        &[],
-                        system,
-                        None,
-                    ))
+                    handle.block_on(self.provider.complete(&messages, &[], system, None))
                 })
             }
-            None => {
+            Err(_) => {
                 // No runtime — fail closed
                 return Err(anyhow::anyhow!("no tokio runtime available"));
             }
@@ -281,7 +267,7 @@ impl YoloClassifier {
     }
 
     /// Stage 2: Thinking-enabled classification (4096 tokens).
-    fn stage2_classify(&self, action: &str, tool: &str, effects: &[&str]) -> Result<Stage2Response> {
+    fn stage2_classify(&self, action: &str, tool: &str, effects: &[String]) -> Result<Stage2Response> {
         let messages = vec![Message::user(&stage2_user_prompt(action, tool, effects))];
 
         let system = STAGE2_SYSTEM;
@@ -289,18 +275,12 @@ impl YoloClassifier {
         // Use block_in_place + block_on for the async call
         let rt = tokio::runtime::Handle::try_current();
         let stream = match rt {
-            Some(handle) => {
+            Ok(handle) => {
                 tokio::task::block_in_place(|| {
-                    handle.block_on(self.provider.complete_on_provider(
-                        self.provider.active_provider(),
-                        &messages,
-                        &[],
-                        system,
-                        None,
-                    ))
+                    handle.block_on(self.provider.complete(&messages, &[], system, None))
                 })
             }
-            None => {
+            Err(_) => {
                 return Err(anyhow::anyhow!("no tokio runtime available"));
             }
         };
@@ -317,17 +297,15 @@ impl YoloClassifier {
         use futures::StreamExt;
 
         let mut text = String::new();
-        let mut stream = stream;
+        let stream = stream;
         // Use block_on for the stream iteration since we're in a sync context
         let rt = tokio::runtime::Handle::try_current();
-        if let Some(handle) = rt {
+        if let Ok(handle) = rt {
             tokio::task::block_in_place(|| {
-                let mut stream_handle = stream;
+                let stream_handle = stream;
                 while let Some(event) = handle.block_on(stream_handle.next()) {
-                    if let Ok(StreamEvent::ContentBlock { block }) = event {
-                        if let crate::message::ContentBlock::Text { text: t, .. } = block {
-                            text.push_str(&t);
-                        }
+                    if let Ok(StreamEvent::TextDelta(delta)) = event {
+                        text.push_str(&delta);
                     }
                 }
             });
@@ -367,7 +345,11 @@ mod tests {
 
     #[test]
     fn test_stage2_user_prompt_format() {
-        let prompt = stage2_user_prompt("delete_ssh_keys", "Bash", &["Irreversible", "CredentialAccess"]);
+        let prompt = stage2_user_prompt(
+            "delete_ssh_keys",
+            "Bash",
+            &["Irreversible", "CredentialAccess"],
+        );
         assert!(prompt.contains("delete_ssh_keys"));
         assert!(prompt.contains("Bash"));
         assert!(prompt.contains("Irreversible"));
