@@ -1980,6 +1980,14 @@ pub(super) fn handle_session_command(app: &mut App, trimmed: &str) -> bool {
         return true;
     }
 
+    // DCP commands (dynamic context pruning)
+    #[cfg(feature = "dcp")]
+    {
+        if handle_dcp_command(app, trimmed) {
+            return true;
+        }
+    }
+
     if handle_test_command(app, trimmed) {
         return true;
     }
@@ -3170,6 +3178,135 @@ pub(super) fn handle_feedback_command(app: &mut App, trimmed: &str) -> bool {
 
 pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
     super::tui_lifecycle_runtime::handle_dev_command(app, trimmed)
+}
+
+/// Handle DCP slash commands: /dcp [context|stats|sweep|manual on|off]
+#[cfg(feature = "dcp")]
+pub(super) fn handle_dcp_command(app: &mut App, trimmed: &str) -> bool {
+    // Helper to get DCP plugin from app
+    let get_dcp = || {
+        app.registry.dcp()
+    };
+
+    if trimmed == "/dcp" {
+        // Show DCP status
+        if let Some(dcp_arc) = get_dcp() {
+            if let Ok(dcp) = dcp_arc.lock() {
+                let stats = dcp.stats();
+                let enabled = dcp.is_enabled();
+                app.push_display_message(DisplayMessage::system(format!(
+                    "**DCP Status:**\n\
+                     • Enabled: {}\n\
+                     • Total prune tokens: {}\n\
+                     • Compression runs: {}\n\
+                     • Blocks committed: {}\n\
+                     \nUsage: `/dcp [context|stats|sweep|manual on|off]`",
+                    if enabled { "yes" } else { "no" },
+                    stats.total_prune_tokens,
+                    stats.compress_runs,
+                    stats.compress_blocks_committed,
+                )));
+                return true;
+            }
+        }
+        app.push_display_message(DisplayMessage::system(
+            "DCP not available in this session.".to_string(),
+        ));
+        return true;
+    }
+
+    if trimmed == "/dcp context" {
+        if let Some(dcp_arc) = get_dcp() {
+            if let Ok(dcp) = dcp_arc.lock() {
+                let stats = dcp.stats();
+                app.push_display_message(DisplayMessage::system(format!(
+                    "**DCP Context:**\n\
+                     • Dedup pruned: {}\n\
+                     • Purge-errors pruned: {}\n\
+                     • Stale-file-reads pruned: {}\n\
+                     • Cache bust events: {}",
+                    stats.dedup_pruned,
+                    stats.purge_errors_pruned,
+                    stats.stale_file_reads_pruned,
+                    stats.cache_bust_events,
+                )));
+                return true;
+            }
+        }
+        app.push_display_message(DisplayMessage::system(
+            "DCP not available.".to_string(),
+        ));
+        return true;
+    }
+
+    if trimmed == "/dcp stats" {
+        if let Some(dcp_arc) = get_dcp() {
+            if let Ok(dcp) = dcp_arc.lock() {
+                let stats = dcp.stats();
+                app.push_display_message(DisplayMessage::system(format!(
+                    "**DCP Statistics:**\n\
+                     • Total prune tokens: {}k\n\
+                     • Compression runs: {}\n\
+                     • Blocks committed: {}\n\
+                     • Compressions useful: {}\n\
+                     • Compressions oversized: {}",
+                    stats.total_prune_tokens / 1000,
+                    stats.compress_runs,
+                    stats.compress_blocks_committed,
+                    stats.compress_useful,
+                    stats.compress_oversized,
+                )));
+                return true;
+            }
+        }
+        app.push_display_message(DisplayMessage::system(
+            "DCP not available.".to_string(),
+        ));
+        return true;
+    }
+
+    if trimmed == "/dcp sweep" {
+        // Note: set_force_apply is pub(crate) in dcp-core and not accessible here.
+        // The sweep functionality requires using the DCP compress tool directly.
+        app.push_display_message(DisplayMessage::system(
+            "Sweep is triggered automatically when context fills up, or use the dcp_compress tool.".to_string(),
+        ));
+        return true;
+    }
+
+    if trimmed == "/dcp manual on" {
+        if let Some(dcp_arc) = get_dcp() {
+            if let Ok(mut dcp) = dcp_arc.lock() {
+                dcp.pruner_mut().set_manual_mode(true);
+                app.push_display_message(DisplayMessage::system(
+                    "DCP manual mode: ON (pruning requires explicit tool call)".to_string(),
+                ));
+                return true;
+            }
+        }
+        app.push_display_message(DisplayMessage::system(
+            "DCP not available.".to_string(),
+        ));
+        return true;
+    }
+
+    if trimmed == "/dcp manual off" {
+        if let Some(dcp_arc) = get_dcp() {
+            if let Ok(mut dcp) = dcp_arc.lock() {
+                dcp.pruner_mut().set_manual_mode(false);
+                app.push_display_message(DisplayMessage::system(
+                    "DCP manual mode: OFF (pruning happens automatically)".to_string(),
+                ));
+                return true;
+            }
+        }
+        app.push_display_message(DisplayMessage::system(
+            "DCP not available.".to_string(),
+        ));
+        return true;
+    }
+
+    false
 }
 
 #[cfg(test)]

@@ -40,11 +40,13 @@ use crate::skill::SkillRegistry;
 use crate::tool::{Registry, ToolContext, ToolExecutionMode};
 use anyhow::Result;
 use futures::StreamExt;
+use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::sync::{Arc, LazyLock, Mutex as StdMutex};
+use std::ptr::NonNull;
+use std::sync::{Arc, LazyLock, Mutex as StdMutex, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, mpsc};
 
@@ -69,6 +71,40 @@ static JCODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> = LazyL
 });
 static WORKING_GIT_STATE_CACHE: LazyLock<StdMutex<HashMap<PathBuf, Option<GitState>>>> =
     LazyLock::new(|| StdMutex::new(HashMap::new()));
+
+// Thread-local agent accessor for DCP tools to reach the agent's DCP plugin
+#[cfg(feature = "dcp")]
+thread_local! {
+    static CURRENT_AGENT: Cell<Option<NonNull<Agent>>> = const { Cell::new(None) };
+}
+
+#[cfg(feature = "dcp")]
+impl Agent {
+    /// Set the current agent pointer (called by the server before tool execution)
+    pub(crate) fn set_current_agent_ptr(&mut self) {
+        CURRENT_AGENT.with(|cell| {
+            cell.set(Some(NonNull::from(self)));
+        });
+    }
+
+    /// Clear the current agent pointer (called when agent is dropped)
+    pub(crate) fn clear_current_agent_ptr() {
+        CURRENT_AGENT.with(|cell| {
+            cell.set(None);
+        });
+    }
+
+    /// Access the current agent's DCP plugin for tool execution
+    pub(crate) fn get_current_dcp() -> Option<Arc<Mutex<crate::dcp_plugin::DcpPlugin>>> {
+        CURRENT_AGENT.with(|cell| {
+            cell.get().map(|ptr| {
+                // SAFETY: ptr is guaranteed valid for the duration of tool execution
+                // because the server clears it when the agent is dropped
+                unsafe { ptr.as_ref() }.registry.dcp()
+            }).flatten()
+        })
+    }
+}
 const STREAM_KEEPALIVE_PONG_ID: u64 = 0;
 
 fn stable_hash_str(value: &str) -> u64 {
@@ -321,6 +357,13 @@ impl Agent {
         agent.session.provider_key =
             crate::session::derive_session_provider_key(agent.provider.name());
         agent.session.ensure_initial_session_context_message();
+
+        // Wire DCP plugin into registry so DCP tools can access it
+        #[cfg(feature = "dcp")]
+        if let Some(dcp) = agent.dcp.take() {
+            agent.registry.set_dcp(dcp);
+        }
+
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("create");
         crate::telemetry::begin_session_with_parent(
@@ -373,6 +416,13 @@ impl Agent {
         agent.restore_reasoning_effort_from_session();
         agent.session.ensure_initial_session_context_message();
         agent.sync_memory_dedup_state_from_session();
+
+        // Wire DCP plugin into registry so DCP tools can access it
+        #[cfg(feature = "dcp")]
+        if let Some(dcp) = agent.dcp.take() {
+            agent.registry.set_dcp(dcp);
+        }
+
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("attach");
         crate::telemetry::begin_session_with_parent(
@@ -417,6 +467,13 @@ impl Agent {
             self.session.messages.len()
         ));
         drop(manager);
+
+        // J9: Set session ID on DCP pruner for proper persistence
+        #[cfg(feature = "dcp")]
+        if let Some(ref mut dcp) = self.dcp {
+            dcp.pruner_mut().set_session_id(&self.session.id);
+        }
+
         if let Some(state) = sanitized_state {
             self.session.compaction = state;
             self.persist_session_best_effort("sanitized oversized OpenAI native compaction");
