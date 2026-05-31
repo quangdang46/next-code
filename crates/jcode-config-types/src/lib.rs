@@ -637,6 +637,8 @@ pub struct FeatureConfig {
     pub persist_memory_injections: bool,
     /// Update channel: "stable" (releases only) or "main" (latest commits)
     pub update_channel: UpdateChannel,
+    /// Enable Dynamic Context Pruning (DCP) feature (default: true)
+    pub dcp_enabled: bool,
 }
 
 impl Default for FeatureConfig {
@@ -647,6 +649,7 @@ impl Default for FeatureConfig {
             message_timestamps: true,
             persist_memory_injections: false,
             update_channel: UpdateChannel::default(),
+            dcp_enabled: true,
         }
     }
 }

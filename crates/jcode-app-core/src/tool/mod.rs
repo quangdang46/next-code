@@ -34,6 +34,9 @@ mod webfetch;
 mod websearch;
 mod write;
 
+#[cfg(feature = "dcp")]
+mod dcp_compress;
+
 use crate::compaction::CompactionManager;
 use crate::provider::Provider;
 use crate::skill::SkillRegistry;
@@ -42,6 +45,7 @@ use jcode_message_types::ToolDefinition;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::{LazyLock, RwLock as StdRwLock};
 use tokio::sync::RwLock;
 
@@ -99,6 +103,8 @@ pub struct Registry {
     tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
     skills: Arc<RwLock<SkillRegistry>>,
     compaction: Arc<RwLock<CompactionManager>>,
+    #[cfg(feature = "dcp")]
+    dcp: Option<Arc<Mutex<crate::dcp_plugin::DcpPlugin>>>,
 }
 
 impl Clone for Registry {
@@ -109,6 +115,8 @@ impl Clone for Registry {
             // Each clone gets a fresh CompactionManager to prevent parallel
             // subagents from corrupting each other's message history
             compaction: Arc::new(RwLock::new(CompactionManager::new())),
+            #[cfg(feature = "dcp")]
+            dcp: self.dcp.clone(),
         }
     }
 }
@@ -145,6 +153,8 @@ impl Registry {
             tools: Arc::new(RwLock::new(HashMap::new())),
             skills: Arc::new(RwLock::new(SkillRegistry::default())),
             compaction: Arc::new(RwLock::new(CompactionManager::new())),
+            #[cfg(feature = "dcp")]
+            dcp: None,
         }
     }
 
@@ -277,6 +287,8 @@ impl Registry {
             tools: Arc::new(RwLock::new(HashMap::new())),
             skills: skills.clone(),
             compaction: compaction.clone(),
+            #[cfg(feature = "dcp")]
+            dcp: None,
         };
         let registry_struct_ms = registry_struct_start.elapsed().as_millis();
 
@@ -325,6 +337,15 @@ impl Registry {
             );
         }
         let session_tools_ms = session_tools_start.elapsed().as_millis();
+
+        // Register DCP tools if feature is enabled
+        #[cfg(feature = "dcp")]
+        {
+            use dcp_compress::{DcpCompressTool, DcpDecompressTool, DcpRecompressTool};
+            Self::insert_tool(&mut tools_map, "dcp_compress", DcpCompressTool::new());
+            Self::insert_tool(&mut tools_map, "dcp_decompress", DcpDecompressTool::new());
+            Self::insert_tool(&mut tools_map, "dcp_recompress", DcpRecompressTool::new());
+        }
 
         let write_start = std::time::Instant::now();
         *registry.tools.write().await = tools_map;
@@ -826,6 +847,18 @@ impl Registry {
     /// Get shared access to the compaction manager
     pub fn compaction(&self) -> Arc<RwLock<CompactionManager>> {
         self.compaction.clone()
+    }
+
+    /// Get shared access to the DCP plugin (if enabled)
+    #[cfg(feature = "dcp")]
+    pub fn dcp(&self) -> Option<Arc<Mutex<crate::dcp_plugin::DcpPlugin>>> {
+        self.dcp.clone()
+    }
+
+    /// Set the DCP plugin (called by Agent after construction)
+    #[cfg(feature = "dcp")]
+    pub fn set_dcp(&mut self, dcp: crate::dcp_plugin::DcpPlugin) {
+        self.dcp = Some(Arc::new(Mutex::new(dcp)));
     }
 }
 
