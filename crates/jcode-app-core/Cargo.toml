@@ -94,6 +94,9 @@ jcode-terminal-image = { path = "../jcode-terminal-image" }
 jcode-tui-workspace = { path = "../jcode-tui-workspace" }
 jcode-usage-types = { path = "../jcode-usage-types" }
 
+# DCG permission modes (experiment/dcg-permission-modes)
+dcg-core = { git = "https://github.com/quangdang46/destructive_command_guard", branch = "main" }
+
 # Streaming
 tokio-stream = "0.1"
 bytes = "1"

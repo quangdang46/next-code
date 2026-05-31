@@ -302,7 +302,7 @@ impl YoloClassifier {
         let rt = tokio::runtime::Handle::try_current();
         if let Ok(handle) = rt {
             tokio::task::block_in_place(|| {
-                let stream_handle = stream;
+                let mut stream_handle = stream;
                 while let Some(event) = handle.block_on(stream_handle.next()) {
                     if let Ok(StreamEvent::TextDelta(delta)) = event {
                         text.push_str(&delta);

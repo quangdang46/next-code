@@ -36,10 +36,6 @@ pub mod skill_distillation;
 pub mod theme;
 pub mod turborag;
 
-// DCG permission modes (experiment/dcg-permission-modes)
-pub mod yolo_classifier;
-pub mod dcg_bridge;
-
 use anyhow::Result;
 
 pub async fn run() -> Result<()> {
