@@ -1519,7 +1519,7 @@ dependencies = [
 [[package]]
 name = "cross_agent_session_resumer"
 version = "0.2.2"
-source = "git+https://github.com/quangdang46/cross_agent_session_resumer?rev=f8c7921ebd5033aad70c56d61784213603e9e3cc#f8c7921ebd5033aad70c56d61784213603e9e3cc"
+source = "git+https://github.com/quangdang46/cross_agent_session_resumer?rev=23a58b8aedf816faf92d5a791fed3a653162d71c#23a58b8aedf816faf92d5a791fed3a653162d71c"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5035,6 +5035,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
+ "cross_agent_session_resumer",
  "crossterm",
  "dcg-core",
  "dirs 5.0.1",

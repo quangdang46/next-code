@@ -1706,23 +1706,30 @@ impl App {
                     format!("OpenCode {}", &session_id[..session_id.len().min(8)])
                 }
             };
-            let resolved_target = match crate::import::resolve_resume_target_to_jcode(target) {
-                Ok(target) => target,
-                Err(err) => {
-                    failed.push(format!("failed to import {}: {}", name, err));
-                    continue;
+            let resolved_target = match target {
+                ResumeTarget::JcodeSession { session_id } => session_id.clone(),
+                ResumeTarget::ClaudeCodeSession { session_id, .. } => {
+                    crate::casr_adapter::imported_claude_code_session_id(session_id)
+                }
+                ResumeTarget::CodexSession { session_id, .. } => {
+                    crate::casr_adapter::imported_codex_session_id(session_id)
+                }
+                ResumeTarget::PiSession { session_path } => {
+                    crate::casr_adapter::imported_pi_session_id(session_path)
+                }
+                ResumeTarget::OpenCodeSession { session_id, .. } => {
+                    crate::casr_adapter::imported_opencode_session_id(session_id)
                 }
             };
 
-            match spawn_resume_target_in_new_terminal(&resolved_target, &cwd, socket.as_deref()) {
+            match spawn_resume_target_in_new_terminal(target, &cwd, socket.as_deref()) {
                 Ok(true) => {
                     spawned += 1;
                     names.push(name);
                 }
-                Ok(false) | Err(_) => failed.push(resume_target_manual_command(
-                    &resolved_target,
-                    socket.as_deref(),
-                )),
+                Ok(false) | Err(_) => {
+                    failed.push(resume_target_manual_command(target, socket.as_deref()))
+                }
             }
         }
 
@@ -1792,24 +1799,28 @@ impl App {
             }
         };
 
-        let resolved_target = match crate::import::resolve_resume_target_to_jcode(target) {
-            Ok(target) => target,
-            Err(err) => {
-                self.push_display_message(DisplayMessage::error(format!(
-                    "Failed to import {}: {}",
-                    name, err
-                )));
-                return;
+        let resolved_target = match target {
+            ResumeTarget::JcodeSession { session_id } => session_id.clone(),
+            ResumeTarget::ClaudeCodeSession { session_id, .. } => {
+                crate::casr_adapter::imported_claude_code_session_id(session_id)
+            }
+            ResumeTarget::CodexSession { session_id, .. } => {
+                crate::casr_adapter::imported_codex_session_id(session_id)
+            }
+            ResumeTarget::PiSession { session_path } => {
+                crate::casr_adapter::imported_pi_session_id(session_path)
+            }
+            ResumeTarget::OpenCodeSession { session_id, .. } => {
+                crate::casr_adapter::imported_opencode_session_id(session_id)
             }
         };
 
-        let ResumeTarget::JcodeSession { session_id } = resolved_target else {
-            self.push_display_message(DisplayMessage::error(format!(
-                "Cannot resume {} in the current terminal.",
-                name
-            )));
-            return;
-        };
+        // The resolved target is a jcode session id (either native for
+        // JcodeSession targets, or an imported id for foreign targets).
+        // Foreign targets (resolved via casr_adapter::imported_*_session_id)
+        // are imported on-the-fly by the launcher, so we don't try to
+        // re-import here — we just pass the id to the launcher.
+        let session_id = resolved_target;
 
         if targets.len() > 1 {
             self.push_display_message(DisplayMessage::system(format!(

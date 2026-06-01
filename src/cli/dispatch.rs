@@ -521,14 +521,14 @@ fn resolve_resume_id(resume_id: &str) -> Result<String> {
         Ok(full_id) => Ok(full_id),
         Err(native_err) => {
             // Unified cross-provider import via casr (any provider -> jcode).
+            // The legacy in-house importer (jcode-import-core / crate::import)
+            // has been removed entirely; casr's discovery registry is the
+            // single source of truth for "is this id from a known foreign
+            // provider, and if so, import it".
             if let Some(imported_id) = casr_import_to_jcode(resume_id) {
                 return Ok(imported_id);
             }
-            // Transition fallback: legacy in-house importer.
-            match crate::import::import_external_resume_id(resume_id)? {
-                Some(imported_id) => Ok(imported_id),
-                None => Err(native_err),
-            }
+            Err(native_err)
         }
     }
 }
@@ -541,7 +541,11 @@ fn casr_import_to_jcode(resume_id: &str) -> Option<String> {
         registry: casr::discovery::ProviderRegistry::default_registry(),
     };
     let result = pipeline
-        .convert("jcode", resume_id, casr::pipeline::ConvertOptions::default())
+        .convert(
+            "jcode",
+            resume_id,
+            casr::pipeline::ConvertOptions::default(),
+        )
         .ok()?;
     result.written.map(|w| w.session_id)
 }

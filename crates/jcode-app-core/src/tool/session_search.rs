@@ -1049,7 +1049,7 @@ fn search_external_sessions(query: &QueryProfile, options: &SearchOptions) -> Se
 
     if source_matches_filter("claude", options)
         && let Ok(sessions) =
-            crate::import::list_claude_code_sessions_lazy(options.max_scan_sessions)
+            crate::casr_adapter::list_claude_code_sessions_lazy(options.max_scan_sessions)
     {
         report.external_sources.push("claude");
         for session in sessions.into_iter().take(options.max_scan_sessions) {
