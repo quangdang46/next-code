@@ -98,6 +98,9 @@ path = "src/bin/tui_bench.rs"
 required-features = ["dev-bins"]
 
 [dependencies]
+# Cross-provider session conversion engine (resume/import any provider -> jcode).
+casr = { path = "../cross_agent_session_resumer", package = "cross_agent_session_resumer" }
+
 # File picker for `@<path>` autocomplete in the TUI input.
 # Provides a long-lived FilePicker with background scan, gitignore-aware walk,
 # fuzzy matching with typo resistance, and frecency-ranked results.
