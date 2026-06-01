@@ -63,8 +63,9 @@ fn configure_system_allocator() {}
 /// back mid-program.
 #[cfg(windows)]
 fn configure_windows_console_for_utf8() {
+    use windows_sys::Win32::Globalization::CP_UTF8;
     use windows_sys::Win32::System::Console::{
-        CP_UTF8, GetConsoleOutputCP, SetConsoleCP, SetConsoleOutputCP,
+        GetConsoleOutputCP, SetConsoleCP, SetConsoleOutputCP,
     };
     unsafe {
         if GetConsoleOutputCP() != CP_UTF8 {
