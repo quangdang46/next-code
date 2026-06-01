@@ -1519,6 +1519,7 @@ dependencies = [
 [[package]]
 name = "cross_agent_session_resumer"
 version = "0.2.2"
+source = "git+https://github.com/quangdang46/cross_agent_session_resumer?rev=f8c7921ebd5033aad70c56d61784213603e9e3cc#f8c7921ebd5033aad70c56d61784213603e9e3cc"
 dependencies = [
  "anyhow",
  "chrono",
