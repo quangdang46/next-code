@@ -1258,6 +1258,7 @@ impl crate::tui::TuiState for App {
             native_compaction_threshold_tokens,
             session_count,
             session_name,
+            working_dir: self.session.working_dir.clone(),
             client_count,
             memory_info,
             swarm_info,
