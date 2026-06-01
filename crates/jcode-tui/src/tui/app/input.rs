@@ -1804,6 +1804,18 @@ impl App {
             || !self.hidden_queued_system_messages.is_empty()
     }
 
+    /// True when a startup submission is staged and ready to auto-send.
+    ///
+    /// Headed spawns (and reloads with a resume prompt) stage their initial
+    /// prompt into `self.input` and set `submit_input_on_startup`, rather than
+    /// pushing onto `queued_messages`. The post-connect dispatcher must treat
+    /// this as pending work so the prompt is actually submitted once the remote
+    /// session history loads. See issues #267/#268/#76.
+    pub(super) fn has_pending_startup_submission(&self) -> bool {
+        self.submit_input_on_startup
+            && (!self.input.trim().is_empty() || !self.pending_images.is_empty())
+    }
+
     pub(super) fn schedule_auto_poke_followup_if_needed(&mut self) -> bool {
         if !self.auto_poke_incomplete_todos
             || self.pending_queued_dispatch
@@ -2789,6 +2801,14 @@ impl App {
 
         if code == KeyCode::BackTab {
             self.cycle_model_favorite_hotkey();
+            return Ok(());
+        }
+
+        // While the model picker preview is visible, route its favorite/default
+        // hotkeys (Ctrl+D, Ctrl+F, Alt+F) to the focused picker handler before the
+        // global control shortcuts can claim them (e.g. Ctrl+D as quit). This makes
+        // the hotkeys work directly in the preview list the user always sees.
+        if self.model_picker_preview_hotkey(code, modifiers)? {
             return Ok(());
         }
 

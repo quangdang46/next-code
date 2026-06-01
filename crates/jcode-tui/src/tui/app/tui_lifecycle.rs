@@ -9,6 +9,15 @@ impl App {
         self.pending_images = restored.pending_images;
         self.submit_input_on_startup = restored.submit_on_restore
             && (!self.input.is_empty() || !self.pending_images.is_empty());
+        crate::logging::info(&format!(
+            "Startup input restored: submit_on_restore={} input_chars={} pending_images={} queued_messages={} hidden_system={} => submit_input_on_startup={}",
+            restored.submit_on_restore,
+            self.input.chars().count(),
+            self.pending_images.len(),
+            restored.queued_messages.len(),
+            restored.hidden_queued_system_messages.len(),
+            self.submit_input_on_startup,
+        ));
         self.hidden_queued_system_messages = restored.hidden_queued_system_messages;
         if let Some(status_notice) = restored.startup_status_notice {
             self.set_status_notice(status_notice);
@@ -369,6 +378,7 @@ impl App {
             pending_images: Vec::new(),
             route_next_prompt_to_new_session: false,
             submit_input_on_startup: false,
+            startup_submit_deferred_reason: None,
             onboarding_preview_mode: false,
             onboarding_flow: None,
             onboarding_startup_checked: false,
@@ -550,6 +560,7 @@ impl App {
             last_mouse_scroll: None,
             mouse_scroll_target: None,
             mouse_scroll_queue: 0,
+            chat_overscroll_last: None,
             changelog_scroll: None,
             help_scroll: None,
             model_status_scroll: None,
@@ -755,6 +766,7 @@ impl App {
             pending_images: Vec::new(),
             route_next_prompt_to_new_session: false,
             submit_input_on_startup: false,
+            startup_submit_deferred_reason: None,
             onboarding_preview_mode: false,
             onboarding_flow: None,
             onboarding_startup_checked: false,
@@ -936,6 +948,7 @@ impl App {
             last_mouse_scroll: None,
             mouse_scroll_target: None,
             mouse_scroll_queue: 0,
+            chat_overscroll_last: None,
             changelog_scroll: None,
             help_scroll: None,
             model_status_scroll: None,
