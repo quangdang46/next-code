@@ -370,6 +370,11 @@ pub struct AuthConfig {
 #[serde(default)]
 pub struct AgentsConfig {
     /// Optional default model override for spawned swarm/subagent sessions.
+    ///
+    /// Leave unset (or use `"inherit"` / `"coordinator"`) to have spawned swarm
+    /// agents inherit the spawning coordinator's model. Set to a concrete model
+    /// string only when you deliberately want every swarm worker pinned to a
+    /// specific model regardless of which model spawned them.
     pub swarm_model: Option<String>,
     /// Default terminal mode for swarm-created agents.
     pub swarm_spawn_mode: SwarmSpawnMode,
@@ -668,6 +673,10 @@ pub enum WebSearchEngine {
     /// fallback, so falls back to DuckDuckGo / Bing if the API key is
     /// missing or quota-exhausted.
     Exa,
+    /// SearXNG metasearch instance (JSON API). Requires `searxng_url` (or the
+    /// `JCODE_SEARXNG_URL` env var) to point at a SearXNG instance. Useful on
+    /// hosts where DuckDuckGo/Bing block the request via TLS fingerprinting.
+    Searxng,
 }
 
 impl WebSearchEngine {
@@ -676,6 +685,7 @@ impl WebSearchEngine {
             Self::Duckduckgo => "duckduckgo",
             Self::Bing => "bing",
             Self::Exa => "exa",
+            Self::Searxng => "searxng",
         }
     }
 
@@ -684,6 +694,7 @@ impl WebSearchEngine {
             "duckduckgo" | "ddg" => Some(Self::Duckduckgo),
             "bing" => Some(Self::Bing),
             "exa" | "exa.ai" | "exa-ai" => Some(Self::Exa),
+            "searxng" | "searx" => Some(Self::Searxng),
             _ => None,
         }
     }
@@ -703,6 +714,12 @@ pub struct WebSearchConfig {
     pub bing_api_key_env: String,
     /// Bing market, e.g. "en-US" or "zh-CN".
     pub bing_market: String,
+    /// Base URL of a SearXNG instance (e.g. "https://searx.example.org"), used
+    /// by the `searxng` engine. When empty, the `searxng_url_env` variable is
+    /// consulted instead.
+    pub searxng_url: Option<String>,
+    /// Environment variable containing the SearXNG base URL.
+    pub searxng_url_env: String,
 }
 
 impl Default for WebSearchConfig {
@@ -713,6 +730,8 @@ impl Default for WebSearchConfig {
             bing_api_key: None,
             bing_api_key_env: "JCODE_BING_API_KEY".to_string(),
             bing_market: "en-US".to_string(),
+            searxng_url: None,
+            searxng_url_env: "JCODE_SEARXNG_URL".to_string(),
         }
     }
 }
@@ -763,6 +782,12 @@ pub struct ProviderConfig {
     /// substring or by glob (`*` and `?`). Empty = full provider list. See
     /// issue #26.
     pub scoped_models: Vec<String>,
+
+    /// Max seconds to wait for streaming data before timing out a request with
+    /// no data received. Raise this for slow reasoning models (e.g. DeepSeek)
+    /// that think silently for minutes before emitting tokens. Default: 180.
+    /// Overridable per-launch via `JCODE_STREAM_IDLE_TIMEOUT_SECS`.
+    pub stream_idle_timeout_secs: u64,
 }
 
 impl Default for ProviderConfig {
@@ -783,6 +808,7 @@ impl Default for ProviderConfig {
             copilot_premium: None,
             system_prompt: None,
             scoped_models: Vec::new(),
+            stream_idle_timeout_secs: 180,
         }
     }
 }
@@ -899,6 +925,10 @@ pub struct SafetyConfig {
     pub jade_relay_session_id: Option<String>,
     /// Enable Jade relay prompt → agent directive feature (default: false)
     pub jade_relay_reply_enabled: bool,
+    /// Enable Jade relay device launch commands that open headed local sessions (default: false)
+    pub jade_relay_launch_enabled: bool,
+    /// Default working directory for remotely launched headed sessions
+    pub jade_relay_launch_working_dir: Option<String>,
 }
 
 impl Default for SafetyConfig {
@@ -932,6 +962,8 @@ impl Default for SafetyConfig {
             jade_relay_user_id: None,
             jade_relay_session_id: None,
             jade_relay_reply_enabled: false,
+            jade_relay_launch_enabled: false,
+            jade_relay_launch_working_dir: None,
         }
     }
 }
