@@ -455,6 +455,20 @@ pub fn list_sessions() -> Result<()> {
                     crate::casr_adapter::imported_opencode_session_id(session_id),
                 ],
             ),
+            jcode_tui_session_picker::ResumeTarget::ForeignSession {
+                provider_slug,
+                session_id,
+                ..
+            } => (
+                exe.to_path_buf(),
+                vec![
+                    "--resume".to_string(),
+                    crate::casr_adapter::imported_session_id_for_provider(
+                        &provider_slug,
+                        session_id,
+                    ),
+                ],
+            ),
         }
     }
 
@@ -493,6 +507,16 @@ pub fn list_sessions() -> Result<()> {
             jcode_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => {
                 format!("◌ OpenCode {}", &session_id[..session_id.len().min(8)])
             }
+            jcode_tui_session_picker::ResumeTarget::ForeignSession {
+                provider_slug,
+                session_id,
+                ..
+            } => {
+                format!(
+                    "💾 {provider_slug} {}",
+                    &session_id[..session_id.len().min(8)]
+                )
+            }
         };
         let command = crate::terminal_launch::TerminalCommand::new(program, args).title(title);
         crate::terminal_launch::spawn_command_in_new_terminal(&command, cwd)
@@ -525,6 +549,14 @@ pub fn list_sessions() -> Result<()> {
                     jcode_tui_session_picker::ResumeTarget::OpenCodeSession {
                         session_id, ..
                     } => crate::casr_adapter::imported_opencode_session_id(session_id),
+                    jcode_tui_session_picker::ResumeTarget::ForeignSession {
+                        provider_slug,
+                        session_id,
+                        ..
+                    } => crate::casr_adapter::imported_session_id_for_provider(
+                        &provider_slug,
+                        session_id,
+                    ),
                 };
                 let mut session_cwd = cwd.clone();
                 let session_id: &str = &resolved_target;
@@ -567,6 +599,14 @@ pub fn list_sessions() -> Result<()> {
                             session_id,
                             ..
                         } => crate::casr_adapter::imported_opencode_session_id(session_id),
+                        jcode_tui_session_picker::ResumeTarget::ForeignSession {
+                            provider_slug,
+                            session_id,
+                            ..
+                        } => crate::casr_adapter::imported_session_id_for_provider(
+                            &provider_slug,
+                            session_id,
+                        ),
                     };
                     let mut session_cwd = cwd.clone();
                     let session_id: &str = &resolved_target;
@@ -630,6 +670,14 @@ pub fn list_sessions() -> Result<()> {
                     jcode_tui_session_picker::ResumeTarget::OpenCodeSession {
                         session_id, ..
                     } => crate::casr_adapter::imported_opencode_session_id(session_id),
+                    jcode_tui_session_picker::ResumeTarget::ForeignSession {
+                        provider_slug,
+                        session_id,
+                        ..
+                    } => crate::casr_adapter::imported_session_id_for_provider(
+                        &provider_slug,
+                        session_id,
+                    ),
                 };
                 let mut session_cwd = cwd.clone();
                 let session_id: &str = &resolved_target;

@@ -2598,7 +2598,7 @@ dependencies = [
 [[package]]
 name = "ffs-budget"
 version = "0.1.3"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=cdeb436#cdeb436c25e2f8605c8c4512428b406fc1521025"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=4cd7f27#4cd7f2706ffa996eaaa93f59b4989b10be07e605"
 dependencies = [
  "once_cell",
  "regex",
@@ -2608,7 +2608,7 @@ dependencies = [
 [[package]]
 name = "ffs-engine"
 version = "0.1.3"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=cdeb436#cdeb436c25e2f8605c8c4512428b406fc1521025"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=4cd7f27#4cd7f2706ffa996eaaa93f59b4989b10be07e605"
 dependencies = [
  "ahash",
  "dashmap",
@@ -2626,7 +2626,7 @@ dependencies = [
 [[package]]
 name = "ffs-grep"
 version = "0.1.3"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=cdeb436#cdeb436c25e2f8605c8c4512428b406fc1521025"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=4cd7f27#4cd7f2706ffa996eaaa93f59b4989b10be07e605"
 dependencies = [
  "bstr",
  "memchr",
@@ -2635,12 +2635,12 @@ dependencies = [
 [[package]]
 name = "ffs-query-parser"
 version = "0.1.3"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=cdeb436#cdeb436c25e2f8605c8c4512428b406fc1521025"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=4cd7f27#4cd7f2706ffa996eaaa93f59b4989b10be07e605"
 
 [[package]]
 name = "ffs-search"
 version = "0.1.3"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=cdeb436#cdeb436c25e2f8605c8c4512428b406fc1521025"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=4cd7f27#4cd7f2706ffa996eaaa93f59b4989b10be07e605"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -2682,7 +2682,7 @@ dependencies = [
 [[package]]
 name = "ffs-symbol"
 version = "0.1.3"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=cdeb436#cdeb436c25e2f8605c8c4512428b406fc1521025"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=4cd7f27#4cd7f2706ffa996eaaa93f59b4989b10be07e605"
 dependencies = [
  "aho-corasick",
  "dashmap",
