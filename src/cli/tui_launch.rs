@@ -529,14 +529,14 @@ pub fn list_sessions() -> Result<()> {
                 let mut session_cwd = cwd.clone();
                 let session_id: &str = &resolved_target;
                 let _ = session_id;
-                if let Ok(sess) = session::Session::load(&resolved_target)
+                if let Ok(_sess) = session::Session::load(&resolved_target)
                     && let Ok(sess) = session::Session::load(session_id)
                     && let Some(dir) = sess.working_dir.as_deref()
                     && std::path::Path::new(dir).is_dir()
                 {
                     session_cwd = std::path::PathBuf::from(dir);
                 }
-                let (program, args) = build_resume_target_command(&exe, &resolved_target);
+                let (program, args) = build_resume_target_command(&exe, target);
                 let err = crate::platform::replace_process(
                     ProcessCommand::new(&program)
                         .args(&args)
@@ -577,7 +577,7 @@ pub fn list_sessions() -> Result<()> {
                         session_cwd = std::path::PathBuf::from(dir);
                     }
 
-                    match spawn_target_in_new_terminal(&resolved_target, &exe, &session_cwd) {
+                    match spawn_target_in_new_terminal(&target, &exe, &session_cwd) {
                         Ok(true) => spawned += 1,
                         Ok(false) => {
                             if !warned_no_terminal {
@@ -586,8 +586,7 @@ pub fn list_sessions() -> Result<()> {
                                 );
                                 warned_no_terminal = true;
                             }
-                            let (program, args) =
-                                build_resume_target_command(&exe, &resolved_target);
+                            let (program, args) = build_resume_target_command(&exe, &target);
                             eprintln!("  {}", command_display(&program, &args));
                         }
                         Err(e) => {
@@ -635,7 +634,7 @@ pub fn list_sessions() -> Result<()> {
                 let mut session_cwd = cwd.clone();
                 let session_id: &str = &resolved_target;
                 let _ = session_id;
-                if let Ok(sess) = session::Session::load(&resolved_target)
+                if let Ok(_sess) = session::Session::load(&resolved_target)
                     && let Ok(sess) = session::Session::load(session_id)
                     && let Some(dir) = sess.working_dir.as_deref()
                     && std::path::Path::new(dir).is_dir()
@@ -643,7 +642,7 @@ pub fn list_sessions() -> Result<()> {
                     session_cwd = std::path::PathBuf::from(dir);
                 }
 
-                match spawn_target_in_new_terminal(&resolved_target, &exe, &session_cwd) {
+                match spawn_target_in_new_terminal(&target, &exe, &session_cwd) {
                     Ok(true) => spawned += 1,
                     Ok(false) => {
                         if !warned_no_terminal {
@@ -652,7 +651,7 @@ pub fn list_sessions() -> Result<()> {
                             );
                             warned_no_terminal = true;
                         }
-                        let (program, args) = build_resume_target_command(&exe, &resolved_target);
+                        let (program, args) = build_resume_target_command(&exe, &target);
                         eprintln!("  {}", command_display(&program, &args));
                     }
                     Err(e) => {

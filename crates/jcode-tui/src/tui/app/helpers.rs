@@ -438,8 +438,6 @@ pub(super) fn pretty_model_display_name(model: &str) -> String {
         // `-<major>-<minor>` version into `<major>.<minor>` and title-case the
         // family/tier words.
         prettify_claude(core)
-    } else if lower.starts_with("gemini-") {
-        title_case_dashed(core)
     } else {
         title_case_dashed(core)
     };

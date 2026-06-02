@@ -1,5 +1,6 @@
 pub mod account_picker;
 pub(crate) mod app;
+pub mod compat;
 
 #[derive(Clone)]
 pub struct ContextSnapshot {

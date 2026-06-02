@@ -743,10 +743,10 @@ impl App {
     /// so prefer the same resolution the header uses; fall back to the session
     /// model and finally the local provider's model.
     fn onboarding_default_model_id(&self) -> String {
-        if self.is_remote {
-            if let Some(model) = self.effective_remote_provider_model() {
-                return model;
-            }
+        if self.is_remote
+            && let Some(model) = self.effective_remote_provider_model()
+        {
+            return model;
         }
         self.session
             .model

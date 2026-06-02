@@ -71,11 +71,7 @@ impl ExternalMessageRecord {
         let mut text = msg.content.clone();
         if !msg.tool_calls.is_empty() {
             for tc in &msg.tool_calls {
-                text.push_str(&format!(
-                    "\n[Tool: {}] {}",
-                    tc.name,
-                    tc.arguments.to_string()
-                ));
+                text.push_str(&format!("\n[Tool: {}] {}", tc.name, tc.arguments));
             }
         }
         if !msg.tool_results.is_empty() {

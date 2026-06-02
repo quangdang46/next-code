@@ -1,5 +1,5 @@
 use super::*;
-use crate::tui::compat::{line_from_spans, text_from_lines};
+use crate::tui::compat::line_from_spans;
 mod ui_pinned_table;
 use ui_pinned_table::is_rendered_table_line;
 
