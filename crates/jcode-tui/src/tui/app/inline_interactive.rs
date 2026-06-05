@@ -1826,7 +1826,7 @@ impl App {
                     session_id,
                     ..
                 } => crate::casr_adapter::imported_session_id_for_provider(
-                    &provider_slug,
+                    provider_slug,
                     session_id,
                 ),
             };
@@ -1946,7 +1946,7 @@ impl App {
                 provider_slug,
                 session_id,
                 ..
-            } => crate::casr_adapter::imported_session_id_for_provider(&provider_slug, session_id),
+            } => crate::casr_adapter::imported_session_id_for_provider(provider_slug, session_id),
         };
 
         // The resolved target is a jcode session id (either native for

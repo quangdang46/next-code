@@ -577,10 +577,10 @@ pub fn parse_markdown(text: &str) -> Document {
             Event::End(TagEnd::Strong) => style.bold = false,
             Event::End(TagEnd::Strikethrough) => style.strike = false,
             Event::End(TagEnd::Link) => {
-                if let Some(url) = link_targets.pop() {
-                    if !url.is_empty() {
-                        spans.push(StyledSpan::new(format!(" ({url})"), StyleRole::Dim));
-                    }
+                if let Some(url) = link_targets.pop()
+                    && !url.is_empty()
+                {
+                    spans.push(StyledSpan::new(format!(" ({url})"), StyleRole::Dim));
                 }
             }
             Event::End(TagEnd::Image) => {
