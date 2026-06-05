@@ -1108,6 +1108,8 @@ pub struct App {
     usage_report_refreshing: bool,
     /// Last time the passive overnight progress card polled its run files.
     last_overnight_card_refresh: Option<Instant>,
+    /// Plugin system bridge for TUI plugin integration.
+    plugin_bridge: Option<super::plugin_integration::PluginTuiBridge>,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

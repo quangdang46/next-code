@@ -27,6 +27,7 @@ pub mod markdown;
 mod memory_profile;
 pub mod mermaid;
 pub mod permissions;
+pub(crate) mod plugin_integration;
 mod remote_diff;
 pub mod screenshot;
 pub mod session_picker;
@@ -406,6 +407,12 @@ pub trait TuiState {
             }
         }
         false
+    }
+
+    /// Access the plugin bridge for TUI plugin integration.
+    /// Returns `None` when the plugin system has not been initialized.
+    fn plugin_bridge(&self) -> Option<&plugin_integration::PluginTuiBridge> {
+        None
     }
 }
 

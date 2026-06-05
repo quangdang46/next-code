@@ -7,7 +7,7 @@ description = "QuickJS plugin runtime: sandbox, transpiler, dispatcher, and brid
 [dependencies]
 jcode-plugin-core = { path = "../jcode-plugin-core" }
 rquickjs = { version = "0.7", features = ["parallel", "futures", "classes"] }
-tokio = { version = "1", features = ["fs", "process", "sync", "time"] }
+tokio = { version = "1", features = ["fs", "process", "sync", "time", "macros", "rt"] }
 tokio-stream = "0.1"
 futures = "0.3"
 regex = "1"
@@ -19,3 +19,10 @@ thiserror = "2"
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+swc_ecma_ast = "25"
+swc_ecma_parser = "41"
+swc_ecma_transforms_typescript = "49"
+swc_ecma_transforms_base = "44"
+swc_ecma_codegen = "28"
+swc_common = "23"
+swc_atoms = "9"

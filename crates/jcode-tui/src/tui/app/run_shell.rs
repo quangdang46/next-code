@@ -228,6 +228,9 @@ impl App {
     /// Run the TUI application
     /// Returns Some(session_id) if hot-reload was requested
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<RunResult> {
+        // Initialize the TUI plugin system before entering the main loop.
+        self.init_plugin_bridge().await;
+
         let mut event_stream = EventStream::new();
         let mut redraw_period = crate::tui::redraw_interval(&self);
         let mut redraw_interval = interval(redraw_period);
@@ -329,6 +332,9 @@ impl App {
 
     /// Run the TUI in remote mode, connecting to a server
     pub async fn run_remote(mut self, mut terminal: DefaultTerminal) -> Result<RunResult> {
+        // Initialize the TUI plugin system before entering the main loop.
+        self.init_plugin_bridge().await;
+
         let mut event_stream = EventStream::new();
         let mut redraw_period = crate::tui::redraw_interval(&self);
         let mut redraw_interval = interval(redraw_period);

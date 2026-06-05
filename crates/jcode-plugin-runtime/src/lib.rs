@@ -11,6 +11,8 @@ pub mod sandbox;
 pub mod server;
 pub mod timer;
 pub mod transpiler;
+pub mod tui_api;
+pub mod tui_system;
 pub mod types;
 
 pub use api::PluginApiBindings;
@@ -26,6 +28,8 @@ pub use sandbox::{DualTimeout, SandboxContext};
 pub use server::{check_kill_switches, is_force_deny, PluginSystem, DISABLE_ALL_PLUGINS, FORCE_DENY, SKIP_HOOKS};
 pub use timer::PluginTimer;
 pub use transpiler::Transpiler;
+pub use tui_api::{SlotContent, SlotRegistry, SlotType, TuiPluginApi};
+pub use tui_system::TuiPluginSystem;
 pub use types::{HandlerSlot, PreflightResult, ResolvedEntry, StaticAnalysis};
 
 #[cfg(test)]
