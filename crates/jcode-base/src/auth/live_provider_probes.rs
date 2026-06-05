@@ -955,10 +955,7 @@ pub async fn run_live_claude_native_tool_smoke(
     .with_evidence("model", serde_json::json!(model))
     .with_evidence("tool_name", serde_json::json!(tool_call.name))
     .with_evidence("tool_arguments", parsed_arguments)
-    .with_evidence(
-        "followup_consumed_result",
-        serde_json::json!(true),
-    );
+    .with_evidence("followup_consumed_result", serde_json::json!(true));
     if total_input != 0 || total_output != 0 {
         stage = stage.with_evidence("usage", usage_evidence(total_input, total_output, 0, 0));
     }

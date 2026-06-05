@@ -389,7 +389,9 @@ impl Agent {
             vec![ContentBlock::ToolUse {
                 id: tool_call_id,
                 name: tool_name,
-                input, thought_signature: None, }],
+                input,
+                thought_signature: None,
+            }],
         );
         self.session.save()?;
         Ok(message_id)

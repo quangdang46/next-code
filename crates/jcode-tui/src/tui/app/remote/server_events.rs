@@ -293,7 +293,9 @@ pub(in crate::tui::app) fn handle_server_event(
                 id,
                 name,
                 input: serde_json::Value::Null,
-                intent: None, thought_signature: None, });
+                intent: None,
+                thought_signature: None,
+            });
             eager_stream_redraw
         }
         ServerEvent::ToolInput { delta } => {
@@ -310,7 +312,9 @@ pub(in crate::tui::app) fn handle_server_event(
                 id: id.clone(),
                 name: name.clone(),
                 input: parsed_input.clone(),
-                intent: ToolCall::intent_from_input(&parsed_input), thought_signature: None, };
+                intent: ToolCall::intent_from_input(&parsed_input),
+                thought_signature: None,
+            };
             if let Some(key) = App::experimental_feature_key_for_tool(&tool_call) {
                 app.note_experimental_feature_use(key);
             }
@@ -527,14 +531,14 @@ pub(in crate::tui::app) fn handle_server_event(
                 let content = app.take_streaming_text();
                 let content = app.collapse_reasoning_for_commit(content);
                 if !content.trim().is_empty() {
-                app.push_display_message(DisplayMessage {
-                    role: "assistant".to_string(),
-                    content,
-                    tool_calls: Vec::new(),
-                    duration_secs: app.display_turn_duration_secs(),
-                    title: None,
-                    tool_data: None,
-                });
+                    app.push_display_message(DisplayMessage {
+                        role: "assistant".to_string(),
+                        content,
+                        tool_calls: Vec::new(),
+                        duration_secs: app.display_turn_duration_secs(),
+                        title: None,
+                        tool_data: None,
+                    });
                 }
             }
             app.clear_streaming_render_state();
@@ -602,14 +606,14 @@ pub(in crate::tui::app) fn handle_server_event(
                     let content = app.take_streaming_text();
                     let content = app.collapse_reasoning_for_commit(content);
                     if !content.trim().is_empty() {
-                    app.push_display_message(DisplayMessage {
-                        role: "assistant".to_string(),
-                        content,
-                        tool_calls: vec![],
-                        duration_secs: duration,
-                        title: None,
-                        tool_data: None,
-                    });
+                        app.push_display_message(DisplayMessage {
+                            role: "assistant".to_string(),
+                            content,
+                            tool_calls: vec![],
+                            duration_secs: duration,
+                            title: None,
+                            tool_data: None,
+                        });
                     }
                     app.push_turn_footer(duration);
                 } else if app.has_streaming_footer_stats() {
@@ -1570,14 +1574,14 @@ pub(in crate::tui::app) fn handle_server_event(
                 let flushed = app.take_streaming_text();
                 let flushed = app.collapse_reasoning_for_commit(flushed);
                 if !flushed.trim().is_empty() {
-                app.push_display_message(DisplayMessage {
-                    role: "assistant".to_string(),
-                    content: flushed,
-                    tool_calls: vec![],
-                    duration_secs: duration,
-                    title: None,
-                    tool_data: None,
-                });
+                    app.push_display_message(DisplayMessage {
+                        role: "assistant".to_string(),
+                        content: flushed,
+                        tool_calls: vec![],
+                        duration_secs: duration,
+                        title: None,
+                        tool_data: None,
+                    });
                 }
                 app.push_turn_footer(duration);
             }

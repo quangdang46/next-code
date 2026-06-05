@@ -239,7 +239,9 @@ fn build_contents_preserves_tool_calls_and_results() {
             content: vec![ContentBlock::ToolUse {
                 id: "call_1".to_string(),
                 name: "read".to_string(),
-                input: json!({"path":"README.md"}), thought_signature: None, }],
+                input: json!({"path":"README.md"}),
+                thought_signature: None,
+            }],
             timestamp: None,
             tool_duration_ms: None,
         },
@@ -280,7 +282,9 @@ fn build_contents_normalizes_non_object_tool_call_args_for_gemini_struct() {
         content: vec![ContentBlock::ToolUse {
             id: "call_primitive".to_string(),
             name: "read".to_string(),
-            input: json!(20), thought_signature: None, }],
+            input: json!(20),
+            thought_signature: None,
+        }],
         timestamp: None,
         tool_duration_ms: None,
     }];

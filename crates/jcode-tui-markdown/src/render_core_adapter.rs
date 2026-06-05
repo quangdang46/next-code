@@ -16,8 +16,8 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 
 use crate::{
-    bold_color, code_bg, code_fg, heading_h1_color, heading_h2_color, heading_h3_color,
-    heading_color, html_fg, link_fg, math_fg, md_dim_color, text_color,
+    bold_color, code_bg, code_fg, heading_color, heading_h1_color, heading_h2_color,
+    heading_h3_color, html_fg, link_fg, math_fg, md_dim_color, text_color,
 };
 
 /// Convert a parsed neutral [`Document`] into ratatui lines using the TUI
@@ -68,7 +68,11 @@ pub fn document_to_lines(doc: &Document) -> Vec<Line<'static>> {
 
 /// Render a code block with the legacy frame: `┌─ lang`, `│ ` gutter per line,
 /// and a closing `└─`.
-fn push_code_block(lines: &mut Vec<Line<'static>>, block: &jcode_render_core::Block, language: Option<&str>) {
+fn push_code_block(
+    lines: &mut Vec<Line<'static>>,
+    block: &jcode_render_core::Block,
+    language: Option<&str>,
+) {
     let dim = Style::default().fg(md_dim_color());
     let header = match language {
         Some(lang) if !lang.is_empty() => format!("┌─ {lang}"),
@@ -187,7 +191,10 @@ pub fn render_markdown_via_core_wrapped(text: &str, width: usize) -> Vec<Line<'s
                 push_math_display(&mut out, block);
             }
             BlockKind::Table => {
-                out.extend(crate::render_support::render_table(&block.table, Some(width)));
+                out.extend(crate::render_support::render_table(
+                    &block.table,
+                    Some(width),
+                ));
             }
             BlockKind::ThematicBreak => {
                 // Legacy fills the available width when one is known.

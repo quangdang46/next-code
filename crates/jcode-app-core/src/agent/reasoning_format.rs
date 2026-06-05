@@ -94,10 +94,7 @@ mod tests {
         assert!(!s.contains('>'), "no blockquote gutter expected: {s:?}");
         assert!(!s.contains("Thought for"), "no footer expected: {s:?}");
         // Each line wrapped in italic with the sentinel inside both ends.
-        assert!(s.contains(&format!(
-            "*{0}alpha{0}*",
-            REASONING_SENTINEL
-        )));
+        assert!(s.contains(&format!("*{0}alpha{0}*", REASONING_SENTINEL)));
         assert!(s.contains(&format!("*{0}beta{0}*", REASONING_SENTINEL)));
         assert!(s.ends_with("\n\n"));
     }
