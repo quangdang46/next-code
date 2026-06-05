@@ -5454,6 +5454,7 @@ dependencies = [
  "bytemuck",
  "glyphon",
  "image",
+ "jcode-base",
  "jcode-tui-messages",
  "libc",
  "pollster",
