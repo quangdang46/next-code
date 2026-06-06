@@ -459,9 +459,9 @@ impl crate::tui::TuiState for App {
         if self.is_remote {
             self.remote_header_provider_name().unwrap_or_default()
         } else {
-            self.remote_provider_name.clone().unwrap_or_else(|| {
-                crate::provider_catalog::runtime_provider_display_name(self.provider.name())
-            })
+            self.remote_provider_name
+                .clone()
+                .unwrap_or_else(|| self.provider.display_name())
         }
     }
 
@@ -594,6 +594,10 @@ impl crate::tui::TuiState for App {
 
     fn has_pending_mouse_scroll_animation(&self) -> bool {
         self.mouse_scroll_queue != 0
+    }
+
+    fn reasoning_collapse_animating(&self) -> bool {
+        self.reasoning_collapse_active()
     }
 
     fn total_session_tokens(&self) -> Option<(u64, u64)> {
@@ -1028,6 +1032,7 @@ impl crate::tui::TuiState for App {
                     status: item.status.clone(),
                     priority: item.priority.clone(),
                     id: item.id.clone(),
+                    group: None,
                     blocked_by: item.blocked_by.clone(),
                     assigned_to: item.assigned_to.clone(),
                     confidence: None,
@@ -1294,9 +1299,9 @@ impl crate::tui::TuiState for App {
             provider_name: if uses_remote_widget_metadata {
                 self.remote_provider_name
                     .clone()
-                    .or_else(|| Some(self.provider.name().to_string()))
+                    .or_else(|| Some(self.provider.display_name()))
             } else {
-                Some(self.provider.name().to_string())
+                Some(self.provider.display_name())
             },
             auth_method,
             upstream_provider: self.upstream_provider.clone(),
@@ -1506,19 +1511,22 @@ impl crate::tui::TuiState for App {
             return None;
         }
 
-        let text = self.current_copy_selection_text().unwrap_or_default();
-        let has_selection = !text.is_empty();
+        // Compute selection metrics without building the full selected string,
+        // which previously re-allocated the entire selection on every render
+        // frame and drag move (O(selection) per frame; a "select all" rebuilt
+        // the whole transcript text repeatedly).
+        let (selected_chars, selected_lines) = self
+            .normalized_copy_selection()
+            .and_then(crate::tui::ui::copy_selection_metrics)
+            .unwrap_or((0, 0));
+        let has_selection = selected_chars > 0;
         Some(crate::tui::CopySelectionStatus {
             pane: self
                 .current_copy_selection_pane()
                 .unwrap_or(crate::tui::CopySelectionPane::Chat),
             has_action: has_selection,
-            selected_chars: text.chars().count(),
-            selected_lines: if has_selection {
-                text.lines().count().max(1)
-            } else {
-                0
-            },
+            selected_chars,
+            selected_lines: if has_selection { selected_lines.max(1) } else { 0 },
             dragging: self.copy_selection_dragging,
         })
     }

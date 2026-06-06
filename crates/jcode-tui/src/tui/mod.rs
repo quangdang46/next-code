@@ -219,6 +219,11 @@ pub trait TuiState {
     fn has_pending_mouse_scroll_animation(&self) -> bool {
         false
     }
+    /// Whether a "current reasoning collapses away" animation is in progress and
+    /// the redraw loop must keep ticking to advance it.
+    fn reasoning_collapse_animating(&self) -> bool {
+        false
+    }
     /// Optional configured keybinding label for external dictation.
     fn dictation_key_label(&self) -> Option<String>;
     /// Time since app started (for startup animations)
@@ -1294,6 +1299,7 @@ pub(crate) fn redraw_interval_with_policy(
         || !state.streaming_text().is_empty()
         || state.status_notice().is_some()
         || state.has_pending_mouse_scroll_animation()
+        || state.reasoning_collapse_animating()
         || state.copy_selection_edge_autoscroll_active()
         || state.has_notification()
         || rate_limit_countdown_redraw_active(state)
@@ -1353,6 +1359,7 @@ pub(crate) fn periodic_redraw_required(state: &dyn TuiState) -> bool {
         || !state.streaming_text().is_empty()
         || state.status_notice().is_some()
         || state.has_pending_mouse_scroll_animation()
+        || state.reasoning_collapse_animating()
         || state.copy_selection_edge_autoscroll_active()
         || state.chat_overscroll_active()
         || state.has_notification()

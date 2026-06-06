@@ -2413,6 +2413,14 @@ pub(crate) fn load_external_cli_sessions_grouped(
     (Vec::new(), sessions)
 }
 
+pub(crate) fn load_external_cli_sessions_grouped_multi(
+    _clis: &[crate::tui::app::onboarding_flow::ExternalCli],
+) -> (Vec<ServerGroup>, Vec<SessionInfo>) {
+    let scan_limit = session_scan_limit();
+    let sessions = load_external_casr_sessions(scan_limit);
+    (Vec::new(), sessions)
+}
+
 #[cfg(test)]
 #[path = "loading_tests.rs"]
 mod tests;

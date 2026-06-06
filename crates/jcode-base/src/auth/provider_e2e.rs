@@ -22,13 +22,14 @@ use crate::auth::lifecycle::{
     AuthActivationRequest, activate_auth_change, validate_catalog_invariants,
 };
 use crate::auth::live_provider_probes::{
-    fetch_live_openai_compatible_models, run_live_antigravity_native_smoke,
-    run_live_antigravity_native_stream_smoke, run_live_antigravity_native_tool_smoke,
+    fetch_live_openai_compatible_models, run_live_antigravity_native_reasoning_smoke,
+    run_live_antigravity_native_smoke, run_live_antigravity_native_stream_smoke,
+    run_live_antigravity_native_tool_smoke, run_live_claude_native_reasoning_smoke,
     run_live_claude_native_smoke, run_live_claude_native_stream_smoke,
-    run_live_claude_native_tool_smoke, run_live_native_provider_smoke,
-    run_live_native_provider_stream_smoke, run_live_native_provider_tool_smoke,
-    run_live_openai_compatible_smoke, run_live_openai_compatible_stream_smoke,
-    run_live_openai_compatible_tool_smoke,
+    run_live_claude_native_tool_smoke, run_live_native_provider_reasoning_smoke,
+    run_live_native_provider_smoke, run_live_native_provider_stream_smoke,
+    run_live_native_provider_tool_smoke, run_live_openai_compatible_smoke,
+    run_live_openai_compatible_stream_smoke, run_live_openai_compatible_tool_smoke,
 };
 use crate::live_tests::{
     self, LiveVerificationAuth, LiveVerificationEvent, LiveVerificationResult,
@@ -273,6 +274,7 @@ const FULL_PIPELINE_LABELS: &[(&str, &str)] = &[
     (checkpoints::TOOL_EXECUTION_LOOP, "Tool execution loop"),
     (checkpoints::TOOL_RESULT_FOLLOWUP, "Tool-result followup"),
     (checkpoints::REAL_JCODE_TOOL_SMOKE, "Real Jcode tool smoke"),
+    (checkpoints::REASONING_CAPABILITY, "Reasoning capability"),
 ];
 
 fn label_for(checkpoint: &str) -> &'static str {
@@ -291,17 +293,89 @@ fn label_for(checkpoint: &str) -> &'static str {
 /// declined a second tool call). Surfacing it keeps the coverage observable in
 /// the doctor report instead of collapsing to a generic pass string.
 fn tool_stage_detail(stage: &crate::live_tests::LiveVerificationStage) -> String {
-    match stage
+    let multi = match stage
         .evidence
         .get("multi_tool_replay")
         .and_then(|value| value.as_str())
     {
-        Some("verified") => "tool call parsed and executed; multi-call signature replay verified".to_string(),
-        Some("skipped") => {
-            "tool call parsed and executed; multi-call signature replay skipped (no 2nd tool call)"
-                .to_string()
+        Some("verified") => "multi-call signature replay verified",
+        Some("skipped") => "multi-call signature replay skipped (no 2nd tool call)",
+        _ => "",
+    };
+    let parallel = match stage
+        .evidence
+        .get("parallel_tool_calls")
+        .and_then(|value| value.as_str())
+    {
+        Some("verified") => "parallel tool calls verified",
+        Some("skipped") => "parallel tool calls skipped (single call)",
+        _ => "",
+    };
+    let mut detail = "tool call parsed and executed".to_string();
+    for part in [multi, parallel] {
+        if !part.is_empty() {
+            detail.push_str("; ");
+            detail.push_str(part);
         }
-        _ => "tool call parsed and executed".to_string(),
+    }
+    detail
+}
+
+/// Human-readable detail for a passed reasoning-capability stage. The stage
+/// records `reasoning_capability` as `streamed` (visible reasoning text),
+/// `opaque` (no text but a reasoning signal: thought signature, reasoning item,
+/// or reasoning tokens), or `none` (neither). All three are passes; `opaque` and
+/// `none` are legitimate because providers like Gemini-3 and OpenAI hide their
+/// reasoning. Surfacing the classification keeps the observation visible in the
+/// doctor report.
+fn reasoning_stage_detail(stage: &crate::live_tests::LiveVerificationStage) -> String {
+    match stage
+        .evidence
+        .get("reasoning_capability")
+        .and_then(|value| value.as_str())
+    {
+        Some("streamed") => "reasoning streamed (visible thinking text)".to_string(),
+        Some("opaque") => {
+            "reasoning hidden but signaled (opaque: thought signature / reasoning item)".to_string()
+        }
+        Some("none") => "no reasoning signal observed (model hides or skips reasoning)".to_string(),
+        _ => "reasoning turn completed".to_string(),
+    }
+}
+
+/// Fold a reasoning-capability probe result into a [`DoctorCheck`], honoring the
+/// observe-only contract.
+///
+/// A clean turn records a passed checkpoint carrying the `streamed`/`opaque`/
+/// `none` classification (all three are passes; hiding reasoning is legitimate).
+/// A probe *error* (network, or a turn that did not complete with a coherent
+/// answer) is recorded as **skipped**, never failed: this checkpoint must never
+/// flip a provider to "not user-ready", and it is not part of the strict
+/// coverage ladder, so an observational miss should not fail the tier. The
+/// broader chat/streaming checkpoints already guard turn completion.
+fn push_reasoning_check(
+    result: anyhow::Result<LiveVerificationStage>,
+    checks: &mut Vec<DoctorCheck>,
+    spend: &mut DoctorSpend,
+) {
+    match result {
+        Ok(stage) => {
+            spend.accumulate(stage.evidence.get("usage"), stage.evidence.get("cost"));
+            let detail = reasoning_stage_detail(&stage);
+            checks.push(DoctorCheck::passed(
+                checkpoints::REASONING_CAPABILITY,
+                label_for(checkpoints::REASONING_CAPABILITY),
+                detail,
+            ));
+        }
+        Err(error) => checks.push(DoctorCheck::skipped(
+            checkpoints::REASONING_CAPABILITY,
+            label_for(checkpoints::REASONING_CAPABILITY),
+            format!(
+                "observe-only reasoning probe did not complete: {}",
+                format_error_chain(&error)
+            ),
+        )),
     }
 }
 
@@ -314,6 +388,7 @@ const API_DEPENDENT_CHECKPOINTS: &[&str] = &[
     checkpoints::TOOL_EXECUTION_LOOP,
     checkpoints::TOOL_RESULT_FOLLOWUP,
     checkpoints::REAL_JCODE_TOOL_SMOKE,
+    checkpoints::REASONING_CAPABILITY,
 ];
 
 /// Run the strict provider/model diagnostic.
@@ -532,8 +607,8 @@ pub async fn run_claude_native_e2e(
     use crate::provider::Provider;
     use crate::provider::anthropic::AnthropicProvider;
 
-    let normalized =
-        crate::auth::lifecycle::normalized_auth_provider_id(Some(provider_id)).unwrap_or("claude");
+    let normalized = crate::auth::lifecycle::normalized_auth_provider_id(Some(provider_id))
+        .unwrap_or("claude");
     let provider_label = crate::auth::lifecycle::provider_display_label(Some(normalized))
         .unwrap_or_else(|| "Anthropic/Claude".to_string());
     let provider_id = normalized.to_string();
@@ -573,11 +648,7 @@ pub async fn run_claude_native_e2e(
     let credential_is_oauth = if tier.requires_api_key() {
         match provider_runtime.resolve_access_token_for_doctor().await {
             Ok((token, is_oauth)) if !token.trim().is_empty() => {
-                let kind = if is_oauth {
-                    "OAuth (subscription)"
-                } else {
-                    "API key"
-                };
+                let kind = if is_oauth { "OAuth (subscription)" } else { "API key" };
                 checks.push(DoctorCheck::passed(
                     checkpoints::AUTH_CREDENTIAL_LOADED,
                     label_for(checkpoints::AUTH_CREDENTIAL_LOADED),
@@ -850,6 +921,13 @@ async fn run_native_claude_api_checks(
             }
         }
     }
+
+    // Reasoning capability (observe-only; never gates readiness).
+    push_reasoning_check(
+        run_live_claude_native_reasoning_smoke(selected).await,
+        checks,
+        spend,
+    );
 }
 
 /// The wiring contract for the native Antigravity (Google OAuth Cloud Code)
@@ -890,10 +968,14 @@ fn native_antigravity_auth(account: &str) -> LiveVerificationAuth {
 /// the caller fall back to the runtime default.
 fn cheapest_antigravity_model(catalog_models: &[String]) -> Option<String> {
     let is_alias = |m: &&String| m.trim().is_empty() || m.trim() == "default";
-    if let Some(flash) = catalog_models.iter().filter(|m| !is_alias(m)).find(|m| {
-        let lower = m.to_ascii_lowercase();
-        lower.starts_with("gemini") && lower.contains("flash")
-    }) {
+    if let Some(flash) = catalog_models
+        .iter()
+        .filter(|m| !is_alias(m))
+        .find(|m| {
+            let lower = m.to_ascii_lowercase();
+            lower.starts_with("gemini") && lower.contains("flash")
+        })
+    {
         return Some(flash.clone());
     }
     if let Some(gemini) = catalog_models
@@ -903,7 +985,10 @@ fn cheapest_antigravity_model(catalog_models: &[String]) -> Option<String> {
     {
         return Some(gemini.clone());
     }
-    catalog_models.iter().find(|m| !is_alias(m)).cloned()
+    catalog_models
+        .iter()
+        .find(|m| !is_alias(m))
+        .cloned()
 }
 
 /// Run the strict provider/model diagnostic for the **native Antigravity**
@@ -1187,6 +1272,13 @@ async fn run_native_antigravity_api_checks(
             }
         }
     }
+
+    // Reasoning capability (observe-only; never gates readiness).
+    push_reasoning_check(
+        run_live_antigravity_native_reasoning_smoke(selected).await,
+        checks,
+        spend,
+    );
 }
 
 // === Generic native-runtime doctor =========================================
@@ -1344,8 +1436,8 @@ impl NativeProviderKind {
     /// Returns an error only when the runtime cannot be constructed at all (e.g.
     /// Copilot with no credential file); model selection happens later.
     fn build_runtime(self) -> anyhow::Result<std::sync::Arc<dyn crate::provider::Provider>> {
-        use crate::provider::Provider;
         use anyhow::Context as _;
+        use crate::provider::Provider;
         let runtime: std::sync::Arc<dyn Provider> = match self {
             Self::OpenAi => {
                 let credentials = crate::auth::codex::load_credentials().unwrap_or_else(|_| {
@@ -1360,7 +1452,9 @@ impl NativeProviderKind {
                 std::sync::Arc::new(crate::provider::openai::OpenAIProvider::new(credentials))
             }
             Self::Gemini => std::sync::Arc::new(crate::provider::gemini::GeminiProvider::new()),
-            Self::Cursor => std::sync::Arc::new(crate::provider::cursor::CursorCliProvider::new()),
+            Self::Cursor => {
+                std::sync::Arc::new(crate::provider::cursor::CursorCliProvider::new())
+            }
             Self::Copilot => {
                 // `new()` requires a loadable GitHub token; fall back to an empty
                 // token so the offline tier can still construct the runtime for
@@ -1375,14 +1469,18 @@ impl NativeProviderKind {
                 crate::env::set_var("JCODE_COPILOT_PREFETCH_STARTUP_GRACE_MS", "0");
                 let runtime = match crate::provider::copilot::CopilotApiProvider::new() {
                     Ok(runtime) => runtime,
-                    Err(_) => {
-                        crate::provider::copilot::CopilotApiProvider::new_with_token(String::new())
-                    }
+                    Err(_) => crate::provider::copilot::CopilotApiProvider::new_with_token(
+                        String::new(),
+                    ),
                 };
                 std::sync::Arc::new(runtime)
             }
-            Self::Bedrock => std::sync::Arc::new(crate::provider::bedrock::BedrockProvider::new()),
-            Self::Jcode => std::sync::Arc::new(crate::provider::jcode::JcodeProvider::new()),
+            Self::Bedrock => {
+                std::sync::Arc::new(crate::provider::bedrock::BedrockProvider::new())
+            }
+            Self::Jcode => {
+                std::sync::Arc::new(crate::provider::jcode::JcodeProvider::new())
+            }
             Self::Azure => {
                 // Azure OpenAI is the OpenRouter transport configured via Azure
                 // env; apply that env (endpoint/key/header wiring) before building
@@ -1713,14 +1811,8 @@ pub async fn run_generic_native_e2e(
                 ));
             }
         } else {
-            run_generic_native_api_checks(
-                runtime.as_ref(),
-                &selected,
-                spec.label,
-                &mut checks,
-                &mut spend,
-            )
-            .await;
+            run_generic_native_api_checks(runtime.as_ref(), &selected, spec.label, &mut checks, &mut spend)
+                .await;
         }
     } else {
         for checkpoint in API_DEPENDENT_CHECKPOINTS {
@@ -1822,6 +1914,13 @@ async fn run_generic_native_api_checks(
             }
         }
     }
+
+    // Reasoning capability (observe-only; never gates readiness).
+    push_reasoning_check(
+        run_live_native_provider_reasoning_smoke(provider, selected, label).await,
+        checks,
+        spend,
+    );
 }
 
 /// The jcode-side wiring a given compat profile is expected to activate.
@@ -2417,9 +2516,7 @@ mod tests {
         // OpenAI-compatible profiles are driven by the generic doctor, not the
         // native path.
         assert!(!native_doctor_supports_provider("openrouter"));
-        assert!(!native_doctor_supports_provider(
-            "definitely-not-a-provider"
-        ));
+        assert!(!native_doctor_supports_provider("definitely-not-a-provider"));
     }
 
     #[test]
@@ -2475,5 +2572,72 @@ mod tests {
         assert!(with_account.source.contains("user@example.com"));
         let anonymous = native_antigravity_auth("");
         assert!(anonymous.source.contains("Antigravity Google OAuth"));
+    }
+
+    #[test]
+    fn tool_stage_detail_surfaces_multi_and_parallel_phases() {
+        let verified = LiveVerificationStage::passed(checkpoints::TOOL_CALL_PARSE)
+            .with_evidence("multi_tool_replay", serde_json::json!("verified"))
+            .with_evidence("parallel_tool_calls", serde_json::json!("verified"));
+        let detail = tool_stage_detail(&verified);
+        assert!(detail.contains("tool call parsed and executed"));
+        assert!(detail.contains("multi-call signature replay verified"));
+        assert!(detail.contains("parallel tool calls verified"));
+
+        let skipped = LiveVerificationStage::passed(checkpoints::TOOL_CALL_PARSE)
+            .with_evidence("multi_tool_replay", serde_json::json!("skipped"))
+            .with_evidence("parallel_tool_calls", serde_json::json!("skipped"));
+        let detail = tool_stage_detail(&skipped);
+        assert!(detail.contains("multi-call signature replay skipped"));
+        assert!(detail.contains("parallel tool calls skipped"));
+
+        // With no evidence the base string is unchanged (back-compat).
+        let bare = LiveVerificationStage::passed(checkpoints::TOOL_CALL_PARSE);
+        assert_eq!(tool_stage_detail(&bare), "tool call parsed and executed");
+    }
+
+    #[test]
+    fn reasoning_stage_detail_describes_each_classification() {
+        for (value, needle) in [
+            ("streamed", "reasoning streamed"),
+            ("opaque", "reasoning hidden but signaled"),
+            ("none", "no reasoning signal observed"),
+        ] {
+            let stage = LiveVerificationStage::passed(checkpoints::REASONING_CAPABILITY)
+                .with_evidence("reasoning_capability", serde_json::json!(value));
+            assert!(
+                reasoning_stage_detail(&stage).contains(needle),
+                "classification {value} should mention {needle}"
+            );
+        }
+    }
+
+    #[test]
+    fn push_reasoning_check_records_pass_for_clean_turn() {
+        let mut checks = Vec::new();
+        let mut spend = DoctorSpend::default();
+        let stage = LiveVerificationStage::passed(checkpoints::REASONING_CAPABILITY)
+            .with_evidence("reasoning_capability", serde_json::json!("opaque"));
+        push_reasoning_check(Ok(stage), &mut checks, &mut spend);
+        assert_eq!(checks.len(), 1);
+        assert_eq!(checks[0].checkpoint, checkpoints::REASONING_CAPABILITY);
+        assert_eq!(checks[0].status, LiveVerificationStageStatus::Passed);
+        assert!(!checks[0].is_failure());
+    }
+
+    #[test]
+    fn push_reasoning_check_skips_never_fails_on_probe_error() {
+        // The observe-only reasoning checkpoint must never produce a failure that
+        // could flip the tier to not-ready; a probe error is recorded as skipped.
+        let mut checks = Vec::new();
+        let mut spend = DoctorSpend::default();
+        push_reasoning_check(
+            Err(anyhow::anyhow!("network blip")),
+            &mut checks,
+            &mut spend,
+        );
+        assert_eq!(checks.len(), 1);
+        assert_eq!(checks[0].status, LiveVerificationStageStatus::Skipped);
+        assert!(!checks[0].is_failure());
     }
 }
