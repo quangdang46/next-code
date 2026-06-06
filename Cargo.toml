@@ -73,6 +73,7 @@ members = [
     "crates/jcode-plugin-runtime",
     "crates/jcode-mempalace-adapter",
     "crates/jcode-render-core",
+    "crates/jcode-keywords",
     "evals/jbench",
 ]
 
