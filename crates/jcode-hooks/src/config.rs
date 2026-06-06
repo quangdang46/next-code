@@ -19,8 +19,8 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use regex::Regex;
 use super::matcher::HookMatcher;
+use regex::Regex;
 
 // ---------------------------------------------------------------------------
 // HookEvent

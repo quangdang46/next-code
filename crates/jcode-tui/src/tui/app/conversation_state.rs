@@ -158,7 +158,7 @@ impl App {
 
         if let Some(summary_chars) = event.summary_chars.filter(|chars| *chars > 0) {
             details.push(format!(
-                "artifact {} chars",
+                "summary {} chars",
                 Self::format_compaction_number(summary_chars as u64)
             ));
         }
@@ -412,6 +412,25 @@ impl App {
     pub(crate) fn clear_remote_startup_phase(&mut self) {
         self.remote_startup_phase = None;
         self.remote_startup_phase_started = None;
+    }
+
+    /// Begin (or restart) the per-connection history-recovery budget.
+    ///
+    /// Called when a remote connection starts waiting for the bootstrap
+    /// `History` payload. Each fresh connection gets a clean budget so a stall on
+    /// one connection does not exhaust the retries available to the next.
+    pub(crate) fn begin_remote_history_wait(&mut self) {
+        self.remote_history_wait_started = Some(Instant::now());
+        self.remote_history_recovery_attempts = 0;
+        self.remote_history_recovery_last_attempt = None;
+    }
+
+    /// Clear the history-recovery watchdog once history has loaded (or the
+    /// connection is no longer waiting on it).
+    pub(crate) fn clear_remote_history_wait(&mut self) {
+        self.remote_history_wait_started = None;
+        self.remote_history_recovery_attempts = 0;
+        self.remote_history_recovery_last_attempt = None;
     }
 
     pub(super) fn set_memory_feature_enabled(&mut self, enabled: bool) {
@@ -803,6 +822,7 @@ mod tests {
             name: "swarm".to_string(),
             input: serde_json::json!({"action": "spawn", "prompt": "try it"}),
             intent: None,
+            thought_signature: None,
         };
 
         assert_eq!(
@@ -818,6 +838,7 @@ mod tests {
             name: "swarm".to_string(),
             input: serde_json::json!({"action": "assign_task", "spawn_if_needed": true}),
             intent: None,
+            thought_signature: None,
         };
 
         assert_eq!(
@@ -833,6 +854,7 @@ mod tests {
             name: "swarm".to_string(),
             input: serde_json::json!({"action": "status"}),
             intent: None,
+            thought_signature: None,
         };
 
         assert_eq!(App::experimental_feature_key_for_tool(&tool), None);

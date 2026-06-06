@@ -1,9 +1,9 @@
 pub mod account_store;
+pub mod active_method;
 pub mod antigravity;
 pub mod azure;
 pub mod claude;
 pub mod codex;
-pub mod codex_config;
 mod commands;
 pub mod copilot;
 pub mod cursor;
@@ -37,6 +37,8 @@ pub use status_types::{
     AuthCredentialSource, AuthExpiryConfidence, AuthReadinessLevel, AuthRefreshSupport, AuthState,
     AuthStatus, AuthValidationMethod, ProviderAuth, ProviderAuthAssessment,
 };
+
+pub use active_method::{ActiveCredential, ResolvedProviderAuth, resolve_dual_credential_auth};
 
 use crate::provider_catalog::LoginProviderAuthStateKey;
 use crate::provider_catalog::LoginProviderDescriptor;
@@ -174,29 +176,6 @@ fn copilot_auth_state_from_credentials() -> (AuthState, bool) {
     }
 }
 
-/// Issue #163: check whether `key` is listed in
-/// `provider.disabled_providers` config. Case-insensitive,
-/// whitespace-trimmed. Recognized aliases:
-///   "copilot" matches "github copilot" and vice versa.
-///
-/// Used by auth status, login picker, and provider catalog to hide
-/// providers an operator has explicitly turned off (e.g. enterprise
-/// policy, billing constraints).
-pub fn provider_key_disabled(key: &str) -> bool {
-    crate::config::config()
-        .provider
-        .disabled_providers
-        .iter()
-        .any(|raw| {
-            let value = raw.trim();
-            value.eq_ignore_ascii_case(key)
-                || (key.eq_ignore_ascii_case("copilot")
-                    && value.eq_ignore_ascii_case("github copilot"))
-                || (key.eq_ignore_ascii_case("github copilot")
-                    && value.eq_ignore_ascii_case("copilot"))
-        })
-}
-
 impl AuthStatus {
     /// Check all authentication sources and return their status.
     /// Results are cached for 30 seconds to avoid expensive PATH scanning on every frame.
@@ -262,6 +241,43 @@ impl AuthStatus {
             || self.antigravity == AuthState::Available
             || self.gemini == AuthState::Available
             || self.cursor == AuthState::Available
+    }
+
+    /// Emit a structured, non-secret snapshot of which providers currently have
+    /// credentials configured. This is the single best line to ask a user to
+    /// share when debugging "my model picker is empty / only OpenAI+Anthropic
+    /// show / login silently failed" reports: it records, per provider, whether
+    /// jcode believes credentials are available/expired/missing without leaking
+    /// any token or key material.
+    ///
+    /// `surface` describes where the snapshot was taken from (for example
+    /// `model_picker`, `auth_changed`, `catalog_refresh`) so logs can be
+    /// correlated with the user action that triggered them.
+    pub fn log_snapshot(&self, surface: &str) {
+        crate::logging::event_info(
+            "auth_status_snapshot",
+            vec![
+                ("surface", surface.to_string()),
+                ("any_available", self.has_any_available().to_string()),
+                ("jcode", self.jcode.label().to_string()),
+                ("anthropic", self.anthropic.state.label().to_string()),
+                ("anthropic_oauth", self.anthropic.has_oauth.to_string()),
+                ("anthropic_api", self.anthropic.has_api_key.to_string()),
+                ("openai", self.openai.label().to_string()),
+                ("openai_oauth", self.openai_has_oauth.to_string()),
+                ("openai_api", self.openai_has_api_key.to_string()),
+                ("openrouter", self.openrouter.label().to_string()),
+                ("azure", self.azure.label().to_string()),
+                ("azure_api", self.azure_has_api_key.to_string()),
+                ("azure_entra", self.azure_uses_entra.to_string()),
+                ("bedrock", self.bedrock.label().to_string()),
+                ("copilot", self.copilot.label().to_string()),
+                ("copilot_cred", self.copilot_has_api_token.to_string()),
+                ("antigravity", self.antigravity.label().to_string()),
+                ("gemini", self.gemini.label().to_string()),
+                ("cursor", self.cursor.label().to_string()),
+            ],
+        );
     }
 
     pub fn has_any_untrusted_external_auth() -> bool {

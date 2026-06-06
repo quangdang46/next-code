@@ -30,30 +30,13 @@ fn display_message_from_stored_message(
 }
 
 fn stored_message_visible_text(message: &crate::session::StoredMessage) -> String {
-    // Issue #98: when `display.show_thinking = false`, MiniMax (and any other
-    // provider that emits `reasoning_content`) was still surfacing the
-    // thinking text here because we lumped Reasoning blocks in with normal
-    // assistant text. Respect the setting at the rendering boundary.
-    let show_thinking = crate::config::config().display.show_thinking;
-    stored_message_visible_text_with_show_thinking(message, show_thinking)
-}
-
-/// Pure helper for `stored_message_visible_text` so tests can pin the
-/// `show_thinking` decision without mutating the global config.
-pub(super) fn stored_message_visible_text_with_show_thinking(
-    message: &crate::session::StoredMessage,
-    show_thinking: bool,
-) -> String {
     let mut parts = Vec::new();
     for block in &message.content {
         match block {
-            ContentBlock::Text { text, .. } => {
+            ContentBlock::Text { text, .. }
+            | ContentBlock::Reasoning { text }
+            | ContentBlock::ReasoningTrace { text } => {
                 if !text.trim().is_empty() {
-                    parts.push(text.trim().to_string());
-                }
-            }
-            ContentBlock::Reasoning { text } => {
-                if show_thinking && !text.trim().is_empty() {
                     parts.push(text.trim().to_string());
                 }
             }
@@ -82,8 +65,13 @@ impl App {
             return;
         }
         let is_tool = message.role == "tool";
+        // Maintain the cached display-message counters incrementally for this
+        // single append, then bump the version without a full O(M) rescan.
+        // Appending is the hot path; rescanning every append was O(M^2) over a
+        // long session.
+        self.adjust_display_message_stats(&message, true);
         self.display_messages.push(message);
-        self.bump_display_messages_version();
+        self.bump_display_messages_version_no_stats();
         if is_tool && self.diff_mode.has_side_pane() && self.diff_pane_auto_scroll {
             self.diff_pane_scroll = usize::MAX;
         }
@@ -353,6 +341,9 @@ impl App {
 
     pub(super) fn clear_display_messages(&mut self) {
         self.compacted_history_lazy = CompactedHistoryLazyState::default();
+        // The transcript is about to be discarded; forget where the live reasoning
+        // block started so a stale offset can't slice the new stream.
+        self.reasoning_block_start = None;
         if !self.display_messages.is_empty() {
             self.display_messages.clear();
             self.bump_display_messages_version();
@@ -560,84 +551,4 @@ fn parse_leading_usize(text: &str) -> Option<(usize, &str)> {
         .last()?;
     let value = text[..end].parse().ok()?;
     Some((value, &text[end..]))
-}
-
-#[cfg(test)]
-mod show_thinking_tests {
-    use super::*;
-    use crate::message::ContentBlock;
-    use crate::session::StoredMessage;
-    use jcode_message_types::Role;
-
-    fn assistant_with_blocks(blocks: Vec<ContentBlock>) -> StoredMessage {
-        StoredMessage {
-            id: "test".to_string(),
-            role: Role::Assistant,
-            content: blocks,
-            display_role: None,
-            timestamp: None,
-            tool_duration_ms: None,
-            token_usage: None,
-        }
-    }
-
-    #[test]
-    fn reasoning_block_hidden_when_show_thinking_is_false() {
-        // Regression for issue #98: MiniMax-style reasoning_content was
-        // leaking into the rendered transcript when display.show_thinking was
-        // false because Reasoning blocks were being lumped with Text blocks.
-        let msg = assistant_with_blocks(vec![
-            ContentBlock::Reasoning {
-                text: "internal thoughts the user explicitly chose not to see".to_string(),
-            },
-            ContentBlock::Text {
-                text: "Final answer for the user.".to_string(),
-                cache_control: None,
-            },
-        ]);
-
-        let visible = stored_message_visible_text_with_show_thinking(&msg, false);
-        assert_eq!(visible, "Final answer for the user.");
-        assert!(
-            !visible.contains("internal thoughts"),
-            "show_thinking=false must suppress Reasoning content; got {visible:?}"
-        );
-    }
-
-    #[test]
-    fn reasoning_block_shown_when_show_thinking_is_true() {
-        let msg = assistant_with_blocks(vec![
-            ContentBlock::Reasoning {
-                text: "thinking step 1".to_string(),
-            },
-            ContentBlock::Text {
-                text: "answer".to_string(),
-                cache_control: None,
-            },
-        ]);
-
-        let visible = stored_message_visible_text_with_show_thinking(&msg, true);
-        assert!(
-            visible.contains("thinking step 1"),
-            "show_thinking=true must include reasoning; got {visible:?}"
-        );
-        assert!(visible.contains("answer"));
-    }
-
-    #[test]
-    fn empty_reasoning_block_is_skipped_either_way() {
-        let msg = assistant_with_blocks(vec![
-            ContentBlock::Reasoning {
-                text: "   \n  ".to_string(),
-            },
-            ContentBlock::Text {
-                text: "real".to_string(),
-                cache_control: None,
-            },
-        ]);
-        for show in [true, false] {
-            let visible = stored_message_visible_text_with_show_thinking(&msg, show);
-            assert_eq!(visible, "real");
-        }
-    }
 }

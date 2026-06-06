@@ -8,6 +8,7 @@ use std::collections::HashSet;
 use std::path::Path;
 mod crash;
 mod journal;
+mod maintenance;
 mod memory_profile;
 mod model;
 mod persistence;
@@ -22,6 +23,7 @@ pub use jcode_session_types::{
     StoredDisplayRole, StoredMemoryInjection, StoredMessage, StoredTokenUsage,
 };
 use journal::{PersistVectorMode, SessionJournalMeta, SessionPersistState};
+pub use maintenance::prune_old_session_backups;
 pub use memory_profile::SessionMemoryProfileSnapshot;
 use memory_profile::{
     ContentBlockMemoryStats, SessionMemoryProfileCache, summarize_blocks, summarize_message_content,
@@ -176,6 +178,8 @@ struct SessionStartupStub {
     #[serde(default)]
     model: Option<String>,
     #[serde(default)]
+    route_api_method: Option<String>,
+    #[serde(default)]
     reasoning_effort: Option<String>,
     #[serde(default)]
     subagent_model: Option<String>,
@@ -283,6 +287,7 @@ impl Session {
         session.provider_session_id = stub.provider_session_id;
         session.provider_key = stub.provider_key;
         session.model = stub.model;
+        session.route_api_method = stub.route_api_method;
         session.reasoning_effort = stub.reasoning_effort;
         session.subagent_model = stub.subagent_model;
         session.improve_mode = stub.improve_mode;
@@ -317,6 +322,7 @@ impl Session {
         session.provider_session_id = snapshot.provider_session_id;
         session.provider_key = snapshot.provider_key;
         session.model = snapshot.model;
+        session.route_api_method = snapshot.route_api_method;
         session.reasoning_effort = snapshot.reasoning_effort;
         session.subagent_model = snapshot.subagent_model;
         session.improve_mode = snapshot.improve_mode;
@@ -709,20 +715,6 @@ impl Session {
     }
 
     pub fn create(parent_id: Option<String>, title: Option<String>) -> Self {
-        // Issue #99: top-level user sessions can be auto-titled via
-        // `jcode --name <title>` (translated to `JCODE_SESSION_NAME`). Only
-        // apply when the caller didn't pass an explicit title and there is
-        // no parent (subagents/spawned children should not inherit the env).
-        let title = title.or_else(|| {
-            if parent_id.is_none() {
-                std::env::var("JCODE_SESSION_NAME")
-                    .ok()
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-            } else {
-                None
-            }
-        });
         let now = Utc::now();
         let (id, short_name) = new_memorable_session_id();
         let is_debug = default_is_test_session();
@@ -1027,7 +1019,9 @@ impl Session {
         for msg in &mut redacted.messages {
             for block in &mut msg.content {
                 match block {
-                    ContentBlock::Text { text, .. } | ContentBlock::Reasoning { text } => {
+                    ContentBlock::Text { text, .. }
+                    | ContentBlock::Reasoning { text }
+                    | ContentBlock::ReasoningTrace { text } => {
                         *text = crate::message::redact_secrets(text);
                     }
                     ContentBlock::AnthropicThinking { thinking, .. } => {
@@ -1441,6 +1435,8 @@ struct RemoteStartupSessionSnapshot {
     provider_key: Option<String>,
     #[serde(default)]
     model: Option<String>,
+    #[serde(default)]
+    route_api_method: Option<String>,
     #[serde(default)]
     reasoning_effort: Option<String>,
     #[serde(default)]

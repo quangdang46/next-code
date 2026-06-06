@@ -431,27 +431,28 @@ pub fn list_sessions() -> Result<()> {
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
-                    crate::casr_adapter::imported_claude_code_session_id(session_id),
+                    crate::import::imported_claude_code_session_id(session_id),
                 ],
             ),
             jcode_tui_session_picker::ResumeTarget::CodexSession { session_id, .. } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
-                    crate::casr_adapter::imported_codex_session_id(session_id),
+                    crate::import::imported_codex_session_id(session_id),
                 ],
             ),
             jcode_tui_session_picker::ResumeTarget::PiSession { session_path } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
-                    crate::casr_adapter::imported_pi_session_id(session_path),
+                    crate::import::imported_pi_session_id(session_path),
                 ],
             ),
             jcode_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
+<<<<<<< HEAD
                     crate::casr_adapter::imported_opencode_session_id(session_id),
                 ],
             ),
@@ -467,6 +468,9 @@ pub fn list_sessions() -> Result<()> {
                         provider_slug,
                         session_id,
                     ),
+=======
+                    crate::import::imported_opencode_session_id(session_id),
+>>>>>>> origin/master
                 ],
             ),
         }
@@ -507,16 +511,6 @@ pub fn list_sessions() -> Result<()> {
             jcode_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => {
                 format!("◌ OpenCode {}", &session_id[..session_id.len().min(8)])
             }
-            jcode_tui_session_picker::ResumeTarget::ForeignSession {
-                provider_slug,
-                session_id,
-                ..
-            } => {
-                format!(
-                    "💾 {provider_slug} {}",
-                    &session_id[..session_id.len().min(8)]
-                )
-            }
         };
         let command = crate::terminal_launch::TerminalCommand::new(program, args).title(title);
         crate::terminal_launch::spawn_command_in_new_terminal(&command, cwd)
@@ -532,6 +526,7 @@ pub fn list_sessions() -> Result<()> {
 
             if targets.len() == 1 {
                 let target = &targets[0];
+<<<<<<< HEAD
                 let resolved_target = match target {
                     jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } => {
                         session_id.clone()
@@ -558,17 +553,19 @@ pub fn list_sessions() -> Result<()> {
                         session_id,
                     ),
                 };
+=======
+                let resolved_target = crate::import::resolve_resume_target_to_jcode(target)?;
+>>>>>>> origin/master
                 let mut session_cwd = cwd.clone();
-                let session_id: &str = &resolved_target;
-                let _ = session_id;
-                if let Ok(_sess) = session::Session::load(&resolved_target)
+                if let jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } =
+                    &resolved_target
                     && let Ok(sess) = session::Session::load(session_id)
                     && let Some(dir) = sess.working_dir.as_deref()
                     && std::path::Path::new(dir).is_dir()
                 {
                     session_cwd = std::path::PathBuf::from(dir);
                 }
-                let (program, args) = build_resume_target_command(&exe, target);
+                let (program, args) = build_resume_target_command(&exe, &resolved_target);
                 let err = crate::platform::replace_process(
                     ProcessCommand::new(&program)
                         .args(&args)
@@ -581,6 +578,7 @@ pub fn list_sessions() -> Result<()> {
                 let mut warned_no_terminal = false;
 
                 for target in targets {
+<<<<<<< HEAD
                     let resolved_target = match &target {
                         jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } => {
                             session_id.clone()
@@ -608,16 +606,27 @@ pub fn list_sessions() -> Result<()> {
                             session_id,
                         ),
                     };
+=======
+                    let resolved_target =
+                        match crate::import::resolve_resume_target_to_jcode(&target) {
+                            Ok(target) => target,
+                            Err(e) => {
+                                eprintln!("Failed to import selected session: {}", e);
+                                continue;
+                            }
+                        };
+>>>>>>> origin/master
                     let mut session_cwd = cwd.clone();
-                    let session_id: &str = &resolved_target;
-                    if let Ok(sess) = session::Session::load(session_id)
+                    if let jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } =
+                        &resolved_target
+                        && let Ok(sess) = session::Session::load(session_id)
                         && let Some(dir) = sess.working_dir.as_deref()
                         && std::path::Path::new(dir).is_dir()
                     {
                         session_cwd = std::path::PathBuf::from(dir);
                     }
 
-                    match spawn_target_in_new_terminal(&target, &exe, &session_cwd) {
+                    match spawn_target_in_new_terminal(&resolved_target, &exe, &session_cwd) {
                         Ok(true) => spawned += 1,
                         Ok(false) => {
                             if !warned_no_terminal {
@@ -626,7 +635,8 @@ pub fn list_sessions() -> Result<()> {
                                 );
                                 warned_no_terminal = true;
                             }
-                            let (program, args) = build_resume_target_command(&exe, &target);
+                            let (program, args) =
+                                build_resume_target_command(&exe, &resolved_target);
                             eprintln!("  {}", command_display(&program, &args));
                         }
                         Err(e) => {
@@ -653,10 +663,13 @@ pub fn list_sessions() -> Result<()> {
             let mut warned_no_terminal = false;
 
             for target in targets {
-                let resolved_target = match &target {
-                    jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } => {
-                        session_id.clone()
+                let resolved_target = match crate::import::resolve_resume_target_to_jcode(&target) {
+                    Ok(target) => target,
+                    Err(e) => {
+                        eprintln!("Failed to import selected session: {}", e);
+                        continue;
                     }
+<<<<<<< HEAD
                     jcode_tui_session_picker::ResumeTarget::ClaudeCodeSession {
                         session_id,
                         ..
@@ -678,11 +691,12 @@ pub fn list_sessions() -> Result<()> {
                         provider_slug,
                         session_id,
                     ),
+=======
+>>>>>>> origin/master
                 };
                 let mut session_cwd = cwd.clone();
-                let session_id: &str = &resolved_target;
-                let _ = session_id;
-                if let Ok(_sess) = session::Session::load(&resolved_target)
+                if let jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } =
+                    &resolved_target
                     && let Ok(sess) = session::Session::load(session_id)
                     && let Some(dir) = sess.working_dir.as_deref()
                     && std::path::Path::new(dir).is_dir()
@@ -690,7 +704,7 @@ pub fn list_sessions() -> Result<()> {
                     session_cwd = std::path::PathBuf::from(dir);
                 }
 
-                match spawn_target_in_new_terminal(&target, &exe, &session_cwd) {
+                match spawn_target_in_new_terminal(&resolved_target, &exe, &session_cwd) {
                     Ok(true) => spawned += 1,
                     Ok(false) => {
                         if !warned_no_terminal {
@@ -699,7 +713,7 @@ pub fn list_sessions() -> Result<()> {
                             );
                             warned_no_terminal = true;
                         }
-                        let (program, args) = build_resume_target_command(&exe, &target);
+                        let (program, args) = build_resume_target_command(&exe, &resolved_target);
                         eprintln!("  {}", command_display(&program, &args));
                     }
                     Err(e) => {

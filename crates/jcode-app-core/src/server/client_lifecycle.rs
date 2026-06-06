@@ -45,10 +45,11 @@ use super::provider_control::{
     try_available_models_updated_event,
 };
 use super::{
-    AwaitMembersRuntime, ClientConnectionInfo, ClientDebugState, FileAccess, SessionControlHandle,
-    SessionInterruptQueues, SharedContext, SwarmEvent, SwarmMember, SwarmMutationRuntime,
-    VersionedPlan, format_structured_completion_report, register_session_interrupt_queue,
-    truncate_detail, update_member_status, update_member_status_with_report,
+    AwaitMembersRuntime, ClientConnectionInfo, ClientDebugState, FileTouchService,
+    SessionControlHandle, SessionInterruptQueues, SharedContext, SwarmEvent, SwarmMember,
+    SwarmMutationRuntime, VersionedPlan, format_structured_completion_report,
+    register_session_interrupt_queue, truncate_detail, update_member_status,
+    update_member_status_with_report,
 };
 use crate::agent::Agent;
 use crate::bus::{Bus, BusEvent};
@@ -64,7 +65,6 @@ use jcode_hooks::{
     ClassifiedOutcome, DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry,
 };
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
@@ -318,8 +318,7 @@ pub(super) async fn handle_client(
     shared_context: Arc<RwLock<HashMap<String, HashMap<String, SharedContext>>>>,
     swarm_plans: Arc<RwLock<HashMap<String, VersionedPlan>>>,
     swarm_coordinators: Arc<RwLock<HashMap<String, String>>>,
-    file_touches: Arc<RwLock<HashMap<PathBuf, Vec<FileAccess>>>>,
-    files_touched_by_session: Arc<RwLock<HashMap<String, HashSet<PathBuf>>>>,
+    file_touch: FileTouchService,
     channel_subscriptions: ChannelSubscriptions,
     channel_subscriptions_by_session: ChannelSubscriptions,
     client_debug_state: Arc<RwLock<ClientDebugState>>,
@@ -374,7 +373,7 @@ pub(super) async fn handle_client(
                             shared_context: &shared_context,
                             swarm_plans: &swarm_plans,
                             swarm_coordinators: &swarm_coordinators,
-                            files_touched_by_session: &files_touched_by_session,
+                            file_touch: &file_touch,
                             channel_subscriptions: &channel_subscriptions,
                             channel_subscriptions_by_session: &channel_subscriptions_by_session,
                             client_connections: &client_connections,
@@ -1105,8 +1104,7 @@ pub(super) async fn handle_client(
                     &client_connections,
                     &swarm_members,
                     &swarms_by_id,
-                    &file_touches,
-                    &files_touched_by_session,
+                    &file_touch,
                     &channel_subscriptions,
                     &channel_subscriptions_by_session,
                     &swarm_plans,
@@ -1288,8 +1286,7 @@ pub(super) async fn handle_client(
                             &client_debug_state,
                             &swarm_members,
                             &swarms_by_id,
-                            &file_touches,
-                            &files_touched_by_session,
+                            &file_touch,
                             &channel_subscriptions,
                             &channel_subscriptions_by_session,
                             &swarm_plans,
@@ -1516,8 +1513,7 @@ pub(super) async fn handle_client(
                     &client_debug_state,
                     &swarm_members,
                     &swarms_by_id,
-                    &file_touches,
-                    &files_touched_by_session,
+                    &file_touch,
                     &channel_subscriptions,
                     &channel_subscriptions_by_session,
                     &swarm_plans,
@@ -1926,7 +1922,9 @@ pub(super) async fn handle_client(
                     &client_event_tx,
                     &swarm_members,
                     &swarms_by_id,
-                    &files_touched_by_session,
+                    &file_touch,
+                    &sessions,
+                    &client_connections,
                 )
                 .await;
             }
@@ -2158,7 +2156,7 @@ pub(super) async fn handle_client(
                     &sessions,
                     &swarm_members,
                     &client_connections,
-                    &files_touched_by_session,
+                    &file_touch,
                     &client_event_tx,
                 )
                 .await;
@@ -2450,8 +2448,7 @@ pub(super) async fn handle_client(
         &swarms_by_id,
         &swarm_coordinators,
         &swarm_plans,
-        &file_touches,
-        &files_touched_by_session,
+        &file_touch,
         &channel_subscriptions,
         &channel_subscriptions_by_session,
         &client_debug_state,

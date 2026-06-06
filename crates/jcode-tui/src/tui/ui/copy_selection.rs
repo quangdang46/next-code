@@ -32,7 +32,7 @@ pub(super) fn copy_point_from_snapshot(
     Some(crate::tui::CopySelectionPoint {
         pane: snapshot.pane,
         abs_line,
-        column: clamp_display_col(text, rel_col).max(copy_start),
+        column: clamp_display_col(&text, rel_col).max(copy_start),
     })
 }
 
@@ -76,14 +76,14 @@ pub(super) fn copy_selection_text_from_raw_lines(
             out.push_str(text);
             continue;
         }
-        let line_width = line_display_width(text);
+        let line_width = line_display_width(&text);
         let start_col = if raw_line == start.raw_line {
-            clamp_display_col(text, start.column)
+            clamp_display_col(&text, start.column)
         } else {
             0
         };
         let end_col = if raw_line == end.raw_line {
-            clamp_display_col(text, end.column)
+            clamp_display_col(&text, end.column)
         } else {
             line_width
         };
@@ -92,14 +92,67 @@ pub(super) fn copy_selection_text_from_raw_lines(
             continue;
         }
 
-        let slice = display_col_slice(text, start_col, end_col);
+        let slice = display_col_slice(&text, start_col, end_col);
         if raw_line == start.raw_line {
             out.reserve(slice.len().saturating_mul(selected_lines.min(8)));
         }
-        out.push_str(slice);
+        out.push_str(&slice);
     }
 
     Some(out)
+}
+
+/// Selection metrics (character count and line count) for the raw-lines path,
+/// computed without allocating the full joined selection string. Mirrors the
+/// slicing in [`copy_selection_text_from_raw_lines`] exactly so the displayed
+/// "N chars · M lines" matches what would actually be copied.
+pub(super) fn copy_selection_metrics_from_raw_lines(
+    snapshot: &CopyViewportSnapshot,
+    start: crate::tui::CopySelectionPoint,
+    end: crate::tui::CopySelectionPoint,
+) -> Option<(usize, usize)> {
+    if snapshot.raw_plain_line_count() == 0 || snapshot.wrapped_line_map(start.abs_line).is_none() {
+        return None;
+    }
+
+    let start = raw_selection_point(snapshot, start)?;
+    let end = raw_selection_point(snapshot, end)?;
+    if start.raw_line >= snapshot.raw_plain_line_count()
+        || end.raw_line >= snapshot.raw_plain_line_count()
+    {
+        return None;
+    }
+
+    let mut chars = 0usize;
+    let mut lines = 0usize;
+    for raw_line in start.raw_line..=end.raw_line {
+        if raw_line > start.raw_line {
+            chars += 1; // the joining '\n'
+        }
+        lines += 1;
+        let text = snapshot.raw_plain_line(raw_line)?;
+        if raw_line != start.raw_line && raw_line != end.raw_line {
+            chars += text.chars().count();
+            continue;
+        }
+        let line_width = line_display_width(&text);
+        let start_col = if raw_line == start.raw_line {
+            clamp_display_col(&text, start.column)
+        } else {
+            0
+        };
+        let end_col = if raw_line == end.raw_line {
+            clamp_display_col(&text, end.column)
+        } else {
+            line_width
+        };
+        if end_col < start_col {
+            continue;
+        }
+        chars += display_col_slice(&text, start_col, end_col).chars().count();
+    }
+
+    Some((chars, lines.max(1)))
 }
 
 pub(super) fn link_target_from_snapshot(
@@ -108,7 +161,7 @@ pub(super) fn link_target_from_snapshot(
 ) -> Option<String> {
     let raw_point = raw_selection_point(snapshot, point)?;
     let raw_text = snapshot.raw_plain_line(raw_point.raw_line)?;
-    link_target_for_display_column(raw_text, raw_point.column)
+    link_target_for_display_column(&raw_text, raw_point.column)
 }
 
 fn raw_selection_point(
@@ -121,7 +174,7 @@ fn raw_selection_point(
         .wrapped_copy_offset(point.abs_line)
         .unwrap_or(0)
         .min(wrapped_text.width());
-    let local_col = clamp_display_col(wrapped_text, point.column).max(display_copy_start);
+    let local_col = clamp_display_col(&wrapped_text, point.column).max(display_copy_start);
     let segment_width = map.end_col.saturating_sub(map.start_col);
     Some(RawSelectionPoint {
         raw_line: map.raw_line,

@@ -44,40 +44,6 @@ const API_URL: &str = "https://api.anthropic.com/v1/messages";
 /// OAuth endpoint (with beta=true query param)
 const API_URL_OAUTH: &str = "https://api.anthropic.com/v1/messages?beta=true";
 
-/// Issue #83: Anthropic-compatible third-party endpoint override.
-///
-/// Returns the base URL (no `/v1/messages` suffix) when the user has
-/// set either `ANTHROPIC_BASE_URL` or `JCODE_ANTHROPIC_BASE_URL`.
-/// Empty values are treated as unset.
-///
-/// Used only for direct API-key auth — OAuth flows are still pinned
-/// to api.anthropic.com to prevent token leakage to a proxy.
-pub(crate) fn anthropic_base_url_override() -> Option<String> {
-    for key in ["JCODE_ANTHROPIC_BASE_URL", "ANTHROPIC_BASE_URL"] {
-        if let Ok(v) = std::env::var(key) {
-            let trimmed = v.trim().to_string();
-            if !trimmed.is_empty() {
-                return Some(trimmed);
-            }
-        }
-    }
-    None
-}
-
-/// Issue #83 follow-up: report whether a direct API key is configured
-/// via the environment, independent of any OAuth credentials on disk.
-///
-/// Used by provider startup / failover to decide whether to instantiate
-/// the Anthropic provider runtime when only an API key (e.g. for a
-/// third-party Anthropic-compatible endpoint via `ANTHROPIC_BASE_URL`)
-/// is available. Empty values are treated as unset.
-pub fn anthropic_api_key_env_configured() -> bool {
-    matches!(
-        std::env::var("ANTHROPIC_API_KEY"),
-        Ok(v) if !v.trim().is_empty()
-    )
-}
-
 /// User-Agent for OAuth requests, matching the official Claude Code CLI.
 pub(crate) const CLAUDE_CLI_USER_AGENT: &str = "claude-cli/2.1.123 (external, sdk-cli)";
 
@@ -422,7 +388,6 @@ const DEFAULT_MAX_TOKENS: u32 = 32_768;
 /// Available models
 pub const AVAILABLE_MODELS: &[&str] = &[
     "claude-opus-4-8",
-    "claude-opus-4-8[1m]",
     "claude-opus-4-6",
     "claude-opus-4-6[1m]",
     "claude-sonnet-4-6",
@@ -450,21 +415,49 @@ pub(crate) enum AnthropicCredentialMode {
 
 impl AnthropicCredentialMode {
     fn from_runtime_env() -> Self {
-        match std::env::var("JCODE_RUNTIME_PROVIDER")
-            .ok()
-            .map(|value| value.trim().to_ascii_lowercase())
-            .as_deref()
-        {
-            Some("claude-api" | "anthropic-api") => Self::ApiKey,
-            Some("claude" | "anthropic") => Self::OAuth,
-            _ => Self::Auto,
+        // Canonical parse: recognizes every runtime/route/CLI/prefix alias for
+        // the Anthropic OAuth-vs-API decision in one place, so this can never
+        // drift from the other vocabularies (see jcode_provider_core::auth_mode).
+        match jcode_provider_core::runtime_env_pinned_mode(
+            jcode_provider_core::DualAuthProvider::Anthropic,
+        ) {
+            Some(jcode_provider_core::AuthMode::ApiKey) => Self::ApiKey,
+            Some(jcode_provider_core::AuthMode::Oauth) => Self::OAuth,
+            None => Self::Auto,
+        }
+    }
+
+    /// The canonical dual-auth route this explicit mode pins, if any.
+    /// `Auto` has no explicit pin and returns `None`.
+    pub(crate) fn auth_route(self) -> Option<jcode_provider_core::AuthRoute> {
+        use jcode_provider_core::{AuthMode, AuthRoute};
+        match self {
+            Self::Auto => None,
+            Self::OAuth => Some(AuthRoute::anthropic(AuthMode::Oauth)),
+            Self::ApiKey => Some(AuthRoute::anthropic(AuthMode::ApiKey)),
         }
     }
 }
 
 pub(crate) fn load_anthropic_api_key() -> Result<String> {
-    crate::provider_catalog::load_api_key_from_env_or_config("ANTHROPIC_API_KEY", "anthropic.env")
-        .context("No Anthropic API key found")
+    let key = crate::provider_catalog::load_api_key_from_env_or_config(
+        "ANTHROPIC_API_KEY",
+        "anthropic.env",
+    )
+    .context("No Anthropic API key found")?;
+    if std::env::var("JCODE_LOG_SERVICE_TIER").is_ok() {
+        // Only show the known prefix — never leak key material to stderr.
+        let display = if key.starts_with("sk-ant-") {
+            "sk-ant-***..."
+        } else {
+            "***..."
+        };
+        eprintln!(
+            "[anthropic] resolved API key prefix={display} (len={})",
+            key.len()
+        );
+    }
+    Ok(key)
 }
 
 pub(crate) fn has_anthropic_api_key() -> bool {
@@ -489,6 +482,63 @@ impl AnthropicProvider {
     fn is_usage_exhausted() -> bool {
         let usage = crate::usage::get_sync();
         usage.five_hour >= 0.99 && usage.seven_day >= 0.99
+    }
+
+    /// Resolve a usable access token (OAuth or API key) and whether it is OAuth.
+    ///
+    /// Exposed for the provider-doctor's native Claude driver so it can validate
+    /// the credential and fetch the live model catalog through the exact same
+    /// resolution path the runtime uses. Returns the bearer token and an
+    /// `is_oauth` flag so callers can pick the matching catalog endpoint.
+    pub async fn resolve_access_token_for_doctor(&self) -> Result<(String, bool)> {
+        self.get_access_token().await
+    }
+
+    /// Pin the credential mode (OAuth vs API key) for a provider-doctor run.
+    ///
+    /// The `claude` login provider is specifically the OAuth/subscription path,
+    /// while `claude-api` is the API-key path. The doctor must test the path
+    /// implied by the provider id under test, regardless of what
+    /// `JCODE_RUNTIME_PROVIDER` happens to be in the current process (e.g. a
+    /// self-dev session may have it set to `claude-api`). This also updates
+    /// `JCODE_RUNTIME_PROVIDER` so any provider instances the probes build
+    /// afterwards inherit the same mode. Errors if the requested credential is
+    /// not available, so the doctor can record a clear AUTH failure.
+    pub fn pin_credential_mode_for_doctor(&self, oauth: bool) -> Result<()> {
+        let mode = if oauth {
+            AnthropicCredentialMode::OAuth
+        } else {
+            AnthropicCredentialMode::ApiKey
+        };
+        self.set_credential_mode(mode)
+    }
+
+    /// Fetch the live Anthropic model catalog using the resolved credential.
+    ///
+    /// Mirrors [`Provider::prefetch_models`] but returns the model ids to the
+    /// caller (rather than only persisting them) so the doctor can assert the
+    /// live `GET /v1/models` endpoint works and that the model under test is in
+    /// the live catalog.
+    pub async fn fetch_live_model_ids_for_doctor(&self) -> Result<Vec<String>> {
+        let (token, is_oauth) = self.get_access_token().await?;
+        if token.trim().is_empty() {
+            anyhow::bail!("resolved an empty Anthropic access token");
+        }
+        let catalog = if is_oauth {
+            crate::provider::fetch_anthropic_model_catalog_oauth(&token).await?
+        } else {
+            crate::provider::fetch_anthropic_model_catalog(&token).await?
+        };
+        // Persist so the rest of the process benefits from the warm catalog,
+        // exactly like the runtime's own prefetch.
+        crate::provider::persist_anthropic_model_catalog(&catalog);
+        if !catalog.context_limits.is_empty() {
+            crate::provider::populate_context_limits(catalog.context_limits.clone());
+        }
+        if !catalog.available_models.is_empty() {
+            crate::provider::populate_anthropic_models(catalog.available_models.clone());
+        }
+        Ok(catalog.available_models)
     }
 
     pub fn new() -> Self {
@@ -647,6 +697,19 @@ impl AnthropicProvider {
         model: &str,
         is_oauth: bool,
     ) -> (Option<ApiThinking>, Option<ApiOutputConfig>, Option<f32>) {
+        // `display.show_thinking` is a request to *see* the model's reasoning.
+        // Anthropic only streams thinking summaries when a thinking request is
+        // present, so opting into the display must also opt into generating it.
+        let show_thinking = crate::config::config().display.show_thinking;
+        self.build_reasoning_request_parts_inner(model, is_oauth, show_thinking)
+    }
+
+    fn build_reasoning_request_parts_inner(
+        &self,
+        model: &str,
+        is_oauth: bool,
+        show_thinking: bool,
+    ) -> (Option<ApiThinking>, Option<ApiOutputConfig>, Option<f32>) {
         let effort = self.reasoning_effort();
         let effort = effort.as_deref().filter(|effort| *effort != "none");
 
@@ -656,18 +719,24 @@ impl AnthropicProvider {
                 effort: Self::actual_effort_for_model(model, effort),
             });
 
-        let thinking = effort.and_then(|effort| {
-            if Self::model_supports_adaptive_thinking(model) {
-                Some(ApiThinking::Adaptive {
-                    display: Some("summarized"),
-                })
-            } else if Self::model_supports_manual_thinking(model) {
-                Self::manual_thinking_budget(effort, self.max_tokens)
-                    .map(|budget_tokens| ApiThinking::Enabled { budget_tokens })
-            } else {
-                None
-            }
-        });
+        // When only the display toggle is on (no explicit effort), request
+        // thinking without forcing `output_config`, so the model keeps its
+        // default reasoning strength and only the thinking *display* is enabled.
+        let thinking = if Self::model_supports_adaptive_thinking(model) {
+            (effort.is_some() || show_thinking).then_some(ApiThinking::Adaptive {
+                display: Some("summarized"),
+            })
+        } else if Self::model_supports_manual_thinking(model) {
+            // Manual-thinking models need a concrete budget. Use the configured
+            // effort, or fall back to a minimal budget when only the display
+            // toggle is on.
+            effort
+                .or(show_thinking.then_some("low"))
+                .and_then(|effort| Self::manual_thinking_budget(effort, self.max_tokens))
+                .map(|budget_tokens| ApiThinking::Enabled { budget_tokens })
+        } else {
+            None
+        };
 
         // Extended/adaptive thinking is incompatible with temperature. OAuth path
         // normally mirrors Claude Code's temperature=1.0, so omit it when thinking is active.
@@ -699,9 +768,10 @@ impl AnthropicProvider {
         // Max/Pro users expect.
         if matches!(mode, AnthropicCredentialMode::Auto)
             && auth::claude::load_credentials().is_err()
-            && let Ok(key) = load_anthropic_api_key()
         {
-            return Ok((key, false));
+            if let Ok(key) = load_anthropic_api_key() {
+                return Ok((key, false));
+            }
         }
 
         self.get_oauth_access_token().await
@@ -802,14 +872,8 @@ impl AnthropicProvider {
         // choice so UI surfaces (model picker, header widget) report the auth
         // method that requests will actually use, instead of inferring it from
         // credential presence. `Auto` leaves the existing identity untouched.
-        match mode {
-            AnthropicCredentialMode::OAuth => {
-                crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude");
-            }
-            AnthropicCredentialMode::ApiKey => {
-                crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude-api");
-            }
-            AnthropicCredentialMode::Auto => {}
+        if let Some(route) = mode.auth_route() {
+            crate::env::set_var("JCODE_RUNTIME_PROVIDER", route.runtime_provider_key());
         }
         Ok(())
     }
@@ -1025,7 +1089,9 @@ impl AnthropicProvider {
                         signature: signature.clone(),
                     });
                 }
-                ContentBlock::ToolUse { id, name, input } => {
+                ContentBlock::ToolUse {
+                    id, name, input, ..
+                } => {
                     result.push(ApiContentBlock::ToolUse {
                         id: crate::message::sanitize_tool_id(id),
                         name: if is_oauth {
@@ -1325,6 +1391,19 @@ impl Provider for AnthropicProvider {
     }
 
     fn set_model(&self, model: &str) -> Result<()> {
+        // Native-1M models (Opus 4.8/4.7) no longer carry a redundant `[1m]`
+        // alias. Gracefully migrate a stale `<model>[1m]` id (from old config or
+        // a restored session) to its canonical form, since the suffix is a no-op
+        // for these models.
+        let model: &str = if is_1m_model(model)
+            && matches!(
+                jcode_provider_core::anthropic_context_mode(model),
+                jcode_provider_core::AnthropicContextMode::Native1M
+            ) {
+            strip_1m_suffix(model)
+        } else {
+            model
+        };
         if !crate::provider::known_anthropic_model_ids()
             .iter()
             .any(|known| known == model)
@@ -1801,22 +1880,8 @@ async fn stream_response(
         .await;
 
     let connect_start = std::time::Instant::now();
-    // Build request with appropriate auth headers.
-    //
-    // Issue #83: support Anthropic-compatible third-party endpoints
-    // (Bedrock proxies, self-hosted gateways, etc.) by allowing
-    // ANTHROPIC_BASE_URL or JCODE_ANTHROPIC_BASE_URL to override the
-    // default api.anthropic.com host. The override is applied only
-    // for direct API-key auth — OAuth flows still hit Anthropic
-    // (would otherwise leak Anthropic-issued tokens).
-    let url = if is_oauth {
-        API_URL_OAUTH.to_string()
-    } else if let Some(base) = anthropic_base_url_override() {
-        format!("{}/v1/messages", base.trim_end_matches('/'))
-    } else {
-        API_URL.to_string()
-    };
-    let url = url.as_str();
+    // Build request with appropriate auth headers
+    let url = if is_oauth { API_URL_OAUTH } else { API_URL };
 
     let mut req = client
         .post(url)
@@ -1897,18 +1962,15 @@ async fn stream_response(
     let mut cache_read_input_tokens: Option<u64> = None;
     let mut cache_creation_input_tokens: Option<u64> = None;
 
-    let sse_chunk_timeout = crate::provider::sse_timeout::chunk_timeout(180);
+    const SSE_CHUNK_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(180);
 
     loop {
-        let chunk = match tokio::time::timeout(sse_chunk_timeout, stream.next()).await {
+        let chunk = match tokio::time::timeout(SSE_CHUNK_TIMEOUT, stream.next()).await {
             Ok(Some(chunk_result)) => chunk_result.context("Error reading stream chunk")?,
             Ok(None) => break, // stream ended normally
             Err(_) => {
-                let secs = sse_chunk_timeout.as_secs();
-                crate::logging::warn(&format!(
-                    "Anthropic SSE stream timed out (no data for {secs}s)"
-                ));
-                anyhow::bail!("Stream read timeout: no data received for {secs} seconds");
+                crate::logging::warn("Anthropic SSE stream timed out (no data for 180s)");
+                anyhow::bail!("Stream read timeout: no data received for 180 seconds");
             }
         };
         let chunk_str = String::from_utf8_lossy(&chunk);
@@ -2035,7 +2097,6 @@ struct SseEvent {
 }
 
 /// Process an SSE event and return StreamEvents if applicable
-#[allow(clippy::too_many_arguments)]
 fn process_sse_event(
     event: &SseEvent,
     current_tool_use: &mut Option<ToolUseAccumulator>,
@@ -2057,6 +2118,12 @@ fn process_sse_event(
                 *input_tokens = usage.input_tokens.map(|t| t as u64);
                 *cache_read_input_tokens = usage.cache_read_input_tokens.map(|t| t as u64);
                 *cache_creation_input_tokens = usage.cache_creation_input_tokens.map(|t| t as u64);
+                if let Some(tier) = usage.service_tier.as_deref() {
+                    crate::logging::info(&format!("Anthropic granted service_tier={}", tier));
+                    if std::env::var("JCODE_LOG_SERVICE_TIER").is_ok() {
+                        eprintln!("[anthropic] granted service_tier={tier}");
+                    }
+                }
             }
         }
         "content_block_start" => {
@@ -2523,7 +2590,6 @@ struct ContentBlockDeltaEvent {
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
-#[allow(clippy::enum_variant_names)]
 enum ApiDelta {
     #[serde(rename = "text_delta")]
     TextDelta { text: String },
@@ -2555,6 +2621,7 @@ struct UsageInfo {
     output_tokens: Option<u32>,
     cache_read_input_tokens: Option<u32>,
     cache_creation_input_tokens: Option<u32>,
+    service_tier: Option<String>,
 }
 
 #[cfg(test)]

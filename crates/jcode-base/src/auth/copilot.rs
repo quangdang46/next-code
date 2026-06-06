@@ -625,6 +625,48 @@ pub async fn exchange_github_token(
     })
 }
 
+/// Run a live Copilot auth check and persist the result as a validation record.
+///
+/// This is the only definitive way to know a discovered GitHub token is actually
+/// usable for Copilot: a token can exist locally while the account is banned,
+/// not entitled, or otherwise rejected by the Copilot token service. We exchange
+/// the GitHub OAuth token for a Copilot bearer token (the same call the live
+/// provider makes) and record success/failure so presence-based readiness
+/// surfaces (`validation_failure_blocks_auto_use`, `check_fast`) reflect reality.
+///
+/// Returns `Ok(())` when the token exchange succeeds, or the underlying error
+/// (whose message embeds the HTTP status, e.g. `HTTP 401`/`HTTP 403`) otherwise.
+pub async fn verify_copilot_credentials_live(client: &reqwest::Client) -> Result<()> {
+    let github_token = load_github_token()?;
+    let result = exchange_github_token(client, &github_token).await;
+
+    let summary = match &result {
+        Ok(_) => "copilot token exchange ok".to_string(),
+        Err(err) => format!("{err}"),
+    };
+    let record = crate::auth::validation::ProviderValidationRecord {
+        checked_at_ms: chrono::Utc::now().timestamp_millis(),
+        success: result.is_ok(),
+        provider_smoke_ok: Some(result.is_ok()),
+        tool_smoke_ok: None,
+        summary,
+    };
+    // Best-effort: a failure to persist must not change the live result.
+    let _ = crate::auth::validation::save("copilot", record);
+    // Refresh the auth snapshot so readiness surfaces pick up the new record.
+    crate::auth::AuthStatus::invalidate_cache();
+
+    result.map(|_| ())
+}
+
+/// Convenience wrapper around [`verify_copilot_credentials_live`] that builds a
+/// short-lived HTTP client. Useful for callers (e.g. the TUI crate) that do not
+/// depend on `reqwest` directly.
+pub async fn verify_copilot_credentials_live_default() -> Result<()> {
+    let client = reqwest::Client::new();
+    verify_copilot_credentials_live(&client).await
+}
+
 /// Initiate GitHub OAuth device flow for Copilot authentication.
 /// Returns the device code response with user instructions.
 pub async fn initiate_device_flow(client: &reqwest::Client) -> Result<DeviceCodeResponse> {
@@ -708,22 +750,8 @@ pub fn save_github_token(token: &str, username: &str) -> Result<()> {
     let config_dir = legacy_copilot_config_dir();
     std::fs::create_dir_all(&config_dir)
         .with_context(|| format!("Failed to create {}", config_dir.display()))?;
-    // Issue #46: on WSL2 / network mounts / FAT filesystems, the
-    // owner-only permission tightening can fail because the underlying
-    // filesystem doesn't support POSIX modes. The previous code returned
-    // those errors via `?`, which killed the entire login flow even
-    // though the directory was created successfully and the rest of the
-    // OS-level access controls (e.g. NTFS ACLs on DrvFs) protected the
-    // file just fine. Degrade chmod failures to a warning so the token
-    // gets saved, and surface the cause in the log for users who want
-    // to investigate.
-    if let Err(e) = crate::platform::set_directory_permissions_owner_only(&config_dir) {
-        crate::logging::warn(&format!(
-            "Could not tighten perms on {} (kept default mode; common on WSL2 / DrvFs / FAT): {}",
-            config_dir.display(),
-            e
-        ));
-    }
+    crate::platform::set_directory_permissions_owner_only(&config_dir)
+        .with_context(|| format!("Failed to secure {}", config_dir.display()))?;
 
     let hosts_path = config_dir.join("hosts.json");
 

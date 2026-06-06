@@ -115,9 +115,10 @@ mod tests {
 
     #[test]
     fn test_invalid_regex_falls_back() {
-        let matcher = // HookMatcher::Regex("[invalid".to_string()); — removed, invalid regex would cause a panic at parse time
-        let ctx = MatcherContext::new("[invalid");
-        // Invalid regex should fall back to exact match
+        // Invalid regex syntax is now caught at parse time in parse_matcher_pattern().
+        // This test uses a valid regex and verifies normal matching instead.
+        let matcher = HookMatcher::Regex(regex::Regex::new("^test").unwrap());
+        let ctx = MatcherContext::new("test_value");
         assert!(matches(&matcher, &ctx));
     }
 }

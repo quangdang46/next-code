@@ -163,6 +163,10 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
         "/context",
         "Show the full session context snapshot",
     ));
+    lines.push(help_entry(
+        "/skills",
+        "Show loaded skills and jcode-endorsed recommendations",
+    ));
     lines.push(help_entry("/info", "Show session info and token usage"));
     lines.push(help_entry("/usage", "Show connected provider usage limits"));
     lines.push(help_entry("/version", "Show version and build details"));
@@ -185,10 +189,6 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(help_entry(
         "/rewind",
         "Show numbered history, /rewind N to rewind",
-    ));
-    lines.push(help_entry(
-        "/history",
-        "Show input history. Subcommands: input N, search, delete N, clear",
     ));
     lines.push(help_entry(
         "/fix",
@@ -340,10 +340,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
     lines.push(Line::from(Span::styled("  Navigation", section_style)));
     lines.push(Line::from(""));
     lines.push(key_entry("PageUp / PageDown", "Scroll history"));
-    lines.push(key_entry(
-        "Up / Down (empty or browsing)",
-        "Recall previous input / navigate history",
-    ));
+    lines.push(key_entry("Up / Down", "Scroll history (when input empty)"));
     lines.push(key_entry("Ctrl+[ / Ctrl+]", "Jump between user prompts"));
     lines.push(key_entry(
         "Cmd/Super+K / J",

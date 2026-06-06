@@ -1,7 +1,6 @@
 /// Available Claude models used by model lists and provider routing.
 pub const ALL_CLAUDE_MODELS: &[&str] = &[
     "claude-opus-4-8",
-    "claude-opus-4-8[1m]",
     "claude-opus-4-6",
     "claude-opus-4-6[1m]",
     "claude-sonnet-4-6",
@@ -140,6 +139,32 @@ pub fn provider_for_model(model: &str) -> Option<&'static str> {
     provider_for_model_with_hint(model, None)
 }
 
+/// Whether `model` resolves to a Claude family jcode classifies statically
+/// (i.e. one whose long-context behavior we have verified). Matches by family
+/// prefix so dated aliases (`claude-opus-4-5-20251101`) and `[1m]` suffixes are
+/// covered, while unknown/future Claude ids fall through to the dynamic cache.
+fn base_is_known_claude_model(base: &str) -> bool {
+    const KNOWN_CLAUDE_PREFIXES: &[&str] = &[
+        "claude-opus-4-8",
+        "claude-opus-4.8",
+        "claude-opus-4-7",
+        "claude-opus-4.7",
+        "claude-opus-4-6",
+        "claude-opus-4.6",
+        "claude-opus-4-5",
+        "claude-opus-4.5",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4.6",
+        "claude-sonnet-4-5",
+        "claude-sonnet-4.5",
+        "claude-haiku-4-5",
+        "claude-haiku-4.5",
+    ];
+    KNOWN_CLAUDE_PREFIXES
+        .iter()
+        .any(|prefix| base.starts_with(prefix))
+}
+
 pub fn context_limit_for_model_with_provider_and_cache(
     model: &str,
     provider_hint: Option<&str>,
@@ -176,42 +201,28 @@ pub fn context_limit_for_model_with_provider_and_cache(
         return Some(272_000);
     }
 
-    if model.starts_with("claude-opus-4-6") || model.starts_with("claude-opus-4.6") {
-        return Some(if is_1m { 1_048_576 } else { 200_000 });
-    }
-
-    if model.starts_with("claude-sonnet-4-6") || model.starts_with("claude-sonnet-4.6") {
-        return Some(if is_1m { 1_048_576 } else { 200_000 });
-    }
-
-    if model.starts_with("claude-opus-4-5") || model.starts_with("claude-opus-4.5") {
-        return Some(200_000);
+    // Claude models: classify long-context behavior centrally. This is the
+    // authoritative source for known Claude models because the live catalog's
+    // `max_input_tokens` field over-advertises 1M for models that are actually
+    // 200K-capped (verified against the live API). Unknown/future Claude models
+    // fall through to the dynamic cache below.
+    if base_is_known_claude_model(model) {
+        let mode = crate::anthropic::anthropic_context_mode(model);
+        return Some(if is_1m {
+            mode.long_context_window()
+        } else {
+            mode.default_context_window()
+        });
     }
 
     if let Some(limit) = cached_context_limit(model) {
         return Some(limit);
     }
 
-    // Issue #81: DeepSeek V4 / chat models default to 1M context.
-    // Upstream PR 1jehuang/jcode#92 for the same fallback.
-    if model.starts_with("deepseek") {
-        return Some(1_000_000);
-    }
-
     if model.starts_with("gemini-2.0-flash")
         || model.starts_with("gemini-2.5")
         || model.starts_with("gemini-3")
     {
-        return Some(1_000_000);
-    }
-
-    // DeepSeek's current generation (deepseek-v4 / deepseek-v4-flash and the
-    // deepseek-coder variants) advertises a 1M-token context window via the
-    // platform's published rate-limit metadata. Older models also accept up to
-    // 1M tokens through the same /v1/chat/completions endpoint, so it's safe
-    // to advertise as a default fallback. Cached/online catalog hits still
-    // override this via the cached_context_limit hook above.
-    if model.starts_with("deepseek") {
         return Some(1_000_000);
     }
 
@@ -264,6 +275,79 @@ mod tests {
     }
 
     #[test]
+    fn context_limit_classifies_claude_by_context_mode() {
+        // Native-1M: 1M by default, suffix is a no-op.
+        assert_eq!(
+            context_limit_for_model_with_provider("claude-opus-4-8", Some("claude")),
+            Some(1_000_000)
+        );
+        assert_eq!(
+            context_limit_for_model_with_provider("claude-opus-4-8[1m]", Some("claude")),
+            Some(1_000_000)
+        );
+        assert_eq!(
+            context_limit_for_model_with_provider("claude-opus-4-7", Some("claude")),
+            Some(1_000_000)
+        );
+        // Opt-in 1M: 200K by default, 1M only via the [1m] suffix.
+        assert_eq!(
+            context_limit_for_model_with_provider("claude-opus-4-6", Some("claude")),
+            Some(200_000)
+        );
+        // Standard: 200K, even though the live catalog over-advertises 1M for it.
+        assert_eq!(
+            context_limit_for_model_with_provider("claude-sonnet-4-5", Some("claude")),
+            Some(200_000)
+        );
+        assert_eq!(
+            context_limit_for_model_with_provider("claude-opus-4-5", Some("claude")),
+            Some(200_000)
+        );
+        assert_eq!(
+            context_limit_for_model_with_provider("claude-haiku-4-5", Some("claude")),
+            Some(200_000)
+        );
+    }
+
+    #[test]
+    fn anthropic_context_mode_classifications() {
+        use crate::anthropic::{AnthropicContextMode, anthropic_context_mode};
+        assert_eq!(
+            anthropic_context_mode("claude-opus-4-8"),
+            AnthropicContextMode::Native1M
+        );
+        assert_eq!(
+            anthropic_context_mode("claude-opus-4-8[1m]"),
+            AnthropicContextMode::Native1M
+        );
+        assert_eq!(
+            anthropic_context_mode("claude-opus-4-7"),
+            AnthropicContextMode::Native1M
+        );
+        assert_eq!(
+            anthropic_context_mode("claude-opus-4-6"),
+            AnthropicContextMode::OptIn1M
+        );
+        assert_eq!(
+            anthropic_context_mode("claude-sonnet-4-6"),
+            AnthropicContextMode::OptIn1M
+        );
+        assert_eq!(
+            anthropic_context_mode("claude-sonnet-4-5"),
+            AnthropicContextMode::Standard
+        );
+        assert_eq!(
+            anthropic_context_mode("claude-opus-4-5"),
+            AnthropicContextMode::Standard
+        );
+
+        // Only opt-in models surface a [1m] picker alias.
+        assert!(!anthropic_context_mode("claude-opus-4-8").exposes_1m_alias());
+        assert!(anthropic_context_mode("claude-opus-4-6").exposes_1m_alias());
+        assert!(!anthropic_context_mode("claude-sonnet-4-5").exposes_1m_alias());
+    }
+
+    #[test]
     fn context_limit_handles_copilot_hint() {
         assert_eq!(
             context_limit_for_model_with_provider("gpt-5.4", Some("copilot")),
@@ -272,35 +356,6 @@ mod tests {
         assert_eq!(
             context_limit_for_model_with_provider("gemini-2.5-pro", Some("copilot")),
             Some(1_000_000)
-        );
-    }
-
-    #[test]
-    fn context_limit_falls_back_to_1m_for_deepseek_models() {
-        // Regression for issue #87: DeepSeek's current generation advertises a
-        // 1M-token context window. Without an explicit branch the function
-        // returned `None` and downstream callers had to either hard-code a
-        // smaller default or wait for a /models cache fill before showing
-        // accurate usage bars.
-        assert_eq!(
-            context_limit_for_model_with_provider("deepseek-v4", None),
-            Some(1_000_000)
-        );
-        assert_eq!(
-            context_limit_for_model_with_provider("deepseek-v4-flash", None),
-            Some(1_000_000)
-        );
-        assert_eq!(
-            context_limit_for_model_with_provider("deepseek-chat", None),
-            Some(1_000_000)
-        );
-        // Cached values must still take precedence so OAuth/online catalog
-        // hits can override the static fallback.
-        assert_eq!(
-            context_limit_for_model_with_provider_and_cache("deepseek-v4", None, |m| (m
-                == "deepseek-v4")
-                .then_some(64_000)),
-            Some(64_000)
         );
     }
 

@@ -341,7 +341,10 @@ matcher = "/^Bash/"
     // Verify Stop handler has regex matcher
     match &config.events["Stop"][0] {
         HookHandlerConfig::Command(cmd) => {
-            assert_eq!(cmd.matcher, Some(HookMatcher::Regex(regex::Regex::new("^Bash").unwrap())));
+            assert_eq!(
+                cmd.matcher,
+                Some(HookMatcher::Regex(regex::Regex::new("^Bash").unwrap()))
+            );
         }
         _ => panic!("expected Command"),
     }

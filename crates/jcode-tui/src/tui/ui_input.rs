@@ -1068,6 +1068,7 @@ mod tests {
                     name: "bash".to_string(),
                     input: serde_json::json!({"command": "cargo test -p jcode"}),
                     intent: None,
+                    thought_signature: None,
                 }],
                 subcalls: Vec::new(),
             }),
@@ -1098,18 +1099,21 @@ mod tests {
                         name: "grep".to_string(),
                         input: serde_json::json!({"pattern": "foo", "path": "src"}),
                         intent: None,
+                        thought_signature: None,
                     },
                     crate::message::ToolCall {
                         id: "batch-1-bash".to_string(),
                         name: "bash".to_string(),
                         input: serde_json::json!({"command": "cargo build --release --workspace"}),
                         intent: None,
+                        thought_signature: None,
                     },
                     crate::message::ToolCall {
                         id: "batch-3-read".to_string(),
                         name: "read".to_string(),
                         input: serde_json::json!({"file_path": "README.md"}),
                         intent: None,
+                        thought_signature: None,
                     },
                 ],
                 subcalls: Vec::new(),
@@ -1433,14 +1437,6 @@ pub(super) fn build_notification_spans(app: &dyn TuiState) -> Vec<Span<'static>>
         spans.push(Span::styled(
             "📋 stash",
             Style::default().fg(rgb(255, 193, 7)),
-        ));
-    }
-
-    if let Some((current, total)) = app.input_history_browse_status() {
-        push_sep(&mut spans);
-        spans.push(Span::styled(
-            format!("📋 history {}/{}", current, total),
-            Style::default().fg(rgb(140, 180, 255)),
         ));
     }
 

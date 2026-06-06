@@ -6,20 +6,16 @@ mod interrupts;
 mod messages;
 mod prompting;
 mod provider;
-mod reasoning_format;
 mod response_recovery;
 mod status;
 mod streaming;
 mod tools;
 mod turn_execution;
 mod turn_loops;
-mod turn_streaming_broadcast;
 mod turn_streaming_mpsc;
 mod utils;
 
-use self::streaming::{
-    send_stream_keepalive_broadcast, send_stream_keepalive_mpsc, stream_keepalive_ticker,
-};
+use self::streaming::{send_stream_keepalive_mpsc, stream_keepalive_ticker};
 use self::tools::{
     cap_sdk_tool_content_for_history, cap_tool_output_for_history, print_tool_summary,
     tool_output_side_pane_images, tool_output_to_content_blocks,
@@ -41,20 +37,19 @@ use crate::skill::SkillRegistry;
 use crate::tool::{Registry, ToolContext, ToolExecutionMode};
 use anyhow::Result;
 use futures::StreamExt;
+<<<<<<< HEAD
 use jcode_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry};
 #[cfg(feature = "dcp")]
 use std::cell::Cell;
+=======
+>>>>>>> origin/master
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
 use std::path::PathBuf;
-#[cfg(feature = "dcp")]
-use std::ptr::NonNull;
-#[cfg(feature = "dcp")]
-use std::sync::Mutex;
 use std::sync::{Arc, LazyLock, Mutex as StdMutex};
 use std::time::{Duration, Instant};
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::mpsc;
 
 use interrupts::{NoToolCallOutcome, PostToolInterruptOutcome};
 pub use jcode_agent_runtime::{
@@ -77,43 +72,6 @@ static JCODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> = LazyL
 });
 static WORKING_GIT_STATE_CACHE: LazyLock<StdMutex<HashMap<PathBuf, Option<GitState>>>> =
     LazyLock::new(|| StdMutex::new(HashMap::new()));
-
-// Thread-local agent accessor for DCP tools to reach the agent's DCP plugin
-#[cfg(feature = "dcp")]
-thread_local! {
-    static CURRENT_AGENT: Cell<Option<NonNull<Agent>>> = const { Cell::new(None) };
-}
-
-#[cfg(feature = "dcp")]
-impl Agent {
-    /// Set the current agent pointer (called by the server before tool execution)
-    #[allow(dead_code)]
-    pub(crate) fn set_current_agent_ptr(&mut self) {
-        CURRENT_AGENT.with(|cell| {
-            cell.set(Some(NonNull::from(self)));
-        });
-    }
-
-    /// Clear the current agent pointer (called when agent is dropped)
-    #[allow(dead_code)]
-    pub(crate) fn clear_current_agent_ptr() {
-        CURRENT_AGENT.with(|cell| {
-            cell.set(None);
-        });
-    }
-
-    /// Access the current agent's DCP plugin for tool execution
-    #[cfg(feature = "dcp")]
-    pub(crate) fn get_current_dcp() -> Option<Arc<Mutex<crate::dcp_plugin::DcpPlugin>>> {
-        CURRENT_AGENT.with(|cell| {
-            cell.get().and_then(|ptr| {
-                // SAFETY: ptr is guaranteed valid for the duration of tool execution
-                // because the server clears it when the agent is dropped
-                unsafe { ptr.as_ref() }.registry.dcp()
-            })
-        })
-    }
-}
 const STREAM_KEEPALIVE_PONG_ID: u64 = 0;
 
 fn stable_hash_str(value: &str) -> u64 {
@@ -283,6 +241,7 @@ pub struct Agent {
     stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tool::StdinInputRequest>>,
     /// Canonical reducer-backed view of runtime provider/model selection.
     provider_runtime_state: ProviderRuntimeState,
+<<<<<<< HEAD
     /// Hook registry for dispatching lifecycle hooks.
     hook_registry: HookRegistry,
     /// Dispatch configuration for hook execution.
@@ -290,6 +249,8 @@ pub struct Agent {
     /// DCP plugin for context pruning (behind feature flag).
     #[cfg(feature = "dcp")]
     dcp: Option<crate::dcp_plugin::DcpPlugin>,
+=======
+>>>>>>> origin/master
 }
 
 impl Agent {
@@ -336,15 +297,18 @@ impl Agent {
             last_usage: TokenUsage::default(),
             locked_tools: None,
             mcp_late_register_resolved: false,
-            system_prompt_override: crate::config::config().provider.system_prompt.clone(),
+            system_prompt_override: None,
             memory_enabled: crate::config::config().features.memory,
             rewind_undo_snapshot: None,
             stdin_request_tx: None,
             provider_runtime_state: ProviderRuntimeState::observed(initial_provider_model),
+<<<<<<< HEAD
             hook_registry: HookRegistry::default(),
             dispatch_config: DispatchConfig::default(),
             #[cfg(feature = "dcp")]
             dcp: crate::dcp_plugin::DcpPlugin::new().ok(),
+=======
+>>>>>>> origin/master
         };
         crate::tool::set_session_tool_policy(
             &agent.session.id,
@@ -384,6 +348,7 @@ impl Agent {
         agent.session.provider_key =
             crate::session::derive_session_provider_key(agent.provider.name());
         agent.session.ensure_initial_session_context_message();
+<<<<<<< HEAD
 
         // Dispatch SessionStart hooks (fire-and-forget, observational only)
         {
@@ -411,6 +376,8 @@ impl Agent {
             agent.registry.set_dcp(dcp);
         }
 
+=======
+>>>>>>> origin/master
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("create");
         crate::telemetry::begin_session_with_parent(
@@ -470,6 +437,7 @@ impl Agent {
         agent.restore_reasoning_effort_from_session();
         agent.session.ensure_initial_session_context_message();
         agent.sync_memory_dedup_state_from_session();
+<<<<<<< HEAD
 
         // Dispatch SessionStart hooks (fire-and-forget, observational only)
         {
@@ -497,6 +465,8 @@ impl Agent {
             agent.registry.set_dcp(dcp);
         }
 
+=======
+>>>>>>> origin/master
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("attach");
         crate::telemetry::begin_session_with_parent(
@@ -541,13 +511,6 @@ impl Agent {
             self.session.messages.len()
         ));
         drop(manager);
-
-        // J9: Set session ID on DCP pruner for proper persistence
-        #[cfg(feature = "dcp")]
-        if let Some(ref mut dcp) = self.dcp {
-            dcp.pruner_mut().set_session_id(&self.session.id);
-        }
-
         if let Some(state) = sanitized_state {
             self.session.compaction = state;
             self.persist_session_best_effort("sanitized oversized OpenAI native compaction");
@@ -717,38 +680,6 @@ impl Agent {
     }
 
     fn messages_for_provider(&mut self) -> (Vec<Message>, Option<CompactionEvent>) {
-        // ── Phase 1: DCP Plugin Layer ──────────────────────────────────
-        #[cfg(feature = "dcp")]
-        let messages = {
-            let all_messages = self.session.provider_messages();
-            if let Some(dcp) = &mut self.dcp {
-                let output = dcp.transform(all_messages).unwrap_or_else(|e| {
-                    logging::warn(&format!("DCP transform failed: {e}"));
-                    crate::dcp_plugin::DcpTransformOutput {
-                        messages: all_messages.to_vec(),
-                        tokens_saved: 0,
-                        removed_count: 0,
-                        changed: false,
-                    }
-                });
-
-                if output.changed {
-                    logging::info(&format!(
-                        "DCP: pruned {} messages, saved ~{} tokens",
-                        output.removed_count, output.tokens_saved,
-                    ));
-                }
-
-                output.messages
-            } else {
-                all_messages.to_vec()
-            }
-        };
-
-        #[cfg(not(feature = "dcp"))]
-        let messages = self.session.provider_messages().to_vec();
-
-        // ── Phase 2: CompactionManager (existing) ──────────────────────
         if self.provider.supports_compaction() || self.session.compaction.is_some() {
             let compaction = self.registry.compaction();
             match compaction.try_write() {
@@ -756,9 +687,10 @@ impl Agent {
                     let discarded_oversized_native =
                         manager.discard_oversized_openai_native_compaction();
                     let messages = {
+                        let all_messages = self.session.provider_messages();
                         if self.provider.uses_jcode_compaction() {
                             let action =
-                                manager.ensure_context_fits(&messages, self.provider.clone());
+                                manager.ensure_context_fits(all_messages, self.provider.clone());
                             match action {
                                 crate::compaction::CompactionAction::BackgroundStarted {
                                     trigger,
@@ -777,7 +709,7 @@ impl Agent {
                                 crate::compaction::CompactionAction::None => {}
                             }
                         }
-                        manager.messages_for_api_with(&messages)
+                        manager.messages_for_api_with(all_messages)
                     };
                     let event = manager.take_compaction_event();
                     if event.is_some() || discarded_oversized_native {
@@ -806,6 +738,8 @@ impl Agent {
             };
         }
 
+        let all_messages = self.session.provider_messages();
+        let messages = all_messages.to_vec();
         let user_count = messages
             .iter()
             .filter(|message| matches!(message.role, Role::User))
@@ -1141,6 +1075,9 @@ impl Agent {
                         md.push_str("\n\n");
                     }
                     ContentBlock::Reasoning { text } => {
+                        md.push_str(&format!("*Thinking:* {}\n\n", text));
+                    }
+                    ContentBlock::ReasoningTrace { text } => {
                         md.push_str(&format!("*Thinking:* {}\n\n", text));
                     }
                     ContentBlock::AnthropicThinking { thinking, .. } => {

@@ -14,18 +14,6 @@ pub struct Skill {
     pub name: String,
     pub description: String,
     pub allowed_tools: Option<Vec<String>>,
-    /// Issue #94: MAS (Multi-Agent Skill) — model the skill targets.
-    /// When `Some`, jcode will route activation of this skill to the
-    /// matching sub-agent / model. When `None`, the active model is
-    /// used (current behavior).
-    pub model: Option<String>,
-    /// Issue #94: MAS — sub-agent role identifier. Used by the future
-    /// MAS dispatcher to find the right side-agent. `None` means
-    /// the skill runs in the main agent.
-    pub agent: Option<String>,
-    /// Issue #94: MAS — semantic activation tags. Used in addition to
-    /// the embedding-based activation for keyword fallback.
-    pub tags: Vec<String>,
     pub content: String,
     pub path: PathBuf,
     search_text: String,
@@ -37,41 +25,6 @@ struct SkillFrontmatter {
     description: String,
     #[serde(rename = "allowed-tools")]
     allowed_tools: Option<String>,
-    /// MAS: target model id (#94)
-    #[serde(default)]
-    model: Option<String>,
-    /// MAS: sub-agent role (#94)
-    #[serde(default)]
-    agent: Option<String>,
-    /// MAS: keyword tags (#94). Accepts either a YAML sequence or a
-    /// comma-separated string.
-    #[serde(default, deserialize_with = "deserialize_tags")]
-    tags: Vec<String>,
-}
-
-fn deserialize_tags<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    use serde::Deserialize;
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum Tags {
-        List(Vec<String>),
-        CommaSeparated(String),
-    }
-    Ok(match Tags::deserialize(deserializer)? {
-        Tags::List(v) => v
-            .into_iter()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
-        Tags::CommaSeparated(s) => s
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect(),
-    })
 }
 
 /// Registry of available skills
@@ -289,39 +242,7 @@ impl SkillRegistry {
             self.load_from_dir(&local_claude)?;
         }
 
-        // Issue #112: repo-level scoping. If `working_dir` (or cwd) lives
-        // inside a git repo, walk up to the repo root and load
-        // <repo>/.jcode/skills/ — but only if the repo root differs from
-        // the current dir (so we don't double-load the same dir).
-        if let Some(repo_skills) = Self::repo_level_skills_dir(working_dir)
-            && repo_skills.is_dir()
-            && Some(repo_skills.as_path()) != Some(local_jcode.as_path())
-        {
-            self.load_from_dir(&repo_skills)?;
-        }
-
         Ok(())
-    }
-
-    /// Walk up from `working_dir` (or cwd) until we find a directory
-    /// containing `.git`. Returns `<repo_root>/.jcode/skills/` for that
-    /// directory. Used by `load_project_local_dirs` to support repo-level
-    /// skills (#112).
-    ///
-    /// Returns `None` if cwd cannot be resolved or no `.git` ancestor
-    /// exists in the path.
-    fn repo_level_skills_dir(working_dir: Option<&Path>) -> Option<PathBuf> {
-        let start = match working_dir {
-            Some(d) => d.to_path_buf(),
-            None => std::env::current_dir().ok()?,
-        };
-        let mut current = start.as_path();
-        loop {
-            if current.join(".git").exists() {
-                return Some(current.join(".jcode").join("skills"));
-            }
-            current = current.parent()?;
-        }
     }
 
     /// Load skills from a directory
@@ -358,9 +279,6 @@ impl SkillRegistry {
             name,
             description,
             allowed_tools,
-            model,
-            agent,
-            tags,
         } = frontmatter;
 
         let allowed_tools =
@@ -371,9 +289,6 @@ impl SkillRegistry {
             name,
             description,
             allowed_tools,
-            model,
-            agent,
-            tags,
             content: body,
             path: path.to_path_buf(),
             search_text,
@@ -491,24 +406,218 @@ impl SkillRegistry {
         Ok(count)
     }
 
-    /// Check if a message is a skill invocation.
-    ///
-    /// Skills use the `$<name>` namespace exclusively — `/` is reserved
-    /// for built-in slash commands. Returns the bare skill name without
-    /// the prefix, or `None` if the input is not a single-word `$`
-    /// invocation.
-    ///
-    /// Note: the historical `/<skill>` form was retired to keep the `/`
-    /// autocomplete dropdown navigable when the user has dozens of
-    /// skills installed.
+    /// Check if a message is a skill invocation (starts with /)
     pub fn parse_invocation(input: &str) -> Option<&str> {
         let trimmed = input.trim();
-        if trimmed.contains(' ') {
-            return None;
+        if trimmed.starts_with('/') && !trimmed.contains(' ') {
+            Some(&trimmed[1..])
+        } else {
+            None
         }
-        let rest = trimmed.strip_prefix('$')?;
-        (!rest.is_empty()).then_some(rest)
     }
+
+    /// Return true if a skill with the given name is currently loaded.
+    pub fn contains(&self, name: &str) -> bool {
+        self.skills.contains_key(name)
+    }
+}
+
+/// A skill recommended/curated by jcode that the user may want to install.
+#[derive(Debug, Clone, Copy)]
+pub struct EndorsedSkill {
+    /// Skill name (matches the `name` field in SKILL.md and the slash command).
+    pub name: &'static str,
+    /// One-line description of what the skill does.
+    pub description: &'static str,
+    /// Grouping label used to organize the endorsed list (e.g. "jcode",
+    /// "NVIDIA CUDA-X").
+    pub category: &'static str,
+    /// Where users can get the skill (repo path, URL, or short note).
+    pub source: &'static str,
+    /// Optional install command/hint shown when the skill is not installed.
+    pub install: Option<&'static str>,
+}
+
+/// Curated list of skills endorsed by jcode. Used by the `/skills` command to
+/// show users which recommended skills they have installed and which they are
+/// missing. This is the single source of truth for endorsed skills.
+///
+/// The NVIDIA CUDA-X entries mirror the official NVIDIA-verified catalog at
+/// <https://github.com/NVIDIA/skills>; install them with
+/// `npx skills add nvidia/skills --skill <name> --yes`.
+pub const ENDORSED_SKILLS: &[EndorsedSkill] = &[
+    EndorsedSkill {
+        name: "optimization",
+        description: "Improve performance, latency, throughput, memory usage, or general efficiency by defining metrics, measuring, attributing bottlenecks, and prioritizing macro-optimizations.",
+        category: "jcode",
+        source: "bundled in jcode repo (.jcode/skills/optimization)",
+        install: None,
+    },
+    EndorsedSkill {
+        name: "todo-planning-skill",
+        description: "Create thorough, well-structured todo lists for long tasks, including reflection, static analysis, verification, and next-step updates.",
+        category: "jcode",
+        source: "bundled with jcode / Claude Code skills",
+        install: None,
+    },
+    EndorsedSkill {
+        name: "firefox-browser",
+        description: "Control the user's Firefox browser with their logins and cookies intact to browse, fill forms, click, screenshot, and read authenticated pages.",
+        category: "jcode",
+        source: "bundled with jcode / Claude Code skills",
+        install: None,
+    },
+    // Anthropic official skills (github.com/anthropics/skills, Apache-2.0).
+    EndorsedSkill {
+        name: "frontend-design",
+        description: "Create distinctive, production-grade frontend interfaces with high design quality (web components, pages, apps). Generates creative, polished code that avoids generic AI aesthetics.",
+        category: "Anthropic Design",
+        source: "anthropics/skills (official Anthropic catalog)",
+        install: Some(
+            "npx skills add anthropics/skills --skill frontend-design --yes (or Claude Code: /plugin marketplace add anthropics/skills)",
+        ),
+    },
+    // NVIDIA CUDA-X / GPU accelerated-computing skills from the official
+    // NVIDIA-verified catalog (github.com/NVIDIA/skills).
+    EndorsedSkill {
+        name: "cuopt-developer",
+        description: "Modify, build, test, debug, and contribute to NVIDIA cuOpt (C++/CUDA, Python, server, CI) — solver internals, PRs, DCO, and code conventions.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cuopt-developer --yes"),
+    },
+    EndorsedSkill {
+        name: "cuopt-install",
+        description: "Install NVIDIA cuOpt for Python, C, or server via pip, conda, or Docker, and verify the install.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cuopt-install --yes"),
+    },
+    EndorsedSkill {
+        name: "cuopt-numerical-optimization-api-c",
+        description: "Solve LP, MILP, and QP (beta) with the cuOpt C API for embedding optimization in C/C++.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some(
+            "npx skills add nvidia/skills --skill cuopt-numerical-optimization-api-c --yes",
+        ),
+    },
+    EndorsedSkill {
+        name: "cuopt-numerical-optimization-api-cli",
+        description: "Solve LP, MILP, and QP (beta) with cuOpt from MPS files via the cuopt_cli command line.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some(
+            "npx skills add nvidia/skills --skill cuopt-numerical-optimization-api-cli --yes",
+        ),
+    },
+    EndorsedSkill {
+        name: "cuopt-numerical-optimization-api-python",
+        description: "Solve LP, MILP, and QP (beta) with the cuOpt Python API — linear/quadratic objectives, integer variables, scheduling, portfolio, and least squares.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some(
+            "npx skills add nvidia/skills --skill cuopt-numerical-optimization-api-python --yes",
+        ),
+    },
+    EndorsedSkill {
+        name: "cuopt-numerical-optimization-formulation",
+        description: "LP, MILP, and QP concepts and formulation patterns (parameters, constraints, decisions, objective). Concepts only; no API.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some(
+            "npx skills add nvidia/skills --skill cuopt-numerical-optimization-formulation --yes",
+        ),
+    },
+    EndorsedSkill {
+        name: "cuopt-routing-api-python",
+        description: "Solve vehicle routing (VRP, TSP, PDP) with the cuOpt Python API.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cuopt-routing-api-python --yes"),
+    },
+    EndorsedSkill {
+        name: "cuopt-routing-formulation",
+        description: "Vehicle routing (VRP, TSP, PDP) problem types and data requirements. Domain concepts; no API or interface.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cuopt-routing-formulation --yes"),
+    },
+    EndorsedSkill {
+        name: "cuopt-server-api-python",
+        description: "Run the cuOpt REST server — start it, call endpoints, and use Python/curl client examples.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cuopt-server-api-python --yes"),
+    },
+    EndorsedSkill {
+        name: "cuopt-server-common",
+        description: "Understand what the cuOpt REST server does and how requests flow. Concepts only; no deploy or client code.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cuopt-server-common --yes"),
+    },
+    EndorsedSkill {
+        name: "cuopt-user-rules",
+        description: "Base rules for end users calling NVIDIA cuOpt (routing/LP/MILP/QP/install/server).",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cuopt-user-rules --yes"),
+    },
+    EndorsedSkill {
+        name: "cupynumeric-install",
+        description: "Install and verify NVIDIA cuPyNumeric (NumPy/SciPy on multi-node multi-GPU) for Python — requirements, commands, and verification.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cupynumeric-install --yes"),
+    },
+    EndorsedSkill {
+        name: "cupynumeric-migration-readiness",
+        description: "Assess NumPy code before porting to cuPyNumeric — which patterns scale on GPU, what must be refactored, and a READY/REFACTOR/NOT-RECOMMENDED verdict.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cupynumeric-migration-readiness --yes"),
+    },
+    EndorsedSkill {
+        name: "cupynumeric-hdf5",
+        description: "Read and write large cuPyNumeric arrays to HDF5 with Legate's parallel, distributed HDF5 I/O (legate.io.hdf5), including GPUDirect Storage.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cupynumeric-hdf5 --yes"),
+    },
+    EndorsedSkill {
+        name: "cupynumeric-parallel-data-load",
+        description: "Load sharded on-disk datasets (.npy, Parquet/Arrow, raw binary, sharded HDF5) into a distributed cuPyNumeric ndarray via manual partition + leaf task launch.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cupynumeric-parallel-data-load --yes"),
+    },
+    EndorsedSkill {
+        name: "accelerated-computing-cudf",
+        description: "Official NVIDIA guidance for cuDF GPU DataFrames, pandas acceleration, dask-cuDF, ETL, joins, groupby, CSV/Parquet I/O, and multi-GPU DataFrame workloads.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill accelerated-computing-cudf --yes"),
+    },
+    EndorsedSkill {
+        name: "cudaq-guide",
+        description: "NVIDIA CUDA-Q (CUDA Quantum) onboarding guide for installation, test programs, GPU simulation, QPU hardware, and quantum applications.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill cudaq-guide --yes"),
+    },
+    EndorsedSkill {
+        name: "tilegym-adding-cutile-kernel",
+        description: "Add a new cuTile GPU kernel operator to NVIDIA TileGym — dispatch registration, cuTile backend implementation, exports, tests, and benchmarks.",
+        category: "NVIDIA CUDA-X",
+        source: "NVIDIA/skills (official NVIDIA-verified catalog)",
+        install: Some("npx skills add nvidia/skills --skill tilegym-adding-cutile-kernel --yes"),
+    },
+];
+
+/// Return the curated list of skills endorsed by jcode.
+pub fn endorsed_skills() -> &'static [EndorsedSkill] {
+    ENDORSED_SKILLS
 }
 
 impl Skill {
@@ -586,9 +695,6 @@ mod tests {
             name: name.to_string(),
             description: description.to_string(),
             allowed_tools: None,
-            model: None,
-            agent: None,
-            tags: Vec::new(),
             content: content.to_string(),
             path: PathBuf::from(format!("/tmp/{name}/SKILL.md")),
             search_text: build_skill_search_text(name, description, content),
@@ -653,194 +759,100 @@ mod tests {
         assert!(registry.get("session-skill").is_some());
     }
 
-    // Issue #112: repo-level scoping. Walking up from cwd to a `.git`
-    // ancestor and loading <repo>/.jcode/skills/.
-
     #[test]
-    fn load_for_working_dir_reads_repo_level_skills_from_git_ancestor() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        let repo_root = temp.path();
-        // Mark this as a git repo.
-        std::fs::create_dir_all(repo_root.join(".git")).expect("create .git");
-        // Write a repo-level skill at <repo>/.jcode/skills/repo-skill/SKILL.md
-        write_test_skill(repo_root, ".jcode", "repo-skill");
+    fn endorsed_skills_have_unique_nonempty_metadata() {
+        let endorsed = endorsed_skills();
+        assert!(!endorsed.is_empty(), "expected at least one endorsed skill");
 
-        // Working dir is a sub-directory of the repo.
-        let sub = repo_root.join("crates/foo");
-        std::fs::create_dir_all(&sub).expect("create sub");
-
-        let registry = SkillRegistry::load_for_working_dir(Some(&sub)).expect("load skills");
-        assert!(
-            registry.get("repo-skill").is_some(),
-            "repo-level skill must be discovered when cwd is a sub-dir of the .git ancestor"
-        );
-    }
-
-    #[test]
-    fn repo_level_skills_dir_returns_none_outside_git_repo() {
-        let temp = tempfile::tempdir().expect("tempdir");
-        // No .git anywhere up the tree from this temp dir.
-        let result = SkillRegistry::repo_level_skills_dir(Some(temp.path()));
-        // Possible Some if the tempdir is itself inside a git tree (e.g. in
-        // CI the runner might be in /tmp which has no .git, but on a dev
-        // machine /tmp could be inside a worktree). We don't assert None
-        // unconditionally — instead assert the path is sensible if returned.
-        if let Some(path) = result {
-            assert!(path.ends_with(std::path::Path::new(".jcode/skills")));
+        let mut seen = std::collections::HashSet::new();
+        for skill in endorsed {
+            assert!(!skill.name.is_empty(), "endorsed skill name must be set");
+            assert!(
+                !skill.description.is_empty(),
+                "endorsed skill {} needs a description",
+                skill.name
+            );
+            assert!(
+                !skill.category.is_empty(),
+                "endorsed skill {} needs a category",
+                skill.name
+            );
+            assert!(
+                !skill.source.is_empty(),
+                "endorsed skill {} needs a source",
+                skill.name
+            );
+            assert!(
+                !skill.name.starts_with('/'),
+                "endorsed skill name should not include the leading slash"
+            );
+            if let Some(install) = skill.install {
+                assert!(
+                    install.contains(skill.name),
+                    "endorsed skill {} install hint should reference its name",
+                    skill.name
+                );
+            }
+            assert!(
+                seen.insert(skill.name),
+                "duplicate endorsed skill name: {}",
+                skill.name
+            );
         }
     }
 
     #[test]
-    fn repo_level_skills_dir_does_not_double_load_when_cwd_equals_repo_root() {
-        // When cwd IS the repo root, project-local + repo-level resolve to
-        // the same dir; load_project_local_dirs guards against double-load.
-        // We only assert that repo_level_skills_dir returns the same path
-        // as project_local_dir — the dedup check is done in the caller.
+    fn endorsed_skills_include_nvidia_cuda_x_catalog() {
+        let endorsed = endorsed_skills();
+        // Spot-check representative NVIDIA CUDA-X skills sourced from the
+        // official NVIDIA/skills catalog.
+        for expected in [
+            "cuopt-numerical-optimization-api-python",
+            "cupynumeric-install",
+            "accelerated-computing-cudf",
+            "cudaq-guide",
+            "tilegym-adding-cutile-kernel",
+        ] {
+            let skill = endorsed
+                .iter()
+                .find(|s| s.name == expected)
+                .unwrap_or_else(|| panic!("expected endorsed NVIDIA skill {expected}"));
+            assert_eq!(skill.category, "NVIDIA CUDA-X");
+            assert!(
+                skill
+                    .install
+                    .is_some_and(|cmd| cmd.contains("nvidia/skills")),
+                "NVIDIA skill {expected} should have an nvidia/skills install hint"
+            );
+        }
+    }
+
+    #[test]
+    fn endorsed_skills_include_anthropic_frontend_design() {
+        let skill = endorsed_skills()
+            .iter()
+            .find(|s| s.name == "frontend-design")
+            .expect("expected endorsed Anthropic frontend-design skill");
+        assert_eq!(skill.category, "Anthropic Design");
+        assert!(
+            skill.source.contains("anthropics/skills"),
+            "frontend-design should be sourced from anthropics/skills"
+        );
+        assert!(
+            skill
+                .install
+                .is_some_and(|cmd| cmd.contains("anthropics/skills")),
+            "frontend-design should have an anthropics/skills install hint"
+        );
+    }
+
+    #[test]
+    fn registry_contains_reports_loaded_skills() {
         let temp = tempfile::tempdir().expect("tempdir");
-        let repo_root = temp.path();
-        std::fs::create_dir_all(repo_root.join(".git")).expect("create .git");
-        write_test_skill(repo_root, ".jcode", "rl-skill");
+        write_test_skill(temp.path(), ".jcode", "present-skill");
 
-        let registry = SkillRegistry::load_for_working_dir(Some(repo_root)).expect("load");
-        // Skill loaded exactly once (no duplicate).
-        let count = registry
-            .skills
-            .values()
-            .filter(|s| s.name == "rl-skill")
-            .count();
-        assert_eq!(
-            count, 1,
-            "skill must not be loaded twice when cwd == repo root"
-        );
-    }
-}
-
-#[cfg(test)]
-mod invocation_parse_tests {
-    use super::*;
-
-    #[test]
-    fn parse_invocation_accepts_dollar_prefix() {
-        assert_eq!(
-            SkillRegistry::parse_invocation("$grill-me"),
-            Some("grill-me")
-        );
-        assert_eq!(
-            SkillRegistry::parse_invocation("  $grill-me  "),
-            Some("grill-me")
-        );
-    }
-
-    #[test]
-    fn parse_invocation_rejects_slash_prefix() {
-        // The historical `/<skill>` form is intentionally rejected so the
-        // `/` autocomplete dropdown can stay focused on built-in commands.
-        // Slash-prefixed input falls through to the slash-command chain.
-        assert!(SkillRegistry::parse_invocation("/grill-me").is_none());
-        assert!(SkillRegistry::parse_invocation("/help").is_none());
-    }
-
-    #[test]
-    fn parse_invocation_rejects_invocation_with_args() {
-        // $<name> requires single-word form; whitespace returns None so
-        // the input is treated as a literal user message.
-        assert!(SkillRegistry::parse_invocation("$grill-me with args").is_none());
-    }
-
-    #[test]
-    fn parse_invocation_rejects_bare_dollar() {
-        assert!(SkillRegistry::parse_invocation("$").is_none());
-        assert!(SkillRegistry::parse_invocation("  $  ").is_none());
-    }
-
-    #[test]
-    fn parse_invocation_rejects_other_prefixes() {
-        assert!(SkillRegistry::parse_invocation("@grill-me").is_none());
-        assert!(SkillRegistry::parse_invocation("!grill-me").is_none());
-        assert!(SkillRegistry::parse_invocation("grill-me").is_none());
-    }
-
-    // ---- Issue #94: MAS frontmatter fields ----
-
-    fn write_skill_with_frontmatter(
-        dir: &std::path::Path,
-        name: &str,
-        fm: &str,
-        body: &str,
-    ) -> std::path::PathBuf {
-        let skill_dir = dir.join(name);
-        std::fs::create_dir_all(&skill_dir).unwrap();
-        let path = skill_dir.join("SKILL.md");
-        std::fs::write(&path, format!("---\n{}\n---\n\n{}\n", fm.trim(), body)).unwrap();
-        path
-    }
-
-    #[test]
-    fn mas_frontmatter_defaults_to_none_when_unset() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let path = write_skill_with_frontmatter(
-            temp.path(),
-            "basic",
-            "name: basic\ndescription: A basic skill",
-            "Body.",
-        );
-        let skill = SkillRegistry::parse_skill(&path).unwrap();
-        assert_eq!(skill.name, "basic");
-        assert_eq!(skill.model, None);
-        assert_eq!(skill.agent, None);
-        assert!(skill.tags.is_empty());
-    }
-
-    #[test]
-    fn mas_frontmatter_parses_model_and_agent() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let path = write_skill_with_frontmatter(
-            temp.path(),
-            "review",
-            "name: review\ndescription: Code review\nmodel: claude-opus-4\nagent: reviewer",
-            "Body.",
-        );
-        let skill = SkillRegistry::parse_skill(&path).unwrap();
-        assert_eq!(skill.model.as_deref(), Some("claude-opus-4"));
-        assert_eq!(skill.agent.as_deref(), Some("reviewer"));
-    }
-
-    #[test]
-    fn mas_frontmatter_parses_tags_as_list() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let path = write_skill_with_frontmatter(
-            temp.path(),
-            "tagged",
-            "name: tagged\ndescription: Tagged\ntags:\n  - rust\n  - async\n  - perf",
-            "Body.",
-        );
-        let skill = SkillRegistry::parse_skill(&path).unwrap();
-        assert_eq!(skill.tags, vec!["rust", "async", "perf"]);
-    }
-
-    #[test]
-    fn mas_frontmatter_parses_tags_as_comma_separated() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let path = write_skill_with_frontmatter(
-            temp.path(),
-            "csv",
-            "name: csv\ndescription: CSV tags\ntags: rust, async , perf",
-            "Body.",
-        );
-        let skill = SkillRegistry::parse_skill(&path).unwrap();
-        assert_eq!(skill.tags, vec!["rust", "async", "perf"]);
-    }
-
-    #[test]
-    fn mas_frontmatter_filters_blank_tags() {
-        let temp = tempfile::TempDir::new().unwrap();
-        let path = write_skill_with_frontmatter(
-            temp.path(),
-            "blank",
-            "name: blank\ndescription: x\ntags:\n  - rust\n  - ''\n  - perf",
-            "Body.",
-        );
-        let skill = SkillRegistry::parse_skill(&path).unwrap();
-        assert_eq!(skill.tags, vec!["rust", "perf"]);
+        let registry = SkillRegistry::load_for_working_dir(Some(temp.path())).expect("load skills");
+        assert!(registry.contains("present-skill"));
+        assert!(!registry.contains("missing-skill"));
     }
 }

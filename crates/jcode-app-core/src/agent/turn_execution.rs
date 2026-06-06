@@ -33,6 +33,7 @@ impl Agent {
         self.run_turn(false).await
     }
 
+<<<<<<< HEAD
     /// Run a single message with events streamed to a broadcast channel (for server mode)
     pub async fn run_once_streaming(
         &mut self,
@@ -103,6 +104,8 @@ impl Agent {
         self.run_turn_streaming(event_tx).await
     }
 
+=======
+>>>>>>> origin/master
     /// Run one conversation turn with streaming events via mpsc channel (per-client)
     pub async fn run_once_streaming_mpsc(
         &mut self,
@@ -417,10 +420,25 @@ impl Agent {
         if !self.disabled_tools.is_empty() {
             tools.retain(|tool| !self.disabled_tools.contains(&tool.name));
         }
-        if !self.session.is_canary {
-            tools.retain(|tool| tool.name != "selfdev");
-        }
+        Self::apply_selfdev_tool_surface(&mut tools, self.session.is_canary);
         tools
+    }
+
+    /// Tailor the `selfdev` tool definition to the session mode.
+    ///
+    /// The registry stores a single shared `selfdev` tool with a default
+    /// (non-self-dev) schema. Self-dev sessions get the full build/test/reload
+    /// surface; every other session keeps the lightweight on-ramp surface
+    /// (`enter`, `setup`, `reload`, `status`, `find-config`). The tool stays
+    /// available in all sessions so the agent can always enter self-dev mode.
+    fn apply_selfdev_tool_surface(tools: &mut [ToolDefinition], is_canary: bool) {
+        for tool in tools.iter_mut() {
+            if tool.name == "selfdev" {
+                tool.description =
+                    crate::tool::selfdev::SelfDevTool::description_for(is_canary).to_string();
+                tool.input_schema = crate::tool::selfdev::SelfDevTool::schema_for(is_canary);
+            }
+        }
     }
 
     /// Returns true if the registry contains `mcp__*` tools (subject to the
@@ -454,9 +472,7 @@ impl Agent {
         if !self.disabled_tools.is_empty() {
             tools.retain(|tool| !self.disabled_tools.contains(&tool.name));
         }
-        if !self.session.is_canary {
-            tools.retain(|tool| tool.name != "selfdev");
-        }
+        Self::apply_selfdev_tool_surface(&mut tools, self.session.is_canary);
         tools
     }
 
@@ -476,7 +492,6 @@ impl Agent {
             message_id: self.session.id.clone(),
             tool_call_id: call_id,
             working_dir: self.working_dir().map(PathBuf::from),
-            sandbox_root: crate::sandbox::current_sandbox_root(),
             stdin_request_tx: self.stdin_request_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             execution_mode: ToolExecutionMode::Direct,
@@ -496,6 +511,7 @@ impl Agent {
                 id: tool_call_id,
                 name: tool_name,
                 input,
+                thought_signature: None,
             }],
         );
         self.session.save()?;
@@ -579,26 +595,6 @@ impl Agent {
         let reset_ms = reset_start.elapsed().as_millis();
 
         let model_start = Instant::now();
-
-        // Issue #69: detect when the restored session was using a different
-        // provider than the one currently active. The MultiProvider doesn't
-        // yet expose a set_active_provider — when it lands, this check
-        // should switch and re-run set_model. For now, log a clear warning
-        // so the symptom (turn fails with "model X is not available") has
-        // a breadcrumb in the logs.
-        if let Some(persisted_provider) = self.session.provider_key.clone() {
-            let current = crate::session::derive_session_provider_key(self.provider.name());
-            if let Some(current_key) = current.as_ref()
-                && current_key != &persisted_provider
-            {
-                logging::warn(&format!(
-                    "Restoring session that used provider '{}' but current jcode is configured for '{}'. \
-                     Re-run with `jcode --provider {} --resume {}` to use the original provider.",
-                    persisted_provider, current_key, persisted_provider, session_id,
-                ));
-            }
-        }
-
         if let Some(model) = self.session.model.clone() {
             let model_request =
                 crate::provider::MultiProvider::model_switch_request_for_session_route(
@@ -806,42 +802,16 @@ impl Agent {
 
             // Check for skill invocation
             if let Some(skill_name) = SkillRegistry::parse_invocation(input) {
-                let mut skill = skills.get(skill_name).cloned();
-
-                // Issue #57 / upstream #59: a `skill_manage reload_all` running
-                // inside the same session updates the registry, but a CLI
-                // input handler that captured `skills` at the top of the loop
-                // sees the old snapshot. On a slash miss, refresh from the
-                // active session's working directory before reporting Unknown
-                // skill — same lazy-reload pattern as the TUI input path
-                // (`src/tui/app/input.rs`).
-                if skill.is_none() {
-                    let working_dir = self
-                        .session
-                        .working_dir
-                        .as_deref()
-                        .map(std::path::Path::new);
-                    if let Ok(reloaded) = SkillRegistry::load_for_working_dir(working_dir) {
-                        skill = reloaded.get(skill_name).cloned();
-                        // Update the shared registry so subsequent invocations
-                        // and the listing below also see the fresh snapshot.
-                        if let Ok(mut shared) = self.registry.skills().try_write() {
-                            *shared = reloaded;
-                        }
-                    }
-                }
-
-                if let Some(skill) = skill {
+                if let Some(skill) = skills.get(skill_name) {
                     println!("Activating skill: {}", skill.name);
                     println!("{}\n", skill.description);
                     self.active_skill = Some(skill_name.to_string());
                     continue;
                 } else {
                     println!("Unknown skill: /{}", skill_name);
-                    let fresh = self.current_skills_snapshot();
                     println!(
                         "Available: {}",
-                        fresh
+                        skills
                             .list()
                             .iter()
                             .map(|s| format!("/{}", s.name))
@@ -908,6 +878,7 @@ impl Agent {
                         transcript.push_str(&format!("[Result: {}]\n", preview));
                     }
                     ContentBlock::Reasoning { .. }
+                    | ContentBlock::ReasoningTrace { .. }
                     | ContentBlock::AnthropicThinking { .. }
                     | ContentBlock::OpenAIReasoning { .. } => {}
                     ContentBlock::Image { .. } => {
