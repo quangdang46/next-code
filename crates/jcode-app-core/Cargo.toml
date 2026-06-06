@@ -112,6 +112,9 @@ jcode-core = { path = "../jcode-core" }
 jcode-memory-types = { path = "../jcode-memory-types" }
 jcode-message-types = { path = "../jcode-message-types" }
 jcode-overnight-core = { path = "../jcode-overnight-core" }
+
+# RTCO pre-filter integration (behind feature flag)
+rtco-core = { path = "../../../rust_token_cost_optimizer/crates/rtco-core", optional = true }
 jcode-plan = { path = "../jcode-plan" }
 jcode-swarm-core = { path = "../jcode-swarm-core" }
 jcode-protocol = { path = "../jcode-protocol" }
@@ -144,6 +147,8 @@ pdf = ["dep:jcode-pdf"]
 # jcode-base's `test-support` so downstream crates' test targets can reach the
 # whole stack's helpers. Never enabled in normal (non-test) builds.
 test-support = ["jcode-base/test-support"]
+# RTCO pre-filter for tool outputs; adds token-efficient command output filtering.
+rtco = ["dep:rtco-core"]
 
 [dev-dependencies]
 # Used by async streaming tests (ambient/runner_tests, server/client_actions_tests).

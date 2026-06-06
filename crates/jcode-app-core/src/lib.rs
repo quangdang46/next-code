@@ -36,6 +36,7 @@ pub mod overnight;
 pub mod perf;
 pub mod replay;
 pub mod restart_snapshot;
+pub mod rtco_filter;
 pub mod server;
 pub mod server_spawn;
 pub mod session_launch;
