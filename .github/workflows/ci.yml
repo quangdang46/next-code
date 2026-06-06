@@ -191,22 +191,14 @@ jobs:
           CARGO_BIN="$(rustup which cargo)"
           "$CARGO_BIN" build --release --target ${{ matrix.target }}
 
-      - name: Purge stale compiled crates (rustc upgrade workaround)
-        shell: bash
-        run: |
-          # When the runner's pre-installed rustc gets upgraded mid-run by
-          # dtolnay/rust-toolchain, crates compiled by old rustc remain in
-          # the cargo registry cache, causing E0514 on test compilation.
-          # Clean affected packages across all profiles.
-          cargo clean -p convert_case -p unicode_segmentation 2>/dev/null || true
-          # Also nuke any stale per-profile rmeta files directly
-          rm -f target/*/deps/libunicode_segmentation-*.rmeta 2>/dev/null || true
-          # Remove cached index/metadata that may reference old rmeta
-          rm -rf target/debug/.fingerprint/convert_case-* target/debug/.fingerprint/unicode_segmentation-* 2>/dev/null || true
-
       - name: Compile library and binary tests
         shell: bash
         run: |
+          # cargo build --release --target compiles proc-macros (e.g. derive_more-impl)
+          # for the HOST debug profile into target/debug/. When the runner's pre-installed
+          # rustc is upgraded mid-run by dtolnay/rust-toolchain, these host artifacts
+          # become stale (E0514). Nuke them so cargo test rebuilds fresh.
+          rm -rf target/debug/ 2>/dev/null || true
           python3 .github/scripts/run_with_timeout.py 900 \
             "$(rustup which cargo)" test --target ${{ matrix.target }} --lib --bins --no-run
 
