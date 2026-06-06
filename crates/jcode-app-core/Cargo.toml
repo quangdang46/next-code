@@ -153,6 +153,8 @@ aws-credential-types = "1.2.14"
 aws-sdk-bedrockruntime = "1.130.0"
 # DCP integration (dynamic context pruning)
 dynamic_context_pruning = { git = "https://github.com/quangdang46/dynamic_context_pruning", branch = "main", package = "dynamic_context_pruning", optional = true }
+# RTCO integration (tool output filtering via Rust Token Killer)
+rtco-core = { git = "https://github.com/quangdang46/rust_token_cost_optimizer", package = "rtco-core", rev = "71a188275", optional = true }
 aws-types = "1.3.15"
 aws-smithy-types = "1.4.7"
 aws-sdk-bedrock = "1.141.0"
@@ -169,6 +171,8 @@ embeddings = ["jcode-base/embeddings"]
 pdf = ["dep:jcode-pdf"]
 # DCP (dynamic context pruning)
 dcp = ["dep:dynamic_context_pruning"]
+# RTCO (tool output filtering via Rust Token Killer)
+rtco = ["dep:rtco-core"]
 # Compiles this crate's test-only helpers/accessors (e.g. the
 # ExternalAuthReviewCandidate read accessors) as `pub` and forwards
 # jcode-base's `test-support` so downstream crates' test targets can reach the

@@ -301,6 +301,7 @@ jemalloc-prof = [
 ]
 embeddings = ["dep:jcode-embedding", "jcode-tui/embeddings"]
 dcp = ["jcode-tui/dcp"]
+rtco = ["jcode-tui/rtco"]
 mmdr-size-api = ["jcode-tui-mermaid/mmdr-size-api"]
 pdf = ["dep:jcode-pdf", "jcode-tui/pdf"]
 
