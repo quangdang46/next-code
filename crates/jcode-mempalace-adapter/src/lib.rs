@@ -26,6 +26,10 @@
 
 pub mod convert;
 
+// Coordination adapter — bridges mempalace's coordination module into jcode.
+#[cfg(feature = "backend")]
+pub mod coordination;
+
 // Migration tool — only available when the full mempalace runtime is linked.
 #[cfg(feature = "backend")]
 pub mod migrate;
