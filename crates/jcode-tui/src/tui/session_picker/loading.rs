@@ -105,9 +105,8 @@ where
     let mut results: Vec<(usize, Vec<R>)> = std::thread::scope(|scope| {
         let mut handles = Vec::with_capacity(chunks.len());
         for (start, chunk) in chunks {
-            handles.push(scope.spawn(move || {
-                (start, chunk.into_iter().map(f).collect::<Vec<R>>())
-            }));
+            handles
+                .push(scope.spawn(move || (start, chunk.into_iter().map(f).collect::<Vec<R>>())));
         }
         handles
             .into_iter()
@@ -1902,8 +1901,6 @@ pub(super) fn load_claude_code_preview(session_id: &str) -> Option<Vec<PreviewMe
         .find(|session| session.session_id == session_id)?;
     load_claude_code_preview_from_path(Path::new(&session.full_path))
 }
-
-
 
 /// Newest external-transcript modification time (Unix seconds) for the given
 /// external CLI, scanning the sandbox-aware session roots. Returns `None` when

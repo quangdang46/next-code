@@ -1526,7 +1526,11 @@ impl crate::tui::TuiState for App {
                 .unwrap_or(crate::tui::CopySelectionPane::Chat),
             has_action: has_selection,
             selected_chars,
-            selected_lines: if has_selection { selected_lines.max(1) } else { 0 },
+            selected_lines: if has_selection {
+                selected_lines.max(1)
+            } else {
+                0
+            },
             dragging: self.copy_selection_dragging,
         })
     }

@@ -3417,8 +3417,7 @@ impl App {
 
         // Build the committed message content: every reasoning line, then the
         // summary as the final line. The renderer reveals a shrinking suffix.
-        let content =
-            reasoning_message_content(&summary_markup, &line_markups, line_markups.len());
+        let content = reasoning_message_content(&summary_markup, &line_markups, line_markups.len());
 
         let msg_index = self.display_messages.len();
         self.push_display_message(DisplayMessage::reasoning(content));

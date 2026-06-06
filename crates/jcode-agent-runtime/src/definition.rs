@@ -651,7 +651,8 @@ mod tests {
             display_name = "ok"
             unknown_future_field = "value"
         "#;
-        let def = toml::from_str::<AgentDefinition>(src).expect("unknown fields should be ignored for forward compat");
+        let def = toml::from_str::<AgentDefinition>(src)
+            .expect("unknown fields should be ignored for forward compat");
         assert_eq!(def.id, "ok");
         assert_eq!(def.display_name, "ok");
     }

@@ -1463,7 +1463,10 @@ mod tests {
         // exists once both halves are appended; the overlap window must catch it.
         let mut acc = String::new();
         acc.push_str("answer to=fun");
-        assert_eq!(find_wrap_marker_incremental(&acc, "answer to=fun".len()), None);
+        assert_eq!(
+            find_wrap_marker_incremental(&acc, "answer to=fun".len()),
+            None
+        );
         acc.push_str("ctions.tool");
         let hit = find_wrap_marker_incremental(&acc, "ctions.tool".len());
         assert_eq!(hit, find_wrap_marker_full(&acc));

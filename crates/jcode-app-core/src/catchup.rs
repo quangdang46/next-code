@@ -46,11 +46,7 @@ impl CatchupSeenSnapshot {
         if !is_attention_status(status) {
             return false;
         }
-        let seen = self
-            .state
-            .seen_at_ms_by_session
-            .get(session_id)
-            .copied();
+        let seen = self.state.seen_at_ms_by_session.get(session_id).copied();
         needs_catchup_with_seen(updated_at.timestamp_millis(), seen, status)
     }
 }

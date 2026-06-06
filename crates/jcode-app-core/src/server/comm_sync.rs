@@ -142,7 +142,6 @@ pub(super) async fn member_runtime_extras(
     }
 }
 
-
 async fn ensure_same_swarm_access(
     id: u64,
     req_session_id: &str,

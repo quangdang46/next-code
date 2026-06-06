@@ -509,7 +509,10 @@ fn resolve_swarm_spawn_model_openai_api_prefix_pins_api_route_over_coordinator()
 
     assert_eq!(selection.model.as_deref(), Some("gpt-5.5"));
     assert_eq!(selection.provider_key.as_deref(), Some("openai-api-key"));
-    assert_eq!(selection.route_api_method.as_deref(), Some("openai-api-key"));
+    assert_eq!(
+        selection.route_api_method.as_deref(),
+        Some("openai-api-key")
+    );
 }
 
 #[test]
@@ -517,12 +520,24 @@ fn resolve_swarm_spawn_model_auth_route_prefixes_pin_expected_routes() {
     for (configured, expected_model, expected_key) in [
         ("openai-api:gpt-5.5", "gpt-5.5", "openai-api-key"),
         ("openai-oauth:gpt-5.5", "gpt-5.5", "openai-oauth"),
-        ("claude-api:claude-opus-4-8", "claude-opus-4-8", "anthropic-api-key"),
-        ("claude-oauth:claude-opus-4-8", "claude-opus-4-8", "claude-oauth"),
+        (
+            "claude-api:claude-opus-4-8",
+            "claude-opus-4-8",
+            "anthropic-api-key",
+        ),
+        (
+            "claude-oauth:claude-opus-4-8",
+            "claude-opus-4-8",
+            "claude-oauth",
+        ),
     ] {
         let selection = resolve_swarm_spawn_selection(
             Some(configured.to_string()),
-            &coordinator_identity(Some("some-other-model"), Some("some-key"), Some("some-route")),
+            &coordinator_identity(
+                Some("some-other-model"),
+                Some("some-key"),
+                Some("some-route"),
+            ),
         );
         assert_eq!(
             selection.model.as_deref(),

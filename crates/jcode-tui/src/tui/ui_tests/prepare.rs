@@ -780,8 +780,12 @@ fn test_prepare_messages_renders_reasoning_role_dim_italic_without_sentinel() {
 
     // A collapsing reasoning message carries sentinel-wrapped dim/italic markup.
     let mut content = String::new();
-    content.push_str(&jcode_tui_markdown::reasoning_line_markup("weighing the options"));
-    content.push_str(&jcode_tui_markdown::reasoning_line_markup("▸ thought for 3s"));
+    content.push_str(&jcode_tui_markdown::reasoning_line_markup(
+        "weighing the options",
+    ));
+    content.push_str(&jcode_tui_markdown::reasoning_line_markup(
+        "▸ thought for 3s",
+    ));
 
     let state = TestState {
         display_messages: vec![

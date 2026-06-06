@@ -1,8 +1,8 @@
+use super::debug::ClientConnectionInfo;
 use super::{
     SharedContext, SwarmEvent, SwarmEventType, SwarmMember, fanout_session_event,
     record_swarm_event,
 };
-use super::debug::ClientConnectionInfo;
 use crate::protocol::{AgentInfo, ContextEntry, NotificationType, ServerEvent};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
