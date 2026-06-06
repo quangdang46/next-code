@@ -78,7 +78,7 @@ pub struct CapabilitySet {
 impl CapabilitySet {
     pub fn matches(&self, resource: &str, _action: &CapabilityAction) -> bool {
         self.tools.iter().any(|t| t == resource)
-            || self.hosts.iter().any(|h| resource.contains(h.as_str()))
+            || self.hosts.iter().any(|h| host_matches(resource, h))
             || self.fs_paths.iter().any(|p| resource.starts_with(p.as_str()))
             || self.env_vars.iter().any(|e| e == resource)
             || self.shell_commands.iter().any(|c| c == resource)
@@ -139,4 +139,29 @@ pub enum AccessDecision {
     Allowed(String),
     Denied(String),
     NeedsApproval(String),
+}
+
+/// Check if a resource (URL or hostname) matches a host pattern.
+/// Uses proper hostname matching instead of simple substring containment,
+/// so "evil.com" won't accidentally match "notevil.com".
+fn host_matches(resource: &str, pattern: &str) -> bool {
+    // Extract hostname from URL if the resource is a full URL
+    let host = if let Some(after_protocol) = resource.strip_prefix("http://").or_else(|| resource.strip_prefix("https://")) {
+        after_protocol.split('/').next().unwrap_or(after_protocol)
+            .split(':').next().unwrap_or(after_protocol) // strip port
+    } else {
+        resource
+    };
+
+    // Exact match
+    if host == pattern {
+        return true;
+    }
+
+    // Subdomain match: "example.com" matches "sub.example.com"
+    if host.ends_with(&format!(".{pattern}")) {
+        return true;
+    }
+
+    false
 }

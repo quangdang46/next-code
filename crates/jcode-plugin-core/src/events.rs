@@ -60,8 +60,9 @@ pub enum PluginEvent {
 }
 
 impl PluginEvent {
-    /// Total number of event variants
-    pub const COUNT: u32 = 28;
+    /// Total number of event variants.
+    /// Note: discriminant 11 is intentionally skipped (reserved for future use).
+    pub const COUNT: u32 = 27;
 
     /// All event variants
     pub fn all() -> Vec<PluginEvent> {

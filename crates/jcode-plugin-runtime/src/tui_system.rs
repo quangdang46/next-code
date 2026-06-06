@@ -367,12 +367,11 @@ impl TuiPluginSystem {
         let kb_prefix_for_closure = kb_prefix.clone();
         let register_kb = Function::new(ctx.clone(), move |key: String, _desc: String, handler: rquickjs::Value<'js>| {
             let fn_name = format!("{}{}", kb_prefix_for_closure, key.replace('+', "_"));
-            // We cannot store the handler value directly (lifetime issue), but
-            // the plugin's JS code can call this and the handler function will be
-            // registered on the global scope by the plugin itself. We just log
-            // the registration for now.
-            tracing::info!("Registered keybinding handler: {}", fn_name);
-            let _ = handler; // handler type logged; actual invocation deferred
+            // TODO(WIP): Cannot store the handler value directly (QuickJS Value lifetime).
+            // Full implementation requires wrapping the JS function in a thread-safe
+            // handle (e.g. StoredFunction) and invoking it when the keybinding fires.
+            tracing::info!("Registered keybinding handler: {} [STUB — handler not wired]", fn_name);
+            let _ = handler;
         })
         .map_err(|e| PluginError::Runtime(format!("Failed to create register_keybinding: {e}")))?;
         globals
@@ -384,7 +383,8 @@ impl TuiPluginSystem {
         let evt_prefix_for_closure = evt_prefix.clone();
         let register_evt = Function::new(ctx.clone(), move |event: String, handler: rquickjs::Value<'js>| {
             let fn_name = format!("{}{}", evt_prefix_for_closure, event);
-            tracing::info!("Registered TUI event handler: {}", fn_name);
+            // TODO(WIP): Same as keybinding — JS function reference not stored.
+            tracing::info!("Registered TUI event handler: {} [STUB — handler not wired]", fn_name);
             let _ = handler;
         })
         .map_err(|e| PluginError::Runtime(format!("Failed to create register_tui_event: {e}")))?;

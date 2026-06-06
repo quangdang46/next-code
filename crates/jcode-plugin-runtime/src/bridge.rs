@@ -17,10 +17,18 @@ impl PromiseBridge {
         }
     }
 
+    /// TODO(WIP): Install promise bridge functions into the QuickJS context.
+    /// Currently a no-op — the bridge between async Rust futures and JS Promises
+    /// is not yet implemented. Requires injecting `__jcode_resolve(id, data)` and
+    /// `__jcode_reject(id, error)` globals and wiring them to the oneshot channels.
     pub fn install(&self, _ctx: &rquickjs::Ctx<'_>) -> Result<(), rquickjs::Error> {
         Ok(())
     }
 
+    /// TODO(WIP): Dispatch an async call from JS to Rust.
+    /// Currently only handles hardcoded stub methods. Full implementation should
+    /// allocate a oneshot channel, return the pending ID to JS as a Promise, and
+    /// resolve/reject when the Rust future completes.
     pub async fn dispatch_call(&self, method: &str, _args: &[u8]) -> Result<Vec<u8>, String> {
         match method {
             "getConfig" => Ok(br#"{}"#.to_vec()),

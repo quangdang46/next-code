@@ -97,11 +97,16 @@ impl PluginApiBindings {
 
             // Create a Rust handler slot that wraps the JS handler invocation.
             // The actual JS function call happens in the sandbox's call_handler method.
+            //
+            // TODO(WIP): The JS handler function (`_handler`) is received but not yet
+            // wired into the Rust closure. Currently returns HandlerResult::default().
+            // Full JS-to-Rust bridge requires storing the JS function reference in a
+            // thread-safe handle and invoking it via QuickJS context during dispatch.
             let id = plugin_id.clone();
             let slot = HandlerSlot::Rust(Arc::new(move |_input, _output| {
                 let id = id.clone();
                 Box::pin(async move {
-                    tracing::debug!("Handler invoked for plugin {} (Rust adapter)", id);
+                    tracing::debug!("Handler invoked for plugin {} (Rust adapter) [STUB]", id);
                     jcode_plugin_core::events::HandlerResult::default()
                 })
             }));
@@ -162,8 +167,12 @@ impl PluginApiBindings {
     }
 
     fn make_sleep_fn<'js>(&self, ctx: &Ctx<'js>) -> Result<Function<'js>, rquickjs::Error> {
+        // Cap sleep duration to prevent plugins from blocking the QuickJS thread indefinitely.
+        // 5 seconds is generous for plugin-side delays; anything longer should use async timers.
+        const MAX_SLEEP_MS: u64 = 5_000;
         Function::new(ctx.clone(), |ms: u64| {
-            std::thread::sleep(std::time::Duration::from_millis(ms));
+            let capped = ms.min(MAX_SLEEP_MS);
+            std::thread::sleep(std::time::Duration::from_millis(capped));
         })
     }
 

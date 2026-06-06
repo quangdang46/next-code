@@ -88,7 +88,7 @@ pub struct TuiPluginApi {
     /// When set, slot fill/clear operations propagate here.
     system_slots: Option<Arc<SlotRegistry>>,
     /// In-memory KV store scoped to this plugin.
-    kv_store: Arc<tokio::sync::RwLock<HashMap<String, String>>>,
+    kv_store: Arc<std::sync::RwLock<HashMap<String, String>>>,
 }
 
 impl TuiPluginApi {
@@ -98,7 +98,7 @@ impl TuiPluginApi {
             registry,
             slots: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             system_slots: None,
-            kv_store: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            kv_store: Arc::new(std::sync::RwLock::new(HashMap::new())),
         }
     }
 
@@ -113,7 +113,7 @@ impl TuiPluginApi {
             registry,
             slots: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             system_slots: Some(system_slots),
-            kv_store: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            kv_store: Arc::new(std::sync::RwLock::new(HashMap::new())),
         }
     }
 
@@ -457,11 +457,7 @@ impl TuiPluginApi {
                 tracing::debug!("Plugin {} kv.get({})", get_id, key);
                 let key = format!("{}:{}", get_id, key);
                 let store = Arc::clone(&get_store);
-                // Block briefly to read; this is acceptable for small in-memory maps.
-                // In a real async runtime the closure would be async, but QuickJS
-                // Function closures are synchronous.
-                let handle = tokio::runtime::Handle::current();
-                handle.block_on(async { store.read().await.get(&key).cloned().unwrap_or_default() })
+                store.read().unwrap().get(&key).cloned().unwrap_or_default()
             }),
         )?;
 
@@ -474,8 +470,7 @@ impl TuiPluginApi {
                 tracing::debug!("Plugin {} kv.set({}, ...)", set_id, key);
                 let key = format!("{}:{}", set_id, key);
                 let store = Arc::clone(&set_store);
-                let handle = tokio::runtime::Handle::current();
-                handle.block_on(async { store.write().await.insert(key, value); });
+                store.write().unwrap().insert(key, value);
             }),
         )?;
 
@@ -488,8 +483,7 @@ impl TuiPluginApi {
                 tracing::debug!("Plugin {} kv.delete({})", del_id, key);
                 let key = format!("{}:{}", del_id, key);
                 let store = Arc::clone(&del_store);
-                let handle = tokio::runtime::Handle::current();
-                handle.block_on(async { store.write().await.remove(&key); });
+                store.write().unwrap().remove(&key);
             }),
         )?;
 
@@ -501,16 +495,13 @@ impl TuiPluginApi {
             Function::new(ctx.clone(), move || -> Vec<String> {
                 let prefix = format!("{}:", list_id);
                 let store = Arc::clone(&list_store);
-                let handle = tokio::runtime::Handle::current();
-                handle.block_on(async {
-                    store
-                        .read()
-                        .await
-                        .keys()
-                        .filter(|k| k.starts_with(&prefix))
-                        .map(|k| k[prefix.len()..].to_string())
-                        .collect()
-                })
+                store
+                    .read()
+                    .unwrap()
+                    .keys()
+                    .filter(|k| k.starts_with(&prefix))
+                    .map(|k| k[prefix.len()..].to_string())
+                    .collect()
             }),
         )?;
 

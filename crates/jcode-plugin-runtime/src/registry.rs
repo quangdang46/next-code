@@ -101,7 +101,13 @@ impl PluginRegistry {
         self.dispatcher.register(event, id, slot);
     }
 
+    /// TODO(WIP): Register a tool exposed by a JS plugin.
+    /// Currently a no-op — the JS tool handle needs to be wrapped in a `Tool`
+    /// implementation that bridges calls into the QuickJS context. This requires
+    /// creating a `PluginTool` adapter that serializes input to JSON, invokes the
+    /// JS function, and deserializes the output.
     pub fn register_js_tool(&self, _id: PluginId, _name: String, _handle: rquickjs::Object) {
+        tracing::warn!("register_js_tool called but not yet implemented [STUB]");
     }
 
     pub async fn plugin_count(&self) -> usize {

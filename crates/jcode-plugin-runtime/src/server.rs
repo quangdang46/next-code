@@ -159,10 +159,14 @@ impl PluginSystem {
         self.uninstall_by_id(&id).await
     }
 
+    /// TODO(WIP): Re-enable a previously disabled plugin.
+    /// Currently only commits the dispatcher but does not re-register handlers
+    /// that were removed during disable. Full implementation should store the
+    /// plugin's handler registrations and replay them on enable.
     pub async fn enable_plugin(&self, id_str: &str) -> Result<(), jcode_plugin_core::PluginError> {
         let id = PluginId::from(id_str.to_string());
         self.dispatcher.commit();
-        tracing::info!("Plugin enabled: {id}");
+        tracing::info!("Plugin enabled: {id} [STUB — handlers not re-registered]");
         Ok(())
     }
 

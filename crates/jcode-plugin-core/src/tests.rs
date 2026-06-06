@@ -489,7 +489,7 @@ mod tests {
 
     #[test]
     fn plugin_event_count_matches_variants() {
-        assert_eq!(PluginEvent::COUNT, 28);
+        assert_eq!(PluginEvent::COUNT, 27);
     }
 
     #[test]
