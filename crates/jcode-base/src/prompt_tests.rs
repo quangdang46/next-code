@@ -120,7 +120,8 @@ fn test_prompt_overlay_files_are_loaded_from_project_and_global_jcode_dirs() {
         "expected global prompt overlay content"
     );
 
-    let (prompt, info) = build_system_prompt_full(None, &[], false, None, Some(project_dir.path()), None);
+    let (prompt, info) =
+        build_system_prompt_full(None, &[], false, None, Some(project_dir.path()), None);
     assert!(prompt.contains("project prompt overlay instructions"));
     assert!(prompt.contains("global prompt overlay instructions"));
     assert!(info.prompt_overlay_chars > 0);
@@ -174,7 +175,8 @@ fn test_preferred_tools_files_are_loaded_from_project_and_global_jcode_dirs() {
         "expected global preferred tools content"
     );
 
-    let (prompt, info) = build_system_prompt_full(None, &[], false, None, Some(project_dir.path()), None);
+    let (prompt, info) =
+        build_system_prompt_full(None, &[], false, None, Some(project_dir.path()), None);
     assert!(prompt.contains("project preferred tools instructions"));
     assert!(prompt.contains("global preferred tools instructions"));
     assert!(info.preferred_tools_chars > 0);
