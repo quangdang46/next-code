@@ -1,6 +1,4 @@
 use super::*;
-use crate::cli::args::Args;
-use clap::Parser;
 
 /// Verify the default system prompt does NOT identify as "Claude Code"
 /// It's fine to say "powered by Claude" but not "Claude Code" (Anthropic's product)

@@ -52,7 +52,7 @@ pub fn execute_active_workflows(
 
         let ctx = WorkflowContext {
             user_input,
-            working_dir: working_dir.map(|p| p),
+            working_dir,
             session_id,
             mode_state,
             metadata: &active_mode.metadata,
