@@ -232,6 +232,55 @@ fn build_contents_replays_thought_signature_on_function_call() {
 }
 
 #[test]
+fn build_contents_replays_every_signature_across_multi_tool_history() {
+    // Regression guard for the Antigravity/Cloud Code 400
+    // ("Function call is missing a thought_signature ... position 5"): the
+    // backend validates *every* functionCall in the replayed history, not just
+    // the latest one. A multi-turn transcript where an earlier tool_use drops
+    // its signature is exactly what triggers the field failure, so assert that
+    // each captured signature survives serialization onto its matching part.
+    let signatures = ["SIG_A", "SIG_B", "SIG_C"];
+    let mut messages = Vec::new();
+    for (idx, sig) in signatures.iter().enumerate() {
+        messages.push(Message {
+            role: Role::Assistant,
+            content: vec![ContentBlock::ToolUse {
+                id: format!("call_{idx}"),
+                name: "bash".to_string(),
+                input: json!({ "command": format!("echo {idx}") }),
+                thought_signature: Some(sig.to_string()),
+            }],
+            timestamp: None,
+            tool_duration_ms: None,
+        });
+        messages.push(Message {
+            role: Role::User,
+            content: vec![ContentBlock::ToolResult {
+                tool_use_id: format!("call_{idx}"),
+                content: format!("out {idx}"),
+                is_error: Some(false),
+            }],
+            timestamp: None,
+            tool_duration_ms: None,
+        });
+    }
+
+    let contents = build_contents(&messages);
+    let replayed: Vec<Option<&str>> = contents
+        .iter()
+        .flat_map(|content| content.parts.iter())
+        .filter(|part| part.function_call.is_some())
+        .map(|part| part.thought_signature.as_deref())
+        .collect();
+    assert_eq!(
+        replayed,
+        vec![Some("SIG_A"), Some("SIG_B"), Some("SIG_C")],
+        "every functionCall in the history must carry its captured thought_signature, \
+         not just the most recent one"
+    );
+}
+
+#[test]
 fn build_contents_preserves_tool_calls_and_results() {
     let messages = vec![
         Message {
@@ -676,4 +725,36 @@ fn developer_api_response_parses_without_code_assist_envelope() {
         .and_then(|part| part.text)
         .expect("missing text");
     assert_eq!(text, "hello from developer api");
+}
+
+#[test]
+fn system_instruction_tool_guard_only_applies_with_tools() {
+    // Without tools, the system instruction is passed through unchanged.
+    let plain = super::build_system_instruction_with_tool_guard("You are helpful.", false)
+        .expect("system instruction present");
+    let plain_text = plain.parts[0].text.clone().unwrap();
+    assert_eq!(plain_text, "You are helpful.");
+    assert!(!plain_text.contains("Function calling"));
+
+    // With tools, the MALFORMED_FUNCTION_CALL prevention guidance is appended.
+    let guarded = super::build_system_instruction_with_tool_guard("You are helpful.", true)
+        .expect("system instruction present");
+    let guarded_text = guarded.parts[0].text.clone().unwrap();
+    assert!(guarded_text.starts_with("You are helpful."));
+    assert!(guarded_text.contains("Function calling"));
+    assert!(guarded_text.contains("native function call, not code"));
+    assert!(guarded_text.contains("default_api."));
+}
+
+#[test]
+fn system_instruction_tool_guard_with_empty_system_still_emits_guidance() {
+    // An empty base system prompt plus tools must still carry the guard so the
+    // model is steered away from pseudo-code tool calls.
+    let guarded = super::build_system_instruction_with_tool_guard("", true)
+        .expect("guard-only instruction present");
+    let text = guarded.parts[0].text.clone().unwrap();
+    assert!(text.contains("Function calling"));
+
+    // Empty system and no tools yields no instruction at all.
+    assert!(super::build_system_instruction_with_tool_guard("", false).is_none());
 }

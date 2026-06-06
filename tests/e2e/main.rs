@@ -9,6 +9,8 @@ mod test_support;
 mod ambient;
 mod binary_integration;
 mod burst_spawn;
+#[cfg(feature = "dcp")]
+mod dcp_integration;
 mod provider_behavior;
 mod reload_multiclient;
 mod safety;

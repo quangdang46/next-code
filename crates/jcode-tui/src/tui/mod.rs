@@ -28,6 +28,7 @@ pub mod markdown;
 mod memory_profile;
 pub mod mermaid;
 pub mod permissions;
+pub(crate) mod plugin_integration;
 mod remote_diff;
 pub mod screenshot;
 pub mod session_picker;
@@ -217,6 +218,11 @@ pub trait TuiState {
     fn remote_startup_phase_active(&self) -> bool;
     /// Whether mouse-wheel smoothing has queued lines to animate.
     fn has_pending_mouse_scroll_animation(&self) -> bool {
+        false
+    }
+    /// Whether a "current reasoning collapses away" animation is in progress and
+    /// the redraw loop must keep ticking to advance it.
+    fn reasoning_collapse_animating(&self) -> bool {
         false
     }
     /// Optional configured keybinding label for external dictation.
@@ -413,6 +419,12 @@ pub trait TuiState {
             }
         }
         false
+    }
+
+    /// Access the plugin bridge for TUI plugin integration.
+    /// Returns `None` when the plugin system has not been initialized.
+    fn plugin_bridge(&self) -> Option<&plugin_integration::PluginTuiBridge> {
+        None
     }
 }
 
@@ -1294,6 +1306,7 @@ pub(crate) fn redraw_interval_with_policy(
         || !state.streaming_text().is_empty()
         || state.status_notice().is_some()
         || state.has_pending_mouse_scroll_animation()
+        || state.reasoning_collapse_animating()
         || state.copy_selection_edge_autoscroll_active()
         || state.has_notification()
         || rate_limit_countdown_redraw_active(state)
@@ -1353,6 +1366,7 @@ pub(crate) fn periodic_redraw_required(state: &dyn TuiState) -> bool {
         || !state.streaming_text().is_empty()
         || state.status_notice().is_some()
         || state.has_pending_mouse_scroll_animation()
+        || state.reasoning_collapse_animating()
         || state.copy_selection_edge_autoscroll_active()
         || state.chat_overscroll_active()
         || state.has_notification()

@@ -55,6 +55,7 @@ pub(super) async fn process_turn_with_input(
 
 pub(super) fn handle_tick(app: &mut App) -> bool {
     let mut needs_redraw = crate::tui::periodic_redraw_required(app);
+    needs_redraw |= app.advance_reasoning_collapse();
     app.maybe_capture_runtime_memory_heartbeat();
     needs_redraw |= app.progress_copy_selection_edge_autoscroll();
     app.progress_mouse_scroll_animation();
@@ -353,7 +354,24 @@ fn apply_terminal_event(
             app.note_client_interaction();
             app.update_copy_badge_key_event(key);
             if matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
-                app.handle_key_press_event(key)?;
+                // Let the plugin system handle the key first. If any plugin
+                // consumes it, skip normal TUI key handling.
+                let plugin_handled = if let Some(bridge) = app.plugin_bridge.as_ref() {
+                    if let Some(key_str) =
+                        crate::tui::plugin_integration::format_plugin_key(key.code, key.modifiers)
+                    {
+                        tokio::task::block_in_place(|| {
+                            tokio::runtime::Handle::current().block_on(bridge.handle_key(&key_str))
+                        })
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+                if !plugin_handled {
+                    app.handle_key_press_event(key)?;
+                }
             }
             Ok(true)
         }
@@ -472,6 +490,9 @@ pub(super) fn finish_turn(app: &mut App) {
     app.thought_line_inserted = false;
     app.thinking_prefix_emitted = false;
     app.thinking_buffer.clear();
+    // Snap any in-flight reasoning collapse straight to its summary so no
+    // animation is left running once the turn is idle.
+    app.finalize_reasoning_collapse();
     app.note_runtime_memory_event_force("turn_completed", "local_turn_finished");
     if !app.schedule_auto_poke_followup_if_needed()
         && !app.schedule_overnight_poke_followup_if_needed()

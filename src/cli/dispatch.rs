@@ -7,8 +7,8 @@ use std::time::Instant;
 
 use super::args::{
     AmbientCommand, Args, AuthCommand, CloudCommand, CloudSessionsCommand, Command,
-    ExperimentCommand, ExportFormatArg, McpCommand, MemoryCommand, ModelCommand, PromptsCommand,
-    ProviderCommand, RestartCommand, ServerCommand, SessionCommand, SkillsCommand,
+    ExperimentCommand, ExportFormatArg, McpCommand, MemoryCommand, ModelCommand, PluginCommand,
+    PromptsCommand, ProviderCommand, RestartCommand, ServerCommand, SessionCommand, SkillsCommand,
     TranscriptModeArg,
 };
 use crate::{
@@ -280,6 +280,20 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             SkillsCommand::Show { name } => commands::run_skills_show(&name)?,
             SkillsCommand::Disable { name } => commands::run_skills_disable(&name)?,
             SkillsCommand::Enable { name } => commands::run_skills_enable(&name)?,
+        },
+        Some(Command::Plugin(subcmd)) => match subcmd {
+            PluginCommand::List => commands::run_plugin_list_command()?,
+            PluginCommand::Install { source } => {
+                commands::run_plugin_install_command(&source).await?
+            }
+            PluginCommand::Uninstall { id } => commands::run_plugin_uninstall_command(&id).await?,
+            PluginCommand::Info { id } => commands::run_plugin_info_command(&id)?,
+            PluginCommand::Enable { id } => commands::run_plugin_enable_command(&id)?,
+            PluginCommand::Disable { id } => commands::run_plugin_disable_command(&id)?,
+            PluginCommand::Audit { recent, json } => {
+                commands::run_plugin_audit_command(recent, json)?
+            }
+            PluginCommand::Doctor { fix } => commands::run_plugin_doctor_command(fix)?,
         },
         Some(Command::Experiment(subcmd)) => match subcmd {
             ExperimentCommand::List { json } => {

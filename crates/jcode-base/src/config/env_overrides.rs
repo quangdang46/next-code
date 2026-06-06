@@ -311,9 +311,7 @@ impl Config {
         if let Ok(v) = std::env::var("JCODE_SWARM_ENABLED") {
             if let Some(parsed) = parse_env_bool(&v) {
                 self.features.swarm = parsed;
-                self.experiments
-                    .entries
-                    .insert("swarm".to_string(), parsed);
+                self.experiments.entries.insert("swarm".to_string(), parsed);
             }
         }
         if let Ok(v) = std::env::var("JCODE_MESSAGE_TIMESTAMPS") {

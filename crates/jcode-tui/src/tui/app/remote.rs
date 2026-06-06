@@ -80,13 +80,16 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
             .is_some_and(|state| state.kind == crate::tui::PickerKind::Model),
     });
     let mut needs_redraw = crate::tui::periodic_redraw_required(app);
+    needs_redraw |= app.advance_reasoning_collapse();
     app.maybe_capture_runtime_memory_heartbeat();
     needs_redraw |= app.progress_copy_selection_edge_autoscroll();
     app.progress_mouse_scroll_animation();
     needs_redraw |= app.update_chat_overscroll();
     needs_redraw |= app.update_pinned_images_auto_hide();
     needs_redraw |= dispatch_compacted_history_load(app, remote).await;
-    if let Some(chunk) = app.stream_buffer.flush() {
+    // Reveal buffered streaming text at the smooth paced rate on each tick, the
+    // same as the local turn loop. Finalization paths still call flush().
+    if let Some(chunk) = app.stream_buffer.flush_smooth_frame() {
         app.append_streaming_text(&chunk);
         needs_redraw = true;
     }
