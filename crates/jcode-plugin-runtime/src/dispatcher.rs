@@ -41,6 +41,7 @@ pub struct RcuDispatcher {
     pending: Mutex<Vec<(PluginEvent, PluginId, HandlerSlot)>>,
 }
 
+#[allow(clippy::new_without_default)]
 impl RcuDispatcher {
     pub fn new() -> Self {
         Self {
@@ -186,7 +187,7 @@ impl RcuDispatcher {
     pub fn plugin_count(&self) -> usize {
         if let Ok(snapshot) = self.snapshot.read() {
             let mut ids: Vec<&PluginId> = snapshot.handlers.iter().map(|(_, id, _)| id).collect();
-            ids.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+            ids.sort_by_key(|id| id.to_string());
             ids.dedup();
             ids.len()
         } else {

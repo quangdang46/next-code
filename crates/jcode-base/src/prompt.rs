@@ -284,10 +284,8 @@ pub fn build_system_prompt_full(
     }
 
     // Keyword mode prompt (changes per turn based on detected keywords)
-    if let Some(kw) = keyword_prompt {
-        if !kw.is_empty() {
-            parts.push(kw);
-        }
+    if let Some(kw) = keyword_prompt && !kw.is_empty() {
+        parts.push(kw);
     }
 
     // Add available skills list
@@ -401,10 +399,8 @@ pub fn build_system_prompt_split(
     }
 
     // Keyword mode prompt (changes per turn based on detected keywords)
-    if let Some(kw) = keyword_prompt {
-        if !kw.is_empty() {
-            dynamic_parts.push(kw);
-        }
+    if let Some(kw) = keyword_prompt && !kw.is_empty() {
+        dynamic_parts.push(kw);
     }
 
     // Active skill prompt (changes per skill invocation)

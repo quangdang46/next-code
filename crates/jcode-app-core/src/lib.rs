@@ -30,6 +30,9 @@ pub mod channel;
 #[cfg(feature = "dcp")]
 pub mod dcp_bridge;
 
+#[cfg(feature = "rtco")]
+pub mod rtco_filter;
+
 pub mod dcg_bridge;
 pub mod doctor;
 pub mod export;

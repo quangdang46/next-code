@@ -4,10 +4,10 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 #[derive(Clone, Copy)]
-pub(crate) struct RegisteredCommand {
-    pub(crate) name: &'static str,
-    pub(crate) help: &'static str,
-    pub(crate) hidden: bool,
+pub struct RegisteredCommand {
+    pub name: &'static str,
+    pub help: &'static str,
+    pub hidden: bool,
 }
 
 impl RegisteredCommand {

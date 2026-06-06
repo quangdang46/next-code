@@ -145,18 +145,14 @@ fn extract_ambiguity_score(response: &str) -> Option<u32> {
                 .into_iter()
                 .rev()
                 .collect();
-            if let Ok(n) = num_str.parse::<u32>() {
-                if n <= 10 {
-                    return Some(n);
-                }
+            if let Ok(n @ ..=10) = num_str.parse::<u32>() {
+                return Some(n);
             }
         }
         // Fallback: look for "ambiguity.*N" pattern
         for word in line.split_whitespace() {
-            if let Ok(n) = word.parse::<u32>() {
-                if n <= 10 {
-                    return Some(n);
-                }
+            if let Ok(n @ ..=10) = word.parse::<u32>() {
+                return Some(n);
             }
         }
     }

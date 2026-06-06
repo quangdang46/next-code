@@ -3509,17 +3509,16 @@ impl App {
     /// Finalize any in-flight reasoning collapse immediately (snap to summary).
     /// Used when the turn ends or state is reset so no animation is left dangling.
     pub(super) fn finalize_reasoning_collapse(&mut self) {
-        if let Some(collapse) = self.reasoning_collapse.take() {
-            if self
+        if let Some(collapse) = self.reasoning_collapse.take()
+            && self
                 .display_messages
                 .get(collapse.msg_index)
                 .map(|m| m.role.as_str())
                 == Some("reasoning")
-            {
-                let content =
-                    reasoning_message_content(&collapse.summary_markup, &collapse.line_markups, 0);
-                self.replace_display_message_content(collapse.msg_index, content);
-            }
+        {
+            let content =
+                reasoning_message_content(&collapse.summary_markup, &collapse.line_markups, 0);
+            self.replace_display_message_content(collapse.msg_index, content);
         }
         self.reasoning_block_start = None;
         self.reasoning_block_started_at = None;
@@ -3631,7 +3630,7 @@ impl App {
         // activate_picker_from_preview() would clear the input (destroying the key)
         // and forward Enter to the picker — never reaching the login handler.
         if self.pending_login.is_some() {
-            let mut raw_input = std::mem::take(&mut self.input);
+            let raw_input = std::mem::take(&mut self.input);
             let input = self.expand_paste_placeholders(&raw_input);
             if let Some(notice) = input_exceeds_submit_limit(&input) {
                 self.input = raw_input;

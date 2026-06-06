@@ -33,7 +33,7 @@ pub fn detect_keywords(input: &str) -> Vec<DetectedKeyword> {
         // Check canonical keyword (case-insensitive)
         if let Some(pos) = lower.find(&entry.keyword.to_lowercase()) {
             results.push(DetectedKeyword {
-                entry: *entry,
+                entry,
                 matched_text: sanitized[pos..pos + entry.keyword.len()].to_string(),
                 position: (pos, pos + entry.keyword.len()),
                 confidence: 1.0,
@@ -56,7 +56,7 @@ pub fn detect_keywords(input: &str) -> Vec<DetectedKeyword> {
                         .last()
                         .unwrap_or(pos);
                     results.push(DetectedKeyword {
-                        entry: *entry,
+                        entry,
                         matched_text: sanitized[pos..end].to_string(),
                         position: (pos, end),
                         confidence: 0.9,
@@ -76,7 +76,7 @@ pub fn detect_keywords(input: &str) -> Vec<DetectedKeyword> {
                     .unwrap_or(alias.len());
                 let end = (pos + match_len).min(sanitized.len());
                 results.push(DetectedKeyword {
-                    entry: *entry,
+                    entry,
                     matched_text: sanitized[pos..end].to_string(),
                     position: (pos, end),
                     confidence: 0.85,

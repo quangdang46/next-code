@@ -2402,6 +2402,7 @@ pub fn load_sessions_grouped() -> Result<(Vec<ServerGroup>, Vec<SessionInfo>)> {
 /// jcode snapshot, the other CLIs, and listing servers) is wasted there. This
 /// scoped loader keeps onboarding responsive by touching only the relevant
 /// transcripts.
+#[allow(dead_code)]
 pub(crate) fn load_external_cli_sessions_grouped(
     _cli: crate::tui::app::onboarding_flow::ExternalCli,
 ) -> (Vec<ServerGroup>, Vec<SessionInfo>) {

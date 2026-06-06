@@ -132,6 +132,7 @@ const MACOS_TERMINAL_PREFERENCE: &[&str] = &[
 ];
 
 #[cfg(unix)]
+#[allow(clippy::needless_return)]
 pub fn detected_resume_terminal() -> Option<String> {
     if std::env::var("HANDTERM_SESSION").is_ok() || std::env::var("HANDTERM_PID").is_ok() {
         return Some("handterm".to_string());

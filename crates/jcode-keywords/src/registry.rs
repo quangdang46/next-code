@@ -173,7 +173,7 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
         ];
 
         // Sort by priority (highest first)
-        entries.sort_by(|a, b| b.priority.cmp(&a.priority));
+        entries.sort_by_key(|a| std::cmp::Reverse(a.priority));
         let leaked: &'static [KeywordEntry] = Box::leak(entries.into_boxed_slice());
         let refs: &'static [&'static KeywordEntry] =
             Box::leak(leaked.iter().collect::<Vec<_>>().into_boxed_slice());

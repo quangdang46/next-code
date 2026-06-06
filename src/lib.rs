@@ -52,8 +52,7 @@ pub fn early_exit_on_help_or_version() {
     match cli::args::Args::try_parse() {
         Ok(_) => {} // normal invocation — caller continues
         Err(e) => match e.kind() {
-            clap::error::ErrorKind::DisplayHelp
-            | clap::error::ErrorKind::DisplayVersion => {
+            clap::error::ErrorKind::DisplayHelp | clap::error::ErrorKind::DisplayVersion => {
                 let _ = e.print();
                 std::process::exit(0);
             }

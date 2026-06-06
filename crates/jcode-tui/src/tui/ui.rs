@@ -1664,6 +1664,7 @@ pub(crate) fn copy_pane_vertical_edge_point(
 /// This mirrors that: dragging below the last visible line snaps to the end of
 /// that line, and dragging above the first visible line snaps to its start, so
 /// the boundary line is fully covered even when there is nothing more to scroll.
+#[allow(dead_code)]
 pub(crate) fn copy_pane_drag_point(
     pane: crate::tui::CopySelectionPane,
     column: u16,
@@ -1930,22 +1931,22 @@ pub(crate) fn copy_selection_metrics(
                 continue;
             }
         }
-        let line_width = line_display_width(&text);
+        let line_width = line_display_width(text);
         let copy_start = snapshot.wrapped_copy_offset(abs_line).unwrap_or(0);
         let start_col = if abs_line == start.abs_line {
-            clamp_display_col(&text, start.column).max(copy_start)
+            clamp_display_col(text, start.column).max(copy_start)
         } else {
             copy_start
         };
         let end_col = if abs_line == end.abs_line {
-            clamp_display_col(&text, end.column).max(copy_start)
+            clamp_display_col(text, end.column).max(copy_start)
         } else {
             line_width
         };
         if end_col < start_col {
             continue;
         }
-        chars += display_col_slice(&text, start_col, end_col).chars().count();
+        chars += display_col_slice(text, start_col, end_col).chars().count();
     }
 
     Some((chars, lines.max(1)))

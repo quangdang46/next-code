@@ -2116,11 +2116,11 @@ fn find_input_highlights(
     let trimmed = input.trim_start();
     let offset = input.len() - trimmed.len();
 
-    if trimmed.starts_with('/') {
-        let cmd_end = trimmed[1..]
+    if let Some(after_slash) = trimmed.strip_prefix('/') {
+        let cmd_end = after_slash
             .find(|c: char| c.is_whitespace())
-            .unwrap_or(trimmed.len() - 1);
-        let cmd_name = &trimmed[..=cmd_end];
+            .unwrap_or(after_slash.len());
+        let cmd_name = &trimmed[..=cmd_end]; // includes the leading '/'
         if registered_commands.iter().any(|c| c.name == cmd_name) {
             highlights.push(InputHighlight {
                 start: offset,
@@ -2306,6 +2306,7 @@ pub(crate) fn input_cursor_pos_from_screen(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn wrap_input_text<'a>(
     input: &str,
     cursor_pos: usize,
