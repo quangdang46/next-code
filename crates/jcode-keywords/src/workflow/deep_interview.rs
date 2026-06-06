@@ -18,24 +18,16 @@ impl WorkflowHandler for DeepInterviewHandler {
 
     fn build_prompt(&self) -> String {
         "# $deep-interview — Requirements Gathering Mode\n\n\
-         You are in deep-interview mode. Gather requirements through Q&A.\n\n\
+         Gather requirements through Q&A.\n\n\
          ## Process\n\
-         1. **Analyze** — Identify ambiguity in the request\n\
-         2. **Ask** — Pose clarifying questions (max 3 per round)\n\
-         3. **Score** — Rate ambiguity 1-10\n\
-         4. **Repeat** — Until ambiguity < 3\n\
-         5. **Summarize** — Confirm requirements\n\n\
-         ## Question Guidelines\n\
-         - Ask one question at a time\n\
-         - Be specific, not vague\n\
-         - Offer options when possible\n\
-         - Explain why you're asking\n\n\
+         1. Analyze request for ambiguity\n\
+         2. Ask clarifying questions (max 3 per round)\n\
+         3. Score ambiguity 1-10\n\
+         4. Repeat until ambiguity < 3\n\n\
          ## Ambiguity Score\n\
-         - 1-2: Crystal clear, proceed\n\
-         - 3-4: Mostly clear, minor questions\n\
-         - 5-6: Some ambiguity, need clarification\n\
-         - 7-8: Significant ambiguity, many questions\n\
-         - 9-10: Very unclear, fundamental questions"
+         Report as: `Ambiguity: N/10`\n\n\
+         ## Completion Marker\n\
+         When done: `[INTERVIEW:COMPLETE]`"
             .to_string()
     }
 
@@ -54,24 +46,23 @@ impl WorkflowHandler for DeepInterviewHandler {
 
         if round >= MAX_ROUNDS {
             return WorkflowAction::Complete(format!(
-                "Interview complete after {} rounds. Proceeding with gathered requirements.",
+                "Interview complete after {} rounds.",
                 round
             ));
         }
 
         if ambiguity < AMBIGUITY_THRESHOLD {
             return WorkflowAction::Complete(
-                "Requirements are clear enough. Proceeding.".to_string(),
+                "Requirements are clear. Proceeding.".to_string(),
             );
         }
 
-        // Build interview prompt based on round
         let reminder = if round == 0 {
             format!(
                 "## Deep Interview — Round {}/{}\n\n\
-                 Analyze the following request for ambiguity:\n{}\n\n\
-                 Ask up to 3 clarifying questions to reduce ambiguity.\n\
-                 Score the current ambiguity level (1-10).",
+                 Analyze for ambiguity:\n{}\n\n\
+                 Ask up to 3 clarifying questions.\n\
+                 Report ambiguity as: `Ambiguity: N/10`",
                 round + 1,
                 MAX_ROUNDS,
                 ctx.user_input
@@ -79,9 +70,9 @@ impl WorkflowHandler for DeepInterviewHandler {
         } else {
             format!(
                 "## Deep Interview — Round {}/{}\n\n\
-                 Based on the answers so far, ask follow-up questions.\n\
-                 Current ambiguity score: {}/10\n\
-                 Target: below {}/10",
+                 Current ambiguity: {}/10\n\
+                 Target: below {}/10\n\
+                 Ask follow-up questions.",
                 round + 1,
                 MAX_ROUNDS,
                 ambiguity,
@@ -89,9 +80,11 @@ impl WorkflowHandler for DeepInterviewHandler {
             )
         };
 
-        let mut metadata = HashMap::new();
+        let mut metadata = ctx.metadata.clone();
         metadata.insert("interview_round".to_string(), (round + 1).to_string());
-        metadata.insert("ambiguity_score".to_string(), ambiguity.to_string());
+        if !metadata.contains_key("ambiguity_score") {
+            metadata.insert("ambiguity_score".to_string(), "5".to_string());
+        }
 
         WorkflowAction::ContinueWithMetadata {
             reminder,
@@ -99,54 +92,81 @@ impl WorkflowHandler for DeepInterviewHandler {
         }
     }
 
-    fn on_turn_complete(&self, response: &str, metadata: &HashMap<String, String>) -> WorkflowAction {
+    fn on_turn_complete(
+        &self,
+        response: &str,
+        metadata: &HashMap<String, String>,
+    ) -> WorkflowAction {
+        // Check for explicit completion marker
+        if response.contains("[INTERVIEW:COMPLETE]") {
+            return WorkflowAction::Complete(
+                "Requirements gathered.".to_string(),
+            );
+        }
+
         let round: u32 = metadata
             .get("interview_round")
             .and_then(|s| s.parse().ok())
             .unwrap_or(0);
 
-        // Try to extract ambiguity score from response
-        let new_ambiguity = extract_ambiguity_score(response).unwrap_or(3);
+        // Extract ambiguity score using tighter pattern
+        let new_ambiguity = extract_ambiguity_score(response).unwrap_or(4);
 
         if new_ambiguity < AMBIGUITY_THRESHOLD {
             return WorkflowAction::Complete(
-                "Requirements gathered. Ambiguity is low enough to proceed.".to_string(),
+                "Requirements gathered. Ambiguity is low.".to_string(),
             );
         }
 
         if round >= MAX_ROUNDS {
             return WorkflowAction::Complete(format!(
-                "Interview complete after {} rounds. Final ambiguity: {}/10",
+                "Interview complete after {} rounds. Ambiguity: {}/10",
                 round, new_ambiguity
             ));
         }
 
-        // Continue interview with updated score
-        let mut updated_metadata = metadata.clone();
-        updated_metadata.insert("ambiguity_score".to_string(), new_ambiguity.to_string());
+        let mut updated = metadata.clone();
+        updated.insert("ambiguity_score".to_string(), new_ambiguity.to_string());
 
         WorkflowAction::ContinueWithMetadata {
-            reminder: format!("Ambiguity score: {}/10. Continuing interview...", new_ambiguity),
-            metadata: updated_metadata,
+            reminder: format!("Ambiguity: {}/10. Continuing interview...", new_ambiguity),
+            metadata: updated,
         }
     }
 }
 
 /// Extract ambiguity score from LLM response.
+/// Uses tight pattern: requires "ambiguity" on the same line as a N/10 pattern.
 fn extract_ambiguity_score(response: &str) -> Option<u32> {
-    // Look for patterns like "ambiguity: 7/10", "score: 7", "7 out of 10"
     let lower = response.to_lowercase();
 
     for line in lower.lines() {
-        if line.contains("ambiguity") || line.contains("score") {
-            // Try to find a number
-            let numbers: Vec<u32> = line
-                .split(|c: char| !c.is_ascii_digit())
-                .filter_map(|s| s.parse().ok())
-                .filter(|&n| n <= 10)
+        if !line.contains("ambiguity") {
+            continue;
+        }
+        // Look for N/10 pattern specifically
+        if let Some(pos) = line.find("/10") {
+            let before = &line[..pos];
+            let num_str: String = before
+                .chars()
+                .rev()
+                .take_while(|c| c.is_ascii_digit())
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
                 .collect();
-            if let Some(&score) = numbers.first() {
-                return Some(score);
+            if let Ok(n) = num_str.parse::<u32>() {
+                if n <= 10 {
+                    return Some(n);
+                }
+            }
+        }
+        // Fallback: look for "ambiguity.*N" pattern
+        for word in line.split_whitespace() {
+            if let Ok(n) = word.parse::<u32>() {
+                if n <= 10 {
+                    return Some(n);
+                }
             }
         }
     }
@@ -159,15 +179,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn extract_score_from_response() {
-        assert_eq!(
-            extract_ambiguity_score("The ambiguity score is 7/10"),
-            Some(7)
-        );
-        assert_eq!(
-            extract_ambiguity_score("Current ambiguity: 3 out of 10"),
-            Some(3)
-        );
+    fn extract_score_from_n_over_10() {
+        assert_eq!(extract_ambiguity_score("Ambiguity: 7/10"), Some(7));
+        assert_eq!(extract_ambiguity_score("The ambiguity is about 3/10"), Some(3));
+    }
+
+    #[test]
+    fn extract_score_requires_ambiguity_keyword() {
+        // Should NOT match "score" without "ambiguity"
+        assert_eq!(extract_ambiguity_score("The security score is 8/10"), None);
+        assert_eq!(extract_ambiguity_score("Performance score: 6"), None);
+    }
+
+    #[test]
+    fn extract_score_no_match() {
         assert_eq!(extract_ambiguity_score("No score here"), None);
+        assert_eq!(extract_ambiguity_score(""), None);
     }
 }

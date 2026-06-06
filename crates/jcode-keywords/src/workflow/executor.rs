@@ -3,37 +3,42 @@
 //! Bridges the keyword system with the agent runtime. Called from the turn loop
 //! to execute active workflows and produce actions (spawn agents, inject reminders, etc.).
 
-use super::{SpawnSpec, WorkflowAction, WorkflowContext};
+use super::{WorkflowAction, WorkflowContext};
 use crate::registry::WorkflowKind;
 use crate::state::ModeState;
 
 /// Execute all active workflows for the current turn.
 ///
-/// Called from `build_system_prompt_split` or the turn loop. Returns the
-/// combined actions from all active workflow handlers.
+/// Returns actions paired with the index of the active mode that produced them.
+/// The caller is responsible for persisting metadata from `ContinueWithMetadata`.
 pub fn execute_active_workflows(
     mode_state: &ModeState,
     user_input: &str,
     working_dir: Option<&std::path::Path>,
     session_id: &str,
-) -> Vec<(WorkflowKind, WorkflowAction)> {
+) -> Vec<(usize, WorkflowKind, WorkflowAction)> {
     let mut actions = Vec::new();
 
-    for active_mode in &mode_state.active_modes {
+    for (i, active_mode) in mode_state.active_modes.iter().enumerate() {
+        // Skip cancel — it's handled by state::update_modes()
+        if active_mode.workflow == WorkflowKind::Cancel {
+            continue;
+        }
+
         let Some(handler) = crate::workflow::get_handler(active_mode.workflow) else {
             continue;
         };
 
         let ctx = WorkflowContext {
-            user_input: user_input.to_string(),
-            working_dir: working_dir.map(|p| p.to_path_buf()),
-            session_id: session_id.to_string(),
-            mode_state: mode_state.clone(),
-            metadata: active_mode.metadata.clone(),
+            user_input,
+            working_dir: working_dir.map(|p| p),
+            session_id,
+            mode_state,
+            metadata: &active_mode.metadata,
         };
 
         let action = handler.execute(&ctx);
-        actions.push((active_mode.workflow, action));
+        actions.push((i, active_mode.workflow, action));
     }
 
     actions
@@ -41,24 +46,86 @@ pub fn execute_active_workflows(
 
 /// Process the LLM's response through all active workflow handlers.
 ///
-/// Called after each turn completes. Handlers can inspect the response
-/// and decide whether to continue, complete, or ask for more input.
+/// Returns actions paired with the index of the active mode that produced them.
 pub fn process_turn_response(
     mode_state: &ModeState,
     response: &str,
-) -> Vec<(WorkflowKind, WorkflowAction)> {
+) -> Vec<(usize, WorkflowKind, WorkflowAction)> {
     let mut actions = Vec::new();
 
-    for active_mode in &mode_state.active_modes {
+    for (i, active_mode) in mode_state.active_modes.iter().enumerate() {
+        if active_mode.workflow == WorkflowKind::Cancel {
+            continue;
+        }
+
         let Some(handler) = crate::workflow::get_handler(active_mode.workflow) else {
             continue;
         };
 
         let action = handler.on_turn_complete(response, &active_mode.metadata);
-        actions.push((active_mode.workflow, action));
+        actions.push((i, active_mode.workflow, action));
     }
 
     actions
+}
+
+/// Apply workflow actions to mode state (metadata persistence, mode deactivation).
+///
+/// This is the key function that persists `ContinueWithMetadata` and `Complete` actions.
+/// Returns a summary of what changed.
+pub fn apply_actions(
+    mode_state: &mut ModeState,
+    actions: &[(usize, WorkflowKind, WorkflowAction)],
+) -> Vec<String> {
+    let mut summaries = Vec::new();
+    let mut to_remove = Vec::new();
+
+    for (idx, kind, action) in actions {
+        match action {
+            WorkflowAction::ContinueWithMetadata { metadata, reminder } => {
+                if let Some(mode) = mode_state.active_modes.get_mut(*idx) {
+                    // Merge new metadata into existing (don't discard)
+                    for (k, v) in metadata {
+                        mode.metadata.insert(k.clone(), v.clone());
+                    }
+                    summaries.push(format!("{}: updated metadata, reminder: {}", kind, &reminder[..reminder.len().min(50)]));
+                }
+            }
+            WorkflowAction::Complete(msg) => {
+                to_remove.push(*idx);
+                summaries.push(format!("{}: completed — {}", kind, msg));
+            }
+            WorkflowAction::Error(msg) => {
+                to_remove.push(*idx);
+                summaries.push(format!("{}: error — {}", kind, msg));
+            }
+            WorkflowAction::InjectReminder(r) => {
+                summaries.push(format!("{}: inject reminder — {}", kind, &r[..r.len().min(50)]));
+            }
+            WorkflowAction::SpawnAgent { description, .. } => {
+                summaries.push(format!("{}: spawn agent — {}", kind, description));
+            }
+            WorkflowAction::SpawnParallel(specs) => {
+                summaries.push(format!("{}: spawn {} agents", kind, specs.len()));
+            }
+            WorkflowAction::AskUser(q) => {
+                summaries.push(format!("{}: ask user — {}", kind, &q[..q.len().min(50)]));
+            }
+            WorkflowAction::Continue => {}
+        }
+    }
+
+    // Remove completed/errored modes (reverse order to preserve indices)
+    to_remove.sort_unstable();
+    to_remove.dedup();
+    for idx in to_remove.into_iter().rev() {
+        if idx < mode_state.active_modes.len() {
+            mode_state.active_modes.remove(idx);
+        }
+    }
+
+    mode_state.updated_at = Some(chrono::Utc::now().to_rfc3339());
+    summaries
 }
 
 /// Build the combined workflow prompt injection for all active modes.
@@ -71,7 +138,6 @@ pub fn build_workflow_prompt(mode_state: &ModeState) -> String {
 
     let mut sections = Vec::new();
     sections.push("# Active Workflow Modes\n".to_string());
-    sections.push("The user has activated the following workflows:\n".to_string());
 
     for active_mode in &mode_state.active_modes {
         let Some(handler) = crate::workflow::get_handler(active_mode.workflow) else {
@@ -87,35 +153,6 @@ pub fn build_workflow_prompt(mode_state: &ModeState) -> String {
     }
 
     sections.join("")
-}
-
-/// Create a SpawnSpec for a workflow sub-agent.
-pub fn make_spawn_spec(
-    description: &str,
-    prompt: &str,
-    system_prompt: &str,
-    max_turns: u32,
-) -> SpawnSpec {
-    SpawnSpec {
-        description: description.to_string(),
-        prompt: prompt.to_string(),
-        system_prompt: system_prompt.to_string(),
-        max_turns,
-    }
-}
-
-/// Build a system prompt for a workflow sub-agent.
-pub fn build_subagent_system_prompt(workflow: WorkflowKind, base_instructions: &str) -> String {
-    let handler_prompt = crate::workflow::get_handler(workflow)
-        .map(|h| h.build_prompt())
-        .unwrap_or_default();
-
-    format!(
-        "{}\n\n{}\n\nYou are a specialized sub-agent executing a workflow step. \
-         Focus on completing your assigned task efficiently. \
-         Report your results clearly and concisely.",
-        handler_prompt, base_instructions
-    )
 }
 
 #[cfg(test)]
@@ -159,5 +196,62 @@ mod tests {
         let prompt = build_workflow_prompt(&state);
         assert!(prompt.contains("ultrathink"));
         assert!(prompt.contains("10 turns remaining"));
+    }
+
+    #[test]
+    fn apply_actions_persists_metadata() {
+        let mut state = ModeState {
+            active_modes: vec![ActiveMode {
+                workflow: WorkflowKind::Tdd,
+                activated_at: "2026-01-01T00:00:00Z".to_string(),
+                turn_count: 0,
+                turn_limit: 10,
+                metadata: HashMap::new(),
+            }],
+            updated_at: None,
+        };
+        let mut new_meta = HashMap::new();
+        new_meta.insert("tdd_phase".to_string(), "green".to_string());
+        let actions = vec![(
+            0,
+            WorkflowKind::Tdd,
+            WorkflowAction::ContinueWithMetadata {
+                reminder: "test".to_string(),
+                metadata: new_meta,
+            },
+        )];
+        apply_actions(&mut state, &actions);
+        assert_eq!(state.active_modes[0].metadata.get("tdd_phase").unwrap(), "green");
+    }
+
+    #[test]
+    fn apply_actions_removes_completed() {
+        let mut state = ModeState {
+            active_modes: vec![
+                ActiveMode {
+                    workflow: WorkflowKind::Tdd,
+                    activated_at: "2026-01-01T00:00:00Z".to_string(),
+                    turn_count: 0,
+                    turn_limit: 10,
+                    metadata: HashMap::new(),
+                },
+                ActiveMode {
+                    workflow: WorkflowKind::Ultrathink,
+                    activated_at: "2026-01-01T00:00:00Z".to_string(),
+                    turn_count: 0,
+                    turn_limit: 10,
+                    metadata: HashMap::new(),
+                },
+            ],
+            updated_at: None,
+        };
+        let actions = vec![(
+            0,
+            WorkflowKind::Tdd,
+            WorkflowAction::Complete("done".to_string()),
+        )];
+        apply_actions(&mut state, &actions);
+        assert_eq!(state.active_modes.len(), 1);
+        assert_eq!(state.active_modes[0].workflow, WorkflowKind::Ultrathink);
     }
 }

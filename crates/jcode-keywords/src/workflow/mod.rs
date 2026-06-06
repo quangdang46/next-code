@@ -3,7 +3,6 @@
 use crate::registry::WorkflowKind;
 use crate::state::ModeState;
 use std::collections::HashMap;
-use std::path::PathBuf;
 
 pub mod ai_slop_cleaner;
 pub mod analyze;
@@ -23,17 +22,17 @@ pub mod ultrawork;
 pub mod wiki;
 
 /// Execution context passed to workflow handlers.
-pub struct WorkflowContext {
+pub struct WorkflowContext<'a> {
     /// The user's original input (with keyword stripped).
-    pub user_input: String,
+    pub user_input: &'a str,
     /// Working directory.
-    pub working_dir: Option<PathBuf>,
+    pub working_dir: Option<&'a std::path::Path>,
     /// Session ID.
-    pub session_id: String,
-    /// Current mode state.
-    pub mode_state: ModeState,
-    /// Metadata from previous turns (iteration counts, scores, etc.).
-    pub metadata: HashMap<String, String>,
+    pub session_id: &'a str,
+    /// Current mode state (borrowed, not cloned).
+    pub mode_state: &'a ModeState,
+    /// Metadata from the current active mode.
+    pub metadata: &'a HashMap<String, String>,
 }
 
 /// Action a workflow handler wants the turn loop to take.
@@ -61,6 +60,8 @@ pub enum WorkflowAction {
         reminder: String,
         metadata: HashMap<String, String>,
     },
+    /// Workflow encountered an error.
+    Error(String),
 }
 
 /// Specification for spawning a sub-agent.
@@ -110,27 +111,27 @@ pub trait WorkflowHandler: Send + Sync {
     }
 }
 
-/// Get all workflow handlers.
-pub fn all_handlers() -> Vec<Box<dyn WorkflowHandler>> {
-    vec![
-        Box::new(ultrawork::UltraworkHandler),
-        Box::new(ultragoal::UltragoalHandler),
-        Box::new(ultraqa::UltraqaHandler),
-        Box::new(ralplan::RalplanHandler),
-        Box::new(deep_interview::DeepInterviewHandler),
-        Box::new(tdd::TddHandler),
-        Box::new(code_review::CodeReviewHandler),
-        Box::new(security_review::SecurityReviewHandler),
-        Box::new(ultrathink::UltrathinkHandler),
-        Box::new(deepsearch::DeepsearchHandler),
-        Box::new(analyze::AnalyzeHandler),
-        Box::new(wiki::WikiHandler),
-        Box::new(ai_slop_cleaner::AiSlopCleanerHandler),
-        Box::new(cancel::CancelHandler),
-    ]
+/// Get a handler reference for a workflow kind (zero-allocation dispatch).
+pub fn get_handler(kind: WorkflowKind) -> Option<&'static dyn WorkflowHandler> {
+    Some(match kind {
+        WorkflowKind::Ultrawork => &ultrawork::UltraworkHandler,
+        WorkflowKind::Ultragoal => &ultragoal::UltragoalHandler,
+        WorkflowKind::Ultraqa => &ultraqa::UltraqaHandler,
+        WorkflowKind::Ralplan => &ralplan::RalplanHandler,
+        WorkflowKind::DeepInterview => &deep_interview::DeepInterviewHandler,
+        WorkflowKind::Tdd => &tdd::TddHandler,
+        WorkflowKind::CodeReview => &code_review::CodeReviewHandler,
+        WorkflowKind::SecurityReview => &security_review::SecurityReviewHandler,
+        WorkflowKind::Ultrathink => &ultrathink::UltrathinkHandler,
+        WorkflowKind::Deepsearch => &deepsearch::DeepsearchHandler,
+        WorkflowKind::Analyze => &analyze::AnalyzeHandler,
+        WorkflowKind::Wiki => &wiki::WikiHandler,
+        WorkflowKind::AiSlopCleaner => &ai_slop_cleaner::AiSlopCleanerHandler,
+        WorkflowKind::Cancel => &cancel::CancelHandler,
+    })
 }
 
-/// Dispatch to the appropriate handler for a workflow kind.
-pub fn get_handler(kind: WorkflowKind) -> Option<Box<dyn WorkflowHandler>> {
-    all_handlers().into_iter().find(|h| h.kind() == kind)
+/// Wrap user input in delimiters to prevent prompt injection in sub-agent prompts.
+pub fn sanitize_user_input(input: &str) -> String {
+    format!("<user_request>\n{}\n</user_request>", input)
 }
