@@ -13,17 +13,16 @@
 //!     ↓
 //! state::update_modes() → ModeState (persisted to .jcode/state/modes.toml)
 //!     ↓
-//! prompt_builder::build_keyword_prompt() → String (injected into system prompt)
+//! workflow::executor::execute_active_workflows() → Vec<(idx, kind, WorkflowAction)>
 //!     ↓
-//! visual::compute_highlights() → Vec<KeywordHighlight> (rainbow TUI rendering)
+//! workflow::executor::apply_actions() → updates ModeState metadata, removes completed
 //!     ↓
-//! workflow::executor::execute_active_workflows() → Vec<WorkflowAction>
+//! workflow::executor::build_workflow_prompt() → String (injected into system prompt)
 //! ```
 
 pub mod conflict;
 pub mod detector;
 pub mod intent;
-pub mod prompt_builder;
 pub mod registry;
 pub mod sanitizer;
 pub mod state;
@@ -37,4 +36,4 @@ pub use registry::{KeywordEntry, WorkflowKind};
 pub use state::ModeState;
 pub use visual::KeywordHighlight;
 pub use workflow::{WorkflowAction, WorkflowContext, WorkflowHandler};
-pub use workflow::executor::{execute_active_workflows, process_turn_response, build_workflow_prompt};
+pub use workflow::executor::{execute_active_workflows, process_turn_response, apply_actions, build_workflow_prompt};

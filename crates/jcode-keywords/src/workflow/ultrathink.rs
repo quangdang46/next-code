@@ -2,9 +2,8 @@
 //!
 //! Tier 1: Prompt-only. Injects deep reasoning instructions into system prompt.
 
-use super::{WorkflowAction, WorkflowContext, WorkflowHandler};
+use super::WorkflowHandler;
 use crate::registry::WorkflowKind;
-use std::collections::HashMap;
 
 pub struct UltrathinkHandler;
 
@@ -15,28 +14,16 @@ impl WorkflowHandler for UltrathinkHandler {
 
     fn build_prompt(&self) -> String {
         "# $ultrathink — Extended Thinking Mode\n\n\
-         You are in ultrathink mode. Reason deeply and thoroughly about the problem.\n\n\
+         Reason deeply and thoroughly about the problem.\n\n\
          ## Strategy\n\
-         1. **Decompose** — Break the problem into atomic components\n\
-         2. **Analyze each component** — Consider edge cases, boundary conditions, failure modes\n\
-         3. **Evaluate trade-offs** — Compare at least 3 approaches with pros/cons\n\
-         4. **Consider alternatives** — What would a skeptical reviewer suggest?\n\
-         5. **Synthesize** — Combine findings into a coherent analysis\n\
-         6. **Recommend** — Provide ranked recommendations with clear rationale\n\n\
-         ## Output Format\n\
-         - Start with a one-sentence summary of your conclusion\n\
-         - Then provide the detailed reasoning chain\n\
-         - End with actionable next steps"
+         1. Break the problem into components\n\
+         2. Consider edge cases and boundary conditions\n\
+         3. Evaluate trade-offs between approaches\n\
+         4. Consider alternatives and implications\n\
+         5. Provide thorough analysis with reasoning chain"
             .to_string()
     }
 
-    fn execute(&self, _ctx: &WorkflowContext) -> WorkflowAction {
-        // Prompt-only: the system prompt injection is sufficient
-        WorkflowAction::Continue
-    }
-
-    fn on_turn_complete(&self, _response: &str, _metadata: &HashMap<String, String>) -> WorkflowAction {
-        // Ultrathink is single-turn, deactivate after one response
-        WorkflowAction::Complete("Extended thinking complete.".to_string())
-    }
+    // Use trait default: Continue (no-op execute, no-op on_turn_complete)
+    // Defer to turn-limit expiration in state::update_modes
 }

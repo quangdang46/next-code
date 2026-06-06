@@ -113,7 +113,7 @@ impl Agent {
             .as_ref()
             .map(std::path::PathBuf::from);
 
-        // Detect keywords in the latest user message for prompt injection
+        // Detect keywords, update mode state, execute workflows, build prompt
         let keyword_prompt = {
             let latest_input = self.session.messages.iter().rev()
                 .find(|m| matches!(m.role, crate::message::Role::User))
@@ -123,11 +123,22 @@ impl Agent {
                 }))
                 .unwrap_or("");
             let detections = jcode_keywords::detect_keywords(latest_input);
-            let mode_state = jcode_keywords::state::update_modes(
+            let mut mode_state = jcode_keywords::state::update_modes(
                 &detections,
                 working_dir.as_deref(),
             );
-            let prompt = jcode_keywords::prompt_builder::build_keyword_prompt(&mode_state);
+
+            // Execute active workflows and persist metadata
+            let actions = jcode_keywords::execute_active_workflows(
+                &mode_state,
+                latest_input,
+                working_dir.as_deref(),
+                &self.session.id,
+            );
+            let _summaries = jcode_keywords::apply_actions(&mut mode_state, &actions);
+
+            // Build workflow prompt (replaces old build_keyword_prompt)
+            let prompt = jcode_keywords::build_workflow_prompt(&mode_state);
             if prompt.is_empty() { None } else { Some(prompt) }
         };
 

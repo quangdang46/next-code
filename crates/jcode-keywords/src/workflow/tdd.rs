@@ -15,22 +15,19 @@ impl WorkflowHandler for TddHandler {
 
     fn build_prompt(&self) -> String {
         "# $tdd — Test-Driven Development Mode\n\n\
-         You are in TDD mode. Follow the Red → Green → Refactor cycle.\n\n\
+         Follow the Red → Green → Refactor cycle.\n\n\
          ## Cycle\n\
-         1. **RED** — Write a failing test that describes the desired behavior\n\
-         2. **GREEN** — Write the minimal code to make the test pass\n\
-         3. **REFACTOR** — Clean up the code while keeping tests green\n\
-         4. **Repeat** — For each new behavior\n\n\
+         1. RED: Write a failing test\n\
+         2. GREEN: Write minimal code to pass\n\
+         3. REFACTOR: Clean up while keeping tests green\n\n\
          ## Rules\n\
-         - Never write production code without a failing test\n\
+         - Never write code without a failing test\n\
          - Write the simplest code that works\n\
-         - Refactor only when tests are green\n\
-         - One behavior per cycle\n\n\
-         ## Output\n\
-         After each cycle:\n\
-         - Test written: [test name]\n\
-         - Status: RED → GREEN → REFACTORED\n\
-         - Coverage: X%"
+         - Refactor only when tests are green\n\n\
+         ## Completion Markers\n\
+         When done with RED phase, say: `[PHASE:RED_DONE]`\n\
+         When done with GREEN phase, say: `[PHASE:GREEN_DONE]`\n\
+         When done with REFACTOR, say: `[PHASE:REFACTORED]`"
             .to_string()
     }
 
@@ -42,43 +39,32 @@ impl WorkflowHandler for TddHandler {
             .unwrap_or("red");
 
         let reminder = match phase {
-            "red" => {
-                format!(
-                    "## TDD — Phase: RED\n\n\
-                     Write a FAILING test for the following behavior:\n{}\n\n\
-                     The test must fail when run. Report: 'Test [name] written — RED'",
-                    ctx.user_input
-                )
-            }
+            "red" => format!(
+                "## TDD — Phase: RED\n\n\
+                 Write a FAILING test for:\n{}\n\n\
+                 The test must fail. Say `[PHASE:RED_DONE]` when done.",
+                ctx.user_input
+            ),
             "green" => {
                 "## TDD — Phase: GREEN\n\n\
-                 Write the MINIMAL code to make the failing test pass.\n\
-                 Don't over-engineer. Report: 'Implementation done — GREEN'"
+                 Write MINIMAL code to make the failing test pass.\n\
+                 Say `[PHASE:GREEN_DONE]` when done."
                     .to_string()
             }
             "refactor" => {
                 "## TDD — Phase: REFACTOR\n\n\
-                 Clean up the code while keeping all tests green.\n\
-                 - Remove duplication\n\
-                 - Improve naming\n\
-                 - Simplify logic\n\
-                 Report: 'Refactoring done — all tests still GREEN'"
+                 Clean up the code. Keep all tests green.\n\
+                 Say `[PHASE:REFACTORED]` when done."
                     .to_string()
             }
             _ => "Continue TDD cycle.".to_string(),
         };
 
-        let mut metadata = HashMap::new();
-        metadata.insert(
-            "tdd_phase".to_string(),
-            match phase {
-                "red" => "green",
-                "green" => "refactor",
-                "refactor" => "red",
-                _ => "red",
-            }
-            .to_string(),
-        );
+        // DON'T advance phase here — let on_turn_complete do it
+        let mut metadata = ctx.metadata.clone();
+        if !metadata.contains_key("tdd_phase") {
+            metadata.insert("tdd_phase".to_string(), "red".to_string());
+        }
 
         WorkflowAction::ContinueWithMetadata {
             reminder,
@@ -86,29 +72,37 @@ impl WorkflowHandler for TddHandler {
         }
     }
 
-    fn on_turn_complete(&self, response: &str, metadata: &HashMap<String, String>) -> WorkflowAction {
+    fn on_turn_complete(
+        &self,
+        response: &str,
+        metadata: &HashMap<String, String>,
+    ) -> WorkflowAction {
         let phase = metadata
             .get("tdd_phase")
             .map(|s| s.as_str())
             .unwrap_or("red");
 
-        // Check for phase completion signals
-        match phase {
-            "red" if response.contains("RED") || response.contains("failing") => {
-                // Test is failing as expected, move to green
-                WorkflowAction::Continue
-            }
-            "green" if response.contains("GREEN") || response.contains("passing") => {
-                // Implementation works, move to refactor
-                WorkflowAction::Continue
-            }
-            "refactor" if response.contains("REFACTORED") || response.contains("green") => {
-                // Cycle complete
-                WorkflowAction::Complete(
+        // Use structured markers instead of fragile string matching
+        let next_phase = match phase {
+            "red" if response.contains("[PHASE:RED_DONE]") => Some("green"),
+            "green" if response.contains("[PHASE:GREEN_DONE]") => Some("refactor"),
+            "refactor" if response.contains("[PHASE:REFACTORED]") => {
+                return WorkflowAction::Complete(
                     "TDD cycle complete. Code is tested and refactored.".to_string(),
-                )
+                );
             }
-            _ => WorkflowAction::Continue,
+            _ => None,
+        };
+
+        if let Some(next) = next_phase {
+            let mut updated = metadata.clone();
+            updated.insert("tdd_phase".to_string(), next.to_string());
+            WorkflowAction::ContinueWithMetadata {
+                reminder: format!("Advancing to {} phase.", next),
+                metadata: updated,
+            }
+        } else {
+            WorkflowAction::Continue
         }
     }
 }

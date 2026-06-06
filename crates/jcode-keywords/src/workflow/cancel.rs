@@ -1,10 +1,11 @@
 //! Cancel — CancelAll workflow handler.
 //!
-//! Tier 6: System action. Clears all active modes and cancels tasks.
+//! Tier 6: System action. Cancel is handled entirely by `state::update_modes()`
+//! which clears all modes before execute() is ever called. These methods are
+//! no-ops in the normal flow.
 
-use super::{WorkflowAction, WorkflowContext, WorkflowHandler};
+use super::WorkflowHandler;
 use crate::registry::WorkflowKind;
-use std::collections::HashMap;
 
 pub struct CancelHandler;
 
@@ -15,21 +16,13 @@ impl WorkflowHandler for CancelHandler {
 
     fn build_prompt(&self) -> String {
         "# canceljcode — All Modes Cancelled\n\n\
-         All keyword modes have been deactivated.\n\
          Returning to normal operation."
             .to_string()
     }
 
-    fn execute(&self, _ctx: &WorkflowContext) -> WorkflowAction {
-        // Cancel is handled by state::update_modes() which clears all modes.
-        // This handler just provides the completion message.
-        WorkflowAction::Complete(
-            "✅ All modes cancelled. Returning to normal operation.".to_string(),
-        )
-    }
-
-    fn on_turn_complete(&self, _response: &str, _metadata: &HashMap<String, String>) -> WorkflowAction {
-        // Cancel should never need multiple turns
-        WorkflowAction::Complete("All modes cancelled.".to_string())
-    }
+    // Note: execute() and on_turn_complete() are intentionally not overridden.
+    // Cancel is handled by state::update_modes() which clears all modes
+    // before execute_active_workflows() iterates them. The trait defaults
+    // (returning Continue) are correct — this handler is unreachable in
+    // the normal flow.
 }

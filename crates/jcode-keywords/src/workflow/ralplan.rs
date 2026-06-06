@@ -15,25 +15,18 @@ impl WorkflowHandler for RalplanHandler {
 
     fn build_prompt(&self) -> String {
         "# $ralplan — Consensus Planning Mode\n\n\
-         You are in ralplan mode. Generate, review, and refine plans.\n\n\
+         Generate, review, and refine plans.\n\n\
          ## Cycle\n\
-         1. **Plan** — Generate an initial plan with clear steps\n\
-         2. **Review** — Self-review: identify risks, gaps, assumptions\n\
-         3. **Revise** — Address issues found in review\n\
-         4. **Approve** — Present final plan for user approval\n\
-         5. **Execute** — Only after explicit approval\n\n\
-         ## Plan Format\n\
-         ### Goal\n\
-         What we're trying to achieve.\n\n\
-         ### Steps\n\
-         1. [ ] Step 1 — Description\n\
-         2. [ ] Step 2 — Description\n\n\
-         ### Risks\n\
-         - Risk 1: Mitigation\n\
-         - Risk 2: Mitigation\n\n\
-         ### Assumptions\n\
-         - Assumption 1\n\
-         - Assumption 2"
+         1. PLAN: Generate a detailed plan\n\
+         2. REVIEW: Self-review for risks and gaps\n\
+         3. REVISE: Address issues found\n\
+         4. APPROVE: Present for user approval\n\n\
+         ## Completion Markers\n\
+         Plan ready: `[PHASE:PLAN_DONE]`\n\
+         Review done: `[PHASE:REVIEW_DONE]`\n\
+         Revision done: `[PHASE:REVISED]`\n\
+         User approved: `[PHASE:APPROVED]`\n\
+         Execution done: `[PHASE:EXECUTED]`"
             .to_string()
     }
 
@@ -45,57 +38,48 @@ impl WorkflowHandler for RalplanHandler {
             .unwrap_or("plan");
 
         let reminder = match phase {
-            "plan" => {
-                format!(
-                    "## Ralplan — Phase: PLAN\n\n\
-                     Generate a detailed plan for:\n{}\n\n\
-                     Include: Goal, Steps, Risks, Assumptions.",
-                    ctx.user_input
-                )
-            }
+            "plan" => format!(
+                "## Ralplan — Phase: PLAN\n\n\
+                 Generate a detailed plan for:\n{}\n\n\
+                 Include: Goal, Steps, Risks, Assumptions.\n\
+                 Say `[PHASE:PLAN_DONE]` when done.",
+                ctx.user_input
+            ),
             "review" => {
                 "## Ralplan — Phase: REVIEW\n\n\
                  Self-review the plan:\n\
                  - What could go wrong?\n\
                  - What assumptions are we making?\n\
                  - What's missing?\n\
-                 - What are the dependencies?"
+                 Say `[PHASE:REVIEW_DONE]` when done."
                     .to_string()
             }
             "revise" => {
                 "## Ralplan — Phase: REVISE\n\n\
-                 Revise the plan addressing the issues found in review.\n\
-                 Present the updated plan."
+                 Revise the plan addressing review issues.\n\
+                 Say `[PHASE:REVISED]` when done."
                     .to_string()
             }
             "approve" => {
                 "## Ralplan — Phase: APPROVE\n\n\
-                 Present the final plan for approval.\n\
-                 Wait for user confirmation before executing."
+                 Present the final plan. Wait for user approval.\n\
+                 Say `[PHASE:APPROVED]` when user confirms."
                     .to_string()
             }
             "execute" => {
                 "## Ralplan — Phase: EXECUTE\n\n\
-                 The plan is approved. Execute each step in order.\n\
-                 Report progress after each step."
+                 Execute the approved plan step by step.\n\
+                 Say `[PHASE:EXECUTED]` when done."
                     .to_string()
             }
             _ => "Continue planning.".to_string(),
         };
 
-        let mut metadata = HashMap::new();
-        metadata.insert(
-            "ralplan_phase".to_string(),
-            match phase {
-                "plan" => "review",
-                "review" => "revise",
-                "revise" => "approve",
-                "approve" => "execute",
-                "execute" => "execute",
-                _ => "plan",
-            }
-            .to_string(),
-        );
+        // DON'T advance phase here
+        let mut metadata = ctx.metadata.clone();
+        if !metadata.contains_key("ralplan_phase") {
+            metadata.insert("ralplan_phase".to_string(), "plan".to_string());
+        }
 
         WorkflowAction::ContinueWithMetadata {
             reminder,
@@ -103,24 +87,38 @@ impl WorkflowHandler for RalplanHandler {
         }
     }
 
-    fn on_turn_complete(&self, response: &str, metadata: &HashMap<String, String>) -> WorkflowAction {
+    fn on_turn_complete(
+        &self,
+        response: &str,
+        metadata: &HashMap<String, String>,
+    ) -> WorkflowAction {
         let phase = metadata
             .get("ralplan_phase")
             .map(|s| s.as_str())
             .unwrap_or("plan");
 
-        match phase {
-            "approve" if response.contains("approved") || response.contains("yes") => {
-                // User approved, move to execute
-                WorkflowAction::Continue
-            }
-            "execute" if response.contains("complete") || response.contains("done") => {
-                // Execution complete
-                WorkflowAction::Complete(
+        let next_phase = match phase {
+            "plan" if response.contains("[PHASE:PLAN_DONE]") => Some("review"),
+            "review" if response.contains("[PHASE:REVIEW_DONE]") => Some("revise"),
+            "revise" if response.contains("[PHASE:REVISED]") => Some("approve"),
+            "approve" if response.contains("[PHASE:APPROVED]") => Some("execute"),
+            "execute" if response.contains("[PHASE:EXECUTED]") => {
+                return WorkflowAction::Complete(
                     "Plan executed successfully.".to_string(),
-                )
+                );
             }
-            _ => WorkflowAction::Continue,
+            _ => None,
+        };
+
+        if let Some(next) = next_phase {
+            let mut updated = metadata.clone();
+            updated.insert("ralplan_phase".to_string(), next.to_string());
+            WorkflowAction::ContinueWithMetadata {
+                reminder: format!("Advancing to {} phase.", next),
+                metadata: updated,
+            }
+        } else {
+            WorkflowAction::Continue
         }
     }
 }

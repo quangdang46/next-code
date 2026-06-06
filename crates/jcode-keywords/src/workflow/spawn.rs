@@ -5,19 +5,15 @@
 
 use super::{SpawnResult, SpawnSpec};
 
+/// Maximum concurrent sub-agents per spawn call.
+const MAX_CONCURRENT: usize = 4;
+
 /// Spawn a single sub-agent synchronously and return its output.
 ///
 /// This is a placeholder that will be wired to the actual Agent spawning
 /// mechanism via the `WorkflowExecutor` in `jcode-app-core`.
-///
-/// The actual implementation needs:
-/// - `provider.fork()` to create an isolated provider
-/// - `Session::create()` for a new session
-/// - `Agent::new_with_session()` to build the agent
-/// - `agent.run_once_capture(&prompt)` to execute
 pub async fn spawn_agent(spec: &SpawnSpec) -> SpawnResult {
-    // This is a stub. The real implementation is in executor.rs
-    // which has access to Provider, Registry, and Session.
+    // Stub implementation — real wiring happens in app-core
     SpawnResult {
         description: spec.description.clone(),
         output: format!(
@@ -29,18 +25,31 @@ pub async fn spawn_agent(spec: &SpawnSpec) -> SpawnResult {
 }
 
 /// Spawn multiple sub-agents in parallel and collect results.
+/// Concurrency is capped at MAX_CONCURRENT.
 pub async fn spawn_parallel(specs: &[SpawnSpec]) -> Vec<SpawnResult> {
-    let mut handles = Vec::new();
-    for spec in specs {
-        let spec = spec.clone();
-        handles.push(tokio::spawn(async move { spawn_agent(&spec).await }));
-    }
     let mut results = Vec::new();
-    for handle in handles {
-        if let Ok(result) = handle.await {
-            results.push(result);
+
+    for chunk in specs.chunks(MAX_CONCURRENT) {
+        let mut handles = Vec::new();
+        for spec in chunk {
+            let spec = spec.clone();
+            handles.push(tokio::spawn(async move { spawn_agent(&spec).await }));
+        }
+        for handle in handles {
+            match handle.await {
+                Ok(result) => results.push(result),
+                Err(e) => {
+                    // Log JoinError instead of silently dropping
+                    results.push(SpawnResult {
+                        description: "unknown".to_string(),
+                        output: format!("Sub-agent panicked: {}", e),
+                        success: false,
+                    });
+                }
+            }
         }
     }
+
     results
 }
 
@@ -69,23 +78,6 @@ pub fn aggregate_results(results: &[SpawnResult]) -> String {
     ));
 
     output
-}
-
-/// Retry a failed sub-agent spawn up to max_retries times.
-pub async fn spawn_with_retry(spec: &SpawnSpec, max_retries: u32) -> SpawnResult {
-    for attempt in 0..=max_retries {
-        let result = spawn_agent(spec).await;
-        if result.success || attempt == max_retries {
-            return result;
-        }
-        // Brief delay before retry
-        tokio::time::sleep(std::time::Duration::from_millis(100 * (attempt as u64 + 1))).await;
-    }
-    SpawnResult {
-        description: spec.description.clone(),
-        output: "Max retries exceeded".to_string(),
-        success: false,
-    }
 }
 
 #[cfg(test)]
