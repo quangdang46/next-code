@@ -1570,4 +1570,8 @@ impl crate::tui::TuiState for App {
             cached_tokens: self.last_turn_input_tokens,
         })
     }
+
+    fn plugin_bridge(&self) -> Option<&crate::tui::plugin_integration::PluginTuiBridge> {
+        self.plugin_bridge.as_ref()
+    }
 }

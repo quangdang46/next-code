@@ -597,6 +597,7 @@ impl App {
             usage_report_refreshing: false,
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
+            plugin_bridge: None,
         };
 
         for notice in app.provider.drain_startup_notices() {
@@ -1006,6 +1007,7 @@ impl App {
             usage_report_refreshing: false,
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
+            plugin_bridge: None,
         };
 
         for notice in app.provider.drain_startup_notices() {
@@ -1140,5 +1142,22 @@ impl App {
         self.server_spawning = true;
         self.remote_startup_phase = Some(super::RemoteStartupPhase::StartingServer);
         self.remote_startup_phase_started = Some(Instant::now());
+    }
+
+    /// Initialize the TUI plugin system. Should be called once at startup
+    /// from an async context (i.e. inside the `run` / `run_remote` event loop
+    /// before entering the main select loop).
+    pub(crate) async fn init_plugin_bridge(&mut self) {
+        if self.plugin_bridge.is_some() {
+            return;
+        }
+        let bridge = crate::tui::plugin_integration::PluginTuiBridge::new().await;
+        if bridge.plugin_count() > 0 {
+            crate::logging::info(&format!(
+                "TUI plugin bridge ready ({} plugin(s))",
+                bridge.plugin_count()
+            ));
+        }
+        self.plugin_bridge = Some(bridge);
     }
 }

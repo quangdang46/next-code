@@ -1980,6 +1980,43 @@ pub(in crate::tui::app) fn handle_server_event(
             app.set_status_notice("⌨ Interactive terminal detected (command will timeout)");
             false
         }
+        ServerEvent::PluginNotification {
+            plugin_id,
+            event_type,
+            data,
+        } => {
+            // Forward the protocol plugin event to all loaded TUI plugins.
+            if let Some(bridge) = app.plugin_bridge.as_ref() {
+                let bridge_ref = bridge;
+                let event_name = format!("plugin:{}", event_type);
+                let pid = plugin_id.clone();
+                let etype = event_type.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(
+                        bridge_ref.dispatch_event(&event_name, &data),
+                    )
+                });
+                crate::logging::info(&format!(
+                    "Forwarded plugin event '{}' from '{}' to TUI plugins",
+                    etype, pid,
+                ));
+            }
+            false
+        }
+        ServerEvent::PluginPermissionRequest {
+            plugin_id,
+            action,
+            resource,
+            request_id,
+            ..
+        } => {
+            // Log the permission request; actual approval flow is TBD.
+            crate::logging::info(&format!(
+                "Plugin permission request: {} wants to {} {} (request {})",
+                plugin_id, action, resource, request_id,
+            ));
+            false
+        }
         _ => false,
     }
 }

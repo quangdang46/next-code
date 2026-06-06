@@ -2715,6 +2715,29 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         visual_debug::record_frame(capture.build());
     }
 
+    // Render TUI plugin slot content (status bar, sidebar).
+    if let Some(bridge) = app.plugin_bridge() {
+        // Status bar: render plugin content in the notification area if there
+        // is room, or overlay it at the bottom of the status bar area.
+        let status_area = chunks[2];
+        super::plugin_integration::draw_status_bar_slots(frame, bridge, status_area);
+
+        // Sidebar: render plugin content as a small panel on the right side
+        // of the messages area when plugins have filled the Sidebar slot.
+        if bridge.has_slot_content(jcode_plugin_runtime::tui_api::SlotType::Sidebar) {
+            let sidebar_width = 30u16.min(messages_area.width / 3);
+            if sidebar_width >= 10 {
+                let sidebar_area = Rect {
+                    x: messages_area.x + messages_area.width.saturating_sub(sidebar_width),
+                    y: messages_area.y,
+                    width: sidebar_width,
+                    height: messages_area.height,
+                };
+                super::plugin_integration::draw_sidebar_slots(frame, bridge, sidebar_area);
+            }
+        }
+    }
+
     finalize_frame_metrics(
         app,
         total_start,

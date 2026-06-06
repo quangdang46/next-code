@@ -1248,6 +1248,26 @@ pub enum ServerEvent {
         tool_call_id: String,
     },
 
+    // === Plugin system events ===
+
+    /// Plugin system notification
+    #[serde(rename = "plugin_notification")]
+    PluginNotification {
+        plugin_id: String,
+        event_type: String,
+        data: serde_json::Value,
+    },
+
+    /// Plugin permission request for IDE-side approval
+    #[serde(rename = "plugin_permission_request")]
+    PluginPermissionRequest {
+        plugin_id: String,
+        action: String,
+        resource: String,
+        request_id: String,
+        timestamp: chrono::DateTime<chrono::Utc>,
+    },
+
     /// Current experiment flag states (response to ExperimentList)
     #[serde(rename = "experiment_flags")]
     ExperimentFlags { flags: Vec<ExperimentFlagWire> },

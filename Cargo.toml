@@ -5,6 +5,9 @@ description = "Possibly the greatest coding agent ever built — blazing-fast TU
 edition = "2024"
 autobins = false
 
+[workspace.package]
+edition = "2024"
+
 [workspace]
 members = [
     ".",
@@ -66,6 +69,8 @@ members = [
     "crates/jcode-mobile-core",
     "crates/jcode-mobile-sim",
     "crates/jcode-desktop",
+    "crates/jcode-plugin-core",
+    "crates/jcode-plugin-runtime",
     "crates/jcode-mempalace-adapter",
     "crates/jcode-render-core",
     "evals/jbench",
