@@ -119,66 +119,12 @@ fn slugify(input: &str) -> String {
 /// Render a session as a self-contained Markdown document.
 /// Replace common secret-shaped tokens with `[REDACTED:<kind>]` markers.
 ///
-/// Patterns covered (high-precision — won't catch every possible secret):
-///   - OpenAI / Anthropic / generic SDK keys: `sk-…`, `sk-ant-…`, `sk-cp-…`
-///   - GitHub tokens: `gho_…`, `ghp_…`, `ghs_…`, `ghr_…`
-///   - Bearer headers: `Bearer <token>` → `Bearer [REDACTED:bearer]`
-///   - z.ai-shape tokens: `<32 hex>.<24 chars>`
-///   - Common env-var assignments: `ANTHROPIC_API_KEY=…`, `OPENAI_API_KEY=…`,
-///     `OPENROUTER_API_KEY=…`, `ZHIPU_API_KEY=…`, `GITHUB_TOKEN=…`
+/// Delegates to the unified [`jcode_secrets::redact_secrets`] sanitizer so the
+/// export pipeline, logging, and any future caller share one set of patterns.
 ///
 /// Returns a new String. The original is left intact.
 pub fn redact_secrets(input: &str) -> String {
-    use regex::Regex;
-    use std::sync::OnceLock;
-
-    struct Pat {
-        re: Regex,
-        replace: &'static str,
-    }
-    static PATS: OnceLock<Vec<Pat>> = OnceLock::new();
-    let pats = PATS.get_or_init(|| {
-        vec![
-            // sk-… style keys (OpenAI, Anthropic, z.ai). Match `sk-` followed by
-            // 20+ url-safe chars or dots/dashes. Anchor on word boundary to avoid
-            // chewing surrounding text.
-            Pat {
-                re: Regex::new(r"\bsk-[A-Za-z0-9_\-\.]{20,}").unwrap(),
-                replace: "[REDACTED:sk]",
-            },
-            // GitHub tokens.
-            Pat {
-                re: Regex::new(r"\bgh[opsru]_[A-Za-z0-9]{20,}").unwrap(),
-                replace: "[REDACTED:github]",
-            },
-            // Bearer tokens (header-shape). Replace token only, keep "Bearer ".
-            Pat {
-                re: Regex::new(r"\b(Bearer\s+)[A-Za-z0-9_\-\.]{16,}").unwrap(),
-                replace: "${1}[REDACTED:bearer]",
-            },
-            // z.ai-shape: 32 hex . 12+ alnum (token format used by z.ai's
-            // anthropic-compatible endpoint and similar).
-            Pat {
-                re: Regex::new(r"\b[a-f0-9]{32}\.[A-Za-z0-9]{12,}").unwrap(),
-                replace: "[REDACTED:zai]",
-            },
-            // Env-var assignments for known secret names (case-insensitive name,
-            // stops at end of line / quote / comma).
-            Pat {
-                re: Regex::new(
-                    r#"(?i)\b(ANTHROPIC_API_KEY|OPENAI_API_KEY|OPENAI_COMPAT_API_KEY|OPENROUTER_API_KEY|ZHIPU_API_KEY|COHERE_API_KEY|GITHUB_TOKEN|GH_TOKEN|MINIMAX_API_KEY|XAI_API_KEY|DEEPSEEK_API_KEY|FIREWORKS_API_KEY|GROQ_API_KEY|MISTRAL_API_KEY|OPENCODE_API_KEY|OPENCODE_GO_API_KEY|TOGETHER_API_KEY|PERPLEXITY_API_KEY|CEREBRAS_API_KEY|NVIDIA_API_KEY|AZURE_OPENAI_API_KEY|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|GEMINI_API_KEY|GOOGLE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|ANTHROPIC_AUTH_TOKEN)(\s*=\s*)([^\r\n,'"\s]+)"#,
-                )
-                .unwrap(),
-                replace: "${1}${2}[REDACTED:env]",
-            },
-        ]
-    });
-
-    let mut out = input.to_string();
-    for pat in pats {
-        out = pat.re.replace_all(&out, pat.replace).into_owned();
-    }
-    out
+    jcode_secrets::redact_secrets(input)
 }
 
 pub fn render_markdown(session: &crate::session::Session) -> String {
@@ -757,7 +703,7 @@ mod tests {
     #[test]
     fn redact_keeps_bearer_label_drops_token() {
         let out = redact_secrets("Authorization: Bearer abcdef0123456789xyz_test");
-        assert!(out.contains("Bearer [REDACTED:bearer]"));
+        assert!(out.contains("Bearer [REDACTED]"));
         assert!(!out.contains("abcdef0123456789xyz_test"));
     }
 
@@ -766,7 +712,7 @@ mod tests {
         // 32 hex . 24+ alnum
         let token = "6e915ba766fb4c3bbe4cce3b58a75523.rrc5r2uvVFFXg4ZE";
         let out = redact_secrets(&format!("token={token}"));
-        assert!(out.contains("[REDACTED:zai]"), "got: {out}");
+        assert!(out.contains("[REDACTED:token]"), "got: {out}");
         assert!(!out.contains(token));
     }
 

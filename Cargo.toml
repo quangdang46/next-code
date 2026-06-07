@@ -73,8 +73,11 @@ members = [
     "crates/jcode-mobile-sim",
     "crates/jcode-desktop",
     "crates/jcode-hooks",
+    "crates/jcode-keyring-store",
+    "crates/jcode-redact",
     "crates/jcode-keywords",
     "crates/jcode-mempalace-adapter",
+    "crates/jcode-secrets",
     "crates/jcode-plugin-core",
     "crates/jcode-plugin-runtime",
     "crates/jcode-render-core",
@@ -267,6 +270,7 @@ jcode-protocol = { path = "crates/jcode-protocol" }
 jcode-selfdev-types = { path = "crates/jcode-selfdev-types" }
 jcode-session-types = { path = "crates/jcode-session-types" }
 jcode-storage = { path = "crates/jcode-storage" }
+jcode-secrets = { path = "crates/jcode-secrets" }
 jcode-task-types = { path = "crates/jcode-task-types" }
 jcode-tool-core = { path = "crates/jcode-tool-core" }
 jcode-tool-types = { path = "crates/jcode-tool-types" }

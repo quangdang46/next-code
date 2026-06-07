@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use super::args::{
     AmbientCommand, Args, AuthCommand, CloudCommand, CloudSessionsCommand, Command, MemoryCommand,
-    ModelCommand, ProviderCommand, RestartCommand, ServerCommand, SessionCommand,
+    ModelCommand, ProviderCommand, RestartCommand, SecretsCommand, ServerCommand, SessionCommand,
     TranscriptModeArg,
 };
 use crate::{
@@ -253,6 +253,22 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
                 clear,
                 json,
             } => commands::run_session_rename_command(&session, name.as_deref(), clear, json)?,
+        },
+        Some(Command::Secrets(subcmd)) => match subcmd {
+            SecretsCommand::Set {
+                name,
+                value,
+                env,
+                json,
+            } => super::secrets_cmd::run_set(&name, value.as_deref(), env, json)?,
+            SecretsCommand::Get { name, env, json } => {
+                super::secrets_cmd::run_get(&name, env, json)?
+            }
+            SecretsCommand::Delete { name, env, json } => {
+                super::secrets_cmd::run_delete(&name, env, json)?
+            }
+            SecretsCommand::List { env, json } => super::secrets_cmd::run_list(env, json)?,
+            SecretsCommand::Init { json } => super::secrets_cmd::run_init(json)?,
         },
         Some(Command::Ambient(subcmd)) => {
             commands::run_ambient_command(map_ambient_subcommand(subcmd)).await?;
