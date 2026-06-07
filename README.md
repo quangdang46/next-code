@@ -731,46 +731,82 @@ graph BT
 ```
 
 ```mermaid
-flowchart LR
-    subgraph jcode["jcode Crate Stack"]
-        direction TB
-        J2["jcode (binary)"]
-        T2["jcode-tui"]
-        C2["jcode-app-core"]
-        B2["jcode-base"]
-        T2 --> J2
-        C2 --> T2
-        B2 --> C2
-    end
+graph TD
+    %% ─── Legend (styling only, disconnected nodes) ───
+    LEG_E["■■ External Repo"]:::external
+    LEG_A["■■ Adapter / Bridge File"]:::adapter
+    LEG_C["■■ jcode Crate"]:::crate
+    LEG_F["■■ Fork-Modified (conflict-prone)"]:::fork
+    LEG_X["■■ Feature-Gated Dep"]:::feature
 
-    subgraph upstream["Upstream Repos"]
-        DCP["dcp\n(dynamic_context_pruning)"]
-        DCG["dcg-core\n(destructive_command_guard)"]
-        CASR["casr\n(cross_agent_session_resumer)"]
-        MEM["mempalace_rust"]
-        RTC["rtco-core\n(rust_token_cost_optimizer)"]
-        HL["hashline"]
-        FFS["ffs\n(fast_file_search)"]
-    end
+    %% ─── External Repositories ───
+    C1["casr<br/>cross_agent_session_resumer<br/><small>pinned rev</small>"]:::external
+    C2["ffs-search + ffs-engine<br/>fast_file_search<br/><small>pinned rev</small>"]:::external
+    C3["dcg-core<br/>destructive_command_guard<br/><small>branch=main</small>"]:::external
+    C4["hashline<br/>SHA-256 anchored hashing<br/><small>pinned rev</small>"]:::external
+    C5["mempalace_rust<br/>memory palace<br/><small>branch=main, feature-gated</small>"]:::feature
+    C6["dynamic_context_pruning<br/>context window optimization<br/><small>branch=main, feature-gated</small>"]:::feature
+    C7["rtco-core<br/>rust_token_cost_optimizer<br/><small>branch=main, feature-gated</small>"]:::feature
 
-    DCP -- "git dep, branch=main, feature-gated" ----> T2
-    DCG -- "git dep, branch=main" ----> B2
-    CASR -- "git dep, pinned rev" ----> J2
-    CASR ----> C2
-    MEM -- "git dep, branch=main" --> ADPT["jcode-mempalace-adapter"] --> J2
-    RTC -- "git dep, branch=main, feature-gated" ----> C2
-    HL -- "git dep, pinned rev" ----> J2
-    HL ----> C2
-    FFS -- "git dep, pinned rev\n(ffs-search + ffs-engine)" ----> C2
+    %% ─── Adapter / Bridge Files ───
+    A1["casr_adapter.rs (748 lines)<br/><small>crates/jcode-base/src/</small>"]:::adapter
+    A2["import.rs (1002 lines)<br/><small>crates/jcode-base/src/</small>"]:::adapter
+    A3["at_picker.rs<br/><small>crates/jcode-tui/tui/app/</small>"]:::adapter
+    A4["dcg_bridge.rs (740 lines)<br/><small>crates/jcode-app-core/src/</small>"]:::adapter
+    A5["hashline_edit.rs<br/><small>crates/jcode-app-core/tool/</small>"]:::adapter
+    A6["jcode-mempalace-adapter/<br/><small>entire adapter crate</small>"]:::adapter
+    A7["dcp_bridge.rs (197 lines)<br/><small>crates/jcode-app-core/src/</small>"]:::adapter
+    A8["rtco_filter.rs<br/><small>crates/jcode-app-core/src/</small>"]:::adapter
 
-    style ADPT fill:#2d5a27,stroke:#4a8f3f,color:#e0e0e0
-    style DCP fill:#3a3a5c,stroke:#6a6a8c,color:#e0e0e0
-    style DCG fill:#3a3a5c,stroke:#6a6a8c,color:#e0e0e0
-    style CASR fill:#3a3a5c,stroke:#6a6a8c,color:#e0e0e0
-    style MEM fill:#3a3a5c,stroke:#6a6a8c,color:#e0e0e0
-    style RTC fill:#3a3a5c,stroke:#6a6a8c,color:#e0e0e0
-    style HL fill:#3a3a5c,stroke:#6a6a8c,color:#e0e0e0
-    style FFS fill:#3a3a5c,stroke:#6a6a8c,color:#e0e0e0
+    %% ─── Fork-Modified Files (common conflict sources during sync) ───
+    F1["+ForeignSession variant<br/><small>jcode-session-types/src/lib.rs</small>"]:::fork
+    F2["+ForeignSession match arms<br/><small>session_picker/*.rs</small>"]:::fork
+    F3["Session picker + casr wiring<br/><small>inline_interactive.rs</small>"]:::fork
+    F4["Terminal launch + casr<br/><small>src/cli/tui_launch.rs</small>"]:::fork
+    F5["DCG classifier integration<br/><small>yolo_classifier.rs</small>"]:::fork
+
+    %% ─── jcode Crate Stack ───
+    J1["jcode (binary)"]:::crate
+    J2["jcode-tui"]:::crate
+    J3["jcode-app-core"]:::crate
+    J4["jcode-base"]:::crate
+    J5["60+ Support Crates"]:::crate
+
+    %% ─── Edges: External Repo → Adapter ───
+    C1 --> A1
+    C1 --> A2
+    C2 --> A3
+    C3 --> A4
+    C4 --> A5
+    C5 --> A6
+    C6 --> A7
+    C7 --> A8
+
+    %% ─── Edges: Adapter → Host Crate ───
+    A1 --> J4
+    A2 --> J4
+    A3 --> J2
+    A4 --> J3
+    A5 --> J3
+    A6 --> J1
+    A7 --> J3
+    A8 --> J3
+
+    %% ─── Edges: Fork File → Host Crate ───
+    F1 --> J4
+    F2 --> J2
+    F3 --> J2
+    F4 --> J1
+    F5 --> J3
+
+    %% ─── Internal Crate Dependencies ───
+    J5 --> J4 --> J3 --> J2 --> J1
+
+    classDef external fill:#1e3a5f,stroke:#3b82f6,color:#e2e8f0
+    classDef adapter fill:#064e3b,stroke:#10b981,color:#e2e8f0
+    classDef crate fill:#3b0764,stroke:#a855f7,color:#e2e8f0
+    classDef fork fill:#7f1d1d,stroke:#ef4444,color:#e2e8f0
+    classDef feature fill:#78350f,stroke:#f59e0b,color:#e2e8f0
 ```
 
 Every upstream repo is consumed cleanly as a library dependency (no manual
