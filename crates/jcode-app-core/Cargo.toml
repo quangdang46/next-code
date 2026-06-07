@@ -137,13 +137,13 @@ jcode-mempalace-adapter = { path = "../jcode-mempalace-adapter", optional = true
 flate2 = "1"
 tar = "0.4"
 tempfile = "3"
-hashline = { version = "0.2", default-features = false, features = ["sha256-anchors"] }
+hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "b2d9e83", default-features = false, features = ["sha256-anchors"] }
 agentgrep = { git = "https://github.com/1jehuang/agentgrep.git", tag = "v0.1.2" }
 qrcode = { version = "0.14.1", default-features = false }
 # DCP integration (dynamic context pruning)
 dynamic_context_pruning = { git = "https://github.com/quangdang46/dynamic_context_pruning", branch = "main", package = "dynamic_context_pruning", optional = true }
 # RTCO integration (tool output filtering via Rust Token Killer)
-rtco-core = { git = "https://github.com/quangdang46/rust_token_cost_optimizer", rev = "6e6241f75fa7e532070ad95bb9643f0e097ebfcb", optional = true }
+rtco-core = { git = "https://github.com/quangdang46/rust_token_cost_optimizer", branch = "main", optional = true }
 
 [features]
 default = ["pdf", "embeddings"]

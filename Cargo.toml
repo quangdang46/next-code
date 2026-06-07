@@ -87,8 +87,8 @@ members = [
 # lands on crates.io. The git rev will be bumped as new ffs features land.
 # Remove this block once ffs-search 0.2.0 is published.
 [workspace.dependencies]
-ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "4cd7f27" }
-ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", rev = "4cd7f27" }
+ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "a8305de" }
+ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", rev = "a8305de" }
 strum = { version = "0.26", features = ["derive"] }
 regex = "1"
 
@@ -132,7 +132,7 @@ jcode-hooks = { path = "crates/jcode-hooks" }
 # reproducible and doesn't accidentally pick up in-flight changes. Bump the
 # `rev` value (or switch to a `tag = "vX.Y.Z"`) when you want to pull a newer
 # CASR snapshot.
-casr = { git = "https://github.com/quangdang46/cross_agent_session_resumer", package = "cross_agent_session_resumer", rev = "23a58b8aedf816faf92d5a791fed3a653162d71c" }
+casr = { git = "https://github.com/quangdang46/cross_agent_session_resumer", package = "cross_agent_session_resumer", rev = "aaee83d0049e2801aa1ffc5d18f22026bf78b225" }
 
 # File picker for `@<path>` autocomplete in the TUI input.
 # Provides a long-lived FilePicker with background scan, gitignore-aware walk,
@@ -198,7 +198,7 @@ jcode-logging = { path = "crates/jcode-logging" }
 # OAuth
 base64 = "0.22"
 sha2 = "0.10"
-hashline = { version = "0.2", default-features = false, features = ["sha256-anchors"] }
+hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "b2d9e83", default-features = false, features = ["sha256-anchors"] }
 rand = "0.9.3"
 hex = "0.4"
 url = "2"
