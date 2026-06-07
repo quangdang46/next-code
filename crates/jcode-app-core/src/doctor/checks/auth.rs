@@ -76,13 +76,13 @@ pub fn check_auth(opts: &DoctorOptions, out: &mut Vec<Finding>) {
 
     let auth_json = home.join("auth.json");
     if auth_json.is_file() {
-        if let Ok(text) = std::fs::read_to_string(&auth_json) {
-            if serde_json::from_str::<serde_json::Value>(&text).is_err() {
-                out.push(
-                    Finding::fail(CheckCategory::Auth, "auth.json is not valid JSON")
-                        .with_remediation("re-run `jcode login`, or fix/remove auth.json"),
-                );
-            }
+        if let Ok(text) = std::fs::read_to_string(&auth_json)
+            && serde_json::from_str::<serde_json::Value>(&text).is_err()
+        {
+            out.push(
+                Finding::fail(CheckCategory::Auth, "auth.json is not valid JSON")
+                    .with_remediation("re-run `jcode login`, or fix/remove auth.json"),
+            );
         }
         check_auth_permissions(opts, &auth_json, out);
     }

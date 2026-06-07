@@ -32,10 +32,11 @@ pub fn print_text(report: &DoctorReport) {
             if let Some(detail) = &f.detail {
                 println!("         {}", redact(detail));
             }
-            if f.status != Severity::Ok && f.fixability != Fixability::Fixed {
-                if let Some(rem) = &f.remediation {
-                    println!("         -> {}", redact(rem));
-                }
+            if f.status != Severity::Ok
+                && f.fixability != Fixability::Fixed
+                && let Some(rem) = &f.remediation
+            {
+                println!("         -> {}", redact(rem));
             }
         }
         println!();
