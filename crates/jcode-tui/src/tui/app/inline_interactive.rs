@@ -1646,6 +1646,38 @@ impl App {
         server_groups: Vec<session_picker::ServerGroup>,
         orphan_sessions: Vec<session_picker::SessionInfo>,
     ) -> bool {
+        // When a picker overlay is already on screen (the common case: the cached
+        // list rendered instantly and this is the async full-refresh landing),
+        // reseed it in place so the user's selection, scroll, search, focus, and
+        // multi-select survive the swap. Rebuilding a fresh picker here used to
+        // yank the view out from under the user a second or two after they opened
+        // `/resume`, which felt like a lag/jump.
+        let has_overlay = self.session_picker_overlay.is_some();
+        if has_overlay {
+            let notice = match self.session_picker_mode {
+                SessionPickerMode::Resume => {
+                    if let Some(existing) = self.session_picker_overlay.as_ref() {
+                        existing
+                            .borrow_mut()
+                            .reseed_grouped(server_groups, orphan_sessions);
+                    }
+                    "Sessions loaded"
+                }
+                SessionPickerMode::CatchUp => {
+                    if let Some(existing) = self.session_picker_overlay.as_ref() {
+                        let mut picker = existing.borrow_mut();
+                        // Keep the catch-up filter active; reseed preserves it.
+                        picker.activate_catchup_filter();
+                        picker.reseed_grouped(server_groups, orphan_sessions);
+                    }
+                    "Catch Up sessions loaded"
+                }
+                SessionPickerMode::Onboarding { .. } => return false,
+            };
+            self.set_status_notice(notice);
+            return true;
+        }
+
         match self.session_picker_mode {
             SessionPickerMode::Resume => {
                 let picker = SessionPicker::new_grouped(server_groups, orphan_sessions);
@@ -1830,6 +1862,11 @@ impl App {
                 ResumeTarget::OpenCodeSession { session_id, .. } => {
                     format!("OpenCode {}", &session_id[..session_id.len().min(8)])
                 }
+                ResumeTarget::ForeignSession {
+                    provider_slug,
+                    session_id,
+                    ..
+                } => format!("{provider_slug} {}", &session_id[..session_id.len().min(8)]),
             };
             let resolved_target = match crate::import::resolve_resume_target_to_jcode(target) {
                 Ok(target) => target,
@@ -1837,23 +1874,6 @@ impl App {
                     failed.push(format!("failed to import {}: {}", name, err));
                     continue;
                 }
-                ResumeTarget::CodexSession { session_id, .. } => {
-                    crate::casr_adapter::imported_codex_session_id(session_id)
-                }
-                ResumeTarget::PiSession { session_path } => {
-                    crate::casr_adapter::imported_pi_session_id(session_path)
-                }
-                ResumeTarget::OpenCodeSession { session_id, .. } => {
-                    crate::casr_adapter::imported_opencode_session_id(session_id)
-                }
-                ResumeTarget::ForeignSession {
-                    provider_slug,
-                    session_id,
-                    ..
-                } => {
-                    crate::casr_adapter::imported_session_id_for_provider(provider_slug, session_id)
-                }
-
             };
 
             match spawn_resume_target_in_new_terminal(&resolved_target, &cwd, socket.as_deref()) {
@@ -1946,17 +1966,11 @@ impl App {
             ResumeTarget::OpenCodeSession { session_id, .. } => {
                 format!("OpenCode {}", &session_id[..session_id.len().min(8)])
             }
-        };
-
-        let resolved_target = match crate::import::resolve_resume_target_to_jcode(target) {
-            Ok(target) => target,
-            Err(err) => {
-                self.push_display_message(DisplayMessage::error(format!(
-                    "Failed to import {}: {}",
-                    name, err
-                )));
-                return;
-            }
+            ResumeTarget::ForeignSession {
+                provider_slug,
+                session_id,
+                ..
+            } => format!("{provider_slug} {}", &session_id[..session_id.len().min(8)]),
         };
 
         let resolved_target = match target {
@@ -1978,7 +1992,6 @@ impl App {
                 session_id,
                 ..
             } => crate::casr_adapter::imported_session_id_for_provider(provider_slug, session_id),
-
         };
 
         if targets.len() > 1 {
@@ -1988,7 +2001,7 @@ impl App {
                 name
             )));
         }
-        self.workspace_client.queue_resume_session(session_id);
+        self.workspace_client.queue_resume_session(resolved_target);
         self.session_picker_overlay = None;
         self.session_picker_mode = SessionPickerMode::Resume;
         self.set_status_notice(format!("Switching → {}", name));

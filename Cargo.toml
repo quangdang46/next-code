@@ -1,6 +1,6 @@
 [package]
 name = "jcode"
-version = "0.23.0"
+version = "0.24.0"
 description = "Possibly the greatest coding agent ever built — blazing-fast TUI, multi-model, swarm coordination, 30+ tools"
 edition = "2024"
 autobins = false
@@ -38,6 +38,7 @@ members = [
     "crates/jcode-protocol",
     "crates/jcode-selfdev-types",
     "crates/jcode-session-types",
+    "crates/jcode-setup-hints",
     "crates/jcode-storage",
     "crates/jcode-side-panel-types",
     "crates/jcode-azure-auth",
@@ -46,6 +47,9 @@ members = [
     "crates/jcode-provider-env",
     "crates/jcode-provider-core",
     "crates/jcode-provider-bedrock",
+    "crates/jcode-provider-anthropic",
+    "crates/jcode-provider-antigravity",
+    "crates/jcode-provider-copilot",
     "crates/jcode-provider-openrouter",
     "crates/jcode-provider-openai",
     "crates/jcode-provider-gemini",
@@ -63,11 +67,13 @@ members = [
     "crates/jcode-tui-visual-debug",
     "crates/jcode-tui-session-picker",
     "crates/jcode-tui-style",
+    "crates/jcode-tui-permissions",
     "crates/jcode-tui-tool-display",
     "crates/jcode-tui-usage-overlay",
     "crates/jcode-update-core",
     "crates/jcode-terminal-launch",
     "crates/jcode-terminal-image",
+    "crates/jcode-telemetry-core",
     "crates/jcode-tui-workspace",
     "crates/jcode-mobile-core",
     "crates/jcode-mobile-sim",
@@ -90,8 +96,8 @@ members = [
 # lands on crates.io. The git rev will be bumped as new ffs features land.
 # Remove this block once ffs-search 0.2.0 is published.
 [workspace.dependencies]
-ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "4cd7f27" }
-ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", rev = "4cd7f27" }
+ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "a8305de" }
+ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", rev = "a8305de" }
 strum = { version = "0.26", features = ["derive"] }
 regex = "1"
 
@@ -135,7 +141,7 @@ jcode-hooks = { path = "crates/jcode-hooks" }
 # reproducible and doesn't accidentally pick up in-flight changes. Bump the
 # `rev` value (or switch to a `tag = "vX.Y.Z"`) when you want to pull a newer
 # CASR snapshot.
-casr = { git = "https://github.com/quangdang46/cross_agent_session_resumer", package = "cross_agent_session_resumer", rev = "23a58b8aedf816faf92d5a791fed3a653162d71c" }
+casr = { git = "https://github.com/quangdang46/cross_agent_session_resumer", package = "cross_agent_session_resumer", rev = "aaee83d0049e2801aa1ffc5d18f22026bf78b225" }
 
 # File picker for `@<path>` autocomplete in the TUI input.
 # Provides a long-lived FilePicker with background scan, gitignore-aware walk,
@@ -201,7 +207,7 @@ jcode-logging = { path = "crates/jcode-logging" }
 # OAuth
 base64 = "0.22"
 sha2 = "0.10"
-hashline = { version = "0.2", default-features = false, features = ["sha256-anchors"] }
+hashline = { git = "https://github.com/quangdang46/hashline.git", tag = "v0.2.2", default-features = false, features = ["sha256-anchors"] }
 rand = "0.9.3"
 hex = "0.4"
 url = "2"
@@ -269,6 +275,7 @@ jcode-swarm-core = { path = "crates/jcode-swarm-core" }
 jcode-protocol = { path = "crates/jcode-protocol" }
 jcode-selfdev-types = { path = "crates/jcode-selfdev-types" }
 jcode-session-types = { path = "crates/jcode-session-types" }
+jcode-setup-hints = { path = "crates/jcode-setup-hints" }
 jcode-storage = { path = "crates/jcode-storage" }
 jcode-secrets = { path = "crates/jcode-secrets" }
 jcode-task-types = { path = "crates/jcode-task-types" }
