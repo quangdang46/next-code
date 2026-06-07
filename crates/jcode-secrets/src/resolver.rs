@@ -43,11 +43,7 @@ pub fn secrets_api_key_resolver(env_key: &str) -> Option<String> {
 
 /// Inner resolution logic, decoupled from the global singleton and the process
 /// cwd so it can be unit-tested with a mock-backed manager.
-fn resolve_with_manager(
-    manager: &SecretsManager,
-    cwd: &Path,
-    env_key: &str,
-) -> Option<String> {
+fn resolve_with_manager(manager: &SecretsManager, cwd: &Path, env_key: &str) -> Option<String> {
     let name = SecretName::new(env_key).ok()?;
     let env_id = crate::environment_id_from_cwd(cwd);
     // Environment scope first; SecretsManager::get falls back to Global.
@@ -88,7 +84,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let manager = manager_in(dir.path());
         let name = SecretName::new("OPENAI_API_KEY").unwrap();
-        manager.set(&SecretScope::Global, &name, "sk-global").unwrap();
+        manager
+            .set(&SecretScope::Global, &name, "sk-global")
+            .unwrap();
 
         // No environment-scoped value exists; resolver must fall back to Global.
         let got = resolve_with_manager(&manager, dir.path(), "OPENAI_API_KEY");
@@ -119,7 +117,9 @@ mod tests {
         let name = SecretName::new("GROQ_API_KEY").unwrap();
         let env_id = crate::environment_id_from_cwd(dir.path());
 
-        manager.set(&SecretScope::Global, &name, "global-val").unwrap();
+        manager
+            .set(&SecretScope::Global, &name, "global-val")
+            .unwrap();
         manager
             .set(&SecretScope::Environment(env_id), &name, "env-val")
             .unwrap();
