@@ -13,9 +13,10 @@ pub struct NotepadTool {
 
 impl NotepadTool {
     fn notepad_from_ctx(ctx: &ToolContext) -> Option<crate::notepad::Notepad> {
+        let cfg = &crate::config::config().notepad;
         crate::notepad::Notepad::new(
             ctx.working_dir.as_deref(),
-            &crate::notepad::NotepadConfig::default(),
+            cfg,
         )
     }
 
@@ -152,6 +153,98 @@ fn capitalize(s: &str) -> String {
     match chars.next() {
         None => String::new(),
         Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotepadPruneTool — clear the working tier (session-scoped scratchpad)
+// ---------------------------------------------------------------------------
+
+/// Tool that prunes (clears) the working tier.
+pub struct NotepadPruneTool;
+
+impl NotepadPruneTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl Tool for NotepadPruneTool {
+    fn name(&self) -> &str {
+        "prune"
+    }
+
+    fn description(&self) -> &str {
+        "Clear the working-notes tier (session-scoped scratchpad). Use this between sessions or when the working notes are no longer relevant."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({ "type": "object", "properties": {} })
+    }
+
+    async fn execute(&self, _input: Value, ctx: ToolContext) -> Result<ToolOutput> {
+        let cfg = &crate::config::config().notepad;
+        let Some(notepad) = crate::notepad::Notepad::new(ctx.working_dir.as_deref(), cfg) else {
+            return Ok(ToolOutput::new(
+                "Notepad is disabled. Enable it in your config (notepad.enabled: true)."
+                    .to_string(),
+            ));
+        };
+        notepad.prune()?;
+        Ok(ToolOutput::new("Working notepad cleared.".to_string()))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// NotepadStatsTool — report file statistics for all tiers
+// ---------------------------------------------------------------------------
+
+/// Tool that reports file statistics for all three notepad tiers.
+pub struct NotepadStatsTool;
+
+impl NotepadStatsTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[async_trait]
+impl Tool for NotepadStatsTool {
+    fn name(&self) -> &str {
+        "stats"
+    }
+
+    fn description(&self) -> &str {
+        "Show notepad file statistics for all three tiers (priority, working, manual) — file sizes and whether each tier has content."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({ "type": "object", "properties": {} })
+    }
+
+    async fn execute(&self, _input: Value, ctx: ToolContext) -> Result<ToolOutput> {
+        let cfg = &crate::config::config().notepad;
+        let Some(notepad) = crate::notepad::Notepad::new(ctx.working_dir.as_deref(), cfg) else {
+            return Ok(ToolOutput::new(
+                "Notepad is disabled. Enable it in your config (notepad.enabled: true)."
+                    .to_string(),
+            ));
+        };
+        let stats = notepad.stats();
+        let mut lines = vec![format!(
+            "Total size: {} bytes",
+            stats.total_size_bytes
+        )];
+        for t in &stats.tiers {
+            lines.push(format!(
+                "- {}: {} bytes {}",
+                t.name,
+                t.file_size_bytes,
+                if t.has_content { "(has content)" } else { "(empty)" }
+            ));
+        }
+        Ok(ToolOutput::new(lines.join("\n")))
     }
 }
 

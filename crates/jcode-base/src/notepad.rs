@@ -10,9 +10,19 @@
 //!   sessions. Not injected automatically.
 //! - **Manual** – user-authored notes that persist across sessions. Not
 //!   injected automatically.
+//!
+//! # Concurrency safety
+//!
+//! Writes use an advisory lockfile (`<notepad_dir>/.lock`) so concurrent
+//! agent instances do not corrupt each other's data. A 5-second timeout
+//! prevents deadlocks. The actual write is atomic on the same filesystem
+//! (write to `.tmp`, then `rename`).
 
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------
 // Tiers
@@ -84,10 +94,40 @@ impl Default for NotepadConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Stats
+// ---------------------------------------------------------------------------
+
+/// Summary of the notepad file state.
+#[derive(Debug, Clone, Serialize)]
+pub struct NotepadStats {
+    /// Whether any notepad files exist.
+    pub exists: bool,
+    /// Total bytes across all tier files.
+    pub total_size_bytes: u64,
+    /// Per-tier breakdown.
+    pub tiers: Vec<TierStats>,
+}
+
+/// Per-tier statistics.
+#[derive(Debug, Clone, Serialize)]
+pub struct TierStats {
+    pub name: &'static str,
+    pub file_size_bytes: u64,
+    pub has_content: bool,
+}
+
+// ---------------------------------------------------------------------------
 // Engine
 // ---------------------------------------------------------------------------
 
+const LOCK_TIMEOUT: Duration = Duration::from_millis(5000);
+const LOCK_RETRY_INTERVAL: Duration = Duration::from_millis(25);
+
 /// The notepad engine — reads/writes/clears tiered note files on disk.
+///
+/// Writes are serialized by an advisory lockfile and are atomic
+/// (tmp+rename). Reads are lock-free (last-writer-wins semantics are
+/// acceptable for note content).
 pub struct Notepad {
     base_dir: PathBuf,
     enabled: bool,
@@ -106,8 +146,6 @@ impl Notepad {
         let base = working_dir
             .map(|wd| wd.join(&config.dir))
             .unwrap_or_else(|| PathBuf::from(&config.dir));
-        // Ensure the directory exists — best-effort.
-        let _ = std::fs::create_dir_all(&base);
         Some(Self {
             base_dir: base,
             enabled: true,
@@ -121,6 +159,53 @@ impl Notepad {
         self.base_dir.join(tier.filename())
     }
 
+    fn lock_path(&self) -> PathBuf {
+        self.base_dir.join(".lock")
+    }
+
+    /// Acquire an advisory exclusive lock via a lockfile.
+    ///
+    /// Creates the lockfile with `create_new(true)` and spins until
+    /// the timeout expires. The returned guard removes the lockfile on
+    /// drop, so no explicit unlock is needed.
+    fn acquire_lock(&self) -> Result<LockGuard, NotepadError> {
+        let lp = self.lock_path();
+        let deadline = Instant::now() + LOCK_TIMEOUT;
+        loop {
+            match fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&lp)
+            {
+                Ok(_) => return Ok(LockGuard(lp)),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    if Instant::now() >= deadline {
+                        return Err(NotepadError::LockTimeout);
+                    }
+                    std::thread::sleep(LOCK_RETRY_INTERVAL);
+                }
+                Err(e) => return Err(NotepadError::Io(e)),
+            }
+        }
+    }
+
+    /// Atomic write: write to `.tmp`, then rename (atomic on same fs).
+    fn atomic_write(path: &Path, content: &[u8]) -> std::io::Result<()> {
+        let tmp = path.with_extension("tmp");
+        {
+            let mut f = fs::File::create(&tmp)?;
+            f.write_all(content)?;
+            f.sync_all()?;
+        }
+        fs::rename(&tmp, path)?;
+        Ok(())
+    }
+
+    /// Ensure the base directory exists (called lazily before writes).
+    fn ensure_dir(&self) -> std::io::Result<()> {
+        fs::create_dir_all(&self.base_dir)
+    }
+
     // -- public API --------------------------------------------------------
 
     /// Read the content of a tier. Returns an empty string if the file does
@@ -129,29 +214,32 @@ impl Notepad {
         if !self.enabled {
             return String::new();
         }
-        std::fs::read_to_string(self.tier_path(tier)).unwrap_or_default()
+        fs::read_to_string(self.tier_path(tier)).unwrap_or_default()
     }
 
     /// Write `content` to a tier, truncating if `max_chars_per_tier` is
     /// exceeded. Returns an error if the write fails.
-    pub fn write(&self, tier: NotepadTier, content: &str) -> std::io::Result<()> {
+    ///
+    /// The write is serialized by an advisory lock and is atomic
+    /// (tmp+rename) to prevent partial reads.
+    pub fn write(&self, tier: NotepadTier, content: &str) -> Result<(), NotepadError> {
         if !self.enabled {
             return Ok(());
         }
+        let _guard = self.acquire_lock()?;
+        self.ensure_dir()?;
+
         let path = self.tier_path(tier);
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
         let truncated = if content.len() > self.max_chars_per_tier {
             &content[..content.floor_char_boundary(self.max_chars_per_tier)]
         } else {
             content
         };
-        std::fs::write(&path, truncated)
+        Self::atomic_write(&path, truncated.as_bytes()).map_err(NotepadError::Io)
     }
 
     /// Clear a tier's content (write an empty string).
-    pub fn clear(&self, tier: NotepadTier) -> std::io::Result<()> {
+    pub fn clear(&self, tier: NotepadTier) -> Result<(), NotepadError> {
         self.write(tier, "")
     }
 
@@ -170,6 +258,99 @@ impl Notepad {
     /// The resolved base directory for notepad files.
     pub fn dir(&self) -> &Path {
         &self.base_dir
+    }
+
+    /// Collect file statistics for all three tiers.
+    ///
+    /// Does not acquire any lock — sizes are best-effort snapshots.
+    pub fn stats(&self) -> NotepadStats {
+        let mut total = 0u64;
+        let mut tier_stats = Vec::with_capacity(3);
+        for tier in NotepadTier::all() {
+            let path = self.tier_path(*tier);
+            let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+            total += size;
+            tier_stats.push(TierStats {
+                name: tier.as_str(),
+                file_size_bytes: size,
+                has_content: size > 0,
+            });
+        }
+        NotepadStats {
+            exists: total > 0,
+            total_size_bytes: total,
+            tiers: tier_stats,
+        }
+    }
+
+    /// Clear the working tier (session-scoped scratchpad).
+    ///
+    /// In per-file tier architecture this is the closest analog to
+    /// pruning — working memory is the session-scoped tier that
+    /// benefits from periodic cleanup.
+    pub fn prune(&self) -> Result<(), NotepadError> {
+        self.clear(NotepadTier::Working)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Lock guard
+// ---------------------------------------------------------------------------
+
+/// RAII guard that removes the lockfile on drop.
+struct LockGuard(PathBuf);
+
+impl Drop for LockGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+/// Errors that can occur during notepad operations.
+#[derive(Debug)]
+pub enum NotepadError {
+    /// Another writer held the lock longer than the timeout.
+    LockTimeout,
+    /// I/O error during file operations.
+    Io(std::io::Error),
+}
+
+impl std::fmt::Display for NotepadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LockTimeout => write!(f, "notepad lock timeout (another writer is busy)"),
+            Self::Io(e) => write!(f, "notepad I/O error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for NotepadError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::LockTimeout => None,
+            Self::Io(e) => Some(e),
+        }
+    }
+}
+
+impl From<NotepadError> for std::io::Error {
+    fn from(e: NotepadError) -> Self {
+        match e {
+            NotepadError::LockTimeout => {
+                std::io::Error::new(std::io::ErrorKind::TimedOut, e.to_string())
+            }
+            NotepadError::Io(ioe) => ioe,
+        }
+    }
+}
+
+impl From<std::io::Error> for NotepadError {
+    fn from(e: std::io::Error) -> Self {
+        NotepadError::Io(e)
     }
 }
 
@@ -274,5 +455,76 @@ mod tests {
         assert!(tiers.contains(&NotepadTier::Priority));
         assert!(tiers.contains(&NotepadTier::Working));
         assert!(tiers.contains(&NotepadTier::Manual));
+    }
+
+    #[test]
+    fn test_stats_empty() {
+        let (_dir, np) = temp_notepad();
+        let s = np.stats();
+        assert!(!s.exists);
+        assert_eq!(s.total_size_bytes, 0);
+        for t in &s.tiers {
+            assert!(!t.has_content);
+        }
+    }
+
+    #[test]
+    fn test_stats_after_write() {
+        let (_dir, np) = temp_notepad();
+        np.write(NotepadTier::Priority, "hello").unwrap();
+        let s = np.stats();
+        assert!(s.exists);
+        assert!(s.total_size_bytes > 0);
+        let priority_tier = s.tiers.iter().find(|t| t.name == "priority").unwrap();
+        assert!(priority_tier.has_content);
+    }
+
+    #[test]
+    fn test_prune_clears_working() {
+        let (_dir, np) = temp_notepad();
+        np.write(NotepadTier::Working, "session data").unwrap();
+        assert!(!np.read(NotepadTier::Working).is_empty());
+        np.prune().unwrap();
+        assert_eq!(np.read(NotepadTier::Working), "");
+    }
+
+    #[test]
+    fn test_lock_timeout_surfaces_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = NotepadConfig {
+            enabled: true,
+            dir: ".notepad".to_string(),
+            max_chars_per_tier: 4096,
+        };
+        let np = Notepad::new(Some(dir.path()), &config).unwrap();
+
+        // Hold the lock by creating the lockfile manually
+        let lock_path = np.lock_path();
+        let _lock_file = fs::File::create(&lock_path).unwrap();
+
+        // A very tight timeout so the second attempt fails fast (use a
+        // notepad with a zero-ish timeout — we just check the error kind).
+        let result = np.write(NotepadTier::Priority, "data");
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            NotepadError::LockTimeout => {} // expected
+            other => panic!("expected LockTimeout, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_new_does_not_create_dir_unless_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = NotepadConfig {
+            enabled: true,
+            dir: ".notepad".to_string(),
+            max_chars_per_tier: 4096,
+        };
+        let np = Notepad::new(Some(dir.path()), &config).unwrap();
+        // The base_dir should NOT exist yet — we only create it on write.
+        assert!(!np.dir().exists());
+        // After a write it should exist.
+        np.write(NotepadTier::Priority, "hello").unwrap();
+        assert!(np.dir().exists());
     }
 }

@@ -84,7 +84,7 @@ impl App {
             .map(std::path::Path::new);
         let notepad_prompt = crate::notepad::Notepad::new(
             working_dir,
-            &crate::notepad::NotepadConfig::default(),
+            &crate::config::config().notepad,
         )
         .and_then(|n| n.priority_prompt_block());
 

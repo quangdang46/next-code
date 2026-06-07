@@ -301,6 +301,18 @@ impl Registry {
                 "write_manual",
                 notepad::NotepadTool::write_manual,
             );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "prune",
+                notepad::NotepadPruneTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "stats",
+                notepad::NotepadStatsTool::new,
+            );
             let nonzero: Vec<String> = timings
                 .iter()
                 .filter(|(_, ms)| *ms > 0)
