@@ -178,11 +178,7 @@ pub fn run_list(env: bool, json: bool) -> Result<()> {
     Ok(())
 }
 
-fn list_with(
-    manager: &SecretsManager,
-    filter: Option<&SecretScope>,
-    json: bool,
-) -> Result<String> {
+fn list_with(manager: &SecretsManager, filter: Option<&SecretScope>, json: bool) -> Result<String> {
     let mut entries = manager.list(filter)?;
     entries.sort_by(|a, b| {
         a.scope
@@ -316,7 +312,10 @@ mod tests {
         let m = test_manager(dir.path());
         let scope = SecretScope::Global;
         set_with(&m, &scope, "K", "v", false).unwrap();
-        assert_eq!(delete_with(&m, &scope, "K", false).unwrap(), "Deleted K (global).");
+        assert_eq!(
+            delete_with(&m, &scope, "K", false).unwrap(),
+            "Deleted K (global)."
+        );
         assert_eq!(
             delete_with(&m, &scope, "K", false).unwrap(),
             "No secret named K in global scope."

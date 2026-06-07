@@ -62,40 +62,78 @@ static PATTERNS: LazyLock<Vec<(Regex, &'static str)>> = LazyLock::new(|| {
     let env_names = KNOWN_SECRET_ENV_VARS.join("|");
     vec![
         // OpenAI / Anthropic style keys: `sk-...`, `sk-ant-...`
-        (Regex::new(r"\bsk-[A-Za-z0-9_\-\.]{20,}").unwrap(), "[REDACTED:sk]"),
+        (
+            Regex::new(r"\bsk-[A-Za-z0-9_\-\.]{20,}").unwrap(),
+            "[REDACTED:sk]",
+        ),
         // GitHub classic tokens: ghp_/gho_/ghs_/ghr_/ghu_
-        (Regex::new(r"\bgh[opsru]_[A-Za-z0-9]{20,}").unwrap(), "[REDACTED:github]"),
+        (
+            Regex::new(r"\bgh[opsru]_[A-Za-z0-9]{20,}").unwrap(),
+            "[REDACTED:github]",
+        ),
         // GitHub fine-grained PAT
-        (Regex::new(r"\bgithub_pat_[A-Za-z0-9_]{20,}").unwrap(), "[REDACTED:github]"),
+        (
+            Regex::new(r"\bgithub_pat_[A-Za-z0-9_]{20,}").unwrap(),
+            "[REDACTED:github]",
+        ),
         // Stripe secret/restricted/publishable live/test keys (underscore form)
-        (Regex::new(r"\b[rsp]k_(?:live|test)_[A-Za-z0-9]{16,}").unwrap(), "[REDACTED:stripe]"),
+        (
+            Regex::new(r"\b[rsp]k_(?:live|test)_[A-Za-z0-9]{16,}").unwrap(),
+            "[REDACTED:stripe]",
+        ),
         // Google API keys
-        (Regex::new(r"\bAIza[0-9A-Za-z_\-]{35}").unwrap(), "[REDACTED:google]"),
+        (
+            Regex::new(r"\bAIza[0-9A-Za-z_\-]{35}").unwrap(),
+            "[REDACTED:google]",
+        ),
         // Google OAuth access tokens
-        (Regex::new(r"\bya29\.[A-Za-z0-9._\-]{20,}").unwrap(), "[REDACTED:google]"),
+        (
+            Regex::new(r"\bya29\.[A-Za-z0-9._\-]{20,}").unwrap(),
+            "[REDACTED:google]",
+        ),
         // Slack tokens: xoxb-/xoxp-/xoxa-/xoxr-/xoxs-
-        (Regex::new(r"\bxox[baprs]-[A-Za-z0-9-]{10,}").unwrap(), "[REDACTED:slack]"),
+        (
+            Regex::new(r"\bxox[baprs]-[A-Za-z0-9-]{10,}").unwrap(),
+            "[REDACTED:slack]",
+        ),
         // AWS access key IDs
-        (Regex::new(r"\bAKIA[0-9A-Z]{16}\b").unwrap(), "[REDACTED:aws]"),
+        (
+            Regex::new(r"\bAKIA[0-9A-Z]{16}\b").unwrap(),
+            "[REDACTED:aws]",
+        ),
         // z.ai / ZHIPU style tokens: {32 hex}.{12+ alphanum}
-        (Regex::new(r"\b[a-f0-9]{32}\.[A-Za-z0-9]{12,}").unwrap(), "[REDACTED:token]"),
+        (
+            Regex::new(r"\b[a-f0-9]{32}\.[A-Za-z0-9]{12,}").unwrap(),
+            "[REDACTED:token]",
+        ),
         // JSON Web Tokens: base64url header.payload.signature (header+payload start eyJ)
         (
-            Regex::new(r"\beyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}").unwrap(),
+            Regex::new(r"\beyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}")
+                .unwrap(),
             "[REDACTED:jwt]",
         ),
         // HTTP Bearer tokens (keep the "Bearer " prefix)
-        (Regex::new(r"(?i)\b(Bearer\s+)[A-Za-z0-9._\-]{16,}").unwrap(), "${1}[REDACTED]"),
+        (
+            Regex::new(r"(?i)\b(Bearer\s+)[A-Za-z0-9._\-]{16,}").unwrap(),
+            "${1}[REDACTED]",
+        ),
         // Generic api_key/token/secret/password assignments
         (
-            Regex::new(r#"(?i)\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)(["']?)[^\s"'\[]{8,}"#).unwrap(),
+            Regex::new(
+                r#"(?i)\b(api[_-]?key|token|secret|password)\b(\s*[:=]\s*)(["']?)[^\s"'\[]{8,}"#,
+            )
+            .unwrap(),
             "${1}${2}[REDACTED]",
         ),
         // Known provider env-var assignments: KEY=value. The value's first char
         // must not be `[`, so an already-inserted `[REDACTED...]` placeholder is
         // never re-redacted (e.g. when layered after another sanitizer).
         (
-            Regex::new(&format!(r#"(?i)\b({})(\s*=\s*)([^\r\n,'"\s\[][^\r\n,'"\s]*)"#, env_names)).unwrap(),
+            Regex::new(&format!(
+                r#"(?i)\b({})(\s*=\s*)([^\r\n,'"\s\[][^\r\n,'"\s]*)"#,
+                env_names
+            ))
+            .unwrap(),
             "${1}${2}[REDACTED:env]",
         ),
     ]
@@ -244,8 +282,7 @@ mod tests {
 
     #[test]
     fn redacts_zai_token() {
-        let result =
-            redact_secrets("token=b8c37e33defde51cf91e1e03e51657da.AqkKii0K0VqLpQRnP");
+        let result = redact_secrets("token=b8c37e33defde51cf91e1e03e51657da.AqkKii0K0VqLpQRnP");
         assert!(result.contains("[REDACTED:token]"));
     }
 

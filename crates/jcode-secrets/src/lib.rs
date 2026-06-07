@@ -28,15 +28,15 @@
 //! ```
 
 mod local;
-pub use local::LocalSecretsBackend;
 pub use jcode_redact::redact_secrets;
+pub use local::LocalSecretsBackend;
 
 mod resolver;
 pub use resolver::{current_manager, secrets_api_key_resolver};
 
 use anyhow::{Context, Result};
-use jcode_keyring_store::KeyringStore;
 use base64::Engine;
+use jcode_keyring_store::KeyringStore;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -116,18 +116,17 @@ pub fn environment_id_from_cwd(cwd: &Path) -> EnvId {
     use sha2::{Digest, Sha256};
 
     // Git repo: sanitized name + a discriminator hash of the canonical root path.
-    if let Ok(repo_root) = get_git_repo_root(cwd) {
-        if let Some(repo_name) = repo_root
+    if let Ok(repo_root) = get_git_repo_root(cwd)
+        && let Some(repo_name) = repo_root
             .file_name()
             .and_then(|n| n.to_str())
             .filter(|n| !n.is_empty())
-        {
-            let sanitized = sanitize_env_component(repo_name);
-            let canonical = std::fs::canonicalize(&repo_root).unwrap_or(repo_root);
-            let hash = Sha256::digest(canonical.to_string_lossy().as_bytes());
-            let short = hex_encode(&hash[..3]); // 6 hex chars
-            return EnvId(format!("{}-{}", sanitized, short));
-        }
+    {
+        let sanitized = sanitize_env_component(repo_name);
+        let canonical = std::fs::canonicalize(&repo_root).unwrap_or(repo_root);
+        let hash = Sha256::digest(canonical.to_string_lossy().as_bytes());
+        let short = hex_encode(&hash[..3]); // 6 hex chars
+        return EnvId(format!("{}-{}", sanitized, short));
     }
 
     // Fallback: hash the canonical path
@@ -204,10 +203,7 @@ impl SecretScope {
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
         {
-            anyhow::bail!(
-                "Environment ID must match [a-zA-Z0-9_-]+, got: {}",
-                env_id
-            );
+            anyhow::bail!("Environment ID must match [a-zA-Z0-9_-]+, got: {}", env_id);
         }
         Ok(Self::Environment(EnvId(env_id)))
     }
@@ -297,7 +293,11 @@ impl SecretsManager {
     pub fn new(jcode_home: PathBuf, kind: SecretsBackendKind) -> Result<Self> {
         let keyring_store: Arc<dyn KeyringStore> =
             Arc::new(jcode_keyring_store::DefaultKeyringStore::new());
-        Ok(Self::new_with_keyring_store(jcode_home, kind, keyring_store))
+        Ok(Self::new_with_keyring_store(
+            jcode_home,
+            kind,
+            keyring_store,
+        ))
     }
 
     /// Create a `SecretsManager` with a custom keyring store (e.g. mock).
@@ -376,7 +376,7 @@ pub fn generate_passphrase() -> String {
     rand::rngs::OsRng
         .try_fill_bytes(&mut bytes)
         .expect("OsRng should never fail");
-    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
     // Zeroize the raw key bytes (the most sensitive form). Volatile write so the
     // compiler cannot elide it. The only `unsafe` in the crate.
     for b in &mut bytes {

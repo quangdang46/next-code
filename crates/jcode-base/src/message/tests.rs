@@ -288,7 +288,10 @@ fn redact_secrets_also_covers_shared_sanitizer_formats() {
     assert!(!aws.contains("AKIAIOSFODNN7EXAMPLE"), "got: {aws}");
 
     let bearer = redact_secrets("Authorization: Bearer abcdef0123456789ghijklmnop");
-    assert!(!bearer.contains("abcdef0123456789ghijklmnop"), "got: {bearer}");
+    assert!(
+        !bearer.contains("abcdef0123456789ghijklmnop"),
+        "got: {bearer}"
+    );
 }
 
 #[test]

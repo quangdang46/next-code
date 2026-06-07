@@ -47,6 +47,12 @@ impl DefaultKeyringStore {
     }
 }
 
+impl Default for DefaultKeyringStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl KeyringStore for DefaultKeyringStore {
     fn load(&self, service: &str, account: &str) -> anyhow::Result<Option<String>> {
         let entry = keyring::Entry::new(service, account)?;
@@ -94,7 +100,14 @@ impl MockKeyringStore {
 
     /// When `inject` is true all subsequent load/save/delete calls will fail.
     pub fn set_inject_error(&self, inject: bool) {
-        self.inject_error.store(inject, std::sync::atomic::Ordering::SeqCst);
+        self.inject_error
+            .store(inject, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+impl Default for MockKeyringStore {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -104,7 +117,9 @@ impl KeyringStore for MockKeyringStore {
             anyhow::bail!("injected error");
         }
         let store = self.store.lock().unwrap();
-        Ok(store.get(&(service.to_string(), account.to_string())).cloned())
+        Ok(store
+            .get(&(service.to_string(), account.to_string()))
+            .cloned())
     }
 
     fn save(&self, service: &str, account: &str, value: &str) -> anyhow::Result<()> {
@@ -112,7 +127,10 @@ impl KeyringStore for MockKeyringStore {
             anyhow::bail!("injected error");
         }
         let mut store = self.store.lock().unwrap();
-        store.insert((service.to_string(), account.to_string()), value.to_string());
+        store.insert(
+            (service.to_string(), account.to_string()),
+            value.to_string(),
+        );
         Ok(())
     }
 

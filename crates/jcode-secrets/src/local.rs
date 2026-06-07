@@ -14,7 +14,7 @@ use anyhow::{Context, Result};
 
 use jcode_keyring_store::KeyringStore;
 
-use super::{SecretListEntry, SecretName, SecretScope, SecretsBackend, SERVICE_NAME, PASS_ACCOUNT};
+use super::{PASS_ACCOUNT, SERVICE_NAME, SecretListEntry, SecretName, SecretScope, SecretsBackend};
 
 const SECRETS_RELATIVE_PATH: &str = "secrets/local.age";
 const FILE_VERSION: u32 = 1;
@@ -67,8 +67,8 @@ impl LocalSecretsBackend {
             .with_context(|| format!("Failed to read {}", self.secrets_path.display()))?;
 
         // Decrypt with age scrypt
-        let decryptor = age::Decryptor::new(&encrypted[..])
-            .context("Failed to create age decryptor")?;
+        let decryptor =
+            age::Decryptor::new(&encrypted[..]).context("Failed to create age decryptor")?;
         let mut decrypted = Vec::new();
         let pass = age::secrecy::SecretString::from(passphrase);
         let identity = age::scrypt::Identity::new(pass);
@@ -118,8 +118,7 @@ impl LocalSecretsBackend {
         let mut writer = encryptor
             .wrap_output(&mut encrypted)
             .context("Failed to wrap age output")?;
-        std::io::Write::write_all(&mut writer, &json)
-            .context("Failed to write encrypted data")?;
+        std::io::Write::write_all(&mut writer, &json).context("Failed to write encrypted data")?;
         writer.finish().context("Failed to finish age encryption")?;
 
         // Atomic, owner-only (0600) write: a crash mid-write cannot truncate or
@@ -158,13 +157,10 @@ impl LocalSecretsBackend {
         let secrets = self.load_secrets()?;
         let mut entries = Vec::new();
         for key in secrets.keys() {
-            if let Some(entry) = parse_canonical_key(key) {
-                let matches = scope_filter.map_or(true, |filter| {
-                    entry.scope == *filter
-                });
-                if matches {
-                    entries.push(entry);
-                }
+            if let Some(entry) = parse_canonical_key(key)
+                && scope_filter.is_none_or(|filter| entry.scope == *filter)
+            {
+                entries.push(entry);
             }
         }
         Ok(entries)
@@ -196,9 +192,8 @@ impl SecretsBackend for LocalSecretsBackend {
     fn purge(&self) -> Result<()> {
         // Remove the encrypted store file if present.
         if self.secrets_path.exists() {
-            std::fs::remove_file(&self.secrets_path).with_context(|| {
-                format!("Failed to remove {}", self.secrets_path.display())
-            })?;
+            std::fs::remove_file(&self.secrets_path)
+                .with_context(|| format!("Failed to remove {}", self.secrets_path.display()))?;
         }
         // Remove the OS keychain passphrase entry (idempotent).
         self.keyring_store.delete(SERVICE_NAME, PASS_ACCOUNT)?;
