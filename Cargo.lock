@@ -5997,6 +5997,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dirs 5.0.1",
+ "global-hotkey",
  "jcode-build-meta",
  "jcode-logging",
  "jcode-storage",
