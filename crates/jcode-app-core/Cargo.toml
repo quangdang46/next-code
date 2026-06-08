@@ -128,6 +128,7 @@ jcode-selfdev-types = { path = "../jcode-selfdev-types" }
 jcode-session-types = { path = "../jcode-session-types" }
 jcode-setup-hints = { path = "../jcode-setup-hints" }
 jcode-storage = { path = "../jcode-storage" }
+jcode-secrets = { path = "../jcode-secrets" }
 jcode-task-types = { path = "../jcode-task-types" }
 jcode-tool-core = { path = "../jcode-tool-core" }
 jcode-tool-types = { path = "../jcode-tool-types" }

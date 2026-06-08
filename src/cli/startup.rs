@@ -41,6 +41,14 @@ pub async fn run() -> Result<()> {
     // Invert the legacy provider_catalog -> auth dependency: provider_catalog
     // consults registered fallback resolvers, and auth (the higher layer)
     // registers its external-CLI credential scan here.
+    //
+    // The encrypted secrets store is registered first so values saved via
+    // `jcode secrets set` are consulted before scanning other tools'
+    // credentials. Both run only after an explicit env var / provider env-file
+    // miss, so they never override a value the user set in their environment.
+    crate::provider_catalog::register_api_key_fallback_resolver(
+        jcode_secrets::secrets_api_key_resolver,
+    );
     crate::provider_catalog::register_api_key_fallback_resolver(
         crate::auth::external::load_api_key_for_env,
     );

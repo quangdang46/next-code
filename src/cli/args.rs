@@ -283,6 +283,10 @@ pub(crate) enum Command {
     #[command(subcommand)]
     Session(SessionCommand),
 
+    /// Manage encrypted, keychain-backed secrets (API keys, tokens)
+    #[command(subcommand)]
+    Secrets(SecretsCommand),
+
     /// Ambient mode management
     #[command(subcommand)]
     Ambient(AmbientCommand),
@@ -816,6 +820,84 @@ pub(crate) enum SessionCommand {
         /// Clear the custom session name/title
         #[arg(long, conflicts_with = "name")]
         clear: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum SecretsCommand {
+    /// Store a secret (encrypted at rest, passphrase in the OS keychain)
+    Set {
+        /// Secret name, e.g. ANTHROPIC_API_KEY (uppercase [A-Z0-9_]+)
+        name: String,
+
+        /// Secret value. If omitted, it is read from stdin so it never lands
+        /// in shell history.
+        value: Option<String>,
+
+        /// Scope the secret to the current environment (git repo) instead of global
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Print a stored secret value (resolves env scope, then global)
+    Get {
+        /// Secret name
+        name: String,
+
+        /// Look up the current environment scope (falls back to global)
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of the raw value
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Delete a stored secret
+    Delete {
+        /// Secret name
+        name: String,
+
+        /// Delete from the current environment scope instead of global
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List stored secret names (values are never printed)
+    List {
+        /// Only list secrets in the current environment scope
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Initialize the encrypted store and OS keychain passphrase
+    Init {
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Permanently delete ALL stored secrets and the keychain passphrase
+    Purge {
+        /// Confirm the destructive purge (required; nothing is deleted without it)
+        #[arg(long)]
+        yes: bool,
 
         /// Emit JSON instead of human-readable output
         #[arg(long)]
