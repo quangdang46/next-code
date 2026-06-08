@@ -26,7 +26,10 @@ mod tips;
 mod todos_render;
 #[path = "info_widget_usage.rs"]
 mod usage_render;
+#[path = "info_widget_team.rs"]
+mod team_render;
 use super::info_widget_overview::{InfoPageKind, MAX_TODO_LINES, compute_page_layout};
+use super::info_widget_team::{TeamInfo, TeamMemberView, TeamTaskView};
 use super::workspace_map::VisibleWorkspaceRow;
 use crate::ambient::AmbientStatus;
 pub use crate::memory_types::{
@@ -99,6 +102,8 @@ pub enum WidgetKind {
     Tips,
     /// Git status
     GitStatus,
+    /// Team run roster + task DAG
+    TeamView,
 }
 
 impl WidgetKind {
@@ -117,6 +122,7 @@ impl WidgetKind {
             WidgetKind::Compaction => 9,
             WidgetKind::BackgroundTasks => 10,
             WidgetKind::GitStatus => 11,
+            WidgetKind::TeamView => 6, // base; bumped to 2 when team is active
             WidgetKind::SwarmStatus => 12, // Session list - lower priority
             WidgetKind::AmbientMode => 13, // Scheduled agent - lower priority
             WidgetKind::Tips => 14,        // Did you know - lowest
@@ -141,6 +147,7 @@ impl WidgetKind {
             WidgetKind::ModelInfo => Side::Left,
             WidgetKind::Tips => Side::Left,
             WidgetKind::GitStatus => Side::Left,
+            WidgetKind::TeamView => Side::Right,
         }
     }
 
@@ -162,12 +169,14 @@ impl WidgetKind {
             WidgetKind::ModelInfo => 3, // Model + usage bars
             WidgetKind::Tips => 3,
             WidgetKind::GitStatus => 3,
+            WidgetKind::TeamView => 5,
         }
     }
 
     /// All widget kinds in priority order
     pub fn all_by_priority() -> &'static [WidgetKind] {
         &[
+            WidgetKind::TeamView,
             WidgetKind::Diagrams,
             WidgetKind::WorkspaceMap,
             WidgetKind::Overview,
@@ -229,6 +238,7 @@ pub(crate) fn is_overview_mergeable(kind: WidgetKind) -> bool {
         WidgetKind::Todos
             | WidgetKind::ContextUsage
             | WidgetKind::SwarmStatus
+            | WidgetKind::TeamView
             | WidgetKind::BackgroundTasks
             | WidgetKind::Compaction
             | WidgetKind::ModelInfo
@@ -604,6 +614,8 @@ pub struct InfoWidgetData {
     pub is_compacting: bool,
     /// Git repository status
     pub git_info: Option<GitInfo>,
+    /// Team run status
+    pub team_info: Option<TeamInfo>,
 }
 
 #[derive(Clone, Debug)]
@@ -630,6 +642,7 @@ impl InfoWidgetData {
             && self.model.is_none()
             && self.memory_info.is_none()
             && self.swarm_info.is_none()
+            && self.team_info.is_none()
             && self.background_info.is_none()
             && self.diagrams.is_empty()
             && self.workspace_rows.is_empty()
@@ -711,6 +724,7 @@ impl InfoWidgetData {
                 .map(|m| m.total_count > 0 || m.activity.is_some() || m.sidecar_model.is_some())
                 .unwrap_or(false),
             WidgetKind::SwarmStatus => false,
+            WidgetKind::TeamView => false,
             WidgetKind::BackgroundTasks => self
                 .background_info
                 .as_ref()
@@ -1435,6 +1449,7 @@ fn render_widget_content(
         WidgetKind::Todos => render_todos_widget(data, inner),
         WidgetKind::ContextUsage => render_context_widget(data, inner),
         WidgetKind::MemoryActivity => render_memory_widget(data, inner),
+        WidgetKind::TeamView => render_team_widget(data, inner),
         WidgetKind::SwarmStatus => render_swarm_widget(data, inner),
         WidgetKind::BackgroundTasks => render_background_widget(data, inner),
         WidgetKind::Compaction => render_compaction_widget(data, inner),

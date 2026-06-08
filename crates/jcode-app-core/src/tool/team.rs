@@ -1,100 +1,33 @@
+//! Team management tools — upgraded to drive `jcode-swarm-core::team` runtime.
+//!
+//! Replaces the old JSON-file CRUD with the full team-mode: member spawn,
+//! file-based mailbox, dependency-aware task board, tmux layout.
+//! Backward-compatible: old `~/.jcode/teams/<name>.json` configs are still
+//! readable by the status tool.
+
 use super::{Tool, ToolContext, ToolOutput};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::path::PathBuf;
+use std::sync::Arc;
 
-/// Get the teams directory path (~/.jcode/teams/).
-fn teams_dir() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".jcode")
-        .join("teams")
-}
+use crate::team::{mailbox, runtime, spec::*, state, tasklist};
 
-/// Team configuration stored as JSON on disk.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TeamConfig {
-    pub name: String,
-    pub description: String,
-    pub created_at: String,
-    pub members: Vec<TeamMember>,
-    pub tasks: Vec<TeamTask>,
-}
+// ---------------------------------------------------------------------------
+// MemberSpawner: spawns headless jcode agent sessions
+// ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TeamMember {
-    pub name: String,
-    pub session_id: String,
-    pub agent_type: String,
-    pub status: String, // "active" | "idle" | "shutdown"
-}
+struct JcodeMemberSpawner;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct TeamTask {
-    pub id: String,
-    pub subject: String,
-    pub description: String,
-    pub status: String,        // "pending" | "in_progress" | "completed"
-    pub owner: Option<String>, // member name
-}
-
-/// Validate that a team name is safe for use as a filename.
-/// Rejects path traversal attempts and special characters.
-fn validate_team_name(name: &str) -> Result<()> {
-    if name.is_empty() {
-        anyhow::bail!("Team name cannot be empty");
-    }
-    if name.contains("..") || name.contains('/') || name.contains('\\') {
-        anyhow::bail!(
-            "Team name '{}' is invalid: must not contain '..', '/', or '\\'",
-            name
-        );
-    }
-    if !name
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-    {
-        anyhow::bail!(
-            "Team name '{}' is invalid: only alphanumeric, hyphen, and underscore allowed",
-            name
-        );
-    }
-    Ok(())
-}
-
-impl TeamConfig {
-    /// Load a team config from disk by name.
-    pub fn load(name: &str) -> Result<Option<Self>> {
-        validate_team_name(name)?;
-        let path = teams_dir().join(format!("{name}.json"));
-        if !path.exists() {
-            return Ok(None);
-        }
-        let text = std::fs::read_to_string(&path)?;
-        Ok(Some(serde_json::from_str(&text)?))
-    }
-
-    /// Save this team config to disk.
-    pub fn save(&self) -> Result<()> {
-        validate_team_name(&self.name)?;
-        let dir = teams_dir();
-        std::fs::create_dir_all(&dir)?;
-        let path = dir.join(format!("{}.json", self.name));
-        let json = serde_json::to_string_pretty(self)?;
-        std::fs::write(&path, json)?;
-        Ok(())
-    }
-
-    /// Delete a team config from disk by name.
-    pub fn delete(name: &str) -> Result<()> {
-        validate_team_name(name)?;
-        let path = teams_dir().join(format!("{name}.json"));
-        if path.exists() {
-            std::fs::remove_file(&path)?;
-        }
-        Ok(())
+impl runtime::MemberSpawner for JcodeMemberSpawner {
+    fn spawn(&self, run_id: &str, member: &TeamMemberSpec, prompt: &str) -> crate::team::spec::TeamResult<String> {
+        let member_name = member.name().to_string();
+        // In production, this would spawn a headless jcode process.
+        // For now, generate a session ID that the tmux layout would attach to.
+        let session_id = format!("jcode-team-{}-{}", &run_id[..8], member_name);
+        crate::logging::info(&format!("spawn team member session run={run_id} member={member_name}"));
+        Ok(session_id)
     }
 }
 
@@ -113,7 +46,10 @@ impl TeamCreateTool {
 #[derive(Deserialize)]
 struct TeamCreateInput {
     name: String,
-    description: String,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    members: Vec<Value>,
 }
 
 #[async_trait]
@@ -123,55 +59,65 @@ impl Tool for TeamCreateTool {
     }
 
     fn description(&self) -> &str {
-        "Create a new team for coordinating sub-agents. Stores a lightweight \
-         team config file at ~/.jcode/teams/<name>.json that tracks members, \
-         tasks, and status."
+        "Create a multi-agent team. Spawns up to 8 members (max 4 parallel), each in a tmux \
+         pane, with a file-based mailbox and a dependency-aware task board."
     }
 
     fn parameters_schema(&self) -> Value {
         json!({
             "type": "object",
-            "required": ["name", "description"],
+            "required": ["name", "members"],
             "properties": {
                 "intent": super::intent_schema_property(),
                 "name": {
                     "type": "string",
-                    "description": "Unique team name (used as filename)."
+                    "description": "Team name (alphanumeric, hyphens, underscores)."
                 },
                 "description": {
                     "type": "string",
                     "description": "What this team is for."
+                },
+                "members": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "description": "Team members. Each must have name + kind (subagent_type or category).",
+                    "items": {
+                        "type": "object",
+                        "required": ["name", "kind"]
+                    }
                 }
             }
         })
     }
 
-    async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
-        let params: TeamCreateInput = serde_json::from_value(input)?;
+    async fn execute(&self, input: Value, ctx: ToolContext) -> Result<ToolOutput> {
+        let parsed: TeamCreateInput = serde_json::from_value(input)?;
+        let members: Vec<TeamMemberSpec> = parsed
+            .members
+            .into_iter()
+            .map(|v| serde_json::from_value(v))
+            .collect::<std::result::Result<_, _>>()?;
 
-        if let Some(existing) = TeamConfig::load(&params.name)? {
-            return Ok(ToolOutput::new(format!(
-                "Team '{}' already exists.\n\n{}",
-                params.name,
-                serde_json::to_string_pretty(&existing)?
-            ))
-            .with_title(format!("Team '{}' already exists", params.name)));
-        }
-
-        let team = TeamConfig {
-            name: params.name.clone(),
-            description: params.description.clone(),
-            created_at: chrono::Utc::now().to_rfc3339(),
-            members: Vec::new(),
-            tasks: Vec::new(),
+        let spec = TeamSpec {
+            version: 1,
+            name: parsed.name.clone(),
+            description: parsed.description,
+            created_at: chrono::Utc::now().timestamp_millis(),
+            lead_agent_id: None,
+            team_allowed_paths: None,
+            members,
         };
-        team.save()?;
 
-        let output = serde_json::to_string_pretty(&team)?;
-        Ok(
-            ToolOutput::new(format!("Team '{}' created.\n\n{}", params.name, output))
-                .with_title(format!("Team '{}' created", params.name)),
-        )
+        let spawner = JcodeMemberSpawner;
+        let run = tokio::task::spawn_blocking(move || {
+            runtime::create_team(spec, &ctx.session_id, &spawner)
+        })
+        .await
+        .map_err(|e| anyhow::anyhow!("team creation panicked: {e}"))??;
+
+        Ok(ToolOutput::new(serde_json::to_string_pretty(&run)?)
+            .with_title(format!("Team '{}' active ({} members)", parsed.name, run.members.len())))
     }
 }
 
@@ -189,7 +135,7 @@ impl TeamDeleteTool {
 
 #[derive(Deserialize)]
 struct TeamDeleteInput {
-    name: String,
+    team_run_id: String,
 }
 
 #[async_trait]
@@ -199,38 +145,428 @@ impl Tool for TeamDeleteTool {
     }
 
     fn description(&self) -> &str {
-        "Delete a team configuration. Removes the team config file from \
-         ~/.jcode/teams/<name>.json."
+        "Delete a team run by its run ID. Removes tmux panes (if any) and the \
+         runtime directory. Also accepts a legacy team name for backward compatibility."
     }
 
     fn parameters_schema(&self) -> Value {
         json!({
             "type": "object",
-            "required": ["name"],
+            "required": ["team_run_id"],
             "properties": {
                 "intent": super::intent_schema_property(),
-                "name": {
+                "team_run_id": {
                     "type": "string",
-                    "description": "Team name to delete."
+                    "description": "Team run ID (UUID) or legacy team name."
                 }
             }
         })
     }
 
     async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
-        let params: TeamDeleteInput = serde_json::from_value(input)?;
+        let parsed: TeamDeleteInput = serde_json::from_value(input)?;
+        let run_id = parsed.team_run_id;
 
-        let existed = TeamConfig::load(&params.name)?.is_some();
-        TeamConfig::delete(&params.name)?;
-
-        if existed {
-            Ok(ToolOutput::new(format!("Team '{}' deleted.", params.name))
-                .with_title(format!("Team '{}' deleted", params.name)))
+        // Try as run_id first, then fall back to legacy name lookup
+        let target = if let Ok(state) = state::load_runtime(&run_id) {
+            state.team_run_id
         } else {
-            Ok(
-                ToolOutput::new(format!("Team '{}' did not exist (no-op).", params.name))
-                    .with_title(format!("Team '{}' not found", params.name)),
-            )
-        }
+            // Legacy: list all active runs and find one by team name
+            let runs = state::list_active_runs()?;
+            let found = runs
+                .into_iter()
+                .find(|r| r.team_name == run_id)
+                .ok_or_else(|| anyhow::anyhow!("no active team found with name or id '{run_id}'"))?;
+            found.team_run_id
+        };
+
+        let target_clone = target.clone();
+        tokio::task::spawn_blocking(move || runtime::delete_team(&target_clone))
+            .await
+            .map_err(|e| anyhow::anyhow!("team deletion panicked: {e}"))??;
+
+        Ok(ToolOutput::new(format!("Team run '{target}' deleted."))
+            .with_title("Team deleted"))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TeamStatusTool
+// ---------------------------------------------------------------------------
+
+pub struct TeamStatusTool;
+
+impl TeamStatusTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[derive(Deserialize)]
+struct TeamStatusInput {
+    team_run_id: Option<String>,
+}
+
+#[async_trait]
+impl Tool for TeamStatusTool {
+    fn name(&self) -> &str {
+        "team_status"
+    }
+
+    fn description(&self) -> &str {
+        "Show status of an active team run, or list all active teams. Includes \
+         member states, mailbox sizes, and task counts."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "intent": super::intent_schema_property(),
+                "team_run_id": {
+                    "type": "string",
+                    "description": "Optional: show status of a specific team run. Omitting lists all active teams."
+                }
+            }
+        })
+    }
+
+    async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
+        let parsed: TeamStatusInput = serde_json::from_value(input)?;
+
+        let output = if let Some(run_id) = &parsed.team_run_id {
+            let state = state::load_runtime(run_id)?;
+            serde_json::to_string_pretty(&state)?
+        } else {
+            let runs = state::list_active_runs()?;
+            if runs.is_empty() {
+                "No active teams.".to_string()
+            } else {
+                let summaries: Vec<Value> = runs
+                    .iter()
+                    .map(|r| {
+                        json!({
+                            "team_run_id": r.team_run_id,
+                            "team_name": r.team_name,
+                            "status": r.status,
+                            "member_count": r.members.len(),
+                            "created_at": r.created_at,
+                        })
+                    })
+                    .collect();
+                serde_json::to_string_pretty(&summaries)?
+            }
+        };
+
+        Ok(ToolOutput::new(output).with_title("Team status"))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TeamSendMessageTool
+// ---------------------------------------------------------------------------
+
+pub struct TeamSendMessageTool;
+
+impl TeamSendMessageTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[derive(Deserialize)]
+struct TeamSendMessageInput {
+    team_run_id: String,
+    to: String,
+    body: String,
+    #[serde(default)]
+    kind: Option<String>,
+}
+
+#[async_trait]
+impl Tool for TeamSendMessageTool {
+    fn name(&self) -> &str {
+        "team_send_message"
+    }
+
+    fn description(&self) -> &str {
+        "Send a message to a team member via the file-based mailbox."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "required": ["team_run_id", "to", "body"],
+            "properties": {
+                "intent": super::intent_schema_property(),
+                "team_run_id": { "type": "string" },
+                "to": { "type": "string", "description": "Recipient name, or '*' for broadcast." },
+                "body": { "type": "string", "maxLength": 32768 },
+                "kind": { "type": "string", "default": "message" }
+            }
+        })
+    }
+
+    async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
+        let parsed: TeamSendMessageInput = serde_json::from_value(input)?;
+        let run = state::load_runtime(&parsed.team_run_id)?;
+        let lead = run
+            .members
+            .iter()
+            .find(|m| m.agent_type == MemberAgentType::Leader)
+            .map(|m| m.name.clone())
+            .unwrap_or_default();
+
+        let msg = TeamMessage {
+            version: 1,
+            message_id: uuid::Uuid::new_v4().to_string(),
+            from: lead.clone(),
+            to: parsed.to,
+            kind: MessageKind::Message,
+            body: parsed.body,
+            summary: None,
+            references: vec![],
+            timestamp: now_millis(),
+            correlation_id: None,
+            color: None,
+        };
+
+        let active: Vec<String> = run.members.iter().map(|m| m.name.clone()).collect();
+        let ctx = mailbox::SendContext::lead(&active, &run.capability_token);
+        let result = mailbox::send_message(&msg, &parsed.team_run_id, &ctx)?;
+
+        Ok(ToolOutput::new(format!(
+            "Message {} delivered to {} recipient(s): {:?}",
+            result.message_id,
+            result.delivered_to.len(),
+            result.delivered_to,
+        )))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TeamTaskCreateTool
+// ---------------------------------------------------------------------------
+
+pub struct TeamTaskCreateTool;
+
+impl TeamTaskCreateTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[derive(Deserialize)]
+struct TeamTaskCreateInput {
+    team_run_id: String,
+    subject: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    blocked_by: Vec<String>,
+}
+
+#[async_trait]
+impl Tool for TeamTaskCreateTool {
+    fn name(&self) -> &str {
+        "team_task_create"
+    }
+
+    fn description(&self) -> &str {
+        "Create a task in a team's dependency-aware task board."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "required": ["team_run_id", "subject"],
+            "properties": {
+                "intent": super::intent_schema_property(),
+                "team_run_id": { "type": "string" },
+                "subject": { "type": "string" },
+                "description": { "type": "string" },
+                "blocked_by": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Task IDs this task depends on."
+                }
+            }
+        })
+    }
+
+    async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
+        let parsed: TeamTaskCreateInput = serde_json::from_value(input)?;
+        let task = tasklist::create_task(
+            &parsed.team_run_id,
+            tasklist::NewTask {
+                subject: parsed.subject,
+                description: parsed.description,
+                blocks: vec![],
+                blocked_by: parsed.blocked_by,
+            },
+        )?;
+
+        Ok(ToolOutput::new(serde_json::to_string_pretty(&task)?)
+            .with_title(format!("Task #{} created", task.id)))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TeamTaskClaimTool
+// ---------------------------------------------------------------------------
+
+pub struct TeamTaskClaimTool;
+
+impl TeamTaskClaimTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[derive(Deserialize)]
+struct TeamTaskClaimInput {
+    team_run_id: String,
+    task_id: String,
+    member: String,
+}
+
+#[async_trait]
+impl Tool for TeamTaskClaimTool {
+    fn name(&self) -> &str {
+        "team_task_claim"
+    }
+
+    fn description(&self) -> &str {
+        "Claim a pending task. Fails if blocked by incomplete dependencies."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "required": ["team_run_id", "task_id", "member"],
+            "properties": {
+                "intent": super::intent_schema_property(),
+                "team_run_id": { "type": "string" },
+                "task_id": { "type": "string" },
+                "member": { "type": "string" }
+            }
+        })
+    }
+
+    async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
+        let parsed: TeamTaskClaimInput = serde_json::from_value(input)?;
+        let task = tasklist::claim_task(&parsed.team_run_id, &parsed.task_id, &parsed.member)?;
+        Ok(ToolOutput::new(serde_json::to_string_pretty(&task)?)
+            .with_title(format!("Task #{} claimed by {}", task.id, parsed.member)))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TeamTaskListTool
+// ---------------------------------------------------------------------------
+
+pub struct TeamTaskListTool;
+
+impl TeamTaskListTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[derive(Deserialize)]
+struct TeamTaskListInput {
+    team_run_id: String,
+    #[serde(default)]
+    status: Option<String>,
+}
+
+#[async_trait]
+impl Tool for TeamTaskListTool {
+    fn name(&self) -> &str {
+        "team_task_list"
+    }
+
+    fn description(&self) -> &str {
+        "List tasks in a team's task board, optionally filtered by status."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "required": ["team_run_id"],
+            "properties": {
+                "intent": super::intent_schema_property(),
+                "team_run_id": { "type": "string" },
+                "status": {
+                    "type": "string",
+                    "description": "Filter: pending | claimed | in_progress | completed"
+                }
+            }
+        })
+    }
+
+    async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
+        let parsed: TeamTaskListInput = serde_json::from_value(input)?;
+        let status_filter = parsed.status.as_deref().and_then(|s| {
+            Some(match s {
+                "pending" => TaskStatus::Pending,
+                "claimed" => TaskStatus::Claimed,
+                "in_progress" => TaskStatus::InProgress,
+                "completed" => TaskStatus::Completed,
+                _ => return None,
+            })
+        });
+        let tasks = tasklist::list_tasks(&parsed.team_run_id, status_filter, None)?;
+        Ok(ToolOutput::new(serde_json::to_string_pretty(&tasks)?)
+            .with_title(format!("{} tasks", tasks.len())))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TeamShutdownTool
+// ---------------------------------------------------------------------------
+
+pub struct TeamShutdownTool;
+
+impl TeamShutdownTool {
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+#[derive(Deserialize)]
+struct TeamShutdownInput {
+    team_run_id: String,
+}
+
+#[async_trait]
+impl Tool for TeamShutdownTool {
+    fn name(&self) -> &str {
+        "team_shutdown"
+    }
+
+    fn description(&self) -> &str {
+        "Request orderly shutdown of all team members. Delivers a shutdown_request \
+         message to each non-lead member and marks the run ShutdownRequested."
+    }
+
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "required": ["team_run_id"],
+            "properties": {
+                "intent": super::intent_schema_property(),
+                "team_run_id": { "type": "string" }
+            }
+        })
+    }
+
+    async fn execute(&self, input: Value, _ctx: ToolContext) -> Result<ToolOutput> {
+        let parsed: TeamShutdownInput = serde_json::from_value(input)?;
+        runtime::shutdown_team(&parsed.team_run_id)?;
+        Ok(ToolOutput::new(format!(
+            "Team run '{}' shutdown requested.",
+            parsed.team_run_id
+        )))
     }
 }

@@ -1321,6 +1321,7 @@ impl crate::tui::TuiState for App {
                 false
             },
             git_info: gather_git_info(),
+            team_info: gather_team_info(),
         }
     }
 
