@@ -138,6 +138,19 @@ impl Registry {
         &self.dispatch_config
     }
 
+    /// Install the DCP plugin (dynamic context pruning) so DCP-aware tools can
+    /// access it. Only available when the crate is built with the `dcp` feature.
+    #[cfg(feature = "dcp")]
+    pub fn set_dcp(&mut self, plugin: crate::dcp_plugin::DcpPlugin) {
+        self.dcp = Some(Arc::new(Mutex::new(plugin)));
+    }
+
+    /// Access the DCP plugin if one has been installed.
+    #[cfg(feature = "dcp")]
+    pub fn dcp(&self) -> Option<&Arc<Mutex<crate::dcp_plugin::DcpPlugin>>> {
+        self.dcp.as_ref()
+    }
+
     fn shared_skills_registry() -> Arc<RwLock<SkillRegistry>> {
         SkillRegistry::shared_registry()
     }

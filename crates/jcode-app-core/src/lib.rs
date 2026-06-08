@@ -49,6 +49,8 @@ pub mod update;
 
 #[cfg(feature = "dcp")]
 pub mod dcp_bridge;
+#[cfg(feature = "dcp")]
+pub mod dcp_plugin;
 
 #[cfg(feature = "rtco")]
 pub mod rtco_filter;
