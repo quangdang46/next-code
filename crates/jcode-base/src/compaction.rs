@@ -1596,6 +1596,7 @@ impl CompactionManager {
     /// Returns a structured outcome so callers can render their own
     /// user-facing message. `pre_usage` is the context usage fraction observed
     /// before recovery (captured here so the report matches what triggered it).
+    #[allow(clippy::ptr_arg)]
     pub fn recover_within_budget(&mut self, all_messages: &mut Vec<Message>) -> EmergencyRecovery {
         let pre_usage = self.context_usage_with(all_messages);
 
