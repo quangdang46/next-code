@@ -72,6 +72,9 @@ jcode-provider-metadata = { path = "../jcode-provider-metadata" }
 jcode-provider-env = { path = "../jcode-provider-env" }
 jcode-provider-core = { path = "../jcode-provider-core" }
 jcode-provider-bedrock = { path = "../jcode-provider-bedrock" }
+jcode-provider-anthropic = { path = "../jcode-provider-anthropic" }
+jcode-provider-antigravity = { path = "../jcode-provider-antigravity" }
+jcode-provider-copilot = { path = "../jcode-provider-copilot" }
 jcode-provider-openai = { path = "../jcode-provider-openai" }
 jcode-provider-openrouter = { path = "../jcode-provider-openrouter" }
 jcode-provider-gemini = { path = "../jcode-provider-gemini" }
@@ -83,6 +86,7 @@ jcode-provider-gemini = { path = "../jcode-provider-gemini" }
 jcode-render-core = { path = "../jcode-render-core" }
 jcode-terminal-launch = { path = "../jcode-terminal-launch" }
 jcode-terminal-image = { path = "../jcode-terminal-image" }
+jcode-telemetry-core = { path = "../jcode-telemetry-core" }
 jcode-usage-types = { path = "../jcode-usage-types" }
 
 # Streaming
@@ -110,6 +114,7 @@ jcode-protocol = { path = "../jcode-protocol" }
 jcode-selfdev-types = { path = "../jcode-selfdev-types" }
 jcode-session-types = { path = "../jcode-session-types" }
 jcode-storage = { path = "../jcode-storage" }
+jcode-redact = { path = "../jcode-redact" }
 jcode-task-types = { path = "../jcode-task-types" }
 jcode-tool-core = { path = "../jcode-tool-core" }
 jcode-tool-types = { path = "../jcode-tool-types" }
@@ -119,6 +124,7 @@ jcode-side-panel-types = { path = "../jcode-side-panel-types" }
 flate2 = "1"
 tempfile = "3"
 agentgrep = { git = "https://github.com/1jehuang/agentgrep.git", tag = "v0.1.2" }
+casr = { git = "https://github.com/quangdang46/cross_agent_session_resumer", package = "cross_agent_session_resumer", rev = "aaee83d0049e2801aa1ffc5d18f22026bf78b225" }
 qrcode = { version = "0.14.1", default-features = false }
 
 [features]

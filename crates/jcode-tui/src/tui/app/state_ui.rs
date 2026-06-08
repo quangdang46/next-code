@@ -100,6 +100,45 @@ impl App {
         }
     }
 
+    /// Whether the client terminal currently has focus. Used to pause decorative
+    /// animations and periodic idle redraws for backgrounded windows/tabs.
+    pub(crate) fn client_focused(&self) -> bool {
+        self.client_focused
+    }
+
+    /// Record a terminal focus-state change (from crossterm FocusGained/FocusLost).
+    /// Returns true when a redraw is warranted (focus regained, so we repaint at
+    /// full fidelity immediately).
+    pub(super) fn set_client_focused(&mut self, focused: bool) -> bool {
+        if self.client_focused == focused {
+            return false;
+        }
+        self.client_focused = focused;
+        if focused {
+            // Repaint immediately so a newly-focused window is not stuck on the
+            // last paused frame, and resume animation timing from "now".
+            self.request_full_redraw();
+            self.note_client_focus(true);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Whether a redraw is worth performing while the terminal is unfocused.
+    ///
+    /// In a tiling WM an unfocused window can still be visible, so sessions with
+    /// live output (streaming/processing, scroll/scroll-copy animations, an active
+    /// notification, a rate-limit countdown, or a transient remote startup phase)
+    /// keep painting. A purely idle unfocused session skips redraws triggered by
+    /// shared-server bus chatter from other sessions; it repaints fully on refocus.
+    ///
+    /// Reuses `periodic_redraw_required`, which already enumerates the live-activity
+    /// conditions, minus the purely decorative idle donut (gated off when unfocused).
+    pub(crate) fn unfocused_redraw_warranted(&self) -> bool {
+        crate::tui::periodic_redraw_required(self)
+    }
+
     pub fn display_messages(&self) -> &[DisplayMessage] {
         &self.display_messages
     }
@@ -810,7 +849,7 @@ fn grouped_u64(value: u64) -> String {
     let raw = value.to_string();
     let mut grouped = String::with_capacity(raw.len() + raw.len() / 3);
     for (index, ch) in raw.chars().enumerate() {
-        if index > 0 && (raw.len() - index) % 3 == 0 {
+        if index > 0 && (raw.len() - index).is_multiple_of(3) {
             grouped.push(',');
         }
         grouped.push(ch);
@@ -856,7 +895,7 @@ fn human_count(value: u64) -> String {
 }
 
 fn bold_count(value: u64) -> String {
-    format!("{}", human_count(value))
+    human_count(value).to_string()
 }
 
 fn bold_count_usize(value: usize) -> String {
@@ -875,7 +914,7 @@ fn opt_usize(value: Option<usize>) -> String {
 
 fn opt_string(value: Option<&str>) -> String {
     value
-        .map(|value| format!("{}", value))
+        .map(|value| value.to_string())
         .unwrap_or_else(|| "None".to_string())
 }
 

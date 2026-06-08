@@ -820,10 +820,7 @@ async fn handle_remote_key_internal(
                         app.push_display_message(DisplayMessage::system(
                             "Reloading client with newer binary...".to_string(),
                         ));
-                        let session_id = app
-                            .remote_session_id
-                            .clone()
-                            .unwrap_or_else(|| crate::id::new_id("ses"));
+                        let session_id = app.reload_handoff_session_id();
                         app.save_input_for_reload(&session_id);
                         app.reload_requested = Some(session_id);
                         app.should_quit = true;
@@ -835,10 +832,7 @@ async fn handle_remote_key_internal(
                     app.push_display_message(DisplayMessage::system(
                         "Reloading client...".to_string(),
                     ));
-                    let session_id = app
-                        .remote_session_id
-                        .clone()
-                        .unwrap_or_else(|| crate::id::new_id("ses"));
+                    let session_id = app.reload_handoff_session_id();
                     app.save_input_for_reload(&session_id);
                     app.reload_requested = Some(session_id);
                     app.should_quit = true;
@@ -848,6 +842,23 @@ async fn handle_remote_key_internal(
                 if trimmed == "/server-reload" {
                     app.append_reload_message("Reloading server...");
                     remote.reload().await?;
+                    return Ok(());
+                }
+
+                if trimmed == "/continue" || trimmed == "/resumeall" || trimmed == "/resume-all" {
+                    app.push_display_message(DisplayMessage::system(
+                        "Continuing all interrupted sessions...".to_string(),
+                    ));
+                    match remote.resume_all_sessions().await {
+                        Ok(_) => app.set_status_notice("Continuing interrupted sessions..."),
+                        Err(error) => {
+                            app.push_display_message(DisplayMessage::error(format!(
+                                "Failed to continue sessions: {}",
+                                error
+                            )));
+                            app.set_status_notice("Continue all failed");
+                        }
+                    }
                     return Ok(());
                 }
 

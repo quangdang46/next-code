@@ -217,10 +217,16 @@ tool_profile = "acp"
 
 [provider]
 # Default model (optional, uses provider default if not set)
-# Set via /model picker with Ctrl+D to save as default
+# Set via /model picker with Ctrl+B to save as default
 # default_model = "claude-opus-4-6"
-# Default provider (optional: claude|openai|copilot|openrouter)
-# When set, this provider is preferred on startup if available
+# Default provider (optional: claude|anthropic-api|openai|openai-api|copilot|openrouter|...)
+# When set, this provider is preferred on startup if available.
+#   claude        = Claude via OAuth/subscription (token in ~/.jcode/auth.json)
+#   anthropic-api = Claude via direct Anthropic API key (ANTHROPIC_API_KEY env
+#                   or ~/.config/jcode/anthropic.env). API-key mode does NOT fall
+#                   back to OAuth; configure the key first.
+# `claude` and `anthropic-api` are distinct providers with distinct credentials.
+# See docs/AUTH_CREDENTIAL_SOURCES.md for where each credential lives.
 # default_provider = "copilot"
 # OpenAI reasoning effort (none|low|medium|high|xhigh)
 openai_reasoning_effort = "low"
@@ -308,6 +314,13 @@ enabled = false
 port = 7643
 # Bind address (0.0.0.0 for LAN/Tailscale reachability)
 bind_addr = "0.0.0.0"
+
+[power]
+# Prevent the machine from suspending (idle/lid sleep) while any jcode session
+# is actively streaming/processing. The display can still sleep; only system
+# suspend is inhibited, and only for as long as work is in flight. (default: true)
+# Set JCODE_DISABLE_POWER_INHIBIT=1 to force-disable regardless of this setting.
+prevent_sleep_while_streaming = true
 
 [safety]
 # Notification settings for ambient mode events

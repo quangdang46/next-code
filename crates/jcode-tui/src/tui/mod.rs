@@ -19,13 +19,16 @@ use jcode_terminal_image::metadata as image_metadata;
 pub mod info_widget;
 mod info_widget_layout;
 mod info_widget_overview;
+pub mod info_widget_stability;
 mod keybind;
 mod layout_utils;
 pub mod login_picker;
 pub mod markdown;
 mod memory_profile;
 pub mod mermaid;
-pub mod permissions;
+pub mod permissions {
+    pub use jcode_tui_permissions::*;
+}
 mod remote_diff;
 pub mod screenshot;
 pub mod session_picker;
@@ -190,6 +193,12 @@ pub trait TuiState {
     /// Progress of a currently-running batch tool call.
     fn batch_progress(&self) -> Option<crate::bus::BatchProgress>;
     fn time_since_activity(&self) -> Option<Duration>;
+    /// Whether the client terminal currently has focus. Decorative animations and
+    /// periodic idle redraws pause while unfocused so backgrounded windows/tabs do
+    /// not burn CPU. Defaults to true for state impls that do not track focus.
+    fn client_focused(&self) -> bool {
+        true
+    }
     /// Whether the provider/server has ended the visible assistant message while turn cleanup
     /// still finishes in the background.
     fn stream_message_ended(&self) -> bool {
@@ -201,7 +210,7 @@ pub trait TuiState {
     fn session_compaction_count(&self) -> usize {
         0
     }
-    /// Whether running in remote (client-server) mode
+    // Whether running in remote (client-server) mode
 
     // ---- Session / server ----
     fn is_remote_mode(&self) -> bool;
@@ -268,7 +277,7 @@ pub trait TuiState {
     fn server_update_available(&self) -> Option<bool>;
     /// Get info widget data (todos, client count, etc.)
     fn info_widget_data(&self) -> info_widget::InfoWidgetData;
-    /// Whether workspace mode is enabled for this client.
+    // Whether workspace mode is enabled for this client.
 
     // ---- Workspace ----
     fn workspace_mode_enabled(&self) -> bool {
@@ -285,6 +294,23 @@ pub trait TuiState {
     /// Render streaming text using incremental markdown renderer
     /// This is more efficient than re-rendering on every frame
     fn render_streaming_markdown(&self, width: usize) -> Vec<Line<'static>>;
+    /// Sentinel-wrapped dim+italic markup of the reasoning trace that is currently
+    /// *retained* on screen above the live stream in `current` display mode (kept
+    /// until the next trace finishes), or `None` when nothing is retained.
+    fn reasoning_retained_markup(&self) -> Option<&str> {
+        None
+    }
+    /// Markup and shrink progress (0.0 = full height, 1.0 = fully gone) of the
+    /// reasoning trace that is currently animating away, or `None` when no collapse
+    /// animation is running.
+    fn reasoning_collapse_state(&self) -> Option<(&str, f32)> {
+        None
+    }
+    /// Whether a retained or collapsing reasoning trace still needs animation
+    /// frames (drives `periodic_redraw_required` / `redraw_interval`).
+    fn reasoning_animation_active(&self) -> bool {
+        false
+    }
     /// Whether centered mode is enabled
     fn centered_mode(&self) -> bool;
     /// Authentication status for all supported providers
@@ -621,12 +647,10 @@ pub enum OnboardingWelcomeKind {
     /// When `None`, there was nothing to import and the card points the user at
     /// the provider picker.
     Login { import: Option<LoginImportPrompt> },
-    /// Ask whether to share prompt/transcript content with telemetry, with a
-    /// live decision countdown. `yes_highlighted` reflects the current choice.
-    TelemetryConsent {
-        yes_highlighted: bool,
-        seconds_left: u64,
-    },
+    /// Ask the user whether to log in to OpenAI (no detected imports). A
+    /// highlightable Yes/No selector; `yes_highlighted` reflects the current
+    /// choice. Yes starts the OpenAI sign-in, No opens the provider picker.
+    LoginOpenAi { yes_highlighted: bool },
     /// "Continue where you left off in <cli>?" with a highlightable Yes/No
     /// selector and a live decision countdown (seconds remaining).
     ContinuePrompt {
@@ -1160,6 +1184,13 @@ fn idle_donut_active_with_policy(
         return false;
     }
 
+    // Decorative animations are purely visual; never spin them while the terminal
+    // window/tab is backgrounded. A swarm of unfocused sessions would otherwise
+    // each render a full-screen 3D scene at animation FPS, saturating every core.
+    if !state.client_focused() {
+        return false;
+    }
+
     // The onboarding welcome screen draws the same live donut, but it also
     // shows a welcome/login card so `display_messages()` is not empty.  Keep the
     // animation loop running smoothly while that screen is up (even past the
@@ -1260,6 +1291,33 @@ pub(crate) fn redraw_interval_with_policy(
     let animation_interval = fps_to_duration(policy.animation_fps);
     let fast_interval = fps_to_duration(policy.redraw_fps);
 
+    // A retained/collapsing reasoning trace shrinks away even when the turn is no
+    // longer processing, so it needs a smooth animation cadence and must skip the
+    // deep-idle short-circuits below.
+    if state.reasoning_animation_active() {
+        return match policy.tier {
+            crate::perf::PerformanceTier::Minimal => fast_interval,
+            _ => animation_interval,
+        };
+    }
+
+    // While the terminal is backgrounded (FocusLost), an idle session has nothing
+    // worth a fast tick: decorative animations are paused and the run loop only
+    // repaints throttled idle frames. Use the slow deep-idle interval so the
+    // event loop sleeps instead of spinning on shared-server bus chatter. Sessions
+    // with live output keep a responsive cadence below.
+    if !state.client_focused()
+        && !state.is_processing()
+        && state.streaming_text().is_empty()
+        && !state.has_pending_mouse_scroll_animation()
+        && !state.copy_selection_edge_autoscroll_active()
+        && !state.remote_startup_phase_active()
+        && !rate_limit_countdown_redraw_active(state)
+        && crate::build::read_build_progress().is_none()
+    {
+        return REDRAW_DEEP_IDLE;
+    }
+
     let deep_idle = state
         .time_since_activity()
         .map(|d| d >= REDRAW_DEEP_IDLE_AFTER)
@@ -1347,6 +1405,7 @@ pub(crate) fn periodic_redraw_required(state: &dyn TuiState) -> bool {
     if deep_idle
         && !state.is_processing()
         && state.streaming_text().is_empty()
+        && !state.reasoning_animation_active()
         && !state.has_pending_mouse_scroll_animation()
         && !state.copy_selection_edge_autoscroll_active()
         && !state.remote_startup_phase_active()
@@ -1367,6 +1426,7 @@ pub(crate) fn periodic_redraw_required(state: &dyn TuiState) -> bool {
 
     if state.is_processing()
         || !state.streaming_text().is_empty()
+        || state.reasoning_animation_active()
         || state.status_notice().is_some()
         || state.has_pending_mouse_scroll_animation()
         || state.copy_selection_edge_autoscroll_active()

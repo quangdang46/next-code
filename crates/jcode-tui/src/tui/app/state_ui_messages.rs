@@ -46,7 +46,11 @@ fn stored_message_visible_text(message: &crate::session::StoredMessage) -> Strin
             }
             ContentBlock::ToolResult { content, .. } => {
                 if !content.trim().is_empty() {
-                    parts.push(content.trim().to_string());
+                    // Tool results are external/untrusted output (command output,
+                    // file contents, API responses) — the most likely place for a
+                    // leaked secret to surface. Scrub before display. User and
+                    // assistant text are intentionally left untouched.
+                    parts.push(jcode_redact::redact_secrets(content.trim()));
                 }
             }
             ContentBlock::Image { media_type, .. } => {
@@ -344,6 +348,7 @@ impl App {
         // The transcript is about to be discarded; forget where the live reasoning
         // block started so a stale offset can't slice the new stream.
         self.reasoning_block_start = None;
+        self.clear_retained_reasoning();
         if !self.display_messages.is_empty() {
             self.display_messages.clear();
             self.bump_display_messages_version();

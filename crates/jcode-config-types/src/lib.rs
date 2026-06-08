@@ -791,6 +791,44 @@ impl Default for WebSearchConfig {
     }
 }
 
+/// Error classification and retry settings.
+///
+/// Controls how jcode classifies provider errors (retryable vs non-retryable
+/// vs STOP) and how it backs off / fail-overs after a failure.
+/// All fields have sensible defaults; most users never need to touch these.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ErrorClassificationConfig {
+    /// Maximum retry attempts across the fallback chain. 0 = never retry.
+    /// Default: 3.
+    pub max_retry_attempts: u32,
+    /// Base delay in milliseconds for exponential backoff.
+    /// The actual delay is `max_retry_attempts * attempt` (capped).
+    /// Default: 2000 (i.e. 2s → 4s → 6s for attempts 1, 2, 3).
+    pub retry_base_delay_ms: u32,
+    /// Maximum delay in milliseconds for any single backoff.
+    /// Default: 60_000 (60 seconds).
+    pub retry_max_delay_ms: u32,
+    /// Seconds to cooldown a provider after a retryable failure before trying
+    /// it again. Default: 60.
+    pub fallback_cooldown_secs: u32,
+    /// Override set of HTTP status codes to treat as retryable, in addition to
+    /// the built-in set (429, 5xx, 529). Default: `None` (use built-in set).
+    pub retry_on_status: Option<Vec<u16>>,
+}
+
+impl Default for ErrorClassificationConfig {
+    fn default() -> Self {
+        Self {
+            max_retry_attempts: 3,
+            retry_base_delay_ms: 2000,
+            retry_max_delay_ms: 60_000,
+            fallback_cooldown_secs: 60,
+            retry_on_status: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProviderConfig {
@@ -825,6 +863,10 @@ pub struct ProviderConfig {
     /// that think silently for minutes before emitting tokens. Default: 180.
     /// Overridable per-launch via `JCODE_STREAM_IDLE_TIMEOUT_SECS`.
     pub stream_idle_timeout_secs: u64,
+    /// Error classification and retry configuration.
+    /// Default: sensible values for most providers.
+    #[serde(default)]
+    pub error_classification: ErrorClassificationConfig,
 }
 
 impl Default for ProviderConfig {
@@ -843,6 +885,7 @@ impl Default for ProviderConfig {
             same_provider_account_failover: true,
             copilot_premium: None,
             stream_idle_timeout_secs: 180,
+            error_classification: ErrorClassificationConfig::default(),
         }
     }
 }
@@ -1014,6 +1057,27 @@ impl Default for GatewayConfig {
             enabled: false,
             port: 7643,
             bind_addr: "0.0.0.0".to_string(),
+        }
+    }
+}
+
+/// Power-management configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PowerConfig {
+    /// Prevent the machine from going to sleep (idle/lid suspend) while any
+    /// jcode session is actively streaming/processing. The display is still
+    /// allowed to sleep; only system suspend is inhibited. Default: true.
+    ///
+    /// Honored by the shared `jcode serve` daemon. The `JCODE_DISABLE_POWER_INHIBIT`
+    /// environment variable forces this off regardless of the config value.
+    pub prevent_sleep_while_streaming: bool,
+}
+
+impl Default for PowerConfig {
+    fn default() -> Self {
+        Self {
+            prevent_sleep_while_streaming: true,
         }
     }
 }

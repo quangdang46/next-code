@@ -9,7 +9,10 @@ use std::time::Duration;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const CURSOR_API_BASE: &str = "https://api2.cursor.sh";
-const CURSOR_DIRECT_CLIENT_VERSION_DEFAULT: &str = "2.4.0";
+// Cursor's server rejects stale client versions for chat ("Update Required").
+// Keep this at a version Cursor currently accepts; override at runtime with
+// `JCODE_CURSOR_CLIENT_VERSION` if Cursor moves the floor again.
+const CURSOR_DIRECT_CLIENT_VERSION_DEFAULT: &str = "2.5.0";
 const CURSOR_OAUTH_CLIENT_ID: &str = "KbZUR41cY7W6zRSdpSUJ7I7mLYBKOCmB";
 const CURSOR_EXTERNAL_COMMAND_TIMEOUT: Duration = Duration::from_secs(3);
 pub const CURSOR_AUTH_FILE_SOURCE_ID: &str = "cursor_auth_json";
@@ -364,6 +367,7 @@ pub fn cursor_auth_file_path() -> Result<PathBuf> {
     }
 
     #[cfg(target_os = "macos")]
+    #[allow(clippy::needless_return)]
     {
         return crate::storage::user_home_path(".cursor/auth.json")
             .context("No home directory found for Cursor auth.json");

@@ -130,6 +130,19 @@ struct PendingLocalTransfer {
     receiver: mpsc::Receiver<anyhow::Result<PreparedTransferSession>>,
 }
 
+/// A reasoning trace that is animating out of view in `current` display mode. Its
+/// rendered height shrinks from full to zero over [`REASONING_COLLAPSE_DURATION`],
+/// after which it is dropped entirely. `markup` is the sentinel-wrapped dim+italic
+/// block exactly as it last rendered live.
+#[derive(Debug, Clone)]
+struct ReasoningCollapse {
+    markup: String,
+    started: Instant,
+}
+
+/// Duration of the reasoning-trace shrink-away animation (`current` mode).
+pub(crate) const REASONING_COLLAPSE_DURATION: Duration = Duration::from_millis(220);
+
 #[derive(Debug, Clone)]
 struct LocalRewindUndoSnapshot {
     messages: Vec<StoredMessage>,
@@ -498,6 +511,8 @@ pub(super) enum MouseScrollTarget {
     HelpOverlay,
     ChangelogOverlay,
     ModelStatusOverlay,
+    /// The right-hand preview pane of the /resume session picker overlay.
+    SessionPickerPreview,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -761,6 +776,17 @@ pub struct App {
     // closed reasoning block back out of the stream in place, keeping any answer
     // text that preceded it in order.
     reasoning_block_start: Option<usize>,
+    // `current` reasoning-display mode keeps the *most recently closed* reasoning
+    // trace on screen (sliced out of the live stream but rendered as its own dim
+    // section just above the stream) until the next trace finishes. Holds the
+    // sentinel-wrapped dim+italic markup of that retained block, or `None` when
+    // nothing is retained.
+    reasoning_retained: Option<String>,
+    // A previously-retained reasoning trace that is now animating away: it shrinks
+    // vertically (its visible height interpolates from full down to zero) and is
+    // dropped once the animation completes. Holds the block markup plus the
+    // animation start instant.
+    reasoning_collapse: Option<ReasoningCollapse>,
     // Hot-reload: if set, exec into new binary with this session ID (no rebuild)
     reload_requested: Option<String>,
     // Hot-rebuild: if set, do full git pull + cargo build + tests then exec
@@ -821,6 +847,13 @@ pub struct App {
     remote_client_instance_id: String,
     remote_provider_name: Option<String>,
     remote_provider_model: Option<String>,
+    /// Monotonic counter bumped each time the server pushes a fresh remote model
+    /// catalog snapshot (`AvailableModelsUpdated`). The onboarding readiness
+    /// validation uses this to wait for the post-login catalog refresh to land
+    /// before capturing the model label, so it reports the freshly-selected
+    /// model (e.g. gpt-5.5 after an OpenAI login) instead of the stale pre-login
+    /// default.
+    remote_model_catalog_generation: u64,
     /// Server-resolved billing credential reported by a remote server: OAuth
     /// (subscription) vs API key (cost-based), or `None` when the active
     /// provider has no OAuth-vs-API-key distinction. Lets the info widget choose
@@ -851,6 +884,13 @@ pub struct App {
     remote_server_has_update: Option<bool>,
     // Auto-reload server when stale (set on first connect if server_has_update)
     pending_server_reload: bool,
+    // Real session id captured from a History event whose payload we deferred
+    // because of a server/runtime version mismatch. The deferral returns before
+    // `remote_session_id` is assigned, so without stashing the id here the
+    // subsequent client reload handoff has no session to resume and would
+    // fabricate a bogus `ses_<ts>_<rand>` id, producing
+    // "No session found matching ..." on the next launch (issue #328).
+    pending_reload_session_id: Option<String>,
     // Defense-in-depth circuit breaker for issue #277: count how many times this
     // client has auto-reloaded the server. A healthy reload happens at most once
     // (afterwards the server is up to date), so repeated auto-reloads indicate a
@@ -1114,6 +1154,12 @@ pub struct App {
     command_suggestion_selected: usize,
     // Time when app started (for startup animations)
     app_started: Instant,
+    // Whether the client terminal currently has focus. When the terminal window
+    // or tab is backgrounded (FocusLost), decorative animations and periodic
+    // idle redraws are paused so a swarm of background sessions does not burn
+    // CPU animating screens nobody is looking at. Defaults to true because not
+    // every terminal reports focus events.
+    client_focused: bool,
     // Optional client runtime memory logger for low-overhead attribution journaling.
     runtime_memory_log: Option<RuntimeMemoryLogController>,
     // Binary modification time when client started (for smart reload detection)

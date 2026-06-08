@@ -22,6 +22,7 @@ pub mod background;
 pub mod browser;
 pub mod bus;
 pub mod cache_tracker;
+pub mod casr_adapter;
 pub mod client_input;
 pub mod compaction;
 pub mod config;
@@ -50,6 +51,7 @@ pub mod memory_types;
 pub mod message;
 pub mod plan;
 pub mod platform;
+pub mod power_inhibit;
 pub mod process_memory;
 pub mod process_title;
 pub mod prompt;
@@ -71,7 +73,9 @@ pub mod stdin_detect;
 pub mod storage;
 pub mod subscription_catalog;
 pub mod telegram;
-pub mod telemetry;
+pub mod telemetry {
+    pub use jcode_telemetry_core::*;
+}
 pub mod terminal_launch;
 pub mod todo;
 pub mod transport;

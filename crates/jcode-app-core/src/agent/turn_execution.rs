@@ -33,7 +33,7 @@ impl Agent {
         self.run_turn(false).await
     }
 
-    /// Run one conversation turn with streaming events via mpsc channel (per-client)    /// Run one conversation turn with streaming events via mpsc channel (per-client)
+    /// Run one conversation turn with streaming events via mpsc channel (per-client)
     pub async fn run_once_streaming_mpsc(
         &mut self,
         user_message: &str,

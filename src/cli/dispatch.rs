@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use super::args::{
     AmbientCommand, Args, AuthCommand, CloudCommand, CloudSessionsCommand, Command, MemoryCommand,
-    ModelCommand, ProviderCommand, RestartCommand, ServerCommand, SessionCommand,
+    ModelCommand, ProviderCommand, RestartCommand, SecretsCommand, ServerCommand, SessionCommand,
     TranscriptModeArg,
 };
 use crate::{
@@ -254,6 +254,23 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
                 json,
             } => commands::run_session_rename_command(&session, name.as_deref(), clear, json)?,
         },
+        Some(Command::Secrets(subcmd)) => match subcmd {
+            SecretsCommand::Set {
+                name,
+                value,
+                env,
+                json,
+            } => super::secrets_cmd::run_set(&name, value.as_deref(), env, json)?,
+            SecretsCommand::Get { name, env, json } => {
+                super::secrets_cmd::run_get(&name, env, json)?
+            }
+            SecretsCommand::Delete { name, env, json } => {
+                super::secrets_cmd::run_delete(&name, env, json)?
+            }
+            SecretsCommand::List { env, json } => super::secrets_cmd::run_list(env, json)?,
+            SecretsCommand::Init { json } => super::secrets_cmd::run_init(json)?,
+            SecretsCommand::Purge { yes, json } => super::secrets_cmd::run_purge(yes, json)?,
+        },
         Some(Command::Ambient(subcmd)) => {
             commands::run_ambient_command(map_ambient_subcommand(subcmd)).await?;
         }
@@ -418,6 +435,31 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
                 .await?;
             }
         }
+        Some(Command::Doctor {
+            json,
+            fix,
+            yes,
+            only,
+        }) => {
+            let only = only
+                .iter()
+                .filter_map(|s| crate::doctor::CheckCategory::parse(s))
+                .collect::<Vec<_>>();
+            let cwd = match args.cwd.clone() {
+                Some(c) => std::path::PathBuf::from(c),
+                None => std::env::current_dir()?,
+            };
+            let code = crate::doctor::run(crate::doctor::DoctorOptions {
+                cwd,
+                fix,
+                assume_yes: yes,
+                only,
+                json,
+            })?;
+            if code != 0 {
+                std::process::exit(code);
+            }
+        }
         Some(Command::Restart { action }) => match action {
             RestartCommand::Save { auto_restore } => {
                 commands::run_restart_save_command(auto_restore).await?
@@ -451,21 +493,69 @@ fn resolve_resume_arg(args: &mut Args) -> Result<()> {
             return tui_launch::list_sessions();
         }
 
-        match resolve_resume_id(resume_id) {
+        let resume_id = resume_id.clone();
+        match resolve_resume_id(&resume_id) {
             Ok(full_id) => {
                 args.resume = Some(full_id);
             }
             Err(e) => {
-                eprintln!("Error: {}", e);
-                if !output::quiet_enabled() {
-                    eprintln!("\nUse `jcode --resume` to list available sessions.");
+                match resume_resolution_failure_action(&resume_id, |key| std::env::var_os(key)) {
+                    // During a reload/update/restart handoff the client re-execs
+                    // itself with `--resume <id>` and `JCODE_RESUMING=1`. In the
+                    // client/server architecture the shared server is the authority
+                    // for session lifecycle, so an id that is not in the local store
+                    // can still be valid server-side. Hard-exiting here dumped the
+                    // user back to a shell with "No session found matching ...",
+                    // making jcode unusable after an auto-update (issue #328).
+                    // Instead, keep the raw id and let the remote connection resolve
+                    // it; if the server cannot find it either, the TUI surfaces a
+                    // recoverable message and falls back to a fresh session rather
+                    // than killing the process.
+                    ResumeResolutionFailureAction::DeferToServer => {
+                        crate::logging::warn(&format!(
+                            "Resume id '{}' not found locally during reload handoff ({}); deferring resolution to the server instead of exiting",
+                            resume_id, e
+                        ));
+                        // Leave args.resume as the raw id for the server to resolve.
+                    }
+                    ResumeResolutionFailureAction::Exit => {
+                        eprintln!("Error: {}", e);
+                        if !output::quiet_enabled() {
+                            eprintln!("\nUse `jcode --resume` to list available sessions.");
+                        }
+                        std::process::exit(1);
+                    }
                 }
-                std::process::exit(1);
             }
         }
     }
 
     Ok(())
+}
+
+/// What to do when a `--resume <id>` cannot be resolved from the local session
+/// store. Extracted as a pure function so the reload-handoff recovery path can
+/// be unit-tested without invoking `std::process::exit` (issue #328).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResumeResolutionFailureAction {
+    /// Keep the raw id and let the shared server resolve it (reload handoff).
+    DeferToServer,
+    /// No live handoff in progress; the id is genuinely bad, so exit.
+    Exit,
+}
+
+fn resume_resolution_failure_action<F, V>(
+    _resume_id: &str,
+    var_os: F,
+) -> ResumeResolutionFailureAction
+where
+    F: Fn(&str) -> Option<V>,
+{
+    if var_os("JCODE_RESUMING").is_some() {
+        ResumeResolutionFailureAction::DeferToServer
+    } else {
+        ResumeResolutionFailureAction::Exit
+    }
 }
 
 fn resolve_resume_id(resume_id: &str) -> Result<String> {

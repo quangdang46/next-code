@@ -682,6 +682,139 @@ Notes:
 
 ---
 
+## Architecture
+
+jcode is a Rust workspace of 68 crates. The layer stack and upstream repo integrations:
+
+```mermaid
+graph BT
+    subgraph support["60+ Support Crates"]
+        direction LR
+        SC1["Protocol Adapters"]
+        SC2["Provider Backends"]
+        SC3["Platform Support"]
+        SC4["Utilities"]
+    end
+
+    subgraph base["jcode-base"]
+        direction TB
+        B1["Provider · Auth · Config"]
+        B2["Session · Message · Memory"]
+        B3["Telemetry · MCP · Sidecar"]
+        B4["Embeddings · PDF · Browser"]
+    end
+
+    subgraph core["jcode-app-core"]
+        A1["Agent · Server · Tools"]
+        A2["Missions · Hooks · Channels"]
+    end
+
+    subgraph tui["jcode-tui"]
+        T["Full-screen TUI · Rendering\nInput Handling"]
+    end
+
+    subgraph bin["jcode (binary)"]
+        J["Entrypoint · Self-build Tools\nRe-exports jcode-app-core + jcode-base"]
+    end
+
+    SC1 --> B1
+    SC2 --> B3
+    SC3 --> B4
+    SC4 --> B2
+    B1 --> A1
+    B2 --> A1
+    B3 --> A2
+    B4 --> A2
+    A1 --> T
+    A2 --> T
+    T --> J
+```
+
+```mermaid
+graph TD
+    %% ─── Legend (styling only, disconnected nodes) ───
+    LEG_E["■■ External Repo"]:::external
+    LEG_A["■■ Adapter / Bridge File"]:::adapter
+    LEG_C["■■ jcode Crate"]:::crate
+    LEG_F["■■ Fork-Modified (conflict-prone)"]:::fork
+    LEG_X["■■ Feature-Gated Dep"]:::feature
+
+    %% ─── External Repositories ───
+    C1["casr<br/>cross_agent_session_resumer<br/><small>pinned rev</small>"]:::external
+    C2["ffs-search + ffs-engine<br/>fast_file_search<br/><small>pinned rev</small>"]:::external
+    C3["dcg-core<br/>destructive_command_guard<br/><small>branch=main</small>"]:::external
+    C4["hashline<br/>SHA-256 anchored hashing<br/><small>pinned rev</small>"]:::external
+    C5["mempalace_rust<br/>memory palace<br/><small>branch=main, feature-gated</small>"]:::feature
+    C6["dynamic_context_pruning<br/>context window optimization<br/><small>branch=main, feature-gated</small>"]:::feature
+    C7["rtco-core<br/>rust_token_cost_optimizer<br/><small>branch=main, feature-gated</small>"]:::feature
+
+    %% ─── Adapter / Bridge Files ───
+    A1["casr_adapter.rs (748 lines)<br/><small>crates/jcode-base/src/</small>"]:::adapter
+    A2["import.rs (1002 lines)<br/><small>crates/jcode-base/src/</small>"]:::adapter
+    A3["at_picker.rs<br/><small>crates/jcode-tui/tui/app/</small>"]:::adapter
+    A4["dcg_bridge.rs (740 lines)<br/><small>crates/jcode-app-core/src/</small>"]:::adapter
+    A5["hashline_edit.rs<br/><small>crates/jcode-app-core/tool/</small>"]:::adapter
+    A6["jcode-mempalace-adapter/<br/><small>entire adapter crate</small>"]:::adapter
+    A7["dcp_bridge.rs (197 lines)<br/><small>crates/jcode-app-core/src/</small>"]:::adapter
+    A8["rtco_filter.rs<br/><small>crates/jcode-app-core/src/</small>"]:::adapter
+
+    %% ─── Fork-Modified Files (common conflict sources during sync) ───
+    F1["+ForeignSession variant<br/><small>jcode-session-types/src/lib.rs</small>"]:::fork
+    F2["+ForeignSession match arms<br/><small>session_picker/*.rs</small>"]:::fork
+    F3["Session picker + casr wiring<br/><small>inline_interactive.rs</small>"]:::fork
+    F4["Terminal launch + casr<br/><small>src/cli/tui_launch.rs</small>"]:::fork
+    F5["DCG classifier integration<br/><small>yolo_classifier.rs</small>"]:::fork
+
+    %% ─── jcode Crate Stack ───
+    J1["jcode (binary)"]:::crate
+    J2["jcode-tui"]:::crate
+    J3["jcode-app-core"]:::crate
+    J4["jcode-base"]:::crate
+    J5["60+ Support Crates"]:::crate
+
+    %% ─── Edges: External Repo → Adapter ───
+    C1 --> A1
+    C1 --> A2
+    C2 --> A3
+    C3 --> A4
+    C4 --> A5
+    C5 --> A6
+    C6 --> A7
+    C7 --> A8
+
+    %% ─── Edges: Adapter → Host Crate ───
+    A1 --> J4
+    A2 --> J4
+    A3 --> J2
+    A4 --> J3
+    A5 --> J3
+    A6 --> J1
+    A7 --> J3
+    A8 --> J3
+
+    %% ─── Edges: Fork File → Host Crate ───
+    F1 --> J4
+    F2 --> J2
+    F3 --> J2
+    F4 --> J1
+    F5 --> J3
+
+    %% ─── Internal Crate Dependencies ───
+    J5 --> J4 --> J3 --> J2 --> J1
+
+    classDef external fill:#1e3a5f,stroke:#3b82f6,color:#e2e8f0
+    classDef adapter fill:#064e3b,stroke:#10b981,color:#e2e8f0
+    classDef crate fill:#3b0764,stroke:#a855f7,color:#e2e8f0
+    classDef fork fill:#7f1d1d,stroke:#ef4444,color:#e2e8f0
+    classDef feature fill:#78350f,stroke:#f59e0b,color:#e2e8f0
+```
+
+Every upstream repo is consumed cleanly as a library dependency (no manual
+re-implementations). Feature flags control optional integrations (dcp, rtco,
+mempalace) so the base build stays lean.
+
+---
+
 ## Further Reading
 
 - [Ambient Mode / OpenClaw](docs/AMBIENT_MODE.md)
