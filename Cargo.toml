@@ -88,6 +88,7 @@ members = [
     "crates/jcode-plugin-runtime",
     "crates/jcode-render-core",
     "evals/jbench",
+    "evals/jcode-edit-bench",
 
 ]
 
