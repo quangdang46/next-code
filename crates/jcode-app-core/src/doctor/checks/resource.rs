@@ -11,25 +11,31 @@ pub fn check_resource(out: &mut Vec<Finding>) {
     };
 
     #[cfg(unix)]
-    if let Some(free_mb) = free_disk_mb(&home) {
-        let f = if free_mb < 50 {
-            Finding::fail(
-                CheckCategory::Resource,
-                format!("low disk: {free_mb} MB free for {}", home.display()),
-            )
-            .with_remediation("free up disk space before running jcode")
-        } else if free_mb < 500 {
-            Finding::warn(
-                CheckCategory::Resource,
-                format!("disk getting low: {free_mb} MB free for {}", home.display()),
-            )
-        } else {
-            Finding::ok(
-                CheckCategory::Resource,
-                format!("{free_mb} MB free for {}", home.display()),
-            )
-        };
-        out.push(f);
+    match free_disk_mb(&home) {
+        Some(free_mb) => {
+            let f = if free_mb < 50 {
+                Finding::fail(
+                    CheckCategory::Resource,
+                    format!("low disk: {free_mb} MB free for {}", home.display()),
+                )
+                .with_remediation("free up disk space before running jcode")
+            } else if free_mb < 500 {
+                Finding::warn(
+                    CheckCategory::Resource,
+                    format!("disk getting low: {free_mb} MB free for {}", home.display()),
+                )
+            } else {
+                Finding::ok(
+                    CheckCategory::Resource,
+                    format!("{free_mb} MB free for {}", home.display()),
+                )
+            };
+            out.push(f);
+        }
+        None => out.push(Finding::warn(
+            CheckCategory::Resource,
+            format!("could not check free disk space for {}", home.display()),
+        )),
     }
 
     let sessions = home.join("sessions");

@@ -36,15 +36,31 @@ fn git_status_porcelain(cwd: &std::path::Path) -> Option<usize> {
 
     let cwd = cwd.to_path_buf();
     let (tx, rx) = mpsc::channel();
+    // Clone the sender so we can drop the original before recv_timeout (if the
+    // spawned thread panics, the clone is dropped during unwind and the channel
+    // errors immediately instead of hanging for the full timeout).
+    let tx2 = tx.clone();
     std::thread::spawn(move || {
         let result = std::process::Command::new("git")
-            .args(["-c", "core.fsmonitor="])
+            .args([
+                "-c",
+                "core.fsmonitor=",
+                "-c",
+                "core.hooksPath=/dev/null",
+                "-c",
+                "filter.lfs.smudge=",
+                "-c",
+                "protocol.version=2",
+                "-c",
+                "core.optionalLocks=true",
+            ])
             .arg("-C")
             .arg(&cwd)
             .args(["status", "--porcelain"])
             .output();
         let _ = tx.send(result);
     });
+    drop(tx2);
     let output = rx.recv_timeout(Duration::from_secs(5)).ok()?.ok()?;
     if !output.status.success() {
         return None;

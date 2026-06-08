@@ -78,8 +78,17 @@ pub fn check_sessions(opts: &DoctorOptions, out: &mut Vec<Finding>) {
             ),
         )
         .with_remediation("run `jcode doctor --fix` to remove them");
-        if opts.fix {
-            // Removing interrupted-write leftovers is safe (they are garbage).
+        if opts.fix
+            && (opts.assume_yes || {
+                // Interactive temp removal requires tty confirmation
+                // (same discipline as quarantine in fix.rs).
+                let prompt = format!(
+                    "Remove {} orphan temp file(s) (safe garbage)? [y/N] ",
+                    orphan_tmp.len()
+                );
+                super::super::fix::confirm(&prompt)
+            })
+        {
             let mut removed = 0usize;
             let mut errors: Vec<String> = Vec::new();
             for p in &orphan_tmp {

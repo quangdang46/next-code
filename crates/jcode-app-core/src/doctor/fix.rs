@@ -49,29 +49,23 @@ pub fn quarantine(
     Ok(Some(backup))
 }
 
-/// Build a `<path>.bak-<ts>[-<n>]` path that does not already exist (so two
-/// repairs in the same second cannot clobber each other's backup).
+/// Build a `<path>.bak-<ts>-<ns>` path that effectively never collides
+/// (TOCTOU-safe: nanosecond-granularity timestamp avoids the stat-then-rename
+/// race of the old counter-based approach).
 fn unique_backup_path(path: &Path) -> PathBuf {
     let ts = chrono::Utc::now().timestamp();
-    let mut n = 0u32;
-    loop {
-        let mut name = path.as_os_str().to_owned();
-        if n == 0 {
-            name.push(format!(".bak-{ts}"));
-        } else {
-            name.push(format!(".bak-{ts}-{n}"));
-        }
-        let candidate = PathBuf::from(name);
-        if !candidate.exists() {
-            return candidate;
-        }
-        n += 1;
-    }
+    let ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos())
+        .unwrap_or(0);
+    let mut name = path.as_os_str().to_owned();
+    name.push(format!(".bak-{ts}-{ns:09}"));
+    PathBuf::from(name)
 }
 
 /// Prompt on stderr (so it never corrupts stdout / `--json`). Returns false
 /// when stdin or stderr is not a tty (non-interactive / CI without `--yes`).
-fn confirm(prompt: &str) -> bool {
+pub(crate) fn confirm(prompt: &str) -> bool {
     if !std::io::stdin().is_terminal() || !std::io::stderr().is_terminal() {
         return false;
     }
@@ -89,6 +83,12 @@ fn confirm(prompt: &str) -> bool {
 pub fn chmod(path: &Path, mode: u32) -> anyhow::Result<()> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))?;
+    Ok(())
+}
+
+/// Set file permissions (non-unix: no-op, filesystem ACLs handle this).
+#[cfg(not(unix))]
+pub fn chmod(_path: &Path, _mode: u32) -> anyhow::Result<()> {
     Ok(())
 }
 

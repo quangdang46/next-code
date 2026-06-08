@@ -59,6 +59,8 @@ pub fn check_storage(opts: &DoctorOptions, out: &mut Vec<Finding>) {
 fn probe_writable(dir: &Path) -> std::io::Result<()> {
     let probe = dir.join(".doctor-probe");
     std::fs::write(&probe, b"ok")?;
-    std::fs::remove_file(&probe)?;
+    // Ignore remove failure: the write already proved we can create files, and
+    // a transient NFS/permission issue on cleanup should not fail the check.
+    let _ = std::fs::remove_file(&probe);
     Ok(())
 }

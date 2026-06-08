@@ -33,6 +33,13 @@ const PROVIDERS: &[(&str, &str, &[&str])] = &[
     ("groq", "", &["GROQ_API_KEY"]),
     ("xai", "", &["XAI_API_KEY"]),
     ("zai", "", &["ZHIPU_API_KEY", "ZAI_API_KEY"]),
+    ("cohere", "", &["COHERE_API_KEY"]),
+    ("fireworks", "", &["FIREWORKS_API_KEY"]),
+    ("minimax", "", &["MINIMAX_API_KEY"]),
+    ("mistral", "", &["MISTRAL_API_KEY"]),
+    ("openai-compatible", "", &["OPENAI_COMPAT_API_KEY"]),
+    ("perplexity", "", &["PERPLEXITY_API_KEY"]),
+    ("togetherai", "", &["TOGETHER_API_KEY"]),
 ];
 
 pub fn check_auth(opts: &DoctorOptions, out: &mut Vec<Finding>) {
