@@ -220,7 +220,7 @@ pub fn shutdown_team(run_id: &str) -> TeamResult<()> {
         .map(|m| m.name.clone())
         .unwrap_or_else(|| "lead".to_string());
     let active: Vec<String> = run.members.iter().map(|m| m.name.clone()).collect();
-    let ctx = mailbox::SendContext::lead(&active);
+    let ctx = mailbox::SendContext::lead(&active, &run.capability_token);
     for m in &run.members {
         if m.name == lead {
             continue;

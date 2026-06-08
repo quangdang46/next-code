@@ -57,6 +57,7 @@ pub fn create_runtime(
         members,
         shutdown_requests: Vec::new(),
         bounds: RuntimeBounds::default(),
+        capability_token: uuid::Uuid::new_v4().simple().to_string(),
     };
     fs::create_dir_all(runtime_dir(&run_id))?;
     persist(&state)?;
@@ -64,12 +65,25 @@ pub fn create_runtime(
 }
 
 /// Load the runtime state for a run, or `NotFound` if its file is absent.
+///
+/// Validates the on-disk `version` field. A `state.json` written by an older
+/// or newer schema (`version != 1`) is rejected with a clear error so callers
+/// can run a migrator instead of silently deserializing with default-valued
+/// missing fields (which would look loaded but be silently corrupt).
 pub fn load_runtime(run_id: &str) -> TeamResult<TeamRuntimeState> {
     let path = runtime_state_path(run_id);
     if !path.exists() {
         return Err(TeamError::NotFound(run_id.to_string()));
     }
-    read_json(&path)
+    let state: TeamRuntimeState = read_json(&path)?;
+    if state.version != 1 {
+        return Err(TeamError::UnsupportedSchemaVersion {
+            run_id: run_id.to_string(),
+            found: state.version,
+            expected: 1,
+        });
+    }
+    Ok(state)
 }
 
 fn persist(state: &TeamRuntimeState) -> TeamResult<()> {

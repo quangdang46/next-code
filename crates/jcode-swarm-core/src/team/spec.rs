@@ -226,6 +226,16 @@ pub struct TeamRuntimeState {
     #[serde(default)]
     pub shutdown_requests: Vec<ShutdownRequest>,
     pub bounds: RuntimeBounds,
+    /// Per-run shared secret. Required to be presented on every mailbox
+    /// API call (send/list/ack) to prevent cross-team access by local
+    /// processes that happen to know the run_id UUID. Generated at create
+    /// time, persisted in `state.json` with `0o600` file mode.
+    #[serde(default = "random_capability_token")]
+    pub capability_token: String,
+}
+
+fn random_capability_token() -> String {
+    uuid::Uuid::new_v4().simple().to_string()
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -398,6 +408,16 @@ pub enum TeamError {
     Task(String),
     #[error("lock timeout acquiring {0}")]
     LockTimeout(String),
+    #[error("schema version {found} for run '{run_id}' is not supported (expected {expected}); a migration is required")]
+    UnsupportedSchemaVersion {
+        run_id: String,
+        found: u8,
+        expected: u8,
+    },
+    #[error("mailbox auth failed: capability token does not match run '{0}'")]
+    MailboxAuthFailed(String),
+    #[error("invalid member name '{0}': {1}")]
+    InvalidMemberName(String, String),
     #[error("tmux error: {0}")]
     Tmux(String),
     #[error(transparent)]

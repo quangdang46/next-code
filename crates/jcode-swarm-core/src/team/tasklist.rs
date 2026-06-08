@@ -26,7 +26,7 @@ pub fn create_task(run_id: &str, input: NewTask) -> TeamResult<TeamTask> {
     let lock = dir.join(".lock");
     with_lock(&lock, &format!("create-task:{run_id}"), || {
         let wm_path = dir.join(".highwatermark");
-        let next = read_high_watermark(&wm_path) + 1;
+        let next = read_high_watermark(&wm_path)? + 1;
         atomic_write(&wm_path, &next.to_string())?;
         let now = now_millis();
         let task = TeamTask {
@@ -51,12 +51,32 @@ pub fn create_task(run_id: &str, input: NewTask) -> TeamResult<TeamTask> {
     })
 }
 
-fn read_high_watermark(path: &Path) -> u64 {
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|s| s.trim().parse::<u64>().ok())
-        .filter(|n| *n < u64::MAX)
-        .unwrap_or(0)
+/// Read the high-watermark counter, distinguishing "missing" from "corrupt".
+///
+/// Missing → returns 0 (caller writes "1" on first task).
+/// Corrupt (truncated, non-numeric, missing) → returns `Task` error so the
+/// caller does NOT silently reuse task id 1 when `1.json` already exists.
+/// The reference port's silent fallback to 0 was the source of a class of
+/// "phantom task id" bugs we want to avoid in the Rust port.
+fn read_high_watermark(path: &Path) -> TeamResult<u64> {
+    match fs::read_to_string(path) {
+        Ok(content) => content
+            .trim()
+            .parse::<u64>()
+            .ok()
+            .filter(|n| *n < u64::MAX)
+            .ok_or_else(|| {
+                TeamError::Task(format!(
+                    ".highwatermark at {} is corrupt (contents: {:?}); refusing to \
+                     silently reuse task ids. Delete the file and re-create tasks, or \
+                     run a migrator.",
+                    path.display(),
+                    content
+                ))
+            }),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(0),
+        Err(e) => Err(TeamError::Io(e)),
+    }
 }
 
 /// Atomically claim a pending task; fails if already claimed or blocked

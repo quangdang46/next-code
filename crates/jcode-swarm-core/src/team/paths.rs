@@ -90,6 +90,39 @@ pub fn validate_team_name(name: &str) -> TeamResult<()> {
     Ok(())
 }
 
+/// Reject empty member names, traversal, control characters, and any character
+/// outside `[a-z0-9_-]`. Member names are used as path components
+/// (`inboxes/{member}/`), as tmux pane titles, and inside `tmux send-keys` argv,
+/// so unvalidated names enable either path traversal or tmux argument-injection
+/// (a name starting with `-` is interpreted as a flag).
+pub fn validate_member_name(name: &str) -> TeamResult<()> {
+    if name.is_empty() {
+        return Err(TeamError::InvalidMemberName(name.into(), "empty".into()));
+    }
+    if name.contains("..") || name.contains('/') || name.contains('\\') {
+        return Err(TeamError::InvalidMemberName(
+            name.into(),
+            "must not contain '..', '/', or '\\'".into(),
+        ));
+    }
+    if name.starts_with('-') {
+        return Err(TeamError::InvalidMemberName(
+            name.into(),
+            "must not start with '-' (tmux flag-injection risk)".into(),
+        ));
+    }
+    if name
+        .chars()
+        .any(|c| c.is_control() || !(c.is_ascii_alphanumeric() || c == '-' || c == '_'))
+    {
+        return Err(TeamError::InvalidMemberName(
+            name.into(),
+            "only ASCII alphanumeric, hyphen, and underscore allowed; no control chars".into(),
+        ));
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

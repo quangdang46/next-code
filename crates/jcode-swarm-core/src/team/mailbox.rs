@@ -7,9 +7,44 @@ use std::fs;
 use std::path::Path;
 
 use crate::team::locks::{atomic_write, read_json, with_lock};
-use crate::team::paths::inbox_dir;
+use crate::team::paths::{inbox_dir, validate_member_name};
 use crate::team::spec::*;
 use crate::team::state::load_runtime;
+
+/// Verify the caller's capability token matches the run's persisted token.
+/// Any local process that can `ls` the runtime dir can discover `run_id`
+/// UUIDs, so `run_id` alone is not an auth boundary; the per-run
+/// `capability_token` (generated at create time, stored in `state.json`
+/// with 0o600) is the actual secret.
+fn verify_capability(run_id: &str, presented_token: &str) -> TeamResult<()> {
+    // Special-case: a run that was created before the capability-token
+    // feature shipped (version 1, no `capability_token` field) is loaded
+    // with an empty default. We treat that as "no auth required" and only
+    // enforce when the state actually has a non-empty token. This avoids
+    // bricking teams that were created during the PR that adds this
+    // field but before the next migration.
+    let state = load_runtime(run_id)?;
+    if state.capability_token.is_empty() {
+        return Ok(());
+    }
+    if subtle_equals(&state.capability_token, presented_token) {
+        Ok(())
+    } else {
+        Err(TeamError::MailboxAuthFailed(run_id.to_string()))
+    }
+}
+
+/// Constant-time string compare. Avoids leaking token length/prefix via timing.
+fn subtle_equals(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff: u8 = 0;
+    for (x, y) in a.as_bytes().iter().zip(b.as_bytes().iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
 
 /// Caller context for a send (mirrors the TS `SendContext`).
 pub struct SendContext<'a> {
@@ -17,16 +52,21 @@ pub struct SendContext<'a> {
     pub active_members: &'a [String],
     pub reserved_recipients: &'a [String],
     pub recipient_unread_max_bytes: usize,
+    /// Per-run shared secret. Required to authenticate the caller; the API
+    /// rejects the call if this does not match `state.capability_token`.
+    /// Generated at create time, persisted in `state.json` with 0o600 mode.
+    pub capability_token: &'a str,
 }
 
 impl<'a> SendContext<'a> {
     /// Convenience: a lead context with default backpressure ceiling.
-    pub fn lead(active_members: &'a [String]) -> Self {
+    pub fn lead(active_members: &'a [String], capability_token: &'a str) -> Self {
         Self {
             is_lead: true,
             active_members,
             reserved_recipients: &[],
             recipient_unread_max_bytes: TEAM_RECIPIENT_UNREAD_MAX_BYTES,
+            capability_token,
         }
     }
 }
@@ -40,6 +80,16 @@ pub struct SendResult {
 /// Send a message to one recipient (or broadcast with `to = "*"`, lead only).
 /// Validation order matches the reference exactly.
 pub fn send_message(msg: &TeamMessage, run_id: &str, ctx: &SendContext) -> TeamResult<SendResult> {
+    verify_capability(run_id, ctx.capability_token)?;
+
+    // Validate all member names that will be used as path components or in
+    // tmux send-keys argv. Reject before any disk work.
+    for name in std::iter::once(&msg.from).chain(std::iter::once(&msg.to)) {
+        if name != "*" {
+            validate_member_name(name)?;
+        }
+    }
+
     let serialized = format!("{}\n", serde_json::to_string_pretty(msg)?);
     let serialized_bytes = serialized.len();
 
@@ -73,6 +123,11 @@ pub fn send_message(msg: &TeamMessage, run_id: &str, ctx: &SendContext) -> TeamR
     } else {
         vec![msg.to.clone()]
     };
+
+    // Validate recipient names before any disk work.
+    for r in &recipients {
+        validate_member_name(r)?;
+    }
 
     let mut delivered = Vec::new();
     for recipient in recipients {
@@ -211,15 +266,45 @@ mod tests {
         }
     }
 
+    /// Create a minimal runtime state on disk so `verify_capability` passes,
+    /// and returns `(run_id, capability_token)`.
+    fn setup_runtime(base: &crate::team::test_support::TestBase) -> (String, String) {
+        let run_id = base.run_id();
+        // Create a minimal state file manually so mailbox tests don't depend
+        // on the full create_runtime flow (which requires a TeamSpec).
+        use crate::team::paths::runtime_dir;
+        use crate::team::spec::*;
+        use crate::team::locks::atomic_write;
+        let state = TeamRuntimeState {
+            version: 1,
+            team_run_id: run_id.clone(),
+            team_name: "test".into(),
+            spec_source: SpecSource::Project,
+            created_at: 0,
+            status: RuntimeStatus::Active,
+            lead_session_id: None,
+            tmux_layout: None,
+            members: vec![],
+            shutdown_requests: vec![],
+            bounds: RuntimeBounds::default(),
+            capability_token: "test-token-abc123".into(),
+        };
+        let dir = runtime_dir(&run_id);
+        std::fs::create_dir_all(&dir).unwrap();
+        let json = serde_json::to_string_pretty(&state).unwrap();
+        atomic_write(&dir.join("state.json"), &format!("{json}\n")).unwrap();
+        (run_id, "test-token-abc123".into())
+    }
+
     #[test]
     fn send_then_list_then_ack() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["worker".to_string()];
         send_message(
             &msg("m1", "worker", "hello"),
             &run,
-            &SendContext::lead(&members),
+            &SendContext::lead(&members, &tok),
         )
         .unwrap();
         let unread = list_unread(&run, "worker").unwrap();
@@ -232,18 +317,18 @@ mod tests {
     #[test]
     fn duplicate_message_id_rejected() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["worker".to_string()];
         send_message(
             &msg("dup", "worker", "a"),
             &run,
-            &SendContext::lead(&members),
+            &SendContext::lead(&members, &tok),
         )
         .unwrap();
         let err = send_message(
             &msg("dup", "worker", "b"),
             &run,
-            &SendContext::lead(&members),
+            &SendContext::lead(&members, &tok),
         )
         .unwrap_err();
         assert!(matches!(err, TeamError::DuplicateMessageId(_)));
@@ -252,13 +337,14 @@ mod tests {
     #[test]
     fn broadcast_requires_lead() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["a".to_string(), "b".to_string()];
         let ctx = SendContext {
             is_lead: false,
             active_members: &members,
             reserved_recipients: &[],
             recipient_unread_max_bytes: TEAM_RECIPIENT_UNREAD_MAX_BYTES,
+            capability_token: &tok,
         };
         let err = send_message(&msg("b1", "*", "hi"), &run, &ctx).unwrap_err();
         assert!(matches!(err, TeamError::BroadcastNotPermitted));
@@ -267,9 +353,9 @@ mod tests {
     #[test]
     fn lead_broadcast_delivers_to_all_active() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["a".to_string(), "b".to_string()];
-        let res = send_message(&msg("bc", "*", "all"), &run, &SendContext::lead(&members)).unwrap();
+        let res = send_message(&msg("bc", "*", "all"), &run, &SendContext::lead(&members, &tok)).unwrap();
         assert_eq!(res.delivered_to.len(), 2);
         assert_eq!(list_unread(&run, "a").unwrap().len(), 1);
         assert_eq!(list_unread(&run, "b").unwrap().len(), 1);
@@ -278,27 +364,28 @@ mod tests {
     #[test]
     fn payload_too_large_rejected() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["w".to_string()];
         let big = "x".repeat(TEAM_MESSAGE_MAX_BYTES + 1);
         let err =
-            send_message(&msg("p", "w", &big), &run, &SendContext::lead(&members)).unwrap_err();
+            send_message(&msg("p", "w", &big), &run, &SendContext::lead(&members, &tok)).unwrap_err();
         assert!(matches!(err, TeamError::PayloadTooLarge));
     }
 
     #[test]
     fn backpressure_blocks_when_inbox_full() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["w".to_string()];
         // First message lands with a generous ceiling.
-        send_message(&msg("a", "w", "hello"), &run, &SendContext::lead(&members)).unwrap();
+        send_message(&msg("a", "w", "hello"), &run, &SendContext::lead(&members, &tok)).unwrap();
         // With unread > 0 and a tiny ceiling, the next send hits backpressure.
         let tiny = SendContext {
             is_lead: true,
             active_members: &members,
             reserved_recipients: &[],
             recipient_unread_max_bytes: 10,
+            capability_token: &tok,
         };
         let err = send_message(&msg("b", "w", "hello"), &run, &tiny).unwrap_err();
         assert!(matches!(err, TeamError::RecipientBackpressure));
@@ -307,14 +394,14 @@ mod tests {
     #[test]
     fn list_unread_sorted_by_timestamp() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["w".to_string()];
         let mut late = msg("late", "w", "2");
         late.timestamp = 200;
         let mut early = msg("early", "w", "1");
         early.timestamp = 100;
-        send_message(&late, &run, &SendContext::lead(&members)).unwrap();
-        send_message(&early, &run, &SendContext::lead(&members)).unwrap();
+        send_message(&late, &run, &SendContext::lead(&members, &tok)).unwrap();
+        send_message(&early, &run, &SendContext::lead(&members, &tok)).unwrap();
         let unread = list_unread(&run, "w").unwrap();
         assert_eq!(unread[0].message_id, "early");
         assert_eq!(unread[1].message_id, "late");
@@ -323,9 +410,9 @@ mod tests {
     #[test]
     fn malformed_message_file_skipped() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["w".to_string()];
-        send_message(&msg("ok", "w", "good"), &run, &SendContext::lead(&members)).unwrap();
+        send_message(&msg("ok", "w", "good"), &run, &SendContext::lead(&members, &tok)).unwrap();
         fs::write(inbox_dir(&run, "w").join("junk.json"), b"{not json").unwrap();
         let unread = list_unread(&run, "w").unwrap();
         assert_eq!(
@@ -338,10 +425,10 @@ mod tests {
     #[test]
     fn poll_filters_already_pending() {
         let base = crate::team::test_support::guarded_base();
-        let run = base.run_id();
+        let (run, tok) = setup_runtime(&base);
         let members = vec!["w".to_string()];
-        send_message(&msg("m1", "w", "a"), &run, &SendContext::lead(&members)).unwrap();
-        send_message(&msg("m2", "w", "b"), &run, &SendContext::lead(&members)).unwrap();
+        send_message(&msg("m1", "w", "a"), &run, &SendContext::lead(&members, &tok)).unwrap();
+        send_message(&msg("m2", "w", "b"), &run, &SendContext::lead(&members, &tok)).unwrap();
         let fresh = poll_messages(&run, "w", &["m1".to_string()]).unwrap();
         assert_eq!(fresh.len(), 1);
         assert_eq!(fresh[0].message_id, "m2");
