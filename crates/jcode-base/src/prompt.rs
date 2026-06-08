@@ -277,6 +277,7 @@ pub fn build_system_prompt_full(
     }
 
     // Keyword mode prompt (changes per turn based on detected keywords)
+    #[allow(clippy::collapsible_if)]
     if let Some(kw) = keyword_prompt {
         if !kw.is_empty() {
             parts.push(kw);
@@ -391,6 +392,7 @@ pub fn build_system_prompt_split(
     }
 
     // Keyword mode prompt (changes per turn based on detected keywords)
+    #[allow(clippy::collapsible_if)]
     if let Some(kw) = keyword_prompt {
         if !kw.is_empty() {
             dynamic_parts.push(kw);
@@ -428,11 +430,13 @@ fn build_selfdev_hint_prompt() -> String {
 }
 
 /// Build self-dev tools prompt section (static version without dynamic socket path)
+#[allow(dead_code)]
 fn build_selfdev_prompt_static() -> String {
     build_selfdev_prompt_static_for_context(SelfDevProductContext::Tui)
 }
 
 /// Build self-dev tools prompt section
+#[allow(dead_code)]
 fn build_selfdev_prompt() -> String {
     build_selfdev_prompt_for_context(SelfDevProductContext::Tui)
 }

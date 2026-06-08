@@ -7,7 +7,7 @@ use std::time::Instant;
 
 use super::args::{
     AmbientCommand, Args, AuthCommand, CloudCommand, CloudSessionsCommand, Command, MemoryCommand,
-    ModelCommand, ProviderCommand, RestartCommand, ServerCommand, SessionCommand,
+    ModelCommand, ProviderCommand, RestartCommand, SecretsCommand, ServerCommand, SessionCommand,
     TranscriptModeArg,
 };
 use crate::{
@@ -254,6 +254,23 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
                 json,
             } => commands::run_session_rename_command(&session, name.as_deref(), clear, json)?,
         },
+        Some(Command::Secrets(subcmd)) => match subcmd {
+            SecretsCommand::Set {
+                name,
+                value,
+                env,
+                json,
+            } => super::secrets_cmd::run_set(&name, value.as_deref(), env, json)?,
+            SecretsCommand::Get { name, env, json } => {
+                super::secrets_cmd::run_get(&name, env, json)?
+            }
+            SecretsCommand::Delete { name, env, json } => {
+                super::secrets_cmd::run_delete(&name, env, json)?
+            }
+            SecretsCommand::List { env, json } => super::secrets_cmd::run_list(env, json)?,
+            SecretsCommand::Init { json } => super::secrets_cmd::run_init(json)?,
+            SecretsCommand::Purge { yes, json } => super::secrets_cmd::run_purge(yes, json)?,
+        },
         Some(Command::Ambient(subcmd)) => {
             commands::run_ambient_command(map_ambient_subcommand(subcmd)).await?;
         }
@@ -416,6 +433,31 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
                     output.as_deref(),
                 )
                 .await?;
+            }
+        }
+        Some(Command::Doctor {
+            json,
+            fix,
+            yes,
+            only,
+        }) => {
+            let only = only
+                .iter()
+                .filter_map(|s| crate::doctor::CheckCategory::parse(s))
+                .collect::<Vec<_>>();
+            let cwd = match args.cwd.clone() {
+                Some(c) => std::path::PathBuf::from(c),
+                None => std::env::current_dir()?,
+            };
+            let code = crate::doctor::run(crate::doctor::DoctorOptions {
+                cwd,
+                fix,
+                assume_yes: yes,
+                only,
+                json,
+            })?;
+            if code != 0 {
+                std::process::exit(code);
             }
         }
         Some(Command::Restart { action }) => match action {

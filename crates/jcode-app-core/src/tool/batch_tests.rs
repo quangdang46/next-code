@@ -110,7 +110,7 @@ fn test_schema_only_requires_tool() {
             crate::compaction::CompactionManager::new(),
         )),
         hook_registry: std::sync::Arc::new(tokio::sync::RwLock::new(
-            jcode_hooks::HookRegistry::from_config(jcode_hooks::HooksConfig::default()),
+            jcode_hooks::HookRegistry::default(),
         )),
         dispatch_config: jcode_hooks::DispatchConfig::default(),
         #[cfg(feature = "dcp")]

@@ -26,6 +26,7 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Provider(_)) => "jcode provider".to_string(),
         Some(Command::Memory(_)) => "jcode memory".to_string(),
         Some(Command::Session(_)) => "jcode session".to_string(),
+        Some(Command::Secrets(_)) => "jcode secrets".to_string(),
         Some(Command::Ambient(subcommand)) => match subcommand {
             AmbientCommand::RunVisible => "jcode ambient visible".to_string(),
             _ => "jcode ambient".to_string(),
@@ -49,6 +50,7 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Model(_)) => "jcode model".to_string(),
         Some(Command::ProviderTestCoverage { .. }) => "jcode provider-test-coverage".to_string(),
         Some(Command::ProviderDoctor { .. }) => "jcode provider-doctor".to_string(),
+        Some(Command::Doctor { .. }) => "jcode doctor".to_string(),
         Some(Command::AuthTest { .. }) => "jcode auth-test".to_string(),
         Some(Command::Restart { .. }) => "jcode restart".to_string(),
         Some(Command::SetupLauncher) => "jcode setup-launcher".to_string(),

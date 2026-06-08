@@ -80,8 +80,11 @@ members = [
     "crates/jcode-best-of-n",
     "crates/jcode-desktop",
     "crates/jcode-hooks",
+    "crates/jcode-keyring-store",
+    "crates/jcode-redact",
     "crates/jcode-keywords",
     "crates/jcode-mempalace-adapter",
+    "crates/jcode-secrets",
     "crates/jcode-plugin-core",
     "crates/jcode-plugin-runtime",
     "crates/jcode-render-core",
@@ -275,6 +278,7 @@ jcode-selfdev-types = { path = "crates/jcode-selfdev-types" }
 jcode-session-types = { path = "crates/jcode-session-types" }
 jcode-setup-hints = { path = "crates/jcode-setup-hints" }
 jcode-storage = { path = "crates/jcode-storage" }
+jcode-secrets = { path = "crates/jcode-secrets" }
 jcode-task-types = { path = "crates/jcode-task-types" }
 jcode-tool-core = { path = "crates/jcode-tool-core" }
 jcode-tool-types = { path = "crates/jcode-tool-types" }
@@ -428,6 +432,7 @@ codegen-units = 256
 
 [dev-dependencies]
 async-stream = "0.3"
+jcode-keyring-store = { path = "crates/jcode-keyring-store" }
 # Enables the downstream test-support helpers (storage::lock_test_env,
 # auth::test_sandbox, bus::reset_models_updated_publish_state_for_tests, the
 # ExternalAuthReviewCandidate read accessors) for the root crate's own cli test

@@ -104,6 +104,19 @@ pub(crate) struct Args {
     pub(crate) command: Option<Command>,
 }
 
+/// Validate a `--only` category token at parse time (clap value_parser) so an
+/// unknown category is rejected instead of silently ignored (which would
+/// otherwise fall back to running every check).
+fn parse_doctor_category(s: &str) -> Result<String, String> {
+    if crate::doctor::CheckCategory::parse(s).is_some() {
+        Ok(s.to_string())
+    } else {
+        Err(format!(
+            "unknown category '{s}' (valid: build, platform, storage, config, auth, shell, sessions, mcp, resource, swarm)"
+        ))
+    }
+}
+
 #[derive(Subcommand, Debug)]
 pub(crate) enum Command {
     /// Start the agent server (background daemon)
@@ -269,6 +282,10 @@ pub(crate) enum Command {
     /// Session management commands
     #[command(subcommand)]
     Session(SessionCommand),
+
+    /// Manage encrypted, keychain-backed secrets (API keys, tokens)
+    #[command(subcommand)]
+    Secrets(SecretsCommand),
 
     /// Ambient mode management
     #[command(subcommand)]
@@ -467,6 +484,32 @@ pub(crate) enum Command {
         /// Maximum uncovered provider/model gaps to show in the text coverage report
         #[arg(long, requires = "coverage", default_value_t = 50)]
         coverage_limit: usize,
+    },
+
+    /// Run a comprehensive offline health check of the local jcode environment.
+    ///
+    /// Validates config, auth files, shell tools, sessions, storage, MCP config,
+    /// resource headroom, and swarm preconditions. Use `--fix` to auto-repair
+    /// safe problems (create missing dirs, tighten `auth.json` permissions). This
+    /// command is offline and never spends provider balance — use
+    /// `jcode provider-doctor` / `jcode auth-test` for live provider verification.
+    Doctor {
+        /// Emit the report as JSON (stable schema) for scripting/CI
+        #[arg(long)]
+        json: bool,
+
+        /// Attempt to automatically repair fixable problems
+        #[arg(long)]
+        fix: bool,
+
+        /// Allow destructive fixes (quarantine corrupt files) without an interactive prompt
+        #[arg(long, requires = "fix")]
+        yes: bool,
+
+        /// Limit checks to specific categories (repeatable): build, platform,
+        /// storage, config, auth, shell, sessions, mcp, resource, swarm
+        #[arg(long = "only", value_name = "CATEGORY", value_parser = parse_doctor_category)]
+        only: Vec<String>,
     },
 
     /// Save or restore the current set of open jcode windows across a system reboot
@@ -777,6 +820,84 @@ pub(crate) enum SessionCommand {
         /// Clear the custom session name/title
         #[arg(long, conflicts_with = "name")]
         clear: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum SecretsCommand {
+    /// Store a secret (encrypted at rest, passphrase in the OS keychain)
+    Set {
+        /// Secret name, e.g. ANTHROPIC_API_KEY (uppercase [A-Z0-9_]+)
+        name: String,
+
+        /// Secret value. If omitted, it is read from stdin so it never lands
+        /// in shell history.
+        value: Option<String>,
+
+        /// Scope the secret to the current environment (git repo) instead of global
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Print a stored secret value (resolves env scope, then global)
+    Get {
+        /// Secret name
+        name: String,
+
+        /// Look up the current environment scope (falls back to global)
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of the raw value
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Delete a stored secret
+    Delete {
+        /// Secret name
+        name: String,
+
+        /// Delete from the current environment scope instead of global
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// List stored secret names (values are never printed)
+    List {
+        /// Only list secrets in the current environment scope
+        #[arg(long)]
+        env: bool,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Initialize the encrypted store and OS keychain passphrase
+    Init {
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Permanently delete ALL stored secrets and the keychain passphrase
+    Purge {
+        /// Confirm the destructive purge (required; nothing is deleted without it)
+        #[arg(long)]
+        yes: bool,
 
         /// Emit JSON instead of human-readable output
         #[arg(long)]

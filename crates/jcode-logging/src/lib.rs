@@ -204,6 +204,10 @@ impl Logger {
     fn write(&mut self, level: &str, message: &str) {
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
         let ctx = context_prefix();
+        // Scrub secret-shaped tokens from the message before it hits disk.
+        // The per-line flush below dominates cost, so the regex scan is cheap
+        // in comparison. Context (session/provider/model) is not redacted.
+        let message = jcode_redact::redact_secrets(message);
         let line = format!("[{}] [{}] {}{}\n", timestamp, level, ctx, message);
         if let Err(err) = self.file.write_all(line.as_bytes()) {
             eprintln!("jcode logger write failed: {err}");
