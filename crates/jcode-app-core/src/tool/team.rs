@@ -23,11 +23,45 @@ struct JcodeMemberSpawner;
 impl runtime::MemberSpawner for JcodeMemberSpawner {
     fn spawn(&self, run_id: &str, member: &TeamMemberSpec, prompt: &str) -> crate::team::spec::TeamResult<String> {
         let member_name = member.name().to_string();
-        // In production, this would spawn a headless jcode process.
-        // For now, generate a session ID that the tmux layout would attach to.
         let session_id = format!("jcode-team-{}-{}", &run_id[..8], member_name);
-        crate::logging::info(&format!("spawn team member session run={run_id} member={member_name}"));
-        Ok(session_id)
+        crate::logging::info(&format!(
+            "spawn team member session run={run_id} member={member_name} session={session_id}"
+        ));
+        // Spawn a headless jcode server for this team member.
+        // The process inherits the parent's PATH and runtime dir access so it
+        // can read/write the shared file-based mailbox and task board.
+        let bin = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("jcode"));
+        match std::process::Command::new(&bin)
+            .arg("serve")
+            .arg("--temporary-server")
+            .arg("--owner-pid")
+            .arg(std::process::id().to_string())
+            .env("JCODE_TEAM_RUN_ID", run_id)
+            .env("JCODE_TEAM_MEMBER", &member_name)
+            .env("JCODE_TEAM_PROMPT", prompt)
+            .spawn()
+        {
+            Ok(child) => {
+                // Detach: we do not wait for the child. It runs until the team
+                // is shut down or the child process exits on its own.
+                let pid = child.id();
+                // Detach: forget the child handle so it continues running
+                // independently (Child::drop would block waiting).
+                std::mem::forget(child);
+                crate::logging::info(&format!(
+                    "spawned team member pid={pid} run={run_id} member={member_name}",
+                ));
+                Ok(session_id)
+            }
+            Err(e) => {
+                crate::logging::error(&format!(
+                    "failed to spawn team member run={run_id} member={member_name} err={e}"
+                ));
+                Err(crate::team::spec::TeamError::Tmux(format!(
+                    "failed to spawn team member '{member_name}': {e}"
+                )))
+            }
+        }
     }
 }
 
@@ -109,9 +143,30 @@ impl Tool for TeamCreateTool {
             members,
         };
 
+        let session_id = ctx.session_id.clone();
         let spawner = JcodeMemberSpawner;
         let run = tokio::task::spawn_blocking(move || {
-            runtime::create_team(spec, &ctx.session_id, &spawner)
+            let run = runtime::create_team(spec, &session_id, &spawner)?;
+            // Activate tmux layout: read TMUX_PANE / TMUX environment for
+            // the caller's window target and pane id. Graceful no-op outside tmux.
+            let window_target = std::env::var("TMUX_PANE")
+                .or_else(|_| std::env::var("TMUX"))
+                .unwrap_or_default();
+            if !window_target.is_empty() {
+                let caller_pane = window_target.clone();
+                runtime::activate_team_layout(
+                    &run.team_run_id,
+                    &window_target,
+                    &caller_pane,
+                    |m| {
+                        format!(
+                            "jcode serve --team-run-id {} --member-name {} 2>/dev/null",
+                            run.team_run_id, m.name
+                        )
+                    },
+                )?;
+            }
+            Ok::<_, crate::team::spec::TeamError>(run)
         })
         .await
         .map_err(|e| anyhow::anyhow!("team creation panicked: {e}"))??;

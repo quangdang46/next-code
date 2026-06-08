@@ -1356,3 +1356,26 @@ fn gather_git_info_inner() -> Option<GitInfo> {
         dirty_files,
     })
 }
+
+pub(super) fn gather_team_info() -> Option<crate::tui::info_widget::TeamInfo> {
+    let runs = crate::team::state::list_active_runs().ok()?;
+    let run = runs.into_iter().next()?;
+    let members: Vec<crate::tui::info_widget::TeamMemberView> = run
+        .members
+        .iter()
+        .map(|m| crate::tui::info_widget::TeamMemberView {
+            name: m.name.clone(),
+            is_lead: m.agent_type == crate::team::spec::MemberAgentType::Leader,
+            status: m.status.as_str().to_string(),
+            task_count: 0,
+            message_count: 0,
+            color: m.color.clone(),
+        })
+        .collect();
+    Some(crate::tui::info_widget::TeamInfo {
+        team_name: run.team_name.clone(),
+        member_total: run.members.len(),
+        members,
+        tasks: vec![],
+    })
+}
