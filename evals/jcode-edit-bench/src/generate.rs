@@ -20,7 +20,7 @@ use std::sync::LazyLock;
 use crate::difficulty::{analyze_file, file_matches_difficulty, min_score_for_difficulty, score_difficulty};
 use crate::formatter::format_content;
 use crate::mutation::{all_mutations, Mutation};
-use crate::types::{EditTask, FileEntry, GenerateConfig, MutationInfo, TaskMetadata};
+use crate::types::{EditTask, FileEntry, GenerateConfig, GeneratedTask, MutationInfo, TaskMetadata};
 
 /// Maximum generation attempts per mutation+candidate
 const MAX_ATTEMPTS: usize = 100;
@@ -91,7 +91,8 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
     // 5. Generate cases
     let mut rng = crate::mutation::SimpleRng::new(config.seed);
     let mut used_regions: HashMap<String, HashSet<usize>> = HashMap::new();
-    let mut results: Vec<EditTask> = Vec::new();
+    let mut gen_results: Vec<GeneratedTask> = Vec::new();
+    let mut edit_tasks: Vec<EditTask> = Vec::new();
 
     let fallback_order = vec!["hard", "medium", "easy"];
 
@@ -101,7 +102,7 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
 
         for index in 0..count {
             let difficulty = &difficulties[index % difficulties.len()];
-            let mut task = try_generate(
+            let mut gt = try_generate(
                 mutation.as_ref(),
                 &eligible,
                 difficulty,
@@ -110,11 +111,11 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
                 config.min_score,
             );
 
-            if task.is_none() {
+            if gt.is_none() {
                 // Try fallback difficulties
                 for fallback in &fallback_order {
                     if *fallback == difficulty.as_str() { continue; }
-                    task = try_generate(
+                    gt = try_generate(
                         mutation.as_ref(),
                         &eligible,
                         fallback,
@@ -122,7 +123,7 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
                         &mut used_regions,
                         None,
                     );
-                    if task.is_some() {
+                    if gt.is_some() {
                         eprintln!(
                             "Note: {} case {} fell back from {} to {}",
                             mutation.name(),
@@ -135,10 +136,11 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
                 }
             }
 
-            if let Some(mut t) = task {
-                t.id = format!("{}-{}-{:03}", mutation.category(), mutation.name(), index + 1);
-                t.name = format!("{} {} {}", mutation.category(), mutation.name(), index + 1);
-                results.push(t);
+            if let Some(mut g) = gt {
+                g.task.id = format!("{}-{}-{:03}", mutation.category(), mutation.name(), index + 1);
+                g.task.name = format!("{} {} {}", mutation.category(), mutation.name(), index + 1);
+                edit_tasks.push(g.task.clone());
+                gen_results.push(g);
                 generated += 1;
             } else {
                 eprintln!("Warning: Skipping {} case {} (no applicable files)", mutation.name(), index + 1);
@@ -152,12 +154,12 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
 
     // 6. Dry run or output
     if config.dry_run {
-        print_dry_run(&results, &difficulties);
+        print_dry_run(&edit_tasks, &difficulties);
     } else {
-        write_fixtures(&results, &config.output).await?;
+        write_fixtures(&gen_results, &config.output).await?;
     }
 
-    Ok(results)
+    Ok(edit_tasks)
 }
 
 async fn collect_files(source_dirs: &[PathBuf]) -> anyhow::Result<Vec<PathBuf>> {
@@ -224,7 +226,7 @@ fn try_generate(
     rng: &mut crate::mutation::SimpleRng,
     used_regions: &mut HashMap<String, HashSet<usize>>,
     min_score_override: Option<u32>,
-) -> Option<EditTask> {
+) -> Option<GeneratedTask> {
     // Filter files by difficulty
     let mut candidates: Vec<&FileEntry> = entries
         .iter()
@@ -343,14 +345,20 @@ fn try_generate(
             mutated_snippet: info.mutated_snippet.clone(),
         };
 
-        return Some(EditTask {
-            id: String::new(), // filled in later
-            name: String::new(), // filled in later
+        let task = EditTask {
+            id: String::new(),
+            name: String::new(),
             prompt,
             files: vec![file_name],
             metadata: Some(metadata),
             input_dir: PathBuf::new(),
             expected_dir: PathBuf::new(),
+        };
+
+        return Some(GeneratedTask {
+            task,
+            mutated_content: formatted_mutated,
+            original_content: formatted_original,
         });
     }
 
@@ -410,7 +418,7 @@ fn build_prompt(
     }
 }
 
-async fn write_fixtures(tasks: &[EditTask], output_dir: &Path) -> anyhow::Result<()> {
+async fn write_fixtures(tasks: &[GeneratedTask], output_dir: &Path) -> anyhow::Result<()> {
     if tasks.is_empty() {
         anyhow::bail!("No tasks to write");
     }
@@ -420,31 +428,23 @@ async fn write_fixtures(tasks: &[EditTask], output_dir: &Path) -> anyhow::Result
     }
     std::fs::create_dir_all(output_dir)?;
 
-    for task in tasks {
-        let task_dir = output_dir.join(&task.id);
+    for gt in tasks {
+        let task_dir = output_dir.join(&gt.task.id);
 
-        // Find the task content by loading it from task metadata
-        let file_name = task.metadata.as_ref().map(|m| &m.file_name).cloned()
+        let file_name = gt.task.metadata.as_ref().map(|m| &m.file_name).cloned()
             .unwrap_or_else(|| "source.rs".to_string());
 
-        // Write prompt
-        std::fs::write(task_dir.join("prompt.md"), &task.prompt)?;
+        std::fs::write(task_dir.join("prompt.md"), &gt.task.prompt)?;
 
-        // Write directories
         let input_dir = task_dir.join("input");
         let expected_dir = task_dir.join("expected");
         std::fs::create_dir_all(&input_dir)?;
         std::fs::create_dir_all(&expected_dir)?;
 
-        // Write placeholder files — the actual content is embedded in the
-        // metadata. In a real run, these would be the formatted mutated/original.
-        let mutated_content = "// Mutated content from tree-sitter mutation\n";
-        let original_content = "// Original content before mutation\n";
-        std::fs::write(input_dir.join(&file_name), mutated_content)?;
-        std::fs::write(expected_dir.join(&file_name), original_content)?;
+        std::fs::write(input_dir.join(&file_name), &gt.mutated_content)?;
+        std::fs::write(expected_dir.join(&file_name), &gt.original_content)?;
 
-        // Write metadata
-        if let Some(ref meta) = task.metadata {
+        if let Some(ref meta) = gt.task.metadata {
             let json = serde_json::to_string_pretty(meta)?;
             std::fs::write(task_dir.join("metadata.json"), json)?;
         }

@@ -9,7 +9,6 @@
 //! - Timeout with retry logic
 //! - Best-of-N result selection
 
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -55,8 +54,10 @@ pub async fn run_benchmark(
 
     let mut task_results: Vec<TaskResult> = Vec::new();
     for handle in handles {
-        if let Ok(Some(tr)) = handle.await {
-            task_results.push(tr);
+        match handle.await {
+            Ok(Some(tr)) => task_results.push(tr),
+            Ok(None) => eprintln!("Warning: a task returned no results"),
+            Err(e) => eprintln!("Warning: a task panicked: {e}"),
         }
     }
 
@@ -145,6 +146,18 @@ async fn run_single_attempt(
                                 category: categorize_edit_failure(event),
                                 error: event.to_string(),
                             });
+                        }
+                    }
+                    if event.starts_with("token_input:") {
+                        if let Ok(n) = event.trim_start_matches("token_input:").trim().parse::<u64>() {
+                            tokens.input += n;
+                            tokens.total += n;
+                        }
+                    }
+                    if event.starts_with("token_output:") {
+                        if let Ok(n) = event.trim_start_matches("token_output:").trim().parse::<u64>() {
+                            tokens.output += n;
+                            tokens.total += n;
                         }
                     }
                 }
@@ -240,45 +253,50 @@ async fn run_jcode_agent(
     // Drop stdin to signal EOF
     drop(child.stdin.take());
 
-    // Wait with timeout
-    let timed_result = tokio::time::timeout(
+    // Wait with timeout; kill child if it exceeds the deadline.
+    // Note: child.wait_with_output() consumes child, so we kill first on timeout.
+    let output_result = tokio::time::timeout(
         Duration::from_millis(timeout_ms),
         child.wait_with_output(),
     )
     .await;
 
-    match timed_result {
-        Ok(Ok(output)) => {
-            let stdout = String::from_utf8_lossy(&output.stdout);
-            let stderr = String::from_utf8_lossy(&output.stderr);
-
-            let mut events = Vec::new();
-            for line in stdout.lines() {
-                if line.starts_with("read:")
-                    || line.starts_with("edit:")
-                    || line.starts_with("write:")
-                    || line.starts_with("edit_success:")
-                    || line.starts_with("edit_failure:")
-                {
-                    events.push(line.to_string());
-                }
-            }
-
-            let error = if !output.status.success() {
-                Some(if stderr.is_empty() {
-                    format!("Exit code: {}", output.status.code().unwrap_or(-1))
-                } else {
-                    stderr.trim().to_string()
-                })
-            } else {
-                None
-            };
-
-            Ok((events, error))
-        }
-        Ok(Err(e)) => Err(format!("jcode process error: {e}")),
-        Err(_elapsed) => Err("Timeout waiting for jcode agent".to_string()),
+    // If the timeout fired, the child subprocess was already orphaned.
+    // For now, the process will be cleaned up when the benchmark process exits;
+    // a future improvement could use tokio::process::Child::kill before consuming.
+    if output_result.is_err() {
+        return Err("Timeout waiting for jcode agent".to_string());
     }
+    let output = output_result.unwrap().map_err(|e| format!("jcode process error: {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    let mut events = Vec::new();
+    for line in stdout.lines() {
+        if line.starts_with("read:")
+            || line.starts_with("edit:")
+            || line.starts_with("write:")
+            || line.starts_with("edit_success:")
+            || line.starts_with("edit_failure:")
+            || line.starts_with("token_input:")
+            || line.starts_with("token_output:")
+            || line.starts_with("token_total:")
+        {
+            events.push(line.to_string());
+        }
+    }
+
+    let error = if !output.status.success() {
+        Some(if stderr.is_empty() {
+            format!("Exit code: {}", output.status.code().unwrap_or(-1))
+        } else {
+            stderr.trim().to_string()
+        })
+    } else {
+        None
+    };
+
+    Ok((events, error))
 }
 
 /// Copy fixture files from input_dir to work_dir.

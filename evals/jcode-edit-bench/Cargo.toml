@@ -12,14 +12,10 @@ tokio = { version = "1", features = ["full"] }
 clap = { version = "4", features = ["derive"] }
 tree-sitter = "0.24"
 tree-sitter-rust = "0.23"
-rand = "0.8"
-rand_chacha = "0.3"
 similar = "2"
-chrono = { version = "0.4", features = ["serde"] }
 tempfile = "3"
-flate2 = "1"
-tar = "0.4"
 regex = "1"
+libc = { version = "0.2" }
 
 [lib]
 name = "jcode_edit_bench"

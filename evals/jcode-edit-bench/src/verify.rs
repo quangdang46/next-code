@@ -50,8 +50,29 @@ pub async fn verify_files(
     let expected_fixture_files = list_files(expected_dir)?;
     let actual_files = list_files(actual_dir)?;
 
+    if expected_fixture_files.is_empty() && files.is_none() {
+        return Ok(VerificationResult {
+            success: false,
+            error: Some(format!("Expected directory is empty: {}", expected_dir.display())),
+            indent_score: None,
+            formatted_equivalent: None,
+            diff_stats: None,
+            diff: None,
+        });
+    }
+
     let expected_files = match files {
         Some(f) => {
+            if f.is_empty() {
+                return Ok(VerificationResult {
+                    success: false,
+                    error: Some("No files specified for verification".into()),
+                    indent_score: None,
+                    formatted_equivalent: None,
+                    diff_stats: None,
+                    diff: None,
+                });
+            }
             let mut f = f.to_vec();
             f.sort();
             f

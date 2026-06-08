@@ -201,3 +201,13 @@ pub struct BenchmarkResult {
     pub start_time: String,
     pub end_time: String,
 }
+
+/// Holds a generated task together with its actual file content.
+/// The `EditTask` alone only stores paths; the content is needed to
+/// write real fixture files.
+#[derive(Debug, Clone)]
+pub struct GeneratedTask {
+    pub task: EditTask,
+    pub mutated_content: String,
+    pub original_content: String,
+}

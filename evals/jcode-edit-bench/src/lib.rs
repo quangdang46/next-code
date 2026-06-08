@@ -28,8 +28,7 @@ pub mod report;
 pub mod runner;
 
 pub use types::*;
-use crate::types::SourceEdit;
-pub use mutation::{all_mutations, Mutation, apply_source_edits};
+pub use mutation::{all_mutations, Mutation, SimpleRng, apply_source_edits};
 pub use difficulty::score_difficulty;
 pub use generate::generate_tasks;
 pub use verify::verify_files;

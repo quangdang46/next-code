@@ -129,6 +129,22 @@ fn compute_summary(tasks: &[TaskResult]) -> BenchmarkSummary {
         })
         .collect();
 
+    // By difficulty — group by difficulty level from TaskRunResult
+    let mut by_difficulty: HashMap<String, DifficultySummary> = HashMap::new();
+    for task in tasks {
+        let diff = task.runs.first()
+            .and_then(|r| r.mutation_type.as_ref())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let entry = by_difficulty.entry(diff).or_insert(DifficultySummary::default());
+        entry.total += 1;
+        if task.success {
+            entry.passed += 1;
+        }
+        entry.rate = entry.passed as f64 / entry.total as f64;
+    }
+
     BenchmarkSummary {
         total_tasks,
         successful_tasks,
@@ -143,7 +159,7 @@ fn compute_summary(tasks: &[TaskResult]) -> BenchmarkSummary {
         timeout_runs,
         ghost_runs,
         by_category: by_category_summary,
-        by_difficulty: HashMap::new(),
+        by_difficulty,
     }
 }
 
@@ -246,8 +262,9 @@ pub fn generate_markdown_report(result: &BenchmarkResult) -> String {
     md.push_str("# Edit Benchmark Report\n\n");
     md.push_str(&format!("**Date:** {}\n\n", result.end_time));
     md.push_str(&format!(
-        "**Config:** model=`{}`, runs_per_task=`, total_tasks=`{}`\n\n",
+        "**Config:** model=`{}`, runs_per_task=`{}`, total_tasks=`{}`\n\n",
         result.config.get("model").and_then(|v| v.as_str()).unwrap_or("?"),
+        result.config.get("runs_per_task").and_then(|v| v.as_u64()).unwrap_or(0),
         result.summary.total_tasks,
     ));
 

@@ -5,6 +5,7 @@
 
 use std::path::Path;
 use std::process::Stdio;
+use std::sync::LazyLock;
 
 /// Result of formatting a single file.
 #[derive(Debug)]
@@ -54,15 +55,19 @@ pub async fn format_content(file_path: &Path, content: &str) -> FormatResult {
                         did_format: true,
                     }
                 }
-                _ => FormatResult {
-                    formatted: content.to_string(),
-                    did_format: false,
+                _ => {
+                    FormatResult {
+                        formatted: content.to_string(),
+                        did_format: false,
+                    }
                 },
             }
         }
-        Err(_) => FormatResult {
-            formatted: content.to_string(),
-            did_format: false,
+        Err(_) => {
+            FormatResult {
+                formatted: content.to_string(),
+                did_format: false,
+            }
         },
     }
 }
@@ -74,7 +79,8 @@ pub fn normalize_line_endings(text: &str) -> String {
 
 /// Collapse runs of 2+ consecutive blank lines into a single blank line.
 pub fn normalize_blank_lines(text: &str) -> String {
-    let re = regex::Regex::new(r"\n{3,}").unwrap();
+    static MULTI_BLANK: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re = MULTI_BLANK.get_or_init(|| regex::Regex::new(r"\n{3,}").unwrap());
     re.replace_all(text, "\n\n").to_string()
 }
 

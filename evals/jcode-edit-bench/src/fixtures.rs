@@ -10,8 +10,7 @@
 //!     metadata.json   - Structured metadata
 //! ```
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 
 use crate::types::{EditTask, TaskMetadata};
 
@@ -94,11 +93,13 @@ pub fn load_tasks_from_dir(fixtures_dir: &Path) -> anyhow::Result<Vec<EditTask>>
 }
 
 /// Recursively list files in a directory, returning relative paths.
+/// Returns an error if the directory does not exist.
 pub fn list_files(dir: &Path) -> anyhow::Result<Vec<String>> {
-    let mut files = Vec::new();
-    if dir.is_dir() {
-        list_files_recursive(dir, dir, &mut files)?;
+    if !dir.is_dir() {
+        anyhow::bail!("Directory does not exist: {}", dir.display());
     }
+    let mut files = Vec::new();
+    list_files_recursive(dir, dir, &mut files)?;
     files.sort();
     Ok(files)
 }
@@ -118,38 +119,6 @@ fn list_files_recursive(root: &Path, dir: &Path, files: &mut Vec<String>) -> any
             files.push(relative);
         }
     }
-    Ok(())
-}
-
-/// Save a task to a directory structure.
-pub fn save_task(task_dir: &Path, task: &EditTask, mutated_content: &str, original_content: &str) -> anyhow::Result<()> {
-    let input_dir = task_dir.join("input");
-    let expected_dir = task_dir.join("expected");
-
-    std::fs::create_dir_all(&input_dir)?;
-    std::fs::create_dir_all(&expected_dir)?;
-
-    // Write mutated content to input/
-    for file in &task.files {
-        std::fs::write(
-            input_dir.join(file),
-            mutated_content,
-        )?;
-        std::fs::write(
-            expected_dir.join(file),
-            original_content,
-        )?;
-    }
-
-    // Write prompt
-    std::fs::write(task_dir.join("prompt.md"), &task.prompt)?;
-
-    // Write metadata
-    if let Some(ref meta) = task.metadata {
-        let json = serde_json::to_string_pretty(meta)?;
-        std::fs::write(task_dir.join("metadata.json"), json)?;
-    }
-
     Ok(())
 }
 
