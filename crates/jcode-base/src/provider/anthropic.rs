@@ -764,6 +764,7 @@ impl AnthropicProvider {
         // available, falling back to the direct API key. This matches the
         // OpenAI provider's OAuth-first Auto behavior and what most Claude
         // Max/Pro users expect.
+        #[allow(clippy::collapsible_if)]
         if matches!(mode, AnthropicCredentialMode::Auto)
             && auth::claude::load_credentials().is_err()
         {
@@ -1772,6 +1773,7 @@ struct SseEvent {
 }
 
 /// Process an SSE event and return StreamEvents if applicable
+#[allow(clippy::too_many_arguments)]
 fn process_sse_event(
     event: &SseEvent,
     current_tool_use: &mut Option<ToolUseAccumulator>,
@@ -1981,6 +1983,7 @@ struct ContentBlockDeltaEvent {
 
 #[derive(Deserialize)]
 #[serde(tag = "type")]
+#[allow(clippy::enum_variant_names)]
 enum ApiDelta {
     #[serde(rename = "text_delta")]
     TextDelta { text: String },
