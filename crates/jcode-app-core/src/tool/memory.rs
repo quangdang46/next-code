@@ -1,27 +1,28 @@
 //! Memory tool for storing and recalling information across sessions
 
 use super::{Tool, ToolContext, ToolOutput};
-use crate::memory::{MemoryCategory, MemoryEntry, MemoryManager, MemoryScope};
+use crate::memory::{MemoryCategory, MemoryEntry, MemoryScope};
 use anyhow::Result;
 use async_trait::async_trait;
+use jcode_memory_types::MemoryProvider;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use std::sync::Arc;
 
 pub struct MemoryTool {
-    manager: MemoryManager,
+    manager: Arc<dyn MemoryProvider>,
 }
 
 impl MemoryTool {
-    pub fn new() -> Self {
-        Self {
-            manager: MemoryManager::new(),
-        }
+    pub fn new(provider: Arc<dyn MemoryProvider>) -> Self {
+        Self { manager: provider }
     }
 
     /// Create a memory tool in test mode (isolated storage)
     pub fn new_test() -> Self {
         Self {
-            manager: MemoryManager::new_test(),
+            manager: Arc::new(crate::memory::MemoryManager::new_test())
+                as Arc<dyn MemoryProvider>,
         }
     }
 
@@ -138,16 +139,16 @@ impl Tool for MemoryTool {
                     action: "remember".into(),
                     detail: truncate_for_widget(&content, 40),
                 });
+                let mem_scope = match scope {
+                    "global" => MemoryScope::Global,
+                    _ => MemoryScope::Project,
+                };
                 let mut entry =
                     MemoryEntry::new(category.clone(), &content).with_source(ctx.session_id);
                 if let Some(tags) = input.tags {
                     entry = entry.with_tags(tags);
                 }
-                let id = if scope == "global" {
-                    self.manager.remember_global(entry)?
-                } else {
-                    self.manager.remember_project(entry)?
-                };
+                let id = self.manager.remember(entry, mem_scope).await?;
                 memory::add_event(MemoryEventKind::ToolRemembered {
                     content: truncate_for_widget(&content, 60),
                     scope: scope.to_string(),
@@ -176,26 +177,25 @@ impl Tool for MemoryTool {
                             action: "recall".into(),
                             detail: "recent".into(),
                         });
-                        let result = match self.manager.get_prompt_memories_scoped(limit, scope) {
-                            Some(memories) => {
-                                let count =
-                                    memories.lines().filter(|l| l.starts_with("- ")).count();
-                                memory::add_event(MemoryEventKind::ToolRecalled {
-                                    query: "(recent)".into(),
-                                    count,
-                                });
-                                Ok(ToolOutput::new(format!("Recent memories:\n{}", memories)))
-                            }
-                            None => {
-                                memory::add_event(MemoryEventKind::ToolRecalled {
-                                    query: "(recent)".into(),
-                                    count: 0,
-                                });
-                                Ok(ToolOutput::new("No memories stored yet."))
-                            }
-                        };
+                        let results = self.manager.recall("", scope, limit, "recent").await?;
+                        let count = results.len();
+                        memory::add_event(MemoryEventKind::ToolRecalled {
+                            query: "(recent)".into(),
+                            count,
+                        });
                         memory::set_state(MemoryState::Idle);
-                        result
+                        if results.is_empty() {
+                            Ok(ToolOutput::new("No memories stored yet."))
+                        } else {
+                            let out = results
+                                .iter()
+ .map(|(entry, _)| {
+                                        format!("- [{}] {}", entry.category, entry.content)
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join("\n");
+                            Ok(ToolOutput::new(format!("Recent memories:\n{}", out)))
+                        }
                     }
                     "semantic" | "cascade" => {
                         let query = match &input.query {
@@ -211,13 +211,7 @@ impl Tool for MemoryTool {
                             detail: truncate_for_widget(&query, 40),
                         });
 
-                        let results = if mode == "cascade" {
-                            self.manager
-                                .find_similar_with_cascade_scoped(&query, 0.5, limit, scope)?
-                        } else {
-                            self.manager
-                                .find_similar_scoped(&query, 0.5, limit, scope)?
-                        };
+                        let results = self.manager.recall(&query, scope, limit, mode).await?;
 
                         memory::add_event(MemoryEventKind::ToolRecalled {
                             query: truncate_for_widget(&query, 40),
@@ -269,7 +263,7 @@ impl Tool for MemoryTool {
                     action: "search".into(),
                     detail: truncate_for_widget(&query, 40),
                 });
-                let results = self.manager.search_scoped(&query, scope)?;
+                let results = self.manager.search(&query, scope).await?;
                 memory::add_event(MemoryEventKind::ToolRecalled {
                     query: truncate_for_widget(&query, 40),
                     count: results.len(),
@@ -294,7 +288,7 @@ impl Tool for MemoryTool {
                     action: "list".into(),
                     detail: String::new(),
                 });
-                let all = self.manager.list_all_scoped(scope)?;
+                let all = self.manager.list_all(scope).await?;
                 memory::add_event(MemoryEventKind::ToolListed { count: all.len() });
                 memory::set_state(MemoryState::Idle);
                 if all.is_empty() {
@@ -316,7 +310,7 @@ impl Tool for MemoryTool {
                     action: "forget".into(),
                     detail: truncate_for_widget(&id, 30),
                 });
-                let found = self.manager.forget(&id)?;
+                let found = self.manager.forget(&id).await?;
                 memory::add_event(MemoryEventKind::ToolForgot { id: id.clone() });
                 memory::set_state(MemoryState::Idle);
                 if found {
@@ -338,7 +332,7 @@ impl Tool for MemoryTool {
                     detail: format!("{} +{}", truncate_for_widget(&id, 20), tags.join(",")),
                 });
                 for tag in &tags {
-                    self.manager.tag_memory(&id, tag)?;
+                    self.manager.tag(&id, tag).await?;
                 }
                 let tags_str = tags.join(", ");
                 memory::add_event(MemoryEventKind::ToolTagged {
@@ -369,7 +363,7 @@ impl Tool for MemoryTool {
                         truncate_for_widget(&to_id, 15)
                     ),
                 });
-                self.manager.link_memories(&from_id, &to_id, weight)?;
+                self.manager.link(&from_id, &to_id, weight).await?;
                 memory::add_event(MemoryEventKind::ToolLinked {
                     from: from_id.clone(),
                     to: to_id.clone(),
@@ -388,7 +382,7 @@ impl Tool for MemoryTool {
                     action: "related".into(),
                     detail: truncate_for_widget(&id, 30),
                 });
-                let related = self.manager.get_related(&id, depth)?;
+                let related = self.manager.related(&id, depth).await?;
                 memory::add_event(MemoryEventKind::ToolRecalled {
                     query: format!("related:{}", truncate_for_widget(&id, 20)),
                     count: related.len(),
@@ -443,7 +437,7 @@ mod tests {
 
     #[test]
     fn schema_only_advertises_core_memory_fields() {
-        let schema = MemoryTool::new().parameters_schema();
+        let schema = MemoryTool::new_test().parameters_schema();
         let props = schema["properties"]
             .as_object()
             .expect("memory schema should have properties");

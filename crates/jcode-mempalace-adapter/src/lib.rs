@@ -285,6 +285,163 @@ impl MempalaceAdapter {
     }
 }
 
+// =====================================================================
+// MemoryProvider trait implementation (behind "backend")
+// =====================================================================
+
+#[cfg(feature = "backend")]
+#[async_trait::async_trait]
+impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
+    async fn remember(
+        &self,
+        entry: jcode_memory_types::MemoryEntry,
+        scope: jcode_memory_types::MemoryScope,
+    ) -> anyhow::Result<String> {
+        let category = &entry.category;
+        let tags = entry.tags.clone();
+        let source = entry.source.as_deref();
+        let content = entry.content.clone();
+        self.remember(&content, category, &tags, scope, source).await
+    }
+
+    async fn recall(
+        &self,
+        query: &str,
+        scope: jcode_memory_types::MemoryScope,
+        limit: usize,
+        mode: &str,
+    ) -> anyhow::Result<Vec<(jcode_memory_types::MemoryEntry, f32)>> {
+        use mempalace_core::{MemoryProvider as MpProvider, SearchScope};
+
+        let search_scope = match scope {
+            jcode_memory_types::MemoryScope::Project => {
+                SearchScope::new().wing("project").limit(limit)
+            }
+            _ => SearchScope::new().limit(limit),
+        };
+
+        let hits = if mode == "cascade" {
+            self.palace
+                .cascade_search(query, &search_scope, 2, limit)
+                .await?
+        } else {
+            MpProvider::search(&self.palace, query, &search_scope).await?
+        };
+
+        let entries: Vec<_> = hits
+            .into_iter()
+            .map(|h| {
+                let mut entry = jcode_memory_types::MemoryEntry::new(
+                    jcode_memory_types::MemoryCategory::Fact,
+                    &h.text,
+                );
+                entry.id = format!("mp-{}", uuid::Uuid::new_v4());
+                (entry, h.similarity as f32)
+            })
+            .collect();
+        Ok(entries)
+    }
+
+    async fn search(
+        &self,
+        query: &str,
+        scope: jcode_memory_types::MemoryScope,
+    ) -> anyhow::Result<Vec<jcode_memory_types::MemoryEntry>> {
+        use mempalace_core::{MemoryProvider as MpProvider, SearchScope};
+
+        let search_scope = match scope {
+            jcode_memory_types::MemoryScope::Project => SearchScope::new().wing("project"),
+            _ => SearchScope::new(),
+        };
+
+        let hits = MpProvider::search(&self.palace, query, &search_scope).await?;
+        let entries = hits
+            .into_iter()
+            .map(|h| {
+                let mut entry = jcode_memory_types::MemoryEntry::new(
+                    jcode_memory_types::MemoryCategory::Fact,
+                    &h.text,
+                );
+                entry.id = format!("mp-{}", uuid::Uuid::new_v4());
+                entry
+            })
+            .collect();
+        Ok(entries)
+    }
+
+    async fn list_all(
+        &self,
+        scope: jcode_memory_types::MemoryScope,
+    ) -> anyhow::Result<Vec<jcode_memory_types::MemoryEntry>> {
+        let results = MempalaceAdapter::list_all(self, scope).await?;
+        let entries = results
+            .into_iter()
+            .map(|(text, _kind, _extra)| {
+                let mut entry = jcode_memory_types::MemoryEntry::new(
+                    jcode_memory_types::MemoryCategory::Fact,
+                    &text,
+                );
+                entry.id = format!("mp-{}", uuid::Uuid::new_v4());
+                entry
+            })
+            .collect();
+        Ok(entries)
+    }
+
+    async fn forget(&self, id: &str) -> anyhow::Result<bool> {
+        self.forget(id).await
+    }
+
+    async fn tag(&self, id: &str, tag: &str) -> anyhow::Result<()> {
+        self.tag(id, &[tag.to_string()]).await
+    }
+
+    async fn link(&self, from_id: &str, to_id: &str, weight: f32) -> anyhow::Result<()> {
+        self.link(from_id, to_id, weight).await
+    }
+
+    async fn related(
+        &self,
+        id: &str,
+        depth: usize,
+    ) -> anyhow::Result<Vec<jcode_memory_types::MemoryEntry>> {
+        let results = self.related(id, depth).await?;
+        let entries = results
+            .into_iter()
+            .map(|(text, _score)| {
+                let mut entry = jcode_memory_types::MemoryEntry::new(
+                    jcode_memory_types::MemoryCategory::Fact,
+                    &text,
+                );
+                entry.id = format!("mp-{}", uuid::Uuid::new_v4());
+                entry
+            })
+            .collect();
+        Ok(entries)
+    }
+
+    async fn get_prompt_memories(
+        &self,
+        limit: usize,
+        scope: jcode_memory_types::MemoryScope,
+    ) -> anyhow::Result<Vec<jcode_memory_types::MemoryEntry>> {
+        let results = MempalaceAdapter::list_all(self, scope).await?;
+        let entries = results
+            .into_iter()
+            .take(limit)
+            .map(|(text, _kind, _extra)| {
+                let mut entry = jcode_memory_types::MemoryEntry::new(
+                    jcode_memory_types::MemoryCategory::Fact,
+                    &text,
+                );
+                entry.id = format!("mp-{}", uuid::Uuid::new_v4());
+                entry
+            })
+            .collect();
+        Ok(entries)
+    }
+}
+
 // ---- tests ------------------------------------------------------------
 
 #[cfg(test)]

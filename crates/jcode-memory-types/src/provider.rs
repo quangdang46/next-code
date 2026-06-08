@@ -1,0 +1,90 @@
+// =====================================================================
+// MemoryProvider trait — abstract memory backend
+// =====================================================================
+//
+// This trait defines the common interface for all memory backends in
+// jcode. Both the legacy `MemoryManager` (JSON-based MemoryGraph) and
+// the `MempalaceAdapter` (SQLite + vector search) implement this trait,
+// allowing the rest of the system to be backend-agnostic.
+//
+// # Design decisions
+//
+// - Methods are async to accommodate both sync (MemoryManager) and
+//   async-first (MempalaceAdapter/Palace) backends. The MemoryManager
+//   impl wraps its sync calls in tokio::task::spawn_blocking or
+//   tokio::task::block_in_place as needed.
+// - All methods take `&self` — implementations are expected to be
+//   thread-safe (Send + Sync) and carry their own interior mutability
+//   or Arc-wrapped state.
+// - Return types use `Vec<MemoryEntry>` rather than raw (text, score)
+//   tuples so callers can inspect all metadata (tags, category, trust,
+//   confidence, timestamps).
+
+use crate::{MemoryEntry, MemoryScope};
+use anyhow::Result;
+use async_trait::async_trait;
+
+/// Abstract memory backend.
+///
+/// Implementations:
+/// - `MemoryManager` (jcode-base) — legacy JSON-based storage
+/// - `MempalaceAdapter` (jcode-mempalace-adapter) — SQLite + vector search
+#[async_trait]
+pub trait MemoryProvider: Send + Sync {
+    /// Store a new memory entry.
+    async fn remember(
+        &self,
+        entry: MemoryEntry,
+        scope: MemoryScope,
+    ) -> Result<String>;
+
+    /// Recall memories matching a query.
+    ///
+    /// `mode` controls retrieval strategy:
+    /// - `"recent"` — most recently created/updated memories
+    /// - `"semantic"` — embedding-based similarity search
+    /// - `"cascade"` — semantic + graph traversal expansion
+    async fn recall(
+        &self,
+        query: &str,
+        scope: MemoryScope,
+        limit: usize,
+        mode: &str,
+    ) -> Result<Vec<(MemoryEntry, f32)>>;
+
+    /// Search memories by keyword/text match.
+    async fn search(
+        &self,
+        query: &str,
+        scope: MemoryScope,
+    ) -> Result<Vec<MemoryEntry>>;
+
+    /// List all memories in the given scope.
+    async fn list_all(
+        &self,
+        scope: MemoryScope,
+    ) -> Result<Vec<MemoryEntry>>;
+
+    /// Remove a memory by ID.
+    async fn forget(&self, id: &str) -> Result<bool>;
+
+    /// Add a tag to a memory.
+    async fn tag(&self, id: &str, tag: &str) -> Result<()>;
+
+    /// Create a weighted link between two memories.
+    async fn link(&self, from_id: &str, to_id: &str, weight: f32) -> Result<()>;
+
+    /// Get memories related to the given memory via graph traversal.
+    async fn related(
+        &self,
+        id: &str,
+        depth: usize,
+    ) -> Result<Vec<MemoryEntry>>;
+
+    /// Get memories formatted for prompt injection.
+    async fn get_prompt_memories(
+        &self,
+        limit: usize,
+        scope: MemoryScope,
+    ) -> Result<Vec<MemoryEntry>>;
+}
