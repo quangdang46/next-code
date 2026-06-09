@@ -1,4 +1,3 @@
-// Best-of-N tool — delegated to jcode-best-of-n crate.
 use super::*;
 
 pub(crate) struct BestOfNTool;

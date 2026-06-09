@@ -1,12 +1,8 @@
-// Propose edit tool
 use super::*;
-
 pub(crate) struct ProposeEditTool;
-
 impl ProposeEditTool {
     pub fn new() -> Self { Self }
 }
-
 #[async_trait::async_trait]
 impl Tool for ProposeEditTool {
     fn name(&self) -> &str { "propose_edit" }

@@ -686,8 +686,8 @@ impl Agent {
                             stdin_request_tx: self.stdin_request_tx.clone(),
                             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                             execution_mode: ToolExecutionMode::AgentTurn,
-                            best_of_n_run_id: None,
-                            best_of_n_candidate_id: None,
+            best_of_n_run_id: None,
+            best_of_n_candidate_id: None,
                         };
                         crate::telemetry::record_tool_call();
                         let tool_result = self
@@ -1105,8 +1105,8 @@ impl Agent {
                     stdin_request_tx: self.stdin_request_tx.clone(),
                     graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                     execution_mode: ToolExecutionMode::AgentTurn,
-                            best_of_n_run_id: None,
-                            best_of_n_candidate_id: None,
+            best_of_n_run_id: None,
+            best_of_n_candidate_id: None,
                 };
 
                 if trace {
@@ -1394,10 +1394,6 @@ impl Agent {
                 }
             }
         }
-
-        // Fire stop hooks for background fork operations
-        #[cfg(feature = "forked-agent")]
-        self.handle_stop_hooks().await;
 
         Ok(())
     }

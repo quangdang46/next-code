@@ -1082,7 +1082,6 @@ impl Default for PowerConfig {
         }
     }
 }
-
 // ── Execution Policy Config ────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
