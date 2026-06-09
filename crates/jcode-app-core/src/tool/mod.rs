@@ -1,6 +1,7 @@
 mod agentgrep;
 pub mod ambient;
 mod apply_patch;
+mod binary_ext;
 mod bash;
 mod batch;
 mod best_of_n;

@@ -100,6 +100,7 @@ members = [
 [workspace.dependencies]
 ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "a8305de" }
 ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", rev = "a8305de" }
+ffs-symbol = { git = "https://github.com/quangdang46/fast_file_search", rev = "a8305de" }
 strum = { version = "0.26", features = ["derive"] }
 regex = "1"
 

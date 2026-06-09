@@ -124,6 +124,7 @@ jcode-plugin-core = { path = "../jcode-plugin-core" }
 jcode-plugin-runtime = { path = "../jcode-plugin-runtime" }
 jcode-swarm-core = { path = "../jcode-swarm-core" }
 jcode-protocol = { path = "../jcode-protocol" }
+ffs-symbol = { workspace = true }
 jcode-selfdev-types = { path = "../jcode-selfdev-types" }
 jcode-session-types = { path = "../jcode-session-types" }
 jcode-setup-hints = { path = "../jcode-setup-hints" }
