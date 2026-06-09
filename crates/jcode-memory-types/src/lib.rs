@@ -1,8 +1,4 @@
 pub mod graph;
-#[cfg(feature = "extraction")]
-pub mod extraction;
-#[cfg(feature = "extraction")]
-pub mod extraction_prompts;
 pub mod provider;
 pub use provider::GraphOperations;
 pub use provider::MemoryProvider;

@@ -38,8 +38,6 @@ use crate::tool::{Registry, ToolContext, ToolExecutionMode};
 use anyhow::Result;
 use futures::StreamExt;
 use jcode_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry};
-#[cfg(feature = "forked-agent")]
-use jcode_swarm_core::fork;
 #[cfg(feature = "dcp")]
 #[allow(unused_imports)]
 use std::cell::Cell;
@@ -1023,15 +1021,9 @@ impl Agent {
                 }
             });
         }
-
-        #[cfg(feature = "forked-agent")]
-        jcode_swarm_core::fork::clear_cache_safe_params();
     }
 
     pub fn mark_crashed(&mut self, message: Option<String>) {
-        #[cfg(feature = "forked-agent")]
-        jcode_swarm_core::fork::clear_cache_safe_params();
-
         crate::telemetry::record_crash(
             self.provider.name(),
             &self.provider.model(),
