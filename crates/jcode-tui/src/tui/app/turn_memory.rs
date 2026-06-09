@@ -306,7 +306,6 @@ impl App {
                         confidence: 1.0,
                     };
 
-                    // Store memory
                     if manager.remember_project(entry).is_ok() {
                         stored_count += 1;
                     }
