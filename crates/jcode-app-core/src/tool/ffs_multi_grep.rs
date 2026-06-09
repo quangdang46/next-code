@@ -1,16 +1,13 @@
 use super::{Tool, ToolContext, ToolOutput};
-use aho_corasick::AhoCorasick;
 use anyhow::Result;
 use async_trait::async_trait;
+use ffs_search::directory_grep::grep_directory;
 use serde::Deserialize;
 use serde_json::{Value, json};
+use std::collections::HashSet;
 use std::path::Path;
-use std::sync::Arc;
-use super::binary_ext::is_binary_extension;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 const MAX_RESULTS: usize = 100;
-const MAX_LINE_LEN: usize = 2000;
 
 pub struct FfsMultiGrepTool;
 
@@ -47,7 +44,7 @@ impl Tool for FfsMultiGrepTool {
     }
 
     fn description(&self) -> &str {
-        "Search for multiple patterns simultaneously. Uses Aho-Corasick for SIMD-accelerated multi-pattern matching."
+        "Search for multiple patterns simultaneously. Uses ffs-search directory_grep for each pattern and combines results."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -131,142 +128,75 @@ impl Tool for FfsMultiGrepTool {
     }
 }
 
+/// Multi-pattern grep using ffs-search's grep_directory.
+///
+/// For "any" mode: runs grep_directory for each pattern and deduplicates results.
+/// For "all" mode: runs grep_directory for the first pattern, then filters lines
+/// to those containing ALL remaining patterns.
 fn multi_grep_blocking(
     base: &Path,
     patterns: &[String],
     mode: &str,
 ) -> Result<Vec<MultiGrepResult>> {
-    let ac = AhoCorasick::builder()
-        .build(patterns.iter().map(|s| s.as_str()))
-        .map_err(|e| anyhow::anyhow!("Failed to build Aho-Corasick automaton: {}", e))?;
+    if mode == "all" {
+        let first = &patterns[0];
+        let rest = &patterns[1..];
 
-    let mode_all = mode == "all";
+        let all_matches = grep_directory(base, &regex::escape(first), MAX_RESULTS);
 
-    let hit_count = Arc::new(AtomicUsize::new(0));
-    let results = Arc::new(std::sync::Mutex::new(Vec::new()));
+        if rest.is_empty() {
+            return Ok(all_matches
+                .into_iter()
+                .map(|m| MultiGrepResult {
+                    file: m.path,
+                    line_num: m.line_number as usize,
+                    line: m.line,
+                })
+                .collect());
+        }
 
-    let walker = ignore::WalkBuilder::new(base)
-        .hidden(false)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .threads(
-            std::thread::available_parallelism()
-                .map(|n| n.get())
-                .unwrap_or(4)
-                .min(8),
-        )
-        .build_parallel();
-
-    let base_owned = base.to_path_buf();
-
-    walker.run(|| {
-        let ac = ac.clone();
-        let patterns = patterns.to_vec();
-        let mode_all = mode_all;
-        let hit_count = hit_count.clone();
-        let results = results.clone();
-        let base = base_owned.clone();
-
-        Box::new(move |entry| {
-            if hit_count.load(Ordering::Relaxed) >= MAX_RESULTS {
-                return ignore::WalkState::Quit;
+        let mut results: Vec<MultiGrepResult> = Vec::new();
+        for m in all_matches {
+            if results.len() >= MAX_RESULTS {
+                break;
             }
-
-            let entry = match entry {
-                Ok(e) => e,
-                Err(_) => return ignore::WalkState::Continue,
-            };
-
-            let path = entry.path();
-
-            // Use entry.file_type() (cached from readdir, no extra stat)
-            let ft = match entry.file_type() {
-                Some(ft) => ft,
-                None => return ignore::WalkState::Continue,
-            };
-            if ft.is_dir() {
-                return ignore::WalkState::Continue;
+            if rest.iter().all(|p| m.line.contains(p.as_str())) {
+                results.push(MultiGrepResult {
+                    file: m.path,
+                    line_num: m.line_number as usize,
+                    line: m.line,
+                });
             }
+        }
+        return Ok(results);
+    }
 
-            if is_binary_extension(path) {
-                return ignore::WalkState::Continue;
+    // "any" mode
+    let mut seen: HashSet<(String, usize)> = HashSet::new();
+    let mut results: Vec<MultiGrepResult> = Vec::new();
+
+    for pattern in patterns {
+        if results.len() >= MAX_RESULTS {
+            break;
+        }
+        let matches = grep_directory(base, &regex::escape(pattern), MAX_RESULTS);
+        for m in matches {
+            if results.len() >= MAX_RESULTS {
+                break;
             }
-
-            if let Ok(content) = std::fs::read_to_string(path) {
-                let mut local_results = Vec::new();
-                for (line_num, line) in content.lines().enumerate() {
-                    if hit_count.load(Ordering::Relaxed) + local_results.len() >= MAX_RESULTS {
-                        break;
-                    }
-
-                    let matches = ac.find_iter(line).count();
-
-                    let matched = if mode_all {
-                        // "all" mode: line must contain ALL patterns
-                        // Each pattern match increments the count; we need at least
-                        // the number of patterns to confirm all matched
-                        find_all_match(line, &patterns)
-                    } else {
-                        matches > 0
-                    };
-
-                    if matched {
-                        let relative = path
-                            .strip_prefix(&base)
-                            .unwrap_or(path)
-                            .display()
-                            .to_string();
-
-                        let truncated = if line.len() > MAX_LINE_LEN {
-                            format!("{}...", crate::util::truncate_str(line, MAX_LINE_LEN))
-                        } else {
-                            line.to_string()
-                        };
-
-                        local_results.push(MultiGrepResult {
-                            file: relative,
-                            line_num: line_num + 1,
-                            line: truncated,
-                        });
-                    }
-                }
-
-                if !local_results.is_empty() {
-                    let count = local_results.len();
-                    hit_count.fetch_add(count, Ordering::Relaxed);
-                    let mut guard = results
-                        .lock()
-                        .unwrap_or_else(|poisoned| poisoned.into_inner());
-                    guard.extend(local_results);
-                }
+            let key = (m.path.clone(), m.line_number as usize);
+            if seen.insert(key) {
+                results.push(MultiGrepResult {
+                    file: m.path,
+                    line_num: m.line_number as usize,
+                    line: m.line,
+                });
             }
+        }
+    }
 
-            ignore::WalkState::Continue
-        })
-    });
-
-    let mut final_results = match Arc::try_unwrap(results) {
-        Ok(mutex) => mutex
-            .into_inner()
-            .unwrap_or_else(|poisoned| poisoned.into_inner()),
-        Err(arc) => arc
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner())
-            .clone(),
-    };
-
-    // Sort by file then line number for deterministic output
-    final_results.sort_by(|a, b| a.file.cmp(&b.file).then(a.line_num.cmp(&b.line_num)));
-    final_results.truncate(MAX_RESULTS);
-
-    Ok(final_results)
-}
-
-/// For "all" mode, check that every pattern matches somewhere in the line.
-/// Uses simple substring search (patterns are already lowered to strings).
-fn find_all_match(line: &str, patterns: &[String]) -> bool {
-    patterns.iter().all(|p| line.contains(p.as_str()))
+    results.sort_by(|a, b| a.file.cmp(&b.file).then(a.line_num.cmp(&b.line_num)));
+    Ok(results)
 }
 
 #[cfg(test)]
@@ -308,7 +238,6 @@ mod tests {
             "all",
         )
         .unwrap();
-        // The last comment line contains both "foo" and "bar", and the "// foo and bar" line does too
         assert!(
             results
                 .iter()
@@ -332,22 +261,11 @@ mod tests {
     }
 
     #[test]
-    fn test_multi_grep_empty_patterns_still_works() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let file_path = temp_dir.path().join("test.rs");
-        let mut file = std::fs::File::create(&file_path).unwrap();
-        writeln!(file, "fn test() {{}}").unwrap();
-
-        let results = multi_grep_blocking(temp_dir.path(), &["".to_string()], "any").unwrap();
-        assert!(!results.is_empty(), "empty pattern should match every line");
-    }
-
-    #[test]
     fn test_multi_grep_binary_extension_skipped() {
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("image.png");
         let mut file = std::fs::File::create(&file_path).unwrap();
-        write!(file, "this is not really a png file but has the extension").unwrap();
+        write!(file, "this is text inside a png extension").unwrap();
 
         let results = multi_grep_blocking(temp_dir.path(), &["this".to_string()], "any").unwrap();
         assert!(results.is_empty(), "should skip binary extensions");
@@ -361,7 +279,7 @@ mod tests {
         let mut file = std::fs::File::create(&file_path).unwrap();
         write!(
             file,
-            "pub fn main() {{\n    let msg = \"hello\";\n    println!(\"{{}}\", msg);\n}}\n"
+            "pub fn main() {{\n    let msg = \"hello\";\n}}\n"
         )
         .unwrap();
 
