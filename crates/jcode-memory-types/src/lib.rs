@@ -3,6 +3,9 @@ pub mod graph;
 pub mod extraction;
 #[cfg(feature = "extraction")]
 pub mod extraction_prompts;
+pub mod provider;
+pub use provider::GraphOperations;
+pub use provider::MemoryProvider;
 pub use graph::{
     ClusterEntry, Edge, EdgeKind, GRAPH_VERSION, GraphMetadata, MemoryGraph, TagEntry,
 };

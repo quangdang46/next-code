@@ -131,6 +131,7 @@ jcode-storage = { path = "../jcode-storage" }
 jcode-secrets = { path = "../jcode-secrets" }
 jcode-task-types = { path = "../jcode-task-types" }
 jcode-tool-core = { path = "../jcode-tool-core" }
+jcode-best-of-n = { path = "../jcode-best-of-n" }
 jcode-tool-types = { path = "../jcode-tool-types" }
 jcode-side-panel-types = { path = "../jcode-side-panel-types" }
 jcode-mempalace-adapter = { path = "../jcode-mempalace-adapter", optional = true }
