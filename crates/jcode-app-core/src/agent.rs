@@ -38,6 +38,8 @@ use crate::tool::{Registry, ToolContext, ToolExecutionMode};
 use anyhow::Result;
 use futures::StreamExt;
 use jcode_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry};
+#[cfg(feature = "forked-agent")]
+use jcode_swarm_core::fork;
 #[cfg(feature = "dcp")]
 #[allow(unused_imports)]
 use std::cell::Cell;
@@ -250,6 +252,12 @@ pub struct Agent {
     /// DCP plugin for context pruning (behind feature flag).
     #[cfg(feature = "dcp")]
     dcp: Option<crate::dcp_plugin::DcpPlugin>,
+    /// Best-of-N run ID, set when this agent is spawned by the orchestrator and
+    /// copied onto every ToolContext so propose_* tools can attribute proposals.
+    best_of_n_run_id: Option<String>,
+    /// Best-of-N candidate ID, set when this agent is spawned by the orchestrator
+    /// and copied onto every ToolContext so propose_* tools can attribute proposals.
+    best_of_n_candidate_id: Option<String>,
 }
 
 impl Agent {
@@ -311,6 +319,8 @@ impl Agent {
             dispatch_config: DispatchConfig::default(),
             #[cfg(feature = "dcp")]
             dcp: crate::dcp_plugin::DcpPlugin::new().ok(),
+            best_of_n_run_id: None,
+            best_of_n_candidate_id: None,
         };
         crate::tool::set_session_tool_policy(
             &agent.session.id,
@@ -398,6 +408,14 @@ impl Agent {
             false,
         );
         agent
+    }
+
+    /// Set the best-of-N context on this agent. Called by the orchestrator
+    /// before a candidate run so that propose_* tools can attribute their
+    /// proposals to the correct run + candidate.
+    pub fn set_best_of_n_context(&mut self, run_id: String, candidate_id: String) {
+        self.best_of_n_run_id = Some(run_id);
+        self.best_of_n_candidate_id = Some(candidate_id);
     }
 
     pub fn new_with_session(
@@ -1009,9 +1027,15 @@ impl Agent {
                 }
             });
         }
+
+        #[cfg(feature = "forked-agent")]
+        jcode_swarm_core::fork::clear_cache_safe_params();
     }
 
     pub fn mark_crashed(&mut self, message: Option<String>) {
+        #[cfg(feature = "forked-agent")]
+        jcode_swarm_core::fork::clear_cache_safe_params();
+
         crate::telemetry::record_crash(
             self.provider.name(),
             &self.provider.model(),

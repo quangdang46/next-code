@@ -3,6 +3,7 @@ pub mod ambient;
 mod apply_patch;
 mod bash;
 mod batch;
+mod best_of_n;
 mod bg;
 mod browser;
 mod codesearch;
@@ -29,6 +30,8 @@ mod multiedit;
 mod notepad;
 mod open;
 mod patch;
+mod propose_edit;
+mod propose_write;
 mod read;
 pub mod selfdev;
 pub(crate) mod serde_coerce;
@@ -103,6 +106,43 @@ fn session_tool_policy(session_id: &str) -> Option<SessionToolPolicy> {
         .cloned()
 }
 
+/// Global handle to the active best-of-N orchestrator's
+/// `BestOfNOrchestratorHandle`, registered by `Agent::new_with_session`
+/// while a best-of-N run is in flight.
+///
+/// `propose_edit` / `propose_write` are registered as stateless base tools,
+/// so they have no constructor-time access to the Registry. They look up
+/// the store through this static instead. The handle is `None` outside of
+/// best-of-N runs and the propose tools must refuse to execute in that case.
+///
+/// Uses `StdRwLock` (not `OnceLock`) so the handle is updated on each run
+/// rather than being permanently stuck on the first run's values.
+static BEST_OF_N_HANDLE: StdRwLock<Option<BestOfNOrchestratorHandle>> =
+    StdRwLock::new(None);
+
+/// Install the global best-of-N handle. Called by the agent when a
+/// best-of-N run starts. Updates on every call so subsequent runs
+/// overwrite the stale handle.
+pub fn set_best_of_n_handle(handle: BestOfNOrchestratorHandle) {
+    if let Ok(mut guard) = BEST_OF_N_HANDLE.write() {
+        *guard = Some(handle);
+    }
+}
+
+/// Borrow the global best-of-N handle, if one has been installed.
+pub fn get_best_of_n_handle() -> Option<BestOfNOrchestratorHandle> {
+    BEST_OF_N_HANDLE.read().ok()?.clone()
+}
+
+/// Clear the global best-of-N handle. Called after a run completes
+/// (both auto-apply and show-mode paths) so stale state does not leak
+/// across unrelated agent turns.
+pub fn clear_best_of_n_handle() {
+    if let Ok(mut guard) = BEST_OF_N_HANDLE.write() {
+        *guard = None;
+    }
+}
+
 /// Registry of available tools (Arc-wrapped for sharing)
 ///
 /// Clone creates a fresh CompactionManager so each subagent gets independent
@@ -115,8 +155,24 @@ pub struct Registry {
     hook_registry: Arc<RwLock<HookRegistry>>,
     /// Dispatch configuration for hooks
     dispatch_config: DispatchConfig,
+    /// Best-of-N orchestrator handle, set during Agent::new_with_session.
+    pub best_of_n: Arc<RwLock<Option<BestOfNOrchestratorHandle>>>,
     #[cfg(feature = "dcp")]
     dcp: Option<Arc<Mutex<crate::dcp_plugin::DcpPlugin>>>,
+}
+
+/// Handle to the best-of-N orchestrator, stored on the Registry
+/// for access by propose_edit/propose_write tools.
+#[derive(Clone)]
+pub struct BestOfNOrchestratorHandle {
+    /// Run ID for the current best-of-N cycle.
+    pub run_id: String,
+    /// Candidate ID for the current subagent.
+    pub candidate_id: String,
+    /// Best-of-N config (mode, count, temperatures).
+    pub config: jcode_best_of_n::BestOfNConfig,
+    /// Shared proposed content store.
+    pub store: std::sync::Arc<jcode_best_of_n::ProposedContentStore>,
 }
 
 impl Clone for Registry {
@@ -129,6 +185,7 @@ impl Clone for Registry {
             compaction: Arc::new(RwLock::new(CompactionManager::new())),
             hook_registry: self.hook_registry.clone(),
             dispatch_config: self.dispatch_config.clone(),
+            best_of_n: self.best_of_n.clone(),
             #[cfg(feature = "dcp")]
             dcp: self.dcp.clone(),
         }
@@ -192,6 +249,7 @@ impl Registry {
             compaction: Arc::new(RwLock::new(CompactionManager::new())),
             hook_registry: Arc::new(RwLock::new(HookRegistry::default())),
             dispatch_config: DispatchConfig::default(),
+            best_of_n: Arc::new(RwLock::new(None)),
             #[cfg(feature = "dcp")]
             dcp: None,
         }
@@ -211,6 +269,12 @@ impl Registry {
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
+                "propose_write",
+                propose_write::ProposeWriteTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
                 "agentgrep",
                 agentgrep::AgentGrepTool::new,
             );
@@ -221,6 +285,12 @@ impl Registry {
                 side_panel::SidePanelTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "edit", edit::EditTool::new);
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "propose_edit",
+                propose_edit::ProposeEditTool::new,
+            );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
@@ -292,7 +362,6 @@ impl Registry {
                 "session_search",
                 session_search::SessionSearchTool::new,
             );
-            Self::insert_tool_timed(&mut m, &mut timings, "memory", memory::MemoryTool::new);
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
@@ -456,6 +525,7 @@ impl Registry {
             compaction: compaction.clone(),
             hook_registry,
             dispatch_config,
+            best_of_n: Arc::new(RwLock::new(None)),
             #[cfg(feature = "dcp")]
             dcp: None,
         };
@@ -470,7 +540,12 @@ impl Registry {
         Self::insert_tool(
             &mut tools_map,
             "subagent",
-            task::SubagentTool::new(provider, registry.clone()),
+            task::SubagentTool::new(provider.clone(), registry.clone()),
+        );
+        Self::insert_tool(
+            &mut tools_map,
+            "best_of_n",
+            best_of_n::BestOfNTool::new(provider, registry.clone()),
         );
         Self::insert_tool(
             &mut tools_map,
@@ -482,6 +557,19 @@ impl Registry {
             "conversation_search",
             conversation_search::ConversationSearchTool::new(compaction),
         );
+        // Memory tool — uses MemoryProvider abstraction.
+        // Default: legacy MemoryManager. When mempalace-backend feature is
+        // enabled, tries to create a MempalaceAdapter first, falling back
+        // to the legacy manager if the adapter fails to open.
+        {
+            let memory_provider: Arc<dyn jcode_memory_types::MemoryProvider> =
+                Self::create_memory_provider().await;
+            Self::insert_tool(
+                &mut tools_map,
+                "memory",
+                memory::MemoryTool::new(memory_provider),
+            );
+        }
         let session_tools_ms = session_tools_start.elapsed().as_millis();
 
         let write_start = std::time::Instant::now();
@@ -543,6 +631,38 @@ impl Registry {
         );
 
         crate::logging::info("Memory test mode enabled - using isolated storage");
+    }
+
+    /// Create a memory provider, trying MempalaceAdapter first when feature
+    /// `mempalace-backend` is enabled, falling back to legacy MemoryManager.
+    async fn create_memory_provider() -> Arc<dyn jcode_memory_types::MemoryProvider> {
+        #[cfg(feature = "mempalace-backend")]
+        {
+            match Self::open_mempalace().await {
+                Ok(provider) => {
+                    crate::logging::info("Using mempalace memory backend");
+                    return provider;
+                }
+                Err(e) => {
+                    crate::logging::warn(&format!(
+                        "Failed to open mempalace, using legacy: {e}"
+                    ));
+                }
+            }
+        }
+        Arc::new(crate::memory::MemoryManager::new())
+    }
+
+    /// Try to open a MempalaceAdapter at the default palace path.
+    #[cfg(feature = "mempalace-backend")]
+    async fn open_mempalace() -> anyhow::Result<Arc<dyn jcode_memory_types::MemoryProvider>> {
+        use jcode_mempalace_adapter::MempalaceAdapter;
+
+        let jcode_home = jcode_storage::jcode_dir()?;
+        let palace_path = jcode_home.join("mempalace");
+
+        let adapter = MempalaceAdapter::open(&palace_path).await?;
+        Ok(Arc::new(adapter) as Arc<dyn jcode_memory_types::MemoryProvider>)
     }
 
     /// Resolve tool name aliases.

@@ -502,6 +502,8 @@ impl Agent {
                             stdin_request_tx: self.stdin_request_tx.clone(),
                             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                             execution_mode: ToolExecutionMode::AgentTurn,
+                            best_of_n_run_id: None,
+                            best_of_n_candidate_id: None,
                         };
                         crate::telemetry::record_tool_call();
                         let tool_result = self
@@ -898,6 +900,8 @@ impl Agent {
                     stdin_request_tx: self.stdin_request_tx.clone(),
                     graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                     execution_mode: ToolExecutionMode::AgentTurn,
+            best_of_n_run_id: None,
+            best_of_n_candidate_id: None,
                 };
 
                 if trace {
@@ -1070,7 +1074,177 @@ impl Agent {
             }
         }
 
+        // Fire stop hooks (background fork operations)
+        self.handle_stop_hooks().await;
+
         Ok(final_text)
+    }
+
+    /// Run stop hooks after a complete turn.
+    /// Saves CacheSafeParams and spawns background forked agent tasks
+    /// (memory extraction, auto-dream) when the forked-agent feature is enabled.
+    #[cfg(feature = "forked-agent")]
+    #[allow(clippy::await_holding_lock)]
+    pub(super) async fn handle_stop_hooks(&mut self) {
+        use std::sync::Arc;
+        use jcode_swarm_core::fork::{CacheSafeParams, save_cache_safe_params};
+        use jcode_message_types::Message;
+
+        let cfg = crate::config::config();
+        if !cfg.forked_agent.enabled {
+            return;
+        }
+
+        // Save CacheSafeParams for background fork consumers
+        let messages: Vec<Message> = self.session.messages_for_provider_uncached();
+        if messages.is_empty() {
+            return;
+        }
+
+        let tools = self.tool_definitions_for_debug().await;
+        // Use the parent's actual compiled system prompt (static part) for cache key matching.
+        // The fork must use the same system prompt the parent sent to get a cache hit.
+        let split = self.build_system_prompt_split(None);
+        let system_prompt = split.static_part;
+
+        save_cache_safe_params(CacheSafeParams {
+            system_prompt: Arc::from(system_prompt),
+            tools: Arc::from(tools),
+            model: Arc::from(self.provider.model()),
+            fork_context_messages: Arc::from(messages),
+            parent_provider: self.provider.clone(),
+        });
+
+        // Spawn memory extraction (if enabled)
+        let memory_config = &cfg.forked_agent.memory_extraction;
+        if memory_config.enabled {
+            let abort = self.graceful_shutdown.clone();
+            let memory_dir = memory_config.memory_dir.clone();
+            let max_turns = memory_config.max_turns;
+            let min_new_messages = memory_config.min_new_messages;
+            let session_id = self.session.id.clone();
+
+            tokio::spawn(async move {
+                let cache_safe = jcode_swarm_core::fork::get_last_cache_safe_params();
+                let Some(cache_safe) = cache_safe else {
+                    logging::warn(&"Memory extraction: no cache-safe params available".to_string());
+                    return;
+                };
+
+                let messages = cache_safe.fork_context_messages.to_vec();
+                if messages.len() < min_new_messages {
+                    logging::info(&format!(
+                        "Memory extraction: only {} messages, need {}",
+                        messages.len(),
+                        min_new_messages
+                    ));
+                    return;
+                }
+
+                // Check if parent already wrote memories
+                let mut parent_wrote_memory = false;
+                for msg in messages.iter().rev() {
+                    if msg.role != jcode_message_types::Role::Assistant {
+                        continue;
+                    }
+                    for block in &msg.content {
+                        if let jcode_message_types::ContentBlock::ToolUse { name, input, .. } = block {
+                            if matches!(name.as_str(), "write" | "edit" | "create" | "file_write" | "file_edit") {
+                                if let Some(path) = input.get("file_path")
+                                    .or_else(|| input.get("path"))
+                                    .and_then(|p| p.as_str())
+                                {
+                                    let p = std::path::PathBuf::from(path);
+                                    if p.starts_with(&memory_dir) {
+                                        parent_wrote_memory = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if parent_wrote_memory {
+                        break;
+                    }
+                }
+
+                if parent_wrote_memory {
+                    logging::info(&"Memory extraction: parent already wrote memories, skipping".to_string());
+                    return;
+                }
+
+                let prompt = jcode_memory_types::extraction_prompts::build_extraction_prompt(
+                    &jcode_memory_types::extraction::ExtractionPromptVariant::Auto,
+                    messages.len(),
+                    "",
+                    true, // skip_index
+                );
+
+                let params = jcode_swarm_core::fork::ForkedAgentParams {
+                    prompt_messages: vec![jcode_message_types::Message::user(&prompt)],
+                    cache_safe_params: cache_safe,
+                    permission_mode: jcode_swarm_core::fork::ForkPermissionMode::MemoryExtraction {
+                        memory_dir: memory_dir.clone(),
+                    },
+                    fork_label: format!("memory_extraction_{}", session_id),
+                    max_output_tokens: Some(memory_config.max_output_tokens),
+                    max_turns: Some(max_turns),
+                    skip_transcript: true,
+                    parent_abort: Some(abort),
+                };
+
+                let result = jcode_swarm_core::fork::run_forked_agent(params).await;
+                logging::info(&format!(
+                    "Memory extraction: {} messages produced in {}ms",
+                    result.messages.len(),
+                    result.duration_ms
+                ));
+            });
+        }
+
+        // Spawn auto-dream (if enabled and due)
+        let dream_config = &cfg.forked_agent.auto_dream;
+        if dream_config.enabled && dream_config.turn_interval > 0 {
+            let abort = self.graceful_shutdown.clone();
+            let allowed_dirs = dream_config.allowed_dirs.clone();
+            let max_turns = dream_config.max_turns;
+            let session_id = self.session.id.clone();
+
+            tokio::spawn(async move {
+                let cache_safe = jcode_swarm_core::fork::get_last_cache_safe_params();
+                let Some(cache_safe) = cache_safe else {
+                    logging::warn(&"Auto-dream: no cache-safe params available".to_string());
+                    return;
+                };
+
+                let prompt = "Synthesize insights from the recent conversation context. Identify patterns, connections, and high-level takeaways.";
+
+                let params = jcode_swarm_core::fork::ForkedAgentParams {
+                    prompt_messages: vec![jcode_message_types::Message::user(prompt)],
+                    cache_safe_params: cache_safe,
+                    permission_mode: jcode_swarm_core::fork::ForkPermissionMode::AutoDream {
+                        allowed_dirs,
+                    },
+                    fork_label: format!("auto_dream_{}", session_id),
+                    max_output_tokens: Some(dream_config.max_output_tokens),
+                    max_turns: Some(max_turns),
+                    skip_transcript: true,
+                    parent_abort: Some(abort),
+                };
+
+                let result = jcode_swarm_core::fork::run_forked_agent(params).await;
+                logging::info(&format!(
+                    "Auto-dream: {} messages produced in {}ms",
+                    result.messages.len(),
+                    result.duration_ms
+                ));
+            });
+        }
+    }
+
+    /// No-op fallback when the forked-agent feature is disabled.
+    #[cfg(not(feature = "forked-agent"))]
+    pub(super) async fn handle_stop_hooks(&mut self) {
+        // No-op: forked agent feature not enabled
     }
 
     fn messages_end_with_tool_result(messages: &[Message]) -> bool {
