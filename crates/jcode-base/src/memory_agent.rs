@@ -23,6 +23,7 @@ use crate::memory::{self, MemoryEntry, MemoryManager};
 use crate::memory_graph::{ClusterEntry, EdgeKind, MemoryGraph};
 use crate::memory_types::{MemoryEventKind, MemoryState, StepResult, StepStatus};
 use crate::sidecar::Sidecar;
+use jcode_memory_types::{GraphOperations, MemoryProvider, MemoryScope};
 
 /// Context from a retrieval operation for post-retrieval maintenance
 #[derive(Debug, Clone)]
@@ -114,6 +115,12 @@ pub fn build_transcript_for_extraction(messages: &[crate::message::Message]) -> 
     transcript
 }
 
+/// Create a default memory provider that wraps the legacy MemoryManager.
+/// Used by extraction and maintenance functions that need graph access.
+pub fn default_memory_provider() -> Arc<MemoryManager> {
+    Arc::new(MemoryManager::new())
+}
+
 fn manager_for_working_dir(working_dir: Option<&str>) -> MemoryManager {
     match working_dir {
         Some(dir) if !dir.trim().is_empty() => MemoryManager::new().with_project_dir(dir),
@@ -160,7 +167,7 @@ async fn run_final_extraction(transcript: String, session_id: String, working_di
                     .with_source(&session_id)
                     .with_trust(trust);
 
-                if manager.remember_project(entry).is_ok() {
+                if manager.remember(entry, MemoryScope::Project).await.is_ok() {
                     stored_count += 1;
                 }
             }
@@ -638,7 +645,7 @@ impl MemoryAgent {
         }
 
         // Step 5: Post-retrieval maintenance (runs in background)
-        self.post_retrieval_maintenance(memory_manager, retrieval_ctx)
+        self.post_retrieval_maintenance(&memory_manager, retrieval_ctx)
             .await;
 
         Ok(())
@@ -994,7 +1001,7 @@ impl MemoryAgent {
     /// 4. Log memory gaps for future learning
     async fn post_retrieval_maintenance(
         &self,
-        memory_manager: MemoryManager,
+        memory_manager: &MemoryManager,
         ctx: RetrievalContext,
     ) {
         memory::set_state(MemoryState::Maintaining {
@@ -1009,6 +1016,7 @@ impl MemoryAgent {
         });
 
         // Run maintenance in background - don't block retrieval flow
+        let memory_manager = memory_manager.clone();
         tokio::spawn(async move {
             let started = Instant::now();
 
