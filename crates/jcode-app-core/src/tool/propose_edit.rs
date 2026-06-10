@@ -1,4 +1,4 @@
-use super::{get_best_of_n_handle, Tool, ToolContext, ToolOutput};
+use super::{Tool, ToolContext, ToolOutput, get_best_of_n_handle};
 use anyhow::Result;
 use async_trait::async_trait;
 use jcode_best_of_n::ProposedContentStore;

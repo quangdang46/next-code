@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use crate::side_panel::{SidePanelSnapshot, snapshot_for_session, write_markdown_page, focus_page};
+use crate::side_panel::{SidePanelSnapshot, focus_page, snapshot_for_session, write_markdown_page};
 
 // Re-export beads-backed types
 pub use jcode_beads_bridge::mapping::{Goal, GoalMilestone, GoalStep, ToBeadsEpic, ToJcodeGoal};
@@ -174,7 +174,10 @@ fn open_beads(working_dir: Option<&Path>) -> Result<jcode_beads_bridge::BeadsPro
 /// Create a goal (Epic issue) in beads_rust storage.
 pub fn create_goal(input: GoalCreateInput, working_dir: Option<&Path>) -> Result<Goal> {
     let project = open_beads(working_dir)?;
-    let id = input.id.clone().unwrap_or_else(|| format!("goal-{}", short_id()));
+    let id = input
+        .id
+        .clone()
+        .unwrap_or_else(|| format!("goal-{}", short_id()));
 
     let goal = Goal {
         id,
@@ -240,7 +243,12 @@ pub fn load_goal(
         Ok(p) => p,
         Err(_) => return Ok(None),
     };
-    Ok(project.storage().get_issue(id).ok().flatten().map(|i| i.to_goal()))
+    Ok(project
+        .storage()
+        .get_issue(id)
+        .ok()
+        .flatten()
+        .map(|i| i.to_goal()))
 }
 
 /// List all relevant goals (Epic issues).
@@ -257,7 +265,9 @@ pub fn list_relevant_goals(working_dir: Option<&Path>) -> Result<Vec<Goal>> {
 /// Resume a goal for a session.
 pub fn resume_goal(session_id: &str, working_dir: Option<&Path>) -> Result<Option<Goal>> {
     let goals = list_relevant_goals(working_dir)?;
-    Ok(goals.into_iter().find(|g| g.id == session_id || g.title.contains(session_id)))
+    Ok(goals
+        .into_iter()
+        .find(|g| g.id == session_id || g.title.contains(session_id)))
 }
 
 /// Attach a goal to a session (adds a label).
@@ -267,7 +277,9 @@ pub fn attach_goal_to_session(
     working_dir: Option<&Path>,
 ) -> Result<()> {
     let project = open_beads(working_dir)?;
-    project.storage_mut().add_label(&goal.id, &format!("session:{session_id}"), "jcode")?;
+    project
+        .storage_mut()
+        .add_label(&goal.id, &format!("session:{session_id}"), "jcode")?;
     project.flush()?;
     Ok(())
 }
@@ -275,11 +287,13 @@ pub fn attach_goal_to_session(
 /// Load the goal attached to a session.
 pub fn load_attached_goal(session_id: &str, working_dir: Option<&Path>) -> Result<Option<Goal>> {
     let project = open_beads(working_dir)?;
-    let issues = project.storage().list_issues(&beads_rust::storage::ListFilters {
-        types: Some(vec![beads_rust::model::IssueType::Epic]),
-        labels: Some(vec![format!("session:{session_id}")]),
-        ..Default::default()
-    })?;
+    let issues = project
+        .storage()
+        .list_issues(&beads_rust::storage::ListFilters {
+            types: Some(vec![beads_rust::model::IssueType::Epic]),
+            labels: Some(vec![format!("session:{session_id}")]),
+            ..Default::default()
+        })?;
     Ok(issues.into_iter().next().map(|i| i.to_goal()))
 }
 
@@ -325,7 +339,13 @@ pub fn write_goal_page(
     let _ = (working_dir, display);
     let content = format_goal_detail(goal);
     let page_id = goal_page_id(&goal.id);
-    write_markdown_page(session_id, &page_id, Some(&format!("Epic: {}", goal.title)), &content, true)?;
+    write_markdown_page(
+        session_id,
+        &page_id,
+        Some(&format!("Epic: {}", goal.title)),
+        &content,
+        true,
+    )?;
     focus_page(session_id, &page_id)
 }
 
@@ -340,8 +360,16 @@ pub fn open_goal_for_session(
         Some(g) => g,
         None => return Ok(None),
     };
-    let snapshot = write_goal_page(session_id, working_dir, &goal, 
-        if explicit_focus { GoalDisplayMode::Focus } else { GoalDisplayMode::Auto })?;
+    let snapshot = write_goal_page(
+        session_id,
+        working_dir,
+        &goal,
+        if explicit_focus {
+            GoalDisplayMode::Focus
+        } else {
+            GoalDisplayMode::Auto
+        },
+    )?;
     Ok(Some(GoalDisplayResult { goal, snapshot }))
 }
 
@@ -355,8 +383,16 @@ pub fn resume_goal_for_session(
         Some(g) => g,
         None => return Ok(None),
     };
-    let snapshot = write_goal_page(session_id, working_dir, &goal,
-        if explicit_focus { GoalDisplayMode::Focus } else { GoalDisplayMode::Auto })?;
+    let snapshot = write_goal_page(
+        session_id,
+        working_dir,
+        &goal,
+        if explicit_focus {
+            GoalDisplayMode::Focus
+        } else {
+            GoalDisplayMode::Auto
+        },
+    )?;
     Ok(Some(GoalDisplayResult { goal, snapshot }))
 }
 

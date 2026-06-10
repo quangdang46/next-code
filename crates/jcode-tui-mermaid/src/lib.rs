@@ -239,13 +239,11 @@ pub use content_render::{
     image_widget_placeholder_markdown, parse_image_placeholder, result_to_content, result_to_lines,
     write_video_export_marker,
 };
+pub use inline_image::{inline_image_dims, inline_image_id, materialize_inline_image};
 pub use runtime::{
     error_lines_for, get_cached_png, get_font_size, image_protocol_available, init_picker,
     is_video_export_mode, protocol_type, register_external_image, register_inline_image,
     set_video_export_mode,
-};
-pub use inline_image::{
-    inline_image_dims, inline_image_id, materialize_inline_image,
 };
 pub use viewport_render::{
     invalidate_render_state, render_image_widget_viewport, render_image_widget_viewport_precise,

@@ -1,13 +1,15 @@
-use super::best_of_n::{build_allowed_tool_set, build_file_touch_preview, format_show_result, BestOfNRunner};
-use super::{ToolContext, Registry};
+use super::best_of_n::{
+    BestOfNRunner, build_allowed_tool_set, build_file_touch_preview, format_show_result,
+};
+use super::{Registry, ToolContext};
 use crate::provider::Provider;
 use anyhow::Result;
 use async_trait::async_trait;
-use jcode_best_of_n::types::*;
-use jcode_best_of_n::config::TemperatureStrategyConfig;
-use jcode_best_of_n::strategies;
 use jcode_best_of_n::BestOfNConfig;
 use jcode_best_of_n::BestOfNMode;
+use jcode_best_of_n::config::TemperatureStrategyConfig;
+use jcode_best_of_n::strategies;
+use jcode_best_of_n::types::*;
 use jcode_message_types::ToolDefinition;
 use jcode_provider_core::EventStream;
 use std::sync::Arc;
@@ -23,7 +25,9 @@ impl Provider for MockProvider {
         _system: &str,
         _resume_session_id: Option<&str>,
     ) -> Result<EventStream> {
-        Err(anyhow::anyhow!("MockProvider should not be called in tests"))
+        Err(anyhow::anyhow!(
+            "MockProvider should not be called in tests"
+        ))
     }
 
     fn name(&self) -> &str {
@@ -154,7 +158,12 @@ fn test_apply_winner_no_winner_returns_error() {
         };
         let registry = Registry::empty();
         let err = runner
-            .apply_winner(&result, &vec!["src/main.rs".to_string()], &registry, &make_tool_context())
+            .apply_winner(
+                &result,
+                &vec!["src/main.rs".to_string()],
+                &registry,
+                &make_tool_context(),
+            )
             .await
             .unwrap_err();
         assert!(err.to_string().contains("no winner"));
@@ -230,7 +239,11 @@ fn test_config_off_mode_disabled() {
 
 #[test]
 fn test_strategy_temperature_spread() {
-    let temps = TemperatureStrategyConfig { min: 0.2, max: 0.8, values: vec![] };
+    let temps = TemperatureStrategyConfig {
+        min: 0.2,
+        max: 0.8,
+        values: vec![],
+    };
     let strategies = strategies::generate_strategies(4, &temps);
     assert_eq!(strategies.len(), 4);
     let temp_values: Vec<f64> = strategies.iter().map(|s| s.temperature).collect();

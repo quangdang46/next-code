@@ -291,7 +291,11 @@ pub(super) fn draw_messages(
     // is seamless (no jump to the new absolute top).
     let anchored_scroll = app
         .pending_history_anchor_lines_from_bottom()
-        .map(|lines_from_bottom| total_lines.saturating_sub(lines_from_bottom).min(max_scroll));
+        .map(|lines_from_bottom| {
+            total_lines
+                .saturating_sub(lines_from_bottom)
+                .min(max_scroll)
+        });
     let user_scroll = app.scroll_offset().min(max_scroll);
     let scroll = if let Some(anchored) = anchored_scroll {
         anchored

@@ -306,7 +306,10 @@ fn build_symbol_index(root: &Path) -> Result<SymbolIndex> {
 /// file cannot be read or the line does not exist.
 fn read_line_text(path: &Path, line_num: usize) -> Option<String> {
     let content = std::fs::read_to_string(path).ok()?;
-    content.lines().nth(line_num - 1).map(|l| l.trim().to_string())
+    content
+        .lines()
+        .nth(line_num - 1)
+        .map(|l| l.trim().to_string())
 }
 
 /// Map the tree-sitter node `kind` string to the short display label used by
@@ -393,8 +396,11 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let f = tmp.path().join("lib.rs");
         let mut file = std::fs::File::create(&f).unwrap();
-        write!(file, "pub fn hello_world() {{\n    println!(\"hello\");\n}}\n\nfn helper() {{}}\n")
-            .unwrap();
+        write!(
+            file,
+            "pub fn hello_world() {{\n    println!(\"hello\");\n}}\n\nfn helper() {{}}\n"
+        )
+        .unwrap();
 
         let idx = test_index(tmp.path());
         let results = idx.lookup_exact("hello_world");
@@ -468,11 +474,7 @@ mod tests {
     fn read_line_text_returns_correct_line() {
         let tmp = tempfile::tempdir().unwrap();
         let f = tmp.path().join("test.rs");
-        std::fs::write(
-            &f,
-            "line one\n  line two\nline three\n",
-        )
-        .unwrap();
+        std::fs::write(&f, "line one\n  line two\nline three\n").unwrap();
 
         assert_eq!(read_line_text(&f, 1).as_deref(), Some("line one"));
         assert_eq!(read_line_text(&f, 2).as_deref(), Some("line two"));

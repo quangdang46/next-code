@@ -1,10 +1,10 @@
 //! Integration tests for the beads_rust bridge.
 //!
 //! Uses in-memory SQLite to test the facade without real filesystem I/O.
-use crate::mapping::{TodoItem, Goal, ToBeadsIssue, ToBeadsEpic, ToJcodeGoal};
+use crate::mapping::{Goal, ToBeadsEpic, ToBeadsIssue, ToJcodeGoal, TodoItem};
 
 use crate::BeadsProject;
-use beads_rust::model::{Status, Priority, IssueType};
+use beads_rust::model::{IssueType, Priority, Status};
 use chrono::Utc;
 
 fn temp_project(prefix: &str) -> BeadsProject {
@@ -17,7 +17,10 @@ fn temp_project(prefix: &str) -> BeadsProject {
 
 fn rand_id() -> u64 {
     use std::time::{SystemTime, UNIX_EPOCH};
-    SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos() as u64
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64
 }
 
 #[test]
@@ -33,7 +36,11 @@ fn test_beads_project_init_open_flush() {
 #[test]
 fn test_beads_open_or_init() {
     let base = std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir());
-    let dir = base.join(format!(".beads-test-open-{}-{}", std::process::id(), rand_id()));
+    let dir = base.join(format!(
+        ".beads-test-open-{}-{}",
+        std::process::id(),
+        rand_id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     // Should init since no project exists
     let p1 = BeadsProject::open_or_init(&dir, "test").expect("open_or_init should succeed");
@@ -49,7 +56,8 @@ fn test_create_and_list_task() {
     let project = temp_project("test");
     let manager = crate::BeadsTaskManager::new(&project);
 
-    let task = manager.create_task("Test task", Priority::HIGH, &["bug".to_string()])
+    let task = manager
+        .create_task("Test task", Priority::HIGH, &["bug".to_string()])
         .expect("create should succeed");
     assert_eq!(task.title, "Test task");
     assert_eq!(task.status, Status::Open);
@@ -78,7 +86,9 @@ fn test_create_todo_from_item() {
         assigned_to: Some("agent".to_string()),
     };
 
-    let issue = manager.create_todo(&item).expect("create_todo should succeed");
+    let issue = manager
+        .create_todo(&item)
+        .expect("create_todo should succeed");
     assert_eq!(issue.title, "A todo item");
     assert_eq!(issue.status, Status::Open);
     assert_eq!(issue.priority, Priority::HIGH);
@@ -93,14 +103,17 @@ fn test_set_status_and_close() {
     let project = temp_project("test");
     let manager = crate::BeadsTaskManager::new(&project);
 
-    let task = manager.create_task("Status test", Priority::MEDIUM, &[])
+    let task = manager
+        .create_task("Status test", Priority::MEDIUM, &[])
         .expect("create should succeed");
 
-    let claimed = manager.set_status(&task.id, Status::InProgress, "tester")
+    let claimed = manager
+        .set_status(&task.id, Status::InProgress, "tester")
         .expect("set_status should succeed");
     assert_eq!(claimed.status, Status::InProgress);
 
-    let closed = manager.close_task(&task.id, "Done", "tester")
+    let closed = manager
+        .close_task(&task.id, "Done", "tester")
         .expect("close should succeed");
     assert_eq!(closed.status, Status::Closed);
 
@@ -112,7 +125,8 @@ fn test_ready_tasks() {
     let project = temp_project("test");
     let manager = crate::BeadsTaskManager::new(&project);
 
-    let _t1 = manager.create_task("Ready task", Priority::HIGH, &[])
+    let _t1 = manager
+        .create_task("Ready task", Priority::HIGH, &[])
         .expect("create should succeed");
     // Ready tasks need no blockers → empty graph = all ready
     let ready = manager.ready_tasks(10).expect("ready_tasks should succeed");
@@ -178,13 +192,16 @@ fn test_dependency_cycle_detection() {
     let project = temp_project("test");
     let manager = crate::BeadsTaskManager::new(&project);
 
-    let a = manager.create_task("Task A", Priority::MEDIUM, &[])
+    let a = manager
+        .create_task("Task A", Priority::MEDIUM, &[])
         .expect("create A");
-    let b = manager.create_task("Task B", Priority::MEDIUM, &[])
+    let b = manager
+        .create_task("Task B", Priority::MEDIUM, &[])
         .expect("create B");
 
     // A blocks on B
-    manager.add_dependency(&a.id, &b.id, "tester")
+    manager
+        .add_dependency(&a.id, &b.id, "tester")
         .expect("add dep A->B should succeed");
 
     // B blocking on A would create a cycle

@@ -1,10 +1,10 @@
 //! `BeadsTaskManager` — higher-level task operations for jcode tools.
 
-use beads_rust::model::{Issue, Status, Priority, IssueType};
-use beads_rust::storage::{ListFilters, ReadyFilters, ReadySortPolicy};
+use beads_rust::model::{Issue, IssueType, Priority, Status};
 use beads_rust::storage::sqlite::IssueUpdate;
+use beads_rust::storage::{ListFilters, ReadyFilters, ReadySortPolicy};
 
-use crate::mapping::{TodoItem, ToJcodeTodoItem, ToBeadsIssue};
+use crate::mapping::{ToBeadsIssue, ToJcodeTodoItem, TodoItem};
 use crate::project::BeadsProject;
 
 use anyhow::{Context, Result};
@@ -31,12 +31,7 @@ impl<'a> BeadsTaskManager<'a> {
     }
 
     /// Create a task with explicit fields.
-    pub fn create_task(
-        &self,
-        title: &str,
-        priority: Priority,
-        labels: &[String],
-    ) -> Result<Issue> {
+    pub fn create_task(&self, title: &str, priority: Priority, labels: &[String]) -> Result<Issue> {
         let id = format!("bead-{}", short_id());
         let issue = Issue {
             id,
@@ -58,7 +53,9 @@ impl<'a> BeadsTaskManager<'a> {
             statuses: Some(vec![Status::Open, Status::InProgress, Status::Blocked]),
             ..ListFilters::default()
         };
-        self.project.storage().list_issues(&filters)
+        self.project
+            .storage()
+            .list_issues(&filters)
             .context("Failed to list open tasks")
     }
 
@@ -70,7 +67,9 @@ impl<'a> BeadsTaskManager<'a> {
 
     /// Get a single task by ID.
     pub fn get_task(&self, id: &str) -> Result<Option<Issue>> {
-        self.project.storage().get_issue(id)
+        self.project
+            .storage()
+            .get_issue(id)
             .context("Failed to get task")
     }
 
@@ -80,7 +79,10 @@ impl<'a> BeadsTaskManager<'a> {
             status: Some(status),
             ..IssueUpdate::default()
         };
-        let updated = self.project.storage_mut().update_issue(id, &update, actor)
+        let updated = self
+            .project
+            .storage_mut()
+            .update_issue(id, &update, actor)
             .context("Failed to update task status")?;
         self.project.flush()?;
         Ok(updated)
@@ -93,7 +95,10 @@ impl<'a> BeadsTaskManager<'a> {
             close_reason: Some(Some(reason.to_string())),
             ..IssueUpdate::default()
         };
-        let updated = self.project.storage_mut().update_issue(id, &update, actor)
+        let updated = self
+            .project
+            .storage_mut()
+            .update_issue(id, &update, actor)
             .context("Failed to close task")?;
         self.project.flush()?;
         Ok(updated)
@@ -107,14 +112,17 @@ impl<'a> BeadsTaskManager<'a> {
             limit: Some(limit),
             ..ReadyFilters::default()
         };
-        self.project.storage()
+        self.project
+            .storage()
             .get_ready_issues(&filters, ReadySortPolicy::Hybrid)
             .context("Failed to get ready tasks")
     }
 
     /// Get blocked tasks with blocker IDs.
     pub fn blocked_tasks(&self) -> Result<Vec<(Issue, Vec<String>)>> {
-        self.project.storage().get_blocked_issues()
+        self.project
+            .storage()
+            .get_blocked_issues()
             .context("Failed to get blocked tasks")
     }
 
@@ -125,21 +133,27 @@ impl<'a> BeadsTaskManager<'a> {
         if self.project.storage().would_create_cycle(from, to, true)? {
             anyhow::bail!("Adding dependency {from} -> {to} would create a cycle");
         }
-        self.project.storage_mut().add_dependency(from, to, "blocks", actor)?;
+        self.project
+            .storage_mut()
+            .add_dependency(from, to, "blocks", actor)?;
         self.project.flush()?;
         Ok(())
     }
 
     /// Remove a dependency.
     pub fn remove_dependency(&self, from: &str, to: &str, actor: &str) -> Result<()> {
-        self.project.storage_mut().remove_dependency(from, to, actor)?;
+        self.project
+            .storage_mut()
+            .remove_dependency(from, to, actor)?;
         self.project.flush()?;
         Ok(())
     }
 
     /// Get blockers for a task.
     pub fn blockers(&self, id: &str) -> Result<Vec<String>> {
-        self.project.storage().get_blockers(id)
+        self.project
+            .storage()
+            .get_blockers(id)
             .context("Failed to get blockers")
     }
 }

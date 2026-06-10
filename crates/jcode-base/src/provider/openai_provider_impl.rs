@@ -615,8 +615,10 @@ impl Provider for OpenAIProvider {
     }
 
     fn set_temperature(&self, temperature: f32) -> Result<()> {
-        self.temperature
-            .store(temperature.clamp(0.0, 1.0).to_bits(), std::sync::atomic::Ordering::Release);
+        self.temperature.store(
+            temperature.clamp(0.0, 1.0).to_bits(),
+            std::sync::atomic::Ordering::Release,
+        );
         Ok(())
     }
 

@@ -259,14 +259,7 @@ impl Tool for HashlineEditTool {
                         old_string.lines().next().unwrap_or(""),
                         params.new_string.lines().next().unwrap_or("")
                     ));
-                    publish_edit_event(
-                        &ctx,
-                        params.intent,
-                        &path,
-                        start_line,
-                        end_line,
-                        detail,
-                    );
+                    publish_edit_event(&ctx, params.intent, &path, start_line, end_line, detail);
 
                     Ok(ToolOutput::new(format!(
                         "Edited {}: lines {}-{} (anchor verified)\n  old: {}\n  new: {}",
@@ -355,10 +348,9 @@ impl Tool for HashlineEditTool {
                         .map_err(|e| anyhow::anyhow!("invalid range anchor {anchor_str:?}: {e}"))?;
                     let index = doc.build_index();
                     let (start_resolved, end_resolved) =
-                        hashline::anchor::resolve_range(&range, &doc, &index)
-                            .map_err(|e| {
-                                anyhow::anyhow!("failed to resolve range {anchor_str:?}: {e}")
-                            })?;
+                        hashline::anchor::resolve_range(&range, &doc, &index).map_err(|e| {
+                            anyhow::anyhow!("failed to resolve range {anchor_str:?}: {e}")
+                        })?;
 
                     let start_line = start_resolved.line_no;
                     let end_line = end_resolved.line_no;
@@ -390,7 +382,10 @@ impl Tool for HashlineEditTool {
                         &path,
                         start_line,
                         end_line,
-                        Some(format!("lines {}-{}: range replacement", start_line, end_line)),
+                        Some(format!(
+                            "lines {}-{}: range replacement",
+                            start_line, end_line
+                        )),
                     );
 
                     let old_preview = old_lines
@@ -408,8 +403,10 @@ impl Tool for HashlineEditTool {
                     let anchor = hashline::anchor::parse_anchor(&anchor_str)
                         .map_err(|e| anyhow::anyhow!("invalid anchor {anchor_str:?}: {e}"))?;
                     let index = doc.build_index();
-                    let resolved = hashline::anchor::resolve(&anchor, &doc, &index)
-                        .map_err(|e| anyhow::anyhow!("failed to resolve anchor {anchor_str:?}: {e}"))?;
+                    let resolved =
+                        hashline::anchor::resolve(&anchor, &doc, &index).map_err(|e| {
+                            anyhow::anyhow!("failed to resolve anchor {anchor_str:?}: {e}")
+                        })?;
 
                     let old_line = doc.lines[resolved.index].content.to_string();
 

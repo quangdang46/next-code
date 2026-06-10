@@ -314,7 +314,10 @@ pub fn analyze_frames_with_scroll(
         .map(|w| w.appearances + w.disappearances)
         .sum();
     report.total_travel = widgets.iter().map(|w| w.x_travel + w.y_travel).sum();
-    report.total_content_travel = widgets.iter().map(|w| w.x_travel + w.content_y_travel).sum();
+    report.total_content_travel = widgets
+        .iter()
+        .map(|w| w.x_travel + w.content_y_travel)
+        .sum();
     report.total_recycles = widgets.iter().map(|w| w.recycles).sum();
     report.total_size_churn = widgets.iter().map(|w| w.width_churn + w.height_churn).sum();
     report.worst_widget = widgets

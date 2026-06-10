@@ -1319,9 +1319,7 @@ impl Provider for AnthropicProvider {
             oauth_preflight_done: Arc::new(AtomicBool::new(
                 self.oauth_preflight_done.load(Ordering::Relaxed),
             )),
-            temperature: Arc::new(AtomicU32::new(
-                self.temperature.load(Ordering::Acquire),
-            )),
+            temperature: Arc::new(AtomicU32::new(self.temperature.load(Ordering::Acquire))),
         })
     }
 

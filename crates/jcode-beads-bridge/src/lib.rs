@@ -18,9 +18,9 @@ pub use project::BeadsProject;
 pub use tasks::BeadsTaskManager;
 
 // Re-export common beads_rust types so callers only need one import.
-pub use beads_rust::model::{Issue, Status, Priority, IssueType};
-pub use beads_rust::storage::{self, ListFilters};
 pub use beads_rust::error::BeadsError;
+pub use beads_rust::model::{Issue, IssueType, Priority, Status};
+pub use beads_rust::storage::{self, ListFilters};
 
 #[cfg(test)]
 mod tests;

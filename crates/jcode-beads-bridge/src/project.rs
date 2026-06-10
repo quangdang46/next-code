@@ -1,15 +1,15 @@
 //! `BeadsProject` — facade over beads_rust project lifecycle.
 
-use beads_rust::config::{self, ConfigLayer, CliOverrides, ConfigPaths, discover_beads_dir};
+use beads_rust::config::{self, CliOverrides, ConfigLayer, ConfigPaths, discover_beads_dir};
 use beads_rust::storage::sqlite::SqliteStorage;
-use beads_rust::sync::{self, blocking_write_lock};
 use beads_rust::sync::history::HistoryConfig;
+use beads_rust::sync::{self, blocking_write_lock};
 
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::fs::File;
-use std::sync::Mutex;
 use anyhow::{Context, Result};
+use std::fs;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use tracing::info;
 
 /// A discovered and opened beads_rust project.
@@ -31,7 +31,13 @@ impl BeadsProject {
             .map_err(|e| anyhow::anyhow!("config load failed: {e}"))?;
         let lock = blocking_write_lock(&beads_dir).ok();
         info!(?beads_dir, "Opened beads project");
-        Ok(BeadsProject { beads_dir, jsonl_path, config, _write_lock: lock, storage: Mutex::new(storage) })
+        Ok(BeadsProject {
+            beads_dir,
+            jsonl_path,
+            config,
+            _write_lock: lock,
+            storage: Mutex::new(storage),
+        })
     }
 
     pub fn open_or_init(working_dir: &Path, prefix: &str) -> Result<Self> {
@@ -58,13 +64,25 @@ impl BeadsProject {
             .map_err(|e| anyhow::anyhow!("config load failed: {e}"))?;
         let lock = blocking_write_lock(&beads_dir).ok();
         info!(?beads_dir, prefix, "Initialised new beads project");
-        Ok(BeadsProject { beads_dir, jsonl_path, config, _write_lock: lock, storage: Mutex::new(storage) })
+        Ok(BeadsProject {
+            beads_dir,
+            jsonl_path,
+            config,
+            _write_lock: lock,
+            storage: Mutex::new(storage),
+        })
     }
 
     pub fn flush(&self) -> Result<()> {
         let mut storage = self.storage.lock().unwrap();
-        sync::auto_flush(&mut *storage, &self.beads_dir, &self.jsonl_path, false, HistoryConfig::default())
-            .map_err(|e| anyhow::anyhow!("JSONL flush failed: {e}"))?;
+        sync::auto_flush(
+            &mut *storage,
+            &self.beads_dir,
+            &self.jsonl_path,
+            false,
+            HistoryConfig::default(),
+        )
+        .map_err(|e| anyhow::anyhow!("JSONL flush failed: {e}"))?;
         Ok(())
     }
 
@@ -76,5 +94,7 @@ impl BeadsProject {
         self.storage.lock().unwrap()
     }
 
-    pub fn beads_dir(&self) -> &Path { &self.beads_dir }
+    pub fn beads_dir(&self) -> &Path {
+        &self.beads_dir
+    }
 }
