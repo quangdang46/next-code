@@ -5689,6 +5689,7 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
+ "core-graphics",
  "crossterm",
  "dcg-core",
  "dirs 5.0.1",
@@ -5943,6 +5944,7 @@ name = "jcode-config-types"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "serde_json",
 ]
 
 [[package]]
