@@ -86,7 +86,7 @@ impl Tool for FfsGrepTool {
 
         let base_owned = base.to_path_buf();
         let pattern_display = pattern_for_display.clone();
-        let literal_needle = params.pattern.clone();
+        let fallback_pattern = effective_pattern.clone();
 
         let output = tokio::task::spawn_blocking(move || {
             if ffs_support::ffs_preferred() {
@@ -121,9 +121,9 @@ impl Tool for FfsGrepTool {
 
             let label = if rg_available() { "ripgrep" } else { "walkdir" };
             let hits = if rg_available() {
-                grep_ripgrep(&base_owned, &literal_needle, MAX_RESULTS).unwrap_or_default()
+                grep_ripgrep(&base_owned, &fallback_pattern, MAX_RESULTS).unwrap_or_default()
             } else {
-                grep_walkdir(&base_owned, &literal_needle, MAX_RESULTS).unwrap_or_default()
+                grep_walkdir(&base_owned, &fallback_pattern, MAX_RESULTS).unwrap_or_default()
             };
             let mut out = format_grep_hits(&hits, label);
             if hits.len() >= MAX_RESULTS {

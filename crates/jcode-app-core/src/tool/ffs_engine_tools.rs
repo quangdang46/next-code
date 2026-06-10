@@ -74,17 +74,19 @@ impl Tool for FfsFindTool {
     async fn execute(&self, input: Value, ctx: ToolContext) -> Result<ToolOutput> {
         let params: FindInput = serde_json::from_value(input)?;
         let limit = params.limit.unwrap_or(50);
-        let base = workspace_root(ctx, params.path.as_deref());
+        let base = workspace_root(&ctx, params.path.as_deref());
+        let needle = params.needle.clone();
+        let base_for_closure = base.clone();
 
         let (matches, label) = tokio::task::spawn_blocking(move || {
             if ffs_support::ffs_preferred() {
-                match ffs_support::find_files(&base, &params.needle, limit) {
+                match ffs_support::find_files(&base_for_closure, &needle, limit) {
                     Ok(m) if !m.is_empty() => return (m, "ffs-search"),
                     Ok(m) => return (m, "ffs-search"),
                     Err(_) => {}
                 }
             }
-            let m = ffs_support::find_fuzzy_walkdir(&base, &params.needle, limit)
+            let m = ffs_support::find_fuzzy_walkdir(&base_for_closure, &needle, limit)
                 .unwrap_or_default();
             (m, "walkdir-fallback")
         })

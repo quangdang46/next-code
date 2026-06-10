@@ -3408,9 +3408,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "ffs-budget"
+version = "0.1.8"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=e853210#e8532104c82baa00687c1c8182b0024d1ce7bc82"
+dependencies = [
+ "once_cell",
+ "regex",
+ "serde",
+]
+
+[[package]]
+name = "ffs-engine"
+version = "0.1.8"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=e853210#e8532104c82baa00687c1c8182b0024d1ce7bc82"
+dependencies = [
+ "ahash",
+ "dashmap",
+ "ffs-budget",
+ "ffs-grep",
+ "ffs-search",
+ "ffs-symbol",
+ "ignore",
+ "memchr",
+ "parking_lot 0.12.5",
+ "rayon",
+ "serde",
+]
+
+[[package]]
 name = "ffs-grep"
-version = "0.1.6"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=28aef7c#28aef7c40bbca50eb1068dc000b19c56289024ea"
+version = "0.1.8"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=e853210#e8532104c82baa00687c1c8182b0024d1ce7bc82"
 dependencies = [
  "bstr",
  "memchr",
@@ -3418,13 +3446,13 @@ dependencies = [
 
 [[package]]
 name = "ffs-query-parser"
-version = "0.1.6"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=28aef7c#28aef7c40bbca50eb1068dc000b19c56289024ea"
+version = "0.1.8"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=e853210#e8532104c82baa00687c1c8182b0024d1ce7bc82"
 
 [[package]]
 name = "ffs-search"
-version = "0.1.6"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=28aef7c#28aef7c40bbca50eb1068dc000b19c56289024ea"
+version = "0.1.8"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=e853210#e8532104c82baa00687c1c8182b0024d1ce7bc82"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -3465,8 +3493,8 @@ dependencies = [
 
 [[package]]
 name = "ffs-symbol"
-version = "0.1.6"
-source = "git+https://github.com/quangdang46/fast_file_search?rev=28aef7c#28aef7c40bbca50eb1068dc000b19c56289024ea"
+version = "0.1.8"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=e853210#e8532104c82baa00687c1c8182b0024d1ce7bc82"
 dependencies = [
  "aho-corasick",
  "dashmap",
@@ -6317,6 +6345,7 @@ dependencies = [
  "crossterm",
  "dcg-core",
  "dirs 5.0.1",
+ "ffs-engine",
  "ffs-search",
  "flate2",
  "futures",
@@ -6452,6 +6481,7 @@ dependencies = [
  "dcg-core",
  "dirs 5.0.1",
  "dynamic_context_pruning",
+ "ffs-engine",
  "ffs-search",
  "ffs-symbol",
  "flate2",
@@ -7367,6 +7397,8 @@ dependencies = [
  "chrono",
  "crossterm",
  "dirs 5.0.1",
+ "ffs-engine",
+ "ffs-search",
  "futures",
  "global-hotkey",
  "hex",

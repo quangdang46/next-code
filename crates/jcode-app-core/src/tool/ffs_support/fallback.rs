@@ -27,10 +27,7 @@ pub fn rg_available() -> bool {
 pub fn grep_ripgrep(base: &Path, pattern: &str, limit: usize) -> Result<Vec<GrepHit>> {
     let output = Command::new("rg")
         .args([
-            "--line-number",
-            "--no-heading",
-            "--color",
-            "never",
+            "--json",
             "--max-count",
             &limit.to_string(),
         ])
@@ -51,19 +48,20 @@ pub fn grep_ripgrep(base: &Path, pattern: &str, limit: usize) -> Result<Vec<Grep
         if hits.len() >= limit {
             break;
         }
-        let Some((rest, text)) = line.split_once(':') else {
+        let Ok(ev): Result<serde_json::Value, _> = serde_json::from_str(line) else {
             continue;
         };
-        let Some((path, line_no)) = rest.rsplit_once(':') else {
+        if ev["type"] != "match" {
             continue;
-        };
-        let Ok(line_num) = line_no.parse::<usize>() else {
-            continue;
-        };
+        }
+        let Some(path) = ev["data"]["path"]["text"].as_str() else { continue };
+        let Some(line_num) = ev["data"]["line_number"].as_u64() else { continue };
+        let Some(text) = ev["data"]["lines"]["text"].as_str() else { continue };
+        let line_num = line_num as usize;
         hits.push(GrepHit {
             path: path.to_string(),
             line: line_num,
-            text: text.to_string(),
+            text: text.trim_end().to_string(),
         });
     }
     Ok(hits)
@@ -173,6 +171,7 @@ pub fn format_grep_hits(hits: &[GrepHit], label: &str) -> String {
 }
 
 pub fn glob_crate(base: &Path, pattern: &str, limit: usize) -> Result<Vec<String>> {
+    let Ok(pat) = glob::Pattern::new(pattern) else { return Ok(Vec::new()) };
     let mut out = Vec::new();
     for entry in WalkBuilder::new(base).standard_filters(true).build() {
         let entry = entry?;
@@ -186,10 +185,7 @@ pub fn glob_crate(base: &Path, pattern: &str, limit: usize) -> Result<Vec<String
             .display()
             .to_string()
             .replace('\\', "/");
-        if glob::Pattern::new(pattern)
-            .map(|p| p.matches(&rel))
-            .unwrap_or(false)
-        {
+        if pat.matches(&rel) {
             out.push(rel);
             if out.len() >= limit {
                 break;

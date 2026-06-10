@@ -26,13 +26,16 @@ pub fn find_call_sites(engine: &Engine, root: &Path, symbol: &str, limit: usize)
         .collect();
 
     let stack = PreFilterStack::new(engine.handles.bloom.clone());
-    let mut candidates: Vec<(PathBuf, SystemTime, String)> = Vec::new();
+    let mut hits = Vec::new();
     for entry in WalkBuilder::new(root)
         .standard_filters(true)
         .follow_links(false)
         .build()
         .flatten()
     {
+        if hits.len() >= limit {
+            break;
+        }
         if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
             continue;
         }
@@ -44,21 +47,11 @@ pub fn find_call_sites(engine: &Engine, root: &Path, symbol: &str, limit: usize)
         let Ok(content) = std::fs::read_to_string(&path) else {
             continue;
         };
-        candidates.push((path, mtime, content));
-    }
-
-    let survivors = stack.confirm_symbol(
-        &candidates
-            .iter()
-            .map(|(p, m, c)| (p.clone(), *m, c.clone()))
-            .collect::<Vec<_>>(),
-        symbol,
-    );
-    let survivor_set: HashSet<PathBuf> = survivors.into_iter().map(|s| s.path).collect();
-
-    let mut hits = Vec::new();
-    for (path, _mtime, content) in &candidates {
-        if !survivor_set.contains(path) {
+        let confirmed = stack.confirm_symbol(
+            &[(path.clone(), mtime, content.clone())],
+            symbol,
+        );
+        if confirmed.is_empty() {
             continue;
         }
         let path_str = path.display().to_string();
@@ -69,7 +62,7 @@ pub fn find_call_sites(engine: &Engine, root: &Path, symbol: &str, limit: usize)
             }
             if definition_lines
                 .iter()
-                .any(|(p, l)| p == path && *l == lineno)
+                .any(|(p, l)| *p == path && *l == lineno)
             {
                 continue;
             }
@@ -79,7 +72,7 @@ pub fn find_call_sites(engine: &Engine, root: &Path, symbol: &str, limit: usize)
                 text: line.to_string(),
             });
             if hits.len() >= limit {
-                return hits;
+                break;
             }
         }
     }
