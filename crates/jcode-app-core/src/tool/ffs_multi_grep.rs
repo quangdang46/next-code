@@ -277,11 +277,7 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let file_path = temp_dir.path().join("app.rs");
         let mut file = std::fs::File::create(&file_path).unwrap();
-        write!(
-            file,
-            "pub fn main() {{\n    let msg = \"hello\";\n}}\n"
-        )
-        .unwrap();
+        write!(file, "pub fn main() {{\n    let msg = \"hello\";\n}}\n").unwrap();
 
         let ctx = ToolContext {
             session_id: "test".to_string(),

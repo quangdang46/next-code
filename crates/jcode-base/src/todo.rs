@@ -1,27 +1,40 @@
-use crate::storage;
-use anyhow::Result;
-use std::path::PathBuf;
+//! Session-local todo persistence backed by beads_rust.
 
-pub use jcode_task_types::TodoItem;
+pub use jcode_beads_bridge::mapping::TodoItem;
 
-pub fn load_todos(session_id: &str) -> Result<Vec<TodoItem>> {
-    let path = todo_path(session_id)?;
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    storage::read_json(&path).or_else(|_| Ok(Vec::new()))
+use anyhow::{Context, Result};
+
+/// Load todos — returns open/in-progress/blocked tasks as `TodoItem`s.
+pub fn load_todos(_session_id: &str) -> Result<Vec<TodoItem>> {
+    let working_dir = std::env::current_dir().context("no cwd")?;
+    let project = jcode_beads_bridge::BeadsProject::open(&working_dir)
+        .map_err(|e| anyhow::anyhow!("failed to open beads project: {e}"))?;
+    let manager = jcode_beads_bridge::BeadsTaskManager::new(&project);
+    manager.list_todo_items()
 }
 
+/// Check if any todos exist.
 pub fn todos_exist(session_id: &str) -> Result<bool> {
-    Ok(todo_path(session_id)?.exists())
+    let todos = load_todos(session_id)?;
+    Ok(!todos.is_empty())
 }
 
-pub fn save_todos(session_id: &str, todos: &[TodoItem]) -> Result<()> {
-    let path = todo_path(session_id)?;
-    storage::write_json_fast(&path, todos)
-}
+/// Save todos — creates or updates tasks in beads_rust storage.
+pub fn save_todos(session_id: &str, items: &[TodoItem]) -> Result<()> {
+    let working_dir = std::env::current_dir().context("no cwd")?;
+    let project = jcode_beads_bridge::BeadsProject::open(&working_dir)
+        .map_err(|e| anyhow::anyhow!("failed to open beads project: {e}"))?;
+    let manager = jcode_beads_bridge::BeadsTaskManager::new(&project);
 
-fn todo_path(session_id: &str) -> Result<PathBuf> {
-    let base = storage::jcode_dir()?;
-    Ok(base.join("todos").join(format!("{}.json", session_id)))
+    for item in items {
+        if manager.get_task(&item.id)?.is_some() {
+            use beads_rust::model::Status;
+            use std::str::FromStr;
+            let status = Status::from_str(&item.status).unwrap_or(Status::Open);
+            manager.set_status(&item.id, status, session_id).ok();
+        } else {
+            manager.create_todo(item).ok();
+        }
+    }
+    Ok(())
 }

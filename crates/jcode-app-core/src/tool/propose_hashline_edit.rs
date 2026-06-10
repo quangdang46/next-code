@@ -1,4 +1,4 @@
-use super::{get_best_of_n_handle, Tool, ToolContext, ToolOutput};
+use super::{Tool, ToolContext, ToolOutput, get_best_of_n_handle};
 use anyhow::Result;
 use async_trait::async_trait;
 use hashline::sha256_window;
@@ -147,11 +147,7 @@ impl Tool for ProposeHashlineEditTool {
         .map_err(|e| anyhow::anyhow!("{e}"))?;
 
         // Generate diff preview
-        let diff = generate_diff(
-            &params.old_string,
-            &params.new_string,
-            start_line,
-        );
+        let diff = generate_diff(&params.old_string, &params.new_string, start_line);
         let preview = build_file_touch_preview(&diff);
 
         // Write the proposed content to the store. is_new_file = false

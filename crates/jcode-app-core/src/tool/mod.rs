@@ -3,6 +3,7 @@ pub mod ambient;
 mod apply_patch;
 mod bash;
 mod batch;
+mod beads;
 mod best_of_n;
 mod bg;
 mod browser;
@@ -21,6 +22,7 @@ mod ffs_multi_grep;
 mod ffs_outline;
 mod ffs_symbol;
 mod gmail;
+
 mod goal;
 mod hashline_edit;
 mod invalid;
@@ -383,6 +385,37 @@ impl Registry {
                 "initiative",
                 goal::InitiativeTool::new,
             );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "beads_list",
+                beads::BeadsListTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "beads_create",
+                beads::BeadsCreateTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "beads_ready",
+                beads::BeadsReadyTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "beads_claim",
+                beads::BeadsClaimTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "beads_close",
+                beads::BeadsCloseTool::new,
+            );
+            Self::insert_tool_timed(&mut m, &mut timings, "beads_dep", beads::BeadsDepTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "gmail", gmail::GmailTool::new);
             Self::insert_tool_timed(
                 &mut m,

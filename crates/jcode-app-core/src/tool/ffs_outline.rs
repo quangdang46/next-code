@@ -293,11 +293,7 @@ pub fn main() -> Result<()> {
             "should detect struct: {:?}",
             kinds
         );
-        assert!(
-            kinds.contains(&"fn"),
-            "should detect fn: {:?}",
-            kinds
-        );
+        assert!(kinds.contains(&"fn"), "should detect fn: {:?}", kinds);
     }
 
     #[test]
@@ -333,11 +329,7 @@ export class MyComponent {
             "should detect interface: {:?}",
             kinds
         );
-        assert!(
-            kinds.contains(&"fn"),
-            "should detect fn: {:?}",
-            kinds
-        );
+        assert!(kinds.contains(&"fn"), "should detect fn: {:?}", kinds);
         // export class MyComponent is parsed as export_statement by tree-sitter,
         // so the kind is "export" not "class". The class body's methods appear
         // as child entries within the export node.
@@ -371,7 +363,10 @@ export class MyComponent {
         let content = "some random content";
         let path = Path::new("test.unknown");
         let items = outline_blocking(content, path, 20);
-        assert!(items.is_empty(), "unknown extension should produce no items");
+        assert!(
+            items.is_empty(),
+            "unknown extension should produce no items"
+        );
     }
 
     #[test]

@@ -227,7 +227,8 @@ fn content_anchoring_reduces_content_relative_travel() {
             .map(|i| if i % period == 0 { 95 } else { 28 })
             .collect();
         let screen = measure_scroll_mode(&content, 100, 24, &sample_data(), SimMode::Anchored);
-        let stuck = measure_scroll_mode(&content, 100, 24, &sample_data(), SimMode::ContentAnchored);
+        let stuck =
+            measure_scroll_mode(&content, 100, 24, &sample_data(), SimMode::ContentAnchored);
         assert!(
             stuck.widgets.iter().any(|w| w.frames_present > 0),
             "period {period}: expected a widget to be placed"
@@ -277,8 +278,14 @@ fn demo_content_anchor() {
             "{:<20} | screen-anchored: travel/100={:>6.1} content-travel/100={:>6.1} flicker/100={:>5.1} keepVis={:>3.0}% \
              | content-anchored: travel/100={:>6.1} content-travel/100={:>6.1} flicker/100={:>5.1} keepVis={:>3.0}%",
             name,
-            s.travel_per_100_lines, s.content_travel_per_100_lines, s.flicker_per_100_lines, s.mean_kind_visibility * 100.0,
-            c.travel_per_100_lines, c.content_travel_per_100_lines, c.flicker_per_100_lines, c.mean_kind_visibility * 100.0,
+            s.travel_per_100_lines,
+            s.content_travel_per_100_lines,
+            s.flicker_per_100_lines,
+            s.mean_kind_visibility * 100.0,
+            c.travel_per_100_lines,
+            c.content_travel_per_100_lines,
+            c.flicker_per_100_lines,
+            c.mean_kind_visibility * 100.0,
         );
     }
 
@@ -289,15 +296,21 @@ fn demo_content_anchor() {
     row("flat narrow", &vec![20; 300]);
     row(
         "long line every 7",
-        &(0..300).map(|i| if i % 7 == 0 { 95 } else { 28 }).collect::<Vec<_>>(),
+        &(0..300)
+            .map(|i| if i % 7 == 0 { 95 } else { 28 })
+            .collect::<Vec<_>>(),
     );
     row(
         "long line every 14",
-        &(0..300).map(|i| if i % 14 == 0 { 95 } else { 28 }).collect::<Vec<_>>(),
+        &(0..300)
+            .map(|i| if i % 14 == 0 { 95 } else { 28 })
+            .collect::<Vec<_>>(),
     );
     row(
         "code-like (ragged)",
-        &(0..300).map(|i| 20 + ((i * 37) % 70) as u16).collect::<Vec<_>>(),
+        &(0..300)
+            .map(|i| 20 + ((i * 37) % 70) as u16)
+            .collect::<Vec<_>>(),
     );
 }
 

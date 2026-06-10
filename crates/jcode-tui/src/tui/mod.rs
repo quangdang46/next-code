@@ -146,7 +146,12 @@ pub trait TuiState {
             image.media_type.hash(&mut hasher);
             image.data.len().hash(&mut hasher);
             // A short prefix is enough to distinguish distinct payloads cheaply.
-            image.data.as_bytes().iter().take(64).for_each(|b| b.hash(&mut hasher));
+            image
+                .data
+                .as_bytes()
+                .iter()
+                .take(64)
+                .for_each(|b| b.hash(&mut hasher));
         }
         (images.len(), hasher.finish())
     }

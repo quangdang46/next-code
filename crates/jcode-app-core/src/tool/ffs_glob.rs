@@ -135,7 +135,10 @@ fn glob_search_blocking(
     max_files: usize,
 ) -> Result<Vec<(String, std::time::SystemTime)>> {
     let files = ffs_search::glob_matcher::glob_files(base, pattern, max_files);
-    Ok(files.into_iter().map(|s| (s, std::time::UNIX_EPOCH)).collect())
+    Ok(files
+        .into_iter()
+        .map(|s| (s, std::time::UNIX_EPOCH))
+        .collect())
 }
 
 /// Fuzzy search via ffs-search's fuzzy_file_search (case-insensitive
@@ -145,7 +148,7 @@ fn fuzzy_search_blocking(
     query: &str,
     max_files: usize,
 ) -> Result<Vec<(String, std::time::SystemTime)>> {
-    use ffs_search::fuzzy_file_search::{fuzzy_search_files, FuzzySearchOptions};
+    use ffs_search::fuzzy_file_search::{FuzzySearchOptions, fuzzy_search_files};
     let matches = fuzzy_search_files(
         base,
         query,
@@ -154,7 +157,10 @@ fn fuzzy_search_blocking(
             ..Default::default()
         },
     );
-    Ok(matches.into_iter().map(|m| (m.path, std::time::UNIX_EPOCH)).collect())
+    Ok(matches
+        .into_iter()
+        .map(|m| (m.path, std::time::UNIX_EPOCH))
+        .collect())
 }
 
 #[cfg(test)]

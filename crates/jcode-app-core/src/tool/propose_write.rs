@@ -90,9 +90,13 @@ impl Tool for ProposeWriteTool {
         // so it matches original_files[].file_path in build_diffs.
         let file_key = params.file_path.clone();
         let run_id_typed = jcode_best_of_n::RunId(run_id.clone());
-        handle
-            .store
-            .set_proposed(&run_id_typed, file_key, &params.content, candidate_id.clone(), !existed);
+        handle.store.set_proposed(
+            &run_id_typed,
+            file_key,
+            &params.content,
+            candidate_id.clone(),
+            !existed,
+        );
 
         let line_count = params.content.lines().count();
         let diff = match old_content.as_deref() {

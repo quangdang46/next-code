@@ -20,8 +20,8 @@ use crate::bus::{Bus, BusEvent, FileOp, FileTouch, SidePanelUpdated};
 use crate::provider::Provider;
 use crate::session::Session;
 use crate::tool::{
-    clear_best_of_n_handle, set_best_of_n_handle, BestOfNOrchestratorHandle, Registry, Tool,
-    ToolContext, ToolOutput,
+    BestOfNOrchestratorHandle, Registry, Tool, ToolContext, ToolOutput, clear_best_of_n_handle,
+    set_best_of_n_handle,
 };
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
@@ -159,7 +159,9 @@ impl Tool for BestOfNTool {
             .await?;
 
         // Decide whether to show or auto-apply based on mode / override.
-        let show_mode = params.show_mode.unwrap_or(matches!(mode, jcode_best_of_n::BestOfNMode::Show));
+        let show_mode = params
+            .show_mode
+            .unwrap_or(matches!(mode, jcode_best_of_n::BestOfNMode::Show));
 
         let file_paths = params.file_paths.clone();
 
@@ -185,7 +187,9 @@ impl Tool for BestOfNTool {
             return Ok(output);
         } else {
             // Auto mode: apply the winner.
-            runner.apply_winner(&result, &file_paths, &self.registry, &ctx).await
+            runner
+                .apply_winner(&result, &file_paths, &self.registry, &ctx)
+                .await
         }
     }
 }
@@ -362,10 +366,7 @@ impl BestOfNRunner {
                     index, strategy.temperature
                 ),
             };
-            let mut session = Session::create(
-                Some(parent_session_id.clone()),
-                Some(session_title),
-            );
+            let mut session = Session::create(Some(parent_session_id.clone()), Some(session_title));
             session.model = Some(provider.model());
             if let Err(err) = session.save() {
                 crate::logging::warn(&format!(
@@ -373,12 +374,8 @@ impl BestOfNRunner {
                 ));
             }
 
-            let mut agent = Agent::new_with_session(
-                provider.clone(),
-                registry.clone(),
-                session,
-                Some(allowed),
-            );
+            let mut agent =
+                Agent::new_with_session(provider.clone(), registry.clone(), session, Some(allowed));
             agent.set_best_of_n_context(run_id_str.clone(), candidate_id_str.clone());
 
             {
@@ -497,9 +494,7 @@ impl BestOfNRunner {
                 paths_match(&allowed, &candidate)
             });
             if !is_allowed {
-                let skip_msg = format!(
-                    "  ! skip '{}' (not in allowed paths)", diff.file_path
-                );
+                let skip_msg = format!("  ! skip '{}' (not in allowed paths)", diff.file_path);
                 crate::logging::warn(&format!(
                     "[best_of_n] apply_winner skipping out-of-scope path: {}",
                     diff.file_path
@@ -521,18 +516,28 @@ impl BestOfNRunner {
                 tokio::fs::write(&path, diff.new_content.as_bytes())
                     .await
                     .with_context(|| format!("write new file {}", path_display))?;
-                summary_lines
-                    .push(format!("  + create {} ({} bytes)", path_display, diff.new_content.len()));
+                summary_lines.push(format!(
+                    "  + create {} ({} bytes)",
+                    path_display,
+                    diff.new_content.len()
+                ));
             } else {
                 tokio::fs::write(&path, diff.new_content.as_bytes())
                     .await
                     .with_context(|| format!("write {}", path_display))?;
-                summary_lines
-                    .push(format!("  ~ update {} ({} bytes)", path_display, diff.new_content.len()));
+                summary_lines.push(format!(
+                    "  ~ update {} ({} bytes)",
+                    path_display,
+                    diff.new_content.len()
+                ));
             }
 
             // Bug #1: Publish FileTouch bus event for swarm coordination.
-            let op = if diff.is_new_file { FileOp::Write } else { FileOp::Edit };
+            let op = if diff.is_new_file {
+                FileOp::Write
+            } else {
+                FileOp::Edit
+            };
             let detail = build_file_touch_preview(&diff.unified_diff);
             Bus::global().publish(BusEvent::FileTouch(FileTouch {
                 session_id: ctx.session_id.clone(),
@@ -555,7 +560,11 @@ impl BestOfNRunner {
                 .unwrap_or_default();
             let file_path_str = path_display.clone();
             let hook_diff = diff.unified_diff.clone();
-            let hook_change_type = if diff.is_new_file { "created" } else { "modified" };
+            let hook_change_type = if diff.is_new_file {
+                "created"
+            } else {
+                "modified"
+            };
             tokio::spawn(async move {
                 let hook_config = load_hooks_config();
                 let hook_registry = HookRegistry::from_config(hook_config.clone());
@@ -678,9 +687,7 @@ pub(crate) fn format_show_result(result: &BestOfNResult) -> ToolOutput {
         let _ = writeln!(
             md,
             "- **Status**: `{:?}` | **T={:.2}** {}",
-            candidate.status,
-            candidate.strategy.temperature,
-            model_str,
+            candidate.status, candidate.strategy.temperature, model_str,
         );
 
         if let Some(ref err) = candidate.error {
@@ -692,7 +699,9 @@ pub(crate) fn format_show_result(result: &BestOfNResult) -> ToolOutput {
             "- **Files**: {} changed, {} ops total, {} tokens",
             candidate.changed_file_count(),
             candidate.total_ops(),
-            candidate.total_tokens.map_or("?".to_string(), |t| t.to_string()),
+            candidate
+                .total_tokens
+                .map_or("?".to_string(), |t| t.to_string()),
         );
 
         if is_winner && !candidate.file_diffs.is_empty() {
@@ -705,7 +714,12 @@ pub(crate) fn format_show_result(result: &BestOfNResult) -> ToolOutput {
                 }
             }
         } else if !candidate.file_diffs.is_empty() {
-            let _ = writeln!(md, "\n<details>\n<summary>Diffs ({}, {} files)</summary>\n\n", candidate.strategy.label, candidate.changed_file_count());
+            let _ = writeln!(
+                md,
+                "\n<details>\n<summary>Diffs ({}, {} files)</summary>\n\n",
+                candidate.strategy.label,
+                candidate.changed_file_count()
+            );
             for diff in &candidate.file_diffs {
                 let action = if diff.is_new_file { "CREATE" } else { "EDIT" };
                 let _ = writeln!(md, "**{}** `{}`\n", action, diff.file_path);
@@ -718,7 +732,11 @@ pub(crate) fn format_show_result(result: &BestOfNResult) -> ToolOutput {
     }
 
     let _ = writeln!(md, "---\n");
-    let _ = writeln!(md, "**Recommendation**: {}", result.selection_reason.as_deref().unwrap_or("no winner"));
+    let _ = writeln!(
+        md,
+        "**Recommendation**: {}",
+        result.selection_reason.as_deref().unwrap_or("no winner")
+    );
 
     ToolOutput::new(md).with_title("Best-of-N candidates (show mode)")
 }

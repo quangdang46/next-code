@@ -1,10 +1,10 @@
 pub mod graph;
 pub mod provider;
-pub use provider::GraphOperations;
-pub use provider::MemoryProvider;
 pub use graph::{
     ClusterEntry, Edge, EdgeKind, GRAPH_VERSION, GraphMetadata, MemoryGraph, TagEntry,
 };
+pub use provider::GraphOperations;
+pub use provider::MemoryProvider;
 
 use std::time::Instant;
 

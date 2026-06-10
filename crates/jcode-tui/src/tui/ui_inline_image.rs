@@ -93,11 +93,7 @@ pub(crate) fn register_payload(id: u64, media_type: &str, data_b64: &str) {
 /// Ensure the image with `id` is materialized (decoded + cached) so it can be
 /// drawn. Returns true on success. Cheap and idempotent on repeat.
 pub(crate) fn materialize_visible(id: u64) -> bool {
-    if let Some((media_type, data_b64)) = PAYLOAD_REGISTRY
-        .lock()
-        .ok()
-        .and_then(|reg| reg.get(id))
-    {
+    if let Some((media_type, data_b64)) = PAYLOAD_REGISTRY.lock().ok().and_then(|reg| reg.get(id)) {
         return mermaid::materialize_inline_image(&media_type, &data_b64).is_some();
     }
     false
@@ -109,8 +105,7 @@ pub(crate) fn materialize_visible(id: u64) -> bool {
 pub(crate) fn resolve_items(images: &[crate::session::RenderedImage]) -> Vec<InlineImageItem> {
     let mut items = Vec::new();
     for image in images {
-        let Some((id, width, height)) =
-            mermaid::inline_image_dims(&image.media_type, &image.data)
+        let Some((id, width, height)) = mermaid::inline_image_dims(&image.media_type, &image.data)
         else {
             continue;
         };
@@ -190,10 +185,7 @@ pub(crate) fn build_section(
             format!("{}  {}", item.label, dims)
         };
         lines.push(Line::from(vec![
-            Span::styled(
-                "  🖼 ",
-                Style::default().add_modifier(Modifier::DIM),
-            ),
+            Span::styled("  🖼 ", Style::default().add_modifier(Modifier::DIM)),
             Span::styled(label, Style::default().add_modifier(Modifier::DIM)),
         ]));
 
@@ -214,7 +206,10 @@ pub(crate) fn build_section(
     }
 
     let line_count = lines.len();
-    let plain: Vec<String> = lines.iter().map(jcode_tui_render::line_plain_text).collect();
+    let plain: Vec<String> = lines
+        .iter()
+        .map(jcode_tui_render::line_plain_text)
+        .collect();
 
     PreparedMessages {
         wrapped_lines: lines,
@@ -300,7 +295,10 @@ mod tests {
         }
         // A dim label line precedes the first region.
         let label_line = jcode_tui_render::line_plain_text(&section.wrapped_lines[1]);
-        assert!(label_line.contains("test.png"), "label missing: {label_line:?}");
+        assert!(
+            label_line.contains("test.png"),
+            "label missing: {label_line:?}"
+        );
     }
 
     #[test]
