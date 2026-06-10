@@ -93,7 +93,10 @@ impl Tool for FfsGlobTool {
                 };
                 if let Ok(v) = r {
                     if !v.is_empty() {
-                        return Ok::<Vec<(std::string::String, std::time::SystemTime)>, anyhow::Error>(v);
+                        return Ok::<
+                            Vec<(std::string::String, std::time::SystemTime)>,
+                            anyhow::Error,
+                        >(v);
                     }
                 }
             }

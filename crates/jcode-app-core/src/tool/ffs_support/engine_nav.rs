@@ -47,10 +47,7 @@ pub fn find_call_sites(engine: &Engine, root: &Path, symbol: &str, limit: usize)
         let Ok(content) = std::fs::read_to_string(&path) else {
             continue;
         };
-        let confirmed = stack.confirm_symbol(
-            &[(path.clone(), mtime, content.clone())],
-            symbol,
-        );
+        let confirmed = stack.confirm_symbol(&[(path.clone(), mtime, content.clone())], symbol);
         if confirmed.is_empty() {
             continue;
         }

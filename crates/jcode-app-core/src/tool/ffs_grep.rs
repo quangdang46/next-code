@@ -127,7 +127,10 @@ impl Tool for FfsGrepTool {
             };
             let mut out = format_grep_hits(&hits, label);
             if hits.len() >= MAX_RESULTS {
-                out.push_str(&format!("\n... results truncated at {} matches", MAX_RESULTS));
+                out.push_str(&format!(
+                    "\n... results truncated at {} matches",
+                    MAX_RESULTS
+                ));
             }
             out
         })

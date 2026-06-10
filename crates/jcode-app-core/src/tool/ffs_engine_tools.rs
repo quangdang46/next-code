@@ -3,8 +3,8 @@
 
 use super::ffs_support::{
     self, DEFAULT_ENGINE_TOKEN_BUDGET, collect_definitions, collect_usages, engine_holder,
-    find_callee_sites, find_call_sites, format_dispatch, format_flow_card, format_refs,
-    format_call_hits,
+    find_call_sites, find_callee_sites, format_call_hits, format_dispatch, format_flow_card,
+    format_refs,
 };
 use super::{Tool, ToolContext, ToolOutput};
 use anyhow::Result;
@@ -408,7 +408,11 @@ impl Tool for FfsFlowTool {
             }
             let total = defs.len();
             let page: Vec<_> = defs.into_iter().skip(offset).take(limit).collect();
-            let mut out = format!("Flow for '{name}' ({} defs, showing {})\n\n", total, page.len());
+            let mut out = format!(
+                "Flow for '{name}' ({} defs, showing {})\n\n",
+                total,
+                page.len()
+            );
             for def in &page {
                 let path = PathBuf::from(&def.path);
                 let body = engine.read(&path).body;

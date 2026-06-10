@@ -30,9 +30,7 @@ pub fn workspace_root(
     if let Some(p) = explicit {
         return resolve(p);
     }
-    working_dir
-        .cloned()
-        .unwrap_or_else(|| PathBuf::from("."))
+    working_dir.cloned().unwrap_or_else(|| PathBuf::from("."))
 }
 
 fn state_cell() -> &'static Mutex<EngineState> {

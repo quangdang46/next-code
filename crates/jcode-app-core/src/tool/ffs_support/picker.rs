@@ -69,10 +69,7 @@ pub fn find_files(root: &Path, needle: &str, limit: usize) -> Result<Vec<String>
             &query,
             None,
             FuzzySearchOptions {
-                pagination: PaginationArgs {
-                    offset: 0,
-                    limit,
-                },
+                pagination: PaginationArgs { offset: 0, limit },
                 ..Default::default()
             },
         );
