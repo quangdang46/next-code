@@ -19,12 +19,12 @@ The naive approach (`git merge` + resolve everything by hand) breaks because:
 
 | # | Cargo Dep Name | External Repo | Local Adapter/Bridge Files | Domain |
 |---|---|---|---|---|
-| 1 | `casr` | `quangdang46/cross_agent_session_resumer` | `crates/jcode-base/src/casr_adapter.rs` (748 lines), `crates/jcode-base/src/import.rs` (1002 lines) | Session import/resume (replaces `jcode-import-core`) |
-| 2 | `ffs-search`, `ffs-engine` | `quangdang46/fast_file_search` | `crates/jcode-tui/src/tui/app/at_picker.rs` (uses `ffs_engine::mention` and `ffs_search::mention`) | File search, @-mention autocomplete |
-| 3 | `dcg-core` | `quangdang46/destructive_command_guard` | `crates/jcode-app-core/src/dcg_bridge.rs` (740 lines) | Permission guard, YOLO classifier |
+| 1 | `casr` | `quangdang46/cross_agent_session_resumer` | `crates/jcode-base/src/casr_adapter.rs`, `crates/jcode-base/src/import.rs` | Session import/resume (replaces `jcode-import-core`) |
+| 2 | `ffs-search`, `ffs-engine`, `ffs-symbol` | `quangdang46/fast_file_search` | `crates/jcode-tui/src/tui/app/at_picker.rs` (uses `ffs_engine::mention` and `ffs_search::mention`) | File search, @-mention autocomplete, symbols |
+| 3 | `dcg-core` | `quangdang46/destructive_command_guard` | `crates/jcode-app-core/src/dcg_bridge.rs` | Permission guard, YOLO classifier |
 | 4 | `hashline` | `quangdang46/hashline` | `crates/jcode-app-core/src/tool/hashline_edit.rs` | SHA-256 anchored hashing |
 | 5 | `mempalace-core` | `quangdang46/mempalace_rust` | `crates/jcode-mempalace-adapter/` (entire crate) | Memory palace |
-| 6 | `dynamic_context_pruning` | `quangdang46/dynamic_context_pruning` | `crates/jcode-app-core/src/dcp_bridge.rs` (197 lines), `dcp_plugin.rs` | Context pruning |
+| 6 | `dynamic_context_pruning` | `quangdang46/dynamic_context_pruning` | `crates/jcode-app-core/src/dcp_bridge.rs`, `dcp_plugin.rs` | Context pruning |
 | 7 | `rtco-core` | `quangdang46/rust_token_cost_optimizer` | `crates/jcode-app-core/src/rtco_filter.rs` | Token cost optimization |
 
 ### Additional git dependencies
@@ -32,6 +32,7 @@ The naive approach (`git merge` + resolve everything by hand) breaks because:
 | Dep | Owner | Domain |
 |---|---|---|
 | `agentgrep` | `1jehuang/agentgrep` | Code search (not extracted, from upstream contributor) |
+| `beads_rust` | `quangdang46/beads_rust` | Issue/bead tracking integration (preserve on `Cargo.toml` conflicts) |
 
 ### Not-yet-extracted domains that commonly conflict
 
@@ -89,6 +90,7 @@ git diff --stat master..upstream/master -- \
   crates/jcode-tui/src/tui/app/inline_interactive.rs \
   crates/jcode-session-types/src/lib.rs \
   crates/jcode-tui/src/tui/session_picker/ \
+  crates/jcode-app-core/src/yolo_classifier.rs \
   src/cli/tui_launch.rs
 ```
 
@@ -151,7 +153,7 @@ git add <file>  # after the auto-merge stage already handled this
 
 **Symptom**: Upstream changed `Cargo.toml` or `Cargo.lock` — adding, removing, or updating dependencies.
 
-**Resolution**: **CAREFUL MERGE**. Our `Cargo.toml` has git deps that upstream doesn't have. Preserve all `[dependencies]` entries for extracted repos (casr, ffs-search, ffs-engine, dcg-core, hashline, mempalace-core, dynamic_context_pruning, rtco-core). For everything else, accept upstream's version.
+**Resolution**: **CAREFUL MERGE**. Our `Cargo.toml` has git deps that upstream doesn't have. Preserve all `[dependencies]` entries for extracted repos (casr, ffs-search, ffs-engine, ffs-symbol, dcg-core, hashline, mempalace-core, dynamic_context_pruning, rtco-core, beads_rust). For everything else, accept upstream's version.
 
 **Always run `cargo check` after resolving Cargo.toml conflicts.**
 
@@ -290,6 +292,6 @@ Then run `cargo generate-lockfile` or just `cargo check`.
 
 - **Fork**: quangdang46/jcode
 - **Upstream**: 1jehuang/jcode
-- **Status**: 21 ahead, 366 behind (diverged, as of 2026-06-07)
+- **Status**: diverged (regenerate counts with `git rev-list --left-right --count master...upstream/master`)
 - **Extracted repos**: 7 (casr, ffs, dcg, hashline, mempalace, dcp, rtco)
 - **Adapter code**: ~2687 lines across 4+ bridge files
