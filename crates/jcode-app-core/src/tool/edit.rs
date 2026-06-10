@@ -61,6 +61,45 @@ async fn atomic_write(path: &Path, content: &str) -> Result<()> {
     Ok(())
 }
 
+/// Attempt hashline-anchored edit; fall back to str_replace on failure.
+fn apply_edit(
+    content: &str,
+    old_string: &str,
+    new_string: &str,
+    replace_all: bool,
+    line: usize,
+) -> (String, usize, usize, &'static str) {
+    // Try hashline first (drift detection + context-scoped edit)
+    let ctx = 0usize;
+    if let Ok((nc, s, e)) = sha256_window::apply_edit_within_window(
+        content, line, old_string, new_string, ctx,
+    ) {
+        if replace_all && content.matches(old_string).count() > 1 {
+            let count_remaining = content.matches(old_string).count() - 1;
+            let mut result = nc;
+            for _ in 0..count_remaining {
+                result = result.replacen(old_string, new_string, 1);
+            }
+            return (result, s, e, "hashline");
+        }
+        return (nc, s, e, "hashline");
+    }
+
+    // Fallback: simple str_replace
+    let label = "str_replace-fallback";
+    if replace_all {
+        let nc = content.replace(old_string, new_string);
+        let start = find_line_number(content, old_string);
+        let end = start + new_string.lines().count().saturating_sub(1);
+        (nc, start, end, label)
+    } else {
+        let nc = content.replacen(old_string, new_string, 1);
+        let start = find_line_number(content, old_string);
+        let end = start + new_string.lines().count().saturating_sub(1);
+        (nc, start, end, label)
+    }
+}
+
 #[async_trait]
 impl Tool for EditTool {
     fn name(&self) -> &str {
@@ -68,7 +107,7 @@ impl Tool for EditTool {
     }
 
     fn description(&self) -> &str {
-        "Replace text in a file. Uses hashline-anchored editing with drift detection — fails closed if the file has changed since it was last read."
+        "Replace text in a file. Uses hashline-anchored editing with drift detection; falls back to str_replace if hashline verification fails."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -134,55 +173,14 @@ impl Tool for EditTool {
         // Find line number where old_string starts (for the first occurrence)
         let start_line = find_line_number(&content, &params.old_string);
 
-        // Compute hash of the anchor line to detect drift
-        let context_window = 0u32;
-        let anchor_hash =
-            sha256_window::hash_window(&content, start_line, start_line);
-
-        // Verify the anchor hash — detects drift from planning to execution
-        sha256_window::verify_anchor(
+        // Apply edit with hashline → str_replace fallback
+        let (new_content, actual_start, actual_end, method) = apply_edit(
             &content,
+            &params.old_string,
+            &params.new_string,
+            params.replace_all,
             start_line,
-            &anchor_hash,
-            context_window as usize,
-        )
-        .map_err(|e| {
-            anyhow::anyhow!(
-                "Content drift detected at line {start_line}: {e}. \
-                 The file may have changed since it was last read. Use `read` to refresh."
-            )
-        })?;
-
-        // Apply edit via hashline (scoped to anchor line, context_window=0 means
-        // old_string must be on the same line as the anchor).
-        let (new_content, actual_start, actual_end) = if params.replace_all {
-            // For replace_all, apply_edit_within_window handles one replacement.
-            // Do the first via hashline for drift detection, then replace remaining.
-            let (mut nc, s, e) = sha256_window::apply_edit_within_window(
-                &content,
-                start_line,
-                &params.old_string,
-                &params.new_string,
-                context_window as usize,
-            )
-            .map_err(|e| anyhow::anyhow!("{e}"))?;
-
-            // Replace remaining occurrences (skip the first one already done)
-            let count_remaining = occurrences - 1;
-            for _ in 0..count_remaining {
-                nc = nc.replacen(&params.old_string, &params.new_string, 1);
-            }
-            (nc, s, e)
-        } else {
-            sha256_window::apply_edit_within_window(
-                &content,
-                start_line,
-                &params.old_string,
-                &params.new_string,
-                context_window as usize,
-            )
-            .map_err(|e| anyhow::anyhow!("{e}"))?
-        };
+        );
 
         // Write back atomically
         atomic_write(&path, &new_content).await?;
@@ -202,11 +200,12 @@ impl Tool for EditTool {
                 .clone()
                 .filter(|value| !value.trim().is_empty()),
             summary: Some(format!(
-                "edited lines {}-{} ({} occurrence{})",
+                "edited lines {}-{} ({} occurrence{}, {})",
                 actual_start,
                 end_line,
                 occurrences,
-                if occurrences == 1 { "" } else { "s" }
+                if occurrences == 1 { "" } else { "s" },
+                method,
             )),
             detail,
         }));
@@ -252,8 +251,8 @@ impl Tool for EditTool {
         let context = extract_context(&new_content, actual_start, end_line, 3);
 
         Ok(ToolOutput::new(format!(
-            "Edited {}: replaced {} occurrence(s)\n{}\n\nContext after edit (lines {}-{}):\n{}",
-            params.file_path, occurrences, diff, context.0, context.1, context.2
+            "Edited {}: replaced {} occurrence(s) ({})\n{}\n\nContext after edit (lines {}-{}):\n{}",
+            params.file_path, occurrences, method, diff, context.0, context.1, context.2
         ))
         .with_title(params.file_path.clone()))
     }
@@ -537,45 +536,48 @@ mod tests {
     }
 
     #[test]
-    fn test_hashline_edit_basic() {
+    fn test_apply_edit_hashline_path() {
         let content = "fn main() {\n    println!(\"hello\");\n}\n";
         let old = "    println!(\"hello\");";
         let new = "    println!(\"world\");";
-
         let line = find_line_number(content, old);
-        assert_eq!(line, 2, "old_string should be on line 2");
 
-        let hash = sha256_window::hash_window(content, line, line);
-        assert!(!hash.is_empty(), "hash should not be empty");
-
-        let verify = sha256_window::verify_anchor(content, line, &hash, 0);
-        assert!(verify.is_ok(), "verify should pass for unchanged content");
-
-        let (result, start, end) =
-            sha256_window::apply_edit_within_window(content, line, old, new, 0)
-                .expect("edit should succeed");
+        let (result, start, end, method) = apply_edit(content, old, new, false, line);
+        assert_eq!(method, "hashline", "should use hashline when verification passes");
         assert_eq!(start, 2);
         assert_eq!(end, 2);
-        assert!(result.contains("world"), "new content should contain 'world'");
-        assert!(!result.contains("hello"), "new content should not contain 'hello'");
+        assert!(result.contains("world"));
+        assert!(!result.contains("hello"));
     }
 
     #[test]
-    fn test_hashline_edit_drift_detection() {
-        let content = "fn main() {\n    println!(\"hello\");\n}\n";
-        let drifted = "fn main() {\n    println!(\"drifted\");\n}\n";
-        let old = "    println!(\"hello\");";
-        let new = "    println!(\"world\");";
-
+    fn test_apply_edit_fallback_path() {
+        // Content where old_string doesn't match line-based hashline window
+        // (e.g. multi-line old_string). apply_edit_within_window will fail,
+        // forcing str_replace fallback.
+        let content = "line1\nline2\nline3";
+        let old = "line1\nline2";
+        let new = "merged line";
         let line = find_line_number(content, old);
-        let hash = sha256_window::hash_window(content, line, line);
 
-        // Verify against drifted content should fail
-        let verify = sha256_window::verify_anchor(&drifted, line, &hash, 0);
-        assert!(verify.is_err(), "drift should be detected");
+        let (result, _start, _end, method) = apply_edit(content, old, new, false, line);
+        assert_eq!(method, "str_replace-fallback", "multi-line old should fall back");
+        assert!(result.contains("merged line"));
+        assert!(!result.contains("line1\nline2"));
+    }
 
-        // apply_edit_within_window on drifted content should also fail
-        let result = sha256_window::apply_edit_within_window(&drifted, line, old, new, 0);
-        assert!(result.is_err(), "edit on drifted content should fail");
+    #[test]
+    fn test_apply_edit_replace_all_fallback() {
+        let content = "abc foo abc bar abc baz";
+        let old = "abc";
+        let new = "XYZ";
+
+        // hashline will fail on multi-occurrence single-line (context_window=0
+        // requires old_string to be on the exact anchor line, but "abc" appears
+        // multiple times on the same line).
+        let line = find_line_number(content, old);
+        let (result, _start, _end, method) = apply_edit(content, old, new, true, line);
+        assert_eq!(method, "str_replace-fallback");
+        assert_eq!(result, "XYZ foo XYZ bar XYZ baz");
     }
 }
