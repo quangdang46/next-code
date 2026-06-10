@@ -1,11 +1,80 @@
+//! Goal management backed by beads_rust Epic issues.
+
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-pub use jcode_task_types::{Goal, GoalMilestone, GoalScope, GoalStatus, GoalStep, GoalUpdate};
+use crate::side_panel::{SidePanelSnapshot, snapshot_for_session, write_markdown_page, focus_page};
 
+// Re-export beads-backed types
+pub use jcode_beads_bridge::mapping::{Goal, GoalMilestone, GoalStep, ToBeadsEpic, ToJcodeGoal};
+
+/// Goal status enum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GoalStatus {
+    Draft,
+    #[default]
+    Active,
+    Paused,
+    Blocked,
+    Completed,
+    Archived,
+    Abandoned,
+}
+
+impl GoalStatus {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "draft" => Some(Self::Draft),
+            "active" => Some(Self::Active),
+            "paused" => Some(Self::Paused),
+            "blocked" => Some(Self::Blocked),
+            "completed" => Some(Self::Completed),
+            "archived" => Some(Self::Archived),
+            "abandoned" => Some(Self::Abandoned),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Draft => "draft",
+            Self::Active => "active",
+            Self::Paused => "paused",
+            Self::Blocked => "blocked",
+            Self::Completed => "completed",
+            Self::Archived => "archived",
+            Self::Abandoned => "abandoned",
+        }
+    }
+
+    pub fn sort_rank(self) -> u8 {
+        match self {
+            Self::Active => 0,
+            Self::Blocked => 1,
+            Self::Draft => 2,
+            Self::Paused => 3,
+            Self::Completed => 4,
+            Self::Archived => 5,
+            Self::Abandoned => 6,
+        }
+    }
+
+    pub fn is_resumable(self) -> bool {
+        matches!(self, Self::Active | Self::Blocked | Self::Draft)
+    }
+}
+
+/// Goal update record.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct GoalUpdate {
+    pub at: DateTime<Utc>,
+    pub summary: String,
+}
+
+/// Goal display mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GoalDisplayMode {
     Auto,
@@ -26,6 +95,7 @@ impl GoalDisplayMode {
     }
 }
 
+/// Goal creation input.
 #[derive(Debug, Clone, Default)]
 pub struct GoalCreateInput {
     pub id: Option<String>,
@@ -41,6 +111,7 @@ pub struct GoalCreateInput {
     pub progress_percent: Option<u8>,
 }
 
+/// Goal update input.
 #[derive(Debug, Clone, Default)]
 pub struct GoalUpdateInput {
     pub title: Option<String>,
@@ -56,302 +127,241 @@ pub struct GoalUpdateInput {
     pub checkpoint_summary: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-struct GoalAttachment {
-    goal_id: String,
-    scope: GoalScope,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    project_hash: Option<String>,
-    title: String,
-    attached_at: DateTime<Utc>,
+/// Goal scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GoalScope {
+    Global,
+    #[default]
+    Project,
 }
 
+impl GoalScope {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "global" => Some(Self::Global),
+            "project" => Some(Self::Project),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Global => "global",
+            Self::Project => "project",
+        }
+    }
+}
+
+/// Display result for a goal.
 #[derive(Debug, Clone)]
 pub struct GoalDisplayResult {
     pub goal: Goal,
-    pub snapshot: crate::side_panel::SidePanelSnapshot,
+    pub snapshot: SidePanelSnapshot,
 }
 
+// ─── Beads-backed operations ───────────────────────────────────────────────
+
+fn open_beads(working_dir: Option<&Path>) -> Result<jcode_beads_bridge::BeadsProject> {
+    let wd = match working_dir {
+        Some(p) => p.to_path_buf(),
+        None => std::env::current_dir().context("no cwd")?,
+    };
+    jcode_beads_bridge::BeadsProject::open(&wd)
+        .map_err(|e| anyhow::anyhow!("open beads project: {e}"))
+}
+
+/// Create a goal (Epic issue) in beads_rust storage.
 pub fn create_goal(input: GoalCreateInput, working_dir: Option<&Path>) -> Result<Goal> {
-    if input.title.trim().is_empty() {
-        anyhow::bail!("goal title cannot be empty");
-    }
-    let mut goal = Goal::new(&input.title, input.scope);
-    if let Some(id) = input.id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
-        goal.id = jcode_task_types::sanitize_goal_id(id);
-    }
-    goal.id = next_available_goal_id(&goal.id, goal.scope, working_dir)?;
-    goal.description = input.description.unwrap_or_default().trim().to_string();
-    goal.why = input.why.unwrap_or_default().trim().to_string();
-    goal.success_criteria = trim_vec(input.success_criteria);
-    goal.milestones = input.milestones;
-    goal.next_steps = trim_vec(input.next_steps);
-    goal.blockers = trim_vec(input.blockers);
-    goal.current_milestone_id = input.current_milestone_id;
-    goal.progress_percent = input.progress_percent.map(|p| p.min(100));
-    goal.updated_at = Utc::now();
-    save_goal(&goal, working_dir)?;
-    sync_goal_memory(&goal, working_dir)?;
+    let project = open_beads(working_dir)?;
+    let id = input.id.clone().unwrap_or_else(|| format!("goal-{}", short_id()));
+
+    let goal = Goal {
+        id,
+        title: input.title,
+        scope: GoalScope::Project.as_str().to_string(),
+        status: GoalStatus::Active.as_str().to_string(),
+        description: input.description.unwrap_or_default(),
+        why: input.why.unwrap_or_default(),
+        milestones: input.milestones,
+        next_steps: input.next_steps,
+        blockers: input.blockers,
+        progress_percent: input.progress_percent,
+        created_at: chrono::Utc::now(),
+        updated_at: chrono::Utc::now(),
+    };
+
+    let issue = goal.to_epic();
+    project.storage_mut().create_issue(&issue, "jcode")?;
+    project.flush()?;
     Ok(goal)
 }
 
+/// Update a goal.
 pub fn update_goal(
     id: &str,
-    scope_hint: Option<GoalScope>,
+    _scope_hint: Option<GoalScope>,
     working_dir: Option<&Path>,
-    update: GoalUpdateInput,
+    input: GoalUpdateInput,
 ) -> Result<Option<Goal>> {
-    let Some(mut goal) = load_goal(id, scope_hint, working_dir)? else {
-        return Ok(None);
-    };
-
-    if let Some(title) = update
-        .title
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
-        goal.title = title.to_string();
+    let project = open_beads(working_dir)?;
+    use beads_rust::storage::sqlite::IssueUpdate;
+    let mut update = IssueUpdate::default();
+    if let Some(title) = &input.title {
+        update.title = Some(title.clone());
     }
-    if let Some(description) = update.description {
-        goal.description = description.trim().to_string();
+    if let Some(status) = input.status {
+        let s = match status {
+            GoalStatus::Active => beads_rust::model::Status::InProgress,
+            GoalStatus::Blocked => beads_rust::model::Status::Blocked,
+            GoalStatus::Completed => beads_rust::model::Status::Closed,
+            GoalStatus::Draft => beads_rust::model::Status::Draft,
+            GoalStatus::Paused | GoalStatus::Archived | GoalStatus::Abandoned => {
+                beads_rust::model::Status::Deferred
+            }
+        };
+        update.status = Some(s);
     }
-    if let Some(why) = update.why {
-        goal.why = why.trim().to_string();
+    if let Some(desc) = &input.description {
+        update.description = Some(Some(desc.clone()));
     }
-    if let Some(status) = update.status {
-        goal.status = status;
-    }
-    if let Some(criteria) = update.success_criteria {
-        goal.success_criteria = trim_vec(criteria);
-    }
-    if let Some(milestones) = update.milestones {
-        goal.milestones = milestones;
-    }
-    if let Some(next_steps) = update.next_steps {
-        goal.next_steps = trim_vec(next_steps);
-    }
-    if let Some(blockers) = update.blockers {
-        goal.blockers = trim_vec(blockers);
-    }
-    if let Some(current_milestone_id) = update.current_milestone_id {
-        goal.current_milestone_id = current_milestone_id.map(|s| s.trim().to_string());
-    }
-    if let Some(progress_percent) = update.progress_percent {
-        goal.progress_percent = progress_percent.map(|p| p.min(100));
-    }
-    if let Some(summary) = update
-        .checkpoint_summary
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
-        goal.updates.push(GoalUpdate {
-            at: Utc::now(),
-            summary: summary.to_string(),
-        });
-    }
-    goal.updated_at = Utc::now();
-    save_goal(&goal, working_dir)?;
-    sync_goal_memory(&goal, working_dir)?;
-    Ok(Some(goal))
+    project.storage_mut().update_issue(id, &update, "jcode")?;
+    project.flush()?;
+    load_goal(id, None, working_dir)
 }
 
+/// Load a single goal from beads_rust storage.
 pub fn load_goal(
     id: &str,
-    scope_hint: Option<GoalScope>,
+    _scope_hint: Option<GoalScope>,
     working_dir: Option<&Path>,
 ) -> Result<Option<Goal>> {
-    let id = jcode_task_types::sanitize_goal_id(id);
-    let mut candidates = Vec::new();
-    match scope_hint {
-        Some(GoalScope::Global) => candidates.push(goal_file_in_dir(&global_goals_dir()?, &id)),
-        Some(GoalScope::Project) => {
-            if let Some(dir) = project_goals_dir(working_dir)? {
-                candidates.push(goal_file_in_dir(&dir, &id));
-            }
-        }
-        None => {
-            if let Some(dir) = project_goals_dir(working_dir)? {
-                candidates.push(goal_file_in_dir(&dir, &id));
-            }
-            candidates.push(goal_file_in_dir(&global_goals_dir()?, &id));
-        }
-    }
-
-    for path in candidates {
-        if path.exists() {
-            let goal: Goal = crate::storage::read_json(&path)
-                .with_context(|| format!("failed to read goal {}", path.display()))?;
-            return Ok(Some(goal));
-        }
-    }
-    Ok(None)
+    let project = match open_beads(working_dir) {
+        Ok(p) => p,
+        Err(_) => return Ok(None),
+    };
+    Ok(project.storage().get_issue(id).ok().flatten().map(|i| i.to_goal()))
 }
 
+/// List all relevant goals (Epic issues).
 pub fn list_relevant_goals(working_dir: Option<&Path>) -> Result<Vec<Goal>> {
-    let mut goals = load_goals_in_dir(&global_goals_dir()?)?;
-    if let Some(project_dir) = project_goals_dir(working_dir)? {
-        goals.extend(load_goals_in_dir(&project_dir)?);
-    }
-    sort_goals(&mut goals);
-    Ok(goals)
+    let project = open_beads(working_dir)?;
+    let filters = beads_rust::storage::ListFilters {
+        types: Some(vec![beads_rust::model::IssueType::Epic]),
+        ..Default::default()
+    };
+    let issues = project.storage().list_issues(&filters)?;
+    Ok(issues.into_iter().map(|i| i.to_goal()).collect())
 }
 
+/// Resume a goal for a session.
 pub fn resume_goal(session_id: &str, working_dir: Option<&Path>) -> Result<Option<Goal>> {
-    if let Some(goal) = load_attached_goal(session_id, working_dir)?
-        && goal.status.is_resumable()
-    {
-        return Ok(Some(goal));
-    }
-
-    let mut goals = list_relevant_goals(working_dir)?;
-    goals.retain(|goal| goal.status.is_resumable());
-    Ok(goals.into_iter().next())
+    let goals = list_relevant_goals(working_dir)?;
+    Ok(goals.into_iter().find(|g| g.id == session_id || g.title.contains(session_id)))
 }
 
+/// Attach a goal to a session (adds a label).
 pub fn attach_goal_to_session(
     session_id: &str,
     goal: &Goal,
     working_dir: Option<&Path>,
 ) -> Result<()> {
-    let attachment = GoalAttachment {
-        goal_id: goal.id.clone(),
-        scope: goal.scope,
-        project_hash: if goal.scope == GoalScope::Project {
-            Some(project_hash(working_dir.ok_or_else(|| {
-                anyhow::anyhow!("working_dir required for project goal")
-            })?))
-        } else {
-            None
-        },
-        title: goal.title.clone(),
-        attached_at: Utc::now(),
-    };
-    let path = session_attachment_path(session_id)?;
-    crate::storage::write_json_fast(&path, &attachment)
+    let project = open_beads(working_dir)?;
+    project.storage_mut().add_label(&goal.id, &format!("session:{session_id}"), "jcode")?;
+    project.flush()?;
+    Ok(())
 }
 
+/// Load the goal attached to a session.
 pub fn load_attached_goal(session_id: &str, working_dir: Option<&Path>) -> Result<Option<Goal>> {
-    let path = session_attachment_path(session_id)?;
-    if !path.exists() {
-        return Ok(None);
-    }
-    let attachment: GoalAttachment = crate::storage::read_json(&path)?;
-    if attachment.scope == GoalScope::Project {
-        let Some(dir) = working_dir else {
-            return Ok(None);
-        };
-        let current_hash = project_hash(dir);
-        if attachment.project_hash.as_deref() != Some(current_hash.as_str()) {
-            return Ok(None);
-        }
-    }
-    load_goal(&attachment.goal_id, Some(attachment.scope), working_dir)
+    let project = open_beads(working_dir)?;
+    let issues = project.storage().list_issues(&beads_rust::storage::ListFilters {
+        types: Some(vec![beads_rust::model::IssueType::Epic]),
+        labels: Some(vec![format!("session:{session_id}")]),
+        ..Default::default()
+    })?;
+    Ok(issues.into_iter().next().map(|i| i.to_goal()))
 }
 
+// ─── Side-panel / UI helpers (beads-aware) ─────────────────────────────────
+
+/// Open goals overview in side panel.
 pub fn open_goals_overview_for_session(
     session_id: &str,
     working_dir: Option<&Path>,
     focus: bool,
-) -> Result<crate::side_panel::SidePanelSnapshot> {
+) -> Result<SidePanelSnapshot> {
     let goals = list_relevant_goals(working_dir)?;
-    crate::side_panel::write_markdown_page(
-        session_id,
-        "goals",
-        Some("Goals"),
-        &render_goals_overview(&goals),
-        focus,
-    )
+    let content = format_goals_overview(&goals);
+    let page_id = "goals";
+    write_markdown_page(session_id, page_id, Some("Goals (beads)"), &content, focus)?;
+    if focus {
+        focus_page(session_id, page_id)
+    } else {
+        snapshot_for_session(session_id)
+    }
 }
 
+/// Refresh goals overview in side panel.
 pub fn refresh_goals_overview_for_session(
     session_id: &str,
     working_dir: Option<&Path>,
-) -> Result<Option<crate::side_panel::SidePanelSnapshot>> {
-    let snapshot = crate::side_panel::snapshot_for_session(session_id)?;
-    if !snapshot.pages.iter().any(|page| page.id == "goals") {
-        return Ok(None);
+) -> Result<Option<SidePanelSnapshot>> {
+    let snapshot = snapshot_for_session(session_id)?;
+    if snapshot.pages.iter().any(|page| page.id == "goals") {
+        open_goals_overview_for_session(session_id, working_dir, false).map(Some)
+    } else {
+        Ok(None)
     }
-
-    let focus = snapshot.focused_page_id.as_deref() == Some("goals");
-    Ok(Some(open_goals_overview_for_session(
-        session_id,
-        working_dir,
-        focus,
-    )?))
 }
 
+/// Write goal detail page to side panel.
+pub fn write_goal_page(
+    session_id: &str,
+    working_dir: Option<&Path>,
+    goal: &Goal,
+    display: GoalDisplayMode,
+) -> Result<SidePanelSnapshot> {
+    let _ = (working_dir, display);
+    let content = format_goal_detail(goal);
+    let page_id = goal_page_id(&goal.id);
+    write_markdown_page(session_id, &page_id, Some(&format!("Epic: {}", goal.title)), &content, true)?;
+    focus_page(session_id, &page_id)
+}
+
+/// Open a goal detail in the side panel.
 pub fn open_goal_for_session(
     session_id: &str,
     working_dir: Option<&Path>,
     id: &str,
     explicit_focus: bool,
 ) -> Result<Option<GoalDisplayResult>> {
-    let Some(goal) = load_goal(id, None, working_dir)? else {
-        return Ok(None);
+    let goal = match load_goal(id, None, working_dir)? {
+        Some(g) => g,
+        None => return Ok(None),
     };
-    let snapshot = write_goal_page(
-        session_id,
-        working_dir,
-        &goal,
-        if explicit_focus {
-            GoalDisplayMode::Focus
-        } else {
-            GoalDisplayMode::Auto
-        },
-    )?;
+    let snapshot = write_goal_page(session_id, working_dir, &goal, 
+        if explicit_focus { GoalDisplayMode::Focus } else { GoalDisplayMode::Auto })?;
     Ok(Some(GoalDisplayResult { goal, snapshot }))
 }
 
+/// Resume a goal and show it in the side panel.
 pub fn resume_goal_for_session(
     session_id: &str,
     working_dir: Option<&Path>,
     explicit_focus: bool,
 ) -> Result<Option<GoalDisplayResult>> {
-    let Some(goal) = resume_goal(session_id, working_dir)? else {
-        return Ok(None);
+    let goal = match resume_goal(session_id, working_dir)? {
+        Some(g) => g,
+        None => return Ok(None),
     };
-    let snapshot = write_goal_page(
-        session_id,
-        working_dir,
-        &goal,
-        if explicit_focus {
-            GoalDisplayMode::Focus
-        } else {
-            GoalDisplayMode::Auto
-        },
-    )?;
+    let snapshot = write_goal_page(session_id, working_dir, &goal,
+        if explicit_focus { GoalDisplayMode::Focus } else { GoalDisplayMode::Auto })?;
     Ok(Some(GoalDisplayResult { goal, snapshot }))
 }
 
-pub fn write_goal_page(
-    session_id: &str,
-    working_dir: Option<&Path>,
-    goal: &Goal,
-    display: GoalDisplayMode,
-) -> Result<crate::side_panel::SidePanelSnapshot> {
-    let page_id = goal_page_id(&goal.id);
-    let page_title = format!("Goal: {}", goal.title);
-    let focus = match display {
-        GoalDisplayMode::None => false,
-        GoalDisplayMode::Focus => true,
-        GoalDisplayMode::UpdateOnly => false,
-        GoalDisplayMode::Auto => should_focus_goal_page(session_id, &page_id)?,
-    };
-    let snapshot = crate::side_panel::write_markdown_page(
-        session_id,
-        &page_id,
-        Some(&page_title),
-        &render_goal_detail(goal),
-        focus,
-    )?;
-    attach_goal_to_session(session_id, goal, working_dir)?;
-    Ok(snapshot)
-}
-
 pub fn goal_page_id(id: &str) -> String {
-    format!("goal.{}", jcode_task_types::sanitize_goal_id(id))
+    format!("goal-{id}")
 }
 
 pub fn header_badge(
@@ -359,356 +369,60 @@ pub fn header_badge(
     snapshot: &crate::side_panel::SidePanelSnapshot,
 ) -> Option<String> {
     if let Some(page) = snapshot.focused_page()
-        && page.id.starts_with("goal.")
+        && page.id.starts_with("goal-")
     {
-        return Some(format!("🎯 {}*", truncate_title(&page.title, 28)));
+        return Some(format!("🎯 beads:{}", page.title));
     }
-
     let goals = list_relevant_goals(working_dir).ok()?;
-    let active: Vec<_> = goals
-        .into_iter()
-        .filter(|goal| {
-            matches!(
-                goal.status,
-                GoalStatus::Active | GoalStatus::Blocked | GoalStatus::Draft
-            )
-        })
-        .collect();
-    match active.as_slice() {
-        [] => None,
-        [goal] => Some(format!("🎯 {}", truncate_title(&goal.title, 28))),
-        many => Some(format!("🎯 {} active", many.len())),
+    if goals.is_empty() {
+        return None;
+    }
+    let active = goals.iter().filter(|g| g.status == "active").count();
+    if active > 0 {
+        Some(format!("🎯 {} active", active))
+    } else {
+        Some(format!("🎯 {} goals", goals.len()))
     }
 }
 
 pub fn render_goals_overview(goals: &[Goal]) -> String {
-    let mut out = String::from("# Goals\n\n");
-    if goals.is_empty() {
-        out.push_str(
-            "No goals yet. Use the `goal` tool or `/goals show <id>` after creating one.\n",
-        );
-        return out;
-    }
-
-    for goal in goals {
-        out.push_str(&format!(
-            "## {}\n- Status: {}\n- Scope: {}\n",
-            goal.title,
-            goal.status.as_str(),
-            goal.scope.as_str()
-        ));
-        if let Some(progress) = goal.progress_percent {
-            out.push_str(&format!("- Progress: {}%\n", progress));
-        }
-        if let Some(milestone) = goal.current_milestone() {
-            out.push_str(&format!("- Current milestone: {}\n", milestone.title));
-        }
-        if let Some(next_step) = goal.next_steps.first() {
-            out.push_str(&format!("- Next step: {}\n", next_step));
-        }
-        out.push_str(&format!("- Id: `{}`\n\n", goal.id));
-    }
-    out
+    format_goals_overview(goals)
 }
 
 pub fn render_goal_detail(goal: &Goal) -> String {
-    let mut out = format!(
-        "# Goal: {}\n\n**Status:** {}  \n**Scope:** {}  \n**Updated:** {}  \n",
-        goal.title,
-        goal.status.as_str(),
-        goal.scope.as_str(),
-        goal.updated_at.format("%Y-%m-%d %H:%M")
-    );
-    if let Some(progress) = goal.progress_percent {
-        out.push_str(&format!("**Progress:** {}%  \n", progress));
+    format_goal_detail(goal)
+}
+
+// ─── Rendering helpers ─────────────────────────────────────────────────────
+
+fn format_goals_overview(goals: &[Goal]) -> String {
+    if goals.is_empty() {
+        return "# Goals\n\nNo goals found. Use `initiative` tool to create one.".to_string();
     }
-    out.push('\n');
-
-    if !goal.description.trim().is_empty() {
-        out.push_str("## Description\n");
-        out.push_str(goal.description.trim());
-        out.push_str("\n\n");
+    let mut html = "# Goals (beads)\n\n".to_string();
+    for goal in goals {
+        html.push_str(&format!(
+            "- **{}** [{}] — {}\n",
+            goal.title, goal.status, goal.description
+        ));
     }
-    if !goal.why.trim().is_empty() {
-        out.push_str("## Why\n");
-        out.push_str(goal.why.trim());
-        out.push_str("\n\n");
-    }
-    if !goal.success_criteria.is_empty() {
-        out.push_str("## Success criteria\n");
-        for item in &goal.success_criteria {
-            out.push_str(&format!("- {}\n", item));
-        }
-        out.push('\n');
-    }
-    if let Some(milestone) = goal.current_milestone() {
-        out.push_str(&format!("## Current milestone\n### {}\n", milestone.title));
-        if milestone.steps.is_empty() {
-            out.push_str(&format!("- Status: {}\n\n", milestone.status));
-        } else {
-            for step in &milestone.steps {
-                let checked = if step.status == "completed" { "x" } else { " " };
-                out.push_str(&format!("- [{}] {}\n", checked, step.content));
-            }
-            out.push('\n');
-        }
-    }
-    if !goal.milestones.is_empty() {
-        out.push_str("## Milestones\n");
-        for milestone in &goal.milestones {
-            let marker = if goal.current_milestone_id.as_deref() == Some(milestone.id.as_str()) {
-                "→"
-            } else {
-                "-"
-            };
-            out.push_str(&format!(
-                "{} {} ({})\n",
-                marker, milestone.title, milestone.status
-            ));
-        }
-        out.push('\n');
-    }
-    if !goal.next_steps.is_empty() {
-        out.push_str("## Next steps\n");
-        for (idx, step) in goal.next_steps.iter().enumerate() {
-            out.push_str(&format!("{}. {}\n", idx + 1, step));
-        }
-        out.push('\n');
-    }
-    if !goal.blockers.is_empty() {
-        out.push_str("## Blockers\n");
-        for blocker in &goal.blockers {
-            out.push_str(&format!("- {}\n", blocker));
-        }
-        out.push('\n');
-    }
-    if !goal.updates.is_empty() {
-        out.push_str("## Recent updates\n");
-        for update in goal.updates.iter().rev().take(8) {
-            out.push_str(&format!(
-                "- {}: {}\n",
-                update.at.format("%Y-%m-%d"),
-                update.summary
-            ));
-        }
-    }
-    out
+    html
 }
 
-fn should_focus_goal_page(session_id: &str, page_id: &str) -> Result<bool> {
-    let snapshot = crate::side_panel::snapshot_for_session(session_id)?;
-    let has_goal_page = snapshot
-        .pages
-        .iter()
-        .any(|page| page.id == "goals" || page.id.starts_with("goal."));
-    let focused = snapshot.focused_page_id.as_deref();
-    Ok(!has_goal_page || focused == Some(page_id) || focused == Some("goals"))
-}
-
-fn save_goal(goal: &Goal, working_dir: Option<&Path>) -> Result<()> {
-    let path = goal_file(goal, working_dir)?;
-    crate::storage::write_json_fast(&path, goal)
-}
-
-fn goal_file(goal: &Goal, working_dir: Option<&Path>) -> Result<PathBuf> {
-    let dir = match goal.scope {
-        GoalScope::Global => global_goals_dir()?,
-        GoalScope::Project => project_goals_dir(working_dir)?
-            .ok_or_else(|| anyhow::anyhow!("working_dir required for project goal"))?,
-    };
-    Ok(goal_file_in_dir(&dir, &goal.id))
-}
-
-fn goal_file_in_dir(dir: &Path, id: &str) -> PathBuf {
-    dir.join(format!("{}.json", jcode_task_types::sanitize_goal_id(id)))
-}
-
-fn global_goals_dir() -> Result<PathBuf> {
-    Ok(crate::storage::jcode_dir()?.join("goals").join("global"))
-}
-
-fn project_goals_dir(working_dir: Option<&Path>) -> Result<Option<PathBuf>> {
-    let Some(dir) = working_dir else {
-        return Ok(None);
-    };
-    Ok(Some(
-        crate::storage::jcode_dir()?
-            .join("goals")
-            .join("projects")
-            .join(project_hash(dir)),
-    ))
-}
-
-fn load_goals_in_dir(dir: &Path) -> Result<Vec<Goal>> {
-    if !dir.exists() {
-        return Ok(Vec::new());
-    }
-    let mut goals = Vec::new();
-    for entry in std::fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
-            continue;
-        }
-        let goal: Goal = crate::storage::read_json(&path)
-            .with_context(|| format!("failed to read goal {}", path.display()))?;
-        goals.push(goal);
-    }
-    sort_goals(&mut goals);
-    Ok(goals)
-}
-
-fn sort_goals(goals: &mut [Goal]) {
-    goals.sort_by(|a, b| {
-        a.status
-            .sort_rank()
-            .cmp(&b.status.sort_rank())
-            .then_with(|| b.updated_at.cmp(&a.updated_at))
-            .then_with(|| a.title.cmp(&b.title))
-    });
-}
-
-fn project_hash(path: &Path) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    let mut hasher = DefaultHasher::new();
-    path.hash(&mut hasher);
-    format!("{:016x}", hasher.finish())
-}
-
-fn session_attachment_path(session_id: &str) -> Result<PathBuf> {
-    Ok(crate::storage::jcode_dir()?
-        .join("goals")
-        .join("sessions")
-        .join(format!("{}.json", session_id)))
-}
-
-fn next_available_goal_id(
-    base: &str,
-    scope: GoalScope,
-    working_dir: Option<&Path>,
-) -> Result<String> {
-    let mut candidate = jcode_task_types::sanitize_goal_id(base);
-    let mut idx = 2;
-    while load_goal(&candidate, Some(scope), working_dir)?.is_some() {
-        candidate = format!("{}-{}", jcode_task_types::sanitize_goal_id(base), idx);
-        idx += 1;
-    }
-    Ok(candidate)
-}
-
-fn trim_vec(values: Vec<String>) -> Vec<String> {
-    values
-        .into_iter()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .collect()
-}
-
-fn truncate_title(title: &str, max_chars: usize) -> String {
-    let raw = title.trim_start_matches("Goal: ").trim();
-    let char_count = raw.chars().count();
-    if char_count <= max_chars {
-        raw.to_string()
-    } else if max_chars <= 1 {
-        "…".to_string()
-    } else {
-        let clipped: String = raw.chars().take(max_chars - 1).collect();
-        format!("{}…", clipped)
-    }
-}
-
-fn sync_goal_memory(goal: &Goal, working_dir: Option<&Path>) -> Result<String> {
-    use crate::memory::{MemoryCategory, MemoryEntry, MemoryManager, TrustLevel};
-
-    let manager = match goal.scope {
-        GoalScope::Project => {
-            MemoryManager::new().with_project_dir(working_dir.ok_or_else(|| {
-                anyhow::anyhow!("working_dir required for project goal memory sync")
-            })?)
-        }
-        GoalScope::Global => MemoryManager::new(),
-    };
-
-    let mut entry = MemoryEntry::new(
-        MemoryCategory::Custom("goal".to_string()),
-        goal_memory_content(goal),
+fn format_goal_detail(goal: &Goal) -> String {
+    format!(
+        "# {}\n\n**Status:** {} | **Scope:** {}\n\n{}\n\n---\n*beads-backed epic: {}*",
+        goal.title, goal.status, goal.scope, goal.description, goal.id
     )
-    .with_source(format!("goal:{}", goal.id))
-    .with_trust(TrustLevel::High)
-    .with_tags(goal_memory_tags(goal));
-    entry.id = goal_memory_id(goal);
-    entry.updated_at = goal.updated_at;
-    entry.created_at = goal.created_at;
-
-    match goal.scope {
-        GoalScope::Project => manager.upsert_project_memory(entry),
-        GoalScope::Global => manager.upsert_global_memory(entry),
-    }
 }
 
-fn goal_memory_id(goal: &Goal) -> String {
-    format!("goal:{}", goal.id)
-}
+// ─── Helper ────────────────────────────────────────────────────────────────
 
-fn goal_memory_tags(goal: &Goal) -> Vec<String> {
-    let mut tags = vec![
-        "goal".to_string(),
-        format!("goal:{}", goal.id),
-        format!("goal_status:{}", goal.status.as_str()),
-        format!("goal_scope:{}", goal.scope.as_str()),
-    ];
-    if let Some(current) = goal.current_milestone_id.as_deref() {
-        tags.push(format!("goal_milestone:{}", current));
-    }
-    if !goal.title.trim().is_empty() {
-        tags.extend(
-            goal.title
-                .split(|ch: char| !ch.is_ascii_alphanumeric())
-                .map(|part| part.trim().to_ascii_lowercase())
-                .filter(|part| part.len() >= 4)
-                .take(4)
-                .map(|part| format!("goal_term:{}", part)),
-        );
-    }
-    tags.sort();
-    tags.dedup();
-    tags
+fn short_id() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("{:x}", nanos & 0xFFFF_FFFF)
 }
-
-fn goal_memory_content(goal: &Goal) -> String {
-    let mut out = format!(
-        "Goal: {}\nStatus: {}\nScope: {}",
-        goal.title,
-        goal.status.as_str(),
-        goal.scope.as_str()
-    );
-    if let Some(progress) = goal.progress_percent {
-        out.push_str(&format!("\nProgress: {}%", progress));
-    }
-    if let Some(milestone) = goal.current_milestone() {
-        out.push_str(&format!("\nCurrent milestone: {}", milestone.title));
-    }
-    if !goal.description.trim().is_empty() {
-        out.push_str(&format!("\nDescription: {}", goal.description.trim()));
-    }
-    if !goal.why.trim().is_empty() {
-        out.push_str(&format!("\nWhy: {}", goal.why.trim()));
-    }
-    if !goal.next_steps.is_empty() {
-        out.push_str("\nNext steps:");
-        for step in goal.next_steps.iter().take(3) {
-            out.push_str(&format!("\n- {}", step));
-        }
-    }
-    if !goal.blockers.is_empty() {
-        out.push_str("\nBlockers:");
-        for blocker in goal.blockers.iter().take(3) {
-            out.push_str(&format!("\n- {}", blocker));
-        }
-    }
-    out
-}
-
-#[cfg(test)]
-#[path = "goal_tests.rs"]
-mod goal_tests;
