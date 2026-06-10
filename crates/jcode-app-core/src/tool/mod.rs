@@ -336,7 +336,12 @@ impl Registry {
                 "multi_grep",
                 ffs_multi_grep::FfsMultiGrepTool::new,
             );
-            Self::insert_tool_timed(&mut m, &mut timings, "find", ffs_engine_tools::FfsFindTool::new);
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "find",
+                ffs_engine_tools::FfsFindTool::new,
+            );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
@@ -355,8 +360,18 @@ impl Registry {
                 "callees",
                 ffs_engine_tools::FfsCalleesTool::new,
             );
-            Self::insert_tool_timed(&mut m, &mut timings, "refs", ffs_engine_tools::FfsRefsTool::new);
-            Self::insert_tool_timed(&mut m, &mut timings, "flow", ffs_engine_tools::FfsFlowTool::new);
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "refs",
+                ffs_engine_tools::FfsRefsTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "flow",
+                ffs_engine_tools::FfsFlowTool::new,
+            );
             Self::insert_tool_timed(&mut m, &mut timings, "ls", ls::LsTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "bash", bash::BashTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "browser", browser::BrowserTool::new);
