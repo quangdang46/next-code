@@ -58,11 +58,16 @@ pub fn build_tools(tools: &[ToolDefinition]) -> Vec<Value> {
             } else {
                 compatible_schema
             };
+            // Some providers (DeepSeek, etc.) require function names to match
+            // ^[a-zA-Z0-9_-]+$. Sanitize any character that doesn't fit.
+            let safe_name: String = t
+                .name
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+                .collect();
             serde_json::json!({
                 "type": "function",
-                "name": t.name,
-                // Prompt-visible. Approximate token cost for this field:
-                // t.description_token_estimate().
+                "name": safe_name,
                 "description": t.description,
                 "strict": supports_strict,
                 "parameters": parameters,
