@@ -640,6 +640,8 @@ fn stored_message_visible_text(message: &jcode::session::StoredMessage) -> Strin
             | ContentBlock::AnthropicThinking { .. }
             | ContentBlock::OpenAIReasoning { .. }
             | ContentBlock::ReasoningTrace { .. } => {}
+            | ContentBlock::ReasoningTrace { .. }
+            | ContentBlock::OpenAIReasoning { .. } => {}
         }
     }
     parts.join("\n\n")
