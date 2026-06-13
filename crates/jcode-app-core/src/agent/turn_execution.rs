@@ -124,37 +124,56 @@ impl Agent {
         result
     }
 
-    /// Fire the `turn_end` observer hook with turn outcome metadata.
-    /// No-op (without building the payload) when the hook is not configured.
+    /// Fire the `TurnEnd` observer hook with turn outcome metadata.
+    /// Fire-and-forget via tokio::spawn — the agent does not wait for hooks.
     fn fire_turn_end_hook(
         &self,
         result: &Result<()>,
         started_at: Instant,
         start_message_index: usize,
     ) {
-        if !crate::hooks::hook_configured("turn_end") {
+        let session_id = self.session.id.clone();
+        let cwd = self.working_dir().unwrap_or_default().to_string();
+        let ctx = HookContext::for_turn_end(session_id.clone(), cwd.clone());
+        let handlers: Vec<jcode_hooks::HookHandlerConfig> = self
+            .hook_registry
+            .get_matching(&HookEvent::TurnEnd, &ctx)
+            .into_iter()
+            .cloned()
+            .collect();
+        if handlers.is_empty() {
             return;
         }
-        let status = if result.is_ok() { "ok" } else { "error" };
-        let mut event = crate::hooks::HookEvent::new("turn_end")
-            .session_id(self.session.id.clone())
-            .field("STATUS", status)
-            .field("DURATION_MS", started_at.elapsed().as_millis().to_string())
-            .field("MODEL", self.provider_model());
-        if let Some(cwd) = self.working_dir() {
-            event = event.cwd(cwd);
-        }
+
+        let duration_ms = started_at.elapsed().as_millis() as u64;
+        let model = self.provider_model();
+        let dispatch_config = self.dispatch_config.clone();
+
+        let mut input = HookInputBuilder::new()
+            .session(&session_id, &cwd)
+            .event("TurnEnd")
+            .duration(duration_ms)
+            .build();
+        input.model = Some(model);
+
+        // Add last assistant text snippet
         if let Some(text) = self.latest_assistant_text_after(start_message_index) {
             const LAST_TEXT_LIMIT: usize = 4000;
-            let snippet: String = text.chars().take(LAST_TEXT_LIMIT).collect();
-            event = event.field("LAST_ASSISTANT_TEXT", snippet);
+            input.prompt_text = Some(text.chars().take(LAST_TEXT_LIMIT).collect());
         }
+
+        // Add error info on failure
         if let Err(error) = result {
             const ERROR_LIMIT: usize = 1000;
             let message: String = error.to_string().chars().take(ERROR_LIMIT).collect();
-            event = event.field("ERROR", message);
+            input.stop_reason = Some(message);
         }
-        crate::hooks::dispatch_observer(event);
+
+        let event = HookEvent::TurnEnd;
+        tokio::spawn(async move {
+            let refs: Vec<&jcode_hooks::HookHandlerConfig> = handlers.iter().collect();
+            jcode_hooks::dispatch_hooks(&event, &input, &refs, &dispatch_config).await;
+        });
     }
 
     /// Clear conversation history
@@ -674,7 +693,25 @@ impl Agent {
         let env_snapshot_start = Instant::now();
         self.log_env_snapshot("resume");
         let env_snapshot_ms = env_snapshot_start.elapsed().as_millis();
-        self.fire_session_lifecycle_hook("session_start", "resume");
+        // Dispatch SessionStart hook on resume (fire-and-forget, observational only)
+        {
+            let registry = self.hook_registry.clone();
+            let config = self.dispatch_config.clone();
+            let sid = self.session.id.clone();
+            let cwd = self.session.working_dir.clone().unwrap_or_default();
+            let hook_input = HookInputBuilder::new()
+                .session(&sid, &cwd)
+                .event("SessionStart")
+                .build();
+            let ctx = HookContext::for_session_start(sid, cwd);
+            let event = HookEvent::SessionStart;
+            tokio::spawn(async move {
+                let handlers = registry.get_matching(&event, &ctx);
+                if !handlers.is_empty() {
+                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
+                }
+            });
+        }
 
         let save_start = Instant::now();
         if let Err(err) = self.session.save() {
