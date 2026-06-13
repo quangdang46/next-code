@@ -1088,6 +1088,51 @@ async fn handle_remote_key_internal(
                     return Ok(());
                 }
 
+                if trimmed == "/permissions" {
+                    let mode = crate::dcg_bridge::current_mode();
+                    let mode_str = crate::dcg_bridge::mode_to_str(mode);
+                    app.push_display_message(DisplayMessage::system(format!(
+                        "Current permission mode: **{}**",
+                        mode_str
+                    )));
+                    return Ok(());
+                }
+
+                if let Some(mode_name) = trimmed.strip_prefix("/permissions ") {
+                    let mode_name = mode_name.trim();
+                    if mode_name.is_empty() {
+                        return Ok(());
+                    }
+                    if mode_name == "cycle" {
+                        let mode = crate::dcg_bridge::cycle_mode();
+                        let mode_str = crate::dcg_bridge::mode_to_str(mode);
+                        // Change locally AND notify server.
+                        let _ = remote.set_permission_mode(mode_str).await;
+                        let _ = crate::config::Config::set_permission_mode(mode_str);
+                        app.push_display_message(DisplayMessage::system(format!(
+                            "Switched to mode: **{}**",
+                            mode_str
+                        )));
+                    } else if crate::dcg_bridge::set_mode_from_str(mode_name) {
+                        let mode_str = crate::dcg_bridge::mode_to_str(
+                            crate::dcg_bridge::current_mode(),
+                        );
+                        // Change locally AND notify server.
+                        let _ = remote.set_permission_mode(mode_str).await;
+                        let _ = crate::config::Config::set_permission_mode(mode_str);
+                        app.push_display_message(DisplayMessage::system(format!(
+                            "Switched to mode: **{}**",
+                            mode_str
+                        )));
+                    } else {
+                        app.push_display_message(DisplayMessage::error(format!(
+                            "Unknown mode: {}",
+                            mode_name
+                        )));
+                    }
+                    return Ok(());
+                }
+
                 if matches!(trimmed, "/fast default" | "/fast default status") {
                     let default_tier = crate::config::Config::load().provider.openai_service_tier;
                     let default_enabled = default_tier.as_deref() == Some("priority");
