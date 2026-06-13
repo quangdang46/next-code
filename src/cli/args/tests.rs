@@ -478,10 +478,12 @@ fn run_json_subcommand_parses() {
         Some(Command::Run {
             json,
             ndjson,
+            toon,
             message,
         }) => {
             assert!(json);
             assert!(!ndjson);
+            assert!(!toon);
             assert_eq!(message, "hello");
         }
         other => panic!("unexpected command: {:?}", other),
@@ -495,16 +497,37 @@ fn run_ndjson_subcommand_parses() {
         Some(Command::Run {
             json,
             ndjson,
+            toon,
             message,
         }) => {
             assert!(!json);
             assert!(ndjson);
+            assert!(!toon);
             assert_eq!(message, "hello");
         }
         other => panic!("unexpected command: {:?}", other),
     }
 }
 
+
+#[test]
+fn run_toon_subcommand_parses() {
+    let args = Args::try_parse_from(["jcode", "run", "--toon", "hello"]).unwrap();
+    match args.command {
+        Some(Command::Run {
+            json,
+            ndjson,
+            toon,
+            message,
+        }) => {
+            assert!(!json);
+            assert!(!ndjson);
+            assert!(toon);
+            assert_eq!(message, "hello");
+        }
+        other => panic!("unexpected command: {:?}", other),
+    }
+}
 #[test]
 fn version_subcommand_parses() {
     let args = Args::try_parse_from(["jcode", "version", "--json"]).unwrap();

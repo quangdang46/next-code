@@ -164,6 +164,10 @@ pub(crate) enum Command {
         #[arg(long, conflicts_with = "json")]
         ndjson: bool,
 
+        /// Emit output in TOON format (token-efficient JSON alternative)
+        #[arg(long)]
+        toon: bool,
+
         /// The message to send
         message: String,
     },
