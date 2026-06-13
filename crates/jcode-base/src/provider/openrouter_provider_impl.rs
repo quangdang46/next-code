@@ -63,24 +63,33 @@ impl Provider for OpenRouterProvider {
             allow_image_input,
         );
 
-        // Build tools in OpenAI format
+        // Build tools in OpenAI format with name sanitization.
+        // Some providers (DeepSeek, Mistral) require function names to match
+        // ^[a-zA-Z0-9_-]+$. Replace any non-conforming character with '_'.
         let api_tools: Vec<Value> = tools
             .iter()
             .map(|t| {
+                let safe_name: String = t
+                    .name
+                    .chars()
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() || c == '_' || c == '-' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
+                    .collect();
                 serde_json::json!({
                     "type": "function",
                     "function": {
-                        "name": t.name,
-                        // Prompt-visible. Approximate token cost for this field:
-                        // t.description_token_estimate().
+                        "name": safe_name,
                         "description": t.description,
                         "parameters": t.input_schema,
                     }
                 })
             })
             .collect();
-
-        // Build request
         let mut request = serde_json::json!({
             "model": model,
             "messages": api_messages,
