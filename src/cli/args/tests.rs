@@ -509,7 +509,6 @@ fn run_ndjson_subcommand_parses() {
     }
 }
 
-
 #[test]
 fn run_toon_subcommand_parses() {
     let args = Args::try_parse_from(["jcode", "run", "--toon", "hello"]).unwrap();
