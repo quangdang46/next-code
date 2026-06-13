@@ -160,10 +160,15 @@ impl Tool for SubagentTool {
         // a child that also runs in Plan mode).
         // SessionModeGuard clears the per-session override on drop, so the
         // SESSION_MODES map doesn't leak entries for short-lived subagents.
+        //
+        // CRITICAL: We only inherit when the parent has an EXPLICIT session
+        // mode override. If the parent is using the global default (no
+        // override), we do NOT pin the child — the child will fall back to
+        // current_mode() via classify_for_session, which respects global
+        // permission mode changes (e.g., /permissions bypass-permissions).
         let _session_mode_guard = {
-            let parent_mode = crate::dcg_bridge::session_mode(&ctx.session_id)
-                .or_else(|| Some(crate::dcg_bridge::current_mode()));
-            if let Some(mode) = parent_mode {
+            let parent_session_override = crate::dcg_bridge::session_mode(&ctx.session_id);
+            if let Some(mode) = parent_session_override {
                 logging::info(&format!(
                     "[tool:subagent] session={} inherits permission mode {:?} from parent={}",
                     session.id, mode, ctx.session_id

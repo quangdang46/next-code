@@ -1067,6 +1067,9 @@ pub(super) fn handle_model_command(app: &mut App, trimmed: &str) -> bool {
                     title: None,
                     tool_data: None,
                 });
+                if !app.is_remote {
+                    let _ = crate::config::Config::set_default_model_only(Some(&active_model));
+                }
                 app.set_status_notice(format!("Model → {}", model_name));
             }
             Err(e) => {

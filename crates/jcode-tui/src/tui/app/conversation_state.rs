@@ -406,10 +406,11 @@ impl App {
     pub fn reset_permission_dialog(&mut self) {
         self.pending_permission_tool = None;
         self.pending_permission_reason = None;
+        self.pending_permission_session_id = None;
         self.pending_permission_code = None;
         self.pending_permission_alternatives.clear();
+        self.pending_permission_selected = 0;
     }
-
     pub(crate) fn set_remote_startup_phase(&mut self, phase: super::RemoteStartupPhase) {
         let changed = self.remote_startup_phase.as_ref() != Some(&phase);
         self.remote_startup_phase = Some(phase);

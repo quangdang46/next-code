@@ -1217,13 +1217,38 @@ impl Default for PowerConfig {
 }
 // ── Execution Policy Config ────────────────────────────────────────────
 
+/// Configuration for command-level policy evaluation and tool-level
+/// allow/deny/ask rules (Claude Code-compatible format).
+///
+/// # Example (TOML)
+///
+/// ```toml
+/// [execution-policy]
+/// # Claude Code-style allow/deny/ask with ToolName(pattern) syntax.
+/// allow = ["Bash(ls *)", "Bash(git status)", "Bash(cat *)"]
+/// deny  = ["Bash(rm -rf *)", "WebSearch", "WebFetch"]
+/// ask   = ["Bash"]
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "kebab-case")]
 pub struct ExecutionPolicyConfig {
     /// Enable command-level policy evaluation (default: true).
     #[serde(default = "default_policy_enabled")]
     pub enabled: bool,
-    /// Custom policy rules.
+    /// Claude Code-style allow list — bare tool names or ToolName(pattern).
+    /// Matched tools are auto-allowed without prompting.
+    #[serde(default)]
+    pub allow: Vec<String>,
+    /// Claude Code-style deny list — bare tool names or ToolName(pattern).
+    /// Matched tools/commands are denied outright.
+    #[serde(default)]
+    pub deny: Vec<String>,
+    /// Claude Code-style ask list — bare tool names or ToolName(pattern).
+    /// Matched tools/commands always trigger a permission prompt.
+    #[serde(default)]
+    pub ask: Vec<String>,
+    /// Custom policy rules (full-structured format, parsed from `[[execution-policy.rules]]`).
+    /// Merged with auto-generated rules from allow/deny/ask.
     #[serde(default)]
     pub rules: Vec<PolicyRuleDef>,
     /// Protected patterns (always prompt regardless of mode).
@@ -1242,6 +1267,9 @@ impl Default for ExecutionPolicyConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            allow: Vec::new(),
+            deny: Vec::new(),
+            ask: Vec::new(),
             rules: Vec::new(),
             protected_patterns: Vec::new(),
             circuit_breaker: CircuitBreakerConfig::default(),

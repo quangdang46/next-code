@@ -30,6 +30,52 @@ use jcode_config_types::{
     CircuitBreakerConfig, ExecutionPolicyConfig, PolicyRuleAction, PolicyRuleDef,
 };
 
+/// Parse a Claude Code-style `ToolName(pattern)` permission rule string.
+///
+/// # Formats
+///
+/// | Input | Tool | Pattern |
+/// |-------|------|---------|
+/// | `"Bash(ls *)"` | `bash` | `ls .*` |
+/// | `"WebSearch"` | `web_search` | `.*` |
+/// | `"Read(.git/config)"` | `read` | `\.git/config` |
+///
+/// Returns `(tool_name_lowercased, regex_pattern)`.
+pub fn parse_permission_rule(s: &str) -> Option<(String, String)> {
+    let s = s.trim();
+    if s.is_empty() {
+        return None;
+    }
+    if let Some(paren) = s.find('(') {
+        let tool_name = s[..paren].trim().to_lowercase();
+        let raw = s[paren + 1..].strip_suffix(')')?.trim();
+        let regex = glob_like_to_regex(raw);
+        Some((tool_name, regex))
+    } else {
+        Some((s.to_lowercase(), ".*".to_string()))
+    }
+}
+
+/// Convert a Claude Code glob-like pattern to a regex string.
+/// `*` → `.*` (greedy), `?` → `.`, regex special chars are escaped.
+fn glob_like_to_regex(pattern: &str) -> String {
+    let mut re = String::with_capacity(pattern.len() + 2);
+    re.push('^');
+    for ch in pattern.chars() {
+        match ch {
+            '*' => re.push_str(".*"),
+            '?' => re.push('.'),
+            '.' | '+' | '(' | ')' | '[' | ']' | '{' | '}' | '\\' | '|' | '^' | '$' => {
+                re.push('\\');
+                re.push(ch);
+            }
+            _ => re.push(ch),
+        }
+    }
+    re.push('$');
+    re
+}
+
 // ── Constants ──────────────────────────────────────────────────────────
 
 /// TTL for allow-once codes (24 hours).
@@ -134,12 +180,61 @@ impl ExecutionPolicyEngine {
             };
         }
         let mut rules: Vec<CompiledRule> = Vec::new();
+
+        // Convert Claude Code-style allow/deny/ask entries to CompiledRules.
+        // These are parsed BEFORE user-defined rules so user rules take priority (last wins).
+        let mut rule_index = 0u32;
+        for entry in &config.deny {
+            if let Some((tool, pattern)) = parse_permission_rule(entry) {
+                if let Ok(regex) = Regex::new(&pattern) {
+                    rule_index += 1;
+                    rules.push(CompiledRule {
+                        id: format!("builtin-deny-{}", rule_index),
+                        description: format!("Denied by permission rule: {}", entry),
+                        regex,
+                        action: PolicyRuleAction::Deny,
+                        tool: Some(tool),
+                        alternatives: vec![],
+                    });
+                }
+            }
+        }
+        for entry in &config.ask {
+            if let Some((tool, pattern)) = parse_permission_rule(entry) {
+                if let Ok(regex) = Regex::new(&pattern) {
+                    rule_index += 1;
+                    rules.push(CompiledRule {
+                        id: format!("builtin-ask-{}", rule_index),
+                        description: format!("Ask by permission rule: {}", entry),
+                        regex,
+                        action: PolicyRuleAction::Prompt,
+                        tool: Some(tool),
+                        alternatives: vec![],
+                    });
+                }
+            }
+        }
+        for entry in &config.allow {
+            if let Some((tool, pattern)) = parse_permission_rule(entry) {
+                if let Ok(regex) = Regex::new(&pattern) {
+                    rule_index += 1;
+                    rules.push(CompiledRule {
+                        id: format!("builtin-allow-{}", rule_index),
+                        description: format!("Allowed by permission rule: {}", entry),
+                        regex,
+                        action: PolicyRuleAction::Allow,
+                        tool: Some(tool),
+                        alternatives: vec![],
+                    });
+                }
+            }
+        }
+
+        // Append user-defined custom rules (these take priority over the auto-generated ones).
         for def in &config.rules {
             match CompiledRule::from_def(def) {
                 Ok(rule) => rules.push(rule),
                 Err(e) => {
-                    // Skipping invalid regex is more resilient than failing
-                    // the entire engine initialization.
                     crate::logging::warn(&format!(
                         "ExecutionPolicy: invalid regex pattern '{}' in rule '{}': {}",
                         def.pattern, def.id, e
@@ -161,17 +256,57 @@ impl ExecutionPolicyEngine {
         }
     }
 
-    /// Evaluate a command and return the policy decision.
+    /// Evaluate a tool call against the policy rules, matching only by tool name.
+    /// Use this for tool-level allow/deny/ask rules (e.g., `"WebSearch"` in deny).
     ///
-    /// Returns `None` if no rule matches — the caller should fall through
-    /// to dcg-core's mode-based evaluation.
+    /// Returns `None` if no rule matches this tool.
+    pub fn evaluate_tool(&self, tool_name: &str) -> Option<PolicyDecision> {
+        for rule in &self.rules {
+            if let Some(ref t) = rule.tool {
+                if t != tool_name {
+                    continue;
+                }
+            } else {
+                continue; // skip rules with no tool scope
+            }
+            // For tool-level evaluation, match only the tool name (regex must match empty/anything).
+            // The regex is tested against an empty string — for bare tool names the pattern is `.*`
+            // which always matches. For ToolName(pattern) patterns, the command-level evaluate()
+            // is what actually checks the command.
+            if rule.regex.is_match("") {
+                match rule.action {
+                    PolicyRuleAction::Allow => {
+                        return Some(PolicyDecision::Allow {
+                            reason: format!("Allowed by tool rule '{}'", rule.id),
+                        });
+                    }
+                    PolicyRuleAction::Deny => {
+                        return Some(PolicyDecision::Deny {
+                            reason: rule.description.clone(),
+                            alternatives: rule.alternatives.clone(),
+                            rule_id: Some(rule.id.clone()),
+                        });
+                    }
+                    PolicyRuleAction::Prompt => {
+                        return Some(PolicyDecision::Prompt {
+                            reason: rule.description.clone(),
+                            allow_once_code: String::new(),
+                            alternatives: rule.alternatives.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        None
+    }
+
     pub fn evaluate(
         &self,
         tool_name: &str,
         command: &str,
         session: &mut PolicySession,
     ) -> Option<PolicyDecision> {
-        // 1. Check protected patterns (always prompt, even in bypass mode)
+        // 1. Check protected patterns (always prompt, regardless of mode)
         for pattern in &self.protected_patterns {
             if pattern.is_match(command) {
                 let code = session.generate_allow_once_code(command);
@@ -201,14 +336,12 @@ impl ExecutionPolicyEngine {
 
         // 3. Evaluate custom rules (first match wins)
         for rule in &self.rules {
-            // Check tool scope: if rule has a tool restriction, it must match
             #[allow(clippy::collapsible_if)]
             if let Some(ref t) = rule.tool {
                 if t != tool_name {
                     continue;
                 }
             }
-            // Check pattern match
             if rule.regex.is_match(command) {
                 match rule.action {
                     PolicyRuleAction::Allow => {
@@ -382,6 +515,14 @@ pub fn evaluate_command(tool_name: &str, command: &str) -> Option<PolicyDecision
     let engine = ENGINE.lock().ok()?;
     let mut session = SESSION.lock().ok()?;
     engine.evaluate(tool_name, command, &mut session)
+}
+
+/// Evaluate a tool call against the global policy engine (tool-level rules only).
+///
+/// Returns `None` if no rule matches this tool.
+pub fn evaluate_tool(tool_name: &str) -> Option<PolicyDecision> {
+    let engine = ENGINE.lock().ok()?;
+    engine.evaluate_tool(tool_name)
 }
 
 /// Try to consume an allow-once code.

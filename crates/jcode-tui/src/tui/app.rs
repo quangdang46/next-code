@@ -1269,12 +1269,18 @@ pub struct App {
     pub pending_permission_tool: Option<String>,
     /// Reason for pending permission request
     pub pending_permission_reason: Option<String>,
+    /// Session ID that requested permission (MAY differ from app.session.id
+    /// when the request comes from a subagent rather than the main session).
+    pub pending_permission_session_id: Option<String>,
     /// Allow-once code for pending permission (6 hex chars, SHA-256 derived)
     pub pending_permission_code: Option<String>,
     /// Safer alternatives for the pending permission, surfaced from dcg-core
     /// in `Decision::Prompt.alternatives`. Rendered in the dialog so the
     /// user can make an informed choice.
     pub pending_permission_alternatives: Vec<String>,
+    /// Index of the currently selected action in the permission dialog
+    /// (0 = Approve, 1 = Approve all, 2 = Always allow, 3 = Deny).
+    pub pending_permission_selected: usize,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

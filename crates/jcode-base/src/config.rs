@@ -477,6 +477,8 @@ pub struct Config {
 
     /// Execution policy engine configuration (per-command rules).
     pub execution_policy: jcode_config_types::ExecutionPolicyConfig,
+    /// Tools that are always allowed without prompting (persisted to config).
+    pub always_allow_tools: Vec<String>,
 }
 
 /// Agent Client Protocol adapter configuration.

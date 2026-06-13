@@ -450,7 +450,16 @@ pub trait TuiState {
     fn pending_permission_code(&self) -> Option<&str> {
         None
     }
+    /// Permission dialog: session ID that requested the permission
+    /// (may differ from the app main session for subagent requests)
+    fn pending_permission_session_id(&self) -> Option<&str> {
+        None
+    }
     /// Permission dialog: safer alternatives (from dcg-core Decision::Prompt)
+    /// Permission dialog: index of the currently selected action (0-3)
+    fn pending_permission_selected(&self) -> Option<usize> {
+        Some(0)
+    }
     fn pending_permission_alternatives(&self) -> &[String] {
         &[]
     }

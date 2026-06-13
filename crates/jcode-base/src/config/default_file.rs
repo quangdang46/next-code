@@ -258,6 +258,29 @@ cross_provider_failover = "countdown"
 # Also overridable per-launch via JCODE_STREAM_IDLE_TIMEOUT_SECS.
 # stream_idle_timeout_secs = 600
 
+[execution-policy]
+# Command-level rule evaluation enabled by default.
+enabled = true
+# Claude Code-style allow/deny/ask rules.
+# Bare tool names match any call to that tool.
+# ToolName(pattern) syntax matches the command or input against a pattern.
+# Patterns support * (any characters) and ? (single character) wildcards.
+#
+# Examples:
+#   deny  = ["WebSearch", "WebFetch"]           # block these entire tools
+#   ask   = ["Bash"]                             # always prompt for bash
+#   allow = ["Bash(ls *)", "Bash(git status)"]   # auto-allow specific bash commands
+#
+# These are equivalent to the more verbose per-rule format:
+#   [[execution-policy.rules]]
+#   id = "allow-git-log"
+#   pattern = "^git log"
+#   action = "allow"
+#   tool = "bash"
+allow = []
+deny = []
+ask = []
+
 [agents]
 # Defaults for spawned helper agents (swarm workers, subagents, sidecars).
 # All keys are optional; the values below are the built-in defaults.

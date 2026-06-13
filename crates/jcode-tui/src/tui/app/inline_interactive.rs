@@ -2752,6 +2752,9 @@ impl App {
                                     self.session.model = Some(active_model.clone());
                                     self.session.route_api_method =
                                         Some(route_selection.api_method.clone());
+                                    let _ = crate::config::Config::set_default_model_only(
+                                        Some(&spec),
+                                    );
                                     let _ = self.session.save();
                                     crate::logging::event_info(
                                         "model_picker_select_applied",

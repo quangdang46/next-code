@@ -248,6 +248,13 @@ pub enum Request {
         mode: jcode_config_types::CompactionMode,
     },
 
+    /// Set the permission mode for tool execution.
+    #[serde(rename = "set_permission_mode")]
+    SetPermissionMode {
+        id: u64,
+        mode: String,
+    },
+
     /// Set or clear the active session's custom display title.
     #[serde(rename = "rename_session")]
     RenameSession {
@@ -1086,6 +1093,15 @@ pub enum ServerEvent {
     },
 
     /// Compaction mode changed (response to set_compaction_mode)
+
+    /// Permission mode changed.
+    #[serde(rename = "permission_mode_changed")]
+    PermissionModeChanged {
+        id: u64,
+        mode: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
     #[serde(rename = "compaction_mode_changed")]
     CompactionModeChanged {
         id: u64,

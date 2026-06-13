@@ -45,6 +45,38 @@ pub(super) async fn available_models_updated_event(agent: &Arc<Mutex<Agent>>) ->
     available_models_updated_event_from_agent(&agent_guard)
 }
 
+pub(super) async fn handle_set_permission_mode(
+    id: u64,
+    mode: String,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+) {
+    let result: Result<(), String> = (|| {
+        if crate::dcg_bridge::set_mode_from_str(&mode) {
+            Ok(())
+        } else {
+            Err(format!("Unknown permission mode: {}", mode))
+        }
+    })();
+
+    match result {
+        Ok(()) => {
+            let _ = client_event_tx.send(ServerEvent::PermissionModeChanged {
+                id,
+                mode: mode.clone(),
+                error: None,
+            });
+        }
+        Err(e) => {
+            let current = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
+            let _ = client_event_tx.send(ServerEvent::PermissionModeChanged {
+                id,
+                mode: current.to_string(),
+                error: Some(e),
+            });
+        }
+    }
+}
+
 pub(super) fn try_available_models_updated_event(agent: &Arc<Mutex<Agent>>) -> Option<ServerEvent> {
     let agent_guard = agent.try_lock().ok()?;
     Some(available_models_updated_event_from_agent(&agent_guard))

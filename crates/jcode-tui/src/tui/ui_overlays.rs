@@ -647,7 +647,6 @@ fn color_to_rgb(color: Color) -> Option<[u8; 3]> {
     }
 }
 
-#[allow(clippy::vec_init_then_push)]
 pub(super) fn draw_permission_dialog_overlay(
     frame: &mut Frame,
     area: Rect,
@@ -662,9 +661,13 @@ pub(super) fn draw_permission_dialog_overlay(
     let dim_style = Style::default().fg(dim_color());
     let warn_style = Style::default().fg(rgb(235, 190, 105));
     let alt_style = Style::default().fg(rgb(160, 200, 240));
+    let highlight_bg = Style::default()
+        .fg(rgb(20, 22, 26))
+        .bg(accent_color());
 
     let tool = app.pending_permission_tool().unwrap_or("unknown");
     let reason = app.pending_permission_reason().unwrap_or("");
+    let selected = app.pending_permission_selected().unwrap_or(0);
 
     let mut lines: Vec<Line<'static>> = Vec::new();
     lines.push(Line::from(Span::styled(
@@ -672,7 +675,7 @@ pub(super) fn draw_permission_dialog_overlay(
         warn_style.add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(Span::styled(
-        "  A tool call needs your approval before it can execute.",
+        "  A tool call needs your approval.",
         dim_style,
     )));
     lines.push(Line::from(""));
@@ -684,8 +687,6 @@ pub(super) fn draw_permission_dialog_overlay(
         Span::styled("  Reason: ", dim_style),
         Span::styled(reason.to_string(), text_style),
     ]));
-    // Render alternatives if present (spec §3.2 Bash command dialog shows
-    // "Safer alternatives" after the reason).
     let alternatives = app.pending_permission_alternatives();
     if !alternatives.is_empty() {
         lines.push(Line::from(Span::styled("  Safer alternatives:", dim_style)));
@@ -697,8 +698,28 @@ pub(super) fn draw_permission_dialog_overlay(
         }
     }
     lines.push(Line::from(""));
+
+    // Selectable options list
+    let options = [
+        ("\u{2714}  Approve", "\u{2192} Enter or y"),
+        ("\u{1f513}  Approve all for session", "\u{2192} Enter or a"),
+        ("\u{1f4be}  Always allow", "\u{2192} Enter or p"),
+        ("\u{2716}  Deny", "\u{2192} Enter or n, Esc"),
+    ];
+    for (i, (label, hint)) in options.iter().enumerate() {
+        let prefix = if i == selected { "\u{276f} " } else { "  " };
+        let label_span = if i == selected {
+            Span::styled(format!("{}{}", prefix, label), highlight_bg)
+        } else {
+            Span::styled(format!("{}{}", prefix, label), text_style)
+        };
+        let hint_span = Span::styled(format!(" {}", hint), dim_style);
+        lines.push(Line::from(vec![label_span, hint_span]));
+    }
+
+    lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  [y] Approve tool  [a] Approve all for session  [n] Deny  [Esc] Cancel",
+        "  \u{2191}\u{2193} or Tab to navigate  \u{23ce} to confirm  Esc to cancel",
         dim_style,
     )));
 

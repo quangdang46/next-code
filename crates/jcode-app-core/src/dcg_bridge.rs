@@ -338,6 +338,35 @@ pub fn classify_for_session(action: &str, session_id: &str) -> BridgeDecision {
     if session_allows_action(session_id, action) {
         return BridgeDecision::Allow;
     }
+
+    // Check tool-level allow/deny/ask rules from execution policy config.
+    // These handle bare tool names like "WebSearch" in deny/ask/allow lists.
+    // Bash commands with patterns (e.g., "Bash(ls *)") are matched at the
+    // command level via classify_command's execution_policy::evaluate().
+    if let Some(decision) = crate::execution_policy::evaluate_tool(action) {
+        use crate::execution_policy::PolicyDecision;
+        return match decision {
+            PolicyDecision::Allow { .. } => BridgeDecision::Allow,
+            PolicyDecision::Deny {
+                reason,
+                alternatives,
+                ..
+            } => BridgeDecision::Deny {
+                reason,
+                alternatives,
+            },
+            PolicyDecision::Prompt {
+                reason,
+                allow_once_code,
+                alternatives,
+            } => BridgeDecision::Prompt {
+                reason,
+                allow_once_code,
+                alternatives,
+            },
+        };
+    }
+
     let mode = session_mode(session_id).unwrap_or_else(current_mode);
     classify_with_mode(action, mode)
 }
@@ -1242,5 +1271,15 @@ pub fn classify_command(tool_name: &str, command: &str, session_id: &str) -> Bri
             reason,
             alternatives,
         },
+    }
+}
+
+/// Initialize the session allow-list from the config's `always_allow_tools` list.
+/// Called at session start so tools the user previously marked as always-allow
+/// are pre-approved without re-prompting.
+pub fn init_session_allow_list(session_id: &str) {
+    let config = crate::config::config();
+    for tool in &config.always_allow_tools {
+        approve_session_action(session_id, tool);
     }
 }

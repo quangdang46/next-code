@@ -1781,55 +1781,105 @@ pub(super) fn handle_modal_key(
         return Ok(true);
     }
 
-    // Permission dialog — handle approval/denial keys
+    // Permission dialog — arrow-key navigation + Enter to confirm.
     if app.pending_permission_tool.is_some() {
-        let session_id = app.session.id.clone();
+        // Use the session ID from the permission request (subagent sessions
+        // may differ from app.session.id). Fall back to main session if
+        // somehow missing — the allow-list is per-session, so approving the
+        // wrong session won't help the blocked tool, but it won't crash.
+        let session_id = app
+            .pending_permission_session_id
+            .clone()
+            .unwrap_or_else(|| app.session.id.clone());
         let tool_name = app.pending_permission_tool.clone().unwrap_or_default();
         match code {
+            // Up/Down arrows or Tab/Shift+Tab to cycle selection
+            KeyCode::Up | KeyCode::Char('k') if modifiers == KeyModifiers::ALT => {
+                app.pending_permission_selected =
+                    app.pending_permission_selected.saturating_sub(1);
+                return Ok(true);
+            }
+            KeyCode::Down | KeyCode::Char('j') if modifiers == KeyModifiers::ALT => {
+                app.pending_permission_selected = app
+                    .pending_permission_selected
+                    .saturating_add(1)
+                    .min(3);
+                return Ok(true);
+            }
+            KeyCode::Tab | KeyCode::BackTab => {
+                if modifiers == KeyModifiers::SHIFT {
+                    app.pending_permission_selected =
+                        app.pending_permission_selected.saturating_sub(1);
+                } else {
+                    app.pending_permission_selected = app
+                        .pending_permission_selected
+                        .saturating_add(1)
+                        .min(3);
+                }
+                return Ok(true);
+            }
+            // Enter confirms the selected action
+            KeyCode::Enter => {
+                match app.pending_permission_selected {
+                    0 => {
+                        // Approve tool
+                        crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
+                        if let Some(ref code_str) = app.pending_permission_code {
+                            crate::dcg_bridge::consume_allow_once(code_str);
+                        }
+                        app.reset_permission_dialog();
+                        app.set_status_notice(format!("Approved '{tool_name}' for this session."));
+                    }
+                    1 => {
+                        // Approve all
+                        crate::dcg_bridge::approve_session_all(&session_id);
+                        app.reset_permission_dialog();
+                        app.set_status_notice("Approved all tools for this session.");
+                    }
+                    2 => {
+                        // Always allow (approve + persist)
+                        crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
+                        let _ = crate::config::Config::add_always_allow_tool(&tool_name);
+                        app.reset_permission_dialog();
+                        app.set_status_notice("Approved and saved as always-allow.");
+                    }
+                    3 => {
+                        // Deny
+                        app.reset_permission_dialog();
+                    }
+                    _ => {}
+                }
+                return Ok(true);
+            }
+            // Legacy single-key shortcuts (still work for power users)
             KeyCode::Char('y') | KeyCode::Char('Y') => {
-                // Approve for this tool. Record the action on the session's
-                // allow-list so the next call to classify_for_session for
-                // the same tool short-circuits to Allow. We deliberately do
-                // not call consume_allow_once() here because that mutates
-                // dcg-core's internal allow-once cache for a code that the
-                // *original* tool call already errored on — there is nothing
-                // to consume for. The session allow-list is the user-facing
-                // "I trust this tool" affordance.
                 crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
-                // Best-effort: also consume the 6-hex code if present and
-                // well-formed, so a subsequent `jcode permission allow` from
-                // another shell honors the same code (length-validated).
                 if let Some(ref code_str) = app.pending_permission_code {
                     crate::dcg_bridge::consume_allow_once(code_str);
                 }
                 app.reset_permission_dialog();
-                let tool = if tool_name.is_empty() {
-                    "tool".to_string()
-                } else {
-                    tool_name
-                };
-                app.set_status_notice(format!("Approved '{tool}' for this session."));
+                app.set_status_notice(format!("Approved '{tool_name}' for this session."));
                 return Ok(true);
             }
             KeyCode::Char('a') | KeyCode::Char('A') => {
-                // Approve every tool for this session. SCOPED to the session,
-                // never global — no more silent global BypassPermissions.
                 crate::dcg_bridge::approve_session_all(&session_id);
                 app.reset_permission_dialog();
                 app.set_status_notice("Approved all tools for this session.");
                 return Ok(true);
             }
+            KeyCode::Char('p') | KeyCode::Char('P') => {
+                crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
+                let _ = crate::config::Config::add_always_allow_tool(&tool_name);
+                app.reset_permission_dialog();
+                app.set_status_notice("Approved and saved as always-allow.");
+                return Ok(true);
+            }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
-                // Deny — just clear the dialog. The agent will see the
-                // original Err and decide whether to retry or surface the
-                // denial to the user.
                 app.reset_permission_dialog();
                 return Ok(true);
             }
             _ => {
-                // Unknown key while the dialog is open: pass through so the
-                // user can still scroll the underlying chat. The dialog
-                // remains open; only y / a / n / Esc close it.
+                // Pass through: user can scroll chat while dialog is open
                 return Ok(false);
             }
         }

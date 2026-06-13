@@ -316,4 +316,19 @@ impl Config {
         }
         Ok(())
     }
+    /// Persist a tool as always-allowed in the config file.
+    /// Adds the tool to the always_allow_tools list if not already present.
+    pub fn add_always_allow_tool(tool_name: &str) -> anyhow::Result<()> {
+        let mut config = Self::load();
+        let tool = tool_name.to_string();
+        if !config.always_allow_tools.contains(&tool) {
+            config.always_allow_tools.push(tool);
+            config.save()?;
+            crate::logging::info(&format!(
+                "Saved always-allow tool to config: {}",
+                tool_name
+            ));
+        }
+        Ok(())
+    }
 }

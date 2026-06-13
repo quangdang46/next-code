@@ -259,6 +259,7 @@ pub(super) fn handle_bus_event(
             let reason = sanitize_terminal_text(&req.reason);
             app.pending_permission_tool = Some(tool.clone());
             app.pending_permission_reason = Some(reason.clone());
+            app.pending_permission_session_id = Some(req.session_id.clone());
             app.pending_permission_code = Some(req.allow_once_code.clone());
             // Alternatives are static suggestions from dcg-core but apply
             // the same sanitizer for defense in depth.

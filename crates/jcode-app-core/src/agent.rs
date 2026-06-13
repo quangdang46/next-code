@@ -371,6 +371,9 @@ impl Agent {
             crate::session::derive_session_provider_key(agent.provider.name());
         agent.session.ensure_initial_session_context_message();
 
+        // Pre-approve tools from the always-allow config list.
+        crate::dcg_bridge::init_session_allow_list(&agent.session.id);
+
         // Dispatch SessionStart hooks (fire-and-forget, observational only)
         {
             let registry = agent.hook_registry.clone();

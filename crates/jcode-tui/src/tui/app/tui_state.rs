@@ -1574,8 +1574,16 @@ impl crate::tui::TuiState for App {
         self.pending_permission_code.as_deref()
     }
 
+    fn pending_permission_session_id(&self) -> Option<&str> {
+        self.pending_permission_session_id.as_deref()
+    }
+
     fn pending_permission_alternatives(&self) -> &[String] {
         &self.pending_permission_alternatives
+    }
+
+    fn pending_permission_selected(&self) -> Option<usize> {
+        Some(self.pending_permission_selected)
     }
 
     fn now_millis(&self) -> u64 {
