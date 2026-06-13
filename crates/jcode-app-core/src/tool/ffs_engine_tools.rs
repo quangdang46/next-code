@@ -51,7 +51,7 @@ struct FindInput {
 #[async_trait]
 impl Tool for FfsFindTool {
     fn name(&self) -> &str {
-        "find"
+        "ffs find"
     }
 
     fn description(&self) -> &str {
@@ -126,7 +126,7 @@ struct DispatchInput {
 #[async_trait]
 impl Tool for FfsDispatchTool {
     fn name(&self) -> &str {
-        "dispatch"
+        "ffs dispatch"
     }
 
     fn description(&self) -> &str {
@@ -188,7 +188,7 @@ struct CallGraphInput {
 #[async_trait]
 impl Tool for FfsCallersTool {
     fn name(&self) -> &str {
-        "callers"
+        "ffs callers"
     }
 
     fn description(&self) -> &str {
@@ -237,7 +237,7 @@ impl FfsCalleesTool {
 #[async_trait]
 impl Tool for FfsCalleesTool {
     fn name(&self) -> &str {
-        "callees"
+        "ffs callees"
     }
 
     fn description(&self) -> &str {
@@ -299,7 +299,7 @@ struct RefsInput {
 #[async_trait]
 impl Tool for FfsRefsTool {
     fn name(&self) -> &str {
-        "refs"
+        "ffs refs"
     }
 
     fn description(&self) -> &str {
@@ -369,7 +369,7 @@ struct FlowInput {
 #[async_trait]
 impl Tool for FfsFlowTool {
     fn name(&self) -> &str {
-        "flow"
+        "ffs flow"
     }
 
     fn description(&self) -> &str {

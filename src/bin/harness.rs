@@ -131,13 +131,13 @@ async fn main() -> Result<()> {
         input: json!({"path": "."}),
     });
     cases.push(ToolCase {
-        name: "glob",
-        label: "glob *.txt",
+        name: "ffs glob",
+        label: "ffs glob *.txt",
         input: json!({"pattern": "*.txt"}),
     });
     cases.push(ToolCase {
-        name: "grep",
-        label: "grep gamma",
+        name: "ffs grep",
+        label: "ffs grep gamma",
         input: json!({"pattern": "gamma", "path": "."}),
     });
     cases.push(ToolCase {

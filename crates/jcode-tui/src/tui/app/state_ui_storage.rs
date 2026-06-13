@@ -91,14 +91,14 @@ fn compact_tool_input_for_display(name: &str, input: &serde_json::Value) -> serd
                 file_path.unwrap_or(serde_json::Value::Null),
             )])
         }
-        "glob" => obj(vec![(
+        "glob" | "ffs glob" => obj(vec![(
             "pattern",
             input
                 .get("pattern")
                 .cloned()
                 .unwrap_or(serde_json::Value::Null),
         )]),
-        "grep" => obj(vec![
+        "grep" | "ffs grep" => obj(vec![
             (
                 "pattern",
                 input

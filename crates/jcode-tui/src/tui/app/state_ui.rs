@@ -1669,6 +1669,45 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
         return true;
     }
 
+    if trimmed == "/permissions" || trimmed.starts_with("/permissions ") {
+        let mode = crate::dcg_bridge::current_mode();
+        let mut content = format!("Current permission mode: **{}**\n\n", crate::dcg_bridge::mode_to_str(mode));
+
+        content.push_str("Modes (cycle order `default` → `accept-edits` → `plan` → `auto` → `dont-ask` → `bypass-permissions` → `default`):\n\n");
+        content.push_str("  `default`             — Standard rules; unmatched commands fall through to allow\n");
+        content.push_str("  `accept-edits`        — Auto-approve read/write in the working directory\n");
+        content.push_str("  `plan`                — Read-only enforcement; write effects are denied\n");
+        content.push_str("  `auto`                — LLM-classified mode; same default as `default`\n");
+        content.push_str("  `dont-ask`            — Restricted surface; non-allow-listed commands denied\n");
+        content.push_str("  `bypass-permissions`  — Skip all evaluation (deny rules still apply)\n\n");
+        content.push_str("Commands:\n");
+        content.push_str("  `/permissions`               Show this status\n");
+        content.push_str("  `/permissions cycle`          Cycle to next mode\n");
+        content.push_str("  `/permissions <mode>`         Set mode by name\n");
+
+        let args = trimmed.strip_prefix("/permissions").map(str::trim).unwrap_or("");
+        match args {
+            "cycle" => {
+                let new_mode = crate::dcg_bridge::cycle_mode();
+                content = format!("Switched to mode: **{}**\n\n{}", crate::dcg_bridge::mode_to_str(new_mode), content);
+            }
+            s if !s.is_empty() => {
+                if crate::dcg_bridge::set_mode_from_str(s) {
+                    content = format!("Switched to mode: **{}**\n\n{}", crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode()), content);
+                } else {
+                    content = format!("Unknown mode: `{}`\n\n{}", s, content);
+                }
+            }
+            _ => {}
+        }
+
+        app.push_display_message(
+            DisplayMessage::system(content).with_title("Permissions"),
+        );
+        app.set_status_notice("Permissions");
+        return true;
+    }
+
     if trimmed == "/version" {
         let version = jcode_build_meta::VERSION;
         let is_canary = if app.session.is_canary {

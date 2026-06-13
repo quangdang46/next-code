@@ -40,7 +40,7 @@ struct MultiGrepResult {
 #[async_trait]
 impl Tool for FfsMultiGrepTool {
     fn name(&self) -> &str {
-        "multi_grep"
+        "ffs multi_grep"
     }
 
     fn description(&self) -> &str {

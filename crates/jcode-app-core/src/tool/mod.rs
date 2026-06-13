@@ -300,7 +300,7 @@ impl Registry {
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "propose_hashline_edit",
+                "ffs propose_hashline",
                 propose_hashline_edit::ProposeHashlineEditTool::new,
             );
             Self::insert_tool_timed(
@@ -316,60 +316,60 @@ impl Registry {
                 "apply_patch",
                 apply_patch::ApplyPatchTool::new,
             );
-            Self::insert_tool_timed(&mut m, &mut timings, "glob", ffs_glob::FfsGlobTool::new);
-            Self::insert_tool_timed(&mut m, &mut timings, "grep", ffs_grep::FfsGrepTool::new);
+            Self::insert_tool_timed(&mut m, &mut timings, "ffs glob", ffs_glob::FfsGlobTool::new);
+            Self::insert_tool_timed(&mut m, &mut timings, "ffs grep", ffs_grep::FfsGrepTool::new);
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "outline",
+                "ffs outline",
                 ffs_outline::FfsOutlineTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "symbol",
+                "ffs symbol",
                 ffs_symbol::FfsSymbolTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "multi_grep",
+                "ffs multi_grep",
                 ffs_multi_grep::FfsMultiGrepTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "find",
+                "ffs find",
                 ffs_engine_tools::FfsFindTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "dispatch",
+                "ffs dispatch",
                 ffs_engine_tools::FfsDispatchTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "callers",
+                "ffs callers",
                 ffs_engine_tools::FfsCallersTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "callees",
+                "ffs callees",
                 ffs_engine_tools::FfsCalleesTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "refs",
+                "ffs refs",
                 ffs_engine_tools::FfsRefsTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "flow",
+                "ffs flow",
                 ffs_engine_tools::FfsFlowTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "ls", ls::LsTool::new);
@@ -458,7 +458,7 @@ impl Registry {
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "hashline_edit",
+                "ffs hashline_edit",
                 hashline_edit::HashlineEditTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "schedule", ambient::ScheduleTool::new);

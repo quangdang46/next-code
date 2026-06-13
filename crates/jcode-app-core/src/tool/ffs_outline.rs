@@ -43,7 +43,7 @@ struct OutlineItem {
 #[async_trait]
 impl Tool for FfsOutlineTool {
     fn name(&self) -> &str {
-        "outline"
+        "ffs outline"
     }
 
     fn description(&self) -> &str {

@@ -37,7 +37,7 @@ struct FuzzyResult {
 #[async_trait]
 impl Tool for FfsGlobTool {
     fn name(&self) -> &str {
-        "glob"
+        "ffs glob"
     }
 
     fn description(&self) -> &str {

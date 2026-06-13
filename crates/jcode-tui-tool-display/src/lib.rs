@@ -10,8 +10,8 @@ pub fn resolve_display_tool_name(name: &str) -> &str {
         "file_read" => "read",
         "file_write" => "write",
         "file_edit" => "edit",
-        "file_glob" => "glob",
-        "file_grep" => "grep",
+        "file_glob" => "ffs glob",
+        "file_grep" => "ffs grep",
         "todo_read" | "todo_write" | "todoread" | "todowrite" => "todo",
         other => other,
     }

@@ -916,7 +916,8 @@ pub(super) fn get_tool_summary_with_budget(
                 .map(|w| truncate_path_with_suffix(path, suffix.as_str(), w))
                 .unwrap_or_else(|| format!("{}{}", path, suffix))
         }
-        "glob" => tool
+        "glob" | "ffs glob" | "ffs outline" | "ffs symbol" | "ffs find" | "ffs dispatch"
+        | "ffs callers" | "ffs callees" | "ffs refs" | "ffs flow" => tool
             .input
             .get("pattern")
             .and_then(|v| v.as_str())
@@ -925,7 +926,7 @@ pub(super) fn get_tool_summary_with_budget(
                 format!("'{}'", truncate_middle_display(p, budget))
             })
             .unwrap_or_default(),
-        "grep" => {
+        "grep" | "ffs grep" => {
             let pattern = tool
                 .input
                 .get("pattern")
@@ -969,9 +970,9 @@ pub(super) fn get_tool_summary_with_budget(
                 .input
                 .get("mode")
                 .and_then(|v| v.as_str())
-                .unwrap_or("grep");
+                .unwrap_or("ffs grep");
             match mode {
-                "grep" | "find" => {
+                "grep" | "ffs grep" | "find" => {
                     let query = tool
                         .input
                         .get("query")

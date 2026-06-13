@@ -183,7 +183,9 @@ pub struct AmbientTranscript {
 const AUTO_ALLOWED: &[&str] = &[
     "read",
     "glob",
+    "ffs glob",
     "grep",
+    "ffs grep",
     "ls",
     "memory",
     "todo",
@@ -192,6 +194,14 @@ const AUTO_ALLOWED: &[&str] = &[
     "conversation_search",
     "session_search",
     "codesearch",
+    "ffs outline",
+    "ffs symbol",
+    "ffs find",
+    "ffs dispatch",
+    "ffs callers",
+    "ffs callees",
+    "ffs refs",
+    "ffs flow",
 ];
 
 // ---------------------------------------------------------------------------
@@ -639,7 +649,9 @@ mod tests {
             let sys = SafetySystem::new();
             assert_eq!(sys.classify("read"), ActionTier::AutoAllowed);
             assert_eq!(sys.classify("glob"), ActionTier::AutoAllowed);
+            assert_eq!(sys.classify("ffs glob"), ActionTier::AutoAllowed);
             assert_eq!(sys.classify("grep"), ActionTier::AutoAllowed);
+            assert_eq!(sys.classify("ffs grep"), ActionTier::AutoAllowed);
             assert_eq!(sys.classify("ls"), ActionTier::AutoAllowed);
             assert_eq!(sys.classify("memory"), ActionTier::AutoAllowed);
             assert_eq!(sys.classify("todo"), ActionTier::AutoAllowed);

@@ -588,7 +588,9 @@ impl ToolConfig {
                     "patch",
                     "agentgrep",
                     "glob",
+                    "ffs glob",
                     "grep",
+                    "ffs grep",
                     "ls",
                     "batch",
                 ]
@@ -608,7 +610,9 @@ impl ToolConfig {
                     "patch",
                     "agentgrep",
                     "glob",
+                    "ffs glob",
                     "grep",
+                    "ffs grep",
                     "ls",
                 ]
                 .into_iter()

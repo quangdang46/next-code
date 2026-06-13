@@ -8944,15 +8944,16 @@ fn formatted_tool_input_summary(
                 lines.push(summary);
             }
         }
-        "glob" => {
+        "glob" | "ffs glob" | "ffs outline" | "ffs symbol" | "ffs find" | "ffs dispatch"
+        | "ffs callers" | "ffs callees" | "ffs refs" | "ffs flow" => {
             if let Some(pattern) = string_value("pattern") {
                 lines.push(format!("'{}'", compact_tool_text(pattern, 96)));
             }
         }
-        "agentgrep" | "grep" => {
+        "agentgrep" | "grep" | "ffs grep" => {
             let query = string_value("query").or_else(|| string_value("pattern"));
             if tool_name == "agentgrep" {
-                let mode = string_value("mode").unwrap_or("grep");
+                let mode = string_value("mode").unwrap_or("ffs grep");
                 if let Some(query) = query.filter(|query| !query.trim().is_empty()) {
                     lines.push(format!("{mode} '{}'", compact_tool_text(query, 72)));
                 } else {

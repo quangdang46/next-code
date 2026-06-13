@@ -1089,7 +1089,7 @@ mod tests {
                 running: vec![
                     crate::message::ToolCall {
                         id: "batch-2-grep".to_string(),
-                        name: "grep".to_string(),
+                        name: "ffs grep".to_string(),
                         input: serde_json::json!({"pattern": "foo", "path": "src"}),
                         intent: None,
                         thought_signature: None,

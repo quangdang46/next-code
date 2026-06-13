@@ -128,7 +128,7 @@ fn publish_edit_event(
 #[async_trait]
 impl Tool for HashlineEditTool {
     fn name(&self) -> &str {
-        "hashline_edit"
+        "ffs hashline_edit"
     }
 
     fn description(&self) -> &str {

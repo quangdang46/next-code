@@ -30,9 +30,8 @@ struct FfsGrepInput {
 #[async_trait]
 impl Tool for FfsGrepTool {
     fn name(&self) -> &str {
-        "grep"
+        "ffs grep"
     }
-
     fn description(&self) -> &str {
         "Search files for a pattern. Uses ffs-search directory_grep (regex-based with gitignore-aware walk). Auto-detects whether the pattern contains regex metacharacters; you can override with `regex: true/false`."
     }

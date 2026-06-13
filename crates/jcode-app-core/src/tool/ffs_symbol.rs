@@ -53,7 +53,7 @@ struct SymbolResult {
 #[async_trait]
 impl Tool for FfsSymbolTool {
     fn name(&self) -> &str {
-        "symbol"
+        "ffs symbol"
     }
 
     fn description(&self) -> &str {

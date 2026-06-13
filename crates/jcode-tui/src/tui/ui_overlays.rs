@@ -344,6 +344,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
         "/debug-visual",
         "Enable visual debugging for TUI issues",
     ));
+    lines.push(help_entry("/permissions", "Show DCG permission mode and recent decisions"));
     lines.push(help_entry("/quit", "Exit jcode"));
 
     let skills = app.available_skills();

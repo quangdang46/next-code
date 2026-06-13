@@ -213,7 +213,7 @@ fn editor_sample_has_expected_shape() {
         "edit",
         "multiedit",
         "apply_patch",
-        "hashline_edit",
+        "ffs hashline_edit",
         "patch",
     ] {
         assert!(

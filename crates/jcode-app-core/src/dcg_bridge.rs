@@ -672,12 +672,22 @@ fn is_legacy_auto_allowed(action_lower: &str) -> bool {
 const READ_ONLY_ACTIONS: &[&str] = &[
     "read",
     "glob",
+    "ffs glob",
     "grep",
+    "ffs grep",
     "ls",
     "codesearch",
     "conversation_search",
     "session_search",
     "todoread",
+    "ffs outline",
+    "ffs find",
+    "ffs callers",
+    "ffs callees",
+    "ffs refs",
+    "ffs flow",
+    "ffs dispatch",
+    "ffs symbol",
 ];
 
 /// Stateful but non-destructive intents — write to jcode-managed scratch
@@ -767,7 +777,9 @@ mod tests {
         for action in [
             "read",
             "glob",
+            "ffs glob",
             "grep",
+            "ffs grep",
             "ls",
             "memory",
             "todo",

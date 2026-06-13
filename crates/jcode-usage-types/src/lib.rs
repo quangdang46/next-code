@@ -81,11 +81,21 @@ pub fn classify_telemetry_tool_category(name: &str) -> TelemetryToolCategory {
     match name {
         "read"
         | "glob"
+        | "ffs glob"
         | "grep"
+        | "ffs grep"
         | "agentgrep"
         | "ls"
         | "conversation_search"
-        | "session_search" => TelemetryToolCategory::ReadSearch,
+        | "session_search"
+        | "ffs outline"
+        | "ffs symbol"
+        | "ffs find"
+        | "ffs dispatch"
+        | "ffs callers"
+        | "ffs callees"
+        | "ffs refs"
+        | "ffs flow" => TelemetryToolCategory::ReadSearch,
         "write" | "edit" | "multiedit" | "patch" | "apply_patch" => TelemetryToolCategory::Write,
         "bash" | "bg" | "schedule" => TelemetryToolCategory::Shell,
         "webfetch" | "websearch" | "codesearch" | "open" => TelemetryToolCategory::Web,

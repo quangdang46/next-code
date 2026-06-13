@@ -44,7 +44,7 @@ fn default_context_window() -> usize {
 #[async_trait]
 impl Tool for ProposeHashlineEditTool {
     fn name(&self) -> &str {
-        "propose_hashline_edit"
+        "ffs propose_hashline"
     }
 
     fn description(&self) -> &str {
