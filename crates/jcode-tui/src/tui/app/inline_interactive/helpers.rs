@@ -268,6 +268,12 @@ mod tests {
             available: true,
             detail: String::new(),
             estimated_reference_cost_micros: None,
+            context_window: None,
+            latency_ms: None,
+            cost_per_million_input: None,
+            cost_per_million_output: None,
+            is_free: false,
+            is_latest: false,
         }
     }
 

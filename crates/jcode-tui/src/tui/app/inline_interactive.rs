@@ -29,6 +29,8 @@ const MODEL_PICKER_USAGE_FILE: &str = "model_picker_usage.json";
 const MODEL_PICKER_USAGE_VERSION: u8 = 1;
 const MODEL_PICKER_FAVORITES_FILE: &str = "model_picker_favorites.json";
 const MODEL_PICKER_FAVORITES_VERSION: u8 = 1;
+const MODEL_PREFS_FILE: &str = "model_prefs.json";
+const MODEL_PREFS_VERSION: u8 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct RemoteModelCatalogCache {
@@ -54,6 +56,21 @@ struct ModelPickerUsageStore {
 struct ModelPickerFavoritesStore {
     version: u8,
     favorites: HashSet<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+struct ModelPreferences {
+    version: u8,
+    recent: Vec<ModelRecentEntry>,
+    variant: HashMap<String, Option<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ModelRecentEntry {
+    model_name: String,
+    provider: String,
+    api_method: String,
+    selected_at_unix: u64,
 }
 
 fn model_picker_usage_path() -> Option<std::path::PathBuf> {
@@ -168,6 +185,56 @@ fn model_picker_is_favorite(
     store
         .favorites
         .contains(&model_picker_usage_key(model_name, route, effort))
+}
+
+fn model_prefs_path() -> Option<std::path::PathBuf> {
+    crate::storage::app_config_dir()
+        .ok()
+        .map(|dir| dir.join("state").join(MODEL_PREFS_FILE))
+}
+
+fn load_model_prefs() -> ModelPreferences {
+    let Some(path) = model_prefs_path() else {
+        return ModelPreferences::default();
+    };
+    let Ok(bytes) = std::fs::read(path) else {
+        return ModelPreferences::default();
+    };
+    let Ok(mut prefs) = serde_json::from_slice::<ModelPreferences>(&bytes) else {
+        return ModelPreferences::default();
+    };
+    if prefs.version != MODEL_PREFS_VERSION {
+        return ModelPreferences::default();
+    }
+    prefs.recent.retain(|e| !e.model_name.is_empty());
+    prefs
+}
+
+fn save_model_prefs(prefs: &ModelPreferences) {
+    let Some(path) = model_prefs_path() else {
+        return;
+    };
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(json) = serde_json::to_vec_pretty(prefs) {
+        let _ = std::fs::write(path, json);
+    }
+}
+
+fn model_prefs_push_recent(prefs: &mut ModelPreferences, entry_name: &str, route: &PickerOption) {
+    prefs.recent.retain(|e| !(e.model_name == entry_name && e.provider == route.provider && e.api_method == route.api_method));
+    prefs.recent.insert(0, ModelRecentEntry {
+        model_name: entry_name.to_string(),
+        provider: route.provider.clone(),
+        api_method: route.api_method.clone(),
+        selected_at_unix: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+    });
+    prefs.recent.truncate(5);
+}
+
+fn model_prefs_recent_models(prefs: &ModelPreferences) -> Vec<(String, String, String)> {
+    prefs.recent.iter().map(|e| (e.model_name.clone(), e.provider.clone(), e.api_method.clone())).collect()
 }
 
 fn picker_is_runtime_model_picker(picker: &InlineInteractiveState) -> bool {
@@ -756,6 +823,12 @@ impl App {
                     available: true,
                     detail: "updating model list…".to_string(),
                     estimated_reference_cost_micros: None,
+                    context_window: None,
+                    latency_ms: None,
+                    cost_per_million_input: None,
+                    cost_per_million_output: None,
+                    is_free: false,
+                    is_latest: false,
                 }],
                 action: PickerAction::Model,
                 selected_option: 0,
@@ -967,13 +1040,10 @@ impl App {
             model_options
                 .entry(r.model.clone())
                 .or_default()
-                .push(PickerOption {
-                    provider: r.provider.clone(),
-                    api_method: r.api_method.clone(),
-                    available: r.available,
-                    detail: r.detail.clone(),
-                    estimated_reference_cost_micros: r.estimated_reference_cost_micros(),
-                });
+                .push(PickerOption { provider: r.provider.clone(),
+                api_method: r.api_method.clone(),
+                available: r.available,
+                detail: r.detail.clone(), estimated_reference_cost_micros: r.estimated_reference_cost_micros(), context_window: None, latency_ms: None, cost_per_million_input: None, cost_per_million_output: None, is_free: false, is_latest: false, });
         }
         let grouping_ms = grouping_started.elapsed().as_millis();
 
@@ -1229,6 +1299,43 @@ impl App {
                         .cmp(&b.active_option().map(|route| route.api_method.as_str()))
                 })
         });
+
+        // Insert section headers grouped by provider name.
+        // Walk the sorted entries and group by provider (from first option).
+        // Prepend a SectionHeader entry before each provider group.
+        if !entries.is_empty() && entries.iter().any(|e| matches!(e.action, PickerAction::Model)) {
+            let mut sectioned: Vec<PickerEntry> = Vec::with_capacity(entries.len() + 16);
+            let mut current_provider: Option<String> = None;
+            for entry in &entries {
+                let provider = entry
+                    .active_option()
+                    .map(|opt| opt.provider.as_str())
+                    .unwrap_or("");
+                let group = if provider.is_empty() { "" } else { provider };
+                if current_provider.as_deref() != Some(group) && !group.is_empty() {
+                    sectioned.push(PickerEntry {
+                        name: group.to_string(),
+                        options: Vec::new(),
+                        action: PickerAction::SectionHeader,
+                        selected_option: 0,
+                        is_current: false,
+                        is_default: false,
+                        is_favorite: false,
+                        recommended: false,
+                        recommendation_rank: 0,
+                        usage_score: 0,
+                        old: false,
+                        created_date: None,
+                        effort: None,
+                        is_free: false,
+                        is_latest: false,
+                    });
+                    current_provider = Some(group.to_string());
+                }
+                sectioned.push(entry.clone());
+            }
+            entries = sectioned;
+        }
         let entries_ms = entries_started.elapsed().as_millis();
         let total_ms = picker_started.elapsed().as_millis();
 
@@ -2369,6 +2476,61 @@ impl App {
         self.cycle_selected_model_favorite();
         let _ = self.handle_inline_interactive_key(KeyCode::Enter, KeyModifiers::NONE);
     }
+    /// Tab/Shift+Tab: cycle through recent models when the picker is closed.
+    /// `direction` — `1` for forward (Tab), `-1` for backward (Shift+Tab).
+    pub(super) fn cycle_recent_model(&mut self, direction: i32) -> Result<()> {
+        // Load model preferences
+        let prefs = load_model_prefs();
+        let recents = model_prefs_recent_models(&prefs);
+        if recents.is_empty() {
+            self.set_status_notice("No recent models to switch to.");
+            return Ok(());
+        }
+
+        // Find current model in the recent list
+        let current_model = self.provider.model();
+        let current_provider = self.provider.name();
+        let current_idx = recents.iter().position(|(m, p, _)| {
+            m.as_str() == current_model.as_str() && p.as_str() == current_provider
+        });
+
+        // Calculate next index with wrap-around
+        let next_idx = match current_idx {
+            Some(i) => {
+                let next = i as i32 + direction;
+                if next < 0 {
+                    recents.len() - 1
+                } else if next >= recents.len() as i32 {
+                    0
+                } else {
+                    next as usize
+                }
+            }
+            None => {
+                // Not in recent list — start with first or last
+                if direction > 0 { 0 } else { recents.len() - 1 }
+            }
+        };
+
+        // Switch to the model
+        if let Some((model, _provider_name, _api_method)) = recents.get(next_idx) {
+            match self.provider.set_model(model.as_str()) {
+                Ok(()) => {
+                    self.finalize_model_switch(model);
+                    self.set_status_notice(format!(
+                        "Model → {} (recent {}/{})",
+                        model,
+                        next_idx + 1,
+                        recents.len()
+                    ));
+                }
+                Err(e) => {
+                    self.set_status_notice(format!("Failed to switch model: {}", e));
+                }
+            }
+        }
+        Ok(())
+    }
 
     pub(super) fn handle_inline_interactive_key(
         &mut self,
@@ -2576,6 +2738,17 @@ impl App {
             {
                 self.cycle_selected_model_favorite();
             }
+            code if modifiers.contains(KeyModifiers::CONTROL)
+                && key_char_eq_ignore_ascii_case(code, 'l') =>
+            {
+                if let Some(ref picker) = self.inline_interactive_state
+                    && !picker_is_runtime_model_picker(picker)
+                {
+                    return Ok(());
+                }
+                self.inline_interactive_state = None;
+                self.open_account_center(None);
+            }
             KeyCode::Enter => {
                 let Some(ref mut picker) = self.inline_interactive_state else {
                     return Ok(());
@@ -2703,6 +2876,29 @@ impl App {
                         }
 
                         let bare_name = model_entry_base_name(&entry);
+                        // Detect effort variants for this model in the picker
+                        let variant_info: Option<String> = {
+                            let mut efforts: Vec<&str> = Vec::new();
+                            if let Some(picker) = self.inline_interactive_state.as_ref() {
+                                for e in &picker.entries {
+                                    if matches!(e.action, PickerAction::Model)
+                                        && e.effort.is_some()
+                                        && model_entry_base_name(e) == bare_name
+                                    {
+                                        if let Some(ef) = e.effort.as_deref() {
+                                            if !efforts.contains(&ef) {
+                                                efforts.push(ef);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if efforts.len() > 1 {
+                                Some(efforts.join(", "))
+                            } else {
+                                None
+                            }
+                        };
                         let spec = if crate::provider::ModelRouteApiMethod::parse(&route.api_method)
                             .is_openrouter()
                             && route.provider == "auto"
@@ -2715,6 +2911,10 @@ impl App {
 
                         let effort = entry.effort.clone();
                         record_model_picker_selection(&bare_name, route, effort.as_deref());
+                        let mut prefs = load_model_prefs();
+                        prefs.version = MODEL_PREFS_VERSION;
+                        model_prefs_push_recent(&mut prefs, &bare_name, route);
+                        save_model_prefs(&prefs);
                         let method_label =
                             crate::provider::ModelRouteApiMethod::parse(&route.api_method)
                                 .display_label();
@@ -2722,6 +2922,11 @@ impl App {
                             "Model → {} via {} ({})",
                             entry.name, route.provider, method_label
                         );
+                        let notice = if let Some(ref info) = variant_info {
+                            format!("{} [efforts: {}]", notice, info)
+                        } else {
+                            notice
+                        };
                         let route_detail = route.detail.trim().to_string();
 
                         // Record exactly which model spec + route the user chose
@@ -2908,65 +3113,25 @@ impl App {
         }
     }
 
-    /// Score a pattern against multiple fields, returning the highest score.
-    /// Useful when a single concatenated string would penalize per-field matches.
+    /// Score a pattern against name (primary), provider (secondary), and api_method (tertiary).
+    /// Weighted: name x3, provider x2, method x1.
     pub(super) fn picker_fuzzy_score_multi(
         pat: &[char],
-        fields: &[&str],
+        name: &str,
+        provider: &str,
+        api_method: &str,
     ) -> Option<i32> {
-        fields
-            .iter()
-            .filter_map(|f| Self::picker_fuzzy_score_with_pattern(pat, f))
-            .max()
+        let name_score = Self::picker_fuzzy_score_with_pattern(pat, name)?;
+        let provider_score = Self::picker_fuzzy_score_with_pattern(pat, provider).unwrap_or(0);
+        let method_score = Self::picker_fuzzy_score_with_pattern(pat, api_method).unwrap_or(0);
+        // Weighted: name x3, provider x2, method x1
+        Some(name_score * 3 + provider_score * 2 + method_score)
     }
 
-    pub(super) fn apply_inline_interactive_filter(picker: &mut InlineInteractiveState) {
-        if picker.filter.is_empty() {
-            picker.filtered = (0..picker.entries.len()).collect();
-        } else {
-            // Normalize the filter pattern once per keystroke instead of once per
-            // entry inside picker_fuzzy_score.
-            let pat = Self::picker_fuzzy_pattern(&picker.filter);
-            let mut scored: Vec<(usize, i32)> = picker
-                .entries
-                .iter()
-                .enumerate()
-                .filter_map(|(i, m)| {
-                    let name = m.name.as_str();
-                    let provider = m.active_option().map(|o| o.provider.as_str()).unwrap_or("");
-                    Self::picker_fuzzy_score_multi(&pat, &[name, provider]).map(|s| {
-                        let usage_bonus = m.usage_score.min(i32::MAX as u32) as i32;
-                        let bonus = usage_bonus + if m.recommended { 5 } else { 0 };
-                        (i, s + bonus)
-                    })
-                })
-                .collect();
-            scored.sort_by(|a, b| {
-                b.1.cmp(&a.1)
-                    .then(
-                        picker.entries[a.0]
-                            .recommendation_rank
-                            .cmp(&picker.entries[b.0].recommendation_rank),
-                    )
-                    .then(picker.entries[a.0].name.cmp(&picker.entries[b.0].name))
-            });
-            picker.filtered = scored.into_iter().map(|(i, _)| i).collect();
-        }
-        if picker.filtered.is_empty() {
-            picker.selected = 0;
-        } else {
-            picker.selected = picker.selected.min(picker.filtered.len() - 1);
-        }
-    }
-
+    /// Auto-complete the filter: if one entry matches, fill its name;
+    /// if multiple, extend to the longest common prefix.
     pub(super) fn tab_complete_inline_interactive_filter(picker: &mut InlineInteractiveState) {
-        if picker.filtered.is_empty() {
-            return;
-        }
-        if picker.filtered.len() == 1 {
-            let name = picker.entries[picker.filtered[0]].name.clone();
-            picker.filter = name;
-            Self::apply_inline_interactive_filter(picker);
+        if picker.filtered.len() <= 1 {
             return;
         }
         let names: Vec<&str> = picker
@@ -2978,7 +3143,7 @@ impl App {
         let first_chars: Vec<char> = first.chars().collect();
         let mut prefix_len = first_chars.len();
         for name in names.iter().skip(1) {
-            let lower = (*name).to_lowercase();
+            let lower = name.to_lowercase();
             let chars: Vec<char> = lower.chars().collect();
             let mut common = 0;
             for (a, b) in first_chars.iter().zip(chars.iter()) {
@@ -2996,15 +3161,64 @@ impl App {
             Self::apply_inline_interactive_filter(picker);
         }
     }
+    pub(super) fn apply_inline_interactive_filter(picker: &mut InlineInteractiveState) {
+        if picker.filter.is_empty() {
+            picker.filtered = (0..picker.entries.len()).collect();
+        } else {
+            let pat = Self::picker_fuzzy_pattern(&picker.filter);
+            let mut scored: Vec<(usize, i32)> = picker
+                .entries
+                .iter()
+                .enumerate()
+                .filter_map(|(i, m)| {
+                    // Section headers are always visible regardless of filter text
+                    if matches!(m.action, PickerAction::SectionHeader) {
+                        return Some((i, i32::MAX)); // always on top
+                    }
+                    let name = m.name.as_str();
+                    let provider = m.active_option().map(|o| o.provider.as_str()).unwrap_or("");
+                    let api_method = m
+                        .active_option()
+                        .map(|o| o.api_method.as_str())
+                        .unwrap_or("");
+                    Self::picker_fuzzy_score_multi(&pat, name, provider, api_method).map(|s| {
+                        let usage_bonus = m.usage_score.min(i32::MAX as u32) as i32;
+                        let bonus = usage_bonus
+                            + if m.recommended { 5 } else { 0 }
+                            + if m.is_favorite { 10 } else { 0 };
+                        (i, s + bonus)
+                    })
+                })
+                .collect();
+            scored.sort_by(|a, b| {
+                // Section headers (score = i32::MAX) sort by their original position
+                if a.1 == i32::MAX && b.1 == i32::MAX {
+                    a.0.cmp(&b.0)
+                } else {
+                    b.1.cmp(&a.1)
+                        .then(
+                            picker.entries[a.0]
+                                .usage_score
+                                .cmp(&picker.entries[b.0].usage_score)
+                                .reverse(),
+                        )
+                        .then(picker.entries[a.0].name.cmp(&picker.entries[b.0].name))
+                }
+            });
+            picker.filtered = scored.iter().map(|(i, _)| *i).collect();
+        }
+
+        // Clamp selection to valid range
+        if picker.selected >= picker.filtered.len() && !picker.filtered.is_empty() {
+            picker.selected = picker.filtered.len() - 1;
+        }
+    }
+
+    // ========== impl App closes above ==========
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        RemoteModelCatalogCache, key_char_eq_ignore_ascii_case, model_picker_route_is_current,
-        model_picker_route_is_default, model_picker_route_is_recommended,
-        picker_is_runtime_model_picker,
-    };
     use crate::tui::{
         AgentModelTarget, App, InlineInteractiveState, PickerAction, PickerEntry, PickerKind,
         PickerOption,
@@ -3012,19 +3226,23 @@ mod tests {
     use crossterm::event::KeyCode;
 
     fn picker_entry(name: &str, provider: &str, usage_score: u32) -> PickerEntry {
-        PickerEntry { name: name.to_string(),
-        options: vec![picker_option(provider)],
-        action: PickerAction::Model,
-        selected_option: 0,
-        is_current: false,
-        is_default: false,
-        is_favorite: false,
-        recommended: false,
-        recommendation_rank: usize::MAX,
-        usage_score,
-        old: false,
-        created_date: None,
-        effort: None, is_free: false, is_latest: false, }
+        PickerEntry {
+            name: name.to_string(),
+            options: vec![picker_option(provider)],
+            action: PickerAction::Model,
+            selected_option: 0,
+            is_current: false,
+            is_default: false,
+            is_favorite: false,
+            recommended: false,
+            recommendation_rank: usize::MAX,
+            usage_score,
+            old: false,
+            created_date: None,
+            effort: None,
+            is_free: false,
+            is_latest: false,
+        }
     }
 
     fn picker_option_with_method(provider: &str, api_method: &str) -> PickerOption {
@@ -3034,6 +3252,12 @@ mod tests {
             available: true,
             detail: String::new(),
             estimated_reference_cost_micros: None,
+            context_window: None,
+            latency_ms: None,
+            cost_per_million_input: None,
+            cost_per_million_output: None,
+            is_free: false,
+            is_latest: false,
         }
     }
 

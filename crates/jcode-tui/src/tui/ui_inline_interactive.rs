@@ -94,7 +94,22 @@ fn picker_entry_display_name(entry: &crate::tui::PickerEntry) -> String {
         default_marker.to_string()
     };
 
-    format!("{}{}", entry.name, suffix)
+    let tag_suffix = {
+        let mut tags = Vec::new();
+        if entry.is_free {
+            tags.push("Free");
+        }
+        if entry.is_latest {
+            tags.push("Latest");
+        }
+        if tags.is_empty() {
+            String::new()
+        } else {
+            format!(" [{}]", tags.join("] ["))
+        }
+    };
+
+    format!("{}{}{}", entry.name, suffix, tag_suffix)
 }
 
 fn picker_row_marker(is_row_selected: bool, unavailable: bool, limited: bool) -> &'static str {
@@ -818,18 +833,9 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
         if is_preview && !is_account_picker {
             spans.push(Span::styled(provider_display, provider_style));
             spans.extend(model_spans);
-        } else {
-            spans.extend(model_spans);
-        }
-        if entry.is_free {
-            spans.push(Span::styled(" [Free]", Style::default().fg(dim_color())));
-        }
-        if entry.is_latest {
-            spans.push(Span::styled(" [Latest]", Style::default().fg(dim_color())));
-        }
-        if is_preview && !is_account_picker {
             spans.push(Span::styled(via_display, via_style));
         } else {
+            spans.extend(model_spans);
             spans.push(Span::styled(provider_display, provider_style));
             spans.push(Span::styled(via_display, via_style));
         }
@@ -906,6 +912,12 @@ mod tests {
                     available: true,
                     detail: String::new(),
                     estimated_reference_cost_micros: None,
+                    context_window: None,
+                    latency_ms: None,
+                    cost_per_million_input: None,
+                    cost_per_million_output: None,
+                    is_free: false,
+                    is_latest: false,
                 }],
                 action: crate::tui::PickerAction::Model,
                 selected_option: 0,
@@ -933,6 +945,12 @@ mod tests {
                 available: true,
                 detail: String::new(),
                 estimated_reference_cost_micros: None,
+                context_window: None,
+                latency_ms: None,
+                cost_per_million_input: None,
+                cost_per_million_output: None,
+                is_free: false,
+                is_latest: false,
             }],
             action: crate::tui::PickerAction::Account(crate::tui::AccountPickerAction::Switch {
                 provider_id: "claude".to_string(),
@@ -960,6 +978,12 @@ mod tests {
                 available: true,
                 detail: String::new(),
                 estimated_reference_cost_micros: None,
+                context_window: None,
+                latency_ms: None,
+                cost_per_million_input: None,
+                cost_per_million_output: None,
+                is_free: false,
+                is_latest: false,
             }],
             action: crate::tui::PickerAction::Account(
                 crate::tui::AccountPickerAction::Switch {
@@ -1006,6 +1030,12 @@ mod tests {
                     available: true,
                     detail: "/agents swarm".to_string(),
                     estimated_reference_cost_micros: None,
+                    context_window: None,
+                    latency_ms: None,
+                    cost_per_million_input: None,
+                    cost_per_million_output: None,
+                    is_free: false,
+                    is_latest: false,
                 }],
                 action: crate::tui::PickerAction::AgentTarget(crate::tui::AgentModelTarget::Swarm),
                 selected_option: 0,

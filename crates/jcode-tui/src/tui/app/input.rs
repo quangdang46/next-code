@@ -2199,7 +2199,19 @@ impl App {
             return Ok(());
         }
 
-        // BackTab (Shift+Tab): cycle permission mode
+        // Tab/BackTab: cycle through recent models (when no picker is open)
+        // Only bare Tab/BackTab — Ctrl+Tab goes to model_switch_keys (cycle_model).
+        if self.inline_interactive_state.is_none() {
+            if code == KeyCode::Tab && modifiers == KeyModifiers::NONE {
+                self.cycle_recent_model(1)?;
+                return Ok(());
+            }
+            if code == KeyCode::BackTab && modifiers == KeyModifiers::NONE {
+                self.cycle_recent_model(-1)?;
+                return Ok(());
+            }
+        }
+        // BackTab (Shift+Tab): cycle permission mode (when picker preview is visible)
         if code == KeyCode::BackTab {
             let mode = crate::dcg_bridge::cycle_mode();
             let mode_str = crate::dcg_bridge::mode_to_str(mode);

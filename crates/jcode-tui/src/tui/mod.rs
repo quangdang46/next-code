@@ -1044,7 +1044,12 @@ fn estimate_picker_action_bytes(action: &PickerAction) -> usize {
 }
 
 fn estimate_picker_option_bytes(option: &PickerOption) -> usize {
-    option.provider.capacity() + option.api_method.capacity() + option.detail.capacity()
+    option.provider.capacity()
+        + option.api_method.capacity()
+        + option.detail.capacity()
+        + std::mem::size_of::<Option<u32>>() * 2
+        + std::mem::size_of::<Option<f64>>() * 2
+        + std::mem::size_of::<bool>() * 2
 }
 
 fn estimate_picker_entry_bytes(entry: &PickerEntry) -> usize {
@@ -1071,8 +1076,8 @@ impl InlineInteractiveState {
     pub fn schema(&self) -> InlineInteractiveSchema {
         if self.is_agent_target_picker() {
             InlineInteractiveSchema {
-                layout: InlineInteractiveLayout::ThreeColumn,
-                primary_label: "TARGET",
+                layout: crate::tui::InlineInteractiveLayout::Compact,
+                primary_label: "MODEL",
                 secondary_label: "MODEL",
                 secondary_preview_label: "MODEL",
                 tertiary_label: "CONFIG",
@@ -1085,7 +1090,6 @@ impl InlineInteractiveState {
             self.kind.schema()
         }
     }
-
     pub fn selected_entry_index(&self) -> Option<usize> {
         self.filtered.get(self.selected).copied()
     }
@@ -1258,6 +1262,33 @@ pub struct PickerOption {
     pub available: bool,
     pub detail: String,
     pub estimated_reference_cost_micros: Option<u64>,
+    /// Context window size in tokens (e.g., 128000, 200000)
+    pub context_window: Option<u32>,
+    /// Estimated latency in milliseconds per request
+    pub latency_ms: Option<u32>,
+    /// Cost per million input tokens in USD (e.g., 3.0, 15.0)
+    pub cost_per_million_input: Option<f64>,
+    /// Cost per million output tokens in USD
+    pub cost_per_million_output: Option<f64>,
+    /// Whether this is a free model
+    pub is_free: bool,
+    /// Whether this is a latest model release
+    pub is_latest: bool,
+}
+
+impl PickerOption {
+    pub fn cost_label(&self) -> Option<String> {
+        if self.is_free {
+            return Some("Free".to_string());
+        }
+        match self.cost_per_million_input {
+            Some(cost) if cost > 0.0 => Some(format!("${:.2}/M in", cost)),
+            Some(_) => Some("<$.01/M in".to_string()),
+            None => self.estimated_reference_cost_micros.map(|c| {
+                if c == 0 { "Free".to_string() } else { format!("{}µs ref", c) }
+            }),
+        }
+    }
 }
 
 pub(crate) const REDRAW_IDLE: Duration = Duration::from_millis(250);
