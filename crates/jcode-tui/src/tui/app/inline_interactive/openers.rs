@@ -23,27 +23,25 @@ impl App {
             let summary = configured
                 .clone()
                 .unwrap_or_else(|| agent_model_default_summary(target, self));
-            PickerEntry {
-                name: agent_model_target_label(target).to_string(),
-                options: vec![PickerOption {
-                    provider: summary,
-                    api_method: agent_model_target_config_path(target).to_string(),
-                    available: true,
-                    detail: format!("/agents {}", agent_model_target_slug(target)),
-                    estimated_reference_cost_micros: None,
-                }],
-                action: PickerAction::AgentTarget(target),
-                selected_option: 0,
-                is_current: false,
-                is_default: configured.is_some(),
-                is_favorite: false,
-                recommended: false,
-                recommendation_rank: usize::MAX,
-                usage_score: 0,
-                old: false,
-                created_date: None,
-                effort: None,
-            }
+            PickerEntry { name: agent_model_target_label(target).to_string(),
+            options: vec![PickerOption {
+                provider: summary,
+                api_method: agent_model_target_config_path(target).to_string(),
+                available: true,
+                detail: format!("/agents {}", agent_model_target_slug(target)),
+                estimated_reference_cost_micros: None,
+            }],
+            action: PickerAction::AgentTarget(target),
+            selected_option: 0,
+            is_current: false,
+            is_default: configured.is_some(),
+            is_favorite: false,
+            recommended: false,
+            recommendation_rank: usize::MAX,
+            usage_score: 0,
+            old: false,
+            created_date: None,
+            effort: None, is_free: false, is_latest: false, }
         })
         .collect();
 
@@ -100,31 +98,29 @@ impl App {
                     crate::auth::AuthState::Expired => "attention",
                     crate::auth::AuthState::NotConfigured => "setup",
                 };
-                PickerEntry {
-                    name: provider.display_name.to_string(),
-                    options: vec![PickerOption {
-                        provider: provider.auth_kind.label().to_string(),
-                        api_method: state_label.to_string(),
-                        available: true,
-                        detail: format!("{} · {}", assessment.method_detail, provider.menu_detail),
-                        estimated_reference_cost_micros: None,
-                    }],
-                    action: if logout {
-                        PickerAction::Logout(provider)
-                    } else {
-                        PickerAction::Login(provider)
-                    },
-                    selected_option: 0,
-                    is_current: auth_state == crate::auth::AuthState::Available,
-                    is_default: false,
-                    is_favorite: false,
-                    recommended: provider.recommended,
-                    recommendation_rank: usize::MAX,
-                    usage_score: 0,
-                    old: false,
-                    created_date: None,
-                    effort: None,
-                }
+                PickerEntry { name: provider.display_name.to_string(),
+                options: vec![PickerOption {
+                    provider: provider.auth_kind.label().to_string(),
+                    api_method: state_label.to_string(),
+                    available: true,
+                    detail: format!("{} · {}", assessment.method_detail, provider.menu_detail),
+                    estimated_reference_cost_micros: None,
+                }],
+                action: if logout {
+                    PickerAction::Logout(provider)
+                } else {
+                    PickerAction::Login(provider)
+                },
+                selected_option: 0,
+                is_current: auth_state == crate::auth::AuthState::Available,
+                is_default: false,
+                is_favorite: false,
+                recommended: provider.recommended,
+                recommendation_rank: usize::MAX,
+                usage_score: 0,
+                old: false,
+                created_date: None,
+                effort: None, is_free: false, is_latest: false, }
             })
             .collect::<Vec<_>>();
 
@@ -132,27 +128,25 @@ impl App {
             // Prepend a synthetic "All providers" entry that logs out everywhere.
             models.insert(
                 0,
-                PickerEntry {
-                    name: "All providers".to_string(),
-                    options: vec![PickerOption {
-                        provider: "all".to_string(),
-                        api_method: "logout".to_string(),
-                        available: true,
-                        detail: "Log out of every provider with a saved session".to_string(),
-                        estimated_reference_cost_micros: None,
-                    }],
-                    action: PickerAction::LogoutAll,
-                    selected_option: 0,
-                    is_current: false,
-                    is_default: false,
-                    is_favorite: false,
-                    recommended: false,
-                    recommendation_rank: usize::MAX,
-                    usage_score: 0,
-                    old: false,
-                    created_date: None,
-                    effort: None,
-                },
+                PickerEntry { name: "All providers".to_string(),
+                options: vec![PickerOption {
+                    provider: "all".to_string(),
+                    api_method: "logout".to_string(),
+                    available: true,
+                    detail: "Log out of every provider with a saved session".to_string(),
+                    estimated_reference_cost_micros: None,
+                }],
+                action: PickerAction::LogoutAll,
+                selected_option: 0,
+                is_current: false,
+                is_default: false,
+                is_favorite: false,
+                recommended: false,
+                recommendation_rank: usize::MAX,
+                usage_score: 0,
+                old: false,
+                created_date: None,
+                effort: None, is_free: false, is_latest: false, },
             );
         }
 
@@ -214,60 +208,56 @@ impl App {
                 if !already_present {
                     picker.entries.insert(
                         0,
-                        PickerEntry {
-                            name: saved.to_string(),
-                            options: vec![PickerOption {
-                                provider: "saved override".to_string(),
-                                api_method: agent_model_target_config_path(target).to_string(),
-                                available: true,
-                                detail: "not in current picker catalog".to_string(),
-                                estimated_reference_cost_micros: None,
-                            }],
-                            action: PickerAction::AgentModelChoice {
-                                target,
-                                clear_override: false,
-                            },
-                            selected_option: 0,
-                            is_current: true,
-                            is_default: false,
-                            is_favorite: false,
-                            recommended: false,
-                            recommendation_rank: usize::MAX,
-                            usage_score: 0,
-                            old: false,
-                            created_date: None,
-                            effort: None,
+                        PickerEntry { name: saved.to_string(),
+                        options: vec![PickerOption {
+                            provider: "saved override".to_string(),
+                            api_method: agent_model_target_config_path(target).to_string(),
+                            available: true,
+                            detail: "not in current picker catalog".to_string(),
+                            estimated_reference_cost_micros: None,
+                        }],
+                        action: PickerAction::AgentModelChoice {
+                            target,
+                            clear_override: false,
                         },
+                        selected_option: 0,
+                        is_current: true,
+                        is_default: false,
+                        is_favorite: false,
+                        recommended: false,
+                        recommendation_rank: usize::MAX,
+                        usage_score: 0,
+                        old: false,
+                        created_date: None,
+                        effort: None, is_free: false, is_latest: false, },
                     );
                 }
             }
 
             picker.entries.insert(
                 0,
-                PickerEntry {
-                    name: format!("inherit ({})", inherit_summary),
-                    options: vec![PickerOption {
-                        provider: "default".to_string(),
-                        api_method: agent_model_target_config_path(target).to_string(),
-                        available: true,
-                        detail: "clear saved override".to_string(),
-                        estimated_reference_cost_micros: None,
-                    }],
-                    action: PickerAction::AgentModelChoice {
-                        target,
-                        clear_override: true,
-                    },
-                    selected_option: 0,
-                    is_current: configured.is_none(),
-                    is_default: false,
-                    is_favorite: false,
-                    recommended: false,
-                    recommendation_rank: usize::MAX,
-                    usage_score: 0,
-                    old: false,
-                    created_date: None,
-                    effort: None,
+                PickerEntry { name: format!("inherit ({})", inherit_summary),
+                options: vec![PickerOption {
+                    provider: "default".to_string(),
+                    api_method: agent_model_target_config_path(target).to_string(),
+                    available: true,
+                    detail: "clear saved override".to_string(),
+                    estimated_reference_cost_micros: None,
+                }],
+                action: PickerAction::AgentModelChoice {
+                    target,
+                    clear_override: true,
                 },
+                selected_option: 0,
+                is_current: configured.is_none(),
+                is_default: false,
+                is_favorite: false,
+                recommended: false,
+                recommendation_rank: usize::MAX,
+                usage_score: 0,
+                old: false,
+                created_date: None,
+                effort: None, is_free: false, is_latest: false, },
             );
 
             picker.filtered = (0..picker.entries.len()).collect();

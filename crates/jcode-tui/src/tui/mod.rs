@@ -925,13 +925,20 @@ pub enum AgentModelTarget {
     Ambient,
 }
 
+/// Actions that can be performed when selecting a picker entry.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PickerAction {
+    /// A model entry that can be selected and activated.
     Model,
+    /// An account action (switch, add, replace).
     Account(AccountPickerAction),
+    /// A provider to log into.
     Login(crate::provider_catalog::LoginProviderDescriptor),
+    /// A provider to log out of.
     Logout(crate::provider_catalog::LoginProviderDescriptor),
+    /// Log out of all accounts.
     LogoutAll,
+    /// Usage/subscription details.
     Usage {
         id: String,
         title: String,
@@ -939,11 +946,16 @@ pub enum PickerAction {
         status: crate::tui::usage_overlay::UsageOverlayStatus,
         detail_lines: Vec<String>,
     },
+    /// Agent target model override.
     AgentTarget(AgentModelTarget),
+    /// Agent model override with choice.
     AgentModelChoice {
         target: AgentModelTarget,
         clear_override: bool,
     },
+    /// Section header in a grouped picker (Favorites, Recent, Provider name).
+    /// Not selectable — rendered as a dimmed label between sections.
+    SectionHeader,
 }
 
 /// Unified inline picker with three columns.
@@ -986,11 +998,14 @@ fn estimate_picker_action_bytes(action: &PickerAction) -> usize {
         PickerAction::Model
         | PickerAction::AgentTarget(_)
         | PickerAction::AgentModelChoice { .. }
-        | PickerAction::LogoutAll => 0,
+        | PickerAction::LogoutAll
+        | PickerAction::SectionHeader => 0,
         PickerAction::Account(AccountPickerAction::Switch { provider_id, label }) => {
             provider_id.capacity() + label.capacity()
         }
-        PickerAction::Account(AccountPickerAction::Add { provider_id }) => provider_id.capacity(),
+        PickerAction::Account(AccountPickerAction::Add { provider_id }) => {
+            provider_id.capacity()
+        }
         PickerAction::Account(AccountPickerAction::Replace { provider_id, label }) => {
             provider_id.capacity() + label.capacity()
         }
@@ -1203,6 +1218,10 @@ pub struct PickerEntry {
     /// Human-readable created date (e.g. "Jan 2026") for OpenRouter models
     pub created_date: Option<String>,
     pub effort: Option<String>,
+    /// Whether this is a free model (cost per million tokens = 0).
+    pub is_free: bool,
+    /// Whether this is a latest/recent model release.
+    pub is_latest: bool,
 }
 
 impl PickerEntry {

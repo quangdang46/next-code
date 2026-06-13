@@ -768,6 +768,8 @@ impl App {
                 old: false,
                 created_date: None,
                 effort: None,
+                is_free: false,
+                is_latest: false,
             }],
             selected: 0,
             column: 0,
@@ -1014,6 +1016,9 @@ impl App {
         let old_threshold_secs = latest_recommended_ts
             .map(|ts| ts.saturating_sub(30 * 86400))
             .unwrap_or(0);
+        let latest_threshold_secs = latest_recommended_ts
+            .map(|ts| ts.saturating_sub(14 * 86400))
+            .unwrap_or(0);
 
         fn format_created(ts: u64) -> String {
             use chrono::{TimeZone, Utc};
@@ -1091,33 +1096,34 @@ impl App {
                                 &current_model,
                                 &current_provider,
                             );
-                        entries.push(PickerEntry {
-                            name: display_name.clone(),
-                            options: vec![route.clone()],
-                            action: PickerAction::Model,
-                            selected_option: 0,
-                            is_current: is_this_current,
-                            recommended: *effort == "high"
-                                && model_picker_route_is_recommended(name, route),
-                            recommendation_rank: model_picker_recommendation_rank(name),
-                            usage_score: model_picker_usage_score(
-                                &usage_store,
-                                name,
-                                route,
-                                Some(effort),
-                            ),
-                            old: old_threshold_secs > 0
-                                && or_created.map(|t| t < old_threshold_secs).unwrap_or(false),
-                            created_date: or_created.map(format_created),
-                            effort: Some(effort.to_string()),
-                            is_default: is_config_default(name, route),
-                            is_favorite: model_picker_is_favorite(
-                                &favorites_store,
-                                name,
-                                route,
-                                Some(effort),
-                            ),
-                        });
+                        entries.push(PickerEntry { name: display_name.clone(),
+                        options: vec![route.clone()],
+                        action: PickerAction::Model,
+                        selected_option: 0,
+                        is_current: is_this_current,
+                        recommended: *effort == "high"
+                            && model_picker_route_is_recommended(name, route),
+                        recommendation_rank: model_picker_recommendation_rank(name),
+                        usage_score: model_picker_usage_score(
+                            &usage_store,
+                            name,
+                            route,
+                            Some(effort),
+                        ),
+                        old: old_threshold_secs > 0
+                            && or_created.map(|t| t < old_threshold_secs).unwrap_or(false),
+                        created_date: or_created.map(format_created),
+                        effort: Some(effort.to_string()),
+                        is_default: is_config_default(name, route),
+                        is_favorite: model_picker_is_favorite(
+                            &favorites_store,
+                            name,
+                            route,
+                            Some(effort),
+                        ),
+                        is_free: route.estimated_reference_cost_micros == Some(0),
+                        is_latest: latest_threshold_secs > 0
+                            && or_created.map(|t| t > latest_threshold_secs).unwrap_or(false), });
                     }
                 }
             } else {
@@ -1133,21 +1139,22 @@ impl App {
                         &current_provider,
                     );
                     let is_default = is_config_default(name, &route);
-                    entries.push(PickerEntry {
-                        name: name.clone(),
-                        options: vec![route.clone()],
-                        action: PickerAction::Model,
-                        selected_option: 0,
-                        is_current,
-                        recommended: is_recommended,
-                        recommendation_rank: model_picker_recommendation_rank(name),
-                        usage_score: model_picker_usage_score(&usage_store, name, &route, None),
-                        old: is_old,
-                        created_date: or_created.map(format_created),
-                        effort: None,
-                        is_default,
-                        is_favorite: model_picker_is_favorite(&favorites_store, name, &route, None),
-                    });
+                    entries.push(PickerEntry { name: name.clone(),
+                    options: vec![route.clone()],
+                    action: PickerAction::Model,
+                    selected_option: 0,
+                    is_current,
+                    recommended: is_recommended,
+                    recommendation_rank: model_picker_recommendation_rank(name),
+                    usage_score: model_picker_usage_score(&usage_store, name, &route, None),
+                    old: is_old,
+                    created_date: or_created.map(format_created),
+                    effort: None,
+                    is_default,
+                    is_favorite: model_picker_is_favorite(&favorites_store, name, &route, None),
+                        is_free: route.estimated_reference_cost_micros == Some(0),
+                        is_latest: latest_threshold_secs > 0
+                            && or_created.map(|t| t > latest_threshold_secs).unwrap_or(false), });
                 }
             }
         }
@@ -2397,7 +2404,12 @@ impl App {
                 }
                 if let Some(ref mut picker) = self.inline_interactive_state {
                     if picker.column == 0 {
-                        picker.selected = picker.selected.saturating_sub(1);
+                        let len = picker.filtered.len();
+                        picker.selected = if len > 0 {
+                            (picker.selected + len - 1) % len
+                        } else {
+                            0
+                        };
                     } else if let Some(&idx) = picker.filtered.get(picker.selected) {
                         let entry = &mut picker.entries[idx];
                         entry.selected_option = entry.selected_option.saturating_sub(1);
@@ -2422,8 +2434,12 @@ impl App {
                 }
                 if let Some(ref mut picker) = self.inline_interactive_state {
                     if picker.column == 0 {
-                        let max = picker.filtered.len().saturating_sub(1);
-                        picker.selected = (picker.selected + 1).min(max);
+                        let len = picker.filtered.len();
+                        picker.selected = if len > 0 {
+                            (picker.selected + 1) % len
+                        } else {
+                            0
+                        };
                     } else if let Some(&idx) = picker.filtered.get(picker.selected) {
                         let entry = &mut picker.entries[idx];
                         let max = entry.options.len().saturating_sub(1);
@@ -2625,6 +2641,10 @@ impl App {
                         self.push_display_message(DisplayMessage::usage(content.join("\n")));
                         self.set_status_notice(format!("Usage → {}", title));
                     }
+                    PickerAction::SectionHeader => {
+                        // Not selectable — pressing Enter on a section header
+                        // does nothing; the user should navigate to an actual entry.
+                    }
                     PickerAction::AgentTarget(target) => {
                         self.open_agent_model_picker(target);
                     }
@@ -2734,7 +2754,11 @@ impl App {
                             self.pending_route_selection = Some(route_selection);
                             self.pending_model_switch = Some(spec);
                         } else {
-                            match self.provider.set_route_selection(&route_selection) {
+                            let route_result = self.provider.set_route_selection(&route_selection).or_else(|_| {
+                                self.provider.on_auth_changed();
+                                self.provider.set_route_selection(&route_selection)
+                            });
+                            match route_result {
                                 Ok(()) => {
                                     self.inline_interactive_state = None;
                                     self.provider_session_id = None;
@@ -2884,6 +2908,18 @@ impl App {
         }
     }
 
+    /// Score a pattern against multiple fields, returning the highest score.
+    /// Useful when a single concatenated string would penalize per-field matches.
+    pub(super) fn picker_fuzzy_score_multi(
+        pat: &[char],
+        fields: &[&str],
+    ) -> Option<i32> {
+        fields
+            .iter()
+            .filter_map(|f| Self::picker_fuzzy_score_with_pattern(pat, f))
+            .max()
+    }
+
     pub(super) fn apply_inline_interactive_filter(picker: &mut InlineInteractiveState) {
         if picker.filter.is_empty() {
             picker.filtered = (0..picker.entries.len()).collect();
@@ -2896,8 +2932,9 @@ impl App {
                 .iter()
                 .enumerate()
                 .filter_map(|(i, m)| {
-                    let filter_text = picker.filter_text(m);
-                    Self::picker_fuzzy_score_with_pattern(&pat, &filter_text).map(|s| {
+                    let name = m.name.as_str();
+                    let provider = m.active_option().map(|o| o.provider.as_str()).unwrap_or("");
+                    Self::picker_fuzzy_score_multi(&pat, &[name, provider]).map(|s| {
                         let usage_bonus = m.usage_score.min(i32::MAX as u32) as i32;
                         let bonus = usage_bonus + if m.recommended { 5 } else { 0 };
                         (i, s + bonus)
@@ -2975,21 +3012,19 @@ mod tests {
     use crossterm::event::KeyCode;
 
     fn picker_entry(name: &str, provider: &str, usage_score: u32) -> PickerEntry {
-        PickerEntry {
-            name: name.to_string(),
-            options: vec![picker_option(provider)],
-            action: PickerAction::Model,
-            selected_option: 0,
-            is_current: false,
-            is_default: false,
-            is_favorite: false,
-            recommended: false,
-            recommendation_rank: usize::MAX,
-            usage_score,
-            old: false,
-            created_date: None,
-            effort: None,
-        }
+        PickerEntry { name: name.to_string(),
+        options: vec![picker_option(provider)],
+        action: PickerAction::Model,
+        selected_option: 0,
+        is_current: false,
+        is_default: false,
+        is_favorite: false,
+        recommended: false,
+        recommendation_rank: usize::MAX,
+        usage_score,
+        old: false,
+        created_date: None,
+        effort: None, is_free: false, is_latest: false, }
     }
 
     fn picker_option_with_method(provider: &str, api_method: &str) -> PickerOption {

@@ -818,9 +818,18 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
         if is_preview && !is_account_picker {
             spans.push(Span::styled(provider_display, provider_style));
             spans.extend(model_spans);
-            spans.push(Span::styled(via_display, via_style));
         } else {
             spans.extend(model_spans);
+        }
+        if entry.is_free {
+            spans.push(Span::styled(" [Free]", Style::default().fg(dim_color())));
+        }
+        if entry.is_latest {
+            spans.push(Span::styled(" [Latest]", Style::default().fg(dim_color())));
+        }
+        if is_preview && !is_account_picker {
+            spans.push(Span::styled(via_display, via_style));
+        } else {
             spans.push(Span::styled(provider_display, provider_style));
             spans.push(Span::styled(via_display, via_style));
         }
@@ -909,6 +918,8 @@ mod tests {
                 old: false,
                 created_date: None,
                 effort: None,
+                is_free: false,
+                is_latest: false,
             }],
         }
     }
@@ -937,35 +948,35 @@ mod tests {
             old: false,
             created_date: None,
             effort: None,
+            is_free: false,
+            is_latest: false,
         }];
 
         if mixed_providers {
-            models.push(crate::tui::PickerEntry {
-                name: "personal".to_string(),
-                options: vec![crate::tui::PickerOption {
-                    provider: "OpenAI".to_string(),
-                    api_method: "saved".to_string(),
-                    available: true,
-                    detail: String::new(),
-                    estimated_reference_cost_micros: None,
-                }],
-                action: crate::tui::PickerAction::Account(
-                    crate::tui::AccountPickerAction::Switch {
-                        provider_id: "openai".to_string(),
-                        label: "personal".to_string(),
-                    },
-                ),
-                selected_option: 0,
-                is_current: false,
-                is_default: false,
-                is_favorite: false,
-                recommended: false,
-                recommendation_rank: usize::MAX,
-                usage_score: 0,
-                old: false,
-                created_date: None,
-                effort: None,
-            });
+            models.push(crate::tui::PickerEntry { name: "personal".to_string(),
+            options: vec![crate::tui::PickerOption {
+                provider: "OpenAI".to_string(),
+                api_method: "saved".to_string(),
+                available: true,
+                detail: String::new(),
+                estimated_reference_cost_micros: None,
+            }],
+            action: crate::tui::PickerAction::Account(
+                crate::tui::AccountPickerAction::Switch {
+                    provider_id: "openai".to_string(),
+                    label: "personal".to_string(),
+                },
+            ),
+            selected_option: 0,
+            is_current: false,
+            is_default: false,
+            is_favorite: false,
+            recommended: false,
+            recommendation_rank: usize::MAX,
+            usage_score: 0,
+            old: false,
+            created_date: None,
+            effort: None, is_free: false, is_latest: false, });
         }
 
         crate::tui::InlineInteractiveState {
@@ -1007,6 +1018,8 @@ mod tests {
                 old: false,
                 created_date: None,
                 effort: None,
+                is_free: false,
+                is_latest: false,
             }],
         }
     }

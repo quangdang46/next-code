@@ -1700,27 +1700,25 @@ fn test_login_smoke_model_picker_renders_unstacked_provider_rows() {
 
 #[test]
 fn test_model_picker_filter_text_includes_provider_and_method() {
-    let entry = crate::tui::PickerEntry {
-        name: "glm-51-nvfp4".to_string(),
-        options: vec![crate::tui::PickerOption {
-            provider: "Comtegra GPU Cloud".to_string(),
-            api_method: "openai-compatible:comtegra".to_string(),
-            available: true,
-            detail: "https://llm.comtegra.cloud/v1".to_string(),
-            estimated_reference_cost_micros: None,
-        }],
-        action: crate::tui::PickerAction::Model,
-        selected_option: 0,
-        is_current: false,
-        is_default: false,
-        is_favorite: false,
-        recommended: false,
-        recommendation_rank: usize::MAX,
-        usage_score: 0,
-        old: false,
-        created_date: None,
-        effort: None,
-    };
+    let entry = crate::tui::PickerEntry { name: "glm-51-nvfp4".to_string(),
+    options: vec![crate::tui::PickerOption {
+        provider: "Comtegra GPU Cloud".to_string(),
+        api_method: "openai-compatible:comtegra".to_string(),
+        available: true,
+        detail: "https://llm.comtegra.cloud/v1".to_string(),
+        estimated_reference_cost_micros: None,
+    }],
+    action: crate::tui::PickerAction::Model,
+    selected_option: 0,
+    is_current: false,
+    is_default: false,
+    is_favorite: false,
+    recommended: false,
+    recommendation_rank: usize::MAX,
+    usage_score: 0,
+    old: false,
+    created_date: None,
+    effort: None, is_free: false, is_latest: false, };
 
     let filter_text = crate::tui::PickerKind::Model.filter_text(&entry);
     assert!(filter_text.contains("glm-51-nvfp4"));

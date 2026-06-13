@@ -1051,7 +1051,11 @@ pub(super) fn handle_model_command(app: &mut App, trimmed: &str) -> bool {
 
     if let Some(model_name) = trimmed.strip_prefix("/model ") {
         let model_name = model_name.trim();
-        match app.provider.set_model(model_name) {
+        let result = app.provider.set_model(model_name).or_else(|_| {
+            app.provider.on_auth_changed();
+            app.provider.set_model(model_name)
+        });
+        match result {
             Ok(()) => {
                 let active_model = app.finalize_model_switch(model_name);
                 let auth_suffix = app
