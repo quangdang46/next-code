@@ -719,6 +719,16 @@ impl RemoteConnection {
         self.send_request(request).await
     }
 
+    /// Set permission mode on the server (bypass-permissions, default, etc.)
+    pub async fn set_permission_mode(&mut self, mode: &str) -> Result<()> {
+        let request = Request::SetPermissionMode {
+            id: self.next_request_id,
+            mode: mode.to_string(),
+        };
+        self.next_request_id += 1;
+        self.send_request(request).await
+    }
+
     /// Toggle a runtime feature on the server for this session
     pub async fn set_feature(&mut self, feature: FeatureToggle, enabled: bool) -> Result<()> {
         let request = Request::SetFeature {
