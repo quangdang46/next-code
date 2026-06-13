@@ -529,6 +529,18 @@ fn run_toon_subcommand_parses() {
     }
 }
 #[test]
+fn run_toon_conflicts_with_json() {
+    let err = Args::try_parse_from(["jcode", "run", "--json", "--toon", "hello"]).unwrap_err();
+    assert!(err.to_string().contains("cannot be used with"));
+}
+
+#[test]
+fn run_toon_conflicts_with_ndjson() {
+    let err = Args::try_parse_from(["jcode", "run", "--ndjson", "--toon", "hello"]).unwrap_err();
+    assert!(err.to_string().contains("cannot be used with"));
+}
+
+#[test]
 fn version_subcommand_parses() {
     let args = Args::try_parse_from(["jcode", "version", "--json"]).unwrap();
     match args.command {
