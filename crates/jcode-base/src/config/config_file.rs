@@ -331,4 +331,14 @@ impl Config {
         }
         Ok(())
     }
+
+    /// Persist the current permission mode to the config file so it survives
+    /// process restarts (e.g., Cmd+; opens a new process each time).
+    pub fn set_permission_mode(mode: &str) -> anyhow::Result<()> {
+        let mut config = Self::load();
+        config.permission_mode = Some(mode.to_string());
+        config.save()?;
+        crate::logging::info(&format!("Saved permission mode '{}' to config", mode));
+        Ok(())
+    }
 }

@@ -1689,11 +1689,17 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
         match args {
             "cycle" => {
                 let new_mode = crate::dcg_bridge::cycle_mode();
-                content = format!("Switched to mode: **{}**\n\n{}", crate::dcg_bridge::mode_to_str(new_mode), content);
+                let mode_str = crate::dcg_bridge::mode_to_str(new_mode);
+                content = format!("Switched to mode: **{}**\n\n{}", mode_str, content);
+                // Persist to config so it survives process restarts (Cmd+; opens new process).
+                let _ = crate::config::Config::set_permission_mode(mode_str);
             }
             s if !s.is_empty() => {
                 if crate::dcg_bridge::set_mode_from_str(s) {
-                    content = format!("Switched to mode: **{}**\n\n{}", crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode()), content);
+                    let mode_str = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
+                    content = format!("Switched to mode: **{}**\n\n{}", mode_str, content);
+                    // Persist to config so it survives process restarts (Cmd+; opens new process).
+                    let _ = crate::config::Config::set_permission_mode(mode_str);
                 } else {
                     content = format!("Unknown mode: `{}`\n\n{}", s, content);
                 }

@@ -1401,6 +1401,7 @@ pub(super) fn handle_alt_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Char('p') => {
             let mode = crate::dcg_bridge::cycle_mode();
             let mode_str = crate::dcg_bridge::mode_to_str(mode);
+            let _ = crate::config::Config::set_permission_mode(mode_str);
             app.set_status_notice(format!("Permission mode → {mode_str}"));
             true
         }
@@ -2202,6 +2203,7 @@ impl App {
         if code == KeyCode::BackTab {
             let mode = crate::dcg_bridge::cycle_mode();
             let mode_str = crate::dcg_bridge::mode_to_str(mode);
+            let _ = crate::config::Config::set_permission_mode(mode_str);
             self.set_status_notice(format!("Permission mode → {mode_str}"));
             return Ok(());
         }
