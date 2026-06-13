@@ -293,7 +293,7 @@ pub fn build_system_prompt_full(
 
     // Add available skills list
     if !available_skills.is_empty() {
-        let mut skills_section = "# Available Skills\n\nYou have access to the following skills that the user can invoke with `/skillname`:\n".to_string();
+        let mut skills_section = "# Available Skills\n\nYou have access to the following skills that the user can invoke with `$skillname`:\n".to_string();
         for skill in available_skills {
             skills_section.push_str(&format!("\n- `/{} ` - {}", skill.name, skill.description));
         }
@@ -372,7 +372,7 @@ pub fn build_system_prompt_split(
 
     // Add available skills list (fairly static)
     if !available_skills.is_empty() {
-        let mut skills_section = "# Available Skills\n\nYou have access to the following skills that the user can invoke with `/skillname`:\n".to_string();
+        let mut skills_section = "# Available Skills\n\nYou have access to the following skills that the user can invoke with `$skillname`:\n".to_string();
         for skill in available_skills {
             skills_section.push_str(&format!("\n- `/{} ` - {}", skill.name, skill.description));
         }

@@ -49,6 +49,7 @@ pub enum AppRuntimeMode {
     TestHarness,
 }
 
+mod at_picker;
 mod auth;
 mod auth_account_picker_saved_accounts;
 mod catchup;
@@ -82,7 +83,7 @@ pub(crate) mod run_shell;
 mod runtime_memory;
 mod split_view;
 mod state_ui;
-mod state_ui_input_helpers;
+pub mod state_ui_input_helpers;
 mod state_ui_maintenance;
 mod state_ui_messages;
 mod state_ui_runtime;
@@ -663,6 +664,9 @@ pub struct App {
     provider: Arc<dyn Provider>,
     registry: Registry,
     skills: Arc<SkillRegistry>,
+    /// Lazy-initialized @-mention picker (ffs-backed file/path autocomplete).
+    /// Stays `Pending` until the first `@`-keystroke triggers `ensure()`.
+    at_picker: at_picker::AtPickerSlot,
     mcp_manager: Arc<RwLock<McpManager>>,
     messages: Vec<Message>,
     session: Session,

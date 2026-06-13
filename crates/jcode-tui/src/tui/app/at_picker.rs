@@ -340,12 +340,28 @@ impl std::fmt::Debug for AtPicker {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug)]
 pub enum AtPickerError {
-    #[error("could not create cache directory: {0}")]
     CacheDir(std::io::Error),
-    #[error("ffs error: {0}")]
     Ffs(String),
+}
+
+impl std::fmt::Display for AtPickerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AtPickerError::CacheDir(e) => write!(f, "could not create cache directory: {e}"),
+            AtPickerError::Ffs(e) => write!(f, "ffs error: {e}"),
+        }
+    }
+}
+
+impl std::error::Error for AtPickerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            AtPickerError::CacheDir(e) => Some(e),
+            AtPickerError::Ffs(_) => None,
+        }
+    }
 }
 
 /// Three-state slot for the lazy-initialized picker stored on `App`.

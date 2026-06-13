@@ -263,6 +263,10 @@ jcode-background-types = { path = "crates/jcode-background-types" }
 jcode-batch-types = { path = "crates/jcode-batch-types" }
 jcode-build-support = { path = "crates/jcode-build-support" }
 jcode-build-meta = { path = "crates/jcode-build-meta" }
+# Application core: tooling, agent, dcg, dcp, mempalace, etc. Re-exported via
+# `pub use jcode_app_core::*` in lib.rs. default-features=false so the root
+# feature set fully controls the downstream features (see [features]).
+jcode-app-core = { path = "crates/jcode-app-core", default-features = false }
 # Presentation layer: the terminal UI (`tui`) + offline replay (`video_export`),
 # compiled as a separate rustc unit. It re-exports the application core
 # (`jcode-app-core`, which re-exports `jcode-base`), so the root crate (cli +
@@ -330,6 +334,7 @@ embeddings = ["dep:jcode-embedding", "jcode-tui/embeddings"]
 dcp = ["jcode-tui/dcp"]
 rtco = ["jcode-tui/rtco"]
 mmdr-size-api = ["jcode-tui-mermaid/mmdr-size-api"]
+mempalace-backend = ["jcode-app-core/mempalace-backend"]
 pdf = ["dep:jcode-pdf", "jcode-tui/pdf"]
 
 [target.'cfg(windows)'.dependencies]

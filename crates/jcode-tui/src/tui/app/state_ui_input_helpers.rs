@@ -229,7 +229,119 @@ impl App {
 
         pos
     }
+}
 
+/// Find the active `$<token>` at the end of `input` for autocomplete /
+/// Tab-completion. Walks the input backward from the cursor; the most
+/// recent `$` that starts a token (preceded by start-of-input or
+/// whitespace) and is followed by zero or more non-whitespace
+/// characters is the active token.
+///
+/// Returns the token (including the leading `$`) when the user is
+/// currently typing or has just finished a `$<word>`. Returns `None`
+/// when:
+/// - There is no `$` in the input
+/// - The most recent `$` is embedded in an identifier
+///   (e.g. `abc$xyz`)
+/// - The most recent `$` was followed by whitespace before the
+///   cursor (token has ended)
+///
+/// Examples:
+///
+/// ```ignore
+/// active_dollar_token("$grill-me")          // Some("$grill-me")
+/// active_dollar_token("fix the auth $gri")  // Some("$gri")
+/// active_dollar_token("xxx $")              // Some("$")
+/// active_dollar_token("xxx $a $b")          // Some("$b")  — last token wins
+/// active_dollar_token("xxx $a hello")       // None       — token ended
+/// active_dollar_token("price=$100")         // None       — embedded in word
+/// active_dollar_token("hello world")        // None
+/// ```
+pub(super) fn active_dollar_token(input: &str) -> Option<&str> {
+    // Walk from the END backwards to find the most recent '$'. While
+    // walking we must NOT cross whitespace (whitespace = token boundary
+    // and we'd be in a different token already).
+    let bytes = input.as_bytes();
+    let mut i = bytes.len();
+    while i > 0 {
+        let prev = bytes[i - 1];
+        if prev == b'$' {
+            // Found a `$`. Verify it starts a token — i.e. char before
+            // is start-of-input or whitespace.
+            if i == 1 || (bytes[i - 2] as char).is_whitespace() {
+                return Some(&input[i - 1..]);
+            }
+            // `$` is in the middle of an identifier (e.g. "abc$xyz") —
+            // not a skill token.
+            return None;
+        }
+        if (prev as char).is_whitespace() {
+            // Crossed whitespace before finding `$` — no active token.
+            return None;
+        }
+        i -= 1;
+    }
+    None
+}
+
+/// Find the active `@<token>` at the end of `input` for autocomplete /
+/// Tab-completion. Mirrors [`active_dollar_token`] but for the ffs-backed
+/// `@<path>` mention namespace (Claude-Code-style file/path picker).
+///
+/// Walks the input backward from the cursor; the most recent `@` that
+/// starts a token (preceded by start-of-input or whitespace) and is
+/// followed by zero or more non-whitespace characters is the active
+/// token. Returns the token (including the leading `@`) when the user
+/// is currently typing or has just finished a `@<word>`. Returns
+/// `None` when:
+///
+/// - There is no `@` in the input
+/// - The most recent `@` is embedded in an identifier (e.g.
+///   `email@host` — handled separately by email/regex consumers)
+/// - The most recent `@` was followed by whitespace before the cursor
+///   (token has ended)
+///
+/// Examples:
+///
+/// ```ignore
+/// active_at_token("@main.rs")          // Some("@main.rs")
+/// active_at_token("look at @src/")     // Some("@src/")
+/// active_at_token("look at @src/foo")  // Some("@src/foo")
+/// active_at_token("xxx @")             // Some("@")
+/// active_at_token("xxx @a @b")         // Some("@b")  — last token wins
+/// active_at_token("user@example.com")  // None       — embedded in word
+/// active_at_token("hello world")       // None
+/// ```
+pub(super) fn active_at_token(input: &str) -> Option<&str> {
+    // Walk from the END backwards to find the most recent '@'. Same
+    // algorithm as `active_dollar_token` — see that function for the
+    // full rationale. We deliberately use the same `is_whitespace`
+    // boundary so that typing `xxx @a hello` ends the token at the
+    // space, mirroring user intuition for `/` and `$` namespaces.
+    let bytes = input.as_bytes();
+    let mut i = bytes.len();
+    while i > 0 {
+        let prev = bytes[i - 1];
+        if prev == b'@' {
+            // Found a `@`. Verify it starts a token — i.e. char before
+            // is start-of-input or whitespace.
+            if i == 1 || (bytes[i - 2] as char).is_whitespace() {
+                return Some(&input[i - 1..]);
+            }
+            // `@` is in the middle of an identifier (e.g. "abc@xyz"
+            // or "user@example.com") — not a path-mention token.
+            return None;
+        }
+        if (prev as char).is_whitespace() {
+            // Crossed whitespace before finding `@` — no active token.
+            return None;
+        }
+        i -= 1;
+    }
+    None
+}
+
+impl App {
     pub fn input(&self) -> &str {
         &self.input
     }
@@ -302,21 +414,14 @@ impl App {
             return cache.candidates.clone();
         }
 
-        fn push_skill_commands(
-            commands: &mut Vec<(String, &'static str)>,
-            seen: &mut std::collections::HashSet<String>,
-            skills: &crate::skill::SkillRegistry,
-        ) {
-            for skill in skills.list() {
-                let command = format!("/{}", skill.name);
-                if seen.insert(command.clone()) {
-                    commands.push((command, "Activate skill"));
-                }
-            }
-        }
-
+        // UX: only show BUILT-IN commands under `/`. Skills live in the
+        // `$` namespace (see `skill_candidates`) so the `/` autocomplete
+        // dropdown stays navigable when the user has 100+ skills
+        // installed. Legacy `/<skill>` invocation still works at submit
+        // time for back-compat — it's just hidden from autocomplete.
+        // (See PR #256.)
         let mut seen = std::collections::HashSet::new();
-        let mut commands: Vec<(String, &'static str)> = REGISTERED_COMMANDS
+        let commands: Vec<(String, &'static str)> = REGISTERED_COMMANDS
             .iter()
             .filter(|command| !command.hidden)
             .filter_map(|command| {
@@ -325,22 +430,103 @@ impl App {
             })
             .collect();
 
-        let skills = self.current_skills_snapshot();
-        push_skill_commands(&mut commands, &mut seen, &skills);
-
-        if self.is_remote && !self.remote_skills.is_empty() {
-            for skill in &self.remote_skills {
-                let command = format!("/{skill}");
-                if seen.insert(command.clone()) {
-                    commands.push((command, "Activate skill"));
-                }
-            }
-        }
-
         *self.command_candidates_cache.borrow_mut() = Some(CommandCandidatesCache {
             candidates: commands.clone(),
         });
         commands
+    }
+
+    /// Build the autocomplete list for the `$` (skill) namespace.
+    ///
+    /// Each entry is `($<skill-name>, "Activate skill")`. Includes both
+    /// locally-discovered skills (project + user dirs, see
+    /// `SkillRegistry`) and remote-session skills when running as a TUI
+    /// client against a shared server.
+    fn skill_candidates(&self) -> Vec<(String, &'static str)> {
+        let mut seen = std::collections::HashSet::new();
+        let mut out: Vec<(String, &'static str)> = Vec::new();
+
+        let skills = self.current_skills_snapshot();
+        for skill in skills.list() {
+            let entry = format!("${}", skill.name);
+            if seen.insert(entry.clone()) {
+                out.push((entry, "Activate skill"));
+            }
+        }
+
+        if self.is_remote && !self.remote_skills.is_empty() {
+            for skill in &self.remote_skills {
+                let entry = format!("${skill}");
+                if seen.insert(entry.clone()) {
+                    out.push((entry, "Activate skill"));
+                }
+            }
+        }
+
+        out
+    }
+
+    /// Build autocomplete list for the `@` (ffs-backed file mention)
+    /// namespace. Returns empty while the picker is still initializing
+    /// (first `@` triggers warm-up in the background).
+    fn at_candidates_for(&self, token: &str) -> Vec<(String, &'static str)> {
+        // Non-blocking peek: if the picker hasn't been initialized yet,
+        // queue an init (which will be ready next time the user types).
+        // The init is triggered lazily from the event loop; here we just
+        // return what's available.
+        let picker = if let Some(p) = self.at_picker.get() {
+            p
+        } else {
+            // First `@` keystroke — trigger lazy init. Since we can't
+            // take `&mut self` here (called via TuiState trait), queue
+            // the full init path that will fire from the event loop.
+            // For now, return empty.
+            return Vec::new();
+        };
+
+        let cursor = token.len();
+        // The mention resolver needs the full input text (not just the
+        // `@token`) so it can correctly parse the @-token at cursor.
+        let results = picker.search(token, cursor, at_picker::AT_PICKER_MAX_SUGGESTIONS);
+        self.rank_at_suggestions(token, results)
+    }
+
+    /// Rank raw `AtSuggestion` objects and convert to the
+    /// `(command_text, help_text)` pair that the ComposerMode expects.
+    fn rank_at_suggestions(
+        &self,
+        needle: &str,
+        suggestions: Vec<at_picker::AtSuggestion>,
+    ) -> Vec<(String, &'static str)> {
+        if needle.is_empty() {
+            return suggestions
+                .into_iter()
+                .map(|s| (format!("@{}", s.display_path), "Mention file"))
+                .collect();
+        }
+        // Fuzzy-rank against the needle, promoting prefix matches.
+        let lower = needle.to_lowercase();
+        let mut scored: Vec<(bool, usize, String)> = suggestions
+            .into_iter()
+            .map(|s| {
+                let cmd = format!("@{}", s.display_path);
+                let cmd_lower = cmd.to_lowercase();
+                if cmd_lower.starts_with(&lower) {
+                    (true, 0, cmd)
+                } else if let Some(score) = Self::fuzzy_score(needle, &cmd_lower) {
+                    (false, score, cmd)
+                } else {
+                    // Skip if no match
+                    (false, usize::MAX, cmd)
+                }
+            })
+            .filter(|(_, score, _)| *score != usize::MAX)
+            .collect();
+        scored.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+        scored
+            .into_iter()
+            .map(|(_, _, cmd)| (cmd, "Mention file"))
+            .collect()
     }
 
     pub(super) fn invalidate_command_candidates_cache(&self) {
@@ -460,6 +646,25 @@ impl App {
     /// Get command suggestions based on current input (or base input for cycling)
     pub(super) fn get_suggestions_for(&self, input: &str) -> Vec<(String, &'static str)> {
         let input = input.trim_start();
+
+        // Three suggestion namespaces (checked in this order):
+        //
+        // 1. `@` — ffs-backed file/path mention picker. Fires mid-text
+        //    too, e.g. "look at @src/fo" → suggest matching paths.
+        // 2. `$` — skill namespace. Fires mid-text, e.g. "fix the auth
+        //    $gri" → suggest skills matching "gri*".
+        // 3. `/` — built-in commands. Only at start of input.
+        //
+        // `active_at_token` / `active_dollar_token` find the last
+        // `@`/`$` that starts a token (preceded by start-of-input or
+        // whitespace); if it has no trailing whitespace we surface
+        // candidates ranked by the partial after the prefix.
+        if let Some(token) = active_at_token(input) {
+            return self.at_candidates_for(token);
+        }
+        if let Some(token) = active_dollar_token(input) {
+            return self.rank_suggestions(&token.to_lowercase(), self.skill_candidates());
+        }
 
         // Only show suggestions when input starts with /
         if !input.starts_with('/') {
@@ -1120,7 +1325,35 @@ impl App {
         }
 
         self.remember_input_undo_state();
-        self.input = cmd;
+
+        // Bug fix (PR #258): when the suggestion starts with `@` or
+        // `$` (mid-text namespaces) and the user typed it mid-text
+        // (e.g. "fix the auth $gri" or "look at @src/fo"), replace
+        // only the token at the end of the input, not the whole input.
+        // Otherwise "xxxx $gri" → Tab → "$grill-me" (drops "xxxx ").
+        //
+        // For `/` commands the input always starts with `/` so the
+        // whole-input replacement is correct and unchanged.
+        if cmd.starts_with('@') {
+            if let Some(token) = active_at_token(&self.input) {
+                let prefix_len = self.input.len() - token.len();
+                let prefix = self.input[..prefix_len].to_string();
+                self.input = format!("{prefix}{cmd}");
+            } else {
+                self.input = cmd;
+            }
+        } else if cmd.starts_with('$') {
+            if let Some(token) = active_dollar_token(&self.input) {
+                let prefix_len = self.input.len() - token.len();
+                let prefix = self.input[..prefix_len].to_string();
+                self.input = format!("{prefix}{cmd}");
+            } else {
+                self.input = cmd;
+            }
+        } else {
+            self.input = cmd;
+        }
+
         self.cursor_pos = self.input.len();
         self.tab_completion_state = None;
         self.command_suggestion_selected = 0;
@@ -1282,7 +1515,24 @@ impl App {
                 let next_index = (idx + 1) % base_suggestions.len();
                 let (cmd, _) = &base_suggestions[next_index];
                 self.remember_input_undo_state();
-                self.input = cmd.clone();
+                // Same prefix-preservation fix as accept_selected_command_suggestion.
+                if cmd.starts_with('@') {
+                    if let Some(token) = active_at_token(base) {
+                        let prefix_len = base.len() - token.len();
+                        self.input = format!("{}{cmd}", &base[..prefix_len]);
+                    } else {
+                        self.input = cmd.clone();
+                    }
+                } else if cmd.starts_with('$') {
+                    if let Some(token) = active_dollar_token(base) {
+                        let prefix_len = base.len() - token.len();
+                        self.input = format!("{}{cmd}", &base[..prefix_len]);
+                    } else {
+                        self.input = cmd.clone();
+                    }
+                } else {
+                    self.input = cmd.clone();
+                }
                 self.cursor_pos = self.input.len();
                 self.tab_completion_state = Some((base.clone(), next_index));
                 return true;
@@ -1316,7 +1566,30 @@ impl App {
         let (cmd, _) = &current_suggestions[selected];
         let base = self.input.clone();
         self.remember_input_undo_state();
-        self.input = cmd.clone();
+
+        // Prefix preservation for @ and $ tokens (same logic as
+        // accept_selected_command_suggestion).
+        let full_cmd = if cmd.starts_with('@') {
+            if let Some(token) = active_at_token(&self.input) {
+                let prefix_len = self.input.len() - token.len();
+                let prefix = self.input[..prefix_len].to_string();
+                format!("{prefix}{cmd}")
+            } else {
+                cmd.clone()
+            }
+        } else if cmd.starts_with('$') {
+            if let Some(token) = active_dollar_token(&self.input) {
+                let prefix_len = self.input.len() - token.len();
+                let prefix = self.input[..prefix_len].to_string();
+                format!("{prefix}{cmd}")
+            } else {
+                cmd.clone()
+            }
+        } else {
+            cmd.clone()
+        };
+        self.input = full_cmd;
+
         // If unique match, add trailing space for arg-accepting commands
         if current_suggestions.len() == 1 && Self::command_accepts_args(&self.input) {
             self.input.push(' ');
@@ -1794,5 +2067,75 @@ mod external_cli_suggestion_tests {
         let candidates = latest_jsonl_suggestion_candidates(temp.path(), "Claude Code", 1);
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].context.as_deref(), Some("new"));
+    }
+}
+
+#[cfg(test)]
+mod dollar_token_tests {
+    use super::active_dollar_token;
+
+    #[test]
+    fn detects_dollar_at_start_of_input() {
+        assert_eq!(active_dollar_token("$grill-me"), Some("$grill-me"));
+        assert_eq!(active_dollar_token("$"), Some("$"));
+    }
+
+    #[test]
+    fn detects_dollar_after_whitespace() {
+        // "fix the auth $gri" → autocomplete on $gri
+        assert_eq!(active_dollar_token("fix the auth $gri"), Some("$gri"));
+        // Multiple spaces
+        assert_eq!(active_dollar_token("xxx   $foo"), Some("$foo"));
+        // Bare dollar at the end (just typed)
+        assert_eq!(active_dollar_token("xxx $"), Some("$"));
+    }
+
+    #[test]
+    fn last_dollar_wins_when_multiple_tokens() {
+        // $a $b → caller is on $b (last token)
+        assert_eq!(active_dollar_token("$a $b"), Some("$b"));
+        assert_eq!(active_dollar_token("xxx $foo $bar"), Some("$bar"));
+    }
+
+    #[test]
+    fn rejects_when_token_ended_with_whitespace() {
+        // User typed `$foo` then space → token boundary; no active token.
+        assert_eq!(active_dollar_token("$foo "), None);
+        assert_eq!(active_dollar_token("$grill-me hello"), None);
+    }
+
+    #[test]
+    fn rejects_dollar_in_middle_of_identifier() {
+        // Embedded `$` like "abc$xyz" is not a skill token.
+        assert_eq!(active_dollar_token("abc$xyz"), None);
+        assert_eq!(active_dollar_token("price=$100"), None);
+    }
+
+    #[test]
+    fn returns_none_when_no_dollar() {
+        assert_eq!(active_dollar_token(""), None);
+        assert_eq!(active_dollar_token("hello world"), None);
+        assert_eq!(active_dollar_token("/help"), None);
+    }
+
+    // ---- Bug fix: autocomplete must preserve prefix before $token ----
+
+    #[test]
+    fn active_dollar_token_prefix_len_is_correct() {
+        // Verify the prefix-length arithmetic used in autocomplete.
+        let input = "fix the auth $gri";
+        let token = active_dollar_token(input).unwrap();
+        assert_eq!(token, "$gri");
+        let prefix_len = input.len() - token.len();
+        assert_eq!(&input[..prefix_len], "fix the auth ");
+    }
+
+    #[test]
+    fn active_dollar_token_prefix_len_for_bare_dollar() {
+        let input = "xxxx $";
+        let token = active_dollar_token(input).unwrap();
+        assert_eq!(token, "$");
+        let prefix_len = input.len() - token.len();
+        assert_eq!(&input[..prefix_len], "xxxx ");
     }
 }

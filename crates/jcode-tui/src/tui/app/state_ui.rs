@@ -1651,7 +1651,7 @@ fn build_skills_report(app: &App) -> String {
         }
     }
 
-    out.push_str("\nActivate a skill by typing its slash command (e.g. /optimization).\n");
+    out.push_str("\nActivate a skill by typing $skillname (e.g. $optimization).\n");
     out.push_str("Manage skills with the skill_manage tool (list/load/read/reload).\n");
     out.push_str(
         "NVIDIA CUDA-X skills come from the official catalog at https://github.com/NVIDIA/skills.\n",

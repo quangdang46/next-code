@@ -736,6 +736,11 @@ pub(super) fn insert_input_text(app: &mut App, text: &str) {
         return;
     }
 
+    // Lazy-init the @-mention picker on the first `@` keystroke.
+    if text == "@" {
+        let _ = app.at_picker.ensure(app.session.working_dir.as_deref());
+    }
+
     app.remember_input_undo_state();
     app.input.insert_str(app.cursor_pos, text);
     app.cursor_pos += text.len();

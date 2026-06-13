@@ -355,7 +355,7 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
         lines.push(Line::from(Span::styled("  Skills", section_style)));
         lines.push(Line::from(""));
         for skill in &skills {
-            lines.push(help_entry(&format!("/{}", skill), "Activate skill"));
+            lines.push(help_entry(&format!("${}", skill), "Activate skill"));
         }
     }
 
