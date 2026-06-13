@@ -530,6 +530,17 @@ fn apply_set_model(
         let result = agent.set_model(&model);
         if result.is_ok() {
             agent.reset_provider_session();
+            // Persist the model to the server's config so it survives
+            // process restarts (Cmd+; launches new server each time).
+            let active = agent.provider_model();
+            if let Err(e) =
+                crate::config::Config::set_default_model_only(Some(&active))
+            {
+                crate::logging::warn(&format!(
+                    "Failed to persist default model '{}' on server: {}",
+                    active, e
+                ));
+            }
         }
         result.map(|_| (agent.provider_model(), agent.provider_name()))
     };
