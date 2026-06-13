@@ -1,5 +1,0 @@
-(standard input):147:    RegisteredCommand::public("/quit", "Exit jcode"),
-crates/jcode-tui/src/tui/ui_overlays.rs:347:    lines.push(help_entry("/quit", "Exit jcode"));
-crates/jcode-desktop/src/single_session.rs:194:    ("/quit", "exit the desktop app"),
-crates/jcode-desktop/src/single_session.rs:5163:            "/quit" | "/exit" => KeyOutcome::Exit,
-crates/jcode-desktop/src/workspace.rs:1047:            "/quit",
