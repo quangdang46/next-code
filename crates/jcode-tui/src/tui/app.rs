@@ -1283,9 +1283,6 @@ pub struct App {
     pub pending_permission_selected: usize,
     /// Status line display configuration for this session.
     pub status_line_config: jcode_config_types::StatusLineConfig,
-    /// IDs of tool messages whose execution frame is expanded (otherwise collapsed).
-    /// Toggle via click or Enter on the tool message area.
-    pub expanded_tool_ids: std::collections::HashSet<String>,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

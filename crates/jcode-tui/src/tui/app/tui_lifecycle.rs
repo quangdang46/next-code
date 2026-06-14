@@ -576,7 +576,6 @@ impl App {
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
             status_line_config: config().status_line.clone(),
-            expanded_tool_ids: std::collections::HashSet::new(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
         };
 
@@ -971,7 +970,6 @@ impl App {
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
             status_line_config: config().status_line.clone(),
-            expanded_tool_ids: std::collections::HashSet::new(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
         };
 

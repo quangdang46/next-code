@@ -12,33 +12,6 @@ use std::borrow::Cow;
 use std::sync::{LazyLock, Mutex};
 use unicode_width::UnicodeWidthStr;
 
-/// Global set of expanded tool call IDs (collapsed by default, toggle with click/Enter).
-static EXPANDED_TOOL_IDS: LazyLock<Mutex<std::collections::HashSet<String>>> =
-    LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
-
-/// Toggle a tool call's expanded state. Returns `true` if now expanded.
-pub fn toggle_tool_expanded(id: &str) -> bool {
-    if let Ok(mut set) = EXPANDED_TOOL_IDS.lock() {
-        if set.contains(id) {
-            set.remove(id);
-            false
-        } else {
-            set.insert(id.to_string());
-            true
-        }
-    } else {
-        false
-    }
-}
-
-/// Check if a tool call is expanded.
-pub fn is_tool_expanded(id: &str) -> bool {
-    if let Ok(set) = EXPANDED_TOOL_IDS.lock() {
-        set.contains(id)
-    } else {
-        false
-    }
-}
 
 const MAX_INLINE_DIFF_LINES: usize = 12;
 
@@ -1893,45 +1866,34 @@ pub(crate) fn render_tool_message(
                 // Command: │ $ cargo build │
                 let cmd_text = format!("│ {} {} │", cmd_display, " ".repeat(inner_w.saturating_sub(cmd_display.chars().count())));
                 lines.push(Line::from(Span::styled(cmd_text, Style::default().fg(box_color))));
-
-                // Tool expanded state
-                let is_expanded = is_tool_expanded(&tc.name);
-
-                if is_expanded {
-                    // Output section (from msg.content)
-                    let output_lines = render_plaintext_lines(&msg.content, inner_w.min(detail_width));
-                    let total_output = output_lines.len();
-                    let max_show = 20usize.min(total_output);
-                    if max_show > 0 {
-                        let sep_l = (box_w.saturating_sub(12)) / 2;
-                        let sep_r = box_w.saturating_sub(12 + sep_l);
-                        lines.push(Line::from(Span::styled(
-                            format!("├{} Output {}┤", "─".repeat(sep_l), "─".repeat(sep_r)),
-                            Style::default().fg(box_color),
-                        )));
-                        for line in output_lines.into_iter().take(max_show) {
-                            let lt = super::line_plain_text(&line);
-                            let trimmed: String = lt.chars().take(inner_w).collect();
-                            let padded = format!("│ {} {} │", trimmed, " ".repeat(inner_w.saturating_sub(trimmed.chars().count())));
-                            lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(180, 180, 190)))));
-                        }
-                        if total_output > max_show {
-                            let more = format!("  … {} more lines", total_output - max_show);
-                            let padded = format!("│ {}{} │", more, " ".repeat(inner_w.saturating_sub(more.chars().count())));
-                            lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(120, 120, 130)))));
-                        }
+                // Always show full output (collapse is at GROUP level, not per-tool).
+                let output_lines = render_plaintext_lines(&msg.content, inner_w.min(detail_width));
+                let total_output = output_lines.len();
+                let max_show = 20usize.min(total_output);
+                if max_show > 0 {
+                    let sep_l = (box_w.saturating_sub(12)) / 2;
+                    let sep_r = box_w.saturating_sub(12 + sep_l);
+                    lines.push(Line::from(Span::styled(
+                        format!("├{} Output {}┤", "─".repeat(sep_l), "─".repeat(sep_r)),
+                        Style::default().fg(box_color),
+                    )));
+                    for line in output_lines.into_iter().take(max_show) {
+                        let lt = super::line_plain_text(&line);
+                        let trimmed: String = lt.chars().take(inner_w).collect();
+                        let padded = format!("│ {} {} │", trimmed, " ".repeat(inner_w.saturating_sub(trimmed.chars().count())));
+                        lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(180, 180, 190)))));
                     }
-                    // Footer: exit status when failed
-                    if is_error {
-                        let exit_text = " ⟦ exit 1 ⟧ ";
-                        let padded = format!("│ {}{} │", exit_text, " ".repeat(inner_w.saturating_sub(exit_text.chars().count())));
-                        lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(100, 100, 110)))));
+                    if total_output > max_show {
+                        let more = format!("  … {} more lines", total_output - max_show);
+                        let padded = format!("│ {}{} │", more, " ".repeat(inner_w.saturating_sub(more.chars().count())));
+                        lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(120, 120, 130)))));
                     }
-                } else {
-                    // Collapsed: show expand hint
-                    let hint = format!("  ▶ {} click or Enter to expand", canon);
-                    let padded = format!("│ {}{} │", hint, " ".repeat(inner_w.saturating_sub(hint.chars().count())));
-                    lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(140, 140, 150)))));
+                }
+                // Footer: exit status when failed
+                if is_error {
+                    let exit_text = " ⟦ exit 1 ⟧ ";
+                    let padded = format!("│ {}{} │", exit_text, " ".repeat(inner_w.saturating_sub(exit_text.chars().count())));
+                    lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(100, 100, 110)))));
                 }
 
                 // Bottom: └──┘
