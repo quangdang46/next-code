@@ -37,6 +37,7 @@
 
 use super::info_widget;
 use super::markdown;
+use super::ui_running_items;
 use super::ui_diff::{
     DiffLineKind, ParsedDiffLine, collect_diff_lines, diff_add_color, diff_change_counts_for_tool,
     diff_del_color, generate_diff_lines_from_tool_input, tint_span_with_diff_color,
@@ -2791,7 +2792,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     input_ui::draw_status(frame, app, chunks[7], pending_count);
     // Running items list below status bar (Claude Code style)
     if running_items_height > 0 {
-        ui_running_items::draw_running_items(frame, app, chunks[8]);
+        super::ui_running_items::draw_running_items(frame, app, chunks[8]);
     }
     // Donut animation
     if donut_height > 0 {

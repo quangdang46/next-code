@@ -1,8 +1,8 @@
 use super::{RunningItem, RunningItemKind, RunningItemStatus, RunningItemsState};
 use crate::tui::color_support::rgb;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Paragraph};
-use unicode_width::UnicodeWidthStr;
+use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 use std::time::Duration;
 
 pub(super) fn draw_running_items(
@@ -181,7 +181,7 @@ fn truncate_to_width(s: &str, max_width: usize) -> String {
     } else {
         let mut out = String::with_capacity(max_width);
         for c in s.chars() {
-            if out.width() + c.width() > max_width.saturating_sub(1) {
+            if UnicodeWidthStr::width(out.as_str()) + UnicodeWidthChar::width(c).unwrap_or(0) > max_width.saturating_sub(1) {
                 break;
             }
             out.push(c);

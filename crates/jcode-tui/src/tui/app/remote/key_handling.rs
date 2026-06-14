@@ -677,6 +677,46 @@ async fn handle_remote_key_internal(
         }
     }
 
+    // Running items list navigation (when visible below status bar)
+    if app.running_items_state.visible {
+        match code {
+            KeyCode::Up => {
+                if app.running_items_state.selected > 0 {
+                    app.running_items_state.selected -= 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Down => {
+                let max = app.running_items_state.items.len().saturating_sub(1);
+                if app.running_items_state.selected < max {
+                    app.running_items_state.selected += 1;
+                }
+                return Ok(());
+            }
+            KeyCode::Enter => {
+                if let Some(item) = app.running_items_state.items.get(app.running_items_state.selected) {
+                    if app.running_items_state.detail.is_some() {
+                        app.running_items_state.detail = None;
+                    } else {
+                        let detail = item.detail.clone()
+                            .unwrap_or_else(|| format!("{} (status: {:?})", item.label, item.status));
+                        app.running_items_state.detail = Some(detail);
+                    }
+                }
+                return Ok(());
+            }
+            KeyCode::Esc => {
+                if app.running_items_state.detail.is_some() {
+                    app.running_items_state.detail = None;
+                } else {
+                    app.running_items_state.visible = false;
+                }
+                return Ok(());
+            }
+            _ => {}
+        }
+    }
+
     if code == KeyCode::Enter
         && modifiers.contains(KeyModifiers::CONTROL)
         && !app.input.trim().starts_with('/')

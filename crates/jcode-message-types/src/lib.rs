@@ -534,8 +534,30 @@ impl ToolCall {
     pub fn refresh_intent_from_input(&mut self) {
         self.intent = Self::intent_from_input(&self.input);
     }
-}
 
+    /// Summarize the tool call arguments as a short string.
+    pub fn args_to_str(&self) -> String {
+        let obj = match &self.input {
+            serde_json::Value::Object(map) => map,
+            _ => return String::new(),
+        };
+        let parts: Vec<String> = obj.iter()
+            .filter(|(k, v)| !v.is_null())
+            .map(|(k, v)| {
+                let val_str = match v {
+                    serde_json::Value::String(s) if s.len() < 40 => s.clone(),
+                    serde_json::Value::String(s) => format!("{}…", &s[..37]),
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::Bool(b) => b.to_string(),
+                    _ => "…".to_string(),
+                };
+                format!("{}={}", k, val_str)
+            })
+            .collect();
+        if parts.is_empty() { String::new() }
+        else { parts.join(" ") }
+    }
+}
 fn json_value_kind(value: &serde_json::Value) -> &'static str {
     match value {
         serde_json::Value::Null => "null",
