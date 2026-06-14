@@ -590,7 +590,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             Span::styled(perm_label, Style::default().fg(rgb(200, 200, 210))),
         ];
         if mode_str != "default" {
-            spans.push(Span::styled(" (shift+tab)", Style::default().fg(rgb(100, 100, 110))));
+            spans.push(Span::styled(" ⟦shift+tab⟧", Style::default().fg(rgb(100, 100, 110))));
         }
 
         // Model + provider + context separator
