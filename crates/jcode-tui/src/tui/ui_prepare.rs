@@ -1717,6 +1717,28 @@ pub(super) fn prepare_body(
         }
     }
 
+
+    // Show thinking indicator when processing but no stream output yet (Claude Code style).
+    if include_streaming && app.is_processing() && app.streaming_text().is_empty()
+        && matches!(app.status(), ProcessingStatus::Sending | ProcessingStatus::Connecting(_) | ProcessingStatus::Thinking(_))
+    {
+        if !lines.is_empty() {
+            lines.push(Line::from(""));
+            line_raw_overrides.push(None);
+            line_copy_offsets.push(0);
+        }
+        let sep = Line::from(vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                super::activity_indicator(app.animation_elapsed(), 12.5),
+                Style::default().fg(ai_color()),
+            ),
+            Span::styled(" thinking…", Style::default().fg(dim_color())),
+        ]);
+        lines.push(align_if_unset(sep, Alignment::Left));
+        line_raw_overrides.push(None);
+        line_copy_offsets.push(0);
+    }
     if include_streaming && app.is_processing() && !app.streaming_text().is_empty() {
         if !lines.is_empty() {
             lines.push(Line::from(""));
