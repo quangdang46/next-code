@@ -635,8 +635,6 @@ impl crate::tui::TuiState for App {
 
     fn running_items(&self) -> crate::tui::RunningItemsState {
         let mut items: Vec<crate::tui::RunningItem> = Vec::new();
-        let now = std::time::Instant::now();
-
         // 1. Batch subcalls (running tools from batch progress)
         if let Some(bp) = &self.batch_progress {
             for sub in &bp.running {
@@ -654,7 +652,7 @@ impl crate::tui::TuiState for App {
 
         // 2. Background tasks
         let bg = crate::background::global();
-        let (running_count, running_tasks, _progress) = bg.running_snapshot();
+        let (_running_count, running_tasks, _progress) = bg.running_snapshot();
         for task_name in &running_tasks {
             items.push(crate::tui::RunningItem {
                 kind: crate::tui::RunningItemKind::BackgroundTask,
