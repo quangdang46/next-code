@@ -2520,37 +2520,38 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Use packed layout when content fits, scrolling layout otherwise
     let use_packed = content_height + fixed_height <= available_height;
 
-    // Layout: messages (includes header), queued, status, notification, inline UI, gap, input, donut
+    // Layout: messages, queued, notification, inline UI, gap, input, STATUS, overscroll, donut
+    // Status bar is at the BOTTOM (below input), matching Codex/Claude Code layout.
     // All vertical chunks are within the chat_area (left column).
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(if use_packed {
             vec![
                 Constraint::Length(content_height.max(1)), // Messages (exact height)
-                Constraint::Length(queued_height),         // Queued messages (above status)
-                Constraint::Length(1),                     // Status line
+                Constraint::Length(queued_height),         // Queued messages
                 Constraint::Length(notification_height),   // Notification line
                 Constraint::Length(inline_block_height),   // Inline UI
                 Constraint::Length(inline_ui_gap_height),  // Inline UI/input spacing
                 Constraint::Length(input_height),          // Input
+                Constraint::Length(1),                     // Status line (BELOW input)
                 Constraint::Length(overscroll_height),     // Overscroll status line
                 Constraint::Length(donut_height),          // Donut animation
             ]
         } else {
             vec![
                 Constraint::Min(3),                       // Messages (scrollable)
-                Constraint::Length(queued_height),        // Queued messages (above status)
-                Constraint::Length(1),                    // Status line
+                Constraint::Length(queued_height),        // Queued messages
                 Constraint::Length(notification_height),  // Notification line
                 Constraint::Length(inline_block_height),  // Inline UI
                 Constraint::Length(inline_ui_gap_height), // Inline UI/input spacing
                 Constraint::Length(input_height),         // Input
+                Constraint::Length(1),                    // Status line (BELOW input)
                 Constraint::Length(overscroll_height),    // Overscroll status line
                 Constraint::Length(donut_height),         // Donut animation
             ]
         })
         .split(chat_area);
-    record_status_area(chunks[2]);
+    record_status_area(chunks[6]);
 
     // Capture layout info for visual debug
     if let Some(ref mut capture) = debug_capture {
@@ -2560,8 +2561,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         if queued_height > 0 {
             capture.layout.queued_area = Some(chunks[1].into());
         }
-        capture.layout.status_area = Some(chunks[2].into());
-        capture.layout.input_area = Some(chunks[6].into());
+        capture.layout.status_area = Some(chunks[6].into());
+        capture.layout.input_area = Some(chunks[5].into());
         capture.layout.input_lines_raw = app.input().lines().count().max(1);
         capture.layout.input_lines_wrapped = base_input_height as usize;
 
@@ -2740,7 +2741,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     if let Some(ref mut capture) = debug_capture {
         capture.render_order.push("draw_status".to_string());
     }
-    input_ui::draw_status(frame, app, chunks[2], pending_count);
+    input_ui::draw_status(frame, app, chunks[6], pending_count);
     if notification_height > 0 {
         input_ui::draw_notification(frame, app, chunks[3]);
     }
