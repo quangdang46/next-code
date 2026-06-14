@@ -652,9 +652,11 @@ pub(super) fn draw_permission_dialog_overlay(
     area: Rect,
     app: &dyn crate::tui::TuiState,
 ) {
+    // Clear the dialog area so overlay text is visible over the chat.
     let dialog_w = area.width.min(84);
     let dialog_x = area.x + (area.width.saturating_sub(dialog_w)) / 2;
     let dialog_area = Rect::new(dialog_x, area.y + 1, dialog_w, 8);
+    clear_area(frame, dialog_area);
 
     let dim = Style::default().fg(rgb(100, 100, 110));
     let warn = Style::default().fg(rgb(235, 190, 105));
