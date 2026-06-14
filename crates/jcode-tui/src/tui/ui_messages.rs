@@ -1800,8 +1800,10 @@ pub(crate) fn render_tool_message(
     let rendered_tool_line_text = super::line_plain_text(&rendered_tool_line);
 
     // Try to create oh-my-pi style framed box ┌──┐ with output + stats footer.
+    // Handle all tool call types: object inputs, string inputs, and empty inputs.
     let mut box_created = false;
-    if tc.input.is_object() && !tc.input.as_object().unwrap().is_empty() {
+    let has_input = tc.input.is_object() || tc.input.is_string();
+    if has_input && !tc.input.to_string().trim().is_empty() {
         let canon = tools_ui::canonical_tool_name(&tc.name);
         let is_error = tools_ui::tool_output_looks_failed(&msg.content);
         let box_color = if is_error {
