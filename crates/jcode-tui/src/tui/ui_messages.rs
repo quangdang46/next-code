@@ -1799,21 +1799,72 @@ pub(crate) fn render_tool_message(
     let rendered_tool_line_text = super::line_plain_text(&rendered_tool_line);
     lines.push(rendered_tool_line);
 
-    if tools_ui::canonical_tool_name(&tc.name) == "bash"
-        && !rendered_tool_line_text.contains('$')
+    // Wrap tool command in a rounded box ╭──╮ with tool-specific border color.
+    // This matches oh-my-pi's framed execution box style for all tool types.
+    if let Some(command) = tc.input.get("command").and_then(|v| v.as_str())
+        .or_else(|| tc.input.get("content").and_then(|v| v.as_str()))
+        .or_else(|| tc.input.get("pattern").and_then(|v| v.as_str()))
+        .or_else(|| tc.input.get("query").and_then(|v| v.as_str()))
+    {
+        let canon = tools_ui::canonical_tool_name(&tc.name);
+        if !rendered_tool_line_text.contains('$') && !command.trim().is_empty() {
+            let box_color = match canon {
+                "bash" | "terminal" | "shell" => rgb(0, 255, 136),
+                "read" | "write" | "edit" | "hashline_edit" => rgb(100, 180, 255),
+                "web_search" | "web_fetch" | "webfetch" => rgb(180, 140, 255),
+                "eval" | "python" => rgb(240, 192, 64),
+                "grep" | "search" | "glob" | "find" => rgb(100, 220, 200),
+                _ => rgb(140, 140, 150),
+            };
+            let detail_width = row_width.saturating_sub(4).max(1);
+            if detail_width >= 20 {
+                let summary = tools_ui::get_tool_summary_with_budget(tc, 60, Some(detail_width));
+                let cmd_display = if !summary.trim().is_empty() {
+                    summary
+                } else {
+                    format!("$ {}", command.trim())
+                };
+                let title = match canon {
+                    "bash" => " bash ",
+                    "read" => " read ",
+                    "write" | "edit" | "hashline_edit" => " edit ",
+                    "web_search" | "web_fetch" | "webfetch" => " web ",
+                    "grep" | "search" | "glob" | "find" => " search ",
+                    "eval" => " eval ",
+                    _ => " tool ",
+                };
+                let box_content = vec![Line::from(Span::styled(
+                    cmd_display,
+                    Style::default().fg(box_color),
+                ))];
+                let box_lines = super::render_rounded_box(
+                    title,
+                    box_content,
+                    row_width.saturating_sub(2) as usize,
+                    Style::default().fg(box_color),
+                );
+                for bl in box_lines {
+                    let truncated = super::truncate_line_with_ellipsis_to_width(&bl, row_width);
+                    lines.push(truncated);
+                }
+            }
+        }
+    }
+    // Fallback: if no command/content field found, try the old bash-only check
+    // for backwards compatibility
+    else if tools_ui::canonical_tool_name(&tc.name) == "bash"
         && let Some(command) = tc.input.get("command").and_then(|v| v.as_str())
+        && !rendered_tool_line_text.contains('$')
+        && !command.trim().is_empty()
     {
         let detail_width = row_width.saturating_sub(4).max(1);
-        let command_detail = tools_ui::get_tool_summary_with_budget(tc, 80, Some(detail_width));
-        let cmd_display = if !command_detail.trim().is_empty() {
-            command_detail
-        } else if !command.trim().is_empty() {
-            format!("$ {}", command.trim())
-        } else {
-            String::new()
-        };
-        if !cmd_display.is_empty() && detail_width >= 20 {
-            // Wrap command in a rounded box (╭──╮) with green border (bash mode color).
+        if detail_width >= 20 {
+            let summary = tools_ui::get_tool_summary_with_budget(tc, 60, Some(detail_width));
+            let cmd_display = if !summary.trim().is_empty() {
+                summary
+            } else {
+                format!("$ {}", command.trim())
+            };
             let box_content = vec![Line::from(Span::styled(
                 cmd_display,
                 Style::default().fg(rgb(0, 255, 136)),
