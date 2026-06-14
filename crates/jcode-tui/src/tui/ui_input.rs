@@ -661,24 +661,8 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         status_line_text(app)
     };
 
-    let spinner = super::activity_indicator(app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0), 12.5);
-
-    if app.is_processing() {
-        let ai = super::ai_color();
-        match app.status_detail() {
-            Some(detail) if !detail.is_empty() => {
-                base_spans.push(Span::styled(" ", Style::default()));
-                base_spans.push(Span::styled(spinner, Style::default().fg(ai)));
-                base_spans.push(Span::styled(format!(" {}", detail), Style::default().fg(ai)));
-            }
-            _ => {
-                base_spans.push(Span::styled(" ", Style::default()));
-                base_spans.push(Span::styled(spinner, Style::default().fg(ai)));
-            }
-        }
-    }
-
     let line = Line::from(base_spans);
+
     crate::memory::check_staleness();
 
     let aligned_line = if app.centered_mode() {
