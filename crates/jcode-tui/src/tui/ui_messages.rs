@@ -1798,9 +1798,7 @@ pub(crate) fn render_tool_message(
     );
     let rendered_tool_line_text = super::line_plain_text(&rendered_tool_line);
     lines.push(rendered_tool_line);
-    // Wrap ALL tool calls in oh-my-pi style framed box ╭──╮
-    // with tool-specific border color and title.
-    // Wrap ALL tool calls in oh-my-pi style framed box ╭──╮
+    // Wrap ALL tool calls in oh-my-pi style framed box with sharp corners ┌──┐
     if tc.input.is_object() && !tc.input.as_object().unwrap().is_empty() {
         let canon = tools_ui::canonical_tool_name(&tc.name);
         let box_color = match canon {
@@ -1844,7 +1842,7 @@ pub(crate) fn render_tool_message(
             };
             if !display.is_empty() {
                 let box_content = vec![Line::from(Span::styled(display, Style::default().fg(box_color)))];
-                let box_lines = super::render_rounded_box(
+                let box_lines = super::render_sharp_box(
                     title, box_content,
                     row_width.saturating_sub(2) as usize,
                     Style::default().fg(box_color),

@@ -66,6 +66,70 @@ pub fn render_rounded_box(
     lines
 }
 
+/// Renders a sharp-cornered framed box `┌──┐└──┘` (oh-my-pi style) around content.
+/// Like `render_rounded_box` but uses `┌┐└┘` instead of `╭╮╰╯`.
+pub fn render_sharp_box(
+    title: &str,
+    content: Vec<Line<'static>>,
+    max_width: usize,
+    border_style: Style,
+) -> Vec<Line<'static>> {
+    if content.is_empty() || max_width < 6 {
+        return Vec::new();
+    }
+
+    let max_content_width = content
+        .iter()
+        .map(|line| line.width())
+        .max()
+        .unwrap_or(0)
+        .min(max_width.saturating_sub(4));
+
+    let truncated_title = truncate_line_with_ellipsis_to_width(
+        &Line::from(Span::raw(format!(" {} ", title))),
+        max_width.saturating_sub(2).max(1),
+    );
+    let title_text = line_plain_text(&truncated_title);
+    let title_len = truncated_title.width();
+    let box_content_width = max_content_width.max(title_len.saturating_sub(2));
+
+    if box_content_width < 6 {
+        return Vec::new();
+    }
+
+    let box_width = box_content_width + 4;
+    let border_chars = box_width.saturating_sub(title_len + 2);
+    let left_border = "─".repeat(border_chars / 2);
+    let right_border = "─".repeat(border_chars - border_chars / 2);
+
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    lines.push(Line::from(Span::styled(
+        format!("┌{}{}{}┐", left_border, title_text, right_border),
+        border_style,
+    )));
+
+    for line in content {
+        let truncated = truncate_line_to_width(&line, box_content_width);
+        let padding = box_content_width.saturating_sub(truncated.width());
+        let mut spans: Vec<Span<'static>> = Vec::new();
+        spans.push(Span::styled("│ ", border_style));
+        spans.extend(truncated.spans);
+        if padding > 0 {
+            spans.push(Span::raw(" ".repeat(padding)));
+        }
+        spans.push(Span::styled(" │", border_style));
+        lines.push(Line::from(spans));
+    }
+
+    // Bottom border
+    lines.push(Line::from(Span::styled(
+        format!("└{}┘", "─".repeat(box_content_width + 2)),
+        border_style,
+    )));
+
+    lines
+}
+
 pub fn truncate_line_to_width(line: &Line<'static>, width: usize) -> Line<'static> {
     if width == 0 {
         return Line::from("");
