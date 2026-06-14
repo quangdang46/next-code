@@ -2534,7 +2534,6 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 Constraint::Length(inline_ui_gap_height),  // Inline UI/input spacing
                 Constraint::Length(input_height),          // Input
                 Constraint::Length(1),                     // Status line (BELOW input)
-                Constraint::Length(overscroll_height),     // Overscroll status line
                 Constraint::Length(donut_height),          // Donut animation
             ]
         } else {
@@ -2545,9 +2544,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 Constraint::Length(inline_block_height),  // Inline UI
                 Constraint::Length(inline_ui_gap_height), // Inline UI/input spacing
                 Constraint::Length(input_height),         // Input
-                Constraint::Length(1),                    // Status line (BELOW input)
-                Constraint::Length(overscroll_height),    // Overscroll status line
-                Constraint::Length(donut_height),         // Donut animation
+                Constraint::Length(1),                     // Status line (BELOW input)
+                Constraint::Length(donut_height),          // Donut animation
             ]
         })
         .split(chat_area);
@@ -2761,12 +2759,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         &mut debug_capture,
     );
 
-    if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, chunks[7]);
-    }
-
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, chunks[8]);
+        animations::draw_idle_animation(frame, app, chunks[7]);
     }
 
     // Draw info widget overlays (skip during idle animation - they look out of place)

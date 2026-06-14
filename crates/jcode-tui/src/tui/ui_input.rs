@@ -562,9 +562,14 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         String::new()
     };
 
-    // Build the "always visible" status prefix: mode + model + provider + context + tokens.
-    // This is prepended to the processing status so it never disappears.
+    // Build the "always visible" status prefix with overscroll visual style
+    // (pink model, blue provider, context bar, working dir).
     fn status_base_prefix(app: &dyn TuiState) -> Vec<Span<'static>> {
+        let data = app.info_widget_data();
+        let sep = || Span::styled(" · ", Style::default().fg(rgb(100, 100, 110)));
+        let mut spans: Vec<Span> = Vec::new();
+
+        // Permission mode icon (leftmost)
         let mode_str = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
         let mode_icon = match mode_str {
             "bypass-permissions" => "⊘",
@@ -574,31 +579,45 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             "auto" => "🤖",
             _ => "🔒",
         };
-        let model = app.provider_model();
-        let provider = app.provider_name();
-        let ctx_pct = app.context_limit().and_then(|limit| {
-            let info = app.context_info();
-            let estimated = info.estimated_tokens();
-            if limit > 0 { Some((estimated as f64 / limit as f64 * 100.0) as u8) } else { None }
-        });
-        let (tokens_in, tokens_out) = app.total_session_tokens().unwrap_or((0, 0));
+        spans.push(Span::styled(mode_icon, Style::default().fg(rgb(255, 193, 7))));
 
-        let mut spans = vec![
-            Span::styled(mode_icon, Style::default()),
-            Span::styled(" ", Style::default()),
-            Span::styled(model, Style::default().fg(dim_color())),
-            Span::styled(format!(" · {}", provider), Style::default().fg(dim_color())),
-        ];
-        if let Some(pct) = ctx_pct {
-            let ctx_color = if pct > 90 { rgb(255, 100, 100) }
-                else if pct > 70 { rgb(255, 193, 7) }
-                else { dim_color() };
-            spans.push(Span::styled(format!(" · {}%", pct), Style::default().fg(ctx_color)));
+        // Model (pink bold, like overscroll)
+        let model = data.model.clone().filter(|m| !m.is_empty()).unwrap_or_else(|| app.provider_model());
+        if !model.is_empty() {
+            spans.push(Span::styled(" ", Style::default()));
+            spans.push(Span::styled(model, Style::default().fg(rgb(255, 150, 200)).bold()));
         }
-        spans.push(Span::styled(
-            format!(" · ↑{} ↓{}", format_stream_tokens(tokens_in), format_stream_tokens(tokens_out)),
-            Style::default().fg(dim_color()),
-        ));
+
+        // Provider (blue, like overscroll)
+        let provider = data.provider_name.clone().filter(|p| !p.is_empty()).unwrap_or_else(|| app.provider_name());
+        if !provider.is_empty() {
+            spans.push(sep());
+            spans.push(Span::styled(provider, Style::default().fg(rgb(140, 180, 255))));
+        }
+
+        // Auth method
+        if let Some((label, color)) = overscroll_auth_label(data.auth_method) {
+            spans.push(sep());
+            spans.push(Span::styled(label.to_string(), Style::default().fg(color)));
+        }
+
+        // Context usage with visual bar (like overscroll)
+        if let Some((used, limit)) = overscroll_context_usage(&data) {
+            spans.push(sep());
+            spans.push(Span::styled(
+                format!("{}/{} ", overscroll_format_tokens(used), overscroll_format_tokens(limit)),
+                Style::default().fg(rgb(140, 140, 150)),
+            ));
+            spans.extend(overscroll_context_bar(used, limit, 10));
+        }
+
+        // Working directory (right side)
+        if let Some(dir) = app.working_dir().and_then(|d| overscroll_dir_label(&d)) {
+            spans.push(sep());
+            spans.push(Span::styled(" ", Style::default().fg(rgb(140, 180, 255))));
+            spans.push(Span::styled(dir, Style::default().fg(rgb(140, 140, 150))));
+        }
+
         spans
     }
 
