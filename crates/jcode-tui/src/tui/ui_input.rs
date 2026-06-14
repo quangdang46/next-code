@@ -562,265 +562,9 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         String::new()
     };
 
-    let line = if let Some(build_progress) = crate::build::read_build_progress() {
-        let spinner = super::activity_indicator(elapsed, 12.5);
-        Line::from(vec![
-            Span::styled(spinner, Style::default().fg(rgb(255, 193, 7))),
-            Span::styled(
-                format!(" {}", build_progress),
-                Style::default().fg(rgb(255, 193, 7)),
-            ),
-        ])
-    } else if let Some(remaining) = app.rate_limit_remaining() {
-        let secs = remaining.as_secs();
-        let spinner = super::activity_indicator(elapsed, 4.0);
-        let time_str = if secs >= 3600 {
-            let hours = secs / 3600;
-            let mins = (secs % 3600) / 60;
-            format!("{}h {}m", hours, mins)
-        } else if secs >= 60 {
-            let mins = secs / 60;
-            let s = secs % 60;
-            format!("{}m {}s", mins, s)
-        } else {
-            format!("{}s", secs)
-        };
-        Line::from(vec![
-            Span::styled(spinner, Style::default().fg(rgb(255, 193, 7))),
-            Span::styled(
-                format!(
-                    " Rate limited. Auto-retry in {}...{}",
-                    time_str, queued_suffix
-                ),
-                Style::default().fg(rgb(255, 193, 7)),
-            ),
-        ])
-    } else if app.is_processing() {
-        let spinner = super::activity_indicator(elapsed, 12.5);
-
-        match app.status() {
-            ProcessingStatus::Idle => Line::from(""),
-            ProcessingStatus::Sending => {
-                let mut spans = vec![
-                    Span::styled(spinner, Style::default().fg(ai_color())),
-                    Span::styled(
-                        format!(" sending… {}", format_elapsed(elapsed)),
-                        Style::default().fg(dim_color()),
-                    ),
-                ];
-                push_queued_suffix(&mut spans, &queued_suffix);
-                Line::from(spans)
-            }
-            ProcessingStatus::Connecting(ref phase) => {
-                let mut label = format!(
-                    " {}… {}",
-                    connection_phase_label(phase),
-                    format_elapsed(elapsed)
-                );
-                append_transport_context(&mut label, app);
-                let label_color = match phase {
-                    crate::message::ConnectionPhase::Retrying { .. } => rgb(255, 193, 7),
-                    crate::message::ConnectionPhase::Authenticating if elapsed > 10.0 => {
-                        rgb(255, 193, 7)
-                    }
-                    crate::message::ConnectionPhase::Connecting if elapsed > 10.0 => {
-                        rgb(255, 193, 7)
-                    }
-                    _ => dim_color(),
-                };
-                let mut spans = vec![
-                    Span::styled(spinner, Style::default().fg(ai_color())),
-                    Span::styled(label, Style::default().fg(label_color)),
-                ];
-                push_queued_suffix(&mut spans, &queued_suffix);
-                Line::from(spans)
-            }
-            ProcessingStatus::Thinking(_start) => {
-                let mut label = format!(" thinking… {}", format_elapsed(elapsed));
-                append_transport_context(&mut label, app);
-                let mut spans = vec![
-                    Span::styled(spinner, Style::default().fg(ai_color())),
-                    Span::styled(label, Style::default().fg(dim_color())),
-                ];
-                push_queued_suffix(&mut spans, &queued_suffix);
-                Line::from(spans)
-            }
-            ProcessingStatus::Streaming => {
-                let time_str = format_elapsed(elapsed);
-                let (input_tokens, output_tokens) = app.streaming_tokens();
-                let stream_message_ended = app.stream_message_ended();
-                let mut status_text =
-                    streaming_liveness_label(time_str, stale_secs, stream_message_ended);
-                if let Some(tps) = app.output_tps() {
-                    status_text = format!("{} · {:.1} tps", status_text, tps);
-                }
-                if input_tokens > 0 || output_tokens > 0 {
-                    status_text = format!(
-                        "{} · ↑{} ↓{}",
-                        status_text,
-                        format_stream_tokens(input_tokens),
-                        format_stream_tokens(output_tokens)
-                    );
-                }
-                append_transport_context(&mut status_text, app);
-                if let Some(problem) = kv_cache_problem {
-                    let miss_tokens = problem.affected_tokens.unwrap_or(0);
-                    let miss_str = if miss_tokens >= 1000 {
-                        format!("{}k", miss_tokens / 1000)
-                    } else if miss_tokens > 0 {
-                        format!("{}", miss_tokens)
-                    } else {
-                        "kv".to_string()
-                    };
-                    status_text = format!("⚠ {} cache miss · {}", miss_str, status_text);
-                }
-                let spans = streaming_status_spans(
-                    spinner,
-                    status_text,
-                    stream_message_ended,
-                    kv_cache_problem.is_some(),
-                    &queued_suffix,
-                );
-                Line::from(spans)
-            }
-            ProcessingStatus::WaitingForNetwork { listener } => {
-                let mut spans = vec![
-                    Span::styled("↻ ", Style::default().fg(rgb(255, 193, 7))),
-                    Span::styled(
-                        format!(
-                            "network disconnected, waiting to retry · {} · {}",
-                            listener,
-                            format_elapsed(elapsed)
-                        ),
-                        Style::default().fg(rgb(255, 193, 7)),
-                    ),
-                ];
-                push_queued_suffix(&mut spans, &queued_suffix);
-                Line::from(spans)
-            }
-            ProcessingStatus::RunningTool(ref name) => {
-                let half_width = 3;
-                let decorative = crate::perf::tui_policy().enable_decorative_animations;
-                // When decorative animations are disabled we still nudge the bar
-                // forward at a slow "liveness" rate so a long-running tool (e.g.
-                // bash) reads as alive instead of frozen.
-                let bar_speed = if decorative {
-                    2.0
-                } else {
-                    jcode_tui_style::theme::LIVENESS_INDICATOR_FPS / half_width as f32
-                };
-                let progress = elapsed * bar_speed % 1.0;
-                let filled_pos = ((progress * half_width as f32) as usize) % half_width;
-                let left_bar: String = (0..half_width)
-                    .map(|i| if i == filled_pos { '●' } else { '·' })
-                    .collect();
-                let right_bar: String = (0..half_width)
-                    .map(|i| {
-                        if i == (half_width - 1 - filled_pos) {
-                            '●'
-                        } else {
-                            '·'
-                        }
-                    })
-                    .collect();
-
-                let anim_color = animated_tool_color(elapsed);
-                let batch_prog = app.batch_progress();
-                let is_batch = name == "batch";
-                // For batch: compute initial total from the streaming tool call input
-                let batch_total_initial = if is_batch {
-                    app.streaming_tool_calls()
-                        .last()
-                        .and_then(|tc| tc.input.get("tool_calls"))
-                        .and_then(|v| v.as_array())
-                        .map(|a| a.len())
-                } else {
-                    None
-                };
-                let tool_detail = if is_batch {
-                    None // batch always uses progress display
-                } else {
-                    app.streaming_tool_calls()
-                        .last()
-                        .map(get_tool_summary)
-                        .filter(|s| !s.is_empty())
-                };
-                let experimental_notice = app.active_experimental_feature_notice();
-                let subagent = app.subagent_status();
-
-                let mut spans = vec![
-                    Span::styled(left_bar, Style::default().fg(anim_color)),
-                    Span::styled(" ", Style::default()),
-                    Span::styled(name.to_string(), Style::default().fg(anim_color).bold()),
-                    Span::styled(" ", Style::default()),
-                    Span::styled(right_bar, Style::default().fg(anim_color)),
-                ];
-
-                // For batch tool: show "completed/total · last_tool" progress
-                if is_batch {
-                    append_batch_progress_spans(
-                        &mut spans,
-                        anim_color,
-                        batch_prog,
-                        batch_total_initial,
-                    );
-                } else if let Some(detail) = tool_detail {
-                    spans.push(Span::styled(
-                        format!(" · {}", detail),
-                        Style::default().fg(dim_color()),
-                    ));
-                }
-
-                if let Some(notice) = experimental_notice {
-                    spans.push(Span::styled(
-                        format!(" · ⚠ {}", notice),
-                        Style::default().fg(rgb(255, 193, 7)).bold(),
-                    ));
-                }
-
-                if let Some(status) = subagent {
-                    spans.push(Span::styled(
-                        format!(" ({})", status),
-                        Style::default().fg(dim_color()),
-                    ));
-                }
-                for label in transport_context_labels(app) {
-                    spans.push(Span::styled(
-                        format!(" · {}", label),
-                        Style::default().fg(dim_color()),
-                    ));
-                }
-                spans.push(Span::styled(
-                    format!(" · {}", format_elapsed(elapsed)),
-                    Style::default().fg(dim_color()),
-                ));
-
-                if let Some(problem) = kv_cache_problem {
-                    let miss_tokens = problem.affected_tokens.unwrap_or(0);
-                    let miss_str = if miss_tokens >= 1000 {
-                        format!("{}k", miss_tokens / 1000)
-                    } else if miss_tokens > 0 {
-                        format!("{}", miss_tokens)
-                    } else {
-                        "kv".to_string()
-                    };
-                    spans.push(Span::styled(
-                        format!(" · ⚠ {} cache miss", miss_str),
-                        Style::default().fg(rgb(255, 193, 7)),
-                    ));
-                }
-
-                spans.push(Span::styled(
-                    " · Alt+B bg",
-                    Style::default().fg(rgb(100, 100, 100)),
-                ));
-
-                push_queued_suffix(&mut spans, &queued_suffix);
-                Line::from(spans)
-            }
-        }
-    } else {
-        // Persistent status line when idle (Layer 1 built-in)
+    // Build the "always visible" status prefix: mode + model + provider + context + tokens.
+    // This is prepended to the processing status so it never disappears.
+    fn status_base_prefix(app: &dyn TuiState) -> Vec<Span<'static>> {
         let mode_str = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
         let mode_icon = match mode_str {
             "bypass-permissions" => "⊘",
@@ -832,52 +576,161 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         };
         let model = app.provider_model();
         let provider = app.provider_name();
-
         let ctx_pct = app.context_limit().and_then(|limit| {
             let info = app.context_info();
             let estimated = info.estimated_tokens();
-            if limit > 0 {
-                Some((estimated as f64 / limit as f64 * 100.0) as u8)
-            } else {
-                None
-            }
+            if limit > 0 { Some((estimated as f64 / limit as f64 * 100.0) as u8) } else { None }
         });
-
         let (tokens_in, tokens_out) = app.total_session_tokens().unwrap_or((0, 0));
 
         let mut spans = vec![
             Span::styled(mode_icon, Style::default()),
             Span::styled(" ", Style::default()),
             Span::styled(model, Style::default().fg(dim_color())),
+            Span::styled(format!(" · {}", provider), Style::default().fg(dim_color())),
         ];
-
-        spans.push(Span::styled(
-            format!(" · {}", provider),
-            Style::default().fg(dim_color()),
-        ));
-
         if let Some(pct) = ctx_pct {
-            let ctx_color = if pct > 90 {
-                rgb(255, 100, 100)
-            } else if pct > 70 {
-                rgb(255, 193, 7)
-            } else {
-                dim_color()
-            };
-            spans.push(Span::styled(
-                format!(" · {}%", pct),
-                Style::default().fg(ctx_color),
-            ));
+            let ctx_color = if pct > 90 { rgb(255, 100, 100) }
+                else if pct > 70 { rgb(255, 193, 7) }
+                else { dim_color() };
+            spans.push(Span::styled(format!(" · {}%", pct), Style::default().fg(ctx_color)));
         }
-
         spans.push(Span::styled(
             format!(" · ↑{} ↓{}", format_stream_tokens(tokens_in), format_stream_tokens(tokens_out)),
             Style::default().fg(dim_color()),
         ));
+        spans
+    }
 
-        Line::from(spans)
+    // Always render the base status prefix, then append the dynamic status (if any).
+    let mut base_spans = status_base_prefix(app);
+
+    // Append dynamic status suffix (processing, rate-limit, build, or nothing).
+    let status_suffix: Vec<Span<'static>> = if let Some(build_progress) = crate::build::read_build_progress() {
+        let spinner = super::activity_indicator(elapsed, 12.5);
+        vec![
+            Span::styled(" ", Style::default()),
+            Span::styled(spinner, Style::default().fg(rgb(255, 193, 7))),
+            Span::styled(format!(" {}", build_progress), Style::default().fg(rgb(255, 193, 7))),
+        ]
+    } else if let Some(remaining) = app.rate_limit_remaining() {
+        let secs = remaining.as_secs();
+        let spinner = super::activity_indicator(elapsed, 4.0);
+        let time_str = if secs >= 3600 {
+            format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+        } else if secs >= 60 {
+            format!("{}m {}s", secs / 60, secs % 60)
+        } else {
+            format!("{}s", secs)
+        };
+        vec![
+            Span::styled(" ", Style::default()),
+            Span::styled(spinner, Style::default().fg(rgb(255, 193, 7))),
+            Span::styled(format!(" Rate limited · retry in {}…{}", time_str, queued_suffix), Style::default().fg(rgb(255, 193, 7))),
+        ]
+    } else if app.is_processing() {
+        let spinner = super::activity_indicator(elapsed, 12.5);
+        let suffix = match app.status() {
+            ProcessingStatus::Idle => vec![],
+            ProcessingStatus::Sending => vec![
+                Span::styled(" ", Style::default()),
+                Span::styled(spinner, Style::default().fg(ai_color())),
+                Span::styled(format!(" sending… {}", format_elapsed(elapsed)), Style::default().fg(dim_color())),
+            ],
+            ProcessingStatus::Connecting(ref phase) => {
+                let mut label = format!(" {}… {}", connection_phase_label(phase), format_elapsed(elapsed));
+                append_transport_context(&mut label, app);
+                let label_color = match phase {
+                    crate::message::ConnectionPhase::Retrying { .. } => rgb(255, 193, 7),
+                    crate::message::ConnectionPhase::Authenticating if elapsed > 10.0 => rgb(255, 193, 7),
+                    crate::message::ConnectionPhase::Connecting if elapsed > 10.0 => rgb(255, 193, 7),
+                    _ => dim_color(),
+                };
+                vec![
+                    Span::styled(" ", Style::default()),
+                    Span::styled(spinner, Style::default().fg(ai_color())),
+                    Span::styled(label, Style::default().fg(label_color)),
+                ]
+            }
+            ProcessingStatus::Thinking(_start) => {
+                let mut label = format!(" thinking… {}", format_elapsed(elapsed));
+                append_transport_context(&mut label, app);
+                vec![
+                    Span::styled(" ", Style::default()),
+                    Span::styled(spinner, Style::default().fg(ai_color())),
+                    Span::styled(label, Style::default().fg(dim_color())),
+                ]
+            }
+            ProcessingStatus::Streaming => {
+                let time_str = format_elapsed(elapsed);
+                let (input_tokens, output_tokens) = app.streaming_tokens();
+                let stream_message_ended = app.stream_message_ended();
+                let mut status_text = streaming_liveness_label(time_str, stale_secs, stream_message_ended);
+                if let Some(tps) = app.output_tps() {
+                    status_text = format!("{} · {:.1} tps", status_text, tps);
+                }
+                if input_tokens > 0 || output_tokens > 0 {
+                    status_text = format!("{} · ↑{} ↓{}", status_text, format_stream_tokens(input_tokens), format_stream_tokens(output_tokens));
+                }
+                append_transport_context(&mut status_text, app);
+                if let Some(problem) = kv_cache_problem {
+                    let miss_str = if problem.affected_tokens.unwrap_or(0) >= 1000 {
+                        format!("{}k", problem.affected_tokens.unwrap_or(0) / 1000)
+                    } else if problem.affected_tokens.unwrap_or(0) > 0 {
+                        format!("{}", problem.affected_tokens.unwrap_or(0))
+                    } else { "kv".to_string() };
+                    status_text = format!("⚠ {} cache miss · {}", miss_str, status_text);
+                }
+                streaming_status_spans(spinner, status_text, stream_message_ended, kv_cache_problem.is_some(), &queued_suffix)
+            }
+            ProcessingStatus::WaitingForNetwork { listener } => vec![
+                Span::styled(" ↻", Style::default().fg(rgb(255, 193, 7))),
+                Span::styled(format!(" network disconnected, waiting to retry · {} · {}", listener, format_elapsed(elapsed)), Style::default().fg(rgb(255, 193, 7))),
+            ],
+            ProcessingStatus::RunningTool(ref name) => {
+                let mut s = vec![
+                    Span::styled(" ", Style::default()),
+                    Span::styled(name.to_string(), Style::default().fg(animated_tool_color(elapsed)).bold()),
+                ];
+                let batch_prog = app.batch_progress();
+                let is_batch = name == "batch";
+                if is_batch {
+                    let batch_total_initial = app.streaming_tool_calls().last()
+                        .and_then(|tc| tc.input.get("tool_calls"))
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.len());
+                    append_batch_progress_spans(&mut s, animated_tool_color(elapsed), batch_prog, batch_total_initial);
+                }
+                if let Some(detail) = app.streaming_tool_calls().last().map(|tc| get_tool_summary(tc)).filter(|s| !s.is_empty()) {
+                    s.push(Span::styled(format!(" · {}", detail), Style::default().fg(dim_color())));
+                }
+                if let Some(notice) = app.active_experimental_feature_notice() {
+                    s.push(Span::styled(format!(" · ⚠ {}", notice), Style::default().fg(rgb(255, 193, 7)).bold()));
+                }
+                if let Some(status) = app.subagent_status() {
+                    s.push(Span::styled(format!(" ({})", status), Style::default().fg(dim_color())));
+                }
+                for label in transport_context_labels(app) {
+                    s.push(Span::styled(format!(" · {}", label), Style::default().fg(dim_color())));
+                }
+                s.push(Span::styled(format!(" · {}", format_elapsed(elapsed)), Style::default().fg(dim_color())));
+                if let Some(problem) = kv_cache_problem {
+                    let miss_str = if problem.affected_tokens.unwrap_or(0) >= 1000 {
+                        format!("{}k", problem.affected_tokens.unwrap_or(0) / 1000)
+                    } else { format!("{}", problem.affected_tokens.unwrap_or(0)) };
+                    s.push(Span::styled(format!(" · ⚠ {} cache miss", miss_str), Style::default().fg(rgb(255, 193, 7))));
+                }
+                push_queued_suffix(&mut s, &queued_suffix);
+                s
+            }
+        };
+        suffix
+    } else {
+        vec![]
     };
 
+    base_spans.extend(status_suffix);
+    let line = Line::from(base_spans);
     crate::memory::check_staleness();
 
     let aligned_line = if app.centered_mode() {
