@@ -933,6 +933,10 @@ impl TuiState for BenchState {
         None
     }
 
+    fn running_items(&self) -> jcode::tui::RunningItemsState {
+        jcode::tui::RunningItemsState::default()
+    }
+
     fn time_since_activity(&self) -> Option<Duration> {
         None
     }

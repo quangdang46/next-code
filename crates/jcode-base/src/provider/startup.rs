@@ -328,8 +328,22 @@ impl MultiProvider {
 
         result.spawn_anthropic_catalog_refresh_if_needed();
         result.spawn_openai_catalog_refresh_if_needed();
+
+        // Re-apply config's default_model after catalog refresh so model names
+        // discovered via live routes are available. The initial apply at line 316
+        // may fail if the catalog hasn't loaded yet.
+        if let Some(model) = provider_state.default_model() {
+            if let Err(e) =
+                result.set_config_default_model(model, provider_state.default_provider_key())
+            {
+                crate::logging::warn(&format!(
+                    "Failed to re-apply default_model '{}' after catalog refresh: {}",
+                    model, e
+                ));
+            }
+        }
+
         result.auto_select_active_multi_account();
-        crate::logging::info(&format!(
             "[TIMING] provider_init: claude={}, anthropic={}, openai={}, copilot={}, antigravity={}, gemini={}, cursor={}, bedrock={}, openrouter={}, total={}ms",
             result
                 .claude

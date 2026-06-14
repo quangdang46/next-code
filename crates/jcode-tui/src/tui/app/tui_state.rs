@@ -633,6 +633,82 @@ impl crate::tui::TuiState for App {
         self.batch_progress.clone()
     }
 
+    fn running_items(&self) -> crate::tui::RunningItemsState {
+        let mut items: Vec<crate::tui::RunningItem> = Vec::new();
+        let now = std::time::Instant::now();
+
+        // 1. Batch subcalls (running tools from batch progress)
+        if let Some(bp) = &self.batch_progress {
+            for sub in &bp.running {
+                items.push(crate::tui::RunningItem {
+                    kind: crate::tui::RunningItemKind::BatchSubcall,
+                    id: sub.id.clone(),
+                    label: format!("{} {}", sub.name, sub.args_to_str()),
+                    status: crate::tui::RunningItemStatus::Running,
+                    detail: None,
+                    elapsed: None,
+                    session_id: Some(bp.session_id.clone()),
+                });
+            }
+        }
+
+        // 2. Background tasks
+        let bg = crate::background::global();
+        let (running_count, running_tasks, _progress) = bg.running_snapshot();
+        for task_name in &running_tasks {
+            items.push(crate::tui::RunningItem {
+                kind: crate::tui::RunningItemKind::BackgroundTask,
+                id: task_name.clone(),
+                label: task_name.clone(),
+                status: crate::tui::RunningItemStatus::Running,
+                detail: None,
+                elapsed: None,
+                session_id: None,
+            });
+        }
+
+        // 3. Subagent status
+        if let Some(status) = &self.subagent_status {
+            items.push(crate::tui::RunningItem {
+                kind: crate::tui::RunningItemKind::Subagent,
+                id: "subagent".to_string(),
+                label: "subagent".to_string(),
+                status: crate::tui::RunningItemStatus::Running,
+                detail: Some(status.clone()),
+                elapsed: self.processing_started.map(|t| t.elapsed()),
+                session_id: Some(self.session.id.clone()),
+            });
+        }
+        for member in &self.remote_swarm_members {
+            let status = match member.status.as_str() {
+                "running" | "processing" => crate::tui::RunningItemStatus::Running,
+                "completed" | "done" | "ok" => crate::tui::RunningItemStatus::Completed,
+                "failed" | "error" => crate::tui::RunningItemStatus::Failed,
+                "stopped" | "cancelled" => crate::tui::RunningItemStatus::Stopped,
+                _ => crate::tui::RunningItemStatus::Running,
+            };
+            items.push(crate::tui::RunningItem {
+                kind: crate::tui::RunningItemKind::SwarmMember,
+                id: member.session_id.clone(),
+                label: member.friendly_name.clone().unwrap_or_default(),
+                status,
+                detail: member.detail.clone(),
+                elapsed: member.status_age_secs.map(|s| std::time::Duration::from_secs(s)),
+                session_id: Some(member.session_id.clone()),
+            });
+        }
+
+        // Cap selected index
+        let selected = self.running_items_state.selected.min(items.len().saturating_sub(1));
+
+        crate::tui::RunningItemsState {
+            visible: self.running_items_state.visible,
+            items,
+            selected,
+            detail: self.running_items_state.detail.clone(),
+        }
+    }
+
     fn time_since_activity(&self) -> Option<std::time::Duration> {
         if let Some(last_activity) = self.last_stream_activity {
             return Some(last_activity.elapsed());

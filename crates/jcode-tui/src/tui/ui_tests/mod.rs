@@ -247,6 +247,9 @@ impl crate::tui::TuiState for TestState {
     fn batch_progress(&self) -> Option<crate::bus::BatchProgress> {
         self.batch_progress.clone()
     }
+    fn running_items(&self) -> crate::tui::RunningItemsState {
+        crate::tui::RunningItemsState::default()
+    }
     fn time_since_activity(&self) -> Option<Duration> {
         self.time_since_activity
     }

@@ -577,6 +577,7 @@ impl App {
             last_overnight_card_refresh: None,
             status_line_config: config().status_line.clone(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
+            running_items_state: Default::default(),
         };
 
         for notice in app.provider.drain_startup_notices() {
@@ -971,6 +972,7 @@ impl App {
             last_overnight_card_refresh: None,
             status_line_config: config().status_line.clone(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
+            running_items_state: Default::default(),
         };
 
         for notice in app.provider.drain_startup_notices() {

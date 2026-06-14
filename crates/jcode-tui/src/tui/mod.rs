@@ -245,6 +245,8 @@ pub trait TuiState {
     fn subagent_status(&self) -> Option<String>;
     /// Progress of a currently-running batch tool call.
     fn batch_progress(&self) -> Option<crate::bus::BatchProgress>;
+    /// Running items state (tools, subagents, background tasks) for the interactive list.
+    fn running_items(&self) -> RunningItemsState;
     fn time_since_activity(&self) -> Option<Duration>;
     /// Whether the client terminal currently has focus. Decorative animations and
     /// periodic idle redraws pause while unfocused so backgrounded windows/tabs do
@@ -998,6 +1000,57 @@ pub struct InlineInteractiveState {
     pub filter: String,
     /// Preview mode: picker is visible but input stays in main text box
     pub preview: bool,
+}
+
+/// Interactive list of running tools, subagents, and background tasks
+/// shown below the status bar, navigable with arrow keys (Claude Code style).
+#[derive(Debug, Clone, Default)]
+pub struct RunningItemsState {
+    /// Whether the running items list is currently visible.
+    pub visible: bool,
+    /// All items currently in the list.
+    pub items: Vec<RunningItem>,
+    /// Index into `items` for keyboard navigation.
+    pub selected: usize,
+    /// Detail overlay: show output for the selected item.
+    pub detail: Option<String>,
+}
+
+/// A single entry in the running items list.
+#[derive(Debug, Clone)]
+pub struct RunningItem {
+    /// Item kind for icon/color selection.
+    pub kind: RunningItemKind,
+    /// Unique identifier (tool_call_id, session_id, task_id).
+    pub id: String,
+    /// Display label (tool name, subagent name, etc.).
+    pub label: String,
+    /// Current status.
+    pub status: RunningItemStatus,
+    /// Optional detail text.
+    pub detail: Option<String>,
+    /// Elapsed time since started.
+    pub elapsed: Option<std::time::Duration>,
+    /// Session ID if this is a subagent/swarm member.
+    pub session_id: Option<String>,
+}
+
+/// Kind of running item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunningItemKind {
+    BatchSubcall,
+    BackgroundTask,
+    Subagent,
+    SwarmMember,
+}
+
+/// Status of a running item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunningItemStatus {
+    Running,
+    Completed,
+    Failed,
+    Stopped,
 }
 
 impl InlineInteractiveState {
