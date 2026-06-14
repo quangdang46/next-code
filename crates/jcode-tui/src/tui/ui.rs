@@ -2794,6 +2794,16 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         super::ui_running_items::draw_running_items(frame, app, chunks[8]);
     }
     // Donut animation
+    // Running item detail overlay (when Enter pressed on an item)
+    if items_state.detail.is_some() && running_items_height > 0 {
+        let detail_area = Rect {
+            x: chat_area.x + 2,
+            y: chunks[8].y,
+            width: chat_area.width.saturating_sub(4).max(20),
+            height: chunks[8].height.saturating_add(6).min(chat_area.height.saturating_sub(chunks[8].y)),
+        };
+        super::ui_running_items::draw_running_item_detail(frame, app, detail_area);
+    }
     if donut_height > 0 {
         animations::draw_idle_animation(frame, app, chunks[9]);
     }

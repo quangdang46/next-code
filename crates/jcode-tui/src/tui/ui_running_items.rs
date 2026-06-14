@@ -1,4 +1,4 @@
-use super::{RunningItem, RunningItemStatus};
+use super::{RunningItem, RunningItemKind, RunningItemStatus};
 use crate::tui::color_support::rgb;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
@@ -109,6 +109,127 @@ pub(super) fn draw_running_items(
 
     let list = Paragraph::new(lines);
     frame.render_widget(list, area);
+}
+
+/// Draw a detail overlay for the selected running item.
+pub(super) fn draw_running_item_detail(
+    frame: &mut Frame,
+    app: &dyn super::TuiState,
+    area: Rect,
+) {
+    let items_state = app.running_items();
+    let detail = match &items_state.detail {
+        Some(d) => d,
+        None => return,
+    };
+    if area.width < 20 || area.height < 3 {
+        return;
+    }
+
+    let selected = items_state.selected;
+    let item = match items_state.items.get(selected) {
+        Some(i) => i,
+        None => return,
+    };
+
+    // Build detail content
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    let (icon, icon_color) = item_icon_and_color(item);
+
+    // Title line: icon + label
+    lines.push(Line::from(vec![
+        Span::styled(format!("{} ", icon), Style::default().fg(icon_color)),
+        Span::styled(
+            item.label.clone(),
+            Style::default().fg(rgb(220, 220, 230)).bold(),
+        ),
+    ]));
+
+    // Status line
+    let status_label = match item.status {
+        RunningItemStatus::Running => "running",
+        RunningItemStatus::Completed => "completed",
+        RunningItemStatus::Failed => "failed",
+        RunningItemStatus::Stopped => "stopped",
+    };
+    lines.push(Line::from(Span::styled(
+        format!("  status: {}", status_label),
+        Style::default().fg(rgb(140, 140, 150)),
+    )));
+
+    // Kind line
+    let kind_label = match item.kind {
+        RunningItemKind::BatchSubcall => "batch tool",
+        RunningItemKind::BackgroundTask => "background task",
+        RunningItemKind::Subagent => "subagent",
+        RunningItemKind::SwarmMember => "swarm member",
+    };
+    lines.push(Line::from(Span::styled(
+        format!("  kind: {}", kind_label),
+        Style::default().fg(rgb(140, 140, 150)),
+    )));
+
+    // ID line
+    if !item.id.is_empty() {
+        lines.push(Line::from(Span::styled(
+            format!("  id: {}", item.id),
+            Style::default().fg(rgb(120, 120, 130)),
+        )));
+    }
+
+    // Session ID
+    if let Some(sid) = &item.session_id {
+        lines.push(Line::from(Span::styled(
+            format!("  session: {}", sid),
+            Style::default().fg(rgb(120, 120, 130)),
+        )));
+    }
+
+    // Elapsed time
+    if let Some(elapsed) = item.elapsed {
+        lines.push(Line::from(Span::styled(
+            format!("  elapsed: {}", format_elapsed(elapsed)),
+            Style::default().fg(rgb(120, 120, 130)),
+        )));
+    }
+
+    // Separator
+    lines.push(Line::from(Span::styled(
+        "  ─────────────────",
+        Style::default().fg(rgb(60, 65, 75)),
+    )));
+
+    // Detail text
+    for line in detail.lines() {
+        lines.push(Line::from(Span::styled(
+            format!("  {}", line),
+            Style::default().fg(rgb(200, 200, 210)),
+        )));
+    }
+
+    // Hint
+    lines.push(Line::from(Span::styled(
+        "",
+        Style::default(),
+    )));
+    lines.push(Line::from(Span::styled(
+        "  Esc to close",
+        Style::default().fg(rgb(80, 80, 90)),
+    )));
+
+    let block = ratatui::widgets::Block::default()
+        .borders(ratatui::widgets::Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(rgb(70, 70, 80)))
+        .title(" Item Detail ")
+        .title_alignment(ratatui::layout::Alignment::Center);
+
+    let inner = block.inner(area);
+    frame.render_widget(ratatui::widgets::Clear, area);
+    frame.render_widget(block, area);
+
+    let para = Paragraph::new(lines);
+    frame.render_widget(para, inner);
 }
 
 fn item_icon_and_color(item: &RunningItem) -> (&'static str, Color) {
