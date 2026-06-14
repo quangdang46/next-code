@@ -652,51 +652,46 @@ pub(super) fn draw_permission_dialog_overlay(
     area: Rect,
     app: &dyn crate::tui::TuiState,
 ) {
-    // Draw a centered popup dialog (Claude Code style), not a full-screen modal.
-    let popup_w = area.width.min(80);
-    let popup_h = 10u16.min(area.height / 2);
-    let x = area.x + (area.width.saturating_sub(popup_w)) / 2;
-    let y = area.y + (area.height.saturating_sub(popup_h)) / 2;
-    let dialog_area = Rect::new(x, y, popup_w, popup_h);
+    let dialog_w = area.width.min(84);
+    let dialog_x = area.x + (area.width.saturating_sub(dialog_w)) / 2;
+    let dialog_area = Rect::new(dialog_x, area.y + 1, dialog_w, 8);
 
-    let title_style = Style::default().fg(accent_color()).add_modifier(Modifier::BOLD);
-    let text_style = Style::default().fg(rgb(210, 210, 220));
-    let dim_style = Style::default().fg(dim_color());
-    let warn_style = Style::default().fg(rgb(235, 190, 105));
-    let highlight_bg = Style::default().fg(rgb(20, 22, 26)).bg(accent_color());
+    let dim = Style::default().fg(rgb(100, 100, 110));
+    let warn = Style::default().fg(rgb(235, 190, 105));
+    let bold = Style::default().add_modifier(Modifier::BOLD);
+    let hlbg = Style::default().fg(rgb(20, 22, 26)).bg(accent_color());
 
     let tool = app.pending_permission_tool().unwrap_or("unknown");
     let reason = app.pending_permission_reason().unwrap_or("");
     let sel = app.pending_permission_selected().unwrap_or(0);
 
-    let mut lines: Vec<Line<'static>> = Vec::new();
-    lines.push(Line::from(Span::styled("  \u{26a0} Permission Required", warn_style.add_modifier(Modifier::BOLD))));
-    lines.push(Line::from(Span::styled(format!("  Tool: {} ({})", tool, reason), dim_style)));
+    // Claude Code-style: top-only rounded border, no left/right/bottom
+    // ╭─ Permission ─────────────────────────╮
+    //   Tool: bash (git status)
+    //   ❯ Approve    ◯ Approve all    ◯ Always allow    ◯ Deny
+    //   ← → navigate  Enter confirm  Esc reject
+    let title = format!(" Permission request: {} ", tool);
+    let iw = dialog_w.saturating_sub(4) as usize;
+    let sep = "─".repeat(iw.saturating_sub(title.chars().count()) / 2);
+    let top = format!("╭{}{}{}╮", sep, title, "─".repeat(iw.saturating_sub(title.chars().count()) - sep.len()));
+
+    let mut lines = vec![Line::from(Span::styled(top, warn))];
+    let r_text = if reason.len() > iw { format!("{}…", &reason[..iw.saturating_sub(1)]) } else { reason.to_string() };
+    lines.push(Line::from(vec![
+        Span::styled(format!("  {}  ", tool), bold),
+        Span::styled(format!("({})", r_text), dim),
+    ]));
     lines.push(Line::from(""));
 
-    let opts = [
-        ("\u{2714}  Approve", "Enter or y"),
-        ("\u{1f513}  Approve all", "Enter or a"),
-        ("\u{1f4be}  Always allow", "Enter or p"),
-        ("\u{2716}  Deny", "Enter or n"),
-    ];
-    for (i, (label, hint)) in opts.iter().enumerate() {
-        let prefix = if i == sel { "\u{276f} " } else { "  " };
-        let line_style = if i == sel { highlight_bg } else { text_style };
-        lines.push(Line::from(vec![
-            Span::styled(format!("{}{}", prefix, label), line_style),
-            Span::styled(format!(" {}", hint), dim_style),
-        ]));
+    let opts = ["\u{2714} Approve", "\u{1f513} Approve all", "\u{1f4be} Always allow", "\u{2716} Deny"];
+    let mut opt_line = Vec::new();
+    for (i, label) in opts.iter().enumerate() {
+        if i == sel { opt_line.push(Span::styled(format!(" ❯{} ", label), hlbg)); }
+        else { opt_line.push(Span::styled(format!("  ◯{} ", label), Style::default().fg(rgb(180, 180, 190)))); }
     }
+    lines.push(Line::from(opt_line));
+    lines.push(Line::from(Span::styled("  \u{2190}\u{2192} navigate  \u{23ce} Enter  Esc reject", dim)));
 
-    lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "  \u{2190}\u{2192} or Tab to navigate  \u{23ce} Enter  Esc to cancel",
-        dim_style,
-    )));
-
-    let paragraph = Paragraph::new(lines)
-        .block(Block::default().borders(Borders::ALL).title(" Permission ").border_style(warn_style))
-        .alignment(Alignment::Left);
-    frame.render_widget(paragraph, dialog_area);
+    let pg = Paragraph::new(lines).block(Block::default().borders(Borders::NONE));
+    frame.render_widget(pg, dialog_area);
 }
