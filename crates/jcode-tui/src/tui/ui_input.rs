@@ -562,20 +562,10 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         String::new()
     };
 
-    // Build the status line with Claude Code format:
-    //   ⏵⏵ bypass permissions on (shift+tab to cycle)
-    // Mode info is always visible, model/provider shown via /statusline.
+    // Build the status line: permission mode info + model/provider/context.
+    // Format: ⏵⏵ bypass permissions on (shift+tab to cycle) │ model │ provider │ X% │ ↑K ↓K
     fn status_line_text(app: &dyn TuiState) -> Vec<Span<'static>> {
         let mode_str = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
-        let perm_label = match mode_str {
-            "bypass-permissions" => "bypass permissions on",
-            "default" => "default",
-            "accept-edits" => "accept edits on",
-            "plan" => "plan on",
-            "auto" => "auto (LLM-classified)",
-            "dont-ask" => "don't ask on",
-            _ => "default",
-        };
         let mode_icon = match mode_str {
             "bypass-permissions" => "⏵⏵",
             "default" => "🔒",
@@ -584,15 +574,46 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             "auto" => "⏵⏵",
             _ => "🔒",
         };
+        let perm_label = match mode_str {
+            "bypass-permissions" => "bypass permissions",
+            "default" => "default",
+            "accept-edits" => "accept edits",
+            "plan" => "plan",
+            "auto" => "auto",
+            "dont-ask" => "don't ask",
+            _ => "default",
+        };
         let mut spans = vec![
             Span::styled("  ", Style::default()),
             Span::styled(mode_icon, Style::default().fg(rgb(200, 200, 210))),
             Span::styled(" ", Style::default()),
             Span::styled(perm_label, Style::default().fg(rgb(200, 200, 210))),
         ];
-        // Append keybinding hint (dimmed) only when not in default mode
         if mode_str != "default" {
-            spans.push(Span::styled(" (shift+tab to cycle)", Style::default().fg(rgb(100, 100, 110))));
+            spans.push(Span::styled(" (shift+tab)", Style::default().fg(rgb(100, 100, 110))));
+        }
+
+        // Model + provider + context separator
+        let sep = || Span::styled(" │ ", Style::default().fg(rgb(100, 100, 110)));
+        let data = app.info_widget_data();
+        let model = data.model.clone().filter(|m| !m.is_empty()).unwrap_or_else(|| app.provider_model());
+        if !model.is_empty() {
+            spans.push(sep());
+            spans.push(Span::styled(model, Style::default().fg(rgb(255, 150, 200)).bold()));
+        }
+        let provider = data.provider_name.clone().filter(|p| !p.is_empty()).unwrap_or_else(|| app.provider_name());
+        if !provider.is_empty() {
+            spans.push(sep());
+            spans.push(Span::styled(provider, Style::default().fg(rgb(140, 180, 255))));
+        }
+        // Context usage
+        if let Some((used, limit)) = overscroll_context_usage(&data) {
+            spans.push(sep());
+            spans.push(Span::styled(
+                format!("{}/{} ", overscroll_format_tokens(used), overscroll_format_tokens(limit)),
+                Style::default().fg(rgb(140, 140, 150)),
+            ));
+            spans.extend(overscroll_context_bar(used, limit, 10));
         }
         spans
     }

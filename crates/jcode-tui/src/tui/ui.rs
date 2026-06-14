@@ -2752,15 +2752,20 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         let sep_w = chunks[4].width as usize;
         if sep_w > 12 {
             let next_prompt = user_count + pending_count + 1;
-            let label = format!(" History {} ", next_prompt);
-            let sep = "─".to_string();
-            let left_len = (sep_w.saturating_sub(label.chars().count())) / 2;
-            let right_len = sep_w.saturating_sub(label.chars().count() + left_len);
+            let total_prompts = app.display_user_message_count() + pending_count;
+            let label = if total_prompts > 0 {
+                format!(" History {}/{} ", next_prompt.min(total_prompts), total_prompts)
+            } else {
+                format!(" History {} ", next_prompt)
+            };
+            let label_w = label.chars().count();
+            let left = (sep_w - label_w) / 2;
+            let right = sep_w - label_w - left;
             let sep_str = format!(
                 "{}{}{}",
-                sep.repeat(left_len),
+                "─".repeat(left),
                 label,
-                sep.repeat(right_len),
+                "─".repeat(right),
             );
             let sep_line = Line::from(Span::styled(sep_str, Style::default().fg(rgb(50, 55, 65))));
             frame.render_widget(Paragraph::new(sep_line), chunks[4]);
