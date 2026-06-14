@@ -618,11 +618,77 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         spans
     }
 
-    // Always render the Claude Code-style status line.
-    let mut base_spans = status_line_text(app);
+    // Layer 3: Custom shell command (Claude Code style).
+    // If status_line.command is configured, run it and use stdout as status line.
+    fn run_custom_command(app: &dyn TuiState) -> Option<String> {
+        let config = app.status_line_config();
+        let command = config.command.as_ref()?;
+        if !config.enabled || command.is_empty() {
+            return None;
+        }
+        // Build JSON input matching Claude Code's StatusLineCommandInput format
+        let data = app.info_widget_data();
+        let (used_tokens, limit) = overscroll_context_usage(&data).unwrap_or((0, 1));
+        let model = data.model.clone().filter(|m| !m.is_empty()).unwrap_or_else(|| app.provider_model());
+        let provider = data.provider_name.clone().filter(|p| !p.is_empty()).unwrap_or_else(|| app.provider_name());
+        let json_input = serde_json::json!({
+            "session_id": "",
+            "cwd": std::env::current_dir().ok().map(|d| d.to_string_lossy().to_string()),
+            "permission_mode": crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode()),
+            "model": {
+                "id": model,
+                "display_name": model,
+            },
+            "workspace": {
+                "current_dir": std::env::current_dir().ok().map(|d| d.to_string_lossy().to_string()),
+            },
+            "context_window": {
+                "used_percentage": if limit > 0 { Some((used_tokens as f64 / limit as f64 * 100.0) as u8) } else { None },
+                "total_input_tokens": used_tokens as u64,
+            },
+            "provider": provider,
+        });
+        let json_str = serde_json::to_string(&json_input).unwrap_or_default();
 
-    // Append processing status suffix (tool name, spinner) when active.
-    let spinner = super::activity_indicator(elapsed, 12.5);
+        // Run command with stdin JSON, capture stdout (like Claude Code's 5s timeout)
+        let mut child = match std::process::Command::new("sh")
+            .arg("-c")
+            .arg(command)
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+        {
+            Ok(c) => c,
+            Err(_) => return None,
+        };
+        // Write JSON to stdin
+        if let Some(ref mut stdin) = child.stdin {
+            use std::io::Write;
+            let _ = stdin.write_all(json_str.as_bytes());
+        }
+        // Wait for output
+        let output = match child.wait_with_output() {
+            Ok(o) => o,
+            Err(_) => return None,
+        };
+        if output.status.success() {
+            let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !text.is_empty() { Some(text) } else { None }
+        } else {
+            None
+        }
+    }
+
+    let mut base_spans = if let Some(custom_text) = run_custom_command(app) {
+        // Layer 3: custom shell command output
+        vec![Span::styled(format!("  {}", custom_text), Style::default().fg(rgb(200, 200, 210)))]
+    } else {
+        status_line_text(app)
+    };
+
+    let spinner = super::activity_indicator(app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0), 12.5);
+
     if app.is_processing() {
         let ai = super::ai_color();
         match app.status_detail() {
