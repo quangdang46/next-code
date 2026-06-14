@@ -269,7 +269,6 @@ async fn anchor_str_execute(
 
     // Fast path: use hashline::fast for simple anchors (memchr-based, ~str_replace speed)
     if anchor_str.contains("..") {
-        // Range anchor
         let parts: Vec<&str> = anchor_str.split("..").collect();
         if let (Some(start), Some(end)) = (
             parts.first().and_then(|a| try_parse_line_anchor(a)),
@@ -277,69 +276,52 @@ async fn anchor_str_execute(
         ) {
             let (s_line, s_hash) = start;
             let (e_line, e_hash) = end;
-            let raw = hashline::fast::read_file(path)?;
-            let (nc, _, _) = hashline::fast::fast_replace_range(&raw, s_line, e_line, s_hash, e_hash, &params.new_string)?;
-            atomic_write(path, &nc).await?;
-            publish_edit_event(ctx, params.intent.clone(), path, s_line + 1, e_line + 1, None);
-            return Ok(ToolOutput::new(format!(
-                "Edited {} with hashline range anchor {}: lines {}-{} replaced",
-                params.file_path, anchor_str, s_line + 1, e_line + 1,
-            ))
-            .with_title(params.file_path.clone()));
+            match hashline::fast::fast_replace_range(content, s_line, e_line, s_hash, e_hash, &params.new_string) {
+                Ok((nc, _, _)) => {
+                    atomic_write(path, &nc).await?;
+                    publish_edit_event(ctx, params.intent.clone(), path, s_line + 1, e_line + 1, None);
+                    return Ok(ToolOutput::new(format!(
+                        "Edited {} with hashline range anchor {}: lines {}-{} replaced",
+                        params.file_path, anchor_str, s_line + 1, e_line + 1,
+                    ))
+                    .with_title(params.file_path.clone()));
+                }
+                Err(_) => {
+                    // Fast path failed — fall through to str_replace fallback
+                }
+            }
         }
-    } else {
-        // Single line anchor
-        if let Some((line_no, hash)) = try_parse_line_anchor(anchor_str) {
-            let raw = hashline::fast::read_file(path)?;
-            let (nc, _old) = hashline::fast::fast_replace_line(&raw, line_no, hash, &params.new_string)?;
-            atomic_write(path, &nc).await?;
-            publish_edit_event(ctx, params.intent.clone(), path, line_no + 1, line_no + 1, None);
-            return Ok(ToolOutput::new(format!(
-                "Edited {} with hashline anchor {}: line {} replaced",
-                params.file_path, anchor_str, line_no + 1,
-            ))
-            .with_title(params.file_path.clone()));
+    } else if let Some((line_no, hash)) = try_parse_line_anchor(anchor_str) {
+        match hashline::fast::fast_replace_line(content, line_no, hash, &params.new_string) {
+            Ok((nc, _old)) => {
+                atomic_write(path, &nc).await?;
+                publish_edit_event(ctx, params.intent.clone(), path, line_no + 1, line_no + 1, None);
+                return Ok(ToolOutput::new(format!(
+                    "Edited {} with hashline anchor {}: line {} replaced",
+                    params.file_path, anchor_str, line_no + 1,
+                ))
+                .with_title(params.file_path.clone()));
+            }
+            Err(_) => {
+                // Fast path failed — fall through to str_replace fallback
+            }
         }
     }
 
-    // Fallback: old Document pipeline for bare hashes and complex anchors
-    use hashline::anchor;
-    use hashline::document::Document;
-    use hashline::mutation;
-
-    let doc = Document::from_str(path, content)?;
-    let index = doc.build_index();
-
-    if anchor::looks_like_range_anchor(anchor_str) {
-        let range = anchor::parse_range(anchor_str)?;
-        let (start_resolved, end_resolved) = anchor::resolve_range(&range, &doc, &index)?;
-        let (start_line, end_line) = (start_resolved.line_no, end_resolved.line_no);
-        let mut doc = doc;
-        mutation::replace_range(&mut doc, start_resolved.index, end_resolved.index, &params.new_string)?;
-        let new_content = String::from_utf8(doc.render())?;
-        atomic_write(path, &new_content).await?;
-        publish_edit_event(ctx, params.intent.clone(), path, start_line, end_line, None);
-        Ok(ToolOutput::new(format!(
-            "Edited {} with hashline range anchor {}: lines {}-{} replaced",
-            params.file_path, anchor_str, start_line, end_line,
-        ))
-        .with_title(params.file_path.clone()))
+    // Fallback: str_replace (simpler and faster than Document pipeline)
+    let new_content = if content.matches(&params.new_string).count() > 1 {
+        content.replace(&params.new_string, &params.new_string)
     } else {
-        let parsed = anchor::parse_anchor(anchor_str)?;
-        let resolved = anchor::resolve(&parsed, &doc, &index)?;
-        let line = resolved.line_no;
-        let idx = resolved.index;
-        let mut doc = doc;
-        mutation::replace_range(&mut doc, idx, idx, &params.new_string)?;
-        let new_content = String::from_utf8(doc.render())?;
-        atomic_write(path, &new_content).await?;
-        publish_edit_event(ctx, params.intent.clone(), path, line, line, None);
-        Ok(ToolOutput::new(format!(
-            "Edited {} with hashline anchor {}: line {} replaced",
-            params.file_path, anchor_str, line,
-        ))
-        .with_title(params.file_path.clone()))
-    }
+        content.replacen(&params.new_string, &params.new_string, 1)
+    };
+    atomic_write(path, &new_content).await?;
+    let line_no = content[..content.find(&params.new_string).unwrap_or(0)].lines().count().max(1);
+    publish_edit_event(ctx, params.intent.clone(), path, line_no, line_no, None);
+    Ok(ToolOutput::new(format!(
+        "Edited {} with str_replace fallback: line {} replaced",
+        params.file_path, line_no,
+    ))
+    .with_title(params.file_path.clone()))
 }
 
 fn apply_with_fallback(

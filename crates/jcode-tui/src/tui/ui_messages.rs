@@ -1797,8 +1797,9 @@ pub(crate) fn render_tool_message(
         row_width,
     );
     let rendered_tool_line_text = super::line_plain_text(&rendered_tool_line);
-    lines.push(rendered_tool_line);
-    // Wrap ALL tool calls in oh-my-pi style framed box with sharp corners ┌──┐
+
+    // Try to create oh-my-pi style framed box ┌──┐ (sharp corners).
+    let mut box_created = false;
     if tc.input.is_object() && !tc.input.as_object().unwrap().is_empty() {
         let canon = tools_ui::canonical_tool_name(&tc.name);
         let box_color = match canon {
@@ -1841,6 +1842,7 @@ pub(crate) fn render_tool_message(
                 else { format!("$ {}", input_val) }
             };
             if !display.is_empty() {
+                // Box replaces the tool name line (avoid duplicate)
                 let box_content = vec![Line::from(Span::styled(display, Style::default().fg(box_color)))];
                 let box_lines = super::render_sharp_box(
                     title, box_content,
@@ -1851,8 +1853,14 @@ pub(crate) fn render_tool_message(
                     let truncated = super::truncate_line_with_ellipsis_to_width(&bl, row_width);
                     lines.push(truncated);
                 }
+                box_created = true;
             }
         }
+    }
+
+    if !box_created {
+        // No box — push the tool name line instead
+        lines.push(rendered_tool_line);
     }
 
     if tc.name == "batch"
