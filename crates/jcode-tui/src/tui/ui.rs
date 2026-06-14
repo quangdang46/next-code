@@ -2756,7 +2756,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     input_ui::draw_input(
         frame,
         app,
-        chunks[6],
+        chunks[5],
         user_count + pending_count + 1,
         &mut debug_capture,
     );
