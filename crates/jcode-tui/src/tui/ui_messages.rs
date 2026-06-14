@@ -9,11 +9,10 @@ use crate::message::{
 pub(super) use cache_support::get_cached_message_lines;
 use cache_support::{centered_wrap_width, left_pad_lines_for_centered_mode};
 use std::borrow::Cow;
-use std::sync::{LazyLock, Mutex};
 use unicode_width::UnicodeWidthStr;
 
-
 const MAX_INLINE_DIFF_LINES: usize = 12;
+
 
 fn prefer_width_stable_system_glyphs() -> bool {
     std::env::var("TERM_PROGRAM")
