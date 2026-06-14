@@ -9,8 +9,8 @@ pub use jcode_config_types::{
     DiffDisplayMode, DisplayConfig, FeatureConfig, GatewayConfig, HooksConfig, KeybindingsConfig,
     MarkdownSpacingMode, NamedProviderAuth, NamedProviderConfig, NamedProviderModelConfig,
     NamedProviderType, NativeScrollbarConfig, PowerConfig, ProviderConfig, ReasoningDisplayMode,
-    SafetyConfig, SessionPickerResumeAction, SwarmSpawnMode, TerminalConfig, UpdateChannel,
-    WebSearchConfig, WebSearchEngine,
+    SafetyConfig, SessionPickerResumeAction, StatusLineConfig, SwarmSpawnMode, TerminalConfig,
+    UpdateChannel, WebSearchConfig, WebSearchEngine,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -477,6 +477,8 @@ pub struct Config {
 
     /// Execution policy engine configuration (per-command rules).
     pub execution_policy: jcode_config_types::ExecutionPolicyConfig,
+    /// Status line display configuration.
+    pub status_line: jcode_config_types::StatusLineConfig,
     /// Tools that are always allowed without prompting (persisted to config).
     pub always_allow_tools: Vec<String>,
 }

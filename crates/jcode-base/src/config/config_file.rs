@@ -341,4 +341,13 @@ impl Config {
         crate::logging::info(&format!("Saved permission mode '{}' to config", mode));
         Ok(())
     }
+
+    /// Persist the status line enabled state to the config file.
+    pub fn set_status_line_enabled(enabled: bool) -> anyhow::Result<()> {
+        let mut config = Self::load();
+        config.status_line.enabled = enabled;
+        config.save()?;
+        crate::logging::info(&format!("Saved status_line.enabled to config: {}", enabled));
+        Ok(())
+    }
 }

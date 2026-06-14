@@ -3089,6 +3089,45 @@ pub(super) fn handle_feedback_command(app: &mut App, trimmed: &str) -> bool {
     true
 }
 
+pub(super) fn handle_statusline_command(app: &mut App, trimmed: &str) -> bool {
+    let Some(rest) = slash_command_rest(trimmed, "/statusline") else {
+        return false;
+    };
+
+    match rest.trim() {
+        "setup" => {
+            app.push_display_message(DisplayMessage::system(
+                "Status line setup: coming soon. Edit ~/.jcode/config.toml [status_line] segments."
+                    .to_string(),
+            ));
+            true
+        }
+        "on" | "enable" => {
+            app.status_line_config.enabled = true;
+            let _ = crate::config::Config::set_status_line_enabled(true);
+            app.set_status_notice("Status line: ON");
+            true
+        }
+        "off" | "disable" => {
+            app.status_line_config.enabled = false;
+            let _ = crate::config::Config::set_status_line_enabled(false);
+            app.set_status_notice("Status line: OFF");
+            true
+        }
+        _ => {
+            let status = if app.status_line_config.enabled {
+                "ON"
+            } else {
+                "OFF"
+            };
+            app.push_display_message(DisplayMessage::system(format!(
+                "Status line: {status}\n/statusline on|off to toggle\n/statusline setup to configure segments"
+            )));
+            true
+        }
+    }
+}
+
 pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
     super::tui_lifecycle_runtime::handle_dev_command(app, trimmed)
 }

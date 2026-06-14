@@ -575,6 +575,7 @@ impl App {
             usage_report_refreshing: false,
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
+            status_line_config: config().status_line.clone(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
         };
 
@@ -968,6 +969,7 @@ impl App {
             usage_report_refreshing: false,
             productivity_refreshing: false,
             last_overnight_card_refresh: None,
+            status_line_config: config().status_line.clone(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
         };
 

@@ -495,6 +495,19 @@ pub trait TuiState {
     fn onboarding_welcome_kind(&self) -> OnboardingWelcomeKind {
         OnboardingWelcomeKind::Suggestions
     }
+    // ---- Status Line ----
+    /// Current permission mode for status line display.
+    fn status_line_permission_mode(&self) -> &str { "default" }
+    /// Current model name for status line.
+    fn status_line_model(&self) -> String { String::new() }
+    /// Current provider name for status line.
+    fn status_line_provider(&self) -> String { String::new() }
+    /// Context usage percentage (0-100).
+    fn status_line_context_pct(&self) -> Option<u8> { None }
+    /// Tokens format in/out for status line.
+    fn status_line_tokens(&self) -> String { String::new() }
+    /// StatusLineConfig for this session.
+    fn status_line_config(&self) -> &jcode_config_types::StatusLineConfig;
     /// Suggestion prompts for new users (shown in initial empty state).
     /// Returns (label, prompt_text) pairs. Empty if user is experienced or not authenticated.
     fn suggestion_prompts(&self) -> Vec<(String, String)>;

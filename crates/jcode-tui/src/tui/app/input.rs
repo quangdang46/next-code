@@ -3036,6 +3036,7 @@ impl App {
             || commands::handle_config_command(self, trimmed)
             || commands::handle_log_command(self, trimmed)
             || commands::handle_diff_command(self, trimmed)
+            || commands::handle_statusline_command(self, trimmed)
             || commands::handle_model_status_command(self, trimmed)
             || super::debug::handle_debug_command(self, trimmed)
             || super::model_context::handle_model_command(self, trimmed)

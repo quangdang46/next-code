@@ -819,45 +819,63 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 Line::from(spans)
             }
         }
-    } else if let Some((total_in, total_out)) = app.total_session_tokens() {
-        let total = total_in + total_out;
-        if let Some(warning) = occasional_session_history_warning(
-            total,
-            app.session_compaction_count(),
-            app.context_limit(),
-            area.width as usize,
-            app.animation_elapsed() as u64,
-        ) {
-            let severe_token_threshold = app
-                .context_limit()
-                .and_then(|limit| u64::try_from(limit).ok())
-                .map(|limit| limit.saturating_mul(3))
-                .unwrap_or(1_000_000);
-            let warning_color =
-                if total >= severe_token_threshold || app.session_compaction_count() >= 3 {
-                    rgb(255, 100, 100)
-                } else {
-                    rgb(255, 193, 7)
-                };
-            Line::from(vec![
-                Span::styled("⚠ ", Style::default().fg(warning_color)),
-                Span::styled(warning, Style::default().fg(warning_color)),
-            ])
-        } else if let Some(tip) =
-            occasional_status_tip(area.width as usize, app.animation_elapsed() as u64)
-        {
-            Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
-        } else {
-            Line::from("")
-        }
     } else {
-        if let Some(tip) =
-            occasional_status_tip(area.width as usize, app.animation_elapsed() as u64)
-        {
-            Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
-        } else {
-            Line::from("")
+        // Persistent status line when idle (Layer 1 built-in)
+        let mode_str = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
+        let mode_icon = match mode_str {
+            "bypass-permissions" => "⊘",
+            "default" => "🔒",
+            "accept-edits" => "✏",
+            "plan" => "📋",
+            "auto" => "🤖",
+            _ => "🔒",
+        };
+        let model = app.provider_model();
+        let provider = app.provider_name();
+
+        let ctx_pct = app.context_limit().and_then(|limit| {
+            let info = app.context_info();
+            let estimated = info.estimated_tokens();
+            if limit > 0 {
+                Some((estimated as f64 / limit as f64 * 100.0) as u8)
+            } else {
+                None
+            }
+        });
+
+        let (tokens_in, tokens_out) = app.total_session_tokens().unwrap_or((0, 0));
+
+        let mut spans = vec![
+            Span::styled(mode_icon, Style::default()),
+            Span::styled(" ", Style::default()),
+            Span::styled(model, Style::default().fg(dim_color())),
+        ];
+
+        spans.push(Span::styled(
+            format!(" · {}", provider),
+            Style::default().fg(dim_color()),
+        ));
+
+        if let Some(pct) = ctx_pct {
+            let ctx_color = if pct > 90 {
+                rgb(255, 100, 100)
+            } else if pct > 70 {
+                rgb(255, 193, 7)
+            } else {
+                dim_color()
+            };
+            spans.push(Span::styled(
+                format!(" · {}%", pct),
+                Style::default().fg(ctx_color),
+            ));
         }
+
+        spans.push(Span::styled(
+            format!(" · ↑{} ↓{}", format_stream_tokens(tokens_in), format_stream_tokens(tokens_out)),
+            Style::default().fg(dim_color()),
+        ));
+
+        Line::from(spans)
     };
 
     crate::memory::check_staleness();

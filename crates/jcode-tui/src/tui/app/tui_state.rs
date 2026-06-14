@@ -1666,4 +1666,40 @@ impl crate::tui::TuiState for App {
             cached_tokens: self.last_turn_input_tokens,
         })
     }
+
+    // ---- Status Line ----
+    fn status_line_permission_mode(&self) -> &str {
+        crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode())
+    }
+
+    fn status_line_model(&self) -> String {
+        self.provider.model()
+    }
+
+    fn status_line_provider(&self) -> String {
+        self.provider.name().to_string()
+    }
+
+    fn status_line_context_pct(&self) -> Option<u8> {
+        let total_session = self.total_session_tokens();
+        let (in_tok, out_tok) = if let Some(ts) = total_session {
+            ts
+        } else {
+            self.streaming_tokens()
+        };
+        let limit = self.context_limit()? as u64;
+        if limit == 0 {
+            return None;
+        }
+        Some(((in_tok.saturating_add(out_tok).saturating_mul(100)) / limit) as u8)
+    }
+
+    fn status_line_tokens(&self) -> String {
+        let (in_tok, out_tok) = self.streaming_tokens();
+        format!("{in_tok}\u{2192}{out_tok}")
+    }
+
+    fn status_line_config(&self) -> &jcode_config_types::StatusLineConfig {
+        &self.status_line_config
+    }
 }

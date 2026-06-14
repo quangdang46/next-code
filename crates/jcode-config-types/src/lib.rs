@@ -1277,6 +1277,35 @@ impl Default for ExecutionPolicyConfig {
     }
 }
 
+/// Status line display configuration.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct StatusLineConfig {
+    /// Whether the status line is enabled (default true).
+    #[serde(default = "default_status_line_enabled")]
+    pub enabled: bool,
+    /// Ordered list of segment names to display.
+    /// Valid values: mode, model, provider, context, tokens, git, dir, cost, session, cache.
+    /// Empty = default order.
+    #[serde(default)]
+    pub segments: Vec<String>,
+    /// Custom shell command for Layer 3 (Claude Code style).
+    /// Receives JSON via stdin. Output is rendered as status line.
+    pub command: Option<String>,
+}
+
+fn default_status_line_enabled() -> bool { true }
+
+impl Default for StatusLineConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            segments: Vec::new(),
+            command: None,
+        }
+    }
+}
+
 /// Configuration for the forked agent system.
 ///
 /// When `enabled = false` (the default), no forks are created regardless of

@@ -21,6 +21,7 @@ path = "src/lib.rs"
 # Application core (server, agent, provider, auth, session, tool, config, ...).
 # Re-exported via `pub use jcode_app_core::*` in lib.rs. default-features=false
 # so this crate (and ultimately the root crate) controls app-core's features.
+jcode-config-types = { path = "../jcode-config-types" }
 jcode-app-core = { path = "../jcode-app-core", default-features = false }
 jcode-keywords = { path = "../jcode-keywords" }
 jcode-memory-types = { path = "../jcode-memory-types" }
