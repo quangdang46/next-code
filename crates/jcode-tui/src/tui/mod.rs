@@ -1004,6 +1004,8 @@ pub enum PickerAction {
     SectionHeader,
     /// Create a new subagent definition file.
     CreateAgent,
+    /// Generate an agent via AI ($EDITOR prompt → model generates → save).
+    GenerateAgent,
     /// Open an existing agent definition file for editing.
     EditAgent { agent_id: String, source_path: String },
     /// Delete an agent definition file.
@@ -1104,6 +1106,7 @@ fn estimate_picker_action_bytes(action: &PickerAction) -> usize {
         | PickerAction::LogoutAll
         | PickerAction::SectionHeader
         | PickerAction::CreateAgent
+        | PickerAction::GenerateAgent
         | PickerAction::EditAgent { .. }
         | PickerAction::DeleteAgent { .. } => 0,
         PickerAction::Account(AccountPickerAction::Switch { provider_id, label }) => {

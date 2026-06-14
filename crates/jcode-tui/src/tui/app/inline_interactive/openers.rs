@@ -94,6 +94,37 @@ impl App {
             is_latest: false,
         });
 
+        // "Generate agent via AI" entry
+        entries.push(PickerEntry {
+            name: "  + Generate via AI".into(),
+            options: vec![PickerOption {
+                provider: "action".into(),
+                api_method: "generate".into(),
+                available: true,
+                detail: "Describe an agent, generate with current model".into(),
+                estimated_reference_cost_micros: None,
+                context_window: None,
+                latency_ms: None,
+                cost_per_million_input: None,
+                cost_per_million_output: None,
+                is_free: false,
+                is_latest: false,
+            }],
+            action: PickerAction::GenerateAgent,
+            selected_option: 0,
+            is_current: false,
+            is_default: false,
+            is_favorite: false,
+            recommended: false,
+            recommendation_rank: usize::MAX,
+            usage_score: 0,
+            old: false,
+            created_date: None,
+            effort: None,
+            is_free: false,
+            is_latest: false,
+        });
+
         // Load agent definitions from disk
         let mut registry = jcode_agent_runtime::AgentRegistry::new();
         let home = dirs::home_dir().map(|h| h.join(".jcode/agents"));
@@ -206,15 +237,13 @@ impl App {
         let model_override_count = models.len();
         entries.extend(models);
         // Build filtered indices: column 0 -> running entries, column 1 -> library entries
-        // Running entries: 1..=running_count (skip section header at index 0)
-        // Library entries: 1+running_count+1..=total (skip Running header + Running items + Library header)
         let running_start = 1; // after "── Running ──" header
         let running_end = running_start + running_count;
         let library_header_idx = running_end; // "── Library ──" header
-        let library_create_idx = library_header_idx + 1; // "+ Create new agent" entry
-        let library_agent_start = library_create_idx + 1;
+        let library_create_idx = library_header_idx + 1; // "+ Create new agent"
+        let library_generate_idx = library_create_idx + 1; // "+ Generate via AI"
+        let library_agent_start = library_generate_idx + 1; // loaded agent files
         let library_agent_end = library_agent_start + library_agent_count;
-        let library_model_start = library_agent_end;
         let library_end = library_agent_end + model_override_count;
 
         let filtered: Vec<usize> = (running_start..running_end).collect();

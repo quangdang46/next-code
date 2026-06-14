@@ -2829,50 +2829,64 @@ impl App {
                     }
                     PickerAction::CreateAgent => {
                         self.inline_interactive_state = None;
-                        // Open $EDITOR with a template TOML file
                         let template = r#"# Agent Definition
-# See https://jcode.dev/docs/agents for all available fields
 id = "my-agent"
 display_name = "My Agent"
-
-# Model selection (optional - inherits from session if unset)
-# model_override = "sonnet"
-# prefer_tier = "quality"
-
-# Tools this agent is allowed to use (empty = no tools)
 tool_names = ["Read", "Grep", "Glob", "Bash"]
-
-# System prompt
 system_prompt = """
 You are a helpful coding assistant.
 """
-
-# Permission mode (optional)
-# permission_mode = "Plan"
-
-# Max turns (optional)
-# max_turns = 20
 "#;
                         let raw = crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
-                        if raw {
-                            let _ = crossterm::terminal::disable_raw_mode();
-                        }
-                        let _ = crossterm::execute!(
-                            std::io::stdout(),
+                        if raw { let _ = crossterm::terminal::disable_raw_mode(); }
+                        let _ = crossterm::execute!(std::io::stdout(),
                             crossterm::terminal::LeaveAlternateScreen,
-                            crossterm::cursor::Show
-                        );
+                            crossterm::cursor::Show);
                         let result = self.run_agent_creation_flow(template);
-                        let _ = crossterm::execute!(
-                            std::io::stdout(),
-                            crossterm::terminal::EnterAlternateScreen
-                        );
-                        if raw {
-                            let _ = crossterm::terminal::enable_raw_mode();
-                        }
+                        let _ = crossterm::execute!(std::io::stdout(),
+                            crossterm::terminal::EnterAlternateScreen);
+                        if raw { let _ = crossterm::terminal::enable_raw_mode(); }
                         match result {
                             Ok(msg) => self.set_status_notice(msg),
                             Err(e) => self.set_status_notice(format!("{}", e)),
+                        }
+                    }
+                    PickerAction::GenerateAgent => {
+                        self.inline_interactive_state = None;
+                        // AI generation: open $EDITOR with prompt template → user describes agent → queue to model
+                        let prompt_template = "# Describe the agent you want me to create for you.
+# Be specific:
+# - What should the agent do? (system prompt / role)
+# - What tools should it use? (Read, Grep, Glob, Bash, Edit, ...)
+# - Any model preference?
+#
+# Example: Create a code reviewer that uses Read, Grep, and Glob to review PRs.
+";
+                        let raw = crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
+                        if raw { let _ = crossterm::terminal::disable_raw_mode(); }
+                        let _ = crossterm::execute!(std::io::stdout(),
+                            crossterm::terminal::LeaveAlternateScreen,
+                            crossterm::cursor::Show);
+                        let description = super::input::edit_text_in_external_editor(prompt_template);
+                        let _ = crossterm::execute!(std::io::stdout(),
+                            crossterm::terminal::EnterAlternateScreen);
+                        if raw { let _ = crossterm::terminal::enable_raw_mode(); }
+                        match description {
+                            Ok(desc) if !desc.trim().is_empty() => {
+                                // Queue to current model
+                                let request = format!(
+                                    r#"Create an agent definition (TOML format) based on this.
+Return ONLY valid TOML with fields: id, display_name, tool_names, system_prompt.
+Optional: model_override, permission_mode, max_turns, color.
+Wrap in ```toml ... ``` code block.
+
+User's request:
+{}
+"#, desc.trim());
+                                self.queued_messages.push(request);
+                                self.set_status_notice("Generating agent via AI... see response above. Save with /agents save");
+                            }
+                            _ => self.set_status_notice("Agent generation canceled"),
                         }
                     }
                     PickerAction::EditAgent { agent_id, source_path } => {

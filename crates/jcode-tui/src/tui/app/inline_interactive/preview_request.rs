@@ -92,6 +92,7 @@ pub(super) fn picker_account_provider_scope(picker: &InlineInteractiveState) -> 
         | PickerAction::AgentModelChoice { .. }
         | PickerAction::SectionHeader
         | PickerAction::CreateAgent
+        | PickerAction::GenerateAgent
         | PickerAction::EditAgent { .. }
         | PickerAction::DeleteAgent { .. } => None,
     })

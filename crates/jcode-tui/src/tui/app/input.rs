@@ -66,7 +66,7 @@ pub(super) fn edit_input_in_external_editor(app: &mut App) {
     }
 }
 
-fn edit_text_in_external_editor(initial_text: &str) -> Result<String> {
+pub(super) fn edit_text_in_external_editor(initial_text: &str) -> Result<String> {
     let mut file = tempfile::Builder::new()
         .prefix("jcode-prompt-")
         .suffix(".md")
