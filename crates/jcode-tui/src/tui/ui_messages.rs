@@ -9,7 +9,36 @@ use crate::message::{
 pub(super) use cache_support::get_cached_message_lines;
 use cache_support::{centered_wrap_width, left_pad_lines_for_centered_mode};
 use std::borrow::Cow;
+use std::sync::{LazyLock, Mutex};
 use unicode_width::UnicodeWidthStr;
+
+/// Global set of expanded tool call IDs (collapsed by default, toggle with click/Enter).
+static EXPANDED_TOOL_IDS: LazyLock<Mutex<std::collections::HashSet<String>>> =
+    LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
+
+/// Toggle a tool call's expanded state. Returns `true` if now expanded.
+pub fn toggle_tool_expanded(id: &str) -> bool {
+    if let Ok(mut set) = EXPANDED_TOOL_IDS.lock() {
+        if set.contains(id) {
+            set.remove(id);
+            false
+        } else {
+            set.insert(id.to_string());
+            true
+        }
+    } else {
+        false
+    }
+}
+
+/// Check if a tool call is expanded.
+pub fn is_tool_expanded(id: &str) -> bool {
+    if let Ok(set) = EXPANDED_TOOL_IDS.lock() {
+        set.contains(id)
+    } else {
+        false
+    }
+}
 
 const MAX_INLINE_DIFF_LINES: usize = 12;
 
@@ -1847,66 +1876,77 @@ pub(crate) fn render_tool_message(
             };
 
             if !cmd_display.is_empty() {
-                // Build box content: command + output lines + footer stats
-                let mut box_content: Vec<Line<'static>> = Vec::new();
-                // Command line
-                box_content.push(Line::from(Span::styled(cmd_display, Style::default().fg(box_color))));
+                // Build oh-my-pi style box manually (render_sharp_box adds │ to separator).
+                let box_w = row_width.min(120) as usize;
+                if box_w < 20 { return lines; }
+                let inner_w = box_w.saturating_sub(4);
 
-                // Output section (from msg.content)
-                let output_lines = render_plaintext_lines(&msg.content, detail_width);
-                let total_output = output_lines.len();
-                let max_show = 20usize.min(total_output);
-                if max_show > 0 {
-                    let sep_w = detail_width.saturating_sub(2);
-                    let sep_label = " Output ";
-                    let sep_left = (sep_w.saturating_sub(sep_label.chars().count())) / 2;
-                    let sep_right = sep_w.saturating_sub(sep_label.chars().count() + sep_left);
-                    let sep_line = format!("├{} {} {}┤", "─".repeat(sep_left), sep_label, "─".repeat(sep_right));
-                    box_content.push(Line::from(Span::styled(sep_line, Style::default().fg(box_color))));
-                    for line in output_lines.into_iter().take(max_show) {
-                        box_content.push(line);
-                    }
-                    if total_output > max_show {
-                        box_content.push(Line::from(Span::styled(
-                            format!("  … {} more lines", total_output - max_show),
-                            Style::default().fg(rgb(140, 140, 150)),
-                        )));
-                    }
-                }
-
-                // Footer: exit status ⟦exit 1⟧ when tool failed
-                let exit_str = if is_error { " exit 1 " } else { "" };
-                let footer_text = if !exit_str.is_empty() {
-                    format!(" ⟦{}⟧", exit_str)
-                } else {
-                    String::new()
-                };
-                if !footer_text.is_empty() {
-                    box_content.push(Line::from(Span::styled(
-                        footer_text,
-                        Style::default().fg(rgb(100, 100, 110)),
-                    )));
-                }
-
-                let box_lines = super::render_sharp_box(
-                    title, box_content,
-                    row_width.saturating_sub(2) as usize,
+                // Top: ┌─ bash ─┐
+                let title_t = format!(" {} ", title.trim());
+                let left_t = (box_w.saturating_sub(title_t.chars().count() + 2)) / 2;
+                let right_t = box_w.saturating_sub(title_t.chars().count() + 2 + left_t);
+                lines.push(Line::from(Span::styled(
+                    format!("┌{}{}{}┐", "─".repeat(left_t), title_t, "─".repeat(right_t)),
                     Style::default().fg(box_color),
-                );
-                for bl in box_lines {
-                    let truncated = super::truncate_line_with_ellipsis_to_width(&bl, row_width);
-                    lines.push(truncated);
+                )));
+
+                // Command: │ $ cargo build │
+                let cmd_text = format!("│ {} {} │", cmd_display, " ".repeat(inner_w.saturating_sub(cmd_display.chars().count())));
+                lines.push(Line::from(Span::styled(cmd_text, Style::default().fg(box_color))));
+
+                // Tool expanded state
+                let is_expanded = is_tool_expanded(&tc.name);
+
+                if is_expanded {
+                    // Output section (from msg.content)
+                    let output_lines = render_plaintext_lines(&msg.content, inner_w.min(detail_width));
+                    let total_output = output_lines.len();
+                    let max_show = 20usize.min(total_output);
+                    if max_show > 0 {
+                        let sep_l = (box_w.saturating_sub(12)) / 2;
+                        let sep_r = box_w.saturating_sub(12 + sep_l);
+                        lines.push(Line::from(Span::styled(
+                            format!("├{} Output {}┤", "─".repeat(sep_l), "─".repeat(sep_r)),
+                            Style::default().fg(box_color),
+                        )));
+                        for line in output_lines.into_iter().take(max_show) {
+                            let lt = super::line_plain_text(&line);
+                            let trimmed: String = lt.chars().take(inner_w).collect();
+                            let padded = format!("│ {} {} │", trimmed, " ".repeat(inner_w.saturating_sub(trimmed.chars().count())));
+                            lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(180, 180, 190)))));
+                        }
+                        if total_output > max_show {
+                            let more = format!("  … {} more lines", total_output - max_show);
+                            let padded = format!("│ {}{} │", more, " ".repeat(inner_w.saturating_sub(more.chars().count())));
+                            lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(120, 120, 130)))));
+                        }
+                    }
+                    // Footer: exit status when failed
+                    if is_error {
+                        let exit_text = " ⟦ exit 1 ⟧ ";
+                        let padded = format!("│ {}{} │", exit_text, " ".repeat(inner_w.saturating_sub(exit_text.chars().count())));
+                        lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(100, 100, 110)))));
+                    }
+                } else {
+                    // Collapsed: show expand hint
+                    let hint = format!("  ▶ {} click or Enter to expand", canon);
+                    let padded = format!("│ {}{} │", hint, " ".repeat(inner_w.saturating_sub(hint.chars().count())));
+                    lines.push(Line::from(Span::styled(padded, Style::default().fg(rgb(140, 140, 150)))));
                 }
+
+                // Bottom: └──┘
+                lines.push(Line::from(Span::styled(
+                    format!("└{}┘", "─".repeat(box_w.saturating_sub(2))),
+                    Style::default().fg(box_color),
+                )));
                 box_created = true;
             }
         }
     }
 
     if !box_created {
-        // No box — push the tool name line instead
         lines.push(rendered_tool_line);
     }
-
     if tc.name == "batch"
         && let Some(calls) = tc.input.get("tool_calls").and_then(|v| v.as_array())
     {
