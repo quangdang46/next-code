@@ -1849,14 +1849,15 @@ pub(crate) fn render_tool_message(
 
             if !cmd_display.is_empty() {
                 // Build oh-my-pi style box manually (render_sharp_box adds │ to separator).
-                let box_w = row_width.min(120) as usize;
+                let box_w = row_width as usize;
                 if box_w < 20 { return lines; }
                 let inner_w = box_w.saturating_sub(4);
 
                 // Top: ┌─ bash ─┐
                 let title_t = format!(" {} ", title.trim());
-                let left_t = (box_w.saturating_sub(title_t.chars().count() + 2)) / 2;
-                let right_t = box_w.saturating_sub(title_t.chars().count() + 2 + left_t);
+                let tw = unicode_width::UnicodeWidthStr::width(title_t.as_str());
+                let left_t = (box_w.saturating_sub(tw + 2)) / 2;
+                let right_t = box_w.saturating_sub(tw + 2 + left_t);
                 lines.push(Line::from(Span::styled(
                     format!("┌{}{}{}┐", "─".repeat(left_t), title_t, "─".repeat(right_t)),
                     Style::default().fg(box_color),
