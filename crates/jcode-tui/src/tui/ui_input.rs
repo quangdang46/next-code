@@ -619,8 +619,24 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
     }
 
     // Always render the Claude Code-style status line.
-    // Always render the Claude Code-style status line.
     let mut base_spans = status_line_text(app);
+
+    // Append processing status suffix (tool name, spinner) when active.
+    let spinner = super::activity_indicator(elapsed, 12.5);
+    if app.is_processing() {
+        let ai = super::ai_color();
+        match app.status_detail() {
+            Some(detail) if !detail.is_empty() => {
+                base_spans.push(Span::styled(" ", Style::default()));
+                base_spans.push(Span::styled(spinner, Style::default().fg(ai)));
+                base_spans.push(Span::styled(format!(" {}", detail), Style::default().fg(ai)));
+            }
+            _ => {
+                base_spans.push(Span::styled(" ", Style::default()));
+                base_spans.push(Span::styled(spinner, Style::default().fg(ai)));
+            }
+        }
+    }
 
     let line = Line::from(base_spans);
     crate::memory::check_staleness();
