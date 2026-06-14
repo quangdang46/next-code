@@ -1869,7 +1869,7 @@ pub(crate) fn render_tool_message(
                 // Always show full output (collapse is at GROUP level, not per-tool).
                 let output_lines = render_plaintext_lines(&msg.content, inner_w.min(detail_width));
                 let total_output = output_lines.len();
-                let max_show = 20usize.min(total_output);
+                let max_show = 5usize.min(total_output);
                 if max_show > 0 {
                     let sep_l = (box_w.saturating_sub(12)) / 2;
                     let sep_r = box_w.saturating_sub(12 + sep_l);
