@@ -2520,9 +2520,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Use packed layout when content fits, scrolling layout otherwise
     let use_packed = content_height + fixed_height <= available_height;
 
-    // Layout: messages, queued, notification, inline UI, gap, input, STATUS, overscroll, donut
+    // Layout: messages, queued, notification, inline UI, gap, input, STATUS, donut.
     // Status bar is at the BOTTOM (below input), matching Codex/Claude Code layout.
-    // All vertical chunks are within the chat_area (left column).
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(if use_packed {
@@ -2741,16 +2740,11 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     }
     input_ui::draw_status(frame, app, chunks[6], pending_count);
     if notification_height > 0 {
-        input_ui::draw_notification(frame, app, chunks[3]);
+        input_ui::draw_notification(frame, app, chunks[2]);
     }
-    if let Some(ref mut capture) = debug_capture {
-        capture.render_order.push("draw_input".to_string());
-    }
-    // Draw inline UI if active
     if inline_block_height > 0 {
-        draw_inline_ui(frame, app, chunks[4]);
+        draw_inline_ui(frame, app, chunks[3]);
     }
-
     input_ui::draw_input(
         frame,
         app,
