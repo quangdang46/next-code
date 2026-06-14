@@ -1482,7 +1482,20 @@ impl OpenRouterProvider {
     }
 
     pub(crate) fn new_openrouter_api_key_runtime() -> Result<Self> {
-        let api_key = load_api_key_from_env_or_config(DEFAULT_API_KEY_NAME, DEFAULT_ENV_FILE)
+        // Use the configured key name and env file (which respect the active
+        // OpenAI-compatible profile via JCODE_OPENROUTER_API_KEY_NAME and
+        // JCODE_OPENROUTER_ENV_FILE), falling back to DEFAULT_API_KEY_NAME
+        // (OPENROUTER_API_KEY) / DEFAULT_ENV_FILE. This ensures startup model
+        // init works for profiles like OpenCode Go (OPENCODE_GO_API_KEY) even
+        // when OPENROUTER_API_KEY is not set.
+        let key_name = configured_api_key_name();
+        let env_file = configured_env_file_name();
+        let (api_key, label) = load_api_key_from_env_or_config(&key_name, &env_file)
+            .map(|k| (k, key_name.clone()))
+            .or_else(|| {
+                load_api_key_from_env_or_config(DEFAULT_API_KEY_NAME, DEFAULT_ENV_FILE)
+                    .map(|k| (k, DEFAULT_API_KEY_NAME.to_string()))
+            })
             .ok_or_else(|| {
                 let path = crate::storage::app_config_dir()
                     .map(|dir| dir.join(DEFAULT_ENV_FILE).display().to_string())
@@ -1501,7 +1514,7 @@ impl OpenRouterProvider {
             api_base: DEFAULT_API_BASE.to_string(),
             auth: ProviderAuth::AuthorizationBearer {
                 token: api_key,
-                label: DEFAULT_API_KEY_NAME.to_string(),
+                label,
             },
             supports_provider_features: true,
             supports_model_catalog: true,
