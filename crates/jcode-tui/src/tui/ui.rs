@@ -89,7 +89,7 @@ mod memory_estimates;
 #[path = "ui_memory.rs"]
 mod memory_ui;
 #[path = "ui_messages.rs"]
-mod messages;
+pub(crate) mod messages;
 #[path = "ui_onboarding.rs"]
 mod onboarding;
 #[path = "ui_overlays.rs"]

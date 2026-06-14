@@ -1252,6 +1252,14 @@ impl App {
             && !on_diagram_border;
         if clicked_main_chat {
             self.set_diff_pane_focus(false);
+            // Click-to-expand: find the first visible tool call from the bottom
+            // and toggle its expanded state (Claude Code style).
+            let msgs = &self.display_messages;
+            for msg in msgs.iter().rev() {
+                if msg.tool_data.is_some() && let Some(ref tc) = msg.tool_data {
+                    crate::tui::ui::messages::toggle_tool_expanded(&tc.name);
+                }
+            }
         }
 
         if let Some(scroll_only) = self.handle_copy_selection_mouse(mouse) {
