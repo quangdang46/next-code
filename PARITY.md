@@ -196,6 +196,31 @@
 
 ---
 
+### 14. Permission System
+
+*Tool-level permission classification, mode management, dialog UI, and rule CRUD.*
+
+| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+|------|-------------|----------------|------------|--------|-----------|
+| **6 permission modes** | Default/AcceptEdits/Plan/Auto/DontAsk/BypassPermissions. Mode cycling via Alt+P, Shift+Tab, `/permissions`. | CCB (PermissionMode union) | `permission.rs`: `PermissionMode` enum. `input.rs`: Alt+P, BackTab. `dcg_bridge.rs`: `cycle_mode()`, `set_mode()`. | ✅ | — |
+| **Tool execution pause** | When permission needed, dialog shows + tool execution pauses via `await_permission_response()`. User approves → tool continues. Model never sees error. | CCB (interactiveHandler flow) | `turn_execution.rs`: `validate_tool_allowed` async. `dcg_bridge.rs`: `await_permission_response()`, `signal_permission_response()`. | ✅ | — |
+| **Permission dialog** | Rounded border overlay. 4 options: Approve/Approve all/Always allow/Deny. ←→ navigate, Enter confirm, Esc reject. | CCB (PermissionDialog.tsx) | `ui_overlays.rs`: `draw_permission_dialog_overlay()`, `append_option_row()`. | ✅ | — |
+| **Tool-specific dialogs** | bash shows full command `$ git push`, edit shows file diff `─ old / + new`, write shows file path + content preview. | CCB (BashPermissionRequest.tsx, FileEditPermissionRequest.tsx) | `ui_overlays.rs`: `build_bash_permission_lines()`, `build_edit_permission_lines()`, `build_write_permission_lines()`. | ✅ | — |
+| **Worker badge** | Dialog title shows `[session: abc-12345]` when permission request comes from a different session (subagent). | CCB (WorkerBadge) | `ui_overlays.rs`: `title_suffix` with session_id. | ✅ | — |
+| **Risk level / explainer** | LOW/MEDIUM/HIGH badge in dialog. Rule-based classification based on tool + input (e.g., `rm -rf` → HIGH). | CCB (permissionExplainer.ts) | `dcg_bridge.rs`: `RiskLevel` enum, `explain_tool_call()`. `ui_overlays.rs`: risk badge rendering. | ✅ | — |
+| **Denial tracking** | Track consecutive + total denials per session. 3 consecutive → warning shown. Reset on approval. | CCB (denialTracking.ts: maxConsecutive=3, maxTotal=20) | `dcg_bridge.rs`: `DENIAL_COUNTS`, `record_denial()`, `record_approval()`, `denial_limit_exceeded()`. `input.rs`: call on approve/deny. | ✅ | — |
+| **Permission timeout** | Track when dialog was shown (`pending_permission_at`). Auto-clear after timeout. | CCB (request timeout) | `app.rs`: `pending_permission_at`. `local.rs`: set on bus event. `conversation_state.rs`: reset. | ✅ | — |
+| **Plan mode notice** | When entering Plan mode via Alt+P, status shows "Plan mode: writes are blocked". | CCB (EnterPlanMode dialog) | `input.rs`: Alt+P handler shows notice. | ✅ | — |
+| **Mode transition safety** | Strip dangerous tools (bash, write, edit, subagent, etc.) from session allow-list when entering Auto mode. | CCB (permissionSetup.ts: stripDangerousPermissionsForAutoMode) | `dcg_bridge.rs`: `strip_dangerous_permissions_for_mode()`, `is_dangerous_allow_rule()`. `input.rs`: call on Auto enter. | ✅ | — |
+| **Auto-allow list** | 39 READ_ONLY + 23 STATEFUL_SAFE tools auto-allowed in Default mode. Auto-allowed lists: `is_legacy_auto_allowed()`. | CCB (SAFE_YOLO_ALLOWLISTED_TOOLS) | `dcg_bridge.rs`: `READ_ONLY_ACTIONS`, `STATEFUL_SAFE_ACTIONS`. `safety.rs`: `AUTO_ALLOWED`. | ✅ | — |
+| **Graceful tool failure** | When permission denied, tool reports error via ToolResult(is_error) + Bus::ToolUpdated(Error). Turn continues to next tool. | CCB (tool execution error) | `turn_loops.rs`, `turn_streaming_mpsc.rs`: `if let Err(e) = validate_tool_allowed().await { ... continue; }`. | ✅ | — |
+| **`/permissions` command** | Show mode, list modes, cycle, set by name. Also: `rules` list, `allow <tool>`, `deny <tool>`, `revoke` all. | CCB (/permissions command) | `state_ui.rs`: `/permissions` handler with CRUD subcommands. | ✅ | — |
+| **Session allow-list** | Per-session approved-tool cache. `approve_session_action()`, `approve_session_all()`, `session_allows_action()`. Always-allow persisted to config. | CCB (session rules, always-allow config) | `dcg_bridge.rs`: `SESSION_ALLOWED_ACTIONS`. `config.rs`: `always_allow_tools`. | ✅ | — |
+| **Sandbox integration** | Auto-sandbox flagged dangerous commands (Docker/container). | CCB (sandbox integration) | — | ❌ | Requires container/sandbox infrastructure. Separate project. |
+|
+
+---
+
 ## Summary
 
 | Section | Features | ✅ Complete | ⚠️ Partial | ❌ Missing |
@@ -213,25 +238,27 @@
 | 11 — Teams & Swarm | 4 | 3 | 1 | 0 |
 | 12 — Built-in Agents | 4 | 4 | 0 | 0 |
 | 13 — Model Override | 5 | 5 | 0 | 0 |
-| **Total** | **62** | **49 (79%)** | **4 (6%)** | **9 (15%)** |
+| 14 — Permission System | 15 | 14 | 0 | 1 |
+| **Total** | **77** | **63 (82%)** | **4 (5%)** | **10 (13%)** |
 
 ### Missing / Partial Features (Priority)
 
 | Priority | Feature | Section | Effort | Reference |
 |----------|---------|---------|--------|-----------|
 | P0 | `/tasks` command | 10 | Low | CCB: `src/commands/tasks/` |
-| P0 | `/agents save` | 9 | Low | Parse ` ```toml ` from assistant message |
+| P0 | `/agents save` | 9 | Low | Parse ```toml from assistant message |
 | P1 | AI auto-save | 9 | Medium | Hook turn completion |
 | P1 | Color picker UI | 7 | Medium | CCB: ColorPicker.tsx (8 swatches) |
 | P2 | Agent edit menu | 9 | Medium | CCB: AgentEditor.tsx |
 | P2 | Agent scopes | 4 | Low | CCB: 4 scopes -> add managed + plugin |
 | P2 | Context visualization | 3 | Medium | CCB: context command |
 | P2 | Creation wizard | 9 | High | CCB: CreateAgentWizard.tsx (10+ steps) |
+| P2 | Sandbox integration | 14 | High | CCB: sandbox integration |
 | P3 | Interactive team mgmt | 11 | High | oh-my-openagent: delegate-task |
-| — | Color badge rendering | 7 | Low | Plain `●` -> ratatui Span color |
+| — | Color badge rendering | 7 | Low | Plain ● -> ratatui Span color |
 
 ### Adding New Features
 
-1. Pick the matching section (1-13). If none matches, add a new section.
+1. Pick the matching section (1-14). If none matches, add a new section.
 2. Add a row: Name, Description, Source Repo(s), jcode Impl, Status, Remaining.
 3. Update the summary table at the bottom.
