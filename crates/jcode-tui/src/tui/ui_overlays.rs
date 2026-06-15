@@ -662,16 +662,25 @@ pub(super) fn draw_permission_dialog_overlay(
     let warn = Style::default().fg(rgb(235, 190, 105));
     let bold = Style::default().add_modifier(Modifier::BOLD);
     let hlbg = Style::default().fg(rgb(20, 22, 26)).bg(accent_color());
-
-    let tool = app.pending_permission_tool().unwrap_or("unknown").to_string();
     let sel = app.pending_permission_selected().unwrap_or(0);
+    let tool = app.pending_permission_tool().unwrap_or("unknown").to_string();
+
+    // Worker badge: show session_id if different from current
+    let current_sid = app.current_session_id().unwrap_or_default();
+    let req_sid = app.pending_permission_session_id().unwrap_or("");
+    let title_suffix = if !req_sid.is_empty() && req_sid != current_sid {
+        format!(" [session: {}]", &req_sid[..req_sid.len().min(8)])
+    } else {
+        String::new()
+    };
+    let tool_display = format!("{}{}", tool, title_suffix);
 
     // Dispatch to tool-specific dialog renderers
     let lines = match tool.as_str() {
-        "bash" => build_bash_permission_lines(app, dialog_w, tool, sel, &dim, &warn, &bold, &hlbg),
-        "edit" | "hashline_edit" => build_edit_permission_lines(app, dialog_w, tool, sel, &dim, &warn, &bold, &hlbg),
-        "write" => build_write_permission_lines(app, dialog_w, tool, sel, &dim, &warn, &bold, &hlbg),
-        _ => build_generic_permission_lines(app, dialog_w, tool, sel, &dim, &warn, &bold, &hlbg),
+        "bash" => build_bash_permission_lines(app, dialog_w, tool_display, sel, &dim, &warn, &bold, &hlbg),
+        "edit" | "hashline_edit" => build_edit_permission_lines(app, dialog_w, tool_display, sel, &dim, &warn, &bold, &hlbg),
+        "write" => build_write_permission_lines(app, dialog_w, tool_display, sel, &dim, &warn, &bold, &hlbg),
+        _ => build_generic_permission_lines(app, dialog_w, tool_display, sel, &dim, &warn, &bold, &hlbg),
     };
 
     let pg = Paragraph::new(lines).block(Block::default().borders(Borders::NONE));

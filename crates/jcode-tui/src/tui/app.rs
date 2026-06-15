@@ -1287,6 +1287,8 @@ pub struct App {
     pub status_line_config: jcode_config_types::StatusLineConfig,
     /// Running tools/subagents/background interactive list (Claude Code style).
     pub running_items_state: super::RunningItemsState,
+    /// When the current permission dialog was shown (for auto-timeout).
+    pub pending_permission_at: Option<std::time::Instant>,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

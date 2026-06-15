@@ -137,6 +137,54 @@ pub fn set_mode(mode: Mode) {
 static PERMISSION_RESPONSE: LazyLock<Mutex<Option<tokio::sync::oneshot::Sender<bool>>>> =
     LazyLock::new(|| Mutex::new(None));
 
+/// Denial tracking state — after N consecutive denials, show warning.
+static DENIAL_COUNTS: LazyLock<Mutex<HashMap<String, (u32, u32)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+const MAX_CONSECUTIVE_DENIALS: u32 = 3;
+const MAX_TOTAL_DENIALS: u32 = 20;
+
+/// Record a denial for the given session.
+pub fn record_denial(session_id: &str) {
+    if let Ok(mut guard) = DENIAL_COUNTS.lock() {
+        let entry = guard.entry(session_id.to_string()).or_insert((0, 0));
+        entry.0 += 1; // consecutive
+        entry.1 += 1; // total
+    }
+}
+
+/// Record an approval — resets consecutive counter.
+pub fn record_approval(session_id: &str) {
+    if let Ok(mut guard) = DENIAL_COUNTS.lock() {
+        let entry = guard.entry(session_id.to_string()).or_insert((0, 0));
+        entry.0 = 0; // reset consecutive
+    }
+}
+
+/// Check if denial limits are exceeded for the given session.
+pub fn denial_limit_exceeded(session_id: &str) -> Option<&'static str> {
+    if let Ok(guard) = DENIAL_COUNTS.lock() {
+        if let Some(&(consec, total)) = guard.get(session_id) {
+            if consec >= MAX_CONSECUTIVE_DENIALS {
+                return Some("You've denied 3 times. Consider reviewing carefully.");
+            }
+            if total >= MAX_TOTAL_DENIALS {
+                return Some("You've denied 20 times. Consider switching to AcceptEdits mode.");
+            }
+        }
+    }
+    None
+}
+
+/// Get the denial count for display in the dialog.
+pub fn denial_count(session_id: &str) -> (u32, u32) {
+    if let Ok(guard) = DENIAL_COUNTS.lock() {
+        guard.get(session_id).copied().unwrap_or((0, 0))
+    } else {
+        (0, 0)
+    }
+}
+
 /// Wait for the user to respond to a pending permission request.
 /// Returns `Ok(true)` if approved (tool should proceed).
 /// Returns `Ok(false)` if denied (tool should fail).

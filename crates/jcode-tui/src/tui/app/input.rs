@@ -1397,12 +1397,16 @@ pub(super) fn handle_alt_key(app: &mut App, code: KeyCode) -> bool {
             app.copy_chat_viewport_context_to_clipboard();
             true
         }
-        // Alt+P: cycle permission mode (Default → AcceptEdits → Plan → Auto → DontAsk → BypassPermissions)
+        // Alt+P: cycle permission mode with confirmation for Plan
         KeyCode::Char('p') => {
             let mode = crate::dcg_bridge::cycle_mode();
             let mode_str = crate::dcg_bridge::mode_to_str(mode);
             let _ = crate::config::Config::set_permission_mode(mode_str);
-            app.set_status_notice(format!("Permission mode → {mode_str}"));
+            if mode_str == "plan" {
+                app.set_status_notice("⚠ Plan mode: writes are blocked. Read-only. Esc to exit plan mode.");
+            } else {
+                app.set_status_notice(format!("Permission mode → {mode_str}"));
+            }
             true
         }
         _ => false,
@@ -1819,7 +1823,6 @@ pub(super) fn handle_modal_key(
                 }
                 return Ok(true);
             }
-            // Enter confirms the selected action
             KeyCode::Enter => {
                 match app.pending_permission_selected {
                     0 => {
@@ -1828,6 +1831,7 @@ pub(super) fn handle_modal_key(
                         if let Some(ref code_str) = app.pending_permission_code {
                             crate::dcg_bridge::consume_allow_once(code_str);
                         }
+                        crate::dcg_bridge::record_approval(&session_id);
                         crate::dcg_bridge::signal_permission_response(true);
                         app.reset_permission_dialog();
                         app.set_status_notice(format!("Approved '{tool_name}' for this session."));
@@ -1835,6 +1839,7 @@ pub(super) fn handle_modal_key(
                     1 => {
                         // Approve all
                         crate::dcg_bridge::approve_session_all(&session_id);
+                        crate::dcg_bridge::record_approval(&session_id);
                         crate::dcg_bridge::signal_permission_response(true);
                         app.reset_permission_dialog();
                         app.set_status_notice("Approved all tools for this session.");
@@ -1843,12 +1848,14 @@ pub(super) fn handle_modal_key(
                         // Always allow (approve + persist)
                         crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
                         let _ = crate::config::Config::add_always_allow_tool(&tool_name);
+                        crate::dcg_bridge::record_approval(&session_id);
                         crate::dcg_bridge::signal_permission_response(true);
                         app.reset_permission_dialog();
                         app.set_status_notice("Approved and saved as always-allow.");
                     }
                     3 => {
                         // Deny
+                        crate::dcg_bridge::record_denial(&session_id);
                         crate::dcg_bridge::signal_permission_response(false);
                         app.reset_permission_dialog();
                     }
@@ -1862,6 +1869,7 @@ pub(super) fn handle_modal_key(
                 if let Some(ref code_str) = app.pending_permission_code {
                     crate::dcg_bridge::consume_allow_once(code_str);
                 }
+                crate::dcg_bridge::record_approval(&session_id);
                 crate::dcg_bridge::signal_permission_response(true);
                 app.reset_permission_dialog();
                 app.set_status_notice(format!("Approved '{tool_name}' for this session."));
@@ -1869,6 +1877,7 @@ pub(super) fn handle_modal_key(
             }
             KeyCode::Char('a') | KeyCode::Char('A') => {
                 crate::dcg_bridge::approve_session_all(&session_id);
+                crate::dcg_bridge::record_approval(&session_id);
                 crate::dcg_bridge::signal_permission_response(true);
                 app.reset_permission_dialog();
                 app.set_status_notice("Approved all tools for this session.");
@@ -1877,12 +1886,14 @@ pub(super) fn handle_modal_key(
             KeyCode::Char('p') | KeyCode::Char('P') => {
                 crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
                 let _ = crate::config::Config::add_always_allow_tool(&tool_name);
+                crate::dcg_bridge::record_approval(&session_id);
                 crate::dcg_bridge::signal_permission_response(true);
                 app.reset_permission_dialog();
                 app.set_status_notice("Approved and saved as always-allow.");
                 return Ok(true);
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                crate::dcg_bridge::record_denial(&session_id);
                 crate::dcg_bridge::signal_permission_response(false);
                 app.reset_permission_dialog();
                 return Ok(true);
@@ -1891,32 +1902,7 @@ pub(super) fn handle_modal_key(
                 // Pass through: user can scroll chat while dialog is open
                 return Ok(false);
             }
-        }
-    }
-
-    if app.model_status_scroll.is_some() {
-        app.handle_model_status_key(code)?;
-        return Ok(true);
-    }
-
-    if app.session_picker_overlay.is_some() {
-        app.handle_session_picker_key(code, modifiers)?;
-        return Ok(true);
-    }
-
-    if app.login_picker_overlay.is_some() {
-        app.handle_login_picker_key(code, modifiers)?;
-        return Ok(true);
-    }
-
-    if app.account_picker_overlay.is_some() {
-        if let Some(command) = app.next_account_picker_action(code, modifiers)? {
-            app.handle_account_picker_command(command);
-        }
-        return Ok(true);
-    }
-
-    if app.copy_selection_mode {
+        } // close match code
         if modifiers.contains(KeyModifiers::CONTROL)
             && matches!(code, KeyCode::Char('c') | KeyCode::Char('d'))
         {

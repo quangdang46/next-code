@@ -411,6 +411,7 @@ impl App {
         self.pending_permission_alternatives.clear();
         self.pending_permission_selected = 0;
         self.pending_permission_input = None;
+        self.pending_permission_at = None;
     }
     pub(crate) fn set_remote_startup_phase(&mut self, phase: super::RemoteStartupPhase) {
         let changed = self.remote_startup_phase.as_ref() != Some(&phase);
