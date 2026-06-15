@@ -347,6 +347,7 @@ impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
                         _ => jcode_memory_types::MemoryCategory::Fact,
                     };
                     let entry = jcode_memory_types::MemoryEntry {
+                        embedding_model: None,
                         id: d.id.as_ref().map(|id| id.to_string()).unwrap_or_default(),
                         category: kind,
                         content: d.content,
@@ -396,6 +397,7 @@ impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
             .into_iter()
             .map(|h| {
                 let entry = jcode_memory_types::MemoryEntry {
+                    embedding_model: None,
                     id: format!("mp-{}", uuid::Uuid::new_v4()),
                     category: jcode_memory_types::MemoryCategory::Fact,
                     content: h.text,
@@ -436,6 +438,7 @@ impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
             .into_iter()
             .map(|h| {
                 let entry = jcode_memory_types::MemoryEntry {
+                    embedding_model: None,
                     id: format!("mp-{}", uuid::Uuid::new_v4()),
                     category: jcode_memory_types::MemoryCategory::Fact,
                     content: h.text,
@@ -578,6 +581,7 @@ impl jcode_memory_types::GraphOperations for MempalaceAdapter {
                 _ => jcode_memory_types::MemoryCategory::Fact,
             };
             let entry = jcode_memory_types::MemoryEntry {
+                embedding_model: None,
                 id: d.id.as_ref().map(|id| id.to_string()).unwrap_or_default(),
                 category: kind,
                 content: d.content,
@@ -621,6 +625,7 @@ impl jcode_memory_types::GraphOperations for MempalaceAdapter {
                 _ => jcode_memory_types::MemoryCategory::Fact,
             };
             let entry = jcode_memory_types::MemoryEntry {
+                embedding_model: None,
                 id: d.id.as_ref().map(|id| id.to_string()).unwrap_or_default(),
                 category: kind,
                 content: d.content,
@@ -671,6 +676,7 @@ mod tests {
 
     fn test_entry(content: &str, category: MemoryCategory) -> MemoryEntry {
         MemoryEntry {
+            embedding_model: None,
             id: "mem-test".to_string(),
             category,
             content: content.to_string(),

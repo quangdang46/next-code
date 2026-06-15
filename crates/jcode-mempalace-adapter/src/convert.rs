@@ -266,6 +266,7 @@ pub fn memory_entry_to_drawer(
 
 /// Convert a mirror `Drawer` back into a jcode `MemoryEntry`.
 pub fn drawer_to_memory_entry(drawer: &Drawer) -> MemoryEntry {
+    embedding_model: None,
     let category = kind_to_category(&drawer.kind);
     let trust = drawer
         .trust
@@ -289,6 +290,7 @@ pub fn drawer_to_memory_entry(drawer: &Drawer) -> MemoryEntry {
         .and_then(|v| serde_json::from_value::<Vec<f32>>(v.clone()).ok());
 
     MemoryEntry {
+        embedding_model: None,
         id: drawer.id.as_ref().map(|d| d.0.clone()).unwrap_or_default(),
         category,
         content: drawer.content.clone(),

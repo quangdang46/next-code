@@ -463,7 +463,7 @@ impl Agent {
         name: &str,
         input: serde_json::Value,
     ) -> Result<crate::tool::ToolOutput> {
-        self.validate_tool_allowed(name)?;
+        self.validate_tool_allowed(name).await?;
 
         let call_id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -533,7 +533,7 @@ impl Agent {
         Ok(())
     }
 
-    pub(super) fn validate_tool_allowed(&self, name: &str) -> Result<()> {
+    pub(super) async fn validate_tool_allowed(&self, name: &str) -> Result<()> {
         if let Some(allowed) = self.allowed_tools.as_ref()
             && !allowed.contains(name)
         {
@@ -587,22 +587,6 @@ impl Agent {
                     allow_once_code,
                     alternatives,
                 } => {
-                    let msg = format!(
-                        "Tool '{}' requires permission: {}. Current mode: {:?}",
-                        name,
-                        reason,
-                        crate::dcg_bridge::current_mode()
-                    );
-                    // NOTE: the allow-once code is intentionally NOT embedded
-                    // in the user-facing error message and NOT logged. The
-                    // 6-hex code is a single-use secret for 24h; leaking it via
-                    // the agent transcript or the log file is a credential
-                    // exposure. The TUI receives the code only over the in-
-                    // process bus and never writes it to disk.
-                    if !alternatives.is_empty() {
-                        // Alternatives are safe to surface; they are static
-                        // suggestions from dcg-core, not untrusted input.
-                    }
                     // Publish bus event so TUI can show a permission dialog
                     crate::bus::Bus::global().publish(crate::bus::BusEvent::PermissionRequested(
                         crate::bus::PermissionRequested {
@@ -613,7 +597,39 @@ impl Agent {
                             alternatives: alternatives.clone(),
                         },
                     ));
-                    return Err(anyhow::anyhow!(msg));
+
+                    // Await user response — tool execution PAUSES here (Claude Code behavior)
+                    match crate::dcg_bridge::await_permission_response().await {
+                        Ok(true) => {
+                            crate::dcg_bridge::approve_session_action(&self.session.id, name);
+                            crate::logging::info(&format!(
+                                "[permission] Approved '{}' for session {}",
+                                name, self.session.id
+                            ));
+                            return Ok(());
+                        }
+                        Ok(false) => {
+                            let msg = format!(
+                                "Tool '{}' denied by user. Current mode: {:?}",
+                                name,
+                                crate::dcg_bridge::current_mode()
+                            );
+                            crate::logging::info(&format!(
+                                "[permission] Denied '{}' by user for session {}",
+                                name, self.session.id
+                            ));
+                            return Err(anyhow::anyhow!(msg));
+                        }
+                        Err(e) => {
+                            let msg = format!(
+                                "Tool '{}' permission cancelled: {}. Current mode: {:?}",
+                                name,
+                                e,
+                                crate::dcg_bridge::current_mode()
+                            );
+                            return Err(anyhow::anyhow!(msg));
+                        }
+                    }
                 }
                 BridgeDecision::Allow => {}
             }

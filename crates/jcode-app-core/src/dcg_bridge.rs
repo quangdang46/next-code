@@ -130,6 +130,41 @@ pub fn set_mode(mode: Mode) {
     }
 }
 
+/// One-shot channel for pending permission responses.
+/// When tool execution needs user approval, it creates a oneshot channel,
+/// stores the sender here, and awaits the receiver.
+/// The TUI dialog handler sends the response through the sender.
+static PERMISSION_RESPONSE: LazyLock<Mutex<Option<tokio::sync::oneshot::Sender<bool>>>> =
+    LazyLock::new(|| Mutex::new(None));
+
+/// Wait for the user to respond to a pending permission request.
+/// Returns `Ok(true)` if approved (tool should proceed).
+/// Returns `Ok(false)` if denied (tool should fail).
+pub async fn await_permission_response() -> anyhow::Result<bool> {
+    let rx = {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        if let Ok(mut guard) = PERMISSION_RESPONSE.lock() {
+            *guard = Some(tx);
+        }
+        rx
+    };
+    match rx.await {
+        Ok(true) => Ok(true),
+        Ok(false) => Ok(false),
+        Err(_) => Err(anyhow::anyhow!("Permission request cancelled")),
+    }
+}
+
+/// Signal the pending permission request with the user's decision.
+/// Called from the TUI dialog handler.
+pub fn signal_permission_response(approved: bool) {
+    if let Ok(mut guard) = PERMISSION_RESPONSE.lock() {
+        if let Some(tx) = guard.take() {
+            let _ = tx.send(approved);
+        }
+    }
+}
+
 /// Return the currently configured permission mode.
 #[must_use]
 pub fn current_mode() -> Mode {

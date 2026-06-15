@@ -1828,12 +1828,14 @@ pub(super) fn handle_modal_key(
                         if let Some(ref code_str) = app.pending_permission_code {
                             crate::dcg_bridge::consume_allow_once(code_str);
                         }
+                        crate::dcg_bridge::signal_permission_response(true);
                         app.reset_permission_dialog();
                         app.set_status_notice(format!("Approved '{tool_name}' for this session."));
                     }
                     1 => {
                         // Approve all
                         crate::dcg_bridge::approve_session_all(&session_id);
+                        crate::dcg_bridge::signal_permission_response(true);
                         app.reset_permission_dialog();
                         app.set_status_notice("Approved all tools for this session.");
                     }
@@ -1841,11 +1843,13 @@ pub(super) fn handle_modal_key(
                         // Always allow (approve + persist)
                         crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
                         let _ = crate::config::Config::add_always_allow_tool(&tool_name);
+                        crate::dcg_bridge::signal_permission_response(true);
                         app.reset_permission_dialog();
                         app.set_status_notice("Approved and saved as always-allow.");
                     }
                     3 => {
                         // Deny
+                        crate::dcg_bridge::signal_permission_response(false);
                         app.reset_permission_dialog();
                     }
                     _ => {}
@@ -1858,12 +1862,14 @@ pub(super) fn handle_modal_key(
                 if let Some(ref code_str) = app.pending_permission_code {
                     crate::dcg_bridge::consume_allow_once(code_str);
                 }
+                crate::dcg_bridge::signal_permission_response(true);
                 app.reset_permission_dialog();
                 app.set_status_notice(format!("Approved '{tool_name}' for this session."));
                 return Ok(true);
             }
             KeyCode::Char('a') | KeyCode::Char('A') => {
                 crate::dcg_bridge::approve_session_all(&session_id);
+                crate::dcg_bridge::signal_permission_response(true);
                 app.reset_permission_dialog();
                 app.set_status_notice("Approved all tools for this session.");
                 return Ok(true);
@@ -1871,11 +1877,13 @@ pub(super) fn handle_modal_key(
             KeyCode::Char('p') | KeyCode::Char('P') => {
                 crate::dcg_bridge::approve_session_action(&session_id, &tool_name);
                 let _ = crate::config::Config::add_always_allow_tool(&tool_name);
+                crate::dcg_bridge::signal_permission_response(true);
                 app.reset_permission_dialog();
                 app.set_status_notice("Approved and saved as always-allow.");
                 return Ok(true);
             }
             KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                crate::dcg_bridge::signal_permission_response(false);
                 app.reset_permission_dialog();
                 return Ok(true);
             }
