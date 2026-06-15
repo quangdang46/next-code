@@ -268,6 +268,7 @@ pub(super) fn handle_bus_event(
                 .iter()
                 .map(|a| sanitize_terminal_text(a))
                 .collect();
+            app.pending_permission_input = req.tool_input;
             // Redact the 6-hex allow-once code from the log line: codes are
             // single-use secrets with 24h TTL and must not be persisted to
             // the on-disk log file.

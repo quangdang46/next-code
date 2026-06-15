@@ -466,6 +466,12 @@ pub trait TuiState {
     fn pending_permission_alternatives(&self) -> &[String] {
         &[]
     }
+
+    /// The tool input (arguments) for the pending permission dialog.
+    /// Contains the command, file path, etc. for tool-specific rendering.
+    fn pending_permission_input(&self) -> Option<&serde_json::Value> {
+        None
+    }
     /// Working directory for this session
     // ---- Misc ----
     fn working_dir(&self) -> Option<String>;

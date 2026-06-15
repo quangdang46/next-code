@@ -1281,6 +1281,8 @@ pub struct App {
     /// Index of the currently selected action in the permission dialog
     /// (0 = Approve, 1 = Approve all, 2 = Always allow, 3 = Deny).
     pub pending_permission_selected: usize,
+    /// Tool input for the pending permission dialog (to show command, diff, etc).
+    pub pending_permission_input: Option<serde_json::Value>,
     /// Status line display configuration for this session.
     pub status_line_config: jcode_config_types::StatusLineConfig,
     /// Running tools/subagents/background interactive list (Claude Code style).

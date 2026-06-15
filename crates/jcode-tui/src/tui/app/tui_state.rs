@@ -1660,6 +1660,10 @@ impl crate::tui::TuiState for App {
         Some(self.pending_permission_selected)
     }
 
+    fn pending_permission_input(&self) -> Option<&serde_json::Value> {
+        self.pending_permission_input.as_ref()
+    }
+
     fn now_millis(&self) -> u64 {
         self.app_started.elapsed().as_millis() as u64
     }
