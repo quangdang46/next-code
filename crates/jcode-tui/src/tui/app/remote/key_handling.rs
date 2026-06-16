@@ -695,17 +695,16 @@ async fn handle_remote_key_internal(
             }
             KeyCode::Enter => {
                 if app.running_items_state.detail_open {
-                    // Enter while detail is open: switch to subagent session if available
                     let session_switch = app.running_items_state.items.get(app.running_items_state.selected)
                         .and_then(|item| item.session_id.as_ref().map(|sid| (item.label.clone(), sid.clone())));
                     if let Some((label, sid)) = session_switch {
                         app.running_items_state.visible = false;
                         app.running_items_state.detail_open = false;
-                        app.set_status_notice(format!("Switching to → {}", label));
-                        app.workspace_client.queue_resume_session(sid);
+                        app.viewing_teammate_session_id = Some(sid.clone());
+                        app.view_teammate_selection = true;
+                        app.set_status_notice(format!("Viewing → {}  (Esc to exit)", label));
                         return Ok(());
                     }
-                    // No session: close detail
                     app.running_items_state.detail_open = false;
                 } else {
                     app.running_items_state.detail_open = true;
@@ -713,6 +712,12 @@ async fn handle_remote_key_internal(
                 return Ok(());
             }
             KeyCode::Esc => {
+                if app.viewing_teammate_session_id.is_some() {
+                    app.viewing_teammate_session_id = None;
+                    app.view_teammate_selection = false;
+                    app.set_status_notice("Exited teammate view");
+                    return Ok(());
+                }
                 if app.running_items_state.detail_open {
                     app.running_items_state.detail_open = false;
                 } else {

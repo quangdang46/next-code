@@ -1289,6 +1289,11 @@ pub struct App {
     pub running_items_state: super::RunningItemsState,
     /// When the current permission dialog was shown (for auto-timeout).
     pub pending_permission_at: Option<std::time::Instant>,
+    /// Teammate view: session_id of the subagent being viewed (CCB teammate view style).
+    /// When set, the UI shows this subagent's stream inline instead of switching sessions.
+    pub viewing_teammate_session_id: Option<String>,
+    /// Selection mode: true when user is in selecting-teammate mode.
+    pub view_teammate_selection: bool,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

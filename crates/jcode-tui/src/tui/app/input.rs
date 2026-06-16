@@ -2308,14 +2308,15 @@ impl App {
                 }
                 KeyCode::Enter => {
                     if self.running_items_state.detail_open {
-                        // Enter while detail is open: switch to subagent session if available
+                        // Enter while detail is open: enter teammate view (CCB style)
                         let session_switch = self.running_items_state.items.get(self.running_items_state.selected)
                             .and_then(|item| item.session_id.as_ref().map(|sid| (item.label.clone(), sid.clone())));
                         if let Some((label, sid)) = session_switch {
                             self.running_items_state.visible = false;
                             self.running_items_state.detail_open = false;
-                            self.set_status_notice(format!("Switching to → {}", label));
-                            self.workspace_client.queue_resume_session(sid);
+                            self.viewing_teammate_session_id = Some(sid.clone());
+                            self.view_teammate_selection = true;
+                            self.set_status_notice(format!("Viewing → {}  (Esc to exit)", label));
                             return Ok(());
                         }
                         // No session to switch to: close detail
@@ -2327,11 +2328,26 @@ impl App {
                     return Ok(());
                 }
                 KeyCode::Esc => {
+                    if self.viewing_teammate_session_id.is_some() {
+                        // Exit teammate view
+                        let sid = self.viewing_teammate_session_id.take();
+                        self.view_teammate_selection = false;
+                        self.set_status_notice("Exited teammate view");
+                        return Ok(());
+                    }
                     if self.running_items_state.detail_open {
                         self.running_items_state.detail_open = false;
                     } else {
                         self.running_items_state.visible = false;
                     }
+                    return Ok(());
+                }
+                // Ctrl+C while viewing teammate → cancel the teammate
+                KeyCode::Char('c') if self.viewing_teammate_session_id.is_some() && modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.set_status_notice("Cancelled teammate");
+                    self.viewing_teammate_session_id = None;
+                    self.view_teammate_selection = false;
+                    self.cancel_requested = true;
                     return Ok(());
                 }
                 // Cancel/stop the selected running item (Ctrl+C or Backspace when detail open)
