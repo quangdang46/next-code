@@ -710,7 +710,12 @@ impl crate::tui::TuiState for App {
                 id: member.session_id.clone(),
                 label: member.friendly_name.clone().unwrap_or_default(),
                 status,
-                detail: member.detail.clone(),
+                detail: match (&member.detail, &member.output_tail) {
+                    (Some(d), Some(t)) => Some(format!("{} — {}", d, t.lines().last().unwrap_or(t))),
+                    (Some(d), None) => Some(d.clone()),
+                    (None, Some(t)) => Some(t.lines().last().unwrap_or(t).to_string()),
+                    (None, None) => None,
+                },
                 elapsed: member.status_age_secs.map(|s| std::time::Duration::from_secs(s)),
                 session_id: Some(member.session_id.clone()),
             });

@@ -959,17 +959,43 @@ You are a helpful coding assistant.
     }
 }
 
-/// Load a session's messages from its journal file and return as DisplayMessages.
+/// Load a session's messages from its files and return as DisplayMessages.
 /// Used by teammate view to show the subagent's messages inline.
 pub(super) fn load_session_messages(session_id: &str) -> Vec<crate::tui::DisplayMessage> {
-    let journal_path = crate::session::session_journal_path(session_id);
-    if !journal_path.exists() {
+    use crate::session::Session;
+
+    let snapshot_path = crate::session::session_path(session_id);
+    if !snapshot_path.exists() {
         return Vec::new();
     }
-    match crate::session::load_session_from_journal(&journal_path) {
-        Ok(session) => crate::tui::display_messages_from_session(&session),
-        Err(_) => Vec::new(),
+
+    // Load session from snapshot file
+    let bytes = match std::fs::read(&snapshot_path) {
+        Ok(b) => b,
+        Err(_) => return Vec::new(),
+    };
+    let mut session: Session = match serde_json::from_slice(&bytes) {
+        Ok(s) => s,
+        Err(_) => return Vec::new(),
+    };
+
+    // Merge messages from journal file
+    let journal_path = crate::session::session_journal_path(session_id);
+    if journal_path.exists() {
+        use std::io::BufRead;
+        if let Ok(file) = std::fs::File::open(&journal_path) {
+            let reader = std::io::BufReader::new(file);
+            for line in reader.lines().flatten() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() { continue; }
+                if let Ok(entry) = serde_json::from_str::<crate::session::SessionJournalEntry>(trimmed) {
+                    session.messages.merge(entry.append_messages);
+                }
+            }
+        }
     }
+
+    crate::tui::display_messages_from_session(&session)
 }
 
 pub(crate) fn save_last_assistant_as_agent(session: &crate::session::Session) -> String {

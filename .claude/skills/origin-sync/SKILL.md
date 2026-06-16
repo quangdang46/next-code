@@ -529,3 +529,29 @@ grep -rn 'MemoryEntry {' --include='*.rs' | grep -v 'fn\|pub struct'
 - Without it, dependent code breaks at compile time
 
 **Prevention**: After merge, always run `cargo check` and grep for `missing field` / `no field named` errors before declaring merge complete. These are Category G signals.
+
+### Category H: Blind Keep Ours Trap (NEW)
+
+**Symptom**: After resolving all conflicts with `--ours`, the fork works — but upstream's fix for a real bug was silently discarded.
+
+**Root cause**: The conflict was in a file where BOTH sides made meaningful changes. `git checkout --ours` discards the ENTIRE upstream change, including bugfixes mixed in with conflicting lines.
+
+**Rule**: When a file conflicts, NEVER blindly keep ours. Instead:
+
+1. **Identify what upstream changed**: `git diff HEAD..upstream/master -- conflicted/file.rs`
+2. **Categorize** each hunk:
+   - "Upstream refactored around our code" → keep ours, manually apply bugfix hunks
+   - "Upstream added feature we don't have" → evaluate: useful? Then cherry-pick
+   - "Upstream fixed a bug" → merge the fix into our code, preserving our logic
+   - "Upstream reverted our improvement" → keep ours (our improvement is correct)
+3. **Apply with 3-way merge**: 
+   ```bash
+   # Instead of checkout --ours:
+   git merge-file --ours -p ours.rs base.rs theirs.rs > merged.rs
+   # Then manually review and re-add any upstream bugfix hunks
+   ```
+4. **Verify**: `cargo check` must pass. If Category G (struct field) errors appear, fix them.
+
+**Key insight**: An upstream hunk that differs from ours is NOT automatically wrong. Read it. If it fixes a bug we also have, the fix belongs in our code regardless of who wrote it.
+
+**Example**: Upstream fixes `openrouter.rs` to handle a null-pointer crash. Our file conflicts because we also modified the same function. Using `--ours` keeps our code crash-free, but drops upstream's fix for the OTHER crash path that we also have. The correct action: keep our logic, apply upstream's null-check manually.
