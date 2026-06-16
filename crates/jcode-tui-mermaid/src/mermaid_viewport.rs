@@ -649,7 +649,7 @@ fn probe_kitty_fit_state(
     (state.source_path == source_path
         && state.font_size == font_size
         && state.fit_target == Some((target_cols, target_rows)))
-    .then(|| (state.unique_id, state.full_cols, state.full_rows))
+    .then_some((state.unique_id, state.full_cols, state.full_rows))
 }
 
 /// Readiness of the Kitty stable-fit fast path for an inline image at a given
