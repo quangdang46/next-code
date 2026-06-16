@@ -2766,7 +2766,37 @@ impl App {
                     self.set_status_notice("Running items list open");
                     return Ok(());
                 }
-                // Agents picker: Library tab → open agent model picker (handled by AgentTarget action below)
+                // Agents Library tab: multi-column actions
+                if picker.kind == PickerKind::Agents && picker.column > 0 {
+                    let idx = picker.filtered[picker.selected];
+                    let entry = &picker.entries[idx];
+                    let agent_id = match &entry.action {
+                        PickerAction::EditAgent { agent_id, .. } => Some(agent_id.clone()),
+                        _ => None,
+                    };
+                    if let Some(agent_id) = agent_id {
+                        if picker.column == 1 {
+                            // Column 1: open color picker
+                            let id = agent_id.clone();
+                            self.inline_interactive_state = None;
+                            crate::tui::app::inline_interactive::openers::open_color_picker(self, &id);
+                            return Ok(());
+                        }
+                        if picker.column == 2 {
+                            // Column 2: open model picker
+                            self.inline_interactive_state = None;
+                            // Open the existing model picker for this agent
+                            self.set_status_notice(format!("Model picker for {} — coming soon", agent_id));
+                            return Ok(());
+                        }
+                    }
+                }
+
+                // Agent Library tab: column navigation for edit entries
+                if picker.kind == PickerKind::Agents && picker.column == 0 {
+                    picker.column = 1;
+                    return Ok(());
+                }
 
                 if matches!(entry.action, PickerAction::Model) {
                     if picker.column == 0 {
@@ -2778,7 +2808,6 @@ impl App {
                         return Ok(());
                     }
                 }
-
                 let route = &entry.options[entry.selected_option];
 
                 if !route.available {
