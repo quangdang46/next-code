@@ -748,6 +748,106 @@ fn agent_color_icon(color: &str) -> Option<&'static str> {
     }
 }
 
+/// Open the color picker for an agent.
+/// Shows 8 named colors + "Automatic" option (CCB ColorPicker style).
+pub(crate) fn open_color_picker(app: &mut App, agent_id: &str) {
+    let colors = [
+        ("red", "❤"),
+        ("blue", "💙"),
+        ("green", "💚"),
+        ("yellow", "💛"),
+        ("purple", "💜"),
+        ("orange", "🧡"),
+        ("pink", "🩷"),
+        ("cyan", "🩵"),
+    ];
+
+    let mut entries: Vec<PickerEntry> = Vec::new();
+
+    // "Automatic" option (remove color override)
+    entries.push(PickerEntry {
+        name: "  ● Automatic (inherit)".into(),
+        options: vec![PickerOption {
+            provider: "color".into(),
+            api_method: "automatic".into(),
+            available: true,
+            detail: "Remove color override, inherit from parent".into(),
+            estimated_reference_cost_micros: None,
+            context_window: None,
+            latency_ms: None,
+            cost_per_million_input: None,
+            cost_per_million_output: None,
+            is_free: false,
+            is_latest: false,
+        }],
+        action: crate::tui::PickerAction::SetAgentColor {
+            agent_id: agent_id.to_string(),
+            color: None,
+        },
+        selected_option: 0,
+        is_current: false,
+        is_default: false,
+        is_favorite: false,
+        recommended: false,
+        recommendation_rank: usize::MAX,
+        usage_score: 0,
+        old: false,
+        created_date: None,
+        effort: None,
+        is_free: false,
+        is_latest: false,
+    });
+
+    // 8 color entries
+    for (color_name, icon) in &colors {
+        entries.push(PickerEntry {
+            name: format!("  {} {}", icon, color_name),
+            options: vec![PickerOption {
+                provider: "color".into(),
+                api_method: "set".into(),
+                available: true,
+                detail: format!("Set agent color to {}", color_name),
+                estimated_reference_cost_micros: None,
+                context_window: None,
+                latency_ms: None,
+                cost_per_million_input: None,
+                cost_per_million_output: None,
+                is_free: false,
+                is_latest: false,
+            }],
+            action: crate::tui::PickerAction::SetAgentColor {
+                agent_id: agent_id.to_string(),
+                color: Some(color_name.to_string()),
+            },
+            selected_option: 0,
+            is_current: false,
+            is_default: false,
+            is_favorite: false,
+            recommended: false,
+            recommendation_rank: usize::MAX,
+            usage_score: 0,
+            old: false,
+            created_date: None,
+            effort: None,
+            is_free: false,
+            is_latest: false,
+        });
+    }
+
+    app.inline_view_state = None;
+    app.inline_interactive_state = Some(crate::tui::InlineInteractiveState {
+        kind: crate::tui::PickerKind::Model, // reuse Model's schema
+        filtered: (0..entries.len()).collect(),
+        entries,
+        selected: 0,
+        column: 0,
+        filter: String::new(),
+        preview: false,
+    });
+    app.input.clear();
+    app.cursor_pos = 0;
+}
+
 pub(crate) fn save_last_assistant_as_agent(session: &crate::session::Session) -> String {
     let text = match session.messages.iter().rev().find(|msg| msg.role == crate::message::Role::Assistant) {
         Some(msg) => {

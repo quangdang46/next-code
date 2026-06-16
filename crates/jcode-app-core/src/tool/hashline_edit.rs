@@ -2,7 +2,7 @@ use super::{Tool, ToolContext, ToolOutput};
 use crate::bus::{Bus, BusEvent, FileOp, FileTouch};
 use anyhow::Result;
 use async_trait::async_trait;
-use hashline::sha256_window;
+use hashline::{anchor, document::FileContent, hash as hashline_hash};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::path::Path;
@@ -42,42 +42,38 @@ enum AnchorInput {
 #[derive(Deserialize)]
 struct AnchorBody {
     line: usize,
-    hash_sha256: String,
-    #[serde(default = "default_context_window")]
-    context_window: usize,
-}
-
-fn default_context_window() -> usize {
-    0
+    hash: String,
 }
 
 #[inline]
-fn verify_anchor(
-    content: &str,
-    anchor_line: usize,
-    expected_hash: &str,
-    context_window: usize,
-) -> Result<()> {
-    sha256_window::verify_anchor(content, anchor_line, expected_hash, context_window)
-        .map_err(|e| anyhow::anyhow!("{e}"))
-}
-
-#[inline]
-fn apply_edit_within_window(
-    content: &str,
-    anchor_line: usize,
-    old_string: &str,
-    new_string: &str,
-    context_window: usize,
-) -> Result<(String, usize, usize)> {
-    sha256_window::apply_edit_within_window(
-        content,
-        anchor_line,
-        old_string,
-        new_string,
-        context_window,
-    )
-    .map_err(|e| anyhow::anyhow!("{e}"))
+fn verify_xxh32_anchor(content: &str, anchor_line: usize, expected_hash: &str) -> Result<()> {
+    use std::path::PathBuf;
+    let fc = FileContent {
+        path: PathBuf::from(""),
+        raw: content.to_string(),
+        normalized: content.to_string(),
+        newline: hashline::document::NewlineStyle::Lf,
+        trailing_newline: content.ends_with('\n'),
+        hash: "0000".into(),
+    };
+    let entries = fc.lines_with_hashes();
+    let line_idx = anchor_line.saturating_sub(1);
+    if line_idx >= entries.len() {
+        return Err(anyhow::anyhow!("line {} out of range", anchor_line));
+    }
+    let actual = hashline_hash::format_short_hash(entries[line_idx].short_hash);
+    if actual != expected_hash {
+        return Err(anyhow::anyhow!(
+            "anchor line {}: expected hash {}, actual hash {}",
+            anchor_line, expected_hash, actual
+        ));
+    }
+    // Also verify anchor resolve succeeds (full content hash is consistent)
+    let anchor = anchor::parse_anchor(&format!("{}:{}", anchor_line, actual))
+        .map_err(|e| anyhow::anyhow!("invalid anchor: {e}"))?;
+    anchor::resolve(&anchor, &fc)
+        .map_err(|e| anyhow::anyhow!("anchor resolve failed: {e}"))?;
+    Ok(())
 }
 
 async fn atomic_write(path: &Path, content: &str) -> Result<()> {
@@ -132,7 +128,7 @@ impl Tool for HashlineEditTool {
     }
 
     fn description(&self) -> &str {
-        "Perform surgical file edits anchored by line hash verification. Falls back to str_replace if hashline verification fails."
+        "Perform surgical file edits anchored by xxh32 short hash. Falls back to str_replace if verification fails."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -146,17 +142,16 @@ impl Tool for HashlineEditTool {
                     "oneOf": [
                         {
                             "type": "object",
-                            "required": ["line", "hash_sha256"],
-                            "description": "Structured anchor with SHA-256 line hash. Use with old_string for substring replacement.",
+                            "required": ["line", "hash"],
+                            "description": "Structured anchor with xxh32 short hash. Use with old_string for substring replacement.",
                             "properties": {
                                 "line": { "type": "integer", "description": "1-based line number." },
-                                "hash_sha256": { "type": "string", "description": "SHA-256 hash of the anchor window." },
-                                "context_window": { "type": "integer", "description": "Surrounding lines for hash (default: 0)." }
+                                "hash": { "type": "string", "description": "2-char xxh32 short hash of the line." }
                             }
                         },
                         {
                             "type": "string",
-                            "description": "Hashline anchor string like '12:ab' for a single line or '12:ab..15:cd' for a range. Uses xxh32 short hashes. Only valid when old_string is omitted."
+                            "description": "Hashline anchor string like '12:ab' for a single line or '12:ab..15:cd' for a range. Uses xxh32 short hashes."
                         }
                     ]
                 },
@@ -224,7 +219,7 @@ async fn structured_execute(
     atomic_write(path, &new_content).await?;
 
     let detail = Some(format!(
-        "lines {}-{} ({}): {} -> {}",
+        "lines {}-{} [{}]: {} -> {}",
         start_line,
         end_line,
         method,
@@ -350,17 +345,23 @@ fn replace_lines(content: &str, start: usize, end: usize, new_text: &str) -> Str
 }
 
 
-fn apply_with_fallback(
+fn apply_with_xxh32_fallback(
     content: &str,
     anchor_line: usize,
+    anchor_hash: &str,
     old_string: &str,
     new_string: &str,
-    context_window: usize,
 ) -> (String, usize, usize, &'static str) {
-    if let Ok((nc, s, e)) =
-        apply_edit_within_window(content, anchor_line, old_string, new_string, context_window)
-    {
-        return (nc, s, e, "hashline");
+    // Try xxh32 anchor verification first
+    if verify_xxh32_anchor(content, anchor_line, anchor_hash).is_ok() {
+        let line_idx = anchor_line.saturating_sub(1);
+        let mut lines: Vec<String> = content.lines().map(String::from).collect();
+        if line_idx < lines.len() && lines[line_idx].contains(old_string) {
+            lines[line_idx] = lines[line_idx].replacen(old_string, new_string, 1);
+            let result = lines.join("\n");
+            let end = anchor_line + new_string.lines().count().saturating_sub(1);
+            return (result, anchor_line, end, "hashline");
+        }
     }
 
     // Fallback: simple str_replace

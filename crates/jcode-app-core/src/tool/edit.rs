@@ -2,7 +2,7 @@ use super::{Tool, ToolContext, ToolOutput};
 use crate::bus::{Bus, BusEvent, FileOp, FileTouch};
 use anyhow::Result;
 use async_trait::async_trait;
-use hashline::sha256_window;
+use hashline::{anchor, document::FileContent, hash as hashline_hash};
 use jcode_hooks::{
     DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry, load_hooks_config,
 };
@@ -61,7 +61,7 @@ async fn atomic_write(path: &Path, content: &str) -> Result<()> {
     Ok(())
 }
 
-/// Attempt hashline-anchored edit; fall back to str_replace on failure.
+/// Attempt hashline-anchored edit using xxh32 anchor; fall back to str_replace.
 fn apply_edit(
     content: &str,
     old_string: &str,
@@ -69,32 +69,56 @@ fn apply_edit(
     replace_all: bool,
     line: usize,
 ) -> (String, usize, usize, &'static str) {
-    // Try hashline first (drift detection + context-scoped edit)
-    let ctx = 0usize;
-    if let Ok((nc, s, e)) =
-        sha256_window::apply_edit_within_window(content, line, old_string, new_string, ctx)
-    {
-        if replace_all && content.matches(old_string).count() > 1 {
-            let count_remaining = content.matches(old_string).count() - 1;
-            let mut result = nc;
-            for _ in 0..count_remaining {
-                result = result.replacen(old_string, new_string, 1);
+    // Build a FileContent to compute native xxh32 hashes for anchor verification
+    use std::path::PathBuf;
+    let fc = FileContent {
+        path: PathBuf::from(""),
+        raw: content.to_string(),
+        normalized: content.to_string(),
+        newline: hashline::document::NewlineStyle::Lf,
+        trailing_newline: content.ends_with('\n'),
+        hash: "0000".into(),
+    };
+    let entries = fc.lines_with_hashes();
+    let line_idx = line.saturating_sub(1);
+
+    // Try xxh32 anchor verification (oh-my-pi native)
+    let anchor_valid = line_idx < entries.len()
+        && entries[line_idx].content.contains(old_string)
+        && {
+            let short = hashline_hash::format_short_hash(entries[line_idx].short_hash);
+            let anchor_str = format!("{}:{}", line, short);
+            anchor::parse_anchor(&anchor_str)
+                .ok()
+                .and_then(|a| anchor::resolve(&a, &fc).ok())
+                .is_some()
+        };
+
+    if anchor_valid {
+        // Anchor verified — do line-scoped replacement
+        let mut lines: Vec<String> = content.lines().map(String::from).collect();
+        if line_idx < lines.len() && lines[line_idx].contains(old_string) {
+            if replace_all {
+                lines[line_idx] = lines[line_idx].replace(old_string, new_string);
+            } else {
+                lines[line_idx] = lines[line_idx].replacen(old_string, new_string, 1);
             }
-            return (result, s, e, "hashline");
+            let result = lines.join("\n");
+            let end = line + new_string.lines().count().saturating_sub(1);
+            return (result, line, end, "hashline");
         }
-        return (nc, s, e, "hashline");
     }
 
     // Fallback: simple str_replace
     let label = "str_replace-fallback";
     if replace_all {
         let nc = content.replace(old_string, new_string);
-        let start = find_line_number(content, old_string);
+        let start = line;
         let end = start + new_string.lines().count().saturating_sub(1);
         (nc, start, end, label)
     } else {
         let nc = content.replacen(old_string, new_string, 1);
-        let start = find_line_number(content, old_string);
+        let start = line;
         let end = start + new_string.lines().count().saturating_sub(1);
         (nc, start, end, label)
     }
@@ -107,7 +131,7 @@ impl Tool for EditTool {
     }
 
     fn description(&self) -> &str {
-        "Replace text in a file. Uses hashline-anchored editing with drift detection; falls back to str_replace if hashline verification fails."
+        "Replace text in a file. Uses hashline xxh32 anchored editing with drift detection; falls back to str_replace if anchor verification fails."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -545,7 +569,7 @@ mod tests {
         let (result, start, end, method) = apply_edit(content, old, new, false, line);
         assert_eq!(
             method, "hashline",
-            "should use hashline when verification passes"
+            "should use xxh32 hashline when verification passes"
         );
         assert_eq!(start, 2);
         assert_eq!(end, 2);
@@ -555,8 +579,7 @@ mod tests {
 
     #[test]
     fn test_apply_edit_fallback_path() {
-        // Content where old_string doesn't match line-based hashline window
-        // (e.g. multi-line old_string). apply_edit_within_window will fail,
+        // Content where old_string spans multiple lines — xxh32 anchor verify fails,
         // forcing str_replace fallback.
         let content = "line1\nline2\nline3";
         let old = "line1\nline2";
@@ -578,9 +601,7 @@ mod tests {
         let old = "abc";
         let new = "XYZ";
 
-        // hashline will fail on multi-occurrence single-line (context_window=0
-        // requires old_string to be on the exact anchor line, but "abc" appears
-        // multiple times on the same line).
+        // xxh32 anchor verify fails when old_string appears multiple times on same line
         let line = find_line_number(content, old);
         let (result, _start, _end, method) = apply_edit(content, old, new, true, line);
         assert_eq!(method, "str_replace-fallback");
