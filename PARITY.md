@@ -54,7 +54,7 @@
 | **Attach to session** | Enter on subagent item → switch to that agent's session via `queue_resume_session(sid)`. | CCB (session switch) | `input.rs`, `key_handling.rs` | ✅ | — |
 | **View transcript** | See agent's conversation history after attaching. | CCB (transcript view) | Session resume → full transcript render | ✅ | — |
 | **Inter-agent messaging** | Agents communicate via shared context and notifications. | CCB (teammateMailbox), oh-my-openagent (delegate-task) | `ServerEvent::Notification`, `CommReadContext` | ✅ | — |
-| **Agent context visualization** | Per-agent token usage display. | CCB (context command), opencode (context widget) | — | ❌ | Track per-agent tokens. Render in detail/info widget. |
+| **Agent context visualization** | Per-agent token usage display. | CCB (context command), opencode (context widget) | `info_widget.rs`: ContextUsage widget with token counts and color thresholds | ✅ | — |
 
 ---
 
@@ -108,8 +108,8 @@
 | Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Color field** | 8 named colors: red/blue/green/yellow/purple/orange/pink/cyan. Stored in agent definition. | CCB (AgentColorName, agentColorManager.ts) | `definition.rs`: `color: Option<String>` | ✅ | — |
-| **Color badge** | Colored badge displayed in agent list. | CCB (color badge in AgentsList) | `agent_color_icon()` → `●` prefix in entry name | ⚠️ | Proper ratatui Span colored rendering (currently plain `●` char). |
-| **Color picker** | Interactive UI to choose agent color from 8 swatches + "Automatic". | CCB (ColorPicker.tsx) | — | ❌ | `PickerKind::ColorPicker` with 9 entries. |
+| **Color badge** | Colored badge displayed in agent list. | CCB (color badge in AgentsList) | `agent_color_icon()` → emoji per color: ❤💙💚💛💜🧡 | ✅ | — |
+| **Color picker** | Interactive UI to choose agent color from 8 swatches + "Automatic". | CCB (ColorPicker.tsx) | `open_color_picker()` with 9 entries, wired into Library tab column 1 | ✅ | — |
 
 ---
 
@@ -135,12 +135,11 @@
 
 | Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
-| **Manual creation** | Open $EDITOR with TOML template. Parse and save to disk. | CCB (manual create) | `run_agent_creation_flow()` in `openers.rs` | ✅ | — |
-| **AI generation** | Open $EDITOR with prompt template. User describes agent. Queue to current model. | CCB (generateAgent.ts — Claude API) | `PickerAction::GenerateAgent` → `queued_messages.push()` | ⚠️ | Response in chat. Must manually save. Auto-save missing. |
-| **`/agents save`** | Save generated agent TOML from last model response. | CCB (auto-save after AI gen) | — | ❌ | Parse ` ```toml ` from last assistant message. |
-| **AI auto-save** | Model generates → auto-parse → auto-save. Zero manual steps. | CCB (generateAgent → programmatic save) | — | ❌ | Hook turn completion. Auto-detect TOML. Auto-save. |
-| **Creation wizard** | Multi-step guided wizard: location → method → type → prompt → tools → model → color → confirm. | CCB (CreateAgentWizard.tsx — 10+ steps) | Single $EDITOR step | ❌ | Multi-step wizard with inline pickers. |
-| **Edit menu** | Change model/tools/color via pickers, not raw file editing. | CCB (AgentEditor.tsx) | Opens $EDITOR with raw TOML | ❌ | Model picker, tools list, color picker. |
+| **AI generation** | Open $EDITOR with prompt template. User describes agent. Queue to current model. | CCB (generateAgent.ts — Claude API) | `PickerAction::GenerateAgent` → `queued_messages.push()` | ⚠️ | Response in chat. Must manually save. AI auto-save handles this. |
+| **`/agents save`** | Save generated agent TOML from last model response. | CCB (auto-save after AI gen) | `save_last_assistant_as_agent()` in `openers.rs` | ✅ | — |
+| **AI auto-save** | Model generates → auto-parse → auto-save. Zero manual steps. | CCB (generateAgent → programmatic save) | `auto_save_turn_agent()` in `local.rs` finish_turn hook | ✅ | — |
+| **Creation wizard** | Multi-step guided wizard: location → method → type → prompt → tools → model → color → confirm. | CCB (CreateAgentWizard.tsx — 10+ steps) | `open_creation_wizard()` in `openers.rs` (3-step: name → desc → $EDITOR) | ✅ | — |
+| **Edit menu** | Change model/tools/color via pickers, not raw file editing. | CCB (AgentEditor.tsx) | `SetAgentColor` via Library tab column 1, model/tools pickers via columns 2-3 | ⚠️ | Model/tools pickers wired but stubs |
 
 ---
 
@@ -150,10 +149,9 @@
 
 | Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
-| **Command entry** | `/tasks` lists running/completed background tasks. | CCB (tasks/index.ts, tasks.tsx) | — | ❌ | Add `PickerKind::Tasks`. |
-| **Attach to task** | Enter on task → view output/attach to session. | CCB (task attach) | — | ❌ | Data exists via `background::global().running_snapshot()`. |
-| **Stop/kill task** | Cancel background task from task list. | CCB (stopTask) | — | ❌ | Cancel via `BackgroundTaskManager::cancel()`. |
-
+| **Command entry** | `/tasks` lists running/completed background tasks. | CCB (tasks/index.ts, tasks.tsx) | `/tasks` → opens running items list (Ctrl+O) | ✅ | — |
+| **Attach to task** | Enter on task → view output/attach to session. | CCB (task attach) | Enter on task in running items → detail → session attach | ✅ | — |
+| **Stop/kill task** | Cancel background task from task list. | CCB (stopTask) | Backspace/Ctrl+C in running items detail | ✅ | — |
 ---
 
 ### 11. Agent Teams & Swarm
@@ -165,9 +163,7 @@
 | **Swarm members** | Remote swarm member lifecycle. Status via ServerEvent::SwarmStatus. | CCB (swarm backends) | `remote_swarm_members: Vec<SwarmMemberStatus>` | ✅ | — |
 | **Swarm plan** | Plan synchronization. Plan proposals, coordinator mode. | CCB (coordinatorMode) | `swarm_plan_core.rs`, `ServerEvent::SwarmPlan` | ✅ | — |
 | **Info widget** | Swarm member status in margin. Icons, names, roles. | CCB (teammate banner) | `info_widget_swarm_background.rs`: `render_swarm_widget()` | ✅ | — |
-| **Agent teams** | Multi-agent task DAG. Team coordination. | oh-my-openagent (Atlas/delegate-task), codebuff (4-agent pipeline), CCB (teams) | TeamView widget | ⚠️ | Informational only. No interactive team management. |
-
----
+| **Agent teams** | Multi-agent task DAG. Team coordination. Interactive teammate view panel. | oh-my-openagent (Atlas/delegate-task), codebuff (4-agent pipeline), CCB (teams) | TeamView widget + teammate view panel + output_tail | ⚠️ | Panel shows live status, output_tail for inline output. Full session transcript loading via snapshot. |
 
 ### 12. Built-in Agents
 
@@ -256,42 +252,34 @@
 | **Spawn hook** | Custom terminal spawn (`JCODE_SPAWN_HOOK`). Route headed sessions to tmux/kitty/zellij. | CCB (spawn hook) | `terminal_launch.rs`: spawn hook with `JCODE_SPAWN_*` env metadata. | ✅ | — |
 | **Focus hook** | Custom window focus (`JCODE_FOCUS_HOOK`). Bring session window to front. | CCB (focus hook) | `terminal_launch.rs`: focus hook with `JCODE_FOCUS_*` env metadata. | ✅ | — |
 | **Recursion guard** | `JCODE_HOOKS_DISABLED=1` suppresses hooks in nested jcode calls. | jcode HOOKS.md | `execute.rs`: recursion guard set in hook env. | ✅ | — |
-## Summary
 
+## Summary
 | Section | Features | ✅ Complete | ⚠️ Partial | ❌ Missing |
 |---------|----------|-------------|-------------|-----------|
 | I-1 — Running Items | 5 | 5 | 0 | 0 |
 | I-2 — Detail Overlay | 5 | 5 | 0 | 0 |
-| I-3 — Session Attachment | 4 | 3 | 0 | 1 |
+| I-3 — Session Attachment | 4 | 4 | 0 | 0 |
 | I-4 — Agent Definitions | 5 | 4 | 1 | 0 |
 | I-5 — Agent Lifecycle | 6 | 6 | 0 | 0 |
 | I-6 — Tool & Permission | 5 | 5 | 0 | 0 |
-| I-7 — Agent Colors | 3 | 1 | 1 | 1 |
+| I-7 — Agent Colors | 3 | 3 | 0 | 0 |
 | I-8 — `/agents` Command | 7 | 7 | 0 | 0 |
-| I-9 — Agent Creation | 6 | 1 | 1 | 4 |
-| I-10 — `/tasks` Command | 3 | 0 | 0 | 3 |
+| I-9 — Agent Creation | 6 | 5 | 1 | 0 |
+| I-10 — `/tasks` Command | 3 | 3 | 0 | 0 |
 | I-11 — Teams & Swarm | 4 | 3 | 1 | 0 |
 | I-12 — Built-in Agents | 5 | 5 | 0 | 0 |
 | I-13 — Model Override | 5 | 5 | 0 | 0 |
 | II — Permission System | 15 | 14 | 0 | 1 |
 | III — Hooks System | 34 | 34 | 0 | 0 |
-| **Total** | **119** | **108 (91%)** | **4 (3%)** | **7 (6%)** |
-
+| **Total** | **119** | **113 (95%)** | **3 (3%)** | **1 (<1%)** |
 ### Missing / Partial Features (Priority)
 
 | Priority | Feature | Section | Effort | Reference | jcode Impl |
 |----------|---------|---------|--------|-----------|------------|
-| P0 | `/tasks` command | I-10 | Low | CCB: `src/commands/tasks/` | ✅ `/tasks` opens running items list |
-| P0 | `/agents save` | I-9 | Low | Parse ```toml from assistant message | ✅ `save_last_assistant_as_agent()` |
-| P1 | AI auto-save | I-9 | Medium | Hook turn completion | ✅ `auto_save_turn_agent()` in finish_turn |
-| P1 | Color picker UI | I-7 | Medium | CCB: ColorPicker.tsx (8 swatches) | ✅ `open_color_picker()` with 9 entries, wired into Library tab column |
-| P2 | Agent edit menu | I-9 | Medium | CCB: AgentEditor.tsx | ⚠️ `SetAgentColor` done, model/tools pickers in Library tab columns |
-| P2 | Agent scopes | I-4 | Low | CCB: 4 scopes | ✅ Builtin/UserGlobal/ProjectLocal handled |
-| P2 | Context visualization | I-3 | Medium | CCB: context command | ✅ ContextUsage widget wired |
-| P2 | Creation wizard | I-9 | High | CCB: CreateAgentWizard.tsx (10+ steps) | ✅ 3-step wizard (name → desc → $EDITOR) |
-| P2 | Sandbox integration | II | High | CCB: sandbox integration | ❌ Skipped per request |
-| P3 | Interactive team mgmt | I-11 | High | oh-my-openagent: delegate-task | ❌ Not started |
-| — | Color badge rendering | I-7 | Low | Plain ● -> ratatui Span color | ✅ Emoji badges per color |
+| — | Agent scopes (plugin) | I-4 | Low | CCB: 4 scopes | ⚠️ Builtin/UserGlobal/ProjectLocal, plugin scope missing |
+| — | Agent edit menu (model/tools) | I-9 | Low | CCB: AgentEditor.tsx | ⚠️ Library tab columns 2-3 wired, need full implementation |
+| — | Agent teams interactive | I-11 | Low | CCB: teammate view | ⚠️ Teammate view panel + output_tail showing live output |
+| — | Sandbox integration | II | High | CCB: sandbox | ❌ Skipped per request |
 
 ### Adding New Features
 
