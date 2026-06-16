@@ -1,7 +1,7 @@
 use super::{Tool, ToolContext, ToolOutput, get_best_of_n_handle};
 use anyhow::Result;
 use async_trait::async_trait;
-use hashline::sha256_window;
+use hashline::{anchor, document::FileContent, hash as hashline_hash};
 use jcode_best_of_n::ProposedContentStore;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -32,13 +32,7 @@ struct ProposeHashlineEditInput {
 #[derive(Deserialize)]
 struct HashlineAnchor {
     line: usize,
-    hash_sha256: String,
-    #[serde(default = "default_context_window")]
-    context_window: usize,
-}
-
-fn default_context_window() -> usize {
-    0
+    hash: String,
 }
 
 #[async_trait]
@@ -48,8 +42,7 @@ impl Tool for ProposeHashlineEditTool {
     }
 
     fn description(&self) -> &str {
-        "Propose a hashline-anchored edit without applying it (best-of-N mode). \
-         Writes the proposed content to the ProposedContentStore for the orchestrator to evaluate."
+        "Propose a xxh32 hashline edit without applying it (best-of-N mode). Writes proposed content to the ProposedContentStore."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -64,26 +57,22 @@ impl Tool for ProposeHashlineEditTool {
                 },
                 "anchor": {
                     "type": "object",
-                    "required": ["line", "hash_sha256"],
-                    "description": "Line hash anchor for edit verification.",
+                    "required": ["line", "hash"],
+                    "description": "xxh32 short hash anchor for edit verification.",
                     "properties": {
                         "line": {
                             "type": "integer",
                             "description": "1-based line number in the file."
                         },
-                        "hash_sha256": {
+                        "hash": {
                             "type": "string",
-                            "description": "SHA-256 hash of the anchor window (line +/- context_window)."
-                        },
-                        "context_window": {
-                            "type": "integer",
-                            "description": "Number of surrounding lines to include in hash (default: 0)."
+                            "description": "2-char xxh32 short hash of the line."
                         }
                     }
                 },
                 "old_string": {
                     "type": "string",
-                    "description": "Exact text to replace within the verified anchor window."
+                    "description": "Exact text to replace on the verified line."
                 },
                 "new_string": {
                     "type": "string",
@@ -127,24 +116,45 @@ impl Tool for ProposeHashlineEditTool {
 
         let content = tokio::fs::read_to_string(&path).await?;
 
-        // Step 1: Verify the anchor hash
-        sha256_window::verify_anchor(
-            &content,
-            params.anchor.line,
-            &params.anchor.hash_sha256,
-            params.anchor.context_window,
-        )
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        // Step 1: Verify the xxh32 anchor hash
+        {
+            use std::path::PathBuf;
+            let fc = FileContent {
+                path: PathBuf::from(""),
+                raw: content.clone(),
+                normalized: content.clone(),
+                newline: hashline::document::NewlineStyle::Lf,
+                trailing_newline: content.ends_with('\n'),
+                hash: "0000".into(),
+            };
+            let entries = fc.lines_with_hashes();
+            let line_idx = params.anchor.line.saturating_sub(1);
+            if line_idx >= entries.len() {
+                return Err(anyhow::anyhow!("line {} out of range", params.anchor.line));
+            }
+            let actual = hashline_hash::format_short_hash(entries[line_idx].short_hash);
+            if actual != params.anchor.hash {
+                return Err(anyhow::anyhow!(
+                    "anchor hash mismatch at line {}: expected {}, actual {}",
+                    params.anchor.line, params.anchor.hash, actual
+                ));
+            }
+            let anchor_obj = anchor::parse_anchor(&format!("{}:{}", params.anchor.line, actual))
+                .map_err(|e| anyhow::anyhow!("invalid anchor: {e}"))?;
+            anchor::resolve(&anchor_obj, &fc)
+                .map_err(|e| anyhow::anyhow!("anchor resolve failed: {e}"))?;
+        }
 
-        // Step 2: Apply edit within the anchor window (in memory)
-        let (new_content, start_line, end_line) = sha256_window::apply_edit_within_window(
-            &content,
-            params.anchor.line,
-            &params.old_string,
-            &params.new_string,
-            params.anchor.context_window,
-        )
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        // Step 2: Apply edit — line-scoped replacement
+        let mut lines: Vec<String> = content.lines().map(String::from).collect();
+        let line_idx = params.anchor.line.saturating_sub(1);
+        if line_idx >= lines.len() || !lines[line_idx].contains(&params.old_string) {
+            return Err(anyhow::anyhow!("old_string not found on line {}", params.anchor.line));
+        }
+        lines[line_idx] = lines[line_idx].replacen(&params.old_string, &params.new_string, 1);
+        let new_content = lines.join("\n");
+        let start_line = params.anchor.line;
+        let end_line = start_line + params.new_string.lines().count().saturating_sub(1).max(0);
 
         // Generate diff preview
         let diff = generate_diff(&params.old_string, &params.new_string, start_line);
@@ -162,7 +172,7 @@ impl Tool for ProposeHashlineEditTool {
         );
 
         Ok(ToolOutput::new(format!(
-            "[PROPOSED] {}: hashline edit lines {}-{} (anchor verified)\n{}\n\n\
+            "[PROPOSED] {}: xxh32 hashline edit lines {}-{} (anchor verified)\n{}\n\n\
              Proposal stored for candidate '{}' in run '{}' (not written to disk).",
             params.file_path, start_line, end_line, diff, candidate_id, run_id
         ))

@@ -207,13 +207,13 @@ async fn structured_execute(
         ));
     }
 
-    // Try hashline path with str_replace fallback
-    let (new_content, start_line, end_line, method) = apply_with_fallback(
+    // Try xxh32 hashline path with str_replace fallback
+    let (new_content, start_line, end_line, method) = apply_with_xxh32_fallback(
         content,
         anchor.line,
+        &anchor.hash,
         old_string,
         &params.new_string,
-        anchor.context_window,
     );
 
     atomic_write(path, &new_content).await?;
