@@ -2858,28 +2858,7 @@ impl App {
                     }
                     PickerAction::CreateAgent => {
                         self.inline_interactive_state = None;
-                        let template = r#"# Agent Definition
-id = "my-agent"
-display_name = "My Agent"
-tool_names = ["Read", "Grep", "Glob", "Bash"]
-system_prompt = """
-You are a helpful coding assistant.
-"""
-# Optional: model_override, permission_mode, max_turns, color (red/blue/green/yellow/purple/orange/pink/cyan)
-"#;
-                        let raw = crossterm::terminal::is_raw_mode_enabled().unwrap_or(false);
-                        if raw { let _ = crossterm::terminal::disable_raw_mode(); }
-                        let _ = crossterm::execute!(std::io::stdout(),
-                            crossterm::terminal::LeaveAlternateScreen,
-                            crossterm::cursor::Show);
-                        let result = self.run_agent_creation_flow(template);
-                        let _ = crossterm::execute!(std::io::stdout(),
-                            crossterm::terminal::EnterAlternateScreen);
-                        if raw { let _ = crossterm::terminal::enable_raw_mode(); }
-                        match result {
-                            Ok(msg) => self.set_status_notice(msg),
-                            Err(e) => self.set_status_notice(format!("{}", e)),
-                        }
+                        super::inline_interactive::openers::open_creation_wizard(self);
                     }
                     PickerAction::GenerateAgent => {
                         self.inline_interactive_state = None;
