@@ -18,7 +18,7 @@ impl WorkflowHandler for UltraqaHandler {
     fn build_prompt(&self) -> String {
         "# $ultraqa — QA Cycling Mode
 
-MANDATORY: Say "QA MODE ENABLED!" as your first response.
+MANDATORY: Say \"QA MODE ENABLED!\" as your first response.
 
 ## QA Protocol (max 5 iterations)
 1. IMPLEMENT — Write or modify code

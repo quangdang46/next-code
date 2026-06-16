@@ -16,7 +16,7 @@ impl WorkflowHandler for DeepsearchHandler {
     fn build_prompt(&self) -> String {
         "# $deepsearch — Codebase Search Mode
 
-MANDATORY: Say "DEEP SEARCH MODE ENABLED!" as your first response.
+MANDATORY: Say \"DEEP SEARCH MODE ENABLED!\" as your first response.
 
 ## Search Strategies
 1. Text/Regex — grep for keywords, patterns, identifiers

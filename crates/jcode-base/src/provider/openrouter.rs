@@ -1511,7 +1511,7 @@ impl OpenRouterProvider {
             client: crate::provider::shared_http_client(),
             model: Arc::new(RwLock::new(DEFAULT_MODEL.to_string())),
             reasoning_effort: Arc::new(RwLock::new(None)),
-            api_base: DEFAULT_API_BASE.to_string(),
+            api_base: configured_api_base(),
             auth: ProviderAuth::AuthorizationBearer {
                 token: api_key,
                 label,

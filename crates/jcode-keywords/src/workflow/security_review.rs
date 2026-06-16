@@ -15,7 +15,7 @@ impl WorkflowHandler for SecurityReviewHandler {
     fn build_prompt(&self) -> String {
         "# $security-review — Security Review Mode
 
-MANDATORY: Say "SECURITY REVIEW MODE ENABLED!" as your first response.
+MANDATORY: Say \"SECURITY REVIEW MODE ENABLED!\" as your first response.
 
 ## OWASP Top 10 Checklist
 A01: Broken Access Control

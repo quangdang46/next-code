@@ -16,7 +16,7 @@ impl WorkflowHandler for RalplanHandler {
     fn build_prompt(&self) -> String {
         "# $ralplan — Consensus Planning Mode
 
-MANDATORY: Say "CONSENSUS PLANNING MODE ENABLED!" as your first response.
+MANDATORY: Say \"CONSENSUS PLANNING MODE ENABLED!\" as your first response.
 
 ## Planning Protocol
 1. PLAN — Generate a detailed step-by-step plan

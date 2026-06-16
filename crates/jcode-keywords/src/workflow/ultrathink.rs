@@ -15,7 +15,7 @@ impl WorkflowHandler for UltrathinkHandler {
     fn build_prompt(&self) -> String {
         "# $ultrathink — Extended Thinking Mode
 
-MANDATORY: Say "ULTRATHINK MODE ENABLED!" as your first response.
+MANDATORY: Say \"ULTRATHINK MODE ENABLED!\" as your first response.
 
 ## Deep Reasoning Protocol
 1. Problem decomposition — Break into sub-problems

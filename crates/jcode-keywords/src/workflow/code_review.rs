@@ -15,7 +15,7 @@ impl WorkflowHandler for CodeReviewHandler {
     fn build_prompt(&self) -> String {
         "# $code-review — Code Review Mode
 
-MANDATORY: Say "CODE REVIEW MODE ENABLED!" as your first response.
+MANDATORY: Say \"CODE REVIEW MODE ENABLED!\" as your first response.
 
 ## Review Checklist
 1. Correctness — Logic errors, edge cases, off-by-one

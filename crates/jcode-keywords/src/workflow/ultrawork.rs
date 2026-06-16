@@ -16,7 +16,7 @@ impl WorkflowHandler for UltraworkHandler {
     fn build_prompt(&self) -> String {
         "# $ultrawork — Parallel Execution Mode
 
-MANDATORY: Say "ULTRAWORK MODE ENABLED!" as your first response.
+MANDATORY: Say \"ULTRAWORK MODE ENABLED!\" as your first response.
 
 ## CERTAINTY PROTOCOL
 Do NOT start implementing until 100% certain. Before you write code:

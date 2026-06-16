@@ -16,7 +16,7 @@ impl WorkflowHandler for TddHandler {
     fn build_prompt(&self) -> String {
         "# $tdd — Test-Driven Development Mode
 
-MANDATORY: Say "TDD MODE ENABLED!" as your first response.
+MANDATORY: Say \"TDD MODE ENABLED!\" as your first response.
 
 ## Red → Green → Refactor Cycle
 1. RED — Write a failing test FIRST
