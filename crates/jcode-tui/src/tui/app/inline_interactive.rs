@@ -3150,6 +3150,43 @@ User's request:
                         // First-run onboarding: a model choice advances the flow.
                         self.onboarding_after_model_select();
                     }
+
+                    PickerAction::OpenColorPicker => {
+                        self.inline_interactive_state = None;
+                        self.set_status_notice("Color picker — coming soon");
+                    }
+                    PickerAction::SetAgentColor { agent_id, color } => {
+                        self.inline_interactive_state = None;
+                        let home = match dirs::home_dir() {
+                            Some(h) => h.join(".jcode").join("agents"),
+                            None => { self.set_status_notice("No home dir"); return Ok(()); }
+                        };
+                        let path = home.join(format!("{}.toml", agent_id));
+                        match std::fs::read_to_string(&path) {
+                            Ok(content) => {
+                                // Rewrite the file with/without color field
+                                let color_val = color.as_deref().unwrap_or("");
+                                let lines: Vec<&str> = content.lines().filter(|l| !l.starts_with("color =")).collect();
+                                let new_content = if color_val.is_empty() {
+                                    lines.join("\n")
+                                } else {
+                                    let base = lines.iter().copied().collect::<Vec<&str>>().join("\n");
+                                    format!("{}\ncolor = \"{}\"", base, color_val)
+                                };
+                                let _ = std::fs::write(&path, &new_content);
+                                self.set_status_notice(format!("Agent {} color set to {}", agent_id, color_val));
+                            }
+                            Err(e) => self.set_status_notice(format!("Failed to read agent: {}", e)),
+                        }
+                    }
+                    PickerAction::OpenAgentModelPicker { agent_id } => {
+                        self.inline_interactive_state = None;
+                        self.set_status_notice(format!("Model picker for {} — coming soon", agent_id));
+                    }
+                    PickerAction::OpenAgentToolsPicker { agent_id } => {
+                        self.inline_interactive_state = None;
+                        self.set_status_notice(format!("Tools picker for {} — coming soon", agent_id));
+                    }
                 }
             }
             KeyCode::Backspace => {

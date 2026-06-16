@@ -1014,6 +1014,14 @@ pub enum PickerAction {
     GenerateAgent,
     /// Open an existing agent definition file for editing.
     EditAgent { agent_id: String, source_path: String },
+    /// Open color picker for an agent.
+    OpenColorPicker,
+    /// Set agent color (None = automatic).
+    SetAgentColor { agent_id: String, color: Option<String> },
+    /// Open model picker for an agent.
+    OpenAgentModelPicker { agent_id: String },
+    /// Open tools picker for an agent.
+    OpenAgentToolsPicker { agent_id: String },
     /// Delete an agent definition file.
     DeleteAgent { agent_id: String, source_path: String },
 }
@@ -1114,7 +1122,11 @@ fn estimate_picker_action_bytes(action: &PickerAction) -> usize {
         | PickerAction::CreateAgent
         | PickerAction::GenerateAgent
         | PickerAction::EditAgent { .. }
-        | PickerAction::DeleteAgent { .. } => 0,
+        | PickerAction::DeleteAgent { .. }
+        | PickerAction::OpenColorPicker
+        | PickerAction::SetAgentColor { .. }
+        | PickerAction::OpenAgentModelPicker { .. }
+        | PickerAction::OpenAgentToolsPicker { .. } => 0,
         PickerAction::Account(AccountPickerAction::Switch { provider_id, label }) => {
             provider_id.capacity() + label.capacity()
         }

@@ -94,6 +94,10 @@ pub(super) fn picker_account_provider_scope(picker: &InlineInteractiveState) -> 
         | PickerAction::CreateAgent
         | PickerAction::GenerateAgent
         | PickerAction::EditAgent { .. }
-        | PickerAction::DeleteAgent { .. } => None,
+        | PickerAction::DeleteAgent { .. }
+        | PickerAction::OpenColorPicker
+        | PickerAction::SetAgentColor { .. }
+        | PickerAction::OpenAgentModelPicker { .. }
+        | PickerAction::OpenAgentToolsPicker { .. } => None,
     })
 }
