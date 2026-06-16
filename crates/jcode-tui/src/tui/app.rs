@@ -1307,6 +1307,10 @@ pub struct App {
     pub view_teammate_selection: bool,
     /// When true, auto-continuation after each turn is disabled.
     pub goal_continuation_disabled: bool,
+    /// Agent snapshot cache: (filename, mtime) for detecting changes.
+    pub agent_snapshot_cache: Vec<(String, std::time::SystemTime)>,
+    /// Whether initial agent snapshot check has been performed.
+    pub agent_snapshot_checked: bool,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

@@ -953,6 +953,49 @@ pub(crate) fn open_tools_picker(app: &mut App, agent_id: &str) {
     app.input.clear();
     app.cursor_pos = 0;
 }
+
+/// Check if agent definition files have changed since last check.
+pub(super) fn check_agent_snapshots(app: &mut App) {
+    let agents_path = match dirs::home_dir() {
+        Some(h) => h.join(".jcode").join("agents"),
+        None => return,
+    };
+    if !agents_path.is_dir() { return; }
+
+    let mut current: Vec<(String, std::time::SystemTime)> = Vec::new();
+    let mut changed = Vec::new();
+
+    if let Ok(entries) = std::fs::read_dir(&agents_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("toml") { continue; }
+            let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+            if let Ok(meta) = entry.metadata() {
+                if let Ok(mtime) = meta.modified() {
+                    let was = app.agent_snapshot_cache.iter().find(|(n, _)| n == &name);
+                    if was.map(|(_, t)| t != &mtime).unwrap_or(true) {
+                        if app.agent_snapshot_checked || was.is_some() {
+                            changed.push(name.clone());
+                        }
+                    }
+                    current.push((name, mtime));
+                }
+            }
+        }
+    }
+
+    app.agent_snapshot_cache = current;
+    app.agent_snapshot_checked = true;
+
+    if !changed.is_empty() {
+        app.push_display_message(
+            crate::tui::DisplayMessage::system(format!(
+                "Agent definition(s) changed since last session: {}.\nCheck /agents for updates.",
+                changed.join(", "),
+            )).with_title("Agent Snapshots"),
+        );
+    }
+}
 /// After all steps, opens $EDITOR with a pre-filled template.
 pub(crate) fn open_creation_wizard(app: &mut App) {
     // Step 1: Edit name + description

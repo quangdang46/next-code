@@ -265,6 +265,12 @@ impl App {
                 needs_redraw = false;
             }
 
+            // First-time agent snapshot check (runs once after initial draw)
+            if !self.agent_snapshot_checked {
+                super::inline_interactive::openers::check_agent_snapshots(&mut self);
+                needs_redraw = true;
+            }
+
             if self.should_quit {
                 break;
             }
