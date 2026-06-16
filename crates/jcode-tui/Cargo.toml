@@ -25,6 +25,7 @@ jcode-config-types = { path = "../jcode-config-types" }
 jcode-app-core = { path = "../jcode-app-core", default-features = false }
 jcode-agent-runtime = { path = "../jcode-agent-runtime" }
 jcode-keywords = { path = "../jcode-keywords" }
+basic-toml = "0.1"
 jcode-memory-types = { path = "../jcode-memory-types" }
 
 # Pure math kernels for the idle animations (3D samplers, glyph chooser,

@@ -5365,8 +5365,8 @@ dependencies = [
 
 [[package]]
 name = "hashline"
-version = "0.6.0"
-source = "git+https://github.com/quangdang46/hashline.git?rev=27b89e437ad3b17afc39e97913779e9c9d2ec31d#27b89e437ad3b17afc39e97913779e9c9d2ec31d"
+version = "0.7.0"
+source = "git+https://github.com/quangdang46/hashline.git?rev=1780f4b81333047323058041d3d0e64abce0c9ad#1780f4b81333047323058041d3d0e64abce0c9ad"
 dependencies = [
  "clap",
  "libc",
@@ -7356,6 +7356,7 @@ dependencies = [
  "arboard",
  "async-trait",
  "base64 0.22.1",
+ "basic-toml",
  "chrono",
  "crossterm",
  "dirs 5.0.1",

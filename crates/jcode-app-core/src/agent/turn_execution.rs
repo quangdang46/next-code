@@ -128,9 +128,10 @@ impl Agent {
                     .prompt(user_message)
                     .build();
                 let event = HookEvent::UserPromptExpansion;
+                let handlers: Vec<jcode_hooks::HookHandlerConfig> = handlers.into_iter().cloned().collect();
                 let dispatch_config = self.dispatch_config.clone();
                 tokio::spawn(async move {
-                    let refs: Vec<_> = handlers.iter().collect();
+                    let refs: Vec<&jcode_hooks::HookHandlerConfig> = handlers.iter().collect();
                     let _ = jcode_hooks::dispatch_hooks(&event, &hook_input, &refs, &dispatch_config).await;
                 });
             }

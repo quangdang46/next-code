@@ -737,3 +737,41 @@ impl App {
 fn agent_color_icon(color: &str) -> Option<&'static str> {
     Some("●")
 }
+
+pub(crate) fn save_last_assistant_as_agent(session: &crate::session::Session) -> String {
+    let text = match session.messages.iter().rev().find(|msg| msg.role == crate::message::Role::Assistant) {
+        Some(msg) => {
+            msg.content.iter().filter_map(|block| {
+                if let crate::message::ContentBlock::Text { text: t, .. } = block {
+                    Some(t.as_str())
+                } else { None }
+            }).collect::<Vec<_>>().join("\n")
+        }
+        None => return "No assistant message found.".to_string(),
+    };
+    let toml_start = match text.find("```toml") {
+        Some(i) => i + 7,
+        None => return "No ```toml code block found.".to_string(),
+    };
+    let toml_end = match text[toml_start..].find("```") {
+        Some(i) => toml_start + i,
+        None => return "Unclosed ```toml block.".to_string(),
+    };
+    let toml_content = text[toml_start..toml_end].trim();
+    let def: jcode_agent_runtime::AgentDefinition = match basic_toml::from_str(toml_content) {
+        Ok(d) => d,
+        Err(e) => return format!("Invalid agent: {}", e),
+    };
+    let agents_dir = match dirs::home_dir() {
+        Some(h) => h.join(".jcode").join("agents"),
+        None => return "No home dir.".to_string(),
+    };
+    if let Err(e) = std::fs::create_dir_all(&agents_dir) {
+        return format!("mkdir fail: {}", e);
+    }
+    let path = agents_dir.join(format!("{}.toml", def.id));
+    match std::fs::write(&path, toml_content) {
+        Ok(_) => format!("Agent '{}' saved to {}", def.display_name, path.display()),
+        Err(e) => format!("Write fail: {}", e),
+    }
+}

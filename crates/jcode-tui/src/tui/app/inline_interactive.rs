@@ -11,7 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 #[path = "inline_interactive/helpers.rs"]
 mod helpers;
 #[path = "inline_interactive/openers.rs"]
-mod openers;
+pub(crate) mod openers;
 #[path = "inline_interactive/preview.rs"]
 mod preview;
 #[path = "inline_interactive/preview_request.rs"]
@@ -2614,7 +2614,7 @@ impl App {
                     if picker.uses_compact_navigation() {
                         return Ok(());
                     }
-                    if picker.kind == PickerKind::Agents {
+                if picker.kind == PickerKind::Agents  {
                         if picker.column == 0 {
                             picker.column = 1;
                             picker.selected = 0;
@@ -2634,7 +2634,7 @@ impl App {
             }
             KeyCode::BackTab | KeyCode::Left => {
                 if let Some(ref mut picker) = self.inline_interactive_state {
-                    if picker.kind == PickerKind::Agents {
+                    if picker.kind == PickerKind::Agents  {
                         if picker.column >= 1 {
                             picker.column = 0;
                             picker.selected = 0;
@@ -2759,7 +2759,7 @@ impl App {
                 }
 
                 // Agents picker: Running tab → open running items list
-                if picker.kind == PickerKind::Agents && picker.column == 0 {
+                if picker.kind == PickerKind::Agents  && picker.column == 0 {
                     self.inline_interactive_state = None;
                     self.running_items_state.visible = true;
                     self.running_items_state.detail_open = false;

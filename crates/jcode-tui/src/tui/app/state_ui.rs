@@ -1669,6 +1669,21 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
         return true;
     }
 
+    if trimmed == "/tasks" {
+        app.running_items_state.visible = true;
+        app.set_status_notice("Tasks: Ctrl+O toggle, ↑↓ navigate, Enter view detail.");
+        return true;
+    }
+
+    if trimmed == "/agents save" || trimmed.starts_with("/agents save ") {
+        let content = super::inline_interactive::openers::save_last_assistant_as_agent(&app.session);
+        app.push_display_message(
+            DisplayMessage::system(content).with_title("Agent Save"),
+        );
+        app.set_status_notice("Agent save");
+        return true;
+    }
+
 if trimmed == "/permissions" || trimmed.starts_with("/permissions ") {
     let current = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
     let mut content = format!("Current permission mode: **{}**\n\n", current);
