@@ -919,38 +919,82 @@ fn append_option_row(lines: &mut Vec<Line<'static>>, sel: usize, dim: &Style, hl
     lines.push(Line::from(Span::styled("  \u{2190}\u{2192} navigate  \u{23ce} Enter  Esc reject", (*dim).clone())));
 }
 
-
-/// Draw the teammate view banner at the top of the transcript area.
-/// Shows "Viewing: {name}" with Esc hint (CCB teammate view style).
-pub(super) fn draw_teammate_view_banner(
+/// Draw the teammate view panel — shows the teammate's live status, detail,
+/// and real-time updates in a dedicated overlay (CCB teammate view style).
+pub(super) fn draw_teammate_view_panel(
     frame: &mut Frame,
     area: Rect,
     app: &dyn crate::tui::TuiState,
 ) {
     let sid = match app.viewing_teammate_session_id() {
-        Some(s) => s.to_string(),
+        Some(s) => s,
         None => return,
     };
-    let short = if sid.len() > 8 { format!("…{}", &sid[sid.len()-8..]) } else { sid.clone() };
+    if area.width < 30 || area.height < 5 { return; }
 
-    let banner_area = Rect::new(area.x, area.y, area.width.min(60), 3);
-    clear_area(frame, banner_area);
+    let items = app.running_items();
+    let teammate = items.items.iter().find(|i| i.session_id.as_deref() == Some(sid));
+    let (label, detail, status) = match teammate {
+        Some(t) => (t.label.clone(), t.detail.clone().unwrap_or_default(), t.status),
+        None => return,
+    };
 
     let dim = Style::default().fg(rgb(100, 100, 110));
-    let accent = Style::default().fg(rgb(80, 160, 255)).bold();
+    let iw = area.width.saturating_sub(4) as usize;
+    let title = format!(" Viewing: {} ", label);
+    let top = format!("╭{}\u{2500}{}\u{2500}╮", "─".repeat(4), "─".repeat(iw.saturating_sub(title.chars().count())));
 
-    let mut lines = vec![
+    let status_label = match status {
+        crate::tui::RunningItemStatus::Running => "running",
+        crate::tui::RunningItemStatus::Completed => "completed",
+        crate::tui::RunningItemStatus::Failed => "failed",
+        crate::tui::RunningItemStatus::Stopped => "stopped",
+    };
+    let status_color = match status {
+        crate::tui::RunningItemStatus::Running => rgb(80, 220, 100),
+        crate::tui::RunningItemStatus::Completed => rgb(100, 180, 100),
+        crate::tui::RunningItemStatus::Failed => rgb(255, 100, 100),
+        crate::tui::RunningItemStatus::Stopped => rgb(200, 180, 80),
+    };
+
+    let mut lines: Vec<Line<'static>> = vec![
+        Line::from(Span::styled(top, dim)),
         Line::from(Span::styled(
-            format!("╭── Viewing: session {} ─────────────────────", short),
-            Style::default().fg(rgb(80, 160, 255)),
+            format!("  Status: {}", status_label),
+            Style::default().fg(status_color),
         )),
-        Line::from(vec![
-            Span::styled("  Viewing teammate stream", accent),
-            Span::styled("  ·  Esc to exit  ·  Ctrl+C to cancel", dim),
-        ]),
     ];
 
-    let pg = Paragraph::new(lines).block(Block::default().borders(Borders::NONE));
-    frame.render_widget(pg, banner_area);
+    if !detail.is_empty() {
+        let dt = if detail.len() > iw { format!("{}…", &detail[..iw.saturating_sub(1)]) } else { detail };
+        lines.push(Line::from(Span::styled(
+            format!("  {}", dt),
+            Style::default().fg(rgb(200, 200, 210)),
+        )));
+    }
+
+    lines.push(Line::from(Span::styled(
+        format!("  session: {}", sid),
+        Style::default().fg(rgb(140, 140, 150)),
+    )));
+    lines.push(Line::from(Span::styled(
+        "  ─────────────────",
+        Style::default().fg(rgb(60, 65, 75)),
+    )));
+    lines.push(Line::from(Span::styled(
+        "  Esc to exit · Ctrl+C to cancel",
+        dim,
+    )));
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(ratatui::widgets::BorderType::Rounded)
+        .border_style(Style::default().fg(rgb(80, 160, 255)));
+
+    let inner = block.inner(area);
     frame.render_widget(ratatui::widgets::Clear, area);
+    frame.render_widget(block, area);
+    let para = Paragraph::new(lines);
+    frame.render_widget(para, inner);
 }
+
