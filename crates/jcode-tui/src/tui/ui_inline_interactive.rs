@@ -172,6 +172,23 @@ fn selected_route_notice_text(
     {
         return Some((format!("ⓘ {}", detail), false));
     }
+    // Tooltip: show model stats when available (context, cost, latency).
+    let mut stats = Vec::new();
+    if let Some(ctx) = route.context_window {
+        stats.push(format!("{}K ctx", ctx / 1024));
+    }
+    if let Some(cost_in) = route.cost_per_million_input {
+        stats.push(format!("${:.2}/M in", cost_in));
+    }
+    if let Some(cost_out) = route.cost_per_million_output {
+        stats.push(format!("${:.2}/M out", cost_out));
+    }
+    if let Some(latency) = route.latency_ms {
+        stats.push(format!("{}ms", latency));
+    }
+    if !stats.is_empty() {
+        return Some((format!("📊 {}", stats.join(" · ")), false));
+    }
     None
 }
 

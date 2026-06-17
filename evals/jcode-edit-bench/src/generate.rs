@@ -112,7 +112,7 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
                 &mut rng,
                 &mut used_regions,
                 config.min_score,
-            );
+            ).await;
 
             if task.is_none() {
                 // Try fallback difficulties
@@ -127,7 +127,7 @@ pub async fn generate_tasks(config: &GenerateConfig) -> anyhow::Result<Vec<EditT
                         &mut rng,
                         &mut used_regions,
                         None,
-                    );
+                    ).await;
                     if task.is_some() {
                         eprintln!(
                             "Note: {} case {} fell back from {} to {}",
@@ -238,7 +238,7 @@ fn has_structure(content: &str) -> bool {
         || content.contains("enum ")
 }
 
-fn try_generate(
+async fn try_generate(
     mutation: &dyn Mutation,
     entries: &[FileEntry],
     difficulty: &str,
@@ -328,13 +328,11 @@ fn try_generate(
         }
 
         // Format both versions via rustfmt
-        let (formatted_mutated, formatted_original) = {
-            let f1 = tokio::runtime::Handle::current()
-                .block_on(format_content(&entry.path, &mutated_content));
-            let f2 = tokio::runtime::Handle::current()
-                .block_on(format_content(&entry.path, &entry.content));
+        let (formatted_mutated, formatted_original) = async {
+            let f1 = format_content(&entry.path, &mutated_content).await;
+            let f2 = format_content(&entry.path, &entry.content).await;
             (f1.formatted, f2.formatted)
-        };
+        }.await;
 
         // Mark this line as used
         used.insert(info.line_number);
