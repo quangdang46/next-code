@@ -1686,6 +1686,12 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
         return true;
     }
 
+    if trimmed == "/team" {
+        app.running_items_state.visible = true;
+        app.set_status_notice("Team: ↑↓ navigate members, Enter view detail, Esc close.");
+        return true;
+    }
+
     if trimmed == "/agents save" || trimmed.starts_with("/agents save ") {
         let content = super::inline_interactive::openers::save_last_assistant_as_agent(&app.session);
         app.push_display_message(

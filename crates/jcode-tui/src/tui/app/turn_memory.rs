@@ -84,6 +84,19 @@ impl App {
                 }
             }
 
+            // Dispatch deferred spawns as status messages
+            // The keyword prompt (injected into system prompt) already tells
+            // the model to spawn subagents. These deferred spawns are
+            // informational — the model reads the prompt and uses the
+            // subagent tool directly.
+            for spawn in &result.deferred_spawns {
+                let msg = format!(
+                    "🧩 Keyword: {} requested a subagent spawn (deferred)",
+                    spawn.kind
+                );
+                crate::logging::info(&msg);
+            }
+
             result.keyword_prompt
         };
 
