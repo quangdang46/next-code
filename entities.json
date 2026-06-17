@@ -1,0 +1,32 @@
+{
+  "people": [
+    {
+      "name": "Jeremy Huang",
+      "confidence": 0.99,
+      "context": "610 commits across 1 repo"
+    },
+    {
+      "name": "Tran Quang Dang",
+      "confidence": 0.99,
+      "context": "357 commits across 1 repo"
+    },
+    {
+      "name": "Trần Quang Đãng",
+      "confidence": 0.85,
+      "context": "24 commits across 1 repo"
+    },
+    {
+      "name": "UI",
+      "confidence": 0.99,
+      "context": "pronoun nearby (6x)"
+    }
+  ],
+  "projects": [
+    {
+      "name": "jcode",
+      "confidence": 0.99,
+      "context": "Cargo.toml, 281 of your commits"
+    }
+  ],
+  "uncertain": []
+}

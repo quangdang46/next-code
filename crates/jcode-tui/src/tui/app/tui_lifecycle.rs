@@ -253,7 +253,9 @@ impl App {
         let skills = Arc::new(SkillRegistry::default());
         let mcp_manager = Arc::new(RwLock::new(McpManager::new()));
         if session.model.is_none() {
-            session.model = Some(provider.model());
+            // Restore saved default_model from config before falling back to provider default
+            let saved_model = crate::config::config().provider.default_model.clone();
+            session.model = Some(saved_model.unwrap_or_else(|| provider.model()));
         }
         if session.provider_key.is_none() {
             session.provider_key = crate::session::derive_session_provider_key(provider.name());

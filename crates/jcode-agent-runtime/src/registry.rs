@@ -214,7 +214,7 @@ impl AgentRegistry {
                 continue;
             }
             match Self::load_file(&path) {
-                Ok(definition) => {
+                Ok(mut definition) => {
                     let expected_stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
                     if !expected_stem.is_empty() && expected_stem != definition.id {
                         self.load_errors.push(LoadError::FileNameMismatch {

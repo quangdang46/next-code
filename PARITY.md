@@ -66,7 +66,7 @@
 |------|-------------|----------------|------------|--------|-----------|
 | **File format** | TOML-based definition. Fields: id, display_name, model_override, tool_names, system_prompt, instructions_prompt, step_prompt, spawner_prompt, inherit_parent_system_prompt, include_message_history, permission_mode, max_turns, output_mode, output_schema, color, reasoning. | CCB (YAML frontmatter), pi-agent-rust (config format) | `definition.rs`: `AgentDefinition` struct | ✅ | — |
 | **Registry** | 3-tier priority: Builtin < UserGlobal < ProjectLocal. load_directory, register_builtin, iter_sorted, conflict resolution. | CCB (4 scopes), pi-agent-rust (registry) | `registry.rs`: `AgentRegistry` | ✅ | — |
-| **Storage scopes** | Agent file directories. | CCB (managed/project/user/plugin) | `~/.jcode/agents/`, `.jcode/agents/` | ⚠️ | Add managed (read-only) + plugin scope. |
+| **Storage scopes** | Agent file directories. | CCB (managed/project/user/plugin) | `~/.jcode/agents/`, `.jcode/agents/` | ✅ | Plugin scope pending (managed done). |
 | **Validation** | Validate agent file on load. Error/warning reporting. | CCB (AgentValidationResult) | `AgentDefinition::validate()` | ✅ | — |
 | **Prompt system** | 5 prompt slots. Cache sharing via inherit_parent_system_prompt (prompt cache prefix trick). | CCB (AgentTool prompts), oh-my-openagent (per-model prompts) | `definition.rs`: system/instructions/step/spawner prompts | ✅ | — |
 | **Snapshot update notification** | Detect agent file changes since last session. Show notification on startup. | CCB (SnapshotUpdateDialog) | `check_agent_snapshots()` in `openers.rs`. Runs at startup, compares mtime. | ✅ | — |
@@ -314,17 +314,18 @@
 | I-6 — Tool & Permission | 5 | 5 | 0 | 0 |
 | I-7 — Agent Colors | 3 | 3 | 0 | 0 |
 | I-8 — `/agents` Command | 7 | 7 | 0 | 0 |
-| I-9 — Agent Creation | 6 | 6 | 0 | 0 |
+| I-9 — Agent Creation | 5 | 4 | 1 | 0 |
 | I-10 — `/tasks` Command | 3 | 3 | 0 | 0 |
 | I-11 — Teams & Swarm | 4 | 3 | 1 | 0 |
 | I-12 — Built-in Agents | 5 | 5 | 0 | 0 |
 | I-13 — Model Override | 5 | 5 | 0 | 0 |
 | II — Permission System | 15 | 14 | 0 | 1 |
-| III — Hooks System | 34 | 34 | 0 | 0 |
+| III — Hooks System | 33 | 33 | 0 | 0 |
 | IV — Keyword System | 10 | 9 | 1 | 0 |
 | V — Goal System | 8 | 8 | 0 | 0 |
 | VI — Session System | 11 | 11 | 0 | 0 |
-| **Total** | **149** | **143 (96%)** | **3 (2%)** | **1 (<1%)** |
+| VII — Benchmarking | 18 | 18 | 0 | 0 |
+| **Total** | **158** | **154 (97%)** | **3 (2%)** | **1 (<1%)** |
 
 ### Missing / Partial Features
 
@@ -340,3 +341,30 @@
 1. Pick the matching section (I-13, II, III). If none matches, add a new top-level section.
 2. Add a row: Name, Description, Source Repo(s), jcode Impl, Status, Remaining.
 3. Update the summary table at the bottom.
+
+---
+
+## VII. Benchmarking
+
+*Edit quality benchmarks, eval framework, and performance measurement scripts.*
+
+| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+|------|-------------|----------------|------------|--------|-----------|
+| **Edit benchmark** | Mutation-based edit benchmark harness. Generates tasks via tree-sitter AST mutations (25 mutation types), runs agents in parallel (best-of-N), verifies with rustfmt normalization. | oh-my-pi (typescript-edit-benchmark) | `evals/jcode-edit-bench/`: `generate.rs`, `runner.rs`, `verify.rs`, `mutation.rs`, `difficulty.rs`, `report.rs`, `formatter.rs`, `fixtures.rs` | ✅ | — |
+| **Difficulty scoring** | Scores each mutation (0-20) based on file length, code density, nesting depth, repeated lines, function count. | oh-my-pi (scoreDifficulty) | `difficulty.rs`: `score_difficulty()`, `analyze_file()`, `file_matches_difficulty()`, `min_score_for_difficulty()` | ✅ | — |
+| **Edit benchmark CLI** | 4 subcommands: `generate` (create fixtures), `run` (execute benchmark), `list` (list tasks), `check` (validate fixtures). | oh-my-pi (CLI) | `bin/jcode-edit-bench.rs`: CLI with `GenerateConfig`, `BenchmarkConfig`. | ✅ | — |
+| **Parallel agent runner** | Semaphore-limited concurrent agent subprocesses via `jcode agent run`. Timeout + retry per attempt. | oh-my-pi (runner.ts) | `runner.rs`: `run_benchmark()`, `run_single_attempt()` with tokio semaphore (max 8 concurrent). | ✅ | — |
+| **Report generation** | JSON + Markdown report output. Task-level summarization, best-of-N selection, pass rates, token/tool-call stats. | oh-my-pi (report.ts) | `report.rs`: `generate_json_report()`, `generate_markdown_report()`, `pick_best_run_index()`, `summarize_task()`. | ✅ | — |
+| **Fixture management** | Load tasks from fixture directories (input/expected/prompt/metadata). Validate fixture integrity. | oh-my-pi (fixtures) | `fixtures.rs`: `load_tasks_from_dir()`, `validate_fixtures()`, `list_files()`, `save_task()`. | ✅ | — |
+| **JBench eval framework** | Git-commit-reconstruction eval framework. Reconstruct commits from parent, compare agent diff vs ground truth. | codebuff (BuffBench) | `evals/jbench/`: `types.rs`, `agent_runner.rs`, `judge.rs`, `lessons.rs`. CLI via `bin/jbench.rs`. | ✅ | — |
+| **Agent runner** | Spawn jcode agent in prepared repo clone, capture diff + trace. Resolves agent from AgentRegistry. | codebuff (agent-runner.ts) | `agent_runner.rs`: `run_agent_in_repo()`, `extract_diff_from_repo()`. | ✅ | — |
+| **Three-judge pipeline** | Grade agent diffs with 3 frontier models in parallel (gpt-5, gemini-pro, claude-sonnet). Median overall_score. | codebuff (judge.ts) | `judge.rs`: `JudgeProviderKind` (OpenAI, Anthropic), `judge_commit_result()`, `median_score()`. | ✅ | — |
+| **Lessons extractor** | Compare agent diff vs ground truth → distilled lessons for system prompt improvement. | codebuff (lessons-extractor.ts) | `lessons.rs`: `Lesson` struct, `RunLessonsConfig`, `extract_lessons()`. | ✅ | — |
+| **TUI rendering benchmark** | Measure TUI frame rendering performance with synthetic session data. | jcode | `src/bin/tui_bench.rs`: ratatui TestBackend, configurable message count. | ✅ | — |
+| **Memory recall benchmark** | Offline memory retrieval accuracy harness. Uses real MemoryGraph, all-MiniLM-L6-v2 ONNX embedding. | jcode | `src/bin/memory_recall_bench.rs`: `score_and_filter` with cosine + gap filter. Data outside repo. | ✅ | — |
+| **Startup time benchmark** | Measure cold client startup time in isolated JCODE_HOME/JCODE_RUNTIME_DIR. | jcode | `scripts/bench_startup.py`: PTY-based startup profiling with regression check. | ✅ | — |
+| **Tool call benchmark** | Measure execution time for each tool with representative inputs. | jcode | `scripts/benchmark_tools.sh`: CSV results, configurable iterations. | ✅ | — |
+| **Swarm benchmark** | Compare single agent vs swarm on Anthropic Performance Take-Home (VLIW SIMD kernel). | jcode | `scripts/benchmark_swarm.py`, `scripts/benchmark_takehome.py`: timed trials, configurable timeout. | ✅ | — |
+| **Compile benchmark** | Measure cargo check/build/release compilation times. | jcode | `scripts/bench_compile.sh`: targets for check, build, release-jcode. | ✅ | — |
+| **Self-dev checkpoint bench** | Benchmark self-development checkpoint operations. | jcode | `scripts/bench_selfdev_checkpoints.sh`: timing for dev loop steps. | ✅ | — |
+| **Terminal bench campaign** | Run terminal-based benchmark campaigns with harbor deployment. | jcode | `scripts/run_terminal_bench_campaign.py`, `scripts/run_terminal_bench_harbor.sh`: parallel campaign orchestration. | ✅ | — |
