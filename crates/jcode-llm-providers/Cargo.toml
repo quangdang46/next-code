@@ -1,0 +1,16 @@
+[package]
+name = "jcode-llm-providers"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "jcode_llm_providers"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+jcode-llm-core = { path = "../jcode-llm-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
