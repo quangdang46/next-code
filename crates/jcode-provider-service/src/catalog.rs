@@ -133,6 +133,61 @@ pub trait CatalogService: Send + Sync {
     /// `jcode provider list` CLI shows by default.
     async fn available(&self) -> Result<Vec<ProviderInfo>, CatalogError>;
 
+    /// Set the cached connection state for one provider. The new
+    /// state is used by [available], [default], and [small] to
+    /// decide which providers to surface.
+    async fn set_connected(
+        &self,
+        provider: &ProviderId,
+        connected: bool,
+    ) -> Result<(), CatalogError>;
+
+    /// Update the cached connection state for one provider based on
+    /// the integration layer's live detection. Returns the new
+    /// is_connected value.
+    async fn refresh_connection(
+        &self,
+        provider: &ProviderId,
+        integration: &dyn crate::integration::IntegrationService,
+    ) -> Result<bool, CatalogError> {
+        let connected = integration
+            .detect(provider)
+            .await
+            .map(|s| s.is_connected())
+            .unwrap_or(false);
+        self.set_connected(provider, connected).await?;
+        Ok(connected)
+    }
+
+    /// Smart variant of [`available`]: returns providers that are
+    /// either statically connected OR have a live credential
+    /// detected through the supplied integration layer. This matches
+    /// opencode's `Catalog.available()` which consults the
+    /// integration layer for the actual connection state.
+    async fn live_available(
+        &self,
+        integration: &dyn crate::integration::IntegrationService,
+    ) -> Result<Vec<ProviderInfo>, CatalogError> {
+        let all = self.list_providers().await?;
+        let mut out = Vec::new();
+        for p in all {
+            if !p.enabled {
+                continue;
+            }
+            if p.is_connected {
+                out.push(p);
+                continue;
+            }
+            // Check the integration layer for live credentials.
+            if let Ok(status) = integration.detect(&p.id).await {
+                if status.is_connected() {
+                    out.push(p);
+                }
+            }
+        }
+        Ok(out)
+    }
+
     /// All models for a single provider.
     async fn models(&self, provider: &ProviderId) -> Result<Vec<ModelInfo>, CatalogError>;
 
@@ -187,6 +242,18 @@ impl CatalogService for InMemoryCatalog {
     async fn register_provider(&self, info: ProviderInfo) -> Result<(), CatalogError> {
         let mut map = self.inner.write().await;
         map.insert(info.id.clone(), info);
+        Ok(())
+    }
+
+    async fn set_connected(
+        &self,
+        provider: &ProviderId,
+        connected: bool,
+    ) -> Result<(), CatalogError> {
+        let mut map = self.inner.write().await;
+        if let Some(p) = map.get_mut(provider) {
+            p.is_connected = connected;
+        }
         Ok(())
     }
 
