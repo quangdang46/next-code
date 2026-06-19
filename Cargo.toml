@@ -53,6 +53,7 @@ members = [
     "crates/jcode-provider-openrouter",
     "crates/jcode-provider-openai",
     "crates/jcode-provider-gemini",
+    "crates/jcode-provider-app",
     "crates/jcode-llm-core",
     "crates/jcode-llm-protocols",
     "crates/jcode-llm-dialects",
