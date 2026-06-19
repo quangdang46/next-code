@@ -124,13 +124,20 @@ pub async fn run_callback_server(
 ) -> Result<CallbackResult, CallbackError> {
     let listener = std::net::TcpListener::bind("127.0.0.1:0")
         .map_err(|e| CallbackError::Io(e.to_string()))?;
+    run_callback_server_with_listener(listener, request, timeout, integration).await
+}
+
+/// Like [run_callback_server] but accepts a pre-bound listener. This
+/// is useful for tests that want to know the port in advance.
+pub async fn run_callback_server_with_listener(
+    listener: std::net::TcpListener,
+    request: CallbackRequest,
+    timeout: Duration,
+    integration: Arc<dyn IntegrationService>,
+) -> Result<CallbackResult, CallbackError> {
     listener
         .set_nonblocking(true)
         .map_err(|e| CallbackError::Io(e.to_string()))?;
-    let port = listener
-        .local_addr()
-        .map_err(|e| CallbackError::Io(e.to_string()))?
-        .port();
 
     let deadline = std::time::Instant::now() + timeout;
 
@@ -144,7 +151,6 @@ pub async fn run_callback_server(
                     stream,
                     &request,
                     integration.as_ref(),
-                    port,
                 )
                 .await
                 {
@@ -166,7 +172,6 @@ async fn handle_connection(
     mut stream: TcpStream,
     request: &CallbackRequest,
     integration: &dyn IntegrationService,
-    _port: u16,
 ) -> Result<CallbackResult, CallbackError> {
     // Read the request.
     stream
@@ -387,5 +392,99 @@ use crate::store::PersistentIntegration;
         let mut resp = String::new();
         client.read_to_string(&mut resp).unwrap();
         assert!(resp.starts_with("HTTP/1.1 200"));
+    }
+}
+
+#[cfg(test)]
+mod e2e_tests {
+    use super::*;
+    use crate::integration::{AuthMethod, LoginProvider};
+    use crate::store::{in_memory::InMemoryCredentialStore, PersistentIntegration};
+    use jcode_keyring_store::MockKeyringStore;
+    use std::io::Write;
+    use std::sync::Arc;
+
+    async fn integration() -> Arc<dyn IntegrationService> {
+        let creds: Arc<dyn crate::credential::CredentialService> =
+            Arc::new(InMemoryCredentialStore::new());
+        let integration: Arc<dyn IntegrationService> =
+            Arc::new(PersistentIntegration::<MockKeyringStore>::new(creds));
+        integration
+            .register(LoginProvider {
+                id: "anthropic".into(),
+                label: "Anthropic".into(),
+                auth_methods: vec![AuthMethod::OAuth {
+                    authorization_url: "https://example.com/oauth".into(),
+                }],
+                env_keys: vec![],
+                oauth_preferred: true,
+            })
+            .await
+            .unwrap();
+        integration
+    }
+
+    #[tokio::test]
+    async fn run_callback_server_with_listener_end_to_end() {
+        // Bind a listener on a free port. Spawn the callback server
+        // with a pre-bound listener so we know the port. Send a
+        // fake callback to it. Verify the credential was stored.
+        let (listener, port) = bind_loopback().unwrap();
+        let integration = integration().await;
+        let attempt = integration
+            .start_oauth(&"anthropic".into())
+            .await
+            .unwrap();
+
+        let request = CallbackRequest {
+            attempt: attempt.clone(),
+            exchange: Arc::new(|_code| {
+                Box::pin(async move {
+                    Ok(ExchangeResponse {
+                        access_token: "tok-from-test".into(),
+                        refresh_token: Some("rt".into()),
+                        expires_at: None,
+                    })
+                })
+            }),
+        };
+
+        let integration_clone = integration.clone();
+        let server_handle = tokio::spawn(async move {
+            run_callback_server_with_listener(
+                listener,
+                request,
+                Duration::from_secs(5),
+                integration_clone,
+            )
+            .await
+        });
+
+        // Give the server a moment to start accepting.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        // Send a fake callback.
+        let mut client = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+        client
+            .write_all(
+                b"GET /callback?code=test-code HTTP/1.1\r\nHost: x\r\n\r\n",
+            )
+            .unwrap();
+        // Don't need to read the response; the server writes one
+        // before closing.
+
+        let result = server_handle.await.unwrap();
+        let outcome = result.expect("callback server should succeed");
+        assert_eq!(outcome.code, "test-code");
+        // outcome.credential_id is the id of the persisted
+        // credential; the attempt id is oauth-XXX. We verify the
+        // code flowed through and the attempt was cleared (below).
+        assert!(!outcome.credential_id.as_str().is_empty());
+
+        // Verify the credential was persisted.
+        let cred = integration
+            .get_oauth_attempt(&attempt.id)
+            .await;
+        // After complete_oauth, the attempt is removed.
+        assert!(cred.is_err(), "attempt should be cleared after complete");
     }
 }
