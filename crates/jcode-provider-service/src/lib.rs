@@ -35,6 +35,7 @@ pub mod failover;
 pub mod integration;
 pub mod migrate;
 pub mod refresh;
+pub mod retry_after;
 pub mod registry;
 pub mod retrofit;
 pub mod runtime;
