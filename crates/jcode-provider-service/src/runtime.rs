@@ -259,6 +259,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn by_label_profile_resolves_via_integration() {
+        // The ByLabel profile goes through the integration layer
+        // to find a provider whose label matches.
+        let svc = fixture().await;
+        let profile = ProviderProfile::ByLabel {
+            label: "Anthropic".into(),
+        };
+        let s = start_session(&svc, Some(&profile), Some(&"claude-haiku-4-5".into()))
+            .await
+            .unwrap();
+        assert_eq!(s.describe(), "anthropic/claude-haiku-4-5");
+    }
+
+    #[tokio::test]
+    async fn with_auth_profile_resolves() {
+        // ProviderProfile::WithAuth carries the provider id + an
+        // auth suffix; the resolver treats it like ById.
+        let svc = fixture().await;
+        let profile = ProviderProfile::WithAuth {
+            id: "anthropic".into(),
+            auth: "api-key".into(),
+        };
+        let s = start_session(&svc, Some(&profile), Some(&"claude-haiku-4-5".into()))
+            .await
+            .unwrap();
+        assert_eq!(s.describe(), "anthropic/claude-haiku-4-5");
+    }
+
+    #[tokio::test]
     async fn errors_when_no_providers_connected() {
         let catalog = InMemoryCatalog::new();
         let keyring = Arc::new(MockKeyringStore::new());
