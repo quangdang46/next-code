@@ -21,7 +21,6 @@
 //!   4. caller retries with the new target
 //! ```
 
-use std::sync::Arc;
 
 use crate::catalog::CatalogService;
 use crate::integration::IntegrationService;
@@ -161,6 +160,7 @@ pub enum FailoverError {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
     use crate::catalog::{
         InMemoryCatalog, ModelInfo, ModelTier, ProviderInfo,

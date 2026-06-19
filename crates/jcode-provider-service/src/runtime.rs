@@ -21,9 +21,8 @@ use std::sync::Arc;
 
 use jcode_llm_core::route::Route;
 
-use crate::catalog::CatalogService;
 use crate::defaults::ProviderDefaults;
-use crate::service::{ProviderService, ResolvedRoute, RouteResolver};
+use crate::service::{ProviderService, ResolvedRoute};
 use crate::types::{ModelId, ProviderId, ProviderProfile};
 
 /// The new-shape session handle. The full `Agent` struct (in
@@ -146,7 +145,7 @@ pub async fn quick_session(
     cli_provider: Option<&str>,
     cli_model: Option<&str>,
 ) -> Result<Session, SessionError> {
-    use jcode_keyring_store::{DefaultKeyringStore, KeyringStore};
+    use jcode_keyring_store::DefaultKeyringStore;
 
     let keyring = Arc::new(DefaultKeyringStore::new());
     let credentials: Arc<dyn crate::credential::CredentialService> = Arc::new(
@@ -176,6 +175,7 @@ pub async fn quick_session(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::CatalogService;
     use crate::store::PersistentIntegration;
     use super::*;
     use crate::catalog::{InMemoryCatalog, ModelInfo, ModelTier, ProviderInfo};

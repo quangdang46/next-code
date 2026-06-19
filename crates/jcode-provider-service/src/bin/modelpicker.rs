@@ -32,7 +32,7 @@ use jcode_provider_service::service::ProviderService;
 use jcode_provider_service::store::DefaultProviderService;
 use jcode_provider_service::tui_picker::{Filter, PickerState, RowOrigin};
 use jcode_provider_service::types::ProviderId;
-use jcode_keyring_store::{DefaultKeyringStore, KeyringStore, MockKeyringStore};
+use jcode_keyring_store::{DefaultKeyringStore, MockKeyringStore};
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::{Color, Modifier, Style};
@@ -143,7 +143,7 @@ async fn run<B: ratatui::backend::Backend>(
                     Constraint::Min(5),
                     Constraint::Length(3),
                 ])
-                .split(f.size());
+                .split(f.area());
             let header = Paragraph::new(Line::from(vec![
                 Span::styled("modelpicker", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw("  jcode provider/model picker — "),
