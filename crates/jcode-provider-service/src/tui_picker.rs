@@ -350,7 +350,8 @@ mod tests {
 
     #[tokio::test]
     async fn recent_is_deduplicated_and_capped() {
-        let cat = catalog().await;
+        // No catalog needed — we only exercise the recent list logic.
+        let _cat = catalog().await;
         let mut state = PickerState::new();
         let mut connected = HashSet::new();
         connected.insert(ProviderId::from("anthropic"));

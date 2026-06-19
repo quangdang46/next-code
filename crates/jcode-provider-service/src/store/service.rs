@@ -5,12 +5,6 @@
 //! `Arc<dyn ProviderService>`. It composes the catalog, integration, and
 //! credential services into a single handle and resolves
 //! `(provider, model)` requests into concrete [`Route`]s.
-//!
-//! The default route construction is intentionally minimal — the real
-//! per-provider route templates land when each provider adopts the new
-//! `Route`-based path in Phase 6. For now we emit a route with
-//! `protocol = openai-chat` as a placeholder so the wiring compiles
-//! end-to-end.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -74,14 +68,12 @@ impl RouteResolver for DefaultProviderService {
         provider: &ProviderId,
         model: &ModelId,
     ) -> Result<ResolvedRoute, ResolveError> {
-        // 1. Verify the provider is in the catalog.
         let _info = self
             .catalog
             .provider(provider)
             .await
             .map_err(|_| ResolveError::UnknownProvider(provider.clone()))?;
 
-        // 2. Verify the provider is connected.
         let status = self
             .integration
             .detect(provider)
@@ -91,7 +83,6 @@ impl RouteResolver for DefaultProviderService {
             return Err(ResolveError::NotConnected(provider.clone()));
         }
 
-        // 3. Build the route.
         let route = build_default_route(provider, model);
         Ok(ResolvedRoute {
             provider: provider.clone(),
@@ -105,19 +96,7 @@ impl RouteResolver for DefaultProviderService {
         profile: &ProviderProfile,
         default_model: Option<&ModelId>,
     ) -> Result<(ProviderId, ModelId), ResolveError> {
-        // For now we only support ById — the others (Named, ByLabel, WithAuth)
-        // land in Phase 4 (CLI) when we wire the config parser.
-        let id = match profile {
-            ProviderProfile::ById { id } => id.clone(),
-            ProviderProfile::WithAuth { id, .. } => id.clone(),
-            ProviderProfile::Named { .. } | ProviderProfile::ByLabel { .. } => {
-                return Err(ResolveError::UnknownProvider(ProviderId::from(
-                    profile.describe(),
-                )))
-            }
-        };
-        // If the caller pinned a model, use it. Otherwise ask the catalog
-        // for the provider's first model.
+        let id = self.resolve_profile_id(profile).await?;
         let model = if let Some(m) = default_model {
             m.clone()
         } else {
@@ -131,9 +110,58 @@ impl RouteResolver for DefaultProviderService {
     }
 }
 
-/// Build a placeholder route. Phase 6 will replace this with the real
-/// per-provider route templates. For now we emit a `Route` with the
-/// provider's standard base URL and the model name in the body overlay.
+impl DefaultProviderService {
+    /// Resolve just the provider id from a [`ProviderProfile`]. Walks
+    /// the integration registry for label-based and named lookups.
+    fn resolve_profile_id<'a>(
+        &'a self,
+        profile: &'a ProviderProfile,
+    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<ProviderId, ResolveError>> + Send + 'a>> {
+        Box::pin(async move {
+            match profile {
+                ProviderProfile::ById { id } => Ok(id.clone()),
+                ProviderProfile::WithAuth { id, .. } => Ok(id.clone()),
+                ProviderProfile::ByLabel { label } => {
+                    let wanted = label.to_ascii_lowercase();
+                    for p in self.integration.list().await? {
+                        if p.label.to_ascii_lowercase() == wanted {
+                            return Ok(p.id);
+                        }
+                    }
+                    Err(ResolveError::UnknownProvider(ProviderId::from(
+                        profile.describe(),
+                    )))
+                }
+                ProviderProfile::Named { profile: name } => {
+                    // A named profile is shorthand for a label-based lookup
+                    // (e.g. "work" -> label "Work"). A more sophisticated
+                    // implementation would consult a profile map from config.
+                    self.resolve_profile_id(&ProviderProfile::ByLabel {
+                        label: name.clone(),
+                    })
+                    .await
+                }
+            }
+        })
+    }
+}
+
+/// Convenience: assert that the given provider has at least one
+/// credential, and return the connection status.
+pub async fn require_connected(
+    integration: &dyn IntegrationService,
+    provider: &ProviderId,
+) -> Result<ConnectionStatus, ResolveError> {
+    let status = integration
+        .detect(provider)
+        .await
+        .map_err(ResolveError::Integration)?;
+    if !status.is_connected() {
+        return Err(ResolveError::NotConnected(provider.clone()));
+    }
+    Ok(status)
+}
+
 fn build_default_route(provider: &ProviderId, model: &ModelId) -> Route {
     let base_url = default_base_url(provider);
     let mut defaults = HashMap::new();
@@ -194,29 +222,13 @@ fn default_protocol(provider: &ProviderId) -> String {
     }
 }
 
-/// Convenience: assert that the given provider has at least one
-/// credential, and return the connection status.
-pub async fn require_connected(
-    integration: &dyn IntegrationService,
-    provider: &ProviderId,
-) -> Result<ConnectionStatus, ResolveError> {
-    let status = integration
-        .detect(provider)
-        .await
-        .map_err(ResolveError::Integration)?;
-    if !status.is_connected() {
-        return Err(ResolveError::NotConnected(provider.clone()));
-    }
-    Ok(status)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::catalog::{InMemoryCatalog, ModelInfo, ModelTier, ProviderInfo};
     use crate::credential::{CredentialService, CredentialType};
     use crate::integration::{AuthMethod, LoginProvider};
-    use crate::store::{InMemoryCredentialStore, KeyringCredentialStore, PersistentIntegration};
+    use crate::store::{KeyringCredentialStore, PersistentIntegration};
     use jcode_keyring_store::MockKeyringStore;
 
     async fn fixture() -> (
@@ -295,7 +307,6 @@ mod tests {
     #[tokio::test]
     async fn resolve_route_errors_when_not_connected() {
         let (cat, int, creds) = fixture().await;
-        // Wipe the credential so detect() returns NotConfigured.
         let creds_clone = creds.clone();
         let all = creds.list(&"anthropic".into()).await.unwrap();
         for c in all {
@@ -323,7 +334,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn resolve_profile_uses_provided_model() {
+    async fn resolve_profile_by_id_uses_provided_model() {
         let (cat, int, creds) = fixture().await;
         let svc = DefaultProviderService::new(cat, int, creds);
         let profile = ProviderProfile::ById {
@@ -345,8 +356,68 @@ mod tests {
         let profile = ProviderProfile::ById {
             id: "anthropic".into(),
         };
-        let (p, m) = svc.resolver().resolve_profile(&profile, None).await.unwrap();
+        let (p, m) = svc
+            .resolver()
+            .resolve_profile(&profile, None)
+            .await
+            .unwrap();
         assert_eq!(p.as_str(), "anthropic");
         assert_eq!(m.as_str(), "claude-haiku-4-5");
+    }
+
+    #[tokio::test]
+    async fn resolve_profile_by_label_resolves_to_id() {
+        let (cat, int, creds) = fixture().await;
+        let svc = DefaultProviderService::new(cat, int, creds);
+        // Exact case.
+        let profile = ProviderProfile::ByLabel {
+            label: "Anthropic".into(),
+        };
+        let (p, _) = svc
+            .resolver()
+            .resolve_profile(&profile, Some(&"claude-haiku-4-5".into()))
+            .await
+            .unwrap();
+        assert_eq!(p.as_str(), "anthropic");
+        // Case-insensitive.
+        let profile = ProviderProfile::ByLabel {
+            label: "anthropic".into(),
+        };
+        let (p, _) = svc
+            .resolver()
+            .resolve_profile(&profile, Some(&"claude-haiku-4-5".into()))
+            .await
+            .unwrap();
+        assert_eq!(p.as_str(), "anthropic");
+    }
+
+    #[tokio::test]
+    async fn resolve_profile_by_label_unknown_errors() {
+        let (cat, int, creds) = fixture().await;
+        let svc = DefaultProviderService::new(cat, int, creds);
+        let profile = ProviderProfile::ByLabel {
+            label: "Mystery".into(),
+        };
+        let err = svc
+            .resolver()
+            .resolve_profile(&profile, None)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, ResolveError::UnknownProvider(_)));
+    }
+
+    #[tokio::test]
+    async fn resolve_profile_named_falls_through_to_label() {
+        let (cat, int, creds) = fixture().await;
+        let svc = DefaultProviderService::new(cat, int, creds);
+        let profile = ProviderProfile::Named {
+            profile: "Anthropic".into(),
+        };
+        let (p, _) = svc
+            .resolver()
+            .resolve_profile(&profile, Some(&"claude-haiku-4-5".into()))
+            .await
+            .unwrap();
+        assert_eq!(p.as_str(), "anthropic");
     }
 }
