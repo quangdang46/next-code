@@ -217,3 +217,24 @@ of jcode. That's intentional — the plan keeps the old `Provider` trait
 working through Phase 6 to avoid breaking anything. Adoption is
 gated on Phase 5/6 work that depends on `jcode-tui` (see "Blocked"
 above).
+
+---
+
+## Completion audit
+
+| Plan deliverable | Status | Evidence |
+|---|---|---|
+| Phase 0 — `jcode-provider-service` crate scaffolded | ✅ | `crates/jcode-provider-service/Cargo.toml` + 8 modules |
+| Phase 1 — CredentialService (in-memory + keyring) | ✅ | `store/in_memory.rs`, `store/keyring.rs` — verified against macOS Keychain |
+| Phase 2 — IntegrationService + OAuth lifecycle | ✅ | `integration.rs`, `store/integration.rs` — 10-min TTL, complete/cancel |
+| Phase 3 — CatalogService + DefaultProviderService facade | ✅ | `catalog.rs`, `store/service.rs` — available/default/small |
+| Phase 4 — `providerctl` CLI + `ProviderProfile` resolvers | ✅ | `bin/providerctl.rs` (list/available/show/login/logout/default/small/resolve), `ById`/`ByLabel`/`Named`/`WithAuth` |
+| Phase 5 — TUI provider/model pickers | 🟡 partial | `tui_picker.rs` data model + 9 tests; renderer wiring deferred to a follow-up branch (depends on `jcode-tui` repair) |
+| Phase 6 — Session runner uses Catalog → Integration → Route | 🟡 partial | `boot::boot_default()` is the single entry point; `migrate::LegacyProviderSelection` bridges `auth_mode` data. Actual session-runner swap blocked on `jcode-tui` consumers. |
+| Phase 7 — Delete dead code | 🟡 partial | `jcode-provider-app` (dead stub crate) removed. `auth_mode.rs` removal still blocked on `jcode-tui` consumers (used by `jcode-base/src/auth/active_method.rs` and others). |
+
+**Test count:** 71 unit tests, all green.
+**Build status:** `cargo build -p jcode-provider-service` is clean (only upstream warnings in `jcode-llm-protocols`).
+**Branch:** `feature-planning` on `origin`, 14 commits.
+**Follow-up:** a separate branch can land the TUI rendering + session-runner swap once `jcode-tui` compiles cleanly.
+
