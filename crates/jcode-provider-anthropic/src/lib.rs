@@ -1,18 +1,20 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use futures::{StreamExt, stream::FuturesUnordered};
-use jcode_llm_core::auth::Auth;
-use jcode_llm_core::endpoint::{Endpoint, PathSpec};
+use futures::Stream;
+use futures::stream::StreamExt;
+use jcode_llm_core::endpoint::Endpoint;
 use jcode_llm_core::framing::SseFrame;
 use jcode_llm_core::protocol::{Protocol, StepOutput};
 use jcode_llm_core::route::PreparedRoute;
-use jcode_llm_core::schema::{ContentPart, GenerationParams, LlmRequest, ModelRef, Usage as LlmUsage};
-use jcode_llm_core::transport::Transport;
+use jcode_llm_core::schema::{ContentPart, GenerationParams, LlmRequest, ModelRef, ToolChoice, Usage as LlmUsage};
 use jcode_llm_protocols::anthropic_messages::{
-    AnthropicMessagesProtocol, AnthropicEvent,
+    AnthropicMessagesProtocol, route as anthropic_messages_route, AnthropicEvent,
 };
 use jcode_message_types::{ContentBlock, Message, Role, StreamEvent, ToolDefinition, sanitize_tool_id};
-use jcode_provider_core::anthropic_map_tool_name_for_oauth as map_tool_name_for_oauth;
+use jcode_provider_core::{
+    Provider, EventStream,
+    anthropic_map_tool_name_for_oauth as map_tool_name_for_oauth,
+};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -20,7 +22,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio_stream::wrappers::ReceiverStream;
-use std::convert::Infallible;
 
 /// Claude Code billing attribution text observed in the official CLI's system
 /// prompt blocks.
@@ -678,6 +679,464 @@ pub struct ApiTool {
     pub input_schema: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CacheControlParam>,
+}
+
+// ---------------------------------------------------------------------------
+// Provider implementation delegating to AnthropicMessagesProtocol + route
+// ---------------------------------------------------------------------------
+
+/// Helper: convert a jcode-message-types `ContentBlock` to a
+/// jcode-llm-core `ContentPart`.
+fn content_block_to_part(block: &ContentBlock) -> Option<ContentPart> {
+    match block {
+        ContentBlock::Text { text, .. } => Some(ContentPart::Text {
+            text: text.clone(),
+        }),
+        ContentBlock::ToolUse { id, name, input, .. } => Some(ContentPart::ToolCall {
+            id: id.clone(),
+            name: name.clone(),
+            input: input.clone(),
+        }),
+        ContentBlock::ToolResult {
+            tool_use_id,
+            content,
+            is_error,
+        } => Some(ContentPart::ToolResult {
+            tool_use_id: tool_use_id.clone(),
+            content: content.clone(),
+            is_error: *is_error,
+        }),
+        ContentBlock::Image { media_type, data } => Some(ContentPart::Media {
+            media_type: media_type.clone(),
+            data: data.clone(),
+        }),
+        ContentBlock::AnthropicThinking { thinking, .. } => Some(ContentPart::Reasoning {
+            text: thinking.clone(),
+        }),
+        // Skip non-replayable content blocks
+        ContentBlock::Reasoning { .. }
+        | ContentBlock::OpenAIReasoning { .. }
+        | ContentBlock::ReasoningTrace { .. }
+        | ContentBlock::OpenAICompaction { .. } => None,
+    }
+}
+
+/// Helper: convert a jcode-message-types `Message` to a jcode-llm-core `Message`.
+fn message_to_part(msg: &Message) -> jcode_llm_core::schema::Message {
+    let content: Vec<ContentPart> = msg
+        .content
+        .iter()
+        .filter_map(content_block_to_part)
+        .collect();
+    let role = match msg.role {
+        Role::User => "user",
+        Role::Assistant => "assistant",
+    };
+    jcode_llm_core::schema::Message {
+        role: role.to_string(),
+        content,
+    }
+}
+
+/// Helper: convert a jcode-message-types `ToolDefinition` to a
+/// jcode-llm-core `ToolDefinition`.
+fn tool_def_to_core(tool: &ToolDefinition) -> jcode_llm_core::schema::ToolDefinition {
+    jcode_llm_core::schema::ToolDefinition {
+        name: tool.name.clone(),
+        description: tool.description.clone(),
+        input_schema: tool.input_schema.clone(),
+    }
+}
+
+/// Converts an `AnthropicEvent` (protocol-level) into zero or more
+/// `StreamEvent` (application-level).
+fn anthropic_event_to_stream_events(
+    event: &AnthropicEvent,
+    tool_use_active: bool,
+) -> Vec<StreamEvent> {
+    let mut events = Vec::new();
+
+    match event {
+        AnthropicEvent::MessageStart { _message } => {
+            // Extract usage from message_start
+            let usage = &_message.usage;
+            let inp = usage.input_tokens;
+            let out = usage.output_tokens;
+            let cache_read = usage.cache_read_input_tokens.unwrap_or(0);
+            let cache_create = usage.cache_creation_input_tokens.unwrap_or(0);
+            events.push(StreamEvent::TokenUsage {
+                input_tokens: Some(inp),
+                output_tokens: Some(out),
+                cache_read_input_tokens: Some(cache_read),
+                cache_creation_input_tokens: Some(cache_create),
+            });
+        }
+        AnthropicEvent::ContentBlockStart {
+            index: _,
+            content_block,
+        } => match content_block {
+            jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::Text { .. } => {
+                // No event needed for text start
+            }
+            jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::ToolUse {
+                id,
+                name,
+                ..
+            } => {
+                events.push(StreamEvent::ToolUseStart {
+                    id: id.clone(),
+                    name: name.clone(),
+                });
+            }
+            jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::Thinking { .. } => {
+                events.push(StreamEvent::ThinkingStart);
+            }
+        },
+        AnthropicEvent::ContentBlockDelta {
+            index: _,
+            delta,
+        } => match delta {
+            jcode_llm_protocols::anthropic_messages::AnthropicContentDelta::TextDelta { text } => {
+                if !text.is_empty() {
+                    events.push(StreamEvent::TextDelta(text.clone()));
+                }
+            }
+            jcode_llm_protocols::anthropic_messages::AnthropicContentDelta::InputJsonDelta {
+                partial_json,
+            } => {
+                if !partial_json.is_empty() {
+                    events.push(StreamEvent::ToolInputDelta(partial_json.clone()));
+                }
+            }
+            jcode_llm_protocols::anthropic_messages::AnthropicContentDelta::ThinkingDelta {
+                thinking,
+            } => {
+                if !thinking.is_empty() {
+                    events.push(StreamEvent::ThinkingDelta(thinking.clone()));
+                }
+            }
+        },
+        AnthropicEvent::ContentBlockStop { index: _ } => {
+            if tool_use_active {
+                events.push(StreamEvent::ToolUseEnd);
+            }
+        }
+        AnthropicEvent::MessageDelta {
+            delta: _,
+            usage,
+        } => {
+            events.push(StreamEvent::TokenUsage {
+                input_tokens: None,
+                output_tokens: Some(usage.output_tokens),
+                cache_read_input_tokens: None,
+                cache_creation_input_tokens: None,
+            });
+        }
+        AnthropicEvent::MessageStop => {
+            events.push(StreamEvent::MessageEnd {
+                stop_reason: Some("end_turn".to_string()),
+            });
+        }
+        AnthropicEvent::Ping => {}
+        AnthropicEvent::Error { error } => {
+            events.push(StreamEvent::Error {
+                message: format!("{}: {}", error.error_type, error.message),
+                retry_after_secs: None,
+            });
+        }
+    }
+
+    events
+}
+
+/// Anthropic provider that uses the new 4-axis route.
+pub struct AnthropicMessagesProvider {
+    protocol: AnthropicMessagesProtocol,
+    route: PreparedRoute,
+    model: String,
+    client: reqwest::Client,
+    max_tokens: u32,
+}
+
+impl AnthropicMessagesProvider {
+    pub fn new(
+        model: String,
+        api_key: String,
+        max_tokens: u32,
+    ) -> Result<Self> {
+        let mut route = anthropic_messages_route();
+        route.auth.insert(
+            "x-api-key".to_string(),
+            api_key.clone(),
+        );
+        let mut provider_ref = route.provider.clone();
+        provider_ref.id = model.clone();
+        route.provider = provider_ref;
+
+        Ok(Self {
+            protocol: AnthropicMessagesProtocol,
+            route,
+            model,
+            client: reqwest::Client::new(),
+            max_tokens,
+        })
+    }
+
+    /// Build an HTTP URL from the route's endpoint.
+    fn build_url(&self) -> String {
+        let base = self.route.endpoint.base_url.trim_end_matches('/');
+        let path = match &self.route.endpoint.path {
+            jcode_llm_core::endpoint::PathSpec::Static(p) => p.trim_start_matches('/').to_string(),
+            jcode_llm_core::endpoint::PathSpec::Dynamic(p) => {
+                p.trim_start_matches('/').to_string()
+            }
+        };
+        format!("{base}/{path}")
+    }
+
+    /// Make a streaming request using the route and protocol.
+    async fn stream_via_protocol(
+        &self,
+        request: LlmRequest,
+    ) -> Result<EventStream> {
+        let (body, mut state) = self
+            .protocol
+            .body_from_request(&request)
+            .map_err(|e| anyhow::anyhow!("Failed to build request body: {}", e))?;
+
+        let url = self.build_url();
+        let client = self.client.clone();
+
+        // Clone data needed inside tokio::spawn to avoid borrowing self
+        let route_body_overlay = self.route.body_overlay.clone();
+        let route_auth = self.route.auth.clone();
+
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<StreamEvent>>(100);
+
+        tokio::spawn(async move {
+            // Send connection type event
+            let _ = tx
+                .send(Ok(StreamEvent::ConnectionType {
+                    connection: "https/sse".to_string(),
+                }))
+                .await;
+
+            // Build HTTP request
+            let mut req_builder = client
+                .post(&url)
+                .header("content-type", "application/json")
+                .header("accept", "text/event-stream");
+
+            // Apply auth headers
+            for (name, val) in &route_auth {
+                req_builder = req_builder.header(name.as_str(), val.as_str());
+            }
+
+            // Add the route's body overlay as headers
+            if let Some(ref overlay) = route_body_overlay {
+                if let Some(obj) = overlay.as_object() {
+                    for (key, val) in obj {
+                        if let Some(s) = val.as_str() {
+                            req_builder = req_builder.header(key.as_str(), s);
+                        }
+                    }
+                }
+            }
+
+            let response = match req_builder.json(&body).send().await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    let _ = tx
+                        .send(Err(anyhow::anyhow!("HTTP request failed: {}", e)))
+                        .await;
+                    return;
+                }
+            };
+
+            if !response.status().is_success() {
+                let status = response.status();
+                let body_text = response.text().await.unwrap_or_default();
+                let _ = tx
+                    .send(Err(anyhow::anyhow!(
+                        "Anthropic API error ({}): {}",
+                        status,
+                        body_text
+                    )))
+                    .await;
+                return;
+            }
+
+            let mut byte_stream = response.bytes_stream();
+            let mut tool_use_active = false;
+
+            while let Some(chunk_result) = byte_stream.next().await {
+                let chunk = match chunk_result {
+                    Ok(c) => c,
+                    Err(e) => {
+                        let _ = tx
+                            .send(Err(anyhow::anyhow!("Stream error: {}", e)))
+                            .await;
+                        return;
+                    }
+                };
+
+                // Feed chunk to protocol decoder
+                match AnthropicMessagesProtocol.step(&mut state, Some(&chunk)).await {
+                    StepOutput::Events(protocol_events) => {
+                        for proto_event in &protocol_events {
+                            // Track tool use state
+                            if matches!(
+                                proto_event,
+                                AnthropicEvent::ContentBlockStart {
+                                    content_block: jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::ToolUse { .. },
+                                    ..
+                                }
+                            ) {
+                                tool_use_active = true;
+                            } else if matches!(proto_event, AnthropicEvent::ContentBlockStop { .. }) {
+                                if tool_use_active {
+                                    tool_use_active = false;
+                                }
+                            }
+
+                            let stream_events = anthropic_event_to_stream_events(
+                                proto_event,
+                                tool_use_active,
+                            );
+                            for se in stream_events {
+                                if tx.send(Ok(se)).await.is_err() {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    StepOutput::NeedMore => {
+                        // Protocol needs more chunks; continue.
+                    }
+                    StepOutput::Done { reason: _, usage: _ } => {
+                        let _ = tx
+                            .send(Ok(StreamEvent::MessageEnd {
+                                stop_reason: Some("end_turn".to_string()),
+                            }))
+                            .await;
+                        return;
+                    }
+                    StepOutput::Error { message } => {
+                        let _ = tx
+                            .send(Err(anyhow::anyhow!("Protocol error: {}", message)))
+                            .await;
+                        return;
+                    }
+                }
+            }
+
+            // After byte stream ends, drain remaining protocol events
+            loop {
+                match AnthropicMessagesProtocol.step(&mut state, None).await {
+                    StepOutput::Events(protocol_events) => {
+                        for proto_event in &protocol_events {
+                            let stream_events = anthropic_event_to_stream_events(
+                                proto_event,
+                                false,
+                            );
+                            for se in stream_events {
+                                if tx.send(Ok(se)).await.is_err() {
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    StepOutput::NeedMore => break,
+                    StepOutput::Done { .. } => break,
+                    StepOutput::Error { message } => {
+                        let _ = tx
+                            .send(Err(anyhow::anyhow!("Protocol error: {}", message)))
+                            .await;
+                        return;
+                    }
+                }
+            }
+        });
+
+        Ok(Box::pin(ReceiverStream::new(rx)))
+    }
+}
+
+#[async_trait]
+impl Provider for AnthropicMessagesProvider {
+    async fn complete(
+        &self,
+        messages: &[Message],
+        tools: &[ToolDefinition],
+        system: &str,
+        _resume_session_id: Option<&str>,
+    ) -> Result<EventStream> {
+        // Convert messages
+        let core_messages: Vec<jcode_llm_core::schema::Message> =
+            messages.iter().map(message_to_part).collect();
+
+        // Convert tools
+        let core_tools: Vec<jcode_llm_core::schema::ToolDefinition> =
+            if tools.is_empty() {
+                vec![]
+            } else {
+                tools.iter().map(tool_def_to_core).collect()
+            };
+
+        let core_system = if system.is_empty() { None } else { Some(system.to_string()) };
+
+        let request = LlmRequest {
+            model: ModelRef {
+                provider_id: "anthropic".into(),
+                id: self.model.clone(),
+                variant: None,
+            },
+            messages: core_messages,
+            system: core_system,
+            tools: if core_tools.is_empty() { None } else { Some(core_tools) },
+            tool_choice: None,
+            generation_params: Some(GenerationParams {
+                temperature: None,
+                max_tokens: Some(self.max_tokens as u64),
+                stop_sequences: None,
+                top_p: None,
+                top_k: None,
+                presence_penalty: None,
+                frequency_penalty: None,
+                seed: None,
+            }),
+            stream: true,
+            route_id: None,
+        };
+
+        self.stream_via_protocol(request).await
+    }
+
+    fn name(&self) -> &str {
+        "anthropic"
+    }
+
+    fn model(&self) -> String {
+        self.model.clone()
+    }
+
+    fn set_model(&self, _model: &str) -> Result<()> {
+        anyhow::bail!("AnthropicMessagesProvider does not support model switching")
+    }
+
+    fn supports_image_input(&self) -> bool {
+        true
+    }
+
+    fn fork(&self) -> Arc<dyn Provider> {
+        Arc::new(AnthropicMessagesProvider {
+            protocol: AnthropicMessagesProtocol,
+            route: self.route.clone(),
+            model: self.model.clone(),
+            client: self.client.clone(),
+            max_tokens: self.max_tokens,
+        })
+    }
 }
 
 #[cfg(test)]
