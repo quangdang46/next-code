@@ -27,6 +27,7 @@ fn account(id: &CredentialId) -> String {
     format!("{}{}", ACCOUNT_PREFIX, id.as_str())
 }
 
+#[allow(dead_code)]
 fn id_from_account(account: &str) -> Option<CredentialId> {
     account
         .strip_prefix(ACCOUNT_PREFIX)
