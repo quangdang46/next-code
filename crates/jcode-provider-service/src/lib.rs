@@ -27,6 +27,7 @@ pub mod credential;
 pub mod integration;
 pub mod service;
 pub mod store;
+pub mod tui_picker;
 pub mod types;
 
 pub use catalog::{CatalogService, ModelInfo, ProviderInfo};
