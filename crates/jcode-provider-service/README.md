@@ -120,6 +120,10 @@ Credential Manager) in production and `MockKeyringStore` in tests.
 
 ---
 
+## Migration from old  types
+
+See [](./MIGRATION.md) for the complete old → new type/function mapping. The old types stay in place until  is repaired (the dependency that prevents Phase 6 from landing).
+
 ## Phase status
 
 | Phase | Plan deliverable                            | Status     | Commit(s) |
