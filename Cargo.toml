@@ -151,6 +151,10 @@ required-features = ["dev-bins"]
 [dependencies]
 # Hook system for lifecycle events
 jcode-hooks = { path = "crates/jcode-hooks" }
+jcode-keyring-store = { path = "crates/jcode-keyring-store" }
+jcode-plugin-core = { path = "crates/jcode-plugin-core" }
+jcode-plugin-runtime = { path = "crates/jcode-plugin-runtime" }
+jcode-provider-service = { path = "crates/jcode-provider-service" }
 
 # Cross-provider session conversion engine (resume/import any provider -> jcode).
 # Pinned to a specific commit SHA on the upstream fork so the dependency is
@@ -506,7 +510,6 @@ codegen-units = 256
 
 [dev-dependencies]
 async-stream = "0.3"
-jcode-keyring-store = { path = "crates/jcode-keyring-store" }
 # Enables the downstream test-support helpers (storage::lock_test_env,
 # auth::test_sandbox, bus::reset_models_updated_publish_state_for_tests, the
 # ExternalAuthReviewCandidate read accessors) for the root crate's own cli test

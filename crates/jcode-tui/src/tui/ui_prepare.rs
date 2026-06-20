@@ -605,6 +605,7 @@ fn prepare_messages_inner(app: &dyn TuiState, width: u16, height: u16) -> Prepar
                 height,
                 prefix_blank,
                 app.inline_images_visible(),
+                &crate::tui::ui::inline_image_ui::AppExpandLevels(app),
             ))
         }
     } else {
@@ -799,7 +800,7 @@ fn prepare_body_cached(app: &dyn TuiState, width: u16) -> Arc<PreparedMessages> 
     super::note_body_cache_lookup(cache_lookup_start.elapsed());
     super::note_body_cache_miss();
 
-    let incremental_base = cache.take_best_incremental_base(&key, msg_count);
+    let incremental_base = cache.take_best_incremental_base(&key);
 
     drop(cache);
 
@@ -932,6 +933,7 @@ pub(super) fn prepare_body_incremental(
                             items,
                             width,
                             inline_images_visible,
+                            &crate::tui::ui::inline_image_ui::AppExpandLevels(app),
                         ) {
                             new_lines.push(line);
                             new_line_raw_overrides.push(None);
@@ -1037,6 +1039,7 @@ pub(super) fn prepare_body_incremental(
                             items,
                             width,
                             inline_images_visible,
+                            &crate::tui::ui::inline_image_ui::AppExpandLevels(app),
                         ) {
                             new_lines.push(line);
                             new_line_raw_overrides.push(None);
@@ -1419,6 +1422,7 @@ pub(super) fn prepare_body(
                             items,
                             width,
                             inline_images_visible,
+                            &crate::tui::ui::inline_image_ui::AppExpandLevels(app),
                         ) {
                             lines.push(line);
                             line_raw_overrides.push(None);
@@ -1554,6 +1558,7 @@ pub(super) fn prepare_body(
                             items,
                             width,
                             inline_images_visible,
+                            &crate::tui::ui::inline_image_ui::AppExpandLevels(app),
                         ) {
                             lines.push(line);
                             line_raw_overrides.push(None);

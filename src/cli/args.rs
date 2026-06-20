@@ -919,6 +919,12 @@ pub(crate) enum ModelCommand {
         #[arg(long)]
         verbose: bool,
     },
+    Catalog {
+        #[arg(long, conflicts_with = "toon")]
+        json: bool,
+        #[arg(long, conflicts_with = "json")]
+        toon: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1135,6 +1141,14 @@ pub(crate) enum ProviderCommand {
         #[arg(long, conflicts_with = "toon")]
         json: bool,
         /// Emit output in TOON format (token-efficient JSON alternative)
+        #[arg(long, conflicts_with = "json")]
+        toon: bool,
+    },
+    Catalog {
+        #[arg(long)]
+        all: bool,
+        #[arg(long, conflicts_with = "toon")]
+        json: bool,
         #[arg(long, conflicts_with = "json")]
         toon: bool,
     },

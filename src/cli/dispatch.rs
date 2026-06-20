@@ -231,6 +231,9 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             }
         },
         Some(Command::Provider(subcmd)) => match subcmd {
+            ProviderCommand::Catalog { all, json, toon } => {
+                commands::run_provider_catalog_command(all, json, toon)?;
+            }
             ProviderCommand::List { json, toon } => {
                 commands::run_provider_list_command(json, toon)?;
             }
@@ -426,6 +429,9 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             .await?;
         }
         Some(Command::Model(subcmd)) => match subcmd {
+            ModelCommand::Catalog { json, toon } => {
+                commands::run_model_catalog_command(json, toon)?;
+            }
             ModelCommand::List {
                 json,
                 toon,

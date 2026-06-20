@@ -1789,15 +1789,9 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
 }
 
 pub async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()> {
-    let install_root = crate::config::config()
-        .plugin
-        .as_ref()
-        .and_then(|p| p.data_dir.clone())
-        .unwrap_or_else(|| {
-            dirs::home_dir()
-                .map(|h| h.join(".jcode").join("plugins"))
-                .unwrap_or_else(|| PathBuf::from("/tmp/jcode-plugins"))
-        });
+    let install_root = dirs::home_dir()
+        .map(|h| h.join(".jcode").join("plugins"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/jcode-plugins"));
     let mgr = jcode_plugin_core::PluginManager::new(install_root).await;
     use jcode_plugin_core::PluginSource;
 
@@ -1818,8 +1812,8 @@ pub async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()
             println!("Plugin loaded from {}", path.display());
         }
         super::args::PluginSubcommand::Clone { url, rev } => {
-            let name = url
-                .split('/')
+            let name = url.to_owned();
+            let name = name.split('/')
                 .last()
                 .and_then(|s| s.strip_suffix(".git"))
                 .unwrap_or("cloned-plugin");
@@ -3389,3 +3383,37 @@ fn filter_cli_model_routes_for_choice(
 #[cfg(test)]
 #[path = "commands_tests.rs"]
 mod tests;
+
+
+use jcode_provider_service::catalog::CatalogService;
+use jcode_provider_service::service::ProviderService;
+
+pub fn run_provider_catalog_command(all: bool, emit_json: bool, emit_toon: bool) -> Result<()> {
+    let svc = super::provider_service::ProviderCliService::new()?;
+    let providers = svc.list_providers()?;
+    if emit_json || emit_toon {
+        let report: Vec<serde_json::Value> = providers.iter().map(|p| serde_json::json!({
+            "id": p.id.as_str(), "name": p.name, "enabled": p.enabled, "connected": p.is_connected, "models": p.models.len()
+        })).collect();
+        let fmt = if emit_toon { output::OutputFormat::Toon } else { output::OutputFormat::Json };
+        output::emit_json_or_toon(&report, fmt)?;
+    } else {
+        for p in &providers { println!("{:<20}  {}  {}", p.id.as_str(), if p.enabled { "enabled" } else { "disabled" }, p.name); }
+    }
+    Ok(())
+}
+
+pub fn run_model_catalog_command(emit_json: bool, emit_toon: bool) -> Result<()> {
+    let svc = super::provider_service::ProviderCliService::new()?;
+    let models = svc.list_models()?;
+    if emit_json || emit_toon {
+        let report: Vec<serde_json::Value> = models.iter().map(|m| serde_json::json!({
+            "provider": m.provider.as_str(), "id": m.id.as_str(), "name": m.name,
+        })).collect();
+        let fmt = if emit_toon { output::OutputFormat::Toon } else { output::OutputFormat::Json };
+        output::emit_json_or_toon(&report, fmt)?;
+    } else {
+        for m in &models { println!("{:<20} {:<30}", m.provider.as_str(), m.id.as_str()); }
+    }
+    Ok(())
+}
