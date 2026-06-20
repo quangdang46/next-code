@@ -130,14 +130,20 @@ async fn run<B: ratatui::backend::Backend>(
     // (per the plan: 'f' toggles favorite, persisted to
     // model_prefs.json). Falls back to empty if the file is
     // missing or malformed.
-    let initial_favorites: std::collections::HashSet<(ProviderId, ModelId)> =
-        if let Some(path) = jcode_provider_service::model_prefs::default_path() {
-            jcode_provider_service::model_prefs::ModelPrefs::load(&path)
-                .map(|p| p.favorites_set())
-                .unwrap_or_default()
-        } else {
-            std::collections::HashSet::new()
-        };
+    let (initial_favorites, initial_recents): (
+        std::collections::HashSet<(ProviderId, ModelId)>,
+        Vec<(ProviderId, ModelId)>,
+    ) = if let Some(path) = jcode_provider_service::model_prefs::default_path() {
+        jcode_provider_service::model_prefs::ModelPrefs::load(&path)
+            .map(|p| (p.favorites_set(), p.recents.iter().map(|e| (e.provider.clone(), e.model.clone())).collect::<Vec<_>>()))
+            .unwrap_or_default()
+    } else {
+        (std::collections::HashSet::new(), Vec::new())
+    };
+    // Seed the picker's in-memory recents from the persistent
+    // store. PickerState::rebuild_rows() reads from state.recent
+    // and surfaces them under the 'Recent' section header.
+    state.recent = initial_recents;
     state
         .rebuild_rows(svc.catalog(), &connected, &initial_favorites)
         .await?;
