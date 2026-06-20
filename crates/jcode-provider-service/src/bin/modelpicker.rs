@@ -31,6 +31,7 @@ use jcode_provider_service::integration::IntegrationService;
 use jcode_provider_service::service::ProviderService;
 use jcode_provider_service::store::DefaultProviderService;
 use jcode_provider_service::tui_picker::{Filter, PickerState, RowOrigin};
+use jcode_provider_service::types::ModelId;
 use jcode_provider_service::types::ProviderId;
 use jcode_keyring_store::{DefaultKeyringStore, MockKeyringStore};
 use ratatui::backend::CrosstermBackend;
@@ -125,8 +126,20 @@ async fn run<B: ratatui::backend::Backend>(
         }
     }
     let mut state = PickerState::new();
+    // Load persisted favorites from ~/.jcode/model_prefs.json
+    // (per the plan: 'f' toggles favorite, persisted to
+    // model_prefs.json). Falls back to empty if the file is
+    // missing or malformed.
+    let initial_favorites: std::collections::HashSet<(ProviderId, ModelId)> =
+        if let Some(path) = jcode_provider_service::model_prefs::default_path() {
+            jcode_provider_service::model_prefs::ModelPrefs::load(&path)
+                .map(|p| p.favorites_set())
+                .unwrap_or_default()
+        } else {
+            std::collections::HashSet::new()
+        };
     state
-        .rebuild_rows(svc.catalog(), &connected, &HashSet::new())
+        .rebuild_rows(svc.catalog(), &connected, &initial_favorites)
         .await?;
 
     let mut filter_input = String::new();
@@ -240,6 +253,27 @@ async fn run<B: ratatui::backend::Backend>(
                                     &favorites,
                                 )
                                 .await?;
+                            // Persist favorites to ~/.jcode/model_prefs.json
+                            // (per the plan: 'f' toggles favorite,
+                            // persisted to model_prefs.json).
+                            if let Some(path) =
+                                jcode_provider_service::model_prefs::default_path()
+                            {
+                                let mut prefs = jcode_provider_service::model_prefs::ModelPrefs::load(&path)
+                                    .unwrap_or_default();
+                                // Sync in-memory favorites to disk.
+                                prefs.favorites = state
+                                    .favorites
+                                    .iter()
+                                    .map(|(p, m)| {
+                                        jcode_provider_service::model_prefs::FavoriteEntry {
+                                            provider: p.clone(),
+                                            model: m.clone(),
+                                        }
+                                    })
+                                    .collect();
+                                let _ = prefs.save(&path);
+                            }
                         }
                         KeyCode::Down => state.move_down(1),
                         KeyCode::Up => state.move_up(1),
@@ -270,6 +304,7 @@ mod tests {
     use jcode_provider_service::catalog::{InMemoryCatalog, ModelTier};
     use jcode_provider_service::integration::InMemoryIntegration;
     use jcode_provider_service::tui_picker::{Filter, PickerState, RowOrigin};
+use jcode_provider_service::types::ModelId;
     use jcode_keyring_store::MockKeyringStore;
     use std::collections::HashSet;
 
