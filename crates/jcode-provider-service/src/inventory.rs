@@ -5,44 +5,76 @@
 //!   >    metadata
 //!   > 2. At boot: Catalog scans inventory, calls register_provider()
 //!
-//! This module defines the [`ProviderPlugin`] trait that external
-//! provider crates can implement, plus the [`collect`] helper that
-//! walks every `inventory`-registered plugin and registers them
-//! into the catalog + integration layers at boot.
+//! This module provides a concrete [`PluginEntry`] type that
+//! consumers wrap their plugin in and submit via
+//! `inventory::submit!`. The boot path calls [`collect`] to walk
+//! the registered entries and register them into the catalog and
+//! integration layers.
 //!
-//! The actual `inventory` collection is gated by the `inventory`
-//! cargo feature (off by default) so consumers that don't need
-//! plugin support don't pull in the inventory crate.
+//! The `inventory` integration is gated by the `inventory` cargo
+//! feature (off by default) so consumers that don't need plugin
+//! support don't pull in the inventory crate.
+//!
+//! ## Usage
+//!
+//! In your provider crate:
+//!
+//! ```ignore
+//! use jcode_provider_service::inventory::PluginEntry;
+//! use jcode_provider_service::registry::ProviderRecord;
+//!
+//! fn my_record() -> ProviderRecord { ... }
+//!
+//! // At module scope:
+//! inventory::submit!(PluginEntry::new("my-provider", my_record));
+//! ```
 
 use crate::catalog::CatalogService;
 use crate::integration::IntegrationService;
 use crate::registry::ProviderRecord;
 
-/// A single provider that can register itself into the service
-/// at boot. Implementors call [`inventory::submit!`] in their crate
-/// to register a static instance, which the boot path picks up via
-/// [`collect`].
-pub trait ProviderPlugin: Send + Sync {
-    /// The provider record describing this provider.
-    fn record(&self) -> ProviderRecord;
+/// A single, statically-allocated plugin entry. Wrap your
+/// provider's `ProviderRecord` in this and submit it.
+#[derive(Debug, Clone)]
+pub struct PluginEntry {
+    id: String,
+    record: ProviderRecord,
 }
 
-/// Collect every registered provider plugin. Only available when
-/// the `inventory` cargo feature is enabled.
+impl PluginEntry {
+    /// Construct a new entry from a static id and a record.
+    pub fn new(id: &'static str, record: ProviderRecord) -> Self {
+        Self { id: id.to_string(), record }
+    }
+
+    /// The plugin's stable id (used for diagnostics).
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    /// The provider record.
+    pub fn record(&self) -> &ProviderRecord {
+        &self.record
+    }
+}
+
+// Register the inventory::collect! macro once, gated by the feature.
+#[cfg(feature = "inventory")]
+inventory::collect!(PluginEntry);
+
+/// Collect every registered plugin entry. Only available when the
+/// `inventory` cargo feature is enabled.
 #[cfg(feature = "inventory")]
 pub fn collect() -> Vec<ProviderRecord> {
-    // The actual inventory iteration is delegated to the host
-    // crate's `inventory_iter` helper macro; calling
-    // `inventory::iter::<<T> as IntoIterator>::into_iter` from
-    // here is brittle because the inventory crate's public
-    // surface is a private impl detail. We provide a stable
-    // wrapper that returns an empty Vec; consumers using the
-    // inventory feature can swap in their own iteration via a
-    // feature-gated `collect_override()` function.
-    Vec::new()
+    use ::inventory::iter;
+    let mut out: Vec<ProviderRecord> = Vec::new();
+    for entry in iter::<PluginEntry> {
+        out.push(entry.record().clone());
+    }
+    out
 }
 
-/// Register every collected provider into the catalog and
+/// Register every collected plugin into the catalog and
 /// integration. No-op when the inventory feature is off.
 pub async fn register_all(
     catalog: &dyn CatalogService,
@@ -81,21 +113,23 @@ pub enum RegisterError {
     Integration(#[from] crate::integration::IntegrationError),
 }
 
+// Re-export the inventory::submit! macro for convenience.
+#[cfg(feature = "inventory")]
+pub use ::inventory::submit;
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::catalog::{InMemoryCatalog, ModelInfo, ModelTier};
     use crate::integration::InMemoryIntegration;
 
+    #[cfg(feature = "inventory")]
     #[test]
     fn collect_returns_empty_when_no_plugins() {
-        // No plugins registered in this test crate, so collect
-        // returns an empty Vec.
-        #[cfg(feature = "inventory")]
-        {
-            let plugins = collect();
-            assert!(plugins.is_empty());
-        }
+        // No PluginEntry instances are submitted in this test
+        // crate, so collect returns an empty Vec.
+        let plugins = collect();
+        assert!(plugins.is_empty());
     }
 
     #[tokio::test]
@@ -108,13 +142,11 @@ mod tests {
         assert_eq!(n, 0);
     }
 
-    #[tokio::test]
-    async fn provider_record_carries_all_fields() {
-        // Sanity check that ProviderRecord (from registry.rs) is
-        // the right shape for plugin output.
+    #[test]
+    fn plugin_entry_carries_id_and_record() {
         let rec = ProviderRecord {
             id: "test".into(),
-            label: "Test Provider".into(),
+            label: "Test".into(),
             auth_methods: vec![],
             env_keys: vec!["TEST_KEY".into()],
             oauth_preferred: false,
@@ -131,7 +163,10 @@ mod tests {
                 tier: Some(ModelTier::Standard),
             }],
         };
-        assert_eq!(rec.id.as_str(), "test");
-        assert_eq!(rec.models.len(), 1);
+        let entry = PluginEntry::new("test-plugin", rec);
+        assert_eq!(entry.id(), "test-plugin");
+        assert_eq!(entry.record().id.as_str(), "test");
     }
 }
+
+
