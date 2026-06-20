@@ -337,3 +337,60 @@ async fn end_to_end_recents_persist_across_sessions() {
     // Cleanup.
     let _ = std::fs::remove_dir_all(&tmp_home);
 }
+
+#[tokio::test]
+async fn end_to_end_classify_with_body_classifier() {
+    use jcode_provider_service::error_classify::{
+        classify_body, classify_status, classify_with_body, ErrorCategory, ProviderError,
+    };
+
+    // Status-only classification.
+    assert_eq!(classify_status(429), ErrorCategory::RateLimit);
+    assert_eq!(classify_status(503), ErrorCategory::ServerError);
+    assert_eq!(classify_status(401), ErrorCategory::Auth);
+    assert_eq!(classify_status(402), ErrorCategory::Quota);
+
+    // Body-only classification (provider-specific error shapes).
+    assert_eq!(
+        classify_body(r#"{"error":"rate_limit_error"}"#),
+        Some(ErrorCategory::RateLimit)
+    );
+    assert_eq!(
+        classify_body(r#"{"error":{"type":"insufficient_quota"}}"#),
+        Some(ErrorCategory::Quota)
+    );
+    assert_eq!(
+        classify_body(r#"{"error":"invalid_api_key"}"#),
+        Some(ErrorCategory::Auth)
+    );
+    assert_eq!(classify_body("ok"), None);
+
+    // Combined: status 200 + body "rate_limit" -> RateLimit (body
+    // wins when both are present and body classifies).
+    assert_eq!(
+        classify_with_body(200, "rate_limit_error"),
+        ErrorCategory::RateLimit
+    );
+    // Status 503 + body "ok" -> ServerError (status wins when body
+    // is unknown).
+    assert_eq!(
+        classify_with_body(503, "ok"),
+        ErrorCategory::ServerError
+    );
+
+    // End-to-end: the classify() helper takes a ProviderError and
+    // dispatches to the right category.
+    let err = ProviderError::Http {
+        status: 502,
+        body: "internal server error".into(),
+    };
+    assert_eq!(
+        jcode_provider_service::error_classify::classify(&err),
+        ErrorCategory::ServerError
+    );
+    let err = ProviderError::Network("connection reset by peer".into());
+    assert_eq!(
+        jcode_provider_service::error_classify::classify(&err),
+        ErrorCategory::Network
+    );
+}
