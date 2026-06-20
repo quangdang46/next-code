@@ -120,6 +120,23 @@ async fn main() -> Result<()> {
                 }
             }
         }
+        "session" => {
+            // End-to-end runtime: build a real keychain service,
+            // save an API key (if --key given), and resolve a
+            // session through runtime::start_session.
+            match args.get(2).map(String::as_str).unwrap_or("start") {
+                "start" => {
+                    let provider = args.get(3).map(String::as_str);
+                    let model = args.get(4).map(String::as_str);
+                    cmd_session_start(provider, model).await
+                }
+                other => {
+                    eprintln!("unknown session subcommand: {other}");
+                    eprintln!("usage: providerctl session {{start}}");
+                    std::process::exit(2);
+                }
+            }
+        }
         "secrets" => {
             // Phase 1 integration: `jcode secrets set provider.<id>.api_key`
             // and `jcode secrets list`.
@@ -367,6 +384,31 @@ async fn cmd_prefs_favorite(provider: &str, model: &str) -> Result<()> {
     prefs.add_favorite(ProviderId::from(provider), model.into());
     prefs.save(&path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
     println!("favorited {provider}.{model}");
+    Ok(())
+}
+
+async fn cmd_session_start(
+    provider: Option<&str>,
+    model: Option<&str>,
+) -> Result<()> {
+    use jcode_provider_service::runtime;
+    use jcode_provider_service::types::{ModelId, ProviderProfile};
+    let profile = provider.map(|p| ProviderProfile::ById { id: p.into() });
+    let model_id = model.map(|m| ModelId::from(m));
+    match runtime::quick_session(provider, model).await {
+        Ok(session) => {
+            println!("resolved: {}", session.describe());
+            println!("protocol: {}", session.route.protocol);
+            println!("endpoint: {}", session.route.endpoint.base_url);
+        }
+        Err(e) => {
+            eprintln!("session start failed: {e}");
+            std::process::exit(1);
+        }
+    }
+    // Avoid unused-variable warnings on the typed values.
+    let _ = profile;
+    let _ = model_id;
     Ok(())
 }
 
