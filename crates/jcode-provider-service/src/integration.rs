@@ -252,9 +252,18 @@ impl IntegrationService for InMemoryIntegration {
     }
 
     async fn detect(&self, id: &ProviderId) -> Result<ConnectionStatus, IntegrationError> {
-        // Phase 0 stub: just return NotConfigured. Phase 2b will wire this
-        // up to the CredentialService + env var detection.
-        let _ = self.get(id).await?;
+        // opencode-style: check env vars for inline credentials.
+        // This maps to opencode's `provider.request.body.apiKey` check:
+        // if the provider has an env var set, it's considered available
+        // even without OAuth (catalog.ts:96-101).
+        let provider_info = self.get(id).await?;
+        // Return InlineEnv for the FIRST env var that's set (opencode
+        // catalog.ts:96-101: `typeof provider.request.body.apiKey === "string"`).
+        for var in &provider_info.env_keys {
+            if std::env::var(var).is_ok() {
+                return Ok(ConnectionStatus::InlineEnv { env_var: var.clone() });
+            }
+        }
         Ok(ConnectionStatus::NotConfigured)
     }
 

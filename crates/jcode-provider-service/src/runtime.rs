@@ -91,7 +91,18 @@ pub async fn start_session(
         return finish(svc, provider, resolved).await;
     }
 
-    // 4. Catalog default.
+    // 3. User-set global default (from model_prefs.json / `jcode model default`).
+    //    Opencode checks this FIRST before falling through to catalog heuristic.
+    if let Some(ref d) = defaults {
+        if let Some((ref global_provider, ref global_model)) = d.global {
+            // Verify provider+model exist in catalog before using.
+            if svc.catalog().find_model(global_provider, global_model).await.is_ok() {
+                return finish(svc, global_provider.clone(), global_model.clone()).await;
+            }
+        }
+    }
+
+    // 4. Catalog default (Flagship heuristic, then newest).
     let (provider, fallback_model) = svc
         .catalog()
         .default()
