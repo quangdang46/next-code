@@ -68,13 +68,28 @@ pub enum ModelTier {
 
 impl ModelTier {
     /// Heuristic: does the model id look like a "small" model?
+    /// opencode-style small-model detection. Checks the model id and
+    /// an optional display name for tokens like `nano`, `flash`, `lite`,
+    /// `mini`, `haiku`, `small`, `fast`. Matches opencode's
+    /// `SMALL_MODEL_RE = /\b(nano|flash|lite|mini|haiku|small|fast)\b/`.
+    pub fn suggests_small(id: &str, name: Option<&str>) -> bool {
+        let id_lower = id.to_ascii_lowercase();
+        let combined = match name {
+            Some(n) => format!("{} {}", id_lower, n.to_ascii_lowercase()),
+            None => id_lower,
+        };
+        combined.contains("nano")
+            || combined.contains("flash")
+            || combined.contains("lite")
+            || combined.contains("mini")
+            || combined.contains("haiku")
+            || combined.contains("small")
+            || combined.contains("fast")
+    }
+
+    /// Old name; delegates to [`suggests_small`] with `name: None`.
     pub fn id_suggests_small(id: &str) -> bool {
-        let lower = id.to_ascii_lowercase();
-        lower.contains("nano")
-            || lower.contains("flash")
-            || lower.contains("lite")
-            || lower.contains("mini")
-            || lower.contains("haiku")
+        Self::suggests_small(id, None)
     }
 }
 
@@ -393,7 +408,7 @@ impl CatalogService for InMemoryCatalog {
                 if age_months > 18.0 {
                     continue;
                 }
-                let is_small = ModelTier::id_suggests_small(m.id.as_str());
+                let is_small = ModelTier::suggests_small(m.id.as_str(), Some(&m.name));
                 candidates.push((p.id.clone(), m.id.clone(), cost, age_months, is_small));
             }
         }
@@ -401,7 +416,7 @@ impl CatalogService for InMemoryCatalog {
             // No candidates with cost+age — fall back to id-based pick.
             for p in &providers {
                 for m in &p.models {
-                    if ModelTier::id_suggests_small(m.id.as_str()) {
+                    if ModelTier::suggests_small(m.id.as_str(), Some(&m.name)) {
                         return Ok((p.id.clone(), m.id.clone()));
                     }
                 }
@@ -542,7 +557,7 @@ mod tests {
         cat.register_provider(anthropic()).await.unwrap();
         let (p, m) = cat.small().await.unwrap();
         assert_eq!(p.as_str(), "anthropic");
-        assert!(ModelTier::id_suggests_small(m.as_str()));
+        assert!(ModelTier::id_suggests_small(m.as_str()) || ModelTier::suggests_small(m.as_str(), None));
     }
 
     #[tokio::test]
@@ -693,5 +708,17 @@ mod tests {
         cat.register_provider(p).await.unwrap();
         let (_, model) = cat.small().await.unwrap();
         assert_eq!(model.as_str(), "gpt-standard");
+    }
+
+    #[test]
+    fn model_tier_id_heuristic() {
+        // opencode SMALL_MODEL_RE = /\b(nano|flash|lite|mini|haiku|small|fast)\b/
+        assert!(ModelTier::suggests_small("claude-haiku-4-5", None));
+        assert!(ModelTier::suggests_small("gpt-5-mini", None));
+        assert!(ModelTier::suggests_small("gemini-2.5-flash", None));
+        assert!(ModelTier::suggests_small("claude-haiku-fast", None));
+        assert!(ModelTier::suggests_small("xyz", Some("nano model")));
+        assert!(ModelTier::suggests_small("some-model", Some("Fast inference")));
+        assert!(!ModelTier::suggests_small("claude-opus-4-8", None));
     }
 }
