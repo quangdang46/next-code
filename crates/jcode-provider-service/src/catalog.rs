@@ -46,6 +46,19 @@ pub struct ModelInfo {
     /// freshness cap).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub release_date: Option<chrono::NaiveDate>,
+
+    /// Optional per-model base URL override. When set, this model
+    /// uses a different endpoint than the provider default (e.g. a
+    /// fine-tuned model on a custom endpoint).
+    /// Matches opencode's `model.api.url` merge in `projectModel()`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// Optional per-model API path override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// Optional per-model protocol override.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
 }
 
 impl ModelInfo {
@@ -273,6 +286,16 @@ pub trait CatalogService: Send + Sync {
     ///
     /// The base implementation is a no-op.
     fn set_policy(&self, _policy: Arc<dyn crate::policy::PolicyService>) {}
+
+    /// Optional callback invoked after every catalog mutation
+    /// (`register_provider`, `register_model`, `set_connected`).
+    ///
+    /// The callback is called *after* the mutation is committed so the
+    /// subscriber sees the latest state.  The default implementation
+    /// returns `None` (no callback).
+    fn on_updated(&self) -> Option<Box<dyn Fn() + Send + Sync>> {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -287,6 +310,7 @@ use tokio::sync::RwLock;
 pub struct InMemoryCatalog {
     inner: Arc<RwLock<HashMap<ProviderId, ProviderInfo>>>,
     policy: std::sync::RwLock<Option<Arc<dyn crate::policy::PolicyService>>>,
+    on_updated: std::sync::RwLock<Option<Box<dyn Fn() + Send + Sync>>>,
 }
 
 impl InMemoryCatalog {
@@ -294,6 +318,7 @@ impl InMemoryCatalog {
         Self {
             inner: Arc::new(RwLock::new(HashMap::new())),
             policy: std::sync::RwLock::new(None),
+            on_updated: std::sync::RwLock::new(None),
         }
     }
 
@@ -302,6 +327,12 @@ impl InMemoryCatalog {
     /// `std::sync::RwLock` rather than `tokio::sync::RwLock`.
     pub fn with_policy(self, policy: Arc<dyn crate::policy::PolicyService>) -> Self {
         *self.policy.write().unwrap() = Some(policy);
+        self
+    }
+
+    /// Attach an "updated" callback, invoked after every catalog mutation.
+    pub fn with_on_updated(self, cb: Box<dyn Fn() + Send + Sync>) -> Self {
+        *self.on_updated.write().unwrap() = Some(cb);
         self
     }
 }
@@ -317,6 +348,8 @@ impl CatalogService for InMemoryCatalog {
     async fn register_provider(&self, info: ProviderInfo) -> Result<(), CatalogError> {
         let mut map = self.inner.write().await;
         map.insert(info.id.clone(), info);
+        drop(map);
+        self.fire_on_updated();
         Ok(())
     }
 
@@ -329,6 +362,8 @@ impl CatalogService for InMemoryCatalog {
         if let Some(p) = map.get_mut(provider) {
             p.is_connected = connected;
         }
+        drop(map);
+        self.fire_on_updated();
         Ok(())
     }
 
@@ -342,6 +377,8 @@ impl CatalogService for InMemoryCatalog {
             .get_mut(provider)
             .ok_or_else(|| CatalogError::UnknownProvider(provider.clone()))?;
         entry.models.push(model);
+        drop(map);
+        self.fire_on_updated();
         Ok(())
     }
 
@@ -588,11 +625,24 @@ impl CatalogService for InMemoryCatalog {
         for id in &denied {
             map.remove(id);
         }
+        drop(map);
+        self.fire_on_updated();
         Ok(())
     }
 
     fn set_policy(&self, policy: Arc<dyn crate::policy::PolicyService>) {
         *self.policy.write().unwrap() = Some(policy);
+    }
+
+}
+
+impl InMemoryCatalog {
+    fn fire_on_updated(&self) {
+        if let Ok(g) = self.on_updated.read() {
+            if let Some(ref cb) = *g {
+                cb();
+            }
+        }
     }
 }
 
@@ -624,6 +674,9 @@ mod tests {
                     tier: Some(ModelTier::Flagship),
 
                     release_date: None,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
                 ModelInfo {
                     id: "claude-haiku-4-5".into(),
@@ -638,6 +691,9 @@ mod tests {
                     tier: Some(ModelTier::Nano),
 
                     release_date: None,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
             ],
         }
@@ -726,6 +782,9 @@ mod tests {
                     supports_streaming: true,
                     tier: Some(ModelTier::Nano),
                     release_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1),
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
                 ModelInfo {
                     id: "claude-haiku-new".into(),
@@ -739,6 +798,9 @@ mod tests {
                     supports_streaming: true,
                     tier: Some(ModelTier::Nano),
                     release_date: chrono::NaiveDate::from_ymd_opt(2025, 1, 1),
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
             ],
         };
@@ -774,6 +836,9 @@ mod tests {
                     supports_streaming: true,
                     tier: Some(ModelTier::Nano),
                     release_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1),
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
                 ModelInfo {
                     id: "claude-haiku-fresh".into(),
@@ -787,6 +852,9 @@ mod tests {
                     supports_streaming: true,
                     tier: Some(ModelTier::Nano),
                     release_date: chrono::NaiveDate::from_ymd_opt(2025, 6, 1),
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
             ],
         };
@@ -821,6 +889,9 @@ mod tests {
                     supports_streaming: true,
                     tier: Some(ModelTier::Flagship),
                     release_date: chrono::NaiveDate::from_ymd_opt(2025, 1, 1),
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
                 ModelInfo {
                     id: "gpt-standard".into(),
@@ -834,6 +905,9 @@ mod tests {
                     supports_streaming: true,
                     tier: Some(ModelTier::Standard),
                     release_date: chrono::NaiveDate::from_ymd_opt(2025, 1, 1),
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
             ],
         };

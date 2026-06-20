@@ -166,6 +166,9 @@ mod tests {
                 tier: Some(ModelTier::Standard),
 
                 release_date: None,
+                base_url: None,
+                path: None,
+                protocol: None,
             }],
             api_key: None,
         };

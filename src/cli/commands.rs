@@ -3247,7 +3247,13 @@ pub async fn run_model_command(
         collect_cli_model_names(&filtered_routes, Vec::new())
     };
 
-    if models.is_empty() {
+    // Also fetch catalog models from ProviderCliService for a broader view
+    let catalog_models = super::provider_service::ProviderCliService::new()
+        .ok()
+        .and_then(|svc| svc.list_models().ok())
+        .unwrap_or_default();
+
+    if models.is_empty() && catalog_models.is_empty() {
         anyhow::bail!(
             "No models found for provider '{}'. Check credentials or try a different --provider.",
             provider.name()
@@ -3287,11 +3293,26 @@ pub async fn run_model_command(
                 crate::provider_catalog::runtime_provider_display_name(provider.name())
             );
             println!("Selected model: {}", provider.model());
-            println!("Available models: {}", models.len());
+            println!("Available models (routes): {}", models.len());
+            if !catalog_models.is_empty() {
+                println!("Catalog models: {}", catalog_models.len());
+            }
             println!()
         }
-        for model in models {
-            println!("{}", model)
+        if !models.is_empty() {
+            println!("== Model routes ==");
+            for model in &models {
+                println!("{}", model)
+            }
+        }
+        if !catalog_models.is_empty() {
+            if !models.is_empty() {
+                println!();
+            }
+            println!("== Catalog models ==");
+            for m in &catalog_models {
+                println!("{:<20} {}", m.provider.as_str(), m.id.as_str());
+            }
         }
     }
 

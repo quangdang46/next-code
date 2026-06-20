@@ -203,6 +203,25 @@ pub trait IntegrationService: Send + Sync {
         label: &str,
         key: &str,
     ) -> Result<CredentialId, IntegrationError>;
+
+    /// List the connection status for every registered provider.
+    /// Returns all providers (including `NotConfigured`) so callers can
+    /// distinguish "no credential yet" from "not registered".
+    async fn connection_list(&self) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError>;
+
+    /// Get the connection status for a single provider.
+    /// Equivalent to opencode's `connection.forIntegration(id)`.
+    async fn connection_for(&self, id: &ProviderId) -> Result<ConnectionStatus, IntegrationError>;
+
+    /// Optional callback invoked after every integration mutation
+    /// (`register`, `save_api_key`, `complete_oauth`, `cancel_oauth`).
+    ///
+    /// The callback is called *after* the mutation is committed so the
+    /// subscriber sees the latest state.  The default implementation
+    /// returns `None` (no callback).
+    fn on_updated(&self) -> Option<Box<dyn Fn() + Send + Sync>> {
+        None
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +233,7 @@ pub trait IntegrationService: Send + Sync {
 pub struct InMemoryIntegration {
     providers: Mutex<std::collections::HashMap<ProviderId, LoginProvider>>,
     attempts: Mutex<std::collections::HashMap<String, OAuthAttempt>>,
+    on_updated: std::sync::RwLock<Option<Box<dyn Fn() + Send + Sync>>>,
 }
 
 impl InMemoryIntegration {
@@ -221,7 +241,14 @@ impl InMemoryIntegration {
         Self {
             providers: Mutex::new(Default::default()),
             attempts: Mutex::new(Default::default()),
+            on_updated: std::sync::RwLock::new(None),
         }
+    }
+
+    /// Attach an "updated" callback, invoked after every integration mutation.
+    pub fn with_on_updated(self, cb: Box<dyn Fn() + Send + Sync>) -> Self {
+        *self.on_updated.write().unwrap() = Some(cb);
+        self
     }
 }
 
@@ -236,6 +263,8 @@ impl IntegrationService for InMemoryIntegration {
     async fn register(&self, provider: LoginProvider) -> Result<(), IntegrationError> {
         let mut map = self.providers.lock().await;
         map.insert(provider.id.clone(), provider);
+        drop(map);
+        self.fire_on_updated();
         Ok(())
     }
 
@@ -278,6 +307,7 @@ impl IntegrationService for InMemoryIntegration {
             .lock()
             .await
             .insert(attempt.id.clone(), attempt.clone());
+        self.fire_on_updated();
         Ok(attempt)
     }
 
@@ -297,6 +327,7 @@ impl IntegrationService for InMemoryIntegration {
     ) -> Result<CredentialId, IntegrationError> {
         // Phase 0 stub. The real implementation needs the CredentialService
         // injected; that lands in Phase 1.
+        self.fire_on_updated();
         Err(IntegrationError::Storage(
             "complete_oauth requires CredentialService (Phase 1)".into(),
         ))
@@ -304,11 +335,26 @@ impl IntegrationService for InMemoryIntegration {
 
     async fn cancel_oauth(&self, attempt_id: &str) -> Result<(), IntegrationError> {
         self.attempts.lock().await.remove(attempt_id);
+        self.fire_on_updated();
         Ok(())
     }
 
     async fn list_oauth_attempts(&self) -> Result<Vec<OAuthAttempt>, IntegrationError> {
         Ok(self.attempts.lock().await.values().cloned().collect())
+    }
+
+    async fn connection_list(&self) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError> {
+        let providers = self.list().await?;
+        let mut result = Vec::with_capacity(providers.len());
+        for p in &providers {
+            let status = self.detect(&p.id).await?;
+            result.push((p.id.clone(), status));
+        }
+        Ok(result)
+    }
+
+    async fn connection_for(&self, id: &ProviderId) -> Result<ConnectionStatus, IntegrationError> {
+        self.detect(id).await
     }
 
     async fn save_api_key(
@@ -317,9 +363,20 @@ impl IntegrationService for InMemoryIntegration {
         _label: &str,
         _key: &str,
     ) -> Result<CredentialId, IntegrationError> {
+        self.fire_on_updated();
         Err(IntegrationError::Storage(
             "save_api_key requires CredentialService (Phase 1)".into(),
         ))
+    }
+}
+
+impl InMemoryIntegration {
+    fn fire_on_updated(&self) {
+        if let Ok(g) = self.on_updated.read() {
+            if let Some(ref cb) = *g {
+                cb();
+            }
+        }
     }
 }
 

@@ -36,6 +36,7 @@ pub struct PersistentIntegration<K: KeyringStore + 'static> {
     attempts: RwLock<HashMap<String, OAuthAttempt>>,
     credentials: Arc<dyn CredentialService>,
     _phantom: std::marker::PhantomData<K>,
+    on_updated: std::sync::RwLock<Option<Box<dyn Fn() + Send + Sync>>>,
 }
 
 impl<K: KeyringStore + 'static> PersistentIntegration<K> {
@@ -45,7 +46,14 @@ impl<K: KeyringStore + 'static> PersistentIntegration<K> {
             attempts: RwLock::new(HashMap::new()),
             credentials,
             _phantom: std::marker::PhantomData,
+            on_updated: std::sync::RwLock::new(None),
         }
+    }
+
+    /// Attach an "updated" callback, invoked after every integration mutation.
+    pub fn with_on_updated(self, cb: Box<dyn Fn() + Send + Sync>) -> Self {
+        *self.on_updated.write().unwrap() = Some(cb);
+        self
     }
 }
 
@@ -54,6 +62,8 @@ impl<K: KeyringStore + 'static> IntegrationService for PersistentIntegration<K> 
     async fn register(&self, provider: LoginProvider) -> Result<(), IntegrationError> {
         let mut map = self.providers.write().await;
         map.insert(provider.id.clone(), provider);
+        drop(map);
+        self.fire_on_updated();
         Ok(())
     }
 
@@ -130,6 +140,7 @@ impl<K: KeyringStore + 'static> IntegrationService for PersistentIntegration<K> 
                 &raw,
             );
         }
+        self.fire_on_updated();
         Ok(attempt)
     }
 
@@ -168,16 +179,32 @@ impl<K: KeyringStore + 'static> IntegrationService for PersistentIntegration<K> 
             .await
             .map_err(|e| IntegrationError::Storage(e.to_string()))?;
         self.attempts.write().await.remove(attempt_id);
+        self.fire_on_updated();
         Ok(id)
     }
 
     async fn cancel_oauth(&self, attempt_id: &str) -> Result<(), IntegrationError> {
         self.attempts.write().await.remove(attempt_id);
+        self.fire_on_updated();
         Ok(())
     }
 
     async fn list_oauth_attempts(&self) -> Result<Vec<OAuthAttempt>, IntegrationError> {
         Ok(self.attempts.read().await.values().cloned().collect())
+    }
+
+    async fn connection_list(&self) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError> {
+        let providers = self.list().await?;
+        let mut result = Vec::with_capacity(providers.len());
+        for p in &providers {
+            let status = self.detect(&p.id).await?;
+            result.push((p.id.clone(), status));
+        }
+        Ok(result)
+    }
+
+    async fn connection_for(&self, id: &ProviderId) -> Result<ConnectionStatus, IntegrationError> {
+        self.detect(id).await
     }
 
     async fn save_api_key(
@@ -195,10 +222,23 @@ impl<K: KeyringStore + 'static> IntegrationService for PersistentIntegration<K> 
                 key: key.to_string(),
             },
         );
-        self.credentials
+        let result = self
+            .credentials
             .upsert(cred)
             .await
-            .map_err(|e| IntegrationError::Storage(e.to_string()))
+            .map_err(|e| IntegrationError::Storage(e.to_string()));
+        self.fire_on_updated();
+        result
+    }
+}
+
+impl<K: KeyringStore + 'static> PersistentIntegration<K> {
+    fn fire_on_updated(&self) {
+        if let Ok(g) = self.on_updated.read() {
+            if let Some(ref cb) = *g {
+                cb();
+            }
+        }
     }
 }
 

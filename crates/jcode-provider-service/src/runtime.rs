@@ -220,6 +220,9 @@ mod tests {
                     tier: Some(ModelTier::Nano),
 
                     release_date: None,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 }],
             api_key: None,
             protocol: "anthropic-messages-2023-01-01".into(),

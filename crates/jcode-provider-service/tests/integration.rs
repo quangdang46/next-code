@@ -76,6 +76,9 @@ async fn booted_service() -> DefaultProviderService {
                         tier: Some(m.tier),
 
                         release_date: None,
+                        base_url: None,
+                        path: None,
+                        protocol: None,
                     })
                     .collect(),
                 api_key: None,

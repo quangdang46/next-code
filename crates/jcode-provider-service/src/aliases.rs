@@ -276,6 +276,9 @@ mod tests {
                     tier: Some(CatalogTier::Flagship),
 
                     release_date: None,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
                 ModelInfo {
                     id: "claude-sonnet-4-6".into(),
@@ -290,6 +293,9 @@ mod tests {
                     tier: Some(CatalogTier::Standard),
 
                     release_date: None,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
                 ModelInfo {
                     id: "claude-haiku-4-5".into(),
@@ -304,6 +310,9 @@ mod tests {
                     tier: Some(CatalogTier::Nano),
 
                     release_date: None,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 },
             ],
             api_key: None,

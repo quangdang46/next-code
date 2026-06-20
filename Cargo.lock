@@ -3420,6 +3420,7 @@ dependencies = [
 [[package]]
 name = "ffs-budget"
 version = "0.1.11"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
 dependencies = [
  "once_cell",
  "regex",
@@ -3429,6 +3430,7 @@ dependencies = [
 [[package]]
 name = "ffs-engine"
 version = "0.1.11"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
 dependencies = [
  "ahash",
  "dashmap",
@@ -3447,6 +3449,7 @@ dependencies = [
 [[package]]
 name = "ffs-grep"
 version = "0.1.11"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
 dependencies = [
  "bstr",
  "memchr",
@@ -3455,10 +3458,12 @@ dependencies = [
 [[package]]
 name = "ffs-query-parser"
 version = "0.1.11"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
 
 [[package]]
 name = "ffs-search"
 version = "0.1.11"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -3500,6 +3505,7 @@ dependencies = [
 [[package]]
 name = "ffs-symbol"
 version = "0.1.11"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
 dependencies = [
  "aho-corasick",
  "dashmap",
@@ -7300,6 +7306,8 @@ dependencies = [
  "jcode-keyring-store",
  "jcode-llm-core",
  "jcode-llm-protocols",
+ "jcode-message-types",
+ "jcode-provider-core",
  "jcode-provider-metadata",
  "ratatui 0.28.1",
  "serde",
@@ -13410,6 +13418,7 @@ dependencies = [
 [[package]]
 name = "tree-sitter-verse"
 version = "0.1.11"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
 dependencies = [
  "cc",
  "tree-sitter",

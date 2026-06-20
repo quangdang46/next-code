@@ -14,7 +14,7 @@ use jcode_llm_core::endpoint::{Endpoint, PathSpec};
 use jcode_llm_core::route::Route;
 use jcode_llm_core::schema::ModelRef;
 
-use crate::catalog::CatalogService;
+use crate::catalog::{CatalogService, ModelInfo, ProviderInfo};
 use crate::credential::CredentialService;
 use crate::integration::IntegrationService;
 use crate::policy::PolicyService;
@@ -95,9 +95,10 @@ impl RouteResolver for DefaultProviderService {
             .provider(provider)
             .await
             .map_err(|_| ResolveError::UnknownProvider(provider.clone()))?;
-        let _model_info = info
+        let raw_model = info
             .model(model)
             .ok_or_else(|| ResolveError::UnknownProvider(provider.clone()))?;
+        let merged = Self::project_model(&info, raw_model);
 
         let status = self
             .integration
@@ -115,10 +116,10 @@ impl RouteResolver for DefaultProviderService {
                 id: model.as_str().to_string(),
                 variant: None,
             },
-            protocol: info.protocol.clone(),
+            protocol: merged.protocol.clone().unwrap_or(info.protocol.clone()),
             endpoint: Endpoint {
-                base_url: info.base_url.clone(),
-                path: PathSpec::Static(info.path.clone()),
+                base_url: merged.base_url.clone().unwrap_or(info.base_url.clone()),
+                path: PathSpec::Static(merged.path.clone().unwrap_or(info.path.clone())),
                 query: None,
             },
             auth: HashMap::new(),
@@ -154,6 +155,23 @@ impl RouteResolver for DefaultProviderService {
 }
 
 impl DefaultProviderService {
+    /// Merge a model into its provider, giving the model's per-override
+    /// fields priority over the provider defaults. This mirrors opencode's
+    /// `projectModel()` in catalog.ts, which merges `model.api` into
+    /// `provider.api` and `model.request` into `provider.request`.
+    ///
+    /// For jcode the relevant overrides are `base_url`, `path`, and
+    /// `protocol` on the model. If the model has its own value for any
+    /// of these, it wins; otherwise the provider default is used.
+    fn project_model(provider: &ProviderInfo, model: &ModelInfo) -> ModelInfo {
+        ModelInfo {
+            base_url: model.base_url.clone().or_else(|| Some(provider.base_url.clone())),
+            path: model.path.clone().or_else(|| Some(provider.path.clone())),
+            protocol: model.protocol.clone().or_else(|| Some(provider.protocol.clone())),
+            ..model.clone()
+        }
+    }
+
     /// Resolve just the provider id from a [`ProviderProfile`]. Walks
     /// the integration registry for label-based and named lookups.
     fn resolve_profile_id<'a>(
@@ -225,6 +243,10 @@ mod tests {
                     tier: Some(ModelTier::Nano),
 
                     release_date: None,
+
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 }],
             api_key: None,
             base_url: "https://api.anthropic.com".into(),

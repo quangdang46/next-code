@@ -268,6 +268,9 @@ pub async fn register_catalog(
                     supports_streaming: m.supports_streaming,
                     tier: Some(m.tier),
                     release_date: m.release_date,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 })
                 .collect(),
             api_key: None,

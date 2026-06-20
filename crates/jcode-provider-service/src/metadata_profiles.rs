@@ -67,6 +67,9 @@ pub fn profile_to_model(p: &OpenAiCompatibleProfile) -> Vec<ModelInfo> {
         tier: None,
 
         release_date: None,
+        base_url: None,
+        path: None,
+        protocol: None,
     }]
 }
 

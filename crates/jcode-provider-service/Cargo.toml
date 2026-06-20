@@ -28,6 +28,8 @@ chrono = { version = "0.4", features = ["serde"] }
 clap = { version = "4", features = ["derive"], optional = true }
 jcode-llm-core = { path = "../jcode-llm-core" }
 jcode-llm-protocols = { path = "../jcode-llm-protocols" }
+jcode-message-types = { path = "../jcode-message-types" }
+jcode-provider-core = { path = "../jcode-provider-core" }
 jcode-provider-metadata = { path = "../jcode-provider-metadata", optional = true }
 inventory = { version = "0.3", optional = true }
 jcode-keyring-store = { path = "../jcode-keyring-store" }

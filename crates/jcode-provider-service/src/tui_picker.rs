@@ -265,6 +265,9 @@ mod tests {
                         tier: Some(ModelTier::Standard),
 
                         release_date: None,
+                        base_url: None,
+                        path: None,
+                        protocol: None,
                     },
                     ModelInfo {
                         id: "claude-haiku-4-5".into(),
@@ -279,6 +282,9 @@ mod tests {
                         tier: Some(ModelTier::Nano),
 
                         release_date: None,
+                        base_url: None,
+                        path: None,
+                        protocol: None,
                     },
                 ],
             api_key: None,
@@ -304,6 +310,9 @@ mod tests {
                     tier: Some(ModelTier::Mini),
 
                     release_date: None,
+                    base_url: None,
+                    path: None,
+                    protocol: None,
                 }],
             api_key: None,
             protocol: "anthropic-messages-2023-01-01".into(),

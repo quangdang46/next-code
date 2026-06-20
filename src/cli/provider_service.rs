@@ -5,13 +5,29 @@ use jcode_provider_service::catalog::{CatalogService, ModelInfo, ProviderInfo, I
 use jcode_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
 use jcode_provider_service::integration::InMemoryIntegration;
 use jcode_provider_service::service::ProviderService;
+use crate::bus::{Bus, BusEvent};
 
 pub struct ProviderCliService { svc: DefaultProviderService }
 
 impl ProviderCliService {
     pub fn new() -> Result<Self> {
-        let catalog = Arc::new(InMemoryCatalog::new());
-        let integration = Arc::new(InMemoryIntegration::new());
+        let bus = Bus::global();
+        let catalog_on_updated = {
+            let bus = bus;
+            move || bus.publish(BusEvent::CatalogUpdated)
+        };
+        let integration_on_updated = {
+            let bus = bus;
+            move || bus.publish(BusEvent::IntegrationUpdated)
+        };
+        let catalog = Arc::new(
+            InMemoryCatalog::new()
+                .with_on_updated(Box::new(catalog_on_updated)),
+        );
+        let integration = Arc::new(
+            InMemoryIntegration::new()
+                .with_on_updated(Box::new(integration_on_updated)),
+        );
         let credential = Arc::new(InMemoryCredentialStore::new());
         let svc = DefaultProviderService::new(catalog, integration, credential);
         let rt = tokio::runtime::Handle::current();
