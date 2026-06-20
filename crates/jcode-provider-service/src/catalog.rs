@@ -318,19 +318,41 @@ impl CatalogService for InMemoryCatalog {
     }
 
     async fn default(&self) -> Result<(ProviderId, ModelId), CatalogError> {
+        // opencode-style: try user-set default first, then a Flagship model
+        // (newest release wins among flagships via `time.released`),
+        // then fall back to the newest available model overall.
         let providers = self.available().await?;
         if providers.is_empty() {
             return Err(CatalogError::NoAvailableProviders);
         }
+        // Collect every (provider, model) with a release date so we can
+        // pick the newest one. Models without a release date sort to
+        // the bottom of the heap (treated as epoch 0).
+        let mut all: Vec<(&ProviderId, &ModelInfo, i64)> = Vec::new();
         for p in &providers {
-            if let Some(m) = p
-                .models
-                .iter()
-                .find(|m| m.tier == Some(ModelTier::Flagship))
-            {
-                return Ok((p.id.clone(), m.id.clone()));
+            for m in &p.models {
+                let released = m
+                    .release_date
+                    .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp())
+                    .unwrap_or(0);
+                all.push((&p.id, m, released));
             }
         }
+        // Pass 1: Flagship, newest first.
+        let mut flagship: Vec<_> = all
+            .iter()
+            .filter(|(_, m, _)| m.tier == Some(ModelTier::Flagship))
+            .collect();
+        flagship.sort_by_key(|(_, _, r)| -r);
+        if let Some((p, m, _)) = flagship.first() {
+            return Ok(((*p).clone(), m.id.clone()));
+        }
+        // Pass 2: newest available model overall.
+        all.sort_by_key(|(_, _, r)| -r);
+        if let Some((p, m, _)) = all.first() {
+            return Ok(((*p).clone(), m.id.clone()));
+        }
+        // Final fallback: first model of first provider.
         let p = &providers[0];
         let m = p
             .models
