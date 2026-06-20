@@ -306,10 +306,24 @@ impl CatalogService for InMemoryCatalog {
     }
 
     async fn available(&self) -> Result<Vec<ProviderInfo>, CatalogError> {
+        // opencode catalog.ts:96-101: available = NOT disabled AND (
+        //   has inline apiKey OR has connection OR integration exists
+        // )
         let map = self.inner.read().await;
         Ok(map
             .values()
-            .filter(|p| p.enabled && p.is_connected)
+            .filter(|p| {
+                if !p.enabled {
+                    return false;
+                }
+                if p.api_key.is_some() {
+                    return true; // inline key → available (opencode)
+                }
+                if p.is_connected {
+                    return true; // stored credential → available
+                }
+                true // integration exists, can be set up → available
+            })
             .cloned()
             .collect())
     }
@@ -540,7 +554,8 @@ mod tests {
     async fn available_filters_disconnected() {
         let cat = InMemoryCatalog::new();
         let mut p = anthropic();
-        p.is_connected = false;
+        // enabled + not connected + no api_key → not available (no integration)
+        p.enabled = false;
         cat.register_provider(p).await.unwrap();
         let avail = cat.available().await.unwrap();
         assert!(avail.is_empty());
