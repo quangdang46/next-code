@@ -16,7 +16,6 @@ use jcode_llm_core::schema::ModelRef;
 
 use crate::catalog::CatalogService;
 use crate::credential::CredentialService;
-use crate::integration::ConnectionStatus;
 use crate::integration::IntegrationService;
 use crate::service::{ProviderService, ResolveError, ResolvedRoute, RouteResolver};
 use crate::types::{ModelId, ProviderId, ProviderProfile};
@@ -68,11 +67,15 @@ impl RouteResolver for DefaultProviderService {
         provider: &ProviderId,
         model: &ModelId,
     ) -> Result<ResolvedRoute, ResolveError> {
-        let _info = self
+        // Look up provider + model info from the catalog (opencode-style).
+        let info = self
             .catalog
             .provider(provider)
             .await
             .map_err(|_| ResolveError::UnknownProvider(provider.clone()))?;
+        let _model_info = info
+            .model(model)
+            .ok_or_else(|| ResolveError::UnknownProvider(provider.clone()))?;
 
         let status = self
             .integration
@@ -83,7 +86,25 @@ impl RouteResolver for DefaultProviderService {
             return Err(ResolveError::NotConnected(provider.clone()));
         }
 
-        let route = build_default_route(provider, model);
+        let route = Route {
+            id: format!("{}/{}", provider, model),
+            provider: ModelRef {
+                provider_id: jcode_llm_core::schema::ProviderId::from(provider.as_str()),
+                id: model.as_str().to_string(),
+                variant: None,
+            },
+            protocol: info.protocol.clone(),
+            endpoint: Endpoint {
+                base_url: info.base_url.clone(),
+                path: PathSpec::Static(info.path.clone()),
+                query: None,
+            },
+            auth: HashMap::new(),
+            framing: jcode_llm_core::framing::Framing::Sse,
+            transport: jcode_llm_core::transport::Transport::Http,
+            defaults: [("temperature".into(), serde_json::json!(0.0))].into(),
+            body_overlay: Some(serde_json::json!({ "model": model.as_str() })),
+        };
         Ok(ResolvedRoute {
             provider: provider.clone(),
             model: model.clone(),
@@ -148,82 +169,6 @@ impl DefaultProviderService {
     }
 }
 
-/// Convenience: assert that the given provider has at least one
-/// credential, and return the connection status.
-pub async fn require_connected(
-    integration: &dyn IntegrationService,
-    provider: &ProviderId,
-) -> Result<ConnectionStatus, ResolveError> {
-    let status = integration
-        .detect(provider)
-        .await
-        .map_err(ResolveError::Integration)?;
-    if !status.is_connected() {
-        return Err(ResolveError::NotConnected(provider.clone()));
-    }
-    Ok(status)
-}
-
-fn build_default_route(provider: &ProviderId, model: &ModelId) -> Route {
-    let base_url = default_base_url(provider);
-    let mut defaults = HashMap::new();
-    defaults.insert("temperature".into(), serde_json::json!(0.0));
-
-    Route {
-        id: format!("{}/{}", provider, model),
-        provider: ModelRef {
-            provider_id: jcode_llm_core::schema::ProviderId::from(provider.as_str()),
-            id: model.as_str().to_string(),
-            variant: None,
-        },
-        protocol: default_protocol(provider),
-        endpoint: Endpoint {
-            base_url,
-            path: PathSpec::Static(default_path(provider)),
-            query: None,
-        },
-        auth: HashMap::new(),
-        framing: jcode_llm_core::framing::Framing::Sse,
-        transport: jcode_llm_core::transport::Transport::Http,
-        defaults,
-        body_overlay: Some(serde_json::json!({ "model": model.as_str() })),
-    }
-}
-
-fn default_base_url(provider: &ProviderId) -> String {
-    match provider.as_str() {
-        "anthropic" => "https://api.anthropic.com".into(),
-        "openai" => "https://api.openai.com".into(),
-        "gemini" => "https://generativelanguage.googleapis.com".into(),
-        "openrouter" => "https://openrouter.ai/api".into(),
-        "bedrock" => "https://bedrock-runtime.us-east-1.amazonaws.com".into(),
-        "copilot" => "https://api.githubcopilot.com".into(),
-        _ => "https://localhost".into(),
-    }
-}
-
-fn default_path(provider: &ProviderId) -> String {
-    match provider.as_str() {
-        "anthropic" => "/v1/messages".into(),
-        "openai" => "/v1/chat/completions".into(),
-        "gemini" => "/v1beta/models/{model}:generateContent".into(),
-        "openrouter" => "/v1/chat/completions".into(),
-        "bedrock" => "/model/{model}/invoke".into(),
-        "copilot" => "/chat/completions".into(),
-        _ => "/".into(),
-    }
-}
-
-fn default_protocol(provider: &ProviderId) -> String {
-    match provider.as_str() {
-        "anthropic" => "anthropic-messages-2023-01-01".into(),
-        "openai" | "openrouter" | "copilot" => "openai-chat-2024".into(),
-        "gemini" => "gemini-1.5".into(),
-        "bedrock" => "bedrock-converse-2024".into(),
-        _ => "openai-chat-2024".into(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,6 +205,9 @@ mod tests {
                     release_date: None,
                 }],
             api_key: None,
+            base_url: "https://api.anthropic.com".into(),
+            path: "/v1/messages".into(),
+            protocol: "anthropic-messages-2023-01-01".into(),
             })
             .await
             .unwrap();

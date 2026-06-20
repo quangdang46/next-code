@@ -193,6 +193,9 @@ mod tests {
                     release_date: None,
                 }],
             api_key: None,
+            protocol: "anthropic-messages-2023-01-01".into(),
+            path: "/v1/messages".into(),
+            base_url: "https://api.anthropic.com".into(),
             },
             ProviderInfo {
                 id: "openai".into(),
@@ -214,6 +217,9 @@ mod tests {
                     release_date: None,
                 }],
             api_key: None,
+            protocol: "anthropic-messages-2023-01-01".into(),
+            path: "/v1/messages".into(),
+            base_url: "https://api.anthropic.com".into(),
             },
             ProviderInfo {
                 id: "gemini".into(),
@@ -235,6 +241,9 @@ mod tests {
                     release_date: None,
                 }],
             api_key: None,
+            protocol: "anthropic-messages-2023-01-01".into(),
+            path: "/v1/messages".into(),
+            base_url: "https://api.anthropic.com".into(),
             },
         ] {
             cat.register_provider(p.clone()).await.unwrap();
@@ -311,6 +320,9 @@ mod tests {
             is_connected: true,
             models: vec![],
             api_key: None,
+            protocol: "anthropic-messages-2023-01-01".into(),
+            path: "/v1/messages".into(),
+            base_url: "https://api.anthropic.com".into(),
         })
         .await
         .unwrap();

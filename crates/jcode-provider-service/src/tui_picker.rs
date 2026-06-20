@@ -282,6 +282,9 @@ mod tests {
                     },
                 ],
             api_key: None,
+            protocol: "anthropic-messages-2023-01-01".into(),
+            path: "/v1/messages".into(),
+            base_url: "https://api.anthropic.com".into(),
             },
             ProviderInfo {
                 id: "openai".into(),
@@ -303,6 +306,9 @@ mod tests {
                     release_date: None,
                 }],
             api_key: None,
+            protocol: "anthropic-messages-2023-01-01".into(),
+            path: "/v1/messages".into(),
+            base_url: "https://api.anthropic.com".into(),
             },
         ] {
             c.register_provider(p.clone()).await.unwrap();

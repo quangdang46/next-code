@@ -79,6 +79,9 @@ async fn booted_service() -> DefaultProviderService {
                     })
                     .collect(),
                 api_key: None,
+                base_url: "https://api.anthropic.com".into(),
+                path: "/v1/messages".into(),
+                protocol: "anthropic-messages-2023-01-01".into(),
             })
             .await
             .unwrap();

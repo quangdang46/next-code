@@ -109,7 +109,22 @@ pub struct ProviderInfo {
     /// Optional inline API key (opencode catalog.ts:96-101).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
+    /// Base URL for API requests (e.g. "https://api.anthropic.com").
+    /// Used by RouteResolver to build the Route without hardcoding.
+    #[serde(default = "default_anthropic_url")]
+    pub base_url: String,
+    /// API path (e.g. "/v1/messages"). Used by RouteResolver.
+    #[serde(default = "default_chat_path")]
+    pub path: String,
+    /// Protocol identifier (e.g. "anthropic-messages-2023-01-01").
+    /// Used by RouteResolver to select the correct protocol adapter.
+    #[serde(default = "default_chat_protocol")]
+    pub protocol: String,
 }
+
+fn default_anthropic_url() -> String { "https://api.anthropic.com".into() }
+fn default_chat_path() -> String { "/v1/chat/completions".into() }
+fn default_chat_protocol() -> String { "openai-chat-2024".into() }
 
 impl ProviderInfo {
     pub fn model(&self, id: &ModelId) -> Option<&ModelInfo> {
@@ -504,6 +519,9 @@ mod tests {
 
     fn anthropic() -> ProviderInfo {
         ProviderInfo {
+            base_url: "https://api.anthropic.com".into(),
+            path: "/v1/messages".into(),
+            protocol: "anthropic-messages-2023-01-01".into(),
             api_key: None,
             id: "anthropic".into(),
             name: "Anthropic".into(),
@@ -604,6 +622,9 @@ mod tests {
         // one (with an 18-month cap).
         let cat = InMemoryCatalog::new();
         let p = ProviderInfo {
+            base_url: "https://api.anthropic.com".into(),
+            path: "/v1/messages".into(),
+            protocol: "anthropic-messages-2023-01-01".into(),
             api_key: None,
             id: "anthropic".into(),
             name: "Anthropic".into(),
@@ -649,6 +670,9 @@ mod tests {
         // Anything older than 18 months should be dropped from candidates.
         let cat = InMemoryCatalog::new();
         let p = ProviderInfo {
+            base_url: "https://api.anthropic.com".into(),
+            path: "/v1/messages".into(),
+            protocol: "anthropic-messages-2023-01-01".into(),
             api_key: None,
             id: "anthropic".into(),
             name: "Anthropic".into(),
@@ -693,6 +717,9 @@ mod tests {
         // No "small" id tokens, but cost+age should still pick the cheapest.
         let cat = InMemoryCatalog::new();
         let p = ProviderInfo {
+            base_url: "https://api.anthropic.com".into(),
+            path: "/v1/messages".into(),
+            protocol: "anthropic-messages-2023-01-01".into(),
             api_key: None,
             id: "openai".into(),
             name: "OpenAI".into(),

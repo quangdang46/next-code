@@ -57,6 +57,11 @@ pub struct BuiltinProvider {
     pub env_keys: &'static [&'static str],
     pub oauth_preferred: bool,
     pub models: &'static [BuiltinModel],
+    /// Base URL for API requests (e.g. "https://api.anthropic.com").
+    /// Used by RouteResolver instead of hardcoded match arms.
+    pub base_url: &'static str,
+    /// API path (e.g. "/v1/messages").
+    pub path: &'static str,
 }
 
 /// A model in a built-in provider.
@@ -85,6 +90,8 @@ pub const BUILTIN_PROVIDERS: &[BuiltinProvider] = &[
         protocol: BuiltinProtocol::AnthropicMessages,
         env_keys: &["ANTHROPIC_API_KEY"],
         oauth_preferred: true,
+        base_url: "https://api.anthropic.com",
+        path: "/v1/messages",
         models: &[
             BuiltinModel {
                 id: "claude-opus-4-8",
@@ -130,6 +137,8 @@ pub const BUILTIN_PROVIDERS: &[BuiltinProvider] = &[
         protocol: BuiltinProtocol::OpenAiChat,
         env_keys: &["OPENAI_API_KEY"],
         oauth_preferred: true,
+        base_url: "https://api.openai.com",
+        path: "/v1/chat/completions",
         models: &[
             BuiltinModel {
                 id: "gpt-5.1",
@@ -163,6 +172,8 @@ pub const BUILTIN_PROVIDERS: &[BuiltinProvider] = &[
         protocol: BuiltinProtocol::OpenAiChat,
         env_keys: &["OPENROUTER_API_KEY"],
         oauth_preferred: false,
+        base_url: "https://openrouter.ai/api",
+        path: "/v1/chat/completions",
         models: &[BuiltinModel {
             id: "openrouter/auto",
             name: "OpenRouter Auto",
@@ -182,6 +193,8 @@ pub const BUILTIN_PROVIDERS: &[BuiltinProvider] = &[
         protocol: BuiltinProtocol::OpenAiResponses,
         env_keys: &["GEMINI_API_KEY", "GOOGLE_API_KEY"],
         oauth_preferred: false,
+        base_url: "https://generativelanguage.googleapis.com",
+        path: "/v1beta/models/{model}:generateContent",
         models: &[BuiltinModel {
             id: "gemini-2.5-pro",
             name: "Gemini 2.5 Pro",
@@ -258,6 +271,9 @@ pub async fn register_catalog(
                 })
                 .collect(),
             api_key: None,
+            base_url: bp.base_url.to_string(),
+            path: bp.path.to_string(),
+            protocol: bp.protocol.as_str().to_string(),
         })
         .await
 }

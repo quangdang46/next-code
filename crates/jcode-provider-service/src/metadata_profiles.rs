@@ -80,6 +80,9 @@ pub fn profile_to_record(p: &OpenAiCompatibleProfile) -> ProviderRecord {
         }],
         env_keys: vec![p.api_key_env.to_string()],
         oauth_preferred: false,
+        base_url: p.api_base.to_string(),
+        path: "/v1/chat/completions".into(),
+        protocol: "openai-chat-2024".into(),
         models: profile_to_model(p),
     }
 }
