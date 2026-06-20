@@ -28,6 +28,10 @@ use crate::types::{ModelId, ProviderId};
 /// On-disk shape.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ModelPrefs {
+    /// The user's default model. (Per the plan: "Enter selects
+    /// model (and optionally sets default)".)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<FavoriteEntry>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub favorites: Vec<FavoriteEntry>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -88,6 +92,21 @@ impl ModelPrefs {
         self.favorites
             .iter()
             .any(|e| &e.provider == provider && &e.model == model)
+    }
+
+    /// Set the user's default model.
+    pub fn set_default(&mut self, provider: ProviderId, model: ModelId) {
+        self.default = Some(FavoriteEntry { provider, model });
+    }
+
+    /// Clear the user's default model.
+    pub fn clear_default(&mut self) {
+        self.default = None;
+    }
+
+    /// The user's default model, if set.
+    pub fn default_model(&self) -> Option<&FavoriteEntry> {
+        self.default.as_ref()
     }
 
     /// Push a recent selection. De-duplicates and caps at 10.
@@ -194,6 +213,30 @@ mod tests {
         let set = prefs.favorites_set();
         assert_eq!(set.len(), 1);
         assert!(set.contains(&("anthropic".into(), "claude-haiku-4-5".into())));
+    }
+
+    #[test]
+    fn round_trip_with_default() {
+        let p = std::env::temp_dir().join("jcode-prefs-default-rt.json");
+        let _ = std::fs::remove_file(&p);
+        let mut prefs = ModelPrefs::new();
+        prefs.set_default("anthropic".into(), "claude-haiku-4-5".into());
+        prefs.save(&p).unwrap();
+        let loaded = ModelPrefs::load(&p).unwrap();
+        assert_eq!(
+            loaded.default_model().unwrap().provider.as_str(),
+            "anthropic"
+        );
+        let _ = std::fs::remove_file(&p);
+    }
+
+    #[test]
+    fn clear_default_removes_field() {
+        let mut prefs = ModelPrefs::new();
+        prefs.set_default("anthropic".into(), "claude-haiku-4-5".into());
+        assert!(prefs.default_model().is_some());
+        prefs.clear_default();
+        assert!(prefs.default_model().is_none());
     }
 
     #[test]

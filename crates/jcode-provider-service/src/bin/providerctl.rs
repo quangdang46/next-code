@@ -91,6 +91,14 @@ async fn main() -> Result<()> {
         "prefs" => {
             match args.get(2).map(String::as_str).unwrap_or("show") {
                 "show" => cmd_prefs_show().await,
+                "default" => {
+                    let provider = args.get(3)
+                        .context("usage: providerctl prefs default <provider> <model>")?;
+                    let model = args.get(4)
+                        .context("usage: providerctl prefs default <provider> <model>")?;
+                    cmd_prefs_default(provider, model).await
+                }
+                "clear-default" => cmd_prefs_clear_default().await,
                 "favorite" => {
                     let provider = args.get(3)
                         .context("usage: providerctl prefs favorite <provider> <model>")?;
@@ -335,6 +343,11 @@ async fn cmd_prefs_show() -> Result<()> {
         .context("HOME not set")?;
     let prefs = jcode_provider_service::model_prefs::ModelPrefs::load(&path)
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    if let Some(d) = prefs.default_model() {
+        println!("default: {}.{}", d.provider, d.model);
+    } else {
+        println!("default: (none)");
+    }
     println!("favorites:");
     for f in &prefs.favorites {
         println!("  {}.{}", f.provider, f.model);
@@ -354,6 +367,28 @@ async fn cmd_prefs_favorite(provider: &str, model: &str) -> Result<()> {
     prefs.add_favorite(ProviderId::from(provider), model.into());
     prefs.save(&path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
     println!("favorited {provider}.{model}");
+    Ok(())
+}
+
+async fn cmd_prefs_default(provider: &str, model: &str) -> Result<()> {
+    let path = jcode_provider_service::model_prefs::default_path()
+        .context("HOME not set")?;
+    let mut prefs = jcode_provider_service::model_prefs::ModelPrefs::load(&path)
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    prefs.set_default(ProviderId::from(provider), model.into());
+    prefs.save(&path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    println!("default = {}.{}", provider, model);
+    Ok(())
+}
+
+async fn cmd_prefs_clear_default() -> Result<()> {
+    let path = jcode_provider_service::model_prefs::default_path()
+        .context("HOME not set")?;
+    let mut prefs = jcode_provider_service::model_prefs::ModelPrefs::load(&path)
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    prefs.clear_default();
+    prefs.save(&path).map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    println!("default cleared");
     Ok(())
 }
 
