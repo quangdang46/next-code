@@ -222,6 +222,18 @@ fn usage() {
   \n             model show <provider> [m]     Show one model details
   \n             model default <p> <m>         Set the global default model (persists)
   \n             connect <provider> [code]     Start OAuth flow; optional code completes it
+             session start [p] [m]         Resolve a session through runtime::start_session
+
+             secrets list|set|delete       Provider credential store (provider.<id>.<label>)
+
+             prefs show|favorite|default   Persistent model prefs (favorites, recents, default)
+
+             aliases                       List known model aliases (opus, sonnet, haiku, ...)
+
+             metadata list|register        The 36 OpenAI-compatible metadata profiles
+
+             legacy <flag>                 Translate a legacy --provider alias
+
   \n             help                          Print this help
 \n         
 \n         EXAMPLES:
@@ -229,7 +241,7 @@ fn usage() {
   \n             providerctl resolve anthropic claude-sonnet-4-6
   \n             providerctl model list
   \n             providerctl model default anthropic claude-haiku-4-5
-  \n             providerctl connect anthropic"
+             providerctl connect anthropic\n  \n             providerctl session start anthropic haiku-4-5"
     );
 }
 
