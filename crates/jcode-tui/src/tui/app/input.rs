@@ -782,6 +782,15 @@ pub(super) fn handle_text_input(app: &mut App, text: &str) -> bool {
     }
 
     insert_input_text(app, text);
+    // Convenience: typing '/connect' (exactly 8 chars) auto-appends a
+    // trailing space so the provider autocomplete list appears without
+    // the user having to type space. This preserves the user's text
+    // (so they can still type a provider name) and avoids the
+    // 'autoclear' UX antipattern.
+    if app.input == "/connect" {
+        app.input.push(' ');
+        app.cursor_pos = app.input.len();
+    }
     true
 }
 
