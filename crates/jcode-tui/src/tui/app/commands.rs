@@ -3325,6 +3325,14 @@ pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
 #[path = "commands_tests.rs"]
 mod tests;
 
-pub fn handle_disabled_mission_command(_app: &mut crate::tui::app::App, _cmd: &str) -> bool {
+pub(super) fn handle_disabled_mission_command(app: &mut App, trimmed: &str) -> bool {
+    if slash_command_rest(trimmed, "/mission").is_none()
+        && slash_command_rest(trimmed, "/goal").is_none()
+    {
+        return false;
+    }
+    app.push_display_message(DisplayMessage::system(
+        "The /mission and /goal commands are disabled in this build.".to_string(),
+    ));
     true
 }
