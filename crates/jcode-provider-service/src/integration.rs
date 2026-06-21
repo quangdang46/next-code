@@ -207,7 +207,9 @@ pub trait IntegrationService: Send + Sync {
     /// List the connection status for every registered provider.
     /// Returns all providers (including `NotConfigured`) so callers can
     /// distinguish "no credential yet" from "not registered".
-    async fn connection_list(&self) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError>;
+    async fn connection_list(
+        &self,
+    ) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError>;
 
     /// Get the connection status for a single provider.
     /// Equivalent to opencode's `connection.forIntegration(id)`.
@@ -290,7 +292,9 @@ impl IntegrationService for InMemoryIntegration {
         // catalog.ts:96-101: `typeof provider.request.body.apiKey === "string"`).
         for var in &provider_info.env_keys {
             if std::env::var(var).is_ok() {
-                return Ok(ConnectionStatus::InlineEnv { env_var: var.clone() });
+                return Ok(ConnectionStatus::InlineEnv {
+                    env_var: var.clone(),
+                });
             }
         }
         Ok(ConnectionStatus::NotConfigured)
@@ -343,7 +347,9 @@ impl IntegrationService for InMemoryIntegration {
         Ok(self.attempts.lock().await.values().cloned().collect())
     }
 
-    async fn connection_list(&self) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError> {
+    async fn connection_list(
+        &self,
+    ) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError> {
         let providers = self.list().await?;
         let mut result = Vec::with_capacity(providers.len());
         for p in &providers {

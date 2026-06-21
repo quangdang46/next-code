@@ -2532,15 +2532,18 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         let budget = ((chat_area.height as usize * max_pct) / 100).clamp(0, 18);
         if budget >= 5 && chat_area.width >= 24 {
             {
-                let tiles: Vec<jcode_tui_render::swarm_tiles::SwarmTile> = members.iter().map(|m| {
-                    let name = m.friendly_name.clone().unwrap_or_default();
-                    let status = format!("{:?}", m.status);
-                    jcode_tui_render::swarm_tiles::SwarmTile::new(
-                        name,
-                        status,
-                        ratatui::style::Color::Cyan,
-                    )
-                }).collect();
+                let tiles: Vec<jcode_tui_render::swarm_tiles::SwarmTile> = members
+                    .iter()
+                    .map(|m| {
+                        let name = m.friendly_name.clone().unwrap_or_default();
+                        let status = format!("{:?}", m.status);
+                        jcode_tui_render::swarm_tiles::SwarmTile::new(
+                            name,
+                            status,
+                            ratatui::style::Color::Cyan,
+                        )
+                    })
+                    .collect();
                 jcode_tui_render::swarm_tiles::render_swarm_gallery(
                     &tiles,
                     chat_area.width as usize,

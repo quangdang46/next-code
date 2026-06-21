@@ -141,7 +141,11 @@ async fn end_to_end_catalog_default_picks_flagship() {
     let avail = svc.catalog().available().await.unwrap();
     let anthropic_prov = avail.iter().find(|p| p.id.as_str() == "anthropic");
     assert!(anthropic_prov.is_some(), "anthropic should be available");
-    let has_flagship = anthropic_prov.unwrap().models.iter().any(|m| m.tier == Some(jcode_provider_service::catalog::ModelTier::Flagship));
+    let has_flagship = anthropic_prov
+        .unwrap()
+        .models
+        .iter()
+        .any(|m| m.tier == Some(jcode_provider_service::catalog::ModelTier::Flagship));
     assert!(has_flagship, "anthropic should have a Flagship model");
 }
 

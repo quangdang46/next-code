@@ -609,13 +609,21 @@ pub fn run_smart_ffs(root: &Path, query: &SmartQuery, args: &SmartArgs) -> Resul
                 why: vec![format!("content match for: {}", subject)],
                 context_applied: None,
                 structure: SmartStructure {
-                    items: outline.as_ref().map(|o| o.entries.iter().map(|e| OutlineItem {
-                        kind: format!("{:?}", e.kind),
-                        label: e.name.clone(),
-                        start_line: e.start_line as usize,
-                        end_line: e.end_line as usize,
-                        line_count: (e.end_line - e.start_line + 1) as usize,
-                    }).collect()).unwrap_or_default(),
+                    items: outline
+                        .as_ref()
+                        .map(|o| {
+                            o.entries
+                                .iter()
+                                .map(|e| OutlineItem {
+                                    kind: format!("{:?}", e.kind),
+                                    label: e.name.clone(),
+                                    start_line: e.start_line as usize,
+                                    end_line: e.end_line as usize,
+                                    line_count: (e.end_line - e.start_line + 1) as usize,
+                                })
+                                .collect()
+                        })
+                        .unwrap_or_default(),
                     omitted_count: 0,
                 },
                 regions,
@@ -636,12 +644,16 @@ pub fn run_smart_ffs(root: &Path, query: &SmartQuery, args: &SmartArgs) -> Resul
         let outline = ffs_engine::api::outline(Path::new(&ff.path));
         let role = ffs_search::role::detect_role(Path::new(&ff.path));
         // Grep for the subject in this file too
-        let file_grep = ffs_engine::api::grep(root, subject, &ffs_engine::api::GrepOptions {
-            regex: false,
-            case_sensitive: false,
-            max_matches: 10,
-            max_files: 1,
-        });
+        let file_grep = ffs_engine::api::grep(
+            root,
+            subject,
+            &ffs_engine::api::GrepOptions {
+                regex: false,
+                case_sensitive: false,
+                max_matches: 10,
+                max_files: 1,
+            },
+        );
         // Narrow grep results to just this file
         let mut regions: Vec<SmartRegion> = Vec::new();
         for gf in file_grep.files.iter() {
@@ -668,18 +680,29 @@ pub fn run_smart_ffs(root: &Path, query: &SmartQuery, args: &SmartArgs) -> Resul
         smart_files.push(SmartFile {
             path: ff.path.clone(),
             role: role.as_str().to_string(),
-            language: outline.as_ref().map(|o| o.language.clone()).unwrap_or_default(),
+            language: outline
+                .as_ref()
+                .map(|o| o.language.clone())
+                .unwrap_or_default(),
             score: ff.score as i32,
             why: vec![format!("path matched: {}", subject)],
             context_applied: None,
             structure: SmartStructure {
-                items: outline.as_ref().map(|o| o.entries.iter().map(|e| OutlineItem {
-                    kind: format!("{:?}", e.kind),
-                    label: e.name.clone(),
-                    start_line: e.start_line as usize,
-                    end_line: e.end_line as usize,
-                    line_count: (e.end_line - e.start_line + 1) as usize,
-                }).collect()).unwrap_or_default(),
+                items: outline
+                    .as_ref()
+                    .map(|o| {
+                        o.entries
+                            .iter()
+                            .map(|e| OutlineItem {
+                                kind: format!("{:?}", e.kind),
+                                label: e.name.clone(),
+                                start_line: e.start_line as usize,
+                                end_line: e.end_line as usize,
+                                line_count: (e.end_line - e.start_line + 1) as usize,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default(),
                 omitted_count: 0,
             },
             regions,
@@ -691,7 +714,8 @@ pub fn run_smart_ffs(root: &Path, query: &SmartQuery, args: &SmartArgs) -> Resul
 
     let total_regions: usize = smart_files.iter().map(|f| f.regions.len()).sum();
     let best_file = smart_files.first().map(|f| f.path.clone());
-    let best_region = smart_files.first()
+    let best_region = smart_files
+        .first()
         .and_then(|f| f.regions.first())
         .map(|r| r.label.clone());
 

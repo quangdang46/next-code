@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, ValueEnum)]
 pub(crate) enum TranscriptModeArg {
     Insert,
@@ -24,7 +23,6 @@ pub(crate) enum ProviderAuthArg {
     /// Do not send authentication, useful for localhost model servers
     None,
 }
-
 
 #[derive(Parser, Debug)]
 #[command(name = "jcode")]

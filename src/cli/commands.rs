@@ -1802,18 +1802,14 @@ pub async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()
                 .or_else(|| path.file_name())
                 .map(|s| s.to_string_lossy().to_string())
                 .unwrap_or_else(|| "plugin".to_string());
-            mgr.load(
-                &name,
-                PluginSource::Local {
-                    path: path.clone(),
-                },
-            )
-            .await?;
+            mgr.load(&name, PluginSource::Local { path: path.clone() })
+                .await?;
             println!("Plugin loaded from {}", path.display());
         }
         super::args::PluginSubcommand::Clone { url, rev } => {
             let name = url.to_owned();
-            let name = name.split('/')
+            let name = name
+                .split('/')
                 .last()
                 .and_then(|s| s.strip_suffix(".git"))
                 .unwrap_or("cloned-plugin");
@@ -1883,8 +1879,9 @@ pub async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()
             // transpilation, preflight static analysis, and QuickJS re-evaluation.
             if let Some(sys) = crate::plugin::plugin_system() {
                 let registered = sys.registry.list().await;
-                if let Some((plugin_id, _)) =
-                    registered.iter().find(|(id, _)| id.short_name().contains(&name))
+                if let Some((plugin_id, _)) = registered
+                    .iter()
+                    .find(|(id, _)| id.short_name().contains(&name))
                 {
                     match sys.loader.reload(plugin_id).await {
                         Ok(()) => println!("Plugin '{name}' hot-reloaded (code reloaded)"),
@@ -3405,7 +3402,6 @@ fn filter_cli_model_routes_for_choice(
 #[path = "commands_tests.rs"]
 mod tests;
 
-
 use jcode_provider_service::catalog::CatalogService;
 use jcode_provider_service::service::ProviderService;
 
@@ -3416,10 +3412,21 @@ pub fn run_provider_catalog_command(all: bool, emit_json: bool, emit_toon: bool)
         let report: Vec<serde_json::Value> = providers.iter().map(|p| serde_json::json!({
             "id": p.id.as_str(), "name": p.name, "enabled": p.enabled, "connected": p.is_connected, "models": p.models.len()
         })).collect();
-        let fmt = if emit_toon { output::OutputFormat::Toon } else { output::OutputFormat::Json };
+        let fmt = if emit_toon {
+            output::OutputFormat::Toon
+        } else {
+            output::OutputFormat::Json
+        };
         output::emit_json_or_toon(&report, fmt)?;
     } else {
-        for p in &providers { println!("{:<20}  {}  {}", p.id.as_str(), if p.enabled { "enabled" } else { "disabled" }, p.name); }
+        for p in &providers {
+            println!(
+                "{:<20}  {}  {}",
+                p.id.as_str(),
+                if p.enabled { "enabled" } else { "disabled" },
+                p.name
+            );
+        }
     }
     Ok(())
 }
@@ -3428,13 +3435,24 @@ pub fn run_model_catalog_command(emit_json: bool, emit_toon: bool) -> Result<()>
     let svc = super::provider_service::ProviderCliService::new()?;
     let models = svc.list_models()?;
     if emit_json || emit_toon {
-        let report: Vec<serde_json::Value> = models.iter().map(|m| serde_json::json!({
-            "provider": m.provider.as_str(), "id": m.id.as_str(), "name": m.name,
-        })).collect();
-        let fmt = if emit_toon { output::OutputFormat::Toon } else { output::OutputFormat::Json };
+        let report: Vec<serde_json::Value> = models
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "provider": m.provider.as_str(), "id": m.id.as_str(), "name": m.name,
+                })
+            })
+            .collect();
+        let fmt = if emit_toon {
+            output::OutputFormat::Toon
+        } else {
+            output::OutputFormat::Json
+        };
         output::emit_json_or_toon(&report, fmt)?;
     } else {
-        for m in &models { println!("{:<20} {:<30}", m.provider.as_str(), m.id.as_str()); }
+        for m in &models {
+            println!("{:<20} {:<30}", m.provider.as_str(), m.id.as_str());
+        }
     }
     Ok(())
 }

@@ -23,7 +23,8 @@ use provider_init::ProviderChoice;
 
 pub(crate) async fn run_main(mut args: Args) -> Result<()> {
     // Resolve --provider string → ProviderChoice for backward-compat code paths.
-    let provider_choice: ProviderChoice = ProviderChoice::provider_choice_from_str(&args.provider).unwrap_or(ProviderChoice::Auto);
+    let provider_choice: ProviderChoice =
+        ProviderChoice::provider_choice_from_str(&args.provider).unwrap_or(ProviderChoice::Auto);
 
     resolve_resume_arg(&mut args)?;
 
@@ -174,7 +175,8 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             api_key_env,
         }) => {
             let login_provider_str = login_provider.as_deref().unwrap_or("auto");
-            let login_choice = ProviderChoice::provider_choice_from_str(login_provider_str).unwrap_or(ProviderChoice::Auto);
+            let login_choice = ProviderChoice::provider_choice_from_str(login_provider_str)
+                .unwrap_or(ProviderChoice::Auto);
             login::run_login(
                 &login_choice,
                 account.as_deref(),
@@ -212,9 +214,11 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
                 let mut agent = agent::Agent::new(catalog_provider, registry);
                 agent.repl().await?;
             } else {
-                let (provider, registry) =
-                    provider_init::init_provider_and_registry(&provider_choice, args.model.as_deref())
-                        .await?;
+                let (provider, registry) = provider_init::init_provider_and_registry(
+                    &provider_choice,
+                    args.model.as_deref(),
+                )
+                .await?;
                 let mut agent = agent::Agent::new(provider, registry);
                 agent.repl().await?;
             }
@@ -909,6 +913,7 @@ async fn try_catalog_provider(
     }
 
     use jcode_keyring_store::MockKeyringStore;
+    use jcode_provider_service::ProviderProfile;
     use jcode_provider_service::boot;
     use jcode_provider_service::catalog::InMemoryCatalog;
     use jcode_provider_service::integration::InMemoryIntegration;
@@ -918,15 +923,11 @@ async fn try_catalog_provider(
     use jcode_provider_service::service::ResolvedRoute;
     use jcode_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
     use jcode_provider_service::types::ModelId;
-    use jcode_provider_service::ProviderProfile;
 
     let catalog = Arc::new(InMemoryCatalog::new());
     let integration = Arc::new(InMemoryIntegration::new());
-    if let Err(e) = boot::register_builtins::<MockKeyringStore>(
-        catalog.as_ref(),
-        integration.as_ref(),
-    )
-    .await
+    if let Err(e) =
+        boot::register_builtins::<MockKeyringStore>(catalog.as_ref(), integration.as_ref()).await
     {
         crate::logging::warn(&format!(
             "Catalog boot failed, falling back to legacy init: {e}"
@@ -975,12 +976,12 @@ async fn try_catalog_provider(
 }
 
 async fn run_default_command(args: Args) -> Result<()> {
-    let provider_choice: ProviderChoice = ProviderChoice::provider_choice_from_str(&args.provider).unwrap_or(ProviderChoice::Auto);
+    let provider_choice: ProviderChoice =
+        ProviderChoice::provider_choice_from_str(&args.provider).unwrap_or(ProviderChoice::Auto);
     startup_profile::mark("run_main_none_branch");
 
-    let explicit_provider_or_model = args.provider != "auto"
-        || args.model.is_some()
-        || args.provider_profile.is_some();
+    let explicit_provider_or_model =
+        args.provider != "auto" || args.model.is_some() || args.provider_profile.is_some();
     let explicit_tool_options = args.tool_profile.is_some()
         || args.tools.is_some()
         || args.disabled_tools.is_some()

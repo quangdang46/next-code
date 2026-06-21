@@ -148,9 +148,15 @@ pub struct ProviderInfo {
     pub body_defaults: Option<serde_json::Value>,
 }
 
-fn default_anthropic_url() -> String { "https://api.anthropic.com".into() }
-fn default_chat_path() -> String { "/v1/chat/completions".into() }
-fn default_chat_protocol() -> String { "openai-chat-2024".into() }
+fn default_anthropic_url() -> String {
+    "https://api.anthropic.com".into()
+}
+fn default_chat_path() -> String {
+    "/v1/chat/completions".into()
+}
+fn default_chat_protocol() -> String {
+    "openai-chat-2024".into()
+}
 
 impl ProviderInfo {
     pub fn model(&self, id: &ModelId) -> Option<&ModelInfo> {
@@ -544,7 +550,10 @@ impl CatalogService for InMemoryCatalog {
         Ok((p.id.clone(), m.id.clone()))
     }
 
-    async fn small(&self, provider_id: Option<&ProviderId>) -> Result<(ProviderId, ModelId), CatalogError> {
+    async fn small(
+        &self,
+        provider_id: Option<&ProviderId>,
+    ) -> Result<(ProviderId, ModelId), CatalogError> {
         // opencode-style: build a candidate list with cost + age, then
         // pick the lowest (cost*0.8 + age*0.2) score among models whose
         // id contains a "small" token, falling back to all candidates.
@@ -695,7 +704,6 @@ impl CatalogService for InMemoryCatalog {
     fn set_policy(&self, policy: Arc<dyn crate::policy::PolicyService>) {
         *self.policy.write().unwrap() = Some(policy);
     }
-
 }
 
 impl InMemoryCatalog {
@@ -796,7 +804,9 @@ mod tests {
         cat.register_provider(anthropic()).await.unwrap();
         let (p, m) = cat.small(None).await.unwrap();
         assert_eq!(p.as_str(), "anthropic");
-        assert!(ModelTier::id_suggests_small(m.as_str()) || ModelTier::suggests_small(m.as_str(), None));
+        assert!(
+            ModelTier::id_suggests_small(m.as_str()) || ModelTier::suggests_small(m.as_str(), None)
+        );
     }
 
     #[tokio::test]
@@ -990,7 +1000,10 @@ mod tests {
         assert!(ModelTier::suggests_small("gemini-2.5-flash", None));
         assert!(ModelTier::suggests_small("claude-haiku-fast", None));
         assert!(ModelTier::suggests_small("xyz", Some("nano model")));
-        assert!(ModelTier::suggests_small("some-model", Some("Fast inference")));
+        assert!(ModelTier::suggests_small(
+            "some-model",
+            Some("Fast inference")
+        ));
         assert!(!ModelTier::suggests_small("claude-opus-4-8", None));
     }
 }

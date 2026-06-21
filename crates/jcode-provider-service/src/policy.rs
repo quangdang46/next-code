@@ -141,7 +141,9 @@ impl PolicyService for DenyListPolicy {
             return true;
         }
         !self.denied.contains(provider.as_str())
-            && !self.denied.contains(&provider.as_str().to_ascii_lowercase())
+            && !self
+                .denied
+                .contains(&provider.as_str().to_ascii_lowercase())
     }
 
     fn has_rules(&self) -> bool {

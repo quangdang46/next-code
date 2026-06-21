@@ -5,7 +5,11 @@ struct ResolvedSearchScope {
     glob: Option<String>,
 }
 
-fn resolved_search_scope(ctx: &ToolContext, path: Option<&str>, glob: Option<&str>) -> ResolvedSearchScope {
+fn resolved_search_scope(
+    ctx: &ToolContext,
+    path: Option<&str>,
+    glob: Option<&str>,
+) -> ResolvedSearchScope {
     let Some(path) = path else {
         return ResolvedSearchScope {
             root: None,
@@ -14,9 +18,18 @@ fn resolved_search_scope(ctx: &ToolContext, path: Option<&str>, glob: Option<&st
     };
     let resolved = resolve_path_arg(ctx, path);
     if resolved.is_file() {
-        let root = resolved.parent().unwrap_or_else(|| Path::new(".")).display().to_string();
-        let glob = resolved.file_name().map(|name| name.to_string_lossy().into_owned());
-        return ResolvedSearchScope { root: Some(root), glob };
+        let root = resolved
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .display()
+            .to_string();
+        let glob = resolved
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned());
+        return ResolvedSearchScope {
+            root: Some(root),
+            glob,
+        };
     }
     ResolvedSearchScope {
         root: Some(resolved.display().to_string()),

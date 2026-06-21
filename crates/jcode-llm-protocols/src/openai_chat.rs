@@ -35,10 +35,7 @@ pub struct OpenAIChatBody {
 #[serde(untagged)]
 pub enum OpenAIChatMessage {
     /// User message with string content.
-    UserString {
-        role: String,
-        content: String,
-    },
+    UserString { role: String, content: String },
     /// User message with structured content parts.
     UserParts {
         role: String,
@@ -55,10 +52,7 @@ pub enum OpenAIChatMessage {
         reasoning_content: Option<String>,
     },
     /// System message.
-    System {
-        role: String,
-        content: String,
-    },
+    System { role: String, content: String },
     /// Tool result message.
     Tool {
         role: String,
@@ -83,12 +77,8 @@ impl OpenAIChatMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OpenAIChatContentPart {
-    Text {
-        text: String,
-    },
-    ImageUrl {
-        image_url: OpenAIImageUrl,
-    },
+    Text { text: String },
+    ImageUrl { image_url: OpenAIImageUrl },
 }
 
 /// Image URL reference.
@@ -222,18 +212,11 @@ pub struct OpenAIChatCompletionDetails {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OpenAIChatEvent {
     /// First chunk received (contains role and possibly content).
-    Start {
-        id: String,
-        model: String,
-    },
+    Start { id: String, model: String },
     /// Text content delta.
-    TextDelta {
-        delta: String,
-    },
+    TextDelta { delta: String },
     /// Reasoning content delta.
-    ReasoningDelta {
-        delta: String,
-    },
+    ReasoningDelta { delta: String },
     /// A new tool call was initiated (index, id, name known).
     ToolCallStart {
         index: u64,
@@ -241,24 +224,16 @@ pub enum OpenAIChatEvent {
         name: String,
     },
     /// Tool call arguments delta.
-    ToolCallArgumentsDelta {
-        index: u64,
-        delta: String,
-    },
+    ToolCallArgumentsDelta { index: u64, delta: String },
     /// A tool call completed (arguments fully received).
-    ToolCallEnd {
-        index: u64,
-        id: String,
-    },
+    ToolCallEnd { index: u64, id: String },
     /// The final chunk with usage info and finish reason.
     Finish {
         finish_reason: Option<String>,
         usage: Option<OpenAIChatUsage>,
     },
     /// Error event.
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -313,13 +288,9 @@ fn map_tool_choice(tc: &ToolChoice) -> Option<Value> {
 // Helper: convert ContentPart to OpenAI chat content parts
 // ---------------------------------------------------------------------------
 
-fn content_part_to_openai_chat(
-    part: &ContentPart,
-) -> Option<OpenAIChatContentPart> {
+fn content_part_to_openai_chat(part: &ContentPart) -> Option<OpenAIChatContentPart> {
     match part {
-        ContentPart::Text { text } => Some(OpenAIChatContentPart::Text {
-            text: text.clone(),
-        }),
+        ContentPart::Text { text } => Some(OpenAIChatContentPart::Text { text: text.clone() }),
         ContentPart::Media { media_type, data } => {
             let url = if data.starts_with("data:") {
                 data.clone()
@@ -327,10 +298,7 @@ fn content_part_to_openai_chat(
                 format!("data:{};base64,{}", media_type, data)
             };
             Some(OpenAIChatContentPart::ImageUrl {
-                image_url: OpenAIImageUrl {
-                    url,
-                    detail: None,
-                },
+                image_url: OpenAIImageUrl { url, detail: None },
             })
         }
         // ToolCall, ToolResult, Reasoning are handled at the message level,
@@ -359,10 +327,7 @@ impl Protocol for OpenAiChatProtocol {
     type Event = OpenAIChatEvent;
     type State = OpenAIChatState;
 
-    fn body_from_request(
-        &self,
-        request: &LlmRequest,
-    ) -> Result<(Self::Body, Self::State), String> {
+    fn body_from_request(&self, request: &LlmRequest) -> Result<(Self::Body, Self::State), String> {
         // --- model ---
         let model = request.model.id.clone();
 
@@ -389,17 +354,14 @@ impl Protocol for OpenAiChatProtocol {
                         .content
                         .iter()
                         .filter_map(|p| match p {
-                            ContentPart::ToolCall { id, name, input } => {
-                                Some(OpenAIToolCall {
-                                    id: id.clone(),
-                                    call_type: "function".to_string(),
-                                    function: OpenAIFunctionCall {
-                                        name: name.clone(),
-                                        arguments: serde_json::to_string(input)
-                                            .unwrap_or_default(),
-                                    },
-                                })
-                            }
+                            ContentPart::ToolCall { id, name, input } => Some(OpenAIToolCall {
+                                id: id.clone(),
+                                call_type: "function".to_string(),
+                                function: OpenAIFunctionCall {
+                                    name: name.clone(),
+                                    arguments: serde_json::to_string(input).unwrap_or_default(),
+                                },
+                            }),
                             _ => None,
                         })
                         .collect();
@@ -499,7 +461,10 @@ impl Protocol for OpenAiChatProtocol {
                             parts.push(converted);
                         }
                     }
-                    OpenAIChatMessage::UserParts { role, content: parts }
+                    OpenAIChatMessage::UserParts {
+                        role,
+                        content: parts,
+                    }
                 }
             })
             .collect();
@@ -520,10 +485,7 @@ impl Protocol for OpenAiChatProtocol {
         });
 
         // --- tool_choice ---
-        let tool_choice = request
-            .tool_choice
-            .as_ref()
-            .and_then(map_tool_choice);
+        let tool_choice = request.tool_choice.as_ref().and_then(map_tool_choice);
 
         // --- generation params ---
         let max_tokens = request
@@ -554,11 +516,7 @@ impl Protocol for OpenAiChatProtocol {
         Ok((body, state))
     }
 
-    async fn step(
-        &self,
-        state: &mut Self::State,
-        chunk: Option<&[u8]>,
-    ) -> StepOutput<Self::Event> {
+    async fn step(&self, state: &mut Self::State, chunk: Option<&[u8]>) -> StepOutput<Self::Event> {
         // If already done, report it.
         if state.done {
             let usage = state.accumulated_usage.clone();
@@ -903,13 +861,11 @@ mod tests {
                 },
                 Message {
                     role: "assistant".into(),
-                    content: vec![
-                        ContentPart::ToolCall {
-                            id: "call_123".into(),
-                            name: "get_weather".into(),
-                            input: serde_json::json!({"location": "San Francisco"}),
-                        },
-                    ],
+                    content: vec![ContentPart::ToolCall {
+                        id: "call_123".into(),
+                        name: "get_weather".into(),
+                        input: serde_json::json!({"location": "San Francisco"}),
+                    }],
                 },
                 Message {
                     role: "user".into(),
@@ -934,7 +890,9 @@ mod tests {
         // Check assistant message has tool_calls.
         match &body.messages[1] {
             OpenAIChatMessage::Assistant {
-                tool_calls, content, ..
+                tool_calls,
+                content,
+                ..
             } => {
                 assert!(tool_calls.is_some());
                 assert_eq!(tool_calls.as_ref().unwrap().len(), 1);
@@ -979,7 +937,9 @@ mod tests {
                 assert!(!evts.is_empty(), "expected at least one event");
 
                 // First event should be Start.
-                let start = evts.iter().find(|e| matches!(e, OpenAIChatEvent::Start { .. }));
+                let start = evts
+                    .iter()
+                    .find(|e| matches!(e, OpenAIChatEvent::Start { .. }));
                 assert!(start.is_some(), "expected Start event");
 
                 // Should have text deltas.
@@ -990,7 +950,9 @@ mod tests {
                 assert!(!text_deltas.is_empty(), "expected TextDelta events");
 
                 // Should finish.
-                let finish = evts.iter().find(|e| matches!(e, OpenAIChatEvent::Finish { .. }));
+                let finish = evts
+                    .iter()
+                    .find(|e| matches!(e, OpenAIChatEvent::Finish { .. }));
                 assert!(finish.is_some(), "expected Finish event");
             }
             other => panic!("expected Events, got {:?}", other),
@@ -1028,7 +990,10 @@ mod tests {
                     .iter()
                     .filter(|e| matches!(e, OpenAIChatEvent::ToolCallArgumentsDelta { .. }))
                     .collect();
-                assert!(!tool_args.is_empty(), "expected ToolCallArgumentsDelta events");
+                assert!(
+                    !tool_args.is_empty(),
+                    "expected ToolCallArgumentsDelta events"
+                );
 
                 let tool_ends: Vec<&OpenAIChatEvent> = evts
                     .iter()
@@ -1036,7 +1001,9 @@ mod tests {
                     .collect();
                 assert!(!tool_ends.is_empty(), "expected ToolCallEnd events");
 
-                let finish = evts.iter().find(|e| matches!(e, OpenAIChatEvent::Finish { .. }));
+                let finish = evts
+                    .iter()
+                    .find(|e| matches!(e, OpenAIChatEvent::Finish { .. }));
                 assert!(finish.is_some(), "expected Finish event");
             }
             other => panic!("expected Events, got {:?}", other),
@@ -1120,18 +1087,23 @@ mod tests {
 
     #[test]
     fn test_map_tool_choice() {
-        assert_eq!(map_tool_choice(&ToolChoice::Auto), Some(Value::String("auto".to_string())));
+        assert_eq!(
+            map_tool_choice(&ToolChoice::Auto),
+            Some(Value::String("auto".to_string()))
+        );
         assert_eq!(
             map_tool_choice(&ToolChoice::Any),
             Some(Value::String("required".to_string()))
         );
         assert!(map_tool_choice(&ToolChoice::None).is_none());
-        let specific = map_tool_choice(&ToolChoice::Specific {
-            name: "foo".into(),
-        });
+        let specific = map_tool_choice(&ToolChoice::Specific { name: "foo".into() });
         assert!(specific.is_some());
         assert_eq!(
-            specific.unwrap().get("function").and_then(|f| f.get("name")).and_then(|n| n.as_str()),
+            specific
+                .unwrap()
+                .get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(|n| n.as_str()),
             Some("foo")
         );
     }

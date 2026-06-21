@@ -8,7 +8,7 @@ use crate::message::ConnectionPhase;
 use crate::tui::app;
 use crate::tui::color_support::rgb;
 use crate::tui::layout_utils;
-use jcode_keywords::visual::{compute_highlights, KeywordHighlight};
+use jcode_keywords::visual::{KeywordHighlight, compute_highlights};
 use ratatui::{prelude::*, widgets::Paragraph};
 
 fn shell_mode_color() -> Color {
@@ -1946,11 +1946,12 @@ fn segment_to_colored_spans(
 
     // Get byte range of this segment in the original input
     let seg_byte_start = char_index_to_byte_offset(input, segment_start_char);
-    let seg_byte_end = if segment_end_char == segment_start_char || segment_end_char >= input.chars().count() {
-        seg_byte_start + segment_text.len()
-    } else {
-        char_index_to_byte_offset(input, segment_end_char)
-    };
+    let seg_byte_end =
+        if segment_end_char == segment_start_char || segment_end_char >= input.chars().count() {
+            seg_byte_start + segment_text.len()
+        } else {
+            char_index_to_byte_offset(input, segment_end_char)
+        };
 
     // Collect highlight ranges that overlap with this segment
     let mut overlapping: Vec<(usize, usize, (u8, u8, u8))> = Vec::new();

@@ -19,8 +19,8 @@ use async_trait::async_trait;
 use jcode_llm_core::route::Route;
 use jcode_message_types::{Message, ToolDefinition};
 use jcode_provider_core::{
-    context_limit_for_model_with_provider, EventStream, ModelRoute, Provider, ResolvedCredential,
-    RouteSelection, DEFAULT_CONTEXT_LIMIT,
+    DEFAULT_CONTEXT_LIMIT, EventStream, ModelRoute, Provider, ResolvedCredential, RouteSelection,
+    context_limit_for_model_with_provider,
 };
 
 use crate::service::ResolvedRoute;
@@ -78,10 +78,7 @@ impl RouteProvider {
     /// as AWS Event Stream or WebSocket binary, which the stub `complete()`
     /// methods still reject uniformly.
     fn uses_sse_framing(&self) -> bool {
-        matches!(
-            self.route.framing,
-            jcode_llm_core::framing::Framing::Sse
-        )
+        matches!(self.route.framing, jcode_llm_core::framing::Framing::Sse)
     }
 }
 
@@ -144,8 +141,7 @@ impl Provider for RouteProvider {
         // Heuristic: OAuth-protocol routes imply subscription billing.
         if protocol_lower.contains("oauth") {
             Some(ResolvedCredential::Oauth)
-        } else if self.route.auth.contains_key("api_key")
-            || self.route.auth.contains_key("apiKey")
+        } else if self.route.auth.contains_key("api_key") || self.route.auth.contains_key("apiKey")
         {
             Some(ResolvedCredential::ApiKey)
         } else {
@@ -193,7 +189,10 @@ impl Provider for RouteProvider {
 
     /// Select a structured model route. Delegates to setting the model
     /// string.
-    fn set_route_selection(&self, selection: &RouteSelection) -> std::result::Result<(), anyhow::Error> {
+    fn set_route_selection(
+        &self,
+        selection: &RouteSelection,
+    ) -> std::result::Result<(), anyhow::Error> {
         // Update the stored model id to the selected one.
         // Since we take &self, we cannot mutate; fork() before calling this.
         let _ = selection;

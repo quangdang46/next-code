@@ -96,7 +96,12 @@ pub async fn start_session(
     if let Some(ref d) = defaults {
         if let Some((ref global_provider, ref global_model)) = d.global {
             // Verify provider+model exist in catalog before using.
-            if svc.catalog().find_model(global_provider, global_model).await.is_ok() {
+            if svc
+                .catalog()
+                .find_model(global_provider, global_model)
+                .await
+                .is_ok()
+            {
                 return finish(svc, global_provider.clone(), global_model.clone()).await;
             }
         }
@@ -224,10 +229,10 @@ mod tests {
                     path: None,
                     protocol: None,
                 }],
-            api_key: None,
-            protocol: "anthropic-messages-2023-01-01".into(),
-            path: "/v1/messages".into(),
-            base_url: "https://api.anthropic.com".into(),
+                api_key: None,
+                protocol: "anthropic-messages-2023-01-01".into(),
+                path: "/v1/messages".into(),
+                base_url: "https://api.anthropic.com".into(),
             })
             .await
             .unwrap();

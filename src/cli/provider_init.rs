@@ -176,7 +176,10 @@ impl ProviderChoice {
             "ollama" => Self::Ollama,
             "chutes" => Self::Chutes,
             "cerebras" | "cerebrascode" | "cerberascode" => Self::Cerebras,
-            "alibaba-coding-plan" | "bailian" | "aliyun-bailian" | "coding-plan"
+            "alibaba-coding-plan"
+            | "bailian"
+            | "aliyun-bailian"
+            | "coding-plan"
             | "alibaba-coding" => Self::AlibabaCodingPlan,
             "openai-compatible" | "compat" | "custom" => Self::OpenaiCompatible,
             "cursor" => Self::Cursor,

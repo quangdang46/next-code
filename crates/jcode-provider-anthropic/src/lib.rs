@@ -6,14 +6,17 @@ use jcode_llm_core::endpoint::Endpoint;
 use jcode_llm_core::framing::SseFrame;
 use jcode_llm_core::protocol::{Protocol, StepOutput};
 use jcode_llm_core::route::PreparedRoute;
-use jcode_llm_core::schema::{ContentPart, GenerationParams, LlmRequest, ModelRef, ToolChoice, Usage as LlmUsage};
-use jcode_llm_protocols::anthropic_messages::{
-    AnthropicMessagesProtocol, route as anthropic_messages_route, AnthropicEvent,
+use jcode_llm_core::schema::{
+    ContentPart, GenerationParams, LlmRequest, ModelRef, ToolChoice, Usage as LlmUsage,
 };
-use jcode_message_types::{ContentBlock, Message, Role, StreamEvent, ToolDefinition, sanitize_tool_id};
+use jcode_llm_protocols::anthropic_messages::{
+    AnthropicEvent, AnthropicMessagesProtocol, route as anthropic_messages_route,
+};
+use jcode_message_types::{
+    ContentBlock, Message, Role, StreamEvent, ToolDefinition, sanitize_tool_id,
+};
 use jcode_provider_core::{
-    Provider, EventStream,
-    anthropic_map_tool_name_for_oauth as map_tool_name_for_oauth,
+    EventStream, Provider, anthropic_map_tool_name_for_oauth as map_tool_name_for_oauth,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -689,10 +692,10 @@ pub struct ApiTool {
 /// jcode-llm-core `ContentPart`.
 fn content_block_to_part(block: &ContentBlock) -> Option<ContentPart> {
     match block {
-        ContentBlock::Text { text, .. } => Some(ContentPart::Text {
-            text: text.clone(),
-        }),
-        ContentBlock::ToolUse { id, name, input, .. } => Some(ContentPart::ToolCall {
+        ContentBlock::Text { text, .. } => Some(ContentPart::Text { text: text.clone() }),
+        ContentBlock::ToolUse {
+            id, name, input, ..
+        } => Some(ContentPart::ToolCall {
             id: id.clone(),
             name: name.clone(),
             input: input.clone(),
@@ -775,7 +778,9 @@ fn anthropic_event_to_stream_events(
             index: _,
             content_block,
         } => match content_block {
-            jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::Text { .. } => {
+            jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::Text {
+                ..
+            } => {
                 // No event needed for text start
             }
             jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::ToolUse {
@@ -788,14 +793,13 @@ fn anthropic_event_to_stream_events(
                     name: name.clone(),
                 });
             }
-            jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::Thinking { .. } => {
+            jcode_llm_protocols::anthropic_messages::AnthropicContentBlockStart::Thinking {
+                ..
+            } => {
                 events.push(StreamEvent::ThinkingStart);
             }
         },
-        AnthropicEvent::ContentBlockDelta {
-            index: _,
-            delta,
-        } => match delta {
+        AnthropicEvent::ContentBlockDelta { index: _, delta } => match delta {
             jcode_llm_protocols::anthropic_messages::AnthropicContentDelta::TextDelta { text } => {
                 if !text.is_empty() {
                     events.push(StreamEvent::TextDelta(text.clone()));
@@ -821,10 +825,7 @@ fn anthropic_event_to_stream_events(
                 events.push(StreamEvent::ToolUseEnd);
             }
         }
-        AnthropicEvent::MessageDelta {
-            delta: _,
-            usage,
-        } => {
+        AnthropicEvent::MessageDelta { delta: _, usage } => {
             events.push(StreamEvent::TokenUsage {
                 input_tokens: None,
                 output_tokens: Some(usage.output_tokens),
@@ -859,16 +860,9 @@ pub struct AnthropicMessagesProvider {
 }
 
 impl AnthropicMessagesProvider {
-    pub fn new(
-        model: String,
-        api_key: String,
-        max_tokens: u32,
-    ) -> Result<Self> {
+    pub fn new(model: String, api_key: String, max_tokens: u32) -> Result<Self> {
         let mut route = anthropic_messages_route();
-        route.auth.insert(
-            "x-api-key".to_string(),
-            api_key.clone(),
-        );
+        route.auth.insert("x-api-key".to_string(), api_key.clone());
         let mut provider_ref = route.provider.clone();
         provider_ref.id = model.clone();
         route.provider = provider_ref;
@@ -887,18 +881,13 @@ impl AnthropicMessagesProvider {
         let base = self.route.endpoint.base_url.trim_end_matches('/');
         let path = match &self.route.endpoint.path {
             jcode_llm_core::endpoint::PathSpec::Static(p) => p.trim_start_matches('/').to_string(),
-            jcode_llm_core::endpoint::PathSpec::Dynamic(p) => {
-                p.trim_start_matches('/').to_string()
-            }
+            jcode_llm_core::endpoint::PathSpec::Dynamic(p) => p.trim_start_matches('/').to_string(),
         };
         format!("{base}/{path}")
     }
 
     /// Make a streaming request using the route and protocol.
-    async fn stream_via_protocol(
-        &self,
-        request: LlmRequest,
-    ) -> Result<EventStream> {
+    async fn stream_via_protocol(&self, request: LlmRequest) -> Result<EventStream> {
         let (body, mut state) = self
             .protocol
             .body_from_request(&request)
@@ -973,15 +962,16 @@ impl AnthropicMessagesProvider {
                 let chunk = match chunk_result {
                     Ok(c) => c,
                     Err(e) => {
-                        let _ = tx
-                            .send(Err(anyhow::anyhow!("Stream error: {}", e)))
-                            .await;
+                        let _ = tx.send(Err(anyhow::anyhow!("Stream error: {}", e))).await;
                         return;
                     }
                 };
 
                 // Feed chunk to protocol decoder
-                match AnthropicMessagesProtocol.step(&mut state, Some(&chunk)).await {
+                match AnthropicMessagesProtocol
+                    .step(&mut state, Some(&chunk))
+                    .await
+                {
                     StepOutput::Events(protocol_events) => {
                         for proto_event in &protocol_events {
                             // Track tool use state
@@ -999,10 +989,8 @@ impl AnthropicMessagesProvider {
                                 }
                             }
 
-                            let stream_events = anthropic_event_to_stream_events(
-                                proto_event,
-                                tool_use_active,
-                            );
+                            let stream_events =
+                                anthropic_event_to_stream_events(proto_event, tool_use_active);
                             for se in stream_events {
                                 if tx.send(Ok(se)).await.is_err() {
                                     return;
@@ -1013,7 +1001,10 @@ impl AnthropicMessagesProvider {
                     StepOutput::NeedMore => {
                         // Protocol needs more chunks; continue.
                     }
-                    StepOutput::Done { reason: _, usage: _ } => {
+                    StepOutput::Done {
+                        reason: _,
+                        usage: _,
+                    } => {
                         let _ = tx
                             .send(Ok(StreamEvent::MessageEnd {
                                 stop_reason: Some("end_turn".to_string()),
@@ -1035,10 +1026,8 @@ impl AnthropicMessagesProvider {
                 match AnthropicMessagesProtocol.step(&mut state, None).await {
                     StepOutput::Events(protocol_events) => {
                         for proto_event in &protocol_events {
-                            let stream_events = anthropic_event_to_stream_events(
-                                proto_event,
-                                false,
-                            );
+                            let stream_events =
+                                anthropic_event_to_stream_events(proto_event, false);
                             for se in stream_events {
                                 if tx.send(Ok(se)).await.is_err() {
                                     return;
@@ -1076,14 +1065,17 @@ impl Provider for AnthropicMessagesProvider {
             messages.iter().map(message_to_part).collect();
 
         // Convert tools
-        let core_tools: Vec<jcode_llm_core::schema::ToolDefinition> =
-            if tools.is_empty() {
-                vec![]
-            } else {
-                tools.iter().map(tool_def_to_core).collect()
-            };
+        let core_tools: Vec<jcode_llm_core::schema::ToolDefinition> = if tools.is_empty() {
+            vec![]
+        } else {
+            tools.iter().map(tool_def_to_core).collect()
+        };
 
-        let core_system = if system.is_empty() { None } else { Some(system.to_string()) };
+        let core_system = if system.is_empty() {
+            None
+        } else {
+            Some(system.to_string())
+        };
 
         let request = LlmRequest {
             model: ModelRef {
@@ -1093,7 +1085,11 @@ impl Provider for AnthropicMessagesProvider {
             },
             messages: core_messages,
             system: core_system,
-            tools: if core_tools.is_empty() { None } else { Some(core_tools) },
+            tools: if core_tools.is_empty() {
+                None
+            } else {
+                Some(core_tools)
+            },
             tool_choice: None,
             generation_params: Some(GenerationParams {
                 temperature: None,

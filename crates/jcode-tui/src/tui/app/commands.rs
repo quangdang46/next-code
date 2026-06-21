@@ -3325,5 +3325,6 @@ pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
 #[path = "commands_tests.rs"]
 mod tests;
 
-
-pub fn handle_disabled_mission_command(_app: &mut crate::tui::app::App, _cmd: &str) -> bool { true }
+pub fn handle_disabled_mission_command(_app: &mut crate::tui::app::App, _cmd: &str) -> bool {
+    true
+}

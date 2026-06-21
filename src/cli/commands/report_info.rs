@@ -401,16 +401,25 @@ pub(super) fn run_provider_list_command(emit_json: bool, emit_toon: bool) -> Res
         if !providers.is_empty() {
             println!("== Legacy providers ==");
         }
-        for provider in providers.iter().filter(|p| p.source.as_deref() == Some("legacy")) {
+        for provider in providers
+            .iter()
+            .filter(|p| p.source.as_deref() == Some("legacy"))
+        {
             if let Some(detail) = provider.detail.as_deref() {
                 println!("{}\t{}\t{}", provider.id, provider.display_name, detail);
             } else {
                 println!("{}\t{}", provider.id, provider.display_name);
             }
         }
-        let catalog_entries: Vec<_> = providers.iter().filter(|p| p.source.as_deref() == Some("catalog")).collect();
+        let catalog_entries: Vec<_> = providers
+            .iter()
+            .filter(|p| p.source.as_deref() == Some("catalog"))
+            .collect();
         if !catalog_entries.is_empty() {
-            if providers.iter().any(|p| p.source.as_deref() == Some("legacy")) {
+            if providers
+                .iter()
+                .any(|p| p.source.as_deref() == Some("legacy"))
+            {
                 println!();
             }
             println!("== Catalog providers ==");
@@ -677,7 +686,9 @@ pub(super) fn list_cli_providers() -> Vec<ProviderListEntry> {
         .collect()
 }
 
-fn list_catalog_providers(catalog: &[jcode_provider_service::catalog::ProviderInfo]) -> Vec<ProviderListEntry> {
+fn list_catalog_providers(
+    catalog: &[jcode_provider_service::catalog::ProviderInfo],
+) -> Vec<ProviderListEntry> {
     catalog
         .iter()
         .map(|p| ProviderListEntry {

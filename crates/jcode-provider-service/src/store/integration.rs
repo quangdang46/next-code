@@ -193,7 +193,9 @@ impl<K: KeyringStore + 'static> IntegrationService for PersistentIntegration<K> 
         Ok(self.attempts.read().await.values().cloned().collect())
     }
 
-    async fn connection_list(&self) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError> {
+    async fn connection_list(
+        &self,
+    ) -> Result<Vec<(ProviderId, ConnectionStatus)>, IntegrationError> {
         let providers = self.list().await?;
         let mut result = Vec::with_capacity(providers.len());
         for p in &providers {

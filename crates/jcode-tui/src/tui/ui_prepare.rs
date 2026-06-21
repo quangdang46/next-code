@@ -383,7 +383,7 @@ fn push_user_prompt_lines(
 
 fn empty_prepared_messages() -> PreparedMessages {
     PreparedMessages {
-            message_boundaries: Vec::new(),
+        message_boundaries: Vec::new(),
         wrapped_lines: Vec::new(),
         wrapped_plain_lines: Arc::new(Vec::new()),
         wrapped_copy_offsets: Arc::new(Vec::new()),
@@ -527,7 +527,7 @@ pub(super) fn prepare_messages(
     }
 
     let key = FullPrepCacheKey {
-            expanded_images_version: 0,
+        expanded_images_version: 0,
         width,
         height,
         diff_mode: app.diff_mode(),
@@ -768,7 +768,7 @@ fn prepare_body_cached(app: &dyn TuiState, width: u16) -> Arc<PreparedMessages> 
     super::note_body_request();
 
     let key = BodyCacheKey {
-            expanded_images_version: 0,
+        expanded_images_version: 0,
         width,
         diff_mode: app.diff_mode(),
         messages_version: app.display_messages_version(),
@@ -1856,7 +1856,7 @@ fn wrap_lines(
     let wrapped_plain_lines = Arc::new(wrapped_lines.iter().map(ui::line_plain_text).collect());
 
     PreparedMessages {
-            message_boundaries: Vec::new(),
+        message_boundaries: Vec::new(),
         wrapped_lines,
         wrapped_plain_lines,
         wrapped_copy_offsets: Arc::new(wrapped_copy_offsets),
@@ -1996,7 +1996,7 @@ fn wrap_lines_with_map(
     let wrapped_plain_lines = Arc::new(wrapped_lines.iter().map(ui::line_plain_text).collect());
 
     PreparedMessages {
-            message_boundaries: Vec::new(),
+        message_boundaries: Vec::new(),
         wrapped_lines,
         wrapped_plain_lines,
         wrapped_copy_offsets: Arc::new(wrapped_copy_offsets),

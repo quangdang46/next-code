@@ -36,7 +36,12 @@ impl DefaultProviderService {
         integration: Arc<dyn IntegrationService>,
         credentials: Arc<dyn CredentialService>,
     ) -> Self {
-        Self::with_policy(catalog, integration, credentials, Arc::new(crate::policy::DenyListPolicy::from_env()))
+        Self::with_policy(
+            catalog,
+            integration,
+            credentials,
+            Arc::new(crate::policy::DenyListPolicy::from_env()),
+        )
     }
 
     /// Create a new provider service with an explicit policy.
@@ -165,9 +170,15 @@ impl DefaultProviderService {
     /// of these, it wins; otherwise the provider default is used.
     fn project_model(provider: &ProviderInfo, model: &ModelInfo) -> ModelInfo {
         ModelInfo {
-            base_url: model.base_url.clone().or_else(|| Some(provider.base_url.clone())),
+            base_url: model
+                .base_url
+                .clone()
+                .or_else(|| Some(provider.base_url.clone())),
             path: model.path.clone().or_else(|| Some(provider.path.clone())),
-            protocol: model.protocol.clone().or_else(|| Some(provider.protocol.clone())),
+            protocol: model
+                .protocol
+                .clone()
+                .or_else(|| Some(provider.protocol.clone())),
             // Body merge: provider.body_defaults as base, model.body_overrides on top
             // (mirrors opencode's projectModel() request merge).
             body_overrides: {
@@ -176,7 +187,9 @@ impl DefaultProviderService {
                         let mut obj = base.clone();
                         if let Some(ref mut map) = obj.as_object_mut() {
                             if let Some(ov) = overrides.as_object() {
-                                for (k, v) in ov { map.insert(k.clone(), v.clone()); }
+                                for (k, v) in ov {
+                                    map.insert(k.clone(), v.clone());
+                                }
                             }
                         }
                         Some(obj)
@@ -267,10 +280,10 @@ mod tests {
                     path: None,
                     protocol: None,
                 }],
-            api_key: None,
-            base_url: "https://api.anthropic.com".into(),
-            path: "/v1/messages".into(),
-            protocol: "anthropic-messages-2023-01-01".into(),
+                api_key: None,
+                base_url: "https://api.anthropic.com".into(),
+                path: "/v1/messages".into(),
+                protocol: "anthropic-messages-2023-01-01".into(),
             })
             .await
             .unwrap();
