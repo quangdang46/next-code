@@ -257,7 +257,6 @@ pub struct OpenAIChatState {
     pending_tool_calls: HashMap<u64, (Option<String>, Option<String>, String)>,
 }
 
-
 // ---------------------------------------------------------------------------
 // Helper: map ToolChoice to OpenAI tool_choice value
 // ---------------------------------------------------------------------------

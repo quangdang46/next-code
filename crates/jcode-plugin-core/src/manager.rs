@@ -196,11 +196,7 @@ impl PluginManager {
         // Normalise colons in the host:path part to slashes for extraction
         let path = path.replace(':', "/");
 
-        let name = path
-            .split('/')
-            .filter(|s| !s.is_empty())
-            .next_back()
-            .unwrap_or("plugin");
+        let name = path.split('/').rfind(|s| !s.is_empty()).unwrap_or("plugin");
 
         name.strip_suffix(".git").unwrap_or(name).to_owned()
     }

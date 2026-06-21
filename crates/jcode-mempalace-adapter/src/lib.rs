@@ -445,26 +445,24 @@ impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
         let hits = MpProvider::search(&self.palace, query, &search_scope).await?;
         let entries = hits
             .into_iter()
-            .map(|h| {
-                jcode_memory_types::MemoryEntry {
-                    embedding_model: None,
-                    id: format!("mp-{}", uuid::Uuid::new_v4()),
-                    category: jcode_memory_types::MemoryCategory::Fact,
-                    content: h.text,
-                    tags: vec![],
-                    search_text: String::new(),
-                    created_at: chrono::Utc::now(),
-                    updated_at: chrono::Utc::now(),
-                    access_count: 0,
-                    source: None,
-                    trust: jcode_memory_types::TrustLevel::Medium,
-                    strength: 1,
-                    active: true,
-                    superseded_by: None,
-                    reinforcements: vec![],
-                    embedding: None,
-                    confidence: 1.0,
-                }
+            .map(|h| jcode_memory_types::MemoryEntry {
+                embedding_model: None,
+                id: format!("mp-{}", uuid::Uuid::new_v4()),
+                category: jcode_memory_types::MemoryCategory::Fact,
+                content: h.text,
+                tags: vec![],
+                search_text: String::new(),
+                created_at: chrono::Utc::now(),
+                updated_at: chrono::Utc::now(),
+                access_count: 0,
+                source: None,
+                trust: jcode_memory_types::TrustLevel::Medium,
+                strength: 1,
+                active: true,
+                superseded_by: None,
+                reinforcements: vec![],
+                embedding: None,
+                confidence: 1.0,
             })
             .collect();
         Ok(entries)

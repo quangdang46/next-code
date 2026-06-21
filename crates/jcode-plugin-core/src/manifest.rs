@@ -205,5 +205,5 @@ pub enum ToolTier {
     Read,  // pure read of already-loaded data
     Write, // mutates workspace/session state
     #[default]
-    Exec,  // spawns subprocesses or network
+    Exec, // spawns subprocesses or network
 }

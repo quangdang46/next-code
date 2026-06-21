@@ -206,7 +206,6 @@ pub struct OpenAIResponsesState {
     pending_tool_calls: HashMap<String, (u64, String, String, String)>,
 }
 
-
 // ---------------------------------------------------------------------------
 // Helper: extract usage from a response value
 // ---------------------------------------------------------------------------

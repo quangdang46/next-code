@@ -1,11 +1,1646 @@
 {
-  "total": 2841,
+  "total": 4891,
   "totals_by_pattern": {
-    "dot_ok": 989,
-    "let_underscore": 1106,
-    "unwrap_or_default": 746
+    "dot_ok": 1554,
+    "let_underscore": 2324,
+    "unwrap_or_default": 1013
   },
   "tracked_files": {
+    "crates/asupersync-patched/src/actor.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/agent_swarm/control_plane.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/agent_swarm/release_proof_aggregator.rs": {
+      "dot_ok": 15,
+      "let_underscore": 0,
+      "unwrap_or_default": 6
+    },
+    "crates/asupersync-patched/src/app.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/adapter/masque.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/adapter/tcptls.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/adapter/webtransport.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/atpd/state.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/benchmark/adapters.rs": {
+      "dot_ok": 1,
+      "let_underscore": 8,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/benchmark/mod.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/benchmark/profiles.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/cache/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/cache/policy.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/cache/storage.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/daemon_control.rs": {
+      "dot_ok": 1,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/directory/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/grant/manager.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/grant/pairing.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/grant/storage.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/journal/append_journal.rs": {
+      "dot_ok": 3,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/journal/commit_policy.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/journal/platform_caps.rs": {
+      "dot_ok": 0,
+      "let_underscore": 16,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/journal/recovery.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/journal/sparse_writer.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/journal/temp_management.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/logging/failure_bundle.rs": {
+      "dot_ok": 3,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/logging/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/mailbox/client.rs": {
+      "dot_ok": 3,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/mailbox/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/mailbox/storage.rs": {
+      "dot_ok": 1,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/manifest.rs": {
+      "dot_ok": 4,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/object.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/planner.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/policy/enforcement.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/policy/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/policy/scope.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/policy/verification.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 6
+    },
+    "crates/asupersync-patched/src/atp/proof/bundle.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/proof/replay.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/quota/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/repair_coordinator.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/repair_scheduler.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/sdk.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/stream_object.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/swarm/coordinator.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/swarm/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/swarm/piece_tracker.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/atp/timing_security.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/transfer_actor.rs": {
+      "dot_ok": 10,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/atp/verify/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/atp/writer.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/audit/ambient.rs": {
+      "dot_ok": 1,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/bin/asupersync.rs": {
+      "dot_ok": 2,
+      "let_underscore": 91,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/bin/atpd.rs": {
+      "dot_ok": 1,
+      "let_underscore": 8,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/cancel/protocol_validator_test_suite.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cancel/symbol_cancel.rs": {
+      "dot_ok": 9,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cancel/symbol_cancel_metamorphic.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/channel/broadcast.rs": {
+      "dot_ok": 1,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/channel/mpsc_metamorphic.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/channel/verification_suite.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cli/atp_workflows.rs": {
+      "dot_ok": 8,
+      "let_underscore": 10,
+      "unwrap_or_default": 5
+    },
+    "crates/asupersync-patched/src/cli/completion.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cli/doctor/mod.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 18
+    },
+    "crates/asupersync-patched/src/cli/error.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cli/progress.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/codec/framed.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/codec/framed_write.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/codec/length_delimited.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/codec/lines.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/combinator/bulkhead.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/combinator/rate_limit.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/combinator/retry.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/conformance/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/conformance/traceability.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/console.rs": {
+      "dot_ok": 6,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cx/cx.rs": {
+      "dot_ok": 1,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cx/macaroon.rs": {
+      "dot_ok": 19,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cx/registry.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/cx/scope.rs": {
+      "dot_ok": 0,
+      "let_underscore": 16,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/database/mysql.rs": {
+      "dot_ok": 2,
+      "let_underscore": 12,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/database/mysql_load_data_infile_security_audit.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/database/pool.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/database/postgres.rs": {
+      "dot_ok": 4,
+      "let_underscore": 28,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/database/sqlite.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/database/transaction.rs": {
+      "dot_ok": 0,
+      "let_underscore": 12,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/decoding.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/distributed/bridge.rs": {
+      "dot_ok": 0,
+      "let_underscore": 14,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/distributed/consensus/pbft.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/distributed/recovery.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/distributed/snapshot.rs": {
+      "dot_ok": 0,
+      "let_underscore": 27,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/evidence_sink.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/fs/path_ops.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/fs/uring.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/gen_server.rs": {
+      "dot_ok": 0,
+      "let_underscore": 10,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/grpc/client.rs": {
+      "dot_ok": 0,
+      "let_underscore": 11,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/grpc/codec.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/grpc/interceptor.rs": {
+      "dot_ok": 0,
+      "let_underscore": 10,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/grpc/server.rs": {
+      "dot_ok": 2,
+      "let_underscore": 4,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/grpc/web.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/compress.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h1/client.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h1/codec.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h1/http_client.rs": {
+      "dot_ok": 1,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h1/listener.rs": {
+      "dot_ok": 1,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h1/server.rs": {
+      "dot_ok": 1,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h1/stream.rs": {
+      "dot_ok": 1,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h1/types.rs": {
+      "dot_ok": 3,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h2/connection.rs": {
+      "dot_ok": 2,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h2/frame.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h2/hpack.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/http/h2/stream.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/integration_mutation_testing.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/integration_scenario_mutations.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/io/browser_storage.rs": {
+      "dot_ok": 4,
+      "let_underscore": 22,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/io/browser_stream.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/benchmark_cartel.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/chaos.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/conformal.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/crashpack/agent_proof.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/crashpack/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/fixtures/repair_roi_e2e.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/lab/injection.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/instrumented_future.rs": {
+      "dot_ok": 0,
+      "let_underscore": 13,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/meta/runner.rs": {
+      "dot_ok": 0,
+      "let_underscore": 8,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/network/harness.rs": {
+      "dot_ok": 1,
+      "let_underscore": 6,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/network/network.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/oracle/ambient_authority.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/lab/oracle/cancellation_protocol.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/oracle/determinism.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/oracle/eprocess.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/oracle/evidence.rs": {
+      "dot_ok": 0,
+      "let_underscore": 18,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/oracle/mod.rs": {
+      "dot_ok": 2,
+      "let_underscore": 6,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/lab/oracle/region_leak.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/oracle/waker_dedup.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/lab/replay.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/replay_minimization.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/lab/runtime.rs": {
+      "dot_ok": 0,
+      "let_underscore": 9,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/scenario_runner.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/lab/snapshot_restore.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/lab/util/stack_trace.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/capability/tokens.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/compiler.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/messaging/consumer.rs": {
+      "dot_ok": 1,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/control.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 4
+    },
+    "crates/asupersync-patched/src/messaging/cut.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/explain.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/messaging/fabric.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/jetstream.rs": {
+      "dot_ok": 4,
+      "let_underscore": 2,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/messaging/kafka.rs": {
+      "dot_ok": 1,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/kafka_consumer.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/messaging/nats.rs": {
+      "dot_ok": 6,
+      "let_underscore": 6,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/messaging/redis.rs": {
+      "dot_ok": 1,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/session/conformance.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/messaging/session/synthesis.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/messaging/stream.rs": {
+      "dot_ok": 2,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/messaging/subject.rs": {
+      "dot_ok": 0,
+      "let_underscore": 15,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/chunk/artifact.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/chunk/dedupe.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/net/atp/chunk/sparse_image.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/compress/algorithms.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/datagram/beacons.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/net/atp/datagram/probes.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/net/atp/protocol/byzantine_defense.rs": {
+      "dot_ok": 12,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/protocol/codec.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/protocol/outcome.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/net/atp/protocol/packet_assembly.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/protocol/varint.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/relay/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/net/atp/rendezvous/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/sdk/diagnostics.rs": {
+      "dot_ok": 7,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/net/atp/sdk/object.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/net/atp/sdk/session.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/sdk/stream.rs": {
+      "dot_ok": 2,
+      "let_underscore": 10,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/sdk/transfer.rs": {
+      "dot_ok": 1,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/atp/sink/writer.rs": {
+      "dot_ok": 3,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/net/dns/resolver.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/net/quic/config.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/quic/connection.rs": {
+      "dot_ok": 1,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/quic/stream.rs": {
+      "dot_ok": 4,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/quic_native/connection.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/quic_native/forensic_log.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/net/quic_native/streams.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/quic_native/tls.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/quic_native/tls_conformance_harness.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/stun.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/net/tcp/listener.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/tcp/socket.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/tcp/split.rs": {
+      "dot_ok": 0,
+      "let_underscore": 13,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/tcp/stream.rs": {
+      "dot_ok": 0,
+      "let_underscore": 17,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/tcp/traits.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/udp.rs": {
+      "dot_ok": 5,
+      "let_underscore": 17,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/unix/datagram.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/unix/listener.rs": {
+      "dot_ok": 1,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/unix/split.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/unix/stream.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/websocket/client.rs": {
+      "dot_ok": 3,
+      "let_underscore": 8,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/websocket/frame.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/websocket/server.rs": {
+      "dot_ok": 1,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/websocket/split.rs": {
+      "dot_ok": 1,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/net/worker_channel.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/obligation/choreography/codegen.rs": {
+      "dot_ok": 59,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/obligation/choreography/pipeline.rs": {
+      "dot_ok": 153,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/obligation/graded_conformance.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/obligation/leak_check.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/obligation/no_aliasing_proof.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/obligation/separation_logic.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/obligation/session_types.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/cancellation_tracer.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/observability/context.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/debt_runtime_integration.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/entry.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/metrics.rs": {
+      "dot_ok": 0,
+      "let_underscore": 14,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/mod.rs": {
+      "dot_ok": 10,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/network_diagnostics.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/observability/network_truth.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/observability/obligation_tracker.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/otel.rs": {
+      "dot_ok": 2,
+      "let_underscore": 5,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/observability/resource_accounting.rs": {
+      "dot_ok": 21,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/swarm_pressure_governor.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/task_inspector.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/observability/w3c_trace_context.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/plan/certificate.rs": {
+      "dot_ok": 2,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/plan/fixtures.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 9
+    },
+    "crates/asupersync-patched/src/plan/latency_algebra.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/plan/rewrite.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/process.rs": {
+      "dot_ok": 0,
+      "let_underscore": 36,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/raptorq/builder.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/raptorq/decoder.rs": {
+      "dot_ok": 3,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/raptorq/gf256.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/raptorq/proof.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/raptorq/rfc6330.rs": {
+      "dot_ok": 3,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/record/distributed_region.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/record/finalizer.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/record/symbol_obligation_tracker.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/record/symbolic_obligation.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/record/task.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/remote.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/blocking_pool.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/builder.rs": {
+      "dot_ok": 8,
+      "let_underscore": 14,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/config.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/runtime/deadline_monitor.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/runtime/env_config.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/epoch_gc.rs": {
+      "dot_ok": 1,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/epoch_gc_integration.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/epoch_tracker.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/epoch_tracking.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/io_driver.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/reactor/browser.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/reactor/epoll.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/reactor/io_uring.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/reactor/registration.rs": {
+      "dot_ok": 1,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/reactor/uring.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/runtime/resource_cleanup_verifier.rs": {
+      "dot_ok": 3,
+      "let_underscore": 0,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/runtime/resource_monitor.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/runtime/resource_monitor_metamorphic.rs": {
+      "dot_ok": 0,
+      "let_underscore": 13,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/scheduler/global_injector.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/scheduler/global_queue.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/scheduler/local_queue.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/scheduler/priority.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/scheduler/three_lane.rs": {
+      "dot_ok": 0,
+      "let_underscore": 11,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/scheduler/worker.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/sharded_state.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/state.rs": {
+      "dot_ok": 0,
+      "let_underscore": 19,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/runtime/state_metamorphic.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/runtime/stored_task.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/security/keys/mod.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/server/connection.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/service/concurrency_limit.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/service/hedge.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/service/load_balance.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/service/rate_limit.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/service/timeout.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/signal/signal.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/stream/debounce.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/supervision.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/sync/barrier.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/sync/barrier_metamorphic.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/sync/lock_ordering.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/sync/mutex_metamorphic.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/sync/once_cell.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/sync/pool.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/test_logging.rs": {
+      "dot_ok": 3,
+      "let_underscore": 18,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/test_ndjson.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/test_utils.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/time/driver.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/time/intrusive_wheel.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/time/sleep.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/time/wheel.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/tls/acceptor.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/tls/connector.rs": {
+      "dot_ok": 1,
+      "let_underscore": 7,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/tls/types.rs": {
+      "dot_ok": 2,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/compat.rs": {
+      "dot_ok": 1,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/trace/delta_debug.rs": {
+      "dot_ok": 0,
+      "let_underscore": 9,
+      "unwrap_or_default": 4
+    },
+    "crates/asupersync-patched/src/trace/distributed/context.rs": {
+      "dot_ok": 12,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/distributed/id.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/divergence.rs": {
+      "dot_ok": 0,
+      "let_underscore": 15,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/dpor.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/trace/file.rs": {
+      "dot_ok": 0,
+      "let_underscore": 4,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/geodesic.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/incident.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 4
+    },
+    "crates/asupersync-patched/src/trace/minimizer.rs": {
+      "dot_ok": 0,
+      "let_underscore": 10,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/scoring.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/streaming.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/trace/tla_export.rs": {
+      "dot_ok": 0,
+      "let_underscore": 12,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/transport/aggregator.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/transport/router.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/types/budget.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/types/slo_policy.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
+    "crates/asupersync-patched/src/types/symbol_set.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/types/typed_symbol.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/types/wasm_abi.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/util/det_rng.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/util/resource.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/util/stack_trace.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/compress.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/web/debug.rs": {
+      "dot_ok": 0,
+      "let_underscore": 18,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/web/extract.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/web/health.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/middleware.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/multipart.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 3
+    },
+    "crates/asupersync-patched/src/web/negotiate.rs": {
+      "dot_ok": 1,
+      "let_underscore": 3,
+      "unwrap_or_default": 1
+    },
+    "crates/asupersync-patched/src/web/request_region.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/security.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/session.rs": {
+      "dot_ok": 1,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/sse.rs": {
+      "dot_ok": 0,
+      "let_underscore": 6,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/static_files.rs": {
+      "dot_ok": 5,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/asupersync-patched/src/web/websocket.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
+    },
     "crates/jcode-agent-runtime/src/tier.rs": {
       "dot_ok": 1,
       "let_underscore": 0,
@@ -14,7 +1649,7 @@
     "crates/jcode-app-core/src/agent.rs": {
       "dot_ok": 4,
       "let_underscore": 0,
-      "unwrap_or_default": 7
+      "unwrap_or_default": 10
     },
     "crates/jcode-app-core/src/agent/compaction.rs": {
       "dot_ok": 0,
@@ -33,8 +1668,8 @@
     },
     "crates/jcode-app-core/src/agent/turn_execution.rs": {
       "dot_ok": 0,
-      "let_underscore": 1,
-      "unwrap_or_default": 3
+      "let_underscore": 2,
+      "unwrap_or_default": 6
     },
     "crates/jcode-app-core/src/agent/turn_loops.rs": {
       "dot_ok": 0,
@@ -43,7 +1678,7 @@
     },
     "crates/jcode-app-core/src/agent/turn_streaming_mpsc.rs": {
       "dot_ok": 0,
-      "let_underscore": 44,
+      "let_underscore": 46,
       "unwrap_or_default": 4
     },
     "crates/jcode-app-core/src/agent/utils.rs": {
@@ -87,9 +1722,9 @@
       "unwrap_or_default": 5
     },
     "crates/jcode-app-core/src/dcg_bridge.rs": {
-      "dot_ok": 3,
-      "let_underscore": 1,
-      "unwrap_or_default": 1
+      "dot_ok": 4,
+      "let_underscore": 2,
+      "unwrap_or_default": 2
     },
     "crates/jcode-app-core/src/dcp_bridge.rs": {
       "dot_ok": 0,
@@ -137,7 +1772,7 @@
       "unwrap_or_default": 0
     },
     "crates/jcode-app-core/src/execution_policy.rs": {
-      "dot_ok": 6,
+      "dot_ok": 7,
       "let_underscore": 0,
       "unwrap_or_default": 0
     },
@@ -228,7 +1863,7 @@
     },
     "crates/jcode-app-core/src/server/client_comm_message.rs": {
       "dot_ok": 0,
-      "let_underscore": 8,
+      "let_underscore": 7,
       "unwrap_or_default": 2
     },
     "crates/jcode-app-core/src/server/client_lifecycle.rs": {
@@ -341,9 +1976,14 @@
       "let_underscore": 2,
       "unwrap_or_default": 0
     },
+    "crates/jcode-app-core/src/server/live_turn.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
     "crates/jcode-app-core/src/server/provider_control.rs": {
       "dot_ok": 1,
-      "let_underscore": 29,
+      "let_underscore": 31,
       "unwrap_or_default": 0
     },
     "crates/jcode-app-core/src/server/reload.rs": {
@@ -362,7 +2002,7 @@
       "unwrap_or_default": 1
     },
     "crates/jcode-app-core/src/server/state.rs": {
-      "dot_ok": 1,
+      "dot_ok": 2,
       "let_underscore": 1,
       "unwrap_or_default": 1
     },
@@ -424,17 +2064,12 @@
     "crates/jcode-app-core/src/tool/agentgrep.rs": {
       "dot_ok": 0,
       "let_underscore": 1,
-      "unwrap_or_default": 0
+      "unwrap_or_default": 3
     },
     "crates/jcode-app-core/src/tool/agentgrep/args.rs": {
       "dot_ok": 0,
       "let_underscore": 0,
       "unwrap_or_default": 1
-    },
-    "crates/jcode-app-core/src/tool/agentgrep/context.rs": {
-      "dot_ok": 17,
-      "let_underscore": 1,
-      "unwrap_or_default": 4
     },
     "crates/jcode-app-core/src/tool/ambient.rs": {
       "dot_ok": 4,
@@ -522,7 +2157,7 @@
       "unwrap_or_default": 2
     },
     "crates/jcode-app-core/src/tool/edit.rs": {
-      "dot_ok": 0,
+      "dot_ok": 2,
       "let_underscore": 3,
       "unwrap_or_default": 1
     },
@@ -562,7 +2197,7 @@
       "unwrap_or_default": 4
     },
     "crates/jcode-app-core/src/tool/hashline_edit.rs": {
-      "dot_ok": 0,
+      "dot_ok": 1,
       "let_underscore": 2,
       "unwrap_or_default": 0
     },
@@ -578,7 +2213,7 @@
     },
     "crates/jcode-app-core/src/tool/mod.rs": {
       "dot_ok": 1,
-      "let_underscore": 5,
+      "let_underscore": 3,
       "unwrap_or_default": 2
     },
     "crates/jcode-app-core/src/tool/open.rs": {
@@ -602,12 +2237,12 @@
       "unwrap_or_default": 1
     },
     "crates/jcode-app-core/src/tool/selfdev/build_queue.rs": {
-      "dot_ok": 0,
+      "dot_ok": 1,
       "let_underscore": 3,
       "unwrap_or_default": 0
     },
     "crates/jcode-app-core/src/tool/selfdev/mod.rs": {
-      "dot_ok": 4,
+      "dot_ok": 6,
       "let_underscore": 1,
       "unwrap_or_default": 0
     },
@@ -663,7 +2298,7 @@
     },
     "crates/jcode-app-core/src/update.rs": {
       "dot_ok": 2,
-      "let_underscore": 7,
+      "let_underscore": 8,
       "unwrap_or_default": 9
     },
     "crates/jcode-app-core/src/usage_openai.rs": {
@@ -671,18 +2306,23 @@
       "let_underscore": 0,
       "unwrap_or_default": 0
     },
+    "crates/jcode-base/src/auth/account_store.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
     "crates/jcode-base/src/auth/antigravity.rs": {
-      "dot_ok": 7,
+      "dot_ok": 8,
       "let_underscore": 3,
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/auth/claude.rs": {
-      "dot_ok": 7,
+      "dot_ok": 6,
       "let_underscore": 1,
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/auth/codex.rs": {
-      "dot_ok": 7,
+      "dot_ok": 6,
       "let_underscore": 0,
       "unwrap_or_default": 0
     },
@@ -707,17 +2347,17 @@
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/auth/gemini.rs": {
-      "dot_ok": 3,
+      "dot_ok": 4,
       "let_underscore": 3,
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/auth/google.rs": {
-      "dot_ok": 3,
+      "dot_ok": 4,
       "let_underscore": 2,
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/auth/lifecycle.rs": {
-      "dot_ok": 1,
+      "dot_ok": 3,
       "let_underscore": 0,
       "unwrap_or_default": 0
     },
@@ -737,13 +2377,13 @@
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/auth/mod.rs": {
-      "dot_ok": 3,
+      "dot_ok": 4,
       "let_underscore": 0,
       "unwrap_or_default": 4
     },
     "crates/jcode-base/src/auth/oauth.rs": {
-      "dot_ok": 2,
-      "let_underscore": 19,
+      "dot_ok": 4,
+      "let_underscore": 17,
       "unwrap_or_default": 3
     },
     "crates/jcode-base/src/auth/provider_e2e.rs": {
@@ -861,6 +2501,11 @@
       "let_underscore": 1,
       "unwrap_or_default": 3
     },
+    "crates/jcode-base/src/hooks.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
     "crates/jcode-base/src/import.rs": {
       "dot_ok": 3,
       "let_underscore": 0,
@@ -921,6 +2566,11 @@
       "let_underscore": 3,
       "unwrap_or_default": 0
     },
+    "crates/jcode-base/src/memory_rerank.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
     "crates/jcode-base/src/message.rs": {
       "dot_ok": 2,
       "let_underscore": 0,
@@ -929,6 +2579,11 @@
     "crates/jcode-base/src/message/notifications.rs": {
       "dot_ok": 1,
       "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-base/src/model_pricing.rs": {
+      "dot_ok": 2,
+      "let_underscore": 1,
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/notepad.rs": {
@@ -963,13 +2618,18 @@
     },
     "crates/jcode-base/src/provider/anthropic.rs": {
       "dot_ok": 4,
-      "let_underscore": 11,
+      "let_underscore": 14,
       "unwrap_or_default": 1
     },
     "crates/jcode-base/src/provider/antigravity.rs": {
       "dot_ok": 4,
       "let_underscore": 18,
       "unwrap_or_default": 3
+    },
+    "crates/jcode-base/src/provider/attempt_tracker.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
     },
     "crates/jcode-base/src/provider/catalog_routes.rs": {
       "dot_ok": 0,
@@ -983,7 +2643,7 @@
     },
     "crates/jcode-base/src/provider/copilot.rs": {
       "dot_ok": 5,
-      "let_underscore": 18,
+      "let_underscore": 20,
       "unwrap_or_default": 2
     },
     "crates/jcode-base/src/provider/cursor.rs": {
@@ -1023,7 +2683,7 @@
     },
     "crates/jcode-base/src/provider/openai_provider_impl.rs": {
       "dot_ok": 1,
-      "let_underscore": 3,
+      "let_underscore": 6,
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/provider/openai_stream_runtime.rs": {
@@ -1034,7 +2694,7 @@
     "crates/jcode-base/src/provider/openrouter.rs": {
       "dot_ok": 23,
       "let_underscore": 1,
-      "unwrap_or_default": 8
+      "unwrap_or_default": 9
     },
     "crates/jcode-base/src/provider/openrouter_provider_impl.rs": {
       "dot_ok": 1,
@@ -1043,7 +2703,7 @@
     },
     "crates/jcode-base/src/provider/openrouter_sse_stream.rs": {
       "dot_ok": 1,
-      "let_underscore": 5,
+      "let_underscore": 7,
       "unwrap_or_default": 0
     },
     "crates/jcode-base/src/provider/pricing.rs": {
@@ -1232,12 +2892,12 @@
       "unwrap_or_default": 2
     },
     "crates/jcode-build-support/src/lib.rs": {
-      "dot_ok": 1,
+      "dot_ok": 2,
       "let_underscore": 5,
       "unwrap_or_default": 6
     },
     "crates/jcode-build-support/src/paths.rs": {
-      "dot_ok": 13,
+      "dot_ok": 18,
       "let_underscore": 0,
       "unwrap_or_default": 0
     },
@@ -1255,6 +2915,11 @@
       "dot_ok": 2,
       "let_underscore": 0,
       "unwrap_or_default": 0
+    },
+    "crates/jcode-config-types/src/lib.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
     },
     "crates/jcode-core/src/fs.rs": {
       "dot_ok": 0,
@@ -1322,9 +2987,9 @@
       "unwrap_or_default": 0
     },
     "crates/jcode-desktop/src/main.rs": {
-      "dot_ok": 12,
-      "let_underscore": 14,
-      "unwrap_or_default": 18
+      "dot_ok": 15,
+      "let_underscore": 15,
+      "unwrap_or_default": 19
     },
     "crates/jcode-desktop/src/power_inhibit.rs": {
       "dot_ok": 1,
@@ -1337,7 +3002,7 @@
       "unwrap_or_default": 1
     },
     "crates/jcode-desktop/src/session_data.rs": {
-      "dot_ok": 4,
+      "dot_ok": 5,
       "let_underscore": 0,
       "unwrap_or_default": 3
     },
@@ -1366,6 +3031,11 @@
       "let_underscore": 0,
       "unwrap_or_default": 9
     },
+    "crates/jcode-embedding/src/lib.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
     "crates/jcode-hooks/src/cli.rs": {
       "dot_ok": 0,
       "let_underscore": 0,
@@ -1381,10 +3051,15 @@
       "let_underscore": 0,
       "unwrap_or_default": 1
     },
+    "crates/jcode-hooks/src/execute.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
     "crates/jcode-import-core/src/lib.rs": {
       "dot_ok": 9,
       "let_underscore": 0,
-      "unwrap_or_default": 11
+      "unwrap_or_default": 13
     },
     "crates/jcode-keywords/src/state.rs": {
       "dot_ok": 0,
@@ -1405,6 +3080,21 @@
       "dot_ok": 2,
       "let_underscore": 0,
       "unwrap_or_default": 0
+    },
+    "crates/jcode-llm-core/src/framing.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-llm-protocols/src/openai_chat.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/jcode-llm-vcr/src/lib.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
     },
     "crates/jcode-logging/src/lib.rs": {
       "dot_ok": 5,
@@ -1456,6 +3146,16 @@
       "let_underscore": 0,
       "unwrap_or_default": 3
     },
+    "crates/jcode-plugin-core/src/manager.rs": {
+      "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/jcode-plugin-runtime/src/loader.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
     "crates/jcode-plugin-runtime/src/tui_api.rs": {
       "dot_ok": 0,
       "let_underscore": 4,
@@ -1479,6 +3179,11 @@
     "crates/jcode-protocol/src/comm_format.rs": {
       "dot_ok": 0,
       "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/jcode-provider-anthropic/src/lib.rs": {
+      "dot_ok": 0,
+      "let_underscore": 7,
       "unwrap_or_default": 1
     },
     "crates/jcode-provider-antigravity/src/lib.rs": {
@@ -1551,6 +3256,66 @@
       "let_underscore": 0,
       "unwrap_or_default": 1
     },
+    "crates/jcode-provider-service/src/bin/modelpicker.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 2
+    },
+    "crates/jcode-provider-service/src/bin/providerctl.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 1
+    },
+    "crates/jcode-provider-service/src/boot.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-provider-service/src/callback_server.rs": {
+      "dot_ok": 0,
+      "let_underscore": 5,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-provider-service/src/failover.rs": {
+      "dot_ok": 0,
+      "let_underscore": 2,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-provider-service/src/hooks.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/jcode-provider-service/src/inventory.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-provider-service/src/retry_after.rs": {
+      "dot_ok": 5,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-provider-service/src/route_provider.rs": {
+      "dot_ok": 0,
+      "let_underscore": 1,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-provider-service/src/runtime.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
+    },
+    "crates/jcode-provider-service/src/store/integration.rs": {
+      "dot_ok": 0,
+      "let_underscore": 3,
+      "unwrap_or_default": 1
+    },
+    "crates/jcode-provider-service/src/store/keyring.rs": {
+      "dot_ok": 1,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
     "crates/jcode-secrets/src/local.rs": {
       "dot_ok": 3,
       "let_underscore": 0,
@@ -1603,7 +3368,7 @@
     },
     "crates/jcode-storage/src/lib.rs": {
       "dot_ok": 0,
-      "let_underscore": 10,
+      "let_underscore": 12,
       "unwrap_or_default": 1
     },
     "crates/jcode-swarm-core/src/lib.rs": {
@@ -1717,7 +3482,7 @@
       "unwrap_or_default": 0
     },
     "crates/jcode-tui-mermaid/src/mermaid_inline.rs": {
-      "dot_ok": 6,
+      "dot_ok": 7,
       "let_underscore": 0,
       "unwrap_or_default": 0
     },
@@ -1778,8 +3543,8 @@
     },
     "crates/jcode-tui/src/tui/app/auth.rs": {
       "dot_ok": 6,
-      "let_underscore": 2,
-      "unwrap_or_default": 11
+      "let_underscore": 1,
+      "unwrap_or_default": 12
     },
     "crates/jcode-tui/src/tui/app/auth_account_commands.rs": {
       "dot_ok": 0,
@@ -1803,8 +3568,8 @@
     },
     "crates/jcode-tui/src/tui/app/commands.rs": {
       "dot_ok": 4,
-      "let_underscore": 10,
-      "unwrap_or_default": 16
+      "let_underscore": 13,
+      "unwrap_or_default": 20
     },
     "crates/jcode-tui/src/tui/app/commands_improve.rs": {
       "dot_ok": 0,
@@ -1872,14 +3637,19 @@
       "unwrap_or_default": 7
     },
     "crates/jcode-tui/src/tui/app/inline_interactive.rs": {
-      "dot_ok": 5,
-      "let_underscore": 12,
-      "unwrap_or_default": 3
+      "dot_ok": 6,
+      "let_underscore": 25,
+      "unwrap_or_default": 4
     },
     "crates/jcode-tui/src/tui/app/inline_interactive/helpers.rs": {
       "dot_ok": 0,
       "let_underscore": 0,
       "unwrap_or_default": 1
+    },
+    "crates/jcode-tui/src/tui/app/inline_interactive/openers.rs": {
+      "dot_ok": 1,
+      "let_underscore": 10,
+      "unwrap_or_default": 2
     },
     "crates/jcode-tui/src/tui/app/inline_interactive/preview.rs": {
       "dot_ok": 0,
@@ -1888,7 +3658,7 @@
     },
     "crates/jcode-tui/src/tui/app/input.rs": {
       "dot_ok": 5,
-      "let_underscore": 6,
+      "let_underscore": 11,
       "unwrap_or_default": 1
     },
     "crates/jcode-tui/src/tui/app/local.rs": {
@@ -1898,8 +3668,13 @@
     },
     "crates/jcode-tui/src/tui/app/model_context.rs": {
       "dot_ok": 1,
-      "let_underscore": 4,
+      "let_underscore": 2,
       "unwrap_or_default": 4
+    },
+    "crates/jcode-tui/src/tui/app/navigation.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
     },
     "crates/jcode-tui/src/tui/app/onboarding_flow.rs": {
       "dot_ok": 1,
@@ -1923,7 +3698,7 @@
     },
     "crates/jcode-tui/src/tui/app/remote/key_handling.rs": {
       "dot_ok": 0,
-      "let_underscore": 18,
+      "let_underscore": 24,
       "unwrap_or_default": 8
     },
     "crates/jcode-tui/src/tui/app/remote/reconnect.rs": {
@@ -1958,7 +3733,7 @@
     },
     "crates/jcode-tui/src/tui/app/state_ui.rs": {
       "dot_ok": 2,
-      "let_underscore": 8,
+      "let_underscore": 10,
       "unwrap_or_default": 11
     },
     "crates/jcode-tui/src/tui/app/state_ui_input_helpers.rs": {
@@ -1989,7 +3764,7 @@
     "crates/jcode-tui/src/tui/app/tui_state.rs": {
       "dot_ok": 5,
       "let_underscore": 0,
-      "unwrap_or_default": 3
+      "unwrap_or_default": 5
     },
     "crates/jcode-tui/src/tui/app/turn.rs": {
       "dot_ok": 0,
@@ -2000,6 +3775,11 @@
       "dot_ok": 0,
       "let_underscore": 0,
       "unwrap_or_default": 2
+    },
+    "crates/jcode-tui/src/tui/app/ui_prefs.rs": {
+      "dot_ok": 1,
+      "let_underscore": 1,
+      "unwrap_or_default": 1
     },
     "crates/jcode-tui/src/tui/info_widget.rs": {
       "dot_ok": 0,
@@ -2064,7 +3844,7 @@
     "crates/jcode-tui/src/tui/ui.rs": {
       "dot_ok": 4,
       "let_underscore": 0,
-      "unwrap_or_default": 1
+      "unwrap_or_default": 2
     },
     "crates/jcode-tui/src/tui/ui/url.rs": {
       "dot_ok": 1,
@@ -2094,7 +3874,7 @@
     "crates/jcode-tui/src/tui/ui_header.rs": {
       "dot_ok": 2,
       "let_underscore": 0,
-      "unwrap_or_default": 2
+      "unwrap_or_default": 3
     },
     "crates/jcode-tui/src/tui/ui_inline_image.rs": {
       "dot_ok": 1,
@@ -2107,14 +3887,19 @@
       "unwrap_or_default": 1
     },
     "crates/jcode-tui/src/tui/ui_input.rs": {
-      "dot_ok": 2,
-      "let_underscore": 0,
-      "unwrap_or_default": 2
+      "dot_ok": 3,
+      "let_underscore": 1,
+      "unwrap_or_default": 3
     },
     "crates/jcode-tui/src/tui/ui_messages.rs": {
       "dot_ok": 3,
       "let_underscore": 0,
       "unwrap_or_default": 1
+    },
+    "crates/jcode-tui/src/tui/ui_overlays.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 2
     },
     "crates/jcode-tui/src/tui/ui_pinned.rs": {
       "dot_ok": 1,
@@ -2123,6 +3908,11 @@
     },
     "crates/jcode-tui/src/tui/ui_status.rs": {
       "dot_ok": 2,
+      "let_underscore": 0,
+      "unwrap_or_default": 0
+    },
+    "crates/jcode-tui/src/tui/ui_todo_changes.rs": {
+      "dot_ok": 1,
       "let_underscore": 0,
       "unwrap_or_default": 0
     },
@@ -2156,6 +3946,11 @@
       "let_underscore": 1,
       "unwrap_or_default": 0
     },
+    "src/bin/memory_recall_bench.rs": {
+      "dot_ok": 29,
+      "let_underscore": 5,
+      "unwrap_or_default": 21
+    },
     "src/bin/tui_bench.rs": {
       "dot_ok": 0,
       "let_underscore": 4,
@@ -2167,9 +3962,9 @@
       "unwrap_or_default": 2
     },
     "src/cli/commands.rs": {
-      "dot_ok": 14,
+      "dot_ok": 16,
       "let_underscore": 3,
-      "unwrap_or_default": 7
+      "unwrap_or_default": 8
     },
     "src/cli/commands/provider_setup.rs": {
       "dot_ok": 0,
@@ -2188,7 +3983,7 @@
     },
     "src/cli/dispatch.rs": {
       "dot_ok": 1,
-      "let_underscore": 3,
+      "let_underscore": 4,
       "unwrap_or_default": 1
     },
     "src/cli/hot_exec.rs": {
@@ -2205,6 +4000,11 @@
       "dot_ok": 0,
       "let_underscore": 2,
       "unwrap_or_default": 0
+    },
+    "src/cli/provider_doctor.rs": {
+      "dot_ok": 0,
+      "let_underscore": 0,
+      "unwrap_or_default": 1
     },
     "src/cli/provider_init.rs": {
       "dot_ok": 2,

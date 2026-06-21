@@ -84,12 +84,10 @@ impl CapabilityChainV2 {
                 reason: "allowed by default".into(),
                 layer: 5,
             },
-            (_, Some(AccessDefault::Ask)) => {
-                AccessDecisionV2::NeedsApproval {
-                    reason: "requires approval".into(),
-                    layer: 5,
-                }
-            }
+            (_, Some(AccessDefault::Ask)) => AccessDecisionV2::NeedsApproval {
+                reason: "requires approval".into(),
+                layer: 5,
+            },
             (PolicyMode::Strict, _) => AccessDecisionV2::Deny {
                 reason: "strict mode".into(),
                 layer: 5,

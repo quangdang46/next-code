@@ -174,7 +174,10 @@ pub async fn migrate_to_mempalace(
         report.tags_migrated += 1;
         // For each memory that has this tag, create a HasTag edge
         for (entry, _scope) in &all_entries {
-            if entry.tags.contains(&tag.name) && let Some(drawer_id) = id_map.get(&entry.id) && let Err(e) = palace.tag(drawer_id, &tag.name).await {
+            if entry.tags.contains(&tag.name)
+                && let Some(drawer_id) = id_map.get(&entry.id)
+                && let Err(e) = palace.tag(drawer_id, &tag.name).await
+            {
                 report.errors.push(format!(
                     "Failed to tag {} with '{}': {}",
                     entry.id, tag.name, e
@@ -190,7 +193,9 @@ pub async fn migrate_to_mempalace(
 
         match &edge.kind {
             EdgeKind::RelatesTo { weight } => {
-                if let (Some(from), Some(to)) = (source_drawer, target_drawer) && let Err(e) = palace.link(from, to, *weight).await {
+                if let (Some(from), Some(to)) = (source_drawer, target_drawer)
+                    && let Err(e) = palace.link(from, to, *weight).await
+                {
                     report.errors.push(format!(
                         "Failed to link {}→{}: {}",
                         source_id, edge.target, e
@@ -198,7 +203,9 @@ pub async fn migrate_to_mempalace(
                 }
             }
             EdgeKind::Supersedes => {
-                if let (Some(old), Some(new)) = (source_drawer, target_drawer) && let Err(e) = palace.supersede(old, new).await {
+                if let (Some(old), Some(new)) = (source_drawer, target_drawer)
+                    && let Err(e) = palace.supersede(old, new).await
+                {
                     report.errors.push(format!(
                         "Failed to supersede {}→{}: {}",
                         source_id, edge.target, e

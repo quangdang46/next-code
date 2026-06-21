@@ -1,14 +1,9 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
-use futures::Stream;
 use futures::stream::StreamExt;
-use jcode_llm_core::endpoint::Endpoint;
-use jcode_llm_core::framing::SseFrame;
 use jcode_llm_core::protocol::{Protocol, StepOutput};
 use jcode_llm_core::route::PreparedRoute;
-use jcode_llm_core::schema::{
-    ContentPart, GenerationParams, LlmRequest, ModelRef, ToolChoice, Usage as LlmUsage,
-};
+use jcode_llm_core::schema::{ContentPart, GenerationParams, LlmRequest, ModelRef};
 use jcode_llm_protocols::anthropic_messages::{
     AnthropicEvent, AnthropicMessagesProtocol, route as anthropic_messages_route,
 };
@@ -20,10 +15,7 @@ use jcode_provider_core::{
 };
 use serde::Serialize;
 use serde_json::{Value, json};
-use std::collections::HashMap;
-use std::pin::Pin;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tokio_stream::wrappers::ReceiverStream;
 
 /// Claude Code billing attribution text observed in the official CLI's system
@@ -922,12 +914,12 @@ impl AnthropicMessagesProvider {
             }
 
             // Add the route's body overlay as headers
-            if let Some(ref overlay) = route_body_overlay {
-                if let Some(obj) = overlay.as_object() {
-                    for (key, val) in obj {
-                        if let Some(s) = val.as_str() {
-                            req_builder = req_builder.header(key.as_str(), s);
-                        }
+            if let Some(ref overlay) = route_body_overlay
+                && let Some(obj) = overlay.as_object()
+            {
+                for (key, val) in obj {
+                    if let Some(s) = val.as_str() {
+                        req_builder = req_builder.header(key.as_str(), s);
                     }
                 }
             }
@@ -983,10 +975,8 @@ impl AnthropicMessagesProvider {
                                 }
                             ) {
                                 tool_use_active = true;
-                            } else if matches!(proto_event, AnthropicEvent::ContentBlockStop { .. }) {
-                                if tool_use_active {
-                                    tool_use_active = false;
-                                }
+                            } else if matches!(proto_event, AnthropicEvent::ContentBlockStop { .. }) && tool_use_active {
+                                tool_use_active = false;
                             }
 
                             let stream_events =
