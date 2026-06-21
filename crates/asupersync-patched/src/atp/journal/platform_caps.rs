@@ -423,7 +423,7 @@ impl PlatformCapabilities {
         None
     }
 
-    fn detect_filesystem_type(_path: &Path) -> Outcome<String, CapabilityError> {
+    fn detect_filesystem_type(path: &Path) -> Outcome<String, CapabilityError> {
         // Platform-specific filesystem detection
         #[cfg(target_os = "linux")]
         {
