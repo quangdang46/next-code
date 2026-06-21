@@ -537,8 +537,8 @@ fn append_batch_progress_spans(
     }
 }
 
-pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pending_count: usize) {
-    let pending_count = pending_prompt_count(app);
+pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, _pending_count: usize) {
+    let _pending_count = pending_prompt_count(app);
 
     // Format: ⏵⏵ bypass permissions on (shift+tab to cycle) │ model │ provider │ X% │ ↑K ↓K
     fn status_line_text(app: &dyn TuiState) -> Vec<Span<'static>> {
@@ -686,7 +686,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         }
     }
 
-    let mut base_spans = if let Some(custom_text) = run_custom_command(app) {
+    let base_spans = if let Some(custom_text) = run_custom_command(app) {
         // Layer 3: custom shell command output
         vec![Span::styled(
             format!("  {}", custom_text),
@@ -1609,7 +1609,7 @@ pub(super) fn draw_input(
         prompt_char,
         caret_color,
         prompt_len,
-        &highlights,
+        highlights,
     );
 
     let mut lines: Vec<Line> = Vec::new();
@@ -2009,6 +2009,7 @@ fn segment_to_colored_spans(
     spans
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn wrap_input_text<'a>(
     input: &str,
     cursor_pos: usize,

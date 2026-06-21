@@ -1911,15 +1911,6 @@ pub(super) fn handle_modal_key(
                 return Ok(false);
             }
         } // close match code
-        if modifiers.contains(KeyModifiers::CONTROL)
-            && matches!(code, KeyCode::Char('c') | KeyCode::Char('d'))
-        {
-            return Ok(false);
-        }
-
-        let _ = app.handle_copy_selection_key(code, modifiers)
-            || handle_navigation_shortcuts(app, code, modifiers);
-        return Ok(true);
     }
 
     if let Some(ref picker) = app.inline_interactive_state
@@ -2338,7 +2329,7 @@ impl App {
                 KeyCode::Esc => {
                     if self.viewing_teammate_session_id.is_some() {
                         // Exit teammate view
-                        let sid = self.viewing_teammate_session_id.take();
+                        let _sid = self.viewing_teammate_session_id.take();
                         self.view_teammate_selection = false;
                         self.set_status_notice("Exited teammate view");
                         return Ok(());

@@ -3090,12 +3090,10 @@ User's request:
                                     if matches!(e.action, PickerAction::Model)
                                         && e.effort.is_some()
                                         && model_entry_base_name(e) == bare_name
+                                        && let Some(ef) = e.effort.as_deref()
+                                        && !efforts.contains(&ef)
                                     {
-                                        if let Some(ef) = e.effort.as_deref() {
-                                            if !efforts.contains(&ef) {
-                                                efforts.push(ef);
-                                            }
-                                        }
+                                        efforts.push(ef);
                                     }
                                 }
                             }
@@ -3277,7 +3275,7 @@ User's request:
                                     lines.join("\n")
                                 } else {
                                     let base =
-                                        lines.iter().copied().collect::<Vec<&str>>().join("\n");
+                                        lines.to_vec().join("\n");
                                     format!("{}\ncolor = \"{}\"", base, color_val)
                                 };
                                 let _ = std::fs::write(&path, &new_content);

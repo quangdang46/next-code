@@ -1990,6 +1990,7 @@ pub(crate) fn side_pane_visible_range() -> Option<(usize, usize)> {
     Some((snapshot.scroll, snapshot.visible_end))
 }
 
+#[allow(dead_code)]
 pub(crate) fn copy_pane_first_visible_point(
     pane: crate::tui::CopySelectionPane,
 ) -> Option<crate::tui::CopySelectionPoint> {
@@ -2941,7 +2942,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         let sep_w = chunks[4].width as usize;
         if sep_w > 12 {
             let (nav_pos, nav_total) = app.prompt_history_info().unwrap_or((0, 0));
-            let next_prompt = user_count + pending_count + 1;
+            let _next_prompt = user_count + pending_count + 1;
             let label = if nav_pos > 0 {
                 format!(" History {}/{} ", nav_pos, nav_total)
             } else {

@@ -720,7 +720,7 @@ impl crate::tui::TuiState for App {
                 },
                 elapsed: member
                     .status_age_secs
-                    .map(|s| std::time::Duration::from_secs(s)),
+                    .map(std::time::Duration::from_secs),
                 session_id: Some(member.session_id.clone()),
             });
         }

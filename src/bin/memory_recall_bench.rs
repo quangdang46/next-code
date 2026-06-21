@@ -57,8 +57,10 @@ fn dirs_home() -> PathBuf {
 struct CorpusMemory {
     id: String,
     content: String,
+    #[allow(dead_code)]
     category: String,
     embedding: Option<Vec<f32>>,
+    #[allow(dead_code)]
     graph: String,
     source: Option<String>,
     active: bool,
@@ -362,9 +364,10 @@ fn rrf(lists: &[Vec<(String, f32)>], k: f32, limit: usize) -> Vec<(String, f32)>
 ///   - `rel_floor`: keep item i only while `score[i] >= score[0] * rel_floor`.
 ///   - `drop_ratio`: stop as soon as an item is `< prev * drop_ratio` (a cliff in
 ///     the score curve marks the relevant/irrelevant boundary).
-///   - `max_k`: hard upper bound (backstop).
+///
 /// Returns at least 1 item when the input is non-empty (the top candidate always
 /// clears its own floor), so recall of a present top-1 is never lost.
+#[allow(dead_code)]
 fn dynamic_gate(
     ranked: &[(String, f32)],
     rel_floor: f32,
@@ -425,6 +428,7 @@ struct QueryRecord {
     origin_memory_ids: Vec<String>,
 }
 
+#[allow(clippy::collapsible_if)]
 fn cmd_queries(args: &[String]) -> Result<()> {
     let opts = parse_kv(args);
     let graph_file = opts.get("corpus").cloned().unwrap_or_else(|| {
@@ -472,7 +476,7 @@ fn cmd_queries(args: &[String]) -> Result<()> {
             Some((p, mtime))
         })
         .collect();
-    sessions.sort_by(|a, b| b.1.cmp(&a.1));
+    sessions.sort_by_key(|k| std::cmp::Reverse(k.1));
 
     let out_path = bench_root().join("labels/queries.jsonl");
     std::fs::create_dir_all(out_path.parent().unwrap())?;
@@ -894,7 +898,7 @@ fn cmd_judge(args: &[String]) -> Result<()> {
 
     let results = rt.block_on(async {
         use futures::stream::{self, StreamExt};
-        stream::iter(inputs.into_iter())
+        stream::iter(inputs)
             .map(|input| {
                 let model = model.clone();
                 let backend = backend.clone();

@@ -15,11 +15,9 @@ impl ProviderCliService {
     pub fn new() -> Result<Self> {
         let bus = Bus::global();
         let catalog_on_updated = {
-            let bus = bus;
             move || bus.publish(BusEvent::CatalogUpdated)
         };
         let integration_on_updated = {
-            let bus = bus;
             move || bus.publish(BusEvent::IntegrationUpdated)
         };
         let catalog =

@@ -1788,7 +1788,7 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
     Ok(())
 }
 
-pub async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()> {
+pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()> {
     let install_root = dirs::home_dir()
         .map(|h| h.join(".jcode").join("plugins"))
         .unwrap_or_else(|| PathBuf::from("/tmp/jcode-plugins"));
@@ -1810,10 +1810,10 @@ pub async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()
             let name = url.to_owned();
             let name = name
                 .split('/')
-                .last()
+                .next_back()
                 .and_then(|s| s.strip_suffix(".git"))
                 .unwrap_or("cloned-plugin");
-            mgr.load(&name, PluginSource::Git { url, rev }).await?;
+            mgr.load(name, PluginSource::Git { url, rev }).await?;
             println!("Plugin cloned and loaded");
         }
         super::args::PluginSubcommand::List { kind } => {
@@ -3402,7 +3402,7 @@ fn filter_cli_model_routes_for_choice(
 #[path = "commands_tests.rs"]
 mod tests;
 
-pub fn run_provider_catalog_command(all: bool, emit_json: bool, emit_toon: bool) -> Result<()> {
+pub fn run_provider_catalog_command(_all: bool, emit_json: bool, emit_toon: bool) -> Result<()> {
     let svc = super::provider_service::ProviderCliService::new()?;
     let providers = svc.list_providers()?;
     if emit_json || emit_toon {

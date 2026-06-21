@@ -29,8 +29,10 @@ pub struct TeamMemberView {
 /// Interactive team view with keyboard selection.
 /// Allows selecting tasks/members and performing actions (claim, close, view).
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub(super) struct TeamViewInteraction {
     /// Currently selected index (0 = header, 1+ = members then tasks).
+    #[allow(dead_code)]
     pub selected: usize,
     /// Whether selection mode is active.
     pub active: bool,

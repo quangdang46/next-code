@@ -901,8 +901,8 @@ fn map_transcript_mode(mode: TranscriptModeArg) -> crate::protocol::TranscriptMo
 /// Returns `Ok(Some(…))` on success, `Ok(None)` to fall through to the
 /// legacy `init_provider` / `init_provider_and_registry` path.
 async fn try_catalog_provider(
-    provider_str: &str,
-    model: Option<&str>,
+    _provider_str: &str,
+    _model: Option<&str>,
 ) -> Result<Option<Arc<dyn provider::Provider>>> {
     // DISABLED: RouteProvider::complete() is a stub that returns "not yet implemented".
     // Using it would silently drop user input on Enter. Fall through to legacy
@@ -941,10 +941,10 @@ async fn try_catalog_provider(
         None
     } else {
         Some(ProviderProfile::ById {
-            id: provider_str.into(),
+            id: _provider_str.into(),
         })
     };
-    let model_id = model.map(ModelId::from);
+    let model_id = _model.map(ModelId::from);
 
     match runtime::start_session(&svc, profile.as_ref(), model_id.as_ref()).await {
         Ok(session) => {
@@ -1052,7 +1052,7 @@ async fn run_default_command(args: Args) -> Result<()> {
         );
         output::stderr_info(format!(
             "Current server settings control `/model`. Restart server to apply: --provider {}{}",
-            &args.provider,
+            args.provider,
             args.model
                 .as_ref()
                 .map(|m| format!(" --model {}", m))

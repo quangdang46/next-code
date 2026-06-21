@@ -383,10 +383,10 @@ fn auth_doctor_validation_detail(
 
 pub(super) fn run_provider_list_command(emit_json: bool, emit_toon: bool) -> Result<()> {
     let mut providers = list_cli_providers();
-    if let Ok(svc) = ProviderCliService::new() {
-        if let Ok(catalog_providers) = svc.list_providers() {
-            providers.extend(list_catalog_providers(&catalog_providers));
-        }
+    if let Ok(svc) = ProviderCliService::new()
+        && let Ok(catalog_providers) = svc.list_providers()
+    {
+        providers.extend(list_catalog_providers(&catalog_providers));
     }
 
     if emit_json || emit_toon {
