@@ -2459,16 +2459,23 @@ pub(super) fn handle_goal_or_mission_command(app: &mut App, trimmed: &str) -> bo
 
 /// Handle /export command — export session conversation to a file.
 pub(super) fn handle_export_command(app: &mut App, trimmed: &str) -> bool {
-    let Some(filename) = trimmed
-        .strip_prefix("/export ")
-        .or_else(|| trimmed.strip_prefix("/export\t"))
-    else {
+    // Only handle /export and /export <arg>. Other commands fall through.
+    if !trimmed.starts_with("/export") {
+        return false;
+    }
+    if trimmed == "/export" {
         app.push_display_message(DisplayMessage::system(
             "Usage: `/export <filename>` — export conversation to a .txt file.\n\
              Example: `/export my-conversation.txt`"
                 .to_string(),
         ));
         return true;
+    }
+    let Some(filename) = trimmed
+        .strip_prefix("/export ")
+        .or_else(|| trimmed.strip_prefix("/export\t"))
+    else {
+        return false;
     };
     let filename = filename.trim();
     if filename.is_empty() {
