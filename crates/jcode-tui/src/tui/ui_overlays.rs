@@ -348,7 +348,8 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
         "/permissions",
         "Show DCG permission mode and recent decisions",
     ));
-    lines.push(help_entry("/quit", "Exit jcode"));
+    lines.push(help_entry("/exit", "Exit jcode (opencode TUI slash)"));
+    lines.push(help_entry("/quit", "Alias for /exit"));
 
     let skills = app.available_skills();
     if !skills.is_empty() {

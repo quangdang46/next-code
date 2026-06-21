@@ -143,7 +143,8 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/split", "Split session into a new window"),
     RegisteredCommand::public("/transfer", "Compact context into a fresh handoff session"),
     RegisteredCommand::public("/workspace", "Niri-style session workspace"),
-    RegisteredCommand::public("/quit", "Exit jcode"),
+    RegisteredCommand::public("/exit", "Exit jcode (opencode TUI slash)"),
+    RegisteredCommand::public("/quit", "Alias for /exit"),
     RegisteredCommand::public(
         "/experiment",
         "List/show/enable/disable experimental feature flags",

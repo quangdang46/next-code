@@ -968,7 +968,7 @@ async fn handle_remote_key_internal(
                     return Ok(());
                 }
 
-                if trimmed == "/quit" {
+                if trimmed == "/quit" || trimmed == "/exit" {
                     crate::telemetry::end_session_with_reason(
                         app.provider.name(),
                         &app.provider.model(),
