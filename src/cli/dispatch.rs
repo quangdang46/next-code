@@ -904,14 +904,13 @@ async fn try_catalog_provider(
     provider_str: &str,
     model: Option<&str>,
 ) -> Result<Option<Arc<dyn provider::Provider>>> {
-    // Only activate for "auto" or unrecognized (catalog-only) provider strings.
-    let is_auto = provider_str == "auto";
-    let is_catalog_only =
-        is_auto || ProviderChoice::provider_choice_from_str(provider_str).is_none();
-    if !is_catalog_only {
-        return Ok(None);
-    }
+    // DISABLED: RouteProvider::complete() is a stub that returns "not yet implemented".
+    // Using it would silently drop user input on Enter. Fall through to legacy
+    // init_provider until RouteProvider actually implements LLM dispatch.
+    return Ok(None);
 
+    #[allow(unreachable_code, unused_variables)]
+    let is_auto = false;
     use jcode_keyring_store::MockKeyringStore;
     use jcode_provider_service::ProviderProfile;
     use jcode_provider_service::boot;

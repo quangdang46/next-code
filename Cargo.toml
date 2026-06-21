@@ -516,4 +516,9 @@ async-stream = "0.3"
 # never to a normal `cargo build`/release binary.
 jcode-tui = { path = "crates/jcode-tui", features = ["test-support"] }
 
+# Patch asupersync to use the local patched copy that removes the nightly-only
+# `try_trait_v2` feature gate, enabling compilation on the stable release channel.
+[patch.crates-io]
+asupersync = { path = "crates/asupersync-patched" }
+
 [build-dependencies]
