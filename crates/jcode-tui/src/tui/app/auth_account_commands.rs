@@ -14,7 +14,11 @@ pub(crate) fn handle_auth_command(app: &mut App, trimmed: &str) -> bool {
         return true;
     }
 
-    if trimmed == "/login" {
+    if trimmed == "/login" || trimmed == "/connect" {
+        // `/connect` is the opencode TUI slash for provider authentication
+        // (see packages/tui/src/app.tsx: `slashName: "connect"` on the
+        // `provider.connect` command). `/login` is kept as an alias for
+        // backwards compatibility.
         app.show_interactive_login();
         return true;
     }
