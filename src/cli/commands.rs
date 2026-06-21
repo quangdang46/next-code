@@ -3402,9 +3402,6 @@ fn filter_cli_model_routes_for_choice(
 #[path = "commands_tests.rs"]
 mod tests;
 
-use jcode_provider_service::catalog::CatalogService;
-use jcode_provider_service::service::ProviderService;
-
 pub fn run_provider_catalog_command(all: bool, emit_json: bool, emit_toon: bool) -> Result<()> {
     let svc = super::provider_service::ProviderCliService::new()?;
     let providers = svc.list_providers()?;

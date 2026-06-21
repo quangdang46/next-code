@@ -38,6 +38,7 @@ pub(super) struct TeamViewInteraction {
 
 impl TeamViewInteraction {
     /// Total interactive slots in the current view.
+    #[allow(dead_code)]
     pub fn slot_count(member_count: usize, task_count: usize) -> usize {
         1 + member_count.min(5) + task_count.min(3) // header + members + tasks
     }

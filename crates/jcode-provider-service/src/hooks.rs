@@ -49,8 +49,8 @@ impl Hooks {
         Self::default()
     }
 
-    /// Add a hook to the registry. Returns self so calls can chain.
-    pub fn add<F>(mut self, f: F) -> Self
+    /// Register a hook. Returns self so calls can chain.
+    pub fn register<F>(mut self, f: F) -> Self
     where
         F: Fn(HookContext<'_>) + Send + Sync + 'static,
     {
@@ -135,11 +135,11 @@ mod tests {
         let c1 = counter.clone();
         let c2 = counter.clone();
         let hooks = Hooks::new()
-            .add(move |_ctx| {
+            .register(move |_ctx| {
                 let prev = c1.fetch_add(1, Ordering::SeqCst);
                 assert_eq!(prev, 0, "first hook should fire first");
             })
-            .add(move |_ctx| {
+            .register(move |_ctx| {
                 let prev = c2.fetch_add(1, Ordering::SeqCst);
                 assert_eq!(prev, 1, "second hook should fire after the first");
             });
@@ -153,8 +153,8 @@ mod tests {
         let counter = Arc::new(AtomicUsize::new(0));
         let c = counter.clone();
         let hooks = Hooks::new()
-            .add(|_ctx| panic!("first hook panics"))
-            .add(move |_ctx| {
+            .register(|_ctx| panic!("first hook panics"))
+            .register(move |_ctx| {
                 c.fetch_add(1, Ordering::SeqCst);
             });
         let (cat, int) = svc();
@@ -167,7 +167,7 @@ mod tests {
     async fn hook_can_register_login_provider() {
         // A common use case: a hook adds a custom login provider
         // to the integration after the built-ins are registered.
-        let hooks = Hooks::new().add(|ctx| {
+        let hooks = Hooks::new().register(|ctx| {
             // Use the runtime to register a custom provider; this
             // is a sync call but the hook closure is sync so it's
             // fine.

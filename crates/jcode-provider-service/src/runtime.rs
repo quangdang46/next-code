@@ -93,18 +93,13 @@ pub async fn start_session(
 
     // 3. User-set global default (from model_prefs.json / `jcode model default`).
     //    Opencode checks this FIRST before falling through to catalog heuristic.
-    if let Some(ref d) = defaults {
-        if let Some((ref global_provider, ref global_model)) = d.global {
-            // Verify provider+model exist in catalog before using.
-            if svc
-                .catalog()
-                .find_model(global_provider, global_model)
-                .await
-                .is_ok()
-            {
-                return finish(svc, global_provider.clone(), global_model.clone()).await;
-            }
-        }
+    if let Some(ref d) = defaults && let Some((ref global_provider, ref global_model)) = d.global && svc
+        .catalog()
+        .find_model(global_provider, global_model)
+        .await
+        .is_ok()
+    {
+        return finish(svc, global_provider.clone(), global_model.clone()).await;
     }
 
     // 4. Catalog default (Flagship heuristic, then newest).
@@ -188,7 +183,7 @@ pub async fn quick_session(
     let svc = DefaultProviderService::new(catalog, integration, credentials);
 
     let profile = cli_provider.map(|p| ProviderProfile::ById { id: p.into() });
-    let model = cli_model.map(|m| ModelId::from(m));
+    let model = cli_model.map(ModelId::from);
     start_session(&svc, profile.as_ref(), model.as_ref()).await
 }
 

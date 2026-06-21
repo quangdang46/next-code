@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use super::tools_ui::summarize_batch_running_tools_compact;
 use super::visual_debug::{self, FrameCaptureBuilder};
 use super::{
@@ -8,7 +9,7 @@ use crate::message::ConnectionPhase;
 use crate::tui::app;
 use crate::tui::color_support::rgb;
 use crate::tui::layout_utils;
-use jcode_keywords::visual::{KeywordHighlight, compute_highlights};
+use jcode_keywords::visual::KeywordHighlight;
 use ratatui::{prelude::*, widgets::Paragraph};
 
 fn shell_mode_color() -> Color {

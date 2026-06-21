@@ -1,4 +1,4 @@
-use super::{RunningItem, RunningItemKind, RunningItemStatus};
+use super::{RunningItem, RunningItemStatus};
 use crate::tui::color_support::rgb;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;

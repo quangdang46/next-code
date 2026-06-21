@@ -251,10 +251,8 @@ pub trait CatalogService: Send + Sync {
                 continue;
             }
             // Check the integration layer for live credentials.
-            if let Ok(status) = integration.detect(&p.id).await {
-                if status.is_connected() {
-                    out.push(p);
-                }
+            if let Ok(status) = integration.detect(&p.id).await && status.is_connected() {
+                out.push(p);
             }
         }
         Ok(out)
@@ -444,10 +442,8 @@ impl CatalogService for InMemoryCatalog {
                 if !p.enabled {
                     return false;
                 }
-                if let Some(ref pol) = *policy {
-                    if !pol.is_allowed(&p.id) {
-                        return false; // policy denies this provider
-                    }
+                if let Some(ref pol) = *policy && !pol.is_allowed(&p.id) {
+                    return false; // policy denies this provider
                 }
                 if p.api_key.is_some() {
                     return true; // inline key → available (opencode)
@@ -499,14 +495,10 @@ impl CatalogService for InMemoryCatalog {
         let saved_default = { self.default_model.read().unwrap().clone() };
         if let Some((ref p, ref m)) = saved_default {
             // Verify the provider is still available and model exists+enabled.
-            if let Ok(provider) = self.provider(p).await {
-                if provider.enabled && provider.model(m).is_some() {
-                    // Check that provider is in available set.
-                    if let Ok(available) = self.available().await {
-                        if available.iter().any(|a| &a.id == p) {
-                            return Ok((p.clone(), m.clone()));
-                        }
-                    }
+            if let Ok(provider) = self.provider(p).await && provider.enabled && provider.model(m).is_some() {
+                // Check that provider is in available set.
+                if let Ok(available) = self.available().await && available.iter().any(|a| &a.id == p) {
+                    return Ok((p.clone(), m.clone()));
                 }
             }
         }
@@ -708,10 +700,8 @@ impl CatalogService for InMemoryCatalog {
 
 impl InMemoryCatalog {
     fn fire_on_updated(&self) {
-        if let Ok(g) = self.on_updated.read() {
-            if let Some(ref cb) = *g {
-                cb();
-            }
+        if let Ok(g) = self.on_updated.read() && let Some(ref cb) = *g {
+            cb();
         }
     }
 }

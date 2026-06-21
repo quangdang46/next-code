@@ -131,7 +131,7 @@ fn parse_imf_fixdate(value: &str) -> Option<DateTime<Utc>> {
     use chrono::NaiveDate;
     let nd = NaiveDate::from_ymd_opt(year, month, day)?;
     let ndt = nd.and_hms_opt(h, m, s)?;
-    Some(DateTime::<Utc>::from_utc(ndt, Utc))
+    Some(DateTime::from_naive_utc_and_offset(ndt, Utc))
 }
 
 fn month_from_name(s: &str) -> Option<u32> {

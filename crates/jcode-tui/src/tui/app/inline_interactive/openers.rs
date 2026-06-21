@@ -6,7 +6,6 @@ use super::helpers::{
 use super::*;
 use crate::tui::{
     AgentModelTarget, InlineInteractiveState, PickerAction, PickerEntry, PickerKind, PickerOption,
-    RunningItem, RunningItemKind, RunningItemStatus,
 };
 
 impl App {
@@ -1129,6 +1128,7 @@ You are a helpful coding assistant.
 
 /// Load a session's messages from its files and return as DisplayMessages.
 /// Used by teammate view to show the subagent's messages inline.
+#[allow(dead_code)]
 pub(super) fn load_session_messages(session_id: &str) -> Vec<crate::tui::DisplayMessage> {
     use crate::session::Session;
 

@@ -19,7 +19,6 @@ use std::time::Duration;
 
 use tokio::sync::Notify;
 
-use crate::attempt::AttemptStatus;
 use crate::integration::IntegrationService;
 
 /// Single scrub pass: list the attempts on the integration service

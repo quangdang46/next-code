@@ -77,6 +77,7 @@ impl RouteProvider {
     /// streaming path). When `false`, the route uses a non-SSE framing such
     /// as AWS Event Stream or WebSocket binary, which the stub `complete()`
     /// methods still reject uniformly.
+    #[allow(dead_code)]
     fn uses_sse_framing(&self) -> bool {
         matches!(self.route.framing, jcode_llm_core::framing::Framing::Sse)
     }

@@ -55,9 +55,8 @@ pub async fn next_target(
     available.sort_by(|a, b| a.id.as_str().cmp(b.id.as_str()));
     // Skip the failing provider.
     let mut after = false;
-    let mut idx = 0usize;
-    for p in &available {
-        idx += 1;
+    for (idx, p) in available.iter().enumerate() {
+        let idx = idx + 1; // 1-based
         if after {
             // Pick flagship first, fall back to first model.
             let pick = p
@@ -81,9 +80,8 @@ pub async fn next_target(
     }
     // No candidate after the failing provider — try *before* it as
     // a last resort (skipping the failing provider again).
-    let mut idx2 = 0usize;
-    for p in &available {
-        idx2 += 1;
+    for (idx2, p) in available.iter().enumerate() {
+        let idx2 = idx2 + 1; // 1-based
         if &p.id == failing.0 {
             continue;
         }

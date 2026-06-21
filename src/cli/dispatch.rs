@@ -9,7 +9,7 @@ use std::time::Instant;
 
 use super::args::{
     AmbientCommand, Args, AuthCommand, CloudCommand, CloudSessionsCommand, Command, MemoryCommand,
-    ModelCommand, PermissionCommand, PluginSubcommand, ProviderCommand, RestartCommand,
+    ModelCommand, PermissionCommand, ProviderCommand, RestartCommand,
     SecretsCommand, ServerCommand, SessionCommand, TranscriptModeArg,
 };
 use crate::{

@@ -378,10 +378,8 @@ impl IntegrationService for InMemoryIntegration {
 
 impl InMemoryIntegration {
     fn fire_on_updated(&self) {
-        if let Ok(g) = self.on_updated.read() {
-            if let Some(ref cb) = *g {
-                cb();
-            }
+        if let Ok(g) = self.on_updated.read() && let Some(ref cb) = *g {
+            cb();
         }
     }
 }

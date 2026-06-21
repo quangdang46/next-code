@@ -139,7 +139,7 @@ impl ProviderChoice {
             "jcode" => Self::Jcode,
             "claude" => Self::Claude,
             "anthropic-api" | "claude-api" | "anthropic-key" | "claude-key" => Self::AnthropicApi,
-            "claude-subprocess" => Self::ClaudeSubprocess,
+            "claude-subprocess" => Self::Claude,
             "openai" => Self::Openai,
             "openai-api" | "openai-key" | "openai-apikey" | "openai-platform" => Self::OpenaiApi,
             "openrouter" => Self::Openrouter,

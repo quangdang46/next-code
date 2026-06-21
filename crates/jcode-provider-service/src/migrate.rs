@@ -44,15 +44,11 @@ pub fn detect_legacy_auth(
     anthropic_key_env: &str,
     openai_key_env: &str,
 ) -> Option<(ProviderId, LegacyAuthMode, String)> {
-    if let Ok(key) = std::env::var(anthropic_key_env) {
-        if !key.is_empty() {
-            return Some((ProviderId::from("anthropic"), LegacyAuthMode::ApiKey, key));
-        }
+    if let Ok(key) = std::env::var(anthropic_key_env) && !key.is_empty() {
+        return Some((ProviderId::from("anthropic"), LegacyAuthMode::ApiKey, key));
     }
-    if let Ok(key) = std::env::var(openai_key_env) {
-        if !key.is_empty() {
-            return Some((ProviderId::from("openai"), LegacyAuthMode::ApiKey, key));
-        }
+    if let Ok(key) = std::env::var(openai_key_env) && !key.is_empty() {
+        return Some((ProviderId::from("openai"), LegacyAuthMode::ApiKey, key));
     }
     None
 }
@@ -114,10 +110,8 @@ impl LegacyProviderSelection {
             "AWS_BEARER_TOKEN_BEDROCK",
             "COPILOT_GITHUB_TOKEN",
         ] {
-            if let Ok(val) = std::env::var(v) {
-                if !val.is_empty() {
-                    env_keys.insert(v.to_string(), val);
-                }
+            if let Ok(val) = std::env::var(v) && !val.is_empty() {
+                env_keys.insert(v.to_string(), val);
             }
         }
 

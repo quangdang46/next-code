@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 
-use crate::credential::{Credential, CredentialService, CredentialType};
+use crate::credential::{Credential, CredentialService};
 use crate::types::ProviderId;
 
 #[derive(Debug, Error)]
@@ -71,7 +71,7 @@ where
     // intent (e.g. "try default first, then work, then personal")
     // is honored even if some labels are missing.
     let mut tried: Vec<&Credential> = Vec::new();
-    let mut last_error: Option<String> = None;
+    let mut _last_error: Option<String> = None;
     for label in labels {
         if let Some(c) = creds.iter().find(|c| &c.label == label) {
             let label_clone = c.label.clone();
@@ -81,7 +81,7 @@ where
                     return Ok(AttemptOutcome::Success { label: label_clone });
                 }
                 Err(e) => {
-                    last_error = Some(e.clone());
+                    _last_error = Some(e.clone());
                     tried.push(c);
                 }
             }
@@ -102,7 +102,7 @@ where
                 return Ok(AttemptOutcome::Success { label: label_clone });
             }
             Err(e) => {
-                last_error = Some(e.clone());
+                _last_error = Some(e.clone());
             }
         }
     }

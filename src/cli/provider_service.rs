@@ -1,7 +1,7 @@
 use crate::bus::{Bus, BusEvent};
 use anyhow::Result;
 use jcode_provider_service::boot;
-use jcode_provider_service::catalog::{CatalogService, InMemoryCatalog, ModelInfo, ProviderInfo};
+use jcode_provider_service::catalog::{InMemoryCatalog, ModelInfo, ProviderInfo};
 use jcode_provider_service::integration::InMemoryIntegration;
 use jcode_provider_service::service::ProviderService;
 use jcode_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};

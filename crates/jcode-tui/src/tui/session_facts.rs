@@ -15,6 +15,7 @@
 
 /// A distinct piece of session information that can be surfaced in the UI.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[allow(dead_code)]
 pub(crate) enum Fact {
     Model,
     ReasoningEffort,
