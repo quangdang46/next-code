@@ -28,7 +28,7 @@ pub(super) fn render_smart_output(result: &SmartResult, _args: &SmartArgs) -> St
                 lines.push(format!("       {line}"));
             }
             if region.body.lines().count() > 5 {
-                lines.push(format!("       ..."));
+                lines.push("       ...".to_string());
             }
         }
         lines.push(String::new());

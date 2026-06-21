@@ -684,7 +684,7 @@ pub fn run_smart_ffs(root: &Path, query: &SmartQuery, args: &SmartArgs) -> Resul
                 .as_ref()
                 .map(|o| o.language.clone())
                 .unwrap_or_default(),
-            score: ff.score as i32,
+            score: ff.score,
             why: vec![format!("path matched: {}", subject)],
             context_applied: None,
             structure: SmartStructure {
