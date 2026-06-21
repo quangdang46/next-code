@@ -62,6 +62,7 @@ pub enum OpenAIChatMessage {
 }
 
 impl OpenAIChatMessage {
+    #[expect(dead_code)]
     fn role(&self) -> &str {
         match self {
             OpenAIChatMessage::UserString { role, .. } => role,
@@ -241,7 +242,7 @@ pub enum OpenAIChatEvent {
 // ---------------------------------------------------------------------------
 
 /// Opaque state carried across `step()` calls for Chat Completions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OpenAIChatState {
     /// Accumulated SSE data buffer.
     buffer: String,
@@ -256,17 +257,6 @@ pub struct OpenAIChatState {
     pending_tool_calls: HashMap<u64, (Option<String>, Option<String>, String)>,
 }
 
-impl Default for OpenAIChatState {
-    fn default() -> Self {
-        Self {
-            buffer: String::new(),
-            accumulated_usage: None,
-            done: false,
-            started: false,
-            pending_tool_calls: HashMap::new(),
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Helper: map ToolChoice to OpenAI tool_choice value
@@ -535,12 +525,9 @@ impl Protocol for OpenAiChatProtocol {
         // Try to extract complete SSE frames from the buffer.
         let mut events: Vec<OpenAIChatEvent> = Vec::new();
 
-        loop {
+        while let Some(pos) = state.buffer.find("\n\n").map(|pos| pos + 2) {
             // Find the next double-newline that delimits an SSE frame.
-            let frame_end = match state.buffer.find("\n\n").map(|pos| pos + 2) {
-                Some(pos) => pos,
-                None => break, // need more data
-            };
+            let frame_end = pos;
 
             let raw_frame = state.buffer[..frame_end].to_string();
             state.buffer.drain(..frame_end);
@@ -586,21 +573,21 @@ impl Protocol for OpenAiChatProtocol {
                 let delta = &choice.delta;
 
                 // Text content delta.
-                if let Some(text) = &delta.content {
-                    if !text.is_empty() {
-                        events.push(OpenAIChatEvent::TextDelta {
-                            delta: text.clone(),
-                        });
-                    }
+                if let Some(text) = &delta.content
+                    && !text.is_empty()
+                {
+                    events.push(OpenAIChatEvent::TextDelta {
+                        delta: text.clone(),
+                    });
                 }
 
                 // Reasoning content delta (non-standard, used by some providers).
-                if let Some(reasoning) = &delta.reasoning_content {
-                    if !reasoning.is_empty() {
-                        events.push(OpenAIChatEvent::ReasoningDelta {
-                            delta: reasoning.clone(),
-                        });
-                    }
+                if let Some(reasoning) = &delta.reasoning_content
+                    && !reasoning.is_empty()
+                {
+                    events.push(OpenAIChatEvent::ReasoningDelta {
+                        delta: reasoning.clone(),
+                    });
                 }
 
                 // Tool call deltas (may be multiple in one chunk, indexed).
@@ -643,14 +630,14 @@ impl Protocol for OpenAiChatProtocol {
                             }
 
                             // Accumulate arguments.
-                            if let Some(args_delta) = &func.arguments {
-                                if !args_delta.is_empty() {
-                                    entry.2.push_str(args_delta);
-                                    events.push(OpenAIChatEvent::ToolCallArgumentsDelta {
-                                        index: idx,
-                                        delta: args_delta.clone(),
-                                    });
-                                }
+                            if let Some(args_delta) = &func.arguments
+                                && !args_delta.is_empty()
+                            {
+                                entry.2.push_str(args_delta);
+                                events.push(OpenAIChatEvent::ToolCallArgumentsDelta {
+                                    index: idx,
+                                    delta: args_delta.clone(),
+                                });
                             }
                         }
                     }

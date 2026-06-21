@@ -192,7 +192,7 @@ pub enum OpenAIResponsesEvent {
 // ---------------------------------------------------------------------------
 
 /// Opaque state carried across `step()` calls for Responses API.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct OpenAIResponsesState {
     /// Accumulated SSE data buffer.
     buffer: String,
@@ -206,17 +206,6 @@ pub struct OpenAIResponsesState {
     pending_tool_calls: HashMap<String, (u64, String, String, String)>,
 }
 
-impl Default for OpenAIResponsesState {
-    fn default() -> Self {
-        Self {
-            buffer: String::new(),
-            accumulated_usage: None,
-            done: false,
-            started: false,
-            pending_tool_calls: HashMap::new(),
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Helper: extract usage from a response value
@@ -282,6 +271,7 @@ fn map_tool_choice(tc: &ToolChoice) -> Option<Value> {
 // Helper: convert ContentPart to ResponseInputItem variants
 // ---------------------------------------------------------------------------
 
+#[expect(dead_code)]
 fn content_part_to_response_item(part: &ContentPart) -> Option<ResponseInputItem> {
     match part {
         ContentPart::Text { .. } => None, // handled at message level
@@ -574,12 +564,9 @@ impl Protocol for OpenAiResponsesProtocol {
         // Try to extract complete SSE frames from the buffer.
         let mut events: Vec<OpenAIResponsesEvent> = Vec::new();
 
-        loop {
+        while let Some(pos) = state.buffer.find("\n\n").map(|pos| pos + 2) {
             // Find the next double-newline that delimits an SSE frame.
-            let frame_end = match state.buffer.find("\n\n").map(|pos| pos + 2) {
-                Some(pos) => pos,
-                None => break, // need more data
-            };
+            let frame_end = pos;
 
             let raw_frame = state.buffer[..frame_end].to_string();
             state.buffer.drain(..frame_end);
@@ -624,38 +611,38 @@ impl Protocol for OpenAiResponsesProtocol {
                 OpenAIResponsesEvent::ResponseOutputItemAdded { item, output_index } => {
                     // If this item is a function_call or custom_tool_call,
                     // initialize a pending entry for argument accumulation.
-                    if let Some(item_type) = item.get("type").and_then(|v| v.as_str()) {
-                        if matches!(item_type, "function_call" | "custom_tool_call") {
-                            if let Some(item_id) = item
-                                .get("id")
-                                .and_then(|v| v.as_str())
-                                .or_else(|| item.get("item_id").and_then(|v| v.as_str()))
-                            {
-                                let call_id = item
-                                    .get("call_id")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or(item_id)
-                                    .to_string();
-                                let name = item
-                                    .get("name")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string();
-                                let existing_arguments =
-                                    item.get("arguments").and_then(|v| v.as_str()).unwrap_or("");
-                                state.pending_tool_calls.insert(
-                                    item_id.to_string(),
-                                    (*output_index, call_id, name, existing_arguments.to_string()),
-                                );
-                            }
-                        }
+                    if let Some(item_type) = item.get("type").and_then(|v| v.as_str())
+                        && matches!(item_type, "function_call" | "custom_tool_call")
+                        && let Some(item_id) = item
+                            .get("id")
+                            .and_then(|v| v.as_str())
+                            .or_else(|| item.get("item_id").and_then(|v| v.as_str()))
+                    {
+                        let call_id = item
+                            .get("call_id")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(item_id)
+                            .to_string();
+                        let name = item
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("")
+                            .to_string();
+                        let existing_arguments =
+                            item.get("arguments").and_then(|v| v.as_str()).unwrap_or("");
+                        state.pending_tool_calls.insert(
+                            item_id.to_string(),
+                            (*output_index, call_id, name, existing_arguments.to_string()),
+                        );
+                    }
 
-                        // Mark provider-executed tools.
-                        if item_type == "web_search" || item_type == "user_location" {
-                            // Provider-executed tools: the provider handles these
-                            // without needing a separate tool call from the model.
-                            // We just pass the event through.
-                        }
+                    // Mark provider-executed tools.
+                    if let Some(item_type) = item.get("type").and_then(|v| v.as_str())
+                        && (item_type == "web_search" || item_type == "user_location")
+                    {
+                        // Provider-executed tools: the provider handles these
+                        // without needing a separate tool call from the model.
+                        // We just pass the event through.
                     }
                     events.push(event);
                 }

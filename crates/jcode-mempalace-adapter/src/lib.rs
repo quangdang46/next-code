@@ -378,7 +378,7 @@ impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
                 })
                 .collect();
             // Sort by updated_at descending for "recent"
-            entries.sort_by(|a, b| b.0.updated_at.cmp(&a.0.updated_at));
+            entries.sort_by_key(|b| std::cmp::Reverse(b.0.updated_at));
             entries.truncate(limit);
             return Ok(entries);
         }
@@ -446,7 +446,7 @@ impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
         let entries = hits
             .into_iter()
             .map(|h| {
-                let entry = jcode_memory_types::MemoryEntry {
+                jcode_memory_types::MemoryEntry {
                     embedding_model: None,
                     id: format!("mp-{}", uuid::Uuid::new_v4()),
                     category: jcode_memory_types::MemoryCategory::Fact,
@@ -464,8 +464,7 @@ impl jcode_memory_types::MemoryProvider for MempalaceAdapter {
                     reinforcements: vec![],
                     embedding: None,
                     confidence: 1.0,
-                };
-                entry
+                }
             })
             .collect();
         Ok(entries)

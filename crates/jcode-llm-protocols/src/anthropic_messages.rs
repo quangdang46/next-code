@@ -456,10 +456,10 @@ impl Protocol for AnthropicMessagesProtocol {
                     }
                     AnthropicEvent::ContentBlockDelta { index: _, delta } => {
                         // Accumulate tool call input JSON across deltas.
-                        if let AnthropicContentDelta::InputJsonDelta { partial_json } = delta {
-                            if let Some((ref _id, ref mut json_acc)) = state.pending_tool_json {
-                                json_acc.push_str(partial_json);
-                            }
+                        if let AnthropicContentDelta::InputJsonDelta { partial_json } = delta
+                            && let Some((ref _id, ref mut json_acc)) = state.pending_tool_json
+                        {
+                            json_acc.push_str(partial_json);
                         }
                         events.push(evt);
                     }

@@ -185,6 +185,7 @@ impl PluginManager {
 
     /// Derive a filesystem-safe install name from a git URL.
     /// Extracts the repo name from the last path segment (stripping `.git` suffix).
+    #[expect(dead_code)]
     fn install_name_from_url(url: &str) -> String {
         let path = url
             .strip_prefix("https://")
@@ -198,7 +199,7 @@ impl PluginManager {
         let name = path
             .split('/')
             .filter(|s| !s.is_empty())
-            .last()
+            .next_back()
             .unwrap_or("plugin");
 
         name.strip_suffix(".git").unwrap_or(name).to_owned()
