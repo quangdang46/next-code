@@ -376,6 +376,8 @@ dependencies = [
 [[package]]
 name = "asupersync"
 version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c72750f89a297f34f0daaf0eb824dbd9effcaa85a562f631109d502dbf742a3"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -1885,7 +1887,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1894,7 +1896,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3435,8 +3437,8 @@ dependencies = [
 
 [[package]]
 name = "ffs-budget"
-version = "0.1.11"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
+version = "0.1.13"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#6e1ad0e407e20ad0b3f42342dcb001ee108ff506"
 dependencies = [
  "once_cell",
  "regex",
@@ -3445,8 +3447,8 @@ dependencies = [
 
 [[package]]
 name = "ffs-engine"
-version = "0.1.11"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
+version = "0.1.13"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#6e1ad0e407e20ad0b3f42342dcb001ee108ff506"
 dependencies = [
  "ahash",
  "dashmap",
@@ -3464,8 +3466,8 @@ dependencies = [
 
 [[package]]
 name = "ffs-grep"
-version = "0.1.11"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
+version = "0.1.13"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#6e1ad0e407e20ad0b3f42342dcb001ee108ff506"
 dependencies = [
  "bstr",
  "memchr",
@@ -3473,13 +3475,13 @@ dependencies = [
 
 [[package]]
 name = "ffs-query-parser"
-version = "0.1.11"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
+version = "0.1.13"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#6e1ad0e407e20ad0b3f42342dcb001ee108ff506"
 
 [[package]]
 name = "ffs-search"
-version = "0.1.11"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
+version = "0.1.13"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#6e1ad0e407e20ad0b3f42342dcb001ee108ff506"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -3520,8 +3522,8 @@ dependencies = [
 
 [[package]]
 name = "ffs-symbol"
-version = "0.1.11"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
+version = "0.1.13"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#6e1ad0e407e20ad0b3f42342dcb001ee108ff506"
 dependencies = [
  "aho-corasick",
  "dashmap",
@@ -5427,6 +5429,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "hashline"
+version = "0.8.1"
+source = "git+https://github.com/quangdang46/hashline.git?rev=f32eeac#f32eeac97bc9c784b2b18ab687e7ebdd75b37c4c"
+dependencies = [
+ "clap",
+ "libc",
+ "memchr",
+ "memmap2 0.9.9",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tracing",
+ "tracing-subscriber",
+ "xxhash-rust",
+]
+
+[[package]]
 name = "hashlink"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5857,7 +5879,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.58.0",
+ "windows-core 0.57.0",
 ]
 
 [[package]]
@@ -6360,7 +6382,7 @@ dependencies = [
  "futures",
  "glob",
  "global-hotkey",
- "hashline",
+ "hashline 0.8.1",
  "hex",
  "ignore",
  "image",
@@ -6501,7 +6523,7 @@ dependencies = [
  "futures",
  "glob",
  "global-hotkey",
- "hashline",
+ "hashline 0.7.0",
  "hex",
  "ignore",
  "image",
@@ -13452,8 +13474,8 @@ dependencies = [
 
 [[package]]
 name = "tree-sitter-verse"
-version = "0.1.11"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#8f3771f6880eedffbabdc956dd94a4fba6235e7e"
+version = "0.1.12"
+source = "git+https://github.com/quangdang46/fast_file_search?branch=main#6e1ad0e407e20ad0b3f42342dcb001ee108ff506"
 dependencies = [
  "cc",
  "tree-sitter",
@@ -14686,7 +14708,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

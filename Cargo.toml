@@ -232,7 +232,7 @@ jcode-logging = { path = "crates/jcode-logging" }
 # OAuth
 base64 = "0.22"
 sha2 = "0.10"
-hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "1780f4b81333047323058041d3d0e64abce0c9ad", }
+hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "f32eeac", }
 rand = "0.9.3"
 hex = "0.4"
 url = "2"
@@ -515,10 +515,5 @@ async-stream = "0.3"
 # target. Feature unification applies this only to test/bench/example builds,
 # never to a normal `cargo build`/release binary.
 jcode-tui = { path = "crates/jcode-tui", features = ["test-support"] }
-
-# Patch asupersync to use the local patched copy that removes the nightly-only
-# `try_trait_v2` feature gate, enabling compilation on the stable release channel.
-[patch.crates-io]
-asupersync = { path = "crates/asupersync-patched" }
 
 [build-dependencies]
