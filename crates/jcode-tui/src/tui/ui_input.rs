@@ -1596,8 +1596,9 @@ pub(super) fn draw_input(
         return;
     }
 
-    // Compute keyword highlights for the input text
-    let highlights = compute_highlights(input_text);
+    // FIXME: compute_highlights causes OOM due to sanitized-vs-raw byte offset mismatch
+    // (commit 6950261d). Disabled until detect_keywords returns original-string positions.
+    let highlights: &[KeywordHighlight] = &[];
 
     let (all_lines, cursor_line, cursor_col) = wrap_input_text(
         input_text,
@@ -1978,7 +1979,7 @@ fn segment_to_colored_spans(
         if current_byte < hl_start {
             let end = hl_start.min(seg_byte_end);
             if end > current_byte {
-                let before = &input[current_byte..end];
+                let before = input.get(current_byte..end).unwrap_or("");
                 spans.push(Span::raw(before.to_string()));
             }
         }
@@ -1987,7 +1988,7 @@ fn segment_to_colored_spans(
         let hl_text_start = hl_start.max(seg_byte_start);
         let hl_text_end = hl_end.min(seg_byte_end);
         if hl_text_end > hl_text_start {
-            let hl_text = &input[hl_text_start..hl_text_end];
+            let hl_text = input.get(hl_text_start..hl_text_end).unwrap_or("");
             spans.push(Span::styled(
                 hl_text.to_string(),
                 Style::default().fg(Color::Rgb(r, g, b)),
@@ -1999,7 +2000,7 @@ fn segment_to_colored_spans(
 
     // Remaining text after last highlight
     if current_byte < seg_byte_end {
-        let remaining = &input[current_byte..seg_byte_end];
+        let remaining = input.get(current_byte..seg_byte_end).unwrap_or("");
         spans.push(Span::raw(remaining.to_string()));
     }
 
