@@ -30,7 +30,6 @@ pub(crate) fn handle_auth_command(app: &mut App, trimmed: &str) -> bool {
     false
 }
 
-
 pub(crate) async fn handle_account_command_remote(
     app: &mut App,
     trimmed: &str,
