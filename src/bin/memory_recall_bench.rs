@@ -17,6 +17,12 @@
 //!
 //! Run via: cargo run --profile selfdev --features dev-bins --bin memory_recall_bench -- <subcmd> ...
 
+#![allow(
+    clippy::type_complexity,
+    clippy::too_many_arguments,
+    clippy::collapsible_if
+)]
+
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -1202,7 +1208,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
             .build()?;
         let raw: Vec<(String, Vec<String>, String, usize, usize)> = rt.block_on(async {
             use futures::stream::{self, StreamExt};
-            stream::iter(jobs.into_iter())
+            stream::iter(jobs)
                 .map(|(qid, query, cands)| {
                     let model = model.clone();
                     let backend = backend.clone();
@@ -1417,7 +1423,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
             .build()?;
         let raw: Vec<(String, Vec<(String, f32)>, usize, usize)> = rt.block_on(async {
             use futures::stream::{self, StreamExt};
-            stream::iter(jobs.into_iter())
+            stream::iter(jobs)
                 .map(|(qid, query, cands)| {
                     let model = model.clone();
                     let backend = backend.clone();
@@ -1555,7 +1561,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
             .build()?;
         let raw: Vec<(String, Vec<(String, f32)>, usize, usize)> = rt.block_on(async {
             use futures::stream::{self, StreamExt};
-            stream::iter(jobs.into_iter())
+            stream::iter(jobs)
                 .map(|(qid, query, cands)| {
                     let model = model.clone();
                     async move {
@@ -2164,7 +2170,7 @@ fn cmd_gate(args: &[String]) -> Result<()> {
             Some((p, mtime))
         })
         .collect();
-    sessions.sort_by(|a, b| b.1.cmp(&a.1));
+    sessions.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     // Per-threshold tallies.
     let mut fires = vec![0usize; thresholds.len()];
@@ -2353,7 +2359,7 @@ fn cmd_gate(args: &[String]) -> Result<()> {
         }
 
         used_sessions += 1;
-        if used_sessions % 5 == 0 {
+        if used_sessions.is_multiple_of(5) {
             eprintln!("  ...{used_sessions} sessions, {total_turns} turns embedded");
         }
     }
