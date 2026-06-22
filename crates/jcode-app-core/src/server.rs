@@ -1,6 +1,7 @@
 mod await_members_state;
 mod background_tasks;
 mod client_actions;
+pub(crate) mod compaction_hooks;
 mod client_api;
 mod client_comm;
 mod client_comm_channels;

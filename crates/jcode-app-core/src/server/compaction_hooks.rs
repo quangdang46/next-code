@@ -7,10 +7,11 @@
 //! block cuối cùng của tool "todo", restore state. Zero in-memory state,
 //! fail-safe.
 
-use crate::bus::{Bus, BusEvent, TodoUpdated};
+use crate::bus::{Bus, BusEvent, TodoEvent};
 use anyhow::Result;
+
 use chrono::Utc;
-use jcode_task_types::{TodoItem, TodoStatus};
+use jcode_task_types::TodoItem;
 use serde_json::Value;
 
 /// Extract most recent todo list from message log.
@@ -66,15 +67,15 @@ fn parse_one(item: Value) -> Option<TodoItem> {
     let content = item.get("content")?.as_str()?.to_string();
     let status_str = item.get("status")?.as_str()?;
     let status = match status_str {
-        "pending" => TodoStatus::Pending,
-        "in_progress" => TodoStatus::InProgress,
-        "completed" => TodoStatus::Completed,
-        "blocked" => TodoStatus::Blocked,
+        "pending" => "pending",
+        "in_progress" => "in_progress",
+        "completed" => "completed",
+        "blocked" => "blocked",
         _ => return None,
     };
     Some(TodoItem {
         content,
-        status,
+        status: status.to_string(),
         active_form: item
             .get("active_form")
             .and_then(|v| v.as_str())
@@ -94,10 +95,9 @@ pub fn restore_todos_after_compaction(
         return Ok(Vec::new());
     }
     crate::todo::save_todos(session_id, &todos)?;
-    Bus::global().publish(BusEvent::TodoUpdated(TodoUpdated {
+    Bus::global().publish(BusEvent::TodoUpdated(TodoEvent {
         session_id: session_id.to_string(),
         todos: todos.clone(),
-        at: Utc::now(),
     }));
     Ok(todos)
 }
@@ -132,7 +132,7 @@ mod tests {
         let todos = extract_todos_from_transcript(&messages);
         assert_eq!(todos.len(), 2);
         assert_eq!(todos[0].content, "task A");
-        assert_eq!(todos[1].status, TodoStatus::InProgress);
+        assert_eq!(todos[1].status, "in_progress");
     }
 
     #[test]

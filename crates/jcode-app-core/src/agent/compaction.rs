@@ -26,6 +26,29 @@ impl Agent {
             self.note_compaction_applied();
             self.persist_session_best_effort("compaction completion");
 
+            // Restore todos from the post-compaction message log so the
+            // model retains task context after compaction. Source pattern:
+            // claude-code v1 sessionRestore.ts:extractTodosFromTranscript.
+            // Fail-safe: tracing::warn on error, never abort compaction.
+            {
+                use crate::server::compaction_hooks::restore_todos_after_compaction;
+                let messages_json: Vec<serde_json::Value> = self
+                    .session
+                    .messages_for_provider()
+                    .iter()
+                    .map(message_to_json_value)
+                    .collect();
+                if let Err(e) = restore_todos_after_compaction(
+                    &self.session.id,
+                    &messages_json,
+                ) {
+                    crate::logging::warn(&format!(
+                        "failed to restore todos after compaction for session={}: {e}",
+                        self.session.id,
+                    ));
+                }
+            }
+
             // PostCompact hook (fire-and-forget)
             let registry = self.hook_registry.clone();
             let config = self.dispatch_config.clone();
@@ -531,4 +554,12 @@ impl Agent {
             manager.push_embedding_snapshot(text);
         };
     }
+}
+
+/// Convert a stored Message to a generic JSON value for the compaction-hooks
+/// transcript scan. Shape: `{role, content}` where content is the array of
+/// content blocks (text + tool_use). Best-effort serialization; any failure
+/// yields Null and the scan simply skips that message.
+fn message_to_json_value(message: &crate::message::Message) -> serde_json::Value {
+    serde_json::to_value(message).unwrap_or(serde_json::Value::Null)
 }
