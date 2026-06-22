@@ -5,7 +5,7 @@ pub use jcode_task_types::TodoItem;
 use anyhow::Result;
 use std::path::PathBuf;
 
-use crate::bus::{self, Bus, BusEvent, TodoEvent};
+use crate::bus::{Bus, BusEvent, TodoEvent};
 use crate::storage::{self, read_json, write_json_fast};
 
 fn todo_path(session_id: &str) -> Result<PathBuf> {
