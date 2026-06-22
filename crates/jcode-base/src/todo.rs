@@ -36,3 +36,112 @@ pub fn save_todos(session_id: &str, todos: &[TodoItem]) -> Result<()> {
     }
     write_json_fast(&path, todos)
 }
+
+/// Detect close-out 3+ tasks không có verification step.
+/// Source: claude-code v1 verificationNudgeNeeded.
+///
+/// Returns true khi model vừa complete ≥3 task (chưa complete trước đó)
+/// và không có task nào chứa "verif" (case-insensitive). Khi false,
+/// tool không cần inject reminder.
+///
+/// `previous` = state trước save; `updated` = state sau save.
+pub fn needs_verification_nudge(previous: &[TodoItem], updated: &[TodoItem]) -> bool {
+    use std::collections::HashSet;
+    let was_completed: HashSet<&str> = previous
+        .iter()
+        .filter(|t| t.status == "completed")
+        .map(|t| t.content.as_str())
+        .collect();
+    let newly_completed: Vec<&TodoItem> = updated
+        .iter()
+        .filter(|t| {
+            t.status == "completed" && !was_completed.contains(t.content.as_str())
+        })
+        .collect();
+    if newly_completed.len() < 3 {
+        return false;
+    }
+    !newly_completed.iter().any(|t| {
+        t.content.to_ascii_lowercase().contains("verif")
+            || t.active_form
+                .as_deref()
+                .map(|s| s.to_ascii_lowercase().contains("verif"))
+                .unwrap_or(false)
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn item(content: &str, status: &str) -> TodoItem {
+        TodoItem {
+            content: content.into(),
+            status: status.into(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn triggers_at_3_no_verif() {
+        let prev = vec![];
+        let updated = vec![
+            item("write code", "completed"),
+            item("run lint", "completed"),
+            item("commit", "completed"),
+        ];
+        assert!(needs_verification_nudge(&prev, &updated));
+    }
+
+    #[test]
+    fn skipped_when_verif_present() {
+        let prev = vec![];
+        let updated = vec![
+            item("write code", "completed"),
+            item("run tests", "completed"),
+            item("verify build", "completed"),
+        ];
+        assert!(!needs_verification_nudge(&prev, &updated));
+    }
+
+    #[test]
+    fn counts_only_newly_completed() {
+        let prev = vec![item("old done", "completed")];
+        let updated = vec![
+            item("old done", "completed"),
+            item("new a", "completed"),
+            item("new b", "completed"),
+        ];
+        assert!(!needs_verification_nudge(&prev, &updated));
+    }
+
+    #[test]
+    fn below_threshold() {
+        let prev = vec![];
+        let updated = vec![
+            item("a", "completed"),
+            item("b", "completed"),
+        ];
+        assert!(!needs_verification_nudge(&prev, &updated));
+    }
+
+    #[test]
+    fn case_insensitive_verif() {
+        let prev = vec![];
+        let updated = vec![
+            item("Run VERIFICATION", "completed"),
+            item("b", "completed"),
+            item("c", "completed"),
+        ];
+        assert!(!needs_verification_nudge(&prev, &updated));
+    }
+
+    #[test]
+    fn active_form_counts_as_verif() {
+        let prev = vec![];
+        let mut i1 = item("a", "completed");
+        i1.active_form = Some("Verifying x".into());
+        let updated = vec![i1, item("b", "completed"), item("c", "completed")];
+        assert!(!needs_verification_nudge(&prev, &updated));
+    }
+}
