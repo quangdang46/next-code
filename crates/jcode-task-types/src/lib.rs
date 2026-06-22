@@ -198,6 +198,11 @@ fn default_pending_status() -> String {
 pub struct TodoItem {
     pub content: String,
     pub status: String,
+    /// Present-continuous form hiển thị trong spinner khi task in_progress
+    /// (e.g. "Running tests" thay vì "Run tests"). UI fallback về `content`
+    /// khi None. Optional để backward-compatible với existing JSON files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_form: Option<String>,
     pub priority: String,
     pub id: String,
     /// Optional group label. Todos that share a group are displayed together
@@ -237,4 +242,46 @@ pub struct CatchupBrief {
     pub latest_agent_response: Option<String>,
     pub needs_from_user: String,
     pub updated_at: DateTime<Utc>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn todoitem_roundtrip_with_active_form() {
+        let item = TodoItem {
+            content: "Run tests".into(),
+            status: "in_progress".into(),
+            active_form: Some("Running tests".into()),
+            priority: "high".into(),
+            id: "t1".into(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        let parsed: TodoItem = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.active_form.as_deref(), Some("Running tests"));
+        assert_eq!(parsed.content, "Run tests");
+    }
+
+    #[test]
+    fn todoitem_roundtrip_without_active_form_backs_to_none() {
+        let json = r#"{"content":"x","status":"pending","priority":"low","id":"a"}"#;
+        let parsed: TodoItem = serde_json::from_str(json).unwrap();
+        assert!(parsed.active_form.is_none());
+    }
+
+    #[test]
+    fn todoitem_active_form_absent_in_serialized_when_none() {
+        let item = TodoItem {
+            content: "x".into(),
+            status: "pending".into(),
+            active_form: None,
+            priority: "low".into(),
+            id: "a".into(),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(!json.contains("active_form"), "active_form must be skipped when None: {json}");
+    }
 }
