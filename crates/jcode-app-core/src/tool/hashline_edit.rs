@@ -94,7 +94,7 @@ async fn execute_patch(file_path: String, intent: Option<String>, patch: String,
                 let ctag = hashline_snapshots::compute_file_tag(&content);
                 if ctag != snap.hash {
                     let store = hashline_snapshots::global();
-                    let recovered = { let guard = store.read().await; try_recover(&*guard, &path, &content, &snap.hash, &edits) };
+                    let recovered = { let guard = store.read().expect("hashline snapshots lock poisoned"); try_recover(&*guard, &path, &content, &snap.hash, &edits) };
                     if let Some(rec) = recovered {
                         let mut msg = format!("Recovered {file_path}: file changed since read");
                         if !rec.warnings.is_empty() { msg.push_str(&format!(" ({})", rec.warnings.join("; "))); }
@@ -187,14 +187,18 @@ fn xxhash64(text: &str) -> u64 {
 async fn execute_old(file_path: String, intent: Option<String>, anchor: OldAnchor, old_string: Option<String>, new_string: String, ctx: ToolContext) -> Result<ToolOutput> {
     let path = ctx.resolve_path(Path::new(&file_path));
     if !path.exists() { return Err(anyhow::anyhow!("File not found: {file_path}")); }
-    let content = tokio::fs::read_to_string(&path).await?;
+    let raw = tokio::fs::read_to_string(&path).await?;
+    let le = hashline::normalize::detect_line_ending(&raw);
+    let content = hashline::normalize::normalize_to_lf(&raw);
     match anchor {
         OldAnchor::Body { line, hash } => {
             let old = old_string.as_deref().unwrap_or("");
             if old.is_empty() { return Err(anyhow::anyhow!("old_string required")); }
             if old == new_string { return Err(anyhow::anyhow!("old and new must differ")); }
             let (nc, sl, el, method) = apply_with_xxh32_fallback(&content, line, &hash, old, &new_string);
-            atomic_write(&path, &nc).await?;
+            let ft = if le == hashline::normalize::LineEnding::Crlf { hashline::normalize::restore_line_endings(&nc, le) } else { nc };
+            atomic_write(&path, &ft).await?;
+            hashline_snapshots::record(&path, &ft, None);
             publish_edit_event(&ctx, intent, &path, sl, el, None);
             Ok(ToolOutput::new(format!("Edited {file_path}: lines {sl}-{el} ({method})")).with_title(file_path))
         }
@@ -202,7 +206,9 @@ async fn execute_old(file_path: String, intent: Option<String>, anchor: OldAncho
             if old_string.is_some() { return Err(anyhow::anyhow!("old_string not supported with string anchor")); }
             let line: usize = anchor_str.split(':').next().and_then(|s| s.parse().ok()).ok_or_else(|| anyhow::anyhow!("invalid anchor: {anchor_str}"))?;
             let nc = replace_lines(&content, line.saturating_sub(1), line.saturating_sub(1), &new_string);
-            atomic_write(&path, &nc).await?;
+            let ft = if le == hashline::normalize::LineEnding::Crlf { hashline::normalize::restore_line_endings(&nc, le) } else { nc };
+            atomic_write(&path, &ft).await?;
+            hashline_snapshots::record(&path, &ft, None);
             publish_edit_event(&ctx, intent, &path, line, line, None);
             Ok(ToolOutput::new(format!("Edited {file_path}: line {line} replaced")).with_title(file_path))
         }
@@ -228,8 +234,9 @@ fn publish_edit_event(ctx: &ToolContext, intent: Option<String>, path: &Path, sl
 }
 
 fn replace_lines(content: &str, start: usize, end: usize, new_text: &str) -> String {
+    let has_trailing_nl = content.ends_with('\n');
     let lines: Vec<&str> = content.lines().collect();
-    if start >= lines.len() { let mut r = content.to_string(); if !r.ends_with('\n') { r.push('\n'); } r.push_str(new_text); return r; }
+    if start >= lines.len() { let mut r = content.to_string(); if !r.ends_with('\n') { r.push('\n'); } r.push_str(new_text); if has_trailing_nl && !r.ends_with('\n') { r.push('\n'); } return r; }
     let end = end.min(lines.len() - 1);
     let rep: Vec<&str> = new_text.lines().collect();
     let mut r = String::new();
@@ -237,6 +244,7 @@ fn replace_lines(content: &str, start: usize, end: usize, new_text: &str) -> Str
         if i >= start && i <= end { if i == start { for (j, rl) in rep.iter().enumerate() { if j > 0 { r.push('\n'); } r.push_str(rl); } } continue; }
         if i > 0 { r.push('\n'); } r.push_str(l);
     }
+    if has_trailing_nl && !r.ends_with('\n') { r.push('\n'); }
     r
 }
 

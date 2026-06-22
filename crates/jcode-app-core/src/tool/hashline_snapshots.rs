@@ -14,8 +14,7 @@
 use hashline::snapshot_store::{InMemorySnapshotStore, Snapshot, SnapshotStore};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
-use tokio::sync::RwLock;
+use std::sync::{Arc, OnceLock, RwLock};
 
 /// Default limits, matching the reference hashline store.
 const DEFAULT_MAX_PATHS: usize = 30;
@@ -46,7 +45,7 @@ pub fn global() -> Arc<RwLock<InMemorySnapshotStore>> {
 pub fn record(path: &Path, text: &str, seen_lines: Option<&[usize]>) -> String {
     let canonical = canonicalize(path);
     let store = global();
-    let mut guard = store.blocking_write();
+    let mut guard = store.write().expect("hashline snapshots lock poisoned");
     guard.record(&canonical, text, seen_lines)
 }
 
@@ -54,23 +53,27 @@ pub fn record(path: &Path, text: &str, seen_lines: Option<&[usize]>) -> String {
 pub fn head(path: &Path) -> Option<Snapshot> {
     let canonical = canonicalize(path);
     let store = global();
-    let guard = store.blocking_read();
+    let guard = store.read().expect("hashline snapshots lock poisoned");
     guard.head(&canonical)
 }
 
 /// Look up a specific snapshot version by tag.
+/// Lookup is case-insensitive — `compute_file_hash` returns lowercase hex,
+/// but `extract_tag` in hashline_edit.rs uppercases the tag before looking
+/// it up. We normalize to lowercase for the store lookup.
 pub fn by_hash(path: &Path, hash: &str) -> Option<Snapshot> {
     let canonical = canonicalize(path);
+    let lower = hash.to_lowercase();
     let store = global();
-    let guard = store.blocking_read();
-    guard.by_hash(&canonical, hash)
+    let guard = store.read().expect("hashline snapshots lock poisoned");
+    guard.by_hash(&canonical, &lower)
 }
 
 /// Merge `lines` into the seen-lines set of the snapshot identified by `hash`.
 pub fn record_seen_lines(path: &Path, hash: &str, lines: &[usize]) {
     let canonical = canonicalize(path);
     let store = global();
-    let mut guard = store.blocking_write();
+    let mut guard = store.write().expect("hashline snapshots lock poisoned");
     guard.record_seen_lines(&canonical, hash, lines);
 }
 
@@ -78,14 +81,14 @@ pub fn record_seen_lines(path: &Path, hash: &str, lines: &[usize]) {
 pub fn invalidate(path: &Path) {
     let canonical = canonicalize(path);
     let store = global();
-    let mut guard = store.blocking_write();
+    let mut guard = store.write().expect("hashline snapshots lock poisoned");
     guard.invalidate(&canonical);
 }
 
 /// Drop all snapshot history (used on session reset).
 pub fn clear() {
     let store = global();
-    let mut guard = store.blocking_write();
+    let mut guard = store.write().expect("hashline snapshots lock poisoned");
     guard.clear();
 }
 
