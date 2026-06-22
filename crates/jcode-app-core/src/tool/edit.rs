@@ -1,5 +1,6 @@
 use super::{Tool, ToolContext, ToolOutput};
 use crate::bus::{Bus, BusEvent, FileOp, FileTouch};
+use crate::tool::hashline_snapshots;
 use anyhow::Result;
 use async_trait::async_trait;
 use hashline::{anchor, document::FileContent, hash as hashline_hash};
@@ -31,6 +32,10 @@ struct EditInput {
     new_string: String,
     #[serde(default)]
     replace_all: bool,
+    /// Optional hashline tag for drift verification. When present, the current
+    /// file hash must match the snapshot before any edit is applied.
+    #[serde(default)]
+    tag: Option<String>,
 }
 
 /// Write `content` to `path` atomically via temp file + rename.

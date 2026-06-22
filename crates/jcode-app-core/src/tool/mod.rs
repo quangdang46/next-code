@@ -26,6 +26,8 @@ mod gmail;
 
 mod goal;
 mod hashline_edit;
+mod hashline_loop_guard;
+pub mod hashline_snapshots;
 mod invalid;
 mod ls;
 mod lsp;

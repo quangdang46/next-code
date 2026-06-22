@@ -1,5 +1,6 @@
 use super::{Tool, ToolContext, ToolOutput};
 use crate::bus::{Bus, BusEvent, FileOp, FileTouch};
+use crate::tool::hashline_snapshots;
 use anyhow::Result;
 use async_trait::async_trait;
 use hashline::{anchor, document::FileContent, hash as hashline_hash};
@@ -125,7 +126,7 @@ fn publish_edit_event(
 #[async_trait]
 impl Tool for HashlineEditTool {
     fn name(&self) -> &str {
-        "ffs hashline_edit"
+        "hashline_edit"
     }
 
     fn description(&self) -> &str {

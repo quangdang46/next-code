@@ -143,7 +143,7 @@ jcode-mempalace-adapter = { path = "../jcode-mempalace-adapter", optional = true
 flate2 = "1"
 tar = "0.4"
 tempfile = "3"
-hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "1780f4b81333047323058041d3d0e64abce0c9ad", }
+hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "286b5104aec108d2ddf4eb3d2c89e5c47ca5ccbc", }
 agentgrep = { git = "https://github.com/1jehuang/agentgrep.git", tag = "v0.1.3" }
 qrcode = { version = "0.14.1", default-features = false }
 # DCP integration (dynamic context pruning)

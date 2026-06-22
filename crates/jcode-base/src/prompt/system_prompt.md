@@ -9,7 +9,29 @@ Jcode is open source: <https://github.com/1jehuang/jcode>
 
 Parallelize tool calls whenever possible. Especially file reads, such as `cat`, `rg`, `sed`, `ls`, `git show`, `nl`, `wc`. Use the `batch` tool for independent parallel tool calls.
 Prefer non-interactive commands. If you run an interactive command, the command may hang waiting for interactive input, which you cannot provide. Avoid this situation.
-Try to use better alternatives to `grep`, like `agentgrep`.
+Try to use better alternatives to `grep`, like `ffs grep`, `ffs glob`, `ffs outline` or `ffs symbol`.
+
+### Hashline edit format
+
+After reading a file, the output starts with `[path#TAG]` — the TAG is a 4-hex content hash.
+When editing, include the TAG in your `hashline_edit` `patch` input so the system can verify
+the file hasn't drifted since you read it.
+
+Hashline patch format (use with `hashline_edit` or `propose_hashline` in patch mode):
+
+- `SWAP N..=M:` followed by `+<lines>` — replace lines N through M (1-indexed)
+- `DEL N` or `DEL N..=M` — delete line(s)
+- `INS.PRE N:` followed by `+<lines>` — insert before line N
+- `INS.POST N:` followed by `+<lines>` — insert after line N
+- `INS.HEAD:` / `INS.TAIL:` — insert at start/end of file
+- `SWAP.BLK N:` — replace the entire syntactic block starting at line N
+
+The optional `[path#TAG]` header at the top merges sections. Example:
+```
+[src/main.rs#A3B2]
+SWAP 2..=2:
++    println!("world");
+```
 
 ## Autonomy and persistence
 
