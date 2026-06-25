@@ -3,6 +3,30 @@
 > Based on research: Claude Code + OpenCode + Codex
 > Stack: Rust + ratatui + crossterm
 
+### ⚠️ Layout Correction (verified from source code)
+
+```
+WRONG (my initial mistake):          CORRECT (Claude Code actual):
+┌──────────────────────┐            ┌──────────────────────┐
+│ STATUS BAR (top)     │ ← WRONG   │ Messages             │
+│ Messages             │            │ ...                  │
+│ Spinner              │            │ ⠋ Thinking...        │ ← Spinner in scrollbox
+│ Input                │            │ (spacer pushes it    │
+│ Hints                │            │  to bottom)          │
+└──────────────────────┘            ├──────────────────────┤
+                                    │ ▌ Input              │
+                                    ├──────────────────────┤
+                                    │ Status line (bottom) │ ← Below input
+                                    │ Hints                │
+                                    └──────────────────────┘
+```
+
+**Key facts from Claude Code source (`FullscreenLayout.tsx`, `REPL.tsx`, `PromptInputFooter.tsx`):**
+1. **Spinner is INSIDE ScrollBox** — it scrolls with conversation (REPL.tsx:5950)
+2. **StatusLine is BELOW input** — inside PromptInputFooter (PromptInputFooter.tsx:159)
+3. **Bottom slot max 50%** — input area can't exceed half terminal (FullscreenLayout.tsx:393)
+4. **NewMessagesPill overlays** — absolute positioned at bottom of scroll area
+
 ---
 
 ## Table of Contents
@@ -40,93 +64,161 @@
 
 ## 1. Overall Layout
 
-The main TUI layout follows a vertical column structure.
+The main TUI layout follows Claude Code's exact structure.
+**Key insight:** Spinner is INSIDE the scrollable area (scrolls with conversation).
+Status line is BELOW the input box (inside PromptInputFooter).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ STATUS BAR (1 row)                                                 │
-│ claude-sonnet-4-20250514  ctx:42%  $0.12  cache:78%  ▌auto        │
-├─────────────────────────────────────────────────────────────────────┤
+│ ┌─ User ──────────────────────────────────────────────────────────┐ │
+│ │ > Fix the bug in auth.rs                                        │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
 │                                                                     │
-│ CHAT VIEWPORT (scrollable, auto-pinned to bottom)                  │
+│ ┌─ Assistant ─────────────────────────────────────────────────────┐ │
+│ │ I'll look at the auth module to find the bug.                  │ │
+│ │                                                                │ │
+│ │ ┌─ Bash ─────────────────────────────────────────────────────┐ │ │
+│ │ │ $ grep -n "validate" src/auth.rs                           │ │ │
+│ │ │ ✓ exit: 0                                                  │ │ │
+│ │ │   12: fn validate_token(token: &str) -> bool {             │ │ │
+│ │ │   45:   if !validate_expiry(expiry) {                      │ │ │
+│ │ └────────────────────────────────────────────────────────────┘ │ │
+│ │                                                                │ │
+│ │ ┌─ Edit ─────────────────────────────────────────────────────┐ │ │
+│ │ │ → Update src/auth.rs                                       │ │ │
+│ │ │   -   if !validate_expiry(expiry) {                        │ │ │
+│ │ │   +   if !validate_expiry(expiry, now) {                   │ │ │
+│ │ └────────────────────────────────────────────────────────────┘ │ │
+│ │                                                                │ │
+│ │ Fixed the bug — `validate_expiry` was missing the current      │ │
+│ │ time parameter.                                                │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
 │                                                                     │
-│  ┌─ User Message ─────────────────────────────────────────────────┐ │
-│  │ > Fix the bug in auth.rs                                      │ │
-│  └────────────────────────────────────────────────────────────────┘ │
-│                                                                     │
-│  ┌─ Assistant ────────────────────────────────────────────────────┐ │
-│  │ I'll look at the auth module to find the bug.                 │ │
-│  │                                                               │ │
-│  │ ┌─ Bash ────────────────────────────────────────────────────┐ │ │
-│  │ │ $ grep -n "validate" src/auth.rs                          │ │ │
-│  │ │ ✓ exit: 0                                                 │ │ │
-│  │ │   12: fn validate_token(token: &str) -> bool {            │ │ │
-│  │ │   45:   if !validate_expiry(expiry) {                     │ │ │
-│  │ └───────────────────────────────────────────────────────────┘ │ │
-│  │                                                               │ │
-│  │ ┌─ Edit ────────────────────────────────────────────────────┐ │ │
-│  │ │ → Update src/auth.rs                                      │ │ │
-│  │ │   -   if !validate_expiry(expiry) {                       │ │ │
-│  │ │   +   if !validate_expiry(expiry, now) {                  │ │ │
-│  │ └───────────────────────────────────────────────────────────┘ │ │
-│  │                                                               │ │
-│  │ Fixed the bug — `validate_expiry` was missing the current     │ │
-│  │ time parameter.                                               │ │
-│  └────────────────────────────────────────────────────────────────┘ │
+│ ⠋ Thinking...                          ← SPINNER (inside scrollbox)│
+│                                                     ┌────────────┐│
+│                              ┌──────────────────────│ 3 new msgs ││← Pill (overlay)
+│──────────────────────────────┴──────────────────────┴────────────┘│
+├─────────────────────────────────────────────────────────────────────┤
+│ ▌  (input area — grows with content, max 50% of terminal)          │
 │                                                                     │
 ├─────────────────────────────────────────────────────────────────────┤
-│ ⠋ Thinking...                                       (spinner row)  │
-├─────────────────────────────────────────────────────────────────────┤
-│ ▌                                                                  │
-│ (input area — grows with content)                                  │
-│                                                                    │
-├─────────────────────────────────────────────────────────────────────┤
-│ Tab:autocomplete  Ctrl+X:leader  Ctrl+O:transcript  /:commands    │
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto   ← STATUS LINE        │
+│ Tab:autocomplete  Ctrl+X:leader  Ctrl+O:transcript  /:commands     │ ← Hints
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Layout Types (Rust)
+### Vertical Stack Order (exact Claude Code structure)
+
+```
+Position  Content                     Scrolls?    Notes
+─────────────────────────────────────────────────────────────
+[1]       StickyPromptHeader          No          Only when scrolled up (1 row)
+[2]       ScrollBox                  YES         Messages + Spinner inside
+          ├─ Messages (VirtualMessageList)        Chat transcript
+          ├─ Spacer (flexGrow=1)                  Pushes spinner to bottom
+          └─ SpinnerWithVerb                      Animated spinner
+[3]       NewMessagesPill             No          Absolute overlay at bottom
+[4]       SuggestionsOverlay          No          Slash-command autocomplete
+[5]       Bottom slot (max 50%)      No          Fixed at terminal bottom
+          ├─ QueuedCommands                       If message is queued
+          ├─ PermissionDialog                     If permission pending
+          ├─ PromptInput                          Input box
+          │   ├─ Mode indicator                   Permission mode icon
+          │   ├─ TextInput                        The actual text input
+          │   ├─ Border (round)                   With model name
+          │   └─ PromptInputFooter                Below input
+          │       ├─ StatusLine                   Model/ctx/cost/cache
+          │       └─ Hints bar                    Keyboard hints
+          └─ BackgroundAgentSelector              If bg agent active
+[6]       Modal                       No          Slash-command dialogs
+```
+
+### Layout Types (Rust) — corrected
 
 ```rust
 // crates/jcode-tui/src/layout.rs
 
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
-/// Main layout computation.
+/// Main layout computation — matches Claude Code's FullscreenLayout exactly.
+///
+/// Key differences from naive layout:
+/// 1. Spinner is INSIDE the scrollable area (part of ScrollBox content)
+/// 2. Status line is BELOW the input (inside PromptInputFooter)
+/// 3. Bottom slot is capped at 50% of terminal height
+/// 4. NewMessagesPill overlays the bottom of the scroll area
 pub fn compute_main_layout(area: Rect) -> MainLayout {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),   // Status bar
-            Constraint::Min(1),     // Chat viewport (flexible)
-            Constraint::Length(1),   // Spinner (hidden when idle)
-            Constraint::Length(3),   // Composer / permission dialog
-            Constraint::Length(1),   // Footer hints
+            Constraint::Min(1),              // ScrollBox (messages + spinner inside)
+            Constraint::Length(3),            // Input area (composer)
+            Constraint::Length(1),            // Status line (inside footer)
         ])
         .split(area);
 
     MainLayout {
-        status_bar: chunks[0],
-        viewport: chunks[1],
-        spinner: chunks[2],
-        composer: chunks[3],
-        footer: chunks[4],
+        viewport: chunks[0],     // Scrollable: messages + spinner
+        composer: chunks[1],     // Fixed: input box
+        footer: chunks[2],       // Fixed: status line + hints
     }
 }
 
 pub struct MainLayout {
-    pub status_bar: Rect,
+    /// Scrollable area containing messages AND spinner.
+    /// Spinner sits at the bottom of this area (inside scroll content).
     pub viewport: Rect,
-    pub spinner: Rect,
+
+    /// Fixed input area (PromptInput).
+    /// Capped at 50% of terminal height in Claude Code.
     pub composer: Rect,
+
+    /// Status line + hints, BELOW the input.
+    /// NOT at the top of the screen.
     pub footer: Rect,
+}
+
+/// Compute the scrollable content area within the viewport.
+/// This is where messages + spinner live.
+pub fn compute_scroll_content(viewport: Rect) -> Rect {
+    // The entire viewport is scrollable
+    // Spinner is rendered at the bottom of the scroll content
+    viewport
+}
+
+/// Compute where the spinner should appear within scroll content.
+/// In Claude Code, spinner is pushed to the bottom by a flexGrow=1 spacer.
+/// In ratatui, we compute this based on total content height.
+pub fn compute_spinner_position(
+    viewport: Rect,
+    total_content_height: u16,
+) -> Option<Rect> {
+    // If content doesn't fill the viewport, spinner is at the bottom
+    // If content overflows, spinner is below the last message
+    if total_content_height < viewport.height {
+        // Content doesn't fill viewport — spinner at bottom
+        Some(Rect {
+            x: viewport.x,
+            y: viewport.y + total_content_height,
+            width: viewport.width,
+            height: 1,
+        })
+    } else {
+        // Content overflows — spinner is below visible area (user scrolls to see it)
+        Some(Rect {
+            x: viewport.x,
+            y: viewport.y + viewport.height, // just below visible
+            width: viewport.width,
+            height: 1,
+        })
+    }
 }
 
 /// With side panel (optional, toggled):
 ///
 /// ┌────────────────────────────┬──────────────┐
 /// │ Main Column                │ Side Panel   │
-/// │ (status+viewport+composer) │ (pinned/     │
+/// │ (viewport+composer+footer) │ (pinned/     │
 /// │                            │  mermaid/    │
 /// │                            │  workspace)  │
 /// └────────────────────────────┴──────────────┘
@@ -147,11 +239,19 @@ pub fn compute_layout_with_panel(area: Rect, panel_width: u16) -> (MainLayout, R
 
 ---
 
-## 2. Status Bar
+## 2. Status Line
+
+**Position: BELOW the input box** (inside PromptInputFooter, NOT at the top of the screen).
+
+This is the actual Claude Code layout:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ claude-sonnet-4-20250514  ctx:42%  $0.12  cache:78%  ▌auto        │
+│ ▌ Fix the bug in auth.rs                                          │ ← Input box
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto                        │ ← Status line
+│ Tab:autocomplete  Ctrl+X:leader  Ctrl+O:transcript  /:commands    │ ← Hints
 └─────────────────────────────────────────────────────────────────────┘
 
   ↑ model name          ↑ context %   ↑ cost   ↑ cache  ↑ mode
@@ -175,7 +275,11 @@ Very narrow (<40 cols):
 ### Code
 
 ```rust
-// crates/jcode-tui/src/status_bar.rs
+// crates/jcode-tui/src/status_line.rs
+//
+// NOTE: This is the STATUS LINE, positioned BELOW the input box.
+// It is part of PromptInputFooter (Claude Code: PromptInputFooter.tsx:159).
+// NOT at the top of the screen.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -183,7 +287,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use jcode_tui_style::Theme;
 
-pub struct StatusBarState {
+pub struct StatusLineState {
     pub model_name: String,
     pub context_percent: f64,      // 0.0 - 1.0
     pub cost_dollars: f64,
@@ -200,7 +304,9 @@ pub enum PermissionMode {
     BypassPermissions,
 }
 
-pub fn render_status_bar(state: &StatusBarState, theme: &Theme, area: Rect, buf: &mut Buffer) {
+/// Render the status line — positioned BELOW the input box.
+/// Part of PromptInputFooter.
+pub fn render_status_line(state: &StatusLineState, theme: &Theme, area: Rect, buf: &mut Buffer) {
     let width = area.width as usize;
     let mut spans = Vec::new();
 
@@ -1798,48 +1904,65 @@ impl ChatComposer {
 
 ## 16. Spinner States
 
+**Position: INSIDE the ScrollBox** (scrolls with conversation).
+Pushed to bottom by a spacer when content doesn't fill the viewport.
+
 ```
 Idle:
 (empty)
 
-Thinking:
-⠋ Thinking...
+Thinking (inside scrollbox, pushed to bottom):
+┌─────────────────────────────────────────────────────────────────────┐
+│ > Fix the bug in auth.rs                                          │
+│                                                                    │
+│ I'll look at the auth module...                                    │
+│                                                                    │
+│                                                                    │
+│ ⠋ Thinking...                       ← spinner at bottom of scroll  │
+└─────────────────────────────────────────────────────────────────────┘
 
 Tool running:
-⚙ Running Bash...
+│ ⠋ Running Bash...                                                  │
 
 Agent spawning:
-🔱 Spawning sub-agent...
+│ 🔱 Spawning sub-agent...                                           │
 
 Waiting for network:
-⏳ Waiting for network...
+│ ⏳ Waiting for network...                                          │
 
 Permission pending:
-🔐 Awaiting permission...
+│ 🔐 Awaiting permission...                                          │
 
 Streaming:
-⚙ Streaming response...
+│ ⠋ Streaming response...                                            │
 
 Compact (during tool output):
-·
+│ ·                                                                   │
 
 Hook executing:
-⚡ Running hook...
+│ ⚡ Running hook...                                                  │
 
 Agent delegating:
-📤 Delegating...
+│ 📤 Delegating...                                                   │
 
 Brief (quick operations):
-✨
+│ ✨                                                                  │
 
 Speculation:
-🔮 Speculating...
+│ 🔮 Speculating...                                                  │
 ```
 
 ### Code
 
 ```rust
 // crates/jcode-tui-style/src/spinner.rs
+//
+// NOTE: The spinner is rendered INSIDE the ScrollBox (scrollable area).
+// It sits at the very bottom of the scroll content, pushed there by
+// a flexGrow=1 spacer. It SCROLLS with the conversation.
+//
+// Claude Code source: REPL.tsx:5950 — SpinnerWithVerb is inside ScrollBox.
+// This is different from a fixed spinner at the bottom of the screen.
 
 /// Animated braille spinner frames.
 pub const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
@@ -2364,28 +2487,29 @@ impl BottomPaneView for SessionPicker {
 
 ## 21. Footer / Hints Bar
 
-```
-Normal (wide terminal):
+**Position: Below the status line** (at the very bottom of the screen).
+Part of PromptInputFooter.
 
+```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ Tab:autocomplete  Ctrl+X:leader  Ctrl+O:transcript  /:commands    │
+│ ▌ Fix the bug in auth.rs                                          │ ← Input
+├─────────────────────────────────────────────────────────────────────┤
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto                        │ ← Status
+│ Tab:autocomplete  Ctrl+X:leader  Ctrl+O:transcript  /:commands    │ ← Hints
 └─────────────────────────────────────────────────────────────────────┘
+                ↑ Status + Hints are BOTH below the input
 
 Narrow terminal (progressive collapse):
 
 ┌─────────────────────────────────────────────────────────────┐
+│ sonnet-4  42%  $0.12  auto                                  │
 │ Ctrl+O:transcript  /:commands                               │
 └─────────────────────────────────────────────────────────────┘
-
-Very narrow:
-
-┌─────────────────────────────────────┐
-│ /:commands                         │
-└─────────────────────────────────────┘
 
 Leader key pressed:
 
 ┌─────────────────────────────────────────────────────────────────────┐
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto                        │
 │ n:new session  o:transcript  t:todos  r:search  ...               │
 └─────────────────────────────────────────────────────────────────────┘
 
@@ -2393,6 +2517,7 @@ Queue active:
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │ [1 queued] Tab:send next  Enter:submit                            │
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto                        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
