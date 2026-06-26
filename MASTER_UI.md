@@ -32,7 +32,7 @@ WRONG (my initial mistake):          CORRECT (Claude Code actual):
 ## Table of Contents
 
 1. [Overall Layout](#1-overall-layout)
-2. [Status Bar](#2-status-bar)
+2. [Status Line](#2-status-line)
 3. [Chat Viewport](#3-chat-viewport)
 4. [User Message](#4-user-message)
 5. [Assistant Message (Text)](#5-assistant-message-text)
@@ -59,6 +59,17 @@ WRONG (my initial mistake):          CORRECT (Claude Code actual):
 26. [Error State](#26-error-state)
 27. [Splash / Empty State](#27-splash--empty-state)
 28. [Onboarding Flow](#28-onboarding-flow)
+29. [Sub-Agent Delegation Flow](#29-sub-agent-delegation-flow)
+30. [Shell / Interactive Terminal](#30-shell--interactive-terminal)
+31. [Agent Team / Coordination UI](#31-agent-team--coordination-ui)
+32. [Background Tasks / Progress Panel](#32-background-tasks--progress-panel)
+33. [Usage / Cost Overlay](#33-usage--cost-overlay)
+34. [Copy Selection Mode](#34-copy-selection-mode)
+35. [Workspace Map (Niri-style)](#35-workspace-map-niri-style)
+36. [Toast Notifications](#36-toast-notifications)
+## Appendix D: [Per-Tool UI Matrix](#appendix-d-per-tool-ui-matrix)
+## Appendix E: [Edge Cases & Error Handling](#appendix-e-edge-cases--error-handling)
+## Appendix F: [Animation Reference](#appendix-f-animation-reference)
 
 ---
 
@@ -2976,4 +2987,537 @@ Transcript overlay:
 
 ▌ cursor                   Input cursor (blinks)
 │  left border             Message left border
+```
+
+---
+
+## 29. Sub-Agent Delegation Flow
+
+This shows the flow when the coordinator spawns a sub-agent to work independently.
+
+```
+Step 1 — Coordinator decides to delegate:
+
+┌─ Agent ──────────────────────────────────────────────────────────────┐
+│ 🔱 Delegate to sub-agent-claude-sonnet-4                             │
+│                                                                      │
+│   prompt: "Research auth patterns in the codebase and               │
+│            propose a fix for the expiry bug"                         │
+│                                                                      │
+│ ⠋ Spawning sub-agent... (will appear in separate tmux pane)         │
+└─────────────────────────────────────────────────────────────────────┘
+
+Step 2 — Sub-agent running in tmux window:
+
+┌─ Agent: research-auth ───────────────────────────────────────────────┐
+│ 📤 Delegated to research-auth (tmux pane)                           │
+│ │                                                                   │
+│ ├─ Read src/auth.rs ✓ (7 lines)                                    │
+│ ├─ Grep "validate" -> 5 matches in 2 files ✓                        │
+│ ├─ Read src/token.rs ✓ (15 lines)                                  │
+│ ├─ Bash "cargo test --lib auth" ✓ exit: 0                          │
+│ │                                                                   │
+│ ⠋ Thinking... 3.2s                                                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+Step 3 — Sub-agent completed:
+
+┌─ Agent: research-auth (8.5s) ────────────────────────────────────────┐
+│ ✓ Sub-agent complete                                                │
+│   tools: 3 read, 2 grep, 1 bash                                    │
+│                                                                      │
+│   Foundings:                                                         │
+│   1. validate_expiry at src/auth.rs:45 is missing current time       │
+│   2. validate_expiry called from check_permissions at line 78        │
+│   3. Token validation works correctly                                │
+│                                                                      │
+│   Returned: "The bug is at auth.rs:45 -- validate_expiry needs      │
+│             a `now: i64` parameter"                                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+Step 4 — Coordinator continues with the result:
+
+┌─ Assistant ──────────────────────────────────────────────────────────┐
+│ Based on the sub-agent's research, the fix is straightforward:      │
+│ add a `now: i64` parameter to `validate_expiry`.                    │
+│                                                                      │
+│ ┌─ Edit ──────────────────────────────────────────────────────────┐ │
+│ │ -> Update src/auth.rs                                            │ │
+│ │   - fn validate_expiry(expiry: i64) -> bool                     │ │
+│ │   + fn validate_expiry(expiry: i64, now: i64) -> bool           │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Sub-agent Status Badge
+
+When sub-agent is running in background, a pill appears in the status line:
+
+```
+│ sonnet-4  ctx:42%  $0.12  [🔱 1 agent active]  ▌auto               │
+                               ^ shows running sub-agent count
+                               ^ clickable to expand swarm gallery
+```
+
+### Sub-agent Lifecycle States
+
+```
+States: Pending -> Spawning -> Running -> Completed | Failed | Timeout
+
++-------+----------------+------------------------------+
+| State | Icon           | Color                        |
++-------+----------------+------------------------------+
+| Queue | ...            | text_subtle                  |
+| Spawn | 🔱             | accent                       |
+| Run   | ⠋ (animated)   | accent (spinning)            |
+| Done  | ✓              | success                      |
+| Fail  | ✗              | error                        |
+| Time  | ⚠              | warning                      |
++-------+----------------+------------------------------+
+```
+
+---
+
+## 30. Shell / Interactive Terminal
+
+When the user runs a shell command (`!` prefix in composer), it shows as an interactive terminal block.
+
+```
+Running shell command:
+
+┌─ Shell ──────────────────────────────────────────────────────────────┐
+│ $ cargo build --release                                              │
+│                                                                    │
+│    Compiling jcode-tui v0.1.0                                        │
+│    Compiling jcode-core v0.1.0                                       │
+│    Compiling jcode v0.1.0                                            │
+│ ⠋ building... 8.5s                                                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+Completed shell (scrolling output):
+
+┌─ Shell ──────────────────────────────────────────────────────────────┐
+│ $ cargo build --release                                              │
+│ ✓ exit: 0  (12.3s)                                                  │
+│                                                                    │
+│    Compiling jcode-tui v0.1.0                                        │
+│    Compiling jcode-core v0.1.0                                       │
+│    Compiling jcode v0.1.0                                            │
+│     Finished release [optimized] target(s) in 12.3s                  │
+│                                                                    │
+│ [Use up/down to scroll output, Ctrl+C to interrupt]                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+Denied shell command:
+
+┌─ Shell ──────────────────────────────────────────────────────────────┐
+│ $ rm -rf /                                                          │
+│ ✗ Command denied by permission policy                               │
+│   Reason: Destructive command requires explicit approval             │
+└─────────────────────────────────────────────────────────────────────┘
+
+Interactive background process (e.g., server):
+
+┌─ Shell ──────────────────────────────────────────────────────────────┐
+│ $ python -m http.server 8000                                       │
+│ ⠋ running... 45.2s                                                  │
+│                                                                    │
+│   Serving HTTP on :: port 8000 (http://[::]:8000/)                  │
+│   127.0.0.1 - - [26/Jun/2026 13:42:01] "GET /" 200 -               │
+│   127.0.0.1 - - [26/Jun/2026 13:42:05] "GET /api" 200 -             │
+│                                                                    │
+│ [Background process -- type in composer to interact via stdin]      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 31. Agent Team / Coordination UI
+
+When multiple agents work together as a team (coordinator + workers), the UI shows the team overview.
+
+```
+Team overview (expanded swarm gallery):
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ ... swarm . 4 agents . 2 active                    [+] expand/collapse│
+├──────────────────┬──────────────────┬──────────────────────────────┤
+│ ★ COORDINATOR    │ ◆ worker-auth    │ ⚙ worker-test               │
+│ ─────────────── │ ─────────────── │ ─────────────────────────── │
+│ status: running  │ status: done    │ status: running              │
+│ task: orchestrate│ reads: 3        │ bash: 2/5 passed             │
+│ plan: fix auth   │ writes: 1       │ coverage: +12%               │
+├──────────────────┼──────────────────┼──────────────────────────────┤
+│ ☆ worker-search  │                  │                              │
+│ ─────────────── │  (+1 more)       │                              │
+│ status: idle     │                  │                              │
+│ result: 2 files  │                  │                              │
+│ matched          │                  │                              │
+└──────────────────┴──────────────────┴──────────────────────────────┘
+                 ^ role icons:
+                   ★ = coordinator
+                   ◆ = researcher/agent
+                   ⚙ = worker
+                   ☆ = search specialist
+```
+
+### Team Task DAG
+
+When viewing task dependencies:
+
+```
+┌─ Coordinator ─────────────────────────────────────────────────────────┐
+│ Task DAG for "Fix auth bug"                                          │
+│                                                                      │
+│          ┌──────────┐                                                │
+│          │ Research  │ ◄── done                                       │
+│          │ patterns  │                                                │
+│          └────┬─────┘                                                │
+│               │ depends on                                           │
+│          ┌────▼─────┐    ┌──────────┐                                │
+│          │ Propose   │    │ Add tests│ ◄── blocked (waiting)          │
+│          │ fix       │    └──────────┘                                │
+│          └────┬─────┘                                                │
+│               │                                                      │
+│          ┌────▼─────┐    ┌──────────┐                                │
+│          │ Implement │    │ Refactor  │ ◄── ready (will start next)    │
+│          │ fix       │    │ token    │                                │
+│          └──────────┘    └──────────┘                                │
+│                                                                      │
+│ [1/6 ready  3/6 running  1/6 done  1/6 blocked]                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+Status colors for DAG nodes:
+  ready  = dimmed border
+  active = accent (animated border)
+  done   = success ✓
+  block  = warning ⚠
+  cycle  = error ✗
+```
+
+### Team Info Widget
+
+Shown in side panel when team is active:
+
+```
+┌────────────────────────────────────────────────┬─────────────────────┐
+│ Chat area                                      │ Team Info          │
+│                                                │ ───────────────── │
+│                                                │ ★ coordinator      │
+│                                                │   Model: sonnet-4  │
+│                                                │   Status: ● running │
+│                                                │                    │
+│                                                │ ◆ worker-auth      │
+│                                                │   Model: sonnet-4  │
+│                                                │   Status: ● done   │
+│                                                │   Result: found    │
+│                                                │                    │
+│                                                │ ◆ worker-test      │
+│                                                │   Model: sonnet-4  │
+│                                                │   Status: ● running│
+│                                                │                    │
+│                                                │ [f] focus [e] view │
+└────────────────────────────────────────────────┴─────────────────────┘
+```
+
+### Role Glyphs
+
+```
++──────────+──────────────────+─────────────────────────────────────+
+| Glyph    | Role             | Purpose                             |
++──────────+──────────────────+─────────────────────────────────────+
+| ★       | Coordinator      | Orchestrates the team, delegates    |
+| ◆       | Researcher       | Gathers information, reads code     |
+| ⚙       | Worker           | Executes tasks, writes code         |
+| ☆       | Search agent     | Specialized in glob/grep/search     |
+| ◇       | Reviewer         | Reviews code, proposes changes      |
+| ⊞       | Planner          | Creates implementation plans        |
+| ◎       | Observer         | Monitors progress, reports status   |
++──────────+──────────────────+─────────────────────────────────────+
+```
+
+---
+
+## 32. Background Tasks / Progress Panel
+
+Shows long-running background tasks (agent teams, builds, tests, etc.) with progress.
+
+```
+Status line pill:
+
+│ sonnet-4  ctx:42%  $0.12  [🔱 1 active]  [⏳ 2 bg tasks]  ▌auto    │
+
+Expanded side panel (toggle with Ctrl+Shift+T or /tasks):
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Background Tasks             [+] expand/collapse                    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ▸ 🔱 Sub-agent: research-auth (40%)                                 │
+│   ═══════════════════════════════░░░░░░░░░░░░ 8.5s/20s             │
+│                                                                      │
+│   ⏳ Running concurrently:                                          │
+│     ◆ Grep "validate" -> 5 matches (0.3s)                           │
+│     ◆ Glob *.rs -> 42 matches (0.1s)                                │
+│     ◆ Read src/auth.rs (0.2s)                                       │
+│                                                                      │
+│   ⚙ worker-test (30%)                                               │
+│   ═══════════════════░░░░░░░░░░░░░░░░░ 5/15 tests                   │
+│                                                                      │
+│ ─────────────────────────────────────────────────────────────────    │
+│                                                                      │
+│ [f] focus task  [c] cancel  [e] view  up/down scroll               │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Task Progress Bar
+
+```
+States:
+
+Running:   ═══════════════░░░░░░░░░░░░░░  42%    (animated fill)
+Waiting:   ............................           (dimmed dots)
+Done:      ════════════════════════════  ✓ 100%  (green check)
+Failed:    ════════✗════════════════════         (red X, stopped at position)
+```
+
+---
+
+## 33. Usage / Cost Overlay
+
+Shown on `/usage` command or with cost pill.
+
+```
+Full usage view:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Usage Statistics                      model: claude-sonnet-4       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ This Session:                                                        │
+│   Input tokens:  42,000  ($6.30)                                    │
+│   Output tokens: 8,500   ($12.75)                                   │
+│   Cache read:    12,000  (28.6% hit rate)                           │
+│   Cache write:   3,000   ($0.45)                                    │
+│   ─────────────────────────────────────────────                     │
+│   Total:                 $19.50                                     │
+│                                                                      │
+│ Rate Limits:                                                         │
+│   Input:   ████████████████░░░░░  2,000 / 4,000 RPM                │
+│   Output:  ███████████████░░░░░░  1,500 / 3,000 RPM                │
+│                                                                      │
+│ 52-Week History:                                                     │
+│   ░░░███░████░░███░░██░░████░░                                       │
+│   ██░░████░██████░░█░░██░░█░░░░                                       │
+│                                                                      │
+│ p50 latency: 2.3s   p95 latency: 4.1s   p99 latency: 8.7s          │
+│                                                                      │
+│ [q] close                                                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Cost Pill on Status Line
+
+```
+| sonnet-4  ctx:42%  $0.12  💰 $19.50 today  cache:78%  ▌auto         |
+                          ^ cost pill -- cyan/white
+                          ^ shows session total
+                          ^ resets per session
+```
+
+---
+
+## 34. Copy Selection Mode
+
+Modal mode for selecting and copying text from the transcript.
+
+```
+Activated with Shift+up or /copy:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ ⚡ COPY MODE -- press up/down to expand, Enter to copy, Esc to cancel │
+│                                                                      │
+│ ┌─ Assistant ──────────────────────────────────────────────────────┐ │
+│ │ ██ I'll analyze the auth module. Here's what I found: █████████ │ │
+│ │ ██ The bug is on line 42 -- `validate_expiry` is called        ██ │ │
+│ │ ██ without the current timestamp.                              ██ │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│ Selected range: lines 1-3  (168 chars)  [Enter to copy]             │
+└─────────────────────────────────────────────────────────────────────┘
+
+  ^ selection is highlighted (highlighted background)
+  ^ range info shown at bottom
+  ^ goal-column tracking for multi-line selection
+  ^ edge auto-scroll when cursor hits terminal boundary
+```
+
+---
+
+## 35. Workspace Map (Niri-style)
+
+Visualization of the workspace/project map in the side panel.
+
+```
+┌────────────────────────────────────────────┬────────────────────────┐
+│ Chat                                       │ Workspace Map         │
+│                                            │ ──────────────────── │
+│                                            │                       │
+│                                            │ ┌─── src/ ─────────┐ │
+│                                            │ │ ■ auth.rs        │ │
+│                                            │ │ ■ token.rs      ⬡ │ │
+│                                            │ │ ■ main.rs        │ │
+│                                            │ └──────────────────┘ │
+│                                            │ ┌── tests/ ────────┐ │
+│                                            │ │ ■ auth_test.rs   │ │
+│                                            │ └──────────────────┘ │
+│                                            │                       │
+│                                            │ ≡ 3 files modified   │
+│                                            │ ⬡ = currently open   │
+│                                            │                       │
+│                                            │ [HJKL navigate]      │
+└────────────────────────────────────────────┴────────────────────────┘
+```
+
+---
+
+## 36. Toast Notifications
+
+Non-blocking transient notifications that appear at the top of the input area.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Messages                                                           │
+│ ═══════════════════════════════════════════════════════════════════ │
+│                                                                    │
+├─────────────────────────────────────────────────────────────────────┤
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ ✓ Build successful (12.3s)                         [2s ago]     │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│ ┌─────────────────────────────────────────────────────────────────┐ │
+│ │ ⚠ Cannot connect to server. Retrying...             [5s ago]    │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                    │
+│ ▌                                                                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Toast Types
+
+```
+✓  success  -- green    (auto-dismiss 3s)
+⚠  warning  -- yellow   (auto-dismiss 5s)
+✗  error    -- red      (manual dismiss)
+ℹ  info     -- gray     (auto-dismiss 2s)
+```
+
+---
+
+## Appendix D: Per-Tool UI Matrix
+
+| Tool      | Icon | Running State                 | Success State                  | Failure State          | Color        |
+|-----------|------|-------------------------------|--------------------------------|------------------------|--------------|
+| Bash      | `$`  | ⠋ running...                 | ✓ exit: 0 + output             | ✗ exit: N + stderr    | `tool_bash`  |
+| Edit      | `->` | ⠋ applying...                | ✓ Updated file.rs              | ✗ Edit failed + error  | `tool_edit`  |
+| Create    | `★`  | ⠋ creating...                | ✓ Created file.rs              | ✗ Create failed        | `success`    |
+| Read      | `->` | ⠋ reading...                 | ✓ file.rs (42 lines)           | ✗ File not found       | `tool_read`  |
+| Glob      | `☆`  | ⠋ searching...               | ☆ glob *.rs -> 42 matches      | ✗ No matches           | `info`       |
+| Grep      | `◆`  | ⠋ searching...               | ◆ grep "fn" -> 7 in 3 files    | ✗ No matches           | `info`       |
+| Agent     | `🔱` | 🔱 Spawning / ⠋ running     | ✓ Sub-agent complete (8.5s)    | ✗ Failed: timeout     | `accent`     |
+| Shell     | `$`  | ⠋ running... (live stream)  | ✓ exit: 0  (12.3s)             | ✗ exit: 1 + error      | `tool_bash`  |
+| WebFetch  | `🌐` | ⠋ fetching url...            | ✓ Fetched (1,234 bytes)        | ✗ Connection error     | `info`       |
+| WebSearch | `🔍` | ⠋ searching web...           | 🔍 "query" -> 5 results        | ✗ No results           | `info`       |
+| Question  | `?`  | ⠋ asking...                  | ? Answered                     | ✗ No answer            | `warning`    |
+| TodoWrite | `☐`  | ⠋ writing todos...           | ☑ 3 todos updated              | ✗ Write failed          | `info`       |
+| Task      | `⊞`  | ⠋ executing task...          | ⊞ Task complete (3/3 steps)    | ✗ Task failed           | `accent`     |
+| ApplyPatch| `->` | ⠋ applying patch...          | ✓ Patch applied (3 files)      | ✗ Patch rejected        | `tool_edit`  |
+
+---
+
+## Appendix E: Edge Cases & Error Handling
+
+### What happens when...
+
+```
+1. Terminal too small (< 60x15):
+   -> Show warning: "Terminal too small -- please resize to at least 60x15"
+   -> Only show messages, hide status line
+   -> Keep input functional
+
+2. Network disconnect:
+   -> Spinner: ⏳ Reconnecting... (attempt 2/5)
+   -> Status line shows ⚠ disconnected
+   -> Messages still visible, cannot submit
+
+3. API rate limited:
+   -> Error cell: ✗ Rate limited. Retry after 30s
+   -> Status line: 🕐 rate limited -- 28s remaining
+   -> Auto-retry countdown shown
+
+4. Token overflow (> 200K context):
+   -> Status line goes red: ctx:98% 🔴
+   -> Warning in transcript: ⚠ Context limit approaching
+   -> Auto-prompt for /compact or fork
+
+5. Permission timeout:
+   -> Permission dialog auto-denies after 60s
+   -> Shows: ⏰ Timed out -- approval not received in time
+
+6. User shell interrupt (Ctrl+C):
+   -> Shell cell shows: 💀 Killed by user (SIGINT)
+   -> Still showed in transcript for reference
+
+7. Terminal resize during streaming:
+   -> Cells recompute desired_height()
+   -> Scroll position adjusted
+   -> Spinner continues smoothly
+
+8. Multiple sub-agents return simultaneously:
+   -> Each appears as separate SubAgentCell
+   -> Ordered by completion time
+   -> Coordinator synthesis shown at end
+
+9. Background process orphaned:
+   -> Shell cell shows: ⏳ Process still running (PID 12345)
+   -> Allows typing more input to interact
+   -> Kill button available when focused
+
+10. Session fork in progress:
+    -> Indicator in status: 🚧 Forking session...
+    -> Original session still accessible
+    -> New session opens automatically when ready
+```
+
+---
+
+## Appendix F: Animation Reference
+
+### Spinner Animation Frames
+
+```rust
+// Braille spinner (10 frames, 12.5 FPS, 80ms per frame)
+pub const SPINNER_FRAMES: &[&str] = &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+// Progress bar animation (running state)
+// Animated fill moving from left to right, wrapping around:
+// ═══░░░░░░░░░░░░░░   ->   ░═══░░░░░░░░░░░   ->   ░░░═══░░░░░░░░  ...
+
+// Blinking cursor (500ms interval)
+// ▌ (shown)  ->  (hidden, 300ms)  ->  ▌ (shown)
+
+// Shimmer effect (cosine-based sweep, 2s period):
+// Periodically draws a bright bar sweeping across header text.
+```
+
+### Timing & Performance Targets
+
+```
+Frame rate:    120 FPS max  (8.33ms per frame)
+Spinner tick:  80ms per frame (12.5 FPS for smooth animation)
+Cursor blink:  500ms on / 300ms off
+Toast dismiss: 2-5 seconds depending on type
+Permission timeout: 60 seconds
+Leader key timeout: 2000ms
+Resize reflow: < 50ms
+Cache TTL for rendered content: 2 full frames
 ```
