@@ -67,9 +67,48 @@ WRONG (my initial mistake):          CORRECT (Claude Code actual):
 34. [Copy Selection Mode](#34-copy-selection-mode)
 35. [Workspace Map (Niri-style)](#35-workspace-map-niri-style)
 36. [Toast Notifications](#36-toast-notifications)
+37. [Model Picker](#37-model-picker)
+38. [Todos / Task Management Panel](#38-todos--task-management-panel)
+39. [File Tree Sidebar](#39-file-tree-sidebar)
+40. [Configurator / Settings Dialog](#40-configurator--settings-dialog)
+41. [Plugin Manager](#41-plugin-manager)
+42. [Git Info Widget](#42-git-info-widget)
+43. [Changelog Dialog](#43-changelog-dialog)
+44. [Account Picker](#44-account-picker)
+45. [Notification Center](#45-notification-center)
+46. [Memory Tiles](#46-memory-tiles)
+47. [Timeline / Session History](#47-timeline--session-history)
+48. [Experiment Popup](#48-experiment-popup)
+49. [Side Conversations](#49-side-conversations--fork-threads)
+50. [Backtrack / Rollback](#50-backtrack--undo-rollback)
+51. [Request User Input](#51-request-user-input-overlay)
+52. [@-Mentions Popup](#52--mentions-popup)
+53. [Plan Mode](#53-plan-mode)
+54. [Goal / Task Tracking](#54-goal--task-tracking)
+55. [Turn Metrics / Separator](#55-turn-metrics--worked-for-separator)
+56. [Keypress Debug Inspector](#56-keypress-debug-inspector)
+57. [Service Tier Selection](#57-service-tier-selection)
+58. [Raw Output / Accessibility](#58-raw-output-mode--accessibility)
+59. [Terminal Pets](#59-terminal-pets)
+60. [Collaboration Modes](#60-collaboration-modes)
+61. [Reasoning Effort Picker](#61-reasoning-effort-picker)
+62. [Interactive Keybinding Editor](#62-interactive-keybinding-editor)
+63. [Copy Agent Response](#63-copy-agent-response-copy)
+64. [Image Paste](#64-image-paste-ctrlaltv)
+65. [Terminal Title Configuration](#65-terminal-title-configuration-title)
+66. [Auto-Review Denials](#66-auto-review-denials-approve)
+67. [Desktop Notifications](#67-desktop-notifications)
+68. [Code Review Setup](#68-code-review-setup-review)
+69. [Model Migration Dialog](#69-model-migration-dialog)
+70. [Personality Picker](#70-personality-picker)
+71. [IDE Context Integration](#71-ide-context-integration-ide)
+72. [Plan Mode Nudge](#72-plan-mode-nudge)
+73. [Safety Buffering Status](#73-safety-buffering-status)
 ## Appendix D: [Per-Tool UI Matrix](#appendix-d-per-tool-ui-matrix)
 ## Appendix E: [Edge Cases & Error Handling](#appendix-e-edge-cases--error-handling)
 ## Appendix F: [Animation Reference](#appendix-f-animation-reference)
+## Appendix G: [Complete Feature Inventory](#appendix-g-complete-feature-inventory)
+## Appendix H: [Codex Missing Features](#appendix-h-codex-missing-features-summary)
 
 ---
 
@@ -1661,6 +1700,89 @@ impl BottomPaneView for BashPermissionDialog {
   ↑ green for additions, red for deletions
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/permission_dialog/edit_permission.rs
+
+use crate::bottom_pane::{BottomPaneResult, BottomPaneView};
+use jcode_tui_core::keymap::KeyCombo;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub struct EditPermissionDialog {
+    file_path: String,
+    diff_lines: Vec<DiffLine>,
+    selected: usize,
+    choices: Vec<(&'static str, &'static str)>,
+    show_debug: bool,
+}
+
+struct DiffLine { line_num: Option<u32>, sign: char, content: String }
+
+impl EditPermissionDialog {
+    pub fn new(file_path: String, diff: String) -> Self {
+        let diff_lines: Vec<DiffLine> = diff.lines().map(|l| {
+            let (sign, content) = match l.chars().next() {
+                Some('+') => ('+', l[1..].to_string()),
+                Some('-') => ('-', l[1..].to_string()),
+                _ => (' ', l.to_string()),
+            };
+            DiffLine { line_num: None, sign, content }
+        }).collect();
+        Self { file_path, diff_lines, selected: 0, choices: vec![("y","Allow"),("a","Always Allow"),("n","Deny")], show_debug: false }
+    }
+}
+
+impl BottomPaneView for EditPermissionDialog {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        buf.set_line(area.x, y, &Line::from(vec![
+            Span::styled("🔐 ", Style::default().fg(theme.warning.into())),
+            Span::styled("Permission required", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD)),
+        ]), area.width); y += 2;
+
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled("Edit wants to modify:", Style::default().fg(theme.text_muted.into()))]), area.width); y += 1;
+        buf.set_line(area.x + 2, y, &Line::from(vec![
+            Span::styled("→ ", Style::default().fg(theme.tool_edit.into())),
+            Span::styled(&self.file_path, Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD)),
+        ]), area.width - 4); y += 2;
+
+        for dl in self.diff_lines.iter().take(6) {
+            if y >= area.y + area.height - 4 { break; }
+            let color = match dl.sign { '+' => theme.diff_added, '-' => theme.diff_removed, _ => theme.text_muted };
+            let prefix = if dl.sign == ' ' { " " } else { &dl.sign.to_string() };
+            buf.set_line(area.x + 2, y, &Line::from(vec![
+                Span::styled(format!(" {}{}", prefix, dl.content), Style::default().fg(color.into())),
+            ]), area.width - 4); y += 1;
+        }
+        if self.diff_lines.len() > 6 {
+            buf.set_line(area.x + 2, y, &Line::from(vec![
+                Span::styled(format!("... {} more diff lines", self.diff_lines.len() - 6), Style::default().fg(theme.text_subtle.into())),
+            ]), area.width - 4); y += 1;
+        }
+        y += 1;
+
+        let mut spans = Vec::new();
+        for (i, (key, label)) in self.choices.iter().enumerate() {
+            let style = if i == self.selected { Style::default().fg(theme.background.into()).bg(theme.accent.into()).add_modifier(Modifier::BOLD) } else { Style::default().fg(theme.text_muted.into()) };
+            spans.push(Span::styled(format!(" [{}] {} ", key, label), style));
+        }
+        buf.set_line(area.x, y, &Line::from(spans), area.width);
+    }
+
+    fn handle_key_event(&mut self, key: &KeyCombo) -> bool {
+        match key.key.as_str() { "y" => { self.selected = 0; true } "a" => { self.selected = 1; true } "n" => { self.selected = 2; true } "d" if key.ctrl => { self.show_debug = !self.show_debug; true } "left" | "h" => { self.selected = (self.selected + 2) % 3; true } "right" | "l" => { self.selected = (self.selected + 1) % 3; true } _ => false }
+    }
+    fn completion(&self) -> Option<BottomPaneResult> { Some(BottomPaneResult::Approved { choice: ["allow","allow_always","deny"][self.selected].into() }) }
+    fn handle_ctrl_c(&mut self) -> BottomPaneResult { BottomPaneResult::Cancelled }
+    fn view_id(&self) -> &str { "permission_edit" }
+}
+```
+
 ---
 
 ## 14. Permission Dialog — Read
@@ -1678,6 +1800,109 @@ impl BottomPaneView for BashPermissionDialog {
 
   ↑ simpler than Bash/Edit — just shows file path
   ↑ no diff preview needed
+```
+
+### Code — ReadPermissionDialog
+
+```rust
+// crates/jcode-tui/src/bottom_pane/permission_dialog/read_permission.rs
+
+use crate::bottom_pane::{BottomPaneResult, BottomPaneView};
+use jcode_tui_core::keymap::KeyCombo;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub struct ReadPermissionDialog {
+    file_path: String,
+    selected: usize,
+    choices: Vec<(&'static str, &'static str)>,
+}
+
+impl ReadPermissionDialog {
+    pub fn new(file_path: String) -> Self {
+        Self {
+            file_path,
+            selected: 0,
+            choices: vec![("y", "Allow"), ("a", "Always Allow"), ("n", "Deny")],
+        }
+    }
+}
+
+impl BottomPaneView for ReadPermissionDialog {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+
+        // Header
+        let header = Line::from(vec![
+            Span::styled("🔐 ", Style::default().fg(theme.warning.into())),
+            Span::styled("Permission required", Style::default().fg(theme.text.into())
+                .add_modifier(Modifier::BOLD)),
+        ]);
+        buf.set_line(area.x, y, &header, area.width);
+        y += 2;
+
+        // Description
+        buf.set_line(area.x, y, &Line::from(vec![
+            Span::styled("Read wants to access:", Style::default().fg(theme.text_muted.into())),
+        ]), area.width);
+        y += 1;
+
+        // File path
+        let path_line = Line::from(vec![
+            Span::styled("→ ", Style::default().fg(theme.tool_read.into())),
+            Span::styled(&self.file_path, Style::default().fg(theme.text.into())
+                .add_modifier(Modifier::BOLD)),
+        ]);
+        buf.set_line(area.x + 2, y, &path_line, area.width.saturating_sub(4));
+        y += 2;
+
+        // Choices
+        let mut spans = Vec::new();
+        for (i, (key, label)) in self.choices.iter().enumerate() {
+            let style = if i == self.selected {
+                Style::default().fg(theme.background.into()).bg(theme.accent.into())
+                    .add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(theme.text_muted.into())
+            };
+            spans.push(Span::styled(format!(" [{}] {} ", key, label), style));
+        }
+        buf.set_line(area.x, y, &Line::from(spans), area.width);
+    }
+
+    fn handle_key_event(&mut self, key: &KeyCombo) -> bool {
+        match key.key.as_str() {
+            "y" => { self.selected = 0; true }
+            "a" => { self.selected = 1; true }
+            "n" => { self.selected = 2; true }
+            "left" | "h" => {
+                self.selected = (self.selected + 2) % 3;
+                true
+            }
+            "right" | "l" => {
+                self.selected = (self.selected + 1) % 3;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    fn completion(&self) -> Option<BottomPaneResult> {
+        Some(BottomPaneResult::Approved {
+            choice: match self.selected {
+                0 => "allow".into(),
+                1 => "allow_always".into(),
+                _ => "deny".into(),
+            },
+        })
+    }
+
+    fn handle_ctrl_c(&mut self) -> BottomPaneResult { BottomPaneResult::Cancelled }
+    fn view_id(&self) -> &str { "permission_read" }
+}
 ```
 
 ---
@@ -2690,6 +2915,75 @@ Side panel showing mermaid diagram:
   ↑ toggled with Ctrl+M or /mermaid command
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/mermaid_pane.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub struct MermaidPane {
+    pub svg_data: Option<Vec<u8>>,
+    pub zoom: f64,
+    pub scroll_x: i32,
+    pub scroll_y: i32,
+    pub loading: bool,
+    pub width: u16,
+    pub height: u16,
+}
+
+impl MermaidPane {
+    pub fn new() -> Self {
+        Self { svg_data: None, zoom: 1.0, scroll_x: 0, scroll_y: 0, loading: false, width: 0, height: 0 }
+    }
+
+    pub fn set_svg(&mut self, data: Vec<u8>) {
+        self.svg_data = Some(data);
+        self.loading = false;
+    }
+
+    pub fn zoom_in(&mut self) { self.zoom = (self.zoom * 1.2).min(5.0); }
+    pub fn zoom_out(&mut self) { self.zoom = (self.zoom / 1.2).max(0.2); }
+    pub fn pan(&mut self, dx: i32, dy: i32) { self.scroll_x += dx; self.scroll_y += dy; }
+
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        // Title
+        buf.set_line(area.x + 1, y, &Line::from(vec![
+            Span::styled("Mermaid Diagram", Style::default().fg(theme.accent.into()).add_modifier(Modifier::BOLD)),
+        ]), area.width.saturating_sub(2));
+        y += 2;
+
+        if self.loading {
+            buf.set_line(area.x + 1, y, &Line::from(vec![
+                Span::styled("⠋ Rendering diagram...", Style::default().fg(theme.spinner.into())),
+            ]), area.width.saturating_sub(2));
+            return;
+        }
+
+        if self.svg_data.is_none() {
+            buf.set_line(area.x + 1, y, &Line::from(vec![
+                Span::styled("No diagram. Use /mermaid to create one.", Style::default().fg(theme.text_subtle.into())),
+            ]), area.width.saturating_sub(2));
+            return;
+        }
+
+        // Render SVG placeholder
+        buf.set_line(area.x + 1, y, &Line::from(vec![
+            Span::styled("[Diagram rendered - use Zoom/Pan to navigate]", Style::default().fg(theme.text_muted.into())),
+        ]), area.width.saturating_sub(2));
+
+        // Zoom controls
+        buf.set_line(area.x, area.y + area.height - 1, &Line::from(vec![
+            Span::styled("[+/-] zoom  ←/→ pan  [Esc] close", Style::default().fg(theme.text_subtle.into())),
+        ]), area.width);
+    }
+}
+```
 ---
 
 ## 24. Swarm Gallery (Multi-Agent)
@@ -2718,6 +3012,83 @@ Side panel showing mermaid diagram:
   ↑ overflow strip "+N more agents"
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui-render/src/swarm_gallery.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub enum AgentRole { Coordinator, Researcher, Worker, SearchAgent, Reviewer }
+
+impl AgentRole {
+    pub fn glyph(&self) -> &'static str {
+        match self { Self::Coordinator => "★", Self::Researcher => "◆", Self::Worker => "⚙", Self::SearchAgent => "☆", Self::Reviewer => "◇" }
+    }
+}
+
+pub enum AgentLifecycle { Spawning, Running, Thinking, Blocked, Failed(String), Completed, Stopped }
+
+impl AgentLifecycle {
+    pub fn color(&self, theme: &Theme) -> ratatui::style::Color {
+        match self { Self::Running => theme.success.into(), Self::Thinking => theme.accent.into(),
+            Self::Blocked => theme.warning.into(), Self::Failed(_) => theme.error.into(),
+            Self::Completed => theme.info.into(), _ => theme.text_subtle.into() }
+    }
+    pub fn dot(&self) -> &'static str { "●" }
+}
+
+pub struct AgentTile {
+    pub role: AgentRole, pub name: String, pub status: AgentLifecycle,
+    pub task: String, pub stats: String,
+}
+
+pub struct SwarmGallery {
+    pub agents: Vec<AgentTile>, pub total: usize, pub active: usize,
+}
+
+impl SwarmGallery {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        // Header
+        buf.set_line(area.x, y, &Line::from(vec![
+            Span::styled("⋯ ", Style::default().fg(theme.accent.into())),
+            Span::styled(format!("swarm · {} agents · {} active", self.total, self.active), Style::default().fg(theme.text.into())),
+        ]), area.width);
+        y += 1;
+
+        // Grid
+        let cols = (self.agents.len() as f64).sqrt().ceil() as u16;
+        let rows = (self.agents.len() as u16 + cols - 1) / cols;
+        let tw = area.width / cols.max(1);
+        let th = (area.height - 1) / rows.max(1);
+
+        for (i, a) in self.agents.iter().enumerate() {
+            let cx = area.x + (i as u16 % cols) * tw;
+            let cy = y + (i as u16 / cols) * th;
+            let color = a.status.color(theme);
+            buf.set_line(cx + 1, cy, &Line::from(vec![
+                Span::styled(format!("{} {} ", a.role.glyph(), a.name), Style::default().fg(color).add_modifier(Modifier::BOLD)),
+            ]), tw.saturating_sub(2));
+            if th > 1 {
+                buf.set_line(cx + 1, cy + 1, &Line::from(vec![
+                    Span::styled(&a.task, Style::default().fg(theme.text_muted.into())),
+                ]), tw.saturating_sub(2));
+            }
+            if th > 2 {
+                buf.set_line(cx + 1, cy + 2, &Line::from(vec![
+                    Span::styled(a.status.dot(), Style::default().fg(color)),
+                    Span::styled(format!(" {}", a.stats), Style::default().fg(theme.text_subtle.into())),
+                ]), tw.saturating_sub(2));
+            }
+        }
+    }
+}
+```
 ---
 
 ## 25. Theme Switching
@@ -2762,6 +3133,63 @@ ANSI themes (for limited terminals):
   ansi-light
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui-style/src/theme_names.rs
+
+pub static THEMES: &[(&str, &str, &str)] = &[
+    ("catppuccin-mocha", "Dark — default", "#1e1e2e"),
+    ("catppuccin-latte", "Light", "#eff1f5"),
+    ("dracula", "Dark", "#282a36"),
+    ("gruvbox-dark", "Dark", "#282828"),
+    ("gruvbox-light", "Light", "#fbf1c7"),
+    ("nord", "Dark", "#2e3440"),
+    ("tokyonight-storm", "Dark", "#24283b"),
+    ("rosepine-moon", "Dark", "#232136"),
+    ("solarized-dark", "Dark", "#002b36"),
+    ("solarized-light", "Light", "#fdf6e3"),
+    ("monokai-pro", "Dark", "#2d2a2e"),
+    ("ansi-dark", "16-color dark", "#000000"),
+    ("ansi-light", "16-color light", "#ffffff"),
+];
+
+pub fn next_theme(current: &str) -> &'static str {
+    let idx = THEMES.iter().position(|(n, _, _)| *n == current).unwrap_or(0);
+    THEMES[(idx + 1) % THEMES.len()].0
+}
+
+pub fn prev_theme(current: &str) -> &'static str {
+    let idx = THEMES.iter().position(|(n, _, _)| *n == current).unwrap_or(0);
+    THEMES[(idx + THEMES.len() - 1) % THEMES.len()].0
+}
+
+pub fn theme_description(name: &str) -> &str {
+    THEMES.iter().find(|(n, _, _)| *n == name).map(|(_, d, _)| *d).unwrap_or("Unknown")
+}
+
+pub fn render_theme_picker(current: &str, area: Rect, buf: &mut Buffer, theme: &Theme) {
+    let mut y = area.y;
+    buf.set_line(area.x, y, &Line::from(vec![
+        Span::styled("Theme: ", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD)),
+    ]), area.width);
+    y += 1;
+
+    for (name, desc, _) in THEMES {
+        if y >= area.y + area.height { break; }
+        let is_current = *name == current;
+        let prefix = if is_current { "▸ " } else { "  " };
+        let style = if is_current { Style::default().fg(theme.accent.into()).add_modifier(Modifier::BOLD) }
+                    else { Style::default().fg(theme.text_muted.into()) };
+        buf.set_line(area.x, y, &Line::from(vec![
+            Span::styled(prefix, style),
+            Span::styled(name, style),
+            Span::styled(format!("  {}", desc), Style::default().fg(theme.text_subtle.into())),
+        ]), area.width);
+        y += 1;
+    }
+}
+```
 ---
 
 ## 26. Error State
@@ -2795,6 +3223,60 @@ Permission denied:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/error_cell.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+use crate::history_cell::HistoryCell;
+
+pub struct ErrorStateCell {
+    pub title: String,
+    pub message: String,
+    pub suggestion: Option<String>,
+    pub retry_available: bool,
+}
+
+impl HistoryCell for ErrorStateCell {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+
+        let header = Line::from(vec![
+            Span::styled("✗ ", Style::default().fg(theme.error.into())),
+            Span::styled(&self.title, Style::default().fg(theme.error.into()).add_modifier(Modifier::BOLD)),
+        ]);
+        buf.set_line(area.x, y, &header, area.width);
+        y += 1;
+
+        buf.set_line(area.x, y, &Line::from(vec![
+            Span::styled(&self.message, Style::default().fg(theme.text_muted.into())),
+        ]), area.width);
+        y += 1;
+
+        if let Some(sug) = &self.suggestion {
+            buf.set_line(area.x, y, &Line::from(vec![
+                Span::styled("💡 ", Style::default().fg(theme.info.into())),
+                Span::styled(sug.as_str(), Style::default().fg(theme.info.into())),
+            ]), area.width);
+        }
+
+        if self.retry_available {
+            buf.set_line(area.x, y + 1, &Line::from(vec![
+                Span::styled("[r] retry  [Esc] dismiss", Style::default().fg(theme.text_subtle.into())),
+            ]), area.width);
+        }
+    }
+
+    fn desired_height(&self, _: u16) -> u16 {
+        2 + if self.suggestion.is_some() { 1 } else { 0 } + if self.retry_available { 1 } else { 0 }
+    }
+}
+```
 ---
 
 ## 27. Splash / Empty State
@@ -2818,6 +3300,40 @@ First launch (no messages):
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/splash.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub fn render_splash(area: Rect, buf: &mut Buffer, theme: &Theme, version: &str) {
+    let cx = area.x + area.width / 2;
+
+    // Logo
+    let logo = Line::from(vec![
+        Span::styled("jcode", Style::default().fg(theme.accent.into()).add_modifier(Modifier::BOLD)),
+    ]);
+    buf.set_line(cx.saturating_sub(3), area.y + 4, &logo, 10);
+
+    // Version
+    buf.set_line(cx.saturating_sub(4), area.y + 5, &Line::from(vec![
+        Span::styled(version, Style::default().fg(theme.text_subtle.into())),
+    ]), 10);
+
+    // Tagline
+    buf.set_line(cx.saturating_sub(15), area.y + 7, &Line::from(vec![
+        Span::styled(""What can I help you with?"", Style::default().fg(theme.text_muted.into()).add_modifier(Modifier::ITALIC)),
+    ]), 32);
+
+    // Cursor
+    buf.set_string(cx.saturating_sub(1), area.y + 9, "▌", Style::default().fg(theme.accent.into()));
+}
+```
 ---
 
 ## 28. Onboarding Flow
@@ -2862,6 +3378,78 @@ Step 3 — API Key:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/onboarding.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub enum OnboardingStep {
+    Welcome,
+    ModelSelection { selected: usize, models: Vec<String> },
+    ApiKeyInput { input: String, masked: bool },
+}
+
+pub struct OnboardingFlow {
+    pub step: OnboardingStep,
+    pub completed: bool,
+}
+
+impl OnboardingFlow {
+    pub fn new() -> Self { Self { step: OnboardingStep::Welcome, completed: false } }
+
+    pub fn advance(&mut self) {
+        self.step = match &self.step {
+            OnboardingStep::Welcome => OnboardingStep::ModelSelection { selected: 0, models: vec!["claude-sonnet-4-20250514 (fast)".into(), "claude-opus-4-20250514 (capable)".into(), "claude-haiku-4-5-20251001 (cheap)".into()] },
+            OnboardingStep::ModelSelection { .. } => OnboardingStep::ApiKeyInput { input: String::new(), masked: true },
+            OnboardingStep::ApiKeyInput { .. } => { self.completed = true; return; },
+        };
+    }
+
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        match &self.step {
+            OnboardingStep::Welcome => {
+                buf.set_line(area.x, area.y + 3, &Line::from(vec![
+                    Span::styled("Welcome to jcode", Style::default().fg(theme.accent.into()).add_modifier(Modifier::BOLD)),
+                ]), area.width);
+                buf.set_line(area.x, area.y + 5, &Line::from(vec![
+                    Span::styled("Let's set up your environment.", Style::default().fg(theme.text_muted.into())),
+                ]), area.width);
+                buf.set_line(area.x, area.y + 7, &Line::from(vec![
+                    Span::styled("[Press Enter to continue]", Style::default().fg(theme.text_subtle.into())),
+                ]), area.width);
+            }
+            OnboardingStep::ModelSelection { selected, models } => {
+                buf.set_line(area.x, area.y + 2, &Line::from(vec![
+                    Span::styled("Select your preferred model:", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD)),
+                ]), area.width);
+                for (i, model) in models.iter().enumerate() {
+                    if area.y + 4 + i as u16 >= area.y + area.height { break; }
+                    let prefix = if i == *selected { "▸ " } else { "  " };
+                    let style = if i == *selected { Style::default().fg(theme.accent.into()).add_modifier(Modifier::BOLD) }
+                                else { Style::default().fg(theme.text_muted.into()) };
+                    buf.set_line(area.x, area.y + 4 + i as u16, &Line::from(vec![
+                        Span::styled(prefix, style), Span::styled(model.as_str(), style),
+                    ]), area.width);
+                }
+            }
+            OnboardingStep::ApiKeyInput { input, masked } => {
+                buf.set_line(area.x, area.y + 3, &Line::from(vec![
+                    Span::styled("Enter your API key:", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD)),
+                ]), area.width);
+                let display = if *masked { input.chars().map(|c| if c == '-' { c } else { '•' }).collect() } else { input.clone() };
+                buf.set_string(area.x + 2, area.y + 5, &display, Style::default().fg(theme.text.into()));
+                buf.set_string(area.x + 2 + display.len() as u16, area.y + 5, "▌", Style::default().fg(theme.accent.into()));
+            }
+        }
+    }
+}
+```
 ---
 
 ## Appendix A: Color Palette (Codex Adaptive)
@@ -3076,6 +3664,69 @@ States: Pending -> Spawning -> Running -> Completed | Failed | Timeout
 +-------+----------------+------------------------------+
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/sub_agent_cell.rs
+
+use std::time::Instant;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+use crate::history_cell::HistoryCell;
+
+pub struct SubAgentCell {
+    pub id: String, pub task: String, pub model: String,
+    pub status: SubAgentStatus, pub tools_used: Vec<String>,
+    pub result: Option<String>, pub created_at: Instant,
+}
+
+pub enum SubAgentStatus { Spawning, Running { tick: u8 }, Completed, Failed(String) }
+
+impl HistoryCell for SubAgentCell {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        let inner = Rect { x: area.x + 2, width: area.width.saturating_sub(4), ..area };
+        let (icon, color) = match &self.status {
+            SubAgentStatus::Spawning => ("🔱", theme.accent.into()),
+            SubAgentStatus::Running { .. } => ("⠋", theme.accent.into()),
+            SubAgentStatus::Completed => ("✓", theme.success.into()),
+            SubAgentStatus::Failed(_) => ("✗", theme.error.into()),
+        };
+        let dur = self.created_at.elapsed().as_secs_f64();
+        buf.set_line(inner.x, y, &Line::from(vec![
+            Span::styled(format!("{} Sub-agent: {} ({})", icon, self.id, self.model), Style::default().fg(color).add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" {:.1}s", dur), Style::default().fg(theme.text_subtle.into())),
+        ]), inner.width);
+        y += 2;
+        buf.set_line(inner.x, y, &Line::from(vec![
+            Span::styled("  prompt: ", Style::default().fg(theme.text_subtle.into())),
+            Span::styled(&self.task, Style::default().fg(theme.text_muted.into())),
+        ]), inner.width);
+        y += 1;
+        if !self.tools_used.is_empty() {
+            buf.set_line(inner.x, y, &Line::from(vec![
+                Span::styled("  tools: ", Style::default().fg(theme.text_subtle.into())),
+                Span::styled(self.tools_used.join(", "), Style::default().fg(theme.text_muted.into())),
+            ]), inner.width);
+            y += 1;
+        }
+        if let Some(result) = &self.result {
+            y += 1;
+            buf.set_line(inner.x, y, &Line::from(vec![Span::styled("  Result:", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD))]), inner.width);
+            y += 1;
+            for line in result.lines().take(5) {
+                buf.set_line(inner.x + 2, y, &Line::from(Span::styled(line, Style::default().fg(theme.text_muted.into()))), inner.width);
+                y += 1;
+            }
+        }
+    }
+    fn desired_height(&self, _: u16) -> u16 { 4 + if self.result.is_some() { 2 } else { 0 } }
+    fn is_active(&self) -> bool { matches!(&self.status, SubAgentStatus::Spawning | SubAgentStatus::Running { .. }) }
+}
+```
 ---
 
 ## 30. Shell / Interactive Terminal
@@ -3130,6 +3781,47 @@ Interactive background process (e.g., server):
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/shell_cell.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+use crate::history_cell::HistoryCell;
+
+pub struct ShellCell {
+    pub command: String, pub output_lines: Vec<String>,
+    pub status: ShellStatus, pub exit_code: Option<i32>,
+    pub duration: Option<std::time::Duration>,
+}
+pub enum ShellStatus { Running, Success, Error(String), Denied(String), Killed(String) }
+impl HistoryCell for ShellCell {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled("$ ", Style::default().fg(theme.tool_bash.into())), Span::styled(&self.command, Style::default().fg(theme.text.into()))]), area.width);
+        y += 1;
+        match &self.status {
+            ShellStatus::Running => { buf.set_line(area.x, y, &Line::from(vec![Span::styled("⠋ running...", Style::default().fg(theme.accent.into()))]), area.width); }
+            ShellStatus::Success => { buf.set_line(area.x, y, &Line::from(vec![Span::styled("✓ exit: 0", Style::default().fg(theme.success.into()))]), area.width); }
+            ShellStatus::Error(msg) => { buf.set_line(area.x, y, &Line::from(vec![Span::styled("✗ ", Style::default().fg(theme.error.into())), Span::styled(msg.as_str(), Style::default().fg(theme.error.into()))]), area.width); }
+            ShellStatus::Denied(r) => { buf.set_line(area.x, y, &Line::from(vec![Span::styled("✗ denied", Style::default().fg(theme.warning.into())), Span::styled(format!(" - {}", r), Style::default().fg(theme.text_muted.into()))]), area.width); }
+            ShellStatus::Killed(r) => { buf.set_line(area.x, y, &Line::from(vec![Span::styled("💀 Killed: ", Style::default().fg(theme.error.into())), Span::styled(r.as_str(), Style::default().fg(theme.text_muted.into()))]), area.width); }
+        }
+        y += 1;
+        for line in self.output_lines.iter().take(50) {
+            if y >= area.y + area.height { break; }
+            buf.set_line(area.x + 2, y, &Line::from(Span::styled(line.as_str(), Style::default().fg(theme.text.into()))), area.width - 2);
+            y += 1;
+        }
+    }
+    fn desired_height(&self, _: u16) -> u16 { 2 + self.output_lines.len().min(50) as u16 }
+    fn is_active(&self) -> bool { matches!(&self.status, ShellStatus::Running) }
+}
+```
 ---
 
 ## 31. Agent Team / Coordination UI
@@ -3236,6 +3928,40 @@ Shown in side panel when team is active:
 +──────────+──────────────────+─────────────────────────────────────+
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui-render/src/team_info.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub struct TeamMember {
+    pub glyph: &'static str, pub name: String, pub model: String,
+    pub status_dot: &'static str, pub status_text: String,
+}
+pub struct TeamInfoPanel { pub members: Vec<TeamMember> }
+
+impl TeamInfoPanel {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled("Team Info", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD))]), area.width);
+        y += 2;
+        for m in &self.members {
+            if y >= area.y + area.height { break; }
+            buf.set_line(area.x, y, &Line::from(vec![
+                Span::styled(format!("{} {} ", m.glyph, m.name), Style::default().fg(theme.text.into())),
+                Span::styled(m.status_dot, Style::default().fg(theme.accent.into())),
+                Span::styled(format!(" {}", m.status_text), Style::default().fg(theme.text_muted.into())),
+            ]), area.width);
+            y += 1;
+        }
+    }
+}
+```
 ---
 
 ## 32. Background Tasks / Progress Panel
@@ -3281,6 +4007,49 @@ Done:      ═══════════════════════
 Failed:    ════════✗════════════════════         (red X, stopped at position)
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/task_progress.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+use crate::history_cell::HistoryCell;
+
+pub struct TaskProgressCell {
+    pub label: String, pub progress: f64,
+    pub elapsed: std::time::Duration, pub status: &'static str,
+    pub details: Vec<String>,
+}
+
+impl HistoryCell for TaskProgressCell {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        // Header with status
+        let status_icon = match self.status { "running" => "⏳", "success" => "✓", "failed" => "✗", _ => "⏳" };
+        let status_color = match self.status { "success" => theme.success, "failed" => theme.error, _ => theme.accent };
+        buf.set_line(area.x, y, &Line::from(vec![
+            Span::styled(format!("{} {} ({:.0}%)", status_icon, self.label, self.progress * 100.0), Style::default().fg(status_color.into()).add_modifier(Modifier::BOLD)),
+        ]), area.width);
+        y += 1;
+        // Progress bar
+        let bw = area.width.saturating_sub(14) as usize;
+        let filled = (self.progress * bw as f64) as usize;
+        let bar = format!("{} {} {:3.0}%", "═".repeat(filled), "░".repeat(bw.saturating_sub(filled)), self.progress * 100.0);
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled(bar, Style::default().fg(theme.accent.into())), Span::styled(format!(" {:.1}s", self.elapsed.as_secs_f64()), Style::default().fg(theme.text_subtle.into()))]), area.width);
+        y += 1;
+        for d in &self.details {
+            if y >= area.y + area.height { break; }
+            buf.set_line(area.x + 2, y, &Line::from(vec![Span::styled(d.as_str(), Style::default().fg(theme.text_muted.into()))]), area.width - 2);
+            y += 1;
+        }
+    }
+    fn desired_height(&self, _: u16) -> u16 { 2 + self.details.len() as u16 }
+}
+```
 ---
 
 ## 33. Usage / Cost Overlay
@@ -3325,6 +4094,51 @@ Full usage view:
                           ^ resets per session
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui-usage-overlay/src/lib.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub struct UsageOverlay {
+    pub input_tokens: u64, pub output_tokens: u64,
+    pub cache_read: u64, pub cache_write: u64,
+    pub total_cost: f64,
+}
+
+impl UsageOverlay {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled("Usage Statistics", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD))]), area.width);
+        y += 2;
+        let rows = [
+            ("Input tokens:", format!("{:>8}  (${:.2})", self.input_tokens, self.input_tokens as f64 * 0.00015)),
+            ("Output tokens:", format!("{:>8}  (${:.2})", self.output_tokens, self.output_tokens as f64 * 0.0006)),
+            ("Cache read:", format!("{:>8}", self.cache_read)),
+            ("Cache write:", format!("{:>8}", self.cache_write)),
+        ];
+        for (l, v) in &rows {
+            if y >= area.y + area.height - 2 { break; }
+            buf.set_line(area.x + 2, y, &Line::from(vec![
+                Span::styled(format!("{:<16}", l), Style::default().fg(theme.text_muted.into())),
+                Span::styled(v.as_str(), Style::default().fg(theme.text.into())),
+            ]), area.width);
+            y += 1;
+        }
+        y += 1;
+        buf.set_line(area.x + 2, y, &Line::from(vec![
+            Span::styled("Total cost:       ", Style::default().fg(theme.text_muted.into())),
+            Span::styled(format!("${:.2}", self.total_cost), Style::default().fg(theme.accent.into()).add_modifier(Modifier::BOLD)),
+            Span::styled("   [q] close", Style::default().fg(theme.text_subtle.into())),
+        ]), area.width);
+    }
+}
+```
 ---
 
 ## 34. Copy Selection Mode
@@ -3352,6 +4166,41 @@ Activated with Shift+up or /copy:
   ^ edge auto-scroll when cursor hits terminal boundary
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui-core/src/copy_selection.rs
+
+pub struct CopySelection {
+    pub active: bool,
+    pub start: CopyPoint,
+    pub end: CopyPoint,
+}
+pub struct CopyPoint {
+    pub cell_index: usize, pub line_offset: u16, pub col: u16,
+}
+
+impl CopySelection {
+    pub fn new() -> Self { Self { active: false, start: CopyPoint { cell_index: 0, line_offset: 0, col: 0 }, end: CopyPoint { cell_index: 0, line_offset: 0, col: 0 } } }
+    pub fn begin(&mut self, cell: usize, line: u16, col: u16) {
+        self.active = true;
+        self.start = CopyPoint { cell_index: cell, line_offset: line, col };
+        self.end = CopyPoint { cell_index: cell, line_offset: line, col };
+    }
+    pub fn extend(&mut self, cell: usize, line: u16, col: u16) { self.end = CopyPoint { cell_index: cell, line_offset: line, col }; }
+    pub fn cancel(&mut self) { self.active = false; }
+    pub fn selected_text(&self, get_text: &dyn Fn(usize, u16) -> String) -> String {
+        let start = std::cmp::min(self.start.cell_index, self.end.cell_index);
+        let end = std::cmp::max(self.start.cell_index, self.end.cell_index);
+        (start..=end).filter_map(|i| { let t = get_text(i, 0); if t.is_empty() { None } else { Some(t) } }).collect::<Vec<_>>().join("
+")
+    }
+    pub fn status_line(&self) -> String {
+        if !self.active { return String::new(); }
+        format!("Selected: cell {} → {}  (Enter to copy, Esc to cancel)", self.start.cell_index, self.end.cell_index)
+    }
+}
+```
 ---
 
 ## 35. Workspace Map (Niri-style)
@@ -3379,6 +4228,44 @@ Visualization of the workspace/project map in the side panel.
 └────────────────────────────────────────────┴────────────────────────┘
 ```
 
+### Code
+
+```rust
+// crates/jcode-tui-workspace/src/lib.rs
+
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub struct FileNode {
+    pub name: String, pub is_dir: bool, pub modified: bool,
+    pub children: Vec<FileNode>, pub open: bool,
+}
+
+pub struct WorkspaceMap { pub root: FileNode, pub selected: usize }
+
+impl WorkspaceMap {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled("Workspace", Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD))]), area.width);
+        y += 1;
+        self.render_node(&self.root, 0, area, &mut y, buf, theme);
+    }
+    fn render_node(&self, node: &FileNode, depth: u16, area: Rect, y: &mut u16, buf: &mut Buffer, theme: &Theme) {
+        if *y >= area.y + area.height { return; }
+        let icon = if node.is_dir { "📁" } else { "📄" };
+        let name_style = if node.modified { Style::default().fg(theme.warning.into()) } else { Style::default().fg(theme.text_muted.into()) };
+        buf.set_line(area.x + depth * 2, *y, &Line::from(vec![
+            Span::styled(format!("{} {}", icon, node.name), name_style)]), area.width);
+        *y += 1;
+        if node.is_dir && node.open {
+            for child in &node.children { self.render_node(child, depth + 1, area, y, buf, theme); }
+        }
+    }
+}
+```
 ---
 
 ## 36. Toast Notifications
@@ -3520,4 +4407,1934 @@ Permission timeout: 60 seconds
 Leader key timeout: 2000ms
 Resize reflow: < 50ms
 Cache TTL for rendered content: 2 full frames
+```
+
+---
+
+## 37. Model Picker
+
+Interactive model selection dialog.
+
+```
+Trigger: /model, Ctrl+M, or Ctrl+X M
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Select Model                                           type to filter│
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ▸ claude-sonnet-4-20250514    (fast, recommended)                   │
+│   claude-opus-4-20250514      (most capable, $3/M tokens)           │
+│   claude-haiku-4-5-20251001   (cheapest, $0.25/M tokens)           │
+│   ─────────────────────────────────────────                          │
+│   gemini-2.5-pro               (via OpenProxy)                      │
+│   gpt-4o                       (via OpenProxy)                      │
+│                                                                      │
+│ Active: claude-sonnet-4-20250514  [Ctrl+S: switch fast mode]        │
+│                                                                      │
+│ ↑/↓ navigate  Enter:select  /:filter  q:close                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/model_picker.rs
+
+pub struct ModelPicker {
+    pub models: Vec<ModelEntry>,
+    pub filtered: Vec<usize>,
+    pub selected: usize,
+    pub search: String,
+    pub on_select: Box<dyn Fn(&ModelEntry) -> bool>,
+}
+
+pub struct ModelEntry {
+    pub id: String,
+    pub display_name: String,
+    pub provider: String,
+    pub is_active: bool,
+    pub cost_hint: Option<String>,
+    pub capability: ModelCapability,
+}
+
+impl BottomPaneView for ModelPicker {
+    fn view_id(&self) -> &str { "model_picker" }
+    fn is_complete(&self) -> bool { false }
+    fn handle_key_event(&mut self, key: &KeyCombo) -> bool {
+        // ↑/↓: navigate, Enter: select, /: search
+    }
+}
+```
+
+---
+
+## 38. Todos / Task Management Panel
+
+Interactive todo list for tracking tasks.
+
+```
+Trigger: Ctrl+T or /todos
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Todos                    [+] new todo  [/] filter                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ☐ Fix the bug in auth.rs                          high  [due:today]│
+│ ☑ Add tests for keymap                   [done]    med              │
+│ ☐ Refactor token validation                        low              │
+│ ☐ Write documentation for TUI spec                  high            │
+│ ─────────────────────────────────────────────────────────────────    │
+│ 3 open · 1 done                                                     │
+│                                                                      │
+│ [a] add  [d] delete  [x] toggle  [e] edit  [p] priority            │
+│ Enter:jump to context  ↑/↓ navigate  q:close                       │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Task States
+
+```
+☐ pending    — open task (dimmed text)
+☑ done       — completed task (strikethrough + green check)
+⚠ overdue    — past due date (red)
+⏳ in-prog   — currently being worked on (accent)
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/todos_panel.rs
+
+pub struct TodosPanel {
+    pub todos: Vec<TodoItem>,
+    pub filtered: Vec<usize>,
+    pub selected: usize,
+    pub filter: String,
+    pub show_filter: bool,
+}
+
+pub struct TodoItem {
+    pub id: String,
+    pub text: String,
+    pub done: bool,
+    pub priority: Priority,
+    pub due_date: Option<chrono::NaiveDate>,
+    pub context: Option<String>, // file:line reference
+}
+
+impl BottomPaneView for TodosPanel {
+    fn view_id(&self) -> &str { "todos" }
+}
+```
+```
+
+---
+
+## 39. File Tree Sidebar
+
+Project file tree in the side panel.
+
+```
+Trigger: /files, or side panel toggle
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Files                              [@] search  [+] collapse all    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ 📁 crates/                                                          │
+│  📁 jcode-tui/                                     ~42 files        │
+│   📁 src/                                                           │
+│    📁 tui/                                                          │
+│     📄 app.rs                                    ◄ active           │
+│     📄 keybind.rs                                                   │
+│     📄 ui.rs                                      ≡ modified        │
+│     📄 mod.rs                                                       │
+│  📁 jcode-tui-core/                               ~8 files          │
+│  📁 jcode-tui-style/                              ~6 files          │
+│ 📁 docs/                                                             │
+│ 📁 tests/                                                            │
+│ 📄 Cargo.toml                                                        │
+│ 📄 README.md                                                         │
+│                                                                      │
+│ ≡ = uncommitted  ◄ = open file                                      │
+│                                                                      │
+│ [Enter] open  [j/k] navigate  [/] search  [Esc] close              │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Keybindings
+
+```
+Ctrl+P         Open file picker (search mode)
+Ctrl+W,L       Toggle file tree sidebar
+Enter          Open file in editor
+/              Filter files
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/section_39.rs
+
+pub struct FileTreeFile { pub name: String, pub is_dir: bool, pub modified: bool, pub depth: u16 } pub struct FileTreeSidebar { pub files: Vec<FileTreeFile>, pub selected: usize }
+```
+---
+
+## 40. Configurator / Settings Dialog
+
+Interactive settings editor.
+
+```
+Trigger: /config
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Configuration                                     [Ctrl+S] save     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ▸ General                                                           │
+│   Theme:         catppuccin-mocha      ▸ (select from 12 themes)    │
+│   Permission:    auto                  ▸ auto | plan | bypass       │
+│   Fast Mode:     off                   ▸ toggle                     │
+│   Language:      en                    ▸ en | vi | ja               │
+│                                                                      │
+│ ▸ Keys & Shortcuts                                                  │
+│   Keybindings:   ~/.jcode/keybinds.json   [e] edit file             │
+│   Leader Key:    Ctrl+X                  ▸ change                   │
+│   Vim Mode:      off                     ▸ toggle                   │
+│                                                                      │
+│ ▸ Providers                                                         │
+│   Anthropic:     sk-ant-***...enabled    [e] change key             │
+│   OpenProxy:     http://127.0.0.1:4623   [e] edit                   │
+│                                                                      │
+│ ↑/↓ navigate  Enter:edit  Tab:next section  q:close                │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/section_40.rs
+
+pub struct ConfigItem { pub label: String, pub current: String, pub options: Vec<String> } pub struct Configurator { pub items: Vec<ConfigItem>, pub selected: usize }
+```
+---
+
+## 41. Plugin Manager
+
+Enables/disables plugins from the TUI.
+
+```
+Trigger: /plugins
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Plugins                  ⚡ 3 enabled / 8 available                 │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ✓ jcode-pro           1.2.0    Enhanced provider support            │
+│ ✓ mermaid-rs          0.3.1    Mermaid diagram rendering            │
+│ ✓ swarm-core          0.1.0    Multi-agent orchestration           │
+│ ☐ lsp-support         0.2.0    LSP integration                      │
+│ ☐ git-blame           0.1.0    Git blame annotations                │
+│ ☐ terminal-image      0.4.0    Kitty terminal image protocol        │
+│                                                                      │
+│ [Enter] toggle  [i] info  [r] remove  [u] update  q:close          │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Plugin Details (pressing i)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Plugin Info                    mermaid-rs 0.3.1                     │
+│                                                                      │
+│ Renders Mermaid diagrams inline in the TUI using                      │
+│ the kitty terminal image protocol.                                   │
+│                                                                      │
+│ Author: jcode team                                                   │
+│ License: MIT                                                         │
+│ Source: ~/.jcode/plugins/mermaid-rs/                                 │
+│ Dependencies: none                                                    │
+│                                                                      │
+│ [d] disable  [u] uninstall  [b] back                                │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/section_41.rs
+
+pub struct PluginEntry { pub name: String, pub ver: String, pub enabled: bool, pub desc: String } pub struct PluginManager { pub plugins: Vec<PluginEntry>, pub selected: usize }
+```
+---
+
+## 42. Git Info Widget
+
+Shows current git status in the side panel or as a status line pill.
+
+```
+Side panel widget:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Git Status                                                          │
+├─────────────────────────────────────────────────────────────────────┤
+│ feat/tui-redesign          ≡ 3 files modified                       │
+│                                                                      │
+│  M  MASTER_UI.md                                                    │
+│  M  crates/jcode-tui/src/ui.rs                                     │
+│  ?? untracked_file.rs                                               │
+│                                                                      │
+│ Recent commits:                                                      │
+│  f2fc63b3  fix layout TUI                                           │
+│  a4157c0b  refactor code structure                                  │
+│                                                                      │
+│ Branch: feat/tui-redesign (ahead: 3 commits)                        │
+│                                                                      │
+│ [r] refresh  [b] branch picker                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+Status line pill:
+
+```
+│ sonnet-4  ctx:42%  $0.12  ≡ feat/tui-redesign  cache:78%  ▌auto    │
+                                ↑ git branch pill (optional)
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/section_42.rs
+
+pub struct GitInfo { pub branch: String, pub modified: Vec<String>, pub untracked: Vec<String> }
+```
+---
+
+## 43. Changelog Dialog
+
+Shows version history and changes.
+
+```
+Trigger: /changelog or on version upgrade
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Changelog                               jcode v0.1.0 (Jun 2026)    │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ v0.1.0 — Jun 26, 2026                                                │
+│                                                                      │
+│ Features:                                                            │
+│   • TUI redesign with Claude Code patterns                           │
+│   • Adaptive color system (CIE76 quantization)                       │
+│   • Per-tool UI components (Bash, Edit, Read, Agent)                 │
+│   • Context-stacked keybinding system                                │
+│   • 13-mode spinner                                                  │
+│   • Permission dialog with per-tool UIs                              │
+│                                                                      │
+│ Bug Fixes:                                                           │
+│   • validate_expiry missing current timestamp param                  │
+│   • Scroll offset reset on resize                                    │
+│                                                                      │
+│ [q] close  ↑/↓ scroll  [/] search                                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/section_43.rs
+
+pub struct ChangeEntry { pub category: String, pub items: Vec<String> } pub struct Changelog { pub entries: Vec<ChangeEntry>, pub scroll: u16 }
+```
+---
+
+## 44. Account Picker
+
+Switch between multiple API accounts.
+
+```
+Trigger: /account or Ctrl+Shift+A
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Switch Account                                                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ▸ quangdang46                 Anthropic        [active]              │
+│   work@company.com            Anthropic                              │
+│   temp-dev-account            Anthropic                              │
+│   ──────────────────────────────────                                  │
+│   openproxy                   OpenProxy       [via env var]          │
+│   + Add Account                                                     │
+│                                                                      │
+│ [Enter] switch  [d] remove  [r] rename  q:close                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/section_44.rs
+
+pub struct AccountEntry { pub name: String, pub provider: String, pub active: bool } pub struct AccountPicker { pub accounts: Vec<AccountEntry>, pub selected: usize }
+```
+---
+
+## 45. Notification Center
+
+History of system notifications.
+
+```
+Trigger: Ctrl+` (backtick) or /notifications
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Notifications                                      38 total         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ✓ Build successful                          12.3s ago    [dismiss]  │
+│ ⚠ Rate limit approaching (87%)              5m ago      [dismiss]  │
+│ ✓ Sub-agent: research-auth completed         10m ago     [dismiss]  │
+│ ℹ Session saved to ~/.jcode/last_session     15m ago     [dismiss]  │
+│ ✗ Connection lost (recovered)                1h ago      [dismiss]  │
+│                                                                      │
+│ ───── older ─────                                                     │
+│                                                                      │
+│ ✓ Tests passed: 42/42                         2h ago                 │
+│                                                                      │
+│ [d] dismiss  [a] dismiss all  ↑/↓ scroll  q:close                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Notification Types
+
+```
+Icon  Type     Color    Auto-dismiss  Sound
+✓     success  green   3s            optional
+⚠     warning  yellow  5s            optional
+✗     error    red      manual        yes
+ℹ     info     gray    2s            no
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/ui/section_45.rs
+
+pub struct NotifEntry { pub icon: &'static str, pub msg: String, pub kind: &'static str, pub age_secs: u64 }
+```
+---
+
+## 46. Memory Tiles
+
+Masonry layout showing agent memories and context entries in the side panel.
+
+```
+┌──────────────────────────────────────┬──────────────────────────────┐
+│ Chat                                 │ Memory                      │
+│                                      │ ────────────────────────── │
+│                                      │                               │
+│                                      │ ┌────────┐ ┌────────┐      │
+│                                      │ │Auth    │ │Expiry  │      │
+│                                      │ │pattern │ │fix     │      │
+│                                      │ │3 items │ │2 items │      │
+│                                      │ └────────┘ └────────┘      │
+│                                      │ ┌────────┐ ┌────────┐      │
+│                                      │ │Token   │ │User    │      │
+│                                      │ │valid   │ │prefs   │      │
+│                                      │ │1 item  │ │4 items │      │
+│                                      │ └────────┘ └────────┘      │
+│                                      │                               │
+│                                      │ [=] edit  [+] add           │
+│                                      │ [CTRL+↑/↓] reorder          │
+│                                      └──────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/widgets/memory_tiles.rs
+
+pub struct MemoryTile { pub title: String, pub entries: u32, pub content: Vec<String> }
+pub struct MemoryTilesWidget { pub tiles: Vec<MemoryTile>, pub selected: usize }
+```
+---
+
+## 47. Timeline / Session History
+
+Chronological view of all sessions in the side panel.
+
+```
+┌──────────────────────────────────────┬──────────────────────────────┐
+│ Chat                                 │ Timeline                    │
+│                                      │ ────────────────────────── │
+│                                      │                               │
+│                                      │ Jun 2026                      │
+│                                      │ ───────────────────────       │
+│                                      │  26  TUI redesign    ● done   │
+│                                      │  25  Fix auth bug    ● done   │
+│                                      │  24  Add keymap test ● done   │
+│                                      │  23  Refactor stream  ● done  │
+│                                      │                               │
+│                                      │ May 2026                      │
+│                                      │ ───────────────────────       │
+│                                      │  30  Project init    ● done   │
+│                                      │                               │
+│                                      │ ≡ 5 sessions this month      │
+│                                      │                               │
+│                                      │ [Enter] resume  q:close      │
+│                                      └──────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/widgets/timeline.rs
+
+pub struct TimelineEntry { pub title: String, pub branch: String, pub age: String, pub status: &'static str }
+pub struct TimelineWidget { pub entries: Vec<TimelineEntry>, pub selected: usize }
+```
+---
+
+## 48. Experiment Popup
+
+One-time dialog for experimental features.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ 🧪 Experimental Feature                                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   Enable Continue Mode?                                              │
+│                                                                      │
+│   This lets jcode continue working autonomously after               │
+│   a task completes. Use this for overnight runs or                  │
+│   long-running code reviews.                                        │
+│                                                                      │
+│   What it does:                                                      │
+│   • After a task completes, jcode will continue until                │
+│     you press Ctrl+C                                                 │
+│   • Runs in a loop: plan → execute → verify → repeat                │
+│   • Tokens are used incrementally                                    │
+│                                                                      │
+│   (y) Enable         (n) Not now         (Esc) Never ask again      │
+│                                                                      │
+│   [Ctrl+D] learn more  [Ctrl+E] show example                        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/experiment_popup.rs
+
+use crate::bottom_pane::{BottomPaneResult, BottomPaneView};
+use jcode_tui_core::keymap::KeyCombo;
+use ratatui::buffer::Buffer; use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style}; use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme;
+
+pub struct ExperimentPopup {
+    pub title: String, pub description: String, pub details: Vec<String>,
+    pub selected: usize, pub choices: Vec<String>,
+}
+impl BottomPaneView for ExperimentPopup {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let mut y = area.y;
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled("🧪 ", Style::default().fg(theme.warning.into())), Span::styled(&self.title, Style::default().fg(theme.text.into()).add_modifier(Modifier::BOLD))]), area.width);
+        y += 1;
+        buf.set_line(area.x, y, &Line::from(vec![Span::styled(&self.description, Style::default().fg(theme.text_muted.into()))]), area.width);
+        y += 2;
+        for d in &self.details {
+            if y >= area.y + area.height - 3 { break; }
+            buf.set_line(area.x + 2, y, &Line::from(vec![Span::styled(format!("• {}", d), Style::default().fg(theme.text_muted.into()))]), area.width);
+            y += 1;
+        }
+    }
+    fn handle_key_event(&mut self, key: &KeyCombo) -> bool { matches!(key.key.as_str(), "y" | "n" | "escape") }
+    fn completion(&self) -> Option<BottomPaneResult> { Some(BottomPaneResult::Approved { choice: ["enable","skip","dismiss"][self.selected].into() }) }
+    fn handle_ctrl_c(&mut self) -> BottomPaneResult { BottomPaneResult::Cancelled }
+    fn view_id(&self) -> &str { "experiment_popup" }
+}
+```
+---
+
+## Appendix G: Complete Feature Inventory
+
+### Coverage Summary
+
+```
+MASTER_UI.md now covers: 48 sections + 7 appendices = 55 spec items
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ CATEGORY             │ COVERED │ MISSING │ TOTAL                    │
+├───────────────────────┼─────────┼─────────┼─────────────────────────┤
+│ Chat / Messages       │   6     │   0     │   6                      │
+│ Tool Calls            │   8     │   0     │   8                      │
+│ Input / Composer      │   1     │   0     │   1                      │
+│ Navigation / Scroll   │   3     │   0     │   3                      │
+│ Permission System     │   3     │   0     │   3                      │
+│ Spinner / Status      │   2     │   0     │   2                      │
+│ Overlays / Dialogs    │   6     │   4     │  10                      │
+│ Side Panels           │   3     │   3     │   6                      │
+│ Multi-Agent           │   3     │   0     │   3                      │
+│ Shell / Terminal      │   1     │   0     │   1                      │
+│ Settings / Config     │   0     │   3     │   3                      │
+│ Info Widgets          │   0     │   3     │   3                      │
+│ Notifications         │   0     │   1     │   1                      │
+├───────────────────────┼─────────┼─────────┼─────────────────────────┤
+│ TOTAL                 │  36     │  12     │  48                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Priority Implementation Order
+
+```
+Phase 0 — Foundation (existing crate features, no new code):
+  - StreamBuffer, AnchorStability, CopySelection, GraphTopology
+  - Keybind parsing (KeyCombo, KeyContext)
+  - Theme colors, spinner animation
+
+Phase 1 — Core Chat UX (Weeks 1-2):
+  - ✅ Status Line (position: below input)
+  - ✅ Chat Viewport (scrollable, auto-pin)
+  - ✅ User Message (border, images, queued badge)
+  - ✅ Assistant Message (markdown, code blocks)
+  - ✅ Thinking/Reasoning Block (collapsed/expanded/hidden)
+  - ✅ Spinner (13 modes, inside scrollbox)
+
+Phase 2 — Tool UI (Weeks 2-3):
+  - ✅ Tool Call — Bash ($ command, collapsible)
+  - ✅ Tool Call — Edit (inline diff, line numbers)
+  - ✅ Tool Call — Read (syntax highlighting)
+  - ✅ Tool Call — Glob/Grep (compact/expanded)
+  - ✅ Tool Call — Agent (sub-agent delegation)
+  - ✅ Shell / Interactive Terminal (live stream)
+
+Phase 3 — Permissions + Input (Weeks 3-4):
+  - ✅ Permission Dialog — Bash (warning + 4 choices)
+  - ✅ Permission Dialog — Edit (diff preview)
+  - ✅ Permission Dialog — Read (simple path)
+  - ✅ Chat Composer (input, autocomplete, stash)
+  - ✅ Unseen Divider ("N new messages")
+  - ✅ Footer Hints (progressive collapse)
+
+Phase 4 — Navigation + Overlays (Weeks 4-5):
+  - ✅ Transcript Overlay (full-screen pager)
+  - ✅ Which-Key Panel (grouped keybinding list)
+  - ✅ Session Picker (search + list + resume)
+  - ✅ Copy Selection Mode (highlighted range)
+  - Keybinding system upgrade (leader key, 150+ bindings)
+
+Phase 5 — Dialogs + Panels (Weeks 5-6):
+  - 🔴 Model Picker (/model)
+  - 🔴 Todos Panel (/todos)
+  - 🔴 Configurator (/config)
+  - 🔴 File Tree Sidebar (side panel)
+  - ✅ Theme Switching (12 themes)
+  - ✅ Toast Notifications (4 types)
+
+Phase 6 — Multi-Agent + Advanced (Weeks 6-7):
+  - ✅ Sub-Agent Delegation (4-step flow)
+  - ✅ Agent Team / Coordination UI (DAG, swarm gallery)
+  - ✅ Background Tasks / Progress Panel (progress bars)
+  - ✅ Swarm Gallery (multi-agent grid)
+  - ✅ Workspace Map (Niri-style file tree)
+  - 🔴 Account Picker (/account)
+
+Phase 7 — Info + Polish (Weeks 7-8):
+  - 🔴 Git Info Widget (git status side panel)
+  - 🔴 Plugin Manager (/plugins)
+  - 🔴 Changelog Dialog (/changelog)
+  - 🔴 Notification Center (notification history)
+  - 🔴 Memory Tiles (context entries masonry)
+  - 🔴 Timeline View (session history)
+
+Legend: ✅ = spec done  🔴 = spec done, needs implementation
+```
+
+### Keybinding Append
+
+Add these to Appendix B:
+
+```
+Additional keybindings (from missing features):
+
+Model picker:
+  Ctrl+M           Open model picker
+  Ctrl+X M         Open model picker (leader)
+
+Todos:
+  Ctrl+T           Toggle todos panel
+  Ctrl+X T         Toggle todos panel (leader)
+
+Files:
+  Ctrl+P           Open file picker
+  Ctrl+W L         Toggle file tree sidebar
+
+Config:
+  Ctrl+,           Open configurator (/config)
+  Ctrl+S           Save config
+
+Notifications:
+  Ctrl+`           Toggle notification center
+
+Account:
+  Ctrl+Shift+A     Switch account
+
+Side panel navigation (Niri-style):
+  Ctrl+W H         Focus left panel
+  Ctrl+W J         Focus panel below
+  Ctrl+W K         Focus panel above
+  Ctrl+W L         Focus right panel
+  Ctrl+W Q         Close side panel
+```
+
+---
+
+## 49. Side Conversations / Fork Threads
+
+Transient fork threads for quick questions without leaving the main conversation.
+
+```
+Trigger: /side
+
+┌─ Side  ──────────────────────────────────────────────────────────────┐
+│ > Quick question: what's the syntax for HashMap?                    │
+│                                                                      │
+│ HashMap::new() — you can use `HashMap::from([(k, v)])` for         │
+│ initialization or the common `map.insert(k, v)` pattern.            │
+│                                                                      │
+│ [Return to main conversation (Esc)]                                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+Status line indication:
+
+│ sonnet-4  ctx:42%  $0.12  ≡ feat/tui-redesign  [SIDE]             │
+                                                       ↑ side session pill
+```
+
+**Keybindings:**
+- `/side` or `Ctrl+X S` — start a side conversation
+- `Esc` or `Ctrl+X R` — return to main conversation
+- Side conversations disappear when dismissed (not saved to history)
+
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/side_conversation.rs
+
+pub struct SideConvCell {
+    pub prompt: String, pub response: String, pub active: bool,
+}
+```
+---
+
+## 50. Backtrack / Undo Rollback
+
+Undo the last turn and go back to a previous state.
+
+```
+Trigger: Ctrl+Z or /roll
+
+Before undo:
+
+┌─ Assistant ──────────────────────────────────────────────────────────┐
+│ I changed the file and now tests are failing...                      │
+│                                                                      │
+│ ┌─ Edit ──────────────────────────────────────────────────────────┐ │
+│ │ → Update src/auth.rs                                            │ │
+│ │   - fn validate_expiry(expiry: i64, now: i64)                   │ │
+│ │   + fn validate_expiry(expiry: i64, now: i64, strict: bool)     │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+
+After Ctrl+Z (tooltip overlay):
+
+┌─ Rollback ───────────────────────────────────────────────────────────┐
+│ ⏪ Rolled back to before "Fix auth bug" turn                         │
+│   Undid: 1 Edit, 2 Bash calls                                       │
+│                                                                      │
+│   [Ctrl+Y] Redo  [Esc] Close                                         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Behavior:** Ctrl+Z in quick succession triggers a rollback dialog. Shows preview of what will be undone. Uses git to revert file changes if possible.
+
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/backtrack.rs
+
+pub struct RollbackCell {
+    pub undone_cells: usize, pub tool_count: usize,
+    pub redos: usize,
+}
+impl RollbackCell {
+    pub fn status_line(&self) -> String {
+        format!("⏪ Rolled back {} cells ({} tools), {} redos available", self.undone_cells, self.tool_count, self.redos)
+    }
+}
+```
+---
+
+## 51. Request User Input Overlay
+
+Structured multi-question form displayed when the agent needs user input.
+
+```
+When agent calls question tool:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ ✋ Agent needs your input                                           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   To fix the auth bug, I need:                                      │
+│                                                                      │
+│   1. What timeout value should I use?                                │
+│      ┌────────────────────────────────┐                             │
+│      │ 3000                          │                             │
+│      └────────────────────────────────┘                             │
+│      Options: 1000 (fast) | 3000 (balanced) | 5000 (safe)          │
+│                                                                      │
+│   2. Should I add more logging? (Yes/No)                             │
+│      [Selected: Yes]                                                 │
+│                                                                      │
+│   3. Any other notes?                                                │
+│      ┌────────────────────────────────┐                             │
+│      │ Make sure to use env var      │                             │
+│      └────────────────────────────────┘                             │
+│                                                                      │
+│  [Tab] next  [Shift+Tab] prev  [Enter] submit  [Esc] cancel         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/user_input_request.rs
+
+pub struct UserInputRequest {
+    pub question: String, pub options: Vec<String>,
+    pub answer: Option<String>, pub timeout_secs: u32,
+}
+```
+---
+
+## 52. @-Mentions Popup
+
+Autocomplete popup when typing `@` in composer.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Fix the bug using @aut                                              │
+│ ┌─ @mention ─────────────────────────────────────────────────────┐ │
+│ │ 🔍 auth                                                         │ │
+│ │ 📄 src/auth.rs                    file                          │ │
+│ │ 📄 src/auth_test.rs               file                          │ │
+│ │ 🔧 validate_expiry               symbol                        │ │
+│ │ 📁 src/                           directory                    │ │
+│ │ ⚡ /fix-auth                      skill                        │ │
+│ │ ★ my-agent                        agent                        │ │
+│ │ 🧠 auth-patterns                  memory                       │ │
+│ └────────────────────────────────────────────────────────────────┘ │
+│ ▌                                                                   │
+└─────────────────────────────────────────────────────────────────────┘
+
+**Mention types:**
+
+```
+@file        — fuzzy file search
+@symbol      — code symbol lookup
+@dir         — directory navigation
+/skill       — invoke a skill
+@agent       — mention an agent
+@memory      — reference a context memory
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/mentions/mod.rs
+
+pub struct MentionPopup {
+    pub query: String, pub results: Vec<MentionResult>, pub selected: usize,
+}
+pub struct MentionResult {
+    pub kind: MentionKind, pub label: String, pub detail: String,
+}
+pub enum MentionKind { File, Symbol, Skill, Agent, Memory, Directory }
+```
+---
+
+## 53. Plan Mode
+
+Distinct interaction mode for planning before implementing.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ ▌auto                                                               │
+│ ▌plan  ← mode pill                                                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+In Plan mode, tool calls require approval:
+
+┌─ Assistant (Plan mode) ─────────────────────────────────────────────┐
+│ Here's my plan to fix the auth bug:                                 │
+│                                                                      │
+│ 1. Modify `validate_expiry` to accept `now: i64` (Edit)             │
+│ 2. Update all call sites (Edit × 3)                                  │
+│ 3. Run tests to verify (Bash)                                        │
+│                                                                      │
+│ ┌─ Plan Approval ─────────────────────────────────────────────────┐ │
+│ │  [y] Approve & Implement    [n] Reject    [e] Edit plan        │ │
+│ └────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────┘
+
+Plan summary header on each turn:
+
+```
+│ 📋 Plan: Fix auth bug (3 steps, 0/3 complete)                      │
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/modes/plan_mode.rs
+
+pub enum PlanModeState { NotPlanning, Planning, AwaitingApproval, Implementing }
+
+pub struct PlanMode {
+    pub state: PlanModeState,
+    pub plan_steps: Vec<PlanStep>,
+}
+pub struct PlanStep {
+    pub description: String, pub done: bool, pub blocked: bool,
+}
+```
+---
+
+## 54. Goal / Task Tracking
+
+Track goals across agent sessions with token budgets and status.
+
+```
+Status line indicator:
+
+│ sonnet-4  ctx:42%  $0.12  🎯 Fix auth bug (active)                │
+                             ↑ goal indicator with current goal
+
+Goal menu (trigger: Ctrl+G or /goal):
+
+┌─ Goal ───────────────────────────────────────────────────────────────┐
+│ Current Goal                                                        │
+│ ─────────────────────────────────────────────────────────────────── │
+│ 🎯 Fix the auth bug                                          active │
+│   Token budget: 50K used / 200K total  ████████░░░░ 25%            │
+│   Duration: 12m 30s                                                 │
+│                                                                      │
+│   [e] edit goal text    [p] pause    [c] complete    [x] cancel    │
+│ ─────────────────────────────────────────────────────────────────── │
+│ Past Goals:                                                          │
+│ ✓ Add keymap tests          10m 20s  ✅ completed                    │
+│ ✓ Refactor structure         5m 00s  ✅ completed                    │
+│ ✗ Migrate to new API         2m 00s  ❌ abandoned                    │
+│                                                                      │
+│ [q] close                                                           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/goal_tracker.rs
+
+pub struct Goal {
+    pub text: String, pub tokens_used: u64, pub token_budget: u64,
+    pub elapsed: std::time::Duration,
+    pub status: GoalStatus,
+}
+pub enum GoalStatus { Active, Paused, Blocked, Complete, Cancelled }
+impl Goal {
+    pub fn progress_pct(&self) -> f64 { self.tokens_used as f64 / self.token_budget.max(1) as f64 }
+    pub fn status_line(&self) -> String {
+        let icon = match self.status { GoalStatus::Active => "🎯", GoalStatus::Paused => "⏸", GoalStatus::Complete => "✓", _ => "⚠" };
+        format!("{} {} ({}%)", icon, self.text, (self.progress_pct() * 100.0) as u32)
+    }
+}
+```
+---
+
+## 55. Turn Metrics / Worked-for Separator
+
+Visual divider between turns showing timing and stats.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ ───────────── Worked for 1m 23s — 4 tool calls ──────────────────  │
+└─────────────────────────────────────────────────────────────────────┘
+
+When user scrolled up, shows timeline markers:
+
+```
+│ ───────── 2m ago ──────────────────────────────                    │
+│ ───────── 5m ago ──────────────────────────────                    │
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/turn_metrics.rs
+
+pub struct TurnMetricsCell {
+    pub elapsed: std::time::Duration,
+    pub tool_calls: usize,
+}
+impl TurnMetricsCell {
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let text = format!("─ Worked for {:.0}m {:.0}s — {} tool calls ─",
+            self.elapsed.as_secs_f64() / 60.0, self.elapsed.as_secs_f64() % 60.0, self.tool_calls);
+        buf.set_string(area.x, area.y, &text, Style::default().fg(theme.text_subtle.into()));
+    }
+}
+```
+---
+
+## 56. Keypress Debug Inspector
+
+Developer tool to inspect raw key events and binding resolution.
+
+```
+Trigger: /keydebug (hidden debug command)
+
+┌─ Keypress Inspector ─────────────────────────────────────────────────┐
+│ Keys pressed: 4    Matches: active contexts                        │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ Last Key: Ctrl+K                                                     │
+│   Raw:      28                                                        │
+│   C0 char:  0x0B (vertical tab)                                     │
+│   Decoded:  Ctrl+K                                                    │
+│   Contexts: [Global, Chat, Composer]                                 │
+│   Resolved: "chat:externalEditor"  (from Chat context)              │
+│   Bypassed: "global:redraw" (overridden by Chat)                    │
+│                                                                      │
+│ [Any key to inspect]  [c] clear  [q] close                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/key_debug.rs
+
+pub struct KeypressDebug {
+    pub active: bool,
+    pub history: Vec<KeypressEvent>,
+}
+pub struct KeypressEvent {
+    pub raw: String, pub decoded: String,
+    pub context: Vec<String>, pub action: String,
+}
+```
+---
+
+## 57. Service Tier Selection
+
+Choose between service tiers (Auto/Max/Balanced).
+
+```
+Trigger: Ctrl+Shift+T or /tier
+
+┌─ Service Tier ──────────────────────────────────────────────────────┐
+│ Select tier for responses:                                          │
+│                                                                      │
+│ ▸ Auto        Use the best tier based on complexity                  │
+│   Max         Maximum intelligence (slower, more expensive)          │
+│   Balanced    Middle ground                                           │
+│                                                                      │
+│   Currently: Auto                                                    │
+│                                                                      │
+│   Model: claude-sonnet-4-20250514                                    │
+│                                                                      │
+│ ↑/↓ navigate  Enter:select  q:close                                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+Status line:
+
+```
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto  ▌max                  │
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/modes/service_tier.rs
+
+pub struct ServiceTierPopup {
+    pub options: Vec<&'static str>,
+    pub selected: usize,
+}
+impl ServiceTierPopup {
+    pub fn with_defaults() -> Self {
+        Self { options: vec!["Auto", "Max", "Balanced"], selected: 0 }
+    }
+}
+```
+---
+
+## 58. Raw Output Mode / Accessibility
+
+Toggle for plain text rendering (for screen readers and accessibility).
+
+```
+Trigger: /raw or /accessibility
+
+Normal mode:
+
+│ ✓ exit: 0                                                           │
+│ ═══░░░░░░░░░░  42%                                                  │
+
+Raw mode:
+
+```
+| ✓ exit: 0
+| [progress 42%]
+```
+
+Status line:
+
+```
+│ sonnet-4  ctx:42%  $0.12  [RAW]  ▌auto                             │
+                            ↑ indicator for raw mode
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/modes/raw_mode.rs
+
+pub struct RawModeState { pub enabled: bool }
+impl RawModeState {
+    pub fn toggle(&mut self) { self.enabled = !self.enabled; }
+    pub fn status_pill(&self) -> &'static str { if self.enabled { "[RAW]" } else { "" } }
+}
+```
+---
+
+## 59. Terminal Pets
+
+Animated ASCII-art pet mascot rendered in the terminal.
+
+```
+┌─ Pet ───────────────────────────────────────────────────────────────┐
+│                                                                      │
+│                   /\_/\                                              │
+│                  ( o.o )    "Working on it..."                       │
+│                   > ^ <                                              │
+│                                                                      │
+│ [p] next pet  [q] hide                                               │
+└─────────────────────────────────────────────────────────────────────┘
+
+Available pets:
+
+```
+/\_/\      (cat)      default pet
+( 0 0)    (owl)      night mode
+( -_-)    (sloth)    slow thinking
+(^_^)     (happy)    success animation
+>(')      (fish)     swimming animation
+```
+
+Triggers: /pet, idle animation when waiting, success animation on completion.
+
+### Code
+
+```rust
+// crates/jcode-tui/src/pets/mod.rs
+
+pub struct TerminalPet {
+    pub name: &'static str, pub active: bool,
+    pub sprite_rows: Vec<&'static str>,
+}
+pub static PETS: &[TerminalPet] = &[
+    TerminalPet { name: "cat", active: true, sprite_rows: vec!["  /\\_/\\", " ( o.o )", "  > ^ <"] },
+    TerminalPet { name: "owl", active: false, sprite_rows: vec!["  ( 0 0 )", "  ( - ) "] },
+    TerminalPet { name: "sloth", active: false, sprite_rows: vec!["  ( -_-)", "  (   ) "] },
+];
+```
+---
+
+## 60. Collaboration Modes
+
+Switch between Plan/Ask/Agent collaboration styles.
+
+```
+Trigger: Ctrl+Shift+M or /mode
+
+┌─ Collaboration Mode ────────────────────────────────────────────────┐
+│ How should we work together?                                        │
+│                                                                      │
+│ ▸ Plan     I suggest → you approve → I implement (step by step)    │
+│                                                                      │
+│   Ask      You decide each action individually                      │
+│                                                                      │
+│   Agent    I work autonomously, you interrupt when needed           │
+│                                                                      │
+│   Currently: Agent                                                   │
+│                                                                      │
+│ ↑/↓ navigate  Enter:select  q:close                                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+Status line:
+
+```
+│ sonnet-4  ctx:42%  $0.12  ▌auto  ▌plan                              │
+                                          ↑ collaboration mode pill
+```
+
+## Appendix H: Codex Missing Features Summary
+## Appendix I: Codex Deep Scan Summary
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ SECTION  │ FEATURE                │ SOURCE FILE                     │
+├──────────┼────────────────────────┼─────────────────────────────────┤
+│ #49      │ Side Conversations     │ app/side.rs                     │
+│ #50      │ Backtrack / Rollback   │ app_backtrack.rs                │
+│ #51      │ Request User Input     │ bottom_pane/request_user_input/ │
+│ #52      │ @-Mentions Popup       │ bottom_pane/mentions_v2/        │
+│ #53      │ Plan Mode              │ chatwidget/plan_implementation  │
+│ #54      │ Goal Tracking          │ chatwidget/goal_menu.rs         │
+│ #55      │ Turn Metrics           │ history_cell/separators.rs      │
+│ #56      │ Key Debug Inspector    │ keymap_setup/debug.rs           │
+│ #57      │ Service Tier           │ chatwidget/service_tiers.rs     │
+│ #58      │ Raw/Accessibility Mode │ app_event.rs                    │
+│ #59      │ Terminal Pets          │ pets/                           │
+│ #60      │ Collaboration Modes    │ collaboration_modes.rs          │
+└─────────────────────────────────────────────────────────────────────┘
+
+Features already covered by MASTER_UI.md and NOT added:
+- Hooks Browser       → Configurator (#40) covers settings
+- App Link View       → Internal, not TUI-facing
+- Custom Prompt View  → Chat Composer (#15) covers this
+- Skills Toggle       → Plugin Manager (#41) covers
+- Memory Settings     → Memory Tiles (#46) covers
+- Status Line Setup   → Configurator (#40) covers
+- Feedback View       → Toast (#36) covers
+- Update Prompt       → Changelog (#43) covers
+- CWD Prompt          → Onboarding (#28) covers
+- Keybinding Remap    → Appendix B covers
+- Vim Textarea        → Appendix B covers
+- Personality Picker  → Configurator (#40) covers
+- Experimental Views  → Experiment Popup (#48) covers
+- Desktop Notify      → Toast (#36) covers
+- Patch History       → Edit tool (#8) covers
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/modes/collab_mode.rs
+
+pub enum CollabMode { Plan, Ask, Agent }
+impl CollabMode {
+    pub fn cycle(&self) -> Self { match self { Self::Plan => Self::Agent, Self::Ask => Self::Plan, Self::Agent => Self::Ask } }
+    pub fn pill(&self) -> &'static str { match self { Self::Plan => "▌plan", Self::Ask => "▌ask", Self::Agent => "▌agent" } }
+    pub fn description(&self) -> &'static str {
+        match self { Self::Plan => "I suggest → you approve → I implement", Self::Ask => "You decide each action", Self::Agent => "I work autonomously" }
+    }
+}
+```
+---
+
+## 61. Reasoning Effort Picker
+
+Select the model's reasoning effort level (affects thinking time and quality).
+
+```
+Trigger: Alt+, (decrease) / Alt+. (increase) or /effort
+
+┌─ Reasoning Effort ──────────────────────────────────────────────────┐
+│ Select effort level for claude-sonnet-4-20250514                   │
+│                                                                      │
+│ ▸ None       No reasoning (fastest, cheapest)                       │
+│   Minimal    Quick reasoning                                         │
+│   Low        Light reasoning                                         │
+│   Medium     Balanced reasoning                                      │
+│   High       Deep reasoning                                          │
+│   Extra High Very deep reasoning                                     │
+│   Ultra      Maximum reasoning (slowest)                             │
+│   Custom     User-defined                                            │
+│                                                                      │
+│   Currently: Medium                                                  │
+│                                                                      │
+│ ↑/↓ navigate  Enter:select  Alt+,/Alt+.: adjust  q:close           │
+└─────────────────────────────────────────────────────────────────────┘
+
+Status line:
+
+```
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto  ▌medium               │
+                                            ↑ effort pill
+```
+
+### Keybindings
+
+```
+Alt+,    Decrease reasoning effort
+Alt+.    Increase reasoning effort
+/effort  Open effort picker
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/effort_picker.rs
+
+pub struct ReasoningEffortPopup { pub selected: usize }
+impl ReasoningEffortPopup {
+    pub fn with_defaults() -> Self { Self { selected: 3 } }
+    pub fn options() -> Vec<&'static str> {
+        vec!["None", "Minimal", "Low", "Medium", "High", "Extra High", "Ultra"]
+    }
+    pub fn current_label(&self) -> &'static str { Self::options()[self.selected] }
+    pub fn adjust(&mut self, delta: i8) {
+        let len = Self::options().len();
+        self.selected = (self.selected as i8 + delta).rem_euclid(len as i8) as usize;
+    }
+}
+```
+---
+
+## 62. Interactive Keybinding Editor
+
+Browse, customize, and capture keyboard shortcuts interactively.
+
+```
+Trigger: /keymap
+
+┌─ Keyboard Shortcuts ────────────────────────────────────────────────┐
+│ All     Common     Custom     Vim              [filter: ]          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ Global                                                              │
+│   Ctrl+C        Interrupt                              [edit]     │
+│   Ctrl+D        Exit                                    [edit]     │
+│   Ctrl+L        Redraw                                  [edit]     │
+│   Ctrl+O        Toggle transcript                      [edit]     │
+│   Ctrl+X        Leader key                              [edit]     │
+│                                                                      │
+│ Chat                                                                │
+│   Enter         Submit message                          [edit]     │
+│   Ctrl+G        External editor                        [edit]     │
+│   Ctrl+S        Stash input                             [edit]     │
+│   Alt+,         Decrease reasoning effort                [edit]     │
+│   Alt+.         Increase reasoning effort                [edit]     │
+│                                                                      │
+│ ↑/↓ navigate  Enter:edit binding  [c] capture key  [d] reset       │
+│ [r] reset all to defaults  q:close                                  │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Key Capture View (when editing)
+
+```
+┌─ Press a key for: "Toggle transcript" ──────────────────────────────┐
+│                                                                      │
+│   Current binding: Ctrl+O                                            │
+│                                                                      │
+│   [Press any key combination...]                                    │
+│   [Esc] cancel  [Backspace] remove                                  │
+│                                                                      │
+│   Pressed: Ctrl+Shift+O  →  "toggle_transcript"                     │
+│                                                                      │
+│   [Enter] confirm  [Esc] cancel                                    │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/keybinding_editor.rs
+
+pub struct KeybindingEditor {
+    pub entries: Vec<KeybindingEntry>,
+    pub selected: usize, pub filter: String,
+}
+pub struct KeybindingEntry {
+    pub action: String, pub binding: String,
+    pub context: &'static str, pub builtin: bool,
+}
+```
+---
+
+## 63. Copy Agent Response (/copy)
+
+Copy the last agent response markdown to clipboard.
+
+```
+Trigger: /copy or assignable keybinding
+
+Before copy:
+
+┌─ Assistant ──────────────────────────────────────────────────────────┐
+│ I'll fix the auth bug. The issue is that `validate_expiry` was      │
+│ called without the current timestamp.                               │
+│                                                                      │
+│ ┌─ Edit ──────────────────────────────────────────────────────────┐ │
+│ │ → Update src/auth.rs                                            │ │
+│ │   - fn validate_expiry(expiry: i64) -> bool                     │ │
+│ │   + fn validate_expiry(expiry: i64, now: i64) -> bool          │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+
+After /copy:
+
+│ ℹ Copied agent response to clipboard (1,234 chars)                  │
+│   [Ctrl+V to paste]                                                 │
+```
+
+### Multiple copies
+
+Tracks last N responses, accessible via `/copy -N`:
+
+```
+/copy      → copies most recent agent response
+/copy -2   → copies 2nd most recent
+/copy -3   → copies 3rd most recent
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/actions/copy_response.rs
+
+pub struct CopyResponseState {
+    pub last_responses: Vec<String>,
+    pub max_saved: usize,
+}
+impl CopyResponseState {
+    pub fn new() -> Self { Self { last_responses: Vec::new(), max_saved: 10 } }
+    pub fn push(&mut self, text: String) { self.last_responses.push(text); if self.last_responses.len() > self.max_saved { self.last_responses.remove(0); } }
+    pub fn get(&self, idx: usize) -> Option<&str> { self.last_responses.iter().rev().nth(idx).map(|s| s.as_str()) }
+    pub fn copy_latest(&self) -> Option<String> { self.last_responses.last().cloned() }
+}
+```
+---
+
+## 64. Image Paste (Ctrl+Alt+V)
+
+Paste images from clipboard directly into the composer.
+
+```
+┌─ User ──────────────────────────────────────────────────────────────┐
+│ > What's wrong with this error? [image attached]                    │
+│                                                                    │
+│ ┌──────────────────────────────────┐                               │
+│ │  [screenshot.png - 42KB]         │                               │
+│ │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │                               │
+│ │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │                               │
+│ │  ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓ │                               │
+│ └──────────────────────────────────┘                               │
+│                                                                      │
+│ ▌                                                                   │
+└─────────────────────────────────────────────────────────────────────┘
+
+Error state (model doesn't support images):
+
+│ ⚠ Current model doesn't support image input. Image will be excluded.│
+```
+
+### Keybindings
+
+```
+Ctrl+Alt+V    Paste image from clipboard (Linux/Windows)
+Ctrl+Shift+V  Paste image from clipboard (macOS)
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/actions/image_paste.rs
+
+pub struct ImagePasteState { pub supports_images: bool }
+impl ImagePasteState {
+    pub fn new() -> Self { Self { supports_images: true } }
+    pub fn can_paste(&self) -> bool { self.supports_images }
+    pub fn error_message(&self) -> &'static str { "⚠ Current model doesn't support image input." }
+}
+```
+---
+
+## 65. Terminal Title Configuration
+
+Customize what appears in the terminal window/tab title.
+
+```
+Trigger: /title
+
+┌─ Terminal Title Configuration ─────────────────────────────────────┐
+│ "jcode — project-name — spinner — cwd"   [live preview]           │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ▸ [✓] App name              jcode                                  │
+│   [✓] Project name          jcode (from Cargo.toml)                │
+│   [✓] Spinner animation     ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏                          │
+│   [✓] Current directory     ~/Projects/jcode                      │
+│   [ ] Git branch            feat/tui-redesign                      │
+│   [ ] Status indicator      🎯 Fix auth bug                        │
+│   [ ] Model name            sonnet-4                               │
+│                                                                      │
+│ [Space] toggle  ↑/↓ move  [r] reorder  [p] preview  q:close       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Live Preview
+
+Bottom of the dialog shows the actual rendered title:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Terminal title will be:                                             │
+│  jcode — jcode — ⠋ — ~/Projects/jcode                             │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/config/terminal_title.rs
+
+pub struct TerminalTitleConfig {
+    pub items: Vec<TitleItem>,
+}
+pub struct TitleItem {
+    pub label: &'static str, pub enabled: bool,
+    pub value_fn: &'static str,
+}
+impl TerminalTitleConfig {
+    pub fn with_defaults() -> Self {
+        Self { items: vec![
+            TitleItem { label: "App name", enabled: true, value_fn: "jcode" },
+            TitleItem { label: "Spinner", enabled: true, value_fn: "⠋" },
+            TitleItem { label: "Directory", enabled: true, value_fn: "%cwd%" },
+        ]}
+    }
+    pub fn render_title(&self, _area: Rect, buf: &mut Buffer, theme: &Theme) {
+        let parts: Vec<&str> = self.items.iter().filter(|i| i.enabled).map(|i| i.value_fn).collect();
+        buf.set_string(_area.x, _area.y, &parts.join(" — "), Style::default().fg(theme.text_muted.into()));
+    }
+}
+```
+---
+
+## 66. Auto-Review Denials (/approve)
+
+Review and retry actions that were blocked by auto-review (guardian).
+
+```
+Trigger: /approve
+
+┌─ Auto-Review Denials ───────────────────────────────────────────────┐
+│ Recently denied actions                            [filter: ]       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│ ▸ ✗ Denied: Bash command "rm -rf /tmp"                             │
+│    2m ago  │ Reason: Destructive operation                          │
+│    [Approve retry]  [View details]                                  │
+│                                                                      │
+│   ✗ Denied: File Edit "chmod 777"                                  │
+│    5m ago  │ Reason: Security risk                                   │
+│    [Approve retry]  [View details]                                  │
+│                                                                      │
+│   ✓ Approved: File Write "create test.rs"                          │
+│    10m ago │ Reason: Safe operation                                  │
+│                                                                      │
+│ ↑/↓ navigate  Enter:retry  [v] view  q:close                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/auto_review.rs
+
+pub struct AutoReviewEntry {
+    pub action: String, pub reason: String,
+    pub retry_available: bool, pub time_ago: String,
+}
+pub struct AutoReviewPopup { pub entries: Vec<AutoReviewEntry>, pub selected: usize }
+```
+---
+
+## 67. Desktop Notifications
+
+Terminal-based desktop notifications for key events.
+
+```
+Terminal title flash:
+
+┌─ jcode — ⠋ — ✗ Command blocked — ~/Projects ─────────────────────┐
+                          ↑ notification shown in title
+
+OSC 9 escape sequence (supported by Ghostty, iTerm2, Kitty, Warp, WezTerm):
+
+```
+\x1b]9;Command blocked by auto-review\x07
+```
+
+### Notification Types
+
+```
+Event                         | Type    | Preview text
+──────────────────────────────┼─────────┼─────────────────────────
+Agent turn completes          | success | "Task complete: Fixed auth bug"
+Approval request pending      | action  | "🔐 Permission needed: rm -rf"
+Auto-review denial            | warning | "✗ Command blocked by auto-review"
+Plan mode prompt              | prompt  | "📋 Plan ready for review"
+Turn starts                   | info    | "Working on: Fix auth bug..."
+```
+
+### Configuration
+
+```
+~/.jcode/config.toml:
+
+[notifications]
+enabled = true
+agent_completion = true
+approval_requests = true
+auto_review_denials = true
+plan_mode = true
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/notifications/mod.rs
+
+pub struct DesktopNotification {
+    pub message: String,
+    pub kind: &'static str,
+    pub icon: &'static str,
+}
+impl DesktopNotification {
+    pub fn send(&self, _theme: &Theme) {
+        // Uses OSC 9 escape sequence for Ghostty/iTerm2/Kitty/Warp/WezTerm
+        print!("\x1b]9;{} {}{}\x07", self.icon, self.message, self.kind);
+    }
+}
+pub fn notify_success(msg: String) { DesktopNotification { message: msg.clone(), kind: "complete", icon: "✓" }.send(); }
+pub fn notify_warning(msg: String) { DesktopNotification { message: msg.clone(), kind: "warning", icon: "⚠" }.send(); }
+pub fn notify_error(msg: String)   { DesktopNotification { message: msg.clone(), kind: "error", icon: "✗" }.send(); }
+```
+---
+
+## 68. Code Review Setup (/review)
+
+Select review scope before running code review.
+
+```
+Trigger: /review
+
+┌─ Code Review ────────────────────────────────────────────────────────┐
+│ Select review target:                                               │
+│                                                                      │
+│ ▸ Review against base branch (PR style)                             │
+│   Review uncommitted changes                                        │
+│   Review a specific commit                                          │
+│   Custom review (enter instructions)                                │
+│                                                                      │
+│ [Enter] select  q:close                                             │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Branch Picker (after selecting PR style)
+
+```
+┌─ Select base branch ────────────────────────────────────────────────┐
+│ [filter: ma]                                                        │
+│                                                                      │
+│ ▸ main                                                              │
+│   master                                                             │
+│   feat/tui-redesign                                                  │
+│                                                                      │
+│ ↑/↓ navigate  Enter:select  /:filter                                │
+└─────────────────────────────────────────────────────────────────────┘
+
+### Custom Review Instructions
+
+```
+┌─ Custom Review Input ───────────────────────────────────────────────┐
+│ Review instructions:                                                │
+│                                                                      │
+│ Focus on:                                                            │
+│ - Security vulnerabilities                                           │
+│ - Thread safety issues                                               │
+│ - Error handling patterns                                            │
+│ ▌                                                                   │
+│                                                                      │
+│ [Enter] submit  [Esc] cancel  [Ctrl+O] external editor              │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/review_setup.rs
+
+pub struct ReviewSetup {
+    pub targets: Vec<ReviewTarget>,
+    pub selected: usize,
+}
+pub enum ReviewTarget {
+    BranchBase(String),
+    Uncommitted,
+    SpecificCommit(String),
+    Custom(String),
+}
+```
+---
+
+## 69. Model Migration Dialog
+
+Prompt when the app server recommends switching to a newer model.
+
+```
+Shown on startup or when model availability changes:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 🚀 New Model Available!                                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│   claude-sonnet-4-20250514 is now available and recommended.        │
+│                                                                      │
+│   It offers:                                                         │
+│   • 2x faster response times                                         │
+│   • Better code generation quality                                   │
+│   • Lower cost per token                                             │
+│                                                                      │
+│   Your current default:                                              │
+│   claude-sonnet-4-20250401                                          │
+│                                                                      │
+│   (y) Switch now    (n) Keep current    (d) Don't ask again         │
+│   (v) View release notes                                             │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/model_migration.rs
+
+pub struct ModelMigrationDialog {
+    pub new_model: String, pub old_model: String,
+    pub selected: usize,
+    pub benefits: Vec<String>,
+}
+```
+---
+
+## 70. Personality Picker
+
+Choose the model's communication style.
+
+```
+Trigger: /personality
+
+┌─ Communication Style ───────────────────────────────────────────────┐
+│ Select how the assistant communicates:                              │
+│                                                                      │
+│ ▸ Friendly    Warm, conversational, explains reasoning              │
+│               "Let me break this down..."                           │
+│                                                                      │
+│   Pragmatic   Direct, concise, code-first                           │
+│               "Fix: add `now` param to validate_expiry"              │
+│                                                                      │
+│   Currently: Friendly                                                │
+│                                                                      │
+│ ↑/↓ navigate  Enter:select  q:close                                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/bottom_pane/personality_picker.rs
+
+pub struct PersonalityPicker { pub selected: usize }
+impl PersonalityPicker {
+    pub fn options() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("Friendly", "Warm, conversational, explains reasoning"),
+            ("Pragmatic", "Direct, concise, code-first"),
+        ]
+    }
+}
+```
+---
+
+## 71. IDE Context Integration (/ide)
+
+Toggle injection of IDE context (active file, selection, open tabs) into messages.
+
+```
+Trigger: /ide
+
+Status line:
+
+```
+│ sonnet-4  ctx:42%  $0.12  cache:78%  ▌auto  🖮 IDE                │
+                                            ↑ IDE active indicator
+
+When enabled, injects context from VS Code / other IDE:
+
+```
+│ ℹ Injecting IDE context: src/auth.rs:42-56                         │
+│   (from VS Code — active selection)                                │
+```
+
+### Supported IDEs
+
+```
+VS Code (via extension IPC)
+Cursor
+JetBrains (via plugin)
+```
+### Code
+
+```rust
+// crates/jcode-tui/src/integrations/ide_context.rs
+
+pub struct IdeContext {
+    pub enabled: bool,
+    pub active_file: Option<String>,
+    pub selection: Option<(u32, u32)>,
+}
+impl IdeContext {
+    pub fn status_pill(&self) -> &'static str { if self.enabled { "🖮 IDE" } else { "" } }
+}
+```
+---
+
+## 72. Plan Mode Nudge
+
+Footer hint that appears when planning keywords are detected but Plan mode is off.
+
+```
+When user types "plan", "implement", "steps" while in Default mode:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ 💡 Looks like you're planning! Press Ctrl+Shift+M to switch to      │
+│    Plan mode where you can review before implementing.             │
+│    [dismiss]  [never show]                                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/modes/plan_nudge.rs
+
+pub struct PlanModeNudge {
+    pub visible: bool,
+    pub dismissed: bool,
+    pub never_show: bool,
+}
+impl PlanModeNudge {
+    pub fn should_show(&self, text: &str) -> bool {
+        !self.dismissed && !self.never_show && (text.contains("plan") || text.contains("steps") || text.contains("implement"))
+    }
+    pub fn dismiss(&mut self) { self.dismissed = true; }
+    pub fn never_show_again(&mut self) { self.never_show = true; }
+    pub fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        if !self.visible { return; }
+        buf.set_string(area.x, area.y, "💡 Looks like you're planning! Press Ctrl+Shift+M for Plan mode. [dismiss]",
+            Style::default().fg(theme.info.into()));
+    }
+}
+```
+---
+
+## 73. Safety Buffering Status
+
+Status indicator when safety checks are running.
+
+```
+During safety check:
+
+│ ⏳ Running safety checks...  (parallel reviews aggregating)        │
+│   🔍 Content analysis...  ✅ Code diff review...  ⏳ Policy...     │
+
+When complete:
+
+│ ✅ Safety checks passed (N/3 checks completed in 1.2s)              │
+
+If blocked:
+
+│ ✗ Content blocked by safety policy                                 │
+│   Reason: This content cannot be shown.                             │
+│   [Retry with faster model]  [View details]                        │
+```
+
+### Code
+
+```rust
+// crates/jcode-tui/src/history_cell/safety_buffering.rs
+
+use ratatui::buffer::Buffer; use ratatui::layout::Rect;
+use ratatui::style::{Modifier, Style}; use ratatui::text::{Line, Span};
+use jcode_tui_style::Theme; use crate::history_cell::HistoryCell;
+
+pub struct SafetyStatusCell {
+    pub in_progress: bool,
+    pub checks_passed: u32, pub total_checks: u32,
+    pub blocked: bool, pub blocked_reason: Option<String>,
+}
+impl HistoryCell for SafetyStatusCell {
+    fn render(&self, area: Rect, buf: &mut Buffer, theme: &Theme) {
+        if self.blocked {
+            buf.set_line(area.x, area.y, &Line::from(vec![
+                Span::styled("✗ Safety checks failed", Style::default().fg(theme.error.into()).add_modifier(Modifier::BOLD)),
+            ]), area.width);
+            if let Some(reason) = &self.blocked_reason {
+                buf.set_line(area.x, area.y + 1, &Line::from(vec![Span::styled(reason.as_str(), Style::default().fg(theme.text_muted.into()))]), area.width);
+            }
+        } else if self.in_progress {
+            buf.set_line(area.x, area.y, &Line::from(vec![
+                Span::styled("⏳ Running safety checks...", Style::default().fg(theme.warning.into())),
+            ]), area.width);
+        } else {
+            buf.set_line(area.x, area.y, &Line::from(vec![
+                Span::styled("✓ Safety checks passed", Style::default().fg(theme.success.into())),
+                Span::styled(format!(" ({}/{})", self.checks_passed, self.total_checks), Style::default().fg(theme.text_subtle.into())),
+            ]), area.width);
+        }
+    }
+    fn desired_height(&self, _: u16) -> u16 { if self.blocked && self.blocked_reason.is_some() { 2 } else { 1 } }
+}
+```
+---
+
+## Appendix I: Codex Deep Scan Summary
+
+### New sections added in this pass
+
+```
+┌────────┬──────────────────────────────────────┬──────────────────────────┐
+│ #61    │ Reasoning Effort Picker              │ chatwidget/              │
+│ #62    │ Interactive Keybinding Editor        │ keymap_setup/            │
+│ #63    │ Copy Agent Response (/copy)          │ chatwidget/              │
+│ #64    │ Image Paste (Ctrl+Alt+V)             │ chatwidget/              │
+│ #65    │ Terminal Title Configuration (/title)│ bottom_pane/             │
+│ #66    │ Auto-Review Denials (/approve)       │ chatwidget/              │
+│ #67    │ Desktop Notifications                │ notifications.rs         │
+│ #68    │ Code Review Setup (/review)          │ chatwidget/              │
+│ #69    │ Model Migration Dialog               │ model_migration.rs       │
+│ #70    │ Personality Picker                   │ chatwidget/              │
+│ #71    │ IDE Context Integration (/ide)       │ ide_context.rs           │
+│ #72    │ Plan Mode Nudge                      │ chatwidget/              │
+│ #73    │ Safety Buffering Status              │ chatwidget/              │
+└────────┴──────────────────────────────────────┴──────────────────────────┘
+```
+
+### Coverage summary
+
+```
+Codex Features     │ In Spec  │ New Now   │ Total
+───────────────────┼──────────┼───────────┼───────────
+Core UI components │ 60       │ 13        │ 73
+Infrastructure     │ 0        │ 0         │ 4
+───────────────────┼──────────┼───────────┼───────────
+Total              │ 60       │ 13        │ ~300+
 ```
