@@ -1882,8 +1882,12 @@ pub(in crate::tui::app) fn handle_server_event(
             };
 
             if background_task_scope {
-                let presentation =
-                    present_swarm_notification(&sender, &notification_type, &message);
+                let presentation = present_swarm_notification(
+                    &sender,
+                    &notification_type,
+                    &message,
+                    crate::config::config().display.compact_notifications,
+                );
                 if crate::message::parse_background_task_progress_notification_markdown(&message)
                     .is_some()
                 {
@@ -1925,7 +1929,12 @@ pub(in crate::tui::app) fn handle_server_event(
                 return false;
             }
 
-            let presentation = present_swarm_notification(&sender, &notification_type, &message);
+            let presentation = present_swarm_notification(
+                &sender,
+                &notification_type,
+                &message,
+                crate::config::config().display.compact_notifications,
+            );
             app.push_display_message(DisplayMessage::swarm(
                 presentation.title.clone(),
                 presentation.message.clone(),

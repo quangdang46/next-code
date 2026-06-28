@@ -825,6 +825,447 @@ fn prepare_body_cached(app: &dyn TuiState, width: u16) -> Arc<PreparedMessages> 
     prepared
 }
 
+/// Immutable per-build render context shared by the full and incremental body
+/// builders. Holding this in one place keeps the single per-message renderer
+/// (`render_message_into`) free of divergence between the two entry points.
+struct BodyRenderCtx<'a> {
+    app: &'a dyn TuiState,
+    width: u16,
+    centered: bool,
+    /// Number rendered next to the first user prompt = global prompt count +
+    /// number of prompts hidden by compaction.
+    prompt_number_offset: usize,
+    total_prompts: usize,
+    pending_count: usize,
+    anchored_images: Arc<super::inline_image_ui::AnchoredInlineImages>,
+    inline_images_visible: bool,
+    messages: &'a [DisplayMessage],
+}
+
+/// Mutable accumulator for one body build. Both `prepare_body` (full) and
+/// `prepare_body_incremental` (tail only) push into one of these via the shared
+/// `render_message_into`, guaranteeing byte-identical per-message output and
+/// recording a per-message boundary table for prefix reuse.
+#[derive(Default)]
+struct BodyAcc {
+    lines: Vec<Line<'static>>,
+    raw_plain_lines: Vec<String>,
+    line_raw_overrides: Vec<Option<WrappedLineMap>>,
+    line_copy_offsets: Vec<usize>,
+    user_line_indices: Vec<usize>,
+    user_prompt_texts: Vec<String>,
+    edit_tool_line_ranges: Vec<(usize, String, usize, usize, bool)>,
+    copy_targets: Vec<RawCopyTarget>,
+    /// One entry per rendered message, in order: `(msg_hash, lines_len_after,
+    /// raw_len_after, user_prompt_len_after)`. `lines_len_after` counts any
+    /// separator blank pushed at the start of that message, so truncating the
+    /// wrapped body at a boundary cleanly drops the message together with its
+    /// leading blank. `raw_len_after` is the contiguous raw count, used to
+    /// truncate the raw array in lockstep.
+    segments: Vec<(u64, usize, usize, usize)>,
+    /// Next 1-based prompt number to assign. Seeded from the reused base in the
+    /// incremental path so numbering continues without rescanning the prefix.
+    prompt_num: usize,
+    /// 0-based ordinal of the next rendered user prompt excluding synthetic
+    /// attached-image label messages; mirrors the session renderer's count.
+    anchor_prompt_ordinal: usize,
+    /// True when a prior (reused) body already has content, so the first message
+    /// rendered here still gets its leading separator blank.
+    body_has_content: bool,
+}
+
+impl BodyAcc {
+    /// Push a fully-rendered display line whose raw selection text is the line
+    /// itself (no logical-line mapping). Seeds a contiguous raw entry and an
+    /// explicit full-width override so the body's `raw_plain_lines` stays
+    /// message-ordered. Keeping raws contiguous is what lets a tail-edit rebuild
+    /// truncate both the wrapped arrays *and* the raw array at a message
+    /// boundary, avoiding an unbounded raw leak across repeated tail edits (e.g.
+    /// a streaming tool result that updates many times).
+    fn push_auto(&mut self, line: Line<'static>) {
+        let raw_text = ui::line_plain_text(&line);
+        let raw_width = unicode_width::UnicodeWidthStr::width(raw_text.as_str());
+        let raw_line = self.raw_plain_lines.len();
+        self.raw_plain_lines.push(raw_text);
+        self.lines.push(line);
+        self.line_raw_overrides.push(Some(WrappedLineMap {
+            raw_line,
+            start_col: 0,
+            end_col: raw_width,
+        }));
+        self.line_copy_offsets.push(0);
+    }
+
+    /// Push a blank separator line. Routed through `push_auto` so it seeds a
+    /// (empty) raw and keeps the raw array contiguous.
+    fn push_blank(&mut self) {
+        self.push_auto(Line::from(""));
+    }
+}
+
+/// Render a todo delta below a `todo` tool call in the transcript, or return
+/// nothing if the message is not a write-oriented todo tool call.
+fn todo_change_lines(
+    messages: &[DisplayMessage],
+    abs_idx: usize,
+    msg: &DisplayMessage,
+    width: u16,
+) -> Vec<Line<'static>> {
+    if tools_ui::tool_output_looks_failed(&msg.content) {
+        return Vec::new();
+    }
+    let Some(tc) = msg.tool_data.as_ref() else {
+        return Vec::new();
+    };
+    if tools_ui::canonical_tool_name(&tc.name) != "todo" {
+        return Vec::new();
+    }
+    let Some(next) = super::todo_changes::todos_from_tool_input(tc) else {
+        return Vec::new();
+    };
+    let prev = super::todo_changes::previous_todos(messages, abs_idx);
+    super::todo_changes::render_todo_change_lines(prev.as_deref(), &next, width)
+}
+
+/// Render a single transcript message into `acc`. This is the one canonical
+/// per-message renderer; the full and incremental body builders both call it so
+/// their output cannot drift (which previously caused subtle text-selection and
+/// spacing differences on the incremental path).
+fn render_message_into(
+    ctx: &BodyRenderCtx<'_>,
+    acc: &mut BodyAcc,
+    msg: &DisplayMessage,
+    msg_global_idx: usize,
+) {
+    let width = ctx.width;
+    let centered = ctx.centered;
+    let app = ctx.app;
+    let role = msg.effective_role();
+    let align = default_message_alignment(role, centered);
+
+    if (acc.body_has_content || !acc.lines.is_empty())
+        && role != "tool"
+        && role != "meta"
+        && role != "swarm"
+    {
+        acc.push_blank();
+    }
+
+    match role {
+        "user" => {
+            acc.prompt_num += 1;
+            acc.user_prompt_texts.push(msg.content.clone());
+            let distance = ctx.total_prompts + ctx.pending_count + 1 - acc.prompt_num;
+            let num_color = rainbow_prompt_color(distance);
+            let displayed_prompt_num = acc.prompt_num + ctx.prompt_number_offset;
+            push_user_prompt_lines(
+                &mut acc.lines,
+                &mut acc.raw_plain_lines,
+                &mut acc.line_raw_overrides,
+                &mut acc.line_copy_offsets,
+                &mut acc.user_line_indices,
+                displayed_prompt_num,
+                num_color,
+                &msg.content,
+                align,
+            );
+            if !crate::session::is_attached_image_label_text(&msg.content) {
+                let ordinal = acc.anchor_prompt_ordinal;
+                acc.anchor_prompt_ordinal += 1;
+                if let Some(items) = ctx.anchored_images.by_prompt.get(&ordinal) {
+                    for line in super::inline_image_ui::anchored_image_lines(
+                        items,
+                        width,
+                        ctx.inline_images_visible,
+                        &super::inline_image_ui::AppExpandLevels(app),
+                    ) {
+                        acc.push_auto(line);
+                    }
+                }
+            }
+        }
+        "assistant" => {
+            let content_width = width.saturating_sub(4);
+            let cached = get_cached_message_lines(
+                msg,
+                content_width,
+                app.diff_mode(),
+                render_assistant_message,
+            );
+            let message_copy_targets = assistant_message_copy_targets(&msg.content, &cached);
+            for target in message_copy_targets {
+                acc.copy_targets
+                    .push(offset_copy_target(target, acc.lines.len()));
+            }
+            let aux = assistant_aux_data(
+                msg,
+                &cached,
+                content_width,
+                centered,
+                app.diff_mode(),
+                align,
+            );
+            let content_line_count = aux.content_line_count;
+            let logical_plain_lines = &aux.logical_plain_lines;
+            let raw_base = acc.raw_plain_lines.len();
+            let content_maps = map_display_lines_to_logical_lines(
+                &cached[..content_line_count],
+                logical_plain_lines,
+                raw_base,
+            );
+            if let Some(maps) = content_maps {
+                // Content lines map back into the logical markdown lines for
+                // text selection; seed those raws contiguously. Trailing
+                // tool-summary lines (idx >= content_line_count) and any line
+                // the mapping could not cover fall back to self-raws via
+                // `push_auto`, keeping `raw_plain_lines` message-contiguous.
+                acc.raw_plain_lines
+                    .extend(logical_plain_lines.iter().cloned());
+                for (idx, line) in cached.into_iter().enumerate() {
+                    let line = align_if_unset(line, align);
+                    if let Some(map) = maps.get(idx).copied() {
+                        acc.lines.push(line);
+                        acc.line_raw_overrides.push(Some(map));
+                        acc.line_copy_offsets.push(0);
+                    } else {
+                        acc.push_auto(line);
+                    }
+                }
+            } else {
+                // Logical mapping failed; every display line uses its own plain
+                // text as the raw, matching the previous wrap-time fallback but
+                // recorded contiguously and in message order.
+                for line in cached {
+                    acc.push_auto(align_if_unset(line, align));
+                }
+            }
+        }
+        "meta" => {
+            let raw_line = acc.raw_plain_lines.len();
+            acc.raw_plain_lines.push(msg.content.clone());
+            let raw_width = unicode_width::UnicodeWidthStr::width(msg.content.as_str());
+            let prefix_width = if centered {
+                0
+            } else {
+                unicode_width::UnicodeWidthStr::width("  ")
+            };
+            acc.lines.push(
+                Line::from(vec![
+                    Span::raw(if centered { "" } else { "  " }),
+                    Span::styled(msg.content.clone(), Style::default().fg(dim_color())),
+                ])
+                .alignment(align),
+            );
+            acc.line_raw_overrides.push(Some(WrappedLineMap {
+                raw_line,
+                start_col: 0,
+                end_col: raw_width,
+            }));
+            acc.line_copy_offsets.push(prefix_width);
+        }
+        "tool" => {
+            let tool_start_line = acc.lines.len();
+            let cached = get_cached_message_lines(msg, width, app.diff_mode(), render_tool_message);
+            if let Some(target) = tool_message_copy_target(msg, cached.len()) {
+                acc.copy_targets
+                    .push(offset_copy_target(target, tool_start_line));
+            }
+            for line in cached {
+                acc.push_auto(align_if_unset(line, align));
+            }
+            for line in todo_change_lines(ctx.messages, msg_global_idx, msg, width) {
+                acc.push_auto(align_if_unset(line, align));
+            }
+            if let Some(ref tc) = msg.tool_data {
+                let is_edit_tool = tools_ui::is_edit_tool_name(&tc.name);
+                if is_edit_tool {
+                    let file_path = tc
+                        .input
+                        .get("file_path")
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string)
+                        .or_else(|| {
+                            tc.input
+                                .get("patch_text")
+                                .and_then(|v| v.as_str())
+                                .and_then(|patch_text| {
+                                    match tools_ui::canonical_tool_name(&tc.name) {
+                                        "apply_patch" => {
+                                            tools_ui::extract_apply_patch_primary_file(patch_text)
+                                        }
+                                        "patch" => {
+                                            tools_ui::extract_unified_patch_primary_file(patch_text)
+                                        }
+                                        _ => None,
+                                    }
+                                })
+                        })
+                        .unwrap_or_else(|| "unknown".to_string());
+                    let expandable =
+                        messages::edit_tool_inline_diff_is_expandable(tc, &msg.content, width);
+                    acc.edit_tool_line_ranges.push((
+                        msg_global_idx,
+                        file_path,
+                        tool_start_line,
+                        acc.lines.len(),
+                        expandable,
+                    ));
+                }
+                if let Some(items) = ctx.anchored_images.by_tool.get(&tc.id) {
+                    for line in super::inline_image_ui::anchored_image_lines(
+                        items,
+                        width,
+                        ctx.inline_images_visible,
+                        &super::inline_image_ui::AppExpandLevels(app),
+                    ) {
+                        acc.push_auto(line);
+                    }
+                }
+            }
+        }
+        "system" => {
+            let content_width = width.saturating_sub(4);
+            let cached = get_cached_message_lines(
+                msg,
+                content_width,
+                app.diff_mode(),
+                render_system_message,
+            );
+            for line in cached {
+                acc.push_auto(align_if_unset(line, align));
+            }
+        }
+        "reasoning" => {
+            let content_width = width.saturating_sub(4);
+            let cached = get_cached_message_lines(
+                msg,
+                content_width,
+                app.diff_mode(),
+                render_reasoning_message,
+            );
+            for line in cached {
+                acc.push_auto(align_if_unset(line, align));
+            }
+        }
+        "background_task" => {
+            let content_width = width.saturating_sub(4);
+            let cached = get_cached_message_lines(
+                msg,
+                content_width,
+                app.diff_mode(),
+                render_background_task_message,
+            );
+            for line in cached {
+                acc.push_auto(align_if_unset(line, align));
+            }
+        }
+        "swarm" => {
+            let content_width = width.saturating_sub(4);
+            let cached =
+                get_cached_message_lines(msg, content_width, app.diff_mode(), render_swarm_message);
+            for line in cached {
+                let line = align_if_unset(line, align);
+                let plain = ui::line_plain_text(&line);
+                let (semantic, prefix_width) = semantic_swarm_line_text(plain.as_str());
+                let raw_line = acc.raw_plain_lines.len();
+                let raw_width = unicode_width::UnicodeWidthStr::width(semantic.as_str());
+                acc.raw_plain_lines.push(semantic);
+                acc.lines.push(line);
+                acc.line_raw_overrides.push(Some(WrappedLineMap {
+                    raw_line,
+                    start_col: 0,
+                    end_col: raw_width,
+                }));
+                acc.line_copy_offsets.push(prefix_width);
+            }
+        }
+        "memory" => {
+            let border_style = Style::default().fg(rgb(130, 140, 180));
+            let text_style = Style::default().fg(dim_color());
+            let entries = super::memory_ui::parse_memory_display_entries(&msg.content);
+
+            let count = entries.len();
+            let tiles = group_into_tiles(entries);
+
+            let header_text = if let Some(title) = &msg.title {
+                title.clone()
+            } else if count == 1 {
+                "🧠 1 memory".to_string()
+            } else {
+                format!("🧠 {} memories", count)
+            };
+            let header = Line::from(Span::styled(header_text, border_style)).alignment(align);
+
+            let total_width = if centered {
+                (width.saturating_sub(4) as usize).min(120)
+            } else {
+                width.saturating_sub(2) as usize
+            };
+            let tile_lines =
+                render_memory_tiles(&tiles, total_width, border_style, text_style, Some(header));
+            for line in tile_lines {
+                acc.push_auto(align_if_unset(line, align));
+            }
+        }
+        "usage" => {
+            let content_width = width.saturating_sub(4);
+            let cached =
+                get_cached_message_lines(msg, content_width, app.diff_mode(), render_usage_message);
+            for line in cached {
+                acc.push_auto(align_if_unset(line, align));
+            }
+        }
+        "overnight" => {
+            let content_width = width.saturating_sub(4);
+            let cached = get_cached_message_lines(
+                msg,
+                content_width,
+                app.diff_mode(),
+                super::messages::render_overnight_message,
+            );
+            for line in cached {
+                acc.push_auto(align_if_unset(line, align));
+            }
+        }
+        "error" => {
+            let error_start_line = acc.lines.len();
+            if let Some(target) = error_copy_target(&msg.content, 1) {
+                acc.copy_targets
+                    .push(offset_copy_target(target, error_start_line));
+            }
+            let raw_line = acc.raw_plain_lines.len();
+            acc.raw_plain_lines.push(msg.content.clone());
+            let raw_width = unicode_width::UnicodeWidthStr::width(msg.content.as_str());
+            let prefix_width =
+                unicode_width::UnicodeWidthStr::width(if centered { "✗ " } else { "  ✗ " });
+            acc.lines.push(
+                Line::from(vec![
+                    Span::styled(
+                        if centered { "✗ " } else { "  ✗ " },
+                        Style::default().fg(Color::Red),
+                    ),
+                    Span::styled(msg.content.clone(), Style::default().fg(Color::Red)),
+                ])
+                .alignment(align),
+            );
+            acc.line_raw_overrides.push(Some(WrappedLineMap {
+                raw_line,
+                start_col: 0,
+                end_col: raw_width,
+            }));
+            acc.line_copy_offsets.push(prefix_width);
+        }
+        _ => {}
+    }
+
+    acc.segments.push((
+        msg.stable_cache_hash(),
+        acc.lines.len(),
+        acc.raw_plain_lines.len(),
+        acc.user_prompt_texts.len(),
+    ));
+}
+
 pub(super) fn prepare_body_incremental(
     app: &dyn TuiState,
     width: u16,

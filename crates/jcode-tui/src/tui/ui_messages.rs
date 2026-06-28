@@ -255,6 +255,62 @@ fn render_plaintext_lines(content: &str, wrap_width: usize) -> Vec<Line<'static>
     lines
 }
 
+/// Render the full agentgrep tool output inline beneath the tool summary line.
+/// Each output line is prefixed with a dim left border and indented so it reads
+/// as a nested block. Long lines are hard-split to the available width and the
+/// block is capped so a giant search result cannot flood the transcript.
+fn render_agentgrep_output_body(content: &str, row_width: usize) -> Vec<Line<'static>> {
+    const MAX_BODY_LINES: usize = 400;
+    let border = "    │ ";
+    let border_width = UnicodeWidthStr::width(border);
+    let avail = row_width.saturating_sub(border_width).max(1);
+
+    let mut out: Vec<Line<'static>> = Vec::new();
+    let source_lines: Vec<&str> = content.split('\n').collect();
+    let total = source_lines.len();
+    let mut truncated_extra = 0usize;
+
+    for raw_line in source_lines {
+        if out.len() >= MAX_BODY_LINES {
+            truncated_extra = total.saturating_sub(out.len());
+            break;
+        }
+        let raw_line = raw_line.trim_end_matches('\r');
+        if raw_line.is_empty() {
+            out.push(Line::from(Span::styled(
+                border.to_string(),
+                Style::default().fg(dim_color()),
+            )));
+            continue;
+        }
+        if UnicodeWidthStr::width(raw_line) <= avail {
+            out.push(Line::from(vec![
+                Span::styled(border.to_string(), Style::default().fg(dim_color())),
+                Span::styled(raw_line.to_string(), Style::default().fg(dim_color())),
+            ]));
+        } else {
+            for chunk in split_by_display_width(raw_line, avail) {
+                if out.len() >= MAX_BODY_LINES {
+                    break;
+                }
+                out.push(Line::from(vec![
+                    Span::styled(border.to_string(), Style::default().fg(dim_color())),
+                    Span::styled(chunk, Style::default().fg(dim_color())),
+                ]));
+            }
+        }
+    }
+
+    if truncated_extra > 0 {
+        out.push(Line::from(Span::styled(
+            format!("    │ … {} more lines …", truncated_extra),
+            Style::default().fg(dim_color()),
+        )));
+    }
+
+    out
+}
+
 pub(crate) fn render_system_message(
     msg: &DisplayMessage,
     width: u16,
@@ -1796,39 +1852,24 @@ pub(crate) fn render_tool_message(
         &token_suffix,
         row_width,
     );
-    let _rendered_tool_line_text = super::line_plain_text(&rendered_tool_line);
+    let rendered_tool_line_text = super::line_plain_text(&rendered_tool_line);
 
-    // Try to create oh-my-pi style framed box ┌──┐ with output + stats footer.
-    // Handle all tool call types: object inputs, string inputs, and empty inputs.
-    let mut box_created = false;
-    let has_input = tc.input.is_object() || tc.input.is_string();
-    if has_input && !tc.input.to_string().trim().is_empty() {
-        let canon = tools_ui::canonical_tool_name(&tc.name);
-        let is_error = tools_ui::tool_output_looks_failed(&msg.content);
-        let box_color = if is_error {
-            rgb(255, 80, 80)
-        } else {
-            match canon {
-                "bash" | "terminal" | "shell" => rgb(0, 255, 136),
-                "read" | "write" | "edit" | "hashline_edit" => rgb(100, 180, 255),
-                "web_search" | "web_fetch" | "webfetch" => rgb(180, 140, 255),
-                "eval" | "python" => rgb(240, 192, 64),
-                "grep" | "search" | "glob" | "find" => rgb(100, 220, 200),
-                "notify" | "memory" | "todo" | "notepad" => rgb(140, 200, 140),
-                _ => rgb(140, 140, 150),
-            }
-        };
-        let title = match canon {
-            "bash" | "terminal" | "shell" => " bash ",
-            "read" | "write" | "edit" | "hashline_edit" => " edit ",
-            "web_search" | "web_fetch" | "webfetch" => " web ",
-            "eval" | "python" => " eval ",
-            "grep" | "search" | "glob" | "find" => " search ",
-            "notify" | "memory" | "todo" | "notepad" => " note ",
-            "batch" | "bg" => " batch ",
-            "ffs" | "codesearch" => " code ",
-            _ => " tool ",
-        };
+    // Optionally render the full agentgrep search output inline in the
+    // transcript. Gated behind `display.show_agentgrep_output` (default false)
+    // so most users keep the compact one-line summary.
+    if tools_ui::canonical_tool_name(&tc.name) == "agentgrep"
+        && crate::config::config().display.show_agentgrep_output
+        && !msg.content.trim().is_empty()
+    {
+        for line in render_agentgrep_output_body(&msg.content, row_width) {
+            lines.push(line);
+        }
+    }
+
+    if tools_ui::canonical_tool_name(&tc.name) == "bash"
+        && !rendered_tool_line_text.contains('$')
+        && let Some(command) = tc.input.get("command").and_then(|v| v.as_str())
+    {
         let detail_width = row_width.saturating_sub(4).max(1);
         if detail_width >= 20 {
             let summary = tools_ui::get_tool_summary_with_budget(tc, 60, Some(detail_width));
@@ -1856,112 +1897,9 @@ pub(crate) fn render_tool_message(
             };
 
             if !cmd_display.is_empty() {
-                // Build oh-my-pi style box manually (render_sharp_box adds │ to separator).
-                let box_w = row_width.min(120) as usize;
-                if box_w < 20 {
-                    return lines;
-                }
-                let inner_w = box_w.saturating_sub(4);
-
-                // Top: ┌─ bash ─┐
-                let title_t = format!(" {} ", title.trim());
-                let tw = unicode_width::UnicodeWidthStr::width(title_t.as_str());
-                let left_t = (box_w.saturating_sub(tw + 2)) / 2;
-                let right_t = box_w.saturating_sub(tw + 2 + left_t);
-                lines.push(Line::from(Span::styled(
-                    format!("┌{}{}{}┐", "─".repeat(left_t), title_t, "─".repeat(right_t)),
-                    Style::default().fg(box_color),
-                )));
-
-                // Command: │ $ cargo build │
-                let cmd_text = format!(
-                    "│ {} {} │",
-                    cmd_display,
-                    " ".repeat(
-                        inner_w.saturating_sub(unicode_width::UnicodeWidthStr::width(
-                            cmd_display.as_str()
-                        ))
-                    )
-                );
-                lines.push(Line::from(Span::styled(
-                    cmd_text,
-                    Style::default().fg(box_color),
-                )));
-                // Always show full output (collapse is at GROUP level, not per-tool).
-                let output_lines = render_plaintext_lines(&msg.content, inner_w.min(detail_width));
-                let total_output = output_lines.len();
-                let max_show = 5usize.min(total_output);
-                if max_show > 0 {
-                    let sep_l = (box_w.saturating_sub(12)) / 2;
-                    let sep_r = box_w.saturating_sub(12 + sep_l);
-                    lines.push(Line::from(Span::styled(
-                        format!("├{} Output {}┤", "─".repeat(sep_l), "─".repeat(sep_r)),
-                        Style::default().fg(box_color),
-                    )));
-                    for line in output_lines.into_iter().take(max_show) {
-                        let lt = super::line_plain_text(&line);
-                        // Truncate by unicode width, not by char count
-                        let mut trimmed = String::new();
-                        let mut w = 0usize;
-                        for ch in lt.chars() {
-                            let cw = unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
-                            if w + cw > inner_w {
-                                break;
-                            }
-                            trimmed.push(ch);
-                            w += cw;
-                        }
-                        let padded =
-                            format!("│ {} {} │", trimmed, " ".repeat(inner_w.saturating_sub(w)));
-                        lines.push(Line::from(Span::styled(
-                            padded,
-                            Style::default().fg(rgb(180, 180, 190)),
-                        )));
-                    }
-                    if total_output > max_show {
-                        let more = format!("  … {} more lines", total_output - max_show);
-                        let padded = format!(
-                            "│ {}{} │",
-                            more,
-                            " ".repeat(inner_w.saturating_sub(
-                                unicode_width::UnicodeWidthStr::width(more.as_str())
-                            ))
-                        );
-                        lines.push(Line::from(Span::styled(
-                            padded,
-                            Style::default().fg(rgb(120, 120, 130)),
-                        )));
-                    }
-                }
-                // Footer: exit status when failed
-                if is_error {
-                    let exit_text = " ⟦ exit 1 ⟧ ";
-                    let padded = format!(
-                        "│ {}{} │",
-                        exit_text,
-                        " ".repeat(
-                            inner_w
-                                .saturating_sub(unicode_width::UnicodeWidthStr::width(exit_text))
-                        )
-                    );
-                    lines.push(Line::from(Span::styled(
-                        padded,
-                        Style::default().fg(rgb(100, 100, 110)),
-                    )));
-                }
-
-                // Bottom: └──┘
-                lines.push(Line::from(Span::styled(
-                    format!("└{}┘", "─".repeat(box_w.saturating_sub(2))),
-                    Style::default().fg(box_color),
-                )));
-                box_created = true;
+                lines.push(rendered_tool_line);
             }
         }
-    }
-
-    if !box_created {
-        lines.push(rendered_tool_line);
     }
     if tc.name == "batch"
         && let Some(calls) = tc.input.get("tool_calls").and_then(|v| v.as_array())

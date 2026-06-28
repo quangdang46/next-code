@@ -78,8 +78,8 @@ info_widget_toggle = "alt+i"
 # new_terminal = "cmd+shift+;"
 
 # Open the /resume session picker.
-# Default: Cmd+R on macOS, Alt+R on Windows/Linux. Set "" to disable.
-# open_resume = "cmd+r"
+# Default: Cmd+B on macOS, Alt+R on Windows/Linux. Set "" to disable.
+# open_resume = "cmd+b"
 
 # /resume picker Enter behavior. Options: "current-terminal" or "new-terminal".
 # By default Enter resumes in this terminal; Ctrl+Enter performs the alternate action.
@@ -149,6 +149,15 @@ idle_animation = true
 
 # Briefly animate a user prompt line when it enters the viewport (default: true)
 prompt_entry_animation = true
+
+# Render swarm/file-activity notifications in a compact single-line form
+# instead of the full multi-line card with diff preview (default: false)
+# compact_notifications = false
+
+# Show the full agentgrep tool output inline in the transcript instead of just
+# the one-line summary (default: false). Useful when you want to read search
+# results directly in the chat.
+# show_agentgrep_output = false
 
 # Disable specific animation variants by name.
 # Examples: ["donut"] or ["donut", "orbit_rings"]

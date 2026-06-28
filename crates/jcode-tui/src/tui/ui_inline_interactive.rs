@@ -203,7 +203,7 @@ fn model_picker_keybind_hint(picker: &crate::tui::InlineInteractiveState) -> Opt
             .any(|entry| matches!(entry.action, crate::tui::PickerAction::Model));
     if is_runtime_model_picker {
         Some(
-            " keys: Ctrl+B set default · Ctrl+F toggle favorite · Shift+Tab switch active model to next favorite",
+            " keys: Ctrl+O set default · Ctrl+N favorite · Shift+Tab switch active model to next favorite",
         )
     } else {
         None
@@ -576,7 +576,7 @@ pub(super) fn draw_inline_interactive(frame: &mut Frame, app: &dyn TuiState, are
         ));
         if picker.shows_default_shortcut_hint() {
             header_spans.push(Span::styled(
-                "  Ctrl-B=set default",
+                "  Ctrl-O=set default",
                 Style::default().fg(rgb(60, 60, 80)).italic(),
             ));
         }
@@ -1213,8 +1213,8 @@ mod tests {
         let hint =
             model_picker_keybind_hint(&picker).expect("active model picker should show hint");
 
-        assert!(hint.contains("Ctrl+B set default"));
-        assert!(hint.contains("Ctrl+F toggle favorite"));
+        assert!(hint.contains("Ctrl+O set default"));
+        assert!(hint.contains("Ctrl+N favorite"));
     }
 
     #[test]

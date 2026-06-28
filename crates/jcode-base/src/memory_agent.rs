@@ -517,32 +517,33 @@ impl MemoryAgent {
         // Step 1: Embed current context
         let start = Instant::now();
         let context_for_embedding = context.clone();
-        let context_embedding =
-            match tokio::task::spawn_blocking(move || embedding::embed(&context_for_embedding))
-                .await
-            {
-                Ok(Ok(emb)) => emb,
-                Ok(Err(e)) => {
-                    crate::logging::event_rate_limited(
-                        crate::logging::LogLevel::Info,
-                        "memory_agent_embedding_failed",
-                        std::time::Duration::from_secs(60),
-                        "MEMORY_EMBEDDING_FAILED",
-                        vec![
-                            ("session_id", session_id.to_string()),
-                            ("error", e.to_string()),
-                            ("fallback", "skip_memory_relevance".to_string()),
-                        ],
-                    );
-                    memory::set_state(MemoryState::Idle);
-                    return Ok(());
-                }
-                Err(e) => {
-                    crate::logging::info(&format!("Embedding task failed: {}", e));
-                    memory::set_state(MemoryState::Idle);
-                    return Ok(());
-                }
-            };
+        let context_embedding = match tokio::task::spawn_blocking(move || {
+            crate::embedding_backend::embed_query_active(&context_for_embedding)
+        })
+        .await
+        {
+            Ok(Ok((emb, _model))) => emb,
+            Ok(Err(e)) => {
+                crate::logging::event_rate_limited(
+                    crate::logging::LogLevel::Info,
+                    "memory_agent_embedding_failed",
+                    std::time::Duration::from_secs(60),
+                    "MEMORY_EMBEDDING_FAILED",
+                    vec![
+                        ("session_id", session_id.to_string()),
+                        ("error", e.to_string()),
+                        ("fallback", "skip_memory_relevance".to_string()),
+                    ],
+                );
+                memory::set_state(MemoryState::Idle);
+                return Ok(());
+            }
+            Err(e) => {
+                crate::logging::info(&format!("Embedding task failed: {}", e));
+                memory::set_state(MemoryState::Idle);
+                return Ok(());
+            }
+        };
 
         // Check for topic change (comparing against this session's last embedding)
         let mut topic_changed = false;
@@ -693,22 +694,49 @@ impl MemoryAgent {
                 let agents = &crate::config::config().agents;
                 let votes = agents.memory_rerank_votes.max(1);
                 let min_agree = agents.memory_rerank_min_agree.clamp(1, votes);
-                let reranked = crate::memory_rerank::rerank_candidates_consensus(
-                    sidecar,
-                    &focused_query,
-                    new_candidates,
-                    votes,
-                    min_agree,
-                )
-                .await;
-                let turn = self.session_state(session_id).turn_count;
-                let result: Vec<_> = reranked.into_iter().take(MAX_MEMORIES_PER_TURN).collect();
-                {
-                    let ss = self.session_state(session_id);
-                    ss.last_rerank_turn = Some(turn);
-                    ss.last_verified_ids = result.iter().map(|e| e.id.clone()).collect();
+                let (reranked, outcome) =
+                    crate::memory_rerank::rerank_candidates_consensus_attributed(
+                        &sidecar,
+                        &focused_query,
+                        new_candidates.clone(),
+                        votes,
+                        min_agree,
+                    )
+                    .await;
+                // Attribute exactly why this turn surfaced what it did: a judged
+                // verdict is the productive path; any rerank failure (transport
+                // error / unparseable / all judges failed) is a no-LLM
+                // degradation we want to drive to zero.
+                crate::memory_judge_metrics::record(
+                    crate::memory_judge_metrics::JudgeDecision::from_rerank_outcome(outcome),
+                    session_id,
+                    candidate_ids.len(),
+                );
+                if outcome == crate::memory_rerank::RerankOutcome::Judged {
+                    // Real judge verdict: surface it and remember it as the new
+                    // verified set for future cadence/failure carries.
+                    let turn = self.session_state(session_id).turn_count;
+                    let result: Vec<_> = reranked.into_iter().take(MAX_MEMORIES_PER_TURN).collect();
+                    {
+                        let ss = self.session_state(session_id);
+                        ss.last_rerank_turn = Some(turn);
+                        ss.last_verified_ids = result.iter().map(|e| e.id.clone()).collect();
+                    }
+                    result
+                } else {
+                    // Judge FAILED this turn (rerank returned empty). Do NOT inject
+                    // unvetted hybrid order; carry the last judge-verified set so
+                    // everything surfaced stays judge-backed. Don't advance
+                    // last_rerank_turn, so the next eligible turn retries the judge.
+                    let carried = self.carry_verified(session_id, new_candidates);
+                    crate::logging::info(&format!(
+                        "[{}] Memory judge failed ({:?}); carrying {} previously verified memories (no hybrid fallback)",
+                        session_id,
+                        outcome,
+                        carried.len()
+                    ));
+                    carried
                 }
-                result
             } else {
                 // Cadence-gated turn: re-surface ONLY the memories the last
                 // consensus rerank verified (intersected with the current
@@ -747,7 +775,7 @@ impl MemoryAgent {
         let retrieval_ctx = RetrievalContext {
             verified_ids: verified_ids.clone(),
             rejected_ids,
-            context_snippet: context[..context.len().min(200)].to_string(),
+            context_snippet: jcode_core::util::truncate_str(&context, 200).to_string(),
         };
 
         // Step 4: Format and store for main agent
@@ -819,10 +847,34 @@ impl MemoryAgent {
                 "[{}] Memory relevant (semantic sim={:.2}): {}",
                 session_id,
                 sim,
-                &entry.content[..entry.content.len().min(40)]
+                jcode_core::util::truncate_str(&entry.content, 40)
             ));
         }
         selected.into_iter().map(|(entry, _)| entry).collect()
+    }
+
+    /// Re-surface ONLY the memories the last consensus rerank verified,
+    /// intersected with the current candidate set. Used both for cadence-gated
+    /// turns and as the fallback when a judge fails this turn: in either case we
+    /// ride the last judge verdict rather than dropping to unvetted hybrid order.
+    /// No prior verdict (or no overlap) -> surface nothing. This keeps the LLM
+    /// judge the ONLY thing that can put a memory in front of the agent.
+    fn carry_verified(
+        &mut self,
+        session_id: &str,
+        candidates: Vec<(MemoryEntry, f32)>,
+    ) -> Vec<MemoryEntry> {
+        let verified: HashSet<String> = self
+            .session_state(session_id)
+            .last_verified_ids
+            .iter()
+            .cloned()
+            .collect();
+        candidates
+            .into_iter()
+            .filter(|(e, _)| verified.contains(&e.id))
+            .map(|(e, _)| e)
+            .collect()
     }
 
     /// Extract memories from a context string
@@ -1141,7 +1193,7 @@ impl MemoryAgent {
                 crate::logging::info(&format!(
                     "Memory gap detected: {} candidates retrieved but none relevant. Context: {}...",
                     ctx.rejected_ids.len(),
-                    &ctx.context_snippet[..ctx.context_snippet.len().min(100)]
+                    jcode_core::util::truncate_str(&ctx.context_snippet, 100)
                 ));
             }
 
@@ -1258,7 +1310,7 @@ async fn refine_clusters(
                 let member_contents: Vec<String> = project_ids
                     .iter()
                     .filter_map(|id| project_graph.get_memory(id))
-                    .map(|m| m.content[..m.content.len().min(80)].to_string())
+                    .map(|m| jcode_core::util::truncate_str(&m.content, 80).to_string())
                     .collect();
                 if let Ok(name) = name_cluster_with_sidecar(&member_contents).await
                     && let Some(cluster) = project_graph.clusters.get_mut(cluster_id)

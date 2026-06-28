@@ -1061,8 +1061,8 @@ impl MemoryManager {
         transcript: &str,
         session_id: &str,
     ) -> Result<Vec<String>> {
-        if !memory_sidecar_enabled() {
-            crate::logging::info("Memory transcript extraction skipped: memory sidecar disabled");
+        if !memory_llm_judge_available() {
+            crate::logging::info("Memory transcript extraction skipped: LLM judge unavailable");
             return Ok(Vec::new());
         }
 

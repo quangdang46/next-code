@@ -1200,6 +1200,19 @@ impl App {
             .unwrap_or(false)
     }
 
+    /// Whether the configured `keybindings.fallback_switch` chord matches this key.
+    pub(crate) fn fallback_switch_key_matches(
+        &self,
+        code: KeyCode,
+        modifiers: KeyModifiers,
+    ) -> bool {
+        self.fallback_switch_key
+            .binding
+            .as_ref()
+            .map(|binding| binding.matches(code, modifiers))
+            .unwrap_or(false)
+    }
+
     /// Spawn a brand-new jcode session in a new terminal window.
     pub(crate) fn handle_new_terminal_hotkey(&mut self) {
         let cwd = commands::active_working_dir(self)
@@ -1701,7 +1714,7 @@ pub(super) fn handle_pre_control_shortcuts(
         app.cycle_effort(direction);
         return true;
     }
-    if app.centered_toggle_keys.toggle.matches(code, modifiers) {
+    if app.centered_toggle_keys.matches(code, modifiers) {
         app.toggle_centered_mode();
         return true;
     }
@@ -2294,9 +2307,10 @@ impl App {
         }
 
         // While the model picker preview is visible, route its favorite/default
-        // hotkeys (Ctrl+B, Ctrl+F, Alt+F) to the focused picker handler before the
-        // global control shortcuts can claim them. This makes the hotkeys work
-        // directly in the preview list the user always sees.
+        // hotkeys (Ctrl+O set default, Ctrl+N toggle favorite) to the focused
+        // picker handler before the global control shortcuts can claim them. This
+        // makes the hotkeys work directly in the preview list the user always
+        // sees, without colliding with the readline/tmux keys (Ctrl+B/Ctrl+F).
         if self.model_picker_preview_hotkey(code, modifiers)? {
             return Ok(());
         }
@@ -2309,6 +2323,16 @@ impl App {
             if !is_scroll_only_key(self, code, modifiers) {
                 self.cancel_pending_provider_failover("Provider auto-switch canceled");
             }
+        }
+
+        // Accept an armed post-error fallback offer: switch to the next best
+        // model/auth-method and resend the failed turn.
+        if self.pending_fallback_offer.is_some()
+            && !self.is_processing
+            && self.fallback_switch_key_matches(code, modifiers)
+        {
+            self.apply_pending_fallback_offer();
+            return Ok(());
         }
 
         if is_next_prompt_new_session_hotkey(code, modifiers) {
@@ -3366,6 +3390,10 @@ impl App {
         }
         crate::telemetry::record_turn();
         self.session_save_pending = true;
+
+        // A fresh user turn supersedes any post-error fallback offer from the
+        // previous turn; drop it so a stale keypress can't switch+resend.
+        self.clear_pending_fallback_offer();
 
         // Set up processing state - actual processing happens after UI redraws
         self.is_processing = true;

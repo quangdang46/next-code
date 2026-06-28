@@ -6252,6 +6252,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tempfile",
 ]
 
 [[package]]
@@ -6757,6 +6758,7 @@ dependencies = [
  "jcode-config-types",
  "jcode-logging",
  "jcode-storage",
+ "jcode-terminal-launch",
  "serde",
  "serde_json",
  "tempfile",

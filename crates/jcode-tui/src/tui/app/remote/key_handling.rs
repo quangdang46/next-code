@@ -365,7 +365,7 @@ async fn handle_remote_key_internal(
         app.toggle_typing_scroll_lock();
         return Ok(());
     }
-    if app.centered_toggle_keys.toggle.matches(code, modifiers) {
+    if app.centered_toggle_keys.matches(code, modifiers) {
         app.toggle_centered_mode();
         return Ok(());
     }
@@ -481,7 +481,7 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
-    if app.centered_toggle_keys.toggle.matches(code, modifiers) {
+    if app.centered_toggle_keys.matches(code, modifiers) {
         app.toggle_centered_mode();
         return Ok(());
     }
@@ -1679,6 +1679,11 @@ async fn handle_remote_key_internal(
                     app.is_processing = false;
                     app.status = ProcessingStatus::Idle;
                     app.set_status_notice("Session cleared");
+                    return Ok(());
+                }
+
+                if trimmed == "/fork" {
+                    app.toggle_next_prompt_new_session_routing();
                     return Ok(());
                 }
 
