@@ -23,7 +23,7 @@ use crate::memory::{self, MemoryEntry, MemoryManager};
 use crate::memory_graph::{ClusterEntry, EdgeKind, MemoryGraph};
 use crate::memory_types::{MemoryEventKind, MemoryState, StepResult, StepStatus};
 use crate::sidecar::Sidecar;
-use jcode_memory_types::{MemoryProvider, MemoryScope};
+use jcode_memory_types::MemoryScope;
 
 /// Context from a retrieval operation for post-retrieval maintenance
 #[derive(Debug, Clone)]
@@ -211,7 +211,7 @@ async fn run_final_extraction(transcript: String, session_id: String, working_di
                     .with_source(&session_id)
                     .with_trust(trust);
 
-                if manager.remember(entry, MemoryScope::Project).await.is_ok() {
+                if manager.remember_project(entry).is_ok() {
                     stored_count += 1;
                 }
             }

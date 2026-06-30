@@ -1232,13 +1232,8 @@ fn fallback_memory_info(
     })
 }
 
-/// Gather memory info using a trait-based provider instead of direct MemoryGraph access.
-///
-/// Uses `list_all()` and `graph_stats()` from the `MemoryProvider` trait, and
-/// `load_project_graph()`/`load_global_graph()` from `GraphOperations` for topology.
-async fn gather_memory_info_with_provider(
-    provider: std::sync::Arc<dyn jcode_memory_types::MemoryProvider>,
-) -> Option<MemoryInfo> {
+/// Gather memory info using MemoryManager directly.
+fn gather_memory_info_with_manager(manager: &crate::memory::MemoryManager) -> Option<MemoryInfo> {
     let activity = crate::memory::get_activity();
     let sidecar_model = if crate::memory::memory_sidecar_enabled() {
         let sidecar = crate::sidecar::Sidecar::new();
@@ -1251,8 +1246,8 @@ async fn gather_memory_info_with_provider(
         None
     };
 
-    let project_graph = provider.load_project_graph().await.ok();
-    let global_graph = provider.load_global_graph().await.ok();
+    let project_graph = manager.load_project_graph().ok();
+    let global_graph = manager.load_global_graph().ok();
 
     let project_count = project_graph
         .as_ref()
@@ -1297,14 +1292,10 @@ async fn gather_memory_info_with_provider(
     }
 }
 
-/// Legacy wrapper that creates a `MemoryManager` and delegates to the trait-based path.
-///
-/// Kept for backward compatibility. Callers that already hold a provider should
-/// call `gather_memory_info_with_provider` directly.
+/// Gather memory info using MemoryManager directly.
 fn gather_memory_info_inner() -> Option<MemoryInfo> {
-    let provider: std::sync::Arc<dyn jcode_memory_types::MemoryProvider> =
-        std::sync::Arc::new(crate::memory::MemoryManager::new());
-    futures::executor::block_on(gather_memory_info_with_provider(provider))
+    let manager = crate::memory::MemoryManager::new();
+    gather_memory_info_with_manager(&manager)
 }
 
 pub(super) fn gather_ambient_info(ambient_enabled: bool) -> Option<AmbientWidgetData> {

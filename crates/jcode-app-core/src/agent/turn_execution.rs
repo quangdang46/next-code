@@ -1108,10 +1108,8 @@ impl Agent {
                         .with_source(&self.session.id)
                         .with_trust(trust);
 
-                    // Use the MemoryProvider trait method so this works with
-                    // any backend (legacy MemoryManager or MempalaceAdapter).
-                    use jcode_memory_types::{MemoryProvider, MemoryScope};
-                    if manager.remember(entry, MemoryScope::Project).await.is_ok() {
+                    // Store via the MemoryManager's project-scoped storage.
+                    if manager.remember_project(entry).is_ok() {
                         stored_count += 1;
                     }
                 }

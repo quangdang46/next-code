@@ -758,18 +758,9 @@ impl Registry {
             "conversation_search",
             conversation_search::ConversationSearchTool::new(compaction),
         );
-        // Memory tool — uses MemoryProvider abstraction.
-        // Default: legacy MemoryManager. When mempalace-backend feature is
-        // enabled, tries to create a MempalaceAdapter first, falling back
-        // to the legacy manager if the adapter fails to open.
+        // Memory tool — uses MemoryManager (JSON-based persistent storage).
         {
-            let memory_provider: Arc<dyn jcode_memory_types::MemoryProvider> =
-                Self::create_memory_provider().await;
-            Self::insert_tool(
-                &mut tools_map,
-                "memory",
-                memory::MemoryTool::new(memory_provider),
-            );
+            Self::insert_tool(&mut tools_map, "memory", memory::MemoryTool::new());
         }
         let session_tools_ms = session_tools_start.elapsed().as_millis();
 
@@ -832,36 +823,6 @@ impl Registry {
         );
 
         crate::logging::info("Memory test mode enabled - using isolated storage");
-    }
-
-    /// Create a memory provider, trying MempalaceAdapter first when feature
-    /// `mempalace-backend` is enabled, falling back to legacy MemoryManager.
-    async fn create_memory_provider() -> Arc<dyn jcode_memory_types::MemoryProvider> {
-        #[cfg(feature = "mempalace-backend")]
-        {
-            match Self::open_mempalace().await {
-                Ok(provider) => {
-                    crate::logging::info("Using mempalace memory backend");
-                    return provider;
-                }
-                Err(e) => {
-                    crate::logging::warn(&format!("Failed to open mempalace, using legacy: {e}"));
-                }
-            }
-        }
-        Arc::new(crate::memory::MemoryManager::new())
-    }
-
-    /// Try to open a MempalaceAdapter at the default palace path.
-    #[cfg(feature = "mempalace-backend")]
-    async fn open_mempalace() -> anyhow::Result<Arc<dyn jcode_memory_types::MemoryProvider>> {
-        use jcode_mempalace_adapter::MempalaceAdapter;
-
-        let jcode_home = jcode_storage::jcode_dir()?;
-        let palace_path = jcode_home.join("mempalace");
-
-        let adapter = MempalaceAdapter::open(&palace_path).await?;
-        Ok(Arc::new(adapter) as Arc<dyn jcode_memory_types::MemoryProvider>)
     }
 
     /// Resolve tool name aliases.

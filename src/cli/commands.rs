@@ -1606,20 +1606,13 @@ pub enum MemorySubcommand {
 }
 
 pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
-    use jcode_memory_types::{MemoryEntry as MemEntry, MemoryProvider, MemoryScope};
-    use std::sync::Arc;
+    use jcode_memory_types::{MemoryEntry as MemEntry, MemoryScope};
 
-    let provider: Arc<dyn MemoryProvider> = Arc::new(memory::MemoryManager::new());
-
-    // Bridge sync → async. Try to get current runtime handle; if none, create a one-shot.
-    let handle = tokio::runtime::Handle::try_current().unwrap_or_else(|_| {
-        let rt = tokio::runtime::Runtime::new().expect("failed to create tokio runtime");
-        rt.handle().clone()
-    });
+    let manager = memory::MemoryManager::new();
 
     match cmd {
         MemorySubcommand::List { scope: _, tag } => {
-            let entries = handle.block_on(provider.list_all(MemoryScope::All))?;
+            let entries = manager.list_all()?;
             let mut all_memories: Vec<MemEntry> = entries;
 
             if let Some(tag_filter) = tag {
@@ -1656,7 +1649,7 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
         MemorySubcommand::Search { query, semantic } => {
             if semantic {
                 let results =
-                    handle.block_on(provider.recall(&query, MemoryScope::All, 20, "semantic"))?;
+                    manager.find_similar_with_cascade_scoped(&query, 0.5, 20, MemoryScope::All)?;
                 if results.is_empty() {
                     println!("No memories found matching '{}'", query);
                 } else {
@@ -1683,7 +1676,7 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
                     }
                 }
             } else {
-                let results = handle.block_on(provider.search(&query, MemoryScope::All))?;
+                let results = manager.search_scoped(&query, MemoryScope::All)?;
                 if results.is_empty() {
                     println!("No memories found matching '{}'", query);
                 } else {
@@ -1714,7 +1707,7 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
                 "global" => MemoryScope::Global,
                 _ => MemoryScope::All,
             };
-            let all_memories = handle.block_on(provider.list_all(mem_scope))?;
+            let all_memories = manager.list_all_scoped(mem_scope)?;
             let json = serde_json::to_string_pretty(&all_memories)?;
             std::fs::write(&output, json)?;
             println!("Exported {} memories to {}", all_memories.len(), output)
@@ -1736,10 +1729,10 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
 
             // Build set of existing IDs for dedup
             let existing_ids: std::collections::HashSet<String> = if !overwrite {
-                let graph = handle
-                    .block_on(provider.load_project_graph())
+                let graph = manager
+                    .load_project_graph()
                     .ok()
-                    .or_else(|| handle.block_on(provider.load_global_graph()).ok())
+                    .or_else(|| manager.load_global_graph().ok())
                     .unwrap_or_default();
                 graph.all_memories().map(|m| m.id.clone()).collect()
             } else {
@@ -1751,7 +1744,11 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
                     skipped += 1;
                     continue;
                 }
-                if handle.block_on(provider.remember(entry, mem_scope)).is_ok() {
+                let result = match mem_scope {
+                    MemoryScope::Global => manager.remember_global(entry),
+                    _ => manager.remember_project(entry),
+                };
+                if result.is_ok() {
                     imported += 1;
                 }
             }
@@ -1759,8 +1756,8 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
         }
 
         MemorySubcommand::Stats => {
-            let (total, tags, _edges, _clusters) = handle.block_on(provider.graph_stats())?;
-            let entries = handle.block_on(provider.list_all(MemoryScope::All))?;
+            let (total, tags, _edges, _clusters) = manager.graph_stats()?;
+            let entries = manager.list_all()?;
             let mut categories: std::collections::HashMap<String, usize> =
                 std::collections::HashMap::new();
             for entry in &entries {

@@ -87,7 +87,6 @@ members = [
     "crates/jcode-keyring-store",
     "crates/jcode-redact",
     "crates/jcode-keywords",
-    "crates/jcode-mempalace-adapter",
     "crates/jcode-secrets",
     "crates/jcode-plugin-core",
     "crates/jcode-plugin-runtime",
@@ -278,7 +277,7 @@ jcode-background-types = { path = "crates/jcode-background-types" }
 jcode-batch-types = { path = "crates/jcode-batch-types" }
 jcode-build-support = { path = "crates/jcode-build-support" }
 jcode-build-meta = { path = "crates/jcode-build-meta" }
-# Application core: tooling, agent, dcg, dcp, mempalace, etc. Re-exported via
+# Application core: tooling, agent, dcg, dcp, etc. Re-exported via
 # `pub use jcode_app_core::*` in lib.rs. default-features=false so the root
 # feature set fully controls the downstream features (see [features]).
 jcode-app-core = { path = "crates/jcode-app-core", default-features = false }
@@ -328,7 +327,7 @@ aws-sdk-sts = "1.103.0"
 # semantic retrieval, and embedding-backed features work out of the box.
 # Use `JCODE_DEV_FEATURE_PROFILE=minimal` for compile-speed probes that need
 # to skip optional default feature stacks.
-default = ["pdf", "embeddings", "dcp", "rtco", "jemalloc", "mmdr-size-api", "mempalace-backend"]
+default = ["pdf", "embeddings", "dcp", "rtco", "jemalloc", "mmdr-size-api"]
 dev-bins = ["jcode-tui/dev-bins"]
 jemalloc = [
     "dep:tikv-jemallocator",
@@ -348,7 +347,6 @@ embeddings = ["dep:jcode-embedding", "jcode-tui/embeddings"]
 dcp = ["jcode-tui/dcp"]
 rtco = ["jcode-tui/rtco"]
 mmdr-size-api = ["jcode-tui-mermaid/mmdr-size-api"]
-mempalace-backend = ["jcode-app-core/mempalace-backend"]
 pdf = ["dep:jcode-pdf", "jcode-tui/pdf"]
 
 [target.'cfg(windows)'.dependencies]

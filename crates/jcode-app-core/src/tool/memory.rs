@@ -1,27 +1,27 @@
 //! Memory tool for storing and recalling information across sessions
 
 use super::{Tool, ToolContext, ToolOutput};
-use crate::memory::{MemoryCategory, MemoryEntry, MemoryScope};
+use crate::memory::{MemoryCategory, MemoryEntry, MemoryManager, MemoryScope};
 use anyhow::Result;
 use async_trait::async_trait;
-use jcode_memory_types::MemoryProvider;
 use serde::Deserialize;
 use serde_json::{Value, json};
-use std::sync::Arc;
 
 pub struct MemoryTool {
-    manager: Arc<dyn MemoryProvider>,
+    manager: MemoryManager,
 }
 
 impl MemoryTool {
-    pub fn new(provider: Arc<dyn MemoryProvider>) -> Self {
-        Self { manager: provider }
+    pub fn new() -> Self {
+        Self {
+            manager: MemoryManager::new(),
+        }
     }
 
     /// Create a memory tool in test mode (isolated storage)
     pub fn new_test() -> Self {
         Self {
-            manager: Arc::new(crate::memory::MemoryManager::new_test()) as Arc<dyn MemoryProvider>,
+            manager: MemoryManager::new_test(),
         }
     }
 
@@ -147,7 +147,7 @@ impl Tool for MemoryTool {
                 if let Some(tags) = input.tags {
                     entry = entry.with_tags(tags);
                 }
-                let id = self.manager.remember(entry, mem_scope).await?;
+                let id = self.manager.remember_project(entry)?;
                 memory::add_event(MemoryEventKind::ToolRemembered {
                     content: truncate_for_widget(&content, 60),
                     scope: scope.to_string(),
@@ -176,7 +176,12 @@ impl Tool for MemoryTool {
                             action: "recall".into(),
                             detail: "recent".into(),
                         });
-                        let results = self.manager.recall("", scope, limit, "recent").await?;
+                        let all_entries = self.manager.list_all_scoped(scope)?;
+                        let results: Vec<(MemoryEntry, f32)> = all_entries
+                            .into_iter()
+                            .take(limit)
+                            .map(|e| (e, 1.0_f32))
+                            .collect();
                         let count = results.len();
                         memory::add_event(MemoryEventKind::ToolRecalled {
                             query: "(recent)".into(),
@@ -210,7 +215,18 @@ impl Tool for MemoryTool {
                             detail: truncate_for_widget(&query, 40),
                         });
 
-                        let results = self.manager.recall(&query, scope, limit, mode).await?;
+                        let results: Vec<(MemoryEntry, f32)> = match mode {
+                            "semantic" | "cascade" => self
+                                .manager
+                                .find_similar_with_cascade_scoped(&query, 0.5, limit, scope)?
+                                .into_iter()
+                                .collect(),
+                            _ => self
+                                .manager
+                                .find_similar_scoped(&query, 0.5, limit, scope)?
+                                .into_iter()
+                                .collect(),
+                        };
 
                         memory::add_event(MemoryEventKind::ToolRecalled {
                             query: truncate_for_widget(&query, 40),
@@ -262,7 +278,7 @@ impl Tool for MemoryTool {
                     action: "search".into(),
                     detail: truncate_for_widget(&query, 40),
                 });
-                let results = self.manager.search(&query, scope).await?;
+                let results = self.manager.search_scoped(&query, scope)?;
                 memory::add_event(MemoryEventKind::ToolRecalled {
                     query: truncate_for_widget(&query, 40),
                     count: results.len(),
@@ -287,7 +303,7 @@ impl Tool for MemoryTool {
                     action: "list".into(),
                     detail: String::new(),
                 });
-                let all = self.manager.list_all(scope).await?;
+                let all = self.manager.list_all_scoped(scope)?;
                 memory::add_event(MemoryEventKind::ToolListed { count: all.len() });
                 memory::set_state(MemoryState::Idle);
                 if all.is_empty() {
@@ -309,7 +325,7 @@ impl Tool for MemoryTool {
                     action: "forget".into(),
                     detail: truncate_for_widget(&id, 30),
                 });
-                let found = self.manager.forget(&id).await?;
+                let found = self.manager.forget(&id)?;
                 memory::add_event(MemoryEventKind::ToolForgot { id: id.clone() });
                 memory::set_state(MemoryState::Idle);
                 if found {
@@ -331,7 +347,7 @@ impl Tool for MemoryTool {
                     detail: format!("{} +{}", truncate_for_widget(&id, 20), tags.join(",")),
                 });
                 for tag in &tags {
-                    self.manager.tag(&id, tag).await?;
+                    self.manager.tag_memory(&id, tag)?;
                 }
                 let tags_str = tags.join(", ");
                 memory::add_event(MemoryEventKind::ToolTagged {
@@ -362,7 +378,7 @@ impl Tool for MemoryTool {
                         truncate_for_widget(&to_id, 15)
                     ),
                 });
-                self.manager.link(&from_id, &to_id, weight).await?;
+                self.manager.link_memories(&from_id, &to_id, weight)?;
                 memory::add_event(MemoryEventKind::ToolLinked {
                     from: from_id.clone(),
                     to: to_id.clone(),
@@ -381,7 +397,7 @@ impl Tool for MemoryTool {
                     action: "related".into(),
                     detail: truncate_for_widget(&id, 30),
                 });
-                let related = self.manager.related(&id, depth).await?;
+                let related = self.manager.get_related(&id, depth)?;
                 memory::add_event(MemoryEventKind::ToolRecalled {
                     query: format!("related:{}", truncate_for_widget(&id, 20)),
                     count: related.len(),
