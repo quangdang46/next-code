@@ -127,6 +127,21 @@ WRONG (my initial mistake):          CORRECT (Claude Code actual):
 94. [MCP Elicitation Form](#94-mcp-elicitation-form)
 95. [Keymap Debug Tree](#95-keymap-debug-tree)
 96. [Teammate Status / Shared Session](#96-teammate-status--shared-session)
+97. [Commands Palette (Ctrl+P)](#97-commands-palette-ctrlp)
+98. [Pills Panel (To-Do & Queue)](#98-pills-panel-to-do--queue)
+99. [Side Q&A Panel (BTW)](#99-side-qa-panel-btw)
+100. [Agent Dashboard (Subagent Manager)](#100-agent-dashboard-subagent-manager)
+101. [Agent Arena (Multi-Model Competition)](#101-agent-arena-multi-model-competition)
+102. [Research / REPL Mode](#102-research--repl-mode)
+103. [Voice Input / Speech-to-Text](#103-voice-input--speech-to-text)
+104. [File Picker Dialog](#104-file-picker-dialog)
+105. [Attachment Chips Bar](#105-attachment-chips-bar)
+106. [Ferment Progress Overlay](#106-ferment-progress-overlay)
+107. [Assistant Turn Footer](#107-assistant-turn-footer)
+108. [Model Selector (Tabbed Browser)](#108-model-selector-tabbed-browser)
+109. [Yolo / Auto-Approve Mode](#109-yolo--auto-approve-mode)
+110. [Subagent Session Observer](#110-subagent-session-observer)
+
 ## Appendix D: [Per-Tool UI Matrix](#appendix-d-per-tool-ui-matrix)
 ## Appendix E: [Edge Cases & Error Handling](#appendix-e-edge-cases--error-handling)
 ## Appendix F: [Animation Reference](#appendix-f-animation-reference)
@@ -1651,26 +1666,6 @@ Non-blocking transient notifications that appear at the top of the input area.
 
 ---
 
-## Appendix D: Per-Tool UI Matrix
-
-| Tool      | Icon | Running State                 | Success State                  | Failure State          | Color        |
-|-----------|------|-------------------------------|--------------------------------|------------------------|--------------|
-| Bash      | `$`  | ⠋ running...                 | ✓ exit: 0 + output             | ✗ exit: N + stderr    | `tool_bash`  |
-| Edit      | `->` | ⠋ applying...                | ✓ Updated file.rs              | ✗ Edit failed + error  | `tool_edit`  |
-| Create    | `★`  | ⠋ creating...                | ✓ Created file.rs              | ✗ Create failed        | `success`    |
-| Read      | `->` | ⠋ reading...                 | ✓ file.rs (42 lines)           | ✗ File not found       | `tool_read`  |
-| Glob      | `☆`  | ⠋ searching...               | ☆ glob *.rs -> 42 matches      | ✗ No matches           | `info`       |
-| Grep      | `◆`  | ⠋ searching...               | ◆ grep "fn" -> 7 in 3 files    | ✗ No matches           | `info`       |
-| Agent     | `🔱` | 🔱 Spawning / ⠋ running     | ✓ Sub-agent complete (8.5s)    | ✗ Failed: timeout     | `accent`     |
-| Shell     | `$`  | ⠋ running... (live stream)  | ✓ exit: 0  (12.3s)             | ✗ exit: 1 + error      | `tool_bash`  |
-| WebFetch  | `🌐` | ⠋ fetching url...            | ✓ Fetched (1,234 bytes)        | ✗ Connection error     | `info`       |
-| WebSearch | `🔍` | ⠋ searching web...           | 🔍 "query" -> 5 results        | ✗ No results           | `info`       |
-| Question  | `?`  | ⠋ asking...                  | ? Answered                     | ✗ No answer            | `warning`    |
-| TodoWrite | `☐`  | ⠋ writing todos...           | ☑ 3 todos updated              | ✗ Write failed          | `info`       |
-| Task      | `⊞`  | ⠋ executing task...          | ⊞ Task complete (3/3 steps)    | ✗ Task failed           | `accent`     |
-| ApplyPatch| `->` | ⠋ applying patch...          | ✓ Patch applied (3 files)      | ✗ Patch rejected        | `tool_edit`  |
-
----
 
 ## Appendix E: Edge Cases & Error Handling
 
@@ -3712,24 +3707,974 @@ When viewing teammate's cursor:
 
 ---
 
+## 97. Commands Palette (Ctrl+P)
+
+Central command palette for quick actions — invoke any system command, user skill, or MCP prompt without remembering keyboard shortcuts.
+
+**Trigger:** `Ctrl+P` or `/cmd`
+
+```
+┌─ Commands ────────────────────────────────────────────────────────────┐
+│ System | User | MCP prompts              [filter: new]                 │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│ ▸ New Session                                                         │
+│   Sessions (list/resume)                                              │
+│   Switch Model                                                        │
+│   Summarize Session                                                   │
+│   Toggle Thinking / Reasoning                                         │
+│   Toggle Sidebar                                                      │
+│   Open File Picker                                                    │
+│   External Editor                                                     │
+│   Yolo Mode                                                           │
+│   Enable Docker MCP                                                   │
+│                                                                        │
+│   fuzzy matching: "new" matches "New Session"                         │
+│   tab switch between System / User / MCP sections                     │
+│   Enter invokes selected command                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Sections
+
+```
+┌─ Tab bar ────────────────────────────────────────────────────────────┐
+│  System  │  User  │  MCP Prompts                                     │
+└───────────────────────────────────────────────────────────────────────┘
+
+System commands (built-in):
+  New Session, Sessions, Switch Model, Summarize Session
+  Toggle Thinking, Toggle Sidebar, Open File Picker
+  External Editor, Enable/Disable Docker MCP
+  Toggle Pills, Notification Style, Yolo Mode
+  Help, Initialize, Transparent Background, Quit
+
+User commands (from AGENTS.md / .agents/skills/):
+  Dynamically loaded from user-invocable skills
+
+MCP Prompts (from connected MCP servers):
+  Dynamically loaded from MCP server prompt resources
+```
+
+**Keybindings:**
+- `Ctrl+P` — Open commands palette
+- `Tab` — Cycle through System/User/MCP tabs
+- `Enter` — Execute selected command
+- `Esc` — Close palette
+- Type to fuzzy-filter results
+
+**Reference repos:** crush (`dialog/commands.go`), kimchi
+
+---
+
+## 98. Pills Panel (To-Do & Queue)
+
+Collapsible status panel between the chat area and the editor showing To-Do progress and prompt queue count.
+
+**Trigger:** `Ctrl+T` or `Ctrl+Space` — toggle expand/collapse
+
+```
+Collapsed (default when < 40 terminal lines):
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Chat messages...                                                     │
+│                                                                      │
+├─────────────────────────────────────────────────────────────────────┤
+│ 📋 2/5  ·  ▶ 3 queued                          ← Pills bar (1 line)│
+│ ▌ Fix the bug in auth.rs                                            │
+└─────────────────────────────────────────────────────────────────────┘
+
+Expanded:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ Chat messages...                                                     │
+│                                                                      │
+├─ To-Do ─────────────────────────────────────────────────────────────┤
+│  ☑ Fix validate_expiry param                   done  ✓             │
+│  ⏳ Add tests for token module                 in-prog  ⠋          │
+│  ☐ Refactor auth module                        pending             │
+│  ─────────────────────────────────────────────────────────────────  │
+│  2/5 tasks complete  ████████░░░░░░░░░░░░  40%                      │
+├─ Queue ─────────────────────────────────────────────────────────────┤
+│  ▶ "Check if CI passes"                                             │
+│  ▶ "Update README"                                                  │
+│  ▶ "Bump version"                                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│ ▌ Fix the bug in auth.rs                                            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### To-Do Section
+
+```
+States:
+  ☑ completed    green check + strikethrough
+  ⏳ in-progress accent spinner
+  ☐ pending      dimmed text
+
+Progress bar:
+  ████████░░░░░░░░░░░░  40%
+  shows completed/total count
+```
+
+### Queue Section
+
+```
+Items:
+  ▶ "message text"     queued (dimmed)
+  ⠋ "message text"     sending (animated spinner)
+  ✓ "message text"     sent (green check)
+
+Controls:
+  ←/→ focus section
+  ↑/↓ navigate items
+  Enter send next queued
+  d delete item from queue
+```
+
+**Edge cases:**
+- When queue is empty and no todos: pills bar is hidden entirely
+- Auto-expands when terminal >40 lines, collapses when ≤40
+- Queue count shows on status line pill `▶ 3` even when collapsed
+
+**Reference repos:** crush (`pills.go`)
+
+---
+
+## 99. Side Q&A Panel (BTW)
+
+Inline quick Q&A panel for asking follow-up questions without interrupting the main conversation.
+
+**Trigger:** Start with `?` prefix in composer, or `/btw`
+
+```
+Composer state:
+
+│ ? What's the syntax for HashMap in Rust 2024?                       │
+│ ⠋  Asking...                                                         │
+
+After Enter:
+
+┌─ BTW ────────────────────────────────────────────────────────────────┐
+│ ? What's the syntax for HashMap in Rust 2024?                       │
+│                                                                      │
+│ Use `HashMap::from([(k, v)])` for inline initialization or          │
+│ the standard insert pattern:                                        │
+│                                                                      │
+│ ```rust                                                              │
+│ let mut map = HashMap::new();                                       │
+│ map.insert("key", "value");                                          │
+│ ```                                                                  │
+│                                                                      │
+│ [Esc] dismiss  · answered in 1.2s                                    │
+└─────────────────────────────────────────────────────────────────────┘
+
+While streaming:
+
+┌─ BTW ────────────────────────────────────────────────────────────────┐
+│ ? What's the syntax for HashMap in Rust 2024?                       │
+│                                                                      │
+│ Use `HashMap::from([(k, v)])` for inline                            │
+│ ⠋  ...                                                               │
+│                                                                      │
+│ [Esc] cancel                                                         │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### States
+
+```
+┌────────┬─────────────────────────────────────────────────────────────┐
+│ Icon   │ State                                                      │
+├────────┼─────────────────────────────────────────────────────────────┤
+│ ⠋      │ Answer is streaming in                                     │
+│ ✓      │ Answer complete                                             │
+│ ✗      │ Error fetching answer                                       │
+│ ⚠      │ Aborted by user                                             │
+└────────┴─────────────────────────────────────────────────────────────┘
+```
+
+**Keybindings:**
+- `Esc` — Dismiss panel (or abort streaming)
+- BTW bubbles do NOT persist in conversation history
+- `Enter` with `?` prefix auto-creates side Q&A instead of main message
+
+**Reference repos:** kimchi (BTW panel)
+
+---
+
+## 100. Agent Dashboard (Subagent Manager)
+
+Dedicated control center for managing Task subagents — browse, enable/disable, configure model overrides, and create new agents.
+
+**Trigger:** `Ctrl+Shift+A` or `/agents`
+
+```
+┌─ Agents ─────────────────────────────────────────────────────────────┐
+│ All │ Project │ User │ Bundled               [+ new agent]  Ctrl+R  │
+├───────────────────────────────┬──────────────────────────────────────┤
+│ ▸ research-auth               │  Agent: research-auth               │
+│   Research auth patterns      │  ───────────────────────────────── │
+│                               │  Status: ● enabled                  │
+│   implement-fix               │  Source: Project (./agents/)        │
+│   Implement the fix           │  File: research-auth.md             │
+│                               │                                      │
+│   add-tests                   │  Model: claude-sonnet-4             │
+│   Add tests for token         │         [override: none]            │
+│                               │                                      │
+│   (2 more — scroll)           │  Prompt preview (first 300 chars):  │
+│                               │  ┌────────────────────────────────┐ │
+│                               │  │ Research auth patterns in the │ │
+│                               │  │ codebase. Focus on:           │ │
+│                               │  │ - JWT validation              │ │
+│                               │  │ - Session management          │ │
+│                               │  │ - OAuth2 flow                 │ │
+│                               │  └────────────────────────────────┘ │
+│                               │                                      │
+│                               │  [e] edit prompt  [d] disable       │
+│                               │  [m] override model  [r] remove     │
+│                               └──────────────────────────────────────┘
+```
+
+### Agent List (left column)
+
+```
+Columns:
+  ▸ selected agent (highlighted)
+  Name + short description
+  Source badges: Project / User / Bundled
+
+Controls:
+  ↑/↓ navigate
+  Tab → right column (inspector)
+  Ctrl+R refresh agent list from disk
+  [+ new agent] opens creation wizard
+```
+
+### Inspector (right column)
+
+```
+Shows:
+  Status (enabled/disabled)
+  Source path
+  Prompt preview (truncated to 300 chars)
+  Model override (or "none")
+  Available actions for each field
+```
+
+### New Agent Wizard
+
+```
+┌─ Create Agent ───────────────────────────────────────────────────────┐
+│ Name:       ┌────────────────────────────────────────────────────┐  │
+│             │ research-auth                                      │  │
+│             └────────────────────────────────────────────────────┘  │
+│ Source:     (●) Project (./agents/)  (○) User (~/.jcode/agents/)  │
+│                                                                     │
+│ Prompt:     ┌────────────────────────────────────────────────────┐ │
+│             │ Research auth patterns in the codebase.           │ │
+│             │ Focus on JWT validation...                        │ │
+│             └────────────────────────────────────────────────────┘ │
+│                                                                     │
+│ [Enter] create  [Esc] cancel                                       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Reference repos:** kimchi (agent dashboard), gajae-code
+
+---
+
+## 101. Agent Arena (Multi-Model Competition)
+
+Run multiple models head-to-head on the same task and compare results side-by-side. Useful for benchmarking model quality on specific coding tasks.
+
+**Trigger:** `/arena`
+
+```
+┌─ Agent Arena ─────────────────────────────────────────────────────────┐
+│ Configure models for this task:              Task: "Fix auth bug"    │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│ ☑ claude-sonnet-4-20250514              ● Ready                     │
+│ ☑ claude-opus-4-20250514                ● Ready                     │
+│ ☑ gemini-2.5-pro                        ○ Warming up                │
+│ ☐ gpt-4o                                ○ Not configured            │
+│                                                                       │
+│ [Enter] start arena  [Space] toggle  [c] configure  q:close         │
+└─────────────────────────────────────────────────────────────────────┘
+
+During competition:
+
+┌─ Arena ──────────────────────────────────────────────────────────────┐
+│ Task: "Fix the bug in auth.rs"                     Elapsed: 14.3s   │
+├─────────────┬─────────────┬─────────────────────────────────────────┤
+│ sonnet-4    │ opus-4      │ gemini-2.5-pro                          │
+│ ─────────── │ ─────────── │ ─────────────────────────────────────── │
+│ ✓ 3 tools   │ ⠋ 2 tools  │ ⏳ queued...                             │
+│ ═══░░░ 60% │ ═░░░░ 20%  │                                          │
+│             │             │                                          │
+│ Read auth…  │ Thinking…   │ Waiting for slot                        │
+│   ✓ done   │             │                                          │
+│ Edit fix…  │             │                                          │
+│   ✓ done   │             │                                          │
+│ Test…      │             │                                          │
+│   ⠋ running │             │                                          │
+├─────────────┴─────────────┴─────────────────────────────────────────┤
+│ [q] close  [d] details  [s] stop arena                              │
+└─────────────────────────────────────────────────────────────────────┘
+
+Results comparison:
+
+┌─ Arena Results ──────────────────────────────────────────────────────┐
+│ Task: "Fix auth bug"                          Duration: 42.3s       │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  1st  claude-sonnet-4     3 tools  12.3s  ✓ All tests pass          │
+│  2nd  claude-opus-4       4 tools  22.1s  ✓ All tests pass          │
+│  3rd  gemini-2.5-pro      5 tools  35.7s  ⚠ 1 test failed           │
+│                                                                       │
+│  Winner analysis: sonnet-4 was fastest and both solutions correct.   │
+│  Opus-4 was more thorough but slower. Gemini missed edge case.       │
+│                                                                       │
+│ [Enter] view diff  [s] save results  [r] re-run  q:close            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Arena States
+
+```
+┌────────────┬───────────────────────────────────────────────────────┐
+│ Phase      │ Description                                           │
+├────────────┼───────────────────────────────────────────────────────┤
+│ Configure  │ Select models, configure task prompt                  │
+│ Warming    │ Models loading / cache priming                        │
+│ Running    │ Models executing concurrently                         │
+│ Evaluating │ Results aggregated and ranked                         │
+│ Complete   │ Final comparison view with winner analysis            │
+└────────────┴───────────────────────────────────────────────────────┘
+```
+
+**Reference repos:** qwen-code (Agent Arena)
+
+---
+
+## 102. Research / REPL Mode
+
+Jupyter-notebook-style interactive research mode with a persistent Python kernel, specialized toolset, and auto-generated report.
+
+**Trigger:** `/rlm` or `/research`
+
+```
+Research mode activation:
+
+┌─ RLM ────────────────────────────────────────────────────────────────┐
+│ 🧪 Research/REPL Mode                                               │
+│                                                                      │
+│   Started at ~/Projects/jcode                                       │
+│   Kernel: Python 3.12 (persistent)                                  │
+│   Tools: python, read, web_search, bash (sandboxed)                 │
+│                                                                      │
+│   Output will be saved to:                                           │
+│     research/output/notebook.ipynb                                   │
+│     research/output/report.md                                       │
+│                                                                      │
+│ [Enter] start  [Esc] cancel                                         │
+└─────────────────────────────────────────────────────────────────────┘
+
+Interactive session:
+
+┌─ RLM ────────────────────────────────────────────────────────────────┐
+│ [1] > import pandas as pd                                            │
+│ ✓                                                                   │
+│ [2] > df = pd.read_csv("data.csv")                                   │
+│ ✓                                                                   │
+│ [3] > df.describe()                                                  │
+│ ┌────────────────────────────────────────────────────────────────┐ │
+│ │          count       mean        std        min        25%     │ │
+│ │ col_a    1000    42.50     12.34     10.00     35.20          │ │
+│ │ col_b    1000     0.85      0.12      0.42      0.78          │ │
+│ └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│ [4] > plt.plot(df["col_a"], df["col_b"])                            │
+│ ┌────────────────────────────────────────────────────────────────┐ │
+│ │           [matplotlib chart rendered as Sixel/Kitty image]    │ │
+│ └────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│ ▶ Type Python code or natural language commands...                  │
+│ [Esc] exit research mode                                             │
+└─────────────────────────────────────────────────────────────────────┘
+
+Auto-generated artifacts:
+
+  research/output/
+    notebook.ipynb    — Full Jupyter notebook with all cells
+    report.md         — Auto-generated research report
+    assets/           — Generated plots and images
+```
+
+### RLM Toolset
+
+```
+┌──────────┬─────────────────────────────────────────────────────────┐
+│ Tool     │ Description                                             │
+├──────────┼─────────────────────────────────────────────────────────┤
+│ python   │ Execute Python code in persistent kernel               │
+│ read     │ Read files from workspace                              │
+│ web_search │ Search the web for information                       │
+│ bash     │ Run shell commands (sandboxed)                         │
+└──────────┴─────────────────────────────────────────────────────────┘
+```
+
+### Cell Types
+
+```
+[1] > code       — Python code execution cell
+[2] > # comment  — Markdown annotation cell
+[3] > ! command  — Shell command cell
+[4] > ? query    — Web search cell
+```
+
+**Reference repos:** gajae-code (RLM/REPL mode)
+
+---
+
+## 103. Voice Input / Speech-to-Text
+
+Push-to-talk voice input for composing messages via speech. Uses local Whisper for transcription.
+
+**Trigger:** Hold assigned key (e.g., `Alt+V`) or `/stt`
+
+```
+Idle:
+
+│ ▌  (ready — press Alt+V to start recording)                         │
+
+Recording:
+
+│ 🎤 Recording... [speak now]  ████████░░░░  3.2s / 30s max           │
+│ ▌ [release to transcribe]                                            │
+
+Transcribing:
+
+│ ⏳ Transcribing... (Whisper local)                                   │
+│ ▌ [transcribing...]                                                  │
+
+Completed:
+
+│ 🎤 ✓ "Fix the bug in auth.rs and add tests"                         │
+│ ▌ Fix the bug in auth.rs and add tests                              │
+
+Error:
+
+│ 🎤 ✗ Could not understand audio. Please try again.                  │
+│ ▌                                                                    │
+```
+
+### States
+
+```
+┌─────────────┬─────────────────────────────────────────────────────┐
+│ State       │ Display                                              │
+├─────────────┼─────────────────────────────────────────────────────┤
+│ Idle        │ Ready — press Alt+V to start recording              │
+│ Recording   │ 🎤 recording... [speak now] + timer + level meter   │
+│ Transcribing│ ⏳ Transcribing... (Whisper local)                   │
+│ Complete    │ 🎤 ✓ "transcribed text" (auto-inserted into input)  │
+│ Error       │ 🎤 ✗ Error message                                  │
+└─────────────┴─────────────────────────────────────────────────────┘
+
+Recording level meter:
+  ░░░░░░░░░░   silence
+  ██░░░░░░░░   quiet
+  ██████░░░░   normal speech
+  ████████░░   loud
+  ██████████   clipping (too loud)
+```
+
+**Keybindings:**
+- `Alt+V` — Hold to record, release to transcribe
+- `Esc` — Cancel recording
+
+**Reference repos:** qwen-code, kimchi (voice input)
+
+---
+
+## 104. File Picker Dialog
+
+Full file browser with search, preview, image rendering, and quick open.
+
+**Trigger:** `Ctrl+P` (in editor mode), `Ctrl+X P` (leader), or `/open`
+
+```
+┌─ File Picker ──────────────────────────────────────────────────────────┐
+│ [filter: auth]                     ◄ live glob/fuzzy filter            │
+├───────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│ ▸ src/auth.rs                           42 lines  ◄ currently open    │
+│   src/auth_test.rs                      120 lines                      │
+│   src/token.rs                          89 lines                       │
+│   docs/auth-flow.md                     55 lines                       │
+│                                                                         │
+│   Matching: 4 files (from 128 total)                                    │
+│                                                                         │
+│ ┌─ Preview: src/auth.rs ──────────────────────────────────────────────┐│
+│ │   1  │ use crate::token::validate_token;                            ││
+│ │   2  │                                                              ││
+│ │   3  │ pub fn validate_expiry(expiry: i64, now: i64) -> bool {    │││
+│ │   4  │     expiry > now                                             │││
+│ │   5  │ }                                                            ││
+│ │   6  │                                                              ││
+│ └─────────────────────────────────────────────────────────────────────┘│
+│                                                                         │
+│ [Enter] open  [i] preview  [Esc] close                                 │
+└───────────────────────────────────────────────────────────────────────┘
+
+Image preview (when selecting image files):
+
+┌─ Preview: screenshot.png ─────────────────────────────────────────────┐
+│ ┌──────────────────────────────────────────────────────────────────┐  │
+│ │  [image rendered via Kitty/Sixel protocol]                      │  │
+│ │                                                                  │  │
+│ │  1024 x 768 px  ·  42 KB  ·  PNG                                │  │
+│ └──────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+### Filter modes
+
+```
+┌──────┬─────────────────────────────────────────────────────────────┐
+│ Mode │ Behavior                                                    │
+├──────┼─────────────────────────────────────────────────────────────┤
+│ Glob │ **/*auth*  pattern matching                                 │
+│ Fuzzy│ Subsequence match (scores exact > prefix > contains)        │
+│ Path │ Absolute file path input                                    │
+└──────┴─────────────────────────────────────────────────────────────┘
+```
+
+**Reference repos:** crush (`dialog/files.go`)
+
+---
+
+## 105. Attachment Chips Bar
+
+File attachment management bar below the editor input. Supports images, markdown, text files with chip-style display.
+
+```
+Default state (no attachments):
+
+│ ▌ Fix the bug in auth.rs                                             │
+
+With attachments:
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ ▌ Fix the bug in auth.rs                                           │
+│                                                                     │
+│ ◎ screenshot.png  🖼 42KB  ·  ◎ notes.md  📝 1.2KB                │
+│                                                                     │
+│ [Ctrl+R] delete mode  ·  [Ctrl+R+R] delete all                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+Delete mode (after Ctrl+R):
+
+│ ▌ Fix the bug in auth.rs                                           │
+│                                                                     │
+│ ⊗ screenshot.png [1]  🖼     ⊗ notes.md [2]  📝                    │
+│                         Press [1] or [2] to remove                  │
+│                                                                     │
+│ [Ctrl+R+R] delete all  ·  [Esc] exit delete mode                   │
+└─────────────────────────────────────────────────────────────────────┘
+
+Overflow (too many attachments):
+
+│ ◎ screenshot.png  🖼  ·  ◎ notes.md  📝  ·  +3 more  ▶            │
+│                                                      ↑ overflow chip│
+```
+
+### Attachment Types
+
+```
+┌──────┬─────────────────────────────────────────────────────────────┐
+│ Icon │ Type                                                        │
+├──────┼─────────────────────────────────────────────────────────────┤
+│ 🖼  │ Image file (PNG, JPG, GIF, WebP)                             │
+│ 📝  │ Markdown / text file                                         │
+│ 📄  │ Source code file                                             │
+│ 📎  │ Other file type                                              │
+└──────┴─────────────────────────────────────────────────────────────┘
+```
+
+### How attachments arrive
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Source              │ Method                                        │
+├─────────────────────┼───────────────────────────────────────────────┤
+│ Clipboard paste     │ Ctrl+V / Ctrl+Shift+V pastes image directly  │
+│ @-mention           │ @file references auto-attach                 │
+│ Drag & drop         │ Terminal drag-to-attach (if supported)       │
+│ /attach command     │ Explicit file attach via slash command       │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Reference repos:** crush (`attachments/attachments.go`)
+
+---
+
+## 106. Ferment Progress Overlay
+
+Structured multi-layer plan overlay for the Ferment cross-session project management system. Shows goals, phases, steps, and their completion status.
+
+**Trigger:** `Ctrl+G` or when Ferment plan is active
+
+```
+Layer 1 — Goal overview:
+
+┌─ Ferment ────────────────────────────────────────────────────────────┐
+│ 🎯 Fix Authentication Module                      Token budget: 200K │
+├──────────────────────────────────────────────────────────────────────┤
+│  ● Phase 1: Research       ████████████████████░░░  85%  █ done     │
+│  ● Phase 2: Implement      ████████░░░░░░░░░░░░░░░  35%  ⏳ active   │
+│  ○ Phase 3: Test           ░░░░░░░░░░░░░░░░░░░░░░░   0%  ○ pending  │
+│  ○ Phase 4: Review         ░░░░░░░░░░░░░░░░░░░░░░░   0%  ○ pending  │
+│                                                                       │
+│  Overall: 30% complete  ·  50K used / 200K total                    │
+│                                                                       │
+│ [Enter] expand phase  [↑/↓] navigate  [q] close                     │
+└─────────────────────────────────────────────────────────────────────┘
+
+Layer 2 — Phase detail (after Enter on a phase):
+
+┌─ Ferment · Phase 2: Implement ────────────────────────────────────────┐
+│ Steps:                                  ⏳ 1/4 running  ·  35%        │
+│                                                                       │
+│ ☑ Add `now` parameter to validate_expiry                done  ✓     │
+│ ☑ Update all call sites                                 done  ✓     │
+│ ⏳ Add new tests for edge cases                       running  ⠋    │
+│ ☐ Run full test suite                                pending        │
+│                                                                       │
+│ [Enter] toggle step  [b] back  [q] close                             │
+└─────────────────────────────────────────────────────────────────────┘
+
+Layer 3 — Step detail (after Enter on a step):
+
+┌─ Ferment · Implement · Add tests ─────────────────────────────────────┐
+│ Task: Add tests for validate_expiry with now parameter               │
+│                                                                       │
+│ Files:  src/auth_test.rs                                              │
+│                                                                       │
+│ Steps:                                                                │
+│   1. Write test for valid expiry ✓                                    │
+│   2. Write test for expired token ⏳                                  │
+│   3. Write test for edge case: Unix epoch                            │
+│                                                                       │
+│ Context: This function now requires `now: i64` parameter — tests     │
+│ must reflect the new signature.                                      │
+│                                                                       │
+│ [e] edit  [r] refresh  [b] back  [q] close                          │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Breadcrumb Navigation
+
+```
+Ferment › Phase 2: Implement › Add tests
+
+Navigational breadcrumbs shown at the top of each layer.
+```
+
+**Reference repos:** kimchi (Ferment), oh-my-openagent (ralplan)
+
+---
+
+## 107. Assistant Turn Footer
+
+Post-end-turn footer showing model name, provider, response duration, and per-message context usage — displayed after each assistant message.
+
+```
+┌─ Assistant ──────────────────────────────────────────────────────────┐
+│ I'll fix the auth bug. The issue is that `validate_expiry` was      │
+│ called without the current timestamp.                               │
+│                                                                      │
+│ ┌─ Edit ──────────────────────────────────────────────────────────┐ │
+│ │ → Update src/auth.rs                                            │ │
+│ └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│ ─── sonnet-4 · Anthropic · 3.2s · ~1,240 tokens ─────────────────── │
+│                                 ↑ turn footer — automatically added  │
+└─────────────────────────────────────────────────────────────────────┘
+
+When multiple model switches during session:
+
+│ ─── sonnet-4 (default) · Anthropic · 2.1s · ~850 tokens ─────────── │
+
+When tool-heavy turn:
+
+│ ─── sonnet-4 · Anthropic · 12.3s · 5 tools · ~3,400 tokens ──────── │
+
+Very narrow terminal:
+
+│ ─── sonnet-4 · 3.2s ──────────────────────────────────────────────── │
+```
+
+### Footer Variants
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Variant                         │ Display                           │
+├─────────────────────────────────┼───────────────────────────────────┤
+│ Default                         │ model · provider · duration       │
+│ With context                    │ model · provider · duration · tok │
+│ Tool-heavy                      │ model · provider · dur · N tools  │
+│ Minimal (< 60 cols)             │ model · duration                  │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Reference repos:** crush (`chat/messages.go`)
+
+---
+
+## 108. Model Selector (Tabbed Browser)
+
+Full model/Provider browser with tabbed categories, fuzzy search, model role assignments, thinking level configuration, and provider badges.
+
+**Trigger:** `Ctrl+L` or `/model` extended
+
+```
+┌─ Models ─────────────────────────────────────────────────────────────┐
+│ Large Models │ Small Models │ Recent │ Configured  [filter: sonnet]  │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│ ▸ claude-sonnet-4-20250514                                           │
+│   Provider: Anthropic ●  Context: 200K  Cost: $3/M in  $15/M out    │
+│   ▲ currently active ● reasoning: medium  ■ default for coding      │
+│                                                                       │
+│   claude-opus-4-20250514                                              │
+│   Provider: Anthropic ●  Context: 200K  Cost: $15/M in $75/M out    │
+│   ■ max reasoning capability  ▲ last used: 2h ago                   │
+│                                                                       │
+│   gemini-2.5-pro                                                      │
+│   Provider: Google ●  Context: 1M  Cost: $1.25/M in $5/M out        │
+│   ■ via OpenProxy                                                    │
+│                                                                       │
+│   gpt-4o                                                              │
+│   Provider: OpenAI ○  Not configured                                 │
+│   [configure]                                                         │
+│                                                                       │
+│ [Enter] select  [Tab] tab  [/] filter  [e] edit config  q:close     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Tab Categories
+
+```
+┌──────────┬─────────────────────────────────────────────────────────┐
+│ Tab      │ Shows                                                   │
+├──────────┼─────────────────────────────────────────────────────────┤
+│ Large    │ Full-size models optimized for complex coding tasks     │
+│ Small    │ Fast/cheap models for simple questions                  │
+│ Recent   │ Models used recently in this session                    │
+│ Configured│ All models with valid API keys / config                │
+└──────────┴─────────────────────────────────────────────────────────┘
+```
+
+### Model Entry Detail
+
+```
+Each entry shows:
+  ▸ selection cursor (for selected)
+  Model name + version
+  Provider badge with connection status ●/○
+  Context window size
+  Cost per 1M tokens (input / output)
+  Capability badges: ■ coding, ■ reasoning, ■ vision
+  Status: currently active, last used timestamp
+  Configured / Not configured
+```
+
+**Keybindings:**
+- `Ctrl+L` — Open model selection
+- `Tab` — Cycle through tabs
+- `/` — Filter by name/provider
+- `Enter` — Select and switch
+- `e` — Edit provider config
+- `Ctrl+S` — Toggle fast mode (cheaper model)
+
+**Reference repos:** crush (`dialog/models.go`), kimchi
+
+---
+
+## 109. Yolo / Auto-Approve Mode
+
+Toggleable mode that automatically approves all permission requests — useful for rapid iteration when safety checks are already handled.
+
+**Trigger:** `Ctrl+Y`, `--yolo` flag on startup, or `/yolo`
+
+```
+Status line indicators:
+
+Normal mode:
+│ ▌auto                                                                 │
+
+Yolo mode:
+│ ▌😈 yolo                    ↑ placeholder changes to "Yolo mode!"    │
+
+During yolo mode — permission dialogs auto-approved silently:
+
+Normal:                        Yolo:
+┌─ Permission ───────────┐    (silent — no dialog shown)
+│ rm -rf /tmp             │    ✓ Command auto-approved (Yolo mode)
+│ [y] [Y] [n]            │
+└─────────────────────────┘
+
+Compact indicator:
+
+Normal:     ▌auto
+Yolo:       ▌yolo
+```
+
+### Behavior
+
+```
+┌─────────────┬──────────────────────┬──────────────────────────────┐
+│ Aspect      │ Normal Mode          │ Yolo Mode                    │
+├─────────────┼──────────────────────┼──────────────────────────────┤
+│ Permissions │ Dialog shown for     │ Auto-approved silently       │
+│             │ each tool            │                              │
+│ Safety      │ Full checks          │ Bypassed                     │
+│ Status      │ ▌auto               │ ▌😈 yolo / ▌yolo            │
+│ Editor hint │ "Ready"              │ "Yolo mode!"                 │
+└─────────────┴──────────────────────┴──────────────────────────────┘
+```
+
+**Keybindings:**
+- `Ctrl+Y` — Toggle Yolo mode
+- `/yolo` — Toggle from commands palette
+
+**Reference repos:** crush (`--yolo` flag), claude-code (bypass mode)
+
+---
+
+## 110. Subagent Session Observer
+
+Interactive viewer for monitoring what a spawned sub-agent is doing in real time. Shows tool calls, output, and thinking state.
+
+**Trigger:** `Ctrl+O` on an active agent pill, or `/observe <agent-name>`
+
+```
+Status line shows active sub-agent count — clickable:
+
+│ sonnet-4  ctx:42%  $0.12  [🔱 2 active]  ▌auto                      │
+                                                    ↑ click to open observer
+
+Observer overlay:
+
+┌─ Subagent Observer ──────────────────────────────────────────────────┐
+│ research-auth                      ● running · 8.3s                 │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  📤 Task: "Research auth patterns in the codebase and propose       │
+│           a fix for the expiry bug"                                  │
+│                                                                       │
+│  ├─ Read src/auth.rs ✓ (7 lines)                                    │
+│  ├─ Grep "validate" → 5 matches in 2 files ✓                        │
+│  ├─ Read src/token.rs ✓ (15 lines)                                  │
+│  ├─ Bash "cargo test --lib auth" ⠋ running... 2.3s                  │
+│  │                                                                   │
+│  ⠋ Thinking... 3.2s                                                  │
+│                                                                       │
+│ [b]readcrumb: main > research-auth  [p] pause  [c] cancel  [q] close│
+└─────────────────────────────────────────────────────────────────────┘
+
+Nested sub-agent breadcrumbs:
+
+│ main > research-auth > read-file-42                                  │
+│                         ↑ clickable to jump to that sub-agent's view │
+
+Completed agent:
+
+┌─ Subagent Observer ──────────────────────────────────────────────────┐
+│ research-auth                      ✓ completed · 15.2s               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  Tools: 3 read, 2 grep, 1 bash                                      │
+│                                                                       │
+│  Results:                                                             │
+│    1. Found bug at auth.rs:45 — missing current timestamp            │
+│    2. validate_expiry called from check_permissions at line 78       │
+│    3. Token validation works correctly                                │
+│                                                                       │
+│  [r] return to main  [f] fork from here  [q] close                   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Features
+
+```
+Tool call expansion:
+  ◄ collapsed:  ├─ Read src/auth.rs ✓
+  ▼ expanded:   ├─ Read src/auth.rs ✓ (7 lines)
+                │   1  │ use crate::token::validate_token;
+                │   2  │ pub fn validate_expiry(expiry: i64, now: i64) -> bool {
+                │   3  │     expiry > now
+                │   4  │ }
+                └──────────────────────────────
+
+Breadcrumb navigation:
+  Shows nesting path for nested sub-agents
+  Each segment is clickable to jump to that level
+  main > research-auth > sub-task-1
+
+Status colors:
+  ● running    accent (animated)
+  ✓ completed  success
+  ✗ failed     error
+  ⏳ queued    dimmed
+```
+
+**Reference repos:** kimchi (session observer), gajae-code
+
+---
+
+| Tool      | Icon | Running State                 | Success State                  | Failure State          | Color        |
+|-----------|------|-------------------------------|--------------------------------|------------------------|--------------|
+| Bash      | `$`  | ⠋ running...                 | ✓ exit: 0 + output             | ✗ exit: N + stderr    | `tool_bash`  |
+| Edit      | `->` | ⠋ applying...                | ✓ Updated file.rs              | ✗ Edit failed + error  | `tool_edit`  |
+| Create    | `★`  | ⠋ creating...                | ✓ Created file.rs              | ✗ Create failed        | `success`    |
+| Read      | `->` | ⠋ reading...                 | ✓ file.rs (42 lines)           | ✗ File not found       | `tool_read`  |
+| Glob      | `☆`  | ⠋ searching...               | ☆ glob *.rs -> 42 matches      | ✗ No matches           | `info`       |
+| Grep      | `◆`  | ⠋ searching...               | ◆ grep "fn" -> 7 in 3 files    | ✗ No matches           | `info`       |
+| Agent     | `🔱` | 🔱 Spawning / ⠋ running     | ✓ Sub-agent complete (8.5s)    | ✗ Failed: timeout     | `accent`     |
+| Shell     | `$`  | ⠋ running... (live stream)  | ✓ exit: 0  (12.3s)             | ✗ exit: 1 + error      | `tool_bash`  |
+| WebFetch  | `🌐` | ⠋ fetching url...            | ✓ Fetched (1,234 bytes)        | ✗ Connection error     | `info`       |
+| WebSearch | `🔍` | ⠋ searching web...           | 🔍 "query" -> 5 results        | ✗ No results           | `info`       |
+| Question  | `?`  | ⠋ asking...                  | ? Answered                     | ✗ No answer            | `warning`    |
+| TodoWrite | `☐`  | ⠋ writing todos...           | ☑ 3 todos updated              | ✗ Write failed          | `info`       |
+| Task      | `⊞`  | ⠋ executing task...          | ⊞ Task complete (3/3 steps)    | ✗ Task failed           | `accent`     |
+| ApplyPatch| `->` | ⠋ applying patch...          | ✓ Patch applied (3 files)      | ✗ Patch rejected        | `tool_edit`  |
+
+---
 ## Appendix J: Final UI Audit Summary
 
 ### Coverage after this pass
 
 ```
-MASTER_UI.md now covers: 96 sections + 10 appendices
+MASTER_UI.md now covers: 110 sections + 10 appendices
 
 ┌─────────────────────────────┬──────┬────────┬──────┐
 │ Source                     │ Old  │ New    │ Total│
 ├─────────────────────────────┼──────┼────────┼──────┤
-│ Claude Code                │ ~25  │ 1      │ ~26  │
-│ Codex                      │ ~12  │ 2      │ ~14  │
-│ OpenCode                   │ ~5   │ 19     │ ~24  │
+│ Claude Code                │ ~26  │ 0      │ ~26  │
+│ Codex                      │ ~14  │ 0      │ ~14  │
+│ OpenCode                   │ ~24  │ 0      │ ~24  │
 │ oh-my-pi                   │ ~0   │ 0      │ ~0   │
 │ jcode unique               │ ~5   │ 0      │ ~5   │
-│ New cross-repo additions   │ 0    │ 4      │ 4    │
+│ gajae-code                 │ ~0   │ 2      │ ~2   │
+│ kimchi                     │ ~0   │ 4      │ ~4   │
+│ qwen-code                  │ ~0   │ 3      │ ~3   │
+│ crush                      │ ~0   │ 5      │ ~5   │
 ├─────────────────────────────┼──────┼────────┼──────┤
-│ TOTAL                      │ 73   │ 26     │ 99   │
+│ TOTAL                      │ 96   │ 14     │ 110  │
 └─────────────────────────────┴──────┴────────┴──────┘
 ```
 
@@ -3739,5 +4684,5 @@ oh-my-pi doesn't have a visible TUI — it's a backend provider/router. No UI fe
 
 ### Verdict
 
-**MASTER_UI.md: 96 sections + 10 appendices = COMPLETE UI/UX SPEC**
-**No more repos to scan. Ready to implement.**
+**MASTER_UI.md: 110 sections + 10 appendices = COMPLETE UI/UX SPEC**
+**Audited against 13 reference repos. Ready to implement.**
