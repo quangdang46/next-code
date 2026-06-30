@@ -1,6 +1,6 @@
 # Reference Repo Summaries
 
-Static summaries of all 12 repos for quick lookup without cloning.
+Static summaries of all 13 repos for quick lookup without cloning.
 
 ---
 
@@ -235,23 +235,59 @@ Static summaries of all 12 repos for quick lookup without cloning.
 
 ---
 
+## 11. crush
+
+**URL:** https://github.com/charmbracelet/crush
+**Stack:** Go (98.4%) / Charm ecosystem (Bubble Tea TUI, GoReleaser, sqlc)
+**What it is:** Open-source, terminal-based AI coding assistant built by Charm. Agentic coding buddy with session-based workspaces, multi-client sharing, LSP + MCP integration, and the Agent Skills open standard.
+
+**Key Patterns:**
+
+- **Bubble Tea TUI**: Full terminal UI built on Charm's Bubble Tea framework with ratatui-style composable widgets
+- **Session workspaces**: Multiple sessions and contexts per project; clients sharing the same `--cwd` join the same workspace with live session mirroring
+- **Shared multi-client sessions**: Multiple TUI instances or `crush serve` clients join the same workspace, with attached-client and busy signals
+- **Agent Skills standard**: Discoverable skill packages from `AGENTS.md`, `.agents/skills/` paths; user-invocable via Ctrl+P
+- **LSP-enhanced context**: Language servers for richer code understanding, auto-synced with file edits
+- **MCP extensibility**: Add capabilities via MCP servers (HTTP, stdio, SSE) with shell expansion in config values
+- **Provider abstraction**: Pluggable backend supporting OpenAI, Anthropic, Bedrock, Vertex AI, Ollama, llama.cpp
+- **`crushignore` files**: Extends `.gitignore` to limit what the agent sees as context
+- **Auto-provider updates**: Pulls latest model metadata from Catwalk community registry
+- **Desktop notifications**: Configurable, sent when focus is lost and agent finishes a turn
+- **Git attribution**: `Assisted-by` and `Co-Authored-By` trailers on commits
+- **First-wins flag policy**: For shared workspaces, flags like `--yolo` and `--debug` are set by the first client
+
+**Key Files:**
+
+- `main.go` — CLI entry point
+- `tui/` — Bubble Tea TUI implementation
+- `session/` — session workspace management
+- `provider/` — provider abstraction layer
+- `lsp/` — LSP integration
+- `mcp/` — MCP server client
+- `skills/` — Agent Skills system
+- `config/` — configuration layering (local `.crush.json` overrides global)
+- `crushignore/` — ignore file parser
+
+---
+
 ## Cross-Repo Quick Reference
 
 | Feature Domain | Best Source Repo(s) |
 |----------------|---------------------|
-| Multi-agent orchestration | oh-my-openagent (Atlas/delegate-task), codebuff (4-agent pipeline), kimchi (multi-model roles) |
-| Model/provider abstraction | oh-my-openagent (resolveModel), oh-my-pi (40+ providers), pi-agent-rust (src/providers/), qwen-code (multi-protocol) |
-| Session persistence | pi-agent-rust (SQLite), claude-code (memory/dream), kimchi (Ferment cross-session plans) |
-| Security & sandboxing | codex (firewall), pi-agent-rust (capability gates, trust lifecycle) |
+| Multi-agent orchestration | oh-my-openagent (Atlas/delegate-task), codebuff (4-agent pipeline), kimchi (multi-model roles), crush (multi-client shared sessions) |
+| Model/provider abstraction | oh-my-openagent (resolveModel), oh-my-pi (40+ providers), pi-agent-rust (src/providers/), qwen-code (multi-protocol), crush (plugable backend) |
+| Session persistence | pi-agent-rust (SQLite), claude-code (memory/dream), kimchi (Ferment cross-session plans), crush (session workspaces) |
+| Security & sandboxing | codex (firewall), pi-agent-rust (capability gates, trust lifecycle), crush (--yolo, permission system) |
 | Benchmarking | oh-my-pi (typescript-edit-benchmark), pi-agent-rust (benches/) |
-| IDE integration | oh-my-pi (LSP/DAP), claude-code (ACP/Zed/Cursor), kimchi (LSP integration) |
+| IDE integration | oh-my-pi (LSP/DAP), claude-code (ACP/Zed/Cursor), kimchi (LSP integration), crush (LSP-enhanced context) |
 | Streaming | pi-agent-rust (SSE parser), opencode (provider abstraction) |
-| Extension/plugin system | pi-agent-rust (WASM), oh-my-openagent (OpenCode plugin), claude-code (ACP) |
+| Extension/plugin system | pi-agent-rust (WASM), oh-my-openagent (OpenCode plugin), claude-code (ACP), crush (Agent Skills, MCP) |
 | Monitoring/observability | claude-code (Langfuse, Sentry), pi-agent-rust (runtime risk ledger) |
-| TUI design | opencode (terminal UI), pi-agent-rust (rich_rust), oh-my-pi (IDE-wired), gajae-code (dual themes) |
-| Code understanding | codebuff (tree-sitter code map), oh-my-openagent (ripgrep-cli) |
+| TUI design | opencode (terminal UI), pi-agent-rust (rich_rust), oh-my-pi (IDE-wired), gajae-code (dual themes), crush (Bubble Tea) |
+| Code understanding | codebuff (tree-sitter code map), oh-my-openagent (ripgrep-cli), crush (LSP-enhanced) |
 | Prompt engineering | oh-my-openagent (per-model prompt variants), oh-my-pi (benchmark prompts) |
 | Workflow planning | gajae-code (deep-interview → ralplan → ultragoal), kimchi (Ferment), qwen-code (auto-skills) |
-| Notifications / Mobile | gajae-code (Telegram notification SDK), qwen-code (Telegram/DingTalk/WeChat bots) |
-| Cross-instance / Teleport | kimchi (remote teleport), claude-code (Pipe IPC), qwen-code (daemon mode) |
+| Notifications / Mobile | gajae-code (Telegram notification SDK), qwen-code (Telegram/DingTalk/WeChat bots), crush (desktop notifications) |
+| Cross-instance / Teleport | kimchi (remote teleport), claude-code (Pipe IPC), qwen-code (daemon mode), crush (shared multi-client sessions) |
 | Token optimization | kimchi (RTK rewrite) |
+| Go ecosystem reference | crush (Bubble Tea, Go TUI patterns, GoReleaser) |
