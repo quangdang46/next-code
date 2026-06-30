@@ -1,6 +1,6 @@
 # Reference Repo Summaries
 
-Static summaries of all 7 repos for quick lookup without cloning.
+Static summaries of all 12 repos for quick lookup without cloning.
 
 ---
 
@@ -159,19 +159,99 @@ Static summaries of all 7 repos for quick lookup without cloning.
 
 ---
 
+## 8. gajae-code
+**URL:** https://github.com/Yeachan-Heo/gajae-code  
+**Stack:** TypeScript (86.2%) + Rust (7.8%) / Bun  
+**What it is:** An external coding-agent harness (`gjc`) that runs alongside Claude Code or Codex CLI. Structured workflow pipeline: `deep-interview` → `ralplan` → `ultragoal`, with optional tmux parallel workers. "Encode intention. Decode software."
+
+**Key Patterns:**
+- **Workflow pipeline**: Three-step `deep-interview` → `ralplan` → `ultragoal` with stateful progression
+- **Tmux-native sessions**: `--tmux` flag for tmux-backed leader sessions with isolated worktrees (`--worktree`)
+- **Notifications SDK**: Bundled Telegram reference daemon with WebSocket-based `action_needed`/`reply` protocol for mobile answers
+- **Research/REPL mode**: Optional Jupyter-notebook-style `rlm` with persistent Python kernel
+- **Computer-Use mode**: Experimental desktop control with screenshot/input bindings
+- **TUI identity**: Dark (`red-claw`) and light (`blue-crab`) themes, plus migration themes mimicking Claude Code, Codex CLI, OpenCode
+- **External & non-invasive**: Sits beside existing agents, not as a plugin; supports RPC, MCP, and Bridge/HTTPS surfaces
+- **Configuration**: Provider retry budgets in `~/.gjc/config.yml`
+
+**Key Files:**
+- `gjc.ts` — CLI entry point
+- `src/pipeline/` — workflow pipeline stages
+- `src/tmux/` — tmux session management
+- `src/notifications/` — Telegram notification SDK
+- `src/repl/` — REPL/research mode
+
+---
+
+## 9. kimchi
+**URL:** https://github.com/getkimchi/kimchi  
+**Stack:** TypeScript (90.9%) / Node.js 22, Bun, pnpm  
+**What it is:** Terminal-based AI coding agent that acts as a development assistant inside the CLI, backed by Kimchi's LLM infrastructure. Built on the [pi-mono](https://github.com/badlogic/pi-mono) coding agent SDK.
+
+**Key Patterns:**
+- **Multi-model orchestration**: Different LLMs handle different roles (orchestrator, builder, reviewer, explorer, researcher); orchestrator classifies tasks and delegates to role-specific models
+- **Ferment system**: Cross-session project management persisting structured plans (goals, phases, steps) as JSON, enabling progressive-refinement work across sessions with a state machine enforcing valid transitions
+- **LSP integration**: Built-in Language Server Protocol support for type-aware code intelligence (TypeScript/JavaScript via `typescript-language-server`, Go via `gopls`), auto-synced with file edits
+- **Remote teleport**: Session multiplexing — local TUI serves as home base; remote workers can be spawned, detached, and re-attached
+- **RTK token optimization**: Rewrites bash tool calls to compress command output by 60-90%
+- **Agent discovery & migration**: Detects existing Claude Code, OpenCode, or Cursor installs on first run and offers to migrate their MCP servers
+- **Tagging & phase tracking**: Every LLM request labeled with `phase:{name}` and user-defined tags for usage analytics and cost attribution
+- **Hooks system**: Custom Bash hooks to rewrite or block shell commands before execution
+- **Context files**: AGENTS.md/CLAUDE.md at global and project levels injected into system prompt
+
+**Key Files:**
+- `src/commands/` — CLI subcommands directory
+- `src/extensions/` — extensions for subagents, orchestration, MCP, auth
+- `src/multi-model/` — multi-model orchestration core
+- `src/ferment/` — cross-session plan system
+- `src/lsp/` — LSP integration
+- `src/teleport/` — remote session multiplexing
+- `src/rtk/` — RTK token optimization
+
+---
+
+## 10. qwen-code
+**URL:** https://github.com/QwenLM/qwen-code  
+**Stack:** TypeScript (79.2%) + Rust / Node.js 22+  
+**What it is:** Open-source AI coding agent that started as a fork of Google Gemini CLI v0.8.2, now an independent multi-protocol agent framework with 25.7k stars.
+
+**Key Patterns:**
+- **Multi-protocol support**: Works with OpenAI, Anthropic, Gemini, and Qwen APIs, plus local models via Ollama/vLLM
+- **Auto-Memory & Auto-Skills**: Dynamic workflows with no manual setup — memory, skills, sub-agents, agent teams, and MCP
+- **Multiple operation modes**: Interactive TUI, headless (`qwen -p "..."`), daemon mode for shared agent sessions, IDE plugins (VS Code, JetBrains, Zed), desktop GUI
+- **IM integrations**: Telegram, DingTalk, WeChat, and Feishu bots
+- **First-party SDK**: TypeScript, Python, and Java SDKs for embedding agent capabilities
+- **Agent delegation via ACP**: "Qwen Code Claw" pattern — other agents delegate coding tasks to Qwen Code
+- **Self-iteration**: Actively iterating on itself — using its own agent and models to file issues, submit PRs, review code, run tests
+- **Dual-license**: Apache-2.0
+
+**Key Files:**
+- `cli/` — CLI entry point and command handling
+- `src/providers/` — multi-provider implementations
+- `src/agents/` — agent delegation and team orchestration
+- `src/im/` — IM integration handlers (Telegram, DingTalk, etc.)
+- `sdk/` — first-party SDKs (TypeScript, Python, Java)
+- `src/memory/` — auto-memory system
+
+---
+
 ## Cross-Repo Quick Reference
 
 | Feature Domain | Best Source Repo(s) |
 |----------------|---------------------|
-| Multi-agent orchestration | oh-my-openagent (Atlas/delegate-task), codebuff (4-agent pipeline) |
-| Model/provider abstraction | oh-my-openagent (resolveModel), oh-my-pi (40+ providers), pi-agent-rust (src/providers/) |
-| Session persistence | pi-agent-rust (SQLite), claude-code (memory/dream) |
+| Multi-agent orchestration | oh-my-openagent (Atlas/delegate-task), codebuff (4-agent pipeline), kimchi (multi-model roles) |
+| Model/provider abstraction | oh-my-openagent (resolveModel), oh-my-pi (40+ providers), pi-agent-rust (src/providers/), qwen-code (multi-protocol) |
+| Session persistence | pi-agent-rust (SQLite), claude-code (memory/dream), kimchi (Ferment cross-session plans) |
 | Security & sandboxing | codex (firewall), pi-agent-rust (capability gates, trust lifecycle) |
 | Benchmarking | oh-my-pi (typescript-edit-benchmark), pi-agent-rust (benches/) |
-| IDE integration | oh-my-pi (LSP/DAP), claude-code (ACP/Zed/Cursor) |
+| IDE integration | oh-my-pi (LSP/DAP), claude-code (ACP/Zed/Cursor), kimchi (LSP integration) |
 | Streaming | pi-agent-rust (SSE parser), opencode (provider abstraction) |
 | Extension/plugin system | pi-agent-rust (WASM), oh-my-openagent (OpenCode plugin), claude-code (ACP) |
 | Monitoring/observability | claude-code (Langfuse, Sentry), pi-agent-rust (runtime risk ledger) |
-| TUI design | opencode (terminal UI), pi-agent-rust (rich_rust), oh-my-pi (IDE-wired) |
+| TUI design | opencode (terminal UI), pi-agent-rust (rich_rust), oh-my-pi (IDE-wired), gajae-code (dual themes) |
 | Code understanding | codebuff (tree-sitter code map), oh-my-openagent (ripgrep-cli) |
 | Prompt engineering | oh-my-openagent (per-model prompt variants), oh-my-pi (benchmark prompts) |
+| Workflow planning | gajae-code (deep-interview → ralplan → ultragoal), kimchi (Ferment), qwen-code (auto-skills) |
+| Notifications / Mobile | gajae-code (Telegram notification SDK), qwen-code (Telegram/DingTalk/WeChat bots) |
+| Cross-instance / Teleport | kimchi (remote teleport), claude-code (Pipe IPC), qwen-code (daemon mode) |
+| Token optimization | kimchi (RTK rewrite) |

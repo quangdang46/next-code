@@ -6,7 +6,7 @@ description: >
   in the context of AI coding agents, CLI tools, terminal agents, or LLM-powered developer tools.
   Triggers on: "I want to add X feature", "how do I implement X", "can we improve X", "I want to
   build X into my agent", "feature request for X", "how does X work in these tools", or any phrasing
-  that implies implementing/improving a capability. This skill clones 7 reference repos, spawns
+  that implies implementing/improving a capability. This skill clones 12 reference repos, spawns
   sub-agents for deep per-repo research, runs an ultra-QA interview with the user, then produces a
   comprehensive implementation plan with code, pseudocode, test cases, benchmarks, and direct repo
   links — so the user can go from idea to working implementation with total confidence.
@@ -14,7 +14,7 @@ description: >
 
 # Feature Planning Skill
 
-Comprehensive feature research + implementation planning using 9 reference repos as the knowledge base.
+Comprehensive feature research + implementation planning using 12 reference repos as the knowledge base.
 
 ## Reference Repositories
 
@@ -29,6 +29,9 @@ Comprehensive feature research + implementation planning using 9 reference repos
 | `pi-agent-rust` | https://github.com/Dicklesworthstone/pi_agent_rust | Rust 2024 edition | High-perf Rust agent, SQLite sessions, SSE streaming, WASM extension security |
 | `oh-my-Codex` | https://github.com/Yeachan-Heo/oh-my-Codex | TypeScript / Codex plugin | Codex extension with hooks, guards, permission modes, multi-agent tools |
 | `oh-my-codex` | https://github.com/Yeachan-Heo/oh-my-codex | TypeScript / Codex plugin | Codex extension with approval modes, sandbox config, tool gating |
+| `gajae-code` | https://github.com/Yeachan-Heo/gajae-code | TypeScript + Rust / Bun | Structured workflow pipeline (deep-interview → ralplan → ultragoal), tmux-native sessions, Telegram notification SDK |
+| `kimchi` | https://github.com/getkimchi/kimchi | TypeScript / Node + Bun | Multi-model orchestration, Ferment cross-session plans, LSP integration, remote teleport, RTK token optimization |
+| `qwen-code` | https://github.com/QwenLM/qwen-code | TypeScript + Rust / Node | Multi-protocol agent (OpenAI/Anthropic/Gemini/Qwen), auto-memory, IM integration, SDK (TS/Python/Java), daemon mode |
 
 ---
 
@@ -36,7 +39,7 @@ Comprehensive feature research + implementation planning using 9 reference repos
 
 ### Phase 1 — Clone & Sub-agent Research
 
-When the skill is triggered, immediately clone all 9 repos (shallow `--depth=1`) and spawn one research sub-agent per repo. Each sub-agent gets the full repo and the feature request — its job is to autonomously explore **the entire repo** to find everything relevant. The sub-agent decides what to read; nothing is off-limits and nothing is assumed to be the right place to look.
+When the skill is triggered, immediately clone all 12 repos (shallow `--depth=1`) and spawn one research sub-agent per repo. Each sub-agent gets the full repo and the feature request — its job is to autonomously explore **the entire repo** to find everything relevant. The sub-agent decides what to read; nothing is off-limits and nothing is assumed to be the right place to look.
 
 Each sub-agent should:
 
@@ -48,7 +51,7 @@ Each sub-agent should:
 
 The sub-agent must NOT limit itself to any predefined set of files or folders. If it finds something unexpected in an unusual location, it should read it. Thoroughness is the goal.
 
-Run sub-agents in parallel. Collect all 9 reports before continuing.
+Run sub-agents in parallel. Collect all 12 reports before continuing.
 
 ```bash
 # Clone command template
@@ -61,7 +64,10 @@ for repo in \
   "https://github.com/claude-code-best/claude-code" \
   "https://github.com/Dicklesworthstone/pi_agent_rust" \
   "https://github.com/Yeachan-Heo/oh-my-Codex" \
-  "https://github.com/Yeachan-Heo/oh-my-codex"; do
+  "https://github.com/Yeachan-Heo/oh-my-codex" \
+  "https://github.com/Yeachan-Heo/gajae-code" \
+  "https://github.com/getkimchi/kimchi" \
+  "https://github.com/QwenLM/qwen-code"; do
   git clone --depth=1 "$repo" /tmp/feature-research/$(basename $repo)
 done
 ```
@@ -170,7 +176,7 @@ After the QA interview, produce the final plan. This is the deliverable the user
 
 ```markdown
 # Implementation Plan: [FEATURE NAME]
-> Generated from research across 9 repos + user interview
+> Generated from research across 12 repos + user interview
 > Goal: [User's stated goal in 1 sentence]
 
 ---
@@ -334,4 +340,4 @@ The plan must meet these bars before presenting to the user:
 
 ## References
 
-See `references/repo-summaries.md` for static summaries of all 9 repos (useful when cloning is slow or unavailable).
+See `references/repo-summaries.md` for static summaries of all 12 repos (useful when cloning is slow or unavailable).
