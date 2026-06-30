@@ -1252,7 +1252,15 @@ impl Provider for AnthropicProvider {
             return vec![];
         }
         if Self::model_supports_xhigh_effort(&model) {
-            vec!["none", "low", "medium", "high", "xhigh", "swarm", "swarm-deep"]
+            vec![
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "swarm",
+                "swarm-deep",
+            ]
         } else {
             vec!["none", "low", "medium", "high", "swarm", "swarm-deep"]
         }

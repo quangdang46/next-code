@@ -56,8 +56,7 @@ pub fn is_active_status(status: &str) -> bool {
 }
 
 /// Frames for the inline status spinner used by active agents on the strip.
-pub const STRIP_SPINNER_FRAMES: [&str; 10] =
-    ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+pub const STRIP_SPINNER_FRAMES: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 /// A glyph summarizing a member's lifecycle status. Active members (running,
 /// thinking, streaming) animate via the spinner frame; terminal states get a
@@ -414,8 +413,7 @@ pub fn render_swarm_strip(
             let mut hint_spans: Vec<Span<'static>> = vec![Span::raw("   ")];
             for (i, h) in hints.iter().enumerate() {
                 if i > 0 {
-                    hint_spans
-                        .push(Span::styled(" · ", Style::default().fg(rgb(80, 80, 90))));
+                    hint_spans.push(Span::styled(" · ", Style::default().fg(rgb(80, 80, 90))));
                 }
                 hint_spans.push(Span::styled(
                     h.key.clone(),
@@ -789,8 +787,7 @@ mod tests {
     #[test]
     fn strip_unfocused_shows_enter_controls_hint() {
         let members = vec![member("a", "running", None, &[])];
-        let lines =
-            render_swarm_strip(&members, 0, false, &hints(), Some("alt+w controls"), 0, 90);
+        let lines = render_swarm_strip(&members, 0, false, &hints(), Some("alt+w controls"), 0, 90);
         let chips = plain_line(&lines[0]);
         assert!(chips.contains("alt+w controls"), "got: {chips}");
     }

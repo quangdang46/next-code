@@ -2814,7 +2814,8 @@ impl App {
                 }
                 self.inline_interactive_state = None;
                 self.open_account_center(None);
-            }            KeyCode::Enter => {
+            }
+            KeyCode::Enter => {
                 let Some(ref mut picker) = self.inline_interactive_state else {
                     return Ok(());
                 };

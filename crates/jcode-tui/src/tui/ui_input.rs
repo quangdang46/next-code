@@ -2,15 +2,18 @@ use super::inline_interactive_ui::format_elapsed;
 use super::tools_ui::{get_tool_summary, summarize_batch_running_tools_compact};
 use super::visual_debug::{self, FrameCaptureBuilder};
 use super::{ProcessingStatus, TuiState};
-use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
-use crate::tui::color_support::rgb;
-use jcode_tui_style::theme::{accent_color, ai_color, asap_color, dim_color, pending_color, queued_color, rainbow_prompt_color, user_color};
 use crate::message::ConnectionPhase;
 use crate::tui::app;
+use crate::tui::color_support::rgb;
 use crate::tui::detect_kv_cache_problem;
 use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
 use crate::tui::session_facts;
+use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
+use jcode_tui_style::theme::{
+    accent_color, ai_color, asap_color, dim_color, pending_color, queued_color,
+    rainbow_prompt_color, user_color,
+};
 use ratatui::{prelude::*, style::Modifier, widgets::Paragraph};
 
 fn shell_mode_color() -> Color {
@@ -810,7 +813,10 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     })
                     .collect();
 
-                let anim_color = theme_animated_tool_color(elapsed, crate::perf::tui_policy().enable_decorative_animations);
+                let anim_color = theme_animated_tool_color(
+                    elapsed,
+                    crate::perf::tui_policy().enable_decorative_animations,
+                );
                 let batch_prog = app.batch_progress();
                 let is_batch = name == "batch";
                 // For batch: compute initial total from the streaming tool call input

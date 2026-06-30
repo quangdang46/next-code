@@ -2536,8 +2536,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let swarm_strip_lines: Vec<Line<'static>> = if app.inline_swarm_gallery_active() {
         let members = app.inline_swarm_members();
         if chat_area.width >= 24 {
-            let focus_key =
-                crate::tui::keybind::swarm_panel_focus_key_label();
+            let focus_key = crate::tui::keybind::swarm_panel_focus_key_label();
             // ~8 fps spinner from the wall-clock animation timer.
             let spinner_frame = (app.animation_elapsed() * 8.0) as usize;
             super::info_widget::swarm_gallery::render_swarm_strip_lines(

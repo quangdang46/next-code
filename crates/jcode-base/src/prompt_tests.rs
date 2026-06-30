@@ -519,4 +519,3 @@ fn classify_effort_distinguishes_reasoning_from_swarm_modes() {
     assert!(EffortKind::SwarmDeep.is_swarm_mode());
     assert!(!EffortKind::Reasoning.is_swarm_mode());
 }
-

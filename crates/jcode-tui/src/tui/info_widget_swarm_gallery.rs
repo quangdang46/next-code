@@ -112,16 +112,29 @@ pub(crate) fn render_swarm_strip_lines(
     }
     let enter_hint = format!("{focus_key} controls");
     let hints = vec![
-        SwarmStripHint { key: "↑/↓".into(), label: "select".into() },
-        SwarmStripHint { key: "enter".into(), label: "pop out".into() },
-        SwarmStripHint { key: "esc".into(), label: "exit".into() },
+        SwarmStripHint {
+            key: "↑/↓".into(),
+            label: "select".into(),
+        },
+        SwarmStripHint {
+            key: "enter".into(),
+            label: "pop out".into(),
+        },
+        SwarmStripHint {
+            key: "esc".into(),
+            label: "exit".into(),
+        },
     ];
     render_swarm_strip(
         &members_to_gallery(members),
         selected,
         focused,
         &hints,
-        if focused { None } else { Some(enter_hint.as_str()) },
+        if focused {
+            None
+        } else {
+            Some(enter_hint.as_str())
+        },
         spinner_frame,
         width,
     )
