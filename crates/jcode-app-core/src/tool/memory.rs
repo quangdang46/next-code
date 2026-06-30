@@ -138,16 +138,16 @@ impl Tool for MemoryTool {
                     action: "remember".into(),
                     detail: truncate_for_widget(&content, 40),
                 });
-                let mem_scope = match scope {
-                    "global" => MemoryScope::Global,
-                    _ => MemoryScope::Project,
-                };
                 let mut entry =
                     MemoryEntry::new(category.clone(), &content).with_source(ctx.session_id);
                 if let Some(tags) = input.tags {
                     entry = entry.with_tags(tags);
                 }
-                let id = self.manager.remember_project(entry)?;
+                let id = if scope == "global" {
+                    self.manager.remember_global(entry)?
+                } else {
+                    self.manager.remember_project(entry)?
+                };
                 memory::add_event(MemoryEventKind::ToolRemembered {
                     content: truncate_for_widget(&content, 60),
                     scope: scope.to_string(),
