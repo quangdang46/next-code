@@ -553,6 +553,12 @@ impl Registry {
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
+                "memory",
+                memory::MemoryTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
                 "hashline_edit",
                 hashline_edit::HashlineEditTool::new,
             );
@@ -758,10 +764,6 @@ impl Registry {
             "conversation_search",
             conversation_search::ConversationSearchTool::new(compaction),
         );
-        // Memory tool — uses MemoryManager (JSON-based persistent storage).
-        {
-            Self::insert_tool(&mut tools_map, "memory", memory::MemoryTool::new());
-        }
         let session_tools_ms = session_tools_start.elapsed().as_millis();
 
         let write_start = std::time::Instant::now();
