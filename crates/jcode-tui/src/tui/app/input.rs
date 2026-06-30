@@ -1401,6 +1401,12 @@ pub(super) fn delete_input_to_end(app: &mut App) {
 
 pub(super) fn handle_super_key(app: &mut App, code: KeyCode) -> bool {
     match code {
+        // Cmd+5 toggles the onboarding simulator (a dev aid for walking through
+        // every first-run onboarding screen without touching real auth state).
+        KeyCode::Char('5') => {
+            app.toggle_onboarding_simulator();
+            true
+        }
         // macOS terminals that forward Command may report Command+Delete as Super+Backspace,
         // Super+Delete, or Super+DEL. Treat all of them as delete-the-previous-word, matching
         // the requested Cmd+Backspace = delete-by-word behavior.
@@ -1695,6 +1701,32 @@ pub(super) fn handle_pre_control_shortcuts(
     }
     if app.dictation_key_matches(code, modifiers) {
         app.handle_dictation_trigger();
+        return true;
+    }
+
+    // Inline swarm panel: Alt+W focuses/unfocuses the managed-agents panel.
+    // While focused, j/k navigate, o pops out the selected agent, esc exits.
+    if app.toggle_keys.swarm_panel_focus.matches(code, modifiers) {
+        let focused = app.toggle_swarm_panel_focus();
+        app.set_status_notice(if focused {
+            "Swarm panel: focused (j/k select, o pop out, esc)"
+        } else {
+            "Swarm panel: unfocused"
+        });
+        return true;
+    }
+    {
+        use crate::tui::TuiState as _;
+        if app.swarm_panel_focused() && app.handle_swarm_panel_key(code, modifiers) {
+            return true;
+        }
+    }
+    if app.new_terminal_key_matches(code, modifiers) {
+        app.handle_new_terminal_hotkey();
+        return true;
+    }
+    if app.open_resume_key_matches(code, modifiers) {
+        app.open_session_picker();
         return true;
     }
     if let Some(direction) = app.model_switch_keys.direction_for(code, modifiers) {
@@ -2272,6 +2304,12 @@ impl App {
         ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
 
         if handle_modal_key(self, code, modifiers)? {
+            return Ok(());
+        }
+
+        // The onboarding simulator owns all key handling while active so the
+        // real onboarding handlers never fire (no real logins/imports).
+        if self.handle_onboarding_sim_key(code, modifiers) {
             return Ok(());
         }
 

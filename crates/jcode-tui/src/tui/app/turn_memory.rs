@@ -123,6 +123,10 @@ impl App {
             notepad_prompt.as_deref(),
         );
         self.append_current_turn_system_reminder(&mut split);
+        crate::prompt::append_swarm_effort_directive(
+            &mut split,
+            self.provider.reasoning_effort().as_deref(),
+        );
         self.context_info = context_info;
         split
     }

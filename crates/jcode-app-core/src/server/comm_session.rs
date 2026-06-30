@@ -459,6 +459,7 @@ async fn register_visible_spawned_member(
                 report_back_to_session_id: report_back_to_session_id.map(str::to_string),
                 latest_completion_report: None,
                 output_tail: None,
+                todo_progress: None,
                 role: "agent".to_string(),
                 joined_at: now,
                 last_status_change: now,
@@ -1084,7 +1085,11 @@ async fn ensure_spawn_coordinator_swarm(
     swarm_coordinators: &Arc<RwLock<HashMap<String, String>>>,
     swarm_plans: &Arc<RwLock<HashMap<String, VersionedPlan>>>,
 ) -> Option<String> {
-    let (swarm_id, from_name, coordinator_id, coordinator_is_stale) = {
+    // `permission_error` is retained for signature compatibility with callers and
+    // tests; recursive spawning no longer rejects non-coordinators, so it is only
+    // referenced defensively below.
+    let _ = permission_error;
+    let (swarm_id, from_name, is_root, coordinator_id, coordinator_is_stale, swarm_size) = {
         let members = swarm_members.read().await;
         let swarm_id = members
             .get(req_session_id)
@@ -1092,6 +1097,22 @@ async fn ensure_spawn_coordinator_swarm(
         let from_name = members
             .get(req_session_id)
             .and_then(|member| member.friendly_name.clone());
+        // A session is a "root" when it has no spawner/owner above it.
+        let is_root = members
+            .get(req_session_id)
+            .and_then(|member| member.report_back_to_session_id.clone())
+            .is_none();
+        // Total live members in this swarm. Used for the breadth-side runaway cap
+        // (`MAX_SWARM_MEMBERS`) so a wide fan-out cannot create unbounded agents.
+        let swarm_size = swarm_id
+            .as_ref()
+            .map(|swarm_id| {
+                members
+                    .values()
+                    .filter(|member| member.swarm_id.as_deref() == Some(swarm_id.as_str()))
+                    .count()
+            })
+            .unwrap_or(0);
         let coordinator_id = if let Some(ref swarm_id) = swarm_id {
             let coordinators = swarm_coordinators.read().await;
             coordinators.get(swarm_id).cloned()
@@ -1104,7 +1125,14 @@ async fn ensure_spawn_coordinator_swarm(
                     && !swarm_member_status_is_stale_for_coordination(&member.status)
             })
         });
-        (swarm_id, from_name, coordinator_id, coordinator_is_stale)
+        (
+            swarm_id,
+            from_name,
+            is_root,
+            coordinator_id,
+            coordinator_is_stale,
+            swarm_size,
+        )
     };
 
     let Some(swarm_id) = swarm_id else {
@@ -1116,14 +1144,17 @@ async fn ensure_spawn_coordinator_swarm(
         return None;
     };
 
-    if coordinator_id.as_deref() == Some(req_session_id) {
-        return Some(swarm_id);
-    }
-
-    if coordinator_id.is_some() && !coordinator_is_stale {
+    // Runaway prevention for the task-graph model is a single total-member cap.
+    // There is no depth or per-node breadth limit: the spawn tree may nest and
+    // fan out freely until the swarm reaches `MAX_SWARM_MEMBERS` live members, at
+    // which point further spawns are refused.
+    if swarm_size >= super::MAX_SWARM_MEMBERS {
         let _ = client_event_tx.send(ServerEvent::Error {
             id,
-            message: permission_error.to_string(),
+            message: format!(
+                "Swarm member limit reached (max {}). This swarm already has {swarm_size} agents; it cannot spawn more. Let existing agents finish and free up capacity, or narrow the task decomposition before spawning further.",
+                super::MAX_SWARM_MEMBERS
+            ),
             retry_after_secs: None,
         });
         return None;

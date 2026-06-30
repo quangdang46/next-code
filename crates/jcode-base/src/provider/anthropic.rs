@@ -571,7 +571,7 @@ impl AnthropicProvider {
             .anthropic_reasoning_effort
             .as_deref()
             .and_then(Self::normalize_reasoning_effort)
-            .map(|effort| Self::actual_effort_for_model(&model, &effort));
+            .map(|effort| Self::store_effort_for_model(&model, &effort));
 
         Self {
             client: crate::provider::shared_http_client(),
@@ -644,7 +644,11 @@ impl AnthropicProvider {
         }
         match value.as_str() {
             "off" | "disabled" => Some("none".to_string()),
-            "none" | "low" | "medium" | "high" | "xhigh" | "max" => Some(value),
+            // `swarm` is a UI sentinel meaning "max effort + use the swarm tool".
+            // Stored verbatim; resolved to a real effort in `actual_effort_for_model`.
+            "none" | "low" | "medium" | "high" | "xhigh" | "max" | "swarm" | "swarm-deep" => {
+                Some(value)
+            }
             other => {
                 crate::logging::info(&format!(
                     "Warning: Unsupported Anthropic reasoning effort '{}'; expected none|low|medium|high|xhigh|max alias. Using the model maximum.",
@@ -656,7 +660,7 @@ impl AnthropicProvider {
     }
 
     fn actual_effort_for_model(model: &str, effort: &str) -> String {
-        if effort == "max" {
+        if effort == "max" || crate::prompt::is_swarm_effort(effort) {
             if Self::model_supports_xhigh_effort(model) {
                 "xhigh".to_string()
             } else {
@@ -666,6 +670,20 @@ impl AnthropicProvider {
             "high".to_string()
         } else {
             effort.to_string()
+        }
+    }
+
+    /// Like [`Self::actual_effort_for_model`], but preserves the swarm sentinels
+    /// (light `swarm` and `swarm-deep`) so the stored/UI value keeps reflecting
+    /// the chosen swarm mode. Used when persisting the user's choice; request
+    /// building resolves swarm to a real effort.
+    fn store_effort_for_model(model: &str, effort: &str) -> String {
+        if crate::prompt::is_deep_swarm_effort(effort) {
+            crate::prompt::SWARM_DEEP_EFFORT.to_string()
+        } else if crate::prompt::is_swarm_effort(effort) {
+            crate::prompt::SWARM_EFFORT.to_string()
+        } else {
+            Self::actual_effort_for_model(model, effort)
         }
     }
 
@@ -739,6 +757,7 @@ impl AnthropicProvider {
             "medium" => 4_096,
             "high" => 8_192,
             "xhigh" | "max" => 16_384,
+            e if crate::prompt::is_swarm_effort(e) => 16_384,
             _ => return None,
         };
         let budget = desired.min(max_tokens.saturating_sub(1));
@@ -1161,13 +1180,13 @@ impl Provider for AnthropicProvider {
         match self.reasoning_effort.write() {
             Ok(mut guard) => {
                 if let Some(current) = guard.clone() {
-                    *guard = Some(Self::actual_effort_for_model(model, &current));
+                    *guard = Some(Self::store_effort_for_model(model, &current));
                 }
             }
             Err(poisoned) => {
                 let mut guard = poisoned.into_inner();
                 if let Some(current) = guard.clone() {
-                    *guard = Some(Self::actual_effort_for_model(model, &current));
+                    *guard = Some(Self::store_effort_for_model(model, &current));
                 }
             }
         }
@@ -1214,7 +1233,7 @@ impl Provider for AnthropicProvider {
         if normalized.as_deref() == Some("xhigh") && !Self::model_supports_xhigh_effort(&model) {
             anyhow::bail!("Anthropic xhigh effort is only supported for Claude Opus 4.7 models");
         }
-        let normalized = normalized.map(|effort| Self::actual_effort_for_model(&model, &effort));
+        let normalized = normalized.map(|effort| Self::store_effort_for_model(&model, &effort));
         match self.reasoning_effort.write() {
             Ok(mut guard) => {
                 *guard = normalized;
@@ -1233,9 +1252,9 @@ impl Provider for AnthropicProvider {
             return vec![];
         }
         if Self::model_supports_xhigh_effort(&model) {
-            vec!["none", "low", "medium", "high", "xhigh"]
+            vec!["none", "low", "medium", "high", "xhigh", "swarm", "swarm-deep"]
         } else {
-            vec!["none", "low", "medium", "high"]
+            vec!["none", "low", "medium", "high", "swarm", "swarm-deep"]
         }
     }
 
@@ -1284,7 +1303,8 @@ impl Provider for AnthropicProvider {
                     crate::logging::info(
                         "Anthropic OAuth model catalog auth failed; forcing token refresh and retrying...",
                     );
-                    let refreshed_token = force_refresh_oauth_token(Arc::clone(&self.credentials)).await?;
+                    let refreshed_token =
+                        force_refresh_oauth_token(Arc::clone(&self.credentials)).await?;
                     crate::provider::fetch_anthropic_model_catalog_oauth(&refreshed_token).await
                 }
                 Err(err) => Err(err),

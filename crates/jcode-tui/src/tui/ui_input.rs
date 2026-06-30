@@ -1,16 +1,17 @@
-#![allow(dead_code)]
-use super::tools_ui::summarize_batch_running_tools_compact;
+use super::inline_interactive_ui::format_elapsed;
+use super::tools_ui::{get_tool_summary, summarize_batch_running_tools_compact};
 use super::visual_debug::{self, FrameCaptureBuilder};
-use super::{
-    TuiState, accent_color, ai_color, asap_color, dim_color, pending_color, queued_color,
-    rainbow_prompt_color, user_color,
-};
+use super::{ProcessingStatus, TuiState};
+use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
+use crate::tui::color_support::rgb;
+use jcode_tui_style::theme::{accent_color, ai_color, asap_color, dim_color, pending_color, queued_color, rainbow_prompt_color, user_color};
 use crate::message::ConnectionPhase;
 use crate::tui::app;
-use crate::tui::color_support::rgb;
+use crate::tui::detect_kv_cache_problem;
+use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
-use jcode_keywords::visual::KeywordHighlight;
-use ratatui::{prelude::*, widgets::Paragraph};
+use crate::tui::session_facts;
+use ratatui::{prelude::*, style::Modifier, widgets::Paragraph};
 
 fn shell_mode_color() -> Color {
     rgb(110, 214, 151)
@@ -98,16 +99,21 @@ fn command_suggestion_lines(
     app: &dyn TuiState,
     suggestions: &[(String, &'static str)],
 ) -> Vec<Line<'static>> {
+    // Highlight the characters of each command that the typed query matched.
+    // We only highlight the command token itself (the part before the first
+    // space), matched against the corresponding leading token of the input.
+    let needle = command_suggestion_needle(app.input());
+    let highlight = |cmd: &str, base: Style| -> Vec<Span<'static>> {
+        highlight_command_spans(cmd, needle.as_deref(), base)
+    };
+
     let mut lines = Vec::new();
     if suggestions.len() == 1 {
         let (cmd, desc) = &suggestions[0];
-        lines.push(Line::from(vec![
-            Span::styled(cmd.to_string(), Style::default().fg(rgb(255, 213, 128))),
-            Span::styled(
-                format!("  {}", desc),
-                Style::default().fg(rgb(255, 213, 128)),
-            ),
-        ]));
+        let base = Style::default().fg(rgb(255, 213, 128));
+        let mut spans = highlight(cmd, base);
+        spans.push(Span::styled(format!("  {}", desc), base));
+        lines.push(Line::from(spans));
     } else if !suggestions.is_empty() {
         let selected = app
             .command_suggestion_selected()
@@ -134,8 +140,7 @@ fn command_suggestion_lines(
             } else {
                 Style::default().fg(rgb(128, 203, 196))
             };
-            let mut spans = Vec::new();
-            spans.push(Span::styled(cmd.to_string(), command_style));
+            let mut spans = highlight(cmd, command_style);
             spans.push(Span::styled(format!("  {}", desc), description_style));
             if i == 0 && window_start > 0 {
                 spans.push(Span::styled(
@@ -153,6 +158,79 @@ fn command_suggestion_lines(
         }
     }
     lines
+}
+
+/// Extract the slash-command portion of the typed input that should be matched
+/// against suggestion command tokens for highlighting purposes.
+fn command_suggestion_needle(input: &str) -> Option<String> {
+    let trimmed = input.trim_start();
+    if !trimmed.starts_with('/') {
+        return None;
+    }
+    Some(trimmed.to_string())
+}
+
+/// Build spans for a suggestion command, recoloring the characters that the
+/// fuzzy matcher aligned with the typed query. Falls back to a single
+/// unhighlighted span when there is nothing (useful) to highlight.
+fn highlight_command_spans(cmd: &str, needle: Option<&str>, base: Style) -> Vec<Span<'static>> {
+    let positions: Vec<usize> = match needle {
+        Some(n) if !n.is_empty() && n != "/" => crate::tui::fuzzy::fuzzy_match_positions(n, cmd),
+        _ => Vec::new(),
+    };
+    if positions.is_empty() {
+        return vec![Span::styled(cmd.to_string(), base)];
+    }
+
+    // Recolor (rather than underline) the matched characters so they stay in
+    // the command palette's own hue: matched chars are a brighter version of
+    // the line's base color, while unmatched chars are dimmed so the match
+    // visually pops.
+    let highlight_style = base
+        .fg(brighten_command_color(base.fg))
+        .add_modifier(Modifier::BOLD);
+    let rest_style = base.fg(dim_command_color(base.fg));
+    let chars: Vec<char> = cmd.chars().collect();
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut run_start = 0usize;
+    let mut run_is_match = !chars.is_empty() && positions.contains(&0);
+    for i in 1..=chars.len() {
+        let cur_is_match = i < chars.len() && positions.contains(&i);
+        if cur_is_match != run_is_match || i == chars.len() {
+            let chunk: String = chars[run_start..i].iter().collect();
+            spans.push(Span::styled(
+                chunk,
+                if run_is_match {
+                    highlight_style
+                } else {
+                    rest_style
+                },
+            ));
+            run_start = i;
+            run_is_match = cur_is_match;
+        }
+    }
+    spans
+}
+
+/// Blend a palette color toward white to emphasize a matched character while
+/// keeping its original hue.
+fn brighten_command_color(color: Option<Color>) -> Color {
+    match color {
+        Some(Color::Rgb(r, g, b)) => {
+            let lift = |c: u8| -> u8 { c.saturating_add((255 - c) / 2) };
+            rgb(lift(r), lift(g), lift(b))
+        }
+        _ => rgb(255, 255, 255),
+    }
+}
+
+/// Blend a palette color toward black so unmatched characters recede.
+fn dim_command_color(color: Option<Color>) -> Color {
+    match color {
+        Some(Color::Rgb(r, g, b)) => rgb(r / 2, g / 2, b / 2),
+        other => other.unwrap_or_else(dim_color),
+    }
 }
 
 pub(super) fn input_hint_line_height(app: &dyn TuiState) -> u16 {
@@ -187,7 +265,7 @@ pub(super) fn input_prompt(app: &dyn TuiState) -> (&'static str, Color) {
     } else if app.active_skill().is_some() {
         ("» ", accent_color())
     } else {
-        ("❯ ", user_color())
+        ("> ", user_color())
     }
 }
 
@@ -222,7 +300,6 @@ pub(super) fn wrapped_input_line_count(
         prompt_char,
         caret_color,
         prompt_len,
-        &[],
     );
     lines.len().max(1)
 }
@@ -537,176 +614,350 @@ fn append_batch_progress_spans(
     }
 }
 
-pub(super) fn draw_status(
-    frame: &mut Frame,
-    app: &dyn TuiState,
-    area: Rect,
-    _pending_count: usize,
-) {
-    let _pending_count = pending_prompt_count(app);
+pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pending_count: usize) {
+    let elapsed = app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0);
+    let stale_secs = app.time_since_activity().map(|d| d.as_secs_f32());
+    let (cache_read, cache_creation) = app.streaming_cache_tokens();
+    let user_turn_count = app.display_user_message_count();
+    let (streaming_input_tokens, _) = app.streaming_tokens();
+    let provider_name = app.provider_name();
+    let upstream_provider = app.upstream_provider();
+    let cache_ttl = app.cache_ttl_status();
+    let kv_cache_problem = detect_kv_cache_problem(
+        &provider_name,
+        upstream_provider.as_deref(),
+        user_turn_count,
+        streaming_input_tokens,
+        cache_read,
+        cache_creation,
+        cache_ttl.as_ref(),
+    );
 
-    // Format: ⏵⏵ bypass permissions on (shift+tab to cycle) │ model │ provider │ X% │ ↑K ↓K
-    fn status_line_text(app: &dyn TuiState) -> Vec<Span<'static>> {
-        let mode_str = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
-        let mode_icon = match mode_str {
-            "bypass-permissions" => "⏵⏵",
-            "default" => "🔒",
-            "accept-edits" => "⏵⏵",
-            "plan" => "⏸",
-            "auto" => "⏵⏵",
-            _ => "🔒",
-        };
-        let perm_label = match mode_str {
-            "bypass-permissions" => "bypass permissions",
-            "default" => "default",
-            "accept-edits" => "accept edits",
-            "plan" => "plan",
-            "auto" => "auto",
-            "dont-ask" => "don't ask",
-            _ => "default",
-        };
-        let mut spans = vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(mode_icon, Style::default().fg(rgb(200, 200, 210))),
-            Span::styled(" ", Style::default()),
-            Span::styled(perm_label, Style::default().fg(rgb(200, 200, 210))),
-        ];
-        if mode_str != "default" {
-            spans.push(Span::styled(
-                " ⟦shift+tab⟧",
-                Style::default().fg(rgb(100, 100, 110)),
-            ));
-        }
-
-        // Model + provider + context separator
-        let sep = || Span::styled(" │ ", Style::default().fg(rgb(100, 100, 110)));
-        let data = app.info_widget_data();
-        let model = data
-            .model
-            .clone()
-            .filter(|m| !m.is_empty())
-            .unwrap_or_else(|| app.provider_model());
-        if !model.is_empty() {
-            spans.push(sep());
-            spans.push(Span::styled(
-                model,
-                Style::default().fg(rgb(255, 150, 200)).bold(),
-            ));
-        }
-        let provider = data
-            .provider_name
-            .clone()
-            .filter(|p| !p.is_empty())
-            .unwrap_or_else(|| app.provider_name());
-        if !provider.is_empty() {
-            spans.push(sep());
-            spans.push(Span::styled(
-                provider,
-                Style::default().fg(rgb(140, 180, 255)),
-            ));
-        }
-        // Context usage
-        if let Some((used, limit)) = overscroll_context_usage(&data) {
-            spans.push(sep());
-            spans.push(Span::styled(
-                format!(
-                    "{}/{} ",
-                    overscroll_format_tokens(used),
-                    overscroll_format_tokens(limit)
-                ),
-                Style::default().fg(rgb(140, 140, 150)),
-            ));
-            spans.extend(overscroll_context_bar(used, limit, 10));
-        }
-        spans
-    }
-
-    // Layer 3: Custom shell command (Claude Code style).
-    // If status_line.command is configured, run it and use stdout as status line.
-    fn run_custom_command(app: &dyn TuiState) -> Option<String> {
-        let config = app.status_line_config();
-        let command = config.command.as_ref()?;
-        if !config.enabled || command.is_empty() {
-            return None;
-        }
-        // Build JSON input matching Claude Code's StatusLineCommandInput format
-        let data = app.info_widget_data();
-        let (used_tokens, limit) = overscroll_context_usage(&data).unwrap_or((0, 1));
-        let model = data
-            .model
-            .clone()
-            .filter(|m| !m.is_empty())
-            .unwrap_or_else(|| app.provider_model());
-        let provider = data
-            .provider_name
-            .clone()
-            .filter(|p| !p.is_empty())
-            .unwrap_or_else(|| app.provider_name());
-        let json_input = serde_json::json!({
-            "session_id": "",
-            "cwd": std::env::current_dir().ok().map(|d| d.to_string_lossy().to_string()),
-            "permission_mode": crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode()),
-            "model": {
-                "id": model,
-                "display_name": model,
-            },
-            "workspace": {
-                "current_dir": std::env::current_dir().ok().map(|d| d.to_string_lossy().to_string()),
-            },
-            "context_window": {
-                "used_percentage": if limit > 0 { Some((used_tokens as f64 / limit as f64 * 100.0) as u8) } else { None },
-                "total_input_tokens": used_tokens as u64,
-            },
-            "provider": provider,
-        });
-        let json_str = serde_json::to_string(&json_input).unwrap_or_default();
-
-        // Run command with stdin JSON, capture stdout (like Claude Code's 5s timeout)
-        let mut child = match std::process::Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-        {
-            Ok(c) => c,
-            Err(_) => return None,
-        };
-        // Write JSON to stdin
-        if let Some(ref mut stdin) = child.stdin {
-            use std::io::Write;
-            let _ = stdin.write_all(json_str.as_bytes());
-        }
-        // Wait for output
-        let output = match child.wait_with_output() {
-            Ok(o) => o,
-            Err(_) => return None,
-        };
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !text.is_empty() { Some(text) } else { None }
-        } else {
-            None
-        }
-    }
-
-    let base_spans = if let Some(custom_text) = run_custom_command(app) {
-        // Layer 3: custom shell command output
-        vec![Span::styled(
-            format!("  {}", custom_text),
-            Style::default().fg(rgb(200, 200, 210)),
-        )]
+    let queued_suffix = if pending_count > 0 {
+        format!(" · +{} queued", pending_count)
     } else {
-        status_line_text(app)
+        String::new()
     };
 
-    let line = Line::from(base_spans);
+    // Idle session facts (context bar + provider) are pinned to the right edge
+    // so they read like a status readout rather than left-flush body text.
+    let mut right_align_facts = false;
+    let line = if let Some(build_progress) = crate::build::read_build_progress() {
+        let spinner = super::activity_indicator(elapsed, 12.5);
+        Line::from(vec![
+            Span::styled(spinner, Style::default().fg(rgb(255, 193, 7))),
+            Span::styled(
+                format!(" {}", build_progress),
+                Style::default().fg(rgb(255, 193, 7)),
+            ),
+        ])
+    } else if let Some(remaining) = app.rate_limit_remaining() {
+        let secs = remaining.as_secs();
+        let spinner = super::activity_indicator(elapsed, 4.0);
+        let time_str = if secs >= 3600 {
+            let hours = secs / 3600;
+            let mins = (secs % 3600) / 60;
+            format!("{}h {}m", hours, mins)
+        } else if secs >= 60 {
+            let mins = secs / 60;
+            let s = secs % 60;
+            format!("{}m {}s", mins, s)
+        } else {
+            format!("{}s", secs)
+        };
+        Line::from(vec![
+            Span::styled(spinner, Style::default().fg(rgb(255, 193, 7))),
+            Span::styled(
+                format!(
+                    " Rate limited. Auto-retry in {}...{}",
+                    time_str, queued_suffix
+                ),
+                Style::default().fg(rgb(255, 193, 7)),
+            ),
+        ])
+    } else if app.is_processing() {
+        let spinner = super::activity_indicator(elapsed, 12.5);
+
+        match app.status() {
+            ProcessingStatus::Idle => Line::from(""),
+            ProcessingStatus::Sending => {
+                let mut spans = vec![
+                    Span::styled(spinner, Style::default().fg(ai_color())),
+                    Span::styled(
+                        format!(" sending… {}", format_elapsed(elapsed)),
+                        Style::default().fg(dim_color()),
+                    ),
+                ];
+                push_queued_suffix(&mut spans, &queued_suffix);
+                Line::from(spans)
+            }
+            ProcessingStatus::Connecting(ref phase) => {
+                let mut label = format!(
+                    " {}… {}",
+                    connection_phase_label(phase),
+                    format_elapsed(elapsed)
+                );
+                append_transport_context(&mut label, app);
+                // "Suspiciously long" is measured per connection attempt, not
+                // across the whole turn, so later round-trips don't immediately
+                // render yellow just because the turn has been running a while.
+                let phase_elapsed = app
+                    .connection_phase_elapsed()
+                    .map_or(elapsed, |d| d.as_secs_f32());
+                let label_color = match phase {
+                    crate::message::ConnectionPhase::Retrying { .. } => rgb(255, 193, 7),
+                    crate::message::ConnectionPhase::Authenticating if phase_elapsed > 10.0 => {
+                        rgb(255, 193, 7)
+                    }
+                    crate::message::ConnectionPhase::Connecting if phase_elapsed > 10.0 => {
+                        rgb(255, 193, 7)
+                    }
+                    _ => dim_color(),
+                };
+                let mut spans = vec![
+                    Span::styled(spinner, Style::default().fg(ai_color())),
+                    Span::styled(label, Style::default().fg(label_color)),
+                ];
+                push_queued_suffix(&mut spans, &queued_suffix);
+                Line::from(spans)
+            }
+            ProcessingStatus::Thinking(_start) => {
+                let mut label = format!(" thinking… {}", format_elapsed(elapsed));
+                append_transport_context(&mut label, app);
+                let mut spans = vec![
+                    Span::styled(spinner, Style::default().fg(ai_color())),
+                    Span::styled(label, Style::default().fg(dim_color())),
+                ];
+                push_queued_suffix(&mut spans, &queued_suffix);
+                Line::from(spans)
+            }
+            ProcessingStatus::Streaming => {
+                let time_str = format_elapsed(elapsed);
+                let (input_tokens, output_tokens) = app.streaming_tokens();
+                let stream_message_ended = app.stream_message_ended();
+                let mut status_text =
+                    streaming_liveness_label(time_str, stale_secs, stream_message_ended);
+                if let Some(tps) = app.output_tps() {
+                    status_text = format!("{} · {:.1} tps", status_text, tps);
+                }
+                if input_tokens > 0 || output_tokens > 0 {
+                    status_text = format!(
+                        "{} · ↑{} ↓{}",
+                        status_text,
+                        format_stream_tokens(input_tokens),
+                        format_stream_tokens(output_tokens)
+                    );
+                }
+                append_transport_context(&mut status_text, app);
+                if let Some(problem) = kv_cache_problem {
+                    let miss_tokens = problem.affected_tokens.unwrap_or(0);
+                    let miss_str = if miss_tokens >= 1000 {
+                        format!("{}k", miss_tokens / 1000)
+                    } else if miss_tokens > 0 {
+                        format!("{}", miss_tokens)
+                    } else {
+                        "kv".to_string()
+                    };
+                    status_text = format!("⚠ {} cache miss · {}", miss_str, status_text);
+                }
+                let spans = streaming_status_spans(
+                    spinner,
+                    status_text,
+                    stream_message_ended,
+                    kv_cache_problem.is_some(),
+                    &queued_suffix,
+                );
+                Line::from(spans)
+            }
+            ProcessingStatus::WaitingForNetwork { listener } => {
+                let mut spans = vec![
+                    Span::styled("↻ ", Style::default().fg(rgb(255, 193, 7))),
+                    Span::styled(
+                        format!(
+                            "network disconnected, waiting to retry · {} · {}",
+                            listener,
+                            format_elapsed(elapsed)
+                        ),
+                        Style::default().fg(rgb(255, 193, 7)),
+                    ),
+                ];
+                push_queued_suffix(&mut spans, &queued_suffix);
+                Line::from(spans)
+            }
+            ProcessingStatus::RunningTool(ref name) => {
+                let half_width = 3;
+                let decorative = crate::perf::tui_policy().enable_decorative_animations;
+                // When decorative animations are disabled we still nudge the bar
+                // forward at a slow "liveness" rate so a long-running tool (e.g.
+                // bash) reads as alive instead of frozen.
+                let bar_speed = if decorative {
+                    2.0
+                } else {
+                    jcode_tui_style::theme::LIVENESS_INDICATOR_FPS / half_width as f32
+                };
+                let progress = elapsed * bar_speed % 1.0;
+                let filled_pos = ((progress * half_width as f32) as usize) % half_width;
+                let left_bar: String = (0..half_width)
+                    .map(|i| if i == filled_pos { '●' } else { '·' })
+                    .collect();
+                let right_bar: String = (0..half_width)
+                    .map(|i| {
+                        if i == (half_width - 1 - filled_pos) {
+                            '●'
+                        } else {
+                            '·'
+                        }
+                    })
+                    .collect();
+
+                let anim_color = theme_animated_tool_color(elapsed, crate::perf::tui_policy().enable_decorative_animations);
+                let batch_prog = app.batch_progress();
+                let is_batch = name == "batch";
+                // For batch: compute initial total from the streaming tool call input
+                let batch_total_initial = if is_batch {
+                    app.streaming_tool_calls()
+                        .last()
+                        .and_then(|tc| tc.input.get("tool_calls"))
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.len())
+                } else {
+                    None
+                };
+                let tool_detail = if is_batch {
+                    None // batch always uses progress display
+                } else {
+                    app.streaming_tool_calls()
+                        .last()
+                        .map(get_tool_summary)
+                        .filter(|s| !s.is_empty())
+                };
+                let experimental_notice = app.active_experimental_feature_notice();
+                let subagent = app.subagent_status();
+
+                let mut spans = vec![
+                    Span::styled(left_bar, Style::default().fg(anim_color)),
+                    Span::styled(" ", Style::default()),
+                    Span::styled(name.to_string(), Style::default().fg(anim_color).bold()),
+                    Span::styled(" ", Style::default()),
+                    Span::styled(right_bar, Style::default().fg(anim_color)),
+                ];
+
+                // For batch tool: show "completed/total · last_tool" progress
+                if is_batch {
+                    append_batch_progress_spans(
+                        &mut spans,
+                        anim_color,
+                        batch_prog,
+                        batch_total_initial,
+                    );
+                } else if let Some(detail) = tool_detail {
+                    spans.push(Span::styled(
+                        format!(" · {}", detail),
+                        Style::default().fg(dim_color()),
+                    ));
+                }
+
+                if let Some(notice) = experimental_notice {
+                    spans.push(Span::styled(
+                        format!(" · ⚠ {}", notice),
+                        Style::default().fg(rgb(255, 193, 7)).bold(),
+                    ));
+                }
+
+                if let Some(status) = subagent {
+                    spans.push(Span::styled(
+                        format!(" ({})", status),
+                        Style::default().fg(dim_color()),
+                    ));
+                }
+                for label in transport_context_labels(app) {
+                    spans.push(Span::styled(
+                        format!(" · {}", label),
+                        Style::default().fg(dim_color()),
+                    ));
+                }
+                spans.push(Span::styled(
+                    format!(" · {}", format_elapsed(elapsed)),
+                    Style::default().fg(dim_color()),
+                ));
+
+                if let Some(problem) = kv_cache_problem {
+                    let miss_tokens = problem.affected_tokens.unwrap_or(0);
+                    let miss_str = if miss_tokens >= 1000 {
+                        format!("{}k", miss_tokens / 1000)
+                    } else if miss_tokens > 0 {
+                        format!("{}", miss_tokens)
+                    } else {
+                        "kv".to_string()
+                    };
+                    spans.push(Span::styled(
+                        format!(" · ⚠ {} cache miss", miss_str),
+                        Style::default().fg(rgb(255, 193, 7)),
+                    ));
+                }
+
+                spans.push(Span::styled(
+                    " · Alt+B bg",
+                    Style::default().fg(rgb(100, 100, 100)),
+                ));
+
+                push_queued_suffix(&mut spans, &queued_suffix);
+                Line::from(spans)
+            }
+        }
+    } else if let Some((total_in, total_out)) = app.total_session_tokens() {
+        let total = total_in + total_out;
+        if let Some(warning) = occasional_session_history_warning(
+            total,
+            app.session_compaction_count(),
+            app.context_limit(),
+            area.width as usize,
+            app.animation_elapsed() as u64,
+        ) {
+            let severe_token_threshold = app
+                .context_limit()
+                .and_then(|limit| u64::try_from(limit).ok())
+                .map(|limit| limit.saturating_mul(3))
+                .unwrap_or(1_000_000);
+            let warning_color =
+                if total >= severe_token_threshold || app.session_compaction_count() >= 3 {
+                    rgb(255, 100, 100)
+                } else {
+                    rgb(255, 193, 7)
+                };
+            Line::from(vec![
+                Span::styled("⚠ ", Style::default().fg(warning_color)),
+                Span::styled(warning, Style::default().fg(warning_color)),
+            ])
+        } else if let Some(tip) =
+            occasional_status_tip(area.width as usize, app.animation_elapsed() as u64)
+        {
+            Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
+        } else if let Some(facts) = idle_status_facts(app) {
+            right_align_facts = true;
+            Line::from(facts)
+        } else {
+            Line::from("")
+        }
+    } else {
+        if let Some(tip) =
+            occasional_status_tip(area.width as usize, app.animation_elapsed() as u64)
+        {
+            Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
+        } else if let Some(facts) = idle_status_facts(app) {
+            right_align_facts = true;
+            Line::from(facts)
+        } else {
+            Line::from("")
+        }
+    };
 
     crate::memory::check_staleness();
 
     let aligned_line = if app.centered_mode() {
         line.alignment(Alignment::Center)
+    } else if right_align_facts {
+        line.alignment(Alignment::Right)
     } else {
         line
     };
@@ -750,6 +1001,23 @@ fn streaming_status_spans(
 mod tests {
     use super::*;
     use ratatui::style::Modifier;
+
+    #[test]
+    fn idle_input_hint_combines_dir_and_model() {
+        assert_eq!(
+            format_idle_input_hint(Some("opus-4.5".to_string()), Some("jcode".to_string())),
+            Some("opus-4.5 · jcode".to_string())
+        );
+        assert_eq!(
+            format_idle_input_hint(Some("opus-4.5".to_string()), None),
+            Some("opus-4.5".to_string())
+        );
+        assert_eq!(
+            format_idle_input_hint(None, Some("jcode".to_string())),
+            Some("jcode".to_string())
+        );
+        assert_eq!(format_idle_input_hint(None, None), None);
+    }
 
     #[test]
     fn overscroll_provider_display_is_credential_neutral() {
@@ -932,7 +1200,7 @@ mod tests {
                 running: vec![
                     crate::message::ToolCall {
                         id: "batch-2-grep".to_string(),
-                        name: "ffs grep".to_string(),
+                        name: "grep".to_string(),
                         input: serde_json::json!({"pattern": "foo", "path": "src"}),
                         intent: None,
                         thought_signature: None,
@@ -1307,7 +1575,9 @@ pub(super) fn draw_notification(frame: &mut Frame, app: &dyn TuiState, area: Rec
 
 /// Draw the elastic overscroll status line, revealed below the input when the
 /// user scrolls past the bottom of the transcript. Shows model, provider,
-/// access method, reasoning level, and context usage percentage.
+/// access method, reasoning level, and context usage percentage, with a live
+/// `(overscroll x.x)` countdown pinned to the right so users can see the line
+/// is temporary and rebounds away on its own.
 pub(super) fn draw_overscroll_status(frame: &mut Frame, app: &dyn TuiState, area: Rect) {
     if area.height == 0 || area.width == 0 {
         return;
@@ -1315,6 +1585,16 @@ pub(super) fn draw_overscroll_status(frame: &mut Frame, app: &dyn TuiState, area
     let data = app.info_widget_data();
 
     let sep = || Span::styled(" · ", Style::default().fg(rgb(100, 100, 110)));
+
+    // The countdown is the priority affordance: it explains the line exists and
+    // is going away. Build it first so it always gets space on the right edge.
+    let countdown: Option<Span> = app.chat_overscroll_remaining().map(|secs| {
+        Span::styled(
+            format!("(overscroll {:.1})", secs.max(0.0)),
+            Style::default().fg(rgb(150, 150, 165)).italic(),
+        )
+    });
+
     let mut spans: Vec<Span> = Vec::new();
 
     // Model
@@ -1325,7 +1605,7 @@ pub(super) fn draw_overscroll_status(frame: &mut Frame, app: &dyn TuiState, area
         .unwrap_or_else(|| app.provider_model());
     if !model.is_empty() && !overscroll_is_placeholder(&model) {
         spans.push(Span::styled(
-            model,
+            session_facts::pretty_model(&model),
             Style::default().fg(rgb(255, 150, 200)).bold(),
         ));
         // Reasoning level shown inline next to the model, e.g. " high".
@@ -1381,7 +1661,7 @@ pub(super) fn draw_overscroll_status(frame: &mut Frame, app: &dyn TuiState, area
         spans.extend(overscroll_context_bar(used, limit, 10));
     }
 
-    // Working directory last (right side), shown as a home-relative path.
+    // Working directory last, shown as a home-relative path.
     if let Some(dir) = app.working_dir().and_then(|d| overscroll_dir_label(&d)) {
         if !spans.is_empty() {
             spans.push(sep());
@@ -1390,49 +1670,113 @@ pub(super) fn draw_overscroll_status(frame: &mut Frame, app: &dyn TuiState, area
         spans.push(Span::styled(dir, Style::default().fg(rgb(140, 140, 150))));
     }
 
-    if spans.is_empty() {
+    let total_width = area.width as usize;
+
+    // No countdown active: just render the info line (centered or not) as before.
+    let Some(countdown) = countdown else {
+        if spans.is_empty() {
+            return;
+        }
+        let line = Line::from(overscroll_truncate_spans(spans, total_width));
+        let aligned_line = if app.centered_mode() {
+            line.alignment(Alignment::Center)
+        } else {
+            line
+        };
+        frame.render_widget(Paragraph::new(aligned_line), area);
+        return;
+    };
+
+    let countdown_width = countdown.content.chars().count();
+
+    // Tight width: if there is not even room for the countdown plus a single
+    // space of breathing room, drop the info entirely and just show the
+    // countdown (truncated as a last resort). The affordance survives.
+    if total_width <= countdown_width + 1 {
+        let countdown_line = Line::from(overscroll_truncate_spans(vec![countdown], total_width))
+            .alignment(Alignment::Right);
+        frame.render_widget(Paragraph::new(countdown_line), area);
         return;
     }
 
-    let line = Line::from(spans);
-    let aligned_line = if app.centered_mode() {
-        line.alignment(Alignment::Center)
-    } else {
-        line
+    // Reserve the countdown on the right; the info line gets the rest and is
+    // truncated to fit so the two never collide.
+    let gap = 1u16;
+    let right_w = countdown_width as u16;
+    let left_w = area.width.saturating_sub(right_w);
+    let left_area = Rect {
+        width: left_w.saturating_sub(gap),
+        ..area
     };
-    frame.render_widget(Paragraph::new(aligned_line), area);
+    let right_area = Rect {
+        x: area.x + left_w,
+        width: right_w,
+        ..area
+    };
+
+    if !spans.is_empty() {
+        let avail = left_area.width as usize;
+        let info_line = Line::from(overscroll_truncate_spans(spans, avail));
+        let info_line = if app.centered_mode() {
+            info_line.alignment(Alignment::Center)
+        } else {
+            info_line
+        };
+        frame.render_widget(Paragraph::new(info_line), left_area);
+    }
+
+    let countdown_line = Line::from(vec![countdown]).alignment(Alignment::Right);
+    frame.render_widget(Paragraph::new(countdown_line), right_area);
+}
+
+/// Truncate a list of spans to at most `max_width` display columns, appending a
+/// single-cell ellipsis when content is dropped. Preserves per-span styling.
+fn overscroll_truncate_spans(spans: Vec<Span<'static>>, max_width: usize) -> Vec<Span<'static>> {
+    use unicode_width::UnicodeWidthStr;
+    if max_width == 0 {
+        return Vec::new();
+    }
+    let total: usize = spans.iter().map(|s| s.content.width()).sum();
+    if total <= max_width {
+        return spans;
+    }
+    // Leave room for a trailing ellipsis.
+    let budget = max_width.saturating_sub(1);
+    let mut out: Vec<Span<'static>> = Vec::new();
+    let mut used = 0usize;
+    for span in spans {
+        let w = span.content.width();
+        if used + w <= budget {
+            used += w;
+            out.push(span);
+            continue;
+        }
+        // Partial: take as many chars as fit within the remaining budget.
+        let remaining = budget - used;
+        if remaining > 0 {
+            let mut taken = String::new();
+            let mut tw = 0usize;
+            for ch in span.content.chars() {
+                let cw = UnicodeWidthStr::width(ch.to_string().as_str());
+                if tw + cw > remaining {
+                    break;
+                }
+                tw += cw;
+                taken.push(ch);
+            }
+            if !taken.is_empty() {
+                out.push(Span::styled(taken, span.style));
+            }
+        }
+        break;
+    }
+    out.push(Span::styled("…", Style::default().fg(rgb(100, 100, 110))));
+    out
 }
 
 /// Format a working dir path home-relative (~/foo/bar), keeping the last 2 segments.
 fn overscroll_dir_label(path: &str) -> Option<String> {
-    let trimmed = path.trim_end_matches('/');
-    if trimmed.is_empty() {
-        return None;
-    }
-    let display = if let Some(home) = std::env::var_os("HOME") {
-        let home = home.to_string_lossy();
-        if !home.is_empty() && (trimmed == home || trimmed.starts_with(&format!("{home}/"))) {
-            format!("~{}", &trimmed[home.len()..])
-        } else {
-            trimmed.to_string()
-        }
-    } else {
-        trimmed.to_string()
-    };
-    // Keep it short: show at most the last two path segments.
-    let segs: Vec<&str> = display.split('/').filter(|s| !s.is_empty()).collect();
-    let short = if display.starts_with('~') {
-        if segs.len() <= 2 {
-            display.clone()
-        } else {
-            format!("~/…/{}", segs[segs.len() - 1])
-        }
-    } else if segs.len() <= 2 {
-        format!("/{}", segs.join("/"))
-    } else {
-        format!("…/{}/{}", segs[segs.len() - 2], segs[segs.len() - 1])
-    };
-    Some(short)
+    session_facts::dir_label_short(path)
 }
 
 /// Placeholder header strings used during remote startup; not real model names.
@@ -1602,11 +1946,6 @@ pub(super) fn draw_input(
         return;
     }
 
-    // Compute keyword highlights for the input text. compute_highlights
-    // (in jcode-keywords) maps its results back to original-input byte
-    // positions, so the slice below uses the user's literal text.
-    let highlights: &[KeywordHighlight] = &jcode_keywords::visual::compute_highlights(input_text);
-
     let (all_lines, cursor_line, cursor_col) = wrap_input_text(
         input_text,
         cursor_pos,
@@ -1615,7 +1954,6 @@ pub(super) fn draw_input(
         prompt_char,
         caret_color,
         prompt_len,
-        highlights,
     );
 
     let mut lines: Vec<Line> = Vec::new();
@@ -1642,9 +1980,9 @@ pub(super) fn draw_input(
     } else if app.is_processing() && !input_text.is_empty() {
         hint_shown = true;
         let hint = if app.queue_mode() {
-            "  Ctrl+Enter to send now"
+            "  Ctrl/Cmd+Enter to send now"
         } else {
-            "  Ctrl+Enter to queue"
+            "  Ctrl/Cmd+Enter to queue"
         };
         hint_line = Some(hint.trim().to_string());
         lines.push(Line::from(Span::styled(
@@ -1930,92 +2268,6 @@ pub(crate) fn input_cursor_pos_from_screen(
     ))
 }
 
-/// Convert a char index in the input string to a byte offset.
-fn char_index_to_byte_offset(input: &str, char_idx: usize) -> usize {
-    input
-        .char_indices()
-        .nth(char_idx)
-        .map(|(byte_pos, _)| byte_pos)
-        .unwrap_or(input.len())
-}
-
-/// Build colored spans for a wrapped segment, applying keyword highlight colors.
-fn segment_to_colored_spans(
-    input: &str,
-    segment_text: &str,
-    segment_start_char: usize,
-    segment_end_char: usize,
-    highlights: &[KeywordHighlight],
-) -> Vec<Span<'static>> {
-    if highlights.is_empty() {
-        return vec![Span::raw(segment_text.to_string())];
-    }
-
-    // Get byte range of this segment in the original input
-    let seg_byte_start = char_index_to_byte_offset(input, segment_start_char);
-    let seg_byte_end =
-        if segment_end_char == segment_start_char || segment_end_char >= input.chars().count() {
-            seg_byte_start + segment_text.len()
-        } else {
-            char_index_to_byte_offset(input, segment_end_char)
-        };
-
-    // Collect highlight ranges that overlap with this segment
-    let mut overlapping: Vec<(usize, usize, (u8, u8, u8))> = Vec::new();
-    for h in highlights {
-        if h.start < seg_byte_end && h.end > seg_byte_start {
-            let overlap_start = h.start.max(seg_byte_start);
-            let overlap_end = h.end.min(seg_byte_end);
-            if overlap_end > overlap_start {
-                overlapping.push((overlap_start, overlap_end, h.color));
-            }
-        }
-    }
-
-    if overlapping.is_empty() {
-        return vec![Span::raw(segment_text.to_string())];
-    }
-
-    // Sort by start position
-    overlapping.sort_by_key(|&(s, _, _)| s);
-
-    let mut spans: Vec<Span<'static>> = Vec::new();
-    let mut current_byte = seg_byte_start;
-
-    for &(hl_start, hl_end, (r, g, b)) in &overlapping {
-        // Text before this highlight
-        if current_byte < hl_start {
-            let end = hl_start.min(seg_byte_end);
-            if end > current_byte {
-                let before = input.get(current_byte..end).unwrap_or("");
-                spans.push(Span::raw(before.to_string()));
-            }
-        }
-
-        // The highlighted text (clamped to segment bounds)
-        let hl_text_start = hl_start.max(seg_byte_start);
-        let hl_text_end = hl_end.min(seg_byte_end);
-        if hl_text_end > hl_text_start {
-            let hl_text = input.get(hl_text_start..hl_text_end).unwrap_or("");
-            spans.push(Span::styled(
-                hl_text.to_string(),
-                Style::default().fg(Color::Rgb(r, g, b)),
-            ));
-        }
-
-        current_byte = hl_text_end;
-    }
-
-    // Remaining text after last highlight
-    if current_byte < seg_byte_end {
-        let remaining = input.get(current_byte..seg_byte_end).unwrap_or("");
-        spans.push(Span::raw(remaining.to_string()));
-    }
-
-    spans
-}
-
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn wrap_input_text<'a>(
     input: &str,
     cursor_pos: usize,
@@ -2024,7 +2276,6 @@ pub(crate) fn wrap_input_text<'a>(
     prompt_char: &'a str,
     caret_color: Color,
     prompt_len: usize,
-    highlights: &[KeywordHighlight],
 ) -> (Vec<Line<'a>>, usize, usize) {
     let cursor_char_pos = crate::tui::core::byte_offset_to_char_index(input, cursor_pos);
     let wrapped_segments = wrap_input_segments(input, line_width);
@@ -2045,30 +2296,16 @@ pub(crate) fn wrap_input_text<'a>(
 
         if idx == 0 {
             let num_color = rainbow_prompt_color(0);
-            let colored_spans = segment_to_colored_spans(
-                input,
-                &segment.text,
-                segment.start_char,
-                segment.end_char,
-                highlights,
-            );
-            let mut spans = vec![
+            lines.push(Line::from(vec![
                 Span::styled(num_str.to_string(), Style::default().fg(num_color)),
                 Span::styled(prompt_char.to_string(), Style::default().fg(caret_color)),
-            ];
-            spans.extend(colored_spans);
-            lines.push(Line::from(spans));
+                Span::raw(segment.text.clone()),
+            ]));
         } else {
-            let colored_spans = segment_to_colored_spans(
-                input,
-                &segment.text,
-                segment.start_char,
-                segment.end_char,
-                highlights,
-            );
-            let mut spans = vec![Span::raw(" ".repeat(prompt_len))];
-            spans.extend(colored_spans);
-            lines.push(Line::from(spans));
+            lines.push(Line::from(vec![
+                Span::raw(" ".repeat(prompt_len)),
+                Span::raw(segment.text.clone()),
+            ]));
         }
     }
 
@@ -2101,13 +2338,119 @@ fn send_mode_indicator(app: &dyn TuiState) -> (&'static str, Color) {
             ("󰖟", rgb(140, 180, 255))
         }
     } else {
-        ("⚡", asap_color())
+        // Idle: no glyph. The faint dir · model hint is drawn instead.
+        ("", asap_color())
     }
 }
 
+/// Faint right-aligned hint shown in the input line while it is empty and idle:
+/// the model name and working directory, but only the facts that are not
+/// already visible in the info-widget HUD (so we never duplicate them).
+fn idle_input_hint(app: &dyn TuiState) -> Option<String> {
+    // Only show when nothing meaningful is happening in the composer.
+    if !app.input().is_empty() {
+        return None;
+    }
+    let mode = composer_mode(app.input(), app.is_remote_mode());
+    if mode.is_shell()
+        || app.next_prompt_new_session_armed()
+        || app.queue_mode()
+        || app.connection_type().is_some()
+    {
+        return None;
+    }
+
+    // Consult the per-frame ledger: skip facts the HUD already shows.
+    let ledger = crate::tui::info_widget::widget_visible_facts(&app.info_widget_data());
+
+    let dir = if ledger.is_missing(session_facts::Fact::Dir) {
+        app.working_dir()
+            .as_deref()
+            .and_then(session_facts::dir_label_short)
+    } else {
+        None
+    };
+
+    let model = if ledger.is_missing(session_facts::Fact::Model) {
+        let m = app.provider_model();
+        let m = m.trim();
+        if m.is_empty() {
+            None
+        } else {
+            Some(session_facts::pretty_model(m))
+        }
+    } else {
+        None
+    };
+
+    format_idle_input_hint(model, dir)
+}
+
+/// Compose the faint idle hint text: pretty model name first, then the
+/// directory path, joined by a dot.
+fn format_idle_input_hint(model: Option<String>, dir: Option<String>) -> Option<String> {
+    match (model, dir) {
+        (Some(m), Some(d)) => Some(format!("{m} · {d}")),
+        (Some(m), None) => Some(m),
+        (None, Some(d)) => Some(d),
+        (None, None) => None,
+    }
+}
+
+/// Idle status-line facts: surface the session facts that are *not* already
+/// shown by the info-widget HUD nor by the idle input hint (which owns model
+/// and dir). The status line therefore fills in context usage and provider.
+///
+/// Returns styled spans (right-aligned by the caller) including a short glyph
+/// context bar that mirrors the overscroll bar but at a much shorter length.
+/// Returns `None` when everything important is already visible elsewhere, so
+/// the caller can fall back to the occasional tip / blank line.
+fn idle_status_facts(app: &dyn TuiState) -> Option<Vec<Span<'static>>> {
+    use session_facts::Fact;
+    let data = app.info_widget_data();
+    let ledger = crate::tui::info_widget::widget_visible_facts(&data);
+    // The idle input hint owns model + dir, so treat them as already shown.
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let sep = || Span::styled(" · ", Style::default().fg(rgb(100, 100, 110)));
+
+    if ledger.is_missing(Fact::Provider) {
+        let provider = data
+            .provider_name
+            .clone()
+            .filter(|p| !p.is_empty())
+            .unwrap_or_else(|| app.provider_name());
+        if !provider.is_empty() && !overscroll_is_runtime_placeholder(&provider) {
+            spans.push(Span::styled(
+                overscroll_provider_display(&provider),
+                Style::default().fg(dim_color()),
+            ));
+        }
+    }
+
+    if ledger.is_missing(Fact::Context)
+        && let Some((used, limit)) = overscroll_context_usage(&data)
+    {
+        if !spans.is_empty() {
+            spans.push(sep());
+        }
+        spans.push(Span::styled(
+            format!(
+                "{}/{} ",
+                overscroll_format_tokens(used),
+                overscroll_format_tokens(limit)
+            ),
+            Style::default().fg(dim_color()),
+        ));
+        // Short glyph bar: same style as the overscroll context bar but a much
+        // shorter total length so it reads as a compact right-aligned hint.
+        spans.extend(overscroll_context_bar(used, limit, 5));
+    }
+
+    if spans.is_empty() { None } else { Some(spans) }
+}
+
 fn draw_send_mode_indicator(frame: &mut Frame, app: &dyn TuiState, area: Rect) {
-    let (icon, color) = send_mode_indicator(app);
-    if icon.is_empty() || area.width == 0 || area.height == 0 {
+    if area.width == 0 || area.height == 0 {
         return;
     }
     let indicator_area = Rect {
@@ -2116,9 +2459,35 @@ fn draw_send_mode_indicator(frame: &mut Frame, app: &dyn TuiState, area: Rect) {
         width: area.width,
         height: 1,
     };
-    let line = Line::from(Span::styled(icon, Style::default().fg(color)));
-    let paragraph = Paragraph::new(line).alignment(Alignment::Right);
-    frame.render_widget(paragraph, indicator_area);
+
+    let (icon, color) = send_mode_indicator(app);
+    if !icon.is_empty() {
+        let line = Line::from(Span::styled(icon, Style::default().fg(color)));
+        let paragraph = Paragraph::new(line).alignment(Alignment::Right);
+        frame.render_widget(paragraph, indicator_area);
+        return;
+    }
+
+    if let Some(hint) = idle_input_hint(app) {
+        // Leave one character of breathing room at the far right edge.
+        let right_pad = 1u16;
+        let avail = indicator_area.width.saturating_sub(right_pad);
+        if avail == 0 {
+            return;
+        }
+        let hint_area = Rect {
+            width: avail,
+            ..indicator_area
+        };
+        // Truncate to the available width so we never overrun the line.
+        let hint = crate::util::truncate_str(&hint, avail as usize).to_string();
+        let line = Line::from(Span::styled(
+            hint,
+            Style::default().fg(dim_color()).add_modifier(Modifier::DIM),
+        ));
+        let paragraph = Paragraph::new(line).alignment(Alignment::Right);
+        frame.render_widget(paragraph, hint_area);
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -2127,4 +2496,3 @@ enum QueuedMsgType {
     Interleave,
     Queued,
 }
-// force rebuild Sun Jun 14 10:24:32 +07 2026

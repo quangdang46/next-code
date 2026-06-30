@@ -341,6 +341,7 @@ pub struct ToggleKeys {
     pub typing_scroll_lock: ToggleBinding,
     pub diff_mode_cycle: ToggleBinding,
     pub info_widget: ToggleBinding,
+    pub swarm_panel_focus: ToggleBinding,
 }
 
 pub fn load_toggle_keys() -> ToggleKeys {
@@ -352,6 +353,7 @@ pub fn load_toggle_keys() -> ToggleKeys {
         typing_scroll_lock: ToggleBinding::load(&cfg.keybindings.typing_scroll_lock_toggle, 's'),
         diff_mode_cycle: ToggleBinding::load(&cfg.keybindings.diff_mode_cycle, 'g'),
         info_widget: ToggleBinding::load(&cfg.keybindings.info_widget_toggle, 'i'),
+        swarm_panel_focus: ToggleBinding::load(&cfg.keybindings.swarm_panel_focus, 'w'),
     }
 }
 
@@ -363,6 +365,23 @@ pub(crate) fn side_panel_toggle_key_label() -> &'static str {
     #[cfg(not(target_os = "macos"))]
     {
         "Alt+M"
+    }
+}
+
+/// Human-friendly label for the configured swarm-panel focus chord (e.g.
+/// "Alt+W"), used in the inline swarm strip's enter-controls hint.
+pub(crate) fn swarm_panel_focus_key_label() -> String {
+    let cfg = config();
+    let default = KeyBinding {
+        code: KeyCode::Char('w'),
+        modifiers: KeyModifiers::ALT,
+    };
+    let default_label = format_binding(&default);
+    let (binding, _) =
+        parse_optional(&cfg.keybindings.swarm_panel_focus, default, &default_label);
+    match binding {
+        Some(b) => format_binding(&b),
+        None => default_label,
     }
 }
 

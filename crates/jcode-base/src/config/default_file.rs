@@ -66,6 +66,10 @@ diagram_pane_toggle = "alt+t"
 typing_scroll_lock_toggle = "alt+s"
 diff_mode_cycle = "alt+g"
 info_widget_toggle = "alt+i"
+# Focus the inline swarm panel (list of agents this session manages). While
+# focused: j/k select, o pops the selected agent out to a new terminal, esc
+# exits. Active only with agents.swarm_spawn_mode = "inline".
+swarm_panel_focus = "alt+w"
 
 # Spawn a fresh jcode session in a new terminal window, reusing the current
 # session's working directory. Companion to the system-wide launch hotkeys.
@@ -402,6 +406,13 @@ swarm_spawn_mode = "visible"
 # Example:
 #   focus_hook = "~/bin/jcode-focus-router"
 # focus_hook = ""
+#
+# macOS only: terminal that the Cmd+; launch hotkey and in-app session spawns
+# open jcode into. One of: ghostty, iterm2, wezterm, warp, alacritty, vscode,
+# terminal (Apple Terminal). Preferred over the legacy
+# ~/.jcode/preferred_terminal.json file. After changing this, re-run
+# `jcode setup-hotkey` so the generated launcher script (Cmd+;) picks it up.
+# preferred = "ghostty"
 
 [notifications]
 # Desktop notifications for interactive sessions (macOS Notification Center /
@@ -429,17 +440,23 @@ swarm_spawn_mode = "visible"
 # programs can observe or gate agent behavior. Commands are parsed shell-style
 # (quotes work) but executed directly, with JCODE_HOOK_* env vars describing
 # the event:
-#   JCODE_HOOK_EVENT       - "turn_end", "session_start", "session_end",
-#                            "pre_tool", "post_tool"
+#   JCODE_HOOK_EVENT       - "turn_start", "turn_end", "session_start",
+#                            "session_end", "pre_tool", "post_tool"
 #   JCODE_HOOK_SESSION_ID  - the session the event belongs to
 #   JCODE_HOOK_CWD         - session working directory (also the hook's cwd)
 #   JCODE_HOOK_PAYLOAD     - JSON mirror of all fields
 # Hook processes get JCODE_HOOKS_DISABLED=1 so nested jcode calls don't recurse.
 #
 # All hooks except pre_tool are observers: detached, fire-and-forget, failures
-# only logged. Env overrides: JCODE_HOOK_TURN_END, JCODE_HOOK_SESSION_START,
-# JCODE_HOOK_SESSION_END, JCODE_HOOK_PRE_TOOL, JCODE_HOOK_POST_TOOL (set empty
-# to disable a config hook).
+# only logged. Env overrides: JCODE_HOOK_TURN_START, JCODE_HOOK_TURN_END,
+# JCODE_HOOK_SESSION_START, JCODE_HOOK_SESSION_END, JCODE_HOOK_PRE_TOOL,
+# JCODE_HOOK_POST_TOOL (set empty to disable a config hook).
+#
+# Runs when an agent turn begins, before the model starts generating and before
+# the first pre_tool. Lets integrations detect the agent is working during the
+# think/stream window before any tool call. Extra fields: JCODE_HOOK_MODEL,
+# JCODE_HOOK_SOURCE ("chat"/"resume"/"ambient").
+# turn_start = "~/bin/jcode-turn-start"
 #
 # Runs when an agent turn completes. Extra fields: JCODE_HOOK_STATUS
 # ("ok"/"error"), JCODE_HOOK_DURATION_MS, JCODE_HOOK_MODEL,

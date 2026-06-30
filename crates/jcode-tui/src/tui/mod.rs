@@ -241,6 +241,14 @@ pub trait TuiState {
     fn output_tps(&self) -> Option<f32>;
     fn streaming_tool_calls(&self) -> Vec<ToolCall>;
     fn elapsed(&self) -> Option<Duration>;
+    /// Time since the current connection phase (authenticating/connecting/
+    /// waiting for response/retrying) began. Used to decide when a connection
+    /// attempt has been suspiciously long and should render yellow, measured
+    /// per-attempt rather than inheriting the whole-turn elapsed time. Defaults
+    /// to `elapsed()` for impls that do not track per-phase timing.
+    fn connection_phase_elapsed(&self) -> Option<Duration> {
+        self.elapsed()
+    }
     fn status(&self) -> ProcessingStatus;
     fn command_suggestions(&self) -> Vec<(String, &'static str)>;
     fn command_suggestion_selected(&self) -> usize {
@@ -341,7 +349,24 @@ pub trait TuiState {
     fn server_update_available(&self) -> Option<bool>;
     /// Get info widget data (todos, client count, etc.)
     fn info_widget_data(&self) -> info_widget::InfoWidgetData;
-    // Whether workspace mode is enabled for this client.
+
+    /// Whether the inline swarm gallery band should be shown above the chat.
+    /// Active when `agents.swarm_spawn_mode = inline` and the swarm has members.
+    fn inline_swarm_gallery_active(&self) -> bool {
+        false
+    }
+    /// Members to render in the inline swarm gallery band.
+    fn inline_swarm_members(&self) -> Vec<crate::protocol::SwarmMemberStatus> {
+        Vec::new()
+    }
+    /// Selected agent index in the inline swarm panel (display order).
+    fn swarm_panel_selected(&self) -> usize {
+        0
+    }
+    /// Whether the inline swarm panel currently has keyboard focus.
+    fn swarm_panel_focused(&self) -> bool {
+        false
+    }
 
     // ---- Workspace ----
     fn workspace_mode_enabled(&self) -> bool {
@@ -579,13 +604,6 @@ pub trait TuiState {
         false
     }
 
-    // ---- Inline Swarm ----
-    fn inline_swarm_gallery_active(&self) -> bool {
-        false
-    }
-    fn inline_swarm_members(&self) -> Vec<crate::protocol::SwarmMemberStatus> {
-        Vec::new()
-    }
     fn chat_overscroll_remaining(&self) -> Option<f32> {
         None
     }

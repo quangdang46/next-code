@@ -636,6 +636,16 @@ pub struct TerminalConfig {
     ///
     /// Env override: `JCODE_FOCUS_HOOK` (set empty to disable a config hook).
     pub focus_hook: Option<String>,
+    /// Terminal used by the macOS Cmd+; launch hotkey and in-app session spawns.
+    ///
+    /// One of: `ghostty`, `iterm2`, `wezterm`, `warp`, `alacritty`, `vscode`,
+    /// `terminal` (Apple Terminal). When set, this is the source of truth for
+    /// which terminal jcode launches into and is preferred over the legacy
+    /// `~/.jcode/preferred_terminal.json` file. Re-run `jcode setup-hotkey`
+    /// after changing it so the generated launcher script picks up the change.
+    ///
+    /// macOS only; ignored on other platforms.
+    pub preferred: Option<String>,
 }
 
 /// Lifecycle hooks: external commands jcode runs at well-defined points.
@@ -653,6 +663,12 @@ pub struct TerminalConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct HooksConfig {
+    /// Runs when an agent turn begins (after the user message is added and
+    /// before the model starts generating). Fires before the first `pre_tool`,
+    /// so integrations can detect that the agent is actively working even while
+    /// it is only thinking/streaming text. Fields: MODEL, SOURCE
+    /// ("chat"/"resume"/"ambient"). Env override: JCODE_HOOK_TURN_START.
+    pub turn_start: Option<String>,
     /// Runs when an agent turn completes.
     /// Fields: STATUS ("ok"/"error"), DURATION_MS, MODEL, LAST_ASSISTANT_TEXT.
     /// Env override: JCODE_HOOK_TURN_END.
@@ -681,6 +697,7 @@ pub struct HooksConfig {
 impl Default for HooksConfig {
     fn default() -> Self {
         Self {
+            turn_start: None,
             turn_end: None,
             session_start: None,
             session_end: None,
@@ -766,6 +783,10 @@ pub struct KeybindingsConfig {
     pub diff_mode_cycle: String,
     /// Toggle the info widget (default: "alt+i")
     pub info_widget_toggle: String,
+    /// Focus/unfocus the inline swarm panel for keyboard navigation (default:
+    /// "alt+w"). Active only when `agents.swarm_spawn_mode = "inline"` and the
+    /// session manages swarm agents.
+    pub swarm_panel_focus: String,
     /// Spawn a fresh jcode session in a new terminal window (default: unbound).
     /// Example: "alt+enter".
     pub new_terminal: String,
@@ -812,6 +833,7 @@ impl Default for KeybindingsConfig {
             typing_scroll_lock_toggle: get("typing_scroll_lock_toggle", "alt+s"),
             diff_mode_cycle: get("diff_mode_cycle", "alt+g"),
             info_widget_toggle: get("info_widget_toggle", "alt+i"),
+            swarm_panel_focus: get("swarm_panel_focus", "alt+w"),
             new_terminal: get("new_terminal", ""),
             open_resume: get(
                 "open_resume",

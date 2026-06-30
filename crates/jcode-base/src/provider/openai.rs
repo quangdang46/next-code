@@ -39,7 +39,6 @@ fn model_supports_image_generation(model_id: &str) -> bool {
     !model_id.to_ascii_lowercase().contains("codex")
 }
 
-
 /// Maximum number of retries for transient errors
 const MAX_RETRIES: u32 = 3;
 
@@ -757,7 +756,11 @@ impl OpenAIProvider {
             return None;
         }
         match value.as_str() {
-            "none" | "low" | "medium" | "high" | "xhigh" => Some(value),
+            // `swarm` is a UI sentinel meaning "max effort + use the swarm tool".
+            // We keep it stored so the UI/session reflect it and the agent injects
+            // the swarm directive; it is translated to a real effort at request time
+            // by `api_reasoning_effort`.
+            "none" | "low" | "medium" | "high" | "xhigh" | "swarm" | "swarm-deep" => Some(value),
             other => {
                 crate::logging::info(&format!(
                     "Warning: Unsupported OpenAI reasoning effort '{}'; expected none|low|medium|high|xhigh. Using 'xhigh'.",
@@ -765,6 +768,15 @@ impl OpenAIProvider {
                 ));
                 Some("xhigh".to_string())
             }
+        }
+    }
+
+    /// Translate a stored reasoning effort into the value sent to the API.
+    /// The `swarm` sentinel maps to the strongest real effort (`xhigh`).
+    fn api_reasoning_effort(effort: Option<&str>) -> Option<String> {
+        match effort {
+            Some(e) if crate::prompt::is_swarm_effort(e) => Some("xhigh".to_string()),
+            other => other.map(|e| e.to_string()),
         }
     }
 
@@ -954,10 +966,10 @@ impl OpenAIProvider {
         // Only honor providers that speak the Responses wire API. When the key
         // is absent, Codex defaults to the Responses API for OpenAI-style
         // providers, so treat "missing" as eligible.
-        if let Some(wire_api) = provider.get("wire_api").and_then(|v| v.as_str()) {
-            if !wire_api.trim().eq_ignore_ascii_case("responses") {
-                return None;
-            }
+        if let Some(wire_api) = provider.get("wire_api").and_then(|v| v.as_str())
+            && !wire_api.trim().eq_ignore_ascii_case("responses")
+        {
+            return None;
         }
 
         let base = provider.get("base_url")?.as_str()?.trim();

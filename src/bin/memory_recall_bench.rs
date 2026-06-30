@@ -17,12 +17,6 @@
 //!
 //! Run via: cargo run --profile selfdev --features dev-bins --bin memory_recall_bench -- <subcmd> ...
 
-#![allow(
-    clippy::type_complexity,
-    clippy::too_many_arguments,
-    clippy::collapsible_if
-)]
-
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -57,12 +51,19 @@ fn dirs_home() -> PathBuf {
     std::env::var("HOME").map(PathBuf::from).unwrap_or_default()
 }
 
+/// A queued extraction job: (session id, transcript, expected (id, content) pairs).
+type ExtractionJob = (String, String, Vec<(String, String)>);
+/// A raw recall result row: (query, ranked (id, score) candidates, hits, total).
+type RecallResultRow = (String, Vec<(String, f32)>, usize, usize);
+
 // ---------------- Corpus ----------------
 
 #[derive(Clone)]
 struct CorpusMemory {
     id: String,
     content: String,
+    // Parsed from the corpus fixture for completeness; not used by the current
+    // recall scoring path.
     #[allow(dead_code)]
     category: String,
     embedding: Option<Vec<f32>>,
@@ -370,10 +371,11 @@ fn rrf(lists: &[Vec<(String, f32)>], k: f32, limit: usize) -> Vec<(String, f32)>
 ///   - `rel_floor`: keep item i only while `score[i] >= score[0] * rel_floor`.
 ///   - `drop_ratio`: stop as soon as an item is `< prev * drop_ratio` (a cliff in
 ///     the score curve marks the relevant/irrelevant boundary).
+///   - `max_k`: hard upper bound (backstop).
 ///
 /// Returns at least 1 item when the input is non-empty (the top candidate always
 /// clears its own floor), so recall of a present top-1 is never lost.
-#[allow(dead_code)]
+#[allow(dead_code)] // Convenience wrapper; bench paths call dynamic_gate_abs directly.
 fn dynamic_gate(
     ranked: &[(String, f32)],
     rel_floor: f32,
@@ -434,7 +436,6 @@ struct QueryRecord {
     origin_memory_ids: Vec<String>,
 }
 
-#[allow(clippy::collapsible_if)]
 fn cmd_queries(args: &[String]) -> Result<()> {
     let opts = parse_kv(args);
     let graph_file = opts.get("corpus").cloned().unwrap_or_else(|| {
@@ -482,7 +483,7 @@ fn cmd_queries(args: &[String]) -> Result<()> {
             Some((p, mtime))
         })
         .collect();
-    sessions.sort_by_key(|k| std::cmp::Reverse(k.1));
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.1));
 
     let out_path = bench_root().join("labels/queries.jsonl");
     if let Some(parent) = out_path.parent() {
@@ -504,10 +505,10 @@ fn cmd_queries(args: &[String]) -> Result<()> {
             Ok(s) => s,
             Err(_) => continue,
         };
-        if let Some(filter) = &working_dir_filter {
-            if session.working_dir.as_deref() != Some(filter.as_str()) {
-                continue;
-            }
+        if let Some(filter) = &working_dir_filter
+            && session.working_dir.as_deref() != Some(filter.as_str())
+        {
+            continue;
         }
         let sid = path
             .file_stem()
@@ -1216,7 +1217,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
             .unwrap_or_else(|| "focused".to_string());
 
         // Build (qid, focused_query, pool_candidates) for judged queries only.
-        let mut jobs: Vec<(String, String, Vec<(String, String)>)> = Vec::new();
+        let mut jobs: Vec<ExtractionJob> = Vec::new();
         for q in &queries {
             let Some(rel) = gold.get(&q.qid) else {
                 continue;
@@ -1454,7 +1455,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
             .get("concurrency")
             .and_then(|s| s.parse().ok())
             .unwrap_or(8);
-        let mut jobs: Vec<(String, String, Vec<(String, String)>)> = Vec::new();
+        let mut jobs: Vec<ExtractionJob> = Vec::new();
         for q in &queries {
             let Some(rel) = gold.get(&q.qid) else {
                 continue;
@@ -1487,7 +1488,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        let raw: Vec<(String, Vec<(String, f32)>, usize, usize)> = rt.block_on(async {
+        let raw: Vec<RecallResultRow> = rt.block_on(async {
             use futures::stream::{self, StreamExt};
             stream::iter(jobs)
                 .map(|(qid, query, cands)| {
@@ -1585,7 +1586,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
             .get("all_queries")
             .map(|s| s == "1" || s == "true")
             .unwrap_or(false);
-        let mut jobs: Vec<(String, String, Vec<(String, String)>)> = Vec::new();
+        let mut jobs: Vec<ExtractionJob> = Vec::new();
         for q in &queries {
             match gold.get(&q.qid) {
                 Some(rel) if !rel.is_empty() => {}
@@ -1625,7 +1626,7 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
         let rt = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()?;
-        let raw: Vec<(String, Vec<(String, f32)>, usize, usize)> = rt.block_on(async {
+        let raw: Vec<RecallResultRow> = rt.block_on(async {
             use futures::stream::{self, StreamExt};
             stream::iter(jobs)
                 .map(|(qid, query, cands)| {
@@ -2266,7 +2267,7 @@ fn cmd_gate(args: &[String]) -> Result<()> {
             Some((p, mtime))
         })
         .collect();
-    sessions.sort_by_key(|b| std::cmp::Reverse(b.1));
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.1));
 
     // Per-threshold tallies.
     let mut fires = vec![0usize; thresholds.len()];
@@ -2287,10 +2288,10 @@ fn cmd_gate(args: &[String]) -> Result<()> {
             Ok(s) => s,
             Err(_) => continue,
         };
-        if let Some(filter) = &working_dir_filter {
-            if session.working_dir.as_deref() != Some(filter.as_str()) {
-                continue;
-            }
+        if let Some(filter) = &working_dir_filter
+            && session.working_dir.as_deref() != Some(filter.as_str())
+        {
+            continue;
         }
         let messages: Vec<_> = session.messages.iter().map(|m| m.to_message()).collect();
         // Every user turn is a relevance-check opportunity (production runs the
@@ -2557,10 +2558,10 @@ fn read_gold() -> Result<HashMap<String, Vec<String>>> {
 fn parse_kv(args: &[String]) -> HashMap<String, String> {
     let mut m = HashMap::new();
     for a in args {
-        if let Some(rest) = a.strip_prefix("--") {
-            if let Some((k, v)) = rest.split_once('=') {
-                m.insert(k.to_string(), v.to_string());
-            }
+        if let Some(rest) = a.strip_prefix("--")
+            && let Some((k, v)) = rest.split_once('=')
+        {
+            m.insert(k.to_string(), v.to_string());
         }
     }
     m

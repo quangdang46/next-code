@@ -700,6 +700,13 @@ impl App {
         self.remote_session_id = session_id.map(str::to_string);
     }
 
+    /// Set the displayed remote connection type (e.g. "https/sse") for header
+    /// tests. `None` clears it (unknown connection).
+    #[cfg(test)]
+    pub(crate) fn set_connection_type_for_tests(&mut self, connection_type: Option<&str>) {
+        self.connection_type = connection_type.map(str::to_string);
+    }
+
     fn prewarm_focused_side_panel(&self) {
         let Ok((terminal_width, terminal_height)) = crossterm::terminal::size() else {
             return;
@@ -1951,7 +1958,7 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
         if let Some(ref provider_id) = app.provider_session_id {
             info.push_str(&format!(
                 "Provider Session: {}...\n",
-                jcode_core::util::truncate_str(&provider_id, 16)
+                jcode_core::util::truncate_str(provider_id, 16)
             ));
         }
 

@@ -135,6 +135,10 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
         "/onboarding-preview",
         "Preview the first-run onboarding screen",
     ),
+    RegisteredCommand::public(
+        "/onboarding-sim",
+        "Walk through every first-run onboarding screen (Cmd+5)",
+    ),
     RegisteredCommand::public("/reload", "Reload into newest available binary"),
     RegisteredCommand::public("/restart", "Restart with current binary"),
     RegisteredCommand::public("/rebuild", "Background rebuild and auto reload"),
@@ -149,10 +153,7 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/unsave", "Remove bookmark from session"),
     RegisteredCommand::public("/rename", "Rename current session"),
     RegisteredCommand::public("/split", "Split session into a new window"),
-    RegisteredCommand::public(
-        "/fork",
-        "Arm next prompt to launch in a new forked session",
-    ),
+    RegisteredCommand::public("/fork", "Arm next prompt to launch in a new forked session"),
     RegisteredCommand::public("/transfer", "Compact context into a fresh handoff session"),
     RegisteredCommand::public("/workspace", "Niri-style session workspace"),
     RegisteredCommand::public("/exit", "Exit jcode (opencode TUI slash)"),

@@ -1192,6 +1192,12 @@ impl App {
 
             if is_openai_model && is_openai && !available_efforts.is_empty() {
                 for effort in &available_efforts {
+                    // Swarm modes (swarm / swarm-deep) are orchestration rungs on
+                    // the effort ladder, not per-model reasoning variants. They
+                    // must not generate `model (swarm)` picker rows.
+                    if crate::prompt::is_swarm_mode_effort(effort) {
+                        continue;
+                    }
                     let effort_label = match *effort {
                         "xhigh" => "max",
                         "high" => "high",
@@ -2109,11 +2115,11 @@ impl App {
                 ResumeTarget::ClaudeCodeSession { session_id, .. } => {
                     format!(
                         "Claude Code {}",
-                        jcode_core::util::truncate_str(&session_id, 8)
+                        jcode_core::util::truncate_str(session_id, 8)
                     )
                 }
                 ResumeTarget::CodexSession { session_id, .. } => {
-                    format!("Codex {}", jcode_core::util::truncate_str(&session_id, 8))
+                    format!("Codex {}", jcode_core::util::truncate_str(session_id, 8))
                 }
                 ResumeTarget::PiSession { session_path } => std::path::Path::new(session_path)
                     .file_stem()
@@ -2121,10 +2127,7 @@ impl App {
                     .unwrap_or("Pi session")
                     .to_string(),
                 ResumeTarget::OpenCodeSession { session_id, .. } => {
-                    format!(
-                        "OpenCode {}",
-                        jcode_core::util::truncate_str(&session_id, 8)
-                    )
+                    format!("OpenCode {}", jcode_core::util::truncate_str(session_id, 8))
                 }
                 ResumeTarget::ForeignSession {
                     provider_slug,
@@ -2219,11 +2222,11 @@ impl App {
             ResumeTarget::ClaudeCodeSession { session_id, .. } => {
                 format!(
                     "Claude Code {}",
-                    jcode_core::util::truncate_str(&session_id, 8)
+                    jcode_core::util::truncate_str(session_id, 8)
                 )
             }
             ResumeTarget::CodexSession { session_id, .. } => {
-                format!("Codex {}", jcode_core::util::truncate_str(&session_id, 8))
+                format!("Codex {}", jcode_core::util::truncate_str(session_id, 8))
             }
             ResumeTarget::PiSession { session_path } => std::path::Path::new(session_path)
                 .file_stem()
@@ -2231,10 +2234,7 @@ impl App {
                 .unwrap_or("Pi session")
                 .to_string(),
             ResumeTarget::OpenCodeSession { session_id, .. } => {
-                format!(
-                    "OpenCode {}",
-                    jcode_core::util::truncate_str(&session_id, 8)
-                )
+                format!("OpenCode {}", jcode_core::util::truncate_str(session_id, 8))
             }
             ResumeTarget::ForeignSession {
                 provider_slug,
