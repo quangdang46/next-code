@@ -644,6 +644,38 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
 
     // Idle session facts (context bar + provider) are pinned to the right edge
     // so they read like a status readout rather than left-flush body text.
+    /// Always-visible permission-mode pill for the Claude Code-style status line.
+    fn status_line_mode_spans() -> Vec<Span<'static>> {
+        let mode_str = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
+        let perm_label = match mode_str {
+            "bypass-permissions" => "bypass permissions on",
+            "default" => "default",
+            "accept-edits" => "accept edits on",
+            "plan" => "plan on",
+            "auto" => "auto",
+            "dont-ask" => "don't ask on",
+            _ => "default",
+        };
+        let mode_icon = match mode_str {
+            "bypass-permissions" | "accept-edits" | "auto" => "⏵⏵",
+            "default" | "dont-ask" => "🔒",
+            "plan" => "⏸",
+            _ => "🔒",
+        };
+        let color = rgb(200, 200, 210);
+        let dimmed = rgb(100, 100, 110);
+        let mut spans = vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(mode_icon, Style::default().fg(color)),
+            Span::styled(" ", Style::default()),
+            Span::styled(perm_label, Style::default().fg(color)),
+        ];
+        if mode_str != "default" {
+            spans.push(Span::styled(" (shift+tab to cycle)", Style::default().fg(dimmed)));
+        }
+        spans
+    }
+
     let mut right_align_facts = false;
     let line = if let Some(build_progress) = crate::build::read_build_progress() {
         let spinner = super::activity_indicator(elapsed, 12.5);
@@ -683,28 +715,16 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
 
         match app.status() {
             ProcessingStatus::Idle => {
-                // Show permission mode pill when not in default/auto mode
-                let perm_mode = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
-                let mode = composer_mode(app.input(), app.is_remote_mode());
-                if !perm_mode.is_empty() && !mode.is_shell()
-                    && perm_mode != "auto" && app.connection_type().is_none()
-                {
-                    Line::from(Span::styled(
-                        format!("» {} on (shift+tab to cycle)", perm_mode.replace('-', " ")),
-                        Style::default().fg(rgb(120, 200, 255)),
-                    ))
-                } else {
-                    Line::from("")
-                }
+                Line::from(status_line_mode_spans())
             }
             ProcessingStatus::Sending => {
-                let mut spans = vec![
-                    Span::styled(spinner, Style::default().fg(ai_color())),
-                    Span::styled(
-                        format!(" sending… {}", format_elapsed(elapsed)),
-                        Style::default().fg(dim_color()),
-                    ),
-                ];
+                let mut spans = status_line_mode_spans();
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+                spans.push(Span::styled(spinner, Style::default().fg(ai_color())));
+                spans.push(Span::styled(
+                    format!(" sending… {}", format_elapsed(elapsed)),
+                    Style::default().fg(dim_color()),
+                ));
                 push_queued_suffix(&mut spans, &queued_suffix);
                 Line::from(spans)
             }
@@ -731,20 +751,20 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     }
                     _ => dim_color(),
                 };
-                let mut spans = vec![
-                    Span::styled(spinner, Style::default().fg(ai_color())),
-                    Span::styled(label, Style::default().fg(label_color)),
-                ];
+                let mut spans = status_line_mode_spans();
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+                spans.push(Span::styled(spinner, Style::default().fg(ai_color())));
+                spans.push(Span::styled(label, Style::default().fg(label_color)));
                 push_queued_suffix(&mut spans, &queued_suffix);
                 Line::from(spans)
             }
             ProcessingStatus::Thinking(_start) => {
                 let mut label = format!(" thinking… {}", format_elapsed(elapsed));
                 append_transport_context(&mut label, app);
-                let mut spans = vec![
-                    Span::styled(spinner, Style::default().fg(ai_color())),
-                    Span::styled(label, Style::default().fg(dim_color())),
-                ];
+                let mut spans = status_line_mode_spans();
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+                spans.push(Span::styled(spinner, Style::default().fg(ai_color())));
+                spans.push(Span::styled(label, Style::default().fg(dim_color())));
                 push_queued_suffix(&mut spans, &queued_suffix);
                 Line::from(spans)
             }
@@ -777,27 +797,29 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     };
                     status_text = format!("⚠ {} cache miss · {}", miss_str, status_text);
                 }
-                let spans = streaming_status_spans(
+                let mut spans = status_line_mode_spans();
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+                spans.extend(streaming_status_spans(
                     spinner,
                     status_text,
                     stream_message_ended,
                     kv_cache_problem.is_some(),
                     &queued_suffix,
-                );
+                ));
                 Line::from(spans)
             }
             ProcessingStatus::WaitingForNetwork { listener } => {
-                let mut spans = vec![
-                    Span::styled("↻ ", Style::default().fg(rgb(255, 193, 7))),
-                    Span::styled(
-                        format!(
-                            "network disconnected, waiting to retry · {} · {}",
-                            listener,
-                            format_elapsed(elapsed)
-                        ),
-                        Style::default().fg(rgb(255, 193, 7)),
+                let mut spans = status_line_mode_spans();
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+                spans.push(Span::styled("↻ ", Style::default().fg(rgb(255, 193, 7))));
+                spans.push(Span::styled(
+                    format!(
+                        "network disconnected, waiting to retry · {} · {}",
+                        listener,
+                        format_elapsed(elapsed)
                     ),
-                ];
+                    Style::default().fg(rgb(255, 193, 7)),
+                ));
                 push_queued_suffix(&mut spans, &queued_suffix);
                 Line::from(spans)
             }
@@ -854,13 +876,13 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 let experimental_notice = app.active_experimental_feature_notice();
                 let subagent = app.subagent_status();
 
-                let mut spans = vec![
-                    Span::styled(left_bar, Style::default().fg(anim_color)),
-                    Span::styled(" ", Style::default()),
-                    Span::styled(name.to_string(), Style::default().fg(anim_color).bold()),
-                    Span::styled(" ", Style::default()),
-                    Span::styled(right_bar, Style::default().fg(anim_color)),
-                ];
+                let mut spans = status_line_mode_spans();
+                spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
+                spans.push(Span::styled(left_bar, Style::default().fg(anim_color)));
+                spans.push(Span::styled(" ", Style::default()));
+                spans.push(Span::styled(name.to_string(), Style::default().fg(anim_color).bold()));
+                spans.push(Span::styled(" ", Style::default()));
+                spans.push(Span::styled(right_bar, Style::default().fg(anim_color)));
 
                 // For batch tool: show "completed/total · last_tool" progress
                 if is_batch {

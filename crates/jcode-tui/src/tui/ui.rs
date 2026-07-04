@@ -2626,16 +2626,18 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Elastic overscroll status line revealed when the user scrolls past the
     // bottom of the transcript. Rendered directly below the input line.
     let overscroll_height: u16 = if app.chat_overscroll_active() { 1 } else { 0 };
-    let fixed_height = 1
+    let fixed_height = 1            // status bar
         + queued_height
         + swarm_strip_height
         + notification_height
         + inline_block_height
         + inline_ui_gap_height
+        + 1                          // top separator (───)
         + input_height
+        + 1                          // bottom separator (───) + History
         + running_items_height
         + overscroll_height
-        + donut_height; // status + queued + swarm strip + notification + inline UI + gap + input + running items + overscroll + donut
+        + donut_height;
     let available_height = chat_area.height;
     let overflows = |prepared: &PreparedChatFrame| {
         (prepared.total_wrapped_lines().max(1) as u16) + fixed_height > available_height
@@ -2739,10 +2741,12 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             Constraint::Length(notification_height),  // 0 Notification line
             Constraint::Length(inline_block_height),  // 1 Inline UI
             Constraint::Length(inline_ui_gap_height), // 2 Inline UI/input spacing
-            Constraint::Length(input_height),         // 3 Input
-            Constraint::Length(running_items_height), // 4 Running items (quickbar)
-            Constraint::Length(overscroll_height),    // 5 Overscroll status line
-            Constraint::Length(donut_height),         // 6 Donut animation
+            Constraint::Length(1),                    // 3 Top separator (───)
+            Constraint::Length(input_height),         // 4 Input
+            Constraint::Length(1),                    // 5 Bottom separator (───) + History
+            Constraint::Length(running_items_height), // 6 Running items (quickbar)
+            Constraint::Length(overscroll_height),    // 7 Overscroll status line
+            Constraint::Length(donut_height),         // 8 Donut animation
         ])
         .split(top_mid_bot[2]);
     record_status_area(status_area);
@@ -2762,7 +2766,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             capture.layout.queued_area = Some(top_chunks[1].into());
         }
         capture.layout.status_area = Some(status_area.into());
-        capture.layout.input_area = Some(bottom_chunks[3].into());
+        capture.layout.input_area = Some(bottom_chunks[4].into());
         capture.layout.input_lines_raw = app.input().lines().count().max(1);
         capture.layout.input_lines_wrapped = base_input_height as usize;
 
@@ -2839,7 +2843,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         capture.layout.messages_area = Some(messages_area.into());
         capture.layout.diagram_area = diagram_area.map(|r| r.into());
     }
-    record_layout_snapshot(messages_area, diagram_area, diff_pane_area, Some(bottom_chunks[3]));
+    record_layout_snapshot(messages_area, diagram_area, diff_pane_area, Some(bottom_chunks[4]));
 
     let margins = if onboarding_welcome {
         onboarding::draw_onboarding_welcome(frame, app, messages_area);
@@ -2949,44 +2953,49 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     if inline_block_height > 0 {
         draw_inline_ui(frame, app, bottom_chunks[1]);
     }
-    // Top separator line above input (with history counter, like Claude Code)
-    if bottom_chunks[0].height > 0 {
-        let sep_w = bottom_chunks[0].width as usize;
-        if sep_w > 12 {
-            let (nav_pos, nav_total) = app.prompt_history_info().unwrap_or((0, 0));
-            let _next_prompt = user_count + pending_count + 1;
-            let label = if nav_pos > 0 {
-                format!(" History {}/{} ", nav_pos, nav_total)
-            } else {
-                let total = app.display_user_message_count() + pending_count;
-                format!(" History {} ", total + 1)
-            };
-            let label_w = label.chars().count();
-            let left = (sep_w - label_w) / 2;
-            let right = sep_w - label_w - left;
-            let sep_str = format!("{}{}{}", "─".repeat(left), label, "─".repeat(right),);
-            let sep_line = Line::from(Span::styled(sep_str, Style::default().fg(rgb(50, 55, 65))));
-            frame.render_widget(Paragraph::new(sep_line), bottom_chunks[0]);
-        }
+    // Top separator line ─── above input
+    let top_sep_w = bottom_chunks[3].width as usize;
+    if top_sep_w > 12 {
+        let sep_line = Line::from(Span::styled(
+            "─".repeat(top_sep_w),
+            Style::default().fg(rgb(50, 55, 65)),
+        ));
+        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[3]);
     }
     // Input
     input_ui::draw_input(
         frame,
         app,
-        bottom_chunks[3],
+        bottom_chunks[4],
         user_count + pending_count + 1,
         &mut debug_capture,
     );
-
-    // Running items list (quickbar) between input and donut
+    // Bottom separator line ─── below input (with history counter)
+    let bot_sep_w = bottom_chunks[5].width as usize;
+    if bot_sep_w > 12 {
+        let (nav_pos, nav_total) = app.prompt_history_info().unwrap_or((0, 0));
+        let label = if nav_pos > 0 {
+            format!(" History {}/{} ", nav_pos, nav_total)
+        } else {
+            let total = app.display_user_message_count() + pending_count;
+            format!(" History {} ", total + 1)
+        };
+        let label_w = label.chars().count();
+        let left = (bot_sep_w - label_w) / 2;
+        let right = bot_sep_w - label_w - left;
+        let sep_str = format!("{}{}{}", "─".repeat(left), label, "─".repeat(right),);
+        let sep_line = Line::from(Span::styled(sep_str, Style::default().fg(rgb(50, 55, 65))));
+        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[5]);
+    }
+    // Running items list (quickbar) below bottom separator
     if running_items_height > 0 {
-        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[4]);
+        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[6]);
     }
     if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, bottom_chunks[5]);
+        input_ui::draw_overscroll_status(frame, app, bottom_chunks[7]);
     }
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, bottom_chunks[6]);
+        animations::draw_idle_animation(frame, app, bottom_chunks[8]);
     }
 
     // Draw info widget overlays (skip during idle animation - they look out of place)
