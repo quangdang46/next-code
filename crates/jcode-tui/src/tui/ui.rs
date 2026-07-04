@@ -2707,15 +2707,13 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Use packed layout when content fits, scrolling layout otherwise
     let use_packed = content_height + fixed_height <= available_height;
 
-    // Three-level layout: top (messages + queued + swarm) grows to fill,
-    // middle (status bar) always 1 row — never capped,
-    // bottom (input + dialogs) capped at 50% of chat area height (CC pattern).
-    let top_mid_bot = Layout::default()
+    // Two-level layout: top (messages + queued + swarm) grows to fill,
+    // bottom (input + dialogs + status) capped at 50% of chat area height (CC pattern).
+    let top_bottom = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
-            Constraint::Min(1),                          // 0 Messages (fills remaining)
-            Constraint::Length(1),                       // 1 Status bar (always visible)
-            Constraint::Max(chat_area.height / 2),       // 2 Input + dialogs (capped)
+            Constraint::Min(1),                     // 0 Messages (fills remaining)
+            Constraint::Max(chat_area.height / 2),  // 1 Input + dialogs + status (capped)
         ])
         .split(chat_area);
     let top_chunks = Layout::default()
@@ -2733,8 +2731,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 Constraint::Length(swarm_strip_height),   // 2 Swarm strip
             ]
         })
-        .split(top_mid_bot[0]);
-    let status_area = top_mid_bot[1];
+        .split(top_bottom[0]);
     let bottom_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
@@ -2744,11 +2741,13 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             Constraint::Length(1),                    // 3 Top separator (───)
             Constraint::Length(input_height),         // 4 Input
             Constraint::Length(1),                    // 5 Bottom separator (───) + History
-            Constraint::Length(running_items_height), // 6 Running items (quickbar)
-            Constraint::Length(overscroll_height),    // 7 Overscroll status line
-            Constraint::Length(donut_height),         // 8 Donut animation
+            Constraint::Length(1),                    // 6 Status bar (⏵⏵ bypass permissions on)
+            Constraint::Length(running_items_height), // 7 Running items (quickbar)
+            Constraint::Length(overscroll_height),    // 8 Overscroll status line
+            Constraint::Length(donut_height),         // 9 Donut animation
         ])
-        .split(top_mid_bot[2]);
+        .split(top_bottom[1]);
+    let status_area = bottom_chunks[6];
     record_status_area(status_area);
 
     // Draw the inline swarm strip directly above the status line if present.
@@ -2765,8 +2764,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         if queued_height > 0 {
             capture.layout.queued_area = Some(top_chunks[1].into());
         }
-        capture.layout.status_area = Some(status_area.into());
         capture.layout.input_area = Some(bottom_chunks[4].into());
+        capture.layout.status_area = Some(status_area.into());
         capture.layout.input_lines_raw = app.input().lines().count().max(1);
         capture.layout.input_lines_wrapped = base_input_height as usize;
 
@@ -2989,13 +2988,13 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     }
     // Running items list (quickbar) below bottom separator
     if running_items_height > 0 {
-        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[6]);
+        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[7]);
     }
     if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, bottom_chunks[7]);
+        input_ui::draw_overscroll_status(frame, app, bottom_chunks[8]);
     }
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, bottom_chunks[8]);
+        animations::draw_idle_animation(frame, app, bottom_chunks[9]);
     }
 
     // Draw info widget overlays (skip during idle animation - they look out of place)
@@ -3069,7 +3068,6 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
 
     if visual_debug::overlay_enabled() {
         let mut all_chunks = top_chunks.to_vec();
-        all_chunks.push(status_area);
         all_chunks.extend_from_slice(&bottom_chunks);
         overlays::draw_debug_overlay(frame, &placements, &all_chunks);
     }
