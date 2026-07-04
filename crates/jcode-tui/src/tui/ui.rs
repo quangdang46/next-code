@@ -2633,8 +2633,9 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         + inline_block_height
         + inline_ui_gap_height
         + input_height
+        + running_items_height
         + overscroll_height
-        + donut_height; // status + queued + swarm strip + notification + inline UI + gap + input + overscroll + donut
+        + donut_height; // status + queued + swarm strip + notification + inline UI + gap + input + running items + overscroll + donut
     let available_height = chat_area.height;
     let overflows = |prepared: &PreparedChatFrame| {
         (prepared.total_wrapped_lines().max(1) as u16) + fixed_height > available_height
@@ -2739,8 +2740,9 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             Constraint::Length(inline_block_height),  // 1 Inline UI
             Constraint::Length(inline_ui_gap_height), // 2 Inline UI/input spacing
             Constraint::Length(input_height),         // 3 Input
-            Constraint::Length(overscroll_height),    // 4 Overscroll status line
-            Constraint::Length(donut_height),         // 5 Donut animation
+            Constraint::Length(running_items_height), // 4 Running items (quickbar)
+            Constraint::Length(overscroll_height),    // 5 Overscroll status line
+            Constraint::Length(donut_height),         // 6 Donut animation
         ])
         .split(top_mid_bot[2]);
     record_status_area(status_area);
@@ -2976,11 +2978,15 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         &mut debug_capture,
     );
 
+    // Running items list (quickbar) between input and donut
+    if running_items_height > 0 {
+        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[4]);
+    }
     if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, bottom_chunks[4]);
+        input_ui::draw_overscroll_status(frame, app, bottom_chunks[5]);
     }
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, bottom_chunks[5]);
+        animations::draw_idle_animation(frame, app, bottom_chunks[6]);
     }
 
     // Draw info widget overlays (skip during idle animation - they look out of place)
