@@ -982,16 +982,8 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             Line::from("")
         }
     } else {
-        if let Some(tip) =
-            occasional_status_tip(area.width as usize, app.animation_elapsed() as u64)
-        {
-            Line::from(vec![Span::styled(tip, Style::default().fg(dim_color()))])
-        } else if let Some(facts) = idle_status_facts(app) {
-            right_align_facts = true;
-            Line::from(facts)
-        } else {
-            Line::from("")
-        }
+        // Always show permission mode pill when idle
+        Line::from(status_line_mode_spans())
     };
 
     crate::memory::check_staleness();
