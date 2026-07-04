@@ -2944,23 +2944,27 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         }
         input_ui::draw_queued(frame, app, top_chunks[1], user_count + 1);
     }
-    if let Some(ref mut capture) = debug_capture {
-        capture.render_order.push("draw_status".to_string());
-    }
-    input_ui::draw_status(frame, app, status_area, pending_count);
     if notification_height > 0 {
         input_ui::draw_notification(frame, app, bottom_chunks[0]);
     }
     if inline_block_height > 0 {
         draw_inline_ui(frame, app, bottom_chunks[1]);
     }
-    // Top separator line ─── above input
+    // Top separator line ─── above input (with history counter)
     let top_sep_w = bottom_chunks[3].width as usize;
     if top_sep_w > 12 {
-        let sep_line = Line::from(Span::styled(
-            "─".repeat(top_sep_w),
-            Style::default().fg(rgb(50, 55, 65)),
-        ));
+        let (nav_pos, nav_total) = app.prompt_history_info().unwrap_or((0, 0));
+        let label = if nav_pos > 0 {
+            format!(" History {}/{} ", nav_pos, nav_total)
+        } else {
+            let total = app.display_user_message_count() + pending_count;
+            format!(" History {} ", total + 1)
+        };
+        let label_w = label.chars().count();
+        let left = (top_sep_w - label_w) / 2;
+        let right = top_sep_w - label_w - left;
+        let sep_str = format!("{}{}{}", "─".repeat(left), label, "─".repeat(right),);
+        let sep_line = Line::from(Span::styled(sep_str, Style::default().fg(rgb(50, 55, 65))));
         frame.render_widget(Paragraph::new(sep_line), bottom_chunks[3]);
     }
     // Input
@@ -2971,21 +2975,15 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         user_count + pending_count + 1,
         &mut debug_capture,
     );
-    // Bottom separator line ─── below input (with history counter)
+    // Status bar below input
+    input_ui::draw_status(frame, app, status_area, pending_count);
+    // Bottom separator line ─── below status bar
     let bot_sep_w = bottom_chunks[6].width as usize;
     if bot_sep_w > 12 {
-        let (nav_pos, nav_total) = app.prompt_history_info().unwrap_or((0, 0));
-        let label = if nav_pos > 0 {
-            format!(" History {}/{} ", nav_pos, nav_total)
-        } else {
-            let total = app.display_user_message_count() + pending_count;
-            format!(" History {} ", total + 1)
-        };
-        let label_w = label.chars().count();
-        let left = (bot_sep_w - label_w) / 2;
-        let right = bot_sep_w - label_w - left;
-        let sep_str = format!("{}{}{}", "─".repeat(left), label, "─".repeat(right),);
-        let sep_line = Line::from(Span::styled(sep_str, Style::default().fg(rgb(50, 55, 65))));
+        let sep_line = Line::from(Span::styled(
+            "─".repeat(bot_sep_w),
+            Style::default().fg(rgb(50, 55, 65)),
+        ));
         frame.render_widget(Paragraph::new(sep_line), bottom_chunks[6]);
     }
     // Running items list (quickbar) below bottom separator
