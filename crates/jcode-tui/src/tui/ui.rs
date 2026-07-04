@@ -2708,12 +2708,14 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let use_packed = content_height + fixed_height <= available_height;
 
     // Two-level layout: top (messages + queued + swarm) grows to fill,
-    // bottom (input + dialogs + status) capped at 50% of chat area height (CC pattern).
+    // bottom (input + dialogs + status) — exact height, never clipped.
+    let bottom_fixed = notification_height + inline_block_height + inline_ui_gap_height
+        + 3 + input_height + running_items_height + overscroll_height + donut_height;
     let top_bottom = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
             Constraint::Min(1),                     // 0 Messages (fills remaining)
-            Constraint::Max(chat_area.height / 2),  // 1 Input + dialogs + status (capped)
+            Constraint::Length(bottom_fixed),       // 1 Fixed chrome (exact)
         ])
         .split(chat_area);
     let top_chunks = Layout::default()
