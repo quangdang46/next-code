@@ -548,6 +548,7 @@ pub fn imported_session_id_for_provider_and_id(
         Some("cod") | Some("codex") => Some(imported_codex_session_id(source_session_id)),
         Some("opc") | Some("opencode") => Some(imported_opencode_session_id(source_session_id)),
         Some("pi") | Some("pi-agent") => Some(imported_pi_session_id(source_session_id)),
+        Some("cur") | Some("cursor") => Some(imported_cursor_session_id(source_session_id)),
         Some(_) => None,
     }
 }
@@ -596,6 +597,7 @@ pub fn imported_session_id_for_provider(provider_slug: &str, source_session_id: 
         "codex" => "cod",
         "opencode" => "opc",
         "pi-agent" => "pi",
+        "cursor" => "cur",
         other => other,
     };
     casr::pipeline::derive_target_id(alias, source_session_id)
