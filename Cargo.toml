@@ -90,6 +90,7 @@ members = [
     "crates/jcode-secrets",
     "crates/jcode-plugin-core",
     "crates/jcode-plugin-runtime",
+    "crates/jcode-provider-doctor",
     "crates/jcode-render-core",
     "evals/jbench",
     "evals/jcode-edit-bench",
@@ -149,6 +150,7 @@ jcode-hooks = { path = "crates/jcode-hooks" }
 jcode-keyring-store = { path = "crates/jcode-keyring-store" }
 jcode-plugin-core = { path = "crates/jcode-plugin-core" }
 jcode-plugin-runtime = { path = "crates/jcode-plugin-runtime" }
+jcode-provider-doctor = { path = "crates/jcode-provider-doctor" }
 jcode-provider-service = { path = "crates/jcode-provider-service" }
 
 # Cross-provider session conversion engine (resume/import any provider -> jcode).

@@ -150,6 +150,8 @@ jemalloc-prof = [
     "tikv-jemalloc-ctl/profiling",
 ]
 embeddings = ["dep:jcode-embedding"]
+# AWS SDK stack (bedrock provider)
+bedrock = []
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }

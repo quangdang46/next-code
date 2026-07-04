@@ -464,6 +464,7 @@ async fn register_visible_spawned_member(
                 joined_at: now,
                 last_status_change: now,
                 is_headless: false,
+                todo_items: Vec::new(),
             },
         );
     }

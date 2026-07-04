@@ -52,6 +52,9 @@ pub struct RenderedMessage {
     pub content: String,
     pub tool_calls: Vec<String>,
     pub tool_data: Option<ToolCall>,
+    /// Index of the stored session message this rendered message came from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stored_index: Option<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

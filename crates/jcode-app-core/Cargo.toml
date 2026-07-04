@@ -158,6 +158,8 @@ jemalloc-prof = ["jcode-base/jemalloc-prof"]
 embeddings = ["jcode-base/embeddings"]
 # PDF text extraction lives in this crate (tool/read.rs).
 pdf = ["dep:jcode-pdf"]
+# bedrock: forwarded to jcode-base (AWS SDK stack)
+bedrock = ["jcode-base/bedrock"]
 # DCP (dynamic context pruning)
 dcp = ["dep:dynamic_context_pruning"]
 # RTCO (tool output filtering via Rust Token Killer)

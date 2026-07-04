@@ -215,6 +215,11 @@ pub fn imported_pi_session_id(session_path: &str) -> String {
     derive_imported_id("pi", session_path)
 }
 
+/// Idempotent import id for a Cursor session.
+pub fn imported_cursor_session_id(session_id: &str) -> String {
+    derive_imported_id("cur", session_id)
+}
+
 // ---------------------------------------------------------------------------
 // Session listing — Claude Code only (the surface jcode uses today)
 // ---------------------------------------------------------------------------

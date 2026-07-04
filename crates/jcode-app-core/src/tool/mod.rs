@@ -5,7 +5,6 @@ mod batch;
 mod best_of_n;
 mod bg;
 mod browser;
-mod codesearch;
 mod communicate;
 #[cfg(target_os = "macos")]
 mod computer;
@@ -43,6 +42,7 @@ mod read;
 pub mod selfdev;
 pub(crate) mod serde_coerce;
 mod session_search;
+mod session_search_index;
 mod side_panel;
 mod skill;
 mod task;
@@ -199,7 +199,6 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "ffs_flow"
             | "websearch"
             | "webfetch"
-            | "codesearch"
             | "session_search"
             | "notepad_read_priority"
             | "notepad_read_working"
@@ -520,12 +519,6 @@ impl Registry {
                 &mut timings,
                 "websearch",
                 websearch::WebSearchTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "codesearch",
-                codesearch::CodeSearchTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "invalid", invalid::InvalidTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "lsp", lsp::LspTool::new);
@@ -1315,13 +1308,26 @@ impl Registry {
         shared_pool: Option<std::sync::Arc<crate::mcp::SharedMcpPool>>,
         session_id: Option<String>,
     ) {
+        self.register_mcp_tools_for_dir(event_tx, shared_pool, session_id, None)
+            .await
+    }
+
+    pub async fn register_mcp_tools_for_dir(
+        &self,
+        event_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::protocol::ServerEvent>>,
+        shared_pool: Option<std::sync::Arc<crate::mcp::SharedMcpPool>>,
+        session_id: Option<String>,
+        working_dir: Option<std::path::PathBuf>,
+    ) {
         use crate::mcp::McpManager;
         use std::sync::Arc;
         use tokio::sync::RwLock;
 
         let mcp_manager = if let Some(pool) = shared_pool {
             let sid = session_id.unwrap_or_else(|| "unknown".to_string());
-            Arc::new(RwLock::new(McpManager::with_shared_pool(pool, sid)))
+            Arc::new(RwLock::new(McpManager::with_shared_pool_for_dir(
+                pool, sid, working_dir,
+            )))
         } else {
             Arc::new(RwLock::new(McpManager::new()))
         };

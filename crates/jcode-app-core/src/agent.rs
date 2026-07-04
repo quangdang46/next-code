@@ -2,6 +2,7 @@
 
 mod compaction;
 mod environment;
+mod inline_tail;
 mod interrupts;
 mod messages;
 mod orchestrator;
@@ -225,6 +226,7 @@ pub struct Agent {
     locked_tools: Option<Vec<ToolDefinition>>,
     /// When true, spawned child agents run the todo pipeline after each turn.
     todo_orchestrator_enabled: bool,
+    inline_tail: inline_tail::InlineTailBuffer,
     /// One-shot guard for the async MCP-registration race (#206).
     ///
     /// MCP servers connect on a background task and register `mcp__*` tools
@@ -313,6 +315,7 @@ impl Agent {
             last_usage: TokenUsage::default(),
             locked_tools: None,
             todo_orchestrator_enabled: false,
+            inline_tail: inline_tail::InlineTailBuffer::default(),
             mcp_late_register_resolved: false,
             system_prompt_override: None,
             memory_enabled: crate::config::config().features.memory,
