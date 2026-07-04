@@ -761,10 +761,6 @@ impl crate::tui::TuiState for App {
         Some(self.app_started.elapsed())
     }
 
-    fn client_focused(&self) -> bool {
-        App::client_focused(self)
-    }
-
     fn stream_message_ended(&self) -> bool {
         self.stream_message_ended
     }

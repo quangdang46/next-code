@@ -261,12 +261,6 @@ pub trait TuiState {
     /// Running items state (tools, subagents, background tasks) for the interactive list.
     fn running_items(&self) -> RunningItemsState;
     fn time_since_activity(&self) -> Option<Duration>;
-    /// Whether the client terminal currently has focus. Decorative animations and
-    /// periodic idle redraws pause while unfocused so backgrounded windows/tabs do
-    /// not burn CPU. Defaults to true for state impls that do not track focus.
-    fn client_focused(&self) -> bool {
-        true
-    }
     /// Whether the provider/server has ended the visible assistant message while turn cleanup
     /// still finishes in the background.
     fn stream_message_ended(&self) -> bool {
@@ -1528,13 +1522,6 @@ fn idle_donut_active_with_policy(
         return false;
     }
 
-    // Decorative animations are purely visual; never spin them while the terminal
-    // window/tab is backgrounded. A swarm of unfocused sessions would otherwise
-    // each render a full-screen 3D scene at animation FPS, saturating every core.
-    if !state.client_focused() {
-        return false;
-    }
-
     // The onboarding welcome screen draws the same live donut, but it also
     // shows a welcome/login card so `display_messages()` is not empty.  Keep the
     // animation loop running smoothly while that screen is up (even past the
@@ -1672,23 +1659,6 @@ pub(crate) fn redraw_interval_with_policy(
             crate::perf::PerformanceTier::Minimal => fast_interval,
             _ => animation_interval,
         };
-    }
-
-    // While the terminal is backgrounded (FocusLost), an idle session has nothing
-    // worth a fast tick: decorative animations are paused and the run loop only
-    // repaints throttled idle frames. Use the slow deep-idle interval so the
-    // event loop sleeps instead of spinning on shared-server bus chatter. Sessions
-    // with live output keep a responsive cadence below.
-    if !state.client_focused()
-        && !state.is_processing()
-        && state.streaming_text().is_empty()
-        && !state.has_pending_mouse_scroll_animation()
-        && !state.copy_selection_edge_autoscroll_active()
-        && !state.remote_startup_phase_active()
-        && !rate_limit_countdown_redraw_active(state)
-        && crate::build::read_build_progress().is_none()
-    {
-        return REDRAW_DEEP_IDLE;
     }
 
     let deep_idle = state

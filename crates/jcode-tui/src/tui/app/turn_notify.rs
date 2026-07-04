@@ -35,7 +35,7 @@ impl App {
         if !cfg.turn_complete {
             return;
         }
-        if cfg.turn_complete_only_when_unfocused && self.client_focused() {
+        if cfg.turn_complete_only_when_unfocused {
             return;
         }
         let Some(duration) = duration_secs else {
