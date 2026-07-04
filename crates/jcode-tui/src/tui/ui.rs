@@ -2742,14 +2742,14 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             Constraint::Length(inline_ui_gap_height), // 2 Inline UI/input spacing
             Constraint::Length(1),                    // 3 Top separator (───)
             Constraint::Length(input_height),         // 4 Input
-            Constraint::Length(1),                    // 5 Bottom separator (───) + History
-            Constraint::Length(1),                    // 6 Status bar (⏵⏵ bypass permissions on)
+            Constraint::Length(1),                    // 5 Status bar (⏵⏵ bypass permissions on)
+            Constraint::Length(1),                    // 6 Bottom separator (───) + History
             Constraint::Length(running_items_height), // 7 Running items (quickbar)
             Constraint::Length(overscroll_height),    // 8 Overscroll status line
             Constraint::Length(donut_height),         // 9 Donut animation
         ])
         .split(top_bottom[1]);
-    let status_area = bottom_chunks[6];
+    let status_area = bottom_chunks[5];
     record_status_area(status_area);
 
     // Draw the inline swarm strip directly above the status line if present.
@@ -2972,7 +2972,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         &mut debug_capture,
     );
     // Bottom separator line ─── below input (with history counter)
-    let bot_sep_w = bottom_chunks[5].width as usize;
+    let bot_sep_w = bottom_chunks[6].width as usize;
     if bot_sep_w > 12 {
         let (nav_pos, nav_total) = app.prompt_history_info().unwrap_or((0, 0));
         let label = if nav_pos > 0 {
@@ -2986,7 +2986,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         let right = bot_sep_w - label_w - left;
         let sep_str = format!("{}{}{}", "─".repeat(left), label, "─".repeat(right),);
         let sep_line = Line::from(Span::styled(sep_str, Style::default().fg(rgb(50, 55, 65))));
-        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[5]);
+        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[6]);
     }
     // Running items list (quickbar) below bottom separator
     if running_items_height > 0 {
