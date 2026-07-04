@@ -2740,16 +2740,16 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             Constraint::Length(notification_height),  // 0 Notification line
             Constraint::Length(inline_block_height),  // 1 Inline UI
             Constraint::Length(inline_ui_gap_height), // 2 Inline UI/input spacing
-            Constraint::Length(1),                    // 3 Top separator (───)
+            Constraint::Length(1),                    // 3 Top separator (─── History)
             Constraint::Length(input_height),         // 4 Input
-            Constraint::Length(1),                    // 5 Status bar (⏵⏵ bypass permissions on)
-            Constraint::Length(1),                    // 6 Bottom separator (───) + History
+            Constraint::Length(1),                    // 5 Bottom separator (───)
+            Constraint::Length(1),                    // 6 Status bar (⏵⏵ bypass permissions on)
             Constraint::Length(running_items_height), // 7 Running items (quickbar)
             Constraint::Length(overscroll_height),    // 8 Overscroll status line
             Constraint::Length(donut_height),         // 9 Donut animation
         ])
         .split(top_bottom[1]);
-    let status_area = bottom_chunks[5];
+    let status_area = bottom_chunks[6];
     record_status_area(status_area);
 
     // Draw the inline swarm strip directly above the status line if present.
@@ -2975,17 +2975,17 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         user_count + pending_count + 1,
         &mut debug_capture,
     );
-    // Status bar below input
-    input_ui::draw_status(frame, app, status_area, pending_count);
-    // Bottom separator line ─── below status bar
-    let bot_sep_w = bottom_chunks[6].width as usize;
+    // Bottom separator line ─── below input
+    let bot_sep_w = bottom_chunks[5].width as usize;
     if bot_sep_w > 12 {
         let sep_line = Line::from(Span::styled(
             "─".repeat(bot_sep_w),
             Style::default().fg(rgb(50, 55, 65)),
         ));
-        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[6]);
+        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[5]);
     }
+    // Status bar below bottom separator
+    input_ui::draw_status(frame, app, status_area, pending_count);
     // Running items list (quickbar) below bottom separator
     if running_items_height > 0 {
         crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[7]);
