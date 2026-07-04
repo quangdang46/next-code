@@ -2109,7 +2109,6 @@ pub(super) fn draw_input(
     };
 
     frame.set_cursor_position(Position::new(cursor_x, cursor_y));
-    draw_send_mode_indicator(frame, app, area);
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
