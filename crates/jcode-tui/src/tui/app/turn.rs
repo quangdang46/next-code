@@ -120,7 +120,11 @@ impl App {
 
             let mut stream = loop {
                 tokio::select! {
-                    biased;
+                    // Redraw first — keeps TUI alive when terminal is unfocused
+                    _ = redraw_interval.tick() => {
+                        status_spinner_renderer.draw_full(self, terminal)?;
+                        super::run_shell::reset_status_spinner_interval(&mut status_spinner_interval, self);
+                    }
                     // Handle keyboard input while waiting for API
                     event = event_stream.next() => {
                         match event {
@@ -174,10 +178,6 @@ impl App {
                             status_spinner_renderer.draw_full(self, terminal)?;
                             super::run_shell::reset_status_spinner_interval(&mut status_spinner_interval, self);
                         }
-                    }
-                    _ = redraw_interval.tick() => {
-                        status_spinner_renderer.draw_full(self, terminal)?;
-                        super::run_shell::reset_status_spinner_interval(&mut status_spinner_interval, self);
                     }
                     bus_event = async {
                         match bus_receiver.as_mut() {
