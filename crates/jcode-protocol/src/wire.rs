@@ -94,6 +94,9 @@ pub enum Request {
         session_id: Option<String>,
     },
 
+    /// Set permission mode (bypass-permissions, plan, etc.)
+    #[serde(rename = "set_permission_mode")]
+    SetPermissionMode { id: u64, mode: String },
     /// Execute a client debug command (forwarded to TUI)
     #[serde(rename = "client_debug_command")]
     ClientDebugCommand { id: u64, command: String },

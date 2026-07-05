@@ -1783,93 +1783,6 @@ fn test_login_picker_preview_enter_starts_login_flow() {
 }
 
 #[test]
-fn test_typing_login_auto_inserts_filter_space() {
-    let mut app = create_test_app();
-
-    for c in "/login".chars() {
-        app.handle_key(KeyCode::Char(c), KeyModifiers::empty())
-            .unwrap();
-    }
-
-    // The trailing space arms provider filtering immediately, so the next
-    // keystrokes filter the login picker instead of extending the command.
-    assert_eq!(app.input(), "/login ");
-    let picker = app
-        .inline_interactive_state
-        .as_ref()
-        .expect("login picker preview should be open");
-    assert!(picker.preview);
-    assert_eq!(picker.kind, crate::tui::PickerKind::Login);
-    assert_eq!(picker.filter, "");
-
-    // A habitual manually-typed space is swallowed instead of doubling up.
-    app.handle_key(KeyCode::Char(' '), KeyModifiers::empty())
-        .unwrap();
-    assert_eq!(app.input(), "/login ");
-
-    for c in "za".chars() {
-        app.handle_key(KeyCode::Char(c), KeyModifiers::empty())
-            .unwrap();
-    }
-    assert_eq!(app.input(), "/login za");
-    let picker = app
-        .inline_interactive_state
-        .as_ref()
-        .expect("login picker preview should stay open");
-    assert_eq!(picker.filter, "za");
-}
-
-#[test]
-fn test_login_preview_enter_without_selection_focuses_picker_instead_of_logging_in() {
-    let mut app = create_test_app();
-
-    for c in "/login".chars() {
-        app.handle_key(KeyCode::Char(c), KeyModifiers::empty())
-            .unwrap();
-    }
-    app.handle_key(KeyCode::Enter, KeyModifiers::empty())
-        .unwrap();
-
-    // No filter and no explicit selection: Enter must not launch the first
-    // provider's login flow. It focuses the picker for a deliberate choice.
-    let picker = app
-        .inline_interactive_state
-        .as_ref()
-        .expect("login picker should stay open after bare Enter");
-    assert!(!picker.preview, "picker should be focused (not preview)");
-    assert_eq!(picker.kind, crate::tui::PickerKind::Login);
-    assert!(app.pending_login.is_none());
-    assert_eq!(app.input(), "");
-}
-
-#[test]
-fn test_login_preview_enter_after_navigation_starts_selected_login() {
-    let mut app = create_test_app();
-
-    for c in "/login".chars() {
-        app.handle_key(KeyCode::Char(c), KeyModifiers::empty())
-            .unwrap();
-    }
-    // Explicit navigation makes the selection deliberate, so Enter activates.
-    // Navigate to the Anthropic API key row (an offline api-key prompt flow).
-    app.handle_key(KeyCode::Down, KeyModifiers::empty())
-        .unwrap();
-    app.handle_key(KeyCode::Down, KeyModifiers::empty())
-        .unwrap();
-    app.handle_key(KeyCode::Enter, KeyModifiers::empty())
-        .unwrap();
-
-    assert!(
-        app.inline_interactive_state.is_none(),
-        "picker should close after selecting a provider"
-    );
-    assert!(
-        app.pending_login.is_some(),
-        "selected provider login flow should start"
-    );
-}
-
-#[test]
 fn test_subagent_model_command_sets_and_resets_session_preference() {
     let mut app = create_test_app();
 
@@ -2261,18 +2174,11 @@ fn test_finish_turn_auto_poke_queues_confidence_summary_when_todos_done() {
         assert!(!summary.contains("Finish risky provider path"));
         assert!(!summary.contains("Confidence meets the threshold"));
         assert!(summary.contains("1 completed todo is below the 90% confidence threshold"));
-        // Reference the shared prompt constant so this test cannot drift when
-        // the guidance wording changes.
-        assert!(summary.contains(&format!(
-            "\n- {}",
-            crate::prompt::TODO_CONFIDENCE_NEEDS_VALIDATION_PROMPT.trim()
-        )));
+        assert!(summary.contains("\n- Suggested action: validate or test before finalizing."));
         assert!(
             app.display_messages()
                 .iter()
-                .any(|msg| msg
-                    .content
-                    .contains("Todos complete. Auto-poke finished. Cumulative confidence: 86%."))
+                .any(|msg| msg.content.contains("queued hidden confidence reminder"))
         );
     });
 }

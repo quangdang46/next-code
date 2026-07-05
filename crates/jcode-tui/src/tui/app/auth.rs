@@ -2678,9 +2678,6 @@ impl App {
         }
         if login.success {
             self.recent_authenticated_provider = Some((login.provider.clone(), Instant::now()));
-            // A fresh login is exactly what the credential-failure breaker is
-            // waiting for: give automatic retries a fresh budget.
-            self.reset_credential_failure_breaker();
             self.invalidate_model_picker_cache();
             let suppress_first_run_login_noise =
                 self.onboarding_flow_active() && !matches!(login.provider.as_str(), "copilot_code");

@@ -55,6 +55,15 @@ pub fn save_todos(session_id: &str, todos: &[TodoItem]) -> Result<bool> {
     Ok(nudge)
 }
 
+/// Detect the auto-poke prompt.
+pub fn is_auto_poke_message(message: &str) -> bool {
+    let trimmed = message.trim();
+    (trimmed.starts_with("You have ")
+        && trimmed.contains(" incomplete todo")
+        && trimmed.ends_with("update the todo tool."))
+        || trimmed.starts_with("Confidence: ")
+}
+
 /// Detect close-out 3+ tasks không có verification step.
 /// Source: claude-code v1 verificationNudgeNeeded.
 ///

@@ -2,8 +2,6 @@
 pub enum CopySelectionPane {
     Chat,
     SidePane,
-    /// The prompt composer (input box) where the user types the next message.
-    Input,
 }
 
 impl CopySelectionPane {
@@ -11,7 +9,6 @@ impl CopySelectionPane {
         match self {
             Self::Chat => "Chat",
             Self::SidePane => "Side pane",
-            Self::Input => "Input",
         }
     }
 }
@@ -46,6 +43,5 @@ mod tests {
     fn pane_labels_match_ui_copy() {
         assert_eq!(CopySelectionPane::Chat.label(), "Chat");
         assert_eq!(CopySelectionPane::SidePane.label(), "Side pane");
-        assert_eq!(CopySelectionPane::Input.label(), "Input");
     }
 }

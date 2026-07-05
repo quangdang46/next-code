@@ -35,7 +35,7 @@ const BTW_PAGE_ID: &str = "btw";
 pub(super) const REVIEW_PREFERRED_MODEL: &str = "gpt-5.5";
 const POKE_OFF_UI_HINT: &str = "/poke off to stop.";
 const TODO_CONFIDENCE_THRESHOLD: u8 = 90;
-const TODO_CONFIDENCE_SUMMARY_PREFIX: &str = crate::todo::TODO_CONFIDENCE_SUMMARY_PREFIX;
+const TODO_CONFIDENCE_SUMMARY_PREFIX: &str = "All todos are done. Todo confidence summary:";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct TodoConfidenceSummary {
@@ -72,7 +72,10 @@ pub(super) fn parse_poke_command(trimmed: &str) -> Option<Result<PokeCommand, St
 }
 
 pub(super) fn is_poke_message(message: &str) -> bool {
-    crate::todo::is_auto_poke_message(message)
+    (message.starts_with("You have ")
+        && message.contains(" incomplete todo")
+        && message.ends_with("update the todo tool."))
+        || message.starts_with(TODO_CONFIDENCE_SUMMARY_PREFIX)
 }
 
 pub(super) fn is_todo_confidence_summary_message(message: &str) -> bool {
@@ -2692,7 +2695,11 @@ pub(super) fn incomplete_poke_todos(app: &App) -> Vec<crate::todo::TodoItem> {
 }
 
 pub(super) fn build_poke_message(incomplete: &[crate::todo::TodoItem]) -> String {
-    crate::todo::build_auto_poke_message(incomplete.len())
+    format!(
+        "You have {} incomplete todo{}. Continue working, or update the todo tool.",
+        incomplete.len(),
+        if incomplete.len() == 1 { "" } else { "s" },
+    )
 }
 
 fn todo_confidence_weight(priority: &str) -> u32 {

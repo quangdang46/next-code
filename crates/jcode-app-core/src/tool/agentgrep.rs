@@ -4,11 +4,11 @@ use crate::session::Session;
 use crate::storage;
 use crate::{logging, util};
 use ::agentgrep::cli::{FindArgs, FullRegionMode, GrepArgs, OutlineArgs, SmartArgs};
-use ::agentgrep::find::{FindResult, run_find};
-use ::agentgrep::outline::run_outline;
-use ::agentgrep::search::{GrepResult, run_grep};
-use ::agentgrep::smart_dsl::{SmartQuery, parse_smart_query};
-use ::agentgrep::smart_engine::{SmartResult, run_smart};
+use ::agentgrep::find::{FindFile, FindResult, run_find};
+use ::agentgrep::outline::{OutlineResult, run_outline};
+use ::agentgrep::search::{FileMatches, GrepResult, run_grep};
+use ::agentgrep::smart_dsl::{Relation, SmartQuery, parse_smart_query};
+use ::agentgrep::smart_engine::{SmartFile, SmartRegion, SmartResult, run_smart};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -21,6 +21,7 @@ use std::sync::OnceLock;
 
 mod args;
 mod context;
+mod render;
 
 #[cfg(test)]
 use self::args::trace_or_smart_terms_owned;
@@ -33,7 +34,7 @@ use self::context::maybe_write_context_json;
 use self::context::{
     collect_bash_exposure, collect_trace_exposure, tune_known_file, tune_known_region,
 };
-use ::agentgrep::render::{
+use self::render::{
     render_find_output, render_grep_output, render_outline_output, render_smart_output,
 };
 
@@ -44,8 +45,7 @@ struct AgentGrepInput {
     // `pattern` accepted for legacy grep-tool calls aliased to agentgrep.
     #[serde(default, alias = "pattern")]
     query: Option<String>,
-    // `file_path` accepted because agents frequently pass it instead of `file`.
-    #[serde(default, alias = "file_path")]
+    #[serde(default)]
     file: Option<String>,
     #[serde(default)]
     terms: Option<Vec<String>>,

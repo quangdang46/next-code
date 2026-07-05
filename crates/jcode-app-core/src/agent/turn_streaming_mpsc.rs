@@ -52,8 +52,8 @@ fn reload_interrupted_tool_result(tc: &ToolCall, elapsed_secs: f64) -> (String, 
         .get("action")
         .and_then(|value| value.as_str())
         .unwrap_or_default();
-    let is_wait_like = (tc.name == "bg" && action == "wait")
-        || (tc.name == "swarm" && matches!(action, "await_members" | "run_plan"));
+    let is_wait_like =
+        (tc.name == "bg" && action == "wait") || (tc.name == "swarm" && action == "await_members");
 
     if is_wait_like {
         let input = serde_json::to_string(&tc.input).unwrap_or_else(|_| "{}".to_string());
@@ -84,14 +84,6 @@ impl Agent {
         // Mark this session as actively streaming for presence UIs (e.g. the
         // macOS menu bar indicator). Cleared automatically on every exit path.
         let _streaming_guard = crate::session::StreamingGuard::new(self.session.id.clone());
-        // Register this turn's cancel signal in the process-global registry so
-        // a cancel routed through *any* control handle for this session (even a
-        // stale one built for a different agent object, e.g. after a
-        // reattach/reload) aborts this in-flight stream immediately (issue #428).
-        let _turn_cancel_guard = crate::turn_cancel_registry::register_active_turn(
-            &self.session.id,
-            self.graceful_shutdown.clone(),
-        );
         let trace = trace_enabled();
         let mut context_limit_retries = 0u32;
         let mut incomplete_continuations = 0u32;
@@ -290,19 +282,6 @@ impl Agent {
 
             let mut text_content = String::new();
             let mut text_wrapped_detected = false;
-            // Inline swarm worker output tap: publish a throttled tail of the
-            // in-progress assistant text to the bus so a coordinator can render
-            // a live inline gallery viewport.
-            let inline_output_tap = self.inline_output_tap();
-            let mut inline_tap_last = Instant::now()
-                .checked_sub(std::time::Duration::from_millis(1000))
-                .unwrap_or_else(Instant::now);
-            // Throttled "this session is alive" marks while tokens stream, so
-            // swarm status can distinguish a busy worker from a dead one
-            // without paying a registry lock per token.
-            let mut activity_mark_last = Instant::now()
-                .checked_sub(std::time::Duration::from_secs(10))
-                .unwrap_or_else(Instant::now);
             let mut tool_calls: Vec<ToolCall> = Vec::new();
             let mut current_tool: Option<ToolCall> = None;
             let mut current_tool_input = String::new();
@@ -357,11 +336,6 @@ impl Agent {
                     }
                     event = next_event => event,
                 };
-
-                if activity_mark_last.elapsed() >= std::time::Duration::from_secs(2) {
-                    activity_mark_last = Instant::now();
-                    crate::session_metrics::record_activity(&self.session.id);
-                }
                 let Some(event) = event else {
                     log_agent_provider_stream_lifecycle(
                         if saw_message_end {
@@ -480,13 +454,6 @@ impl Agent {
                             });
                         }
                         text_content.push_str(&text);
-                        if inline_output_tap {
-                            self.inline_tail.set_live(&text_content);
-                            if inline_tap_last.elapsed() >= std::time::Duration::from_millis(200) {
-                                inline_tap_last = Instant::now();
-                                self.publish_inline_tail();
-                            }
-                        }
                         if !text_wrapped_detected {
                             // Scan only the new delta (plus a short overlap for
                             // markers straddling the boundary) instead of the
@@ -561,10 +528,11 @@ impl Agent {
                     StreamEvent::ToolUseSignature(signature) => {
                         // Attach Gemini 3 thought signature to the most recent
                         // tool call so it can be persisted and replayed.
-                        if let Some(tool) = tool_calls.last_mut()
-                            && !signature.is_empty()
-                        {
-                            tool.thought_signature = Some(signature);
+                        #[allow(clippy::collapsible_if)]
+                        if let Some(tool) = tool_calls.last_mut() {
+                            if !signature.is_empty() {
+                                tool.thought_signature = Some(signature);
+                            }
                         }
                     }
                     StreamEvent::ToolResult {
@@ -696,11 +664,6 @@ impl Agent {
                             ],
                         );
                         text_content.clear();
-                        if inline_output_tap {
-                            // The provider replays from the top; drop the
-                            // discarded partial from the live tail too.
-                            self.inline_tail.clear_live();
-                        }
                         text_wrapped_detected = false;
                         tool_calls.clear();
                         current_tool = None;
@@ -725,12 +688,6 @@ impl Agent {
                         stop_reason: reason,
                     } => {
                         saw_message_end = true;
-                        if inline_output_tap {
-                            // Fold the finished text into the rolling tail so
-                            // it survives the next turn/continuation.
-                            self.inline_tail.set_live(&text_content);
-                            self.inline_tail.commit_live();
-                        }
                         // Close any still-open reasoning region (e.g. a reasoning-only
                         // step) so the client flushes its live partial line.
                         if reasoning_open {
@@ -787,6 +744,8 @@ impl Agent {
                             stdin_request_tx: self.stdin_request_tx.clone(),
                             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                             execution_mode: ToolExecutionMode::AgentTurn,
+                            best_of_n_run_id: None,
+                            best_of_n_candidate_id: None,
                         };
                         crate::telemetry::record_tool_call();
                         let tool_result = self
@@ -900,10 +859,6 @@ impl Agent {
                 vec![
                     ("mode", "mpsc".to_string()),
                     ("saw_message_end", saw_message_end.to_string()),
-                    (
-                        "stop_reason",
-                        stop_reason.clone().unwrap_or_else(|| "none".to_string()),
-                    ),
                     ("input_tokens", usage_input.unwrap_or(0).to_string()),
                     ("output_tokens", usage_output.unwrap_or(0).to_string()),
                     ("cache_read", usage_cache_read.unwrap_or(0).to_string()),
@@ -1083,33 +1038,7 @@ impl Agent {
                     stop_reason.as_deref(),
                     &mut incomplete_continuations,
                 )? {
-                    NoToolCallOutcome::Break => {
-                        // Surface silent guardrail/refusal stops: the provider
-                        // ended the turn with no visible output (e.g. Anthropic
-                        // stop_reason "refusal", or a reasoning-only response).
-                        // Only when the provider actually finished the message
-                        // (saw_message_end) and the user did not cancel, so
-                        // interrupted turns never show a spurious notice.
-                        if saw_message_end
-                            && !self.is_graceful_shutdown()
-                            && let Some(notice) = Self::provider_guardrail_notice(
-                                stop_reason.as_deref(),
-                                text_content.trim().is_empty(),
-                                !reasoning_content.trim().is_empty(),
-                            )
-                        {
-                            logging::warn(&format!(
-                                "PROVIDER_GUARDRAIL: turn ended with no visible output (stop_reason={:?}, reasoning_chars={})",
-                                stop_reason,
-                                reasoning_content.len()
-                            ));
-                            let _ = event_tx.send(ServerEvent::ProviderGuardrail {
-                                stop_reason: stop_reason.clone(),
-                                message: notice,
-                            });
-                        }
-                        break;
-                    }
+                    NoToolCallOutcome::Break => break,
                     NoToolCallOutcome::ContinueWithoutEvent => continue,
                     NoToolCallOutcome::ContinueWithSoftInterrupt { injected, point } => {
                         for event in Self::build_soft_interrupt_events(injected, point, None) {
@@ -1230,7 +1159,28 @@ impl Agent {
                     continue;
                 }
 
-                self.validate_tool_allowed(&tc.name)?;
+                if let Err(e) = self.validate_tool_allowed(&tc.name, Some(&tc.input)).await {
+                    let error_msg = format!("{}", e);
+                    crate::logging::warn(&error_msg);
+                    Bus::global().publish(BusEvent::ToolUpdated(ToolEvent {
+                        session_id: self.session.id.clone(),
+                        message_id: message_id.clone(),
+                        tool_call_id: tc.id.clone(),
+                        tool_name: tc.name.clone(),
+                        status: ToolStatus::Error,
+                        title: None,
+                    }));
+                    self.add_message(
+                        Role::User,
+                        vec![ContentBlock::ToolResult {
+                            tool_use_id: tc.id.clone(),
+                            content: error_msg,
+                            is_error: Some(true),
+                        }],
+                    );
+                    tool_results_dirty = true;
+                    continue;
+                }
 
                 let is_native_tool = JCODE_NATIVE_TOOLS.contains(&tc.name.as_str());
 
@@ -1263,6 +1213,8 @@ impl Agent {
                     stdin_request_tx: self.stdin_request_tx.clone(),
                     graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                     execution_mode: ToolExecutionMode::AgentTurn,
+                    best_of_n_run_id: None,
+                    best_of_n_candidate_id: None,
                 };
 
                 if trace {
@@ -1270,14 +1222,6 @@ impl Agent {
                 }
 
                 logging::info(&format!("Tool starting: {}", tc.name));
-                crate::session_metrics::record_activity(&self.session.id);
-                if inline_output_tap {
-                    // Surface the tool execution on the coordinator's inline
-                    // viewport immediately: workers spend most wall-clock time
-                    // here, where no assistant text streams.
-                    self.inline_tail.start_tool(&tc.name, &tc.input);
-                    self.publish_inline_tail();
-                }
                 let tool_start = Instant::now();
 
                 // Spawn tool in its own task so we can detach it to background on Alt+B
@@ -1335,7 +1279,6 @@ impl Agent {
 
                 self.unlock_tools_if_needed(&tc.name);
                 let tool_elapsed = tool_start.elapsed();
-                crate::session_metrics::record_activity(&self.session.id);
 
                 if let Some(result) = tool_result {
                     // Normal tool completion
@@ -1344,16 +1287,53 @@ impl Agent {
                         tc.name,
                         tool_elapsed.as_secs_f64()
                     ));
-                    if inline_output_tap {
-                        // Update the tool marker in place with duration/error.
-                        self.inline_tail
-                            .finish_tool(tool_elapsed.as_secs_f64(), result.is_err());
-                        self.publish_inline_tail();
-                    }
 
                     match result {
                         Ok(output) => {
                             let output = cap_tool_output_for_history(&tc.name, output);
+
+                            // Dispatch SessionDiff hooks for file-modifying tools
+                            if matches!(tc.name.as_str(), "Edit" | "Write" | "ApplyPatch") {
+                                let registry = self.hook_registry.clone();
+                                let config = self.dispatch_config.clone();
+                                let session_id = self.session.id.clone();
+                                let cwd = self.session.working_dir.clone().unwrap_or_default();
+                                let tool_name = tc.name.clone();
+                                let tool_output_preview = if output.output.len() > 4096 {
+                                    output.output[..4096].to_string()
+                                } else {
+                                    output.output.clone()
+                                };
+                                let file_path = tc
+                                    .input
+                                    .get("file_path")
+                                    .and_then(|v| v.as_str())
+                                    .map(|s| s.to_string());
+                                let hook_input = HookInputBuilder::new()
+                                    .session(&session_id, &cwd)
+                                    .event("SessionDiff")
+                                    .tool(&tool_name, tc.input.clone(), &tc.id)
+                                    .tool_output(
+                                        serde_json::json!({ "output": tool_output_preview }),
+                                    )
+                                    .diff(&tool_output_preview, file_path.as_deref())
+                                    .build();
+                                let ctx = HookContext::for_session_diff(session_id, cwd, file_path);
+                                let event = HookEvent::SessionDiff;
+                                tokio::spawn(async move {
+                                    let handlers = registry.get_matching(&event, &ctx);
+                                    if !handlers.is_empty() {
+                                        jcode_hooks::dispatch_hooks(
+                                            &event,
+                                            &hook_input,
+                                            &handlers,
+                                            &config,
+                                        )
+                                        .await;
+                                    }
+                                });
+                            }
+
                             let _ = event_tx.send(ServerEvent::ToolDone {
                                 id: tc.id.clone(),
                                 name: tc.name.clone(),
