@@ -600,3 +600,50 @@ grep -rn 'MemoryEntry {' --include='*.rs' | grep -v 'fn\|pub struct'
 **Key insight**: An upstream hunk that differs from ours is NOT automatically wrong. Read it. If it fixes a bug we also have, the fix belongs in our code regardless of who wrote it.
 
 **Example**: Upstream fixes `openrouter.rs` to handle a null-pointer crash. Our file conflicts because we also modified the same function. Using `--ours` keeps our code crash-free, but drops upstream's fix for the OTHER crash path that we also have. The correct action: keep our logic, apply upstream's null-check manually.
+
+---
+
+## Sync Log
+
+### 2026-07-05 — v0.35.0..v0.36.0 upstream sync (commit 5a2437c7c)
+**Branch**: `sync-final-merge` → PR #478
+**Upstream commits**: 164 (v0.35.0..v0.36.0). **Files merged**: 261 (+30,369 / -15,264).
+
+**Status**: ✅ Build clean. `cargo check -p jcode-tui` = 0 errors.
+
+| Category | What |
+|----------|------|
+| ⚡ Swarm | PTY debug, turn cancel registry, per-spawn model/effort, salvage stranded, double-assignment reject, TLDR collapse, run_plan fixes, agent sorting |
+| 🖥️ Server | Corrupt journal recovery, history scoping, power inhibition |
+| 🏎️ Performance | Memory profiling, glibc MMAP, heap release |
+| 🧪 CI | Wildcard re-export, security preflight, memory probe |
+| 📝 Mermaid | Layout-tier cache, aspect ratio, resize probes |
+| 🐛 Bugfixes | Copy badge, auto-poke, History dedup, /login guide |
+
+**Kept OURS** (Lesson 1 — status bar/event loop):
+- `crates/jcode-tui/src/tui/ui_input.rs`, `ui.rs`, `mod.rs`
+- `crates/jcode-tui/src/tui/app/turn.rs`, `local.rs`, `run_shell.rs`, `state_ui.rs`
+
+**Kept OURS** (Category A — extracted modules):
+- `crates/jcode-base/src/import.rs`, `casr_adapter.rs`
+- `crates/jcode-app-core/src/dcg_bridge.rs`, `hashline_edit.rs`
+- `crates/jcode-app-core/src/tool/mod.rs` (ffs replacement)
+
+**Kept OURS** (fork-specific crates — user maintains):
+- `jcode-hooks/`, `jcode-plugin-core/`, `jcode-plugin-runtime/`
+- `jcode-best-of-n/`, `jcode-llm-core/`, `jcode-keywords/`
+- `jcode-provider-service/`, `evals/`, `examples/`
+- `.beads/`, `.jcode/agents/`
+
+**Category G fixes applied**:
+1. `SetPermissionMode` — added variant to `jcode-protocol/src/wire.rs`
+2. `is_auto_poke_message` — added to `todo.rs`
+3. `DcpCompressTool` / `BestOfNTool` — replaced with `InvalidTool` stubs
+4. `task_label` field — added `task_label: None` to all `SwarmMemberStatus` initializers
+5. `tldr` field — added `..` patterns to `NotificationType::Message` matches
+6. `poll_todo_pipeline` — added stub returning `Ok(())`
+7. `same_instance` — added to `InterruptSignal`
+8. `set_temperature` — added to Provider trait (default `Ok(())`)
+9. `has_credentials` — added free function wrapper in openrouter.rs
+10. `fetch_catalog_snapshot` / `persist_catalog` — made `pub` in antigravity.rs
+11. `MERMAID_PENDING_PLACEHOLDER_TEXT` — added constant + helper function
