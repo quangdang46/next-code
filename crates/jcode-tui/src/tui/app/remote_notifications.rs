@@ -165,7 +165,7 @@ pub(super) fn present_swarm_notification(
 ) -> SwarmNotificationPresentation {
     let trimmed = message.trim();
     match notification_type {
-        NotificationType::Message { scope, channel } => match scope.as_deref() {
+        NotificationType::Message { scope, channel, .. } => match scope.as_deref() {
             Some("dm") => {
                 if let Some(task_body) =
                     strip_message_prefix(trimmed, "Task assigned to you by coordinator: ")

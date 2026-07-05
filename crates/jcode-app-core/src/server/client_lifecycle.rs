@@ -2611,7 +2611,7 @@ pub(super) async fn handle_client(
             Request::ClientDebugCommand { id, .. } => {
                 handle_client_debug_command(id, &client_event_tx).await;
             }
-            Request::Request::SetPermissionMode { .. } => {}
+            Request::SetPermissionMode { .. } => {}
             Request::ClientDebugResponse { id, output } => {
                 handle_client_debug_response(id, output, &client_debug_response_tx);
             }

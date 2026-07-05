@@ -315,6 +315,7 @@ impl App {
                         output_tail: Some(samples[i % samples.len()].to_string()),
                         report_back_to_session_id: None,
                         todo_progress: Some(((i as u32 * 3) % 9, 9)),
+                        task_label: None,
                         todo_items: Vec::new(),
                     })
                     .collect();
@@ -352,6 +353,7 @@ impl App {
                         output_tail: None,
                         report_back_to_session_id: None,
                         todo_progress: None,
+                        task_label: None,
                         todo_items: Vec::new(),
                     }],
                 })
