@@ -1086,11 +1086,11 @@ impl Provider for AnthropicProvider {
     }
 
     fn credential_mode(&self) -> jcode_provider_core::CredentialMode {
-        self.credential_mode_snapshot()
+        self.credential_mode_snapshot().into()
     }
 
     fn set_credential_mode(&self, mode: jcode_provider_core::CredentialMode) -> Result<()> {
-        AnthropicProvider::set_credential_mode(self, mode)
+        AnthropicProvider::set_credential_mode(self, mode.into())
     }
 
     fn set_model(&self, model: &str) -> Result<()> {

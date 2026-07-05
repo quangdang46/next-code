@@ -410,6 +410,21 @@ pub trait Provider: Send + Sync {
             .unwrap_or(DEFAULT_CONTEXT_LIMIT)
     }
 
+    /// Set the temperature parameter (if the provider supports it).
+    fn set_temperature(&self, _temperature: f32) -> Result<()> {
+        Ok(())
+    }
+
+    /// Get the premium mode for this provider.
+    fn get_premium_mode(&self) -> PremiumMode {
+        PremiumMode::Normal
+    }
+
+    /// Re-read credentials from disk immediately.
+    /// Unlike `reload_credentials`, this is the concrete per-provider
+    /// implementation that the composition root calls directly.
+    fn reload_credentials_now(&self) {}
+
     /// Create a new provider instance with independent mutable state.
     fn fork(&self) -> Arc<dyn Provider>;
 

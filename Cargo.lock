@@ -5657,6 +5657,7 @@ dependencies = [
  "jcode-plugin-core",
  "jcode-plugin-runtime",
  "jcode-protocol",
+ "jcode-provider-claude-cli-runtime",
  "jcode-provider-core",
  "jcode-provider-doctor",
  "jcode-provider-gemini",
@@ -6473,6 +6474,22 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "jcode-provider-claude-cli-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "jcode-base",
+ "jcode-message-types",
+ "jcode-provider-core",
+ "serde",
+ "serde_json",
  "tokio",
  "tokio-stream",
 ]

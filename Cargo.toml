@@ -54,6 +54,7 @@ members = [
     "crates/jcode-provider-openai",
     "crates/jcode-provider-gemini",
     "crates/jcode-provider-service",
+    "crates/jcode-provider-claude-cli-runtime",
     "crates/jcode-llm-core",
     "crates/jcode-llm-protocols",
     "crates/jcode-llm-dialects",
@@ -151,6 +152,7 @@ jcode-keyring-store = { path = "crates/jcode-keyring-store" }
 jcode-plugin-core = { path = "crates/jcode-plugin-core" }
 jcode-plugin-runtime = { path = "crates/jcode-plugin-runtime" }
 jcode-provider-doctor = { path = "crates/jcode-provider-doctor" }
+jcode-provider-claude-cli-runtime = { path = "crates/jcode-provider-claude-cli-runtime" }
 jcode-provider-service = { path = "crates/jcode-provider-service" }
 
 # Cross-provider session conversion engine (resume/import any provider -> jcode).

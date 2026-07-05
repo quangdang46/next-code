@@ -73,8 +73,9 @@ pub use route_builders::{
 };
 pub(crate) use routing::{
     anthropic_api_key_route_availability, anthropic_oauth_route_availability,
-    is_transient_transport_error, should_eager_detect_copilot_tier,
+    should_eager_detect_copilot_tier,
 };
+pub(crate) use jcode_provider_core::is_transient_transport_error;
 
 /// Process-wide handle to the live agent provider.
 ///
@@ -765,10 +766,10 @@ impl MultiProvider {
             ActiveProvider::Claude => {
                 let uses_api_key = self
                     .anthropic_provider()
-                    .map(|anthropic| match anthropic.credential_mode_snapshot() {
-                        anthropic::AnthropicCredentialMode::ApiKey => true,
-                        anthropic::AnthropicCredentialMode::OAuth => false,
-                        anthropic::AnthropicCredentialMode::Auto => {
+                    .map(|anthropic| match anthropic.credential_mode() {
+                        jcode_provider_core::CredentialMode::ApiKey => true,
+                        jcode_provider_core::CredentialMode::OAuth => false,
+                        jcode_provider_core::CredentialMode::Auto => {
                             crate::auth::claude::load_credentials().is_err()
                         }
                     })
@@ -784,10 +785,10 @@ impl MultiProvider {
             ActiveProvider::OpenAI => {
                 let uses_api_key = self
                     .openai_provider()
-                    .map(|openai| match openai.credential_mode_snapshot() {
-                        openai::OpenAICredentialMode::ApiKey => true,
-                        openai::OpenAICredentialMode::OAuth => false,
-                        openai::OpenAICredentialMode::Auto => {
+                    .map(|openai| match openai.credential_mode() {
+                        jcode_provider_core::CredentialMode::ApiKey => true,
+                        jcode_provider_core::CredentialMode::OAuth => false,
+                        jcode_provider_core::CredentialMode::Auto => {
                             crate::auth::codex::load_oauth_credentials().is_err()
                         }
                     })
@@ -1083,8 +1084,8 @@ impl MultiProvider {
     }
 
     fn should_replace_openrouter_after_auth_change(
-        existing: &openrouter::OpenRouterProvider,
-        candidate: &openrouter::OpenRouterProvider,
+        existing: &dyn Provider,
+        candidate: &dyn Provider,
     ) -> bool {
         if existing.supports_provider_routing_features()
             != candidate.supports_provider_routing_features()
@@ -1137,7 +1138,7 @@ impl MultiProvider {
         }
 
         if let Some(openai) = self.openai_provider() {
-            openai.reload_credentials_now();
+            openai.reload_credentials();
         } else if let Ok(credentials) = crate::auth::codex::load_credentials() {
             crate::logging::info("Hot-initialized OpenAI provider after auth change");
             *self
@@ -1373,8 +1374,8 @@ impl MultiProvider {
                     // OAuth/ApiKey emit their canonical model prefix; Auto keeps
                     // the bare provider key (route without pinning a credential).
                     anthropic
-                        .credential_mode_snapshot()
-                        .auth_route()
+                        .credential_mode()
+                        .auth_route(jcode_provider_core::DualAuthProvider::Anthropic)
                         .map(|route| route.model_prefix())
                         .unwrap_or("claude")
                 } else {
@@ -1384,8 +1385,8 @@ impl MultiProvider {
             ActiveProvider::OpenAI => {
                 if let Some(openai) = self.openai_provider() {
                     openai
-                        .credential_mode_snapshot()
-                        .auth_route()
+                        .credential_mode()
+                        .auth_route(jcode_provider_core::DualAuthProvider::OpenAI)
                         .map(|route| route.model_prefix())
                         .unwrap_or("openai")
                 } else {
@@ -1539,12 +1540,12 @@ impl Provider for MultiProvider {
         match self.active_provider() {
             ActiveProvider::Claude => {
                 let anthropic = self.anthropic_provider()?;
-                Some(match anthropic.credential_mode_snapshot() {
-                    anthropic::AnthropicCredentialMode::OAuth => ResolvedCredential::Oauth,
-                    anthropic::AnthropicCredentialMode::ApiKey => ResolvedCredential::ApiKey,
+                Some(match anthropic.credential_mode() {
+                    jcode_provider_core::CredentialMode::OAuth => ResolvedCredential::Oauth,
+                    jcode_provider_core::CredentialMode::ApiKey => ResolvedCredential::ApiKey,
                     // Auto prefers OAuth (Claude subscription) when available,
                     // otherwise falls back to the API key. Mirror that exactly.
-                    anthropic::AnthropicCredentialMode::Auto => {
+                    jcode_provider_core::CredentialMode::Auto => {
                         if crate::auth::claude::load_credentials().is_ok() {
                             ResolvedCredential::Oauth
                         } else {
@@ -1555,11 +1556,11 @@ impl Provider for MultiProvider {
             }
             ActiveProvider::OpenAI => {
                 let openai = self.openai_provider()?;
-                Some(match openai.credential_mode_snapshot() {
-                    openai::OpenAICredentialMode::OAuth => ResolvedCredential::Oauth,
-                    openai::OpenAICredentialMode::ApiKey => ResolvedCredential::ApiKey,
+                Some(match openai.credential_mode() {
+                    jcode_provider_core::CredentialMode::OAuth => ResolvedCredential::Oauth,
+                    jcode_provider_core::CredentialMode::ApiKey => ResolvedCredential::ApiKey,
                     // Auto resolves to OAuth first when available, otherwise API key.
-                    openai::OpenAICredentialMode::Auto => {
+                    jcode_provider_core::CredentialMode::Auto => {
                         if crate::auth::codex::load_oauth_credentials().is_ok() {
                             ResolvedCredential::Oauth
                         } else {
@@ -1579,15 +1580,15 @@ impl Provider for MultiProvider {
         // a disk read on every frame. This stays in lockstep with
         // `active_resolved_credential`'s explicit arms above.
         match self.active_provider() {
-            ActiveProvider::Claude => match self.anthropic_provider()?.credential_mode_snapshot() {
-                anthropic::AnthropicCredentialMode::OAuth => Some(ResolvedCredential::Oauth),
-                anthropic::AnthropicCredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
-                anthropic::AnthropicCredentialMode::Auto => None,
+            ActiveProvider::Claude => match self.anthropic_provider()?.credential_mode() {
+                jcode_provider_core::CredentialMode::OAuth => Some(ResolvedCredential::Oauth),
+                jcode_provider_core::CredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
+                jcode_provider_core::CredentialMode::Auto => None,
             },
-            ActiveProvider::OpenAI => match self.openai_provider()?.credential_mode_snapshot() {
-                openai::OpenAICredentialMode::OAuth => Some(ResolvedCredential::Oauth),
-                openai::OpenAICredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
-                openai::OpenAICredentialMode::Auto => None,
+            ActiveProvider::OpenAI => match self.openai_provider()?.credential_mode() {
+                jcode_provider_core::CredentialMode::OAuth => Some(ResolvedCredential::Oauth),
+                jcode_provider_core::CredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
+                jcode_provider_core::CredentialMode::Auto => None,
             },
             _ => None,
         }

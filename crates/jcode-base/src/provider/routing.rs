@@ -15,3 +15,7 @@ pub(crate) fn anthropic_api_key_route_availability(model: &str) -> (bool, String
         (true, String::new())
     }
 }
+
+pub(crate) fn should_eager_detect_copilot_tier() -> bool {
+    std::env::var("JCODE_NON_INTERACTIVE").is_err()
+}
