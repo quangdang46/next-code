@@ -9,12 +9,88 @@ use std::path::PathBuf;
 pub const MAX_SWARM_COMPLETION_REPORT_CHARS: usize = 4000;
 pub const SWARM_COMPLETION_REPORT_MARKER: &str = "SWARM COMPLETION REPORT REQUIRED";
 
+/// Message/report bodies longer than this require a sender-provided `tldr`
+/// so receiving UIs can render them collapsed to one line with an expand
+/// control instead of dumping the full body into the transcript.
+pub const SWARM_TLDR_REQUIRED_OVER_CHARS: usize = 240;
+
+/// Upper bound for a sender-provided `tldr`. Anything longer defeats the
+/// purpose of a one-line collapsed summary.
+pub const MAX_SWARM_TLDR_CHARS: usize = 200;
+
+/// Validate a sender-provided `tldr` against the message body it summarizes.
+///
+/// Returns the normalized (trimmed, whitespace-collapsed) tldr when present,
+/// `Ok(None)` when the body is short enough to not need one, and a
+/// human/model-actionable error when a long body is missing a tldr or the
+/// tldr itself is malformed (too long or multi-line).
+pub fn validate_swarm_tldr(
+    tldr: Option<&str>,
+    body: &str,
+    context: &str,
+) -> Result<Option<String>, String> {
+    let normalized = tldr
+        .map(|t| t.split_whitespace().collect::<Vec<_>>().join(" "))
+        .filter(|t| !t.is_empty());
+
+    if let Some(ref tldr) = normalized {
+        let chars = tldr.chars().count();
+        if chars > MAX_SWARM_TLDR_CHARS {
+            return Err(format!(
+                "'tldr' for {context} is too long ({chars} chars, max {MAX_SWARM_TLDR_CHARS}). \
+                 Provide a single short line summarizing the message."
+            ));
+        }
+        return Ok(normalized);
+    }
+
+    let body_chars = body.chars().count();
+    if body_chars > SWARM_TLDR_REQUIRED_OVER_CHARS {
+        return Err(format!(
+            "'tldr' is required for {context} because the body is {body_chars} chars \
+             (over {SWARM_TLDR_REQUIRED_OVER_CHARS}). Add a one-line 'tldr' (under \
+             {MAX_SWARM_TLDR_CHARS} chars) summarizing it; recipients see the tldr \
+             collapsed with an expand control."
+        ));
+    }
+
+    Ok(None)
+}
+
 /// Maximum number of live members (agents) in a single swarm. This is the sole
 /// runaway-prevention cap for the task-graph model. There is intentionally no
 /// spawn-depth limit and no per-node fan-out limit: the spawn tree may nest and
 /// fan out freely until the swarm reaches this many live members, at which point
 /// further spawns are refused.
 pub const MAX_SWARM_MEMBERS: usize = 1000;
+
+/// Upper bound for a member's derived task label, sized for one-line UI chips.
+pub const MAX_SWARM_TASK_LABEL_CHARS: usize = 48;
+
+/// Derive a short, stable task label from a spawn prompt or task assignment.
+///
+/// Takes the first non-empty line, strips common markdown/list prefixes,
+/// collapses whitespace, and truncates on a char boundary with an ellipsis.
+/// Returns `None` when the text has no usable content.
+pub fn derive_swarm_task_label(text: &str) -> Option<String> {
+    let line = text.lines().map(str::trim).find(|line| !line.is_empty())?;
+    let line = line
+        .trim_start_matches(['#', '-', '*', '>', ' '])
+        .trim_end_matches(':')
+        .trim();
+    let collapsed = line.split_whitespace().collect::<Vec<_>>().join(" ");
+    if collapsed.is_empty() {
+        return None;
+    }
+    if collapsed.chars().count() <= MAX_SWARM_TASK_LABEL_CHARS {
+        return Some(collapsed);
+    }
+    let truncated: String = collapsed
+        .chars()
+        .take(MAX_SWARM_TASK_LABEL_CHARS.saturating_sub(1))
+        .collect();
+    Some(format!("{}…", truncated.trim_end()))
+}
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SwarmRole {
@@ -151,6 +227,9 @@ pub struct SwarmMemberRecord {
     pub swarm_enabled: bool,
     pub status: SwarmLifecycleStatus,
     pub detail: Option<String>,
+    /// Stable label of the task/role this member was spawned or assigned for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_label: Option<String>,
     pub friendly_name: Option<String>,
     pub report_back_to_session_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -461,6 +540,7 @@ fn completion_status_intro(name: &str, status: &str) -> String {
         "ready" => format!("Agent {} finished their work and is ready for more.", name),
         "failed" => format!("Agent {} finished with status failed.", name),
         "stopped" => format!("Agent {} stopped.", name),
+        "crashed" => format!("Agent {} crashed while working.", name),
         _ => format!("Agent {} completed their work.", name),
     }
 }
@@ -480,6 +560,10 @@ fn completion_followup(status: &str, has_report: bool) -> &'static str {
             "Use summary/read_context to inspect results, assign_task to retry with guidance, or stop to remove them."
         }
         ("stopped", _) => "Use summary/read_context to inspect results or stop to remove them.",
+        ("crashed", _) => {
+            "Any swarm task assignments they held are requeued automatically where possible. \
+             Check plan_status, and spawn a replacement or use retry/assign_task if work remains."
+        }
         (_, true) => {
             "Use assign_task to give them new work, stop to remove them, or summary/read_context for full context."
         }
@@ -546,6 +630,45 @@ mod tests {
     #[test]
     fn truncate_detail_collapses_whitespace_and_ellipsizes() {
         assert_eq!(truncate_detail("hello   there\nworld", 11), "hello th...");
+    }
+
+    #[test]
+    fn validate_swarm_tldr_allows_short_body_without_tldr() {
+        assert_eq!(validate_swarm_tldr(None, "quick note", "this DM"), Ok(None));
+    }
+
+    #[test]
+    fn validate_swarm_tldr_requires_tldr_for_long_body() {
+        let body = "x".repeat(SWARM_TLDR_REQUIRED_OVER_CHARS + 1);
+        let err = validate_swarm_tldr(None, &body, "this DM").unwrap_err();
+        assert!(err.contains("'tldr' is required"), "{err}");
+        assert!(err.contains("this DM"), "{err}");
+    }
+
+    #[test]
+    fn validate_swarm_tldr_normalizes_whitespace() {
+        let body = "x".repeat(SWARM_TLDR_REQUIRED_OVER_CHARS + 1);
+        assert_eq!(
+            validate_swarm_tldr(Some("  did\nthe   thing  "), &body, "this report"),
+            Ok(Some("did the thing".to_string()))
+        );
+    }
+
+    #[test]
+    fn validate_swarm_tldr_rejects_overlong_tldr() {
+        let tldr = "y".repeat(MAX_SWARM_TLDR_CHARS + 1);
+        let err = validate_swarm_tldr(Some(&tldr), "body", "this message").unwrap_err();
+        assert!(err.contains("too long"), "{err}");
+    }
+
+    #[test]
+    fn validate_swarm_tldr_blank_tldr_counts_as_missing() {
+        let body = "x".repeat(SWARM_TLDR_REQUIRED_OVER_CHARS + 1);
+        assert!(validate_swarm_tldr(Some("   "), &body, "this DM").is_err());
+        assert_eq!(
+            validate_swarm_tldr(Some("   "), "short", "this DM"),
+            Ok(None)
+        );
     }
 
     #[test]
@@ -661,5 +784,36 @@ mod tests {
         index.remove_session("worker-1");
         assert!(index.channels_for_session("worker-1", "swarm-a").is_empty());
         assert_eq!(index.members("swarm-a", "tests"), Vec::<String>::new());
+    }
+
+    #[test]
+    fn task_label_takes_first_line_strips_prefixes_and_collapses_whitespace() {
+        assert_eq!(
+            derive_swarm_task_label("Fix the   parser\n\nMore detail here"),
+            Some("Fix the parser".to_string())
+        );
+        assert_eq!(
+            derive_swarm_task_label("\n\n  ## Investigate flaky test:  \nbody"),
+            Some("Investigate flaky test".to_string())
+        );
+        assert_eq!(
+            derive_swarm_task_label("- review PR #42"),
+            Some("review PR #42".to_string())
+        );
+    }
+
+    #[test]
+    fn task_label_truncates_long_prompts_with_ellipsis() {
+        let long = "implement the entire authentication subsystem including oauth flows";
+        let label = derive_swarm_task_label(long).unwrap();
+        assert!(label.chars().count() <= MAX_SWARM_TASK_LABEL_CHARS);
+        assert!(label.ends_with('…'), "got: {label}");
+    }
+
+    #[test]
+    fn task_label_rejects_empty_or_marker_only_text() {
+        assert_eq!(derive_swarm_task_label(""), None);
+        assert_eq!(derive_swarm_task_label("   \n\t\n"), None);
+        assert_eq!(derive_swarm_task_label("###"), None);
     }
 }

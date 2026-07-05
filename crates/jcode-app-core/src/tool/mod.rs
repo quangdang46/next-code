@@ -1,52 +1,33 @@
+mod agentgrep;
 pub mod ambient;
 mod apply_patch;
 mod bash;
 mod batch;
-mod best_of_n;
 mod bg;
 mod browser;
 mod communicate;
 #[cfg(target_os = "macos")]
 mod computer;
 mod conversation_search;
-#[cfg(feature = "dcp")]
-mod dcp_compress;
 mod debug_socket;
 mod edit;
-mod ffs_engine_tools;
-mod ffs_glob;
-mod ffs_grep;
-mod ffs_multi_grep;
-mod ffs_outline;
-mod ffs_support;
-mod ffs_symbol;
 mod gmail;
-
 mod goal;
-mod hashline_edit;
-mod hashline_loop_guard;
-pub mod hashline_snapshots;
 mod invalid;
 mod ls;
-mod lsp;
 pub mod mcp;
 mod memory;
 mod multiedit;
-mod notepad;
 mod open;
 mod patch;
-mod propose_edit;
-mod propose_hashline_edit;
-mod propose_write;
 mod read;
 pub mod selfdev;
 pub(crate) mod serde_coerce;
 mod session_search;
-mod session_search_index;
+pub(crate) mod session_search_index;
 mod side_panel;
 mod skill;
 mod task;
-mod team;
 mod todo;
 mod webfetch;
 mod websearch;
@@ -56,18 +37,10 @@ use crate::compaction::CompactionManager;
 use crate::provider::Provider;
 use crate::skill::SkillRegistry;
 use anyhow::Result;
-use jcode_hooks::{
-    DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry,
-    legacy_v1_to_v2_handlers,
-};
 use jcode_message_types::ToolDefinition;
-use jcode_plugin_core::ToolTier;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-#[cfg(feature = "dcp")]
-use std::sync::Mutex;
-
 use std::sync::{LazyLock, RwLock as StdRwLock};
 use tokio::sync::RwLock;
 
@@ -117,169 +90,6 @@ fn session_tool_policy(session_id: &str) -> Option<SessionToolPolicy> {
         .cloned()
 }
 
-/// Global handle to the active best-of-N orchestrator's
-/// `BestOfNOrchestratorHandle`, registered by `Agent::new_with_session`
-/// while a best-of-N run is in flight.
-///
-/// `propose_edit` / `propose_write` are registered as stateless base tools,
-/// so they have no constructor-time access to the Registry. They look up
-/// the store through this static instead. The handle is `None` outside of
-/// best-of-N runs and the propose tools must refuse to execute in that case.
-///
-/// Uses `StdRwLock` (not `OnceLock`) so the handle is updated on each run
-/// rather than being permanently stuck on the first run's values.
-static BEST_OF_N_HANDLE: StdRwLock<Option<BestOfNOrchestratorHandle>> = StdRwLock::new(None);
-
-/// Install the global best-of-N handle. Called by the agent when a
-/// best-of-N run starts. Updates on every call so subsequent runs
-/// overwrite the stale handle.
-pub fn set_best_of_n_handle(handle: BestOfNOrchestratorHandle) {
-    if let Ok(mut guard) = BEST_OF_N_HANDLE.write() {
-        *guard = Some(handle);
-    }
-}
-
-/// Borrow the global best-of-N handle, if one has been installed.
-pub fn get_best_of_n_handle() -> Option<BestOfNOrchestratorHandle> {
-    BEST_OF_N_HANDLE.read().ok()?.clone()
-}
-
-/// Clear the global best-of-N handle. Called after a run completes
-/// (both auto-apply and show-mode paths) so stale state does not leak
-/// across unrelated agent turns.
-pub fn clear_best_of_n_handle() {
-    if let Ok(mut guard) = BEST_OF_N_HANDLE.write() {
-        *guard = None;
-    }
-}
-
-// ---------------------------------------------------------------------------
-// ApprovalGate dispatcher bridge
-// ---------------------------------------------------------------------------
-
-/// Global handle to the plugin system's [`RcuDispatcher`] so the tool execution
-/// path can consult the ApprovalGate before running a tool.
-///
-/// Set once during plugin system initialisation. The handle is
-/// `Option<Arc<...>>` so that tools still work when the plugin system is
-/// disabled or not yet initialised — the gate check simply passes through.
-static GATE_DISPATCHER: StdRwLock<Option<std::sync::Arc<jcode_plugin_runtime::RcuDispatcher>>> =
-    StdRwLock::new(None);
-
-/// Install the global gate dispatcher. Called once during plugin system
-/// initialisation. Replacing it at runtime is safe (the old handle is dropped
-/// once the write lock is released).
-pub fn set_gate_dispatcher(dispatcher: std::sync::Arc<jcode_plugin_runtime::RcuDispatcher>) {
-    if let Ok(mut guard) = GATE_DISPATCHER.write() {
-        *guard = Some(dispatcher);
-    }
-}
-
-/// Map a tool name to its [`ToolTier`] for the approval gate.
-///
-/// This is a built-in classification based on the tool's known behaviour.
-/// Plugin-registered tools default to `Exec` (the most restrictive tier).
-fn tool_name_to_tier(name: &str) -> ToolTier {
-    // Read-only introspection tools.
-    if matches!(
-        name,
-        "read"
-            | "ls"
-            | "grep"
-            | "ffs_glob"
-            | "ffs_grep"
-            | "ffs_outline"
-            | "ffs_symbol"
-            | "ffs_multi_grep"
-            | "ffs_find"
-            | "ffs_dispatch"
-            | "ffs_callers"
-            | "ffs_callees"
-            | "ffs_refs"
-            | "ffs_flow"
-            | "websearch"
-            | "webfetch"
-            | "session_search"
-            | "notepad_read_priority"
-            | "notepad_read_working"
-            | "notepad_read_manual"
-            | "notepad_stats"
-            | "beads_list"
-            | "memory"
-            | "lsp"
-            | "conversation_search"
-            | "skill_manage"
-            | "team_status"
-            | "team_task_list"
-    ) {
-        return ToolTier::Read;
-    }
-    // Write tools that mutate workspace or session state.
-    if matches!(
-        name,
-        "write"
-            | "edit"
-            | "multiedit"
-            | "patch"
-            | "apply_patch"
-            | "hashline_edit"
-            | "hashline_edit"
-            | "propose_write"
-            | "propose_edit"
-            | "propose_hashline"
-            | "notepad_write_priority"
-            | "notepad_write_working"
-            | "notepad_write_manual"
-            | "beads_create"
-            | "beads_ready"
-            | "beads_claim"
-            | "beads_close"
-            | "beads_dep"
-            | "batch"
-            | "bg"
-            | "todo"
-            | "mcp"
-            | "team_create"
-            | "team_delete"
-            | "team_send_message"
-            | "team_task_create"
-            | "team_task_claim"
-            | "team_shutdown"
-    ) {
-        return ToolTier::Write;
-    }
-    // Everything else is Exec (most restrictive).
-    ToolTier::Exec
-}
-
-/// Run the plugin-system approval gate check before executing a tool.
-///
-/// Returns `Ok(())` if the gate allows or no gate is installed.
-/// Returns `Err` with a descriptive message if the gate denies the call.
-pub(crate) fn check_approval_gate(tool_name: &str, input: &Value) -> Result<()> {
-    let Ok(guard) = GATE_DISPATCHER.read() else {
-        return Ok(());
-    };
-    let Some(dispatcher) = guard.as_ref() else {
-        return Ok(());
-    };
-    let tier = tool_name_to_tier(tool_name);
-    match dispatcher.check_tool(tool_name, tier, input) {
-        None | Some(jcode_plugin_runtime::gate::GateDecision::Allow) => Ok(()),
-        Some(jcode_plugin_runtime::gate::GateDecision::Deny { reason, layer }) => {
-            Err(anyhow::anyhow!(
-                "Tool '{}' blocked by approval gate: {} ({})",
-                tool_name,
-                reason,
-                layer
-            ))
-        }
-        Some(jcode_plugin_runtime::gate::GateDecision::NeedsApproval { prompt }) => Err(
-            anyhow::anyhow!("Tool '{}' requires approval: {}", tool_name, prompt.reason),
-        ),
-    }
-}
-
 /// Registry of available tools (Arc-wrapped for sharing)
 ///
 /// Clone creates a fresh CompactionManager so each subagent gets independent
@@ -288,28 +98,6 @@ pub struct Registry {
     tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
     skills: Arc<RwLock<SkillRegistry>>,
     compaction: Arc<RwLock<CompactionManager>>,
-    /// Hook system for lifecycle events (PreToolUse, PostToolUse, etc.)
-    hook_registry: Arc<RwLock<HookRegistry>>,
-    /// Dispatch configuration for hooks
-    dispatch_config: DispatchConfig,
-    /// Best-of-N orchestrator handle, set during Agent::new_with_session.
-    pub best_of_n: Arc<RwLock<Option<BestOfNOrchestratorHandle>>>,
-    #[cfg(feature = "dcp")]
-    dcp: Option<Arc<Mutex<crate::dcp_plugin::DcpPlugin>>>,
-}
-
-/// Handle to the best-of-N orchestrator, stored on the Registry
-/// for access by propose_edit/propose_write tools.
-#[derive(Clone)]
-pub struct BestOfNOrchestratorHandle {
-    /// Run ID for the current best-of-N cycle.
-    pub run_id: String,
-    /// Candidate ID for the current subagent.
-    pub candidate_id: String,
-    /// Best-of-N config (mode, count, temperatures).
-    pub config: jcode_best_of_n::BestOfNConfig,
-    /// Shared proposed content store.
-    pub store: std::sync::Arc<jcode_best_of_n::ProposedContentStore>,
 }
 
 impl Clone for Registry {
@@ -320,39 +108,11 @@ impl Clone for Registry {
             // Each clone gets a fresh CompactionManager to prevent parallel
             // subagents from corrupting each other's message history
             compaction: Arc::new(RwLock::new(CompactionManager::new())),
-            hook_registry: self.hook_registry.clone(),
-            dispatch_config: self.dispatch_config.clone(),
-            best_of_n: self.best_of_n.clone(),
-            #[cfg(feature = "dcp")]
-            dcp: self.dcp.clone(),
         }
     }
 }
 
 impl Registry {
-    /// Access the hook registry for dispatching lifecycle hooks.
-    pub fn hook_registry(&self) -> &Arc<RwLock<HookRegistry>> {
-        &self.hook_registry
-    }
-
-    /// Access the dispatch configuration for hooks.
-    pub fn dispatch_config(&self) -> &DispatchConfig {
-        &self.dispatch_config
-    }
-
-    /// Install the DCP plugin (dynamic context pruning) so DCP-aware tools can
-    /// access it. Only available when the crate is built with the `dcp` feature.
-    #[cfg(feature = "dcp")]
-    pub fn set_dcp(&mut self, plugin: crate::dcp_plugin::DcpPlugin) {
-        self.dcp = Some(Arc::new(Mutex::new(plugin)));
-    }
-
-    /// Access the DCP plugin if one has been installed.
-    #[cfg(feature = "dcp")]
-    pub fn dcp(&self) -> Option<&Arc<Mutex<crate::dcp_plugin::DcpPlugin>>> {
-        self.dcp.as_ref()
-    }
-
     fn shared_skills_registry() -> Arc<RwLock<SkillRegistry>> {
         SkillRegistry::shared_registry()
     }
@@ -384,11 +144,6 @@ impl Registry {
             tools: Arc::new(RwLock::new(HashMap::new())),
             skills: Arc::new(RwLock::new(SkillRegistry::default())),
             compaction: Arc::new(RwLock::new(CompactionManager::new())),
-            hook_registry: Arc::new(RwLock::new(HookRegistry::default())),
-            dispatch_config: DispatchConfig::default(),
-            best_of_n: Arc::new(RwLock::new(None)),
-            #[cfg(feature = "dcp")]
-            dcp: None,
         }
     }
 
@@ -406,8 +161,8 @@ impl Registry {
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "propose_write",
-                propose_write::ProposeWriteTool::new,
+                "agentgrep",
+                agentgrep::AgentGrepTool::new,
             );
             Self::insert_tool_timed(
                 &mut m,
@@ -416,18 +171,6 @@ impl Registry {
                 side_panel::SidePanelTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "edit", edit::EditTool::new);
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "propose_edit",
-                propose_edit::ProposeEditTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "propose_hashline",
-                propose_hashline_edit::ProposeHashlineEditTool::new,
-            );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
@@ -440,62 +183,6 @@ impl Registry {
                 &mut timings,
                 "apply_patch",
                 apply_patch::ApplyPatchTool::new,
-            );
-            Self::insert_tool_timed(&mut m, &mut timings, "ffs_glob", ffs_glob::FfsGlobTool::new);
-            Self::insert_tool_timed(&mut m, &mut timings, "ffs_grep", ffs_grep::FfsGrepTool::new);
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_outline",
-                ffs_outline::FfsOutlineTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_symbol",
-                ffs_symbol::FfsSymbolTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_multi_grep",
-                ffs_multi_grep::FfsMultiGrepTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_find",
-                ffs_engine_tools::FfsFindTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_dispatch",
-                ffs_engine_tools::FfsDispatchTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_callers",
-                ffs_engine_tools::FfsCallersTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_callees",
-                ffs_engine_tools::FfsCalleesTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_refs",
-                ffs_engine_tools::FfsRefsTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "ffs_flow",
-                ffs_engine_tools::FfsFlowTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "ls", ls::LsTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "bash", bash::BashTool::new);
@@ -521,7 +208,6 @@ impl Registry {
                 websearch::WebSearchTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "invalid", invalid::InvalidTool::new);
-            Self::insert_tool_timed(&mut m, &mut timings, "lsp", lsp::LspTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "todo", todo::TodoTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "bg", bg::BgTool::new);
             Self::insert_tool_timed(
@@ -536,6 +222,7 @@ impl Registry {
                 "session_search",
                 session_search::SessionSearchTool::new,
             );
+            Self::insert_tool_timed(&mut m, &mut timings, "memory", memory::MemoryTool::new);
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
@@ -543,127 +230,8 @@ impl Registry {
                 goal::InitiativeTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "gmail", gmail::GmailTool::new);
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "memory",
-                memory::MemoryTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "hashline_edit",
-                hashline_edit::HashlineEditTool::new,
-            );
             Self::insert_tool_timed(&mut m, &mut timings, "schedule", ambient::ScheduleTool::new);
-            #[cfg(feature = "dcp")]
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "dcp_compress",
-                dcp_compress::DcpCompressTool::new,
-            );
             Self::insert_tool_timed(&mut m, &mut timings, "selfdev", selfdev::SelfDevTool::new);
-            // Notepad tools (compaction-resistant notes)
-            // Names are namespaced (`notepad_*`) to avoid collision
-            // with future built-in or MCP tools.
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_read_priority",
-                notepad::NotepadTool::read_priority,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_write_priority",
-                notepad::NotepadTool::write_priority,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_read_working",
-                notepad::NotepadTool::read_working,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_write_working",
-                notepad::NotepadTool::write_working,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_read_manual",
-                notepad::NotepadTool::read_manual,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_write_manual",
-                notepad::NotepadTool::write_manual,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_prune",
-                notepad::NotepadPruneTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "notepad_stats",
-                notepad::NotepadStatsTool::new,
-            );
-            // Team tools (multi-agent orchestration)
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_create",
-                team::TeamCreateTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_delete",
-                team::TeamDeleteTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_status",
-                team::TeamStatusTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_send_message",
-                team::TeamSendMessageTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_task_create",
-                team::TeamTaskCreateTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_task_claim",
-                team::TeamTaskClaimTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_task_list",
-                team::TeamTaskListTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "team_shutdown",
-                team::TeamShutdownTool::new,
-            );
             let nonzero: Vec<String> = timings
                 .iter()
                 .filter(|(_, ms)| *ms > 0)
@@ -696,38 +264,10 @@ impl Registry {
         let compaction = Arc::new(RwLock::new(CompactionManager::new()));
         let compaction_ms = compaction_start.elapsed().as_millis();
         let registry_struct_start = std::time::Instant::now();
-        // Load v2 hooks config (.jcode/hooks.toml, $JCODE_HOOKS_CONFIG, etc.)
-        let mut hook_config = jcode_hooks::load_hooks_config();
-        // Merge v1 legacy config.toml [hooks] entries into the v2 config so
-        // existing single-line hooks (`pre_tool = "check.sh"`) continue working
-        // alongside the richer v2 TOML format without dual-firing.
-        let v1_hooks = &crate::config::config().hooks;
-        let v2_entries = legacy_v1_to_v2_handlers(
-            v1_hooks.turn_end.clone(),
-            v1_hooks.session_start.clone(),
-            v1_hooks.session_end.clone(),
-            v1_hooks.pre_tool.clone(),
-            Some(v1_hooks.pre_tool_timeout_ms),
-            v1_hooks.post_tool.clone(),
-        );
-        for (event_name, handlers) in v2_entries {
-            hook_config
-                .events
-                .entry(event_name)
-                .or_default()
-                .extend(handlers);
-        }
-        let hook_registry = Arc::new(RwLock::new(HookRegistry::from_config(hook_config.clone())));
-        let dispatch_config = DispatchConfig::from_settings(&hook_config.settings);
         let registry = Self {
             tools: Arc::new(RwLock::new(HashMap::new())),
             skills: skills.clone(),
             compaction: compaction.clone(),
-            hook_registry,
-            dispatch_config,
-            best_of_n: Arc::new(RwLock::new(None)),
-            #[cfg(feature = "dcp")]
-            dcp: None,
         };
         let registry_struct_ms = registry_struct_start.elapsed().as_millis();
 
@@ -740,12 +280,7 @@ impl Registry {
         Self::insert_tool(
             &mut tools_map,
             "subagent",
-            task::SubagentTool::new(provider.clone(), registry.clone()),
-        );
-        Self::insert_tool(
-            &mut tools_map,
-            "best_of_n",
-            best_of_n::BestOfNTool::new(provider, registry.clone()),
+            task::SubagentTool::new(provider, registry.clone()),
         );
         Self::insert_tool(
             &mut tools_map,
@@ -964,6 +499,38 @@ impl Registry {
     /// Outputs that would push total context beyond this are truncated.
     const CONTEXT_GUARD_THRESHOLD: f32 = 0.90;
 
+    /// Fire the `post_tool` observer hook with tool outcome metadata.
+    /// No-op (without building the payload) when the hook is not configured.
+    fn fire_post_tool_hook(
+        resolved_name: &str,
+        ctx: &ToolContext,
+        result: &Result<ToolOutput>,
+        latency_ms: u64,
+    ) {
+        if !crate::hooks::hook_configured("post_tool") {
+            return;
+        }
+        let mut event = crate::hooks::HookEvent::new("post_tool")
+            .session_id(ctx.session_id.clone())
+            .field("TOOL_NAME", resolved_name)
+            .field("STATUS", if result.is_ok() { "ok" } else { "error" })
+            .field("DURATION_MS", latency_ms.to_string());
+        if let Some(dir) = &ctx.working_dir {
+            event = event.cwd(dir.display().to_string());
+        }
+        match result {
+            Ok(output) => {
+                event = event.field("OUTPUT_BYTES", output.output.len().to_string());
+            }
+            Err(error) => {
+                const ERROR_LIMIT: usize = 1000;
+                let message: String = error.to_string().chars().take(ERROR_LIMIT).collect();
+                event = event.field("ERROR", message);
+            }
+        }
+        crate::hooks::dispatch_observer(event);
+    }
+
     /// Maximum fraction of context budget a single tool output may occupy.
     /// Even if we have room, a single output shouldn't dominate the context.
     const SINGLE_OUTPUT_MAX_FRACTION: f32 = 0.30;
@@ -1002,182 +569,47 @@ impl Registry {
         // Drop the lock before executing
         drop(tools);
 
+        // User-configured pre_tool gate: external policy hook that can block
+        // this call (exit 2). Skipped entirely when not configured.
+        if crate::hooks::hook_configured("pre_tool") {
+            let input_json = input.to_string();
+            let working_dir = ctx
+                .working_dir
+                .as_ref()
+                .map(|dir| dir.display().to_string());
+            let decision = crate::hooks::run_pre_tool_gate(
+                &ctx.session_id,
+                working_dir.as_deref(),
+                resolved_name,
+                &input_json,
+            )
+            .await;
+            if let crate::hooks::GateDecision::Block { reason } = decision {
+                let mut fields =
+                    Self::tool_lifecycle_fields("blocked", name, resolved_name, &input, &ctx);
+                fields.push(("block_reason".to_string(), reason.clone()));
+                crate::logging::event_warn("TOOL_LIFECYCLE", fields);
+                return Err(anyhow::anyhow!(
+                    "Tool call blocked by pre_tool hook: {reason}"
+                ));
+            }
+        }
+
         crate::logging::event_info(
             "TOOL_LIFECYCLE",
             Self::tool_lifecycle_fields("start", name, resolved_name, &input, &ctx),
         );
-
-        // --- PreToolUse hook ---
-        let cwd = ctx
-            .working_dir
-            .as_ref()
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_default();
-        let hook_ctx = HookContext::for_tool(
-            resolved_name.to_string(),
-            ctx.session_id.clone(),
-            cwd.clone(),
-        );
-        {
-            let hook_registry = self.hook_registry.read().await;
-            let handlers = hook_registry.get_matching(&HookEvent::PreToolUse, &hook_ctx);
-            if !handlers.is_empty() {
-                let hook_input = HookInputBuilder::new()
-                    .session(&ctx.session_id, &cwd)
-                    .event("PreToolUse")
-                    .tool(resolved_name, input.clone(), &ctx.tool_call_id)
-                    .build();
-                let stats = jcode_hooks::dispatch_hooks(
-                    &HookEvent::PreToolUse,
-                    &hook_input,
-                    &handlers,
-                    &self.dispatch_config,
-                )
-                .await;
-                if stats.any_denied() {
-                    let deny_reason = stats
-                        .results
-                        .iter()
-                        .find(|r| matches!(r.outcome, jcode_hooks::ClassifiedOutcome::Deny { .. }))
-                        .map(|r| match &r.outcome {
-                            jcode_hooks::ClassifiedOutcome::Deny { reason } => reason.clone(),
-                            _ => String::new(),
-                        })
-                        .unwrap_or_else(|| "blocked by hook".to_string());
-                    return Err(anyhow::anyhow!(
-                        "Tool '{}' blocked by hook: {}",
-                        resolved_name,
-                        deny_reason
-                    ));
-                }
-                if stats.any_asked() {
-                    let ask_reasons: Vec<&str> = stats
-                        .results
-                        .iter()
-                        .filter_map(|r| match &r.outcome {
-                            jcode_hooks::ClassifiedOutcome::Ask { reason }
-                                if !reason.is_empty() =>
-                            {
-                                Some(reason.as_str())
-                            }
-                            _ => None,
-                        })
-                        .collect();
-                    let reason = if ask_reasons.is_empty() {
-                        "user approval required by hook".to_string()
-                    } else {
-                        format!("user approval required by hook: {}", ask_reasons.join("; "))
-                    };
-                    return Err(anyhow::anyhow!("Tool '{}': {}", resolved_name, reason));
-                }
-            }
-        }
-
-        // --- Approval gate check (plugin-system gate, not DCG) ---
-        if let Err(e) = check_approval_gate(resolved_name, &input) {
-            let error_msg = format!("{}", e);
-            crate::logging::warn(&error_msg);
-            let mut fields =
-                Self::tool_lifecycle_fields("denied", name, resolved_name, &input, &ctx);
-            fields.push(("error".to_string(), error_msg.clone()));
-            crate::logging::event_warn("TOOL_LIFECYCLE", fields);
-            return Err(anyhow::anyhow!(error_msg));
-        }
 
         let started_at = std::time::Instant::now();
         let result = tool.execute(input.clone(), ctx.clone()).await;
         let latency_ms = started_at.elapsed().as_millis().min(u128::from(u64::MAX)) as u64;
 
         crate::telemetry::record_tool_execution(resolved_name, &input, result.is_ok(), latency_ms);
+        Self::fire_post_tool_hook(resolved_name, &ctx, &result, latency_ms);
 
         let mut output = match result {
-            Ok(output) => {
-                // --- PostToolUse hook (fire-and-forget) ---
-                let hook_registry = self.hook_registry.clone();
-                let dispatch_config = self.dispatch_config.clone();
-                let hook_input = HookInputBuilder::new()
-                    .session(&ctx.session_id, &cwd)
-                    .event("PostToolUse")
-                    .tool(resolved_name, input.clone(), &ctx.tool_call_id)
-                    .tool_output(serde_json::json!({ "output": &output.output }))
-                    .duration(latency_ms)
-                    .build();
-                let handlers: Vec<_> = {
-                    let reg = hook_registry.read().await;
-                    reg.get_matching(&HookEvent::PostToolUse, &hook_ctx)
-                        .into_iter()
-                        .cloned()
-                        .collect()
-                };
-                if !handlers.is_empty() {
-                    let event = HookEvent::PostToolUse;
-                    tokio::spawn(async move {
-                        let refs: Vec<_> = handlers.iter().collect();
-                        jcode_hooks::dispatch_hooks(&event, &hook_input, &refs, &dispatch_config)
-                            .await;
-                    });
-                }
-                output
-            }
+            Ok(output) => output,
             Err(error) => {
-                // --- PostToolUseFailure hook (fire-and-forget) ---
-                let hook_registry = self.hook_registry.clone();
-                let dispatch_config = self.dispatch_config.clone();
-                let event = HookEvent::PostToolUseFailure;
-                let hook_input = HookInputBuilder::new()
-                    .session(&ctx.session_id, &cwd)
-                    .event("PostToolUseFailure")
-                    .tool(resolved_name, input.clone(), &ctx.tool_call_id)
-                    .error(&crate::util::format_error_chain(&error), -1)
-                    .duration(latency_ms)
-                    .build();
-                let handlers: Vec<_> = {
-                    let reg = hook_registry.read().await;
-                    reg.get_matching(&HookEvent::PostToolUseFailure, &hook_ctx)
-                        .into_iter()
-                        .cloned()
-                        .collect()
-                };
-                if !handlers.is_empty() {
-                    tokio::spawn(async move {
-                        let refs: Vec<_> = handlers.iter().collect();
-                        jcode_hooks::dispatch_hooks(&event, &hook_input, &refs, &dispatch_config)
-                            .await;
-                    });
-                }
-
-                // --- ToolError hook (fire-and-forget, diagnostic) ---
-                {
-                    let hook_registry = self.hook_registry.clone();
-                    let dispatch_config = self.dispatch_config.clone();
-                    let event = HookEvent::ToolError;
-                    let hook_input = HookInputBuilder::new()
-                        .session(&ctx.session_id, &cwd)
-                        .event("ToolError")
-                        .tool(resolved_name, input.clone(), &ctx.tool_call_id)
-                        .error(&crate::util::format_error_chain(&error), -1)
-                        .duration(latency_ms)
-                        .build();
-                    let handlers: Vec<_> = {
-                        let reg = hook_registry.read().await;
-                        reg.get_matching(&HookEvent::ToolError, &hook_ctx)
-                            .into_iter()
-                            .cloned()
-                            .collect()
-                    };
-                    if !handlers.is_empty() {
-                        tokio::spawn(async move {
-                            let refs: Vec<_> = handlers.iter().collect();
-                            jcode_hooks::dispatch_hooks(
-                                &event,
-                                &hook_input,
-                                &refs,
-                                &dispatch_config,
-                            )
-                            .await;
-                        });
-                    }
-                }
                 let mut fields =
                     Self::tool_lifecycle_fields("error", name, resolved_name, &input, &ctx);
                 fields.push(("elapsed_ms".to_string(), latency_ms.to_string()));
@@ -1312,6 +744,10 @@ impl Registry {
             .await
     }
 
+    /// Like [`Self::register_mcp_tools`], but resolves project-local MCP config
+    /// (`.mcp.json`, `.jcode/mcp.json`, `.claude/mcp.json`) against
+    /// `working_dir` instead of the server process cwd. Remote/client sessions
+    /// must pass their session working directory here (issue #420).
     pub async fn register_mcp_tools_for_dir(
         &self,
         event_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::protocol::ServerEvent>>,
@@ -1326,7 +762,9 @@ impl Registry {
         let mcp_manager = if let Some(pool) = shared_pool {
             let sid = session_id.unwrap_or_else(|| "unknown".to_string());
             Arc::new(RwLock::new(McpManager::with_shared_pool_for_dir(
-                pool, sid, working_dir,
+                pool,
+                sid,
+                working_dir,
             )))
         } else {
             Arc::new(RwLock::new(McpManager::new()))
@@ -1338,14 +776,29 @@ impl Registry {
         self.register("mcp".to_string(), Arc::new(mcp_tool) as Arc<dyn Tool>)
             .await;
 
-        // Check if we have servers to connect to
-        let server_count = {
+        // Check if we have enabled servers to connect to. Disabled servers stay
+        // configured (visible to the mcp management tool, connectable by name)
+        // but are not spawned, advertised, or shown as connecting (issue #436).
+        let (enabled_count, disabled_count) = {
             let manager = mcp_manager.read().await;
-            manager.config().servers.len()
+            let enabled = manager
+                .config()
+                .servers
+                .values()
+                .filter(|cfg| cfg.is_enabled())
+                .count();
+            (enabled, manager.config().servers.len() - enabled)
         };
 
-        if server_count > 0 {
-            crate::logging::info(&format!("MCP: Found {} server(s) in config", server_count));
+        if disabled_count > 0 {
+            crate::logging::info(&format!(
+                "MCP: {} disabled server(s) in config (kept, not spawned)",
+                disabled_count
+            ));
+        }
+
+        if enabled_count > 0 {
+            crate::logging::info(&format!("MCP: Found {} server(s) in config", enabled_count));
 
             // Send immediate "connecting" status so the TUI shows loading state
             // Server names with count 0 means "connecting..."
@@ -1355,8 +808,9 @@ impl Registry {
                     manager
                         .config()
                         .servers
-                        .keys()
-                        .map(|name| format!("{}:0", name))
+                        .iter()
+                        .filter(|(_, cfg)| cfg.is_enabled())
+                        .map(|(name, _)| format!("{}:0", name))
                         .collect()
                 };
                 let _ = tx.send(crate::protocol::ServerEvent::McpStatus {
@@ -1381,6 +835,7 @@ impl Registry {
                         .config()
                         .servers
                         .iter()
+                        .filter(|(_, cfg)| cfg.is_enabled())
                         .map(|(name, cfg)| (name.clone(), cfg.clone()))
                         .collect()
                 };
@@ -1469,7 +924,6 @@ impl Registry {
                 // miss. Group live tool defs by server and update each entry
                 // under the current config fingerprint; prune servers that are
                 // no longer configured. (#206 Phase 2)
-                #[allow(clippy::type_complexity)]
                 {
                     // Live tool defs grouped by server, plus a snapshot of the
                     // configured servers, captured under one read lock.
@@ -1633,6 +1087,3 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod best_of_n_tests;

@@ -19,6 +19,7 @@ use jcode_batch_types::BatchProgress;
 use jcode_message_types::{InputShellResult, ToolCall};
 use jcode_plan::{PlanItem, VersionedPlan, next_runnable_item_ids, summarize_plan_graph};
 use jcode_side_panel_types::{SidePanelSnapshot, snapshot_is_empty};
+use std::collections::BTreeMap;
 
 #[path = "protocol_memory.rs"]
 mod memory_snapshots;
@@ -212,6 +213,9 @@ pub struct AgentInfo {
     /// Optional status detail (current task, error, etc.)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// Stable label of the task/role this member was spawned or assigned for.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_label: Option<String>,
     /// Role: "agent", "coordinator", "worktree_manager"
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
@@ -230,6 +234,12 @@ pub struct AgentInfo {
     /// Seconds since the last status change.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status_age_secs: Option<u64>,
+    /// Seconds since the last observed activity (token usage, turn start,
+    /// tool events, or swarm task heartbeats). Unlike `status_age_secs`,
+    /// which measures the last lifecycle transition, this reflects whether
+    /// the agent is actually doing work right now.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_activity_age_secs: Option<u64>,
     /// Live activity (whether processing + current tool name).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub activity: Option<SessionActivitySnapshot>,
@@ -282,6 +292,10 @@ pub struct AgentStatusSnapshot {
     pub live_attachments: Option<usize>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status_age_secs: Option<u64>,
+    /// Seconds since the last observed activity (tokens, turns, tool events,
+    /// or swarm task heartbeats), independent of lifecycle transitions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_activity_age_secs: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub joined_age_secs: Option<u64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -315,6 +329,13 @@ pub struct PlanGraphStatus {
     /// terminal state as success.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub failed_ids: Vec<String>,
+    /// Recorded failure reason per failed item id (from the durable task
+    /// progress checkpoint, e.g. "task failed: Anthropic API error (401
+    /// Unauthorized)"). Lets `plan_status` and schedulers explain *why* a node
+    /// failed (and classify waves of credential failures) instead of only
+    /// listing failed ids. Only failed items with a recorded reason appear.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub failed_reasons: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub cycle_ids: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -360,6 +381,7 @@ impl PlanGraphStatus {
             active_ids: Vec::new(),
             completed_ids: Vec::new(),
             failed_ids: Vec::new(),
+            failed_reasons: BTreeMap::new(),
             cycle_ids: Vec::new(),
             unresolved_dependency_ids: Vec::new(),
             next_ready_ids: Vec::new(),
@@ -379,6 +401,16 @@ impl PlanGraphStatus {
     ) -> Self {
         let graph = summarize_plan_graph(&plan.items);
         let growth = jcode_plan::bridge::growth_stats(plan);
+        let failed_reasons: BTreeMap<String, String> = graph
+            .failed_ids
+            .iter()
+            .filter_map(|id| {
+                plan.task_progress
+                    .get(id)
+                    .and_then(|progress| progress.checkpoint_summary.clone())
+                    .map(|reason| (id.clone(), reason))
+            })
+            .collect();
         Self {
             swarm_id: Some(swarm_id.into()),
             version: plan.version,
@@ -388,6 +420,7 @@ impl PlanGraphStatus {
             active_ids: graph.active_ids,
             completed_ids: graph.completed_ids,
             failed_ids: graph.failed_ids,
+            failed_reasons,
             cycle_ids: graph.cycle_ids,
             unresolved_dependency_ids: graph.unresolved_dependency_ids,
             next_ready_ids: next_runnable_item_ids(&plan.items, next_ready_limit),
@@ -411,6 +444,10 @@ pub struct SwarmMemberStatus {
     /// Optional detail (task, error, etc.)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
+    /// Stable label of the task/role this member was spawned or assigned for.
+    /// Unlike `detail`, it is not overwritten by transient status updates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub task_label: Option<String>,
     /// Role: "agent", "coordinator", "worktree_manager"
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub role: Option<String>,
@@ -532,6 +569,7 @@ impl Request {
             Request::CommCompleteNode { id, .. } => *id,
             Request::CommInjectGap { id, .. } => *id,
             Request::CommSpawn { id, .. } => *id,
+            Request::CommListModels { id, .. } => *id,
             Request::CommStop { id, .. } => *id,
             Request::CommAssignRole { id, .. } => *id,
             Request::CommSummary { id, .. } => *id,
@@ -546,7 +584,6 @@ impl Request {
             Request::CommSubscribeChannel { id, .. } => *id,
             Request::CommUnsubscribeChannel { id, .. } => *id,
             Request::CommAwaitMembers { id, .. } => *id,
-            Request::SetPermissionMode { id, .. } => *id,
         }
     }
 
@@ -568,6 +605,7 @@ impl Request {
                 | Request::CommCompleteNode { .. }
                 | Request::CommInjectGap { .. }
                 | Request::CommSpawn { .. }
+                | Request::CommListModels { .. }
                 | Request::CommStop { .. }
                 | Request::CommAssignRole { .. }
                 | Request::CommSummary { .. }

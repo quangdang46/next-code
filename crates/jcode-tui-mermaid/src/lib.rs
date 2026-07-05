@@ -228,21 +228,25 @@ mod viewport_render;
 mod widget_render;
 
 pub use cache_render::{
-    RenderResult, deferred_render_epoch, get_cached_path, is_mermaid_lang, render_mermaid,
-    render_mermaid_deferred, render_mermaid_deferred_with_registration,
-    render_mermaid_deferred_with_stream_scope, render_mermaid_sized, render_mermaid_untracked,
+    RenderResult, deferred_render_epoch, evict_render_cache_for_content, get_cached_path,
+    is_mermaid_lang, render_mermaid, render_mermaid_deferred,
+    render_mermaid_deferred_with_registration, render_mermaid_deferred_with_stream_scope,
+    render_mermaid_sized, render_mermaid_untracked,
 };
 #[cfg(feature = "renderer")]
 pub use content_render::terminal_theme;
 pub use content_render::{
     INLINE_DIAGRAM_MAX_ROWS, INLINE_FIT_MIN_ROWS, MermaidContent, diagram_placeholder_lines,
     error_to_lines, estimate_image_height, image_widget_placeholder_markdown, inline_fit_geometry,
-    inline_image_placeholder_lines, parse_image_placeholder, parse_inline_image_placeholder,
-    result_to_content, result_to_lines, write_video_export_marker,
+    inline_image_placeholder_lines, inline_transcript_aspect_goal,
+    inline_transcript_aspect_goal_with_font, parse_image_placeholder,
+    parse_inline_image_placeholder, result_to_content, result_to_lines,
+    transcript_preferred_aspect_ratio, transcript_preferred_aspect_ratio_with_font,
+    write_video_export_marker,
 };
 pub use inline_image::{
     inline_image_dims, inline_image_id, inline_image_is_materialized, materialize_inline_image,
-    materialize_inline_image_by_id,
+    materialize_inline_image_by_id, rediscover_inline_image,
 };
 pub use runtime::force_test_kitty_picker;
 pub use runtime::{
@@ -257,11 +261,13 @@ pub use viewport_render::{
 };
 pub use widget_render::{render_image_widget, render_image_widget_fit, render_image_widget_scale};
 
+use cache_render::LAYOUT_CACHE_MAX;
 #[cfg(test)]
 use cache_render::calculate_render_size;
 use cache_render::{
     CachedDiagram, MermaidCache, RENDER_CACHE_MAX, RENDER_WIDTH_BUCKET_CELLS,
-    bump_deferred_render_epoch, get_cached_diagram, get_cached_diagram_in_memory,
+    bump_deferred_render_epoch, clear_layout_cache, get_cached_diagram,
+    get_cached_diagram_in_memory, layout_cache_usage,
 };
 use viewport_render::clear_image_area;
 use widget_render::{BORDER_WIDTH, draw_left_border, render_stateful_image_safe};
@@ -348,8 +354,28 @@ fn render_svg_for_png(
     layout_config: &LayoutConfig,
     output_dimensions: Option<(f32, f32)>,
 ) -> (String, MeasuredSvgDimensions) {
-    let dimensions = mmdr_measure_svg_dimensions(layout, layout_config, output_dimensions);
-    let svg = mmdr_render_svg_with_dimensions(layout, theme, layout_config, output_dimensions);
+    // Measure the natural (content-hugging) canvas first, then fit it into the
+    // requested target box while preserving aspect ratio. Forcing the raw
+    // target dimensions letterboxes wide diagrams inside the ~4:3 request box:
+    // the PNG (and therefore the transcript placeholder) reserves huge
+    // transparent bands above/below the ink. This mirrors the legacy
+    // `retarget_svg_for_png` fit semantics.
+    let natural = mmdr_measure_svg_dimensions(layout, layout_config, None);
+    let fitted = output_dimensions.map(|(target_width, target_height)| {
+        let target_width = target_width.max(1.0);
+        let target_height = target_height.max(1.0);
+        let natural_width = natural.width.max(1.0);
+        let natural_height = natural.height.max(1.0);
+        let scale = (target_width / natural_width)
+            .min(target_height / natural_height)
+            .max(0.0001);
+        (
+            (natural_width * scale).max(1.0),
+            (natural_height * scale).max(1.0),
+        )
+    });
+    let dimensions = mmdr_measure_svg_dimensions(layout, layout_config, fitted);
+    let svg = mmdr_render_svg_with_dimensions(layout, theme, layout_config, fitted);
     (
         svg,
         MeasuredSvgDimensions {
@@ -768,6 +794,11 @@ pub struct MermaidDebugStats {
     pub total_requests: u64,
     pub cache_hits: u64,
     pub cache_misses: u64,
+    /// Layout-tier cache hits: the PNG cache missed but the computed layout
+    /// was reused, so only SVG+PNG rasterization ran (no parse/compute_layout).
+    pub layout_cache_hits: u64,
+    /// Layout-tier cache misses: full parse + compute_layout executed.
+    pub layout_cache_misses: u64,
     pub deferred_enqueued: u64,
     pub deferred_deduped: u64,
     pub deferred_superseded: u64,
@@ -809,6 +840,11 @@ pub struct MermaidDebugStats {
     pub last_target_height: Option<u32>,
     pub deferred_pending: usize,
     pub deferred_epoch: u64,
+    /// Layout-tier cache resident entries (see `layout_cache_hits`).
+    pub layout_cache_entries: usize,
+    pub layout_cache_limit: usize,
+    /// Approximate resident bytes held by cached layouts.
+    pub layout_cache_approx_bytes: u64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -888,6 +924,11 @@ pub struct MermaidMemoryProfile {
     pub cache_disk_max_age_secs: u64,
     /// Mermaid-specific working set estimate (cache metadata + protocol floor + decoded source).
     pub mermaid_working_set_estimate_bytes: u64,
+    /// Number of computed layouts cached in the layout tier.
+    pub layout_cache_entries: usize,
+    pub layout_cache_limit: usize,
+    /// Approximate resident bytes held by cached layouts (nodes+edges+labels walk).
+    pub layout_cache_approx_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]

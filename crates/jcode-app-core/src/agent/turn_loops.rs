@@ -13,6 +13,12 @@ impl Agent {
         // Mark this session as actively streaming for presence UIs (e.g. the
         // macOS menu bar indicator). Cleared automatically on every exit path.
         let _streaming_guard = crate::session::StreamingGuard::new(self.session.id.clone());
+        // Register this turn's cancel signal so session-level cancels reach
+        // this in-flight turn even through stale control handles (issue #428).
+        let _turn_cancel_guard = crate::turn_cancel_registry::register_active_turn(
+            &self.session.id,
+            self.graceful_shutdown.clone(),
+        );
         let mut final_text = String::new();
         let trace = trace_enabled();
         let mut context_limit_retries = 0u32;
@@ -303,11 +309,10 @@ impl Agent {
                     StreamEvent::ToolUseSignature(signature) => {
                         // Attach Gemini 3 thought signature to the most recent
                         // tool call so it can be persisted and replayed.
-                        #[allow(clippy::collapsible_if)]
-                        if let Some(tool) = tool_calls.last_mut() {
-                            if !signature.is_empty() {
-                                tool.thought_signature = Some(signature);
-                            }
+                        if let Some(tool) = tool_calls.last_mut()
+                            && !signature.is_empty()
+                        {
+                            tool.thought_signature = Some(signature);
                         }
                     }
                     StreamEvent::ToolResult {
@@ -535,8 +540,6 @@ impl Agent {
                             stdin_request_tx: self.stdin_request_tx.clone(),
                             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                             execution_mode: ToolExecutionMode::AgentTurn,
-                            best_of_n_run_id: None,
-                            best_of_n_candidate_id: None,
                         };
                         crate::telemetry::record_tool_call();
                         let tool_result = self
@@ -819,19 +822,6 @@ impl Agent {
                     println!();
                 }
                 final_text = text_content;
-
-                // Drain and log RTCO stats accumulated during this turn
-                #[cfg(feature = "rtco")]
-                {
-                    let rtco_stats = super::tools::take_rtco_stats();
-                    if !rtco_stats.is_empty() {
-                        let summary = crate::rtco_filter::format_rtco_summary(&rtco_stats);
-                        if !summary.is_empty() {
-                            logging::info(&summary);
-                        }
-                    }
-                }
-
                 break;
             }
 
@@ -892,31 +882,7 @@ impl Agent {
                     continue;
                 }
 
-                if let Err(e) = self.validate_tool_allowed(&tc.name, Some(&tc.input)).await {
-                    let error_msg = format!("{}", e);
-                    crate::logging::warn(&error_msg);
-                    Bus::global().publish(BusEvent::ToolUpdated(ToolEvent {
-                        session_id: self.session.id.clone(),
-                        message_id: message_id.clone(),
-                        tool_call_id: tc.id.clone(),
-                        tool_name: tc.name.clone(),
-                        status: ToolStatus::Error,
-                        title: None,
-                    }));
-                    if print_output {
-                        println!("\n  → {}", error_msg);
-                    }
-                    self.add_message(
-                        Role::User,
-                        vec![ContentBlock::ToolResult {
-                            tool_use_id: tc.id,
-                            content: error_msg,
-                            is_error: Some(true),
-                        }],
-                    );
-                    tool_results_dirty = true;
-                    continue;
-                }
+                self.validate_tool_allowed(&tc.name)?;
 
                 let is_native_tool = JCODE_NATIVE_TOOLS.contains(&tc.name.as_str());
 
@@ -988,8 +954,6 @@ impl Agent {
                     stdin_request_tx: self.stdin_request_tx.clone(),
                     graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                     execution_mode: ToolExecutionMode::AgentTurn,
-                    best_of_n_run_id: None,
-                    best_of_n_candidate_id: None,
                 };
 
                 if trace {
@@ -1027,47 +991,6 @@ impl Agent {
                 match result {
                     Ok(output) => {
                         let output = cap_tool_output_for_history(&tc.name, output);
-
-                        // Dispatch SessionDiff hooks for file-modifying tools
-                        if matches!(tc.name.as_str(), "Edit" | "Write" | "ApplyPatch") {
-                            let registry = self.hook_registry.clone();
-                            let config = self.dispatch_config.clone();
-                            let session_id = self.session.id.clone();
-                            let cwd = self.session.working_dir.clone().unwrap_or_default();
-                            let tool_name = tc.name.clone();
-                            let tool_output_preview = if output.output.len() > 4096 {
-                                output.output[..4096].to_string()
-                            } else {
-                                output.output.clone()
-                            };
-                            let file_path = tc
-                                .input
-                                .get("file_path")
-                                .and_then(|v| v.as_str())
-                                .map(|s| s.to_string());
-                            let hook_input = HookInputBuilder::new()
-                                .session(&session_id, &cwd)
-                                .event("SessionDiff")
-                                .tool(&tool_name, tc.input.clone(), &tc.id)
-                                .tool_output(serde_json::json!({ "output": tool_output_preview }))
-                                .diff(&tool_output_preview, file_path.as_deref())
-                                .build();
-                            let ctx = HookContext::for_session_diff(session_id, cwd, file_path);
-                            let event = HookEvent::SessionDiff;
-                            tokio::spawn(async move {
-                                let handlers = registry.get_matching(&event, &ctx);
-                                if !handlers.is_empty() {
-                                    jcode_hooks::dispatch_hooks(
-                                        &event,
-                                        &hook_input,
-                                        &handlers,
-                                        &config,
-                                    )
-                                    .await;
-                                }
-                            });
-                        }
-
                         Bus::global().publish(BusEvent::ToolUpdated(ToolEvent {
                             session_id: self.session.id.clone(),
                             message_id: message_id.clone(),
@@ -1162,18 +1085,6 @@ impl Agent {
             }
         }
 
-        // Drain and log RTCO stats accumulated across all turns in this run_turn call
-        #[cfg(feature = "rtco")]
-        {
-            let rtco_stats = super::tools::take_rtco_stats();
-            if !rtco_stats.is_empty() {
-                let summary = crate::rtco_filter::format_rtco_summary(&rtco_stats);
-                if !summary.is_empty() {
-                    logging::info(&summary);
-                }
-            }
-        }
-
         Ok(final_text)
     }
 
@@ -1231,7 +1142,7 @@ mod tests {
         let messages = vec![
             user_text("tell me about the desktop application"),
             tool_result("functions.read:0", "desktop architecture docs"),
-            tool_result("functions.ffs_grep:4", "desktop source summary"),
+            tool_result("functions.agentgrep:4", "desktop source summary"),
         ];
 
         assert!(Agent::messages_end_with_tool_result(&messages));

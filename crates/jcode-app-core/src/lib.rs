@@ -63,6 +63,7 @@ pub mod setup_hints;
 pub mod ssh_remote;
 pub mod startup_profile;
 pub mod tool;
+pub mod turn_cancel_registry;
 pub mod update;
 pub mod yolo_classifier;
 

@@ -283,10 +283,6 @@ pub enum Request {
         mode: jcode_config_types::CompactionMode,
     },
 
-    /// Set the permission mode for tool execution.
-    #[serde(rename = "set_permission_mode")]
-    SetPermissionMode { id: u64, mode: String },
-
     /// Set or clear the active session's custom display title.
     #[serde(rename = "rename_session")]
     RenameSession {
@@ -412,6 +408,10 @@ pub enum Request {
         delivery: Option<CommDeliveryMode>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         wake: Option<bool>,
+        /// Sender-provided one-line summary. Receiving UIs render long
+        /// message bodies collapsed to this with an expand control.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tldr: Option<String>,
     },
 
     /// List agents and their activity
@@ -512,7 +512,21 @@ pub enum Request {
         request_nonce: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         spawn_mode: Option<String>,
+        /// Optional per-spawn model override. Takes precedence over
+        /// `agents.swarm_model` config. Supports explicit auth-route prefixes
+        /// (e.g. `openai-api:gpt-5.5`) and the `inherit`/`coordinator`
+        /// sentinels to force coordinator inheritance past a config pin.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        /// Optional reasoning effort for the spawned agent (e.g. `none`,
+        /// `low`, `medium`, `high`, `xhigh`, `max`). Unset = provider default.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<String>,
     },
+
+    /// List models/routes available for spawning swarm agents
+    #[serde(rename = "comm_list_models")]
+    CommListModels { id: u64, session_id: String },
 
     /// Stop/destroy an agent session (coordinator only)
     #[serde(rename = "comm_stop")]
@@ -567,6 +581,10 @@ pub enum Request {
         /// Optional blockers/follow-up summary.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         follow_up: Option<String>,
+        /// Reporter-provided one-line summary. Receiving UIs render long
+        /// report bodies collapsed to this with an expand control.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tldr: Option<String>,
     },
 
     /// Read another agent's full conversation context
@@ -613,6 +631,14 @@ pub enum Request {
         spawn_if_needed: Option<bool>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         message: Option<String>,
+        /// Optional model override for workers spawned by this assignment
+        /// (same semantics as CommSpawn::model).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        model: Option<String>,
+        /// Optional reasoning effort for workers spawned by this assignment
+        /// (same semantics as CommSpawn::effort).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        effort: Option<String>,
     },
 
     /// Control an existing assigned task lifecycle (coordinator only)
@@ -1193,15 +1219,6 @@ pub enum ServerEvent {
     },
 
     /// Compaction mode changed (response to set_compaction_mode)
-
-    /// Permission mode changed.
-    #[serde(rename = "permission_mode_changed")]
-    PermissionModeChanged {
-        id: u64,
-        mode: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        error: Option<String>,
-    },
     #[serde(rename = "compaction_mode_changed")]
     CompactionModeChanged {
         id: u64,
@@ -1324,6 +1341,23 @@ pub enum ServerEvent {
         id: u64,
         session_id: String,
         new_session_id: String,
+    },
+
+    /// Response to comm_list_models request
+    #[serde(rename = "comm_list_models_response")]
+    CommListModelsResponse {
+        id: u64,
+        /// The coordinator's currently active model (spawn default when no
+        /// override is configured or requested).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        current_model: Option<String>,
+        /// The configured `agents.swarm_model` pin, if any.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        configured_swarm_model: Option<String>,
+        /// All model routes known to the server (model + provider + auth
+        /// method + availability + rough cost estimate).
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        model_routes: Vec<jcode_provider_core::ModelRoute>,
     },
 
     /// Response to comm_await_members request

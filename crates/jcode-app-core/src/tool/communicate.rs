@@ -15,6 +15,7 @@ use crate::protocol::{
 };
 use anyhow::Result;
 use async_trait::async_trait;
+use jcode_swarm_core::validate_swarm_tldr;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
@@ -150,15 +151,25 @@ fn coordination_in_flight_count(
 /// happen to sit in a `queued` status. Awaiting those would hang `run_plan`
 /// forever even though every plan task is already terminal (they are never auto
 /// driven), which is exactly the stall this scoping prevents.
+///
+/// Pure over an already-fetched member list so the coordination loop can reuse
+/// one `CommList` snapshot for both in-flight scoping and failure-wave
+/// classification.
+fn in_flight_swarm_session_ids(members: &[AgentInfo], coordinator_session_id: &str) -> Vec<String> {
+    members
+        .iter()
+        .filter(|member| member.session_id != coordinator_session_id)
+        .filter(|member| swarm_member_is_in_flight(member))
+        .filter(|member| swarm_member_is_drivable_worker(member, coordinator_session_id))
+        .map(|member| member.session_id.clone())
+        .collect()
+}
+
+/// Fetch-and-filter convenience over [`in_flight_swarm_session_ids`] for call
+/// sites that do not otherwise need the member snapshot.
 async fn fetch_in_flight_swarm_sessions(session_id: &str) -> Result<Vec<String>> {
     let members = fetch_swarm_members(session_id).await?;
-    Ok(members
-        .into_iter()
-        .filter(|member| member.session_id != session_id)
-        .filter(swarm_member_is_in_flight)
-        .filter(|member| swarm_member_is_drivable_worker(member, session_id))
-        .map(|member| member.session_id)
-        .collect())
+    Ok(in_flight_swarm_session_ids(&members, session_id))
 }
 
 /// Whether `member` is a worker `run_plan` can rely on to autonomously execute an
@@ -293,10 +304,40 @@ async fn cleanup_finished_workers_for_capacity(
     outcome.stopped.len()
 }
 
+/// How often the background progress card is refreshed from live plan state
+/// while the driver is blocked awaiting workers.
+const RUN_PLAN_PROGRESS_REFRESH_SECS: u64 = 15;
+
+/// Whether the driver should abandon the current member-await and start a new
+/// coordination loop because the plan's ready frontier grew while it was
+/// blocked. Pure for unit testing.
+///
+/// `ready_baseline` is the set of ready item ids observed at the top of the
+/// loop that started this await. Any *new* ready id means work the driver has
+/// never had a chance to dispatch: a failed node re-queued via `swarm retry`,
+/// a node unblocked by an externally-driven completion, or a gate-injected
+/// gap. Comparing against the baseline (instead of `!ready.is_empty()`) is
+/// what prevents wake storms: items that were already ready when the await
+/// began (e.g. just-assigned tasks still momentarily `queued`, or ready nodes
+/// that could not be assigned to any drivable worker) do not re-trigger, so a
+/// permanently-stuck ready node wakes the driver at most once per await.
+fn await_should_wake_for_new_ready(
+    ready_baseline: &std::collections::HashSet<String>,
+    summary: &PlanGraphStatus,
+) -> bool {
+    summary
+        .ready_ids
+        .iter()
+        .any(|id| !ready_baseline.contains(id))
+}
+
 async fn await_swarm_progress(
     ctx: &ToolContext,
     session_ids: Vec<String>,
     timeout_minutes: u64,
+    reporter: &RunPlanReporter,
+    assignment_count: usize,
+    ready_baseline: &std::collections::HashSet<String>,
 ) -> Result<()> {
     let request = Request::CommAwaitMembers {
         id: REQUEST_ID,
@@ -312,7 +353,55 @@ async fn await_swarm_progress(
         wake: false,
     };
     let socket_timeout = std::time::Duration::from_secs(timeout_minutes.max(1) * 60 + 30);
-    match send_request_with_timeout(request, Some(socket_timeout)).await {
+    let await_members = send_request_with_timeout(request, Some(socket_timeout));
+    tokio::pin!(await_members);
+
+    // While blocked on the await (potentially many minutes), periodically
+    // re-read live plan + member state and push it to the progress card.
+    // Without this, worker completions and externally-assigned work (manual
+    // `assign_task`) only surface at the driver's own wave boundaries, so the
+    // card goes stale for the whole await. Refresh failures are ignored: the
+    // card is best-effort and the await result is what drives the loop.
+    let refresh_period = std::time::Duration::from_secs(RUN_PLAN_PROGRESS_REFRESH_SECS);
+    let mut refresh =
+        tokio::time::interval_at(tokio::time::Instant::now() + refresh_period, refresh_period);
+    refresh.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
+    let response = loop {
+        tokio::select! {
+            result = &mut await_members => break result,
+            _ = refresh.tick() => {
+                let summary = match fetch_plan_status(&ctx.session_id).await {
+                    Ok(summary) => summary,
+                    Err(_) => continue,
+                };
+                if reporter.is_background() {
+                    let live_active = fetch_in_flight_swarm_sessions(&ctx.session_id)
+                        .await
+                        .map(|sessions| sessions.len())
+                        .unwrap_or(0);
+                    let (completed, total, message) =
+                        run_plan_progress_snapshot(&summary, live_active, assignment_count);
+                    reporter.progress(completed, total, message).await;
+                }
+                // Ready frontier grew while blocked (a `swarm retry` re-queued
+                // failed nodes, an external completion unblocked work, a gate
+                // injected gaps): return to the coordination loop so the new
+                // work is dispatched under the normal budget instead of
+                // waiting out the current wave. The abandoned await is a
+                // plain request future; dropping it cancels only our wait,
+                // not the workers.
+                if await_should_wake_for_new_ready(ready_baseline, &summary) {
+                    reporter
+                        .log("ready frontier grew during await (retry/requeue or external unblock); re-entering dispatch loop")
+                        .await;
+                    return Ok(());
+                }
+            }
+        }
+    };
+
+    match response {
         Ok(ServerEvent::CommAwaitMembersResponse {
             completed, summary, ..
         }) => {
@@ -452,6 +541,12 @@ impl RunPlanReporter {
         }
     }
 
+    /// Whether this reporter feeds a live background progress card (inline
+    /// reporters are no-ops, so refresh polling would be wasted requests).
+    fn is_background(&self) -> bool {
+        self.task_id.is_some()
+    }
+
     async fn log(&self, line: &str) {
         let Some(path) = &self.output_path else {
             return;
@@ -485,6 +580,31 @@ impl RunPlanReporter {
         .normalize();
         let _ = crate::background::global()
             .update_progress(task_id, progress)
+            .await;
+    }
+
+    /// Record an explicit checkpoint (a JCODE_CHECKPOINT-style milestone) on
+    /// the background task, so pause/alert moments surface as checkpoint events
+    /// in the UI instead of only trailing the output log. No-op inline.
+    async fn checkpoint(&self, message: &str) {
+        self.log(message).await;
+        let Some(task_id) = &self.task_id else {
+            return;
+        };
+        let progress = crate::bus::BackgroundTaskProgress {
+            kind: crate::bus::BackgroundTaskProgressKind::Indeterminate,
+            percent: None,
+            message: Some(message.to_string()),
+            current: None,
+            total: None,
+            unit: None,
+            eta_seconds: None,
+            updated_at: chrono::Utc::now().to_rfc3339(),
+            source: crate::bus::BackgroundTaskProgressSource::Reported,
+        }
+        .normalize();
+        let _ = crate::background::global()
+            .update_checkpoint(task_id, progress)
             .await;
     }
 
@@ -799,6 +919,34 @@ fn plan_terminal_node_count(summary: &PlanGraphStatus) -> usize {
         .len()
 }
 
+/// Numbers for the `run_plan` background progress card. Pure for unit testing.
+///
+/// The percent-driving pair is `(completed, total)`: only *completed* nodes
+/// count toward 100%, so a run where most nodes failed reads as mostly
+/// unfinished instead of "98% complete" (failed/blocked counts are surfaced in
+/// the message instead). `live_active` is the count of in-flight worker
+/// sessions observed from member state; the card shows whichever of plan
+/// execution state (`active_ids`) or live member state is larger, so nodes
+/// assigned outside this driver (e.g. manual `assign_task`) still show as
+/// active.
+fn run_plan_progress_snapshot(
+    summary: &PlanGraphStatus,
+    live_active: usize,
+    assignment_count: usize,
+) -> (usize, usize, String) {
+    let completed = summary.completed_ids.len();
+    let active = summary.active_ids.len().max(live_active);
+    let message = format!(
+        "completed {} · failed {} · blocked {} · active {} · assignments {}",
+        completed,
+        summary.failed_ids.len(),
+        summary.blocked_ids.len(),
+        active,
+        assignment_count
+    );
+    (completed, summary.item_count, message)
+}
+
 /// Terminal-state summary line for `run_plan`, including failed nodes so a run
 /// with failures never reads like a clean finish. Pure for unit testing.
 fn format_run_plan_terminal_summary(
@@ -827,8 +975,156 @@ fn format_run_plan_terminal_summary(
             "\nFailed nodes: {}. This run did NOT finish cleanly; inspect them with `swarm plan_status` and retry or salvage before trusting the result.",
             summary.failed_ids.join(", ")
         ));
+        // Recorded failure reasons make the summary self-explanatory: a wave
+        // of "task failed: ... 401 Unauthorized" lines names the root cause
+        // without another plan_status round-trip.
+        for id in &summary.failed_ids {
+            if let Some(reason) = summary.failed_reasons.get(id) {
+                output.push_str(&format!("\n  {}: {}", id, reason));
+            }
+        }
     }
     output
+}
+
+/// Minimum number of credential-failed workers that count as a wave rather
+/// than an isolated bad worker.
+const CREDENTIAL_FAILURE_WAVE_MIN_WORKERS: usize = 2;
+
+/// How recent a worker's credential failure must be (via `status_age_secs`) to
+/// count toward a wave. Old failed workers from a previous, already-diagnosed
+/// wave must not re-trip the breaker after the user fixes auth and retries.
+const CREDENTIAL_FAILURE_WAVE_WINDOW_SECS: u64 = 60;
+
+/// A wave of worker failures that share one credential-shaped root cause.
+///
+/// When dispatched workers die within seconds of assignment with 401 /
+/// `invalid_grant` / `authentication_error`-style errors, the credential is
+/// broken for every worker on that route: assigning more nodes only fails more
+/// of the plan. Detecting the wave lets `run_plan` pause dispatching and
+/// surface the one real fix instead of silently burning the graph.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct CredentialFailureWave {
+    /// Failed worker sessions in the wave.
+    session_ids: Vec<String>,
+    /// Representative failure detail (first observed).
+    sample_detail: String,
+    /// Provider named by the failing workers, when known (e.g. "anthropic").
+    provider: Option<String>,
+}
+
+/// Detect a credential-failure wave in a swarm member snapshot.
+///
+/// A wave exists when, with **zero completed plan nodes**, at least
+/// [`CREDENTIAL_FAILURE_WAVE_MIN_WORKERS`] drivable workers sit in `failed`
+/// status whose detail classifies as a credential failure (via the shared
+/// [`crate::provider::error_looks_like_credential_failure`] classifier) and
+/// whose failure is recent (`status_age_secs <= window_secs`). Pure over its
+/// inputs so the breaker contract is unit-testable without a live swarm.
+fn detect_credential_failure_wave(
+    members: &[AgentInfo],
+    coordinator_session_id: &str,
+    completed_node_count: usize,
+    window_secs: u64,
+) -> Option<CredentialFailureWave> {
+    if completed_node_count > 0 {
+        return None;
+    }
+    let mut session_ids = Vec::new();
+    let mut sample_detail: Option<String> = None;
+    let mut provider: Option<String> = None;
+    for member in members {
+        if member.session_id == coordinator_session_id {
+            continue;
+        }
+        if !swarm_member_is_drivable_worker(member, coordinator_session_id) {
+            continue;
+        }
+        if member.status.as_deref() != Some("failed") {
+            continue;
+        }
+        let Some(detail) = member.detail.as_deref() else {
+            continue;
+        };
+        if !crate::provider::error_looks_like_credential_failure(detail) {
+            continue;
+        }
+        // Require a known, recent failure age: stale failed workers (or ones
+        // whose age did not propagate) must not re-trip the breaker.
+        if !matches!(member.status_age_secs, Some(age) if age <= window_secs) {
+            continue;
+        }
+        session_ids.push(member.session_id.clone());
+        if sample_detail.is_none() {
+            sample_detail = Some(detail.to_string());
+        }
+        if provider.is_none() {
+            provider = member.provider_name.clone();
+        }
+    }
+    if session_ids.len() < CREDENTIAL_FAILURE_WAVE_MIN_WORKERS {
+        return None;
+    }
+    Some(CredentialFailureWave {
+        session_ids,
+        sample_detail: sample_detail.unwrap_or_default(),
+        provider,
+    })
+}
+
+/// The `jcode login` invocation most likely to fix a credential wave for
+/// `provider`, mapping provider names to their login provider keys.
+fn credential_login_fix_hint(provider: Option<&str>) -> String {
+    let lowered = provider.map(str::to_ascii_lowercase);
+    let target = match lowered.as_deref() {
+        Some("anthropic" | "claude") => "claude",
+        Some("openai" | "codex") => "openai",
+        Some("google" | "gemini") => "gemini",
+        Some(other) if !other.trim().is_empty() => other,
+        _ => "<provider>",
+    };
+    format!("`jcode login --provider {target}`")
+}
+
+/// Actionable pause message for a credential-failure wave: names the failed
+/// workers, the credential-shaped root cause, and the fix. Pure for unit
+/// testing; used both as the run error and as the swarm broadcast body.
+fn format_credential_failure_wave_error(wave: &CredentialFailureWave, window_secs: u64) -> String {
+    format!(
+        "run_plan paused dispatching: {count} worker(s) failed within {window_secs}s with \
+         credential/auth failures and no plan node has completed (e.g. {first}: \"{sample}\"). \
+         A broken credential (expired OAuth session, revoked refresh token, or invalid API key) \
+         fails every worker on that route, so assigning more nodes would only fail more of the \
+         plan. Fix auth first: run {login_hint} (or pin a working API-key route), then requeue \
+         the failed nodes (`swarm retry`) and run `swarm run_plan` again.",
+        count = wave.session_ids.len(),
+        first = wave
+            .session_ids
+            .first()
+            .map(String::as_str)
+            .unwrap_or("worker"),
+        sample = wave.sample_detail,
+        login_hint = credential_login_fix_hint(wave.provider.as_deref()),
+    )
+}
+
+/// Best-effort broadcast of a plan-level alert to the whole swarm, so live
+/// members and attached UIs see why dispatch stopped.
+async fn broadcast_plan_alert(ctx: &ToolContext, message: &str) -> Result<()> {
+    let request = Request::CommMessage {
+        id: REQUEST_ID,
+        from_session: ctx.session_id.clone(),
+        message: message.to_string(),
+        to_session: None,
+        channel: None,
+        wake: None,
+        delivery: None,
+        tldr: Some("run_plan paused: credential failure wave; fix auth then retry".to_string()),
+    };
+    match send_request(request).await {
+        Ok(response) => ensure_success(&response),
+        Err(e) => Err(anyhow::anyhow!("Failed to broadcast plan alert: {}", e)),
+    }
 }
 
 async fn run_swarm_plan_to_terminal(
@@ -895,22 +1191,39 @@ async fn run_swarm_plan_loop(
             return Ok(ToolOutput::new("No swarm plan items to run."));
         }
 
-        let in_flight_sessions = fetch_in_flight_swarm_sessions(&ctx.session_id).await?;
+        let members = fetch_swarm_members(&ctx.session_id).await?;
+        let in_flight_sessions = in_flight_swarm_session_ids(&members, &ctx.session_id);
+
+        // Credential-failure circuit breaker: when a wave of workers dies with
+        // 401/invalid_grant-style auth errors and nothing has completed, the
+        // credential is broken for every worker on that route. Pausing here
+        // (before the terminal check) means even a fully-burned first wave
+        // surfaces the root cause and the fix instead of a bare
+        // "failed=N" terminal summary with no explanation.
+        if let Some(wave) = detect_credential_failure_wave(
+            &members,
+            &ctx.session_id,
+            summary.completed_ids.len(),
+            CREDENTIAL_FAILURE_WAVE_WINDOW_SECS,
+        ) {
+            let message =
+                format_credential_failure_wave_error(&wave, CREDENTIAL_FAILURE_WAVE_WINDOW_SECS);
+            reporter.checkpoint(&message).await;
+            if let Err(error) = broadcast_plan_alert(ctx, &message).await {
+                reporter
+                    .log(&format!(
+                        "failed to broadcast credential-failure alert to the swarm: {error}"
+                    ))
+                    .await;
+            }
+            return Err(anyhow::anyhow!(message));
+        }
 
         let terminal_count = plan_terminal_node_count(&summary);
+        let (progress_completed, progress_total, progress_message) =
+            run_plan_progress_snapshot(&summary, in_flight_sessions.len(), assignment_count);
         reporter
-            .progress(
-                terminal_count,
-                summary.item_count,
-                format!(
-                    "completed {} · failed {} · blocked {} · active {} · assignments {}",
-                    summary.completed_ids.len(),
-                    summary.failed_ids.len(),
-                    summary.blocked_ids.len(),
-                    summary.active_ids.len(),
-                    assignment_count
-                ),
-            )
+            .progress(progress_completed, progress_total, progress_message)
             .await;
         let no_more_runnable = summary.active_ids.is_empty()
             && summary.next_ready_ids.is_empty()
@@ -979,6 +1292,8 @@ async fn run_swarm_plan_loop(
                     spawn_if_needed
                 },
                 message: params.message.clone(),
+                model: params.model.clone(),
+                effort: params.effort.clone(),
             };
             match send_request(request).await {
                 Ok(ServerEvent::CommAssignTaskResponse {
@@ -1099,7 +1414,21 @@ async fn run_swarm_plan_loop(
                 detail
             ));
         }
-        await_swarm_progress(ctx, await_sessions, timeout_minutes).await?;
+        // Baseline for requeue pickup: everything ready at the top of this
+        // loop either gets assigned below or is known-undispatchable this
+        // wave. Anything ready *beyond* this set while we block (a retried
+        // failure, an external unblock) should cut the await short.
+        let ready_baseline: std::collections::HashSet<String> =
+            summary.ready_ids.iter().cloned().collect();
+        await_swarm_progress(
+            ctx,
+            await_sessions,
+            timeout_minutes,
+            reporter,
+            assignment_count,
+            &ready_baseline,
+        )
+        .await?;
         // Real progress (an await completed); clear the transient-stall backoff so
         // a later genuine stall starts counting fresh.
         transient_stall_loops = 0;
@@ -1114,6 +1443,8 @@ async fn spawn_assignment_session(ctx: &ToolContext, params: &CommunicateInput) 
         initial_message: None,
         request_nonce: Some(fresh_spawn_request_nonce(ctx)),
         spawn_mode: params.spawn_mode.clone(),
+        model: params.model.clone(),
+        effort: params.effort.clone(),
     };
 
     match send_request(spawn_request).await {
@@ -1305,11 +1636,75 @@ fn format_channels(channels: &[SwarmChannelInfo]) -> ToolOutput {
     ToolOutput::new(format_comm_channels(channels))
 }
 
-pub struct CommunicateTool;
+/// Render the swarm model catalog for the `list_models` action: the current
+/// (spawn-default) model, any config pin, and one line per route with
+/// availability, auth method, and a relative cost estimate.
+fn format_swarm_model_list(
+    current_model: Option<&str>,
+    configured_swarm_model: Option<&str>,
+    model_routes: &[jcode_provider_core::ModelRoute],
+) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "Current model (spawn default when no override): {}\n",
+        current_model.unwrap_or("unknown")
+    ));
+    match configured_swarm_model {
+        Some(pin) if !pin.trim().is_empty() => {
+            out.push_str(&format!("Configured agents.swarm_model pin: {pin}\n"));
+        }
+        _ => out.push_str("No agents.swarm_model pin configured (workers inherit the coordinator's model unless a per-spawn model is passed).\n"),
+    }
+    if model_routes.is_empty() {
+        out.push_str(
+            "\nNo model routes reported. Spawn with a bare model name or omit model to inherit.",
+        );
+        return out;
+    }
+    out.push_str("\nAvailable model routes (pass as spawn model, e.g. 'gpt-5.5' or route-pinned 'openai-api:gpt-5.5'):\n");
+    for route in model_routes {
+        let availability = if route.available {
+            ""
+        } else {
+            " [unavailable]"
+        };
+        let cost = route
+            .estimated_reference_cost_micros()
+            .map(|micros| format!(" ~${:.2}/ref-task", micros as f64 / 1_000_000.0))
+            .unwrap_or_default();
+        let detail = if route.detail.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", route.detail)
+        };
+        out.push_str(&format!(
+            "- {} via {} [{}]{}{}{}\n",
+            route.model, route.provider, route.api_method, availability, cost, detail
+        ));
+    }
+    out.push_str("\nAlso pass effort (none|low|medium|high|xhigh|max) to set the spawned agent's reasoning effort.");
+    out
+}
+
+pub struct CommunicateTool {
+    /// Full tool description including the user-tunable swarm prompt
+    /// (model-routing guidance loaded from `swarm-prompt.md`). Computed once at
+    /// registry construction so `description()` can hand out a borrowed str.
+    description: String,
+}
 
 impl CommunicateTool {
     pub fn new() -> Self {
-        Self
+        const BASE_DESCRIPTION: &str = "Coordinate agents. Any agent can spawn child agents, and those children can spawn their own, forming a recursive spawn tree with no depth limit (growth is bounded only by the total swarm member cap). For spawn, prefer providing a prompt so the new agent starts with a concrete task instead of idling. Spawned/assigned agents automatically report their final response back to the agent that spawned them; you can stop any agent in the subtree you spawned.\n\nCommunication: prefer structural dataflow (task-graph artifacts via complete_node) over chat, and DMs for point-to-point coordination. broadcast reaches only your spawned subtree (whole swarm for the coordinator) and should be rare; channels and shared-context are discouraged legacy primitives.";
+        let swarm_prompt = crate::prompt::load_swarm_prompt(None);
+        let description = if swarm_prompt.is_empty() {
+            BASE_DESCRIPTION.to_string()
+        } else {
+            format!(
+                "{BASE_DESCRIPTION}\n\nSwarm prompt (user-tunable via ~/.jcode/swarm-prompt.md):\n{swarm_prompt}"
+            )
+        };
+        Self { description }
     }
 }
 
@@ -1390,6 +1785,18 @@ struct CommunicateInput {
     follow_up: Option<String>,
     #[serde(default)]
     spawn_mode: Option<String>,
+    /// One-line summary shown collapsed in the recipient's UI for long
+    /// message/report bodies. Required when the body exceeds the collapse
+    /// threshold.
+    #[serde(default)]
+    tldr: Option<String>,
+    /// Per-spawn model override for spawn/assign_task/assign_next/run_plan
+    /// spawns. Takes precedence over agents.swarm_model config.
+    #[serde(default)]
+    model: Option<String>,
+    /// Reasoning effort for spawned agents (none|low|medium|high|xhigh|max).
+    #[serde(default)]
+    effort: Option<String>,
 }
 
 impl CommunicateInput {
@@ -1409,6 +1816,7 @@ fn canonical_swarm_action(action: &str) -> &str {
         "dm_session" | "direct_message" | "whisper" => "dm",
         "broadcast_all" | "announce" => "broadcast",
         "agents" | "members" | "list_agents" | "list_members" | "roster" => "list",
+        "models" | "model_list" | "list_model" | "list_providers" | "list_routes" => "list_models",
         "plan" | "status_plan" => "plan_status",
         "assign" => "assign_task",
         "kill" | "terminate" => "stop",
@@ -1423,7 +1831,7 @@ impl Tool for CommunicateTool {
     }
 
     fn description(&self) -> &str {
-        "Coordinate agents. Any agent can spawn child agents, and those children can spawn their own, forming a recursive spawn tree capped at depth 5. For spawn, prefer providing a prompt so the new agent starts with a concrete task instead of idling. Spawned/assigned agents automatically report their final response back to the agent that spawned them; you can stop any agent in the subtree you spawned."
+        &self.description
     }
 
     fn parameters_schema(&self) -> Value {
@@ -1439,18 +1847,23 @@ impl Tool for CommunicateTool {
                              "status", "report", "plan_status", "summary", "read_context", "resync_plan", "assign_task", "assign_next", "fill_slots", "run_plan", "cleanup",
                              "task_graph", "expand_node", "complete_node", "inject_gap",
                              "start", "start_task", "wake", "resume", "retry", "reassign", "replace", "salvage",
-                             "subscribe_channel", "unsubscribe_channel", "await_members"],
-                    "description": "Action. For spawn, prefer including prompt with the initial task so the new agent starts useful work immediately."
+                             "subscribe_channel", "unsubscribe_channel", "await_members", "list_models"],
+                    "description": "Action. For spawn, prefer including prompt with the initial task so the new agent starts useful work immediately. Use list_models to see which models/routes are available for per-spawn model selection."
                 },
                 "key": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Shared-context key for share/share_append/read. Discouraged: prefer the repo and typed node artifacts as the shared medium; use shared context only for small non-repo state."
                 },
                 "value": {
                     "type": "string"
                 },
                 "message": {
                     "type": "string",
-                    "description": "Message body. For action=message, routes by fields provided: with to_session it is a DM, with channel it posts to that channel, with neither it broadcasts to the whole swarm. For action=broadcast it always goes to the whole swarm. For action=report, this is the completion report body."
+                    "description": "Message body. For action=message, routes by fields provided: with to_session it is a DM, with channel it posts to that channel, with neither it broadcasts to your spawned subtree. For action=report, this is the completion report body."
+                },
+                "tldr": {
+                    "type": "string",
+                    "description": "One-line summary (aim for under 120 chars) of the message/report. Required for message/broadcast/dm/channel/report when the body is longer than 240 chars. The recipient's UI shows this collapsed with an expand control instead of the full body."
                 },
                 "status": {
                     "type": "string",
@@ -1470,7 +1883,7 @@ impl Tool for CommunicateTool {
                 },
                 "channel": {
                     "type": "string",
-                    "description": "Channel name. For action=channel (or action=message with a channel) the message goes to subscribers of this channel. Also used by subscribe_channel/unsubscribe_channel/channel_members."
+                    "description": "Channel name. For action=channel (or action=message with a channel) the message goes to subscribers of this channel. Also used by subscribe_channel/unsubscribe_channel/channel_members. Discouraged: prefer DMs and task-graph artifacts over ad hoc channels."
                 },
                 "proposer_session": { "type": "string" },
                 "reason": { "type": "string" },
@@ -1515,6 +1928,15 @@ impl Tool for CommunicateTool {
                     "type": "string",
                     "enum": ["visible", "headless", "inline", "auto"],
                     "description": "Per-call spawn mode for swarm-created agents. Overrides agents.swarm_spawn_mode config when set. 'visible' opens a terminal window, 'headless' runs in-process with no UI, 'inline' runs in-process and renders a live gallery viewport in the coordinator, 'auto' tries visible then falls back to headless. Defaults to inline."
+                },
+                "model": {
+                    "type": "string",
+                    "description": "Optional model for the spawned agent (spawn, and spawns triggered by assign_task/assign_next/run_plan). Overrides the agents.swarm_model config pin for this call. Accepts a bare model name (e.g. 'gpt-5.5') or an auth-route-prefixed form (e.g. 'openai-api:gpt-5.5', 'claude-api:claude-fable-5'). Use 'inherit' to force coordinator inheritance. Omit to use the configured/coordinator default. Run action=list_models to see available models and routes."
+                },
+                "effort": {
+                    "type": "string",
+                    "enum": ["none", "low", "medium", "high", "xhigh", "max"],
+                    "description": "Optional reasoning effort for the spawned agent. Omit for the model's default. Only meaningful with spawn-creating actions."
                 },
                 "session_ids": {
                     "type": "array",
@@ -1689,10 +2111,12 @@ impl Tool for CommunicateTool {
                 // `message` is the general-purpose send: it routes by the fields
                 // provided. With `to_session` it acts as a DM, with `channel` it
                 // posts to that channel, and with neither it broadcasts to the
-                // whole swarm. `broadcast` is the explicit group-only send.
+                // sender's spawned subtree (whole swarm only for the coordinator).
                 let message = params
                     .message
                     .ok_or_else(|| anyhow::anyhow!("'message' is required for message action"))?;
+                let tldr = validate_swarm_tldr(params.tldr.as_deref(), &message, "this message")
+                    .map_err(|e| anyhow::anyhow!(e))?;
                 let to_session = params.to_session.clone();
                 let channel = params.channel.clone();
 
@@ -1704,6 +2128,7 @@ impl Tool for CommunicateTool {
                     channel: channel.clone(),
                     wake: params.wake,
                     delivery: params.delivery,
+                    tldr,
                 };
 
                 match send_request(request).await {
@@ -1717,7 +2142,7 @@ impl Tool for CommunicateTool {
                                 format!("Channel message sent to #{}: {}", channel, message)
                             }
                             (None, None) => {
-                                format!("Broadcast sent to all agents: {}", message)
+                                format!("Broadcast sent to your spawned subtree: {}", message)
                             }
                         };
                         Ok(ToolOutput::new(confirmation))
@@ -1727,12 +2152,17 @@ impl Tool for CommunicateTool {
             }
 
             "broadcast" => {
-                // `broadcast` always targets the whole swarm. Any `to_session`/
+                // `broadcast` targets the sender's spawned subtree (the swarm
+                // coordinator reaches the whole swarm). Any `to_session`/
                 // `channel` is intentionally ignored so the action stays an
                 // unambiguous group send; use `message`/`dm`/`channel` to target.
+                // Prefer DMs or task-graph artifacts; group sends are for rare
+                // coordination moments, not routine status updates.
                 let message = params
                     .message
                     .ok_or_else(|| anyhow::anyhow!("'message' is required for broadcast action"))?;
+                let tldr = validate_swarm_tldr(params.tldr.as_deref(), &message, "this broadcast")
+                    .map_err(|e| anyhow::anyhow!(e))?;
 
                 let request = Request::CommMessage {
                     id: REQUEST_ID,
@@ -1742,13 +2172,14 @@ impl Tool for CommunicateTool {
                     channel: None,
                     wake: params.wake,
                     delivery: params.delivery,
+                    tldr,
                 };
 
                 match send_request(request).await {
                     Ok(response) => {
                         ensure_success(&response)?;
                         Ok(ToolOutput::new(format!(
-                            "Broadcast sent to all agents: {}",
+                            "Broadcast sent to your spawned subtree: {}",
                             message
                         )))
                     }
@@ -1760,6 +2191,8 @@ impl Tool for CommunicateTool {
                 let message = params
                     .message
                     .ok_or_else(|| anyhow::anyhow!("'message' is required for dm action"))?;
+                let tldr = validate_swarm_tldr(params.tldr.as_deref(), &message, "this DM")
+                    .map_err(|e| anyhow::anyhow!(e))?;
                 let to_session = params.to_session.ok_or_else(|| {
                     anyhow::anyhow!("'to_session' (or 'target_session') is required for dm action")
                 })?;
@@ -1772,6 +2205,7 @@ impl Tool for CommunicateTool {
                     channel: None,
                     delivery: params.delivery,
                     wake: params.wake,
+                    tldr,
                 };
 
                 match send_request(request).await {
@@ -1790,6 +2224,9 @@ impl Tool for CommunicateTool {
                 let message = params
                     .message
                     .ok_or_else(|| anyhow::anyhow!("'message' is required for channel action"))?;
+                let tldr =
+                    validate_swarm_tldr(params.tldr.as_deref(), &message, "this channel message")
+                        .map_err(|e| anyhow::anyhow!(e))?;
                 let channel = params
                     .channel
                     .ok_or_else(|| anyhow::anyhow!("'channel' is required for channel action"))?;
@@ -1802,6 +2239,7 @@ impl Tool for CommunicateTool {
                     channel: Some(channel.clone()),
                     delivery: params.delivery,
                     wake: params.wake,
+                    tldr,
                 };
 
                 match send_request(request).await {
@@ -2091,6 +2529,8 @@ impl Tool for CommunicateTool {
                     initial_message: params.spawn_initial_message(),
                     request_nonce: None,
                     spawn_mode: params.spawn_mode.clone(),
+                    model: params.model.clone(),
+                    effort: params.effort.clone(),
                 };
 
                 match send_request(request).await {
@@ -2109,6 +2549,30 @@ impl Tool for CommunicateTool {
                         ))
                     }
                     Err(e) => Err(anyhow::anyhow!("Failed to spawn agent: {}", e)),
+                }
+            }
+
+            "list_models" => {
+                let request = Request::CommListModels {
+                    id: REQUEST_ID,
+                    session_id: ctx.session_id.clone(),
+                };
+                match send_request(request).await {
+                    Ok(ServerEvent::CommListModelsResponse {
+                        current_model,
+                        configured_swarm_model,
+                        model_routes,
+                        ..
+                    }) => Ok(ToolOutput::new(format_swarm_model_list(
+                        current_model.as_deref(),
+                        configured_swarm_model.as_deref(),
+                        &model_routes,
+                    ))),
+                    Ok(response) => {
+                        ensure_success(&response)?;
+                        Ok(ToolOutput::new("No model catalog returned."))
+                    }
+                    Err(e) => Err(anyhow::anyhow!("Failed to list models: {}", e)),
                 }
             }
 
@@ -2197,6 +2661,8 @@ impl Tool for CommunicateTool {
                 let message = params
                     .message
                     .ok_or_else(|| anyhow::anyhow!("'message' is required for report action"))?;
+                let tldr = validate_swarm_tldr(params.tldr.as_deref(), &message, "this report")
+                    .map_err(|e| anyhow::anyhow!(e))?;
                 let request = Request::CommReport {
                     id: REQUEST_ID,
                     session_id: ctx.session_id.clone(),
@@ -2204,6 +2670,7 @@ impl Tool for CommunicateTool {
                     message,
                     validation: params.validation,
                     follow_up: params.follow_up,
+                    tldr,
                 };
                 match send_request(request).await {
                     Ok(ServerEvent::CommReportResponse {
@@ -2366,6 +2833,8 @@ impl Tool for CommunicateTool {
                     prefer_spawn: params.prefer_spawn,
                     spawn_if_needed: params.spawn_if_needed,
                     message: params.message.clone(),
+                    model: params.model.clone(),
+                    effort: params.effort.clone(),
                 };
 
                 match send_request(request).await {
@@ -2416,6 +2885,8 @@ impl Tool for CommunicateTool {
                         prefer_spawn: params.prefer_spawn,
                         spawn_if_needed: params.spawn_if_needed,
                         message: params.message.clone(),
+                        model: params.model.clone(),
+                        effort: params.effort.clone(),
                     };
 
                     match send_request(request).await {

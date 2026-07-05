@@ -45,36 +45,6 @@ pub(super) async fn available_models_updated_event(agent: &Arc<Mutex<Agent>>) ->
     available_models_updated_event_from_agent(&agent_guard)
 }
 
-pub(super) async fn handle_set_permission_mode(
-    id: u64,
-    mode: String,
-    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
-) {
-    let result: Result<(), String> = if crate::dcg_bridge::set_mode_from_str(&mode) {
-        Ok(())
-    } else {
-        Err(format!("Unknown permission mode: {}", mode))
-    };
-
-    match result {
-        Ok(()) => {
-            let _ = client_event_tx.send(ServerEvent::PermissionModeChanged {
-                id,
-                mode: mode.clone(),
-                error: None,
-            });
-        }
-        Err(e) => {
-            let current = crate::dcg_bridge::mode_to_str(crate::dcg_bridge::current_mode());
-            let _ = client_event_tx.send(ServerEvent::PermissionModeChanged {
-                id,
-                mode: current.to_string(),
-                error: Some(e),
-            });
-        }
-    }
-}
-
 pub(super) fn try_available_models_updated_event(agent: &Arc<Mutex<Agent>>) -> Option<ServerEvent> {
     let agent_guard = agent.try_lock().ok()?;
     Some(available_models_updated_event_from_agent(&agent_guard))
@@ -528,22 +498,6 @@ fn apply_set_model(
         let result = agent.set_model(&model);
         if result.is_ok() {
             agent.reset_provider_session();
-            // Persist the model to config so it survives process restarts.
-            // Include provider_key so set_model routes to the correct provider.
-            let active = agent.provider_model();
-            let provider_key = crate::session::derive_session_provider_key(&agent.provider_name());
-            crate::logging::warn(&format!(
-                "[SERVER-SAVE] model='{}' provider_key='{:?}'",
-                active, provider_key
-            ));
-            if let Err(e) =
-                crate::config::Config::set_default_model(Some(&active), provider_key.as_deref())
-            {
-                crate::logging::warn(&format!(
-                    "Failed to persist default model '{}' on server: {}",
-                    active, e
-                ));
-            }
         }
         result.map(|_| (agent.provider_model(), agent.provider_name()))
     };
@@ -592,22 +546,6 @@ fn apply_set_route(
         let result = agent.set_route_selection(&selection);
         if result.is_ok() {
             agent.reset_provider_session();
-            // Persist the model to config so it survives process restarts.
-            // Include provider_key so set_model routes to the correct provider.
-            let active = agent.provider_model();
-            let provider_key = crate::session::derive_session_provider_key(&agent.provider_name());
-            crate::logging::warn(&format!(
-                "[ROUTE-SAVE] model='{}' provider_key='{:?}'",
-                active, provider_key
-            ));
-            if let Err(e) =
-                crate::config::Config::set_default_model(Some(&active), provider_key.as_deref())
-            {
-                crate::logging::warn(&format!(
-                    "Failed to persist default model '{}' on server (route): {}",
-                    active, e
-                ));
-            }
         }
         result.map(|_| (agent.provider_model(), agent.provider_name()))
     };
@@ -743,6 +681,7 @@ fn send_catalog_activity(client_event_tx: &mpsc::UnboundedSender<ServerEvent>, m
         notification_type: NotificationType::Message {
             scope: Some("catalog_activity".to_string()),
             channel: None,
+            tldr: None,
         },
         message: message.to_string(),
     });

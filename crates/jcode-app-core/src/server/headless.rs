@@ -32,6 +32,7 @@ pub(super) async fn create_headless_session(
     model_override: Option<String>,
     provider_key_override: Option<String>,
     route_api_method_override: Option<String>,
+    effort_override: Option<String>,
     mcp_pool: Option<Arc<crate::mcp::SharedMcpPool>>,
     report_back_to_session_id: Option<String>,
 ) -> Result<String> {
@@ -99,6 +100,18 @@ pub(super) async fn create_headless_session(
                 model, model_request, e
             ));
         }
+    }
+
+    if let Some(effort) = effort_override
+        .as_deref()
+        .map(str::trim)
+        .filter(|effort| !effort.is_empty())
+        && let Err(e) = new_agent.set_reasoning_effort(effort)
+    {
+        crate::logging::warn(&format!(
+            "Failed to set headless session reasoning effort override '{}': {}",
+            effort, e
+        ));
     }
 
     if let Some(ref dir) = working_dir
@@ -174,6 +187,7 @@ pub(super) async fn create_headless_session(
                 swarm_enabled,
                 status: "ready".to_string(),
                 detail: None,
+                task_label: None,
                 friendly_name: Some(friendly_name.clone()),
                 report_back_to_session_id: report_back_to_session_id.clone(),
                 latest_completion_report: None,

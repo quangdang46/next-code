@@ -2,8 +2,9 @@ use super::{
     CommunicateInput, CommunicateTool, canonical_swarm_action, cleanup_candidate_session_ids,
     coordination_in_flight_count, default_await_target_statuses, default_cleanup_target_statuses,
     format_awaited_members, format_awaited_members_with_reports, format_members,
-    format_plan_status, latest_assistant_report, resolve_optional_target_session,
-    resolve_run_plan_concurrency, swarm_member_is_drivable_worker, swarm_member_is_in_flight,
+    format_plan_status, format_swarm_model_list, latest_assistant_report,
+    resolve_optional_target_session, resolve_run_plan_concurrency, swarm_member_is_drivable_worker,
+    swarm_member_is_in_flight,
 };
 use crate::message::{Message, StreamEvent, ToolDefinition};
 use crate::protocol::{
@@ -296,6 +297,133 @@ fn run_plan_utilization_handles_unbounded_budget() {
 }
 
 #[test]
+fn await_wakes_only_for_ready_items_beyond_the_wave_baseline() {
+    let baseline: std::collections::HashSet<String> =
+        ["stuck".to_string(), "assigned".to_string()].into();
+    let mut summary = crate::protocol::PlanGraphStatus {
+        swarm_id: None,
+        version: 3,
+        item_count: 6,
+        ready_ids: vec!["stuck".to_string()],
+        blocked_ids: Vec::new(),
+        active_ids: vec!["a1".to_string()],
+        completed_ids: Vec::new(),
+        failed_ids: Vec::new(),
+        failed_reasons: Default::default(),
+        cycle_ids: Vec::new(),
+        unresolved_dependency_ids: Vec::new(),
+        next_ready_ids: Vec::new(),
+        newly_ready_ids: Vec::new(),
+        low_confidence_ids: Vec::new(),
+        mode: "deep".to_string(),
+        seeded_count: 0,
+        grown_count: 0,
+    };
+
+    // Items already ready at wave start (even permanently-undispatchable
+    // ones) must not wake the driver: that would busy-spin the await.
+    assert!(!super::await_should_wake_for_new_ready(&baseline, &summary));
+
+    // No ready items at all: keep waiting on members.
+    summary.ready_ids.clear();
+    assert!(!super::await_should_wake_for_new_ready(&baseline, &summary));
+
+    // A retried failed node re-enters ready as a NEW id -> wake and dispatch.
+    summary.ready_ids = vec!["stuck".to_string(), "retried-node".to_string()];
+    assert!(super::await_should_wake_for_new_ready(&baseline, &summary));
+}
+
+#[test]
+fn run_plan_progress_counts_only_completed_toward_percent_and_shows_live_active() {
+    // Regression: a plan with 33 completed / 116 failed of 152 used to report
+    // terminal/total = 149/152 (~98%) with active 0 while four externally
+    // assigned workers were still running.
+    let summary = crate::protocol::PlanGraphStatus {
+        swarm_id: Some("swarm-a".to_string()),
+        version: 9,
+        item_count: 152,
+        ready_ids: Vec::new(),
+        blocked_ids: Vec::new(),
+        active_ids: Vec::new(),
+        completed_ids: (0..33).map(|i| format!("c{i}")).collect(),
+        failed_ids: (0..116).map(|i| format!("f{i}")).collect(),
+        failed_reasons: Default::default(),
+        cycle_ids: Vec::new(),
+        unresolved_dependency_ids: Vec::new(),
+        next_ready_ids: Vec::new(),
+        newly_ready_ids: Vec::new(),
+        low_confidence_ids: Vec::new(),
+        mode: "deep".to_string(),
+        seeded_count: 0,
+        grown_count: 0,
+    };
+
+    let (completed, total, message) = super::run_plan_progress_snapshot(&summary, 4, 137);
+    // Percent driver is completed/total: 33/152 (~22%), never ~98%.
+    assert_eq!(completed, 33);
+    assert_eq!(total, 152);
+    // Failed nodes are surfaced separately, and live in-flight workers show as
+    // active even when the plan's own active_ids is empty (external
+    // assign_task dispatches).
+    assert_eq!(
+        message,
+        "completed 33 · failed 116 · blocked 0 · active 4 · assignments 137"
+    );
+
+    // The normalized background progress percent derived from (current,total)
+    // must match completed/total, not terminal/total.
+    let progress = crate::bus::BackgroundTaskProgress {
+        kind: crate::bus::BackgroundTaskProgressKind::Determinate,
+        percent: None,
+        message: Some(message),
+        current: Some(completed as u64),
+        total: Some(total as u64),
+        unit: Some("nodes".to_string()),
+        eta_seconds: None,
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        source: crate::bus::BackgroundTaskProgressSource::Reported,
+    }
+    .normalize();
+    let percent = progress.percent.expect("determinate percent");
+    assert!(
+        (percent - 21.71).abs() < 0.1,
+        "33/152 must normalize to ~21.7%, got {percent}"
+    );
+}
+
+#[test]
+fn run_plan_progress_active_prefers_plan_execution_state_when_larger() {
+    let summary = crate::protocol::PlanGraphStatus {
+        swarm_id: None,
+        version: 1,
+        item_count: 10,
+        ready_ids: Vec::new(),
+        blocked_ids: vec!["b1".to_string()],
+        active_ids: vec!["a1".to_string(), "a2".to_string(), "a3".to_string()],
+        completed_ids: vec!["c1".to_string(), "c2".to_string()],
+        failed_ids: vec!["f1".to_string()],
+        failed_reasons: Default::default(),
+        cycle_ids: Vec::new(),
+        unresolved_dependency_ids: Vec::new(),
+        next_ready_ids: Vec::new(),
+        newly_ready_ids: Vec::new(),
+        low_confidence_ids: Vec::new(),
+        mode: "light".to_string(),
+        seeded_count: 0,
+        grown_count: 0,
+    };
+
+    // Plan says 3 active but only 1 live member is observable (e.g. status
+    // propagation lag): keep the larger plan-state number.
+    let (completed, total, message) = super::run_plan_progress_snapshot(&summary, 1, 5);
+    assert_eq!((completed, total), (2, 10));
+    assert_eq!(
+        message,
+        "completed 2 · failed 1 · blocked 1 · active 3 · assignments 5"
+    );
+}
+
+#[test]
 fn plan_status_budget_line_is_deep_only_and_nudges_serialized_graphs() {
     let base = crate::protocol::PlanGraphStatus {
         swarm_id: Some("swarm-a".to_string()),
@@ -306,6 +434,7 @@ fn plan_status_budget_line_is_deep_only_and_nudges_serialized_graphs() {
         active_ids: vec!["b".to_string()],
         completed_ids: vec!["c".to_string()],
         failed_ids: Vec::new(),
+        failed_reasons: Default::default(),
         cycle_ids: Vec::new(),
         unresolved_dependency_ids: Vec::new(),
         next_ready_ids: Vec::new(),
@@ -429,6 +558,7 @@ fn run_plan_terminal_summary_reports_failed_nodes() {
         active_ids: Vec::new(),
         completed_ids: vec!["a".to_string(), "b".to_string()],
         failed_ids: vec!["c".to_string(), "d".to_string()],
+        failed_reasons: Default::default(),
         cycle_ids: Vec::new(),
         unresolved_dependency_ids: Vec::new(),
         next_ready_ids: Vec::new(),
@@ -454,6 +584,7 @@ fn run_plan_terminal_summary_reports_failed_nodes() {
             "d".to_string(),
         ],
         failed_ids: Vec::new(),
+        failed_reasons: Default::default(),
         ..base
     };
     let clean_summary = super::format_run_plan_terminal_summary(5, &clean, 7);
@@ -472,6 +603,7 @@ fn plan_terminal_node_count_includes_failed_without_double_counting() {
         active_ids: Vec::new(),
         completed_ids: vec!["a".to_string()],
         failed_ids: vec!["c".to_string()],
+        failed_reasons: Default::default(),
         // "x" is both blocked and cyclic; it must count once.
         cycle_ids: vec!["x".to_string()],
         unresolved_dependency_ids: Vec::new(),
@@ -546,6 +678,7 @@ fn format_plan_status_includes_next_ready() {
         active_ids: vec!["task-1".to_string()],
         completed_ids: vec!["setup".to_string()],
         failed_ids: Vec::new(),
+        failed_reasons: Default::default(),
         cycle_ids: Vec::new(),
         unresolved_dependency_ids: Vec::new(),
         next_ready_ids: vec!["task-2".to_string()],
@@ -573,6 +706,7 @@ fn in_flight_slot_accounting_counts_queued_workers_not_coordinator() {
         active_ids: vec!["running-plan-task".to_string()],
         completed_ids: Vec::new(),
         failed_ids: Vec::new(),
+        failed_reasons: Default::default(),
         cycle_ids: Vec::new(),
         unresolved_dependency_ids: Vec::new(),
         next_ready_ids: vec!["queued-assigned".to_string()],
@@ -647,6 +781,7 @@ fn in_flight_count_excludes_foreign_queued_session() {
         active_ids: Vec::new(),
         completed_ids: vec!["done-task".to_string()],
         failed_ids: Vec::new(),
+        failed_reasons: Default::default(),
         cycle_ids: Vec::new(),
         unresolved_dependency_ids: Vec::new(),
         next_ready_ids: Vec::new(),
@@ -761,6 +896,81 @@ fn resolve_optional_target_session_defaults_to_current() {
 fn schema_still_requires_action() {
     let schema = CommunicateTool::new().parameters_schema();
     assert_eq!(schema["required"], json!(["action"]));
+}
+
+#[test]
+fn schema_advertises_model_and_effort_spawn_overrides() {
+    let schema = CommunicateTool::new().parameters_schema();
+    let props = schema["properties"]
+        .as_object()
+        .expect("swarm schema should have properties");
+
+    assert!(props.contains_key("model"));
+    assert!(
+        props["model"]["description"]
+            .as_str()
+            .expect("model description")
+            .contains("list_models"),
+        "model param should point at the list_models action"
+    );
+    assert!(props.contains_key("effort"));
+    assert_eq!(
+        props["effort"]["enum"],
+        json!(["none", "low", "medium", "high", "xhigh", "max"])
+    );
+    assert!(
+        schema["properties"]["action"]["enum"]
+            .as_array()
+            .expect("action enum")
+            .contains(&json!("list_models"))
+    );
+}
+
+#[test]
+fn description_includes_swarm_prompt_guidance() {
+    let tool = CommunicateTool::new();
+    let description = tool.description();
+    assert!(
+        description.contains("Swarm prompt"),
+        "description should embed the swarm prompt section"
+    );
+}
+
+#[test]
+fn format_swarm_model_list_renders_routes_and_pin() {
+    let routes = vec![
+        jcode_provider_core::ModelRoute {
+            model: "gpt-5.5".to_string(),
+            provider: "OpenAI".to_string(),
+            api_method: "openai-api-key".to_string(),
+            available: true,
+            detail: "API key".to_string(),
+            cheapness: None,
+        },
+        jcode_provider_core::ModelRoute {
+            model: "claude-fable-5".to_string(),
+            provider: "Anthropic".to_string(),
+            api_method: "anthropic-api-key".to_string(),
+            available: false,
+            detail: String::new(),
+            cheapness: None,
+        },
+    ];
+    let output =
+        format_swarm_model_list(Some("claude-fable-5"), Some("openai-api:gpt-5.5"), &routes);
+    assert!(output.contains("Current model (spawn default when no override): claude-fable-5"));
+    assert!(output.contains("Configured agents.swarm_model pin: openai-api:gpt-5.5"));
+    assert!(output.contains("gpt-5.5 via OpenAI [openai-api-key] (API key)"));
+    assert!(output.contains("claude-fable-5 via Anthropic [anthropic-api-key] [unavailable]"));
+    assert!(output.contains("effort"));
+}
+
+#[test]
+fn format_swarm_model_list_handles_empty_catalog() {
+    let output = format_swarm_model_list(None, None, &[]);
+    assert!(output.contains("Current model (spawn default when no override): unknown"));
+    assert!(output.contains("No agents.swarm_model pin configured"));
+    assert!(output.contains("No model routes reported"));
 }
 
 #[test]
@@ -1215,7 +1425,179 @@ async fn wait_for_member_presence(
 fn default_await_members_targets_include_ready() {
     assert_eq!(
         default_await_target_statuses(),
-        vec!["ready", "completed", "stopped", "failed"]
+        vec!["ready", "completed", "stopped", "failed", "crashed"]
+    );
+}
+
+fn credential_failed_worker(session_id: &str, detail: &str, age_secs: u64) -> AgentInfo {
+    AgentInfo {
+        session_id: session_id.to_string(),
+        status: Some("failed".to_string()),
+        detail: Some(detail.to_string()),
+        role: Some("agent".to_string()),
+        is_headless: Some(true),
+        report_back_to_session_id: Some("coord".to_string()),
+        status_age_secs: Some(age_secs),
+        provider_name: Some("anthropic".to_string()),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn credential_failure_wave_detected_for_recent_auth_failed_workers() {
+    // The observed incident: every dispatched worker died within seconds with
+    // an Anthropic 401 (expired OAuth + revoked refresh token) and nothing
+    // completed. That must classify as a wave, not as N independent failures.
+    let members = vec![
+        AgentInfo {
+            session_id: "coord".to_string(),
+            status: Some("running".to_string()),
+            role: Some("coordinator".to_string()),
+            ..Default::default()
+        },
+        credential_failed_worker("w1", "Anthropic API error (401 Unauthorized)", 2),
+        credential_failed_worker("w2", "Anthropic API error (401 Unauthorized)", 3),
+        credential_failed_worker("w3", "invalid_grant: refresh token invalid", 5),
+    ];
+    let wave = super::detect_credential_failure_wave(&members, "coord", 0, 60)
+        .expect("three recent credential failures with zero completions is a wave");
+    assert_eq!(wave.session_ids, vec!["w1", "w2", "w3"]);
+    assert_eq!(wave.sample_detail, "Anthropic API error (401 Unauthorized)");
+    assert_eq!(wave.provider.as_deref(), Some("anthropic"));
+
+    let message = super::format_credential_failure_wave_error(&wave, 60);
+    assert!(message.contains("paused dispatching"));
+    assert!(message.contains("3 worker(s)"));
+    assert!(message.contains("401 Unauthorized"));
+    assert!(message.contains("`jcode login --provider claude`"));
+}
+
+#[test]
+fn credential_failure_wave_requires_at_least_two_workers() {
+    let members = vec![credential_failed_worker(
+        "w1",
+        "Anthropic API error (401 Unauthorized)",
+        2,
+    )];
+    assert_eq!(
+        super::detect_credential_failure_wave(&members, "coord", 0, 60),
+        None,
+        "one bad worker is not a wave"
+    );
+}
+
+#[test]
+fn credential_failure_wave_not_detected_once_anything_completed() {
+    // Completions prove the credential works (or worked); later auth failures
+    // are then per-worker problems, not a route-wide outage to halt over.
+    let members = vec![
+        credential_failed_worker("w1", "Anthropic API error (401 Unauthorized)", 2),
+        credential_failed_worker("w2", "Anthropic API error (401 Unauthorized)", 3),
+    ];
+    assert_eq!(
+        super::detect_credential_failure_wave(&members, "coord", 1, 60),
+        None
+    );
+}
+
+#[test]
+fn credential_failure_wave_ignores_stale_and_non_credential_failures() {
+    let members = vec![
+        // Stale: failed long before this window (e.g. a previous, already
+        // diagnosed wave; the user has since re-authenticated and retried).
+        credential_failed_worker("old", "Anthropic API error (401 Unauthorized)", 3600),
+        // Unknown age must not count either.
+        AgentInfo {
+            status_age_secs: None,
+            ..credential_failed_worker("ageless", "401 Unauthorized", 0)
+        },
+        // Non-credential failure.
+        credential_failed_worker("crashed", "worker panicked: index out of bounds", 2),
+        // Only one recent credential failure remains: below the wave minimum.
+        credential_failed_worker("w1", "Anthropic API error (401 Unauthorized)", 2),
+    ];
+    assert_eq!(
+        super::detect_credential_failure_wave(&members, "coord", 0, 60),
+        None
+    );
+}
+
+#[test]
+fn credential_failure_wave_ignores_foreign_members() {
+    // A foreign, client-attached session that failed with an auth error is not
+    // one of run_plan's workers; it must not trip the breaker.
+    let foreign = AgentInfo {
+        is_headless: Some(false),
+        report_back_to_session_id: None,
+        ..credential_failed_worker("foreign", "401 Unauthorized", 2)
+    };
+    let members = vec![
+        foreign,
+        credential_failed_worker("w1", "401 Unauthorized", 2),
+    ];
+    assert_eq!(
+        super::detect_credential_failure_wave(&members, "coord", 0, 60),
+        None
+    );
+}
+
+#[test]
+fn credential_login_fix_hint_maps_provider_names() {
+    assert_eq!(
+        super::credential_login_fix_hint(Some("anthropic")),
+        "`jcode login --provider claude`"
+    );
+    assert_eq!(
+        super::credential_login_fix_hint(Some("OpenAI")),
+        "`jcode login --provider openai`"
+    );
+    assert_eq!(
+        super::credential_login_fix_hint(Some("copilot")),
+        "`jcode login --provider copilot`"
+    );
+    assert_eq!(
+        super::credential_login_fix_hint(None),
+        "`jcode login --provider <provider>`"
+    );
+}
+
+#[test]
+fn run_plan_terminal_summary_includes_recorded_failure_reasons() {
+    let mut failed_reasons = std::collections::BTreeMap::new();
+    failed_reasons.insert(
+        "c".to_string(),
+        "task failed: Anthropic API error (401 Unauthorized)".to_string(),
+    );
+    let summary = crate::protocol::PlanGraphStatus {
+        swarm_id: Some("swarm-a".to_string()),
+        version: 1,
+        item_count: 2,
+        ready_ids: Vec::new(),
+        blocked_ids: Vec::new(),
+        active_ids: Vec::new(),
+        completed_ids: vec!["a".to_string()],
+        failed_ids: vec!["c".to_string()],
+        failed_reasons,
+        cycle_ids: Vec::new(),
+        unresolved_dependency_ids: Vec::new(),
+        next_ready_ids: Vec::new(),
+        newly_ready_ids: Vec::new(),
+        low_confidence_ids: Vec::new(),
+        mode: "light".to_string(),
+        seeded_count: 0,
+        grown_count: 0,
+    };
+    let output = super::format_run_plan_terminal_summary(3, &summary, 2);
+    assert!(output.contains("Failed nodes: c"));
+    assert!(
+        output.contains("c: task failed: Anthropic API error (401 Unauthorized)"),
+        "terminal summary must carry the recorded failure reason:\n{output}"
+    );
+
+    let plan_status = format_plan_status(&summary).output;
+    assert!(
+        plan_status.contains("c: task failed: Anthropic API error (401 Unauthorized)"),
+        "plan_status must display the recorded failure reason:\n{plan_status}"
     );
 }
 

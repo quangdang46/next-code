@@ -5,7 +5,6 @@ mod environment;
 mod inline_tail;
 mod interrupts;
 mod messages;
-mod orchestrator;
 mod prompting;
 mod provider;
 mod response_recovery;
@@ -39,11 +38,6 @@ use crate::skill::SkillRegistry;
 use crate::tool::{Registry, ToolContext, ToolExecutionMode};
 use anyhow::Result;
 use futures::StreamExt;
-use jcode_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry};
-#[cfg(feature = "dcp")]
-#[allow(unused_imports)]
-use std::cell::Cell;
-
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io::{self, Write};
@@ -73,9 +67,6 @@ static JCODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> = LazyL
 });
 static WORKING_GIT_STATE_CACHE: LazyLock<StdMutex<HashMap<PathBuf, Option<GitState>>>> =
     LazyLock::new(|| StdMutex::new(HashMap::new()));
-#[cfg(feature = "dcp")]
-static CURRENT_DCP: LazyLock<StdMutex<Option<Arc<StdMutex<crate::dcp_plugin::DcpPlugin>>>>> =
-    LazyLock::new(|| StdMutex::new(None));
 const STREAM_KEEPALIVE_PONG_ID: u64 = 0;
 
 fn stable_hash_str(value: &str) -> u64 {
@@ -224,9 +215,6 @@ pub struct Agent {
     /// to avoid cache invalidation when MCP tools arrive asynchronously.
     /// Cleared on compaction/reset.
     locked_tools: Option<Vec<ToolDefinition>>,
-    /// When true, spawned child agents run the todo pipeline after each turn.
-    todo_orchestrator_enabled: bool,
-    inline_tail: inline_tail::InlineTailBuffer,
     /// One-shot guard for the async MCP-registration race (#206).
     ///
     /// MCP servers connect on a background task and register `mcp__*` tools
@@ -242,36 +230,23 @@ pub struct Agent {
     system_prompt_override: Option<String>,
     /// Whether memory features are enabled for this session
     memory_enabled: bool,
-    /// Whether this session streams an inline output tail to the bus (swarm worker).
-    inline_output_tap: bool,
     /// One-step undo snapshot captured before the most recent rewind.
     rewind_undo_snapshot: Option<RewindUndoSnapshot>,
     /// Channel for tools to request stdin input from the user
     stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tool::StdinInputRequest>>,
     /// Canonical reducer-backed view of runtime provider/model selection.
     provider_runtime_state: ProviderRuntimeState,
-    /// Hook registry for dispatching lifecycle hooks.
-    hook_registry: HookRegistry,
-    /// Dispatch configuration for hook execution.
-    dispatch_config: DispatchConfig,
-    /// DCP plugin for context pruning (behind feature flag).
-    #[cfg(feature = "dcp")]
-    dcp: Option<crate::dcp_plugin::DcpPlugin>,
-    /// Best-of-N run ID, set when this agent is spawned by the orchestrator and
-    /// copied onto every ToolContext so propose_* tools can attribute proposals.
-    best_of_n_run_id: Option<String>,
-    /// Best-of-N candidate ID, set when this agent is spawned by the orchestrator
-    /// and copied onto every ToolContext so propose_* tools can attribute proposals.
-    best_of_n_candidate_id: Option<String>,
+    /// When true, this session is an inline swarm worker: stream a throttled
+    /// output tail to the global bus so the coordinator's inline gallery can
+    /// render a live viewport. Off for normal sessions to avoid bus traffic.
+    inline_output_tap: bool,
+    /// Rolling activity tail (text + tool markers) for the inline output tap.
+    /// Persists across turns so the coordinator's viewport never blanks at
+    /// turn boundaries or freezes during long tool calls.
+    inline_tail: inline_tail::InlineTailBuffer,
 }
 
 impl Agent {
-    /// Get the current DCP plugin instance (for tool access).
-    #[cfg(feature = "dcp")]
-    pub fn get_current_dcp() -> Option<Arc<StdMutex<crate::dcp_plugin::DcpPlugin>>> {
-        CURRENT_DCP.lock().ok()?.clone()
-    }
-
     fn should_track_client_cache(&self) -> bool {
         match std::env::var("JCODE_TRACK_CLIENT_CACHE") {
             Ok(value) => {
@@ -314,35 +289,20 @@ impl Agent {
             cache_tracker: CacheTracker::new(),
             last_usage: TokenUsage::default(),
             locked_tools: None,
-            todo_orchestrator_enabled: false,
-            inline_tail: inline_tail::InlineTailBuffer::default(),
             mcp_late_register_resolved: false,
             system_prompt_override: None,
             memory_enabled: crate::config::config().features.memory,
-            inline_output_tap: false,
             rewind_undo_snapshot: None,
             stdin_request_tx: None,
             provider_runtime_state: ProviderRuntimeState::observed(initial_provider_model),
-            hook_registry: HookRegistry::default(),
-            dispatch_config: DispatchConfig::default(),
-            #[cfg(feature = "dcp")]
-            dcp: crate::dcp_plugin::DcpPlugin::new().ok(),
-            best_of_n_run_id: None,
-            best_of_n_candidate_id: None,
+            inline_output_tap: false,
+            inline_tail: inline_tail::InlineTailBuffer::default(),
         };
         crate::tool::set_session_tool_policy(
             &agent.session.id,
             agent.allowed_tools.clone(),
             agent.disabled_tools.clone(),
         );
-        #[cfg(feature = "dcp")]
-        {
-            if let Ok(dcp) = crate::dcp_plugin::DcpPlugin::new()
-                && let Ok(mut guard) = CURRENT_DCP.lock()
-            {
-                *guard = Some(Arc::new(StdMutex::new(dcp)));
-            }
-        }
         agent
     }
 
@@ -363,29 +323,6 @@ impl Agent {
     }
 
     pub fn new(provider: Arc<dyn Provider>, registry: Registry) -> Self {
-        // Reset per-process policy session state (circuit breaker counters,
-        // allow-once cache) at the start of each new agent session.
-        crate::execution_policy::reset_policy_session();
-
-        // FIX: Apply persisted default_model from config BEFORE build_base moves provider.
-        // Provider constructors only check env vars and hardcoded defaults (e.g.
-        // AnthropicProvider::new reads JCODE_ANTHROPIC_MODEL or "claude-opus-4-6"),
-        // never config.toml. After the user changes model via TUI (which writes
-        // config.toml via set_default_model), a restart loses that selection.
-        // Apply it here so the model survives restarts.
-        let config_model = crate::config::config().provider.default_model.clone();
-        if let Some(ref model) = config_model
-            && !model.trim().is_empty()
-            && let Err(e) = provider.set_model(model.trim())
-        {
-            crate::logging::warn(&format!(
-                "Failed to apply config default_model '{}': {}; falling back to provider default {}",
-                model.trim(),
-                e,
-                provider.model()
-            ));
-        }
-
         let tool_selection = crate::config::config().tools.selection();
         let mut agent = Self::build_base(
             provider,
@@ -399,57 +336,9 @@ impl Agent {
         agent.session.provider_key =
             crate::session::derive_session_provider_key(agent.provider.name());
         agent.session.ensure_initial_session_context_message();
-
-        // Pre-approve tools from the always-allow config list.
-        crate::dcg_bridge::init_session_allow_list(&agent.session.id);
-
-        // Setup hook (fire-and-forget, fires once on agent creation)
-        {
-            let registry = agent.hook_registry.clone();
-            let config = agent.dispatch_config.clone();
-            let session_id = agent.session.id.clone();
-            let cwd = agent.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("Setup")
-                .build();
-            let ctx = HookContext::new(&session_id, "", &cwd, "Setup");
-            let event = HookEvent::Setup;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
-        // Dispatch SessionStart hooks (fire-and-forget, observational only)
-        {
-            let registry = agent.hook_registry.clone();
-            let config = agent.dispatch_config.clone();
-            let session_id = agent.session.id.clone();
-            let cwd = agent.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("SessionStart")
-                .build();
-            let ctx = HookContext::for_session_start(session_id, cwd);
-            let event = HookEvent::SessionStart;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
-
-        // Wire DCP plugin into registry so DCP tools can access it
-        #[cfg(feature = "dcp")]
-        if let Some(dcp) = agent.dcp.take() {
-            agent.registry.set_dcp(dcp);
-        }
-
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("create");
+        agent.fire_session_lifecycle_hook("session_start", "create");
         crate::telemetry::begin_session_with_parent(
             agent.provider.name(),
             &agent.provider.model(),
@@ -459,35 +348,12 @@ impl Agent {
         agent
     }
 
-    /// Set the best-of-N context on this agent. Called by the orchestrator
-    /// before a candidate run so that propose_* tools can attribute their
-    /// proposals to the correct run + candidate.
-    pub fn set_best_of_n_context(&mut self, run_id: String, candidate_id: String) {
-        self.best_of_n_run_id = Some(run_id);
-        self.best_of_n_candidate_id = Some(candidate_id);
-    }
-
     pub fn new_with_session(
         provider: Arc<dyn Provider>,
         registry: Registry,
         session: Session,
         allowed_tools: Option<HashSet<String>>,
     ) -> Self {
-        // FIX: Same as new() — apply config default_model before build_base.
-        // Server restarts (jcode restart) create agents through this path too.
-        let config_model = crate::config::config().provider.default_model.clone();
-        if let Some(ref model) = config_model
-            && !model.trim().is_empty()
-            && let Err(e) = provider.set_model(model.trim())
-        {
-            crate::logging::warn(&format!(
-                "Failed to apply config default_model '{}': {}; falling back to provider default {}",
-                model.trim(),
-                e,
-                provider.model()
-            ));
-        }
-
         let tool_selection = if let Some(allowed_tools) = allowed_tools {
             crate::config::ToolSelection {
                 allowed_tools: Some(allowed_tools),
@@ -530,35 +396,9 @@ impl Agent {
         agent.restore_reasoning_effort_from_session();
         agent.session.ensure_initial_session_context_message();
         agent.sync_memory_dedup_state_from_session();
-
-        // Dispatch SessionStart hooks (fire-and-forget, observational only)
-        {
-            let registry = agent.hook_registry.clone();
-            let config = agent.dispatch_config.clone();
-            let session_id = agent.session.id.clone();
-            let cwd = agent.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("SessionStart")
-                .build();
-            let ctx = HookContext::for_session_start(session_id, cwd);
-            let event = HookEvent::SessionStart;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
-
-        // Wire DCP plugin into registry so DCP tools can access it
-        #[cfg(feature = "dcp")]
-        if let Some(dcp) = agent.dcp.take() {
-            agent.registry.set_dcp(dcp);
-        }
-
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("attach");
+        agent.fire_session_lifecycle_hook("session_start", "attach");
         crate::telemetry::begin_session_with_parent(
             agent.provider.name(),
             &agent.provider.model(),
@@ -694,7 +534,6 @@ impl Agent {
         self.cache_tracker.reset();
         self.last_usage = TokenUsage::default();
         self.locked_tools = None;
-        self.todo_orchestrator_enabled = false;
         self.mcp_late_register_resolved = false;
         self.rewind_undo_snapshot = None;
     }
@@ -771,30 +610,6 @@ impl Agent {
     }
 
     fn messages_for_provider(&mut self) -> (Vec<Message>, Option<CompactionEvent>) {
-        // Step 1: Get raw messages from session
-        #[cfg_attr(not(feature = "dcp"), allow(unused_mut))]
-        let mut messages: Vec<Message> = self.session.provider_messages().to_vec();
-
-        // Step 2: Optionally run DCP transform before compaction.
-        #[cfg(feature = "dcp")]
-        if let Some(dcp_plugin) = Self::get_current_dcp()
-            && let Ok(mut dcp) = dcp_plugin.lock()
-            && dcp.is_enabled()
-        {
-            match dcp.transform(&messages) {
-                Ok(output) if output.changed => {
-                    logging::info(&format!(
-                        "DCP: transformed messages, saved {} tokens",
-                        output.tokens_saved
-                    ));
-                    messages = output.messages;
-                }
-                Ok(_) => {}
-                Err(e) => logging::warn(&format!("DCP transform error: {e}")),
-            }
-        }
-
-        // Step 3: Feed DCP-pruned messages into CompactionManager.
         if self.provider.supports_compaction() || self.session.compaction.is_some() {
             let compaction = self.registry.compaction();
             match compaction.try_write() {
@@ -802,9 +617,10 @@ impl Agent {
                     let discarded_oversized_native =
                         manager.discard_oversized_openai_native_compaction();
                     let messages = {
+                        let all_messages = self.session.provider_messages();
                         if self.provider.uses_jcode_compaction() {
                             let action =
-                                manager.ensure_context_fits(&messages, self.provider.clone());
+                                manager.ensure_context_fits(all_messages, self.provider.clone());
                             match action {
                                 crate::compaction::CompactionAction::BackgroundStarted {
                                     trigger,
@@ -823,7 +639,7 @@ impl Agent {
                                 crate::compaction::CompactionAction::None => {}
                             }
                         }
-                        manager.messages_for_api_with(&messages)
+                        manager.messages_for_api_with(all_messages)
                     };
                     let event = manager.take_compaction_event();
                     if event.is_some() || discarded_oversized_native {
@@ -852,6 +668,8 @@ impl Agent {
             };
         }
 
+        let all_messages = self.session.provider_messages();
+        let messages = all_messages.to_vec();
         let user_count = messages
             .iter()
             .filter(|message| matches!(message.role, Role::User))
@@ -1027,73 +845,28 @@ impl Agent {
             &self.provider.model(),
             crate::telemetry::SessionEndReason::NormalExit,
         );
-
-        // Dispatch SessionEnd hooks (fire-and-forget, observational only)
-        {
-            let registry = self.hook_registry.clone();
-            let config = self.dispatch_config.clone();
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("SessionEnd")
-                .build();
-            let ctx = HookContext::for_session_end(session_id.clone());
-            let event = HookEvent::SessionEnd;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
-
-        // Dispatch AgentEnd hooks (fire-and-forget, observational only)
-        {
-            let registry = self.hook_registry.clone();
-            let config = self.dispatch_config.clone();
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("AgentEnd")
-                .build();
-            let ctx = HookContext::for_agent_end(session_id);
-            let event = HookEvent::AgentEnd;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
-
         self.persist_soft_interrupt_snapshot();
         self.session.mark_closed();
         if !self.session.messages.is_empty() {
             self.persist_session_best_effort("session close state");
         }
+        self.fire_session_lifecycle_hook("session_end", "close");
+    }
 
-        // Dispatch SessionUpdated hooks — session state changed to "closed"
-        {
-            let registry = self.hook_registry.clone();
-            let config = self.dispatch_config.clone();
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("SessionUpdated")
-                .session_state("active", "closed", "normal_exit")
-                .build();
-            let ctx = HookContext::for_session_updated(session_id, cwd);
-            let event = HookEvent::SessionUpdated;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
+    /// Fire a session lifecycle observer hook (`session_start`/`session_end`).
+    /// No-op when the hook is not configured.
+    pub(crate) fn fire_session_lifecycle_hook(&self, event_name: &'static str, source: &str) {
+        if !crate::hooks::hook_configured(event_name) {
+            return;
         }
+        let mut event = crate::hooks::HookEvent::new(event_name)
+            .session_id(self.session.id.clone())
+            .field("SOURCE", source)
+            .field("MODEL", self.provider_model());
+        if let Some(cwd) = self.working_dir() {
+            event = event.cwd(cwd);
+        }
+        crate::hooks::dispatch_observer(event);
     }
 
     pub fn mark_crashed(&mut self, message: Option<String>) {
@@ -1102,71 +875,16 @@ impl Agent {
             &self.provider.model(),
             crate::telemetry::SessionEndReason::Unknown,
         );
-        let crash_msg = message
-            .clone()
-            .unwrap_or_else(|| "unknown crash".to_string());
         self.persist_soft_interrupt_snapshot();
         self.session.mark_crashed(message);
         if !self.session.messages.is_empty() {
             self.persist_session_best_effort("session crash state");
-        }
-
-        // Dispatch SessionUpdated hooks — session state changed to "crashed"
-        {
-            let registry = self.hook_registry.clone();
-            let config = self.dispatch_config.clone();
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("SessionUpdated")
-                .session_state("active", "crashed", &crash_msg)
-                .build();
-            let ctx = HookContext::for_session_updated(session_id.clone(), cwd.clone());
-            let event = HookEvent::SessionUpdated;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
-
-        // Dispatch SessionError hooks — the session encountered a fatal error
-        {
-            let registry = self.hook_registry.clone();
-            let config = self.dispatch_config.clone();
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let mut hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("SessionError")
-                .build();
-            hook_input.error = Some(crash_msg);
-            let ctx = HookContext::for_session_error(session_id, cwd);
-            let event = HookEvent::SessionError;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
         }
     }
 
     /// Get the last token usage from the most recent API request
     pub fn last_usage(&self) -> &TokenUsage {
         &self.last_usage
-    }
-
-    /// Get a reference to the hook registry for external dispatch.
-    pub fn hook_registry(&self) -> &HookRegistry {
-        &self.hook_registry
-    }
-
-    /// Get a reference to the dispatch configuration for external dispatch.
-    pub fn dispatch_config(&self) -> &DispatchConfig {
-        &self.dispatch_config
     }
 
     pub fn token_usage_totals(&self) -> crate::protocol::TokenUsageTotals {

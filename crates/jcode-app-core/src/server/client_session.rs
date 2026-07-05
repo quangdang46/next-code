@@ -345,6 +345,7 @@ async fn ensure_client_swarm_member(
                     swarm_enabled,
                     status: "ready".to_string(),
                     detail: None,
+                    task_label: None,
                     friendly_name: member_name.clone(),
                     report_back_to_session_id: None,
                     latest_completion_report: None,
@@ -562,6 +563,7 @@ pub(super) async fn handle_subscribe(
                             notification_type: NotificationType::Message {
                                 scope: Some("swarm".to_string()),
                                 channel: None,
+                                tldr: None,
                             },
                             message: "You are now the coordinator for this swarm.".to_string(),
                         });
@@ -1078,10 +1080,17 @@ pub(super) async fn handle_resume_session(
         let _ = client_event_tx.send(ServerEvent::Done { id });
         // Resolve project-local MCP config against the resumed session's
         // working dir, not the server process cwd (issue #420).
-        let mcp_working_dir = {
-            let agent_guard = live_target_agent.lock().await;
-            agent_guard.working_dir().map(PathBuf::from)
-        };
+        // Do not block on the agent lock here: the target agent may be busy
+        // mid-turn (lock held), and awaiting it would deadlock the resume.
+        let mcp_working_dir = live_target_agent
+            .try_lock()
+            .ok()
+            .and_then(|agent_guard| agent_guard.working_dir().map(PathBuf::from))
+            .or_else(|| {
+                crate::session::Session::load_startup_stub(&session_id)
+                    .ok()
+                    .and_then(|session| session.working_dir.map(PathBuf::from))
+            });
         registry
             .register_mcp_tools_for_dir(
                 Some(client_event_tx.clone()),
@@ -1303,6 +1312,15 @@ pub(super) async fn handle_resume_session(
                     member.status = "ready".to_string();
                     member.detail = None;
                     members.insert(session_id.clone(), member);
+                }
+                // Keep the spawn tree intact across the rename: children that
+                // reported back to the old session id must follow it, otherwise
+                // ownership (stop permissions, subtree broadcast, report-back)
+                // silently dangles on a dead id.
+                for member in members.values_mut() {
+                    if member.report_back_to_session_id.as_deref() == Some(&old_session_id) {
+                        member.report_back_to_session_id = Some(session_id.clone());
+                    }
                 }
             }
             remove_session_channel_subscriptions(

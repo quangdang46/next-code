@@ -26,6 +26,7 @@ pub fn default_comm_cleanup_target_statuses() -> Vec<String> {
         "completed".to_string(),
         "failed".to_string(),
         "stopped".to_string(),
+        "crashed".to_string(),
     ]
 }
 
@@ -35,6 +36,7 @@ pub fn default_comm_run_await_statuses() -> Vec<String> {
         "completed".to_string(),
         "failed".to_string(),
         "stopped".to_string(),
+        "crashed".to_string(),
     ]
 }
 
@@ -44,6 +46,7 @@ pub fn default_comm_await_target_statuses() -> Vec<String> {
         "completed".to_string(),
         "stopped".to_string(),
         "failed".to_string(),
+        "crashed".to_string(),
     ]
 }
 
@@ -161,6 +164,17 @@ pub fn format_comm_members(current_session_id: &str, members: &[AgentInfo]) -> S
                 .as_deref()
                 .map(|detail| format!(" — {}", detail))
                 .unwrap_or_default();
+            // Stable task label: what this agent was spawned/assigned for.
+            // Skip when the transient detail already says the same thing.
+            let task_suffix = match member.task_label.as_deref() {
+                Some(task)
+                    if !task.trim().is_empty()
+                        && member.detail.as_deref().is_none_or(|d| !d.contains(task)) =>
+                {
+                    format!("\n    Task: {}", task)
+                }
+                _ => String::new(),
+            };
             let age_suffix = match member.status_age_secs {
                 Some(age) if status == "ready" || status == "idle" => {
                     format!(" · idle {}", format_secs(age))
@@ -168,6 +182,15 @@ pub fn format_comm_members(current_session_id: &str, members: &[AgentInfo]) -> S
                 Some(age) if status == "running" => format!(" · {}", format_secs(age)),
                 Some(age) => format!(" · {} ago", format_secs(age)),
                 None => String::new(),
+            };
+            // Last observed activity (tokens/tools/heartbeats). status_age only
+            // tracks lifecycle transitions, so a worker mid-turn for minutes
+            // looks stale without this even while it streams tokens.
+            let activity_age_suffix = match member.last_activity_age_secs {
+                Some(age) if status == "running" || status == "queued" => {
+                    format!(" · active {} ago", format_secs(age))
+                }
+                _ => String::new(),
             };
 
             // Live activity: what the agent is doing right now.
@@ -248,13 +271,15 @@ pub fn format_comm_members(current_session_id: &str, members: &[AgentInfo]) -> S
             };
 
             output.push_str(&format!(
-                "  {}{} ({})\n    Status: {}{}{}{}{}{}{}{}{}{}\n",
+                "  {}{} ({})\n    Status: {}{}{}{}{}{}{}{}{}{}{}{}\n",
                 name,
                 role_label,
                 if is_me { "you" } else { session },
                 status,
                 detail_suffix,
                 age_suffix,
+                activity_age_suffix,
+                task_suffix,
                 activity_suffix,
                 progress_suffix,
                 work_suffix,
@@ -365,6 +390,9 @@ pub fn format_comm_status_snapshot(snapshot: &AgentStatusSnapshot) -> String {
     if let Some(attachments) = snapshot.live_attachments {
         meta.push(format!("attachments={attachments}"));
     }
+    if let Some(age_secs) = snapshot.last_activity_age_secs {
+        meta.push(format!("active={} ago", format_secs(age_secs)));
+    }
     if let Some(age_secs) = snapshot.status_age_secs {
         meta.push(format!("status_age={}s", age_secs));
     }
@@ -452,6 +480,14 @@ pub fn format_comm_plan_status(summary: &PlanGraphStatus) -> String {
             "  Failed (terminal without completing): {}\n",
             summary.failed_ids.join(", ")
         ));
+        // Recorded failure reasons (from the durable task progress): a run
+        // that burned nodes on e.g. a 401 credential wave must explain itself
+        // here instead of only listing ids.
+        for id in &summary.failed_ids {
+            if let Some(reason) = summary.failed_reasons.get(id) {
+                output.push_str(&format!("    {}: {}\n", id, reason));
+            }
+        }
     }
     if !summary.low_confidence_ids.is_empty() {
         output.push_str(&format!(

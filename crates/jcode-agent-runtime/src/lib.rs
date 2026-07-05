@@ -61,6 +61,10 @@ impl InterruptSignal {
         }
     }
 
+    pub fn same_instance(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.flag, &other.flag)
+    }
+
     pub fn fire(&self) {
         self.epoch
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);

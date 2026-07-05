@@ -24,6 +24,7 @@ fn test_swarm_plan_event_roundtrip_with_summary() -> Result<()> {
             active_ids: Vec::new(),
             completed_ids: Vec::new(),
             failed_ids: Vec::new(),
+            failed_reasons: Default::default(),
             cycle_ids: Vec::new(),
             unresolved_dependency_ids: Vec::new(),
             next_ready_ids: vec!["task-1".to_string()],
@@ -77,6 +78,7 @@ fn test_comm_task_control_response_roundtrip() -> Result<()> {
             active_ids: vec!["task-1".to_string()],
             completed_ids: vec!["setup".to_string()],
             failed_ids: Vec::new(),
+            failed_reasons: Default::default(),
             cycle_ids: Vec::new(),
             unresolved_dependency_ids: Vec::new(),
             next_ready_ids: vec!["task-2".to_string()],
@@ -228,6 +230,7 @@ fn test_comm_status_response_roundtrip() -> Result<()> {
             is_headless: Some(true),
             live_attachments: Some(0),
             status_age_secs: Some(5),
+            last_activity_age_secs: Some(2),
             joined_age_secs: Some(30),
             files_touched: vec!["src/main.rs".to_string()],
             activity: Some(SessionActivitySnapshot {

@@ -23,7 +23,6 @@ use crate::memory::{self, MemoryEntry, MemoryManager};
 use crate::memory_graph::{ClusterEntry, EdgeKind, MemoryGraph};
 use crate::memory_types::{MemoryEventKind, MemoryState, StepResult, StepStatus};
 use crate::sidecar::Sidecar;
-use jcode_memory_types::MemoryScope;
 
 /// Context from a retrieval operation for post-retrieval maintenance
 #[derive(Debug, Clone)]
@@ -157,12 +156,6 @@ pub fn build_transcript_for_extraction(messages: &[crate::message::Message]) -> 
         transcript.push('\n');
     }
     transcript
-}
-
-/// Create a default memory provider that wraps the legacy MemoryManager.
-/// Used by extraction and maintenance functions that need graph access.
-pub fn default_memory_provider() -> Arc<MemoryManager> {
-    Arc::new(MemoryManager::new())
 }
 
 fn manager_for_working_dir(working_dir: Option<&str>) -> MemoryManager {
@@ -381,9 +374,6 @@ pub struct MemoryAgent {
     /// Channel to receive messages
     rx: mpsc::Receiver<AgentMessage>,
 
-    /// Optional sidecar for LLM-backed memory decisions.
-    sidecar: Option<Sidecar>,
-
     /// Per-session state keyed by session ID
     sessions: HashMap<String, SessionState>,
 }
@@ -393,9 +383,19 @@ impl MemoryAgent {
     fn new(rx: mpsc::Receiver<AgentMessage>) -> Self {
         Self {
             rx,
-            sidecar: memory::memory_sidecar_enabled().then(Sidecar::new),
             sessions: HashMap::new(),
         }
+    }
+
+    /// Construct a fresh sidecar for an LLM-backed memory operation, but ONLY
+    /// when the LLM precision-judge path is actually usable right now (sidecar
+    /// mode is enabled AND a real LLM backend is reachable).
+    ///
+    /// Built fresh on each call rather than cached at construction so that
+    /// login changes (gaining or losing access to a provider/credentials) are
+    /// reflected immediately without restarting the agent.
+    fn live_sidecar(&self) -> Option<Sidecar> {
+        memory::memory_llm_judge_available().then(Sidecar::new)
     }
 
     /// Reset all agent state
@@ -485,6 +485,33 @@ impl MemoryAgent {
         if context.is_empty() {
             return Ok(());
         }
+        // Memory is only productive with the LLM precision judge. If sidecar mode
+        // is requested but no LLM backend is reachable (e.g. logged out / lost
+        // provider access), go dormant for this turn instead of silently
+        // degrading to the low-precision no-LLM hybrid path. Re-checked live, so
+        // memory resumes automatically once a login returns.
+        if !memory::memory_runtime_active() {
+            crate::logging::event_rate_limited(
+                crate::logging::LogLevel::Info,
+                "memory_runtime_dormant",
+                std::time::Duration::from_secs(300),
+                "MEMORY_RUNTIME_DORMANT",
+                vec![
+                    ("session_id", session_id.to_string()),
+                    (
+                        "reason",
+                        "sidecar_mode_without_reachable_llm_backend".to_string(),
+                    ),
+                ],
+            );
+            memory::set_state(MemoryState::Idle);
+            crate::memory_judge_metrics::record(
+                crate::memory_judge_metrics::JudgeDecision::NoBackend,
+                session_id,
+                0,
+            );
+            return Ok(());
+        }
         // Focused query (latest user intent, boilerplate/tool-noise stripped) used
         // for listwise LLM reranking. Benchmarking showed the cross-encoder/LLM
         // reranker only works with this focused query, not the full noisy window.
@@ -514,7 +541,8 @@ impl MemoryAgent {
         memory::set_state(MemoryState::Embedding);
         memory::add_event(MemoryEventKind::EmbeddingStarted);
 
-        // Step 1: Embed current context
+        // Step 1: Embed current context (via the active embedding backend:
+        // local MiniLM by default, or the remote OpenAI backend when configured).
         let start = Instant::now();
         let context_for_embedding = context.clone();
         let context_embedding = match tokio::task::spawn_blocking(move || {
@@ -678,18 +706,17 @@ impl MemoryAgent {
 
         // Cadence gate for the EXPENSIVE Mode-2 rerank: run the listwise LLM
         // rerank at most once per `memory_rerank_cadence` turns. Skipped turns
-        // still surface memories via hybrid order (recall@5 ~0.53 vs ~0.79 on a
-        // reranked turn) - never blind. A topic change or the first rerank of a
-        // session always fires, so genuine topic jumps are never delayed.
+        // re-surface only the last judge-verified set (never unvetted hybrid),
+        // so precision is preserved between reranks. A topic change or the first
+        // rerank of a session always fires, so genuine topic jumps are never
+        // delayed.
         let should_rerank = {
             let cadence = crate::config::config().agents.memory_rerank_cadence;
             let ss = self.session_state(session_id);
             should_run_rerank(ss.turn_count, ss.last_rerank_turn, cadence, topic_changed)
         };
 
-        let relevant = if memory::memory_sidecar_enabled()
-            && let Some(sidecar) = self.sidecar.as_ref()
-        {
+        let relevant = if let Some(sidecar) = self.live_sidecar() {
             if should_rerank {
                 let agents = &crate::config::config().agents;
                 let votes = agents.memory_rerank_votes.max(1);
@@ -743,17 +770,12 @@ impl MemoryAgent {
                 // candidate set), preserving high precision. Falling back to the
                 // noisy no-LLM hybrid order here would inject low-similarity
                 // bloat (the exact behavior we are trying to avoid).
-                let verified: HashSet<String> = self
-                    .session_state(session_id)
-                    .last_verified_ids
-                    .iter()
-                    .cloned()
-                    .collect();
-                let carried: Vec<_> = new_candidates
-                    .into_iter()
-                    .filter(|(e, _)| verified.contains(&e.id))
-                    .map(|(e, _)| e)
-                    .collect();
+                crate::memory_judge_metrics::record(
+                    crate::memory_judge_metrics::JudgeDecision::CadenceCarry,
+                    session_id,
+                    candidate_ids.len(),
+                );
+                let carried = self.carry_verified(session_id, new_candidates);
                 crate::logging::info(&format!(
                     "[{}] Memory rerank gated by cadence; re-surfacing {} consensus-verified memories",
                     session_id,
@@ -762,6 +784,16 @@ impl MemoryAgent {
                 carried
             }
         } else {
+            // No LLM judge. This is reached only when the user explicitly opted
+            // OUT of the sidecar (`memory_sidecar_enabled = false`); when sidecar
+            // mode is on but no LLM backend is reachable, `process_context`
+            // returns early before this point (memory goes dormant rather than
+            // degrading to the low-precision no-LLM path).
+            crate::memory_judge_metrics::record(
+                crate::memory_judge_metrics::JudgeDecision::OptedOut,
+                session_id,
+                candidate_ids.len(),
+            );
             self.select_top_candidates_no_sidecar(session_id, new_candidates)
         };
 
@@ -820,7 +852,7 @@ impl MemoryAgent {
         }
 
         // Step 5: Post-retrieval maintenance (runs in background)
-        self.post_retrieval_maintenance(&memory_manager, retrieval_ctx)
+        self.post_retrieval_maintenance(memory_manager, retrieval_ctx)
             .await;
 
         Ok(())
@@ -882,13 +914,16 @@ impl MemoryAgent {
     /// This is an incremental extraction - we extract from a portion of the
     /// conversation (on topic change or periodically) rather than waiting for session end.
     async fn extract_from_context(&self, session_id: &str, context: &str, reason: &str) {
-        if !memory::memory_sidecar_enabled() {
+        // Memory extraction requires the LLM. Skip when sidecar mode is off OR
+        // (sidecar mode on but) no LLM backend is reachable. Re-checked live so a
+        // login change is reflected without a restart.
+        let Some(sidecar) = self.live_sidecar() else {
             crate::logging::info(&format!(
-                "Incremental extraction skipped for session {}: memory sidecar disabled",
+                "Incremental extraction skipped for session {}: LLM judge unavailable",
                 session_id
             ));
             return;
-        }
+        };
 
         // Don't extract from very short contexts
         if context.len() < 200 {
@@ -903,13 +938,6 @@ impl MemoryAgent {
             reason: reason.to_string(),
         });
 
-        let Some(sidecar) = self.sidecar.clone() else {
-            crate::logging::info(&format!(
-                "Incremental extraction skipped for session {}: sidecar unavailable",
-                session_id
-            ));
-            return;
-        };
         let memory_manager = self.manager_for_session(session_id);
         let context_owned = context.to_string();
 
@@ -1140,7 +1168,7 @@ impl MemoryAgent {
     /// 4. Log memory gaps for future learning
     async fn post_retrieval_maintenance(
         &self,
-        memory_manager: &MemoryManager,
+        memory_manager: MemoryManager,
         ctx: RetrievalContext,
     ) {
         memory::set_state(MemoryState::Maintaining {
@@ -1155,7 +1183,6 @@ impl MemoryAgent {
         });
 
         // Run maintenance in background - don't block retrieval flow
-        let memory_manager = memory_manager.clone();
         tokio::spawn(async move {
             let started = Instant::now();
 

@@ -30,30 +30,6 @@ impl Agent {
         if trace_enabled() {
             eprintln!("[trace] session_id {}", self.session.id);
         }
-        let result = self.run_turn(false).await;
-        // Post-turn: run orchestrator if enabled (skip on child agents to avoid recursion).
-        if result.is_ok() && self.todo_orchestrator_enabled {
-            if let Err(e) = self.poll_todo_pipeline().await {
-                crate::logging::warn(&format!("[orchestrator] poll failed: {e}"));
-            }
-        }
-        result
-    }
-
-    /// Inner run_once_capture used by child agents spawned by the orchestrator.
-    /// Does NOT trigger the post-turn orchestrator hook.
-    pub(crate) async fn run_once_capture_inner(&mut self, user_message: &str) -> Result<String> {
-        self.add_message(
-            Role::User,
-            vec![ContentBlock::Text {
-                text: user_message.to_string(),
-                cache_control: None,
-            }],
-        );
-        self.session.save()?;
-        if trace_enabled() {
-            eprintln!("[trace] session_id {}", self.session.id);
-        }
         self.run_turn(false).await
     }
 
@@ -69,7 +45,7 @@ impl Agent {
         let alerts = self.take_alerts();
         if !alerts.is_empty() {
             let alert_text = format!(
-                "[NOTIFICATION]\nYou received {} notification(s) from other agents working in this codebase:\n\n{}\n\nUse the communicate tool (actions: list, read, message/broadcast, dm, channel, share) to coordinate with other agents.",
+                "[NOTIFICATION]\nYou received {} notification(s) from other agents working in this codebase:\n\n{}\n\nUse the communicate tool to coordinate with other agents (prefer dm; broadcast reaches only your spawned subtree).",
                 alerts.len(),
                 alerts.join("\n\n---\n\n")
             );
@@ -99,69 +75,6 @@ impl Agent {
                 "Agent received message with {} image(s)",
                 blocks.len() - 1
             ));
-        }
-
-        // UserPromptSubmit hook — BLOCKING: can deny the prompt before it enters the conversation
-        {
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let hook_ctx = HookContext::new(&session_id, "", &cwd, "UserPromptSubmit");
-            let handlers = self
-                .hook_registry
-                .get_matching(&HookEvent::UserPromptSubmit, &hook_ctx);
-            if !handlers.is_empty() {
-                let hook_input = HookInputBuilder::new()
-                    .session(&session_id, &cwd)
-                    .event("UserPromptSubmit")
-                    .prompt(user_message)
-                    .build();
-                let stats = jcode_hooks::dispatch_hooks(
-                    &HookEvent::UserPromptSubmit,
-                    &hook_input,
-                    &handlers,
-                    &self.dispatch_config,
-                )
-                .await;
-                if stats.any_denied() {
-                    let deny_reason = stats
-                        .results
-                        .iter()
-                        .find(|r| matches!(r.outcome, jcode_hooks::ClassifiedOutcome::Deny { .. }))
-                        .map(|r| match &r.outcome {
-                            jcode_hooks::ClassifiedOutcome::Deny { reason } => reason.clone(),
-                            _ => String::new(),
-                        })
-                        .unwrap_or_else(|| "blocked by hook".to_string());
-                    return Err(anyhow::anyhow!("Prompt blocked by hook: {}", deny_reason));
-                }
-            }
-        }
-
-        // UserPromptExpansion hook (fire-and-forget, diagnostic)
-        {
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let hook_ctx = HookContext::new(&session_id, "", &cwd, "UserPromptExpansion");
-            let handlers = self
-                .hook_registry
-                .get_matching(&HookEvent::UserPromptExpansion, &hook_ctx);
-            if !handlers.is_empty() {
-                let hook_input = HookInputBuilder::new()
-                    .session(&session_id, &cwd)
-                    .event("UserPromptExpansion")
-                    .prompt(user_message)
-                    .build();
-                let event = HookEvent::UserPromptExpansion;
-                let handlers: Vec<jcode_hooks::HookHandlerConfig> =
-                    handlers.into_iter().cloned().collect();
-                let dispatch_config = self.dispatch_config.clone();
-                tokio::spawn(async move {
-                    let refs: Vec<&jcode_hooks::HookHandlerConfig> = handlers.iter().collect();
-                    let _ =
-                        jcode_hooks::dispatch_hooks(&event, &hook_input, &refs, &dispatch_config)
-                            .await;
-                });
-            }
         }
 
         self.add_message(Role::User, blocks);
@@ -204,48 +117,29 @@ impl Agent {
         started_at: Instant,
         start_message_index: usize,
     ) {
-        let session_id = self.session.id.clone();
-        let cwd = self.working_dir().unwrap_or_default().to_string();
-        let ctx = HookContext::for_turn_end(session_id.clone(), cwd.clone());
-        let handlers: Vec<jcode_hooks::HookHandlerConfig> = self
-            .hook_registry
-            .get_matching(&HookEvent::TurnEnd, &ctx)
-            .into_iter()
-            .cloned()
-            .collect();
-        if handlers.is_empty() {
+        if !crate::hooks::hook_configured("turn_end") {
             return;
         }
-
-        let duration_ms = started_at.elapsed().as_millis() as u64;
-        let model = self.provider_model();
-        let dispatch_config = self.dispatch_config.clone();
-
-        let mut input = HookInputBuilder::new()
-            .session(&session_id, &cwd)
-            .event("TurnEnd")
-            .duration(duration_ms)
-            .build();
-        input.model = Some(model);
-
-        // Add last assistant text snippet
+        let status = if result.is_ok() { "ok" } else { "error" };
+        let mut event = crate::hooks::HookEvent::new("turn_end")
+            .session_id(self.session.id.clone())
+            .field("STATUS", status)
+            .field("DURATION_MS", started_at.elapsed().as_millis().to_string())
+            .field("MODEL", self.provider_model());
+        if let Some(cwd) = self.working_dir() {
+            event = event.cwd(cwd);
+        }
         if let Some(text) = self.latest_assistant_text_after(start_message_index) {
             const LAST_TEXT_LIMIT: usize = 4000;
-            input.prompt_text = Some(text.chars().take(LAST_TEXT_LIMIT).collect());
+            let snippet: String = text.chars().take(LAST_TEXT_LIMIT).collect();
+            event = event.field("LAST_ASSISTANT_TEXT", snippet);
         }
-
-        // Add error info on failure
         if let Err(error) = result {
             const ERROR_LIMIT: usize = 1000;
             let message: String = error.to_string().chars().take(ERROR_LIMIT).collect();
-            input.stop_reason = Some(message);
+            event = event.field("ERROR", message);
         }
-
-        let event = HookEvent::TurnEnd;
-        tokio::spawn(async move {
-            let refs: Vec<&jcode_hooks::HookHandlerConfig> = handlers.iter().collect();
-            jcode_hooks::dispatch_hooks(&event, &input, &refs, &dispatch_config).await;
-        });
+        crate::hooks::dispatch_observer(event);
     }
 
     /// Clear conversation history
@@ -566,7 +460,7 @@ impl Agent {
         name: &str,
         input: serde_json::Value,
     ) -> Result<crate::tool::ToolOutput> {
-        self.validate_tool_allowed(name, Some(&input)).await?;
+        self.validate_tool_allowed(name)?;
 
         let call_id = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -580,8 +474,6 @@ impl Agent {
             stdin_request_tx: self.stdin_request_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             execution_mode: ToolExecutionMode::Direct,
-            best_of_n_run_id: self.best_of_n_run_id.clone(),
-            best_of_n_candidate_id: self.best_of_n_candidate_id.clone(),
         };
         self.registry.execute(name, input, ctx).await
     }
@@ -636,11 +528,7 @@ impl Agent {
         Ok(())
     }
 
-    pub(super) async fn validate_tool_allowed(
-        &self,
-        name: &str,
-        input: Option<&serde_json::Value>,
-    ) -> Result<()> {
+    pub(super) fn validate_tool_allowed(&self, name: &str) -> Result<()> {
         if let Some(allowed) = self.allowed_tools.as_ref()
             && !allowed.contains(name)
         {
@@ -648,101 +536,6 @@ impl Agent {
         }
         if self.disabled_tools.contains(name) {
             return Err(anyhow::anyhow!("Tool '{}' is disabled", name));
-        }
-        // Delegate to dcg_bridge for permission mode evaluation.
-        // Uses classify_for_session so that per-session overrides (e.g. a
-        // subagent spawned with an explicit mode) are honored; falls back to
-        // the global mode when no per-session override is set.
-        // - Allow → proceed
-        // - Deny → block with error
-        // - Prompt → block with a permission-required error and surface a
-        //   TUI dialog via the bus
-        {
-            use crate::dcg_bridge::{self, BridgeDecision};
-            match dcg_bridge::classify_for_session(name, &self.session.id) {
-                BridgeDecision::Deny {
-                    reason,
-                    alternatives,
-                    ..
-                } => {
-                    let msg = if alternatives.is_empty() {
-                        format!(
-                            "Tool '{}' blocked: {}. Current mode: {:?}",
-                            name,
-                            reason,
-                            crate::dcg_bridge::current_mode()
-                        )
-                    } else {
-                        format!(
-                            "Tool '{}' blocked: {}. Alternatives: {}. Current mode: {:?}",
-                            name,
-                            reason,
-                            alternatives.join(", "),
-                            crate::dcg_bridge::current_mode()
-                        )
-                    };
-                    crate::logging::info(&format!(
-                        "[permission] Denied tool '{}': {} (mode {:?})",
-                        name,
-                        reason,
-                        crate::dcg_bridge::current_mode()
-                    ));
-                    return Err(anyhow::anyhow!(msg));
-                }
-                BridgeDecision::Prompt {
-                    reason,
-                    allow_once_code,
-                    alternatives,
-                } => {
-                    // Publish bus event so TUI can show a permission dialog
-                    let tool_input =
-                        input.and_then(|v| if v.is_null() { None } else { Some(v.clone()) });
-                    crate::bus::Bus::global().publish(crate::bus::BusEvent::PermissionRequested(
-                        crate::bus::PermissionRequested {
-                            session_id: self.session.id.clone(),
-                            tool_name: name.to_string(),
-                            reason: reason.clone(),
-                            allow_once_code: allow_once_code.clone(),
-                            alternatives: alternatives.clone(),
-                            tool_input,
-                        },
-                    ));
-
-                    // Await user response — tool execution PAUSES here (Claude Code behavior)
-                    match crate::dcg_bridge::await_permission_response().await {
-                        Ok(true) => {
-                            crate::dcg_bridge::approve_session_action(&self.session.id, name);
-                            crate::logging::info(&format!(
-                                "[permission] Approved '{}' for session {}",
-                                name, self.session.id
-                            ));
-                            return Ok(());
-                        }
-                        Ok(false) => {
-                            let msg = format!(
-                                "Tool '{}' denied by user. Current mode: {:?}",
-                                name,
-                                crate::dcg_bridge::current_mode()
-                            );
-                            crate::logging::info(&format!(
-                                "[permission] Denied '{}' by user for session {}",
-                                name, self.session.id
-                            ));
-                            return Err(anyhow::anyhow!(msg));
-                        }
-                        Err(e) => {
-                            let msg = format!(
-                                "Tool '{}' permission cancelled: {}. Current mode: {:?}",
-                                name,
-                                e,
-                                crate::dcg_bridge::current_mode()
-                            );
-                            return Err(anyhow::anyhow!(msg));
-                        }
-                    }
-                }
-                BridgeDecision::Allow => {}
-            }
         }
         Ok(())
     }
@@ -819,25 +612,7 @@ impl Agent {
         let env_snapshot_start = Instant::now();
         self.log_env_snapshot("resume");
         let env_snapshot_ms = env_snapshot_start.elapsed().as_millis();
-        // Dispatch SessionStart hook on resume (fire-and-forget, observational only)
-        {
-            let registry = self.hook_registry.clone();
-            let config = self.dispatch_config.clone();
-            let sid = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let hook_input = HookInputBuilder::new()
-                .session(&sid, &cwd)
-                .event("SessionStart")
-                .build();
-            let ctx = HookContext::for_session_start(sid, cwd);
-            let event = HookEvent::SessionStart;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
+        self.fire_session_lifecycle_hook("session_start", "resume");
 
         let save_start = Instant::now();
         if let Err(err) = self.session.save() {
@@ -867,29 +642,6 @@ impl Agent {
             "Session restored: {} messages in session",
             self.session.messages.len()
         ));
-
-        // Dispatch SessionUpdated hooks — session state changed to "active" via restore
-        {
-            let registry = self.hook_registry.clone();
-            let config = self.dispatch_config.clone();
-            let session_id = self.session.id.clone();
-            let cwd = self.session.working_dir.clone().unwrap_or_default();
-            let prev = previous_status.display().to_string();
-            let hook_input = HookInputBuilder::new()
-                .session(&session_id, &cwd)
-                .event("SessionUpdated")
-                .session_state(&prev, "active", "session_restored")
-                .build();
-            let ctx = HookContext::for_session_updated(session_id, cwd);
-            let event = HookEvent::SessionUpdated;
-            tokio::spawn(async move {
-                let handlers = registry.get_matching(&event, &ctx);
-                if !handlers.is_empty() {
-                    jcode_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
-                }
-            });
-        }
-
         Ok(previous_status)
     }
 
@@ -1127,7 +879,6 @@ impl Agent {
                         .with_source(&self.session.id)
                         .with_trust(trust);
 
-                    // Store via the MemoryManager's project-scoped storage.
                     if manager.remember_project(entry).is_ok() {
                         stored_count += 1;
                     }

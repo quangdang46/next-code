@@ -18,9 +18,6 @@
 //! intentionally record the API-dependent checkpoints as skipped so nothing is
 //! over-credited in the ledger.
 
-use jcode_base::auth::lifecycle::{
-    AuthActivationRequest, activate_auth_change, validate_catalog_invariants,
-};
 use crate::live_provider_probes::{
     fetch_live_openai_compatible_models, run_live_antigravity_native_reasoning_smoke,
     run_live_antigravity_native_smoke, run_live_antigravity_native_stream_smoke,
@@ -30,6 +27,9 @@ use crate::live_provider_probes::{
     run_live_native_provider_smoke, run_live_native_provider_stream_smoke,
     run_live_native_provider_tool_smoke, run_live_openai_compatible_smoke,
     run_live_openai_compatible_stream_smoke, run_live_openai_compatible_tool_smoke,
+};
+use jcode_base::auth::lifecycle::{
+    AuthActivationRequest, activate_auth_change, validate_catalog_invariants,
 };
 use jcode_base::live_tests::{
     self, LiveVerificationAuth, LiveVerificationEvent, LiveVerificationResult,
@@ -604,10 +604,10 @@ pub async fn run_claude_native_e2e(
     tier: DoctorTier,
 ) -> anyhow::Result<DoctorReport> {
     use jcode_base::provider::Provider;
-    use jcode_base::provider::anthropic::AnthropicProvider;
+    use jcode_provider_anthropic_runtime::AnthropicProvider;
 
-    let normalized =
-        jcode_base::auth::lifecycle::normalized_auth_provider_id(Some(provider_id)).unwrap_or("claude");
+    let normalized = jcode_base::auth::lifecycle::normalized_auth_provider_id(Some(provider_id))
+        .unwrap_or("claude");
     let provider_label = jcode_base::auth::lifecycle::provider_display_label(Some(normalized))
         .unwrap_or_else(|| "Anthropic/Claude".to_string());
     let provider_id = normalized.to_string();
@@ -1004,7 +1004,7 @@ pub async fn run_antigravity_native_e2e(
     tier: DoctorTier,
 ) -> anyhow::Result<DoctorReport> {
     use jcode_base::provider::Provider;
-    use jcode_base::provider::antigravity::AntigravityProvider;
+    use jcode_provider_antigravity_runtime::AntigravityProvider;
 
     // The antigravity login provider has a single fixed id; accept any alias the
     // caller passed (e.g. "antigravity") and normalize to the canonical id.
@@ -1432,23 +1432,30 @@ impl NativeProviderKind {
     /// Returns an error only when the runtime cannot be constructed at all (e.g.
     /// Copilot with no credential file); model selection happens later.
     fn build_runtime(self) -> anyhow::Result<std::sync::Arc<dyn jcode_base::provider::Provider>> {
-        use jcode_base::provider::Provider;
         use anyhow::Context as _;
+        use jcode_base::provider::Provider;
         let runtime: std::sync::Arc<dyn Provider> = match self {
             Self::OpenAi => {
-                let credentials = jcode_base::auth::codex::load_credentials().unwrap_or_else(|_| {
-                    jcode_base::auth::codex::CodexCredentials {
-                        access_token: String::new(),
-                        refresh_token: String::new(),
-                        id_token: None,
-                        account_id: None,
-                        expires_at: None,
-                    }
-                });
-                std::sync::Arc::new(jcode_base::provider::openai::OpenAIProvider::new(credentials))
+                let credentials =
+                    jcode_base::auth::codex::load_credentials().unwrap_or_else(|_| {
+                        jcode_base::auth::codex::CodexCredentials {
+                            access_token: String::new(),
+                            refresh_token: String::new(),
+                            id_token: None,
+                            account_id: None,
+                            expires_at: None,
+                        }
+                    });
+                std::sync::Arc::new(jcode_provider_openai_runtime::OpenAIProvider::new(
+                    credentials,
+                ))
             }
-            Self::Gemini => std::sync::Arc::new(jcode_base::provider::gemini::GeminiProvider::new()),
-            Self::Cursor => std::sync::Arc::new(jcode_base::provider::cursor::CursorCliProvider::new()),
+            Self::Gemini => {
+                std::sync::Arc::new(jcode_provider_gemini_runtime::GeminiProvider::new())
+            }
+            Self::Cursor => {
+                std::sync::Arc::new(jcode_provider_cursor_runtime::CursorCliProvider::new())
+            }
             Self::Copilot => {
                 // `new()` requires a loadable GitHub token; fall back to an empty
                 // token so the offline tier can still construct the runtime for
@@ -1461,15 +1468,17 @@ impl NativeProviderKind {
                 // the default grace window the doctor's immediate prefetch returns
                 // early without marking init done, so the live probes would hang.
                 jcode_base::env::set_var("JCODE_COPILOT_PREFETCH_STARTUP_GRACE_MS", "0");
-                let runtime = match jcode_base::provider::copilot::CopilotApiProvider::new() {
+                let runtime = match jcode_provider_copilot_runtime::CopilotApiProvider::new() {
                     Ok(runtime) => runtime,
-                    Err(_) => {
-                        jcode_base::provider::copilot::CopilotApiProvider::new_with_token(String::new())
-                    }
+                    Err(_) => jcode_provider_copilot_runtime::CopilotApiProvider::new_with_token(
+                        String::new(),
+                    ),
                 };
                 std::sync::Arc::new(runtime)
             }
-            Self::Bedrock => std::sync::Arc::new(jcode_base::provider::bedrock::BedrockProvider::new()),
+            Self::Bedrock => {
+                std::sync::Arc::new(jcode_base::provider::bedrock::BedrockProvider::new())
+            }
             Self::Jcode => std::sync::Arc::new(jcode_base::provider::jcode::JcodeProvider::new()),
             Self::Azure => {
                 // Azure OpenAI is the OpenRouter transport configured via Azure
@@ -1477,7 +1486,7 @@ impl NativeProviderKind {
                 // so the runtime points at the user's Azure deployment.
                 jcode_base::auth::azure::apply_runtime_env()
                     .context("apply Azure OpenAI runtime env")?;
-                let runtime = jcode_base::provider::openrouter::OpenRouterProvider::new()
+                let runtime = jcode_provider_openrouter_runtime::OpenRouterProvider::new()
                     .context("construct Azure OpenAI (OpenRouter transport) runtime")?;
                 // Azure exposes a single user-configured deployment rather than a
                 // live catalog; pin the runtime to it so the catalog/picker
