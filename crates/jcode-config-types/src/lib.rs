@@ -466,6 +466,12 @@ pub struct AgentsConfig {
     /// Lower values keep more of the transcript visible; set near the minimum
     /// to effectively collapse the gallery to a thin strip.
     pub swarm_gallery_max_pct: Option<u8>,
+    /// Layout of the inline swarm strip above the status line:
+    /// `"vertical"` (default) lists one agent per row (session icon + status
+    /// glyph + task), capped to a few lines; `"horizontal"` packs all agents
+    /// as chips on a single row.
+    #[serde(default)]
+    pub swarm_strip_layout: SwarmStripLayout,
     /// Optional default model override for the memory sidecar.
     pub memory_model: Option<String>,
     /// Whether memory should use the sidecar for relevance/extraction.
@@ -568,6 +574,7 @@ impl Default for AgentsConfig {
             swarm_model: None,
             swarm_spawn_mode: SwarmSpawnMode::default(),
             swarm_gallery_max_pct: None,
+            swarm_strip_layout: SwarmStripLayout::default(),
             memory_model: None,
             memory_sidecar_enabled: default_memory_sidecar_enabled(),
             memory_rerank_cadence: default_memory_rerank_cadence(),
@@ -617,6 +624,36 @@ impl SwarmSpawnMode {
             Self::Headless => "headless",
             Self::Inline => "inline",
             Self::Auto => "auto",
+        }
+    }
+}
+
+/// Layout of the inline swarm strip shown above the status line.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum SwarmStripLayout {
+    /// One agent per row: session icon + status glyph + task label, capped to
+    /// a few lines with a `+N more` overflow marker.
+    #[default]
+    Vertical,
+    /// All agents packed as chips on a single row (the historical layout).
+    Horizontal,
+}
+
+impl SwarmStripLayout {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "vertical" | "list" => Some(Self::Vertical),
+            "horizontal" | "chips" | "strip" => Some(Self::Horizontal),
+            _ => None,
+        }
+    }
+
+    /// Canonical lowercase string for this layout (matches config/env values).
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Vertical => "vertical",
+            Self::Horizontal => "horizontal",
         }
     }
 }
@@ -733,6 +770,33 @@ pub struct AutoReviewConfig {
     pub model: Option<String>,
 }
 
+/// Sponsored discovery configuration.
+///
+/// Sponsored discovery makes third-party developer tools discoverable to the
+/// agent via a `discover_tools` tool backed by a hosted manifest. Sponsors buy
+/// placement (discoverability), never recommendations. Every use is disclosed
+/// in the UI with a `[sponsored discovery]` tag. See
+/// <https://solosystems.dev/sponsored-discovery>.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SponsorsConfig {
+    /// Enable sponsored discovery. When false (the default), no discovery
+    /// categories are added to the prompt, the `discover_tools` tool is not
+    /// registered, and jcode never contacts the discovery endpoint.
+    pub enabled: bool,
+    /// Base URL of the discovery endpoint.
+    pub endpoint: String,
+}
+
+impl Default for SponsorsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            endpoint: "https://api.solosystems.dev/v1/discovery".to_string(),
+        }
+    }
+}
+
 /// Automatic end-of-turn execution judging configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
@@ -799,8 +863,9 @@ pub struct KeybindingsConfig {
     /// Toggle the info widget (default: "alt+i")
     pub info_widget_toggle: String,
     /// Focus/unfocus the inline swarm panel for keyboard navigation (default:
-    /// "alt+n"). Active only when `agents.swarm_spawn_mode = "inline"` and the
-    /// session manages swarm agents.
+    /// "alt+n"; press again to cycle agents, alt+↑/↓ select, alt+o pop out,
+    /// esc exits). Active only when `agents.swarm_spawn_mode = "inline"` and
+    /// the session manages swarm agents.
     pub swarm_panel_focus: String,
     /// Spawn a fresh jcode session in a new terminal window (default: unbound).
     /// Example: "alt+enter".

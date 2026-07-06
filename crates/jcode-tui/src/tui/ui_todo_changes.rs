@@ -313,6 +313,7 @@ mod tests {
             group: None,
             confidence: None,
             completion_confidence: None,
+            confidence_history: Vec::new(),
             blocked_by: Vec::new(),
             assigned_to: None,
         }

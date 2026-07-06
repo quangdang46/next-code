@@ -66,8 +66,7 @@ impl InterruptSignal {
     }
 
     pub fn fire(&self) {
-        self.epoch
-            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        self.epoch.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         self.flag.store(true, std::sync::atomic::Ordering::SeqCst);
         self.notify.notify_waiters();
     }
@@ -125,6 +124,13 @@ impl InterruptSignal {
 
     pub fn as_atomic(&self) -> Arc<std::sync::atomic::AtomicBool> {
         Arc::clone(&self.flag)
+    }
+
+    /// True when `other` is a clone of this signal (shares the same state).
+    /// Used by cancel fan-out to avoid double-firing the same signal and by
+    /// diagnostics that need to detect stale signal instances (issue #428).
+    pub fn same_instance(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.flag, &other.flag)
     }
 }
 

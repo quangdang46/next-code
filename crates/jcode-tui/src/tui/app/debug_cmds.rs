@@ -304,6 +304,7 @@ impl App {
                         friendly_name: Some(names[i % names.len()].to_string()),
                         status: statuses[i % statuses.len()].to_string(),
                         detail: Some(format!("task {}", i + 1)),
+                        task_label: None,
                         role: if i == 0 {
                             Some("coordinator".to_string())
                         } else {
@@ -346,6 +347,7 @@ impl App {
                             ProcessingStatus::RunningTool(_) => "running".to_string(),
                         },
                         detail: self.subagent_status.clone(),
+                        task_label: None,
                         role: None,
                         is_headless: Some(false),
                         live_attachments: Some(1),
