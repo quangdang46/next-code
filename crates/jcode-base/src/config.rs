@@ -10,8 +10,9 @@ pub use jcode_config_types::{
     LaunchHotkeyEntry, LaunchHotkeysConfig, MarkdownSpacingMode, NamedProviderAuth,
     NamedProviderConfig, NamedProviderModelConfig, NamedProviderType, NativeScrollbarConfig,
     NotificationsConfig, PowerConfig, ProviderConfig, ReasoningDisplayMode, SafetyConfig,
-    SessionPickerResumeAction, SponsorsConfig, StatusLineConfig, SwarmSpawnMode, SwarmStripLayout,
-    TerminalConfig, UpdateChannel, WebSearchConfig, WebSearchEngine,
+    ExecutionPolicyConfig, SessionPickerResumeAction, SponsorsConfig, StatusLineConfig,
+    SwarmSpawnMode, SwarmStripLayout, TerminalConfig, UpdateChannel, WebSearchConfig,
+    WebSearchEngine,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
@@ -550,6 +551,10 @@ pub struct Config {
     /// Notepad configuration
     #[serde(default)]
     pub notepad: crate::notepad::NotepadConfig,
+
+    /// Execution policy configuration
+    #[serde(default)]
+    pub execution_policy: ExecutionPolicyConfig,
 
     /// Task execution configuration
     #[serde(default)]

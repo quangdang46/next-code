@@ -5657,13 +5657,20 @@ dependencies = [
  "jcode-plugin-core",
  "jcode-plugin-runtime",
  "jcode-protocol",
+ "jcode-provider-anthropic-runtime",
+ "jcode-provider-antigravity-runtime",
  "jcode-provider-claude-cli-runtime",
+ "jcode-provider-copilot-runtime",
  "jcode-provider-core",
+ "jcode-provider-cursor-runtime",
  "jcode-provider-doctor",
  "jcode-provider-gemini",
+ "jcode-provider-gemini-runtime",
  "jcode-provider-metadata",
  "jcode-provider-openai",
+ "jcode-provider-openai-runtime",
  "jcode-provider-openrouter",
+ "jcode-provider-openrouter-runtime",
  "jcode-provider-service",
  "jcode-secrets",
  "jcode-selfdev-types",
@@ -6973,6 +6980,7 @@ dependencies = [
  "sha2 0.10.9",
  "similar",
  "tempfile",
+ "terminal-colorsaurus",
  "tokio",
  "unicode-width 0.2.2",
  "url",
@@ -7829,8 +7837,8 @@ dependencies = [
 
 [[package]]
 name = "mermaid-rs-renderer"
-version = "0.3.0"
-source = "git+https://github.com/1jehuang/mermaid-rs-renderer.git?tag=v0.3.0#bac530cc975d1daa957d21d8c1f76fc34cff7b04"
+version = "0.3.1"
+source = "git+https://github.com/1jehuang/mermaid-rs-renderer.git?tag=v0.3.1#2f993bd79a55235eb59a34d807852276ba25bea7"
 dependencies = [
  "anyhow",
  "clap",
@@ -11677,6 +11685,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "terminal-colorsaurus"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a46bb5364467da040298c573c8a95dbf9a512efc039630409a03126e3703e90"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "memchr",
+ "mio",
+ "terminal-trx",
+ "windows-sys 0.61.2",
+ "xterm-color",
+]
+
+[[package]]
+name = "terminal-trx"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b3f27d9a8a177e57545481faec87acb45c6e854ed1e5a3658ad186c106f38ed"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "terminfo"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14443,6 +14477,12 @@ name = "xmlwriter"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
+
+[[package]]
+name = "xterm-color"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7008a9d8ba97a7e47d9b2df63fcdb8dade303010c5a7cd5bf2469d4da6eba673"
 
 [[package]]
 name = "xxhash-rust"

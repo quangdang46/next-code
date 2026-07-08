@@ -23,6 +23,7 @@ pub const SPONSORED_DISCOVERY_URL: &str = "https://solosystems.dev/sponsored-dis
 
 /// Provenance tagging and coarse usage metering for MCP servers connected
 /// as a result of a discovery listing.
+pub mod provenance;
 
 /// Disclosure tag rendered in the UI whenever discovery is used.
 pub const SPONSORED_DISCOVERY_TAG: &str = "(sponsored discovery)";

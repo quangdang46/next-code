@@ -342,6 +342,7 @@ pub struct ToggleKeys {
     pub diff_mode_cycle: ToggleBinding,
     pub info_widget: ToggleBinding,
     pub swarm_panel_focus: ToggleBinding,
+    pub todo_card: ToggleBinding,
 }
 
 pub fn load_toggle_keys() -> ToggleKeys {
@@ -354,6 +355,22 @@ pub fn load_toggle_keys() -> ToggleKeys {
         diff_mode_cycle: ToggleBinding::load(&cfg.keybindings.diff_mode_cycle, 'g'),
         info_widget: ToggleBinding::load(&cfg.keybindings.info_widget_toggle, 'i'),
         swarm_panel_focus: ToggleBinding::load(&cfg.keybindings.swarm_panel_focus, 'w'),
+        todo_card: ToggleBinding::load(&cfg.keybindings.todo_card_toggle, 'p'),
+    }
+}
+
+/// Human-friendly label for the configured todo-card toggle chord.
+pub(crate) fn todo_card_key_label() -> String {
+    let cfg = config();
+    let default = KeyBinding {
+        code: KeyCode::Char('x'),
+        modifiers: KeyModifiers::ALT,
+    };
+    let default_label = format_binding(&default);
+    let (binding, _) = parse_optional(&cfg.keybindings.todo_card_toggle, default, &default_label);
+    match binding {
+        Some(b) => format_binding(&b),
+        None => default_label,
     }
 }
 

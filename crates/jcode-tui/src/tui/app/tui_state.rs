@@ -1847,6 +1847,7 @@ impl crate::tui::TuiState for App {
             remaining_secs: remaining,
             ttl_secs,
             is_cold: remaining == 0,
+            cold_for_secs: elapsed.saturating_sub(ttl_secs),
             cached_tokens: self.last_turn_input_tokens,
         })
     }

@@ -1,5 +1,5 @@
 use super::inline_interactive_ui::format_elapsed;
-use super::selection_highlight::highlight_line_selection;
+use crate::tui::selection_highlight::highlight_line_selection;
 use super::tools_ui::{get_tool_activity_detail, summarize_batch_running_tools_compact};
 use super::visual_debug::{self, FrameCaptureBuilder};
 use super::{ProcessingStatus, TuiState};
@@ -1566,6 +1566,14 @@ pub(super) fn build_notification_spans(app: &dyn TuiState) -> Vec<Span<'static>>
                 spans.push(Span::styled(
                     format!("🧊 cache cold{}", tokens_str),
                     Style::default().fg(rgb(140, 180, 255)),
+                ));
+                // Small gray "how long ago it went cold" hint, e.g. `1h 1m`.
+                spans.push(Span::styled(
+                    format!(
+                        " {}",
+                        crate::tui::format_compact_age(cache_info.cold_for_secs)
+                    ),
+                    Style::default().fg(dim_color()),
                 ));
             } else if cache_info.expiring_soon() {
                 let tokens_str = cache_info

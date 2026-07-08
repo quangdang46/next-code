@@ -377,6 +377,15 @@ pub enum ProcessingStatus {
     RunningTool(String),
 }
 
+/// What triggered the cold cache warning message.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ColdCacheWarningTrigger {
+    /// The idle tick detected a cold cache; warn on the next user turn.
+    IdleExpiry,
+    /// A just-completed API turn's usage data shows a cold cache.
+    RequestStart,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum RemoteStartupPhase {
     StartingServer,
@@ -1129,6 +1138,9 @@ pub struct App {
     todos_view_markdown: String,
     todos_view_updated_at_ms: u64,
     todos_view_rendered_hash: u64,
+    /// Hash of the todo payload rendered into the inline chat todo card, used
+    /// to keep the card live-updating while it stays in the transcript.
+    todo_card_rendered_hash: u64,
     last_side_panel_refresh: Option<Instant>,
     // Most recently persisted focus target for dictation routing.
     last_client_focus_recorded_at: Option<Instant>,
@@ -1508,6 +1520,7 @@ impl App {
             turn_number,
             self.kv_cache.kv_cache_turn_call_index,
             baseline.as_ref(),
+            ColdCacheWarningTrigger::RequestStart,
         );
         self.pause_streaming_tps(false);
         self.kv_cache.current_api_usage_recorded = false;
@@ -1554,6 +1567,7 @@ impl App {
             turn_number,
             self.kv_cache.kv_cache_turn_call_index,
             baseline.as_ref(),
+            ColdCacheWarningTrigger::RequestStart,
         );
         self.pause_streaming_tps(false);
         self.kv_cache.current_api_usage_recorded = false;
@@ -1603,21 +1617,22 @@ impl App {
         turn_number: usize,
         call_index: u16,
         baseline: Option<&KvCacheBaseline>,
-    ) {
+        trigger: ColdCacheWarningTrigger,
+    ) -> bool {
         if turn_number <= 1 || call_index != 1 {
-            return;
+            return false;
         }
         let Some(baseline) = baseline else {
-            return;
+            return false;
         };
         let Some(ttl_secs) =
             crate::tui::cache_ttl_for_provider_model(&baseline.provider, Some(&baseline.model))
         else {
-            return;
+            return false;
         };
         let age_secs = baseline.completed_at.elapsed().as_secs();
         if age_secs < ttl_secs {
-            return;
+            return false;
         }
 
         let expired_ago_secs = age_secs.saturating_sub(ttl_secs);
@@ -1629,10 +1644,23 @@ impl App {
         } else {
             tokens.to_string()
         };
-        self.push_display_message(DisplayMessage::system(format!(
-            "🧊 Prompt cache is cold: ~{} input tokens may be resent on this request ({}s TTL expired {}s ago; last cache write was {}s ago). Use /cache to extend the timer before long breaks, or start a fresh/compacted session for very large histories.",
-            token_label, ttl_secs, expired_ago_secs, age_secs
-        )));
+        // Keep this to a single short line. The idle trigger fires the moment
+        // the TTL expires, so an "N ago" detail would always read ~0s there;
+        // the request-start fallback can fire long after expiry (e.g.
+        // suspended TUI), where the age is genuinely informative.
+        let message = match trigger {
+            ColdCacheWarningTrigger::IdleExpiry => format!(
+                "🧊 Prompt cache went cold: ~{} tok resent with your next message (/cache to extend)",
+                token_label
+            ),
+            ColdCacheWarningTrigger::RequestStart => format!(
+                "🧊 Prompt cache went cold {} ago: ~{} tok may be resent on this request",
+                crate::tui::format_compact_age(expired_ago_secs),
+                token_label
+            ),
+        };
+        self.push_display_message(DisplayMessage::system(message));
+        true
     }
 
     pub(super) fn record_completed_stream_cache_usage(&mut self) -> bool {
@@ -1967,7 +1995,12 @@ impl App {
             self.kv_cache.kv_cache_miss_samples.drain(0..overflow);
         }
 
-        self.maybe_push_kv_cache_miss_notice(request.turn_number, reason, missed_tokens);
+        self.maybe_push_kv_cache_miss_notice(
+            request.turn_number,
+            reason,
+            missed_tokens,
+            baseline.completed_at,
+        );
     }
 
     /// Surface a loud in-chat alarm when a request missed the KV cache for a
@@ -1976,30 +2009,26 @@ impl App {
     /// time-driven, not harness bugs. The harness should essentially never
     /// invalidate the prefix cache on its own, so when it does we want it to be
     /// visible immediately rather than buried in logs.
+    ///
+    /// Some harness actions do legitimately change the prompt mid-session
+    /// (config reloads, skill reloads). Those sites document the invalidation
+    /// in `cache_invalidation` when it happens; if a documented cause is found
+    /// between the baseline and this request, the notice attributes the miss
+    /// to it (informational) instead of raising the unexplained-bust alarm.
     fn maybe_push_kv_cache_miss_notice(
         &mut self,
         turn_number: usize,
         reason: KvCacheMissReason,
         missed_tokens: u64,
+        baseline_completed_at: Instant,
     ) {
         if !crate::config::config().features.kv_cache_miss_notices {
             return;
         }
         let detail = match reason {
-            KvCacheMissReason::HarnessSystemChanged => {
-                "the system prompt changed between turns (its hash differs even though the \
-                 conversation only grew). Common causes: nondeterministic ordering in a \
-                 prompt section, or a same-width dynamic value embedded in the static prompt."
-            }
-            KvCacheMissReason::HarnessToolsChanged => {
-                "the tool set changed between turns. Tools should be locked after the first \
-                 turn; an unexpected change here resends the whole tool schema."
-            }
-            KvCacheMissReason::HarnessPrefixChanged => {
-                "an earlier message in the conversation prefix was modified (not just \
-                 appended to). Editing/replacing prior messages busts every cached token \
-                 after the edit point."
-            }
+            KvCacheMissReason::HarnessSystemChanged => "system prompt changed mid-session",
+            KvCacheMissReason::HarnessToolsChanged => "tool set changed mid-session",
+            KvCacheMissReason::HarnessPrefixChanged => "an earlier message was modified",
             // Not harness-caused: provider/model/upstream switch, TTL expiry,
             // and the soft zero/low-read diagnostics. Skip the alarm for these.
             _ => return,
@@ -2013,10 +2042,18 @@ impl App {
             missed_tokens.to_string()
         };
 
+        // Documented invalidation between the baseline and now: expected
+        // resend, attribute instead of alarm.
+        if let Some(cause) = crate::cache_invalidation::most_recent_since(baseline_completed_at) {
+            self.push_display_message(DisplayMessage::system(format!(
+                "ℹ️ KV cache refresh [{}] turn {}: ~{} tokens resent ({}).",
+                cause.source, turn_number, token_label, detail,
+            )));
+            return;
+        }
+
         self.push_display_message(DisplayMessage::system(format!(
-            "⚠️ KV cache miss [{}] on turn {}: ~{} prefix tokens were resent instead of \
-             read from cache. Reason: {} This is a harness-side cache bust and should not \
-             normally happen — see KV_CACHE_USAGE in the logs for the exact hashes.",
+            "⚠️ KV cache miss [{}] turn {}: ~{} tokens resent ({}). See KV_CACHE_USAGE in logs.",
             reason.label(),
             turn_number,
             token_label,

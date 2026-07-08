@@ -1,6 +1,18 @@
 //! Session-local todo persistence (file-backed JSON store).
 
-pub use jcode_task_types::TodoItem;
+pub use jcode_task_types::{TodoGoal, TodoItem};
+
+/// Completed todos whose confidence trail ends in an unearned jump: a final
+/// step of [`TODO_CONFIDENCE_SPIKE`]+ points in the tool-maintained
+/// `confidence_history`, or, for todos without a recorded trail, an equally
+/// large gap between planning `confidence` and `completion_confidence`.
+pub const TODO_CONFIDENCE_SPIKE: u8 = 50;
+
+/// Goals with a hill-climbability score strictly below this are considered
+/// low: no credible metric to iterate against. The todo tool nudges the model
+/// once per goal to either reframe the objective into something measurable or
+/// deliberately mark it taste-driven and plan user checkpoints.
+pub const LOW_HILL_CLIMBABILITY: u8 = 40;
 
 use anyhow::Result;
 use std::path::PathBuf;
@@ -101,6 +113,52 @@ pub fn needs_verification_nudge(previous: &[TodoItem], updated: &[TodoItem]) -> 
                 .map(|s| s.to_ascii_lowercase().contains("verif"))
                 .unwrap_or(false)
     })
+}
+
+/// Detect completed todos whose confidence trail shows a suspicious jump:
+/// a final leap of [`TODO_CONFIDENCE_SPIKE`]+ points at completion time,
+/// suggesting the model retroactively inflated its confidence rather than
+/// tracking genuine evidence as work progressed.
+pub fn spike_completed_todos(todos: &[TodoItem]) -> Vec<&TodoItem> {
+    todos
+        .iter()
+        .filter(|todo| todo.status == "completed")
+        .filter(|todo| {
+            let history = &todo.confidence_history;
+            match history.len() {
+                0 => todo
+                    .confidence
+                    .zip(todo.completion_confidence)
+                    .is_some_and(|(first, last)| {
+                        last.saturating_sub(first) >= TODO_CONFIDENCE_SPIKE
+                    }),
+                1 => false,
+                n => history[n - 1].saturating_sub(history[n - 2]) >= TODO_CONFIDENCE_SPIKE,
+            }
+        })
+        .collect()
+}
+
+fn goals_path(session_id: &str) -> Result<PathBuf> {
+    let base = storage::jcode_dir()?;
+    Ok(base
+        .join("todos")
+        .join(format!("{}-goals.json", session_id)))
+}
+
+/// Load goals for a session from disk.
+pub fn load_goals(session_id: &str) -> Result<Vec<TodoGoal>> {
+    let path = goals_path(session_id)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    storage::read_json(&path).or_else(|_| Ok(Vec::new()))
+}
+
+/// Save goals for a session to disk.
+pub fn save_goals(session_id: &str, goals: &[TodoGoal]) -> Result<()> {
+    let path = goals_path(session_id)?;
+    storage::write_json_fast(&path, goals)
 }
 
 #[cfg(test)]

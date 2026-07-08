@@ -230,6 +230,39 @@ pub struct TodoItem {
     pub assigned_to: Option<String>,
 }
 
+/// A goal-level assessment attached to a todo group (or, for an ungrouped
+/// flat list, the whole list as one implicit goal with `group: None`).
+///
+/// Hill-climbability is a property of an objective, not of individual steps:
+/// "optimize grep latency" is hill-climbable because progress has a metric,
+/// while "design an onboarding screen" is not because success is a taste
+/// judgment. Items like "read the auth code" have no meaningful score of
+/// their own, so the score lives here instead of on `TodoItem`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TodoGoal {
+    /// Group label this goal describes. `None` covers the ungrouped list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// How hill-climbable this goal is, from 0-100: can progress be measured
+    /// against a quantifiable, verifiable objective and iterated on?
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hill_climbability: Option<u8>,
+    /// The measurable objective progress is climbing toward, when one exists
+    /// (e.g. "p50 grep latency under 50ms on the repo corpus"). A stated
+    /// objective is what makes a high score credible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective: Option<String>,
+    /// Set when the goal is deliberately taste-driven: no honest metric
+    /// exists and the plan is user checkpoints/artifacts instead of a
+    /// fabricated proxy metric.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub taste_driven: bool,
+    /// Maintained by the todo tool: true once the low-score reframe nudge has
+    /// been sent for this goal, so it never nag-loops.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub reframe_nudge_sent: bool,
+}
+
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

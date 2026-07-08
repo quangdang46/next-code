@@ -2037,12 +2037,6 @@ pub fn input_pane_line_text(_line: usize) -> Option<String> {
     None
 }
 
-/// Stub: given a screen coordinate, returns the transcript message index of the
-/// swarm expand/collapse badge at that location, if any.
-pub fn swarm_expand_target_from_screen(_column: u16, _row: u16) -> Option<usize> {
-    None
-}
-
 /// Stub: records a copy snapshot of the input pane for mouse-drag selection.
 /// Populated by `ui_input::draw_input`.
 #[expect(clippy::too_many_arguments)]
@@ -2263,6 +2257,15 @@ pub(crate) fn inline_image_expand_target_from_screen(column: u16, row: u16) -> O
     }
 }
 
+/// Stub: swarm expand/collapse badge hit-testing from a screen coordinate.
+/// Returns the transcript message index that was clicked, or `None` when no
+/// badge was at that position. Currently always returns `None` — the swarm
+/// badge is rendered but click-to-toggle is not yet wired through the
+/// copy-selection snapshot machinery.
+pub(crate) fn swarm_expand_target_from_screen(_column: u16, _row: u16) -> Option<usize> {
+    None
+}
+
 pub fn draw(frame: &mut Frame, app: &dyn TuiState) {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         crate::tui::markdown::with_deferred_mermaid_render_context(|| draw_inner(frame, app))
@@ -2270,6 +2273,10 @@ pub fn draw(frame: &mut Frame, app: &dyn TuiState) {
         Ok(()) => {}
         Err(payload) => render_recovered_panic_frame(frame, &payload),
     }
+    // Adapt the finished frame for light terminal backgrounds (no-op on dark).
+    // Doing this at the buffer level covers every widget and overlay without
+    // touching individual color call sites.
+    jcode_tui_style::adapt_buffer_for_theme(frame.buffer_mut());
 }
 
 fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {

@@ -1,6 +1,6 @@
 use super::*;
 
-use super::selection_highlight::highlight_line_selection;
+use crate::tui::selection_highlight::highlight_line_selection;
 
 pub(super) fn apply_side_selection_highlight(
     app: &dyn TuiState,
