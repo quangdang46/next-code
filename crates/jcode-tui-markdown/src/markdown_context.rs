@@ -18,6 +18,8 @@ thread_local! {
     /// Whether Mermaid cache misses should be rendered in the background and
     /// replaced on a later redraw instead of blocking the current frame.
     static DEFER_MERMAID_RENDER_CONTEXT: Cell<bool> = const { Cell::new(false) };
+    /// Scoped diagram display mode (thread-local, set via `with_diagram_mode_scope`).
+    static DIAGRAM_MODE_SCOPE: Cell<Option<DiagramDisplayMode>> = const { Cell::new(None) };
     /// Optional test/debug override for whether mermaid rendering is enabled.
     /// Thread-local (not process-global) so tests that disable mermaid cannot
     /// race other test threads that rely on the process-env default.
@@ -39,16 +41,6 @@ fn with_scoped_cell_value<T: Copy, R>(cell: &Cell<T>, value: T, f: impl FnOnce()
     let prev = cell.replace(value);
     let _guard = ScopedReset { cell, prev };
     f()
-}
-
-/// Run `f` with the diagram display mode set on the current thread only.
-/// Unlike `set_diagram_mode_override`, this never mutates process-global
-/// state, so concurrent renders (and parallel tests) are unaffected.
-pub fn with_diagram_mode_scope<T>(mode: DiagramDisplayMode, f: impl FnOnce() -> T) -> T {
-    let prev = set_diagram_mode_raw(Some(mode));
-    let result = f();
-    set_diagram_mode_raw(prev);
-    result
 }
 
 fn set_diagram_mode_raw(mode: Option<DiagramDisplayMode>) -> Option<DiagramDisplayMode> {
@@ -128,6 +120,12 @@ pub fn with_deferred_mermaid_render_context<T>(f: impl FnOnce() -> T) -> T {
 
 pub(super) fn deferred_mermaid_render_context_enabled() -> bool {
     DEFER_MERMAID_RENDER_CONTEXT.with(|ctx| ctx.get())
+}
+
+/// Run `f` with `mode` as the diagram display mode for the current thread only.
+/// Unlike `set_diagram_mode_override`, this never mutates process-global state.
+pub fn with_diagram_mode_scope<T>(mode: DiagramDisplayMode, f: impl FnOnce() -> T) -> T {
+    DIAGRAM_MODE_SCOPE.with(|ctx| with_scoped_cell_value(ctx, Some(mode), f))
 }
 
 pub fn set_center_code_blocks(centered: bool) {

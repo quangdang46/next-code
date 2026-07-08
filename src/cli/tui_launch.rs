@@ -452,21 +452,14 @@ pub fn list_sessions() -> Result<()> {
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
-                    crate::casr_adapter::imported_opencode_session_id(session_id),
+                    crate::import::imported_opencode_session_id(session_id),
                 ],
             ),
-            jcode_tui_session_picker::ResumeTarget::ForeignSession {
-                provider_slug,
-                session_id,
-                ..
-            } => (
+            jcode_tui_session_picker::ResumeTarget::CursorSession { session_id, .. } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
-                    crate::casr_adapter::imported_session_id_for_provider(
-                        provider_slug,
-                        session_id,
-                    ),
+                    crate::import::imported_cursor_session_id(session_id),
                 ],
             ),
         }
@@ -507,12 +500,8 @@ pub fn list_sessions() -> Result<()> {
             jcode_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => {
                 format!("◌ OpenCode {}", &session_id[..session_id.len().min(8)])
             }
-            jcode_tui_session_picker::ResumeTarget::ForeignSession {
-                provider_slug,
-                session_id,
-                ..
-            } => format!(
-                "💾 {provider_slug} {}",
+            jcode_tui_session_picker::ResumeTarget::CursorSession { session_id, .. } => format!(
+                "💾 Cursor {}",
                 &session_id[..session_id.len().min(8)]
             ),
         };

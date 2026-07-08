@@ -43,6 +43,7 @@ pub(crate) enum ExternalCli {
     ClaudeCode,
     Pi,
     OpenCode,
+    Cursor,
 }
 
 impl ExternalCli {
@@ -52,6 +53,7 @@ impl ExternalCli {
             ExternalCli::ClaudeCode => "Claude Code",
             ExternalCli::Pi => "Pi",
             ExternalCli::OpenCode => "OpenCode",
+            ExternalCli::Cursor => "Cursor",
         }
     }
 }

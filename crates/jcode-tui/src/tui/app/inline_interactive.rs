@@ -2143,11 +2143,9 @@ impl App {
                 ResumeTarget::OpenCodeSession { session_id, .. } => {
                     format!("OpenCode {}", jcode_core::util::truncate_str(session_id, 8))
                 }
-                ResumeTarget::ForeignSession {
-                    provider_slug,
-                    session_id,
-                    ..
-                } => format!("{provider_slug} {}", &session_id[..session_id.len().min(8)]),
+                ResumeTarget::CursorSession { session_id, .. } => {
+                    format!("Cursor {}", jcode_core::util::truncate_str(session_id, 8))
+                }
             };
             let resolved_target = match crate::import::resolve_resume_target_to_jcode(target) {
                 Ok(target) => target,
@@ -2250,32 +2248,28 @@ impl App {
             ResumeTarget::OpenCodeSession { session_id, .. } => {
                 format!("OpenCode {}", jcode_core::util::truncate_str(session_id, 8))
             }
-            ResumeTarget::ForeignSession {
-                provider_slug,
-                session_id,
-                ..
-            } => format!("{provider_slug} {}", &session_id[..session_id.len().min(8)]),
+            ResumeTarget::CursorSession { session_id, .. } => {
+                format!("Cursor {}", jcode_core::util::truncate_str(session_id, 8))
+            }
         };
 
         let resolved_target = match target {
             ResumeTarget::JcodeSession { session_id } => session_id.clone(),
             ResumeTarget::ClaudeCodeSession { session_id, .. } => {
-                crate::casr_adapter::imported_claude_code_session_id(session_id)
+                crate::import::imported_claude_code_session_id(session_id)
             }
             ResumeTarget::CodexSession { session_id, .. } => {
-                crate::casr_adapter::imported_codex_session_id(session_id)
+                crate::import::imported_codex_session_id(session_id)
             }
             ResumeTarget::PiSession { session_path } => {
-                crate::casr_adapter::imported_pi_session_id(session_path)
+                crate::import::imported_pi_session_id(session_path)
             }
             ResumeTarget::OpenCodeSession { session_id, .. } => {
-                crate::casr_adapter::imported_opencode_session_id(session_id)
+                crate::import::imported_opencode_session_id(session_id)
             }
-            ResumeTarget::ForeignSession {
-                provider_slug,
-                session_id,
-                ..
-            } => crate::casr_adapter::imported_session_id_for_provider(provider_slug, session_id),
+            ResumeTarget::CursorSession { session_id, .. } => {
+                crate::import::imported_cursor_session_id(session_id)
+            }
         };
 
         if targets.len() > 1 {
