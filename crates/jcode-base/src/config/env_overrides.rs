@@ -105,20 +105,6 @@ impl Config {
             self.dictation.timeout_secs = parsed;
         }
 
-        // Permission mode
-        if let Ok(v) = std::env::var("JCODE_PERMISSION_MODE") {
-            self.permission_mode = Some(v);
-        }
-
-        // Dangerous override — non-CLI consumers (desktop, daemon) use this
-        // to disable all permission checks. The CLI flag also sets this by
-        // populating the env var in dispatch.rs.
-        if std::env::var("JCODE_DANGEROUSLY_SKIP_PERMISSIONS").is_ok()
-            && std::env::var("JCODE_DANGEROUSLY_SKIP_PERMISSIONS").unwrap_or_default() == "1"
-        {
-            self.dangerously_skip_permissions = true;
-        }
-
         // Tools
         if let Ok(v) = std::env::var("JCODE_TOOL_PROFILE") {
             self.tools.profile = v;
@@ -638,20 +624,6 @@ impl Config {
             let trimmed = v.trim();
             if !trimmed.is_empty() {
                 self.gateway.bind_addr = trimmed.to_string();
-            }
-        }
-
-        // Best-of-N editing
-        if let Ok(v) = std::env::var("JCODE_BEST_OF_N_MODE")
-            && let Some(mode) = jcode_best_of_n::BestOfNMode::parse(&v)
-        {
-            self.best_of_n.mode = mode;
-        }
-        if let Ok(v) = std::env::var("JCODE_BEST_OF_N_COUNT")
-            && let Ok(count) = v.trim().parse::<usize>()
-        {
-            if count >= 1 {
-                self.best_of_n.count = count;
             }
         }
 

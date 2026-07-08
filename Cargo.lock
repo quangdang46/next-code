@@ -6976,6 +6976,7 @@ dependencies = [
  "tokio",
  "unicode-width 0.2.2",
  "url",
+ "urlencoding",
 ]
 
 [[package]]
@@ -7026,6 +7027,7 @@ dependencies = [
  "crossterm 0.29.0",
  "dirs 5.0.1",
  "image",
+ "jcode-plan",
  "jcode-tui-workspace",
  "mermaid-rs-renderer",
  "ratatui 0.30.2",

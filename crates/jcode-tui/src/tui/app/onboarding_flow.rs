@@ -79,6 +79,10 @@ pub(crate) struct ImportReview {
     /// This lets the user reach the commit action purely by arrowing, instead
     /// of relying on the "Press Enter" instruction text.
     pub(crate) continue_focused: bool,
+    /// `None` = summary screen with two pills ("Continue" / "Choose what to
+    /// import"). `Some(label)` = checkbox-list choose mode (the string carries
+    /// a brief mode label, e.g. "import").
+    pub(crate) choosing: Option<String>,
     /// When the screen was first shown, for the single decision countdown.
     pub(crate) shown_at: Instant,
 }
@@ -98,6 +102,7 @@ impl ImportReview {
             checked,
             cursor: 0,
             continue_focused: false,
+            choosing: None,
             shown_at: Instant::now(),
         })
     }
@@ -217,6 +222,15 @@ impl ImportReview {
     /// Whether the decision countdown has elapsed.
     pub(crate) fn timed_out(&self) -> bool {
         self.shown_at.elapsed() >= DECISION_TIMEOUT
+    }
+
+    /// Switch from the summary screen into the per-login checkbox-list
+    /// choose mode. Sets `choosing` to `Some("import")` and moves the cursor
+    /// onto the first row so the user can immediately start toggling.
+    pub(crate) fn enter_choose_mode(&mut self) {
+        self.choosing = Some("import".to_string());
+        self.continue_focused = false;
+        self.cursor = 0;
     }
 }
 

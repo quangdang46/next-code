@@ -396,6 +396,7 @@ fn empty_prepared_messages() -> PreparedMessages {
         image_regions: Vec::new(),
         edit_tool_ranges: Vec::new(),
         copy_targets: Vec::new(),
+        mermaid_pending_epoch: None,
     }
 }
 
@@ -729,6 +730,7 @@ fn prepare_messages_inner(app: &dyn TuiState, width: u16, height: u16) -> Prepar
             image_regions: Vec::new(),
             edit_tool_ranges: Vec::new(),
             copy_targets: Vec::new(),
+            mermaid_pending_epoch: None,
         });
         let frame = PreparedChatFrame::from_single(prepared);
         super::note_full_prep_phase_metrics(super::FullPrepPhaseMetrics {
@@ -1768,6 +1770,7 @@ fn prepare_streaming_cached(
             image_regions: Vec::new(),
             edit_tool_ranges: Vec::new(),
             copy_targets: Vec::new(),
+            mermaid_pending_epoch: None,
         };
     }
 
@@ -2310,6 +2313,7 @@ fn wrap_lines(
         image_regions,
         edit_tool_ranges: Vec::new(),
         copy_targets: Vec::new(),
+        mermaid_pending_epoch: None,
     }
 }
 
@@ -2450,6 +2454,7 @@ fn wrap_lines_with_map(
         image_regions,
         edit_tool_ranges,
         copy_targets,
+        mermaid_pending_epoch: None,
     }
 }
 

@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 pub mod keybindings;
 pub use keybindings::{
@@ -7,6 +6,15 @@ pub use keybindings::{
     KeybindingPlatform, KeybindingProvenance, PlatformDefault, default_binding, default_binding_or,
     keybinding_default, keybinding_defaults_report, validate_keybinding_defaults,
 };
+
+/// Status line configuration (fork-specific)
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(default)]
+pub struct StatusLineConfig {
+    pub enabled: bool,
+    pub segments: Vec<String>,
+    pub command: Option<String>,
+}
 
 /// Compaction mode
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -774,15 +782,17 @@ pub struct AutoReviewConfig {
 ///
 /// Sponsored discovery makes third-party developer tools discoverable to the
 /// agent via a `discover_tools` tool backed by a hosted manifest. Sponsors buy
-/// placement (discoverability), never recommendations. Every use is disclosed
-/// in the UI with a `[sponsored discovery]` tag. See
-/// <https://solosystems.dev/sponsored-discovery>.
+/// placement (discoverability), never recommendations. Each session's first
+/// use of `discover_tools` is disclosed in the UI with a
+/// `(sponsored discovery)` tag; using a discovered tool afterwards carries no
+/// extra tag. See <https://solosystems.dev/sponsored-discovery>.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SponsorsConfig {
-    /// Enable sponsored discovery. When false (the default), no discovery
-    /// categories are added to the prompt, the `discover_tools` tool is not
-    /// registered, and jcode never contacts the discovery endpoint.
+    /// Enable sponsored discovery. Enabled by default; set to false to opt
+    /// out. When false, no discovery categories are added to the prompt, the
+    /// `discover_tools` tool is not registered, and jcode never contacts the
+    /// discovery endpoint.
     pub enabled: bool,
     /// Base URL of the discovery endpoint.
     pub endpoint: String,
@@ -791,7 +801,7 @@ pub struct SponsorsConfig {
 impl Default for SponsorsConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             endpoint: "https://api.solosystems.dev/v1/discovery".to_string(),
         }
     }
@@ -1194,44 +1204,6 @@ impl Default for WebSearchConfig {
     }
 }
 
-/// Error classification and retry settings.
-///
-/// Controls how jcode classifies provider errors (retryable vs non-retryable
-/// vs STOP) and how it backs off / fail-overs after a failure.
-/// All fields have sensible defaults; most users never need to touch these.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub struct ErrorClassificationConfig {
-    /// Maximum retry attempts across the fallback chain. 0 = never retry.
-    /// Default: 3.
-    pub max_retry_attempts: u32,
-    /// Base delay in milliseconds for exponential backoff.
-    /// The actual delay is `max_retry_attempts * attempt` (capped).
-    /// Default: 2000 (i.e. 2s → 4s → 6s for attempts 1, 2, 3).
-    pub retry_base_delay_ms: u32,
-    /// Maximum delay in milliseconds for any single backoff.
-    /// Default: 60_000 (60 seconds).
-    pub retry_max_delay_ms: u32,
-    /// Seconds to cooldown a provider after a retryable failure before trying
-    /// it again. Default: 60.
-    pub fallback_cooldown_secs: u32,
-    /// Override set of HTTP status codes to treat as retryable, in addition to
-    /// the built-in set (429, 5xx, 529). Default: `None` (use built-in set).
-    pub retry_on_status: Option<Vec<u16>>,
-}
-
-impl Default for ErrorClassificationConfig {
-    fn default() -> Self {
-        Self {
-            max_retry_attempts: 3,
-            retry_base_delay_ms: 2000,
-            retry_max_delay_ms: 60_000,
-            fallback_cooldown_secs: 60,
-            retry_on_status: None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProviderConfig {
@@ -1266,10 +1238,6 @@ pub struct ProviderConfig {
     /// that think silently for minutes before emitting tokens. Default: 180.
     /// Overridable per-launch via `JCODE_STREAM_IDLE_TIMEOUT_SECS`.
     pub stream_idle_timeout_secs: u64,
-    /// Error classification and retry configuration.
-    /// Default: sensible values for most providers.
-    #[serde(default)]
-    pub error_classification: ErrorClassificationConfig,
 }
 
 impl Default for ProviderConfig {
@@ -1288,7 +1256,6 @@ impl Default for ProviderConfig {
             same_provider_account_failover: true,
             copilot_premium: None,
             stream_idle_timeout_secs: 180,
-            error_classification: ErrorClassificationConfig::default(),
         }
     }
 }
@@ -1523,240 +1490,6 @@ impl Default for PowerConfig {
         }
     }
 }
-// ── Execution Policy Config ────────────────────────────────────────────
-
-/// Configuration for command-level policy evaluation and tool-level
-/// allow/deny/ask rules (Claude Code-compatible format).
-///
-/// # Example (TOML)
-///
-/// ```toml
-/// [execution-policy]
-/// # Claude Code-style allow/deny/ask with ToolName(pattern) syntax.
-/// allow = ["Bash(ls *)", "Bash(git status)", "Bash(cat *)"]
-/// deny  = ["Bash(rm -rf *)", "WebSearch", "WebFetch"]
-/// ask   = ["Bash"]
-/// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
-pub struct ExecutionPolicyConfig {
-    /// Enable command-level policy evaluation (default: true).
-    #[serde(default = "default_policy_enabled")]
-    pub enabled: bool,
-    /// Claude Code-style allow list — bare tool names or ToolName(pattern).
-    /// Matched tools are auto-allowed without prompting.
-    #[serde(default)]
-    pub allow: Vec<String>,
-    /// Claude Code-style deny list — bare tool names or ToolName(pattern).
-    /// Matched tools/commands are denied outright.
-    #[serde(default)]
-    pub deny: Vec<String>,
-    /// Claude Code-style ask list — bare tool names or ToolName(pattern).
-    /// Matched tools/commands always trigger a permission prompt.
-    #[serde(default)]
-    pub ask: Vec<String>,
-    /// Custom policy rules (full-structured format, parsed from `[[execution-policy.rules]]`).
-    /// Merged with auto-generated rules from allow/deny/ask.
-    #[serde(default)]
-    pub rules: Vec<PolicyRuleDef>,
-    /// Protected patterns (always prompt regardless of mode).
-    #[serde(default)]
-    pub protected_patterns: Vec<String>,
-    /// Circuit breaker thresholds.
-    #[serde(default)]
-    pub circuit_breaker: CircuitBreakerConfig,
-}
-
-fn default_policy_enabled() -> bool {
-    true
-}
-
-impl Default for ExecutionPolicyConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            allow: Vec::new(),
-            deny: Vec::new(),
-            ask: Vec::new(),
-            rules: Vec::new(),
-            protected_patterns: Vec::new(),
-            circuit_breaker: CircuitBreakerConfig::default(),
-        }
-    }
-}
-
-/// Status line display configuration.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
-pub struct StatusLineConfig {
-    /// Whether the status line is enabled (default true).
-    #[serde(default = "default_status_line_enabled")]
-    pub enabled: bool,
-    /// Ordered list of segment names to display.
-    /// Valid values: mode, model, provider, context, tokens, git, dir, cost, session, cache.
-    /// Empty = default order.
-    #[serde(default)]
-    pub segments: Vec<String>,
-    /// Custom shell command for Layer 3 (Claude Code style).
-    /// Receives JSON via stdin. Output is rendered as status line.
-    pub command: Option<String>,
-}
-
-fn default_status_line_enabled() -> bool {
-    true
-}
-
-impl Default for StatusLineConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            segments: Vec::new(),
-            command: None,
-        }
-    }
-}
-
-/// Configuration for the forked agent system.
-///
-/// When `enabled = false` (the default), no forks are created regardless of
-/// sub-feature settings. This is a master switch for all background agent
-/// features.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ForkedAgentConfig {
-    /// Master switch — when false, all fork features are disabled.
-    pub enabled: bool,
-    /// Memory extraction sub-config.
-    pub memory_extraction: MemoryExtractionConfig,
-    /// Auto-dream sub-config.
-    pub auto_dream: AutoDreamConfig,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
-pub struct CircuitBreakerConfig {
-    #[serde(default = "default_max_consecutive")]
-    pub max_consecutive_denials: u32,
-    #[serde(default = "default_max_total")]
-    pub max_total_denials: u32,
-}
-
-fn default_max_consecutive() -> u32 {
-    3
-}
-
-fn default_max_total() -> u32 {
-    20
-}
-
-impl Default for CircuitBreakerConfig {
-    fn default() -> Self {
-        Self {
-            max_consecutive_denials: 3,
-            max_total_denials: 20,
-        }
-    }
-}
-
-/// Memory extraction configuration for forked agents.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct MemoryExtractionConfig {
-    /// Enable automatic memory extraction.
-    pub enabled: bool,
-    /// Memory directory path (relative to working dir).
-    pub memory_dir: PathBuf,
-    /// Max turns for the extraction agent.
-    pub max_turns: u32,
-    /// Max output tokens per turn.
-    pub max_output_tokens: u32,
-    /// Minimum number of new (unprocessed) messages before triggering extraction.
-    pub min_new_messages: usize,
-    /// The extraction prompt template variant.
-    pub prompt_variant: ExtractionPromptVariant,
-}
-
-impl Default for MemoryExtractionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            memory_dir: PathBuf::from(".jcode/memory"),
-            max_turns: 3,
-            max_output_tokens: 4096,
-            min_new_messages: 5,
-            prompt_variant: ExtractionPromptVariant::Auto,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum PolicyRuleAction {
-    /// Always allow commands matching this pattern.
-    Allow,
-    /// Always deny commands matching this pattern.
-    Deny,
-    /// Always prompt for commands matching this pattern.
-    Prompt,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "kebab-case")]
-pub struct PolicyRuleDef {
-    /// Unique rule identifier (for audit logging).
-    pub id: String,
-    /// Human-readable description.
-    pub description: String,
-    /// Regex pattern to match against the command string.
-    pub pattern: String,
-    /// What to do when this rule matches.
-    pub action: PolicyRuleAction,
-    /// Optional: tool name to scope the rule to (e.g., "bash", "write").
-    /// None means applies to all tools.
-    #[serde(default)]
-    pub tool: Option<String>,
-    /// Optional: suggested alternatives when action is Deny.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub alternatives: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ExtractionPromptVariant {
-    Auto,
-    Combined,
-}
-
-/// Auto-dream configuration for forked agents.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct AutoDreamConfig {
-    /// Enable auto-dream.
-    pub enabled: bool,
-    /// Run dream every N turns.
-    pub turn_interval: usize,
-    /// Max turns for the dream agent.
-    pub max_turns: u32,
-    /// Max output tokens per turn.
-    pub max_output_tokens: u32,
-    /// Directories where the dream agent is allowed to write.
-    pub allowed_dirs: Vec<PathBuf>,
-    /// Dream output directory.
-    pub dream_dir: PathBuf,
-}
-
-impl Default for AutoDreamConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            turn_interval: 10,
-            max_turns: 2,
-            max_output_tokens: 2048,
-            allowed_dirs: vec![PathBuf::from(".jcode/dreams")],
-            dream_dir: PathBuf::from(".jcode/dreams"),
-        }
-    }
-}
 
 /// A single global launch hotkey: a chord plus the directory it opens jcode in.
 ///
@@ -1802,4 +1535,122 @@ pub struct LaunchHotkeysConfig {
     /// Set true once auto-import has populated `entries`, so we only bake the
     /// per-repo mapping a single time and never clobber later user edits.
     pub imported: bool,
+}
+
+// ── Execution Policy Config ────────────────────────────────────────────
+
+/// Configuration for command-level policy evaluation and tool-level
+/// allow/deny/ask rules (Claude Code-compatible format).
+///
+/// # Example (TOML)
+///
+/// ```toml
+/// [execution-policy]
+/// # Claude Code-style allow/deny/ask with ToolName(pattern) syntax.
+/// allow = ["Bash(ls *)", "Bash(git status)", "Bash(cat *)"]
+/// deny  = ["Bash(rm -rf *)", "WebSearch", "WebFetch"]
+/// ask   = ["Bash"]
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct ExecutionPolicyConfig {
+    /// Enable command-level policy evaluation (default: true).
+    #[serde(default = "default_policy_enabled")]
+    pub enabled: bool,
+    /// Claude Code-style allow list — bare tool names or ToolName(pattern).
+    /// Matched tools are auto-allowed without prompting.
+    #[serde(default)]
+    pub allow: Vec<String>,
+    /// Claude Code-style deny list — bare tool names or ToolName(pattern).
+    /// Matched tools/commands are denied outright.
+    #[serde(default)]
+    pub deny: Vec<String>,
+    /// Claude Code-style ask list — bare tool names or ToolName(pattern).
+    /// Matched tools/commands always trigger a permission prompt.
+    #[serde(default)]
+    pub ask: Vec<String>,
+    /// Custom policy rules (programmatic evaluation).
+    #[serde(default)]
+    pub rules: Vec<PolicyRuleDef>,
+    /// Protected patterns (always prompt regardless of mode).
+    #[serde(default)]
+    pub protected_patterns: Vec<String>,
+    /// Circuit breaker thresholds.
+    #[serde(default)]
+    pub circuit_breaker: CircuitBreakerConfig,
+}
+
+fn default_policy_enabled() -> bool {
+    true
+}
+
+impl Default for ExecutionPolicyConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            allow: Vec::new(),
+            deny: Vec::new(),
+            ask: Vec::new(),
+            rules: Vec::new(),
+            protected_patterns: Vec::new(),
+            circuit_breaker: CircuitBreakerConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct CircuitBreakerConfig {
+    #[serde(default = "default_max_consecutive")]
+    pub max_consecutive_denials: u32,
+    #[serde(default = "default_max_total")]
+    pub max_total_denials: u32,
+}
+
+fn default_max_consecutive() -> u32 {
+    3
+}
+
+fn default_max_total() -> u32 {
+    20
+}
+
+impl Default for CircuitBreakerConfig {
+    fn default() -> Self {
+        Self {
+            max_consecutive_denials: 3,
+            max_total_denials: 20,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum PolicyRuleAction {
+    /// Always allow commands matching this pattern.
+    Allow,
+    /// Always deny commands matching this pattern.
+    Deny,
+    /// Always prompt for commands matching this pattern.
+    Prompt,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "kebab-case")]
+pub struct PolicyRuleDef {
+    /// Unique rule identifier (for audit logging).
+    pub id: String,
+    /// Human-readable description.
+    pub description: String,
+    /// Regex pattern to match against the command string.
+    pub pattern: String,
+    /// What to do when this rule matches.
+    pub action: PolicyRuleAction,
+    /// Optional: tool name to scope the rule to (e.g., "bash", "write").
+    /// None means applies to all tools.
+    #[serde(default)]
+    pub tool: Option<String>,
+    /// Suggested safer alternatives when this rule denies a command.
+    #[serde(default)]
+    pub alternatives: Vec<String>,
 }

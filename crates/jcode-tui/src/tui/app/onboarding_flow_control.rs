@@ -540,7 +540,7 @@ impl App {
             let Some(review) = self.onboarding_import_review_mut() else {
                 return false;
             };
-            if !review.choosing {
+            if review.choosing.is_none() {
                 // Summary mode: two pills, "Continue" (preselected) and
                 // "Choose what to import". Any directional key moves between
                 // them; Enter/Space commit the focused one.
@@ -709,7 +709,7 @@ impl App {
             let checked = review.checked_count();
             let total = review.total();
             let secs = review.seconds_remaining();
-            let notice = if !review.choosing {
+            let notice = if review.choosing.is_none() {
                 format!(
                     "Found {total} login{} - Enter imports all (auto in {secs}s), or pick \"Choose what to import\"",
                     if total == 1 { "" } else { "s" },

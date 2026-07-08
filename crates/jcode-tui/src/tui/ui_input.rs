@@ -672,7 +672,10 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             Span::styled(perm_label, Style::default().fg(color)),
         ];
         if mode_str != "default" {
-            spans.push(Span::styled(" (shift+tab to cycle)", Style::default().fg(dimmed)));
+            spans.push(Span::styled(
+                " (shift+tab to cycle)",
+                Style::default().fg(dimmed),
+            ));
         }
         spans
     }
@@ -715,9 +718,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         let spinner = super::activity_indicator(elapsed, 12.5);
 
         match app.status() {
-            ProcessingStatus::Idle => {
-                Line::from(status_line_mode_spans())
-            }
+            ProcessingStatus::Idle => Line::from(status_line_mode_spans()),
             ProcessingStatus::Sending => {
                 let mut spans = status_line_mode_spans();
                 spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
@@ -881,7 +882,10 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
                 spans.push(Span::styled(left_bar, Style::default().fg(anim_color)));
                 spans.push(Span::styled(" ", Style::default()));
-                spans.push(Span::styled(name.to_string(), Style::default().fg(anim_color).bold()));
+                spans.push(Span::styled(
+                    name.to_string(),
+                    Style::default().fg(anim_color).bold(),
+                ));
                 spans.push(Span::styled(" ", Style::default()));
                 spans.push(Span::styled(right_bar, Style::default().fg(anim_color)));
 

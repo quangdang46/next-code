@@ -386,7 +386,7 @@ fn welcome_body_lines(app: &dyn TuiState) -> Vec<Line<'static>> {
                         .alignment(align),
                     );
                 }
-                Some(prompt) if !prompt.choosing => {
+                Some(prompt) if prompt.choosing.is_none() => {
                     // Summary screen (default): show what we detected as a
                     // read-only checkmarked list, then land the user on a
                     // preselected "Continue" pill that imports everything.

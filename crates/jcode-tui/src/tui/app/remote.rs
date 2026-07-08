@@ -619,8 +619,7 @@ fn handle_terminal_event_while_disconnected(
         Some(Ok(Event::FocusGained)) => {
             app.note_client_focus(true);
         }
-        Some(Ok(Event::FocusLost)) => {
-        }
+        Some(Ok(Event::FocusLost)) => {}
         Some(Ok(Event::Key(key))) => {
             app.note_client_interaction();
             app.update_copy_badge_key_event(key);

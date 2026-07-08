@@ -3,11 +3,13 @@
 //! Sponsored discovery makes third-party developer tools discoverable to the
 //! agent through the `discover_tools` tool, backed by a hosted manifest.
 //! Sponsors buy placement (discoverability), never recommendations. The
-//! policy is disclosed in the UI with a `[sponsored discovery]` tag whose
+//! policy is disclosed in the UI with a `(sponsored discovery)` tag whose
 //! definition lives at <https://solosystems.dev/sponsored-discovery>.
 //!
 //! Design constraints (see the sponsored-discovery page for the public
 //! version of this policy):
+//! - Discovery is on by default and can be opted out of with
+//!   `[sponsors] enabled = false` in config.toml.
 //! - The category list below is a shipped constant, so building the system
 //!   prompt never requires a network request.
 //! - Tools within a category live server-side and are fetched on demand by
@@ -19,12 +21,15 @@
 /// Public URL explaining what sponsored discovery is.
 pub const SPONSORED_DISCOVERY_URL: &str = "https://solosystems.dev/sponsored-discovery";
 
+/// Provenance tagging and coarse usage metering for MCP servers connected
+/// as a result of a discovery listing.
+
 /// Disclosure tag rendered in the UI whenever discovery is used.
-pub const SPONSORED_DISCOVERY_TAG: &str = "[sponsored discovery]";
+pub const SPONSORED_DISCOVERY_TAG: &str = "(sponsored discovery)";
 
 /// First-use-per-session disclosure line rendered in the TUI.
-pub const SPONSORED_DISCOVERY_NOTICE: &str = "sponsored discovery: sponsors make tools discoverable, never recommended \
-     (solosystems.dev/sponsored-discovery)";
+pub const SPONSORED_DISCOVERY_NOTICE: &str = "sponsors make tools discoverable, never recommended \
+     \u{b7} solosystems.dev/sponsored-discovery";
 
 /// Categories in which discoverable tools exist. Shipped as a constant so the
 /// prompt never depends on the network. The tools within each category are
@@ -70,11 +75,11 @@ mod tests {
     }
 
     #[test]
-    fn prompt_section_is_none_by_default() {
-        // sponsors.enabled defaults to false; the default config must not
-        // advertise discovery.
+    fn prompt_section_enabled_by_default() {
+        // sponsors.enabled defaults to true (opt-out); the default config
+        // advertises discovery.
         let config = crate::config::Config::default();
-        assert!(!config.sponsors.enabled);
+        assert!(config.sponsors.enabled);
     }
 
     #[test]

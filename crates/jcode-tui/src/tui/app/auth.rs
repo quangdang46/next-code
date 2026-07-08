@@ -2909,6 +2909,8 @@ impl App {
             ),
         }));
     }
+
+    fn reset_credential_failure_breaker(&mut self) {}
 }
 
 #[cfg(test)]

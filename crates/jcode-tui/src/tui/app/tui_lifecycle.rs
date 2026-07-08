@@ -625,6 +625,10 @@ impl App {
             status_line_config: config().status_line.clone(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
             running_items_state: Default::default(),
+            idle_heap_release: crate::tui::app::idle_heap_release::IdleHeapRelease::default(),
+            sponsor_disclosure_shown_this_session: false,
+            swarm_hint_shown_this_session: false,
+            learn_hint: None,
         };
 
         for notice in app.provider.drain_startup_notices() {
@@ -1044,6 +1048,10 @@ impl App {
             status_line_config: config().status_line.clone(),
             workspace_client: crate::tui::workspace_client::WorkspaceClientState::default(),
             running_items_state: Default::default(),
+            idle_heap_release: crate::tui::app::idle_heap_release::IdleHeapRelease::default(),
+            sponsor_disclosure_shown_this_session: false,
+            swarm_hint_shown_this_session: false,
+            learn_hint: None,
         };
 
         for notice in app.provider.drain_startup_notices() {

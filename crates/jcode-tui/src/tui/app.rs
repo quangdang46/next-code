@@ -65,6 +65,7 @@ mod dictation;
 mod event_wrappers;
 mod handterm_native_scroll;
 pub(crate) mod helpers;
+mod idle_heap_release;
 mod inline_interactive;
 mod input;
 mod input_help;
@@ -84,11 +85,13 @@ mod replay;
 pub(crate) mod run_shell;
 mod runtime_memory;
 mod shortcut_hints;
+mod sponsor_disclosure;
 mod split_view;
 mod state_ui;
 pub mod state_ui_input_helpers;
 mod state_ui_maintenance;
 mod state_ui_messages;
+mod swarm_hint;
 mod state_ui_runtime;
 mod state_ui_storage;
 mod todos_view;
@@ -670,6 +673,10 @@ struct StreamingProgress {
     streaming_tps_observed_output_tokens: u64,
     /// Streaming-only elapsed time corresponding to streaming_tps_observed_output_tokens.
     streaming_tps_observed_elapsed: Duration,
+    /// How many ASCII characters have been streamed (used for spinner / progress bar).
+    streaming_context_stale: bool,
+    /// Whether we need to reset the usage bar on the next call.
+    streaming_usage_call_reset_pending: bool,
 }
 
 /// Accumulated session cost and cached per-model pricing.
@@ -1378,6 +1385,14 @@ pub struct App {
     pub agent_snapshot_cache: Vec<(String, std::time::SystemTime)>,
     /// Whether initial agent snapshot check has been performed.
     pub agent_snapshot_checked: bool,
+    /// Idle-time retained-heap release tracker.
+    idle_heap_release: idle_heap_release::IdleHeapRelease,
+    /// Whether sponsor disclosure has been shown in this session.
+    sponsor_disclosure_shown_this_session: bool,
+    /// Whether swarm config hint has been shown in this session.
+    swarm_hint_shown_this_session: bool,
+    /// Swarm config hint message with timestamp.
+    learn_hint: Option<(String, std::time::Instant)>,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

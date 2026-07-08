@@ -860,9 +860,10 @@ pub struct LoginImportPrompt {
     /// screen this is the preselected default; in choose mode it means focus is
     /// on the pill rather than a login row, so Enter commits the import.
     pub continue_focused: bool,
-    /// `false` = the default summary screen (detected logins listed read-only,
-    /// with Continue / Choose pills). `true` = the per-login checkbox list.
-    pub choosing: bool,
+    /// `None` = the default summary screen (detected logins listed read-only,
+    /// with Continue / Choose pills). `Some(label)` = the per-login checkbox list
+    /// with the label describing the action (e.g. "import").
+    pub choosing: Option<String>,
     /// How many rows are currently checked for import.
     pub checked_count: usize,
     /// Seconds left before the screen auto-imports all checked logins.

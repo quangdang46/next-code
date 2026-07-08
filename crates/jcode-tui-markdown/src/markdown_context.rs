@@ -41,6 +41,25 @@ fn with_scoped_cell_value<T: Copy, R>(cell: &Cell<T>, value: T, f: impl FnOnce()
     f()
 }
 
+/// Run `f` with the diagram display mode set on the current thread only.
+/// Unlike `set_diagram_mode_override`, this never mutates process-global
+/// state, so concurrent renders (and parallel tests) are unaffected.
+pub fn with_diagram_mode_scope<T>(mode: DiagramDisplayMode, f: impl FnOnce() -> T) -> T {
+    let prev = set_diagram_mode_raw(Some(mode));
+    let result = f();
+    set_diagram_mode_raw(prev);
+    result
+}
+
+fn set_diagram_mode_raw(mode: Option<DiagramDisplayMode>) -> Option<DiagramDisplayMode> {
+    if let Ok(mut override_mode) = DIAGRAM_MODE_OVERRIDE.lock() {
+        let prev = *override_mode;
+        *override_mode = mode;
+        return prev;
+    }
+    None
+}
+
 pub fn set_diagram_mode_override(mode: Option<DiagramDisplayMode>) {
     if let Ok(mut override_mode) = DIAGRAM_MODE_OVERRIDE.lock() {
         *override_mode = mode;

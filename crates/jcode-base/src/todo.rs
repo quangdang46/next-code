@@ -8,6 +8,14 @@ use std::path::PathBuf;
 use crate::bus::{Bus, BusEvent, TodoEvent};
 use crate::storage::{self, read_json, write_json_fast};
 
+/// Prefix for the confidence summary line appended to auto-poke messages.
+pub const TODO_CONFIDENCE_SUMMARY_PREFIX: &str = "Confidence history:";
+
+/// Build the auto-poke message shown when an agent has incomplete todos.
+pub fn build_auto_poke_message(incomplete: usize) -> String {
+    format!("You have {incomplete} incomplete todo items. Review and update the todo tool.")
+}
+
 fn todo_path(session_id: &str) -> Result<PathBuf> {
     let base = storage::jcode_dir()?;
     Ok(base.join("todos").join(format!("{}.json", session_id)))

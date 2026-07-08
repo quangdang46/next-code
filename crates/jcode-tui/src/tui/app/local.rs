@@ -393,9 +393,7 @@ fn apply_terminal_event(
             app.note_client_focus(true);
             Ok(false)
         }
-        Some(Ok(Event::FocusLost)) => {
-            Ok(false)
-        }
+        Some(Ok(Event::FocusLost)) => Ok(false),
         Some(Ok(Event::Key(key))) => {
             app.note_client_interaction();
             app.update_copy_badge_key_event(key);
@@ -567,6 +565,13 @@ impl App {
             self.set_status_notice(result);
         }
         // Silently ignore errors — not every turn produces an agent.
+    }
+
+    /// Stub: called from the idle tick loop when a cold-cache transcript warning
+    /// needs to be surfaced. The upstream method in `app.rs` requires turn
+    /// context, so the idle loop delegates to a no-op here.
+    pub(crate) fn maybe_push_idle_cold_cache_warning(&mut self) -> bool {
+        false
     }
 }
 

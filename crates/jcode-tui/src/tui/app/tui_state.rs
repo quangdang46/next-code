@@ -1212,6 +1212,7 @@ impl crate::tui::TuiState for App {
                     assigned_to: item.assigned_to.clone(),
                     confidence: None,
                     completion_confidence: None,
+                    confidence_history: Vec::new(),
                 })
                 .collect()
         } else {

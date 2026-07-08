@@ -3,12 +3,7 @@
 //! Run with: `cargo run --profile selfdev -p jcode-tui-render --example swarm_gallery_preview`
 
 use jcode_tui_render::swarm_gallery::{
-<<<<<<< HEAD
     GalleryMember, SwarmStripHint, render_swarm_panel, render_swarm_strip,
-=======
-    GalleryMember, SwarmStripHint, render_swarm_compact, render_swarm_dock, render_swarm_panel,
-    render_swarm_strip, render_swarm_strip_vertical,
->>>>>>> upstream/master
 };
 use jcode_tui_render::swarm_tiles::{SwarmGalleryConfig, SwarmTile, render_swarm_gallery};
 use ratatui::prelude::*;
@@ -181,13 +176,8 @@ fn main() {
     // ---- New compact strip (above status line) ----
     let hints = vec![
         SwarmStripHint {
-<<<<<<< HEAD
             key: "alt+w".into(),
             label: "focus".into(),
-=======
-            key: "alt+n".into(),
-            label: "next".into(),
->>>>>>> upstream/master
         },
         SwarmStripHint {
             key: "alt+↑/↓".into(),
@@ -220,91 +210,6 @@ fn main() {
     );
     print_lines(
         "STRIP: focused narrow @ width 54",
-<<<<<<< HEAD
         &render_swarm_strip(&panel_members, 0, true, &hints, None, 5, 54),
-=======
-        &render_swarm_strip(&panel_members, 0, true, &hints, None, 5, 54, 12),
-    );
-
-    // ---- Vertical strip (default layout: one agent per row) ----
-    let mut vert_members = panel_members.clone();
-    for (m, icon) in vert_members.iter_mut().zip(["🦊", "🐝", "🐅", "🦉"]) {
-        m.icon = Some(icon.to_string());
-        m.task = Some(match m.label.as_str() {
-            "researcher" => "wire the auth flow".to_string(),
-            "implementer" => "audit the webhook path".to_string(),
-            "reviewer" => "support/contact page".to_string(),
-            _ => "misc background task".to_string(),
-        });
-    }
-    vert_members[1].todo = Some((3, 9));
-    print_lines(
-        "VERTICAL: unfocused @ width 90",
-        &render_swarm_strip_vertical(
-            &vert_members,
-            1,
-            false,
-            &hints,
-            Some("alt+n controls"),
-            0,
-            90,
-            4,
-            12,
-        ),
-    );
-    print_lines(
-        "VERTICAL: focused (accordion), selected #1 @ width 90",
-        &render_swarm_strip_vertical(&vert_members, 1, true, &hints, None, 3, 90, 4, 12),
-    );
-    print_lines(
-        "VERTICAL: 7 agents overflow @ width 80",
-        &render_swarm_strip_vertical(
-            &{
-                let mut many = Vec::new();
-                for i in 0..7 {
-                    let mut m = gm(&format!("agent-{i}"), None, "running", &[]);
-                    m.icon = Some("🐜".to_string());
-                    many.push(m);
-                }
-                many
-            },
-            0,
-            false,
-            &hints,
-            Some("alt+n controls"),
-            0,
-            80,
-            4,
-            12,
-        ),
-    );
-
-    // ---- Dock (vertical agent list for the info-widget margins) ----
-    print_lines(
-        "DOCK: 4 agents, selected #0, unfocused @ width 34 h 12",
-        &render_swarm_dock(&panel_members, 0, false, Some((3, 7)), 0, 34, 12),
-    );
-    print_lines(
-        "DOCK: 4 agents, selected #1, focused @ width 34 h 14",
-        &render_swarm_dock(&panel_members, 1, true, Some((3, 7)), 2, 34, 14),
-    );
-    print_lines(
-        "DOCK: narrow @ width 24 h 8",
-        &render_swarm_dock(&panel_members, 2, false, None, 0, 24, 8),
->>>>>>> upstream/master
-    );
-
-    // ---- Compact summary (two lines: tally + plan bar) ----
-    print_lines(
-        "COMPACT: 4 agents, nodes 5/12 (3 running) @ width 34",
-        &render_swarm_compact(&panel_members, Some((5, 3, 12)), 34, 2),
-    );
-    print_lines(
-        "COMPACT: no plan @ width 34",
-        &render_swarm_compact(&panel_members, None, 34, 2),
-    );
-    print_lines(
-        "COMPACT: narrow @ width 20",
-        &render_swarm_compact(&panel_members, Some((5, 3, 12)), 20, 2),
     );
 }
