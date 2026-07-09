@@ -10,6 +10,7 @@ use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
 use crate::tui::selection_highlight::highlight_line_selection;
 use crate::tui::session_facts;
+use jcode_keywords::visual::{compute_highlights, KeywordHighlight};
 use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
 use jcode_tui_style::theme::{
     accent_color, ai_color, asap_color, dim_color, pending_color, queued_color,
@@ -2444,6 +2445,37 @@ pub(crate) fn input_cursor_pos_from_screen(
     ))
 }
 
+/// Build rendered spans for a text segment, applying keyword highlight
+/// colors where they overlap the segment's byte range in the original input.
+fn highlighted_text_spans(text: &str) -> Vec<Span<'static>> {
+    let highlights = compute_highlights(text);
+    if highlights.is_empty() {
+        return vec![Span::raw(text.to_string())];
+    }
+
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut cursor = 0usize;
+    for hl in &highlights {
+        // Text before this highlight
+        if hl.start > cursor {
+            spans.push(Span::raw(text[cursor..hl.start].to_string()));
+        }
+
+        let color = Color::Rgb(hl.color.0, hl.color.1, hl.color.2);
+        spans.push(Span::styled(
+            text[hl.start..hl.end].to_string(),
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        ));
+        cursor = hl.end;
+    }
+    // Remaining text after last highlight
+    if cursor < text.len() {
+        spans.push(Span::raw(text[cursor..].to_string()));
+    }
+
+    spans
+}
+
 pub(crate) fn wrap_input_text<'a>(
     input: &str,
     cursor_pos: usize,
@@ -2470,18 +2502,19 @@ pub(crate) fn wrap_input_text<'a>(
             found_cursor = true;
         }
 
+        let text_spans = highlighted_text_spans(&segment.text);
         if idx == 0 {
             let num_color = rainbow_prompt_color(0);
-            lines.push(Line::from(vec![
+            let mut spans = vec![
                 Span::styled(num_str.to_string(), Style::default().fg(num_color)),
                 Span::styled(prompt_char.to_string(), Style::default().fg(caret_color)),
-                Span::raw(segment.text.clone()),
-            ]));
+            ];
+            spans.extend(text_spans);
+            lines.push(Line::from(spans));
         } else {
-            lines.push(Line::from(vec![
-                Span::raw(" ".repeat(prompt_len)),
-                Span::raw(segment.text.clone()),
-            ]));
+            let mut spans = vec![Span::raw(" ".repeat(prompt_len))];
+            spans.extend(text_spans);
+            lines.push(Line::from(spans));
         }
     }
 
