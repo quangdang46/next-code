@@ -1289,7 +1289,6 @@ impl App {
 
                 let result = loop {
                     tokio::select! {
-                        biased;
                         // Handle keyboard input while tool executes
                         event = event_stream.next() => {
                             match event {
