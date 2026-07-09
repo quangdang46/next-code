@@ -419,6 +419,10 @@ impl App {
             WidgetProviderKind::Unknown => None,
         }
     }
+
+    pub(super) fn client_focused(&self) -> bool {
+        true // always true — upstream's FocusLost handling is not ported
+    }
 }
 
 impl crate::tui::TuiState for App {
@@ -1212,6 +1216,7 @@ impl crate::tui::TuiState for App {
                     assigned_to: item.assigned_to.clone(),
                     confidence: None,
                     completion_confidence: None,
+                    confidence_history: Vec::new(),
                 })
                 .collect()
         } else {
@@ -1846,6 +1851,7 @@ impl crate::tui::TuiState for App {
             remaining_secs: remaining,
             ttl_secs,
             is_cold: remaining == 0,
+            cold_for_secs: elapsed.saturating_sub(ttl_secs),
             cached_tokens: self.last_turn_input_tokens,
         })
     }
@@ -1913,6 +1919,34 @@ impl crate::tui::TuiState for App {
             .display_user_message_count
             .saturating_sub(self.compacted_hidden_user_prompts());
         Some((pos, total.max(1)))
+    }
+
+    fn client_focused(&self) -> bool {
+        App::client_focused(self)
+    }
+
+    fn hotkey_feedback(&self) -> Option<String> {
+        self.hotkey_feedback.as_ref().and_then(|(text, at)| {
+            // Long enough to read the chord and its action, short enough to
+            // stay out of the way during rapid keying.
+            if at.elapsed() <= std::time::Duration::from_secs(5) {
+                Some(text.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    fn learn_hint(&self) -> Option<String> {
+        self.learn_hint.as_ref().and_then(|(text, at)| {
+            // Learn-hints linger a little longer than status notices so the user
+            // has time to read and register the keybinding.
+            if at.elapsed() <= std::time::Duration::from_secs(8) {
+                Some(text.clone())
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -2026,6 +2060,70 @@ impl App {
             )),
             Err(e) => self.set_status_notice(format!("Failed to open {label}: {e}")),
         }
+    }
+
+    pub(crate) fn cycle_swarm_panel_selection(&mut self) {
+        let new = self.swarm_panel_selected.saturating_add(1);
+        let max = self.remote_swarm_members.len().max(
+            self.swarm_plan_items
+                .len()
+                .saturating_sub(1)
+                .min(self.swarm_panel_selected),
+        );
+        if new <= max {
+            self.swarm_panel_selected = new;
+            self.swarm_panel_focused = true;
+        }
+    }
+
+    pub(super) fn remote_effort_identity(&self) -> (Option<String>, Option<String>) {
+        let model = self.effective_remote_provider_model();
+        let provider = self.remote_provider_name.clone().or_else(|| {
+            model
+                .as_deref()
+                .and_then(|model| {
+                    crate::provider::provider_for_model_with_hint(model, None).map(str::to_string)
+                })
+                .or_else(|| self.configured_remote_provider_hint())
+        });
+        (provider, model)
+    }
+
+    /// Best-known current reasoning effort for the remote session. Falls back
+    /// to the configured provider-family default when the server has not
+    /// reported one yet, so pre-settle effort cycling starts from the value the
+    /// session will actually use instead of assuming the maximum.
+    pub(super) fn remote_reasoning_effort_hint(&self) -> Option<String> {
+        self.remote_reasoning_effort.clone().or_else(|| {
+            let (provider, model) = self.remote_effort_identity();
+            let provider = provider.unwrap_or_default().to_ascii_lowercase();
+            let model = model.unwrap_or_default().to_ascii_lowercase();
+            let cfg = &crate::config::config().provider;
+            if provider.contains("anthropic")
+                || provider.contains("claude")
+                || model.starts_with("claude-")
+            {
+                cfg.anthropic_reasoning_effort.clone()
+            } else if provider.contains("openai")
+                || provider.contains("codex")
+                || model.starts_with("gpt-")
+            {
+                cfg.openai_reasoning_effort.clone()
+            } else {
+                None
+            }
+        })
+    }
+
+    pub(crate) fn swarm_panel_action_for_key(
+        &self,
+        code: crossterm::event::KeyCode,
+        modifiers: crossterm::event::KeyModifiers,
+    ) -> Option<crate::tui::SwarmPanelAction> {
+        if self.toggle_keys.swarm_panel_focus.matches(code, modifiers) {
+            return Some(crate::tui::SwarmPanelAction::ToggleFocus);
+        }
+        None
     }
 }
 

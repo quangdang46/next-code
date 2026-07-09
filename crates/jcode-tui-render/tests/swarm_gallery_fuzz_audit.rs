@@ -12,7 +12,9 @@ use unicode_width::UnicodeWidthStr;
 fn member(id: &str, status: &str, role: Option<&str>, body: &[&str]) -> GalleryMember {
     GalleryMember {
         label: id.to_string(),
+        icon: None,
         status: status.to_string(),
+        task: None,
         role: role.map(str::to_string),
         body: body.iter().map(|s| s.to_string()).collect(),
         sort_key: id.to_string(),
@@ -74,7 +76,7 @@ fn member_sets() -> Vec<Vec<GalleryMember>> {
         vec![wide.clone()],
         vec![
             wide,
-            member("b", "done", Some("worktree_manager"), &["ok", "· 1h ago"]),
+            member("b", "done", Some("mystery_role_2"), &["ok", "· 1h ago"]),
             member(
                 "",
                 "weird-status-xyz",

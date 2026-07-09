@@ -1,5 +1,5 @@
 use super::inline_interactive_ui::format_elapsed;
-use super::tools_ui::{get_tool_summary, summarize_batch_running_tools_compact};
+use super::tools_ui::{get_tool_activity_detail, summarize_batch_running_tools_compact};
 use super::visual_debug::{self, FrameCaptureBuilder};
 use super::{ProcessingStatus, TuiState};
 use crate::message::ConnectionPhase;
@@ -8,6 +8,7 @@ use crate::tui::color_support::rgb;
 use crate::tui::detect_kv_cache_problem;
 use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
+use crate::tui::selection_highlight::highlight_line_selection;
 use crate::tui::session_facts;
 use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
 use jcode_tui_style::theme::{
@@ -671,7 +672,10 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
             Span::styled(perm_label, Style::default().fg(color)),
         ];
         if mode_str != "default" {
-            spans.push(Span::styled(" (shift+tab to cycle)", Style::default().fg(dimmed)));
+            spans.push(Span::styled(
+                " (shift+tab to cycle)",
+                Style::default().fg(dimmed),
+            ));
         }
         spans
     }
@@ -714,9 +718,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         let spinner = super::activity_indicator(elapsed, 12.5);
 
         match app.status() {
-            ProcessingStatus::Idle => {
-                Line::from(status_line_mode_spans())
-            }
+            ProcessingStatus::Idle => Line::from(status_line_mode_spans()),
             ProcessingStatus::Sending => {
                 let mut spans = status_line_mode_spans();
                 spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
@@ -870,7 +872,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 } else {
                     app.streaming_tool_calls()
                         .last()
-                        .map(get_tool_summary)
+                        .map(get_tool_activity_detail)
                         .filter(|s| !s.is_empty())
                 };
                 let experimental_notice = app.active_experimental_feature_notice();
@@ -880,7 +882,10 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
                 spans.push(Span::styled(left_bar, Style::default().fg(anim_color)));
                 spans.push(Span::styled(" ", Style::default()));
-                spans.push(Span::styled(name.to_string(), Style::default().fg(anim_color).bold()));
+                spans.push(Span::styled(
+                    name.to_string(),
+                    Style::default().fg(anim_color).bold(),
+                ));
                 spans.push(Span::styled(" ", Style::default()));
                 spans.push(Span::styled(right_bar, Style::default().fg(anim_color)));
 
@@ -1562,7 +1567,15 @@ pub(super) fn build_notification_spans(app: &dyn TuiState) -> Vec<Span<'static>>
                     format!("🧊 cache cold{}", tokens_str),
                     Style::default().fg(rgb(140, 180, 255)),
                 ));
-            } else if cache_info.remaining_secs <= 60 {
+                // Small gray "how long ago it went cold" hint, e.g. `1h 1m`.
+                spans.push(Span::styled(
+                    format!(
+                        " {}",
+                        crate::tui::format_compact_age(cache_info.cold_for_secs)
+                    ),
+                    Style::default().fg(dim_color()),
+                ));
+            } else if cache_info.expiring_soon() {
                 let tokens_str = cache_info
                     .cached_tokens
                     .map(|t| {
@@ -1573,9 +1586,17 @@ pub(super) fn build_notification_spans(app: &dyn TuiState) -> Vec<Span<'static>>
                         }
                     })
                     .unwrap_or_default();
+                // Above a minute, a raw seconds count is hard to read at a
+                // glance; show minutes granularity instead.
+                let remaining = cache_info.remaining_secs;
+                let time_str = if remaining > 60 {
+                    format!("{}m", remaining.div_ceil(60))
+                } else {
+                    format!("{}s", remaining)
+                };
                 push_sep(&mut spans);
                 spans.push(Span::styled(
-                    format!("⏳ cache {}s{}", cache_info.remaining_secs, tokens_str),
+                    format!("⏳ cache {}{}", time_str, tokens_str),
                     Style::default().fg(rgb(255, 193, 7)),
                 ));
             }
@@ -2070,6 +2091,7 @@ pub(super) fn draw_input(
             break;
         }
     }
+    let visible_input_rows = lines.len().saturating_sub(suggestions_offset);
 
     if has_suggestions && render_suggestions_below {
         for line in suggestion_lines {
@@ -2081,6 +2103,81 @@ pub(super) fn draw_input(
     }
 
     let centered = app.centered_mode();
+
+    // Register the composer's visible rows with the shared copy-selection
+    // machinery so mouse drags can select and copy the text being typed
+    // (issue #430). The prompt prefix / continuation indent is excluded via
+    // per-row left margins, so hit-testing and the copied text only ever
+    // cover the typed text, never the prompt decoration.
+    if visible_input_rows > 0 {
+        let (wrapped_plain, raw_plain, line_map) =
+            input_copy_snapshot_parts(input_text, line_width);
+        let left_margins: Vec<u16> = (0..visible_input_rows)
+            .map(|rel| {
+                let abs = scroll_offset + rel;
+                let text_width = wrapped_plain
+                    .get(abs)
+                    .map(|text| unicode_width::UnicodeWidthStr::width(text.as_str()))
+                    .unwrap_or(0);
+                let mut margin = prompt_len;
+                if centered {
+                    margin += (area.width as usize).saturating_sub(prompt_len + text_width) / 2;
+                }
+                margin.min(area.width as usize) as u16
+            })
+            .collect();
+        let input_rows_area = Rect::new(
+            area.x,
+            area.y.saturating_add(suggestions_offset as u16),
+            area.width,
+            visible_input_rows as u16,
+        );
+        super::record_input_copy_snapshot(
+            wrapped_plain,
+            raw_plain,
+            line_map,
+            scroll_offset,
+            scroll_offset + visible_input_rows,
+            input_rows_area,
+            &left_margins,
+        );
+    }
+
+    // Highlight an active copy selection over the composer text, mirroring the
+    // chat/side-pane selection rendering. Columns are selection-space (typed
+    // text only), so shift them right by the prompt width for display.
+    if let Some(range) = app.copy_selection_range().filter(|range| {
+        range.start.pane == crate::tui::CopySelectionPane::Input
+            && range.end.pane == crate::tui::CopySelectionPane::Input
+    }) {
+        let (start, end) = if (range.start.abs_line, range.start.column)
+            <= (range.end.abs_line, range.end.column)
+        {
+            (range.start, range.end)
+        } else {
+            (range.end, range.start)
+        };
+        for rel in 0..visible_input_rows {
+            let abs = scroll_offset + rel;
+            if abs < start.abs_line || abs > end.abs_line {
+                continue;
+            }
+            if let Some(line) = lines.get_mut(suggestions_offset + rel) {
+                let start_col = if abs == start.abs_line {
+                    prompt_len + start.column
+                } else {
+                    prompt_len
+                };
+                let end_col = if abs == end.abs_line {
+                    prompt_len + end.column
+                } else {
+                    line.width()
+                };
+                *line = highlight_line_selection(line, start_col, end_col);
+            }
+        }
+    }
+
     let paragraph = if centered {
         Paragraph::new(
             lines
@@ -2117,6 +2214,52 @@ struct WrappedInputSegment {
     start_char: usize,
     end_char: usize,
     display_width: usize,
+}
+
+/// Wrapped/raw text plus the wrapped-to-raw line map for the composer's
+/// copy-selection snapshot. Wrapped rows mirror `wrap_input_segments` exactly
+/// (the same function that lays out the rendered rows), while raw lines are
+/// the logical `\n`-separated input lines, so copying a selection that spans
+/// a soft wrap yields the original text without injected line breaks.
+fn input_copy_snapshot_parts(
+    input: &str,
+    line_width: usize,
+) -> (Vec<String>, Vec<String>, Vec<super::WrappedLineMap>) {
+    use unicode_width::UnicodeWidthChar;
+
+    let segments = wrap_input_segments(input, line_width);
+    let raw_lines: Vec<String> = input.split('\n').map(str::to_owned).collect();
+
+    // (raw_line, display_col) at each char boundary of the input.
+    let mut boundaries = Vec::with_capacity(input.chars().count() + 1);
+    let mut raw_line = 0usize;
+    let mut col = 0usize;
+    boundaries.push((raw_line, col));
+    for ch in input.chars() {
+        if ch == '\n' {
+            raw_line += 1;
+            col = 0;
+        } else {
+            col += ch.width().unwrap_or(0);
+        }
+        boundaries.push((raw_line, col));
+    }
+
+    let mut wrapped_plain = Vec::with_capacity(segments.len());
+    let mut line_map = Vec::with_capacity(segments.len());
+    for segment in &segments {
+        let (raw_line, start_col) = boundaries
+            .get(segment.start_char)
+            .copied()
+            .unwrap_or((0, 0));
+        line_map.push(super::WrappedLineMap {
+            raw_line,
+            start_col,
+            end_col: start_col + segment.display_width,
+        });
+        wrapped_plain.push(segment.text.clone());
+    }
+    (wrapped_plain, raw_lines, line_map)
 }
 
 fn wrap_input_segments(input: &str, line_width: usize) -> Vec<WrappedInputSegment> {

@@ -3,13 +3,13 @@ mod account_failover;
 pub mod activation;
 pub mod anthropic;
 pub mod antigravity;
-mod attempt_tracker;
 pub mod bedrock;
 mod catalog_routes;
 pub mod claude;
 pub mod copilot;
 pub mod cursor;
 mod dispatch;
+pub mod external;
 mod failover;
 mod fingerprint;
 pub mod gemini;
@@ -49,6 +49,7 @@ pub use catalog_routes::{
     remote_model_routes_lightweight_fallback, remote_model_should_offer_copilot_route,
     remote_openai_compatible_route_for_model, simplified_model_routes_for_picker,
 };
+pub use jcode_provider_core::attempt_tracker;
 pub use jcode_provider_core::cli_provider_arg_for_session_key;
 pub use jcode_provider_core::{
     ALL_CLAUDE_MODELS, ALL_OPENAI_MODELS, CHEAPNESS_REFERENCE_INPUT_TOKENS,
@@ -60,11 +61,11 @@ pub use jcode_provider_core::{
     model_name_for_provider, normalize_copilot_model_name, provider_from_model_key,
     shared_http_client, summarize_model_catalog_refresh,
 };
-pub use jcode_provider_core::{ProviderFailoverPrompt, parse_failover_prompt_message};
 pub use jcode_provider_core::{
     FallbackPickOptions, error_looks_like_credential_failure, model_route_provider_labels_match,
     pick_next_fallback_route, pick_next_fallback_route_with_options,
 };
+pub use jcode_provider_core::{ProviderFailoverPrompt, parse_failover_prompt_message};
 pub use route_builders::{
     build_anthropic_oauth_route, build_copilot_route, build_openai_api_key_route,
     build_openai_oauth_route, build_openrouter_auto_route, build_openrouter_endpoint_route,
@@ -73,9 +74,7 @@ pub use route_builders::{
 };
 pub(crate) use routing::{
     anthropic_api_key_route_availability, anthropic_oauth_route_availability,
-    should_eager_detect_copilot_tier,
 };
-pub(crate) use jcode_provider_core::is_transient_transport_error;
 
 /// Process-wide handle to the live agent provider.
 ///
@@ -305,11 +304,11 @@ pub use self::models::{
     note_openai_model_catalog_refresh_attempt, persist_anthropic_model_catalog,
     persist_openai_model_catalog, populate_account_models, populate_anthropic_models,
     populate_context_limits, populate_context_limits_from_config,
-    populate_context_limits_from_config_value, provider_for_model,
-    provider_for_model_with_hint, provider_unavailability_detail_for_account,
-    record_model_unavailable_for_account, record_provider_unavailable_for_account,
-    refresh_openai_model_catalog_in_background, resolve_model_capabilities,
-    should_refresh_anthropic_model_catalog, should_refresh_openai_model_catalog,
+    populate_context_limits_from_config_value, provider_for_model, provider_for_model_with_hint,
+    provider_unavailability_detail_for_account, record_model_unavailable_for_account,
+    record_provider_unavailable_for_account, refresh_openai_model_catalog_in_background,
+    resolve_model_capabilities, should_refresh_anthropic_model_catalog,
+    should_refresh_openai_model_catalog,
 };
 pub use self::selection::DefaultModelSelection;
 use self::selection::{ActiveProvider, ProviderAvailability};
@@ -319,29 +318,40 @@ pub use self::state::{ProviderModelSelectionSource, ProviderRuntimeState, Provid
 /// MultiProvider wraps multiple providers and allows seamless model switching
 pub struct MultiProvider {
     /// Claude Code CLI provider
-    claude: RwLock<Option<Arc<claude::ClaudeProvider>>>,
+    claude: RwLock<Option<Arc<dyn Provider>>>,
     /// Direct Anthropic API provider (no Python dependency)
-    anthropic: RwLock<Option<Arc<anthropic::AnthropicProvider>>>,
-    openai: RwLock<Option<Arc<openai::OpenAIProvider>>>,
-    /// GitHub Copilot API provider (direct API, hot-swappable after login)
-    copilot_api: RwLock<Option<Arc<copilot::CopilotApiProvider>>>,
-    /// Antigravity provider (direct HTTPS, hot-swappable after login)
-    antigravity: RwLock<Option<Arc<antigravity::AntigravityProvider>>>,
-    /// Gemini provider (hot-swappable after login)
-    gemini: RwLock<Option<Arc<gemini::GeminiProvider>>>,
-    /// Cursor provider (native/direct API, hot-swappable after login)
-    cursor: RwLock<Option<Arc<cursor::CursorCliProvider>>>,
+    anthropic: RwLock<Option<Arc<dyn Provider>>>,
+    openai: RwLock<Option<Arc<dyn Provider>>>,
+    /// GitHub Copilot API provider (direct API, hot-swappable after login).
+    /// Held as `dyn Provider`: the concrete runtime lives downstream in
+    /// `jcode-provider-copilot-runtime` and is instantiated through
+    /// `external::instantiate_external_provider`.
+    copilot_api: RwLock<Option<Arc<dyn Provider>>>,
+    /// Antigravity provider (direct HTTPS, hot-swappable after login). Held as
+    /// `dyn Provider`: the concrete runtime lives downstream in
+    /// `jcode-provider-antigravity-runtime` and is instantiated through
+    /// `external::instantiate_external_provider`.
+    antigravity: RwLock<Option<Arc<dyn Provider>>>,
+    /// Gemini provider (hot-swappable after login). Held as `dyn Provider`:
+    /// the concrete runtime lives downstream in `jcode-provider-gemini-runtime`
+    /// and is instantiated through `external::instantiate_external_provider`.
+    gemini: RwLock<Option<Arc<dyn Provider>>>,
+    /// Cursor provider (native/direct API, hot-swappable after login). Held as
+    /// `dyn Provider`: the concrete runtime lives downstream in
+    /// `jcode-provider-cursor-runtime` and is instantiated through
+    /// `external::instantiate_external_provider`.
+    cursor: RwLock<Option<Arc<dyn Provider>>>,
     /// AWS Bedrock provider (native Converse/ConverseStream, IAM/SigV4)
     bedrock: RwLock<Option<Arc<bedrock::BedrockProvider>>>,
     /// OpenRouter API provider
-    openrouter: RwLock<Option<Arc<openrouter::OpenRouterProvider>>>,
+    openrouter: RwLock<Option<Arc<dyn Provider>>>,
     /// Direct OpenAI-compatible runtimes keyed by profile id.
     ///
     /// These use the same wire protocol implementation as OpenRouter, but must
     /// not occupy the real OpenRouter slot. Keeping them separate prevents a
     /// compatible endpoint selection from corrupting later OpenRouter model
     /// switches, catalog display, or auth refresh handling.
-    openai_compatible_profiles: RwLock<HashMap<String, Arc<openrouter::OpenRouterProvider>>>,
+    openai_compatible_profiles: RwLock<HashMap<String, Arc<dyn Provider>>>,
     active_openai_compatible_profile: RwLock<Option<String>>,
     active: RwLock<ActiveProvider>,
     /// Use Claude CLI instead of direct API (legacy mode)
@@ -767,9 +777,9 @@ impl MultiProvider {
                 let uses_api_key = self
                     .anthropic_provider()
                     .map(|anthropic| match anthropic.credential_mode() {
-                        jcode_provider_core::CredentialMode::ApiKey => true,
-                        jcode_provider_core::CredentialMode::OAuth => false,
-                        jcode_provider_core::CredentialMode::Auto => {
+                        anthropic::AnthropicCredentialMode::ApiKey => true,
+                        anthropic::AnthropicCredentialMode::OAuth => false,
+                        anthropic::AnthropicCredentialMode::Auto => {
                             crate::auth::claude::load_credentials().is_err()
                         }
                     })
@@ -786,9 +796,9 @@ impl MultiProvider {
                 let uses_api_key = self
                     .openai_provider()
                     .map(|openai| match openai.credential_mode() {
-                        jcode_provider_core::CredentialMode::ApiKey => true,
-                        jcode_provider_core::CredentialMode::OAuth => false,
-                        jcode_provider_core::CredentialMode::Auto => {
+                        openai::OpenAICredentialMode::ApiKey => true,
+                        openai::OpenAICredentialMode::OAuth => false,
+                        openai::OpenAICredentialMode::Auto => {
                             crate::auth::codex::load_oauth_credentials().is_err()
                         }
                     })
@@ -829,6 +839,71 @@ impl MultiProvider {
 
         let profile = crate::provider_catalog::openai_compatible_profile_by_id(prefix)?;
         Some((profile, rest))
+    }
+
+    /// Parse a `<name>:<model>` spec whose prefix is a user-defined named
+    /// provider profile from config (`[providers.<name>]`). Built-in provider
+    /// prefixes and catalog profile ids take precedence and never reach here.
+    fn named_provider_profile_model_prefix(model: &str) -> Option<(String, String)> {
+        let (prefix, rest) = model.split_once(':')?;
+        if explicit_model_provider_prefix(model).is_some()
+            || Self::openai_compatible_model_prefix(model).is_some()
+        {
+            return None;
+        }
+        let prefix = prefix.trim();
+        let rest = rest.trim();
+        if prefix.is_empty() || rest.is_empty() {
+            return None;
+        }
+        crate::config::config()
+            .providers
+            .contains_key(prefix)
+            .then(|| (prefix.to_string(), rest.to_string()))
+    }
+
+    /// Bind (or reuse) the runtime for a named config provider profile and
+    /// select `model` on it (issue #444).
+    fn set_model_on_named_provider_profile(&self, profile_name: &str, model: &str) -> Result<()> {
+        let model = model.trim();
+        if model.is_empty() {
+            anyhow::bail!("Model cannot be empty");
+        }
+        let config = crate::config::config()
+            .providers
+            .get(profile_name)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Unknown provider profile '{}'", profile_name))?;
+
+        let expected_api_method = format!("openai-compatible:{}", profile_name);
+        let registry = ProviderRegistry::new(self);
+        let provider = {
+            let existing = registry
+                .compatible_profile(profile_name)
+                .filter(|provider| {
+                    provider
+                        .direct_openai_compatible_route_parts()
+                        .map(|(_provider, api_method, _detail)| api_method == expected_api_method)
+                        .unwrap_or(false)
+                });
+            if let Some(provider) = existing {
+                provider
+            } else {
+                let provider = external::instantiate_openrouter_runtime(
+                    external::OpenRouterRuntimeSpec::NamedProfile {
+                        name: profile_name.to_string(),
+                        config,
+                    },
+                )?;
+                registry
+                    .install_compatible_profile(profile_name.to_string(), Arc::clone(&provider));
+                provider
+            }
+        };
+        provider.set_model(model)?;
+        registry.set_active_compatible_profile(profile_name.to_string());
+        self.set_active_provider(ActiveProvider::OpenRouter);
+        Ok(())
     }
 
     fn ensure_provider_lock_allows_model_target(
@@ -1015,8 +1090,9 @@ impl MultiProvider {
                     }
                 };
                 if needs_rebind {
-                    let provider =
-                        Arc::new(openrouter::OpenRouterProvider::new_openrouter_api_key_runtime()?);
+                    let provider = external::instantiate_openrouter_runtime(
+                        external::OpenRouterRuntimeSpec::OpenRouterApiKey,
+                    )?;
                     *self
                         .openrouter
                         .write()
@@ -1070,10 +1146,10 @@ impl MultiProvider {
             if let Some(provider) = existing {
                 provider
             } else {
-                let provider = Arc::new(
-                    openrouter::OpenRouterProvider::new_openai_compatible_profile_runtime(profile)?,
-                );
-                registry.install_compatible_profile(profile_id.clone(), provider.clone());
+                let provider = external::instantiate_openrouter_runtime(
+                    external::OpenRouterRuntimeSpec::CompatibleProfile(profile),
+                )?;
+                registry.install_compatible_profile(profile_id.clone(), Arc::clone(&provider));
                 provider
             }
         };
@@ -1113,13 +1189,16 @@ impl MultiProvider {
         crate::auth::AuthStatus::invalidate_cache();
 
         if self.use_claude_cli {
-            if self.claude_provider().is_none() && crate::auth::claude::load_credentials().is_ok() {
+            if self.claude_provider().is_none()
+                && crate::auth::claude::load_credentials().is_ok()
+                && let Some(claude) =
+                    external::instantiate_expected_external_provider(external::CLAUDE_CLI_RUNTIME)
+            {
                 crate::logging::info("Hot-initialized Claude CLI provider after auth change");
                 *self
                     .claude
                     .write()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                    Some(Arc::new(claude::ClaudeProvider::new()));
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(claude);
             }
         } else if self.anthropic_provider().is_none()
             && (crate::auth::claude::load_credentials().is_ok()
@@ -1134,29 +1213,33 @@ impl MultiProvider {
                 .anthropic
                 .write()
                 .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                Some(Arc::new(anthropic::AnthropicProvider::new()));
+                external::instantiate_expected_external_provider(external::ANTHROPIC_RUNTIME);
         }
 
         if let Some(openai) = self.openai_provider() {
             openai.reload_credentials();
-        } else if let Ok(credentials) = crate::auth::codex::load_credentials() {
+        } else if crate::auth::codex::load_credentials().is_ok()
+            && let Some(openai) =
+                external::instantiate_expected_external_provider(external::OPENAI_RUNTIME)
+        {
             crate::logging::info("Hot-initialized OpenAI provider after auth change");
             *self
                 .openai
                 .write()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                Some(Arc::new(openai::OpenAIProvider::new(credentials)));
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(openai);
         }
 
-        if openrouter::OpenRouterProvider::has_credentials() {
-            match openrouter::OpenRouterProvider::new() {
+        if openrouter::has_credentials() {
+            match external::instantiate_openrouter_runtime(external::OpenRouterRuntimeSpec::Default)
+            {
                 Ok(provider) => {
                     let should_install = if preserve_existing_openrouter_profile {
                         self.openrouter_provider()
                             .as_deref()
                             .map(|existing| {
                                 Self::should_replace_openrouter_after_auth_change(
-                                    existing, &provider,
+                                    existing,
+                                    provider.as_ref(),
                                 )
                             })
                             .unwrap_or(true)
@@ -1170,8 +1253,7 @@ impl MultiProvider {
                         *self
                             .openrouter
                             .write()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                            Some(Arc::new(provider));
+                            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(provider);
                     } else {
                         crate::logging::info(
                             "Preserved existing OpenRouter/OpenAI-compatible provider after unrelated auth change",
@@ -1190,48 +1272,43 @@ impl MultiProvider {
         let already_has = self.copilot_provider().is_some();
         if !already_has {
             let status = crate::auth::AuthStatus::check_fast();
-            if status.copilot_has_api_token {
-                match copilot::CopilotApiProvider::new() {
-                    Ok(p) => {
-                        crate::logging::info("Hot-initialized Copilot API provider after login");
-                        let provider = Arc::new(p);
-                        let p_clone = provider.clone();
-                        tokio::spawn(async move {
-                            p_clone.detect_tier_and_set_default().await;
-                        });
-                        *self
-                            .copilot_api
-                            .write()
-                            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(provider);
-                    }
-                    Err(e) => {
-                        crate::logging::info(&format!(
-                            "Failed to hot-initialize Copilot API after login: {}",
-                            e
-                        ));
-                    }
-                }
+            // The composition-root factory schedules tier detection itself.
+            if status.copilot_has_api_token
+                && let Some(provider) =
+                    external::instantiate_expected_external_provider(external::COPILOT_RUNTIME)
+            {
+                crate::logging::info("Hot-initialized Copilot API provider after login");
+                *self
+                    .copilot_api
+                    .write()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(provider);
             }
         }
 
         let already_has_antigravity = self.antigravity_provider().is_some();
-        if !already_has_antigravity && crate::auth::antigravity::load_tokens().is_ok() {
+        if !already_has_antigravity
+            && crate::auth::antigravity::load_tokens().is_ok()
+            && let Some(antigravity) =
+                external::instantiate_expected_external_provider(external::ANTIGRAVITY_RUNTIME)
+        {
             crate::logging::info("Hot-initialized Antigravity provider after login");
             *self
                 .antigravity
                 .write()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                Some(Arc::new(antigravity::AntigravityProvider::new()));
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(antigravity);
         }
 
         let already_has_gemini = self.gemini_provider().is_some();
-        if !already_has_gemini && crate::auth::gemini::load_tokens().is_ok() {
+        if !already_has_gemini
+            && crate::auth::gemini::load_tokens().is_ok()
+            && let Some(gemini) =
+                external::instantiate_expected_external_provider(external::GEMINI_RUNTIME)
+        {
             crate::logging::info("Hot-initialized Gemini provider after login");
             *self
                 .gemini
                 .write()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                Some(Arc::new(gemini::GeminiProvider::new()));
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(gemini);
         }
 
         let already_has_cursor = self.cursor_provider().is_some();
@@ -1239,13 +1316,14 @@ impl MultiProvider {
             && crate::auth::AuthStatus::check_fast()
                 .assessment_for_provider(crate::provider_catalog::CURSOR_LOGIN_PROVIDER)
                 .is_available()
+            && let Some(cursor) =
+                external::instantiate_expected_external_provider(external::CURSOR_RUNTIME)
         {
             crate::logging::info("Hot-initialized Cursor provider after login");
             *self
                 .cursor
                 .write()
-                .unwrap_or_else(|poisoned| poisoned.into_inner()) =
-                Some(Arc::new(cursor::CursorCliProvider::new()));
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(cursor);
         }
 
         let already_has_bedrock = self.bedrock_provider().is_some();
@@ -1320,6 +1398,28 @@ impl MultiProvider {
         }) && let Some(selection) =
             Self::resolve_config_provider_selection(pref, crate::config::config())
         {
+            // A known OpenAI-compatible catalog profile (deepseek, zai, ...)
+            // must be handled profile-locally. Its `active_provider()` maps to
+            // the shared OpenRouter slot, but routing through the generic
+            // OpenRouter path would trigger the OpenRouter rebind logic, which
+            // replaces the profile runtime with a plain OpenRouter API-key
+            // runtime and fails when OPENROUTER_API_KEY is not configured --
+            // silently dropping the configured default (issue #448).
+            if let selection::ConfigProviderSelection::OpenAiCompatibleProfile(profile_id) =
+                &selection
+                && let Some(profile) =
+                    crate::provider_catalog::openai_compatible_profile_by_id(profile_id)
+            {
+                return self.set_model_on_openai_compatible_profile(profile, model);
+            }
+
+            // Same reasoning for user-defined named provider profiles from
+            // config: bind the named profile runtime directly instead of the
+            // generic OpenRouter slot path.
+            if let selection::ConfigProviderSelection::NamedProfile(profile_name) = &selection {
+                return self.set_model_on_named_provider_profile(profile_name, model);
+            }
+
             // A dual-auth config provider key (`anthropic-api`, `claude-oauth`,
             // `openai-api`, ...) also pins the OAuth-vs-API credential. Carry
             // that through so the active credential -- and every surface that
@@ -1541,11 +1641,11 @@ impl Provider for MultiProvider {
             ActiveProvider::Claude => {
                 let anthropic = self.anthropic_provider()?;
                 Some(match anthropic.credential_mode() {
-                    jcode_provider_core::CredentialMode::OAuth => ResolvedCredential::Oauth,
-                    jcode_provider_core::CredentialMode::ApiKey => ResolvedCredential::ApiKey,
+                    anthropic::AnthropicCredentialMode::OAuth => ResolvedCredential::Oauth,
+                    anthropic::AnthropicCredentialMode::ApiKey => ResolvedCredential::ApiKey,
                     // Auto prefers OAuth (Claude subscription) when available,
                     // otherwise falls back to the API key. Mirror that exactly.
-                    jcode_provider_core::CredentialMode::Auto => {
+                    anthropic::AnthropicCredentialMode::Auto => {
                         if crate::auth::claude::load_credentials().is_ok() {
                             ResolvedCredential::Oauth
                         } else {
@@ -1557,10 +1657,10 @@ impl Provider for MultiProvider {
             ActiveProvider::OpenAI => {
                 let openai = self.openai_provider()?;
                 Some(match openai.credential_mode() {
-                    jcode_provider_core::CredentialMode::OAuth => ResolvedCredential::Oauth,
-                    jcode_provider_core::CredentialMode::ApiKey => ResolvedCredential::ApiKey,
+                    openai::OpenAICredentialMode::OAuth => ResolvedCredential::Oauth,
+                    openai::OpenAICredentialMode::ApiKey => ResolvedCredential::ApiKey,
                     // Auto resolves to OAuth first when available, otherwise API key.
-                    jcode_provider_core::CredentialMode::Auto => {
+                    openai::OpenAICredentialMode::Auto => {
                         if crate::auth::codex::load_oauth_credentials().is_ok() {
                             ResolvedCredential::Oauth
                         } else {
@@ -1581,14 +1681,14 @@ impl Provider for MultiProvider {
         // `active_resolved_credential`'s explicit arms above.
         match self.active_provider() {
             ActiveProvider::Claude => match self.anthropic_provider()?.credential_mode() {
-                jcode_provider_core::CredentialMode::OAuth => Some(ResolvedCredential::Oauth),
-                jcode_provider_core::CredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
-                jcode_provider_core::CredentialMode::Auto => None,
+                anthropic::AnthropicCredentialMode::OAuth => Some(ResolvedCredential::Oauth),
+                anthropic::AnthropicCredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
+                anthropic::AnthropicCredentialMode::Auto => None,
             },
             ActiveProvider::OpenAI => match self.openai_provider()?.credential_mode() {
-                jcode_provider_core::CredentialMode::OAuth => Some(ResolvedCredential::Oauth),
-                jcode_provider_core::CredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
-                jcode_provider_core::CredentialMode::Auto => None,
+                openai::OpenAICredentialMode::OAuth => Some(ResolvedCredential::Oauth),
+                openai::OpenAICredentialMode::ApiKey => Some(ResolvedCredential::ApiKey),
+                openai::OpenAICredentialMode::Auto => None,
             },
             _ => None,
         }
@@ -1651,6 +1751,17 @@ impl Provider for MultiProvider {
         {
             self.ensure_provider_lock_allows_openai_compatible_profile(requested_model)?;
             return self.set_model_on_openai_compatible_profile(profile, target_model);
+        }
+
+        // User-defined named provider profiles from config (`[providers.<name>]`).
+        // The model picker emits `<name>:<model>` specs for their routes
+        // (issue #444), so the switch must bind that profile's runtime instead
+        // of falling through to global model-name heuristics.
+        if let Some((profile_name, target_model)) =
+            Self::named_provider_profile_model_prefix(requested_model)
+        {
+            self.ensure_provider_lock_allows_openai_compatible_profile(requested_model)?;
+            return self.set_model_on_named_provider_profile(&profile_name, &target_model);
         }
 
         // Provider-prefixed model names are explicit routing directives. They
@@ -2367,7 +2478,7 @@ impl Provider for MultiProvider {
 
     fn premium_mode(&self) -> PremiumMode {
         if let Some(copilot) = self.copilot_provider() {
-            copilot.get_premium_mode()
+            copilot.premium_mode()
         } else {
             PremiumMode::Normal
         }
@@ -2430,20 +2541,17 @@ impl Provider for MultiProvider {
 
         let claude = if matches!(active, ActiveProvider::Claude) && self.claude_provider().is_some()
         {
-            Some(Arc::new(claude::ClaudeProvider::new()))
+            external::instantiate_expected_external_provider(external::CLAUDE_CLI_RUNTIME)
         } else {
             None
         };
         let anthropic = if self.anthropic_provider().is_some() {
-            Some(Arc::new(anthropic::AnthropicProvider::new()))
+            external::instantiate_expected_external_provider(external::ANTHROPIC_RUNTIME)
         } else {
             None
         };
         let openai = if self.openai_provider().is_some() {
-            auth::codex::load_credentials()
-                .ok()
-                .map(openai::OpenAIProvider::new)
-                .map(Arc::new)
+            external::instantiate_expected_external_provider(external::OPENAI_RUNTIME)
         } else {
             None
         };
@@ -2468,7 +2576,7 @@ impl Provider for MultiProvider {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .is_some()
         {
-            Some(Arc::new(cursor::CursorCliProvider::new()))
+            external::instantiate_expected_external_provider(external::CURSOR_RUNTIME)
         } else {
             None
         };
@@ -2483,7 +2591,7 @@ impl Provider for MultiProvider {
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .is_some()
         {
-            openrouter::OpenRouterProvider::new().ok().map(Arc::new)
+            external::instantiate_openrouter_runtime(external::OpenRouterRuntimeSpec::Default).ok()
         } else {
             None
         };
@@ -2570,7 +2678,7 @@ pub fn cache_ttl_for_provider_model(provider: &str, model: Option<&str>) -> Opti
         }),
         "openai" => {
             if model
-                .map(openai::OpenAIProvider::supports_extended_prompt_cache_retention)
+                .map(openai::supports_extended_prompt_cache_retention)
                 .unwrap_or(false)
             {
                 Some(24 * 60 * 60)

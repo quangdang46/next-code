@@ -187,7 +187,7 @@ fn default_message_alignment(role: &str, centered: bool) -> ratatui::layout::Ali
     if centered
         && !matches!(
             role,
-            "tool" | "system" | "swarm" | "background_task" | "overnight"
+            "tool" | "system" | "swarm" | "background_task" | "overnight" | "todos"
         )
     {
         ratatui::layout::Alignment::Center
@@ -396,6 +396,7 @@ fn empty_prepared_messages() -> PreparedMessages {
         image_regions: Vec::new(),
         edit_tool_ranges: Vec::new(),
         copy_targets: Vec::new(),
+        mermaid_pending_epoch: None,
     }
 }
 
@@ -729,6 +730,7 @@ fn prepare_messages_inner(app: &dyn TuiState, width: u16, height: u16) -> Prepar
             image_regions: Vec::new(),
             edit_tool_ranges: Vec::new(),
             copy_targets: Vec::new(),
+            mermaid_pending_epoch: None,
         });
         let frame = PreparedChatFrame::from_single(prepared);
         super::note_full_prep_phase_metrics(super::FullPrepPhaseMetrics {
@@ -1222,6 +1224,18 @@ fn render_message_into(
                 content_width,
                 app.diff_mode(),
                 super::messages::render_overnight_message,
+            );
+            for line in cached {
+                acc.push_auto(align_if_unset(line, align));
+            }
+        }
+        "todos" => {
+            let content_width = width.saturating_sub(4);
+            let cached = get_cached_message_lines(
+                msg,
+                content_width,
+                app.diff_mode(),
+                super::messages::render_todos_message,
             );
             for line in cached {
                 acc.push_auto(align_if_unset(line, align));
@@ -1768,6 +1782,7 @@ fn prepare_streaming_cached(
             image_regions: Vec::new(),
             edit_tool_ranges: Vec::new(),
             copy_targets: Vec::new(),
+            mermaid_pending_epoch: None,
         };
     }
 
@@ -2310,6 +2325,7 @@ fn wrap_lines(
         image_regions,
         edit_tool_ranges: Vec::new(),
         copy_targets: Vec::new(),
+        mermaid_pending_epoch: None,
     }
 }
 
@@ -2450,6 +2466,7 @@ fn wrap_lines_with_map(
         image_regions,
         edit_tool_ranges,
         copy_targets,
+        mermaid_pending_epoch: None,
     }
 }
 

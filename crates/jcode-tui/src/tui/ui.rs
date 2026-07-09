@@ -1431,6 +1431,7 @@ impl CopyViewportSnapshot {
 struct CopyViewportSnapshots {
     chat: Option<CopyViewportSnapshot>,
     side: Option<CopyViewportSnapshot>,
+    input: Option<CopyViewportSnapshot>,
 }
 
 #[cfg(not(test))]
@@ -1443,6 +1444,8 @@ mod display_width;
 mod draw_recovery;
 #[path = "ui/profile.rs"]
 mod profile;
+#[path = "ui/selection_highlight.rs"]
+pub(crate) mod selection_highlight;
 #[path = "ui/url.rs"]
 mod url_regex_support;
 use self::copy_selection::{
@@ -1464,6 +1467,7 @@ fn copy_snapshot_slot_mut(
     match pane {
         crate::tui::CopySelectionPane::Chat => &mut snapshots.chat,
         crate::tui::CopySelectionPane::SidePane => &mut snapshots.side,
+        crate::tui::CopySelectionPane::Input => &mut snapshots.input,
     }
 }
 
@@ -1475,6 +1479,7 @@ fn copy_snapshot_for_pane(pane: crate::tui::CopySelectionPane) -> Option<CopyVie
             match pane {
                 crate::tui::CopySelectionPane::Chat => snapshots.chat,
                 crate::tui::CopySelectionPane::SidePane => snapshots.side,
+                crate::tui::CopySelectionPane::Input => snapshots.input,
             }
         })
     }
@@ -1484,6 +1489,7 @@ fn copy_snapshot_for_pane(pane: crate::tui::CopySelectionPane) -> Option<CopyVie
         match pane {
             crate::tui::CopySelectionPane::Chat => snapshots.chat,
             crate::tui::CopySelectionPane::SidePane => snapshots.side,
+            crate::tui::CopySelectionPane::Input => snapshots.input,
         }
     }
 }
@@ -2019,6 +2025,32 @@ pub(crate) fn copy_pane_first_visible_point(
     })
 }
 
+// ---- Input pane copy-selection stubs (populated by ui_input) ----
+
+/// Stub: returns the number of wrapped lines in the input pane.
+pub fn input_pane_line_count() -> Option<usize> {
+    None
+}
+
+/// Stub: returns the wrapped-line text for a given absolute line index in the input pane.
+pub fn input_pane_line_text(_line: usize) -> Option<String> {
+    None
+}
+
+/// Stub: records a copy snapshot of the input pane for mouse-drag selection.
+/// Populated by `ui_input::draw_input`.
+#[expect(clippy::too_many_arguments)]
+pub fn record_input_copy_snapshot(
+    _wrapped_plain: Vec<String>,
+    _raw_plain: Vec<String>,
+    _line_map: Vec<WrappedLineMap>,
+    _scroll_start: usize,
+    _scroll_end: usize,
+    _area: ratatui::prelude::Rect,
+    _left_margins: &[u16],
+) {
+}
+
 pub(crate) fn copy_selection_text(range: crate::tui::CopySelectionRange) -> Option<String> {
     if range.start.pane != range.end.pane {
         return None;
@@ -2225,6 +2257,15 @@ pub(crate) fn inline_image_expand_target_from_screen(column: u16, row: u16) -> O
     }
 }
 
+/// Stub: swarm expand/collapse badge hit-testing from a screen coordinate.
+/// Returns the transcript message index that was clicked, or `None` when no
+/// badge was at that position. Currently always returns `None` — the swarm
+/// badge is rendered but click-to-toggle is not yet wired through the
+/// copy-selection snapshot machinery.
+pub(crate) fn swarm_expand_target_from_screen(_column: u16, _row: u16) -> Option<usize> {
+    None
+}
+
 pub fn draw(frame: &mut Frame, app: &dyn TuiState) {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         crate::tui::markdown::with_deferred_mermaid_render_context(|| draw_inner(frame, app))
@@ -2232,6 +2273,10 @@ pub fn draw(frame: &mut Frame, app: &dyn TuiState) {
         Ok(()) => {}
         Err(payload) => render_recovered_panic_frame(frame, &payload),
     }
+    // Adapt the finished frame for light terminal backgrounds (no-op on dark).
+    // Doing this at the buffer level covers every widget and overlay without
+    // touching individual color call sites.
+    jcode_tui_style::adapt_buffer_for_theme(frame.buffer_mut());
 }
 
 fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
@@ -2709,13 +2754,19 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
 
     // Two-level layout: top (messages + queued + swarm) grows to fill,
     // bottom (input + dialogs + status) — exact height, never clipped.
-    let bottom_fixed = notification_height + inline_block_height + inline_ui_gap_height
-        + 3 + input_height + running_items_height + overscroll_height + donut_height;
+    let bottom_fixed = notification_height
+        + inline_block_height
+        + inline_ui_gap_height
+        + 3
+        + input_height
+        + running_items_height
+        + overscroll_height
+        + donut_height;
     let top_bottom = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
-            Constraint::Min(1),                     // 0 Messages (fills remaining)
-            Constraint::Length(bottom_fixed),       // 1 Fixed chrome (exact)
+            Constraint::Min(1),               // 0 Messages (fills remaining)
+            Constraint::Length(bottom_fixed), // 1 Fixed chrome (exact)
         ])
         .split(chat_area);
     let top_chunks = Layout::default()
@@ -2728,25 +2779,25 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             ]
         } else {
             vec![
-                Constraint::Min(3),                       // 0 Messages (scrollable)
-                Constraint::Length(queued_height),        // 1 Queued messages
-                Constraint::Length(swarm_strip_height),   // 2 Swarm strip
+                Constraint::Min(3),                     // 0 Messages (scrollable)
+                Constraint::Length(queued_height),      // 1 Queued messages
+                Constraint::Length(swarm_strip_height), // 2 Swarm strip
             ]
         })
         .split(top_bottom[0]);
     let bottom_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
-            Constraint::Length(notification_height),  // 0 Notification line
-            Constraint::Length(inline_block_height),  // 1 Inline UI
+            Constraint::Length(notification_height), // 0 Notification line
+            Constraint::Length(inline_block_height), // 1 Inline UI
             Constraint::Length(inline_ui_gap_height), // 2 Inline UI/input spacing
-            Constraint::Length(1),                    // 3 Top separator (─── History)
-            Constraint::Length(input_height),         // 4 Input
-            Constraint::Length(1),                    // 5 Bottom separator (───)
-            Constraint::Length(1),                    // 6 Status bar (⏵⏵ bypass permissions on)
+            Constraint::Length(1),                   // 3 Top separator (─── History)
+            Constraint::Length(input_height),        // 4 Input
+            Constraint::Length(1),                   // 5 Bottom separator (───)
+            Constraint::Length(1),                   // 6 Status bar (⏵⏵ bypass permissions on)
             Constraint::Length(running_items_height), // 7 Running items (quickbar)
-            Constraint::Length(overscroll_height),    // 8 Overscroll status line
-            Constraint::Length(donut_height),         // 9 Donut animation
+            Constraint::Length(overscroll_height),   // 8 Overscroll status line
+            Constraint::Length(donut_height),        // 9 Donut animation
         ])
         .split(top_bottom[1]);
     let status_area = bottom_chunks[6];
@@ -2844,7 +2895,12 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         capture.layout.messages_area = Some(messages_area.into());
         capture.layout.diagram_area = diagram_area.map(|r| r.into());
     }
-    record_layout_snapshot(messages_area, diagram_area, diff_pane_area, Some(bottom_chunks[4]));
+    record_layout_snapshot(
+        messages_area,
+        diagram_area,
+        diff_pane_area,
+        Some(bottom_chunks[4]),
+    );
 
     let margins = if onboarding_welcome {
         onboarding::draw_onboarding_welcome(frame, app, messages_area);

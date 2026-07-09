@@ -942,7 +942,7 @@ fn swarm_widget_renders_member_roles_and_details() {
                     output_tail: None,
                     report_back_to_session_id: None,
                     todo_progress: None,
-            todo_items: Vec::new(),
+                    todo_items: Vec::new(),
                 },
                 SwarmMemberStatus {
                     session_id: "tree-12345678".to_string(),
@@ -956,7 +956,7 @@ fn swarm_widget_renders_member_roles_and_details() {
                     output_tail: None,
                     report_back_to_session_id: None,
                     todo_progress: None,
-            todo_items: Vec::new(),
+                    todo_items: Vec::new(),
                 },
             ],
             ..Default::default()

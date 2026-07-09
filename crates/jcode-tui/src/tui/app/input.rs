@@ -1699,6 +1699,10 @@ pub(super) fn handle_pre_control_shortcuts(
         app.set_status_notice(status);
         return true;
     }
+    if app.toggle_keys.todo_card.matches(code, modifiers) {
+        app.toggle_todo_card();
+        return true;
+    }
     if app.dictation_key_matches(code, modifiers) {
         app.handle_dictation_trigger();
         return true;
@@ -2132,6 +2136,10 @@ pub(super) fn handle_basic_key(app: &mut App, code: KeyCode) -> bool {
         KeyCode::Left => {
             if app.cursor_pos > 0 {
                 app.cursor_pos = crate::tui::core::prev_char_boundary(&app.input, app.cursor_pos);
+            } else {
+                // Opt-in: Left on an empty input opens the active sessions
+                // manager (no-op unless display.active_sessions_manager).
+                app.maybe_open_active_sessions_on_left();
             }
             true
         }
@@ -3357,9 +3365,26 @@ impl App {
                     tool_data: None,
                 });
             } else {
+                // Distinguish an endorsed-but-not-installed skill from a
+                // typo: the skill list advertises endorsed skills, so a bare
+                // "Unknown skill" for them reads like a bug (issue #445).
+                let endorsed_hint = crate::skill::endorsed_skills()
+                    .iter()
+                    .find(|endorsed| endorsed.name == skill_name)
+                    .map(|endorsed| match endorsed.install {
+                        Some(install) => format!(
+                            "Skill /{} is endorsed but not installed. Install it with `{}`, then run /skills or skill_manage reload_all.",
+                            skill_name, install
+                        ),
+                        None => format!(
+                            "Skill /{} is endorsed but not installed (source: {}). Install it into ~/.jcode/skills/{}/SKILL.md.",
+                            skill_name, endorsed.source, skill_name
+                        ),
+                    });
                 self.push_display_message(DisplayMessage {
                     role: "error".to_string(),
-                    content: format!("Unknown skill: /{}", skill_name),
+                    content: endorsed_hint
+                        .unwrap_or_else(|| format!("Unknown skill: /{}", skill_name)),
                     tool_calls: vec![],
                     duration_secs: None,
                     title: None,

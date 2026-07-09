@@ -94,9 +94,11 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
     }
 
     needs_redraw |= app.refresh_todos_view_if_needed();
+    needs_redraw |= app.refresh_todo_card_if_needed();
     needs_redraw |= app.refresh_side_panel_linked_content_if_due();
     needs_redraw |= app.poll_model_picker_load();
     needs_redraw |= app.poll_session_picker_load();
+    needs_redraw |= app.poll_session_picker_presence();
     needs_redraw |= app.onboarding_tick();
 
     let _ = check_debug_command(app, remote).await;
@@ -619,8 +621,7 @@ fn handle_terminal_event_while_disconnected(
         Some(Ok(Event::FocusGained)) => {
             app.note_client_focus(true);
         }
-        Some(Ok(Event::FocusLost)) => {
-        }
+        Some(Ok(Event::FocusLost)) => {}
         Some(Ok(Event::Key(key))) => {
             app.note_client_interaction();
             app.update_copy_badge_key_event(key);

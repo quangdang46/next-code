@@ -28,6 +28,7 @@ fn todo(id: &str, status: &str) -> crate::todo::TodoItem {
         assigned_to: None,
         confidence: None,
         completion_confidence: None,
+        confidence_history: Vec::new(),
     }
 }
 
@@ -61,6 +62,7 @@ fn contended_data() -> InfoWidgetData {
                     friendly_name: Some("worker-1".to_string()),
                     status: "running".to_string(),
                     detail: None,
+                    task_label: None,
                     role: Some("coordinator".to_string()),
                     is_headless: Some(true),
                     live_attachments: None,
@@ -75,6 +77,7 @@ fn contended_data() -> InfoWidgetData {
                     friendly_name: Some("worker-2".to_string()),
                     status: "blocked".to_string(),
                     detail: None,
+                    task_label: None,
                     role: None,
                     is_headless: Some(true),
                     live_attachments: None,
@@ -85,7 +88,7 @@ fn contended_data() -> InfoWidgetData {
                     todo_items: Vec::new(),
                 },
             ],
-            plan_progress: Some((3, 7)),
+            plan_progress: Some((3, 1, 7)),
             ..Default::default()
         }),
         background_info: Some(BackgroundInfo {

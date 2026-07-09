@@ -140,6 +140,50 @@ fn persisted_swarm_state_round_trips_and_marks_running_stale() {
 }
 
 #[test]
+fn ready_headless_member_with_report_survives_reload_without_crashed_status() {
+    // A headless worker that finished its task (status "ready", completion
+    // report recorded) must not be resurrected as "crashed" after a server
+    // reload: nothing in-flight was lost. Regression test for finished swarm
+    // workers reporting "(crashed)" in await_members summaries after reloads.
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let _env = test_env(&dir);
+
+    let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+    let members = vec![SwarmMember {
+        session_id: "session-ready".to_string(),
+        event_tx,
+        event_txs: HashMap::new(),
+        working_dir: Some(PathBuf::from("/tmp/swarm-gamma")),
+        swarm_id: Some("swarm-gamma".to_string()),
+        swarm_enabled: true,
+        status: "ready".to_string(),
+        detail: None,
+        friendly_name: Some("pig".to_string()),
+        report_back_to_session_id: Some("session-coordinator".to_string()),
+        latest_completion_report: Some("Done. Built the worker; all tests pass.".to_string()),
+        role: "agent".to_string(),
+        joined_at: Instant::now(),
+        last_status_change: Instant::now(),
+        is_headless: true,
+        output_tail: None,
+        todo_progress: None,
+        todo_items: Vec::new(),
+        task_label: None,
+    }];
+
+    persist_swarm_state("swarm-gamma", None, None, &members);
+    let loaded = load_runtime_state();
+
+    let recovered = loaded.members.get("session-ready").expect("member");
+    assert_eq!(recovered.status, "ready");
+    assert_eq!(recovered.detail, None);
+    assert_eq!(
+        recovered.latest_completion_report.as_deref(),
+        Some("Done. Built the worker; all tests pass.")
+    );
+}
+
+#[test]
 fn remove_swarm_state_deletes_persisted_snapshot() {
     let dir = tempfile::TempDir::new().expect("tempdir");
     let _env = test_env(&dir);
@@ -660,6 +704,63 @@ fn load_runtime_state_reads_bak_files_as_snapshots() {
          this fails the loader gained a .json extension filter (update the \
          wiring audit and the primary-file assertions in \
          persist_snapshot_can_regress_to_older_plan_version_when_calls_interleave)"
+    );
+}
+
+/// A `.bak` sibling must NOT be loaded when the primary `.json` exists:
+/// the write path rotates the previous snapshot to `.bak`, so after an
+/// intentional state drop (e.g. `swarm:clear_plan`) the `.bak` still holds
+/// the dropped plan. Union-loading both would resurrect the cleared plan on
+/// every server restart.
+#[test]
+fn load_runtime_state_ignores_bak_when_primary_json_exists() {
+    let dir = tempfile::TempDir::new().expect("tempdir");
+    let _env = test_env(&dir);
+
+    std::fs::create_dir_all(state_dir()).expect("state dir");
+    let stale_with_plan = serde_json::json!({
+        "swarm_id": "swarm-cleared",
+        "plan": {
+            "items": [{
+                "id": "stale-task",
+                "content": "stale",
+                "status": "queued",
+                "assigned_to": null
+            }],
+            "version": 42u64,
+            "participants": [],
+            "task_progress": {},
+            "mode": "light",
+            "node_meta": {}
+        },
+        "coordinator_session_id": "coord-stale",
+        "updated_at_unix_ms": 1u64
+    });
+    let current_without_plan = serde_json::json!({
+        "swarm_id": "swarm-cleared",
+        "coordinator_session_id": "coord-current",
+        "updated_at_unix_ms": 2u64
+    });
+    std::fs::write(
+        state_dir().join("swarm-cleared.bak"),
+        serde_json::to_vec(&stale_with_plan).unwrap(),
+    )
+    .expect("write bak snapshot");
+    std::fs::write(
+        state_dir().join("swarm-cleared.json"),
+        serde_json::to_vec(&current_without_plan).unwrap(),
+    )
+    .expect("write primary snapshot");
+
+    let loaded = load_runtime_state();
+    assert!(
+        !loaded.plans.contains_key("swarm-cleared"),
+        "plan cleared from the primary snapshot must not be resurrected from .bak"
+    );
+    assert_eq!(
+        loaded.coordinators.get("swarm-cleared"),
+        Some(&"coord-current".to_string()),
+        "primary snapshot must win over its .bak sibling"
     );
 }
 

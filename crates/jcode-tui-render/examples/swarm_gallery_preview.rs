@@ -127,7 +127,9 @@ fn main() {
     // ---- New list+detail panel ----
     let gm = |name: &str, role: Option<&str>, status: &str, body: &[&str]| GalleryMember {
         label: name.to_string(),
+        icon: None,
         status: status.to_string(),
+        task: None,
         role: role.map(str::to_string),
         body: body.iter().map(|s| s.to_string()).collect(),
         sort_key: name.to_string(),
@@ -178,20 +180,16 @@ fn main() {
             label: "focus".into(),
         },
         SwarmStripHint {
-            key: "j/k".into(),
+            key: "alt+↑/↓".into(),
             label: "select".into(),
         },
         SwarmStripHint {
-            key: "o".into(),
-            label: "pop out".into(),
-        },
-        SwarmStripHint {
-            key: "enter".into(),
+            key: "alt+o".into(),
             label: "open".into(),
         },
         SwarmStripHint {
             key: "esc".into(),
-            label: "back".into(),
+            label: "exit".into(),
         },
     ];
     print_lines(

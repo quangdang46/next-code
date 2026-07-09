@@ -16,10 +16,10 @@ pub use transport::is_transient_transport_error;
 
 pub use anthropic::{
     ANTHROPIC_OAUTH_BETA_HEADERS, ANTHROPIC_OAUTH_BETA_HEADERS_1M, AnthropicContextMode,
-    anthropic_context_mode, anthropic_effectively_1m, anthropic_is_1m_model,
-    anthropic_map_tool_name_for_oauth, anthropic_map_tool_name_from_oauth,
-    anthropic_oauth_beta_headers, anthropic_stainless_arch, anthropic_stainless_os,
-    anthropic_strip_1m_suffix,
+    AnthropicReasoningCaps, anthropic_context_mode, anthropic_effectively_1m,
+    anthropic_is_1m_model, anthropic_map_tool_name_for_oauth, anthropic_map_tool_name_from_oauth,
+    anthropic_oauth_beta_headers, anthropic_reasoning_caps, anthropic_stainless_arch,
+    anthropic_stainless_os, anthropic_strip_1m_suffix,
 };
 pub use auth_mode::{
     AuthMode, AuthRoute, DualAuthProvider, pinned_mode_for, runtime_env_auth_route,
@@ -409,21 +409,6 @@ pub trait Provider: Send + Sync {
         context_limit_for_model_with_provider(&self.model(), Some(self.name()))
             .unwrap_or(DEFAULT_CONTEXT_LIMIT)
     }
-
-    /// Set the temperature parameter (if the provider supports it).
-    fn set_temperature(&self, _temperature: f32) -> Result<()> {
-        Ok(())
-    }
-
-    /// Get the premium mode for this provider.
-    fn get_premium_mode(&self) -> PremiumMode {
-        PremiumMode::Normal
-    }
-
-    /// Re-read credentials from disk immediately.
-    /// Unlike `reload_credentials`, this is the concrete per-provider
-    /// implementation that the composition root calls directly.
-    fn reload_credentials_now(&self) {}
 
     /// Create a new provider instance with independent mutable state.
     fn fork(&self) -> Arc<dyn Provider>;

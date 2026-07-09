@@ -51,10 +51,8 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/agents", "Configure models for agent roles"),
     RegisteredCommand::public("/subagent", "Launch a subagent manually"),
     RegisteredCommand::public("/observe", "Show the latest tool context in the side panel"),
-    RegisteredCommand::public(
-        "/todos",
-        "Show the current session todo list in the side panel",
-    ),
+    RegisteredCommand::public("/todos", "Show the session todo list as a card in the chat"),
+    RegisteredCommand::hidden("/todo", "Alias for /todos"),
     RegisteredCommand::public("/splitview", "Mirror the current chat in the side panel"),
     RegisteredCommand::public("/split-view", "Alias for /splitview"),
     RegisteredCommand::public("/btw", "Ask a side question in the side panel"),
@@ -147,6 +145,7 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/resume", "Open session picker"),
     RegisteredCommand::public("/sessions", "Alias for /resume"),
     RegisteredCommand::public("/session", "Alias for /resume"),
+    RegisteredCommand::public("/active", "Manage live sessions (working vs ready)"),
     RegisteredCommand::public("/catchup", "Open Catch Up picker"),
     RegisteredCommand::public("/back", "Return to the previous Catch Up session"),
     RegisteredCommand::public("/save", "Bookmark session for easy access"),
@@ -1474,6 +1473,7 @@ impl App {
                         rows,
                         cursor: review.cursor,
                         continue_focused: review.continue_focused,
+                        choosing: review.choosing.clone(),
                         checked_count: review.checked_count(),
                         seconds_left: review.seconds_remaining(),
                     }

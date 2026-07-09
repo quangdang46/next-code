@@ -304,6 +304,7 @@ impl App {
                         friendly_name: Some(names[i % names.len()].to_string()),
                         status: statuses[i % statuses.len()].to_string(),
                         detail: Some(format!("task {}", i + 1)),
+                        task_label: None,
                         role: if i == 0 {
                             Some("coordinator".to_string())
                         } else {
@@ -315,7 +316,6 @@ impl App {
                         output_tail: Some(samples[i % samples.len()].to_string()),
                         report_back_to_session_id: None,
                         todo_progress: Some(((i as u32 * 3) % 9, 9)),
-                        task_label: None,
                         todo_items: Vec::new(),
                     })
                     .collect();
@@ -346,6 +346,7 @@ impl App {
                             ProcessingStatus::RunningTool(_) => "running".to_string(),
                         },
                         detail: self.subagent_status.clone(),
+                        task_label: None,
                         role: None,
                         is_headless: Some(false),
                         live_attachments: Some(1),
@@ -353,7 +354,6 @@ impl App {
                         output_tail: None,
                         report_back_to_session_id: None,
                         todo_progress: None,
-                        task_label: None,
                         todo_items: Vec::new(),
                     }],
                 })

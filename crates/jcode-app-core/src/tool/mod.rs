@@ -12,6 +12,7 @@ mod conversation_search;
 #[cfg(feature = "dcp")]
 mod dcp_compress;
 mod debug_socket;
+mod discover;
 mod edit;
 mod ffs_engine_tools;
 mod ffs_glob;
@@ -42,7 +43,7 @@ mod read;
 pub mod selfdev;
 pub(crate) mod serde_coerce;
 mod session_search;
-mod session_search_index;
+pub(crate) mod session_search_index;
 mod side_panel;
 mod skill;
 mod task;
@@ -223,8 +224,6 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "patch"
             | "apply_patch"
             | "hashline_edit"
-            | "hashline_edit"
-            | "propose_write"
             | "propose_edit"
             | "propose_hashline"
             | "notepad_write_priority"
@@ -543,12 +542,7 @@ impl Registry {
                 goal::InitiativeTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "gmail", gmail::GmailTool::new);
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "memory",
-                memory::MemoryTool::new,
-            );
+            Self::insert_tool_timed(&mut m, &mut timings, "memory", memory::MemoryTool::new);
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
@@ -557,12 +551,9 @@ impl Registry {
             );
             Self::insert_tool_timed(&mut m, &mut timings, "schedule", ambient::ScheduleTool::new);
             #[cfg(feature = "dcp")]
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "dcp_compress",
-                || invalid::InvalidTool::new(),
-            );
+            Self::insert_tool_timed(&mut m, &mut timings, "dcp_compress", || {
+                invalid::InvalidTool::new()
+            });
             Self::insert_tool_timed(&mut m, &mut timings, "selfdev", selfdev::SelfDevTool::new);
             // Notepad tools (compaction-resistant notes)
             // Names are namespaced (`notepad_*`) to avoid collision
@@ -742,11 +733,7 @@ impl Registry {
             "subagent",
             task::SubagentTool::new(provider.clone(), registry.clone()),
         );
-        Self::insert_tool(
-            &mut tools_map,
-            "best_of_n",
-            invalid::InvalidTool::new(),
-        );
+        Self::insert_tool(&mut tools_map, "best_of_n", invalid::InvalidTool::new());
         Self::insert_tool(
             &mut tools_map,
             "batch",
@@ -757,6 +744,16 @@ impl Registry {
             "conversation_search",
             conversation_search::ConversationSearchTool::new(compaction),
         );
+        // Sponsored discovery is on by default (opt-out); when disabled the
+        // tool is never registered and no discovery endpoint is ever
+        // contacted.
+        if crate::config::config().sponsors.enabled {
+            Self::insert_tool(
+                &mut tools_map,
+                "discover_tools",
+                discover::DiscoverToolsTool::new(),
+            );
+        }
         let session_tools_ms = session_tools_start.elapsed().as_millis();
 
         let write_start = std::time::Instant::now();
@@ -1326,7 +1323,9 @@ impl Registry {
         let mcp_manager = if let Some(pool) = shared_pool {
             let sid = session_id.unwrap_or_else(|| "unknown".to_string());
             Arc::new(RwLock::new(McpManager::with_shared_pool_for_dir(
-                pool, sid, working_dir,
+                pool,
+                sid,
+                working_dir,
             )))
         } else {
             Arc::new(RwLock::new(McpManager::new()))

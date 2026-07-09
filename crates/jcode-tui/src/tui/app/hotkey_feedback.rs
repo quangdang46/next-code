@@ -146,6 +146,11 @@ pub(super) fn build_registry(inputs: &RegistryInputs<'_>) -> Vec<KnownHotkey> {
         "toggle the info widget",
     );
     push(
+        inputs.toggles.todo_card.binding().cloned(),
+        "todo_card_toggle",
+        "show/dismiss the inline todo card",
+    );
+    push(
         inputs.toggles.swarm_panel_focus.binding().cloned(),
         "swarm_panel_focus",
         "focus the swarm panel",
@@ -683,10 +688,7 @@ impl App {
             return false;
         }
         let registry = self.hotkey_registry(self.is_remote);
-        if self.hotkey_usage.is_none() {
-            self.hotkey_usage = Some(load_state());
-        }
-        let usage = self.hotkey_usage.as_ref().expect("hotkey usage loaded");
+        let usage = self.hotkey_usage.get_or_insert_with(load_state);
         let listing = render_hotkeys_listing(&registry, usage, now_unix());
         self.push_display_message(jcode_tui_messages::DisplayMessage::system(listing));
         true
@@ -746,10 +748,7 @@ impl App {
         };
 
         let now = now_unix();
-        if self.hotkey_usage.is_none() {
-            self.hotkey_usage = Some(load_state());
-        }
-        let state = self.hotkey_usage.as_mut().expect("hotkey usage loaded");
+        let state = self.hotkey_usage.get_or_insert_with(load_state);
         let stat = state.actions.entry(info.action.to_string()).or_default();
         let unfamiliar = is_unfamiliar(stat, now);
         stat.uses = stat.uses.saturating_add(1);
@@ -757,7 +756,7 @@ impl App {
         // Persist while the counters still matter, plus an occasional refresh so
         // `last_used_unix` on disk tracks reality without rewriting the file on
         // every rapid keypress (word-nav, scrolling).
-        if stat.uses <= FAMILIAR_USES || unfamiliar || stat.uses % 32 == 0 {
+        if stat.uses <= FAMILIAR_USES || unfamiliar || stat.uses.is_multiple_of(32) {
             save_state(state);
         }
 

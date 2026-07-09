@@ -38,6 +38,7 @@ pub mod screenshot;
 pub mod session_picker;
 mod stream_buffer;
 pub mod test_harness;
+pub mod theme_detect;
 mod ui;
 mod ui_diff;
 mod ui_running_items;
@@ -52,6 +53,7 @@ pub use crate::generated_image::{
     write_generated_image_side_panel_page,
 };
 pub use app::{App, CopyBadgeUiState, ProcessingStatus, RunResult};
+pub(crate) use ui::selection_highlight;
 
 use crate::message::ToolCall;
 use ratatui::prelude::Frame;
@@ -79,6 +81,13 @@ pub use jcode_tui_core::{
     CopySelectionPane, CopySelectionPoint, CopySelectionRange, CopySelectionStatus,
 };
 pub use jcode_tui_messages::DisplayMessage;
+
+/// Actions that can be triggered via the swarm panel's keyboard shortcuts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SwarmPanelAction {
+    /// Toggle swarm panel keyboard focus.
+    ToggleFocus,
+}
 
 fn keyboard_enhancement_flags() -> crossterm::event::KeyboardEnhancementFlags {
     use crossterm::event::KeyboardEnhancementFlags;
@@ -261,6 +270,19 @@ pub trait TuiState {
     /// Running items state (tools, subagents, background tasks) for the interactive list.
     fn running_items(&self) -> RunningItemsState;
     fn time_since_activity(&self) -> Option<Duration>;
+    /// Whether the terminal is currently focused (receiving key events).
+    /// Always true in this fork — upstream's FocusLost handling is not ported.
+    fn client_focused(&self) -> bool {
+        true
+    }
+    /// Transient hotkey-feedback text shown briefly after a (Alt+?) chord fires.
+    fn hotkey_feedback(&self) -> Option<String> {
+        None
+    }
+    /// Learn-hint text shown briefly on first skill usage.
+    fn learn_hint(&self) -> Option<String> {
+        None
+    }
     /// Whether the provider/server has ended the visible assistant message while turn cleanup
     /// still finishes in the background.
     fn stream_message_ended(&self) -> bool {
@@ -590,7 +612,7 @@ pub trait TuiState {
                 return true;
             }
             if let Some(cache_info) = self.cache_ttl_status()
-                && (cache_info.is_cold || cache_info.remaining_secs <= 60)
+                && (cache_info.is_cold || cache_info.expiring_soon())
             {
                 return true;
             }
@@ -634,8 +656,56 @@ pub struct CacheTtlInfo {
     pub ttl_secs: u64,
     /// Whether the cache is expired (cold)
     pub is_cold: bool,
+    /// How long ago the cache went cold, in seconds (0 while warm)
+    pub cold_for_secs: u64,
     /// Estimated cached tokens (from last response's input tokens)
     pub cached_tokens: Option<u64>,
+}
+
+/// Compact human age like `30s`, `5m`, `1h 1m`, `2d 3h` for "went cold N ago"
+/// annotations. Keeps at most two units so it stays glanceable.
+pub(crate) fn format_compact_age(secs: u64) -> String {
+    if secs < 60 {
+        return format!("{}s", secs);
+    }
+    let mins = secs / 60;
+    if mins < 60 {
+        return format!("{}m", mins);
+    }
+    let hours = mins / 60;
+    let rem_mins = mins % 60;
+    if hours < 24 {
+        return if rem_mins == 0 {
+            format!("{}h", hours)
+        } else {
+            format!("{}h {}m", hours, rem_mins)
+        };
+    }
+    let days = hours / 24;
+    let rem_hours = hours % 24;
+    if rem_hours == 0 {
+        format!("{}d", days)
+    } else {
+        format!("{}d {}h", days, rem_hours)
+    }
+}
+
+impl CacheTtlInfo {
+    /// How long before expiry the `⏳ cache ...` countdown should appear.
+    ///
+    /// A fixed 60s window is fine for a 5-minute TTL but far too easy to miss
+    /// on a 1-hour (or 24-hour) TTL where stepping away is exactly the failure
+    /// mode. Scale with the TTL (10%) but keep it within 60s..10min so short
+    /// TTLs keep their old behavior and long TTLs don't nag for hours.
+    pub fn warn_window_secs(&self) -> u64 {
+        (self.ttl_secs / 10).clamp(60, 600)
+    }
+
+    /// Whether the cache is warm but close enough to expiry that the
+    /// countdown should be shown (and idle redraws kept alive).
+    pub fn expiring_soon(&self) -> bool {
+        !self.is_cold && self.remaining_secs <= self.warn_window_secs()
+    }
 }
 
 /// Prompt cache TTL helpers now live in `crate::provider` (provider
@@ -838,10 +908,14 @@ pub struct LoginImportPrompt {
     pub rows: Vec<LoginImportRow>,
     /// Index of the row the cursor is currently on.
     pub cursor: usize,
-    /// When `true`, the navigable "Continue" pill (above and below the list) is
-    /// focused instead of a login row, so it renders highlighted and Enter
-    /// commits the import.
+    /// When `true`, the navigable "Continue" pill is focused. On the summary
+    /// screen this is the preselected default; in choose mode it means focus is
+    /// on the pill rather than a login row, so Enter commits the import.
     pub continue_focused: bool,
+    /// `None` = the default summary screen (detected logins listed read-only,
+    /// with Continue / Choose pills). `Some(label)` = the per-login checkbox list
+    /// with the label describing the action (e.g. "import").
+    pub choosing: Option<String>,
     /// How many rows are currently checked for import.
     pub checked_count: usize,
     /// Seconds left before the screen auto-imports all checked logins.
@@ -1589,7 +1663,7 @@ fn cache_cold_countdown_redraw_active(state: &dyn TuiState) -> bool {
     }
     state
         .cache_ttl_status()
-        .map(|info| info.is_cold || info.remaining_secs <= 60)
+        .map(|info| info.is_cold || info.expiring_soon())
         .unwrap_or(false)
 }
 
@@ -1903,6 +1977,7 @@ mod tests {
             remaining_secs: 240,
             ttl_secs: 300,
             is_cold: false,
+            cold_for_secs: 0,
             cached_tokens: Some(12_000),
         }
     }
@@ -1912,8 +1987,21 @@ mod tests {
             remaining_secs: 0,
             ttl_secs: 300,
             is_cold: true,
+            cold_for_secs: 90,
             cached_tokens: Some(12_000),
         }
+    }
+
+    #[test]
+    fn format_compact_age_is_glanceable() {
+        use super::format_compact_age;
+        assert_eq!(format_compact_age(0), "0s");
+        assert_eq!(format_compact_age(45), "45s");
+        assert_eq!(format_compact_age(60), "1m");
+        assert_eq!(format_compact_age(3_660), "1h 1m");
+        assert_eq!(format_compact_age(7_200), "2h");
+        assert_eq!(format_compact_age(90_000), "1d 1h");
+        assert_eq!(format_compact_age(172_800), "2d");
     }
 
     #[test]

@@ -1,3 +1,13 @@
+pub const MERMAID_PENDING_PLACEHOLDER_TEXT: &str = "↻ rendering mermaid diagram...";
+
+pub fn line_is_mermaid_pending_placeholder(line: &::ratatui::text::Line<'_>) -> bool {
+    let mut spans = line.spans.iter();
+    let first = match spans.next() {
+        Some(span) => span.content.as_ref(),
+        None => return false,
+    };
+    first.starts_with("↻ rendering mermaid") && spans.next().is_none()
+}
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use ratatui::prelude::*;
 use serde::Serialize;
@@ -84,7 +94,7 @@ pub(crate) use context::with_markdown_spacing_mode_override;
 pub use context::{
     center_code_blocks, get_diagram_mode_override, mermaid_rendering_enabled,
     set_center_code_blocks, set_diagram_mode_override, with_deferred_mermaid_render_context,
-    with_mermaid_rendering_override,
+    with_diagram_mode_scope, with_mermaid_rendering_override,
 };
 use context::{
     deferred_mermaid_render_context_enabled, effective_diagram_mode,
@@ -105,7 +115,7 @@ pub use render_core_adapter::{
     styled_line_to_line,
 };
 
-pub use render_full::render_markdown_with_width;
+pub use render_full::{render_markdown_with_width, thread_render_count};
 pub use render_lazy::render_markdown_lazy;
 pub use render_support::extract_copy_targets_from_rendered_lines;
 

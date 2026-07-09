@@ -1791,6 +1791,20 @@ impl App {
                         self.cursor_pos = 0;
                         return Ok(true);
                     }
+                    // `/login` + immediate Enter should not silently launch the
+                    // first provider's login flow. Without a filter or an
+                    // explicit selection there is no clear user choice yet, so
+                    // activate the picker and let them pick deliberately.
+                    if picker.kind == PickerKind::Login
+                        && picker.filter.is_empty()
+                        && picker.selected == 0
+                    {
+                        picker.preview = false;
+                        picker.column = 0;
+                        self.input.clear();
+                        self.cursor_pos = 0;
+                        return Ok(true);
+                    }
                     picker.preview = false;
                     if picker.kind == PickerKind::Usage {
                         picker.column = 0;
@@ -1884,10 +1898,61 @@ impl App {
             (SessionPicker::loading(), "Loading sessions...")
         };
         picker.set_current_dir(current_dir);
+        picker.set_current_session_id(Some(super::commands::active_session_id(self)));
         self.session_picker_overlay = Some(RefCell::new(picker));
         self.session_picker_mode = SessionPickerMode::Resume;
         self.set_status_notice(status);
         self.start_session_picker_load();
+    }
+
+    /// Open the active sessions manager: the session picker scoped to live
+    /// (open) sessions, showing which are still working on a response and
+    /// which are ready for input. Reached via Left arrow on an empty input
+    /// (when `display.active_sessions_manager` is enabled) or `/active`.
+    pub(super) fn open_active_sessions_picker(&mut self) {
+        let current_dir = self.session.working_dir.clone();
+        let (mut picker, status) = if let Some((server_groups, orphan_sessions)) =
+            session_picker::load_cached_sessions_grouped()
+        {
+            (
+                SessionPicker::new_grouped(server_groups, orphan_sessions),
+                "Refreshing active sessions...",
+            )
+        } else {
+            (SessionPicker::loading(), "Loading active sessions...")
+        };
+        picker.set_current_dir(current_dir);
+        picker.set_current_session_id(Some(super::commands::active_session_id(self)));
+        picker.activate_active_filter();
+        self.session_picker_overlay = Some(RefCell::new(picker));
+        self.session_picker_mode = SessionPickerMode::ActiveSessions;
+        self.set_status_notice(status);
+        self.start_session_picker_load();
+    }
+
+    /// Opt-in Left-arrow gesture: pressing Left on an empty input opens the
+    /// active sessions manager. Gated behind `display.active_sessions_manager`
+    /// so the default input behavior is unchanged. Returns true when the
+    /// gesture fired.
+    pub(super) fn maybe_open_active_sessions_on_left(&mut self) -> bool {
+        if !self.input.is_empty() || self.cursor_pos != 0 {
+            return false;
+        }
+        if !crate::config::config().display.active_sessions_manager {
+            return false;
+        }
+        self.open_active_sessions_picker();
+        true
+    }
+
+    /// Tick hook: while the session picker overlay is up, periodically refresh
+    /// the live presence snapshot so working/ready badges (and the Active view
+    /// membership) track reality. Returns true when a redraw is needed.
+    pub(super) fn poll_session_picker_presence(&mut self) -> bool {
+        let Some(picker_cell) = self.session_picker_overlay.as_ref() else {
+            return false;
+        };
+        picker_cell.borrow_mut().maybe_refresh_live_presence()
     }
 
     fn start_session_picker_load(&mut self) {
@@ -1934,6 +1999,16 @@ impl App {
                     }
                     "Catch Up sessions loaded"
                 }
+                SessionPickerMode::ActiveSessions => {
+                    if let Some(existing) = self.session_picker_overlay.as_ref() {
+                        let mut picker = existing.borrow_mut();
+                        // Keep the active filter; reseed preserves it and
+                        // refreshes the live presence snapshot.
+                        picker.activate_active_filter();
+                        picker.reseed_grouped(server_groups, orphan_sessions);
+                    }
+                    "Active sessions loaded"
+                }
                 SessionPickerMode::Onboarding { .. } => return false,
             };
             self.set_status_notice(notice);
@@ -1944,6 +2019,7 @@ impl App {
             SessionPickerMode::Resume => {
                 let mut picker = SessionPicker::new_grouped(server_groups, orphan_sessions);
                 picker.set_current_dir(self.session.working_dir.clone());
+                picker.set_current_session_id(Some(super::commands::active_session_id(self)));
                 self.session_picker_overlay = Some(RefCell::new(picker));
                 self.set_status_notice("Sessions loaded");
                 true
@@ -1954,6 +2030,15 @@ impl App {
                 picker.set_current_dir(self.session.working_dir.clone());
                 self.session_picker_overlay = Some(RefCell::new(picker));
                 self.set_status_notice("Catch Up sessions loaded");
+                true
+            }
+            SessionPickerMode::ActiveSessions => {
+                let mut picker = SessionPicker::new_grouped(server_groups, orphan_sessions);
+                picker.set_current_dir(self.session.working_dir.clone());
+                picker.set_current_session_id(Some(super::commands::active_session_id(self)));
+                picker.activate_active_filter();
+                self.session_picker_overlay = Some(RefCell::new(picker));
+                self.set_status_notice("Active sessions loaded");
                 true
             }
             // Onboarding loads its scoped transcript list synchronously, so it
@@ -1973,7 +2058,9 @@ impl App {
         let picker_active = self.session_picker_overlay.is_some()
             && matches!(
                 self.session_picker_mode,
-                SessionPickerMode::Resume | SessionPickerMode::CatchUp
+                SessionPickerMode::Resume
+                    | SessionPickerMode::CatchUp
+                    | SessionPickerMode::ActiveSessions
             );
 
         match recv_result {
@@ -2129,11 +2216,9 @@ impl App {
                 ResumeTarget::OpenCodeSession { session_id, .. } => {
                     format!("OpenCode {}", jcode_core::util::truncate_str(session_id, 8))
                 }
-                ResumeTarget::ForeignSession {
-                    provider_slug,
-                    session_id,
-                    ..
-                } => format!("{provider_slug} {}", &session_id[..session_id.len().min(8)]),
+                ResumeTarget::CursorSession { session_id, .. } => {
+                    format!("Cursor {}", jcode_core::util::truncate_str(session_id, 8))
+                }
             };
             let resolved_target = match crate::import::resolve_resume_target_to_jcode(target) {
                 Ok(target) => target,
@@ -2236,33 +2321,38 @@ impl App {
             ResumeTarget::OpenCodeSession { session_id, .. } => {
                 format!("OpenCode {}", jcode_core::util::truncate_str(session_id, 8))
             }
-            ResumeTarget::ForeignSession {
-                provider_slug,
-                session_id,
-                ..
-            } => format!("{provider_slug} {}", &session_id[..session_id.len().min(8)]),
+            ResumeTarget::CursorSession { session_id, .. } => {
+                format!("Cursor {}", jcode_core::util::truncate_str(session_id, 8))
+            }
         };
 
         let resolved_target = match target {
             ResumeTarget::JcodeSession { session_id } => session_id.clone(),
             ResumeTarget::ClaudeCodeSession { session_id, .. } => {
-                crate::casr_adapter::imported_claude_code_session_id(session_id)
+                crate::import::imported_claude_code_session_id(session_id)
             }
             ResumeTarget::CodexSession { session_id, .. } => {
-                crate::casr_adapter::imported_codex_session_id(session_id)
+                crate::import::imported_codex_session_id(session_id)
             }
             ResumeTarget::PiSession { session_path } => {
-                crate::casr_adapter::imported_pi_session_id(session_path)
+                crate::import::imported_pi_session_id(session_path)
             }
             ResumeTarget::OpenCodeSession { session_id, .. } => {
-                crate::casr_adapter::imported_opencode_session_id(session_id)
+                crate::import::imported_opencode_session_id(session_id)
             }
-            ResumeTarget::ForeignSession {
-                provider_slug,
-                session_id,
-                ..
-            } => crate::casr_adapter::imported_session_id_for_provider(provider_slug, session_id),
+            ResumeTarget::CursorSession { session_id, .. } => {
+                crate::import::imported_cursor_session_id(session_id)
+            }
         };
+
+        // Selecting the session we are already in (visible in the Active view,
+        // labeled "current") should simply close the picker, not re-resume.
+        if resolved_target == super::commands::active_session_id(self) {
+            self.session_picker_overlay = None;
+            self.session_picker_mode = SessionPickerMode::Resume;
+            self.set_status_notice("Already in this session");
+            return;
+        }
 
         if targets.len() > 1 {
             self.push_display_message(DisplayMessage::system(format!(

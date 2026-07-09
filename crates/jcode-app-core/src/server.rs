@@ -64,8 +64,9 @@ use self::swarm::{
     MAX_SWARM_MEMBERS, broadcast_swarm_plan, broadcast_swarm_plan_with_previous,
     broadcast_swarm_status, record_swarm_event, record_swarm_event_for_session,
     refresh_swarm_task_staleness, remove_plan_participant, remove_session_from_swarm,
-    rename_plan_participant, run_swarm_message, set_member_task_label, swarm_is_self_or_ancestor,
-    update_member_status, update_member_status_with_report, update_member_status_with_report_tldr,
+    rename_plan_participant, run_swarm_message, send_swarm_plan_to_session, set_member_task_label,
+    swarm_is_self_or_ancestor, update_member_status, update_member_status_with_report,
+    update_member_status_with_report_tldr,
 };
 use self::swarm_channels::{
     remove_session_channel_subscriptions, subscribe_session_to_channel,
@@ -107,6 +108,10 @@ pub(super) type SessionAgents = Arc<RwLock<HashMap<String, Arc<Mutex<Agent>>>>>;
 pub(super) type ChannelSubscriptions =
     Arc<RwLock<HashMap<String, HashMap<String, HashSet<String>>>>>;
 
+const SERVER_NAME_ENV: &str = "JCODE_SERVER_NAME";
+const SERVER_DISPLAY_NAME_ENV: &str = "JCODE_SERVER_DISPLAY_NAME";
+const MAX_CONFIGURED_SERVER_NAME_LEN: usize = 64;
+
 pub(super) async fn persist_swarm_state_for(swarm_id: &str, swarm_state: &SwarmState) {
     let runtime = swarm_state.load_runtime(swarm_id).await;
     persist_swarm_state_snapshot(
@@ -132,6 +137,54 @@ fn headless_member_should_restore(status: &str, is_headless: bool) -> bool {
 fn headless_reload_continuation_message(reload_ctx: Option<ReloadContext>) -> Option<String> {
     ReloadContext::recovery_directive(reload_ctx.as_ref(), true, "", None)
         .map(|directive| directive.continuation_message)
+}
+
+fn configured_server_name(cli_name: Option<String>) -> Option<String> {
+    cli_name
+        .as_deref()
+        .and_then(normalize_configured_server_name)
+        .or_else(configured_server_name_from_env)
+}
+
+fn configured_server_name_from_env() -> Option<String> {
+    [SERVER_NAME_ENV, SERVER_DISPLAY_NAME_ENV]
+        .into_iter()
+        .find_map(|key| {
+            std::env::var(key)
+                .ok()
+                .and_then(|value| normalize_configured_server_name(&value))
+        })
+}
+
+fn normalize_configured_server_name(raw: &str) -> Option<String> {
+    let mut normalized = String::new();
+    let mut previous_dash = false;
+
+    for ch in raw.trim().chars() {
+        let mapped = if ch.is_ascii_alphanumeric() {
+            ch.to_ascii_lowercase()
+        } else if ch == '.' || ch == '-' {
+            ch
+        } else {
+            '-'
+        };
+
+        if mapped == '-' {
+            if previous_dash {
+                continue;
+            }
+            previous_dash = true;
+        } else {
+            previous_dash = false;
+        }
+        normalized.push(mapped);
+        if normalized.len() >= MAX_CONFIGURED_SERVER_NAME_LEN {
+            break;
+        }
+    }
+
+    let trimmed = normalized.trim_matches(|ch| matches!(ch, '-' | '.'));
+    (!trimmed.is_empty()).then(|| trimmed.to_string())
 }
 
 #[derive(Default)]
@@ -451,7 +504,11 @@ pub struct Server {
 
 impl Server {
     pub fn new(provider: Arc<dyn Provider>) -> Self {
-        use crate::id::{new_memorable_server_id, server_icon};
+        Self::new_with_name(provider, None)
+    }
+
+    pub fn new_with_name(provider: Arc<dyn Provider>, server_name: Option<String>) -> Self {
+        use crate::id::{new_id, new_memorable_server_id, server_icon};
 
         // Register the live provider so background helpers (the memory sidecar)
         // can make cheap model calls on whatever provider the user is running.
@@ -463,8 +520,12 @@ impl Server {
         let (event_tx, _) = broadcast::channel(1024);
         let (client_debug_response_tx, _) = broadcast::channel(64);
 
-        // Generate a memorable server name
-        let (id, name) = new_memorable_server_id();
+        // Generate a memorable server name unless the operator configured a
+        // stable one for long-lived remote runtimes.
+        let (id, name) = match configured_server_name(server_name) {
+            Some(name) => (new_id(&format!("server_{name}")), name),
+            None => new_memorable_server_id(),
+        };
         let icon = server_icon(&name).to_string();
         let identity = ServerIdentity {
             id,

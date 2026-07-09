@@ -1698,15 +1698,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "colored"
-version = "3.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
-dependencies = [
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "com"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1999,34 +1990,6 @@ name = "critical-section"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
-
-[[package]]
-name = "cross_agent_session_resumer"
-version = "0.1.4"
-source = "git+https://github.com/quangdang46/cross_agent_session_resumer?rev=bac44dd20a9ccab2ba49e5821d2d5c0b7603f978#bac44dd20a9ccab2ba49e5821d2d5c0b7603f978"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "clap_complete",
- "colored 3.1.1",
- "dirs 6.0.0",
- "glob",
- "rayon",
- "rich_rust",
- "rusqlite",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 2.0.18",
- "tracing",
- "tracing-subscriber",
- "urlencoding",
- "uuid",
- "vergen-gix",
- "walkdir",
- "which 7.0.3",
-]
 
 [[package]]
 name = "crossbeam-channel"
@@ -2951,12 +2914,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "env_home"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f84e12ccf0a7ddc17a6c41c93326024c42920d7ee630d04950e6926645c0fe"
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3053,17 +3010,6 @@ checksum = "b95f7c0680e4142284cf8b22c14a476e87d61b004a3a0861872b32ef7ead40a2"
 dependencies = [
  "bit-set 0.5.3",
  "regex",
-]
-
-[[package]]
-name = "fancy-regex"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72cf461f865c862bb7dc573f643dd6a2b6842f7c30b07882b56bd148cc2761b8"
-dependencies = [
- "bit-set 0.8.0",
- "regex-automata",
- "regex-syntax",
 ]
 
 [[package]]
@@ -5616,7 +5562,6 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
- "cross_agent_session_resumer",
  "crossterm 0.29.0",
  "dcg-core",
  "dirs 5.0.1",
@@ -5657,13 +5602,20 @@ dependencies = [
  "jcode-plugin-core",
  "jcode-plugin-runtime",
  "jcode-protocol",
+ "jcode-provider-anthropic-runtime",
+ "jcode-provider-antigravity-runtime",
  "jcode-provider-claude-cli-runtime",
+ "jcode-provider-copilot-runtime",
  "jcode-provider-core",
+ "jcode-provider-cursor-runtime",
  "jcode-provider-doctor",
  "jcode-provider-gemini",
+ "jcode-provider-gemini-runtime",
  "jcode-provider-metadata",
  "jcode-provider-openai",
+ "jcode-provider-openai-runtime",
  "jcode-provider-openrouter",
+ "jcode-provider-openrouter-runtime",
  "jcode-provider-service",
  "jcode-secrets",
  "jcode-selfdev-types",
@@ -5882,7 +5834,6 @@ dependencies = [
  "bytes",
  "chrono",
  "criterion",
- "cross_agent_session_resumer",
  "crossterm 0.29.0",
  "dirs 5.0.1",
  "ffs-engine",
@@ -6550,8 +6501,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bytes",
  "chrono",
  "flate2",
+ "h2 0.4.15",
+ "http 1.4.2",
  "jcode-base",
  "jcode-message-types",
  "jcode-provider-core",
@@ -6560,8 +6514,10 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tokio-rustls 0.26.4",
  "tokio-stream",
  "uuid",
+ "webpki-roots 1.0.8",
 ]
 
 [[package]]
@@ -6973,9 +6929,11 @@ dependencies = [
  "sha2 0.10.9",
  "similar",
  "tempfile",
+ "terminal-colorsaurus",
  "tokio",
  "unicode-width 0.2.2",
  "url",
+ "urlencoding",
 ]
 
 [[package]]
@@ -7026,6 +6984,7 @@ dependencies = [
  "crossterm 0.29.0",
  "dirs 5.0.1",
  "image",
+ "jcode-plan",
  "jcode-tui-workspace",
  "mermaid-rs-renderer",
  "ratatui 0.30.2",
@@ -7674,15 +7633,6 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.16.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
-dependencies = [
- "hashbrown 0.16.1",
-]
-
-[[package]]
-name = "lru"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a860605968fce16869fd239cf4237a82f3ac470723415db603b0e8b6c8d4fb9"
@@ -7827,8 +7777,8 @@ dependencies = [
 
 [[package]]
 name = "mermaid-rs-renderer"
-version = "0.3.0"
-source = "git+https://github.com/1jehuang/mermaid-rs-renderer.git?tag=v0.3.0#bac530cc975d1daa957d21d8c1f76fc34cff7b04"
+version = "0.3.1"
+source = "git+https://github.com/1jehuang/mermaid-rs-renderer.git?tag=v0.3.1#2f993bd79a55235eb59a34d807852276ba25bea7"
 dependencies = [
  "anyhow",
  "clap",
@@ -9985,27 +9935,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rich_rust"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b739581beb432b2743e3561cec117559483d7a66fdd11acd72e98b6ffad19915"
-dependencies = [
- "bitflags 2.13.0",
- "crossterm 0.29.0",
- "fancy-regex 0.17.0",
- "log",
- "lru 0.16.4",
- "num-rational",
- "once_cell",
- "os_pipe",
- "regex",
- "smallvec",
- "stdio-override",
- "time",
- "unicode-width 0.2.2",
-]
-
-[[package]]
 name = "ring"
 version = "0.17.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10071,7 +10000,7 @@ dependencies = [
  "anyhow",
  "blake3",
  "chrono",
- "colored 2.2.0",
+ "colored",
  "dirs 5.0.1",
  "getrandom 0.4.3",
  "lazy_static",
@@ -10084,7 +10013,7 @@ dependencies = [
  "toml 0.8.23",
  "ureq",
  "walkdir",
- "which 8.0.4",
+ "which",
 ]
 
 [[package]]
@@ -11065,16 +10994,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
-name = "stdio-override"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cffa8a2e517b4e9f270c47e1c4120df90506d9451c1efa67e3698d66446d30ce"
-dependencies = [
- "libc",
- "winapi",
-]
-
-[[package]]
 name = "streaming-iterator"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11671,6 +11590,32 @@ dependencies = [
  "parking_lot",
  "rustix 1.1.4",
  "signal-hook 0.3.18",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "terminal-colorsaurus"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a46bb5364467da040298c573c8a95dbf9a512efc039630409a03126e3703e90"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "memchr",
+ "mio",
+ "terminal-trx",
+ "windows-sys 0.61.2",
+ "xterm-color",
+]
+
+[[package]]
+name = "terminal-trx"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3b3f27d9a8a177e57545481faec87acb45c6e854ed1e5a3658ad186c106f38ed"
+dependencies = [
+ "cfg-if",
+ "libc",
  "windows-sys 0.61.2",
 ]
 
@@ -13687,18 +13632,6 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "7.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d643ce3fd3e5b54854602a080f34fb10ab75e0b813ee32d00ca2b44fa74762"
-dependencies = [
- "either",
- "env_home",
- "rustix 1.1.4",
- "winsafe",
-]
-
-[[package]]
-name = "which"
 version = "8.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48d7cd18d4acb58fb3cdfe9ea54e6cd96a4e7d4cc45c56338b236e82dad47248"
@@ -14291,12 +14224,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "winsafe"
-version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
-
-[[package]]
 name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14441,6 +14368,12 @@ name = "xmlwriter"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec7a2a501ed189703dba8b08142f057e887dfc4b2cc4db2d343ac6376ba3e0b9"
+
+[[package]]
+name = "xterm-color"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7008a9d8ba97a7e47d9b2df63fcdb8dade303010c5a7cd5bf2469d4da6eba673"
 
 [[package]]
 name = "xxhash-rust"

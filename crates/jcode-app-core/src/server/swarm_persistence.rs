@@ -191,10 +191,18 @@ fn recover_member_status(
         );
     }
 
+    // Ready/Done headless members finished their work before the reload:
+    // nothing in-flight was lost, their completion report is preserved, and
+    // startup recovery re-registers the agent, so the reload is invisible to
+    // them. Marking them crashed here is wrong and races ahead of recovery,
+    // making cleanly-finished workers report as "(crashed)" to await_members
+    // watchers that resume before recovery rewrites the status (#swarm).
     if is_headless
         && !matches!(
             status,
-            SwarmLifecycleStatus::Completed
+            SwarmLifecycleStatus::Ready
+                | SwarmLifecycleStatus::Completed
+                | SwarmLifecycleStatus::Done
                 | SwarmLifecycleStatus::Failed
                 | SwarmLifecycleStatus::Stopped
         )
@@ -246,6 +254,19 @@ pub(super) fn load_runtime_state() -> LoadedSwarmRuntimeState {
     for entry in entries.flatten() {
         let path = entry.path();
         if !path.is_file() {
+            continue;
+        }
+        // `.bak` files are corruption-recovery fallbacks, not co-equal
+        // snapshots. When the primary `.json` still exists, reading the
+        // `.bak` alongside it can resurrect state the primary deliberately
+        // dropped (e.g. a cleared plan: the rotate-on-write keeps the old
+        // plan-bearing snapshot as `.bak`, and a union-load would re-insert
+        // that plan forever). `read_json` already falls back to the `.bak`
+        // internally when the primary is corrupt, so skipping it here loses
+        // nothing.
+        if path.extension().and_then(|ext| ext.to_str()) == Some("bak")
+            && path.with_extension("json").is_file()
+        {
             continue;
         }
         let Ok(state) = storage::read_json::<PersistedSwarmState>(&path) else {

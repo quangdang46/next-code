@@ -32,7 +32,7 @@ SERVER COMMANDS (server: prefix or no prefix):
   agent:info               - Get comprehensive agent internal state
   agent:memory             - Get process + session memory breakdown
   allocator                - Get allocator info and jemalloc stats, if available
-  allocator:purge          - Flush/purge jemalloc arenas to test retained-memory behavior
+  allocator:purge          - Release retained heap (jemalloc arena purge / glibc malloc_trim)
   allocator:decay:<ms>     - Set jemalloc dirty/muzzy decay for all arenas to <ms>
   allocator:profile:on     - Enable jemalloc sampling at runtime (jemalloc-prof builds)
   allocator:profile:off    - Disable jemalloc sampling at runtime (jemalloc-prof builds)
@@ -197,6 +197,7 @@ PLANS (server-scoped plan items):
   swarm:plans              - List all swarm plans with item counts
   swarm:plan:<swarm_id>    - Get plan items for specific swarm
   swarm:plan_version:<id>  - Show current plan version for a swarm
+  swarm:clear_plan:<id>    - Admin: delete a swarm's plan (memory + persisted state)
 
 PLAN PROPOSALS (pending approval):
   swarm:proposals          - List all pending proposals across swarms
