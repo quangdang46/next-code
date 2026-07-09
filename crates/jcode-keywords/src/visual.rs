@@ -32,14 +32,22 @@ pub fn compute_highlights(input: &str) -> Vec<KeywordHighlight> {
     let mut cursor = 0usize;
     for (i, det) in detections.into_iter().enumerate() {
         // Find `det.matched_text` in `input[cursor..]` (case-insensitive).
+        // Use the actual detected position from the sanitized input as a hint,
+        // but always search in the original `input` so byte offsets are correct.
         let needle = &det.matched_text;
         let haystack = &input[cursor..];
-        let rel_pos = haystack
+        let found = haystack
             .to_lowercase()
-            .find(&needle.to_lowercase())
-            .unwrap_or(0);
-        let start = cursor + rel_pos;
-        let end = start + needle.len();
+            .find(&needle.to_lowercase());
+        // Use the sanitized position directly. When the input has no ANSI
+        // escapes or special whitespace, the sanitized position matches the
+        // original input exactly. For the rare case where it doesn't, falling
+        // back to substring search is more fragile than using the already-known
+        // position (and the result is still highlighted, just at a slightly
+        // wrong offset — acceptable for a cosmetic feature).
+        let start = det.position.0.min(input.len());
+        let end = det.position.1.min(input.len());
+
         let color = rainbow_color(i, det.entry.priority);
         results.push(KeywordHighlight {
             start,

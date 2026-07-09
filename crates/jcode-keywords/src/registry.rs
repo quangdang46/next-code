@@ -76,7 +76,7 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
             // Priority 10
             KeywordEntry {
                 keyword: "$ultrawork",
-                aliases: &["ulw", "uw", "parallel", "dont stop", "must complete"],
+                aliases: &["ultracode", "ultra", "ulw", "uw", "parallel", "dont stop", "must complete"],
                 priority: 10,
                 workflow: WorkflowKind::Ultrawork,
                 description: "Parallel execution — spawn sub-agents, coordinate, aggregate",
