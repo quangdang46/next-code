@@ -1,5 +1,4 @@
 use super::inline_interactive_ui::format_elapsed;
-use crate::tui::selection_highlight::highlight_line_selection;
 use super::tools_ui::{get_tool_activity_detail, summarize_batch_running_tools_compact};
 use super::visual_debug::{self, FrameCaptureBuilder};
 use super::{ProcessingStatus, TuiState};
@@ -9,6 +8,7 @@ use crate::tui::color_support::rgb;
 use crate::tui::detect_kv_cache_problem;
 use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
+use crate::tui::selection_highlight::highlight_line_selection;
 use crate::tui::session_facts;
 use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
 use jcode_tui_style::theme::{

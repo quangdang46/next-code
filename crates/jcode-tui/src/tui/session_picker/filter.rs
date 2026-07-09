@@ -144,7 +144,11 @@ impl SessionPicker {
         jcode_tui_session_picker::session_is_cursor(session.source, session.provider_key.as_deref())
     }
 
-    fn session_matches_filter_mode(&self, session: &SessionInfo, filter_mode: SessionFilterMode) -> bool {
+    fn session_matches_filter_mode(
+        &self,
+        session: &SessionInfo,
+        filter_mode: SessionFilterMode,
+    ) -> bool {
         match filter_mode {
             SessionFilterMode::All => true,
             SessionFilterMode::CatchUp => session.needs_catchup,

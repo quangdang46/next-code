@@ -846,9 +846,8 @@ fn live_presence(session_id: &str, streaming: bool) -> crate::session::SessionPr
         session_id: session_id.to_string(),
         pid: std::process::id(),
         streaming,
-        streaming_since: streaming.then(|| {
-            std::time::SystemTime::now() - std::time::Duration::from_secs(90)
-        }),
+        streaming_since: streaming
+            .then(|| std::time::SystemTime::now() - std::time::Duration::from_secs(90)),
     }
 }
 

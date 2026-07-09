@@ -28,7 +28,6 @@ pub mod compaction;
 pub mod config;
 pub mod copilot_usage;
 pub mod dictation;
-pub mod notepad;
 #[cfg(feature = "embeddings")]
 pub mod embedding;
 pub mod embedding_backend;
@@ -55,6 +54,7 @@ pub mod memory_rerank;
 pub mod memory_types;
 pub mod message;
 pub mod model_pricing;
+pub mod notepad;
 pub mod plan;
 pub mod platform;
 pub mod power_inhibit;
