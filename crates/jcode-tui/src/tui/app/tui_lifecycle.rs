@@ -630,6 +630,20 @@ impl App {
             sponsor_disclosure_shown_this_session: false,
             swarm_hint_shown_this_session: false,
             learn_hint: None,
+            cold_cache_warned_baseline_completed_at: None,
+            consecutive_credential_failures: 0,
+            force_full_repaint: false,
+            hotkey_feedback: None,
+            hotkey_usage: None,
+            unknown_hotkey_seen: std::collections::HashMap::new(),
+            last_unknown_hotkey_notice: None,
+            learn_hint_shown_this_session: false,
+            pending_fallback_resend: None,
+            pending_merge_offer: None,
+            pending_reasoning_effort: None,
+            pending_startup_notice: None,
+            remote_resend: None,
+            repo_dir: None,
         };
 
         for notice in app.provider.drain_startup_notices() {
@@ -1054,6 +1068,20 @@ impl App {
             sponsor_disclosure_shown_this_session: false,
             swarm_hint_shown_this_session: false,
             learn_hint: None,
+            cold_cache_warned_baseline_completed_at: None,
+            consecutive_credential_failures: 0,
+            force_full_repaint: false,
+            hotkey_feedback: None,
+            hotkey_usage: None,
+            unknown_hotkey_seen: std::collections::HashMap::new(),
+            last_unknown_hotkey_notice: None,
+            learn_hint_shown_this_session: false,
+            pending_fallback_resend: None,
+            pending_merge_offer: None,
+            pending_reasoning_effort: None,
+            pending_startup_notice: None,
+            remote_resend: None,
+            repo_dir: None,
         };
 
         for notice in app.provider.drain_startup_notices() {

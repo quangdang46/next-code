@@ -317,6 +317,10 @@ impl ToggleBinding {
         }
     }
 
+    pub fn binding(&self) -> Option<&KeyBinding> {
+        self.binding.as_ref()
+    }
+
     pub fn matches(&self, code: KeyCode, modifiers: KeyModifiers) -> bool {
         if let Some(binding) = &self.binding
             && binding.matches(code, modifiers)

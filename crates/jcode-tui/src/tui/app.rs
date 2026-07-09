@@ -65,6 +65,7 @@ mod dictation;
 mod event_wrappers;
 mod handterm_native_scroll;
 pub(crate) mod helpers;
+mod hotkey_feedback;
 mod idle_heap_release;
 mod inline_interactive;
 mod input;
@@ -1408,6 +1409,79 @@ pub struct App {
     swarm_hint_shown_this_session: bool,
     /// Swarm config hint message with timestamp.
     learn_hint: Option<(String, std::time::Instant)>,
+    /// Cached baseline completed_at from the last completed turn, so the
+    /// request-start cold-cache warning can reference a concrete age even
+    /// when the server's usage summary does not include one. Cleared after
+    /// the warning fires so a subsequent turn with the same warm baseline
+    /// does not re-warn from the old `completed_at`, which re-arms the
+    /// warning automatically.
+    cold_cache_warned_baseline_completed_at: Option<Instant>,
+    // Per-session count of consecutive credential failures (reset on success).
+    consecutive_credential_failures: u32,
+    /// Forces the next ratatui render pass to draw every cell unconditionally
+    /// (issue #404).
+    force_full_repaint: bool,
+    // Transient hotkey-feedback text shown briefly after a (Alt+?) chord fires.
+    // Rendered in the same pop-out slot as learn_hint.
+    hotkey_feedback: Option<(String, Instant)>,
+    // Lazily-loaded persisted per-action hotkey usage counters.
+    hotkey_usage: Option<hotkey_feedback::HotkeyUsageState>,
+    // Per-chord counts of unknown-hotkey notices shown this session.
+    unknown_hotkey_seen: std::collections::HashMap<String, u32>,
+    // When the last unknown-hotkey notice was shown, for rate limiting.
+    last_unknown_hotkey_notice: Option<Instant>,
+    // Whether a learned-keybinding nudge has already been surfaced this session.
+    learn_hint_shown_this_session: bool,
+    /// Pending cross-provider resend after a fallback offer is accepted via
+    /// keypress. Carries the original message payload and the recipient route.
+    /// Local sessions resend via `pending_turn` instead.
+    pending_fallback_resend: Option<FallbackResendPayload>,
+    /// Interactive "spawn a jcode agent to merge the diverged update" offer shown
+    /// when the update check finds that the working tree has diverged from HEAD.
+    /// Accepted with the same key as the fallback offer.
+    pending_merge_offer: Option<PendingMergeOffer>,
+    // Pending reasoning effort switch for the remote session, set by the effort
+    // picker and flushed to the server on the next follow-up dispatch (avoids
+    // racing a mid-turn effort switch against the provider round that committed the
+    // last send at the wrong effort, issue #427).
+    pending_reasoning_effort: Option<String>,
+    // Persistent startup notice card (e.g. launch-hotkeys / welcome tip) shown on
+    // the first few fresh-spawn sessions. Stored here rather than pushed through
+    // the normal display-message pipeline so it survives an early `clear_display_messages()`
+    // which otherwise makes the card flash for a moment and disappear.
+    pending_startup_notice: Option<(String, String)>,
+    /// Pending cross-provider resend from a fallback offer on a *remote* (server)
+    /// route. Local sessions resend via `pending_turn` instead.
+    remote_resend: Option<FallbackResendPayload>,
+    /// Repository whose local/upstream branches diverged, if known. Used as the
+    /// spawned agent's working directory and named in its prompt.
+    repo_dir: Option<std::path::PathBuf>,
+}
+
+#[derive(Debug, Clone)]
+struct FallbackResendPayload {
+    /// Expanded message content that was sent to the server.
+    content: String,
+    /// Inline image attachments that accompanied the message.
+    images: Vec<(String, String)>,
+    /// Whether the failed send was a system continuation (poke/reminder).
+    is_system: bool,
+    /// Whether the failed send was flagged for automatic retries.
+    auto_retry: bool,
+    /// Hidden system reminder that accompanied the message, if any.
+    system_reminder: Option<String>,
+    /// The raw prompt the user typed, when known. Used to de-duplicate the
+    /// input box (the error path restores the prompt there) on accept.
+    raw_input: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct PendingMergeOffer {
+    /// Repository whose local/upstream branches diverged, if known. Used as the
+    /// spawned agent's working directory and named in its prompt.
+    repo_dir: Option<std::path::PathBuf>,
+    /// The raw update-failure detail, shown to the user and the merge agent.
+    detail: String,
 }
 
 /// Inert provider used by runtime modes whose output is supplied by another source.

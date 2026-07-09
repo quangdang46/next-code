@@ -82,6 +82,13 @@ pub use jcode_tui_core::{
 };
 pub use jcode_tui_messages::DisplayMessage;
 
+/// Actions that can be triggered via the swarm panel's keyboard shortcuts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SwarmPanelAction {
+    /// Toggle swarm panel keyboard focus.
+    ToggleFocus,
+}
+
 fn keyboard_enhancement_flags() -> crossterm::event::KeyboardEnhancementFlags {
     use crossterm::event::KeyboardEnhancementFlags;
 
@@ -263,6 +270,19 @@ pub trait TuiState {
     /// Running items state (tools, subagents, background tasks) for the interactive list.
     fn running_items(&self) -> RunningItemsState;
     fn time_since_activity(&self) -> Option<Duration>;
+    /// Whether the terminal is currently focused (receiving key events).
+    /// Always true in this fork — upstream's FocusLost handling is not ported.
+    fn client_focused(&self) -> bool {
+        true
+    }
+    /// Transient hotkey-feedback text shown briefly after a (Alt+?) chord fires.
+    fn hotkey_feedback(&self) -> Option<String> {
+        None
+    }
+    /// Learn-hint text shown briefly on first skill usage.
+    fn learn_hint(&self) -> Option<String> {
+        None
+    }
     /// Whether the provider/server has ended the visible assistant message while turn cleanup
     /// still finishes in the background.
     fn stream_message_ended(&self) -> bool {
