@@ -1,4 +1,3 @@
-#![allow(clippy::collapsible_if, clippy::doc_lazy_continuation)]
 //! Control logic / phase transitions for the first-run onboarding flow.
 //!
 //! See [`super::onboarding_flow`] for the phase definitions. This module hangs
@@ -246,7 +245,7 @@ impl App {
     pub(super) fn onboarding_start_default_login(&mut self) {
         crate::telemetry::record_setup_step_once("login_picker_opened");
         self.start_login_provider(crate::provider_catalog::OPENAI_LOGIN_PROVIDER);
-        self.set_status_notice("Login: opening OpenAI sign-in (or type /connect for others)");
+        self.set_status_notice("Login: opening OpenAI sign-in (or type /login for others)");
     }
 
     /// Advance out of a login phase once credentials are available. We no longer
@@ -399,7 +398,8 @@ impl App {
             self.onboarding_import_in_progress = None;
             self.onboarding_import_error = None;
             self.onboarding_finish();
-            self.set_status_notice("Onboarding skipped - run /login when you're ready");
+            let login = Self::onboarding_login_suggestion();
+            self.set_status_notice(format!("Onboarding skipped - run {login} when you're ready"));
             return true;
         }
         match self.onboarding_phase() {
@@ -672,12 +672,19 @@ impl App {
             self.onboarding_start_default_login();
         } else {
             self.onboarding_finish();
-            self.push_display_message(DisplayMessage::system(
+            let login = Self::onboarding_login_suggestion();
+            let hint = if login == "/login" {
                 "No problem. When you're ready to log in, run /login to pick a provider \
                  (OpenAI, Anthropic, Gemini, OpenRouter, and more)."
-                    .to_string(),
-            ));
-            self.set_status_notice("Run /login when you're ready to choose a provider");
+                    .to_string()
+            } else {
+                format!(
+                    "No problem. When you're ready, run {login} to reuse the credentials \
+                     already on this machine, or /login to pick another provider."
+                )
+            };
+            self.push_display_message(DisplayMessage::system(hint));
+            self.set_status_notice(format!("Run {login} when you're ready"));
         }
     }
 
@@ -1221,6 +1228,53 @@ impl App {
             || lower.contains("expired or invalid")
     }
 
+    /// Suggest a concrete `/login <provider>` command the user can actually
+    /// complete, instead of the generic `/login`. Preference order:
+    /// 1. A jcode login that exists but expired (they clearly use it).
+    /// 2. Credentials detected from another CLI (Codex -> openai, Claude Code
+    ///    -> claude, Cursor -> cursor), since that login will succeed instantly.
+    /// Falls back to plain `/login` when nothing is detected.
+    pub(super) fn onboarding_login_suggestion() -> String {
+        Self::onboarding_login_suggestion_provider()
+            .map(|p| format!("/login {p}"))
+            .unwrap_or_else(|| "/login".to_string())
+    }
+
+    fn onboarding_login_suggestion_provider() -> Option<&'static str> {
+        use crate::auth::AuthState;
+        let status = crate::auth::AuthStatus::check_fast();
+        // An expired login is the strongest signal: the user already picked
+        // this provider once, so re-login is the fastest path back to working.
+        let states = [
+            ("claude", status.anthropic.state),
+            ("openai", status.openai),
+            ("gemini", status.gemini),
+            ("copilot", status.copilot),
+            ("cursor", status.cursor),
+            ("openrouter", status.openrouter),
+        ];
+        for (id, state) in states {
+            if matches!(state, AuthState::Expired) {
+                return Some(id);
+            }
+        }
+        // Otherwise suggest a provider whose credentials another CLI on this
+        // machine already holds, so the import/login completes without any
+        // new sign-up.
+        for cli in super::onboarding_flow::detect_external_cli_oauths() {
+            let id = match cli {
+                ExternalCli::Codex => Some("openai"),
+                ExternalCli::ClaudeCode => Some("claude"),
+                ExternalCli::Cursor => Some("cursor"),
+                ExternalCli::Pi | ExternalCli::OpenCode => None,
+            };
+            if id.is_some() {
+                return id;
+            }
+        }
+        None
+    }
+
     /// Build the "other providers" rows for the onboarding readiness summary.
     ///
     /// We already ran a live ping for the default model; for the remaining
@@ -1314,10 +1368,11 @@ impl App {
             for row in &attention {
                 body.push_str(&format!("- ✕ {row}\n"));
             }
+            let login = Self::onboarding_login_suggestion();
             let fix_hint = if looks_like_auth || !ready.is_empty() {
-                "Run /connect (or /login) to fix a login, or /model to pick another."
+                format!("Run {login} to fix a login, or /model to pick another.")
             } else {
-                "Run /connect (or /login) to add a login, or /model to pick another."
+                format!("Run {login} to add a login, or /model to pick another.")
             };
             body.push_str(&format!("\n{fix_hint}"));
         }
@@ -1343,9 +1398,12 @@ impl App {
             ));
         } else {
             let hint = if looks_like_auth {
-                "/connect (or /login) to fix credentials, or /model"
+                format!(
+                    "{} to fix credentials, or /model",
+                    Self::onboarding_login_suggestion()
+                )
             } else {
-                "type anything to try, or /model"
+                "type anything to try, or /model".to_string()
             };
             self.set_status_notice(format!("{} not validated - {hint}", result.model_label));
         }

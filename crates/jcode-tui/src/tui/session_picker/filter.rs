@@ -145,6 +145,7 @@ impl SessionPicker {
             SessionFilterMode::All => true,
             SessionFilterMode::CatchUp => session.needs_catchup,
             SessionFilterMode::Saved => session.saved,
+            SessionFilterMode::Active => true,
             SessionFilterMode::ClaudeCode => Self::session_is_claude_code(session),
             SessionFilterMode::Codex => Self::session_is_codex(session),
             SessionFilterMode::Pi => Self::session_is_pi(session),
