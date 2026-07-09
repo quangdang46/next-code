@@ -2446,34 +2446,46 @@ pub(crate) fn input_cursor_pos_from_screen(
 }
 
 /// Build rendered spans for a text segment, applying keyword highlight
-/// colors where they overlap the segment's byte range in the original input.
-fn highlighted_text_spans(text: &str) -> Vec<Span<'static>> {
-    let highlights = compute_highlights(text);
-    if highlights.is_empty() {
-        return vec![Span::raw(text.to_string())];
-    }
-
+/// colors from the full input's pre-computed highlights.
+fn highlighted_text_spans(
+    text: &str,
+    seg_byte_start: usize,
+    seg_byte_end: usize,
+    highlights: &[KeywordHighlight],
+) -> Vec<Span<'static>> {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let mut cursor = 0usize;
-    for hl in &highlights {
+    for hl in highlights {
+        // Skip highlights entirely outside this segment
+        if hl.end <= seg_byte_start || hl.start >= seg_byte_end {
+            continue;
+        }
+        // Map highlight range to segment-local coordinates
+        let local_start = hl.start.saturating_sub(seg_byte_start);
+        let local_end = hl.end.saturating_sub(seg_byte_start).min(text.len());
+
         // Text before this highlight
-        if hl.start > cursor {
-            spans.push(Span::raw(text[cursor..hl.start].to_string()));
+        if local_start > cursor {
+            spans.push(Span::raw(text[cursor..local_start].to_string()));
         }
 
         let color = Color::Rgb(hl.color.0, hl.color.1, hl.color.2);
         spans.push(Span::styled(
-            text[hl.start..hl.end].to_string(),
+            text[local_start..local_end].to_string(),
             Style::default().fg(color).add_modifier(Modifier::BOLD),
         ));
-        cursor = hl.end;
+        cursor = local_end;
     }
     // Remaining text after last highlight
     if cursor < text.len() {
         spans.push(Span::raw(text[cursor..].to_string()));
     }
 
-    spans
+    if spans.is_empty() {
+        vec![Span::raw(text.to_string())]
+    } else {
+        spans
+    }
 }
 
 pub(crate) fn wrap_input_text<'a>(
@@ -2492,6 +2504,10 @@ pub(crate) fn wrap_input_text<'a>(
     let mut cursor_col = 0;
     let mut found_cursor = false;
 
+    // Compute keyword highlights once on the full input, then map each
+    // highlight onto the segment(s) it overlaps.
+    let full_highlights = compute_highlights(input);
+
     for (idx, segment) in wrapped_segments.iter().enumerate() {
         if !found_cursor
             && cursor_char_pos >= segment.start_char
@@ -2502,7 +2518,15 @@ pub(crate) fn wrap_input_text<'a>(
             found_cursor = true;
         }
 
-        let text_spans = highlighted_text_spans(&segment.text);
+        // Convert segment char range to byte range in the original input.
+        let seg_byte_start = crate::tui::core::char_index_to_byte_offset(input, segment.start_char);
+        let seg_byte_end = crate::tui::core::char_index_to_byte_offset(input, segment.end_char);
+        let text_spans = highlighted_text_spans(
+            &segment.text,
+            seg_byte_start,
+            seg_byte_end,
+            &full_highlights,
+        );
         if idx == 0 {
             let num_color = rainbow_prompt_color(0);
             let mut spans = vec![
