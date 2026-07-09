@@ -45,20 +45,19 @@ pub fn detect_keywords(input: &str) -> Vec<DetectedKeyword> {
         for alias in entry.aliases {
             let alias_lower = alias.to_lowercase();
             if alias_lower.len() < 5 {
-                // Short aliases: exact match only
+                // Short aliases: exact match only. Extend match to the end of
+                // the current token (up to next whitespace or end-of-string)
+                // so "ulw" matches "ultracode" fully, not just "ult".
                 if let Some(pos) = lower.find(&alias_lower) {
-                    let end = (pos + alias.len()).min(sanitized.len());
-                    // Guard against non-char-boundary slicing
-                    let end = sanitized
-                        .char_indices()
-                        .map(|(i, _)| i)
-                        .take_while(|&i| i <= end)
-                        .last()
-                        .unwrap_or(pos);
+                    // Find the next whitespace or end-of-string after pos
+                    let after = sanitized[pos..]
+                        .find(char::is_whitespace)
+                        .map(|ws| pos + ws)
+                        .unwrap_or(sanitized.len());
                     results.push(DetectedKeyword {
                         entry,
-                        matched_text: sanitized[pos..end].to_string(),
-                        position: (pos, end),
+                        matched_text: sanitized[pos..after].to_string(),
+                        position: (pos, after),
                         confidence: 0.9,
                     });
                     break;
