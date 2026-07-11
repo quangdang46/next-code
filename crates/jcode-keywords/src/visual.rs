@@ -48,6 +48,13 @@ pub fn compute_highlights(input: &str) -> Vec<KeywordHighlight> {
         let start = det.position.0.min(input.len());
         let end = det.position.1.min(input.len());
 
+        // Skip highlights that are entirely subsumed by previous ones
+        // (same keyword matched with different aliases, e.g. $ultrawork
+        // and $ultraqa both matching start of "ultracode").
+        if end <= cursor {
+            continue;
+        }
+
         let color = rainbow_color(i, det.entry.priority);
         results.push(KeywordHighlight {
             start,
