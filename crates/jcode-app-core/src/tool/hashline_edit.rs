@@ -113,7 +113,7 @@ async fn execute_patch(
     let raw = tokio::fs::read_to_string(&path).await?;
     let content = hashline::normalize::normalize_to_lf(&raw);
 
-    let (edits, pw, _has_block) = hashline::parser::parse_patch(&patch);
+    let (edits, pw, _file_op, _has_block) = hashline::parser::parse_patch(&patch);
     if edits.is_empty() {
         let m = if pw.is_empty() {
             "empty patch".into()

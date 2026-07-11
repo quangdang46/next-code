@@ -114,6 +114,8 @@ members = [
 ffs-search = { git = "https://github.com/quangdang46/fast_file_search", branch = "main" }
 ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", branch = "main" }
 ffs-symbol = { git = "https://github.com/quangdang46/fast_file_search", branch = "main" }
+# Pin hashline to latest v0.8.6 (UTF-8-safe truncation + INS N: shorthand).
+hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "d0f836789" }
 strum = { version = "0.26", features = ["derive"] }
 regex = "1"
 
@@ -240,7 +242,6 @@ jcode-logging = { path = "crates/jcode-logging" }
 # OAuth
 base64 = "0.22"
 sha2 = "0.10"
-hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "f32eeac", }
 rand = "0.9.3"
 hex = "0.4"
 url = "2"

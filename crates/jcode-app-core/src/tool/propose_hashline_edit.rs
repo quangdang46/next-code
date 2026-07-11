@@ -139,7 +139,7 @@ async fn execute_propose_patch(
     let current_raw = tokio::fs::read_to_string(&path).await?;
     let content = hashline::normalize::normalize_to_lf(&current_raw);
 
-    let (edits, warnings, _has_block) = hashline::parser::parse_patch(&patch);
+    let (edits, warnings, _file_op, _has_block) = hashline::parser::parse_patch(&patch);
     if edits.is_empty() {
         let msg = if warnings.is_empty() {
             "hashline patch produced no edits".to_string()

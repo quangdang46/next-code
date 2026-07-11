@@ -391,7 +391,7 @@ pub(crate) fn formatted_tool_input_summary(
                 lines.push(format!("read {}", compact_tool_text(path, 132)));
             }
         }
-        "write" | "edit" | "multiedit" => {
+        "write" | "edit" | "multiedit" | "hashline_edit" => {
             if let Some(path) = string_value("file_path") {
                 let mut summary = compact_tool_text(path, 132);
                 if tool_name == "multiedit"

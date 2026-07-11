@@ -11,7 +11,11 @@ Use `batch` tool to parallelize tool calls.
 Prefer non-interactive commands. If you run an interactive command, the command may hang waiting for interactive input, which you cannot provide. Avoid this situation.
 Try to use better alternatives to `grep`, like `ffs grep`, `ffs glob`, `ffs outline` or `ffs symbol`.
 
-### Hashline edit format
+### File edits (hashline only)
+
+Do **not** use legacy `edit` / `multiedit` / `apply_patch` / `patch` tools — they are not available.
+Use **`hashline_edit`** for all in-place file edits (and `write` only for new files or full rewrites).
+In best-of-N, use `propose_hashline` instead of `propose_edit`.
 
 After reading a file, the output starts with `[path#TAG]` — the TAG is a 4-hex content hash.
 When editing, include the TAG in your `hashline_edit` `patch` input so the system can verify

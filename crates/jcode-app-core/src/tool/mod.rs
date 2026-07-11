@@ -1,4 +1,5 @@
 pub mod ambient;
+#[allow(dead_code)]
 mod apply_patch;
 mod bash;
 mod batch;
@@ -13,6 +14,7 @@ mod conversation_search;
 mod dcp_compress;
 mod debug_socket;
 mod discover;
+#[allow(dead_code)]
 mod edit;
 mod ffs_engine_tools;
 mod ffs_glob;
@@ -32,10 +34,13 @@ mod ls;
 mod lsp;
 pub mod mcp;
 mod memory;
+#[allow(dead_code)]
 mod multiedit;
 mod notepad;
 mod open;
+#[allow(dead_code)]
 mod patch;
+#[allow(dead_code)]
 mod propose_edit;
 mod propose_hashline_edit;
 mod propose_write;
@@ -121,7 +126,7 @@ fn session_tool_policy(session_id: &str) -> Option<SessionToolPolicy> {
 /// `BestOfNOrchestratorHandle`, registered by `Agent::new_with_session`
 /// while a best-of-N run is in flight.
 ///
-/// `propose_edit` / `propose_write` are registered as stateless base tools,
+/// `propose_hashline` / `propose_write` are registered as stateless base tools,
 /// so they have no constructor-time access to the Registry. They look up
 /// the store through this static instead. The handle is `None` outside of
 /// best-of-N runs and the propose tools must refuse to execute in that case.
@@ -413,31 +418,11 @@ impl Registry {
                 "side_panel",
                 side_panel::SidePanelTool::new,
             );
-            Self::insert_tool_timed(&mut m, &mut timings, "edit", edit::EditTool::new);
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "propose_edit",
-                propose_edit::ProposeEditTool::new,
-            );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
                 "propose_hashline",
                 propose_hashline_edit::ProposeHashlineEditTool::new,
-            );
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "multiedit",
-                multiedit::MultiEditTool::new,
-            );
-            Self::insert_tool_timed(&mut m, &mut timings, "patch", patch::PatchTool::new);
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "apply_patch",
-                apply_patch::ApplyPatchTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "ffs_glob", ffs_glob::FfsGlobTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "ffs_grep", ffs_grep::FfsGrepTool::new);

@@ -143,7 +143,7 @@ jcode-side-panel-types = { path = "../jcode-side-panel-types" }
 flate2 = "1"
 tar = "0.4"
 tempfile = "3"
-hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "286b5104aec108d2ddf4eb3d2c89e5c47ca5ccbc", }
+hashline = { workspace = true }
 qrcode = { version = "0.14.1", default-features = false }
 # DCP integration (dynamic context pruning)
 dynamic_context_pruning = { git = "https://github.com/quangdang46/dynamic_context_pruning", branch = "main", package = "dynamic_context_pruning", optional = true }
