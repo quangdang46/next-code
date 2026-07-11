@@ -10,7 +10,7 @@ use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
 use crate::tui::selection_highlight::highlight_line_selection;
 use crate::tui::session_facts;
-use jcode_keywords::visual::{compute_highlights, KeywordHighlight};
+use jcode_keywords::visual::{KeywordHighlight, compute_highlights};
 use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
 use jcode_tui_style::theme::{
     accent_color, ai_color, asap_color, dim_color, pending_color, queued_color,

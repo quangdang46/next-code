@@ -36,9 +36,7 @@ pub fn compute_highlights(input: &str) -> Vec<KeywordHighlight> {
         // but always search in the original `input` so byte offsets are correct.
         let needle = &det.matched_text;
         let haystack = &input[cursor..];
-        let found = haystack
-            .to_lowercase()
-            .find(&needle.to_lowercase());
+        let found = haystack.to_lowercase().find(&needle.to_lowercase());
         // Use the sanitized position directly. When the input has no ANSI
         // escapes or special whitespace, the sanitized position matches the
         // original input exactly. For the rare case where it doesn't, falling
