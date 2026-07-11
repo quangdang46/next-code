@@ -2599,7 +2599,6 @@ pub(super) fn suffix_reuse_compatible(
 /// rendered and wrapped; the prepared suffix is kept and its line/raw indices
 /// are shifted. Returns `Err(prev)` untouched when the stitch would not be
 
-
 fn first_mermaid_pending_message(prepared: &PreparedMessages) -> Option<usize> {
     let line_idx = prepared
         .wrapped_lines

@@ -212,11 +212,10 @@ pub(crate) fn truncate_line_for_copy_badge(line: &mut Line<'static>, max_content
     }
     truncate_line_in_place_to_width(line, max_content_width.saturating_sub(1));
     trim_line_trailing_spaces(line);
-    line.spans
-        .push(Span::styled(
-            "…",
-            Style::default().fg(ratatui::style::Color::DarkGray),
-        ));
+    line.spans.push(Span::styled(
+        "…",
+        Style::default().fg(ratatui::style::Color::DarkGray),
+    ));
 }
 
 /// Choose the wrapped line that hosts an inline copy badge for a copy target

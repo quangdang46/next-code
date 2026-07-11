@@ -308,7 +308,7 @@ fn render_overnight_message_uses_rounded_progress_card() {
 fn render_todos_message_shows_grouped_card_with_status_glyphs() {
     fn todo(id: &str, content: &str, status: &str, group: Option<&str>) -> crate::todo::TodoItem {
         crate::todo::TodoItem {
-        active_form: None,
+            active_form: None,
             id: id.to_string(),
             content: content.to_string(),
             status: status.to_string(),

@@ -109,7 +109,7 @@ fn todos_widgets_show_item_and_aggregate_confidence() {
                 completion_confidence: None,
                 blocked_by: Vec::new(),
                 assigned_to: None,
-            confidence_history: Vec::new(),
+                confidence_history: Vec::new(),
             },
             crate::todo::TodoItem {
                 active_form: None,
@@ -122,7 +122,7 @@ fn todos_widgets_show_item_and_aggregate_confidence() {
                 completion_confidence: Some(95),
                 blocked_by: Vec::new(),
                 assigned_to: None,
-            confidence_history: Vec::new(),
+                confidence_history: Vec::new(),
             },
         ],
         ..Default::default()
@@ -155,7 +155,7 @@ fn todos_widgets_render_group_headers_when_groups_present() {
         completion_confidence: None,
         blocked_by: Vec::new(),
         assigned_to: None,
-    confidence_history: Vec::new(),
+        confidence_history: Vec::new(),
     };
     let data = InfoWidgetData {
         todos: vec![
@@ -194,7 +194,7 @@ fn todos_widgets_stay_flat_without_groups() {
         completion_confidence: None,
         blocked_by: Vec::new(),
         assigned_to: None,
-    confidence_history: Vec::new(),
+        confidence_history: Vec::new(),
     };
     let data = InfoWidgetData {
         todos: vec![mk("a", "completed"), mk("b", "pending")],
@@ -217,7 +217,7 @@ fn todos_widget_renders_exact_pips_for_small_lists() {
         completion_confidence: None,
         blocked_by: Vec::new(),
         assigned_to: None,
-    confidence_history: Vec::new(),
+        confidence_history: Vec::new(),
     };
     let data = InfoWidgetData {
         todos: vec![
@@ -953,7 +953,7 @@ fn swarm_widget_renders_member_roles_and_details() {
                     report_back_to_session_id: None,
                     todo_progress: None,
                     todo_items: Vec::new(),
-                task_label: None,
+                    task_label: None,
                 },
                 SwarmMemberStatus {
                     session_id: "tree-12345678".to_string(),
@@ -968,7 +968,7 @@ fn swarm_widget_renders_member_roles_and_details() {
                     report_back_to_session_id: None,
                     todo_progress: None,
                     todo_items: Vec::new(),
-                task_label: None,
+                    task_label: None,
                 },
             ],
             ..Default::default()
@@ -1123,7 +1123,7 @@ fn placements_never_include_border_only_widgets() {
             assigned_to: None,
             confidence: None,
             completion_confidence: None,
-        confidence_history: Vec::new(),
+            confidence_history: Vec::new(),
         }],
         queue_mode: Some(true),
         memory_info: Some(MemoryInfo {

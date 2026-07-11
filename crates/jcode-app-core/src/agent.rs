@@ -308,9 +308,7 @@ fn apply_config_default_model(provider: &dyn Provider) {
     } else {
         crate::logging::info(&format!(
             "Applied config default_model '{}' via '{}' (provider={:?})",
-            model,
-            model_request,
-            provider_key
+            model, model_request, provider_key
         ));
     }
 }
@@ -407,7 +405,11 @@ impl Agent {
             .try_read()
             .map(|skills| Arc::new(skills.clone()))
             .unwrap_or_else(|_| self.skills.clone());
-        let working_dir = self.session.working_dir.as_deref().map(std::path::Path::new);
+        let working_dir = self
+            .session
+            .working_dir
+            .as_deref()
+            .map(std::path::Path::new);
         Arc::new(SkillRegistry::effective_for_working_dir(
             &global,
             working_dir,
