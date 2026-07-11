@@ -340,7 +340,9 @@ git show origin/master:<file> > <file>  # get our version
 # Then manually merge in any upstream additions that don't conflict
 ```
 
-**Common files with silent overwrite risk** (checked 2026-06):
+**Common files with silent overwrite risk** (checked 2026-06; freeze lesson 2026-07):
+- `crates/jcode-tui/src/tui/app/turn.rs` — **NO `biased;` before `event_stream`** (freeze on alt-tab; Lesson 2)
+- `crates/jcode-tui/src/tui/app/local.rs`, `run_shell.rs` — event-loop keep-ours (Lesson 1)
 - `crates/jcode-tui/src/tui/app/state_ui_input_helpers.rs` — slash commands, FFS rename, `$`/`@` autocomplete
 - `crates/jcode-tui/src/tui/app/state_ui.rs` — `/permissions`, `/skills` report
 - `crates/jcode-tui/src/tui/ui_overlays.rs` — help entries
@@ -447,6 +449,7 @@ After push, verify:
 - [ ] `cargo check` passes
 - [ ] Local builds work (`cargo build`)
 - [ ] Category F check done: all locally-modified files that upstream touched were audited for silent overwrite
+- [ ] **Lesson 2**: `rg -n 'biased\s*;' crates/jcode-tui/src/tui/app/turn.rs` is empty (no freeze-on-alt-tab regression)
 - [ ] `ffs`/`$`/`@`/`/permissions` features still working
 - [ ] `Cargo.toml` has our feature flags (`mempalace-backend`, `dcp`, `rtco`)
 - [ ] Extracted features still functional (session resume, file picker, DCG mode)
@@ -601,6 +604,38 @@ grep -rn 'MemoryEntry {' --include='*.rs' | grep -v 'fn\|pub struct'
 
 **Example**: Upstream fixes `openrouter.rs` to handle a null-pointer crash. Our file conflicts because we also modified the same function. Using `--ours` keeps our code crash-free, but drops upstream's fix for the OTHER crash path that we also have. The correct action: keep our logic, apply upstream's null-check manually.
 
+### Lesson 2: `biased;` in TUI `select!` freezes the screen (alt-tab / unfocus)
+
+**Recorded**: 2026-07 (sync-nov-commits). **Severity**: user-visible freeze.
+
+**Bug**: In `crates/jcode-tui/src/tui/app/turn.rs`, a `tokio::select!` over the live turn loop had:
+
+```rust
+tokio::select! {
+    biased;
+    // ready tool/API futures first …
+    event = event_stream.next() => { /* keys, focus, resize */ }
+}
+```
+
+With `biased;`, branches are polled in order. When a tool future or stream is continuously ready (or re-ready every poll), `event_stream.next()` is **starved**. Result: TUI stops handling keyboard / focus / redraw during long turns — classic freeze on **alt-tab** or unfocus/refocus while a turn is running.
+
+**Fix (fork)**: **Remove `biased;`** from TUI event-loop `select!`s that also wait on `event_stream`. Fair polling lets input/focus land.
+
+**Upstream still has `biased;`** in `turn.rs` (as of v0.41). Future merges that touch `turn.rs` will try to reintroduce it.
+
+**Resolution on every sync**:
+1. Treat `crates/jcode-tui/src/tui/app/turn.rs` as **Lesson 1 + Lesson 2** keep-ours for the event loop.
+2. After merge, run:
+   ```bash
+   rg -n "biased\s*;" crates/jcode-tui/src/tui/app/turn.rs
+   # expect: no matches
+   ```
+3. If a conflict or auto-merge brings `biased;` back before `event_stream.next()`, **delete it again**. Do not "accept upstream" on that hunk.
+4. Optional: also prefer redraw/timer branches ahead of pure stream arms if freezes return (see commit `6862310fa` history: redraw tick ordering).
+
+**Not the same as every `biased;` in the repo** — server/client bus prioritization and tool Alt+B selects may keep `biased;` when they intentionally prioritize one non-UI arm. Only the **TUI event_stream loop** is the freeze bug.
+
 ---
 
 ## Sync Log
@@ -647,3 +682,41 @@ grep -rn 'MemoryEntry {' --include='*.rs' | grep -v 'fn\|pub struct'
 9. `has_credentials` — added free function wrapper in openrouter.rs
 10. `fetch_catalog_snapshot` / `persist_catalog` — made `pub` in antigravity.rs
 11. `MERMAID_PENDING_PLACEHOLDER_TEXT` — added constant + helper function
+
+### 2026-07-11 — v0.40.0..v0.41.0 upstream sync (commits 7dbc480ae + 82ea601a9 + 0399554e1)
+
+**Branch**: `master` (via `sync-nov-commits` merge).
+**Upstream range**: v0.40.0..v0.41.0 (~39 commits). **~107 files** in the merge (+4k lines).
+
+**Status**: ✅ Binary builds. `cargo check -p jcode` / `jcode-tui` / `jcode-base --tests` / `jcode-tui --tests` clean. Installed local `current` channel as `v0.32.1408-dev (0399554e1)`.
+
+| Category | What |
+|----------|------|
+| 🔀 Merge | Conflicts: Category A keep-ours (casr/dcg/dcp/hashline/ffs adapters), Category B local extensions |
+| 🏗️ Category G | App fields/methods (auth catalog refresh, todo goals, spinner cadence, pinned diffs API, signature cache, session title) |
+| 🐛 Fork bugfix | **`biased;` freeze** in `turn.rs` — MUST NOT reintroduce (see Lesson 2 below) |
+| 🐛 Keyword highlight | Short-alias match extend to token boundary; skip subsumed highlights |
+| 🔧 CASR | Removed inline `casr_adapter`; CursorSession path; `import_cursor_session` restored for tests |
+| 🖥️ Remote auth | `AvailableModelsUpdated` → `finish_auth_catalog_refresh()` + force redraw |
+| 📝 Prompt | `PromptCapabilities` / `MERMAID_PROMPT` module gating |
+
+**Category G (v0.41) fixes applied**:
+1. `auth_catalog_refresh_pending` init + `finish_auth_catalog_refresh`
+2. `gather_todos_and_goals_for_session` + `InfoWidgetData.todo_goals` / `todos_are_swarm_plan`
+3. `load_session_title` / `derive_session_title`
+4. `STRIP_SPINNER_FRAME_MS` / `STRIP_SPINNER_FPS`
+5. `collect_pinned_diffs_cached` (not the old multi-arg content probe)
+6. `side_pane_images_signature` cache shape (invalidate-on-mutation, not version tuple)
+7. `client_focused` + set/unfocused redraw helpers
+8. Test compile: TodoItem `active_form`, openrouter-runtime dev-dep, prepare helpers, copy-badge helpers
+
+**Post-merge MUST-check (freeze)**:
+```bash
+# Must print nothing for turn.rs event-loop select!
+rg -n "biased\s*;" crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biased reintroduced" || echo "OK: no biased in turn.rs"
+```
+
+**Note on other `biased;` (OK to keep)**: intentional priority selects that do **not** starve `event_stream`:
+- `crates/jcode-tui/src/tui/backend.rs` — cancellation-safety test
+- `crates/jcode-app-core/src/agent/turn_streaming_mpsc.rs` — tool completion vs Alt+B
+- `crates/jcode-app-core/src/server/client_lifecycle.rs` — client I/O over bus noise

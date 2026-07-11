@@ -119,6 +119,8 @@ impl App {
             ));
 
             let mut stream = loop {
+                // No `biased;` — fair poll so event_stream is not starved
+                // (origin-sync Lesson 2: freeze on alt-tab).
                 tokio::select! {
                     // Redraw first — keeps TUI alive when terminal is unfocused
                     _ = redraw_interval.tick() => {
@@ -253,6 +255,8 @@ impl App {
                     redraw_period = desired_redraw;
                     redraw_interval = super::run_shell::redraw_timer(redraw_period);
                 }
+                // No `biased;` — fair poll so event_stream is not starved
+                // (origin-sync Lesson 2: freeze on alt-tab).
                 tokio::select! {
                     // Cheap single-cell spinner refresh between full redraws. This
                     // keeps the thinking/connecting spinner feeling responsive
@@ -1287,6 +1291,10 @@ impl App {
                 self.batch_progress = None; // Clear previous batch progress
 
                 let result = loop {
+                    // Do NOT add `biased;` here. Upstream still ships it; with
+                    // biased polling a continuously-ready tool future starves
+                    // event_stream and freezes the TUI on alt-tab/unfocus
+                    // (origin-sync Lesson 2). Fair select is intentional.
                     tokio::select! {
                         // Handle keyboard input while tool executes
                         event = event_stream.next() => {
