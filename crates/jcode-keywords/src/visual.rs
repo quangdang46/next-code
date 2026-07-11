@@ -48,10 +48,10 @@ pub fn compute_highlights(input: &str) -> Vec<KeywordHighlight> {
         let start = det.position.0.min(input.len());
         let end = det.position.1.min(input.len());
 
-        // Skip highlights that are entirely subsumed by previous ones
-        // (same keyword matched with different aliases, e.g. $ultrawork
-        // and $ultraqa both matching start of "ultracode").
-        if end <= cursor {
+        // Skip highlights that start before the current cursor (overlap with
+        // a previous, higher-priority match). Same keyword matched with
+        // different aliases, e.g. $ultrawork [0,9] and $ultraqa [0,7].
+        if start < cursor {
             continue;
         }
 
