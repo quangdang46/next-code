@@ -210,7 +210,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -221,7 +221,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -276,7 +276,7 @@ dependencies = [
  "objc2-foundation",
  "parking_lot",
  "percent-encoding",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
  "wl-clipboard-rs",
  "x11rb",
 ]
@@ -2932,7 +2932,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3093,7 +3093,7 @@ dependencies = [
 [[package]]
 name = "ffs-budget"
 version = "0.1.15"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
 dependencies = [
  "once_cell",
  "regex",
@@ -3103,7 +3103,7 @@ dependencies = [
 [[package]]
 name = "ffs-engine"
 version = "0.1.15"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
 dependencies = [
  "ahash",
  "dashmap",
@@ -3122,7 +3122,7 @@ dependencies = [
 [[package]]
 name = "ffs-grep"
 version = "0.1.15"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
 dependencies = [
  "bstr",
  "memchr",
@@ -3131,12 +3131,12 @@ dependencies = [
 [[package]]
 name = "ffs-query-parser"
 version = "0.1.15"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
 
 [[package]]
 name = "ffs-search"
 version = "0.1.15"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
 dependencies = [
  "ahash",
  "aho-corasick",
@@ -3178,7 +3178,7 @@ dependencies = [
 [[package]]
 name = "ffs-symbol"
 version = "0.1.15"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
 dependencies = [
  "aho-corasick",
  "dashmap",
@@ -5102,7 +5102,7 @@ dependencies = [
  "js-sys",
  "log",
  "wasm-bindgen",
- "windows-core 0.62.2",
+ "windows-core 0.58.0",
 ]
 
 [[package]]
@@ -5467,7 +5467,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -9304,7 +9304,7 @@ dependencies = [
  "once_cell",
  "socket2 0.6.4",
  "tracing",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -10135,7 +10135,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -10264,7 +10264,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -10947,7 +10947,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52d1cfed4120b4d927bf7c0f86d2087a4a7d6027c906d9f9d525a80573b9be51"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10997,7 +10997,7 @@ dependencies = [
  "cfg-if",
  "libc",
  "psm",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -11578,10 +11578,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -11603,7 +11603,7 @@ dependencies = [
  "parking_lot",
  "rustix 1.1.4",
  "signal-hook 0.3.18",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -12578,7 +12578,7 @@ dependencies = [
 [[package]]
 name = "tree-sitter-verse"
 version = "0.1.12"
-source = "git+https://github.com/quangdang46/fast_file_search?branch=main#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
+source = "git+https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d16cff8637d162a700dc8f1cbd41d957b"
 dependencies = [
  "cc",
  "tree-sitter",
@@ -12759,7 +12759,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -13701,7 +13701,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -13745,24 +13745,11 @@ version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ba6d44ec8c2591c134257ce647b7ea6b20335bf6379a27dac5f1641fcf59f99"
 dependencies = [
- "windows-implement 0.58.0",
- "windows-interface 0.58.0",
+ "windows-implement",
+ "windows-interface",
  "windows-result 0.2.0",
  "windows-strings 0.1.0",
  "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.62.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8e83a14d34d0623b51dce9581199302a221863196a1dde71a7663a4c2be9deb"
-dependencies = [
- "windows-implement 0.60.2",
- "windows-interface 0.59.3",
- "windows-link",
- "windows-result 0.4.1",
- "windows-strings 0.5.1",
 ]
 
 [[package]]
@@ -13777,32 +13764,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "windows-implement"
-version = "0.60.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "053e2e040ab57b9dc951b72c264860db7eb3b0200ba345b4e4c3b14f67855ddf"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.118",
-]
-
-[[package]]
 name = "windows-interface"
 version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "053c4c462dc91d3b1504c6fe5a726dd15e216ba718e84a0e46a88fbe5ded3515"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.118",
-]
-
-[[package]]
-name = "windows-interface"
-version = "0.59.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f316c4a2570ba26bbec722032c4099d8c8bc095efccdc15688708623367e358"
 dependencies = [
  "proc-macro2",
  "quote",
