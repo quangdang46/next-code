@@ -659,7 +659,8 @@ impl ToolConfig {
                     "multiedit",
                     "apply_patch",
                     "patch",
-                    "agentgrep",
+                    "ffs_grep",
+                    "ffs_glob",
                     "ls",
                     "batch",
                 ]
@@ -677,7 +678,8 @@ impl ToolConfig {
                     "multiedit",
                     "apply_patch",
                     "patch",
-                    "agentgrep",
+                    "ffs_grep",
+                    "ffs_glob",
                     "ls",
                 ]
                 .into_iter()

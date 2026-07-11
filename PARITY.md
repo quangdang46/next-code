@@ -411,7 +411,7 @@
 | Name | Description | Source Repo(s) | jcode Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **codesearch** | Semantic code search across workspace. | oh-my-openagent (ripgrep-cli) | `tool/codesearch.rs`: `CodeSearchTool` | ✅ |
-| **agentgrep** | AI-powered grep with context-aware pattern matching. | — | `tool/agentgrep.rs`: `AgentGrepTool` | ✅ |
+| **agentgrep** | *(removed)* Replaced by FFS (`ffs_grep` / `ffs_glob` / …). | — | deleted | 🗑️ |
 | **ffs_glob** | Fast file system glob — list files matching a pattern. | codebuff (code-map) | `tool/ffs_glob.rs`: `FfsGlobTool` | ✅ |
 | **ffs_grep** | Fast file system grep — search file contents with regex. | CCB (grep) | `tool/ffs_grep.rs`: `FfsGrepTool` | ✅ |
 | **ffs_multi_grep** | Run multiple grep queries in a single operation. | — | `tool/ffs_multi_grep.rs`: `FfsMultiGrepTool` | ✅ |

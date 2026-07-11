@@ -410,16 +410,9 @@ pub(crate) fn formatted_tool_input_summary(
                 lines.push(format!("'{}'", compact_tool_text(pattern, 96)));
             }
         }
-        "agentgrep" | "grep" => {
+        "grep" | "ffs_grep" | "ffs grep" => {
             let query = string_value("query").or_else(|| string_value("pattern"));
-            if tool_name == "agentgrep" {
-                let mode = string_value("mode").unwrap_or("grep");
-                if let Some(query) = query.filter(|query| !query.trim().is_empty()) {
-                    lines.push(format!("{mode} '{}'", compact_tool_text(query, 72)));
-                } else {
-                    lines.push(mode.to_string());
-                }
-            } else if let Some(query) = query {
+            if let Some(query) = query {
                 lines.push(format!("'{}'", compact_tool_text(query, 72)));
             }
             if let Some(path) = string_value("path") {

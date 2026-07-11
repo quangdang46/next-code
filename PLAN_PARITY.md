@@ -25,7 +25,7 @@
 | # | Tool | File | Known From | Priority |
 |---|------|------|------------|----------|
 | 7 | **codesearch** | `tool/codesearch.rs` | oh-my-openagent (ripgrep-cli) | P0 |
-| 8 | **agentgrep** | `tool/agentgrep.rs` | — | P1 |
+| 8 | **agentgrep** | *(removed → FFS)* | — | done |
 | 9 | **lsp** | `tool/lsp.rs` | oh-my-pi (13 LSP ops) | P1 |
 | 10 | **websearch** | `tool/websearch.rs` | CCB | P1 |
 | 11 | **webfetch** | `tool/webfetch.rs` | CCB | P1 |

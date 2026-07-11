@@ -329,7 +329,7 @@ impl App {
                                     vec![
                                         crate::protocol::SwarmToolIntent {
                                             tool_call_id: String::new(),
-                                            tool_name: "agentgrep".into(),
+                                            tool_name: "ffs_grep".into(),
                                             intent: "Locate the affected rendering path".into(),
                                             status: "completed".into(),
                                             progress: None,

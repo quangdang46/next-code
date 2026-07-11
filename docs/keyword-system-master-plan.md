@@ -2022,7 +2022,7 @@ enum RalplanStatus {
 | **code-review** | `subagent`, `read`, `diff`, `grep` | Spawn reviewer, read changes |
 | **security-review** | `subagent`, `read`, `grep`, `glob` | Spawn security agent, scan code |
 | **ultrathink** | (prompt-only) | Think deeply, no tool calls |
-| **deepsearch** | `grep`, `glob`, `lsp`, `read`, `agentgrep` | Multi-strategy search |
+| **deepsearch** | `ffs_grep`, `ffs_glob`, `lsp`, `read` | Multi-strategy search |
 | **analyze** | `read`, `grep`, `glob`, `lsp` | Gather context, analyze |
 | **wiki** | `read`, `websearch`, `webfetch` | Local + web docs |
 | **ai-slop-cleaner** | `read`, `edit`, `grep` | Find + fix patterns |

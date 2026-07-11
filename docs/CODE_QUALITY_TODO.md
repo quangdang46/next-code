@@ -121,7 +121,7 @@ Generated from `docs/CODE_QUALITY_AUDIT_2026-04-18.md`. This section enumerates 
 - [ ] Split `src/tui/ui_input.rs` (1572 LOC)
 - [ ] Split `src/server.rs` (1559 LOC)
 - [ ] Split `src/tui/app/helpers.rs` (1551 LOC)
-- [ ] Split `src/tool/agentgrep.rs` (1516 LOC)
+- [x] Split/remove `src/tool/agentgrep.rs` — replaced by FFS; orphan deleted
 - [ ] Split `src/import.rs` (1504 LOC)
 - [ ] Split `src/ambient.rs` (1496 LOC)
 - [ ] Split `src/server/swarm.rs` (1491 LOC)
@@ -330,7 +330,7 @@ Generated from `docs/CODE_QUALITY_AUDIT_2026-04-18.md`. This section enumerates 
 - [ ] Harden `src/server/swarm_mutation_state.rs` (`unwrap`: 0, `expect`: 8, `panic!`: 4, `todo!`: 0, `unimplemented!`: 0, total: 12)
 - [ ] Harden `src/provider_catalog.rs` (`unwrap`: 0, `expect`: 12, `panic!`: 0, `todo!`: 0, `unimplemented!`: 0, total: 12)
 - [ ] Harden `src/prompt.rs` (`unwrap`: 11, `expect`: 1, `panic!`: 0, `todo!`: 0, `unimplemented!`: 0, total: 12)
-- [ ] Harden `src/tool/agentgrep.rs` (`unwrap`: 0, `expect`: 11, `panic!`: 0, `todo!`: 0, `unimplemented!`: 0, total: 11)
+- [x] Harden `src/tool/agentgrep.rs` (obsolete — deleted, FFS) (`unwrap`: 0, `expect`: 11, `panic!`: 0, `todo!`: 0, `unimplemented!`: 0, total: 11)
 - [ ] Harden `src/tool/ambient.rs` (`unwrap`: 10, `expect`: 0, `panic!`: 0, `todo!`: 0, `unimplemented!`: 0, total: 10)
 - [ ] Harden `src/soft_interrupt_store.rs` (`unwrap`: 0, `expect`: 9, `panic!`: 0, `todo!`: 0, `unimplemented!`: 0, total: 9)
 - [ ] Harden `src/server/provider_control.rs` (`unwrap`: 3, `expect`: 6, `panic!`: 0, `todo!`: 0, `unimplemented!`: 0, total: 9)

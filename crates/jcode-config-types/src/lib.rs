@@ -1009,10 +1009,6 @@ pub struct DisplayConfig {
     pub compact_notifications: bool,
     /// Override the Alt/Option label shown in copy badges. Empty = auto (⌥ on macOS, Alt elsewhere).
     pub copy_badge_alt_label: String,
-    /// Show the full agentgrep tool output inline in the transcript instead of
-    /// just the one-line summary (default: false)
-    #[serde(default)]
-    pub show_agentgrep_output: bool,
     /// Native terminal scrollbar configuration for scrollable panes
     pub native_scrollbars: NativeScrollbarConfig,
     /// Surface occasional "learn this keybinding" nudges when the user keeps
@@ -1058,7 +1054,6 @@ impl Default for DisplayConfig {
             prompt_preview: true,
             compact_notifications: false,
             copy_badge_alt_label: String::new(),
-            show_agentgrep_output: false,
             native_scrollbars: NativeScrollbarConfig::default(),
             keybinding_hints: true,
             theme: String::new(),

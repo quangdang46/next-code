@@ -234,7 +234,7 @@ fn active_tool_lines_carry_visual_metadata_for_native_cards() {
 fn desktop_tool_metadata_prioritizes_tui_like_summary_over_intent() {
     assert_eq!(
         formatted_tool_input_lines(
-            "agentgrep",
+            "ffs_grep",
             "{\"intent\":\"Locate rendering code\",\"query\":\"tool call\",\"path\":\"src/tui\"}",
         ),
         vec!["grep 'tool call'", "in src/tui"]

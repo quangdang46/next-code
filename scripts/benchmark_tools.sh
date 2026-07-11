@@ -133,12 +133,12 @@ done
 echo ""
 echo "=== Search/Navigation Tools ==="
 
-benchmark_tool "agentgrep" "{\"mode\":\"grep\",\"query\":\"fn main\",\"path\":\"src\",\"type\":\"rs\"}" "agentgrep (fn main in src/)"
-benchmark_tool "agentgrep" "{\"mode\":\"grep\",\"query\":\"async fn\",\"path\":\"src/tool\",\"type\":\"rs\"}" "agentgrep (async fn in tools)"
-benchmark_tool "agentgrep" "{\"mode\":\"grep\",\"query\":\"tokio::spawn\",\"path\":\"src\"}" "agentgrep (tokio::spawn)"
+benchmark_tool "ffs_grep" "{\"pattern\":\"fn main\",\"path\":\"src\"}" "ffs_grep (fn main in src/)"
+benchmark_tool "ffs_grep" "{\"pattern\":\"async fn\",\"path\":\"src/tool\"}" "ffs_grep (async fn in tools)"
+benchmark_tool "ffs_grep" "{\"pattern\":\"tokio::spawn\",\"path\":\"src\"}" "ffs_grep (tokio::spawn)"
 
-benchmark_tool "agentgrep" "{\"mode\":\"find\",\"glob\":\"**/*.rs\"}" "agentgrep find (**/*.rs)"
-benchmark_tool "agentgrep" "{\"mode\":\"find\",\"glob\":\"**/*.rs\",\"path\":\"src/tool\"}" "agentgrep find (tool/*.rs)"
+benchmark_tool "ffs_find" "{\"mode\":\"find\",\"glob\":\"**/*.rs\"}" "ffs_find find (**/*.rs)"
+benchmark_tool "ffs_find" "{\"mode\":\"find\",\"glob\":\"**/*.rs\",\"path\":\"src/tool\"}" "ffs_find find (tool/*.rs)"
 
 benchmark_tool "ls" "{}" "ls (repo root)"
 benchmark_tool "ls" "{\"path\":\"src\"}" "ls (src/)"

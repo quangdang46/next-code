@@ -163,9 +163,6 @@ impl App {
             "compact-notifications" => {
                 "/compact-notifications\nShow whether swarm/file-activity notifications are compact.\n\n/compact-notifications on\nCollapse file-activity notifications to a single line (path · summary), dropping the intent and diff preview.\n\n/compact-notifications off\nRestore the full multi-line notification cards."
             }
-            "show-agentgrep-output" => {
-                "/show-agentgrep-output\nShow whether full agentgrep search output renders inline in the transcript.\n\n/show-agentgrep-output on\nRender the full agentgrep search results inline beneath each agentgrep call instead of just the one-line summary.\n\n/show-agentgrep-output off\nShow only the compact one-line agentgrep summary."
-            }
             "auth" | "login" => {
                 "/auth\nShow authentication status for all providers.\n\n/connect\nInteractive provider selection - pick a provider to log into (opencode TUI slash).\n\n/connect <provider>\nStart login flow directly for any provider shown by /connect or the /connect completions.\n\n/login is an alias for /connect, kept for backwards compatibility.\n\nUse /connect jcode for curated jcode subscription access via your router, not OpenRouter BYOK."
             }

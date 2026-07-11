@@ -2069,7 +2069,7 @@ mod tests {
                         progress: None,
                     },
                     GalleryToolIntent {
-                        tool_name: "agentgrep".into(),
+                        tool_name: "ffs_grep".into(),
                         intent: "Locate refresh implementation".into(),
                         status: "completed".into(),
                         progress: None,
@@ -2116,7 +2116,7 @@ mod tests {
             "active todo missing: {all}"
         );
         assert!(
-            all.contains("agentgrep · Locate refresh implementation"),
+            all.contains("ffs_grep · Locate refresh implementation"),
             "{all}"
         );
         assert!(
@@ -2132,7 +2132,7 @@ mod tests {
             "todo rail missing: {all}"
         );
         assert!(
-            all.contains("│     ├─ ✓ agentgrep"),
+            all.contains("│     ├─ ✓ ffs_grep"),
             "nested tool rail missing: {all}"
         );
         assert!(
