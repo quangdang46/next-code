@@ -5,7 +5,6 @@ use crossterm::cursor::{RestorePosition, SavePosition};
 use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate};
 use ratatui::backend::{Backend, ClearType};
 use ratatui::{buffer::Buffer, layout::Rect, style::Style};
-use std::io::Write;
 
 const STATUS_SPINNER_FPS: f32 = 12.5;
 pub(super) const STATUS_SPINNER_ONLY_INTERVAL: Duration = Duration::from_millis(80);
