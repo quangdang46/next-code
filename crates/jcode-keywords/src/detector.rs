@@ -65,19 +65,17 @@ pub fn detect_keywords(input: &str) -> Vec<DetectedKeyword> {
                 continue;
             }
             if let Some(pos) = find_fuzzy(&lower, &alias_lower, 2) {
-                // Take the byte length of the actually-matched window, not the
-                // alias itself, so a multi-byte alias cannot cause a panic on
-                // a non-char-boundary slice.
-                let match_len = lower[pos..]
-                    .char_indices()
-                    .nth(alias.chars().count())
-                    .map(|(i, _)| i)
-                    .unwrap_or(alias.len());
-                let end = (pos + match_len).min(sanitized.len());
+                // Extend the match to the end of the current token, so a
+                // prefix alias like "ultra" in "ultrawork" highlights the
+                // full token rather than just the alias length.
+                let after = sanitized[pos..]
+                    .find(char::is_whitespace)
+                    .map(|ws| pos + ws)
+                    .unwrap_or(sanitized.len());
                 results.push(DetectedKeyword {
                     entry,
-                    matched_text: sanitized[pos..end].to_string(),
-                    position: (pos, end),
+                    matched_text: sanitized[pos..after].to_string(),
+                    position: (pos, after),
                     confidence: 0.85,
                 });
                 break; // Only one alias match per entry
