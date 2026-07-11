@@ -270,6 +270,51 @@ pub struct Agent {
     best_of_n_candidate_id: Option<String>,
 }
 
+/// Apply `config.provider.default_model` (+ `default_provider`) to a freshly
+/// constructed MultiProvider.
+///
+/// Bare `set_model("deepseek-v4-flash")` without the provider key mis-routes
+/// OpenAI-compatible profile models through the generic OpenRouter slot and
+/// fails with `OPENROUTER_API_KEY not found`, undoing the successful apply in
+/// `provider/startup.rs`. Always route through
+/// `model_switch_request_for_session_route` so `default_provider = "opencode-go"`
+/// becomes `opencode-go:deepseek-v4-flash`.
+fn apply_config_default_model(provider: &dyn Provider) {
+    let cfg = crate::config::config();
+    let Some(model) = cfg
+        .provider
+        .default_model
+        .as_deref()
+        .map(str::trim)
+        .filter(|m| !m.is_empty())
+    else {
+        return;
+    };
+    let provider_key = cfg.provider.default_provider.as_deref();
+    let model_request = crate::provider::MultiProvider::model_switch_request_for_session_route(
+        model,
+        provider_key,
+        None,
+    );
+    if let Err(e) = crate::provider::set_model_with_auth_refresh(provider, &model_request) {
+        crate::logging::warn(&format!(
+            "Failed to apply config default_model '{}' (via '{}', provider={:?}): {}; falling back to provider default {}",
+            model,
+            model_request,
+            provider_key,
+            e,
+            provider.model()
+        ));
+    } else {
+        crate::logging::info(&format!(
+            "Applied config default_model '{}' via '{}' (provider={:?})",
+            model,
+            model_request,
+            provider_key
+        ));
+    }
+}
+
 impl Agent {
     /// Get the current DCP plugin instance (for tool access).
     #[cfg(feature = "dcp")]
@@ -382,24 +427,11 @@ impl Agent {
         // allow-once cache) at the start of each new agent session.
         crate::execution_policy::reset_policy_session();
 
-        // FIX: Apply persisted default_model from config BEFORE build_base moves provider.
-        // Provider constructors only check env vars and hardcoded defaults (e.g.
-        // AnthropicProvider::new reads JCODE_ANTHROPIC_MODEL or "claude-opus-4-6"),
-        // never config.toml. After the user changes model via TUI (which writes
-        // config.toml via set_default_model), a restart loses that selection.
-        // Apply it here so the model survives restarts.
-        let config_model = crate::config::config().provider.default_model.clone();
-        if let Some(ref model) = config_model
-            && !model.trim().is_empty()
-            && let Err(e) = provider.set_model(model.trim())
-        {
-            crate::logging::warn(&format!(
-                "Failed to apply config default_model '{}': {}; falling back to provider default {}",
-                model.trim(),
-                e,
-                provider.model()
-            ));
-        }
+        // Apply persisted default_model + default_provider from config BEFORE
+        // build_base. Bare set_model("deepseek-v4-flash") mis-routes to OpenRouter
+        // when default_provider is opencode-go and fails with OPENROUTER_API_KEY
+        // missing — undoing the successful apply in provider startup.
+        apply_config_default_model(provider.as_ref());
 
         let tool_selection = crate::config::config().tools.selection();
         let mut agent = Self::build_base(
@@ -488,20 +520,11 @@ impl Agent {
         session: Session,
         allowed_tools: Option<HashSet<String>>,
     ) -> Self {
-        // FIX: Same as new() — apply config default_model before build_base.
+        // Same as new() — apply config default_model+provider before build_base.
         // Server restarts (jcode restart) create agents through this path too.
-        let config_model = crate::config::config().provider.default_model.clone();
-        if let Some(ref model) = config_model
-            && !model.trim().is_empty()
-            && let Err(e) = provider.set_model(model.trim())
-        {
-            crate::logging::warn(&format!(
-                "Failed to apply config default_model '{}': {}; falling back to provider default {}",
-                model.trim(),
-                e,
-                provider.model()
-            ));
-        }
+        // If the session already has a model, the block below re-applies it with
+        // the session's provider_key (takes precedence after this).
+        apply_config_default_model(provider.as_ref());
 
         let tool_selection = if let Some(allowed_tools) = allowed_tools {
             crate::config::ToolSelection {
