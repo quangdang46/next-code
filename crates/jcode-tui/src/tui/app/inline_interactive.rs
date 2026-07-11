@@ -3318,14 +3318,21 @@ User's request:
                                     self.session.model = Some(active_model.clone());
                                     self.session.route_api_method =
                                         Some(route_selection.api_method.clone());
-                                    // Persist the model as default for future sessions.
-                                    match crate::config::Config::set_default_model_only(Some(&spec))
-                                    {
+                                    // Persist model + provider so future sessions restore both.
+                                    let provider_key = self.session.provider_key.clone();
+                                    crate::logging::warn(&format!(
+                                        "[PICKER-SAVE] model='{}' provider_key='{:?}'",
+                                        active_model, provider_key
+                                    ));
+                                    match crate::config::Config::set_default_model(
+                                        Some(&active_model),
+                                        provider_key.as_deref(),
+                                    ) {
                                         Ok(()) => {}
                                         Err(e) => {
                                             crate::logging::warn(&format!(
                                                 "Failed to save default model '{}': {}",
-                                                spec, e
+                                                active_model, e
                                             ));
                                         }
                                     }

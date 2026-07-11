@@ -604,6 +604,28 @@ grep -rn 'MemoryEntry {' --include='*.rs' | grep -v 'fn\|pub struct'
 
 **Example**: Upstream fixes `openrouter.rs` to handle a null-pointer crash. Our file conflicts because we also modified the same function. Using `--ours` keeps our code crash-free, but drops upstream's fix for the OTHER crash path that we also have. The correct action: keep our logic, apply upstream's null-check manually.
 
+### Lesson 3: Server model persist dropped by upstream merge (Category H)
+
+**Recorded**: 2026-07-11. **Symptom**: `/model` / model picker switch works in-session, but **restart loses the model** (always back to provider default).
+
+**Root cause**: Fork fixes `1b71a6cd7` / `f84b9e823` / `a20aca1bf` wrote `Config::set_default_model` inside server `apply_set_model` / `apply_set_route` (`provider_control.rs`). Remote/daemon switches go through the **server** protocol, so client-only persist never runs.
+
+Merge **`27731574a`** (`sync-final-merge` ← upstream) auto-merged `provider_control.rs` and **deleted** the `[SERVER-SAVE]` / `[ROUTE-SAVE]` blocks (upstream never had them). No conflict markers — pure Category H silent drop of a fork bugfix.
+
+**Detection**:
+```bash
+rg -n 'SERVER-SAVE|ROUTE-SAVE|set_default_model' crates/jcode-app-core/src/server/provider_control.rs
+# expect: set_default_model calls after successful set_model / set_route_selection
+```
+
+**Resolution**: Restore both persist blocks with provider_key (see HEAD `provider_control.rs`). On every sync that touches that file, re-check the SAVE logs still exist.
+
+**Related keep paths** (still present — do not drop):
+- Client `/model`: `model_context.rs` → `Config::set_default_model` + `[SAVE]` log
+- Picker local apply: `inline_interactive.rs` → `Config::set_default_model` + `[PICKER-SAVE]`
+- Ctrl+D default: `inline_interactive.rs` → `set_default_model`
+- Restart restore: `Agent::new` + `tui_lifecycle` read `config.provider.default_model`
+
 ### Lesson 2: `biased;` in TUI `select!` freezes the screen (alt-tab / unfocus)
 
 **Recorded**: 2026-07 (sync-nov-commits). **Severity**: user-visible freeze.
