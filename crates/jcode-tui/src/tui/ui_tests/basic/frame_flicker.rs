@@ -89,6 +89,7 @@ fn test_cold_cache_warning_keeps_redrawing_at_deep_idle() {
             ttl_secs: 300,
             is_cold: true,
             cached_tokens: Some(4000),
+        cold_for_secs: 0,
         }),
         ..Default::default()
     };
@@ -111,6 +112,7 @@ fn test_cold_cache_warning_keeps_redrawing_at_deep_idle() {
             ttl_secs: 300,
             is_cold: false,
             cached_tokens: Some(4000),
+        cold_for_secs: 0,
         }),
         ..Default::default()
     };
@@ -128,6 +130,7 @@ fn test_cold_cache_warning_keeps_redrawing_at_deep_idle() {
             ttl_secs: 300,
             is_cold: false,
             cached_tokens: Some(4000),
+        cold_for_secs: 0,
         }),
         ..Default::default()
     };
@@ -176,6 +179,7 @@ fn make_prepared_messages_with_content_bytes(bytes: usize, marker: &str) -> Arc<
         edit_tool_ranges: Vec::new(),
         copy_targets: Vec::new(),
         message_boundaries: Vec::new(),
+    mermaid_pending_epoch: None,
     })
 }
 

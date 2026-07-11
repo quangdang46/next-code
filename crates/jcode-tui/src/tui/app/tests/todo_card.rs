@@ -81,6 +81,7 @@ fn refresh_todo_card_updates_content_when_todos_change() {
     let session_id = app.session.id.clone();
 
     let todo = |content: &str, status: &str| crate::todo::TodoItem {
+        active_form: None,
         id: "t1".to_string(),
         content: content.to_string(),
         status: status.to_string(),

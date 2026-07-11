@@ -1423,6 +1423,9 @@ pub struct App {
     /// Forces the next ratatui render pass to draw every cell unconditionally
     /// (issue #404).
     force_full_repaint: bool,
+    /// Whether the client terminal currently has focus. Used to pause decorative
+    /// animations and periodic idle redraws for backgrounded windows/tabs.
+    client_focused: bool,
     // Transient hotkey-feedback text shown briefly after a (Alt+?) chord fires.
     // Rendered in the same pop-out slot as learn_hint.
     hotkey_feedback: Option<(String, Instant)>,

@@ -5874,6 +5874,7 @@ dependencies = [
  "jcode-provider-metadata",
  "jcode-provider-openai",
  "jcode-provider-openrouter",
+ "jcode-provider-openrouter-runtime",
  "jcode-redact",
  "jcode-render-core",
  "jcode-selfdev-types",

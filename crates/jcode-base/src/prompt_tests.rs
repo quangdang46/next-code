@@ -24,6 +24,8 @@ fn mermaid_prompt_module_follows_capability() {
         false,
         None,
         None,
+        None,
+        None,
         PromptCapabilities { mermaid: true },
     );
     assert!(enabled.static_part.contains(MERMAID_PROMPT));
@@ -32,6 +34,8 @@ fn mermaid_prompt_module_follows_capability() {
         None,
         &[],
         false,
+        None,
+        None,
         None,
         None,
         PromptCapabilities { mermaid: false },
@@ -121,7 +125,7 @@ fn test_sponsored_discovery_section_gated_on_config() {
     // Default (no config file): sponsored discovery is on (opt-out), so the
     // section appears with the placement-not-preference policy.
     crate::config::Config::invalidate_cache();
-    let (split, info) = build_system_prompt_split(None, &[], false, None, None);
+    let (split, info) = build_system_prompt_split(None, &[], false, None, None, None, None);
     assert!(
         split
             .static_part
@@ -144,7 +148,7 @@ fn test_sponsored_discovery_section_gated_on_config() {
     )
     .unwrap();
     crate::config::Config::invalidate_cache();
-    let (split, info) = build_system_prompt_split(None, &[], false, None, None);
+    let (split, info) = build_system_prompt_split(None, &[], false, None, None, None, None);
     assert!(
         !split.static_part.contains("Discoverable Tools"),
         "discovery section must be absent when opted out"

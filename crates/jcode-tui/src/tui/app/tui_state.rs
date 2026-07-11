@@ -421,7 +421,28 @@ impl App {
     }
 
     pub(super) fn client_focused(&self) -> bool {
-        true // always true — upstream's FocusLost handling is not ported
+        self.client_focused
+    }
+
+    /// Record a terminal focus-state change (from crossterm FocusGained/FocusLost).
+    /// Returns true when a redraw is warranted (focus regained).
+    pub(super) fn set_client_focused(&mut self, focused: bool) -> bool {
+        if self.client_focused == focused {
+            return false;
+        }
+        self.client_focused = focused;
+        if focused {
+            self.request_full_redraw();
+            self.note_client_focus(true);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Whether a redraw is worth performing while the terminal is unfocused.
+    pub(crate) fn unfocused_redraw_warranted(&self) -> bool {
+        crate::tui::periodic_redraw_required(self)
     }
 }
 

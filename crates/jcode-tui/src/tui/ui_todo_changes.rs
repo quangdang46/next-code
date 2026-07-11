@@ -306,6 +306,7 @@ mod tests {
 
     fn todo(id: &str, content: &str, status: &str) -> TodoItem {
         TodoItem {
+            active_form: None,
             id: id.to_string(),
             content: content.to_string(),
             status: status.to_string(),

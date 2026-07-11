@@ -184,6 +184,7 @@ mod tests {
             report_back_to_session_id: None,
             todo_progress: None,
             todo_items: Vec::new(),
+            task_label: None,
         }
     }
 

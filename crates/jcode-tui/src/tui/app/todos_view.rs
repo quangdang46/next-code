@@ -627,6 +627,7 @@ mod tests {
         completion_confidence: Option<u8>,
     ) -> TodoItem {
         TodoItem {
+            active_form: None,
             id: id.to_string(),
             content: content.to_string(),
             status: status.to_string(),

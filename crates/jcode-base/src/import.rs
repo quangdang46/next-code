@@ -1017,6 +1017,21 @@ pub fn import_opencode_session_from_path(
     finalize_imported_session(session, created_at, updated_at)
 }
 
+fn find_cursor_session_file(session_id: &str) -> Result<PathBuf> {
+    let root = crate::storage::user_home_path(".cursor/projects")?;
+    for path in collect_files_recursive(&root, "jsonl") {
+        if cursor_session_id_from_path(&path) == session_id {
+            return Ok(path);
+        }
+    }
+    anyhow::bail!("Cursor session {} not found", session_id)
+}
+
+pub fn import_cursor_session(session_id: &str) -> Result<Session> {
+    let path = find_cursor_session_file(session_id)?;
+    import_cursor_session_from_path(&path, Some(session_id))
+}
+
 pub fn import_cursor_session_from_path(
     session_path: &Path,
     session_id_hint: Option<&str>,

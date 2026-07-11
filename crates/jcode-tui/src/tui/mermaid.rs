@@ -24,8 +24,8 @@ pub use jcode_tui_mermaid::{
     render_mermaid_deferred_with_stream_scope, render_mermaid_sized, render_mermaid_untracked,
     reset_debug_stats, restore_active_diagrams, result_to_content, result_to_lines, set_log_hooks,
     set_memory_snapshot_hook, set_render_completed_hook, set_streaming_preview_diagram,
-    set_video_export_mode, snapshot_active_diagrams, with_preferred_aspect_ratio,
-    write_video_export_marker,
+    set_video_export_mode, snapshot_active_diagrams, with_image_protocol_override,
+    with_preferred_aspect_ratio, write_video_export_marker,
 };
 pub use jcode_tui_mermaid::{ImageScrollBenchmark, cache_stat_syscalls};
 

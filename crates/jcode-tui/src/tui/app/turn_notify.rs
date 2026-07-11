@@ -296,6 +296,7 @@ mod tests {
 
     fn todo_named(content: &str, status: &str, blocked_by: &[&str]) -> TodoItem {
         TodoItem {
+            active_form: None,
             content: content.to_string(),
             status: status.to_string(),
             priority: "medium".to_string(),

@@ -3667,6 +3667,7 @@ User's request:
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::tui::{
         AgentModelTarget, App, InlineInteractiveState, PickerAction, PickerEntry, PickerKind,
         PickerOption,

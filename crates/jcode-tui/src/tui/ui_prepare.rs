@@ -208,7 +208,9 @@ fn is_error_copy_content(content: &str) -> bool {
 /// of the blank run starting at that line. The previous implementation scanned
 /// forward through the trailing blanks for every placeholder, which is O(L^2)
 /// when a message has many placeholders each followed by long blank runs.
-fn compute_image_regions(wrapped_lines: &[ratatui::text::Line<'static>]) -> Vec<ImageRegion> {
+pub(super) fn compute_image_regions(
+    wrapped_lines: &[ratatui::text::Line<'static>],
+) -> Vec<ImageRegion> {
     fn is_blank_line(line: &ratatui::text::Line<'static>) -> bool {
         line.spans.is_empty() || (line.spans.len() == 1 && line.spans[0].content.is_empty())
     }
@@ -2468,6 +2470,195 @@ fn wrap_lines_with_map(
         copy_targets,
         mermaid_pending_epoch: None,
     }
+}
+
+pub(super) fn truncate_prepared_to_boundary(prepared: &mut PreparedMessages, keep_msgs: usize) {
+    if keep_msgs >= prepared.message_boundaries.len() {
+        return;
+    }
+    let (wrapped_len, raw_len, user_prompt_len) = if keep_msgs == 0 {
+        (0, 0, 0)
+    } else {
+        let b = prepared.message_boundaries[keep_msgs - 1];
+        (b.wrapped_len, b.raw_len, b.user_prompt_len)
+    };
+
+    prepared.wrapped_lines.truncate(wrapped_len);
+    Arc::make_mut(&mut prepared.wrapped_plain_lines).truncate(wrapped_len);
+    Arc::make_mut(&mut prepared.wrapped_copy_offsets).truncate(wrapped_len);
+    Arc::make_mut(&mut prepared.wrapped_line_map).truncate(wrapped_len);
+    Arc::make_mut(&mut prepared.raw_plain_lines).truncate(raw_len);
+    prepared.user_prompt_texts.truncate(user_prompt_len);
+    prepared.message_boundaries.truncate(keep_msgs);
+
+    prepared.wrapped_user_indices.retain(|&i| i < wrapped_len);
+    // The prompt start/end arrays are parallel; drop any prompt that begins at
+    // or after the cut. A prompt cannot straddle the cut because the cut is a
+    // message boundary and a prompt belongs to exactly one message.
+    {
+        let starts = &mut prepared.wrapped_user_prompt_starts;
+        let ends = &mut prepared.wrapped_user_prompt_ends;
+        let keep = starts.iter().take_while(|&&s| s < wrapped_len).count();
+        starts.truncate(keep);
+        ends.truncate(keep);
+    }
+    prepared
+        .image_regions
+        .retain(|r| r.abs_line_idx < wrapped_len);
+    prepared
+        .edit_tool_ranges
+        .retain(|r| r.start_line < wrapped_len);
+    prepared.copy_targets.retain(|t| t.start_line < wrapped_len);
+
+    // The pending-mermaid placeholder may have lived in the dropped tail;
+    // recompute so a stale-positive stamp cannot force rebuilds forever.
+    if prepared.mermaid_pending_epoch.is_some()
+        && !prepared
+            .wrapped_lines
+            .iter()
+            .any(markdown::line_is_mermaid_pending_placeholder)
+    {
+        prepared.mermaid_pending_epoch = None;
+    }
+}
+
+/// Longest message prefix length `k` such that `base.message_boundaries[..k]`
+/// hashes match the first `k` messages of `messages`. Returns `0` when nothing
+/// matches (caller then does a full rebuild). Bounded by the shorter of the two
+/// lengths.
+pub(super) fn matching_prefix_len(base: &PreparedMessages, messages: &[DisplayMessage]) -> usize {
+    let limit = base.message_boundaries.len().min(messages.len());
+    let mut k = 0;
+    while k < limit && base.message_boundaries[k].msg_hash == messages[k].stable_cache_hash() {
+        k += 1;
+    }
+    k
+}
+
+/// Longest message suffix length `s` such that the last `s` boundaries of
+/// `base` hash-match the last `s` entries of `messages`. Used to detect a
+/// prepend (older compacted history loaded above an unchanged tail).
+pub(super) fn matching_suffix_len(base: &PreparedMessages, messages: &[DisplayMessage]) -> usize {
+    let base_n = base.message_boundaries.len();
+    let msg_n = messages.len();
+    let limit = base_n.min(msg_n);
+    let mut s = 0;
+    while s < limit
+        && base.message_boundaries[base_n - 1 - s].msg_hash
+            == messages[msg_n - 1 - s].stable_cache_hash()
+    {
+        s += 1;
+    }
+    s
+}
+
+/// Whether a cached body whose message suffix matches the current transcript
+/// can be reused verbatim below a freshly rendered head. The reused lines bake
+/// in per-prompt state, so this verifies that state is invariant under the
+/// prepend:
+///
+/// - Displayed prompt numbers: the base rendered `local_num + base_offset`; a
+///   full rebuild renders `new_local_num + current_offset`. They agree exactly
+///   when `dropped_prompts + base_offset == head_prompts + current_offset`
+///   (loading compacted history reveals prompts, decreasing the hidden-prompt
+///   offset by the same amount, so this holds in the real flow).
+/// - Prompt-anchored inline images embed window-relative prompt ordinals that
+///   all shift under a prepend, so any `by_prompt` anchors force a rebuild.
+///
+/// Rainbow prompt-number colors and todo "what changed" deltas may be slightly
+/// stale in the reused suffix (they can depend on messages outside it). Both
+/// are cosmetic, match the existing staleness of the append/prefix-reuse path,
+/// and self-correct on any full rebuild (e.g. a width change).
+pub(super) fn suffix_reuse_compatible(
+    app: &dyn TuiState,
+    messages: &[DisplayMessage],
+    head_count: usize,
+    base: &PreparedMessages,
+    drop_msgs: usize,
+    base_prompt_offset: usize,
+) -> bool {
+    if drop_msgs == 0 || drop_msgs >= base.message_boundaries.len() {
+        return false;
+    }
+    let anchored = super::inline_image_ui::resolve_anchored_items_cached(app);
+    if !anchored.by_prompt.is_empty() {
+        return false;
+    }
+    let dropped_prompts = base.message_boundaries[drop_msgs - 1].user_prompt_len;
+    let head_prompts = messages[..head_count.min(messages.len())]
+        .iter()
+        .filter(|msg| msg.effective_role() == "user")
+        .count();
+    dropped_prompts + base_prompt_offset == head_prompts + app.compacted_hidden_user_prompts()
+}
+
+/// Rebuild a body as `freshly rendered head + reused suffix of a cached base`,
+/// in place on `prev`. This is the prepend analogue of
+/// [`prepare_body_incremental`]: when older compacted history is loaded above
+/// an unchanged tail, only the new head (marker + revealed messages) is
+/// rendered and wrapped; the prepared suffix is kept and its line/raw indices
+/// are shifted. Returns `Err(prev)` untouched when the stitch would not be
+
+
+fn first_mermaid_pending_message(prepared: &PreparedMessages) -> Option<usize> {
+    let line_idx = prepared
+        .wrapped_lines
+        .iter()
+        .position(markdown::line_is_mermaid_pending_placeholder)?;
+    Some(
+        prepared
+            .message_boundaries
+            .partition_point(|boundary| boundary.wrapped_len <= line_idx),
+    )
+}
+
+/// Rebuild the body reusing as much of a cached base as possible.
+pub(super) fn build_body_from_base(
+    app: &dyn TuiState,
+    width: u16,
+    mut prev: Arc<PreparedMessages>,
+    mut prev_count: usize,
+    _prev_prompt_offset: usize,
+    msg_count: usize,
+) -> (Arc<PreparedMessages>, &'static str) {
+    let messages = app.display_messages();
+    // A stale deferred-mermaid base must not be reused verbatim.
+    if let Some(stamp) = prev.mermaid_pending_epoch
+        && crate::tui::mermaid::deferred_render_epoch() != stamp
+    {
+        match first_mermaid_pending_message(prev.as_ref()) {
+            Some(keep) if !prev.message_boundaries.is_empty() => {
+                let prepared = Arc::make_mut(&mut prev);
+                truncate_prepared_to_boundary(prepared, keep);
+                prepared.mermaid_pending_epoch = None;
+                prev_count = prepared.message_boundaries.len();
+            }
+            Some(_) => {
+                return (Arc::new(prepare_body(app, width, false)), "full");
+            }
+            None => {
+                Arc::make_mut(&mut prev).mermaid_pending_epoch = None;
+            }
+        }
+    }
+    let k = matching_prefix_len(prev.as_ref(), messages);
+    if k == prev_count && prev_count == msg_count {
+        return (prev, "prefix_exact");
+    }
+    // Full rebuild fallback (prefix/suffix stitch lives in prepare_body_incremental).
+    (Arc::new(prepare_body(app, width, false)), "full")
+}
+
+/// Prepend-rebuild path used by tests and suffix-reuse. Falls back to a full
+/// prepare when a stitch is not available.
+pub(super) fn prepare_body_prepended(
+    app: &dyn TuiState,
+    width: u16,
+    _prev: Arc<PreparedMessages>,
+    _drop_msgs: usize,
+    _head_count: usize,
+) -> Result<Arc<PreparedMessages>, Arc<PreparedMessages>> {
+    Ok(Arc::new(prepare_body(app, width, false)))
 }
 
 #[cfg(test)]

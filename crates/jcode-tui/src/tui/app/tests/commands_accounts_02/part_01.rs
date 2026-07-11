@@ -671,6 +671,7 @@ fn test_improve_status_summarizes_current_todos() {
             &app.session.id,
             &[
                 crate::todo::TodoItem {
+                    active_form: None,
                     group: None,
                     id: "one".to_string(),
                     content: "Profile startup path".to_string(),
@@ -683,6 +684,7 @@ fn test_improve_status_summarizes_current_todos() {
                     confidence_history: Vec::new(),
                 },
                 crate::todo::TodoItem {
+                    active_form: None,
                     group: None,
                     id: "two".to_string(),
                     content: "Add regression test".to_string(),
@@ -776,6 +778,7 @@ fn test_improve_resume_uses_saved_mode_and_current_todos() {
         crate::todo::save_todos(
             &app.session.id,
             &[crate::todo::TodoItem {
+                active_form: None,
                 group: None,
                 id: "resume1".to_string(),
                 content: "Refactor command parsing".to_string(),
