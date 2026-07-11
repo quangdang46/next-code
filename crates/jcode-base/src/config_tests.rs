@@ -51,6 +51,28 @@ fn swarm_max_concurrent_agents_defaults_high_for_deep_fanout() {
 }
 
 #[test]
+fn mermaid_feature_defaults_on_and_parses_false() {
+    assert!(Config::default().features.mermaid);
+
+    let cfg: Config =
+        toml::from_str("[features]\nmermaid = false\n").expect("features.mermaid should parse");
+    assert!(!cfg.features.mermaid);
+}
+
+#[test]
+fn mermaid_environment_override_uses_standard_boolean_values() {
+    let _guard = crate::storage::lock_test_env();
+    let previous = std::env::var_os("JCODE_ENABLE_MERMAID");
+    crate::env::set_var("JCODE_ENABLE_MERMAID", "off");
+
+    let mut cfg = Config::default();
+    cfg.apply_env_overrides();
+    assert!(!cfg.features.mermaid);
+
+    restore_env_var("JCODE_ENABLE_MERMAID", previous);
+}
+
+#[test]
 fn swarm_max_concurrent_agents_parses_and_allows_zero_for_unbounded() {
     let cfg: Config = toml::from_str("[agents]\nswarm_max_concurrent_agents = 64\n")
         .expect("swarm_max_concurrent_agents should parse");
@@ -265,11 +287,11 @@ fn test_env_override_memory_sidecar() {
 fn tool_config_defaults_to_full_toolset() {
     let selection = ToolConfig::default().selection();
     assert!(selection.allowed_tools.is_none());
-    assert!(selection.disabled_tools.contains("gmail"));
+    assert!(selection.disabled_tools.is_empty());
 }
 
 #[test]
-fn tool_config_explicit_enabled_default_disabled_tools_opts_in() {
+fn tool_config_explicit_enabled_uses_allow_list() {
     let cfg = ToolConfig {
         enabled: vec!["gmail".to_string()],
         ..ToolConfig::default()
@@ -284,7 +306,7 @@ fn tool_config_explicit_enabled_default_disabled_tools_opts_in() {
 }
 
 #[test]
-fn tool_config_all_enabled_sentinel_opts_in_gmail_without_allow_list() {
+fn tool_config_all_enabled_sentinel_keeps_unrestricted_toolset() {
     let cfg = ToolConfig {
         enabled: vec!["*".to_string()],
         ..ToolConfig::default()
@@ -401,7 +423,7 @@ fn tool_config_disabled_only_keeps_full_profile_with_deny_list() {
     assert!(selection.allowed_tools.is_none());
     assert!(selection.disabled_tools.contains("browser"));
     assert!(selection.disabled_tools.contains("swarm"));
-    assert!(selection.disabled_tools.contains("gmail"));
+    assert!(!selection.disabled_tools.contains("gmail"));
 }
 
 #[test]
@@ -433,6 +455,11 @@ fn test_generated_default_config_uses_low_openai_reasoning_effort() {
     assert!(
         content.contains("[agents]") && content.contains("swarm_spawn_mode = \"inline\""),
         "generated default config should document agent spawn defaults"
+    );
+    assert!(
+        content.contains("memory_model = \"gpt-5.6-luna\"")
+            && content.contains("reasoning effort \"none\""),
+        "generated default config should document the Luna memory sidecar default"
     );
 
     // Effort keys come from the per-platform keybinding registry; the template

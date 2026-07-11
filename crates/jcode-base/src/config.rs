@@ -106,6 +106,7 @@ const CONFIG_ENV_KEYS: &[&str] = &[
     "JCODE_MEMORY_EMBEDDING_DIM",
     "JCODE_MEMORY_EMBEDDING_MODEL",
     "JCODE_MEMORY_ENABLED",
+    "JCODE_ENABLE_MERMAID",
     "JCODE_MEMORY_MODEL",
     "JCODE_MEMORY_SIDECAR_ENABLED",
     "JCODE_PERSIST_MEMORY_INJECTIONS",
@@ -587,7 +588,7 @@ pub struct ToolConfig {
     /// Tool profile: "full" (default), "acp", "minimal"/"lite", or "none".
     pub profile: String,
     /// Explicit allow-list. When set, only these tools are exposed.
-    /// Use "*" or "all" to expose all tools, including default-disabled tools.
+    /// Use "*" or "all" to expose all tools without an allow-list.
     pub enabled: Vec<String>,
     /// Tools to remove after applying profile/enabled.
     pub disabled: Vec<String>,
@@ -602,24 +603,14 @@ pub struct ToolSelection {
 }
 
 impl ToolConfig {
-    const DEFAULT_DISABLED_TOOLS: &'static [&'static str] = &["gmail"];
-
     pub fn selection(&self) -> ToolSelection {
         let mut allowed_tools = self.base_allowed_tools();
-        let (explicit_enabled, enables_all_tools) = self.normalized_enabled_tools();
-        let mut disabled_tools: HashSet<String> = self
+        let disabled_tools: HashSet<String> = self
             .disabled
             .iter()
             .map(|name| normalize_tool_name(name))
             .filter(|name| !name.is_empty())
             .collect();
-
-        for name in Self::DEFAULT_DISABLED_TOOLS {
-            let normalized = normalize_tool_name(name);
-            if !enables_all_tools && !explicit_enabled.contains(&normalized) {
-                disabled_tools.insert(normalized);
-            }
-        }
 
         if let Some(allowed) = allowed_tools.as_mut() {
             for name in &disabled_tools {

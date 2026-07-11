@@ -1107,12 +1107,14 @@ fn test_model_picker_state_space_preserves_provider_labels_after_route_hydration
         );
     }
 
+    // Models with reasoning-effort support expand into effort rows (issue
+    // #458); the hydrated route must be preserved on each variant.
     assert_eq!(
-        routes_by_model.get("gpt-5.5"),
+        routes_by_model.get("gpt-5.5 (high)"),
         Some(&("OpenAI".to_string(), "openai-oauth".to_string()))
     );
     assert_eq!(
-        routes_by_model.get("claude-opus-4-6"),
+        routes_by_model.get("claude-opus-4-6 (high)"),
         Some(&("Anthropic".to_string(), "claude-oauth".to_string()))
     );
     assert_eq!(
@@ -1120,7 +1122,7 @@ fn test_model_picker_state_space_preserves_provider_labels_after_route_hydration
         Some(&("Chutes".to_string(), "openai-compatible:chutes".to_string()))
     );
     assert_eq!(
-        routes_by_model.get("deepseek/deepseek-v4-pro"),
+        routes_by_model.get("deepseek/deepseek-v4-pro (high)"),
         Some(&("auto".to_string(), "openrouter".to_string()))
     );
 
@@ -1243,6 +1245,83 @@ fn test_login_completed_spawns_auth_refresh_when_runtime_is_available() {
         );
         std::thread::sleep(Duration::from_millis(10));
     }
+}
+
+#[test]
+fn test_model_picker_waits_for_async_post_login_catalog_activation() {
+    ensure_test_jcode_home_if_unset();
+    clear_persisted_test_ui_state();
+    crate::tui::ui::clear_test_render_state_for_tests();
+
+    let logged_in = StdArc::new(StdMutex::new(false));
+    let provider: Arc<dyn Provider> = Arc::new(AuthRefreshingMockProvider {
+        logged_in: StdArc::clone(&logged_in),
+    });
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    let registry = rt.block_on(crate::tool::Registry::new(provider.clone()));
+    let mut app = App::new_for_test_harness(provider, registry);
+    let mut bus_rx = crate::bus::Bus::global().subscribe();
+
+    {
+        let _guard = rt.enter();
+        app.handle_login_completed(crate::bus::LoginCompleted {
+            provider: "auto-import".to_string(),
+            success: true,
+            message: "Imported existing logins".to_string(),
+        });
+        app.open_model_picker();
+    }
+
+    let picker = app
+        .inline_interactive_state
+        .as_ref()
+        .expect("loading model picker should be open");
+    assert_eq!(picker.entries.len(), 1);
+    assert!(
+        picker.entries[0].options[0]
+            .detail
+            .contains("updating model list")
+    );
+    assert!(
+        !picker.entries.iter().any(|entry| entry.name == "gpt-5.4"),
+        "the stale pre-import catalog must not be presented as ready"
+    );
+
+    let ready = rt.block_on(async {
+        tokio::time::timeout(Duration::from_secs(2), async {
+            loop {
+                let event = bus_rx.recv().await.expect("auth catalog event");
+                if matches!(event, crate::bus::BusEvent::AuthCatalogRefreshReady) {
+                    break event;
+                }
+            }
+        })
+        .await
+        .expect("post-login activation should finish")
+    });
+    assert!(crate::tui::app::local::handle_bus_event(
+        &mut app,
+        Ok(ready)
+    ));
+    assert!(*logged_in.lock().unwrap());
+    wait_for_model_picker_load(&mut app);
+
+    let picker = app
+        .inline_interactive_state
+        .as_ref()
+        .expect("model picker should refresh in place");
+    assert!(
+        picker
+            .entries
+            .iter()
+            .any(|entry| entry.name == "claude-opus-4.6")
+    );
+    assert!(
+        picker
+            .entries
+            .iter()
+            .any(|entry| entry.name == "grok-code-fast-1")
+    );
 }
 
 #[test]

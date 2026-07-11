@@ -37,7 +37,6 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tokio::time::interval;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AppRuntimeMode {
@@ -1049,10 +1048,9 @@ pub struct App {
     // All sessions on the server (remote mode only)
     remote_sessions: Vec<String>,
     remote_side_pane_images: Vec<crate::session::RenderedImage>,
-    /// Cached `(display_messages_version, signature)` for
-    /// `side_pane_images_signature`, recomputed only when the transcript
-    /// version changes.
-    side_pane_images_signature_cache: std::cell::Cell<Option<(u64, (usize, u64))>>,
+    /// Cached image-set signature. Text-only transcript changes must not
+    /// invalidate this because rebuilding it materializes every image payload.
+    side_pane_images_signature_cache: std::cell::Cell<Option<(usize, u64)>>,
     // Swarm member status snapshots (remote mode only)
     remote_swarm_members: Vec<crate::protocol::SwarmMemberStatus>,
     // Latest swarm plan snapshot (local or remote server event stream)
@@ -1188,6 +1186,10 @@ pub struct App {
     model_picker_catalog_revision: u64,
     // Short-lived provider boost after login so newly authenticated models surface in /models.
     recent_authenticated_provider: Option<(String, Instant)>,
+    /// A successful login/import has invalidated the catalog, but the refreshed
+    /// provider snapshot has not reached this client yet. While set, `/model`
+    /// shows a loading state instead of reusing the pre-login catalog.
+    auth_catalog_refresh_pending: bool,
     pending_model_picker_load: Option<PendingModelPickerLoad>,
     model_picker_load_request_id: u64,
     // Pending model switch from picker (for remote mode async processing)

@@ -917,6 +917,23 @@ fn test_active_rows_render_working_and_ready_badges() {
         "expected working badge with duration, got: {working_text}"
     );
 
+    let first_frame = picker
+        .render_session_item_lines_at_frame(&working, false, 0)
+        .iter()
+        .map(line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let second_frame = picker
+        .render_session_item_lines_at_frame(&working, false, 1)
+        .iter()
+        .map(line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(first_frame.contains('⠋'));
+    assert!(second_frame.contains('⠙'));
+    assert_ne!(first_frame, second_frame, "running glyph should animate");
+    assert!(picker.has_visible_running_sessions());
+
     let ready_lines = picker.render_session_item_lines(&ready, false);
     let ready_text = ready_lines
         .iter()

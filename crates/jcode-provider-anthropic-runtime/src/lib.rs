@@ -590,9 +590,9 @@ impl AnthropicProvider {
     /// `high` on older Opus. Deliberately NOT `max`: Anthropic recommends
     /// `xhigh` as the starting point for coding/agentic work and reserves
     /// `max` for frontier problems (it costs much more and can overthink).
-    /// Claude Fable 5 defaults to `low`: it is strong at low reasoning and
-    /// this keeps everyday turns fast and cheap. Every other model keeps the
-    /// model's own default (no forced effort) so cheaper models stay cheap.
+    /// Claude Fable 5 defaults to `high`: it benefits from deeper reasoning
+    /// on coding/agentic work. Every other model keeps the model's own
+    /// default (no forced effort) so cheaper models stay cheap.
     fn default_reasoning_effort_for_model(model: &str) -> Option<String> {
         let key = Self::normalized_model_key(model);
         if key.contains("claude-opus") {
@@ -602,9 +602,9 @@ impl AnthropicProvider {
                 "high".to_string()
             })
         } else if key.contains("claude-fable-5") {
-            // Fable 5 is fast and capable at low reasoning; default to `low`
-            // so day-to-day turns stay snappy. Users can still cycle up.
-            Some("low".to_string())
+            // Fable 5 defaults to `high` reasoning for stronger day-to-day
+            // results. Users can still cycle down for faster/cheaper turns.
+            Some("high".to_string())
         } else {
             None
         }
@@ -873,7 +873,7 @@ impl AnthropicProvider {
         // cached probe (auto-mode resolution, usage availability, account labels)
         // re-derive from the new credential choice on their next read instead of
         // lingering on a snapshot taken before the switch.
-        jcode_base::auth::AuthStatus::invalidate_cache();
+        jcode_base::auth::AuthStatus::invalidate_cached_status();
         Ok(())
     }
 

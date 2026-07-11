@@ -1122,6 +1122,8 @@ pub struct FeatureConfig {
     pub memory: bool,
     /// Enable swarm coordination features (default: true)
     pub swarm: bool,
+    /// Enable Mermaid rendering and Mermaid-specific model guidance (default: true)
+    pub mermaid: bool,
     /// Inject timestamps into user messages and tool results sent to the model (default: true)
     pub message_timestamps: bool,
     /// Persist auto-recalled memory injections into normal session history instead of sending
@@ -1143,6 +1145,7 @@ impl Default for FeatureConfig {
         Self {
             memory: true,
             swarm: true,
+            mermaid: true,
             message_timestamps: true,
             persist_memory_injections: false,
             kv_cache_miss_notices: true,
@@ -1250,6 +1253,12 @@ pub struct ProviderConfig {
     /// Copilot premium request mode: "normal", "one", or "zero"
     /// "zero" means all requests are free (no premium requests consumed)
     pub copilot_premium: Option<String>,
+    /// When set (non-empty), /model only lists routes from these providers.
+    /// Entries match provider labels ("openai", "anthropic", "copilot",
+    /// "openrouter", ...), api methods ("claude-oauth",
+    /// "openai-compatible:myprofile", ...), or openai-compatible profile ids
+    /// ("myprofile"). The active model's routes always stay visible.
+    pub model_picker_providers: Option<Vec<String>>,
     /// Max seconds to wait for streaming data before timing out a request with
     /// no data received. Raise this for slow reasoning models (e.g. DeepSeek)
     /// that think silently for minutes before emitting tokens. Default: 180.
@@ -1272,6 +1281,7 @@ impl Default for ProviderConfig {
             cross_provider_failover: CrossProviderFailoverMode::Countdown,
             same_provider_account_failover: true,
             copilot_premium: None,
+            model_picker_providers: None,
             stream_idle_timeout_secs: 180,
         }
     }
