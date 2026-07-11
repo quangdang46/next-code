@@ -785,3 +785,21 @@ rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control
 rg -n 'parse_invocation|SkillInvocation' crates/jcode-base/src/skill.rs | head
 cargo check -p jcode
 ```
+
+### 2026-07-11 — v0.42.0..v0.43.0 upstream sync (2 commits)
+
+**Branch**: `master`.
+**Upstream commits**:
+- `a07bd3d96` feat(markdown): support common LaTeX containers
+- `649276753` release: v0.43.0
+
+**Status**: ✅ `cargo check -p jcode` clean. Lesson 2/3 OK. Fork package version remains **0.32.0**.
+
+| Category | What |
+|----------|------|
+| ✨ Feature | `normalize_latex_math` — `\(...\)`, `\[...\]`, display envs, fenced math/latex/tex/katex |
+| ✨ Feature | Broader math env delimiters (`gather`, `multline`, `eqnarray`, …) |
+| 📝 Release | changelog `v0.43.0.json` + index entry (accepted) |
+| 🏗️ Category D | Cargo.toml version conflict → **keep 0.32.0** (not 0.43.0) |
+
+**No extracted-domain / Lesson 2–3 files touched** by the 2 commits. Auto-merge for render/markdown paths (Category C).
