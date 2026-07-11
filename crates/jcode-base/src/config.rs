@@ -581,6 +581,44 @@ impl Default for AcpConfig {
     }
 }
 
+/// Backend for the single model-facing `edit` tool (oh-my-pi style).
+/// Default is hashline; other modes re-enable classic backends without changing the tool name.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum EditMode {
+    /// Hashline patch language (default).
+    #[default]
+    Hashline,
+    /// Unified apply_patch / Codex-style patches.
+    ApplyPatch,
+    /// Classic string replace (`old_string` / `new_string`).
+    Replace,
+    /// Multi-hunk classic multiedit.
+    Multiedit,
+}
+
+impl EditMode {
+    pub fn parse(raw: &str) -> Option<Self> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "hashline" | "hl" | "default" | "auto" | "" => Some(Self::Hashline),
+            "apply_patch" | "apply-patch" | "codex" => Some(Self::ApplyPatch),
+            "replace" | "str_replace" | "string" => Some(Self::Replace),
+            "multiedit" | "multi_edit" | "multi-edit" => Some(Self::Multiedit),
+            "patch" => Some(Self::ApplyPatch), // treat legacy "patch" as apply_patch backend
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Hashline => "hashline",
+            Self::ApplyPatch => "apply_patch",
+            Self::Replace => "replace",
+            Self::Multiedit => "multiedit",
+        }
+    }
+}
+
 /// Controls which tools are sent to the model.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
@@ -594,6 +632,10 @@ pub struct ToolConfig {
     pub disabled: Vec<String>,
     /// Disable all built-in tools unless `enabled` is provided.
     pub disable_base_tools: bool,
+    /// Backend for the model-facing `edit` tool (default: hashline).
+    /// Mirrors oh-my-pi `edit.mode` / `PI_EDIT_VARIANT`.
+    #[serde(default)]
+    pub edit_mode: EditMode,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

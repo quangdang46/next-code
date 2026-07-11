@@ -253,6 +253,16 @@ impl Config {
                 self.display.compact_notifications = parsed;
             }
         }
+
+        // oh-my-pi style edit backend: JCODE_EDIT_MODE or PI_EDIT_VARIANT
+        for key in ["JCODE_EDIT_MODE", "PI_EDIT_VARIANT"] {
+            if let Ok(v) = std::env::var(key) {
+                if let Some(mode) = crate::config::EditMode::parse(&v) {
+                    self.tools.edit_mode = mode;
+                }
+            }
+        }
+
         if let Ok(v) = std::env::var("JCODE_CHAT_NATIVE_SCROLLBAR") {
             if let Some(parsed) = parse_env_bool(&v) {
                 self.display.native_scrollbars.chat = parsed;

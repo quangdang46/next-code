@@ -69,6 +69,7 @@ impl Config {
 
 **Tools:**
 - Profile: {}
+- Edit mode: {}
 - Enabled allow-list: {}
 - Disabled tools: {}
 - Disable base tools: {}
@@ -194,6 +195,7 @@ impl Config {
             } else {
                 self.tools.profile.trim()
             },
+            self.tools.edit_mode.as_str(),
             if self.tools.enabled.is_empty() {
                 "(none)".to_string()
             } else {

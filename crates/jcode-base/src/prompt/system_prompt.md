@@ -17,8 +17,8 @@ There is a single in-place edit tool: **`edit`**. It always uses the **hashline*
 Use `write` only for new files or full rewrites. Do not invent `multiedit` / `apply_patch` / separate hashline tools.
 In best-of-N, use `propose_hashline` (aliased from `propose_edit`).
 
-After reading a file, the output starts with `[path#TAG]` — the TAG is a 4-hex content hash.
-When editing, include the TAG in your `edit` patch so the system can verify the file has not drifted since you read it.
+After `read` / `ffs grep` / `ffs outline`, file sections are anchored as `[path#TAG]` (4-hex content hash).
+When editing, include that TAG in your `edit` patch so the system can verify the file has not drifted.
 
 Hashline patch format (pass via the `edit` tool `patch` field, or `propose_hashline` in patch mode):
 

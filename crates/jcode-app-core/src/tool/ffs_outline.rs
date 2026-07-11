@@ -88,7 +88,11 @@ impl Tool for FfsOutlineTool {
         let items = outline_blocking(&content, &file_path, max_items);
 
         let mut output = String::new();
-        output.push_str(&format!("Outline for: {}\n\n", file_path.display()));
+        // Mint hashline TAG so outline anchors can feed the `edit` tool.
+        let tag = crate::tool::hashline_snapshots::record(&file_path, &content, None);
+        let header = crate::tool::hashline_snapshots::format_header(&file_path, &tag);
+        output.push_str(&header);
+        output.push_str("\n\n");
 
         if items.is_empty() {
             output.push_str("No structural items found.\n");

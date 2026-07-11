@@ -120,6 +120,32 @@ pub fn format_header(path: &Path, tag: &str) -> String {
     )
 }
 
+/// Read `path`, record a snapshot, and return the `[path#TAG]` header line.
+/// Returns `None` for unreadable/binary/missing files (caller falls back to bare path).
+pub fn try_format_header_for_path(path: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    // Skip huge files for search anchors (same order as typical source files).
+    if text.len() > 2_000_000 {
+        return None;
+    }
+    let tag = record(path, &text, None);
+    Some(format_header(path, &tag))
+}
+
+/// Header or bare path label for grouped search output.
+/// Uses the full path string from the search hit so multi-file results stay unique
+/// (unlike [`format_header`], which shows only the file name).
+pub fn path_label_for_search(path: &str) -> String {
+    let p = Path::new(path);
+    match std::fs::read_to_string(p) {
+        Ok(text) if text.len() <= 2_000_000 => {
+            let tag = record(p, &text, None);
+            format!("[{path}#{tag}]")
+        }
+        _ => format!("{path}:"),
+    }
+}
+
 /// Compute the 4-hex file content tag using the hashline crate's standard
 /// algorithm. This is the tag the model sees in the `[path#TAG]` header.
 pub fn compute_file_tag(text: &str) -> String {

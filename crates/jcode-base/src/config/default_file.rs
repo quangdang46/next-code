@@ -220,6 +220,10 @@ bing_market = "en-US"
 # searxng_url = "https://searx.example.org"
 
 [tools]
+# Backend for the single `edit` tool: hashline (default), apply_patch, replace, multiedit.
+# Override with env JCODE_EDIT_MODE or PI_EDIT_VARIANT.
+# edit_mode = "hashline"
+
 # Controls which built-in tools are sent to the model.
 # Profiles: "full" (default), "acp", "minimal"/"lite", or "none".
 # acp keeps core coding tools plus batch for generic ACP clients.

@@ -164,7 +164,11 @@ pub fn format_grep_hits(hits: &[GrepHit], label: &str) -> String {
             if !current.is_empty() {
                 out.push('\n');
             }
-            out.push_str(&format!("{}:\n", h.path));
+            // oh-my-pi style: mint hashline [path#TAG] anchors for editable files
+            out.push_str(&crate::tool::hashline_snapshots::path_label_for_search(
+                &h.path,
+            ));
+            out.push('\n');
             current = h.path.clone();
         }
         out.push_str(&format!("  {:>4}: {}\n", h.line, h.text));

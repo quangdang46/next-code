@@ -103,7 +103,10 @@ impl Tool for FfsGrepTool {
                             if !current_file.is_empty() {
                                 out.push('\n');
                             }
-                            out.push_str(&format!("{}:\n", m.path));
+                            out.push_str(&crate::tool::hashline_snapshots::path_label_for_search(
+                                &m.path,
+                            ));
+                            out.push('\n');
                             current_file = m.path.clone();
                         }
                         out.push_str(&format!("  {:>4}: {}\n", m.line_number, m.line));

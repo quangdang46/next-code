@@ -1,5 +1,4 @@
 pub mod ambient;
-#[allow(dead_code)]
 mod apply_patch;
 mod bash;
 mod batch;
@@ -14,7 +13,6 @@ mod conversation_search;
 mod dcp_compress;
 mod debug_socket;
 mod discover;
-#[allow(dead_code)]
 mod edit;
 mod ffs_engine_tools;
 mod ffs_glob;
@@ -34,7 +32,6 @@ mod ls;
 mod lsp;
 pub mod mcp;
 mod memory;
-#[allow(dead_code)]
 mod multiedit;
 mod notepad;
 mod open;
@@ -527,13 +524,37 @@ impl Registry {
             );
             Self::insert_tool_timed(&mut m, &mut timings, "gmail", gmail::GmailTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "memory", memory::MemoryTool::new);
-            // Primary edit tool (oh-my-pi style): name `edit`, hashline backend only.
-            Self::insert_tool_timed(
-                &mut m,
-                &mut timings,
-                "edit",
-                hashline_edit::HashlineEditTool::new,
-            );
+            // Single model-facing `edit` tool; backend selected by tools.edit_mode
+            // (oh-my-pi style: default hashline, optional apply_patch/replace/multiedit).
+            match crate::config::config().tools.edit_mode {
+                crate::config::EditMode::Hashline => {
+                    Self::insert_tool_timed(
+                        &mut m,
+                        &mut timings,
+                        "edit",
+                        hashline_edit::HashlineEditTool::new,
+                    );
+                }
+                crate::config::EditMode::ApplyPatch => {
+                    Self::insert_tool_timed(
+                        &mut m,
+                        &mut timings,
+                        "edit",
+                        apply_patch::ApplyPatchTool::new,
+                    );
+                }
+                crate::config::EditMode::Replace => {
+                    Self::insert_tool_timed(&mut m, &mut timings, "edit", edit::EditTool::new);
+                }
+                crate::config::EditMode::Multiedit => {
+                    Self::insert_tool_timed(
+                        &mut m,
+                        &mut timings,
+                        "edit",
+                        multiedit::MultiEditTool::new,
+                    );
+                }
+            }
             Self::insert_tool_timed(&mut m, &mut timings, "schedule", ambient::ScheduleTool::new);
             #[cfg(feature = "dcp")]
             Self::insert_tool_timed(&mut m, &mut timings, "dcp_compress", || {
