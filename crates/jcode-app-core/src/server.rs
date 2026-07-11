@@ -52,8 +52,9 @@ mod util;
 pub(super) use self::await_members_state::AwaitMembersRuntime;
 use self::background_tasks::{
     dispatch_background_task_completion, dispatch_background_task_progress,
-    dispatch_swarm_await_completion, dispatch_swarm_output_tail, dispatch_swarm_todo_progress,
-    dispatch_swarm_tool_activity, dispatch_ui_activity,
+    dispatch_swarm_await_completion, dispatch_swarm_batch_progress, dispatch_swarm_output_tail,
+    dispatch_swarm_runtime_status, dispatch_swarm_todo_progress, dispatch_swarm_tool_activity,
+    dispatch_ui_activity,
 };
 use self::debug::{ClientConnectionInfo, ClientDebugState};
 use self::debug_jobs::DebugJob;
@@ -74,9 +75,10 @@ use self::swarm_channels::{
 };
 pub(super) use self::swarm_mutation_state::SwarmMutationRuntime;
 use self::swarm_persistence::{
-    LoadedSwarmRuntimeState, load_runtime_state as load_persisted_swarm_runtime_state,
-    persist_swarm_state as persist_swarm_state_snapshot,
-    remove_swarm_state as remove_persisted_swarm_state,
+    LoadedSwarmRuntimeState, capture_swarm_state_version,
+    load_runtime_state as load_persisted_swarm_runtime_state,
+    persist_swarm_state as persist_swarm_state_snapshot, remove_swarm_state_if_version,
+    swarm_operation_lock,
 };
 use self::util::get_shared_mcp_pool;
 use crate::agent::Agent;
@@ -113,6 +115,10 @@ const SERVER_DISPLAY_NAME_ENV: &str = "JCODE_SERVER_DISPLAY_NAME";
 const MAX_CONFIGURED_SERVER_NAME_LEN: usize = 64;
 
 pub(super) async fn persist_swarm_state_for(swarm_id: &str, swarm_state: &SwarmState) {
+    // Never call this while holding any SwarmState map guard. The operation
+    // lock deliberately spans the independent map reads and atomic file write.
+    let operation_lock = swarm_operation_lock(swarm_id);
+    let _operation_guard = operation_lock.lock().await;
     let runtime = swarm_state.load_runtime(swarm_id).await;
     persist_swarm_state_snapshot(
         swarm_id,
@@ -123,11 +129,16 @@ pub(super) async fn persist_swarm_state_for(swarm_id: &str, swarm_state: &SwarmS
 }
 
 pub(super) async fn remove_persisted_swarm_state_for(swarm_id: &str, swarm_state: &SwarmState) {
+    // Persist and remove share one per-swarm ordering domain. The file version
+    // is an extra CAS guard against direct/recovery writers outside this path.
+    let operation_lock = swarm_operation_lock(swarm_id);
+    let _operation_guard = operation_lock.lock().await;
+    let file_version = capture_swarm_state_version(swarm_id);
     let runtime = swarm_state.load_runtime(swarm_id).await;
     if runtime.has_any_state() {
         return;
     }
-    remove_persisted_swarm_state(swarm_id);
+    let _ = remove_swarm_state_if_version(swarm_id, &file_version);
 }
 
 fn headless_member_should_restore(status: &str, is_headless: bool) -> bool {
@@ -986,7 +997,11 @@ impl Server {
         main_listener: Listener,
         debug_listener: Listener,
         server_start_time: Instant,
-    ) -> (tokio::task::JoinHandle<()>, tokio::task::JoinHandle<()>) {
+    ) -> (
+        ServerRuntime,
+        tokio::task::JoinHandle<()>,
+        tokio::task::JoinHandle<()>,
+    ) {
         self.spawn_registry_prewarm();
         let registry_info = self.build_registry_info();
 
@@ -1005,13 +1020,13 @@ impl Server {
         self.spawn_registry_metadata_publisher(registry_info);
 
         // Spawn WebSocket gateway for iOS/web clients (if enabled)
-        let _gateway_handle = self.spawn_gateway(runtime);
+        self.spawn_gateway(runtime.clone()).await;
 
         // Startup recovery can be expensive in multi-session reloads. Run it
         // only after the replacement daemon is already accepting reconnects.
         self.recover_headless_sessions_on_startup().await;
 
-        (main_handle, debug_handle)
+        (runtime, main_handle, debug_handle)
     }
 
     fn spawn_background_tasks(
@@ -1939,6 +1954,12 @@ impl Server {
                 Ok(BusEvent::ToolUpdated(event)) => {
                     dispatch_swarm_tool_activity(&event, &swarm_members, &swarms_by_id).await;
                 }
+                Ok(BusEvent::SubagentStatus(event)) => {
+                    dispatch_swarm_runtime_status(&event, &swarm_members, &swarms_by_id).await;
+                }
+                Ok(BusEvent::BatchProgress(progress)) => {
+                    dispatch_swarm_batch_progress(&progress, &swarm_members, &swarms_by_id).await;
+                }
                 // Session todos are private to the session's transcript, but the
                 // Compact todo names and progress are surfaced on the inline
                 // swarm strip so a coordinator can see each managed agent's work.
@@ -1997,6 +2018,19 @@ impl Server {
         // process, but clear stale markers from unrelated/stale processes.
         clear_reload_marker_if_stale_for_pid(std::process::id());
 
+        match reload_recovery::collect_garbage() {
+            Ok(stats) if stats.removed > 0 || stats.errors > 0 => {
+                crate::logging::info(&format!(
+                    "Reload recovery GC: removed={}, retained={}, errors={}",
+                    stats.removed, stats.retained, stats.errors
+                ));
+            }
+            Ok(_) => {}
+            Err(error) => crate::logging::warn(&format!(
+                "Reload recovery GC failed during startup: {error}"
+            )),
+        }
+
         // Restrict socket files to owner-only so other local users cannot connect.
         let _ = crate::platform::set_permissions_owner_only(&self.socket_path);
         let _ = crate::platform::set_permissions_owner_only(&self.debug_socket_path);
@@ -2029,19 +2063,38 @@ impl Server {
         let server_start_time = Instant::now();
 
         self.spawn_background_tasks(server_start_time, temporary_server_policy);
-        let (main_handle, debug_handle) = self
+        let (runtime, main_handle, debug_handle) = self
             .finish_startup_after_bind(main_listener, debug_listener, server_start_time)
             .await;
 
-        // Wait for both to complete (they won't normally)
-        let _ = tokio::join!(main_handle, debug_handle);
+        // If either listener exits unexpectedly, stop accepting work and wait
+        // for every owned connection task before returning. The normal daemon
+        // path runs until process shutdown or exec-based reload.
+        let mut main_handle = main_handle;
+        let mut debug_handle = debug_handle;
+        tokio::select! {
+            result = &mut main_handle => {
+                if let Err(error) = result {
+                    crate::logging::error(&format!("Main accept loop failed: {error}"));
+                }
+                runtime.shutdown().await;
+                let _ = debug_handle.await;
+            }
+            result = &mut debug_handle => {
+                if let Err(error) = result {
+                    crate::logging::error(&format!("Debug accept loop failed: {error}"));
+                }
+                runtime.shutdown().await;
+                let _ = main_handle.await;
+            }
+        }
         Ok(())
     }
 
     /// Spawn the WebSocket gateway if enabled in config.
-    /// Returns a task handle that accepts gateway clients and feeds them
-    /// into handle_client just like Unix socket connections.
-    fn spawn_gateway(&self, runtime: ServerRuntime) -> Option<tokio::task::JoinHandle<()>> {
+    /// The runtime task scope owns both the listener and client accept loop so
+    /// server shutdown can cancel and join them with the other connection work.
+    async fn spawn_gateway(&self, runtime: ServerRuntime) {
         let config = if let Some(override_config) = &self.gateway_config_override {
             override_config.clone()
         } else {
@@ -2054,20 +2107,23 @@ impl Server {
         };
 
         if !config.enabled {
-            return None;
+            return;
         }
 
         let (client_tx, client_rx) =
             tokio::sync::mpsc::unbounded_channel::<crate::gateway::GatewayClient>();
 
-        // Spawn the TCP/WebSocket listener
-        tokio::spawn(async move {
-            if let Err(e) = crate::gateway::run_gateway(config, client_tx).await {
-                crate::logging::error(&format!("Gateway error: {}", e));
-            }
-        });
-
-        Some(runtime.spawn_gateway_accept_loop(client_rx))
+        let listener_runtime = runtime.clone();
+        let listener_spawned = runtime
+            .spawn_background_task(async move {
+                if let Err(e) = crate::gateway::run_gateway(config, client_tx).await {
+                    crate::logging::error(&format!("Gateway error: {}", e));
+                }
+            })
+            .await;
+        if listener_spawned {
+            let _ = listener_runtime.spawn_gateway_accept_loop(client_rx).await;
+        }
     }
 }
 

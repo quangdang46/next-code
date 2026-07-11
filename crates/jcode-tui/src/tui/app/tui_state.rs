@@ -1345,6 +1345,7 @@ impl crate::tui::TuiState for App {
                         todo_progress: None,
                         task_label: None,
                         todo_items: Vec::new(),
+                        runtime: crate::protocol::SwarmMemberRuntime::default(),
                     });
                 }
                 (
@@ -1355,14 +1356,52 @@ impl crate::tui::TuiState for App {
                 )
             };
 
+            // Dock data: the agents this session actually manages (spawn
+            // subtree), the shared panel selection/focus, and plan progress.
+            // This is what the SwarmStatus widget renders. Computed outside
+            // the activity gate: managing agents is itself "interesting".
+            let managed_members = self.inline_swarm_members();
+
             // Only show if there's something interesting
-            if has_activity || session_count > 1 || client_count.is_some() {
+            if has_activity
+                || session_count > 1
+                || client_count.is_some()
+                || !managed_members.is_empty()
+            {
+                let plan_progress = if self.swarm_plan_items.is_empty() {
+                    None
+                } else {
+                    let total = self.swarm_plan_items.len() as u32;
+                    let done = self
+                        .swarm_plan_items
+                        .iter()
+                        .filter(|item| matches!(item.status.as_str(), "completed" | "done"))
+                        .count() as u32;
+                    let running = self
+                        .swarm_plan_items
+                        .iter()
+                        .filter(|item| matches!(item.status.as_str(), "running" | "running_stale"))
+                        .count() as u32;
+                    Some((done, running, total))
+                };
                 Some(crate::tui::info_widget::SwarmInfo {
                     session_count,
                     subagent_status,
                     client_count,
                     session_names,
                     members,
+                    selected: if managed_members.is_empty() {
+                        0
+                    } else {
+                        self.swarm_panel_selected
+                            .min(managed_members.len().saturating_sub(1))
+                    },
+                    focused: self.swarm_panel_focused,
+                    plan_progress,
+                    spinner_frame: (self.animation_elapsed()
+                        * jcode_tui_render::swarm_gallery::STRIP_SPINNER_FPS)
+                        as usize,
+                    managed_members,
                 })
             } else {
                 None
@@ -2210,6 +2249,7 @@ mod inline_swarm_subtree_tests {
             todo_progress: None,
             task_label: None,
             todo_items: Vec::new(),
+            runtime: crate::protocol::SwarmMemberRuntime::default(),
         }
     }
 

@@ -261,6 +261,7 @@ fn attached_swarm_member(
         output_tail: None,
         todo_progress: None,
         todo_items: Vec::new(),
+        runtime: crate::protocol::SwarmMemberRuntime::default(),
         task_label: None,
     }
 }
@@ -291,6 +292,7 @@ fn persisted_headless_member(
         output_tail: None,
         todo_progress: None,
         todo_items: Vec::new(),
+        runtime: crate::protocol::SwarmMemberRuntime::default(),
         task_label: None,
     }
 }
@@ -919,12 +921,19 @@ async fn startup_ready_signal_is_not_blocked_by_headless_recovery_delay() -> Res
         "startup task should still be blocked on delayed recovery even though ready was already signaled"
     );
 
-    let (main_handle, debug_handle) = timeout(Duration::from_secs(2), startup)
+    let (runtime, main_handle, debug_handle) = timeout(Duration::from_secs(2), startup)
         .await
         .expect("startup should finish after delayed recovery")
         .expect("startup task should succeed");
-    main_handle.abort();
-    debug_handle.abort();
+    timeout(Duration::from_secs(1), runtime.shutdown())
+        .await
+        .expect("runtime should shut down");
+    timeout(Duration::from_secs(1), async {
+        main_handle.await.expect("main accept loop");
+        debug_handle.await.expect("debug accept loop");
+    })
+    .await
+    .expect("accept loops should observe runtime cancellation");
 
     Ok(())
 }

@@ -287,4 +287,66 @@ mod tests {
         let updated = vec![i1, item("b", "completed"), item("c", "completed")];
         assert!(!needs_verification_nudge(&prev, &updated));
     }
+
+    fn todo(content: &str, status: &str, group: Option<&str>) -> TodoItem {
+        TodoItem {
+            content: content.to_string(),
+            status: status.to_string(),
+            priority: "high".to_string(),
+            id: content.to_ascii_lowercase().replace(' ', "-"),
+            active_form: None,
+            group: group.map(str::to_string),
+            confidence: None,
+            completion_confidence: None,
+            confidence_history: Vec::new(),
+            blocked_by: Vec::new(),
+            assigned_to: None,
+        }
+    }
+
+    #[test]
+    fn session_title_prefers_in_progress_todo_group() {
+        let todos = vec![
+            todo("old task", "pending", Some("Older goal")),
+            todo("current task", "in_progress", Some("Fix resume names")),
+            todo("later task", "pending", Some("Later goal")),
+        ];
+
+        assert_eq!(
+            derive_session_title(&todos, &[]).as_deref(),
+            Some("Fix resume names")
+        );
+    }
+
+    #[test]
+    fn session_title_uses_latest_incomplete_group_when_nothing_is_active() {
+        let todos = vec![
+            todo("finished", "completed", Some("Old goal")),
+            todo("next", "pending", Some("Current goal")),
+        ];
+
+        assert_eq!(
+            derive_session_title(&todos, &[]).as_deref(),
+            Some("Current goal")
+        );
+    }
+
+    #[test]
+    fn ungrouped_session_title_prefers_goal_objective_then_item_content() {
+        let todos = vec![todo("Run targeted tests", "in_progress", None)];
+        let goals = vec![TodoGoal {
+            group: None,
+            hill_climbability: Some(90),
+            objective: Some("All resume naming tests pass".to_string()),
+        }];
+
+        assert_eq!(
+            derive_session_title(&todos, &goals).as_deref(),
+            Some("All resume naming tests pass")
+        );
+        assert_eq!(
+            derive_session_title(&todos, &[]).as_deref(),
+            Some("Run targeted tests")
+        );
+    }
 }

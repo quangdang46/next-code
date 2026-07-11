@@ -273,6 +273,18 @@ pub struct SwarmInfo {
     pub session_names: Vec<String>,
     /// Swarm member lifecycle status updates
     pub members: Vec<SwarmMemberStatus>,
+    /// Agents this session manages (spawn-subtree filtered), shown in the
+    /// swarm dock widget. Empty = no dock.
+    pub managed_members: Vec<SwarmMemberStatus>,
+    /// Selected agent index in the dock (display order), mirrors the inline
+    /// swarm panel selection so both surfaces agree.
+    pub selected: usize,
+    /// Whether the swarm panel/dock has keyboard focus.
+    pub focused: bool,
+    /// Swarm plan progress (completed, running, total), when a plan is active.
+    pub plan_progress: Option<(u32, u32, u32)>,
+    /// Spinner frame for animating active agents' status glyphs.
+    pub spinner_frame: usize,
 }
 
 /// Background task status for the info widget
@@ -521,6 +533,25 @@ pub struct MemoryInfo {
     pub graph_edges: Vec<GraphEdge>,
 }
 
+impl MemoryInfo {
+    pub(crate) fn should_render(&self) -> bool {
+        !self.disabled && (self.total_count > 0 || self.activity.is_some())
+    }
+
+    pub(crate) fn should_show_activity(&self) -> bool {
+        self.activity.as_ref().is_some_and(|activity| {
+            activity.is_processing()
+                || (matches!(activity.state, MemoryState::Idle)
+                    && activity
+                        .pipeline
+                        .as_ref()
+                        .map(PipelineState::is_complete)
+                        .unwrap_or(false)
+                    && activity.state_since.elapsed() <= Duration::from_secs(5))
+        })
+    }
+}
+
 pub use jcode_tui_mermaid::DiagramInfo;
 
 /// Git repository status for the info widget
@@ -567,7 +598,7 @@ const PAGE_SWITCH_SECONDS: u64 = 30;
 #[derive(Debug, Default, Clone)]
 pub struct InfoWidgetData {
     pub todos: Vec<TodoItem>,
-    /// Goal-level assessments (hill-climbability, objective, taste-driven)
+    /// Goal-level assessments (hill-climbability and objective)
     /// keyed by todo group (`group: None` covers the ungrouped list). Empty
     /// when the session has no recorded goals or `todos` is a swarm-plan
     /// projection.
@@ -735,9 +766,13 @@ impl InfoWidgetData {
             WidgetKind::MemoryActivity => self
                 .memory_info
                 .as_ref()
-                .map(|m| m.total_count > 0 || m.activity.is_some() || m.sidecar_model.is_some())
+                .map(MemoryInfo::should_render)
                 .unwrap_or(false),
-            WidgetKind::SwarmStatus => false,
+            WidgetKind::SwarmStatus => self
+                .swarm_info
+                .as_ref()
+                .map(|s| !s.managed_members.is_empty())
+                .unwrap_or(false),
             WidgetKind::TeamView => false,
             WidgetKind::BackgroundTasks => self
                 .background_info

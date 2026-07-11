@@ -85,6 +85,89 @@ fn model_picker_favorites_path() -> Option<std::path::PathBuf> {
         .map(|dir| dir.join(MODEL_PICKER_FAVORITES_FILE))
 }
 
+/// Whether a picker route's runtime can apply a per-request reasoning effort.
+/// Effort rows are only rendered for these routes; other routes (Copilot,
+/// Bedrock, Antigravity CLI, remote-catalog placeholders, ...) get one plain
+/// row per model because a picked effort could not actually be applied.
+fn route_supports_reasoning_effort(api_method: &str) -> bool {
+    use crate::provider::ModelRouteApiMethod as Method;
+    match Method::parse(api_method) {
+        Method::ClaudeOAuth
+        | Method::AnthropicApiKey
+        | Method::OpenAIOAuth
+        | Method::OpenAIApiKey
+        | Method::OpenRouter => true,
+        Method::OpenAiCompatible { .. }
+        | Method::Copilot
+        | Method::Cursor
+        | Method::Bedrock
+        | Method::CodeAssistOAuth
+        | Method::AntigravityHttps
+        | Method::RemoteCatalog
+        | Method::Current
+        | Method::Other(_) => false,
+    }
+}
+
+/// Apply the `provider.model_picker_providers` allowlist (issue #460).
+///
+/// Each allowlist entry can name a provider label ("openai", "llama.cpp",
+/// "anthropic"), a route api method ("claude-oauth", "openrouter",
+/// "openai-compatible:myprofile"), or a bare openai-compatible profile id
+/// ("myprofile"). Matching is case/format-insensitive via the shared provider
+/// label normalizer. Routes for the active model are always kept so the
+/// current selection never disappears from the picker, and a filter that
+/// matches nothing falls back to the unfiltered list instead of an empty
+/// picker.
+fn filter_routes_by_provider_allowlist(
+    routes: Vec<crate::provider::ModelRoute>,
+    allowlist: Option<&[String]>,
+    current_model: &str,
+) -> Vec<crate::provider::ModelRoute> {
+    use crate::provider::normalize_model_route_provider_label as normalize;
+
+    let Some(allowlist) = allowlist else {
+        return routes;
+    };
+    let allowed: Vec<String> = allowlist
+        .iter()
+        .map(|entry| normalize(entry))
+        .filter(|entry| !entry.is_empty())
+        .collect();
+    if allowed.is_empty() {
+        return routes;
+    }
+
+    let route_matches = |route: &crate::provider::ModelRoute| -> bool {
+        let provider = normalize(&route.provider);
+        let api_method = normalize(&route.api_method);
+        // "openai-compatible:myprofile" normalizes to "openaicompatible:myprofile";
+        // also expose the bare profile id for convenience.
+        let profile_id = route
+            .api_method
+            .split_once(':')
+            .map(|(_, profile)| normalize(profile))
+            .unwrap_or_default();
+        allowed.iter().any(|entry| {
+            *entry == provider
+                || *entry == api_method
+                || (!profile_id.is_empty() && *entry == profile_id)
+                || crate::provider::model_route_provider_labels_match(&route.provider, entry)
+        })
+    };
+
+    let filtered: Vec<crate::provider::ModelRoute> = routes
+        .iter()
+        .filter(|route| route.model == current_model || route_matches(route))
+        .cloned()
+        .collect();
+    if filtered.is_empty() {
+        routes
+    } else {
+        filtered
+    }
+}
+
 fn model_picker_usage_key(model_name: &str, route: &PickerOption, effort: Option<&str>) -> String {
     format!(
         "{}\u{1f}{}\u{1f}{}\u{1f}{}",
@@ -3511,76 +3594,53 @@ User's request:
     }
 
     pub(super) fn picker_fuzzy_score(pattern: &str, text: &str) -> Option<i32> {
-        let pat = Self::picker_fuzzy_pattern(pattern);
-        Self::picker_fuzzy_score_with_pattern(&pat, text)
+        jcode_fuzzy::fuzzy_score_tokens(pattern, text)
     }
 
-    /// Normalize a fuzzy-match pattern (lowercase, drop whitespace) into chars.
-    /// Hoist this out of per-entry scoring so a filter pass over N entries
-    /// normalizes the pattern once instead of N times per keystroke.
-    pub(super) fn picker_fuzzy_pattern(pattern: &str) -> Vec<char> {
-        pattern
-            .to_lowercase()
-            .chars()
-            .filter(|c| !c.is_whitespace())
-            .collect()
-    }
-
-    pub(super) fn picker_fuzzy_score_with_pattern(pat: &[char], text: &str) -> Option<i32> {
-        let txt: Vec<char> = text.to_lowercase().chars().collect();
-        if pat.is_empty() {
-            return Some(0);
-        }
-
-        let mut pi = 0;
-        let mut score = 0i32;
-        let mut last_match: Option<usize> = None;
-
-        for (ti, &tc) in txt.iter().enumerate() {
-            if pi < pat.len() && tc == pat[pi] {
-                score += 1;
-                if let Some(last) = last_match
-                    && last + 1 == ti
-                {
-                    score += 3;
-                }
-                if ti == 0
-                    || matches!(
-                        txt.get(ti.wrapping_sub(1)),
-                        Some('/' | '-' | '_' | ' ' | '.')
-                    )
-                {
-                    score += 5;
-                }
-                if pi == 0 && ti == 0 {
-                    score += 10;
-                }
-                last_match = Some(ti);
-                pi += 1;
-            }
-        }
-
-        if pi == pat.len() {
-            score -= (txt.len() as i32) / 10;
-            Some(score)
+    pub(super) fn apply_inline_interactive_filter(picker: &mut InlineInteractiveState) {
+        if picker.filter.is_empty() {
+            picker.filtered = (0..picker.entries.len()).collect();
         } else {
-            None
+            let mut scored: Vec<(usize, i32)> = picker
+                .entries
+                .iter()
+                .enumerate()
+                .filter_map(|(i, m)| {
+                    // Section headers stay visible regardless of filter text.
+                    if matches!(m.action, PickerAction::SectionHeader) {
+                        return Some((i, i32::MAX));
+                    }
+                    let filter_text = picker.filter_text(m);
+                    Self::picker_fuzzy_score(&picker.filter, &filter_text).map(|s| {
+                        let usage_bonus = m.usage_score.min(i32::MAX as u32) as i32;
+                        let bonus = usage_bonus
+                            + if m.recommended { 5 } else { 0 }
+                            + if m.is_favorite { 10 } else { 0 };
+                        (i, s + bonus)
+                    })
+                })
+                .collect();
+            scored.sort_by(|a, b| {
+                if a.1 == i32::MAX && b.1 == i32::MAX {
+                    a.0.cmp(&b.0)
+                } else {
+                    b.1.cmp(&a.1)
+                        .then(
+                            picker.entries[a.0]
+                                .usage_score
+                                .cmp(&picker.entries[b.0].usage_score)
+                                .reverse(),
+                        )
+                        .then(picker.entries[a.0].name.cmp(&picker.entries[b.0].name))
+                }
+            });
+            picker.filtered = scored.into_iter().map(|(i, _)| i).collect();
         }
-    }
-
-    /// Score a pattern against name (primary), provider (secondary), and api_method (tertiary).
-    /// Weighted: name x3, provider x2, method x1.
-    pub(super) fn picker_fuzzy_score_multi(
-        pat: &[char],
-        name: &str,
-        provider: &str,
-        api_method: &str,
-    ) -> Option<i32> {
-        let name_score = Self::picker_fuzzy_score_with_pattern(pat, name)?;
-        let provider_score = Self::picker_fuzzy_score_with_pattern(pat, provider).unwrap_or(0);
-        let method_score = Self::picker_fuzzy_score_with_pattern(pat, api_method).unwrap_or(0);
-        // Weighted: name x3, provider x2, method x1
-        Some(name_score * 3 + provider_score * 2 + method_score)
+        if picker.filtered.is_empty() {
+            picker.selected = 0;
+        } else {
+            picker.selected = picker.selected.min(picker.filtered.len() - 1);
+        }
     }
 
     /// Auto-complete the filter: if one entry matches, fill its name;
@@ -3614,58 +3674,6 @@ User's request:
             let first_original = &picker.entries[picker.filtered[0]].name;
             picker.filter = first_original[..prefix_len].to_string();
             Self::apply_inline_interactive_filter(picker);
-        }
-    }
-    pub(super) fn apply_inline_interactive_filter(picker: &mut InlineInteractiveState) {
-        if picker.filter.is_empty() {
-            picker.filtered = (0..picker.entries.len()).collect();
-        } else {
-            let pat = Self::picker_fuzzy_pattern(&picker.filter);
-            let mut scored: Vec<(usize, i32)> = picker
-                .entries
-                .iter()
-                .enumerate()
-                .filter_map(|(i, m)| {
-                    // Section headers are always visible regardless of filter text
-                    if matches!(m.action, PickerAction::SectionHeader) {
-                        return Some((i, i32::MAX)); // always on top
-                    }
-                    let name = m.name.as_str();
-                    let provider = m.active_option().map(|o| o.provider.as_str()).unwrap_or("");
-                    let api_method = m
-                        .active_option()
-                        .map(|o| o.api_method.as_str())
-                        .unwrap_or("");
-                    Self::picker_fuzzy_score_multi(&pat, name, provider, api_method).map(|s| {
-                        let usage_bonus = m.usage_score.min(i32::MAX as u32) as i32;
-                        let bonus = usage_bonus
-                            + if m.recommended { 5 } else { 0 }
-                            + if m.is_favorite { 10 } else { 0 };
-                        (i, s + bonus)
-                    })
-                })
-                .collect();
-            scored.sort_by(|a, b| {
-                // Section headers (score = i32::MAX) sort by their original position
-                if a.1 == i32::MAX && b.1 == i32::MAX {
-                    a.0.cmp(&b.0)
-                } else {
-                    b.1.cmp(&a.1)
-                        .then(
-                            picker.entries[a.0]
-                                .usage_score
-                                .cmp(&picker.entries[b.0].usage_score)
-                                .reverse(),
-                        )
-                        .then(picker.entries[a.0].name.cmp(&picker.entries[b.0].name))
-                }
-            });
-            picker.filtered = scored.iter().map(|(i, _)| *i).collect();
-        }
-
-        // Clamp selection to valid range
-        if picker.selected >= picker.filtered.len() && !picker.filtered.is_empty() {
-            picker.selected = picker.filtered.len() - 1;
         }
     }
 
@@ -3774,6 +3782,26 @@ mod tests {
         App::apply_inline_interactive_filter(&mut picker);
 
         assert_eq!(picker.filtered, vec![1, 0]);
+    }
+
+    #[test]
+    fn model_picker_fuzzy_filter_tolerates_common_typos() {
+        let mut picker = InlineInteractiveState {
+            kind: PickerKind::Model,
+            filtered: vec![0, 1],
+            entries: vec![
+                picker_entry("gpt-5-codex", "OpenAI", 0),
+                picker_entry("claude-opus-4.6", "Anthropic", 0),
+            ],
+            selected: 0,
+            column: 0,
+            filter: "codxe".to_string(),
+            preview: false,
+        };
+
+        App::apply_inline_interactive_filter(&mut picker);
+
+        assert_eq!(picker.filtered, vec![0]);
     }
 
     #[test]
@@ -4005,5 +4033,110 @@ mod tests {
         let serialized = serde_json::to_value(&cache).expect("cache should serialize");
         assert_eq!(serialized["provider_name"], "OpenAI");
         assert!(serialized.get("snapshot").is_none());
+    }
+
+    fn model_route(model: &str, provider: &str, api_method: &str) -> crate::provider::ModelRoute {
+        crate::provider::ModelRoute {
+            model: model.to_string(),
+            provider: provider.to_string(),
+            api_method: api_method.to_string(),
+            available: true,
+            detail: String::new(),
+            cheapness: None,
+        }
+    }
+
+    #[test]
+    fn route_effort_support_covers_effort_capable_runtimes_only() {
+        assert!(route_supports_reasoning_effort("claude-oauth"));
+        assert!(route_supports_reasoning_effort("claude-api"));
+        assert!(route_supports_reasoning_effort("openai-oauth"));
+        assert!(route_supports_reasoning_effort("openai-api-key"));
+        assert!(route_supports_reasoning_effort("openrouter"));
+
+        assert!(!route_supports_reasoning_effort("copilot"));
+        assert!(!route_supports_reasoning_effort("bedrock"));
+        assert!(!route_supports_reasoning_effort("https"));
+        assert!(!route_supports_reasoning_effort(
+            "openai-compatible:llamacpp"
+        ));
+        assert!(!route_supports_reasoning_effort("remote-catalog"));
+        assert!(!route_supports_reasoning_effort("current"));
+    }
+
+    #[test]
+    fn provider_allowlist_filters_routes_by_label_method_and_profile() {
+        let routes = vec![
+            model_route("gpt-5.5", "OpenAI", "openai-oauth"),
+            model_route("claude-fable-5", "Anthropic", "claude-oauth"),
+            model_route("qwen3-coder", "llama.cpp", "openai-compatible:llamacpp"),
+            model_route("deepseek/deepseek-v4-pro", "auto", "openrouter"),
+        ];
+
+        // Provider label match (normalized: case/dots/spaces insensitive).
+        let filtered = filter_routes_by_provider_allowlist(
+            routes.clone(),
+            Some(&["Llama.CPP".to_string()]),
+            "unrelated-current",
+        );
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].model, "qwen3-coder");
+
+        // Bare openai-compatible profile id match.
+        let filtered = filter_routes_by_provider_allowlist(
+            routes.clone(),
+            Some(&["llamacpp".to_string()]),
+            "unrelated-current",
+        );
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].provider, "llama.cpp");
+
+        // Api-method match plus alias-aware provider label match.
+        let filtered = filter_routes_by_provider_allowlist(
+            routes.clone(),
+            Some(&["claude-oauth".to_string(), "openrouter".to_string()]),
+            "unrelated-current",
+        );
+        let models: Vec<&str> = filtered.iter().map(|r| r.model.as_str()).collect();
+        assert_eq!(models, ["claude-fable-5", "deepseek/deepseek-v4-pro"]);
+    }
+
+    #[test]
+    fn provider_allowlist_keeps_current_model_and_never_empties_picker() {
+        let routes = vec![
+            model_route("gpt-5.5", "OpenAI", "openai-oauth"),
+            model_route("qwen3-coder", "llama.cpp", "openai-compatible:llamacpp"),
+        ];
+
+        // Current model's route survives even when its provider is filtered out.
+        let filtered = filter_routes_by_provider_allowlist(
+            routes.clone(),
+            Some(&["llamacpp".to_string()]),
+            "gpt-5.5",
+        );
+        let models: Vec<&str> = filtered.iter().map(|r| r.model.as_str()).collect();
+        assert_eq!(models, ["gpt-5.5", "qwen3-coder"]);
+
+        // A filter matching nothing falls back to the full list.
+        let filtered = filter_routes_by_provider_allowlist(
+            routes.clone(),
+            Some(&["nonexistent".to_string()]),
+            "unrelated-current",
+        );
+        assert_eq!(filtered.len(), routes.len());
+
+        // None / empty / blank-entry allowlists are no-ops.
+        assert_eq!(
+            filter_routes_by_provider_allowlist(routes.clone(), None, "x").len(),
+            2
+        );
+        assert_eq!(
+            filter_routes_by_provider_allowlist(routes.clone(), Some(&[]), "x").len(),
+            2
+        );
+        assert_eq!(
+            filter_routes_by_provider_allowlist(routes, Some(&["  ".to_string()]), "x").len(),
+            2
+        );
     }
 }

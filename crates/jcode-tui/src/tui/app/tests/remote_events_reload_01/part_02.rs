@@ -161,7 +161,7 @@ fn test_remote_auto_poke_completion_above_threshold_only_updates_ui() {
         assert!(app.hidden_queued_system_messages.is_empty());
         assert!(app.display_messages().iter().any(|msg| {
             msg.content
-                .contains("Todos complete. Auto-poke finished. Cumulative confidence: 95%.")
+                .contains("Todos complete. Completion confidence: 95%.")
         }));
     });
 }
@@ -206,7 +206,7 @@ fn test_remote_auto_poke_completion_below_threshold_tells_model_to_keep_working(
             .contains(crate::prompt::TODO_CONFIDENCE_NEEDS_VALIDATION_PROMPT.trim()));
         assert!(app.display_messages().iter().any(|msg| {
             msg.content
-                .contains("Todos complete. Auto-poke finished. Cumulative confidence: 80%.")
+                .contains("Todos complete. Completion confidence: 80%.")
         }));
     });
 }

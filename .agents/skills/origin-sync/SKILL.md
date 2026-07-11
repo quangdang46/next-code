@@ -743,3 +743,45 @@ rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biase
 - `crates/jcode-tui/src/tui/backend.rs` — cancellation-safety test
 - `crates/jcode-app-core/src/agent/turn_streaming_mpsc.rs` — tool completion vs Alt+B
 - `crates/jcode-app-core/src/server/client_lifecycle.rs` — client I/O over bus noise
+
+### 2026-07-11 — v0.41.0..v0.42.0 upstream sync (merge upstream/master → master)
+
+**Branch**: `master`.
+**Upstream range**: post-v0.41 tip → v0.42.0 + follow-ups (~34 commits, tip `329c1ebf0`).
+**Files**: ~122 changed in merge (+7k / -1.5k).
+
+**Status**: ✅ `cargo check -p jcode` clean. Lesson 2 (`biased;` absent in `turn.rs`). Lesson 3 (`SERVER-SAVE` / `ROUTE-SAVE` + `PICKER-SAVE` + `apply_config_default_model`) preserved. Fork version stays **0.32.0** (do not take upstream package version).
+
+| Category | What |
+|----------|------|
+| ✨ Feature | **LaTeX / terminal math** (`jcode-render-core` math, markdown render path) |
+| ✨ Feature | **Typo-resistant fuzzy** (`jcode-fuzzy` crate; TUI picker / slash commands) |
+| ✨ Feature | **Swarm agent cards** under spawn calls; strip `icon`/`task`; dock `managed_members` |
+| 🖥️ Server | Swarm persistence, lock races, lifecycle ownership, reload recovery, Retry-After |
+| 🏎️ Memory | Retained-heap watchdog (`release_retained_heap_if_excessive`, idle TUI trim) |
+| 📝 Skills | Upstream trailing-prompt after skill; **fork keeps `$` namespace** + `SkillInvocation` |
+| 🐛 Fork protect | Lesson 2 no-`biased;`; Lesson 3 model persist blocks; agent route-aware default_model |
+
+**Kept OURS** (Category A / B / H):
+- Extracted deps + adapters (casr/ffs/dcg/hashline/mempalace/dcp/rtco/beads)
+- `skill.rs` `$` + trailing prompt (not `/skill`)
+- `turn.rs` event loop without `biased;`
+- `provider_control.rs` SERVER/ROUTE-SAVE
+- Cargo workspace version 0.32.0 + `jcode-fuzzy` member
+
+**Category G / bad-merge repairs**:
+1. `GalleryMember.icon` / `.task` + `disp_w` / `CHIP_TASK_*` in `swarm_gallery.rs`
+2. `members_to_gallery` + `member_icon` / `age_marker` in info-widget adapter
+3. Restored `ui_prepare.rs` from HEAD (duplicate-fn concat), re-applied upstream swarm-card inject + cache signature
+4. `SwarmInfo` fields: `managed_members`, `selected`, `focused`, `plan_progress`, `spinner_frame`
+5. `process_memory.rs` take upstream retention-trim APIs
+6. Deduped `apply_inline_interactive_filter` onto `jcode_fuzzy::fuzzy_score_tokens`
+7. Skill invocation tests updated for `SkillInvocation` + trailing prompt
+
+**Post-merge MUST-check**:
+```bash
+rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
+rg -n 'parse_invocation|SkillInvocation' crates/jcode-base/src/skill.rs | head
+cargo check -p jcode
+```

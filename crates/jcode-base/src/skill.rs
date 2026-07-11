@@ -33,6 +33,14 @@ pub struct SkillRegistry {
     skills: HashMap<String, Skill>,
 }
 
+/// A slash-command skill invocation, optionally followed by a prompt that
+/// should be submitted immediately after activating the skill.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SkillInvocation<'a> {
+    pub name: &'a str,
+    pub prompt: Option<&'a str>,
+}
+
 /// Maximum directory depth scanned under a Claude Code plugin root when
 /// looking for `skills/<name>/SKILL.md` entries. Plugin layouts vary across
 /// Claude Code versions (`cache/<marketplace>/<plugin>/<version>/skills/...`,
@@ -626,23 +634,33 @@ impl SkillRegistry {
         Ok(count)
     }
 
-    /// Check if a message is a skill invocation.
+    /// Parse `$skill-name` and `$skill-name prompt...` invocations.
     ///
-    /// Skills use the `$<name>` namespace exclusively — `/` is reserved
-    /// for built-in slash commands. Returns the bare skill name without
-    /// the prefix, or `None` if the input is not a single-word `$`
-    /// invocation.
-    ///
-    /// Note: the historical `/<skill>` form was retired to keep the `/`
-    /// autocomplete dropdown navigable when the user has dozens of
-    /// skills installed (see PR #256).
-    pub fn parse_invocation(input: &str) -> Option<&str> {
+    /// Skills use the `$<name>` namespace exclusively — `/` is reserved for
+    /// built-in slash commands (PR #256). The trailing prompt is kept verbatim
+    /// apart from surrounding whitespace; incomplete quotes are not special.
+    pub fn parse_invocation(input: &str) -> Option<SkillInvocation<'_>> {
         let trimmed = input.trim();
-        if trimmed.contains(' ') {
+        let invocation = trimmed.strip_prefix('$')?;
+        let name_end = invocation
+            .find(char::is_whitespace)
+            .unwrap_or(invocation.len());
+        let name = &invocation[..name_end];
+        if name.is_empty() {
             return None;
         }
-        let rest = trimmed.strip_prefix('$')?;
-        (!rest.is_empty()).then_some(rest)
+
+        let prompt = invocation[name_end..].trim();
+        let prompt = match prompt.as_bytes() {
+            [b'"', .., b'"'] | [b'\'', .., b'\''] if prompt.len() >= 2 => {
+                &prompt[1..prompt.len() - 1]
+            }
+            _ => prompt,
+        };
+        Some(SkillInvocation {
+            name,
+            prompt: (!prompt.is_empty()).then_some(prompt),
+        })
     }
 
     /// Return true if a skill with the given name is currently loaded.
@@ -939,6 +957,71 @@ mod tests {
             format!("---\nname: {name}\ndescription: Test skill {name}\n---\n\nUse {name}.\n"),
         )
         .expect("write skill");
+    }
+
+    #[test]
+    fn parse_invocation_supports_a_trailing_prompt() {
+        assert_eq!(
+            SkillRegistry::parse_invocation("$frontend-design build a settings page"),
+            Some(SkillInvocation {
+                name: "frontend-design",
+                prompt: Some("build a settings page"),
+            })
+        );
+        assert_eq!(
+            SkillRegistry::parse_invocation("  $frontend-design   \"build a settings page\"  "),
+            Some(SkillInvocation {
+                name: "frontend-design",
+                prompt: Some("build a settings page"),
+            })
+        );
+    }
+
+    #[test]
+    fn parse_invocation_handles_bare_and_incomplete_quoted_prompts_without_blocking() {
+        assert_eq!(
+            SkillRegistry::parse_invocation("$optimization"),
+            Some(SkillInvocation {
+                name: "optimization",
+                prompt: None,
+            })
+        );
+        assert_eq!(
+            SkillRegistry::parse_invocation("$optimization \"make this faster"),
+            Some(SkillInvocation {
+                name: "optimization",
+                prompt: Some("\"make this faster"),
+            })
+        );
+        assert_eq!(SkillRegistry::parse_invocation("$"), None);
+    }
+
+    #[test]
+    fn list_is_sorted_by_name_regardless_of_insertion_order() {
+        let names = ["zebra", "alpha", "mango", "beta", "yak"];
+
+        let mut reg_a = SkillRegistry::default();
+        for name in names {
+            reg_a
+                .skills
+                .insert(name.to_string(), test_skill(name, "d", "c"));
+        }
+
+        let mut reg_b = SkillRegistry::default();
+        for name in names.iter().rev() {
+            reg_b
+                .skills
+                .insert(name.to_string(), test_skill(name, "d", "c"));
+        }
+
+        let order_a: Vec<&str> = reg_a.list().iter().map(|s| s.name.as_str()).collect();
+        let order_b: Vec<&str> = reg_b.list().iter().map(|s| s.name.as_str()).collect();
+
+        assert_eq!(order_a, vec!["alpha", "beta", "mango", "yak", "zebra"]);
+        assert_eq!(
+            order_a, order_b,
+            "list() ordering must be identical across HashMap instances"
+        );
     }
 
     #[test]
@@ -1321,11 +1404,17 @@ mod invocation_parse_tests {
     fn parse_invocation_accepts_dollar_prefix() {
         assert_eq!(
             SkillRegistry::parse_invocation("$grill-me"),
-            Some("grill-me")
+            Some(SkillInvocation {
+                name: "grill-me",
+                prompt: None,
+            })
         );
         assert_eq!(
             SkillRegistry::parse_invocation("  $grill-me  "),
-            Some("grill-me")
+            Some(SkillInvocation {
+                name: "grill-me",
+                prompt: None,
+            })
         );
     }
 
@@ -1339,10 +1428,16 @@ mod invocation_parse_tests {
     }
 
     #[test]
-    fn parse_invocation_rejects_invocation_with_args() {
-        // $<name> requires single-word form; whitespace returns None so
-        // the input is treated as a literal user message.
-        assert!(SkillRegistry::parse_invocation("$grill-me with args").is_none());
+    fn parse_invocation_keeps_trailing_prompt_on_dollar_namespace() {
+        // Upstream v0.42: `$name prompt...` is valid (prompt after skill).
+        // Keep `$` namespace (fork); do not reintroduce `/skill` parsing.
+        assert_eq!(
+            SkillRegistry::parse_invocation("$grill-me with args"),
+            Some(SkillInvocation {
+                name: "grill-me",
+                prompt: Some("with args"),
+            })
+        );
     }
 
     #[test]

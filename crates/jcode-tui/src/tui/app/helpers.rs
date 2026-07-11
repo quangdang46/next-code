@@ -406,8 +406,8 @@ fn copy_to_clipboard_osc52(text: &str) -> bool {
 
 pub(super) fn effort_display_label(effort: &str) -> &str {
     match effort {
-        "swarm" => "Swarm (light fan-out)",
-        "swarm-deep" => "Swarm Deep (Max + task graph)",
+        "swarm" => "Swarm (light fan-out) [Beta]",
+        "swarm-deep" => "Swarm Deep (Max + task graph) [Beta]",
         "max" => "Max",
         "xhigh" => "xHigh (Max)",
         "high" => "High",
@@ -1100,7 +1100,7 @@ pub(super) fn gather_git_info() -> Option<GitInfo> {
 
 /// Fetch a session's todos plus its goal-level assessments through the same
 /// stale-while-revalidate cache, so the info widget can render goal metadata
-/// (hill-climbability, taste-driven flags) without extra disk reads per frame.
+/// (hill-climbability and objectives) without extra disk reads per frame.
 pub(super) fn gather_todos_and_goals_for_session(
     session_id: Option<&str>,
 ) -> (Vec<TodoItem>, Vec<crate::todo::TodoGoal>) {

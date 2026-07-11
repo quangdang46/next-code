@@ -229,12 +229,48 @@ pub fn allocator_info() -> AllocatorInfo {
 /// heap into "live" (bytes the app currently holds) and "retained" (bytes
 /// freed by the app but kept by the allocator), which is the distinction that
 /// matters when diagnosing unattributed RSS.
+///
+/// `mallinfo2` is resolved with `dlsym` instead of linked directly: release
+/// binaries are built against a glibc 2.17 (manylinux2014) baseline where the
+/// symbol does not exist, so a direct call fails to link. At runtime on a
+/// modern glibc the lookup succeeds and stats work as before; on an old glibc
+/// this returns `None` and callers already treat stats as unavailable.
 #[cfg(all(target_os = "linux", target_env = "gnu", not(feature = "jemalloc")))]
 fn glibc_malloc_stats() -> Option<AllocatorStats> {
+    // Mirrors glibc's `struct mallinfo2` (all fields `size_t`).
+    #[repr(C)]
+    #[derive(Clone, Copy)]
+    struct Mallinfo2 {
+        arena: libc::size_t,
+        ordblks: libc::size_t,
+        smblks: libc::size_t,
+        hblks: libc::size_t,
+        hblkhd: libc::size_t,
+        usmblks: libc::size_t,
+        fsmblks: libc::size_t,
+        uordblks: libc::size_t,
+        fordblks: libc::size_t,
+        keepcost: libc::size_t,
+    }
+    type Mallinfo2Fn = unsafe extern "C" fn() -> Mallinfo2;
+
+    static MALLINFO2: std::sync::OnceLock<Option<Mallinfo2Fn>> = std::sync::OnceLock::new();
+    let mallinfo2 = (*MALLINFO2.get_or_init(|| {
+        // Safety: dlsym with a NUL-terminated literal; the default namespace
+        // (RTLD_DEFAULT) searches the already-loaded glibc.
+        let sym = unsafe { libc::dlsym(libc::RTLD_DEFAULT, c"mallinfo2".as_ptr()) };
+        if sym.is_null() {
+            None
+        } else {
+            // Safety: glibc's mallinfo2 has exactly this signature.
+            Some(unsafe { std::mem::transmute::<*mut libc::c_void, Mallinfo2Fn>(sym) })
+        }
+    }))?;
+
     // Totals are summed across all arenas by modern glibc.
     // uordblks: in-use arena bytes; fordblks: freed-but-retained arena bytes;
     // hblkhd: mmap-backed allocation bytes; arena: total sbrk/mmap arena size.
-    let info = unsafe { libc::mallinfo2() };
+    let info = unsafe { mallinfo2() };
     let live = (info.uordblks as u64).saturating_add(info.hblkhd as u64);
     let mapped = (info.arena as u64).saturating_add(info.hblkhd as u64);
     Some(AllocatorStats {
@@ -279,11 +315,24 @@ pub fn purge_allocator() -> Result<AllocatorTuningInfo> {
         }))
     }
 
-    #[cfg(not(feature = "jemalloc"))]
+    #[cfg(all(target_os = "linux", not(feature = "jemalloc")))]
     {
-        logging::warn("allocator purge requested but jemalloc feature is disabled");
+        // glibc has no arena purge API, but malloc_trim(0) walks all arenas
+        // and returns freed pages to the OS (MADV_DONTNEED), which is the
+        // equivalent retained-memory release.
+        logging::info("purging glibc allocator via malloc_trim(0)");
+        release_retained_heap("debug_allocator_purge");
+        Ok(AllocatorTuningInfo {
+            available: true,
+            ..AllocatorTuningInfo::default()
+        })
+    }
+
+    #[cfg(all(not(target_os = "linux"), not(feature = "jemalloc")))]
+    {
+        logging::warn("allocator purge requested but no purge mechanism is available");
         Err(anyhow!(
-            "allocator purge unavailable: rebuild with --features jemalloc"
+            "allocator purge unavailable on this platform: rebuild with --features jemalloc"
         ))
     }
 }
@@ -443,6 +492,11 @@ pub fn release_retained_heap(reason: &str) {
     {
         let _ = reason;
     }
+
+    // Whatever apparent retention remains after the release is the
+    // unrecoverable floor (fragmentation residual); measure future growth
+    // from it so retention-triggered callers stay quiet at steady state.
+    record_post_trim_retention_baseline();
 }
 
 static LAST_HEAP_RELEASE_MS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -468,6 +522,129 @@ pub fn release_retained_heap_debounced(reason: &str, min_interval: std::time::Du
     }
     release_retained_heap(reason);
     true
+}
+
+/// Default apparent-retention growth threshold that triggers a background trim.
+pub const DEFAULT_RETENTION_TRIM_THRESHOLD_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Post-trim apparent-retention baseline (bytes). Updated after every
+/// [`release_retained_heap`] and ratcheted down when current apparent
+/// retention falls below it, so growth is always measured from the floor.
+static POST_TRIM_APPARENT_RETENTION: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(0);
+
+/// Resident anonymous memory not accounted for by live allocator bytes:
+/// freed-but-still-resident heap pages plus fragmentation overhead. This is
+/// the memory a trim/purge can plausibly return to the OS, measured from the
+/// OS side (RssAnon) minus the allocator's live bytes.
+///
+/// Allocator-reported "retained/free" counters are the wrong trigger metric
+/// on glibc: `malloc_trim` releases the physical pages behind free chunks
+/// (MADV_DONTNEED) but the chunks remain in `fordblks`, so that counter never
+/// drops after a trim and a threshold on it re-fires forever.
+#[cfg(target_os = "linux")]
+fn apparent_heap_retention_bytes() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    let rss_anon = parse_proc_status_value_bytes(&status, "RssAnon:")?;
+    let live = allocator_info().stats.as_ref()?.allocated_bytes?;
+    Some(rss_anon.saturating_sub(live))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn apparent_heap_retention_bytes() -> Option<u64> {
+    None
+}
+
+/// Refresh the post-trim baseline from the current apparent retention.
+fn record_post_trim_retention_baseline() {
+    if let Some(apparent) = apparent_heap_retention_bytes() {
+        POST_TRIM_APPARENT_RETENTION.store(apparent, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// Pure trigger decision for retention-based trimming: has apparent retention
+/// grown at least `threshold` bytes above the post-trim `baseline`?
+fn retention_growth_exceeds(apparent: u64, baseline: u64, threshold: u64) -> bool {
+    apparent.saturating_sub(baseline) >= threshold
+}
+
+/// Release retained heap when apparent retention (RssAnon minus live
+/// allocator bytes) has grown at least `threshold_bytes` above the post-trim
+/// baseline. Intended for periodic (heartbeat) callers: cheap when below
+/// threshold (one /proc/self/status read + allocator stats read), debounced
+/// against other release paths when above it. Returns true when a release ran.
+///
+/// This closes the gap left by event-driven trims (turn completion, history
+/// load): a server hosting many mostly-idle sessions can accumulate hundreds
+/// of MB of freed-but-resident pages without ever hitting those event hooks.
+/// Measuring *growth above the post-trim floor* keeps the watchdog quiet at
+/// steady state: the unrecoverable fragmentation residual left after a trim
+/// becomes the new baseline instead of re-triggering every cycle.
+pub fn release_retained_heap_if_excessive(
+    reason: &str,
+    threshold_bytes: u64,
+    min_interval: std::time::Duration,
+) -> bool {
+    use std::sync::atomic::Ordering;
+
+    let Some(apparent) = apparent_heap_retention_bytes() else {
+        // No OS-side metric available (non-Linux, or allocator stats missing):
+        // fall back to the allocator-reported retained counter as an absolute
+        // threshold. Coarse, but better than never trimming.
+        let retained = allocator_info()
+            .stats
+            .and_then(|stats| stats.retained_bytes)
+            .unwrap_or(0);
+        if retained < threshold_bytes {
+            return false;
+        }
+        return release_retained_heap_debounced(reason, min_interval);
+    };
+
+    // Ratchet the baseline down so growth is measured from the true floor
+    // (e.g. after freed pages get reused into live memory).
+    let mut baseline = POST_TRIM_APPARENT_RETENTION.load(Ordering::Relaxed);
+    if apparent < baseline {
+        POST_TRIM_APPARENT_RETENTION.store(apparent, Ordering::Relaxed);
+        baseline = apparent;
+    }
+
+    if !retention_growth_exceeds(apparent, baseline, threshold_bytes) {
+        return false;
+    }
+
+    let released = release_retained_heap_debounced(reason, min_interval);
+    if released {
+        let after = apparent_heap_retention_bytes().unwrap_or(apparent);
+        logging::info(&format!(
+            "retained-heap trim ({reason}): apparent retention {} MB grew {} MB above post-trim baseline {} MB (threshold {} MB); recovered ~{} MB",
+            apparent / (1024 * 1024),
+            (apparent - baseline) / (1024 * 1024),
+            baseline / (1024 * 1024),
+            threshold_bytes / (1024 * 1024),
+            apparent.saturating_sub(after) / (1024 * 1024),
+        ));
+    }
+    released
+}
+
+/// Retention trim threshold in bytes, from `JCODE_HEAP_RETENTION_TRIM_MB`
+/// (in MiB), falling back to [`DEFAULT_RETENTION_TRIM_THRESHOLD_BYTES`].
+/// `0` disables retention-triggered trimming (returns `u64::MAX`).
+pub fn retention_trim_threshold_bytes() -> u64 {
+    parse_retention_trim_threshold(
+        std::env::var("JCODE_HEAP_RETENTION_TRIM_MB")
+            .ok()
+            .as_deref(),
+    )
+}
+
+fn parse_retention_trim_threshold(value: Option<&str>) -> u64 {
+    match value.and_then(|value| value.trim().parse::<u64>().ok()) {
+        Some(0) => u64::MAX,
+        Some(mb) => mb.saturating_mul(1024 * 1024),
+        None => DEFAULT_RETENTION_TRIM_THRESHOLD_BYTES,
+    }
 }
 
 fn record_snapshot(source: String, snapshot: ProcessMemorySnapshot) {
@@ -750,6 +927,77 @@ mod tests {
         assert!(
             !ran,
             "second call within debounce interval should be skipped"
+        );
+    }
+
+    #[test]
+    fn parse_retention_trim_threshold_handles_default_disable_and_values() {
+        assert_eq!(
+            parse_retention_trim_threshold(None),
+            DEFAULT_RETENTION_TRIM_THRESHOLD_BYTES
+        );
+        assert_eq!(
+            parse_retention_trim_threshold(Some("garbage")),
+            DEFAULT_RETENTION_TRIM_THRESHOLD_BYTES
+        );
+        // 0 disables retention trimming entirely.
+        assert_eq!(parse_retention_trim_threshold(Some("0")), u64::MAX);
+        assert_eq!(
+            parse_retention_trim_threshold(Some(" 128 ")),
+            128 * 1024 * 1024
+        );
+    }
+
+    #[test]
+    fn release_retained_heap_if_excessive_skips_below_threshold() {
+        // u64::MAX growth threshold can never be exceeded, so no release
+        // should run regardless of current allocator state.
+        let ran = release_retained_heap_if_excessive(
+            "unit_test_below_threshold",
+            u64::MAX,
+            std::time::Duration::ZERO,
+        );
+        assert!(!ran, "release should not run below threshold");
+    }
+
+    #[test]
+    fn retention_growth_trigger_measures_growth_above_baseline() {
+        let mb = 1024 * 1024;
+        // At or below baseline: no growth.
+        assert!(!retention_growth_exceeds(100 * mb, 100 * mb, 64 * mb));
+        assert!(!retention_growth_exceeds(50 * mb, 100 * mb, 64 * mb));
+        // Growth below threshold stays quiet (the post-trim residual case).
+        assert!(!retention_growth_exceeds(163 * mb, 100 * mb, 64 * mb));
+        // Growth at/above threshold fires.
+        assert!(retention_growth_exceeds(164 * mb, 100 * mb, 64 * mb));
+        assert!(retention_growth_exceeds(300 * mb, 100 * mb, 64 * mb));
+        // Threshold 0 always fires.
+        assert!(retention_growth_exceeds(0, 0, 0));
+    }
+
+    #[cfg(all(target_os = "linux", target_env = "gnu", not(feature = "jemalloc")))]
+    #[test]
+    fn release_retained_heap_if_excessive_runs_above_threshold_then_requires_regrowth() {
+        // Threshold 0 means any growth (>= 0) triggers; with a zero debounce
+        // the release must run and reset the baseline to the current level.
+        let ran = release_retained_heap_if_excessive(
+            "unit_test_above_threshold",
+            0,
+            std::time::Duration::ZERO,
+        );
+        assert!(ran, "release should run when growth exceeds threshold");
+
+        // Immediately after the trim the baseline equals current apparent
+        // retention, so a huge growth threshold cannot be met: steady state
+        // must not re-trigger.
+        let ran_again = release_retained_heap_if_excessive(
+            "unit_test_steady_state",
+            u64::MAX,
+            std::time::Duration::ZERO,
+        );
+        assert!(
+            !ran_again,
+            "steady-state retention must not re-trigger the watchdog"
         );
     }
 

@@ -21,6 +21,32 @@ fn member_label(member: &SwarmMemberStatus) -> String {
         .unwrap_or_else(|| member.session_id.chars().take(8).collect())
 }
 
+/// Session icon (emoji) for a member, derived from its friendly name (session
+/// names come from the shared `SESSION_NAMES` word list, e.g. "fox" -> 🦊).
+/// Falls back to `None` when the name is unknown so the strip shows the name.
+fn member_icon(member: &SwarmMemberStatus) -> Option<String> {
+    let name = member.friendly_name.as_deref()?;
+    let icon = crate::id::session_icon(name);
+    if icon == "💫" {
+        // Unknown word: don't show the generic fallback, keep the name.
+        None
+    } else {
+        Some(icon.to_string())
+    }
+}
+
+/// Age marker appended to member bodies, e.g. "· 7s ago" or "· now".
+/// `humanize_age` already yields "now" for fresh updates, which reads wrong
+/// with an "ago" suffix.
+fn age_marker(age: u64) -> String {
+    let human = humanize_age(age);
+    if human == "now" {
+        "· now".to_string()
+    } else {
+        format!("· {human} ago")
+    }
+}
+
 /// Build the body lines shown inside a member's viewport. Prefers live streamed
 /// output (the tail) when present; otherwise surfaces the latest detail plus a
 /// status-age hint.
@@ -29,7 +55,7 @@ fn member_body(member: &SwarmMemberStatus) -> Vec<String> {
     if let Some(tail) = member.output_tail.as_ref().filter(|t| !t.trim().is_empty()) {
         let mut body: Vec<String> = tail.lines().map(|l| l.to_string()).collect();
         if let Some(age) = member.status_age_secs {
-            body.push(format!("· {} ago", humanize_age(age)));
+            body.push(age_marker(age));
         }
         return body;
     }
@@ -38,24 +64,62 @@ fn member_body(member: &SwarmMemberStatus) -> Vec<String> {
         body.push(detail.clone());
     }
     if let Some(age) = member.status_age_secs {
-        body.push(format!("· {} ago", humanize_age(age)));
+        body.push(age_marker(age));
     }
     body
 }
 
 /// Convert swarm members into renderer-agnostic gallery members.
-fn members_to_gallery(members: &[SwarmMemberStatus]) -> Vec<GalleryMember> {
+pub(crate) fn members_to_gallery(members: &[SwarmMemberStatus]) -> Vec<GalleryMember> {
     members
         .iter()
         .map(|member| GalleryMember {
             label: member_label(member),
+            icon: member_icon(member),
             status: member.status.clone(),
+            task: member.task_label.clone(),
             role: member.role.clone(),
             body: member_body(member),
             sort_key: member.session_id.clone(),
             todo: member.todo_progress,
+            model: member.runtime.model.clone(),
+            elapsed_secs: member.runtime.elapsed_secs,
+            todo_items: member
+                .todo_items
+                .iter()
+                .map(|t| jcode_tui_render::swarm_gallery::GalleryTodo {
+                    content: t.content.clone(),
+                    status: t.status.clone(),
+                    tool_intents: t
+                        .tool_intents
+                        .iter()
+                        .map(|tool| jcode_tui_render::swarm_gallery::GalleryToolIntent {
+                            tool_name: tool.tool_name.clone(),
+                            intent: tool.intent.clone(),
+                            status: tool.status.clone(),
+                            progress: tool.progress.as_ref().map(|progress| {
+                                (progress.current, progress.total, progress.unit.clone())
+                            }),
+                        })
+                        .collect(),
+                })
+                .collect(),
         })
         .collect()
+}
+
+/// Render expanded member cards for insertion directly beneath a swarm tool
+/// call in the transcript.
+pub(crate) fn render_swarm_chat_card_lines(
+    members: &[SwarmMemberStatus],
+    spinner_frame: usize,
+    width: usize,
+) -> Vec<Line<'static>> {
+    jcode_tui_render::swarm_gallery::render_swarm_chat_cards(
+        &members_to_gallery(members),
+        spinner_frame,
+        width,
+    )
 }
 
 /// Render the inline swarm gallery for the given members into `area`-width lines.
@@ -184,7 +248,7 @@ mod tests {
             report_back_to_session_id: None,
             todo_progress: None,
             todo_items: Vec::new(),
-            task_label: None,
+            runtime: crate::protocol::SwarmMemberRuntime::default(),
         }
     }
 

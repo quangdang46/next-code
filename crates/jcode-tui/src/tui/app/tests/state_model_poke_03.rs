@@ -37,8 +37,8 @@ fn test_model_picker_preview_arrow_keys_navigate() {
     assert!(picker.preview, "should remain in preview mode");
     assert_eq!(picker.selected, initial_selected);
 
-    // Input should be preserved
-    assert_eq!(app.input(), "/model");
+    // Opening the preview should place the cursor in the model filter argument.
+    assert_eq!(app.input(), "/model ");
 }
 
 #[test]
@@ -2369,7 +2369,7 @@ fn test_finish_turn_auto_poke_queues_confidence_summary_when_todos_done() {
                 .iter()
                 .any(|msg| msg
                     .content
-                    .contains("Todos complete. Auto-poke finished. Cumulative confidence: 86%."))
+                    .contains("Todos complete. Completion confidence: 86%."))
         );
     });
 }

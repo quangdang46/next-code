@@ -438,6 +438,54 @@ pub(super) fn active_batch_progress_hash(app: &dyn TuiState) -> u64 {
     hasher.finish()
 }
 
+fn swarm_members_signature(members: &[crate::protocol::SwarmMemberStatus]) -> u64 {
+    serde_json::to_string(members)
+        .map(|snapshot| super::hash_text_for_cache(&snapshot))
+        .unwrap_or_default()
+}
+
+fn spawned_member_for_tool<'a>(
+    msg: &DisplayMessage,
+    members: &'a [crate::protocol::SwarmMemberStatus],
+) -> Option<&'a crate::protocol::SwarmMemberStatus> {
+    let tool = msg.tool_data.as_ref()?;
+    if tools_ui::canonical_tool_name(&tool.name) != "swarm"
+        || tool.input.get("action").and_then(|value| value.as_str()) != Some("spawn")
+    {
+        return None;
+    }
+
+    let session_id = msg
+        .content
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("Spawned new agent: "))?
+        .trim();
+    members
+        .iter()
+        .find(|member| member.session_id == session_id)
+}
+
+fn push_spawned_swarm_card_lines(
+    out: &mut Vec<Line<'static>>,
+    msg: &DisplayMessage,
+    members: &[crate::protocol::SwarmMemberStatus],
+    app: &dyn TuiState,
+    width: u16,
+) {
+    let Some(member) = spawned_member_for_tool(msg, members) else {
+        return;
+    };
+    let spinner_frame =
+        (app.animation_elapsed() * jcode_tui_render::swarm_gallery::STRIP_SPINNER_FPS) as usize;
+    for line in crate::tui::info_widget::swarm_gallery::render_swarm_chat_card_lines(
+        std::slice::from_ref(member),
+        spinner_frame,
+        width.saturating_sub(1) as usize,
+    ) {
+        out.push(line.alignment(ratatui::layout::Alignment::Left));
+    }
+}
+
 fn prepare_active_batch_progress(
     app: &dyn TuiState,
     width: u16,
@@ -530,7 +578,7 @@ pub(super) fn prepare_messages(
     }
 
     let key = FullPrepCacheKey {
-        expanded_images_version: 0,
+        expanded_images_version: app.expanded_images_version(),
         width,
         height,
         diff_mode: app.diff_mode(),
@@ -543,6 +591,7 @@ pub(super) fn prepare_messages(
         batch_progress_hash: active_batch_progress_hash(app),
         inline_images_signature: app.side_pane_images_signature(),
         inline_images_visible: app.inline_images_visible(),
+        swarm_members_signature: swarm_members_signature(&app.inline_swarm_members()),
     };
 
     super::note_full_prep_request();
@@ -772,7 +821,7 @@ fn prepare_body_cached(app: &dyn TuiState, width: u16) -> Arc<PreparedMessages> 
     super::note_body_request();
 
     let key = BodyCacheKey {
-        expanded_images_version: 0,
+        expanded_images_version: app.expanded_images_version(),
         width,
         diff_mode: app.diff_mode(),
         messages_version: app.display_messages_version(),
@@ -781,6 +830,7 @@ fn prepare_body_cached(app: &dyn TuiState, width: u16) -> Arc<PreparedMessages> 
         pin_images: app.pin_images(),
         inline_images_visible: app.inline_images_visible(),
         images_signature: app.side_pane_images_signature(),
+        swarm_members_signature: swarm_members_signature(&app.inline_swarm_members()),
     };
     let msg_count = app.display_messages().len();
     let cache_lookup_start = Instant::now();
@@ -844,6 +894,7 @@ struct BodyRenderCtx<'a> {
     anchored_images: Arc<super::inline_image_ui::AnchoredInlineImages>,
     inline_images_visible: bool,
     messages: &'a [DisplayMessage],
+    swarm_members: Vec<crate::protocol::SwarmMemberStatus>,
 }
 
 /// Mutable accumulator for one body build. Both `prepare_body` (full) and
@@ -1076,6 +1127,18 @@ fn render_message_into(
             }
             for line in cached {
                 acc.push_auto(align_if_unset(line, align));
+            }
+            if let Some(member) = spawned_member_for_tool(msg, &ctx.swarm_members) {
+                let spinner_frame = (app.animation_elapsed()
+                    * jcode_tui_render::swarm_gallery::STRIP_SPINNER_FPS)
+                    as usize;
+                for line in crate::tui::info_widget::swarm_gallery::render_swarm_chat_card_lines(
+                    std::slice::from_ref(member),
+                    spinner_frame,
+                    width.saturating_sub(1) as usize,
+                ) {
+                    acc.push_auto(line.alignment(ratatui::layout::Alignment::Left));
+                }
             }
             for line in todo_change_lines(ctx.messages, msg_global_idx, msg, width) {
                 acc.push_auto(align_if_unset(line, align));
@@ -1321,6 +1384,7 @@ pub(super) fn prepare_body_incremental(
     // target did not exist when the base was built.
     let anchored_images = super::inline_image_ui::resolve_anchored_items_cached(app);
     let inline_images_visible = app.inline_images_visible();
+    let swarm_members = app.inline_swarm_members();
     // 0-based ordinal of the next rendered user prompt, excluding synthetic
     // attached-image label messages, mirroring the session renderer's count.
     let mut anchor_prompt_ordinal = if anchored_images.by_prompt.is_empty() {
@@ -1449,6 +1513,12 @@ pub(super) fn prepare_body_incremental(
                 }
                 for line in cached {
                     new_lines.push(align_if_unset(line, align));
+                    new_line_raw_overrides.push(None);
+                    new_line_copy_offsets.push(0);
+                }
+                let card_start = new_lines.len();
+                push_spawned_swarm_card_lines(&mut new_lines, msg, &swarm_members, app, width);
+                for _ in card_start..new_lines.len() {
                     new_line_raw_overrides.push(None);
                     new_line_copy_offsets.push(0);
                 }
@@ -1843,6 +1913,7 @@ pub(super) fn prepare_body(
     // message that produced them (tool result or user prompt).
     let anchored_images = super::inline_image_ui::resolve_anchored_items_cached(app);
     let inline_images_visible = app.inline_images_visible();
+    let swarm_members = app.inline_swarm_members();
     let mut anchor_prompt_ordinal = 0usize;
 
     for (msg_idx, msg) in app.display_messages().iter().enumerate() {
@@ -1965,6 +2036,12 @@ pub(super) fn prepare_body(
                 }
                 for line in cached {
                     lines.push(align_if_unset(line, align));
+                    line_raw_overrides.push(None);
+                    line_copy_offsets.push(0);
+                }
+                let card_start = lines.len();
+                push_spawned_swarm_card_lines(&mut lines, msg, &swarm_members, app, width);
+                for _ in card_start..lines.len() {
                     line_raw_overrides.push(None);
                     line_copy_offsets.push(0);
                 }

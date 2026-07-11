@@ -1122,6 +1122,7 @@ async fn run_default_command(args: Args) -> Result<()> {
         startup_hints,
         !server_running,
         args.fresh_spawn,
+        args.remote_working_dir,
     )
     .await?;
 
