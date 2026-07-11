@@ -3,6 +3,7 @@ use super::*;
 use crate::tui::TuiState;
 use crossterm::cursor::{RestorePosition, SavePosition};
 use crossterm::terminal::{BeginSynchronizedUpdate, EndSynchronizedUpdate};
+use ratatui::backend::{Backend, ClearType};
 use ratatui::{buffer::Buffer, layout::Rect, style::Style};
 use std::io::Write;
 
@@ -131,7 +132,16 @@ impl StatusSpinnerRenderer {
         // multiplexed sessions) show visible flicker. See issue #282.
         let sync = crossterm::execute!(terminal.backend_mut(), BeginSynchronizedUpdate).is_ok();
         if app.force_full_redraw {
-            terminal.clear()?;
+            // Never call Terminal::clear() here: it queries cursor position via DSR (CSI 6n)
+            // and a 2s timeout was fatal for the client mid-session. Fullscreen clear does not
+            // need cursor restore.
+            if let Err(e) = clear_terminal_for_full_redraw(terminal) {
+                crate::logging::warn(&format!(
+                    "Force full redraw clear failed ({e}); continuing with buffer reset only"
+                ));
+                // Still force a full cell rewrite even if the physical clear failed.
+                force_full_buffer_redraw(terminal);
+            }
             app.force_full_redraw = false;
             self.invalidate();
         }
@@ -139,11 +149,29 @@ impl StatusSpinnerRenderer {
         let previous_frame = self.last_frame.as_ref();
         let draw_start = Instant::now();
         let mut render_elapsed = Duration::ZERO;
-        let completed = terminal.draw(|frame| {
+        let completed = match terminal.draw(|frame| {
             let render_start = Instant::now();
             crate::tui::ui::draw(frame, app);
             render_elapsed = render_start.elapsed();
-        })?;
+        }) {
+            Ok(completed) => completed,
+            Err(e) if is_cursor_position_timeout(&e) => {
+                // Defensive: any residual DSR path should not kill the session.
+                crate::logging::warn(&format!(
+                    "Skipping frame after cursor-position timeout during draw ({e})"
+                ));
+                if sync {
+                    let _ = crossterm::execute!(terminal.backend_mut(), EndSynchronizedUpdate);
+                }
+                return Ok(());
+            }
+            Err(e) => {
+                if sync {
+                    let _ = crossterm::execute!(terminal.backend_mut(), EndSynchronizedUpdate);
+                }
+                return Err(e.into());
+            }
+        };
         let total_elapsed = draw_start.elapsed();
         let changed_cells = previous_frame
             .filter(|previous| previous.area == completed.buffer.area)
@@ -217,10 +245,37 @@ impl StatusSpinnerRenderer {
             EndSynchronizedUpdate
         )?;
         terminal.swap_buffers();
-        terminal.backend_mut().flush()?;
+        // Disambiguate: Backend and Write both expose flush on CrosstermBackend.
+        Backend::flush(terminal.backend_mut())?;
         self.last_frame = Some(next_frame);
         Ok(true)
     }
+}
+
+/// Clear the physical terminal and force a full cell rewrite without DSR cursor queries.
+///
+/// `Terminal::clear()` calls `get_cursor_position()` (CSI `6n` / CPR) so it can restore the
+/// cursor after clearing. On Unix that round-trip races with the event reader and times out
+/// after ~2s with "The cursor position could not be read within a normal duration", which used
+/// to exit the TUI client while the agent/server kept running. Fullscreen viewports do not
+/// need cursor restore — clear the whole screen and reset ratatui's diff buffers instead.
+fn clear_terminal_for_full_redraw(terminal: &mut DefaultTerminal) -> std::io::Result<()> {
+    // Physical clear without a cursor-position report.
+    terminal.backend_mut().clear_region(ClearType::All)?;
+    force_full_buffer_redraw(terminal);
+    Ok(())
+}
+
+/// Reset ratatui's double buffers so the next flush paints every cell.
+fn force_full_buffer_redraw(terminal: &mut DefaultTerminal) {
+    terminal.current_buffer_mut().reset();
+    // swap_buffers resets the new current buffer; previous becomes the blank we just reset.
+    terminal.swap_buffers();
+}
+
+fn is_cursor_position_timeout(err: &std::io::Error) -> bool {
+    let msg = err.to_string();
+    msg.contains("cursor position could not be read")
 }
 
 fn render_status_spinner_into_buffer(buffer: &Buffer, area: Rect, symbol: &str) -> bool {
@@ -640,6 +695,50 @@ impl App {
 mod tests {
     use super::*;
     use ratatui::style::Color;
+
+    #[test]
+    fn cursor_position_timeout_is_detected() {
+        let err = std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "The cursor position could not be read within a normal duration",
+        );
+        assert!(is_cursor_position_timeout(&err));
+        let other = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "Broken pipe");
+        assert!(!is_cursor_position_timeout(&other));
+    }
+
+    #[test]
+    fn force_full_buffer_redraw_empties_diff_base() {
+        use ratatui::backend::TestBackend;
+        use ratatui::widgets::Paragraph;
+
+        let backend = TestBackend::new(10, 4);
+        let mut terminal = ratatui::Terminal::new(backend).expect("terminal");
+        terminal
+            .draw(|frame| {
+                frame.render_widget(Paragraph::new("hello"), frame.area());
+            })
+            .expect("draw");
+
+        // Same helpers as production, but for TestBackend (no DSR).
+        terminal.current_buffer_mut().reset();
+        terminal.swap_buffers();
+
+        // Previous buffer is blank, so a redraw of the same content still emits cells.
+        let completed = terminal
+            .draw(|frame| {
+                frame.render_widget(Paragraph::new("hello"), frame.area());
+            })
+            .expect("draw after reset");
+        assert!(
+            completed
+                .buffer
+                .content
+                .iter()
+                .any(|cell| cell.symbol() == "h"),
+            "content should be present after buffer-forced full redraw"
+        );
+    }
 
     #[tokio::test]
     async fn redraw_timer_waits_one_period_and_skips_missed_ticks() {
