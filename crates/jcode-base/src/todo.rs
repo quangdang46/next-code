@@ -156,6 +156,60 @@ pub fn load_goals(session_id: &str) -> Result<Vec<TodoGoal>> {
     storage::read_json(&path).or_else(|_| Ok(Vec::new()))
 }
 
+/// Derive a concise session-title hint from the todo tool's persisted plan.
+///
+/// Todo groups are intended to name coherent goals, so the group containing the
+/// current (or latest incomplete) item is the strongest signal. Ungrouped plans
+/// fall back to their measurable objective, then the item text itself.
+pub fn derive_session_title(todos: &[TodoItem], goals: &[TodoGoal]) -> Option<String> {
+    fn non_empty(value: Option<&str>) -> Option<String> {
+        value
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    }
+
+    let current = todos
+        .iter()
+        .rev()
+        .find(|todo| todo.status.eq_ignore_ascii_case("in_progress"))
+        .or_else(|| {
+            todos
+                .iter()
+                .rev()
+                .find(|todo| !todo.status.eq_ignore_ascii_case("completed"))
+        })
+        .or_else(|| todos.last());
+
+    if let Some(todo) = current {
+        if let Some(group) = non_empty(todo.group.as_deref()) {
+            return Some(group);
+        }
+
+        if let Some(objective) = goals
+            .iter()
+            .rev()
+            .find(|goal| goal.group.is_none())
+            .and_then(|goal| non_empty(goal.objective.as_deref()))
+        {
+            return Some(objective);
+        }
+
+        return non_empty(Some(&todo.content));
+    }
+
+    goals.iter().rev().find_map(|goal| {
+        non_empty(goal.group.as_deref()).or_else(|| non_empty(goal.objective.as_deref()))
+    })
+}
+
+/// Load todo state for a session and derive its best title hint.
+pub fn load_session_title(session_id: &str) -> Option<String> {
+    let todos = load_todos(session_id).ok()?;
+    let goals = load_goals(session_id).unwrap_or_default();
+    derive_session_title(&todos, &goals)
+}
+
 /// Save goals for a session to disk.
 pub fn save_goals(session_id: &str, goals: &[TodoGoal]) -> Result<()> {
     let path = goals_path(session_id)?;

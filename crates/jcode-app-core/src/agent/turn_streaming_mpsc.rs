@@ -1184,6 +1184,7 @@ impl Agent {
                         message_id: message_id.clone(),
                         tool_call_id: tc.id.clone(),
                         tool_name: tc.name.clone(),
+                        intent: None,
                         status: ToolStatus::Error,
                         title: None,
                     }));

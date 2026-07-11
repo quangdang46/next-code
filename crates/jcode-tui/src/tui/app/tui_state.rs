@@ -452,12 +452,9 @@ impl crate::tui::TuiState for App {
 
     fn side_pane_images_signature(&self) -> (usize, u64) {
         // Recomputing the signature walks (and in local mode re-renders) every
-        // image payload, so cache it per display_messages_version: image sets
-        // only change when the transcript does.
-        let version = self.display_messages_version;
-        if let Some((cached_version, signature)) = self.side_pane_images_signature_cache.get()
-            && cached_version == version
-        {
+        // image payload. Cache it until an image mutation explicitly invalidates
+        // it; ordinary text/tool transcript updates do not change the image set.
+        if let Some(signature) = self.side_pane_images_signature_cache.get() {
             return signature;
         }
         use std::hash::{Hash, Hasher};
@@ -475,8 +472,7 @@ impl crate::tui::TuiState for App {
             crate::tui::hash_rendered_image_anchor(image.anchor.as_ref(), &mut hasher);
         }
         let signature = (images.len(), hasher.finish());
-        self.side_pane_images_signature_cache
-            .set(Some((version, signature)));
+        self.side_pane_images_signature_cache.set(Some(signature));
         signature
     }
 
@@ -1202,25 +1198,14 @@ impl crate::tui::TuiState for App {
             Some(self.session.id.as_str())
         };
 
-        let todos = if self.swarm_enabled && !self.swarm_plan_items.is_empty() {
-            self.swarm_plan_items
-                .iter()
-                .map(|item| crate::todo::TodoItem {
-                    content: item.content.clone(),
-                    status: item.status.clone(),
-                    priority: item.priority.clone(),
-                    id: item.id.clone(),
-                    active_form: None,
-                    group: None,
-                    blocked_by: item.blocked_by.clone(),
-                    assigned_to: item.assigned_to.clone(),
-                    confidence: None,
-                    completion_confidence: None,
-                    confidence_history: Vec::new(),
-                })
-                .collect()
+        let todos_are_swarm_plan = self.swarm_enabled && !self.swarm_plan_items.is_empty();
+        let (todos, todo_goals) = if todos_are_swarm_plan {
+            (
+                crate::tui::info_widget::swarm_plan_todos(&self.swarm_plan_items),
+                Vec::new(),
+            )
         } else {
-            gather_todos_for_session(session_id)
+            gather_todos_and_goals_for_session(session_id)
         };
 
         let context_snapshot = self.context_snapshot();
@@ -1470,6 +1455,8 @@ impl crate::tui::TuiState for App {
 
         crate::tui::info_widget::InfoWidgetData {
             todos,
+            todo_goals,
+            todos_are_swarm_plan,
             context_info,
             context_info_stale: !context_snapshot.fresh,
             queue_mode: Some(self.queue_mode),

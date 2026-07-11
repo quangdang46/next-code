@@ -908,6 +908,7 @@ impl Agent {
                         tool_call_id: tc.id.clone(),
                         tool_name: tc.name.clone(),
                         status: ToolStatus::Error,
+                        intent: None,
                         title: None,
                     }));
                     if print_output {

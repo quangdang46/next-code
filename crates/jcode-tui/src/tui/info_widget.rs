@@ -64,6 +64,7 @@ use team_render::render_team_widget;
 use text::{truncate_smart, truncate_with_ellipsis};
 pub(crate) use tips::occasional_status_tip;
 use tips::{render_tips_widget, tips_widget_height};
+pub(crate) use todos_render::swarm_plan_todos;
 use todos_render::{render_todos_compact, render_todos_expanded, render_todos_widget};
 #[cfg(test)]
 use usage_render::render_usage_pill;
@@ -566,6 +567,16 @@ const PAGE_SWITCH_SECONDS: u64 = 30;
 #[derive(Debug, Default, Clone)]
 pub struct InfoWidgetData {
     pub todos: Vec<TodoItem>,
+    /// Goal-level assessments (hill-climbability, objective, taste-driven)
+    /// keyed by todo group (`group: None` covers the ungrouped list). Empty
+    /// when the session has no recorded goals or `todos` is a swarm-plan
+    /// projection.
+    pub todo_goals: Vec<crate::todo::TodoGoal>,
+    /// True when `todos` is actually a projection of the shared swarm plan
+    /// (task DAG) rather than this session's private todo list. The widget
+    /// renders a "Plan" header instead of "Todos" so the two are not
+    /// conflated.
+    pub todos_are_swarm_plan: bool,
     pub context_info: Option<ContextInfo>,
     /// True when context state is being updated and no authoritative snapshot is available.
     pub context_info_stale: bool,
