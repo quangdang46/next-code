@@ -449,7 +449,7 @@ After push, verify:
 - [ ] `cargo check` passes
 - [ ] Local builds work (`cargo build`)
 - [ ] Category F check done: all locally-modified files that upstream touched were audited for silent overwrite
-- [ ] **Lesson 2**: `rg -n 'biased\s*;' crates/jcode-tui/src/tui/app/turn.rs` is empty (no freeze-on-alt-tab regression)
+- [ ] **Lesson 2**: `rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs` is empty (no freeze-on-alt-tab regression; ignore comments)
 - [ ] `ffs`/`$`/`@`/`/permissions` features still working
 - [ ] `Cargo.toml` has our feature flags (`mempalace-backend`, `dcp`, `rtco`)
 - [ ] Extracted features still functional (session resume, file picker, DCG mode)
@@ -628,7 +628,8 @@ With `biased;`, branches are polled in order. When a tool future or stream is co
 1. Treat `crates/jcode-tui/src/tui/app/turn.rs` as **Lesson 1 + Lesson 2** keep-ours for the event loop.
 2. After merge, run:
    ```bash
-   rg -n "biased\s*;" crates/jcode-tui/src/tui/app/turn.rs
+   # Match the statement only (comments may mention biased intentionally)
+   rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs
    # expect: no matches
    ```
 3. If a conflict or auto-merge brings `biased;` back before `event_stream.next()`, **delete it again**. Do not "accept upstream" on that hunk.
@@ -712,8 +713,8 @@ With `biased;`, branches are polled in order. When a tool future or stream is co
 
 **Post-merge MUST-check (freeze)**:
 ```bash
-# Must print nothing for turn.rs event-loop select!
-rg -n "biased\s*;" crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biased reintroduced" || echo "OK: no biased in turn.rs"
+# Must print nothing for turn.rs event-loop select! (statement only)
+rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biased reintroduced" || echo "OK: no biased in turn.rs"
 ```
 
 **Note on other `biased;` (OK to keep)**: intentional priority selects that do **not** starve `event_stream`:
