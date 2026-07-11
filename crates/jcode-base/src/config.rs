@@ -652,14 +652,7 @@ impl ToolConfig {
         } else if matches!(profile.as_str(), "acp") {
             Some(
                 [
-                    "bash",
-                    "read",
-                    "write",
-                    "hashline_edit",
-                    "ffs_grep",
-                    "ffs_glob",
-                    "ls",
-                    "batch",
+                    "bash", "read", "write", "edit", "ffs_grep", "ffs_glob", "ls", "batch",
                 ]
                 .into_iter()
                 .map(|name| name.to_string())
@@ -668,13 +661,7 @@ impl ToolConfig {
         } else if matches!(profile.as_str(), "minimal" | "lite" | "small") {
             Some(
                 [
-                    "bash",
-                    "read",
-                    "write",
-                    "hashline_edit",
-                    "ffs_grep",
-                    "ffs_glob",
-                    "ls",
+                    "bash", "read", "write", "edit", "ffs_grep", "ffs_glob", "ls",
                 ]
                 .into_iter()
                 .map(|name| name.to_string())

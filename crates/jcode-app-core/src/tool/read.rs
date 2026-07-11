@@ -190,8 +190,15 @@ impl Tool for ReadTool {
         // Read file
         let content = tokio::fs::read_to_string(&path).await?;
 
+        // Mint a hashline snapshot so the model can quote `[path#TAG]` in `edit`.
+        // Matches oh-my-pi: read/search emit anchors for the default hashline edit mode.
+        let tag = crate::tool::hashline_snapshots::record(&path, &content, None);
+        let header = crate::tool::hashline_snapshots::format_header(&path, &tag);
+
         // Single-pass: count lines while building output
-        let mut output = String::with_capacity(range.limit.min(2000) * 80);
+        let mut output = String::with_capacity(header.len() + 1 + range.limit.min(2000) * 80);
+        output.push_str(&header);
+        output.push('\n');
         let mut total_lines = 0usize;
         let mut truncated_line_count = 0usize;
         let end_exclusive = range.offset + range.limit;

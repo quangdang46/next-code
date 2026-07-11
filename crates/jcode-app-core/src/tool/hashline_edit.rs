@@ -56,10 +56,11 @@ enum OldAnchor {
 #[async_trait]
 impl Tool for HashlineEditTool {
     fn name(&self) -> &str {
-        "hashline_edit"
+        // Model-facing name matches oh-my-pi: single `edit` tool, hashline backend.
+        "edit"
     }
     fn description(&self) -> &str {
-        "Edit files using hashline patch format or structured anchors."
+        "Apply source edits using the hashline patch language (default edit tool). Pass a patch with [path#TAG] headers from your latest read/search output. Ops: SWAP/DEL/INS (and .BLK variants). Prefer this over any legacy edit/patch tools."
     }
 
     fn parameters_schema(&self) -> Value {

@@ -81,11 +81,12 @@ pub fn resolve_tool_name(name: &str) -> &str {
         "file_read" => "read",
         "write_file" => "write",
         "file_write" => "write",
-        // Classic edit stack is retired; map everything to hashline_edit.
-        "edit" | "Edit" | "edit_file" | "file_edit" => "hashline_edit",
-        "multiedit" | "MultiEdit" => "hashline_edit",
-        "patch" | "Patch" => "hashline_edit",
-        "apply_patch" | "ApplyPatch" => "hashline_edit",
+        // oh-my-pi style: single model-facing `edit` tool (hashline backend).
+        // Legacy names and the old hashline_edit tool id all resolve to `edit`.
+        "Edit" | "edit_file" | "file_edit" | "hashline_edit" => "edit",
+        "multiedit" | "MultiEdit" => "edit",
+        "patch" | "Patch" => "edit",
+        "apply_patch" | "ApplyPatch" => "edit",
         "propose_edit" => "propose_hashline",
         "file_glob" => "ffs glob",
         "file_grep" => "ffs grep",

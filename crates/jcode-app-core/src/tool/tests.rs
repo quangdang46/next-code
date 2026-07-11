@@ -173,13 +173,15 @@ fn test_resolve_tool_name_oauth_aliases() {
     assert_eq!(Registry::resolve_tool_name("file_grep"), "grep");
     assert_eq!(Registry::resolve_tool_name("file_read"), "read");
     assert_eq!(Registry::resolve_tool_name("file_write"), "write");
-    assert_eq!(Registry::resolve_tool_name("file_edit"), "hashline_edit");
+    assert_eq!(Registry::resolve_tool_name("file_edit"), "edit");
     assert_eq!(Registry::resolve_tool_name("file_glob"), "glob");
     assert_eq!(Registry::resolve_tool_name("shell_exec"), "bash");
     assert_eq!(Registry::resolve_tool_name("shell"), "bash");
     assert_eq!(Registry::resolve_tool_name("read_file"), "read");
     assert_eq!(Registry::resolve_tool_name("write_file"), "write");
-    assert_eq!(Registry::resolve_tool_name("edit_file"), "hashline_edit");
+    assert_eq!(Registry::resolve_tool_name("edit_file"), "edit");
+    assert_eq!(Registry::resolve_tool_name("hashline_edit"), "edit");
+    assert_eq!(Registry::resolve_tool_name("apply_patch"), "edit");
     assert_eq!(Registry::resolve_tool_name("task_runner"), "subagent");
     assert_eq!(Registry::resolve_tool_name("task"), "subagent");
     assert_eq!(Registry::resolve_tool_name("launch"), "open");

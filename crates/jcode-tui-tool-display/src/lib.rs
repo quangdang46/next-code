@@ -9,7 +9,7 @@ pub fn resolve_display_tool_name(name: &str) -> &str {
         "shell_exec" => "bash",
         "file_read" => "read",
         "file_write" => "write",
-        "file_edit" => "hashline_edit",
+        "file_edit" => "edit",
         "file_glob" => "ffs glob",
         "file_grep" => "ffs grep",
         "todo_read" | "todo_write" | "todoread" | "todowrite" => "todo",
@@ -21,10 +21,11 @@ pub fn canonical_tool_name(name: &str) -> &str {
     match name {
         "communicate" => "swarm",
         "Write" => "write",
-        "Edit" => "hashline_edit",
-        "MultiEdit" => "hashline_edit",
-        "Patch" => "patch",
-        "ApplyPatch" => "hashline_edit",
+        "Edit" => "edit",
+        "MultiEdit" => "edit",
+        "Patch" => "edit",
+        "hashline_edit" => "edit",
+        "ApplyPatch" => "edit",
         other => other,
     }
 }
@@ -200,7 +201,9 @@ mod tests {
 
     #[test]
     fn canonicalizes_edit_tool_names() {
-        assert_eq!(canonical_tool_name("ApplyPatch"), "hashline_edit");
+        assert_eq!(canonical_tool_name("ApplyPatch"), "edit");
+        assert_eq!(canonical_tool_name("hashline_edit"), "edit");
+        assert!(is_edit_tool_name("edit"));
         assert!(is_edit_tool_name("hashline_edit"));
         assert!(is_edit_tool_name("MultiEdit"));
         assert!(!is_edit_tool_name("read"));

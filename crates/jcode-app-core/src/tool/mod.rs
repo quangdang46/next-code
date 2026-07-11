@@ -527,10 +527,11 @@ impl Registry {
             );
             Self::insert_tool_timed(&mut m, &mut timings, "gmail", gmail::GmailTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "memory", memory::MemoryTool::new);
+            // Primary edit tool (oh-my-pi style): name `edit`, hashline backend only.
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
-                "hashline_edit",
+                "edit",
                 hashline_edit::HashlineEditTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "schedule", ambient::ScheduleTool::new);
