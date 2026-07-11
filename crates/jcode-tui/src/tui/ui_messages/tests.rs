@@ -213,6 +213,91 @@ fn render_background_task_message_uses_box_and_truncates_preview_lines() {
 }
 
 #[test]
+fn render_background_task_message_strips_ansi_from_existing_preview() {
+    let msg = DisplayMessage::background_task(
+        "**Background task** `bg123` · `bash` · ✓ completed · 0.1s · exit 0\n\n```text\n\u{1b}[32m✓\u{1b}[39m passes \u{1b}[2m12ms\u{1b}[22m\n```\n\n_Full output:_ `bg action=\"output\" task_id=\"bg123\"`",
+    );
+
+    let plain = render_background_task_message(&msg, 80, crate::config::DiffDisplayMode::Off)
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.contains("✓ passes 12ms"),
+        "rendered preview:\n{plain}"
+    );
+    assert!(!plain.contains('\u{1b}'));
+    assert!(!plain.contains("[32m"));
+    assert!(!plain.contains("[2m"));
+}
+
+#[test]
+fn render_system_message_strips_ansi_from_existing_inline_command_preview() {
+    let msg = DisplayMessage::system(
+        "Shell command · ✓ exit 0 · 12ms\n\n  cargo test\n\n  \u{1b}[32m✓\u{1b}[39m passes \u{1b}[2m12ms\u{1b}[22m",
+    );
+
+    let plain = render_system_message(&msg, 80, crate::config::DiffDisplayMode::Off)
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.contains("✓ passes 12ms"),
+        "rendered preview:\n{plain}"
+    );
+    assert!(!plain.contains('\u{1b}'));
+    assert!(!plain.contains("[32m"));
+    assert!(!plain.contains("[2m"));
+}
+
+#[test]
+fn render_background_task_message_uses_swarm_flavor_for_swarm_tool() {
+    let msg = DisplayMessage::background_task(
+        "**Background task** `bg777` · `run_plan (6 nodes, deep mode)` (`swarm`) · ✓ completed · 92.4s · exit 0\n\n```text\nSwarm plan reached terminal/blocked state after 9 loop(s). completed=6 blocked=0 cycles=0 active=0 assignments=8\n```\n\n_Full output:_ `bg action=\"output\" task_id=\"bg777\"`",
+    );
+
+    let lines = render_background_task_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.contains("🐝 run_plan (6 nodes, deep mode) completed · bg777"),
+        "expected swarm-flavored completion title, got:\n{plain}"
+    );
+    assert!(!plain.contains("✓ bg "));
+    assert!(plain.contains("exit 0 · 92.4s"));
+    assert!(plain.contains("Swarm plan reached terminal/blocked state"));
+}
+
+#[test]
+fn render_background_task_progress_message_uses_swarm_flavor_for_swarm_tool() {
+    let msg = DisplayMessage::background_task(
+        "**Background task progress** `bg777` · `run_plan (6 nodes, deep mode)` (`swarm`)\n\n[####--------] 33% · 2/6 nodes · completed 2 · blocked 0 · active 3 · assignments 5 (reported)",
+    );
+
+    let lines = render_background_task_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.contains("🐝 run_plan (6 nodes, deep mode) · bg777"),
+        "expected swarm-flavored progress title, got:\n{plain}"
+    );
+    assert!(!plain.contains("◌ bg "));
+    assert!(plain.contains("33%"));
+}
+
+#[test]
 fn render_background_task_progress_message_uses_box_with_progress_bar() {
     let msg = DisplayMessage::background_task(
         "**Background task progress** `bg123` · `bash`\n\n[#####-------] 42% · Running tests (reported)",

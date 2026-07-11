@@ -803,3 +803,38 @@ cargo check -p jcode
 | 🏗️ Category D | Cargo.toml version conflict → **keep 0.32.0** (not 0.43.0) |
 
 **No extracted-domain / Lesson 2–3 files touched** by the 2 commits. Auto-merge for render/markdown paths (Category C).
+
+### 2026-07-12 — PR #481 / post-v0.43 upstream sync (19 commits)
+
+**Branch**: `master`.
+**Source**: cross-repo PR https://github.com/quangdang46/jcode/pull/481 (`1jehuang/jcode:master` @ `9c66c82f7` → fork `master`).
+**Upstream range**: `649276753`..`9c66c82f7` (19 commits after v0.43.0).
+
+**Status**: ✅ `cargo check -p jcode` clean. Lesson 2/3 OK. `$skillname` kept. Fork version remains **0.32.0**.
+
+| Category | What |
+|----------|------|
+| ✨ Feature | Hardened LaTeX math render; prompt discovery → tool schema; usage countdown UI |
+| 🐛 Bugfix | ANSI strip in command previews; live swarm cards on spawn; client working-dir required |
+| 🖥️ Server | Working-directory required; reload handoff query-free |
+| 🪟 Windows | Platform cfg cleanups + test silencing |
+| 🗑️ Removal | Deprecated `subagent` tool (`task.rs`); redundant selfdev hint prompt |
+| 🎨 Demo | Pelican bicycle animation asset |
+
+**Conflict resolution**:
+- **agent.rs** (B): take `new_with_initial_working_dir`; keep fork `reset_policy_session` + `apply_config_default_model`
+- **tool/mod.rs** (C/B): drop `subagent`/`task`; keep `mod team`
+- **agentgrep/args.rs** (C): accept upstream working-dir `Result` requirement
+- **prompt.rs** (C/B): remove selfdev hint; `#[cfg(test)]` static builder; keep `$skillname`
+- **prompt_tests** (C): discovery no longer injected into system prompt
+- **key_handling** (C): `/clear` clears live usage + mermaid diagrams
+- **reload_state / process_title** (C): `#[cfg(unix)]` / `#[cfg(linux)]`
+- **ui_messages tests** (C): ANSI strip + swarm flavor tests
+
+**Post-merge MUST-check**:
+```bash
+rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
+cargo check -p jcode
+```
+

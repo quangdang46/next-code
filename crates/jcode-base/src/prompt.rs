@@ -7,7 +7,7 @@ use std::process::Command;
 pub const DEFAULT_SYSTEM_PROMPT: &str = include_str!("prompt/system_prompt.md");
 
 /// Prompt guidance for the optional Mermaid rendering capability.
-pub const MERMAID_PROMPT: &str = "# Mermaid diagrams\n\nMermaid diagrams will be rendered inline by the harness. You can start a diagram with a fenced `mermaid` code block, and it will automatically be rendered.";
+pub const MERMAID_PROMPT: &str = "# Mermaid\n\nRender fenced `mermaid` blocks inline.";
 
 /// Harness capabilities that conditionally contribute prompt modules.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -163,7 +163,6 @@ pub fn append_swarm_effort_directive(split: &mut SplitSystemPrompt, effort: Opti
 /// `mission` module in the upper `jcode-app-core` layer; the asset lives here
 /// alongside the other prompt templates.
 pub const MISSION_CONTINUATION_TEMPLATE: &str = include_str!("prompt/mission_continuation.md");
-const SELFDEV_HINT_PROMPT: &str = include_str!("prompt/selfdev_hint.txt");
 const SELFDEV_MODE_PROMPT: &str = include_str!("prompt/selfdev_mode.txt");
 const SELFDEV_FOCUS_TUI_PROMPT: &str = include_str!("prompt/selfdev_focus_tui.txt");
 const SELFDEV_FOCUS_DESKTOP_PROMPT: &str = include_str!("prompt/selfdev_focus_desktop.txt");
@@ -222,7 +221,7 @@ pub struct ContextInfo {
     pub has_project_agents_md: bool,
     /// Project AGENTS.md size (chars)
     pub project_agents_md_chars: usize,
-    /// Whether global ~/.AGENTS.md was loaded
+    /// Whether global ~/AGENTS.md was loaded
     pub has_global_agents_md: bool,
     /// Global AGENTS.md size (chars)
     pub global_agents_md_chars: usize,
@@ -236,9 +235,6 @@ pub struct ContextInfo {
     pub prompt_overlay_chars: usize,
     /// Preferred tools section size (chars)
     pub preferred_tools_chars: usize,
-    /// Sponsored discovery section size (chars)
-    pub sponsored_discovery_chars: usize,
-
     // === Dynamic (Conversation) ===
     /// Tool definitions sent to API (chars)
     pub tool_defs_chars: usize,
@@ -281,7 +277,6 @@ impl ContextInfo {
             + self.memory_chars
             + self.prompt_overlay_chars
             + self.preferred_tools_chars
-            + self.sponsored_discovery_chars
             + self.tool_defs_chars
     }
 
@@ -319,9 +314,6 @@ impl ContextInfo {
         }
         if self.preferred_tools_chars > 0 {
             parts.push(("tools", self.preferred_tools_chars, "🧰"));
-        }
-        if self.sponsored_discovery_chars > 0 {
-            parts.push(("sponsored", self.sponsored_discovery_chars, "$"));
         }
         parts
     }
@@ -417,14 +409,12 @@ pub fn build_system_prompt_full_with_capabilities(
         ..Default::default()
     };
 
-    // Add self-dev guidance. Full workflow instructions are only included for
-    // active self-dev sessions; other sessions get a lightweight hint.
+    // Add self-dev guidance only in active self-dev sessions. Normal sessions
+    // learn about the on-ramp from the mode-aware `selfdev` tool schema.
     if is_selfdev {
         let selfdev_prompt = build_selfdev_prompt_for_working_dir(working_dir);
         info.selfdev_chars = selfdev_prompt.len();
         parts.push(selfdev_prompt);
-    } else {
-        parts.push(build_selfdev_hint_prompt());
     }
 
     // Add AGENTS.md instructions with tracking (from working_dir or cwd)
@@ -451,12 +441,6 @@ pub fn build_system_prompt_full_with_capabilities(
     if let Some(content) = preferred_tools_content {
         info.preferred_tools_chars = preferred_tools_chars;
         parts.push(content);
-    }
-
-    // Add sponsored discovery categories (on by default, opt-out; see sponsors.rs)
-    if let Some(section) = crate::sponsors::build_discovery_prompt_section() {
-        info.sponsored_discovery_chars = section.len();
-        parts.push(section);
     }
 
     if let Some(memory) = memory_prompt {
@@ -545,14 +529,12 @@ pub fn build_system_prompt_split_with_capabilities(
 
     // === STATIC CONTENT (cacheable) ===
 
-    // Add self-dev guidance. Full workflow instructions are only included for
-    // active self-dev sessions; other sessions get a lightweight hint.
+    // Add self-dev guidance only in active self-dev sessions. Normal sessions
+    // learn about the on-ramp from the mode-aware `selfdev` tool schema.
     if is_selfdev {
         let selfdev_prompt = build_selfdev_prompt_static_for_working_dir(working_dir);
         info.selfdev_chars = selfdev_prompt.len();
         static_parts.push(selfdev_prompt);
-    } else {
-        static_parts.push(build_selfdev_hint_prompt());
     }
 
     // Add AGENTS.md instructions (static per project)
@@ -578,12 +560,6 @@ pub fn build_system_prompt_split_with_capabilities(
     if let Some(content) = preferred_tools_content {
         info.preferred_tools_chars = preferred_tools_chars;
         static_parts.push(content);
-    }
-
-    // Add sponsored discovery categories (static; on by default, opt-out)
-    if let Some(section) = crate::sponsors::build_discovery_prompt_section() {
-        info.sponsored_discovery_chars = section.len();
-        static_parts.push(section);
     }
 
     // Add available skills list (fairly static)
@@ -641,12 +617,7 @@ pub fn build_system_prompt_split_with_capabilities(
 }
 
 /// Build self-dev tools prompt section (static version without dynamic socket path)
-fn build_selfdev_hint_prompt() -> String {
-    SELFDEV_HINT_PROMPT.to_string()
-}
-
-/// Build self-dev tools prompt section (static version without dynamic socket path)
-#[allow(dead_code)]
+#[cfg(test)]
 fn build_selfdev_prompt_static() -> String {
     build_selfdev_prompt_static_for_context(SelfDevProductContext::Tui)
 }
@@ -721,15 +692,12 @@ pub fn build_session_context(working_dir: Option<&Path>) -> String {
         lines.push(hardware);
     }
 
-    let cwd = working_dir
-        .map(Path::to_path_buf)
-        .or_else(|| std::env::current_dir().ok());
-    if let Some(cwd) = cwd.as_ref() {
+    let cwd = working_dir.map(Path::to_path_buf);
+    if let Some(cwd) = cwd.as_deref() {
         lines.push(format!("Working directory: {}", cwd.display()));
-    }
-
-    if let Some(git_info) = get_git_info(cwd.as_deref()) {
-        lines.push(git_info);
+        if let Some(git_info) = get_git_info(Some(cwd)) {
+            lines.push(git_info);
+        }
     }
 
     lines.join("\n")
@@ -936,7 +904,7 @@ pub fn load_agents_md_files_from_dir(working_dir: Option<&Path>) -> (Option<Stri
     // Home directory files
     if let Ok(global_agents_md) = crate::storage::user_home_path("AGENTS.md")
         && let Some((content, size)) =
-            load_file(&global_agents_md, "Global Instructions (~/.AGENTS.md)")
+            load_file(&global_agents_md, "Global Instructions (~/AGENTS.md)")
     {
         info.has_global_agents_md = true;
         info.global_agents_md_chars = size;

@@ -86,6 +86,8 @@ fn test_load_agents_md_files_uses_sandboxed_global_files() {
 
     assert!(info.has_global_agents_md);
     let content = content.expect("global instructions content");
+    assert!(content.contains("# Global Instructions (~/AGENTS.md)"));
+    assert!(!content.contains("~/.AGENTS.md"));
     assert!(content.contains("sandboxed global agents instructions"));
 
     if let Some(prev_home) = prev_home {
@@ -104,6 +106,8 @@ fn test_session_context_includes_time_timezone_and_system_info() {
     assert!(context.contains("OS: "));
     assert!(context.contains("Architecture: "));
     assert!(context.contains("Jcode version: "));
+    assert!(!context.contains("Working directory: "));
+    assert!(!context.contains("Git:"));
 }
 
 #[test]
@@ -115,52 +119,10 @@ fn test_split_prompt_does_not_inject_session_context_per_turn() {
 }
 
 #[test]
-fn test_sponsored_discovery_section_gated_on_config() {
-    let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
-    let temp = tempfile::TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
-    std::fs::create_dir_all(temp.path()).unwrap();
-
-    // Default (no config file): sponsored discovery is on (opt-out), so the
-    // section appears with the placement-not-preference policy.
-    crate::config::Config::invalidate_cache();
-    let (split, info) = build_system_prompt_split(None, &[], false, None, None, None, None);
-    assert!(
-        split
-            .static_part
-            .contains("# Discoverable Tools (sponsored discovery)"),
-        "discovery section must appear by default"
-    );
-    assert!(split.static_part.contains("discover_tools"));
-    assert!(
-        split
-            .static_part
-            .contains("Sponsors pay for discoverability, not recommendations"),
-        "policy line must be part of the injected prompt"
-    );
-    assert!(info.sponsored_discovery_chars > 0);
-
-    // Opted out: section is absent.
-    std::fs::write(
-        temp.path().join("config.toml"),
-        "[sponsors]\nenabled = false\n",
-    )
-    .unwrap();
-    crate::config::Config::invalidate_cache();
-    let (split, info) = build_system_prompt_split(None, &[], false, None, None, None, None);
-    assert!(
-        !split.static_part.contains("Discoverable Tools"),
-        "discovery section must be absent when opted out"
-    );
-    assert_eq!(info.sponsored_discovery_chars, 0);
-
-    if let Some(prev) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev);
-    } else {
-        crate::env::remove_var("JCODE_HOME");
-    }
-    crate::config::Config::invalidate_cache();
+fn sponsored_discovery_is_not_injected_into_the_system_prompt() {
+    let (split, _) = build_system_prompt_split(None, &[], false, None, None);
+    assert!(!split.static_part.contains("Discoverable Tools"));
+    assert!(!split.static_part.contains("discover_tools"));
 }
 
 #[test]
@@ -328,12 +290,11 @@ fn test_default_swarm_prompt_mentions_model_and_list_models() {
 }
 
 #[test]
-fn test_non_selfdev_prompt_includes_lightweight_selfdev_hint() {
+fn test_non_selfdev_prompt_leaves_selfdev_guidance_to_the_tool_schema() {
     let prompt = build_system_prompt(None, &[]);
-    assert!(prompt.contains("Self-Development Access"));
-    assert!(prompt.contains("`selfdev`"));
-    assert!(prompt.contains("selfdev enter"));
-    assert!(!prompt.contains("You are running in self-dev mode"));
+    assert!(!prompt.contains("Self-Development Access"));
+    assert!(!prompt.contains("You have access to the `selfdev` tool in all sessions"));
+    assert!(!prompt.contains("You are working on the jcode codebase itself."));
 }
 
 #[test]

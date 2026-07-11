@@ -1468,6 +1468,7 @@ pub(crate) async fn spawn_server(
         );
     }
 
+    #[cfg(unix)]
     Ok(())
 }
 
