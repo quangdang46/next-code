@@ -2,9 +2,10 @@ use super::{
     BackgroundInfo, CacheHitInfo, CacheMissAttribution, GraphEdge, GraphNode, InfoWidgetData,
     Margins, MemoryActivity, MemoryEvent, MemoryEventKind, MemoryInfo, MemoryState, PipelineState,
     StepStatus, SwarmInfo, UsageInfo, UsageProvider, WidgetKind, calculate_placements,
-    effective_prompt_tokens, occasional_status_tip, render_kv_cache_widget, render_memory_compact,
-    render_memory_widget, render_model_widget, render_todos_compact, render_todos_expanded,
-    render_todos_widget, render_usage_compact, render_usage_widget, truncate_smart,
+    calculate_widget_height, effective_prompt_tokens, occasional_status_tip,
+    render_kv_cache_widget, render_memory_compact, render_memory_widget, render_model_widget,
+    render_todos_compact, render_todos_expanded, render_todos_widget, render_usage_compact,
+    render_usage_widget, swarm_plan_todos, truncate_smart,
 };
 use crate::protocol::SwarmMemberStatus;
 use ratatui::layout::Rect;
@@ -391,6 +392,7 @@ fn todo_widget_header_says_plan_when_showing_swarm_plan_projection() {
 
 fn todo_item(id: &str, content: &str, status: &str, group: Option<&str>) -> crate::todo::TodoItem {
     crate::todo::TodoItem {
+        active_form: None,
         content: content.to_string(),
         status: status.to_string(),
         priority: "medium".to_string(),
@@ -1343,6 +1345,7 @@ fn swarm_widget_renders_member_roles_and_details() {
                     friendly_name: Some("coord".to_string()),
                     status: "running".to_string(),
                     detail: Some("orchestrating patch".to_string()),
+                    task_label: None,
                     role: Some("coordinator".to_string()),
                     is_headless: None,
                     live_attachments: None,
@@ -1358,6 +1361,7 @@ fn swarm_widget_renders_member_roles_and_details() {
                     friendly_name: Some("trees".to_string()),
                     status: "ready".to_string(),
                     detail: Some("worktree synced".to_string()),
+                    task_label: None,
                     role: Some("worktree_manager".to_string()),
                     is_headless: None,
                     live_attachments: None,

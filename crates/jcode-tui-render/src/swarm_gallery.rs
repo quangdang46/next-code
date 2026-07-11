@@ -129,6 +129,20 @@ fn role_rank(role: Option<&str>) -> u8 {
     }
 }
 
+/// Sort rank for lifecycle status within a role bucket: still-working agents
+/// first, then agents needing attention, then idle ones, then finished ones.
+/// This keeps active agents visible on the strip instead of letting them
+/// collapse into the "+N" overflow behind completed agents.
+fn status_rank(status: &str) -> u8 {
+    match status {
+        s if is_active_status(s) => 0,
+        "blocked" | "waiting_network" | "failed" | "crashed" => 1,
+        "completed" | "done" | "stopped" => 3,
+        // ready/spawned/unknown: idle but not finished.
+        _ => 2,
+    }
+}
+
 /// The header line shown above the gallery grid.
 pub fn gallery_header(total: usize, active: usize) -> Line<'static> {
     Line::from(vec![
@@ -208,14 +222,7 @@ pub struct GalleryToolIntent {
 /// Convert members into gallery tiles, sorted for stable placement
 /// (coordinator first, worktree manager next, then by `sort_key`).
 pub fn members_to_tiles(members: &[GalleryMember]) -> Vec<SwarmTile> {
-    let mut sorted: Vec<&GalleryMember> = members.iter().collect();
-    sorted.sort_by(|a, b| {
-        role_rank(a.role.as_deref())
-            .cmp(&role_rank(b.role.as_deref()))
-            .then_with(|| a.sort_key.cmp(&b.sort_key))
-    });
-
-    sorted
+    sort_members_for_display(members)
         .into_iter()
         .map(|m| {
             let mut tile =
@@ -429,15 +436,18 @@ pub struct SwarmStripHint {
 /// - Unfocused: a single line of agent "chips" (status glyph + name + optional
 ///   `done/total` todo count), colored by status, plus a right-aligned
 ///   `M/N active` readout. A trailing hint shows how to enter the controls.
-/// - Focused: the chips line (selected agent highlighted) + a one-line inline
-///   render of the hovered agent's latest output + a keybinding hint line.
+/// - Focused: the chips line (selected agent highlighted) + a detail viewport
+///   for the hovered agent (bounded by `max_height`) + a keybinding hint line.
 ///
+/// `max_height` is the total line budget for the strip when focused (chips +
+/// detail + hints). Small budgets degrade to a single inline detail line.
 /// `spinner_frame` animates the glyph for active agents. Returns empty when
 /// there are no members or no width.
 ///
 /// ```text
 /// 🐝 swarm  ⠙researcher 8/16  ✓reviewer            2/3 active   ctrl+t controls
 /// ```
+#[allow(clippy::too_many_arguments)]
 pub fn render_swarm_strip(
     members: &[GalleryMember],
     selected: usize,
@@ -446,6 +456,7 @@ pub fn render_swarm_strip(
     enter_hint: Option<&str>,
     spinner_frame: usize,
     width: usize,
+    max_height: usize,
 ) -> Vec<Line<'static>> {
     if members.is_empty() || width < 8 {
         return Vec::new();
@@ -551,24 +562,38 @@ pub fn render_swarm_strip(
 
     let mut out = vec![Line::from(spans)];
 
-    // ---- Focused extras: inline detail render + hint line ----
+    // ---- Focused extras: expanded detail viewport + hint line ----
     if focused {
-        // Inline one-line render of the hovered agent's latest output.
+        // Budget: chips line (already emitted) + hint line are fixed; the
+        // detail viewport gets the rest. Degrade to one inline line when the
+        // budget is too small for the expanded view.
+        let hint_rows = usize::from(!hints.is_empty());
+        let detail_budget = max_height.saturating_sub(1 + hint_rows);
         if let Some(m) = ordered.get(selected) {
-            let detail = m
-                .body
-                .iter()
-                .rev()
-                .find(|l| !l.trim().is_empty() && !l.trim_start().starts_with('·'))
-                .cloned()
-                .unwrap_or_else(|| format!("[{}]", m.status));
-            let prefix = format!("   {} ", status_glyph(&m.status, spinner_frame));
-            let prefix_w = prefix.chars().count();
-            let body = truncate_label(&detail, width.saturating_sub(prefix_w));
-            out.push(Line::from(vec![
-                Span::styled(prefix, Style::default().fg(status_accent(&m.status))),
-                Span::styled(body, Style::default().fg(rgb(180, 180, 190))),
-            ]));
+            if detail_budget >= 4 {
+                out.extend(render_hovered_detail(
+                    m,
+                    spinner_frame,
+                    width,
+                    detail_budget,
+                ));
+            } else if detail_budget > 0 {
+                // Compact fallback: a single inline line of the latest output.
+                let detail = m
+                    .body
+                    .iter()
+                    .rev()
+                    .find(|l| !l.trim().is_empty() && !l.trim_start().starts_with('·'))
+                    .cloned()
+                    .unwrap_or_else(|| format!("[{}]", m.status));
+                let prefix = format!("   {} ", status_glyph(&m.status, spinner_frame));
+                let prefix_w = disp_w(&prefix);
+                let body = truncate_label(&detail, width.saturating_sub(prefix_w));
+                out.push(Line::from(vec![
+                    Span::styled(prefix, Style::default().fg(status_accent(&m.status))),
+                    Span::styled(body, Style::default().fg(rgb(180, 180, 190))),
+                ]));
+            }
         }
 
         if !hints.is_empty() {
@@ -591,7 +616,7 @@ pub fn render_swarm_strip(
             let mut total = 0usize;
             let mut trimmed: Vec<Span<'static>> = Vec::new();
             for s in hint_spans {
-                let w = s.content.chars().count();
+                let w = disp_w(&s.content);
                 if total + w > width {
                     break;
                 }
@@ -600,6 +625,14 @@ pub fn render_swarm_strip(
             }
             out.push(Line::from(trimmed));
         }
+    }
+
+    // Hard bound: never emit a line wider than the strip.
+    for line in &mut out {
+        clamp_line_to_width(line, width);
+    }
+    if focused && out.len() > max_height.max(1) {
+        out.truncate(max_height.max(1));
     }
 
     out
@@ -1511,16 +1544,33 @@ fn panel_header(total: usize, active: usize, focused: bool) -> Line<'static> {
     Line::from(spans)
 }
 
-/// Sort members the same way `members_to_tiles` does (coordinator first, then
-/// worktree manager, then by sort_key), returning references in display order.
-fn sort_members_for_display(members: &[GalleryMember]) -> Vec<&GalleryMember> {
-    let mut sorted: Vec<&GalleryMember> = members.iter().collect();
-    sorted.sort_by(|a, b| {
+/// Indices of `members` in display order: coordinator first, then worktree
+/// manager, then everything else. Within a role bucket, still-working agents
+/// sort before blocked/failed ones, which sort before idle and then finished
+/// ones, so active agents never hide behind completed ones in the "+N"
+/// overflow. Remaining ties break by `sort_key` (stable for full ties). This
+/// is the single source of truth for how the gallery, panel, and strip order
+/// members; callers that need to map a displayed row back to an input member
+/// (e.g. pop-out selection) must use this rather than re-implementing the
+/// sort.
+pub fn display_order(members: &[GalleryMember]) -> Vec<usize> {
+    let mut idx: Vec<usize> = (0..members.len()).collect();
+    idx.sort_by(|&a, &b| {
+        let (a, b) = (&members[a], &members[b]);
         role_rank(a.role.as_deref())
             .cmp(&role_rank(b.role.as_deref()))
+            .then_with(|| status_rank(&a.status).cmp(&status_rank(&b.status)))
             .then_with(|| a.sort_key.cmp(&b.sort_key))
     });
-    sorted
+    idx
+}
+
+/// References to `members` in [`display_order`], for rendering.
+fn sort_members_for_display(members: &[GalleryMember]) -> Vec<&GalleryMember> {
+    display_order(members)
+        .into_iter()
+        .map(|i| &members[i])
+        .collect()
 }
 
 /// The tile index (in `members_to_tiles(members)` order) for a display row.
@@ -1673,6 +1723,65 @@ mod tests {
         assert_eq!(tiles[0].role_glyph.as_deref(), Some("★"));
     }
 
+    /// `display_order` is the contract callers (e.g. pop-out selection) use to
+    /// map a displayed row back to an input member, so it must match tile
+    /// order exactly, including for mixed/unknown roles and sort_key ties.
+    #[test]
+    fn display_order_matches_tile_order_for_mixed_members() {
+        let mut members = vec![
+            member("zeta", "running", None, &[]),
+            member("mid", "done", Some("mystery_role_2"), &[]),
+            member("boss", "running", Some("coordinator"), &[]),
+            member("alpha", "thinking", Some("mystery_role"), &[]),
+            member("beta", "failed", None, &[]),
+        ];
+        // Full tie with "beta" on both role rank and sort_key.
+        let mut dup = member("beta-label-2", "ready", None, &[]);
+        dup.sort_key = "beta".to_string();
+        members.push(dup);
+
+        let order = display_order(&members);
+        assert_eq!(order.len(), members.len());
+        let ordered_labels: Vec<String> = order.iter().map(|&i| members[i].label.clone()).collect();
+        let tile_titles: Vec<String> = members_to_tiles(&members)
+            .into_iter()
+            .map(|t| t.title)
+            .collect();
+        assert_eq!(ordered_labels, tile_titles);
+        let ordered_labels: Vec<&str> = ordered_labels.iter().map(String::as_str).collect();
+        // Role buckets come first (coordinator only), then active-before-
+        // finished status order, then sort_key within the same status rank.
+        assert_eq!(ordered_labels[0], "boss");
+        assert_eq!(
+            &ordered_labels[1..],
+            &["alpha", "zeta", "beta", "beta-label-2", "mid"]
+        );
+    }
+
+    /// Active agents must sort ahead of finished ones within a role bucket, so
+    /// they stay visible on the strip instead of hiding in the "+N" overflow.
+    #[test]
+    fn display_order_puts_active_agents_before_finished_ones() {
+        let members = vec![
+            member("ant", "completed", None, &[]),
+            member("bat", "done", None, &[]),
+            member("crab", "running", None, &[]),
+            member("dove", "failed", None, &[]),
+            member("elk", "ready", None, &[]),
+            member("fox", "thinking", None, &[]),
+            member("gnu", "stopped", None, &[]),
+            member("hen", "blocked", None, &[]),
+        ];
+        let order = display_order(&members);
+        let labels: Vec<&str> = order.iter().map(|&i| members[i].label.as_str()).collect();
+        assert_eq!(
+            labels,
+            // active (crab, fox) < attention (dove, hen) < idle (elk)
+            // < finished (ant, bat, gnu), each bucket sorted by sort_key.
+            ["crab", "fox", "dove", "hen", "elk", "ant", "bat", "gnu"]
+        );
+    }
+
     #[test]
     fn renders_header_and_is_width_bounded() {
         let members = vec![
@@ -1816,7 +1925,7 @@ mod tests {
 
     #[test]
     fn strip_empty_renders_nothing() {
-        assert!(render_swarm_strip(&[], 0, true, &hints(), None, 0, 80).is_empty());
+        assert!(render_swarm_strip(&[], 0, true, &hints(), None, 0, 80, 16).is_empty());
     }
 
     #[test]
@@ -2154,14 +2263,15 @@ mod tests {
             member("researcher", "thinking", Some("coordinator"), &["working"]),
             member("implementer", "running", None, &["building"]),
         ];
-        let unfocused = render_swarm_strip(&members, 0, false, &hints(), None, 0, 80);
+        let unfocused = render_swarm_strip(&members, 0, false, &hints(), None, 0, 80, 16);
         assert_eq!(
             unfocused.len(),
             1,
             "unfocused strip should be a single line"
         );
         // Focused: chips line + inline detail line + hint line.
-        let focused = render_swarm_strip(&members, 0, true, &hints(), None, 0, 80);
+        // Small budget forces the single-line detail fallback (chips + detail + hints).
+        let focused = render_swarm_strip(&members, 0, true, &hints(), None, 0, 80, 3);
         assert_eq!(
             focused.len(),
             3,
@@ -2176,7 +2286,7 @@ mod tests {
             member("implementer", "running", None, &["building"]),
             member("reviewer", "done", None, &["done"]),
         ];
-        let lines = render_swarm_strip(&members, 1, true, &hints(), None, 0, 90);
+        let lines = render_swarm_strip(&members, 1, true, &hints(), None, 0, 90, 16);
         for line in &lines {
             assert!(line.width() <= 90, "line too wide: {}", plain_line(line));
         }
@@ -2193,7 +2303,16 @@ mod tests {
     #[test]
     fn strip_unfocused_shows_enter_controls_hint() {
         let members = vec![member("a", "running", None, &[])];
-        let lines = render_swarm_strip(&members, 0, false, &hints(), Some("alt+w controls"), 0, 90);
+        let lines = render_swarm_strip(
+            &members,
+            0,
+            false,
+            &hints(),
+            Some("alt+w controls"),
+            0,
+            90,
+            16,
+        );
         let chips = plain_line(&lines[0]);
         assert!(chips.contains("alt+w controls"), "got: {chips}");
     }
@@ -2202,7 +2321,7 @@ mod tests {
     fn strip_shows_todo_counter() {
         let mut m = member("worker", "running", None, &["step"]);
         m.todo = Some((8, 16));
-        let lines = render_swarm_strip(&[m], 0, false, &hints(), None, 0, 90);
+        let lines = render_swarm_strip(&[m], 0, false, &hints(), None, 0, 90, 16);
         let chips = plain_line(&lines[0]);
         assert!(chips.contains("8/16"), "todo counter missing: {chips}");
     }
@@ -2212,7 +2331,7 @@ mod tests {
         let members: Vec<GalleryMember> = (0..12)
             .map(|i| member(&format!("agent-number-{i:02}"), "running", None, &[]))
             .collect();
-        let lines = render_swarm_strip(&members, 0, false, &hints(), None, 0, 50);
+        let lines = render_swarm_strip(&members, 0, false, &hints(), None, 0, 50, 16);
         assert!(lines[0].width() <= 50, "too wide");
         let chips = plain_line(&lines[0]);
         assert!(chips.contains('+'), "expected +N overflow marker: {chips}");

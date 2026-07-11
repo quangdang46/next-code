@@ -1587,6 +1587,9 @@ pub(crate) const REDRAW_DEEP_IDLE: Duration = Duration::from_millis(5000);
 pub(crate) const REDRAW_REMOTE_STARTUP: Duration = Duration::from_millis(1000);
 pub(crate) const REDRAW_PASSIVE_LIVENESS: Duration = Duration::from_millis(1000);
 pub(crate) const REDRAW_DEEP_IDLE_AFTER: Duration = Duration::from_secs(30);
+/// Cadence for swarm strip/dock status spinners while agents stay active.
+pub(crate) const REDRAW_SWARM_SPINNER: Duration =
+    Duration::from_millis(jcode_tui_render::swarm_gallery::STRIP_SPINNER_FRAME_MS);
 
 fn idle_donut_active_with_policy(
     state: &dyn TuiState,

@@ -2581,13 +2581,23 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
 
     // Inline swarm strip: when `swarm_spawn_mode = inline` and this session
     // manages agents, render a compact strip (agent chips + keybinding hints)
-    // directly above the status line instead of a big gallery band.
-    let swarm_strip_lines: Vec<Line<'static>> = if app.inline_swarm_gallery_active() {
+    // directly above the status line instead of a big gallery band — unless the
+    // SwarmStatus dock already shows those agents (stand-down avoids flicker
+    // from frame-by-frame dock visibility).
+    let swarm_strip_lines: Vec<Line<'static>> = if app.inline_swarm_gallery_active()
+        && (app.swarm_panel_focused() || !super::info_widget::swarm_strip_stands_down_for_dock())
+    {
         let members = app.inline_swarm_members();
         if chat_area.width >= 24 {
             let focus_key = crate::tui::keybind::swarm_panel_focus_key_label();
-            // ~8 fps spinner from the wall-clock animation timer.
-            let spinner_frame = (app.animation_elapsed() * 8.0) as usize;
+            // Use the same smooth cadence as the primary status spinner.
+            let spinner_frame = (app.animation_elapsed()
+                * jcode_tui_render::swarm_gallery::STRIP_SPINNER_FPS)
+                as usize;
+            // Focused budget: chips + hints + a ~14-line detail viewport, but
+            // never more than a third of the chat column so the transcript
+            // stays usable on short terminals.
+            let focused_budget = ((chat_area.height as usize) / 3).clamp(3, 16);
             super::info_widget::swarm_gallery::render_swarm_strip_lines(
                 &members,
                 app.swarm_panel_selected(),
@@ -2595,6 +2605,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
                 &focus_key,
                 spinner_frame,
                 chat_area.width as usize,
+                focused_budget,
             )
         } else {
             Vec::new()
@@ -2756,13 +2767,15 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Use packed layout when content fits, scrolling layout otherwise
     let use_packed = content_height + fixed_height <= available_height;
 
-    // Two-level layout: top (messages + queued + swarm) grows to fill,
-    // bottom (input + dialogs + status) — exact height, never clipped.
+    // Two-level layout: top (messages + queued) grows to fill, bottom (input +
+    // strip + status) is exact height so the swarm strip sits immediately above
+    // the status bar (upstream v0.42+ strip placement).
     let bottom_fixed = notification_height
         + inline_block_height
         + inline_ui_gap_height
         + 3
         + input_height
+        + swarm_strip_height
         + running_items_height
         + overscroll_height
         + donut_height;
@@ -2779,29 +2792,28 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             vec![
                 Constraint::Length(content_height.max(1)), // 0 Messages (exact height)
                 Constraint::Length(queued_height),         // 1 Queued messages
-                Constraint::Length(swarm_strip_height),    // 2 Swarm strip
             ]
         } else {
             vec![
-                Constraint::Min(3),                     // 0 Messages (scrollable)
-                Constraint::Length(queued_height),      // 1 Queued messages
-                Constraint::Length(swarm_strip_height), // 2 Swarm strip
+                Constraint::Min(3),                // 0 Messages (scrollable)
+                Constraint::Length(queued_height), // 1 Queued messages
             ]
         })
         .split(top_bottom[0]);
     let bottom_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints(vec![
-            Constraint::Length(notification_height), // 0 Notification line
-            Constraint::Length(inline_block_height), // 1 Inline UI
-            Constraint::Length(inline_ui_gap_height), // 2 Inline UI/input spacing
-            Constraint::Length(1),                   // 3 Top separator (─── History)
-            Constraint::Length(input_height),        // 4 Input
-            Constraint::Length(1),                   // 5 Bottom separator (───)
-            Constraint::Length(1),                   // 6 Status bar (⏵⏵ bypass permissions on)
-            Constraint::Length(running_items_height), // 7 Running items (quickbar)
-            Constraint::Length(overscroll_height),   // 8 Overscroll status line
-            Constraint::Length(donut_height),        // 9 Donut animation
+            Constraint::Length(inline_block_height),  // 0 Inline UI
+            Constraint::Length(inline_ui_gap_height), // 1 Inline UI/input spacing
+            Constraint::Length(1),                    // 2 Top separator (─── History)
+            Constraint::Length(input_height),         // 3 Input
+            Constraint::Length(1),                    // 4 Bottom separator (───)
+            Constraint::Length(swarm_strip_height),   // 5 Swarm strip (above status)
+            Constraint::Length(1),                    // 6 Status bar
+            Constraint::Length(notification_height),  // 7 Notification line (below status)
+            Constraint::Length(running_items_height), // 8 Running items (quickbar)
+            Constraint::Length(overscroll_height),    // 9 Overscroll status line
+            Constraint::Length(donut_height),         // 10 Donut animation
         ])
         .split(top_bottom[1]);
     let status_area = bottom_chunks[6];
@@ -2809,8 +2821,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
 
     // Draw the inline swarm strip directly above the status line if present.
     if swarm_strip_height > 0 {
-        clear_area(frame, top_chunks[2]);
-        frame.render_widget(Paragraph::new(swarm_strip_lines.clone()), top_chunks[2]);
+        clear_area(frame, bottom_chunks[5]);
+        frame.render_widget(Paragraph::new(swarm_strip_lines.clone()), bottom_chunks[5]);
     }
 
     // Capture layout info for visual debug
@@ -2821,7 +2833,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         if queued_height > 0 {
             capture.layout.queued_area = Some(top_chunks[1].into());
         }
-        capture.layout.input_area = Some(bottom_chunks[4].into());
+        capture.layout.input_area = Some(bottom_chunks[3].into());
         capture.layout.status_area = Some(status_area.into());
         capture.layout.input_lines_raw = app.input().lines().count().max(1);
         capture.layout.input_lines_wrapped = base_input_height as usize;
@@ -3004,14 +3016,11 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         }
         input_ui::draw_queued(frame, app, top_chunks[1], user_count + 1);
     }
-    if notification_height > 0 {
-        input_ui::draw_notification(frame, app, bottom_chunks[0]);
-    }
     if inline_block_height > 0 {
-        draw_inline_ui(frame, app, bottom_chunks[1]);
+        draw_inline_ui(frame, app, bottom_chunks[0]);
     }
     // Top separator line ─── above input (with history counter)
-    let top_sep_w = bottom_chunks[3].width as usize;
+    let top_sep_w = bottom_chunks[2].width as usize;
     if top_sep_w > 12 {
         let (nav_pos, nav_total) = app.prompt_history_info().unwrap_or((0, 0));
         let label = if nav_pos > 0 {
@@ -3025,36 +3034,39 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         let right = top_sep_w - label_w - left;
         let sep_str = format!("{}{}{}", "─".repeat(left), label, "─".repeat(right),);
         let sep_line = Line::from(Span::styled(sep_str, Style::default().fg(rgb(50, 55, 65))));
-        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[3]);
+        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[2]);
     }
     // Input
     input_ui::draw_input(
         frame,
         app,
-        bottom_chunks[4],
+        bottom_chunks[3],
         user_count + pending_count + 1,
         &mut debug_capture,
     );
     // Bottom separator line ─── below input
-    let bot_sep_w = bottom_chunks[5].width as usize;
+    let bot_sep_w = bottom_chunks[4].width as usize;
     if bot_sep_w > 12 {
         let sep_line = Line::from(Span::styled(
             "─".repeat(bot_sep_w),
             Style::default().fg(rgb(50, 55, 65)),
         ));
-        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[5]);
+        frame.render_widget(Paragraph::new(sep_line), bottom_chunks[4]);
     }
-    // Status bar below bottom separator
+    // Status bar below swarm strip
     input_ui::draw_status(frame, app, status_area, pending_count);
-    // Running items list (quickbar) below bottom separator
+    if notification_height > 0 {
+        input_ui::draw_notification(frame, app, bottom_chunks[7]);
+    }
+    // Running items list (quickbar) below status
     if running_items_height > 0 {
-        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[7]);
+        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[8]);
     }
     if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, bottom_chunks[8]);
+        input_ui::draw_overscroll_status(frame, app, bottom_chunks[9]);
     }
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, bottom_chunks[9]);
+        animations::draw_idle_animation(frame, app, bottom_chunks[10]);
     }
 
     // Draw info widget overlays (skip during idle animation - they look out of place)

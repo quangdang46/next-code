@@ -202,14 +202,15 @@ fn main() {
             Some("alt+w controls"),
             0,
             90,
+            16,
         ),
     );
     print_lines(
         "STRIP: focused, selected #1 @ width 90",
-        &render_swarm_strip(&panel_members, 1, true, &hints, None, 3, 90),
+        &render_swarm_strip(&panel_members, 1, true, &hints, None, 3, 90, 16),
     );
     print_lines(
         "STRIP: focused narrow @ width 54",
-        &render_swarm_strip(&panel_members, 0, true, &hints, None, 5, 54),
+        &render_swarm_strip(&panel_members, 0, true, &hints, None, 5, 54, 12),
     );
 }

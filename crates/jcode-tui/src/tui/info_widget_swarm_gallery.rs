@@ -9,8 +9,9 @@
 
 use crate::protocol::SwarmMemberStatus;
 use jcode_tui_render::swarm_gallery::{
-    GalleryMember, SwarmStripHint, humanize_age, render_gallery, render_swarm_panel,
-    render_swarm_strip,
+    GalleryMember, SwarmStripHint, display_order, humanize_age, render_gallery,
+    render_swarm_compact, render_swarm_dock, render_swarm_panel, render_swarm_strip,
+    render_swarm_strip_vertical,
 };
 use ratatui::prelude::*;
 
@@ -157,12 +158,16 @@ pub(crate) fn render_swarm_panel_lines(
     )
 }
 
-/// Render the compact swarm strip (agent chips + status glyphs + todo counts)
-/// shown directly above the status line.
+/// Render the compact swarm strip shown directly above the status line.
+///
+/// The layout follows `agents.swarm_strip_layout`: `vertical` (default) lists
+/// one agent per row (session icon + task, capped to a few rows), while
+/// `horizontal` packs all agents as chips on a single row.
 ///
 /// `focus_key` is the configured chord to enter the controls (e.g. "ctrl+t"),
 /// used both for the unfocused enter-hint and as the first focused hint.
-/// `spinner_frame` animates active agents' glyphs.
+/// `spinner_frame` animates active agents' glyphs. `max_height` bounds the
+/// focused strip (chips + expanded hovered-agent detail + hints).
 pub(crate) fn render_swarm_strip_lines(
     members: &[SwarmMemberStatus],
     selected: usize,
@@ -170,58 +175,119 @@ pub(crate) fn render_swarm_strip_lines(
     focus_key: &str,
     spinner_frame: usize,
     width: usize,
+    max_height: usize,
 ) -> Vec<Line<'static>> {
     if members.is_empty() {
         return Vec::new();
     }
     let enter_hint = format!("{focus_key} controls");
+    // Focused hints: only Alt-chords (plus esc) are claimed so plain typing
+    // keeps flowing to the chat input while the panel is focused.
     let hints = vec![
         SwarmStripHint {
-            key: "↑/↓".into(),
+            key: focus_key.to_string(),
+            label: "next".into(),
+        },
+        SwarmStripHint {
+            key: "alt+↑/↓".into(),
             label: "select".into(),
         },
         SwarmStripHint {
-            key: "enter".into(),
-            label: "pop out".into(),
+            key: "alt+o".into(),
+            label: "open".into(),
         },
         SwarmStripHint {
             key: "esc".into(),
             label: "exit".into(),
         },
     ];
-    render_swarm_strip(
+    let gallery = members_to_gallery(members);
+    let enter = if focused {
+        None
+    } else {
+        Some(enter_hint.as_str())
+    };
+    match crate::config::config().agents.swarm_strip_layout {
+        crate::config::SwarmStripLayout::Vertical => render_swarm_strip_vertical(
+            &gallery,
+            selected,
+            focused,
+            &hints,
+            enter,
+            spinner_frame,
+            width,
+            SWARM_STRIP_VERTICAL_MAX_ROWS,
+            max_height,
+        ),
+        crate::config::SwarmStripLayout::Horizontal => render_swarm_strip(
+            &gallery,
+            selected,
+            focused,
+            &hints,
+            enter,
+            spinner_frame,
+            width,
+            max_height,
+        ),
+    }
+}
+
+/// Row cap for the vertical strip: agents beyond this collapse into a
+/// `+N more` line (the cap includes that overflow row).
+const SWARM_STRIP_VERTICAL_MAX_ROWS: usize = 4;
+
+/// Render the compact swarm widget body: at most two lines, an agents/nodes
+/// summary plus a green/yellow/empty plan progress bar. `plan` is the
+/// coordinator's task-graph progress as (done, running, total).
+pub(crate) fn render_swarm_compact_lines(
+    members: &[SwarmMemberStatus],
+    plan: Option<(u32, u32, u32)>,
+    width: usize,
+    max_height: usize,
+) -> Vec<Line<'static>> {
+    if members.is_empty() {
+        return Vec::new();
+    }
+    render_swarm_compact(&members_to_gallery(members), plan, width, max_height)
+}
+
+/// Render the swarm dock widget body: a narrow vertical agent list for the
+/// info-widget margins. `plan` is the coordinator's swarm plan progress
+/// (completed, total), shown in the header when present.
+#[allow(dead_code)]
+pub(crate) fn render_swarm_dock_lines(
+    members: &[SwarmMemberStatus],
+    selected: usize,
+    focused: bool,
+    plan: Option<(u32, u32)>,
+    spinner_frame: usize,
+    width: usize,
+    max_height: usize,
+) -> Vec<Line<'static>> {
+    if members.is_empty() {
+        return Vec::new();
+    }
+    render_swarm_dock(
         &members_to_gallery(members),
         selected,
         focused,
-        &hints,
-        if focused {
-            None
-        } else {
-            Some(enter_hint.as_str())
-        },
+        plan,
         spinner_frame,
         width,
+        max_height,
     )
 }
 
-/// Session ids of `members` in the same order the panel/gallery displays them
-/// (coordinator first, then worktree manager, then by session id). Lets the TUI
-/// map a selected panel index back to a concrete session for pop-out.
+/// Session ids of `members` in the same order the panel/gallery displays them.
+///
+/// Delegates to the renderer's [`display_order`] on the exact same
+/// [`GalleryMember`] conversion used for rendering, so the pop-out index can
+/// never drift from what is on screen.
 pub(crate) fn members_display_order(members: &[SwarmMemberStatus]) -> Vec<String> {
-    fn role_rank(role: Option<&str>) -> u8 {
-        match role {
-            Some("coordinator") => 0,
-            Some("worktree_manager") => 1,
-            _ => 2,
-        }
-    }
-    let mut idx: Vec<&SwarmMemberStatus> = members.iter().collect();
-    idx.sort_by(|a, b| {
-        role_rank(a.role.as_deref())
-            .cmp(&role_rank(b.role.as_deref()))
-            .then_with(|| a.session_id.cmp(&b.session_id))
-    });
-    idx.into_iter().map(|m| m.session_id.clone()).collect()
+    display_order(&members_to_gallery(members))
+        .into_iter()
+        .map(|i| members[i].session_id.clone())
+        .collect()
 }
 
 #[cfg(test)]
@@ -240,6 +306,7 @@ mod tests {
             friendly_name: Some(id.to_string()),
             status: status.to_string(),
             detail: detail.map(str::to_string),
+            task_label: None,
             role: role.map(str::to_string),
             is_headless: Some(true),
             live_attachments: None,

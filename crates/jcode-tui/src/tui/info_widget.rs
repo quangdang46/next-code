@@ -674,10 +674,8 @@ pub struct CompactionInfo {
 
 impl InfoWidgetData {
     fn widget_disabled(kind: WidgetKind) -> bool {
-        matches!(
-            kind,
-            WidgetKind::SwarmStatus | WidgetKind::AmbientMode | WidgetKind::Tips
-        )
+        // SwarmStatus dock is live when managed_members is non-empty (upstream).
+        matches!(kind, WidgetKind::AmbientMode | WidgetKind::Tips)
     }
 
     pub fn is_empty(&self) -> bool {
@@ -877,6 +875,11 @@ struct WidgetsState {
     placements: Vec<WidgetPlacement>,
     /// Persistent widget anchors (HUD slot memory, including hidden-in-place ones)
     anchors: Vec<super::info_widget_layout::WidgetAnchor>,
+    /// When the SwarmStatus dock was last engaged (placed or anchored). Lets the
+    /// inline swarm strip keep standing down through brief dock dropouts instead
+    /// of popping back for a few frames (which resizes the bottom chrome and
+    /// bounces the transcript).
+    swarm_dock_last_engaged: Option<std::time::Instant>,
 }
 
 impl Default for WidgetsState {
@@ -886,6 +889,7 @@ impl Default for WidgetsState {
             widget_states: HashMap::new(),
             placements: Vec::new(),
             anchors: Vec::new(),
+            swarm_dock_last_engaged: None,
         }
     }
 }
@@ -939,7 +943,63 @@ pub fn calculate_placements(
     );
     state.anchors = outcome.anchors;
     state.placements = outcome.visible.clone();
+    if swarm_dock_engaged(state) {
+        state.swarm_dock_last_engaged = Some(std::time::Instant::now());
+    }
     outcome.visible
+}
+
+/// How long the inline swarm strip keeps standing down after the SwarmStatus
+/// dock disengages. The dock's placement naturally churns while content
+/// streams past it; reacting instantly turns that churn into visible flicker.
+const SWARM_STRIP_STAND_DOWN_LINGER: std::time::Duration = std::time::Duration::from_millis(2000);
+
+/// Whether the SwarmStatus dock widget is engaged: either actually placed, or
+/// hidden-in-place behind a live anchor.
+fn swarm_dock_engaged(state: &WidgetsState) -> bool {
+    state.enabled
+        && (state
+            .placements
+            .iter()
+            .any(|p| p.kind == WidgetKind::SwarmStatus)
+            || state
+                .anchors
+                .iter()
+                .any(|a| a.placement.kind == WidgetKind::SwarmStatus))
+}
+
+/// Whether the inline swarm strip (above the status line) should stand down
+/// because the SwarmStatus dock widget (margin HUD) is showing - or was very
+/// recently showing - the same agents.
+pub(crate) fn swarm_strip_stands_down_for_dock() -> bool {
+    let guard = get_or_init_state();
+    let Some(state) = guard.as_ref() else {
+        return false;
+    };
+    if swarm_dock_engaged(state) {
+        return true;
+    }
+    state
+        .swarm_dock_last_engaged
+        .is_some_and(|at| at.elapsed() < SWARM_STRIP_STAND_DOWN_LINGER)
+}
+
+/// Forget the per-frame placement/anchor state because the widget render pass
+/// was skipped this frame (idle donut takeover, or no widget data at all).
+pub(crate) fn note_widget_pass_skipped() {
+    let mut guard = get_or_init_state();
+    if let Some(state) = guard.as_mut() {
+        state.placements.clear();
+        state.anchors.clear();
+        state.swarm_dock_last_engaged = None;
+        state.enabled = true;
+    }
+}
+
+/// Clear placement/anchor/stand-down state between tests (process-global).
+#[cfg(test)]
+pub(crate) fn clear_widget_placements_for_tests() {
+    note_widget_pass_skipped();
 }
 
 /// Facts surfaced by the info-widget HUD as of the last rendered frame.
@@ -1080,19 +1140,13 @@ pub(crate) fn calculate_widget_height(
             let Some(info) = &data.swarm_info else {
                 return 0;
             };
-            if info.subagent_status.is_none()
-                && info.session_count <= 1
-                && info.client_count.is_none()
-                && info.members.is_empty()
-            {
+            // Dock mode: only render when this session manages agents.
+            if info.managed_members.is_empty() {
                 return 0;
             }
-            let mut h = 1u16; // Stats line
-            if info.subagent_status.is_some() {
-                h += 1;
-            }
-            h += info.session_names.len().min(3) as u16;
-            h
+            // Compact: agents/nodes summary line + optional plan bar.
+            let bar = u16::from(info.plan_progress.is_some());
+            (1 + bar).min(max_height.saturating_sub(border_height))
         }
         WidgetKind::BackgroundTasks => {
             if data
