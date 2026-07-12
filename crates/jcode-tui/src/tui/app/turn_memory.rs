@@ -90,8 +90,13 @@ impl App {
                         .as_deref()
                         .map(std::path::Path::new),
                 );
-                if let Some(active) = mode_state.active_modes.first() {
-                    self.set_status_notice(format!("🧠 {} mode activated", active.workflow));
+                let labels: Vec<String> = mode_state
+                    .active_modes
+                    .iter()
+                    .map(|m| format!("{}", m.workflow))
+                    .collect();
+                if !labels.is_empty() {
+                    self.set_status_notice(format!("🧠 {} mode(s) activated", labels.join(", ")));
                 }
             }
 
