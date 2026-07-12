@@ -10,7 +10,7 @@ use crate::tui::info_widget::occasional_status_tip;
 use crate::tui::layout_utils;
 use crate::tui::selection_highlight::highlight_line_selection;
 use crate::tui::session_facts;
-use jcode_keywords::visual::{KeywordHighlight, compute_highlights};
+use jcode_keywords::visual::{KeywordHighlight, compute_highlights_with};
 use jcode_tui_style::theme::animated_tool_color as theme_animated_tool_color;
 use jcode_tui_style::theme::{
     accent_color, ai_color, asap_color, dim_color, pending_color, queued_color,
@@ -677,6 +677,28 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                 " (shift+tab to cycle)",
                 Style::default().fg(dimmed),
             ));
+        }
+        // Active keyword modes chip (same source of truth as system-prompt inject).
+        let kw_cfg = &crate::config::config().keywords;
+        if kw_cfg.enabled && kw_cfg.show_status_chip {
+            let wd = std::env::current_dir().ok();
+            let chips = jcode_keywords::mode_chips(wd.as_deref());
+            if !chips.is_empty() {
+                let chip_color = rgb(255, 180, 80);
+                let labels: Vec<String> = chips
+                    .iter()
+                    .map(|c| format!("{} {}/{}", c.label, c.remaining, c.turn_limit))
+                    .collect();
+                spans.push(Span::styled(" · ", Style::default().fg(dimmed)));
+                spans.push(Span::styled(
+                    format!("✨ {}", labels.join(" · ")),
+                    Style::default().fg(chip_color),
+                ));
+                spans.push(Span::styled(
+                    " (canceljcode)",
+                    Style::default().fg(dimmed),
+                ));
+            }
         }
         spans
     }
@@ -2505,8 +2527,22 @@ pub(crate) fn wrap_input_text<'a>(
     let mut found_cursor = false;
 
     // Compute keyword highlights once on the full input, then map each
-    // highlight onto the segment(s) it overlaps.
-    let full_highlights = compute_highlights(input);
+    // highlight onto the segment(s) it overlaps. Use the same DetectOptions as
+    // activation so input paint cannot drift from process_turn.
+    let full_highlights = {
+        let kw_cfg = &crate::config::config().keywords;
+        let opts = jcode_keywords::process_turn_options_from_config(
+            kw_cfg.enabled,
+            &kw_cfg.match_mode,
+            kw_cfg.sticky_turns,
+            kw_cfg.allow_fuzzy,
+        );
+        if !opts.enabled {
+            Vec::new()
+        } else {
+            compute_highlights_with(input, &opts.detect)
+        }
+    };
 
     for (idx, segment) in wrapped_segments.iter().enumerate() {
         if !found_cursor

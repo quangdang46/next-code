@@ -59,6 +59,7 @@ mod tests {
             entry: Box::leak(Box::new(KeywordEntry {
                 keyword,
                 aliases: &[],
+                phrase_aliases: &[],
                 priority,
                 workflow,
                 description: "",

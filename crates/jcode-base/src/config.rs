@@ -105,6 +105,11 @@ const CONFIG_ENV_KEYS: &[&str] = &[
     "JCODE_MEMORY_EMBEDDING_BASE_URL",
     "JCODE_MEMORY_EMBEDDING_DIM",
     "JCODE_MEMORY_EMBEDDING_MODEL",
+    "JCODE_KEYWORDS_ALLOW_FUZZY",
+    "JCODE_KEYWORDS_CLEAR_ON_SESSION_START",
+    "JCODE_KEYWORDS_ENABLED",
+    "JCODE_KEYWORDS_MATCH_MODE",
+    "JCODE_KEYWORDS_STICKY_TURNS",
     "JCODE_MEMORY_ENABLED",
     "JCODE_ENABLE_MERMAID",
     "JCODE_MEMORY_MODEL",
@@ -553,6 +558,10 @@ pub struct Config {
     #[serde(default)]
     pub notepad: crate::notepad::NotepadConfig,
 
+    /// Magic keyword / mode workflow configuration
+    #[serde(default)]
+    pub keywords: KeywordsConfig,
+
     /// Execution policy configuration
     #[serde(default)]
     pub execution_policy: ExecutionPolicyConfig,
@@ -560,6 +569,38 @@ pub struct Config {
     /// Task execution configuration
     #[serde(default)]
     pub task: TaskConfig,
+}
+
+/// Configuration for the magic keyword / sticky mode system.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct KeywordsConfig {
+    /// Master switch. When false, no detection, sticky inject, or chips.
+    pub enabled: bool,
+    /// `strict` (default): `$keyword` + token aliases only.
+    /// `loose`: also multi-word phrase aliases (+ optional fuzzy).
+    pub match_mode: String,
+    /// Sticky turn budget for newly activated modes.
+    pub sticky_turns: u32,
+    /// Clear project modes.toml when a new session starts.
+    pub clear_on_session_start: bool,
+    /// Show active modes on the TUI status line.
+    pub show_status_chip: bool,
+    /// Allow Levenshtein fuzzy aliases (only effective when match_mode=loose).
+    pub allow_fuzzy: bool,
+}
+
+impl Default for KeywordsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            match_mode: "strict".to_string(),
+            sticky_turns: 10,
+            clear_on_session_start: true,
+            show_status_chip: true,
+            allow_fuzzy: false,
+        }
+    }
 }
 
 /// Agent Client Protocol adapter configuration.

@@ -273,6 +273,18 @@ impl Agent {
         self.reset_runtime_state_for_session_change();
         self.provider_session_id = None;
         self.seed_compaction_from_session();
+
+        // NEW-SESSION: wipe stale keyword modes from disk so the fresh session
+        // does not inherit mode state from a prior run.
+        {
+            use crate::config;
+            let kw_cfg = &config::config().keywords;
+            jcode_keywords::clear_modes_if_session_start(
+                kw_cfg.enabled,
+                kw_cfg.clear_on_session_start,
+                self.session.working_dir.as_deref().map(std::path::Path::new),
+            );
+        }
     }
 
     /// Clear provider session so the next turn sends full context.

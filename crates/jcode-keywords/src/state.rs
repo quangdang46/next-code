@@ -52,8 +52,19 @@ impl ActiveMode {
 /// - Increments turn count for existing modes
 /// - Deactivates expired modes
 /// - Cancel clears everything
-/// - Persists state to disk
+///
+/// `sticky_turns` sets `turn_limit` for newly activated modes (min 1).
 pub fn update_modes(detections: &[DetectedKeyword], working_dir: Option<&Path>) -> ModeState {
+    update_modes_with_limit(detections, working_dir, DEFAULT_TURN_LIMIT)
+}
+
+/// Like [`update_modes`] but with an explicit sticky turn limit.
+pub fn update_modes_with_limit(
+    detections: &[DetectedKeyword],
+    working_dir: Option<&Path>,
+    sticky_turns: u32,
+) -> ModeState {
+    let sticky_turns = sticky_turns.max(1);
     let mut state = load_state(working_dir);
 
     // Cancel clears everything
@@ -63,6 +74,7 @@ pub fn update_modes(detections: &[DetectedKeyword], working_dir: Option<&Path>) 
     {
         state.active_modes.clear();
         state.updated_at = Some(Utc::now().to_rfc3339());
+        save_state(&state, working_dir);
         return state;
     }
 
@@ -87,13 +99,40 @@ pub fn update_modes(detections: &[DetectedKeyword], working_dir: Option<&Path>) 
             workflow,
             activated_at: Utc::now().to_rfc3339(),
             turn_count: 0,
-            turn_limit: DEFAULT_TURN_LIMIT,
+            turn_limit: sticky_turns,
             metadata: HashMap::new(),
         });
     }
 
     state.updated_at = Some(Utc::now().to_rfc3339());
     state
+}
+
+/// Snapshot for status-line chips (label + remaining turns).
+#[derive(Debug, Clone)]
+pub struct ModeChip {
+    pub workflow: WorkflowKind,
+    pub label: String,
+    pub remaining: u32,
+    pub turn_count: u32,
+    pub turn_limit: u32,
+}
+
+/// Build status chips from current disk state.
+pub fn mode_chips(working_dir: Option<&Path>) -> Vec<ModeChip> {
+    let state = load_state(working_dir);
+    state
+        .active_modes
+        .iter()
+        .filter(|m| !m.is_expired())
+        .map(|m| ModeChip {
+            workflow: m.workflow,
+            label: format!("${}", m.workflow),
+            remaining: m.turn_limit.saturating_sub(m.turn_count),
+            turn_count: m.turn_count,
+            turn_limit: m.turn_limit,
+        })
+        .collect()
 }
 
 /// Load mode state from disk.
@@ -155,6 +194,18 @@ fn state_path(working_dir: Option<&Path>) -> PathBuf {
 pub fn clear_modes(working_dir: Option<&Path>) {
     let state = ModeState::default();
     save_state(&state, working_dir);
+}
+
+/// Clear modes if both keywords are enabled and the `clear_on_session_start` config is set.
+/// Call this once per session start (not per turn).
+pub fn clear_modes_if_session_start(
+    keywords_enabled: bool,
+    clear_on_session_start: bool,
+    working_dir: Option<&Path>,
+) {
+    if keywords_enabled && clear_on_session_start {
+        clear_modes(working_dir);
+    }
 }
 
 #[cfg(test)]

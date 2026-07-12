@@ -696,6 +696,17 @@ impl App {
         });
         let t_session = t0.elapsed();
 
+        // NEW-SESSION: If keywords config says so, wipe stale modes from disk
+        // so a new client session never inherits mode state from a prior run.
+        {
+            let kw_cfg = &crate::config::config().keywords;
+            jcode_keywords::clear_modes_if_session_start(
+                kw_cfg.enabled,
+                kw_cfg.clear_on_session_start,
+                session.working_dir.as_deref().map(std::path::Path::new),
+            );
+        }
+
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             let provider_clone = Arc::clone(&provider);
             handle.spawn(async move {

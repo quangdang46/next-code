@@ -61,7 +61,14 @@ impl App {
                         _ => None,
                     })
                 });
-            let result = jcode_keywords::process_turn(
+            let kw_cfg = &crate::config::config().keywords;
+            let opts = jcode_keywords::process_turn_options_from_config(
+                kw_cfg.enabled,
+                &kw_cfg.match_mode,
+                kw_cfg.sticky_turns,
+                kw_cfg.allow_fuzzy,
+            );
+            let result = jcode_keywords::process_turn_with_options(
                 latest_input,
                 last_assistant,
                 self.session
@@ -69,6 +76,7 @@ impl App {
                     .as_deref()
                     .map(std::path::Path::new),
                 &self.session.id,
+                &opts,
             );
             for conflict in &result.conflicts {
                 crate::logging::warn(&jcode_keywords::conflict::format_warning(conflict));

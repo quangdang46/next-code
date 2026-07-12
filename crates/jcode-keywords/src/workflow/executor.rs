@@ -221,22 +221,38 @@ pub struct TurnResult {
     pub deferred_spawns: Vec<DeferredSpawn>,
 }
 
-/// One-shot keyword processing for a turn.
-///
-/// This is the canonical entry point used by both the agent runtime and the
-/// TUI: it runs the full detect -> update -> process-response -> execute
-/// pipeline against the latest user input, persists state to disk, and
-/// returns the workflow prompt section to inject into the system prompt.
-///
-/// `keyword_prompt` is `None` if the input is empty or no workflow is active.
-/// `conflicts` is always computed when there is input and at least one
-/// active mode.
+/// One-shot keyword processing for a turn (Strict defaults).
 pub fn process_turn(
     latest_input: &str,
     last_assistant: Option<&str>,
     working_dir: Option<&std::path::Path>,
     session_id: &str,
 ) -> TurnResult {
+    process_turn_with_options(
+        latest_input,
+        last_assistant,
+        working_dir,
+        session_id,
+        &crate::options::ProcessTurnOptions::default(),
+    )
+}
+
+/// Keyword processing with explicit options (match mode, sticky turns, enabled).
+pub fn process_turn_with_options(
+    latest_input: &str,
+    last_assistant: Option<&str>,
+    working_dir: Option<&std::path::Path>,
+    session_id: &str,
+    opts: &crate::options::ProcessTurnOptions,
+) -> TurnResult {
+    if !opts.enabled {
+        return TurnResult {
+            keyword_prompt: None,
+            conflicts: Vec::new(),
+            deferred_spawns: Vec::new(),
+        };
+    }
+
     if latest_input.is_empty() {
         return TurnResult {
             keyword_prompt: None,
@@ -245,8 +261,9 @@ pub fn process_turn(
         };
     }
 
-    let detections = crate::detector::detect_keywords(latest_input);
-    let mut mode_state = crate::state::update_modes(&detections, working_dir);
+    let detections = crate::detector::detect_keywords_with(latest_input, &opts.detect);
+    let mut mode_state =
+        crate::state::update_modes_with_limit(&detections, working_dir, opts.sticky_turns);
     let mut deferred_spawns: Vec<DeferredSpawn> = Vec::new();
 
     // Process PREVIOUS turn's LLM response (phase transitions, completion)

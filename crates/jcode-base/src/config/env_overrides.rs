@@ -263,6 +263,34 @@ impl Config {
             }
         }
 
+        // Keyword / sticky mode workflows
+        if let Ok(v) = std::env::var("JCODE_KEYWORDS_ENABLED") {
+            if let Some(parsed) = parse_env_bool(&v) {
+                self.keywords.enabled = parsed;
+            }
+        }
+        if let Ok(v) = std::env::var("JCODE_KEYWORDS_MATCH_MODE") {
+            let mode = v.trim().to_ascii_lowercase();
+            if matches!(mode.as_str(), "strict" | "loose" | "legacy" | "nl") {
+                self.keywords.match_mode = mode;
+            }
+        }
+        if let Ok(v) = std::env::var("JCODE_KEYWORDS_STICKY_TURNS") {
+            if let Ok(n) = v.trim().parse::<u32>() {
+                self.keywords.sticky_turns = n.max(1);
+            }
+        }
+        if let Ok(v) = std::env::var("JCODE_KEYWORDS_CLEAR_ON_SESSION_START") {
+            if let Some(parsed) = parse_env_bool(&v) {
+                self.keywords.clear_on_session_start = parsed;
+            }
+        }
+        if let Ok(v) = std::env::var("JCODE_KEYWORDS_ALLOW_FUZZY") {
+            if let Some(parsed) = parse_env_bool(&v) {
+                self.keywords.allow_fuzzy = parsed;
+            }
+        }
+
         if let Ok(v) = std::env::var("JCODE_CHAT_NATIVE_SCROLLBAR") {
             if let Some(parsed) = parse_env_bool(&v) {
                 self.display.native_scrollbars.chat = parsed;

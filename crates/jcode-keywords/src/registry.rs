@@ -46,8 +46,10 @@ pub enum WorkflowKind {
 pub struct KeywordEntry {
     /// The canonical keyword trigger (e.g. "$ultrawork")
     pub keyword: &'static str,
-    /// Alternative triggers (natural language aliases)
+    /// Single-token aliases (word-boundary exact). Used in Strict and Loose.
     pub aliases: &'static [&'static str],
+    /// Multi-word / phrase aliases. **Loose mode only** (substring match).
+    pub phrase_aliases: &'static [&'static str],
     /// Priority: 11 (highest) .. 5 (lowest)
     pub priority: u8,
     /// The workflow this keyword activates
@@ -57,130 +59,125 @@ pub struct KeywordEntry {
 }
 
 /// Build the full keyword registry, sorted by priority (highest first).
-///
-/// Returns a `&'static` slice backed by a lazily-initialised static, so callers
-/// (e.g. `detector`) can hold onto `&'static KeywordEntry` references without
-/// leaking memory on every detection.
 pub fn build_registry() -> &'static [&'static KeywordEntry] {
     static REGISTRY: OnceLock<&'static [&'static KeywordEntry]> = OnceLock::new();
     REGISTRY.get_or_init(|| {
         let mut entries: Vec<KeywordEntry> = vec![
-            // Priority 11 — highest
             KeywordEntry {
                 keyword: "$ralplan",
-                aliases: &["ralplan", "consensus plan"],
+                aliases: &["ralplan"],
+                phrase_aliases: &["consensus plan"],
                 priority: 11,
                 workflow: WorkflowKind::Ralplan,
                 description: "Consensus planning — plan → adversarial review → revise → approve",
             },
-            // Priority 10
             KeywordEntry {
                 keyword: "$ultrawork",
-                aliases: &[
-                    "work on",
-                    "ultra",
-                    "parallel",
-                    "dont stop",
-                    "must complete",
-                    "ulw",
-                    "uw",
-                ],
+                aliases: &["ulw", "uw"],
+                phrase_aliases: &["work on", "dont stop", "must complete", "dont stop"],
+                // Note: "parallel", "ultra" intentionally NOT included (too broad).
                 priority: 10,
                 workflow: WorkflowKind::Ultrawork,
-                description: "Parallel execution — spawn sub-agents, coordinate, aggregate",
+                description: "Parallel execution — break down work and coordinate subtasks",
             },
             KeywordEntry {
                 keyword: "$ultragoal",
                 aliases: &["ultragoal"],
+                phrase_aliases: &[],
                 priority: 10,
                 workflow: WorkflowKind::Ultragoal,
                 description: "Goal tracking — durable goal + token budget across turns",
             },
-            // Priority 9
             KeywordEntry {
                 keyword: "canceljcode",
                 aliases: &["stopjcode"],
+                phrase_aliases: &[],
                 priority: 9,
                 workflow: WorkflowKind::Cancel,
                 description: "Cancel all active modes and stop running tasks",
             },
-            // Priority 8
             KeywordEntry {
                 keyword: "$ultraqa",
-                aliases: &["ultraqa", "qa cycle"],
+                aliases: &["ultraqa"],
+                phrase_aliases: &["qa cycle"],
                 priority: 8,
                 workflow: WorkflowKind::Ultraqa,
                 description: "QA cycling — implement → test → fix → repeat",
             },
             KeywordEntry {
                 keyword: "$deep-interview",
-                aliases: &["ouroboros", "interview me", "gather requirements"],
+                aliases: &["ouroboros"],
+                phrase_aliases: &["interview me", "gather requirements"],
                 priority: 8,
                 workflow: WorkflowKind::DeepInterview,
                 description: "Requirements gathering — ask questions → score ambiguity → threshold",
             },
-            // Priority 7
             KeywordEntry {
                 keyword: "$ultrathink",
-                aliases: &["think hard", "think deeply"],
+                aliases: &["ultrathink"],
+                phrase_aliases: &["think hard", "think deeply"],
                 priority: 7,
                 workflow: WorkflowKind::Ultrathink,
                 description: "Extended thinking — deep reasoning, single-turn",
             },
             KeywordEntry {
                 keyword: "$deepsearch",
-                aliases: &["search the codebase", "find in codebase"],
+                aliases: &["deepsearch"],
+                phrase_aliases: &["search the codebase", "find in codebase"],
                 priority: 7,
                 workflow: WorkflowKind::Deepsearch,
                 description: "Codebase search — multi-strategy search → context map",
             },
             KeywordEntry {
                 keyword: "$tdd",
-                aliases: &["test first", "red green"],
+                aliases: &["tdd"],
+                phrase_aliases: &["test first", "red green"],
                 priority: 7,
                 workflow: WorkflowKind::Tdd,
                 description: "Test-driven development — write test → fail → implement → pass",
             },
-            // Priority 6
             KeywordEntry {
                 keyword: "$code-review",
-                aliases: &["code review", "review code"],
+                aliases: &[],
+                phrase_aliases: &["code review", "review code"],
                 priority: 6,
                 workflow: WorkflowKind::CodeReview,
                 description: "Code review — spawn reviewer → analyze → report",
             },
             KeywordEntry {
                 keyword: "$security-review",
-                aliases: &["security review", "audit security"],
+                aliases: &[],
+                phrase_aliases: &["security review", "audit security"],
                 priority: 6,
                 workflow: WorkflowKind::SecurityReview,
                 description: "Security review — OWASP scan → secrets → report",
             },
             KeywordEntry {
                 keyword: "$analyze",
-                aliases: &["deep-analyze", "deep analysis"],
+                aliases: &["deep-analyze"],
+                phrase_aliases: &["deep analysis"],
                 priority: 6,
                 workflow: WorkflowKind::Analyze,
                 description: "Deep analysis — structured analysis → report",
             },
-            // Priority 5
             KeywordEntry {
                 keyword: "$wiki",
-                aliases: &["wiki this", "look up docs"],
+                aliases: &["wiki"],
+                phrase_aliases: &["wiki this", "look up docs"],
                 priority: 5,
                 workflow: WorkflowKind::Wiki,
                 description: "Doc lookup — local + web docs → summary",
             },
             KeywordEntry {
                 keyword: "ai-slop-cleaner",
-                aliases: &["clean ai slop", "fix ai code"],
+                aliases: &[],
+                phrase_aliases: &["clean ai slop", "fix ai code"],
                 priority: 5,
                 workflow: WorkflowKind::AiSlopCleaner,
                 description: "AI slop cleanup — detect + fix AI low-quality code",
             },
         ];
 
-        // Sort by priority (highest first)
         entries.sort_by_key(|a| std::cmp::Reverse(a.priority));
         let leaked: &'static [KeywordEntry] = Box::leak(entries.into_boxed_slice());
         let refs: &'static [&'static KeywordEntry] =
@@ -188,6 +185,15 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
         refs
     })
 }
+
+/// Human-readable list of canonical `$keywords` for help/docs.
+pub fn list_canonical_keywords() -> Vec<&'static str> {
+    build_registry()
+        .iter()
+        .map(|e| e.keyword)
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,7 +218,20 @@ mod tests {
         let registry = build_registry();
         let kinds: std::collections::HashSet<WorkflowKind> =
             registry.iter().map(|e| e.workflow).collect();
-        // All 14 workflows should be represented
         assert_eq!(kinds.len(), 14);
+    }
+
+    #[test]
+    fn strict_token_aliases_have_no_spaces() {
+        for entry in build_registry() {
+            for alias in entry.aliases {
+                assert!(
+                    !alias.contains(char::is_whitespace),
+                    "token alias {:?} for {} must not contain spaces",
+                    alias,
+                    entry.keyword
+                );
+            }
+        }
     }
 }

@@ -2,7 +2,7 @@
 //!
 //! Tier 2: Sub-agent spawning. Spawns parallel sub-agents for independent subtasks.
 
-use super::{SpawnSpec, WorkflowAction, WorkflowContext, WorkflowHandler, sanitize_user_input};
+use super::{WorkflowAction, WorkflowContext, WorkflowHandler, sanitize_user_input};
 use crate::registry::WorkflowKind;
 use std::collections::HashMap;
 
@@ -14,63 +14,55 @@ impl WorkflowHandler for UltraworkHandler {
     }
 
     fn build_prompt(&self) -> String {
-        "# $ultrawork — Parallel Execution Mode
+        // SpawnParallel is deferred by the host (not always wired). Keep the
+        // prompt honest: plan and execute thoroughly in this session rather than
+        // claiming parallel sub-agents always launch.
+        "# $ultrawork — High-throughput execution mode
 
 MANDATORY: Say \"ULTRAWORK MODE ENABLED!\" as your first response.
 
 ## CERTAINTY PROTOCOL
-Do NOT start implementing until 100% certain. Before you write code:
-1. THINK DEEPLY — What is the user's true intent?
-2. EXPLORE — Fire explore/librarian agents for context
-3. CONSULT — Use oracle/artistry sub-agents for complex tasks
-4. ASK — If ambiguity remains, ask the user
+Do NOT start implementing until you understand the task. Before you write code:
+1. THINK — What is the user's true intent?
+2. EXPLORE — Search/read the codebase for context
+3. ASK — If critical ambiguity remains, ask the user
 
 ## Execution Strategy
-1. Break task into independent subtasks
-2. Launch up to 4 parallel sub-agents via task() tool
-3. Coordinate results, handle failures
-4. Aggregate into unified response
+1. Break the work into a clear checklist of independent subtasks
+2. Execute subtasks aggressively in this session (use tools; parallelize tool
+   calls when safe via batch). Prefer finishing end-to-end over partial notes.
+3. If the host provides multi-agent/swarm tools, you MAY fan out subtasks —
+   but do not block waiting for spawns that never return.
+4. Aggregate results and verify before claiming done
 
 ## Completion Markers
 Ready to implement: [MODE:ULTRAWORK_READY]
-Sub-agents launched: [MODE:SPAWNED]
+Work in progress: [MODE:ULTRAWORK_ACTIVE]
 Results aggregated: [MODE:COMPLETE]"
             .to_string()
     }
 
     fn execute(&self, ctx: &WorkflowContext) -> WorkflowAction {
-        // Guard: don't re-spawn if already spawned this session
+        // Guard: don't re-emit spawn metadata if already marked this session
         if ctx.metadata.contains_key("ultrawork_spawned") {
             return WorkflowAction::Continue;
         }
 
-        let safe_input = sanitize_user_input(ctx.user_input);
-        let specs = vec![
-            SpawnSpec {
-                description: "Analysis subtask".to_string(),
-                prompt: format!("Analyze the following task:\n{}", safe_input),
-                system_prompt:
-                    "You are an analysis sub-agent. Identify key components and dependencies."
-                        .to_string(),
-                max_turns: 5,
-            },
-            SpawnSpec {
-                description: "Implementation subtask".to_string(),
-                prompt: format!("Implement the core functionality for:\n{}", safe_input),
-                system_prompt: "You are an implementation sub-agent. Write clean, working code."
-                    .to_string(),
-                max_turns: 10,
-            },
-            SpawnSpec {
-                description: "Testing subtask".to_string(),
-                prompt: format!("Write tests for:\n{}", safe_input),
-                system_prompt: "You are a testing sub-agent. Ensure comprehensive test coverage."
-                    .to_string(),
-                max_turns: 5,
-            },
-        ];
-
-        WorkflowAction::SpawnParallel(specs)
+        // Soft-mark activation. Actual multi-agent spawn remains deferred to the
+        // host (see deferred_spawns); until wired, this mode is prompt-driven.
+        let mut meta = HashMap::new();
+        meta.insert("ultrawork_spawned".to_string(), "prompt_only".to_string());
+        meta.insert(
+            "task_preview".to_string(),
+            sanitize_user_input(ctx.user_input)
+                .chars()
+                .take(200)
+                .collect(),
+        );
+        WorkflowAction::ContinueWithMetadata {
+            reminder: String::new(),
+            metadata: meta,
+        }
     }
 
     fn on_turn_complete(

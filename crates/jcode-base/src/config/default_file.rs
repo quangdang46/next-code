@@ -239,6 +239,18 @@ profile = "full"
 # Disable all built-in tools unless enabled is set.
 disable_base_tools = false
 
+[keywords]
+# Magic keyword / sticky mode workflows ($ultrawork, $ultraqa, canceljcode, …).
+# match_mode = "strict"  # default: only $keyword + single-token aliases (ulw, uw)
+# match_mode = "loose"   # also multi-word phrases ("work on", "think hard", …)
+# Override with env: JCODE_KEYWORDS_MATCH_MODE, JCODE_KEYWORDS_ENABLED
+enabled = true
+match_mode = "strict"
+sticky_turns = 10
+clear_on_session_start = true
+show_status_chip = true
+allow_fuzzy = false
+
 [acp]
 # Agent Client Protocol adapter compatibility profile: standard, extended, or full.
 # standard emits only spec-compatible ACP messages.

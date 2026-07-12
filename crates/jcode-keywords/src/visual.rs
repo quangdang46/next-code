@@ -1,6 +1,7 @@
 //! Visual effects — keyword highlight spans for TUI rendering.
 
-use crate::detector::detect_keywords;
+use crate::detector::detect_keywords_with;
+use crate::options::DetectOptions;
 
 /// A highlight span for a detected keyword in the input.
 #[derive(Debug, Clone)]
@@ -17,38 +18,24 @@ pub struct KeywordHighlight {
     pub priority: u8,
 }
 
-/// Compute highlight spans for detected keywords in the original input.
-///
-/// `detect_keywords` returns positions in the *sanitized* string (after
-/// ANSI-stripping and whitespace-collapsing), which does not match the
-/// original input that the TUI renders. Remap each detection by
-/// searching for `det.matched_text` in the original input starting at
-/// the position implied by the previous detection (or 0 for the first
-/// one). This is O(n*m) but n is the number of highlights (small) and
-/// the substring search is fast.
+/// Compute highlight spans using Strict defaults.
 pub fn compute_highlights(input: &str) -> Vec<KeywordHighlight> {
-    let detections = detect_keywords(input);
+    compute_highlights_with(input, &DetectOptions::default())
+}
+
+/// Compute highlight spans with the same detect options as activation.
+pub fn compute_highlights_with(input: &str, opts: &DetectOptions) -> Vec<KeywordHighlight> {
+    let detections = detect_keywords_with(input, opts);
     let mut results: Vec<KeywordHighlight> = Vec::with_capacity(detections.len());
     let mut cursor = 0usize;
     for (i, det) in detections.into_iter().enumerate() {
-        // Find `det.matched_text` in `input[cursor..]` (case-insensitive).
-        // Use the actual detected position from the sanitized input as a hint,
-        // but always search in the original `input` so byte offsets are correct.
-        let needle = &det.matched_text;
-        let haystack = &input[cursor..];
-        let found = haystack.to_lowercase().find(&needle.to_lowercase());
-        // Use the sanitized position directly. When the input has no ANSI
-        // escapes or special whitespace, the sanitized position matches the
-        // original input exactly. For the rare case where it doesn't, falling
-        // back to substring search is more fragile than using the already-known
-        // position (and the result is still highlighted, just at a slightly
-        // wrong offset — acceptable for a cosmetic feature).
+        // Use sanitized positions when input is clean; acceptable cosmetic
+        // drift when ANSI/whitespace differs.
         let start = det.position.0.min(input.len());
         let end = det.position.1.min(input.len());
 
         // Skip highlights that start before the current cursor (overlap with
-        // a previous, higher-priority match). Same keyword matched with
-        // different aliases, e.g. $ultrawork [0,9] and $ultraqa [0,7].
+        // a previous, higher-priority match).
         if start < cursor {
             continue;
         }
