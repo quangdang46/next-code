@@ -65,48 +65,19 @@ fn status_spinner_delay_until_next_frame(elapsed: f32) -> Duration {
 }
 
 pub(super) fn status_spinner_only_symbol(app: &App) -> Option<&'static str> {
-    let policy = crate::perf::tui_policy();
-    // The single-cell spinner fast path is intentionally available even when
-    // decorative animations are disabled (Minimal tier, SSH, WSL, etc.). It
-    // patches exactly one status cell between full redraws, so it stays very
-    // cheap while keeping the "thinking/connecting/streaming" spinner feeling
-    // responsive instead of choppy at the ~1 Hz passive-liveness redraw rate.
-    // When decorative animations are off it advances at the smooth liveness
-    // rate; otherwise it uses the full-rate spinner clock.
-    if !app.is_processing
-        || !app.streaming.streaming_text.is_empty()
-        || app.centered_mode()
-        || app.has_pending_mouse_scroll_animation()
-        || app.remote_startup_phase_active()
-    {
-        return None;
-    }
-
-    if status_uses_primary_spinner(&app.status) {
-        Some(jcode_tui_style::theme::activity_indicator(
-            status_spinner_elapsed(app),
-            STATUS_SPINNER_FPS,
-            policy.enable_decorative_animations,
-        ))
-    } else {
-        None
-    }
+    // Claude Code-style layout: processing activity lives in the conversation
+    // chrome above the input (`conversation_activity_line`), not on the status
+    // bar. Patching a spinner cell into the status area re-creates the dual-
+    // spinner look the user reported, so this fast path is intentionally off.
+    let _ = app;
+    None
 }
 
-/// Statuses whose full status line starts with the primary green circular spinner.
-///
-/// Keep this in sync with `ui_input::draw_status`: these statuses can be safely
-/// refreshed by the one-cell spinner fast path when the status line is left aligned.
-/// Tool execution uses its own full-line activity indicator, and network waits use
-/// a static amber retry marker, so neither belongs here.
+/// Formerly true for statuses whose status line led with the green spinner.
+/// Always false now — activity spinner moved out of the status bar.
 pub(crate) fn status_uses_primary_spinner(status: &ProcessingStatus) -> bool {
-    matches!(
-        status,
-        ProcessingStatus::Sending
-            | ProcessingStatus::Connecting(_)
-            | ProcessingStatus::Thinking(_)
-            | ProcessingStatus::Streaming
-    )
+    let _ = status;
+    false
 }
 
 #[derive(Default)]
@@ -841,8 +812,9 @@ mod tests {
 
     #[test]
     fn primary_spinner_statuses_are_explicit() {
-        assert!(status_uses_primary_spinner(&ProcessingStatus::Sending));
-        assert!(status_uses_primary_spinner(&ProcessingStatus::Streaming));
+        // Status-bar primary spinner retired — conversation chrome owns activity.
+        assert!(!status_uses_primary_spinner(&ProcessingStatus::Sending));
+        assert!(!status_uses_primary_spinner(&ProcessingStatus::Streaming));
         assert!(!status_uses_primary_spinner(
             &ProcessingStatus::RunningTool("bash".to_string())
         ));
