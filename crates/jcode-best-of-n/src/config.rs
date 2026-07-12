@@ -118,8 +118,8 @@ pub struct BestOfNConfig {
 impl Default for BestOfNConfig {
     fn default() -> Self {
         Self {
-            mode: BestOfNMode::Auto,
-            count: 4,
+            mode: BestOfNMode::Off,
+            count: 3,
             temperatures: TemperatureStrategyConfig::default(),
             selector: SelectorConfig::default(),
             model: None,

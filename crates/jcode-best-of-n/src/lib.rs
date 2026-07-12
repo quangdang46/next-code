@@ -41,8 +41,8 @@ pub mod types;
 
 // Re-export key types at the crate root.
 pub use config::{BestOfNConfig, BestOfNMode};
-pub use selector::select_best_candidate;
-pub use store::ProposedContentStore;
+pub use selector::{SelectionResult, select_best_candidate};
+pub use store::{ProposedContentStore, ProposedEntry};
 pub use types::{
     BestOfNResult, CandidateDiff, CandidateId, CandidateStatus, CandidateStrategy, FileDiff, RunId,
     SelectScore,

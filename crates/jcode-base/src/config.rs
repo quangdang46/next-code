@@ -44,6 +44,8 @@ const CONFIG_ENV_KEYS: &[&str] = &[
     "JCODE_AUTOREVIEW_ENABLED",
     "JCODE_AUTOREVIEW_MODEL",
     "JCODE_AUTO_SERVER_RELOAD",
+    "JCODE_BEST_OF_N_COUNT",
+    "JCODE_BEST_OF_N_MODE",
     "JCODE_BING_API_KEY",
     "JCODE_BING_API_KEY_ENV",
     "JCODE_BING_MARKET",
@@ -439,14 +441,8 @@ pub fn on_config_reloaded(listener: fn()) {
 }
 
 /// Main configuration struct
-/// Best-of-N configuration (fork-specific)
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(default)]
-pub struct BestOfNConfig {
-    pub enabled: bool,
-    pub candidates: usize,
-    pub score_threshold: f64,
-}
+/// Best-of-N configuration — re-exported from jcode-best-of-n crate.
+pub use jcode_best_of_n::BestOfNConfig;
 
 /// Task execution configuration (fork-specific)
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -552,7 +548,7 @@ pub struct Config {
 
     /// Best-of-N configuration
     #[serde(default)]
-    pub best_of_n: Option<BestOfNConfig>,
+    pub best_of_n: BestOfNConfig,
 
     /// Notepad configuration
     #[serde(default)]

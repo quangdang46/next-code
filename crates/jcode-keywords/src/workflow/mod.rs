@@ -6,6 +6,7 @@ use std::collections::HashMap;
 
 pub mod ai_slop_cleaner;
 pub mod analyze;
+pub mod best_of_n;
 pub mod cancel;
 pub mod code_review;
 pub mod deep_interview;
@@ -127,6 +128,7 @@ pub fn get_handler(kind: WorkflowKind) -> Option<&'static dyn WorkflowHandler> {
         WorkflowKind::Analyze => &analyze::AnalyzeHandler,
         WorkflowKind::Wiki => &wiki::WikiHandler,
         WorkflowKind::AiSlopCleaner => &ai_slop_cleaner::AiSlopCleanerHandler,
+        WorkflowKind::BestOfN => &best_of_n::BestOfNHandler,
         WorkflowKind::Cancel => &cancel::CancelHandler,
     })
 }

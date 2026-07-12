@@ -227,6 +227,7 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "hashline_edit"
             | "propose_edit"
             | "propose_hashline"
+            | "best_of_n_edit"
             | "notepad_write_priority"
             | "notepad_write_working"
             | "notepad_write_manual"
@@ -420,6 +421,18 @@ impl Registry {
                 &mut timings,
                 "propose_hashline",
                 propose_hashline_edit::ProposeHashlineEditTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "best_of_n_edit",
+                best_of_n::BestOfNEditTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "best_of_n_apply",
+                best_of_n::BestOfNApplyTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "ffs_glob", ffs_glob::FfsGlobTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "ffs_grep", ffs_grep::FfsGrepTool::new);

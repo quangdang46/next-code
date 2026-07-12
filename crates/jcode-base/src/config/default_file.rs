@@ -251,6 +251,14 @@ clear_on_session_start = true
 show_status_chip = true
 allow_fuzzy = false
 
+[best_of_n]
+# Parallel candidate editing: spawn N agents, pick the best diff.
+# mode = "off"   # default: disabled — normal single-edit path
+# mode = "auto"  # run N candidates, auto-select best, apply silently
+# mode = "show"  # run N candidates, present diffs to user for selection
+# count = 3      # number of parallel candidates (min 2)
+# Override with env: JCODE_BEST_OF_N_MODE, JCODE_BEST_OF_N_COUNT
+
 [acp]
 # Agent Client Protocol adapter compatibility profile: standard, extended, or full.
 # standard emits only spec-compatible ACP messages.

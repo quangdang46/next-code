@@ -37,6 +37,8 @@ pub enum WorkflowKind {
     Wiki,
     /// SlopCleanup — detect + fix AI low-quality code
     AiSlopCleaner,
+    /// BestOfN — spawn parallel candidates, pick best diff
+    BestOfN,
     /// CancelAll — stop all modes + cancel tasks
     Cancel,
 }
@@ -176,6 +178,14 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
                 workflow: WorkflowKind::AiSlopCleaner,
                 description: "AI slop cleanup — detect + fix AI low-quality code",
             },
+            KeywordEntry {
+                keyword: "$bestofn",
+                aliases: &["bestofn", "bon"],
+                phrase_aliases: &[],
+                priority: 6,
+                workflow: WorkflowKind::BestOfN,
+                description: "Best-of-N editing — spawn parallel candidates, pick best",
+            },
         ];
 
         entries.sort_by_key(|a| std::cmp::Reverse(a.priority));
@@ -218,7 +228,7 @@ mod tests {
         let registry = build_registry();
         let kinds: std::collections::HashSet<WorkflowKind> =
             registry.iter().map(|e| e.workflow).collect();
-        assert_eq!(kinds.len(), 14);
+        assert_eq!(kinds.len(), 15);
     }
 
     #[test]

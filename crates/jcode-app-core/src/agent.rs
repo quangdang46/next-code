@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+pub mod best_of_n_orchestrator;
 mod compaction;
 mod environment;
 mod inline_tail;

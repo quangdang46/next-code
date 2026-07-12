@@ -291,6 +291,18 @@ impl Config {
             }
         }
 
+        // Best-of-N editing
+        if let Ok(v) = std::env::var("JCODE_BEST_OF_N_MODE") {
+            if let Some(mode) = jcode_best_of_n::BestOfNMode::parse(&v) {
+                self.best_of_n.mode = mode;
+            }
+        }
+        if let Ok(v) = std::env::var("JCODE_BEST_OF_N_COUNT") {
+            if let Ok(n) = v.trim().parse::<usize>() {
+                self.best_of_n.count = n.max(2);
+            }
+        }
+
         if let Ok(v) = std::env::var("JCODE_CHAT_NATIVE_SCROLLBAR") {
             if let Some(parsed) = parse_env_bool(&v) {
                 self.display.native_scrollbars.chat = parsed;
