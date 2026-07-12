@@ -138,6 +138,20 @@ pub fn get_current_session() -> Option<String> {
 pub fn install_panic_hook() {
     let default_hook = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
+        // Best-effort terminal restore before printing anything — panic can
+        // leave raw mode + SGR mouse tracking on, corrupting the shell.
+        let _ = crossterm::terminal::disable_raw_mode();
+        let _ = crossterm::execute!(
+            std::io::stderr(),
+            crossterm::event::DisableMouseCapture,
+            crossterm::event::DisableBracketedPaste,
+            crossterm::event::DisableFocusChange,
+            crossterm::terminal::LeaveAlternateScreen,
+            crossterm::cursor::Show
+        );
+        let _ = write!(std::io::stderr(), "\x1b[?1006l\x1b[?1002l\x1b[?1000l");
+        let _ = std::io::stderr().flush();
+
         default_hook(info);
 
         if let Some(session_id) = get_current_session() {
@@ -295,9 +309,17 @@ fn cleanup_tui_runtime(state: &TuiRuntimeState, restore_terminal: bool) {
         if state.focus_change {
             let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableFocusChange);
         }
-        if state.mouse_capture {
-            let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
-        }
+        // Always disable mouse tracking — even when our state says mouse_capture
+        // is false. Residual SGR mouse sequences (`^[[<51;…M`) leak into the shell
+        // when a previous process (or incomplete teardown) left tracking on, or
+        // when mouse was enabled outside this guard's knowledge.
+        let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture);
+        // Belt-and-suspenders: emit the CSI disable sequences that some terminals
+        // require after SGR extended mouse mode was enabled.
+        // CSI ?1006l = SGR mouse off, ?1002l = button-event tracking off,
+        // ?1000l = basic mouse tracking off.
+        let _ = write!(std::io::stdout(), "\x1b[?1006l\x1b[?1002l\x1b[?1000l");
+        let _ = std::io::stdout().flush();
         if state.keyboard_enhanced {
             tui::disable_keyboard_enhancement();
         }
@@ -404,12 +426,20 @@ fn signal_crash_reason(sig: i32) -> String {
 fn handle_termination_signal(sig: i32) -> ! {
     mark_current_session_crashed(signal_crash_reason(sig));
 
+    // Full terminal restore — raw mode, alternate screen, cursor, AND mouse
+    // tracking (SGR residual otherwise pollutes the shell after SIGINT/SIGHUP).
     let _ = crossterm::terminal::disable_raw_mode();
     let _ = crossterm::execute!(
         std::io::stderr(),
+        crossterm::event::DisableMouseCapture,
+        crossterm::event::DisableBracketedPaste,
+        crossterm::event::DisableFocusChange,
         crossterm::terminal::LeaveAlternateScreen,
         crossterm::cursor::Show
     );
+    // Explicit CSI disable for SGR extended mouse modes some terminals leave on.
+    let _ = write!(std::io::stderr(), "\x1b[?1006l\x1b[?1002l\x1b[?1000l");
+    let _ = std::io::stderr().flush();
 
     if let Some(session_id) = get_current_session() {
         print_session_resume_hint(&session_id);
