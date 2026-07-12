@@ -67,34 +67,33 @@ impl Tool for ProposeWriteTool {
             None
         };
 
-        // Best-of-N context: run id + candidate id must be set on the
-        // tool context, otherwise this tool was called outside a
-        // candidate execution and we have nowhere to store the proposal.
+        // Prefer ToolContext; fall back to global handle (parent agent path).
+        let handle = current_handle().await.ok_or_else(|| {
+            anyhow::anyhow!("propose_write requires best-of-N context — call best_of_n_edit first")
+        })?;
         let run_id = ctx
             .best_of_n_run_id
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("propose_write requires best-of-N context"))?;
+            .as_deref()
+            .unwrap_or(handle.run_id.as_str());
         let candidate_id = ctx
             .best_of_n_candidate_id
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("propose_write requires best-of-N context"))?;
-
-        // The handle itself lives on the shared `Registry`. If the agent
-        // never installed a best-of-N orchestrator we have no place to
-        // record the proposal and the call must fail.
-        let handle = current_handle()
-            .await
-            .ok_or_else(|| anyhow::anyhow!("propose_write requires best-of-N context"))?;
+            .as_deref()
+            .or(if handle.candidate_id.is_empty() {
+                None
+            } else {
+                Some(handle.candidate_id.as_str())
+            })
+            .unwrap_or("manual");
 
         // Use the user-supplied path as the dedup key inside the store
         // so it matches original_files[].file_path in build_diffs.
         let file_key = params.file_path.clone();
-        let run_id_typed = jcode_best_of_n::RunId(run_id.clone());
+        let run_id_typed = jcode_best_of_n::RunId(run_id.to_string());
         handle.store.set_proposed(
             &run_id_typed,
             file_key,
             &params.content,
-            candidate_id.clone(),
+            candidate_id.to_string(),
             !existed,
         );
 

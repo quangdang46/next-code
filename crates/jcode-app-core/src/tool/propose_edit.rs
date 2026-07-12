@@ -78,24 +78,24 @@ impl Tool for ProposeEditTool {
         // run_id/candidate_id on the subagent's ToolContext; if either is
         // missing, the propose_* tools have nothing to attribute the
         // proposal to and must refuse to run.
+        // Prefer ToolContext (set on child agents by orchestrator); fall back to
+        // the global handle so the parent agent can also draft proposals.
+        let handle = get_best_of_n_handle()
+            .ok_or_else(|| anyhow::anyhow!("best-of-N handle not initialized — call best_of_n_edit first"))?;
         let run_id = ctx
             .best_of_n_run_id
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("propose_edit requires best-of-N context"))?;
+            .as_deref()
+            .unwrap_or(handle.run_id.as_str());
         let candidate_id = ctx
             .best_of_n_candidate_id
-            .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("propose_edit requires best-of-N context"))?;
-
-        // Resolve the store from the global best-of-N handle static. The
-        // orchestrator registers itself during Agent::new_with_session via
-        // set_best_of_n_handle(), so this is only Some() while a
-        // best-of-N run is in flight.
-        let store: std::sync::Arc<ProposedContentStore> = {
-            let handle = get_best_of_n_handle()
-                .ok_or_else(|| anyhow::anyhow!("best-of-N handle not initialized"))?;
-            handle.store.clone()
-        };
+            .as_deref()
+            .or(if handle.candidate_id.is_empty() {
+                None
+            } else {
+                Some(handle.candidate_id.as_str())
+            })
+            .unwrap_or("manual");
+        let store: std::sync::Arc<ProposedContentStore> = handle.store.clone();
 
         let path = ctx.resolve_path(Path::new(&params.file_path));
 
@@ -138,12 +138,12 @@ impl Tool for ProposeEditTool {
 
         // Write the proposed content to the store. is_new_file = false
         // because the file already exists on disk.
-        let run_id_typed = jcode_best_of_n::RunId(run_id.clone());
+        let run_id_typed = jcode_best_of_n::RunId(run_id.to_string());
         store.set_proposed(
             &run_id_typed,
             params.file_path.clone(),
             new_content.clone(),
-            candidate_id.clone(),
+            candidate_id.to_string(),
             false,
         );
 

@@ -80,20 +80,21 @@ impl Tool for ProposeHashlineEditTool {
     async fn execute(&self, input: Value, ctx: ToolContext) -> Result<ToolOutput> {
         let params: ProposeInput = serde_json::from_value(input)?;
 
+        let handle = get_best_of_n_handle().ok_or_else(|| {
+            anyhow::anyhow!("best-of-N handle not initialized — call best_of_n_edit first")
+        })?;
         let run_id = ctx
             .best_of_n_run_id
             .clone()
-            .ok_or_else(|| anyhow::anyhow!("propose_hashline requires best-of-N context"))?;
-        let candidate_id = ctx
-            .best_of_n_candidate_id
-            .clone()
-            .ok_or_else(|| anyhow::anyhow!("propose_hashline requires best-of-N context"))?;
-
-        let store: std::sync::Arc<ProposedContentStore> = {
-            let handle = get_best_of_n_handle()
-                .ok_or_else(|| anyhow::anyhow!("best-of-N handle not initialized"))?;
-            handle.store.clone()
-        };
+            .unwrap_or_else(|| handle.run_id.clone());
+        let candidate_id = ctx.best_of_n_candidate_id.clone().unwrap_or_else(|| {
+            if handle.candidate_id.is_empty() {
+                "manual".to_string()
+            } else {
+                handle.candidate_id.clone()
+            }
+        });
+        let store: std::sync::Arc<ProposedContentStore> = handle.store.clone();
 
         match params {
             ProposeInput::Patch {

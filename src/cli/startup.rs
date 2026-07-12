@@ -11,6 +11,8 @@ use super::{
 
 pub async fn run() -> Result<()> {
     startup_profile::init();
+    // Register keyword workflow spawn stub (real agent spawn is still deferred).
+    startup_profile::init_workflow_spawn();
 
     terminal::install_panic_hook();
     startup_profile::mark("panic_hook");
