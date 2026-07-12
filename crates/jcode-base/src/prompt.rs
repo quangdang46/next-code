@@ -29,8 +29,28 @@ impl PromptCapabilities {
     }
 }
 
+/// Edit-tool guidance for the active `tools.edit_mode` backend.
+const EDIT_HASHLINE_PROMPT: &str = include_str!("prompt/edit_hashline.md");
+const EDIT_REPLACE_PROMPT: &str = include_str!("prompt/edit_replace.md");
+const EDIT_APPLY_PATCH_PROMPT: &str = include_str!("prompt/edit_apply_patch.md");
+const EDIT_MULTIEDIT_PROMPT: &str = include_str!("prompt/edit_multiedit.md");
+
+fn edit_mode_prompt_section() -> &'static str {
+    use crate::config::EditMode;
+    match crate::config::config().tools.edit_mode {
+        EditMode::Hashline => EDIT_HASHLINE_PROMPT,
+        EditMode::Replace => EDIT_REPLACE_PROMPT,
+        EditMode::ApplyPatch => EDIT_APPLY_PATCH_PROMPT,
+        EditMode::Multiedit => EDIT_MULTIEDIT_PROMPT,
+    }
+}
+
 fn base_system_prompt_parts(capabilities: PromptCapabilities) -> Vec<String> {
-    let mut parts = vec![DEFAULT_SYSTEM_PROMPT.to_string()];
+    let mut parts = vec![
+        DEFAULT_SYSTEM_PROMPT.to_string(),
+        // Mode-aware: only teach the backend actually registered as `edit`.
+        edit_mode_prompt_section().trim().to_string(),
+    ];
     if capabilities.mermaid {
         parts.push(MERMAID_PROMPT.to_string());
     }

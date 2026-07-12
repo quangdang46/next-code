@@ -88,8 +88,25 @@ impl Tool for FfsOutlineTool {
         let items = outline_blocking(&content, &file_path, max_items);
 
         let mut output = String::new();
-        // Mint hashline TAG so outline anchors can feed the `edit` tool.
-        let tag = crate::tool::hashline_snapshots::record(&file_path, &content, None);
+        // Mint hashline TAG; mark outline item line spans as seen so edits
+        // targeting those anchors pass provenance checks (oh-my-pi style).
+        let mut seen: Vec<usize> = Vec::new();
+        for item in &items {
+            for line in item.start_line..=item.end_line.max(item.start_line) {
+                seen.push(line);
+            }
+        }
+        seen.sort_unstable();
+        seen.dedup();
+        let tag = crate::tool::hashline_snapshots::record(
+            &file_path,
+            &content,
+            if seen.is_empty() {
+                None
+            } else {
+                Some(&seen)
+            },
+        );
         let display_path = params.file.trim_start_matches("./");
         // Prefer model-facing path (not basename-only) so edit headers resolve uniquely.
         let header = format!("[{display_path}#{tag}]");

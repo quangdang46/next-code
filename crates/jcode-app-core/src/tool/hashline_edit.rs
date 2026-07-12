@@ -88,7 +88,7 @@ impl Tool for HashlineEditTool {
                 "intent": super::intent_schema_property(),
                 "input": {
                     "type": "string",
-                    "description": "Full hashline patch (preferred). Sections start with [path#TAG]; ops SWAP/DEL/INS/REM/MV."
+                    "description": "Full hashline patch (preferred). One or more [path#TAG] sections; multi-file OK. Ops: SWAP/DEL/INS/REM/MV."
                 },
                 "file_path": {
                     "type": "string",
@@ -120,22 +120,12 @@ impl Tool for HashlineEditTool {
                 file_path,
                 intent,
                 patch,
-            } => execute_patch(file_path, intent, patch, ctx).await,
+            } => dispatch_patch(Some(file_path), intent, patch, ctx).await,
             HashlineEditInput::Input {
                 input,
                 intent,
                 file_path,
-            } => {
-                let path = file_path
-                    .or_else(|| extract_path_from_patch(&input))
-                    .ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "edit `input` must start with `[path#TAG]` (from your latest read/search) \
-                             or include `file_path`"
-                        )
-                    })?;
-                execute_patch(path, intent, input, ctx).await
-            }
+            } => dispatch_patch(file_path, intent, input, ctx).await,
             HashlineEditInput::Structured {
                 file_path,
                 intent,
@@ -149,7 +139,97 @@ impl Tool for HashlineEditTool {
 
 // ── Patch mode ───────────────────────────────────────────────────
 
-async fn execute_patch(
+/// Route single- or multi-file hashline patches.
+///
+/// Multi-file `input` with several `[path#TAG]` sections is applied
+/// section-by-section (oh-my-pi style). On failure mid-batch, already-applied
+/// paths are reported so the model can re-read and retry only the remainder.
+async fn dispatch_patch(
+    file_path: Option<String>,
+    intent: Option<String>,
+    patch: String,
+    ctx: ToolContext,
+) -> Result<ToolOutput> {
+    let sections = split_patch_sections(&patch);
+    if sections.len() > 1 {
+        if file_path.is_some() {
+            crate::logging::warn(
+                "edit: multi-section patch ignores top-level file_path; each [path#TAG] is authoritative",
+            );
+        }
+        return execute_multi_sections(sections, intent, ctx).await;
+    }
+
+    let path = file_path
+        .or_else(|| sections.first().map(|(p, _)| p.clone()))
+        .or_else(|| extract_path_from_patch(&patch))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "edit requires `file_path` or a patch starting with `[path#TAG]` \
+                 (from your latest read/search)"
+            )
+        })?;
+
+    // Prefer the isolated section text when a header is present (avoids
+    // leftover multi-path residue after split of a single section).
+    let body = sections
+        .into_iter()
+        .next()
+        .map(|(_, section)| section)
+        .unwrap_or(patch);
+
+    execute_one_section(path, intent, body, ctx).await
+}
+
+async fn execute_multi_sections(
+    sections: Vec<(String, String)>,
+    intent: Option<String>,
+    ctx: ToolContext,
+) -> Result<ToolOutput> {
+    let total = sections.len();
+    let mut results: Vec<String> = Vec::with_capacity(total);
+    let mut applied: Vec<String> = Vec::new();
+
+    for (i, (path, section)) in sections.into_iter().enumerate() {
+        match execute_one_section(path.clone(), intent.clone(), section, ctx.clone()).await {
+            Ok(out) => {
+                applied.push(path);
+                results.push(out.output);
+            }
+            Err(e) => {
+                let mut msg = format!(
+                    "Multi-file hashline edit failed on section {}/{total} ({path}): {e}\n",
+                    i + 1
+                );
+                if !applied.is_empty() {
+                    msg.push_str(&format!(
+                        "Already applied: {}. Re-read those files before re-issuing remaining sections.\n",
+                        applied.join(", ")
+                    ));
+                }
+                msg.push_str(&format!(
+                    "Stopped after {} successful section(s) of {total}; \
+                     fix the failure and re-issue only unapplied sections.\n",
+                    applied.len()
+                ));
+                if !results.is_empty() {
+                    msg.push_str("\n--- results so far ---\n");
+                    msg.push_str(&results.join("\n\n"));
+                }
+                return Err(anyhow::anyhow!(msg));
+            }
+        }
+    }
+
+    Ok(ToolOutput::new(format!(
+        "Applied {} file section(s):\n\n{}",
+        results.len(),
+        results.join("\n\n")
+    ))
+    .with_title(format!("{} files", results.len())))
+}
+
+async fn execute_one_section(
     file_path: String,
     intent: Option<String>,
     patch: String,
@@ -432,23 +512,61 @@ fn extract_tag(patch: &str) -> Option<String> {
 
 /// First section path from a `[path#TAG]` or `[path]` header line.
 fn extract_path_from_patch(patch: &str) -> Option<String> {
-    for line in patch.lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    split_patch_sections(patch)
+        .into_iter()
+        .next()
+        .map(|(path, _)| path)
+}
+
+/// Split a multi-file hashline patch into `(path, section_text)` pairs.
+///
+/// Section text includes the `[path#TAG]` header line. Returns an empty vec
+/// when the patch has no file headers (caller then requires explicit `file_path`).
+fn split_patch_sections(patch: &str) -> Vec<(String, String)> {
+    let lines: Vec<&str> = patch.lines().collect();
+    let mut header_indices: Vec<usize> = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        if parse_header_line(line).is_some() {
+            header_indices.push(i);
         }
-        if !(line.starts_with('[') && line.ends_with(']')) {
-            // Non-header first non-empty line → no path in patch.
-            return None;
-        }
-        let inner = &line[1..line.len() - 1];
-        let path = inner.split('#').next()?.trim();
-        if path.is_empty() {
-            return None;
-        }
-        return Some(path.to_string());
     }
-    None
+    if header_indices.is_empty() {
+        return Vec::new();
+    }
+
+    let mut sections = Vec::with_capacity(header_indices.len());
+    for (i, &start) in header_indices.iter().enumerate() {
+        let end = header_indices
+            .get(i + 1)
+            .copied()
+            .unwrap_or(lines.len());
+        let path = parse_header_line(lines[start])
+            .expect("header index always points at a valid header");
+        let mut body = lines[start..end].join("\n");
+        // Preserve a trailing newline when the original section had one
+        // (last section only, and only if the full patch ends with \n).
+        if end == lines.len() && patch.ends_with('\n') && !body.ends_with('\n') {
+            body.push('\n');
+        }
+        sections.push((path, body));
+    }
+    sections
+}
+
+fn parse_header_line(line: &str) -> Option<String> {
+    let line = line.trim();
+    if !(line.starts_with('[') && line.ends_with(']')) {
+        return None;
+    }
+    let inner = &line[1..line.len() - 1];
+    // Reject bare `[` `]` or apply-patch style paths with spaces only if empty.
+    let path = inner.split('#').next()?.trim();
+    if path.is_empty() || path.contains('\n') {
+        return None;
+    }
+    // Hashline headers never contain spaces in practice for relative paths;
+    // still accept them (quoted paths are rare).
+    Some(path.to_string())
 }
 
 fn try_recover(
@@ -773,5 +891,28 @@ mod tests {
             hashline::parser::parse_patch("[x.rs#ABCD]\nSWAP 2..2:\n+hello\n");
         assert!(file_op.is_none(), "warnings={warnings:?}");
         assert!(!edits.is_empty(), "warnings={warnings:?}");
+    }
+
+    #[test]
+    fn split_multi_file_sections() {
+        let patch = "\
+[a.rs#AAAA]
+SWAP 1:
++one
+[b.rs#BBBB]
+DEL 2
+";
+        let sections = split_patch_sections(patch);
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].0, "a.rs");
+        assert!(sections[0].1.starts_with("[a.rs#AAAA]"));
+        assert!(sections[0].1.contains("SWAP 1:"));
+        assert_eq!(sections[1].0, "b.rs");
+        assert!(sections[1].1.contains("DEL 2"));
+    }
+
+    #[test]
+    fn split_no_headers_is_empty() {
+        assert!(split_patch_sections("SWAP 1:\n+x\n").is_empty());
     }
 }
