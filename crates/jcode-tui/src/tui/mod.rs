@@ -270,6 +270,8 @@ pub trait TuiState {
     fn batch_progress(&self) -> Option<crate::bus::BatchProgress>;
     /// Running items state (tools, subagents, background tasks) for the interactive list.
     fn running_items(&self) -> RunningItemsState;
+    /// Agent tree for conversation rendering (Claude Code style tree).
+    fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> { Vec::new() }
     fn time_since_activity(&self) -> Option<Duration>;
     /// Whether the terminal is currently focused (receiving key events).
     /// Always true in this fork — upstream's FocusLost handling is not ported.

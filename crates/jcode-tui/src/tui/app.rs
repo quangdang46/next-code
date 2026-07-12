@@ -1395,6 +1395,9 @@ pub struct App {
     /// Teammate view: session_id of the subagent being viewed (CCB teammate view style).
     /// When set, the UI shows this subagent's stream inline instead of switching sessions.
     pub viewing_teammate_session_id: Option<String>,
+    /// Agent tree for conversation rendering (Claude Code style).
+    /// Populated from running items / communicate tool results every frame.
+    pub agent_trees: Vec<super::agent_tree::AgentTreeNode>,
     /// Selection mode: true when user is in selecting-teammate mode.
     pub view_teammate_selection: bool,
     /// When true, auto-continuation after each turn is disabled.

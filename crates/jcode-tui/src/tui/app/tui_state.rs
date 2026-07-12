@@ -683,6 +683,10 @@ impl crate::tui::TuiState for App {
         self.batch_progress.clone()
     }
 
+    fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> {
+        self.agent_trees.clone()
+    }
+
     fn running_items(&self) -> crate::tui::RunningItemsState {
         let mut items: Vec<crate::tui::RunningItem> = Vec::new();
         // 1. Batch subcalls (running tools from batch progress)
