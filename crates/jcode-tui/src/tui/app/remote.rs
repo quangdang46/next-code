@@ -651,7 +651,7 @@ fn handle_terminal_event_while_disconnected(
     }
 
     if needs_redraw {
-        terminal.draw(|frame| crate::tui::ui::draw(frame, app))?;
+        super::run_shell::draw_ui_frame(terminal, app)?;
     }
 
     Ok(app.should_quit)
@@ -702,7 +702,7 @@ pub(super) async fn handle_remote_event<B: Backend>(
             // the current TUI state rather than "no frames captured".
             if debug_command_needs_current_frame(&command) {
                 crate::tui::visual_debug::enable();
-                if let Err(error) = terminal.draw(|frame| crate::tui::ui::draw(frame, app)) {
+                if let Err(error) = super::run_shell::draw_ui_frame(terminal, app) {
                     let output = format!("ERR: failed to capture current frame: {error}");
                     let _ = remote.send_client_debug_response(id, output).await;
                     return Ok((RemoteEventOutcome::Continue, false));

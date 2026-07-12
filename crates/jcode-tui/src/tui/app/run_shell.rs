@@ -130,6 +130,7 @@ impl StatusSpinnerRenderer {
         // backend streams cells one-by-one and eagerly-repainting terminals (and slow/remote or
         // multiplexed sessions) show visible flicker. See issue #282.
         let sync = crossterm::execute!(terminal.backend_mut(), BeginSynchronizedUpdate).is_ok();
+        let mut cleared_for_full_redraw = false;
         if app.force_full_redraw {
             // Never call Terminal::clear() here: it queries cursor position via DSR (CSI 6n)
             // and a 2s timeout was fatal for the client mid-session. Fullscreen clear does not
@@ -141,6 +142,7 @@ impl StatusSpinnerRenderer {
                 // Still force a full cell rewrite even if the physical clear failed.
                 force_full_buffer_redraw(terminal);
             }
+            cleared_for_full_redraw = true;
             app.force_full_redraw = false;
             self.invalidate();
         }
@@ -162,11 +164,19 @@ impl StatusSpinnerRenderer {
                 if sync {
                     let _ = crossterm::execute!(terminal.backend_mut(), EndSynchronizedUpdate);
                 }
+                // If we already cleared / reset buffers, re-arm so the next successful frame
+                // still paints a full screen instead of leaving a half-applied redraw.
+                if cleared_for_full_redraw {
+                    app.force_full_redraw = true;
+                }
                 return Ok(());
             }
             Err(e) => {
                 if sync {
                     let _ = crossterm::execute!(terminal.backend_mut(), EndSynchronizedUpdate);
+                }
+                if cleared_for_full_redraw {
+                    app.force_full_redraw = true;
                 }
                 return Err(e.into());
             }
@@ -273,8 +283,38 @@ fn force_full_buffer_redraw(terminal: &mut DefaultTerminal) {
 }
 
 fn is_cursor_position_timeout(err: &std::io::Error) -> bool {
-    let msg = err.to_string();
-    msg.contains("cursor position could not be read")
+    is_cursor_position_timeout_msg(&err.to_string())
+}
+
+fn is_cursor_position_timeout_msg(msg: &str) -> bool {
+    msg.to_ascii_lowercase()
+        .contains("cursor position could not be read")
+}
+
+/// Draw one UI frame without treating cursor DSR timeouts as fatal.
+///
+/// Production call sites outside [`StatusSpinnerRenderer::draw_full`] (reconnect loops,
+/// disconnected-event redraws, debug capture) used bare `terminal.draw()?`, which still
+/// exited the client when crossterm's CSI `6n` round-trip timed out. Route those through
+/// this helper so the session stays attached.
+pub(in crate::tui::app) fn draw_ui_frame<B>(
+    terminal: &mut ratatui::Terminal<B>,
+    app: &dyn crate::tui::TuiState,
+) -> Result<()>
+where
+    B: Backend,
+    B::Error: std::fmt::Display,
+{
+    match terminal.draw(|frame| crate::tui::ui::draw(frame, app)) {
+        Ok(_) => Ok(()),
+        Err(e) if is_cursor_position_timeout_msg(&e.to_string()) => {
+            crate::logging::warn(&format!(
+                "Skipping frame after cursor-position timeout during draw ({e})"
+            ));
+            Ok(())
+        }
+        Err(e) => Err(anyhow::anyhow!("terminal draw failed: {e}")),
+    }
 }
 
 fn render_status_spinner_into_buffer(buffer: &Buffer, area: Rect, symbol: &str) -> bool {
@@ -702,8 +742,16 @@ mod tests {
             "The cursor position could not be read within a normal duration",
         );
         assert!(is_cursor_position_timeout(&err));
+        assert!(is_cursor_position_timeout_msg(
+            "The cursor position could not be read within a normal duration"
+        ));
+        // Case-insensitive: some wrappers rephrase / lowercase the message.
+        assert!(is_cursor_position_timeout_msg(
+            "error: the cursor position could not be read within a normal duration"
+        ));
         let other = std::io::Error::new(std::io::ErrorKind::BrokenPipe, "Broken pipe");
         assert!(!is_cursor_position_timeout(&other));
+        assert!(!is_cursor_position_timeout_msg("Broken pipe"));
     }
 
     #[test]
