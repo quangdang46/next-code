@@ -309,7 +309,7 @@ async fn execute_one_section(
     let mut final_display = file_path.clone();
     let mut did_rename = false;
     if let Some(HashlineFileOp::Rename(dest)) = file_op {
-        let dest_path = ctx.resolve_path(Path::new(&dest));
+        let dest_path = resolve_mv_destination(&ctx, &path, &dest);
         if let Some(parent) = dest_path.parent() {
             tokio::fs::create_dir_all(parent).await.ok();
         }
@@ -325,8 +325,9 @@ async fn execute_one_section(
         if let Ok(moved) = tokio::fs::read_to_string(&dest_path).await {
             hashline_snapshots::record(&dest_path, &moved, None);
         }
+        // Prefer a path string relative to working_dir when possible for the TAG header.
+        final_display = display_path_for(&ctx, &dest_path, &dest);
         final_path = dest_path;
-        final_display = dest;
         did_rename = true;
         publish_file_event(
             &ctx,
@@ -573,6 +574,45 @@ fn parse_header_line(line: &str) -> Option<String> {
     // Hashline headers never contain spaces in practice for relative paths;
     // still accept them (quoted paths are rare).
     Some(path.to_string())
+}
+
+/// Resolve `MV DEST` paths for agent ergonomics.
+///
+/// - Absolute `DEST` → used as-is.
+/// - Bare filename (`moved.txt`) → same directory as the **source** file
+///   (so `MV moved.txt` next to `/tmp/proj/a.txt` lands at `/tmp/proj/moved.txt`,
+///   not under the process cwd).
+/// - Relative path with separators (`subdir/x.txt`) → `ToolContext::resolve_path`
+///   (workspace / working_dir relative).
+fn resolve_mv_destination(ctx: &ToolContext, source: &Path, dest: &str) -> std::path::PathBuf {
+    use std::path::Component;
+    let dest_path = Path::new(dest);
+    if dest_path.is_absolute() {
+        return dest_path.to_path_buf();
+    }
+    let is_bare_name = dest_path
+        .components()
+        .all(|c| matches!(c, Component::Normal(_)))
+        && dest_path.components().count() == 1;
+    if is_bare_name {
+        if let Some(parent) = source.parent() {
+            return parent.join(dest_path);
+        }
+    }
+    ctx.resolve_path(dest_path)
+}
+
+fn display_path_for(ctx: &ToolContext, abs: &Path, fallback: &str) -> String {
+    if let Some(wd) = ctx.working_dir.as_ref() {
+        if let Ok(rel) = abs.strip_prefix(wd) {
+            return rel.display().to_string();
+        }
+    }
+    // Prefer the agent-authored dest string when it was relative/bare.
+    if !Path::new(fallback).is_absolute() {
+        return fallback.to_string();
+    }
+    abs.display().to_string()
 }
 
 fn try_recover(
@@ -920,5 +960,38 @@ DEL 2
     #[test]
     fn split_no_headers_is_empty() {
         assert!(split_patch_sections("SWAP 1:\n+x\n").is_empty());
+    }
+
+    #[test]
+    fn mv_bare_name_stays_beside_source() {
+        use crate::tool::ToolContext;
+        let ctx = ToolContext {
+            working_dir: Some(std::path::PathBuf::from("/workspace")),
+            ..Default::default()
+        };
+        let source = Path::new("/tmp/smoke/move_me.txt");
+        let dest = resolve_mv_destination(&ctx, source, "moved.txt");
+        assert_eq!(dest, Path::new("/tmp/smoke/moved.txt"));
+    }
+
+    #[test]
+    fn mv_relative_path_uses_working_dir() {
+        use crate::tool::ToolContext;
+        let ctx = ToolContext {
+            working_dir: Some(std::path::PathBuf::from("/workspace")),
+            ..Default::default()
+        };
+        let source = Path::new("/tmp/smoke/move_me.txt");
+        let dest = resolve_mv_destination(&ctx, source, "out/moved.txt");
+        assert_eq!(dest, Path::new("/workspace/out/moved.txt"));
+    }
+
+    #[test]
+    fn mv_absolute_dest_unchanged() {
+        use crate::tool::ToolContext;
+        let ctx = ToolContext::default();
+        let source = Path::new("/tmp/smoke/move_me.txt");
+        let dest = resolve_mv_destination(&ctx, source, "/var/moved.txt");
+        assert_eq!(dest, Path::new("/var/moved.txt"));
     }
 }
