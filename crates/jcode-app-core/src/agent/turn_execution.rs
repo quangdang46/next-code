@@ -112,7 +112,13 @@ impl Agent {
             ""
         };
 
-        match self.run_best_of_n(user_message, &[]).await {
+        match crate::agent::best_of_n_orchestrator::run_best_of_n(
+            self,
+            user_message,
+            &[],
+        )
+        .await
+        {
             Ok(result) => {
                 let winner = result
                     .candidates
@@ -146,6 +152,55 @@ impl Agent {
             Err(e) => {
                 crate::logging::warn(&format!("[best-of-n] auto-run failed: {e}"));
                 // Fall through to normal turn on failure.
+                Ok(None)
+            }
+        }
+    }
+
+    /// Same as maybe_auto_best_of_n but passes event_tx for streaming progress.
+    async fn maybe_auto_best_of_n_streaming(
+        &self,
+        user_message: &str,
+        event_tx: &tokio::sync::mpsc::UnboundedSender<ServerEvent>,
+    ) -> Result<Option<String>> {
+        let cfg = crate::config::config().best_of_n.clone();
+        if !cfg.enabled() || self.best_of_n_run_id.is_some() {
+            return Ok(None);
+        }
+        let detections = jcode_keywords::detect_keywords(user_message);
+        let triggered = detections
+            .iter()
+            .any(|d| d.entry.workflow == jcode_keywords::WorkflowKind::BestOfN);
+
+        let working_dir = std::path::PathBuf::from(self.working_dir().unwrap_or("."));
+        let sticky = jcode_keywords::load_state(Some(&working_dir))
+            .active_modes
+            .iter()
+            .any(|m| m.workflow == jcode_keywords::WorkflowKind::BestOfN && !m.is_expired());
+
+        if !triggered && !sticky && !(cfg.mode.is_auto() && looks_like_edit_request(user_message)) {
+            return Ok(None);
+        }
+
+        let event_tx_opt = Some(event_tx.clone());
+        match crate::agent::best_of_n_orchestrator::run_best_of_n_with_progress(
+            self,
+            user_message,
+            &[],
+            &event_tx_opt,
+        )
+        .await
+        {
+            Ok(r) => {
+                let winner = r.candidates.get(r.winner_index).map(|c| c.strategy.label.as_str()).unwrap_or("?");
+                let files = if r.files_applied.is_empty() { "  (none)".to_string() } else { r.files_applied.iter().map(|f| format!("  - {f}")).collect::<Vec<_>>().join("\n") };
+                Ok(Some(format!(
+                    "BEST-OF-N MODE ENABLED!\nCandidates: {}\nWinner: #{} ({})\nReason: {}\nFiles:\n{}",
+                    r.candidates.len(), r.winner_index, winner, r.selection_reason, files,
+                )))
+            }
+            Err(e) => {
+                crate::logging::warn(&format!("[best-of-n] auto-run streaming failed: {e}"));
                 Ok(None)
             }
         }
@@ -276,20 +331,19 @@ impl Agent {
         }
 
         // Auto best-of-N before streaming turn (same rules as run_once_capture).
-        if let Some(bon_result) = self.maybe_auto_best_of_n(user_message).await? {
+        if let Some(partial) = self.maybe_auto_best_of_n_streaming(user_message, &event_tx).await? {
             self.add_message(Role::User, blocks);
             self.add_message(
                 Role::Assistant,
                 vec![ContentBlock::Text {
-                    text: bon_result.clone(),
+                    text: partial.clone(),
                     cache_control: None,
                 }],
             );
             crate::telemetry::record_turn();
             self.session.save()?;
-            // Emit as a single assistant text event so TUI still sees a reply.
             let _ = event_tx.send(ServerEvent::TextDelta {
-                text: bon_result,
+                text: partial,
             });
             let _ = event_tx.send(ServerEvent::MessageEnd);
             self.current_turn_system_reminder = None;

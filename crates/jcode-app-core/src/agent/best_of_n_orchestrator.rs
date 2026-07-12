@@ -18,6 +18,7 @@ use jcode_best_of_n::{
 
 use crate::agent::Agent;
 use crate::provider::Provider;
+use crate::protocol::ServerEvent;
 use crate::session::Session;
 use crate::tool::{BestOfNOrchestratorHandle, Registry};
 
@@ -105,6 +106,18 @@ pub async fn run_best_of_n(
     user_request: &str,
     context_files: &[String],
 ) -> Result<BestOfNRunResult> {
+    run_best_of_n_with_progress(parent, user_request, context_files, &None).await
+}
+
+/// Like [`run_best_of_n`] but emits progress via an optional event sender.
+/// When `event_tx` is provided, the caller (e.g. streaming path) can relay
+/// progress updates to the TUI client so the user sees activity.
+pub async fn run_best_of_n_with_progress(
+    parent: &Agent,
+    user_request: &str,
+    context_files: &[String],
+    event_tx: &Option<tokio::sync::mpsc::UnboundedSender<ServerEvent>>,
+) -> Result<BestOfNRunResult> {
     let cfg = crate::config::config().best_of_n.clone();
     if !cfg.enabled() {
         return Err(anyhow::anyhow!(
@@ -112,10 +125,14 @@ pub async fn run_best_of_n(
         ));
     }
 
+    // Capture parent's spawn parts once before parallel loops.
+    let (parent_provider, parent_registry, parent_session) = parent.best_of_n_spawn_parts();
+
     let run_id = RunId::new();
     let store = Arc::new(ProposedContentStore::new());
     let strategies =
         jcode_best_of_n::strategies::generate_strategies(cfg.effective_count(), &cfg.temperatures);
+    let total = strategies.len();
 
     crate::tool::set_best_of_n_handle(BestOfNOrchestratorHandle {
         run_id: run_id.to_string(),
@@ -125,37 +142,101 @@ pub async fn run_best_of_n(
     });
 
     let context_block = load_context_files(context_files).await;
-    let mut candidates = Vec::with_capacity(strategies.len());
+    emit_progress(
+        event_tx,
+        &format!("Best-of-N: generating {} candidates…", total),
+    );
+    crate::logging::info(&format!(
+        "[best-of-n] spawning {}/{} candidates for run {}",
+        total, cfg.effective_count(), run_id
+    ));
 
+    // Spawn all candidates in parallel with a per-candidate timeout.
+    let mut handles = Vec::with_capacity(strategies.len());
     for (i, strategy) in strategies.iter().enumerate() {
         let candidate_id = CandidateId::new(i);
         let prompt =
             build_candidate_prompt(&candidate_id, &strategy.label, user_request, &context_block);
-        match spawn_and_run_candidate(parent, &run_id, &candidate_id, strategy, &prompt, &store)
+        let strategy = strategy.clone();
+        let rid = run_id.clone();
+        let st = store.clone();
+        let pv = parent_provider.clone();
+        let rg = parent_registry.clone();
+        let ps = parent_session.clone();
+
+        handles.push(tokio::spawn(async move {
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(120),
+                spawn_and_run_candidate(&rid, &candidate_id, &strategy, &prompt, &st, &pv, &rg, &ps),
+            )
             .await
-        {
+            {
+                Ok(Ok(c)) => c,
+                Ok(Err(e)) => {
+                    crate::logging::warn(&format!(
+                        "[best-of-n] candidate {candidate_id} error: {e}"
+                    ));
+                    CandidateDiff {
+                        candidate_id: candidate_id.clone(),
+                        strategy,
+                        status: CandidateStatus::Failed,
+                        file_diffs: Vec::new(),
+                        total_tokens: None,
+                        error: Some(e.to_string()),
+                    }
+                }
+                Err(_) => {
+                    crate::logging::warn(&format!(
+                        "[best-of-n] candidate {candidate_id} timed out (120s)"
+                    ));
+                    CandidateDiff {
+                        candidate_id: candidate_id.clone(),
+                        strategy,
+                        status: CandidateStatus::Failed,
+                        file_diffs: Vec::new(),
+                        total_tokens: None,
+                        error: Some("candidate timed out after 120s".to_string()),
+                    }
+                }
+            }
+        }));
+    }
+
+    // Collect results with per-candidate progress.
+    let mut candidates = Vec::with_capacity(handles.len());
+    for (i, handle) in handles.into_iter().enumerate() {
+        crate::logging::info(&format!("[best-of-n] candidate {}/{} done", i + 1, total));
+        emit_progress(
+            event_tx,
+            &format!("Best-of-N: candidate {}/{} complete…", i + 1, total),
+        );
+        match handle.await {
             Ok(c) => candidates.push(c),
             Err(e) => {
                 crate::logging::warn(&format!(
-                    "[best-of-n] candidate {candidate_id} failed: {e}"
+                    "[best-of-n] candidate {i} panicked: {e}"
                 ));
                 candidates.push(CandidateDiff {
-                    candidate_id: candidate_id.clone(),
-                    strategy: strategy.clone(),
+                    candidate_id: CandidateId::new(i),
+                    strategy: strategies[i].clone(),
                     status: CandidateStatus::Failed,
                     file_diffs: Vec::new(),
                     total_tokens: None,
-                    error: Some(e.to_string()),
+                    error: Some(format!("candidate panicked: {e}")),
                 });
             }
         }
     }
+
+    emit_progress(event_tx, "Best-of-N: selecting best candidate…");
 
     let selection = select_best_candidate(&candidates, &cfg.selector);
     let files_applied = apply_winner(&run_id, &candidates, selection.winner_index, &store);
 
     crate::tool::clear_best_of_n_handle();
     store.clear_run(&run_id);
+
+    emit_progress(event_tx, "Best-of-N: done.");
 
     Ok(BestOfNRunResult {
         run_id: run_id.to_string(),
@@ -167,14 +248,15 @@ pub async fn run_best_of_n(
 }
 
 async fn spawn_and_run_candidate(
-    parent: &Agent,
     run_id: &RunId,
     candidate_id: &CandidateId,
     strategy: &CandidateStrategy,
     prompt: &str,
     store: &Arc<ProposedContentStore>,
+    provider: &Arc<dyn Provider>,
+    registry: &Registry,
+    parent_session: &Session,
 ) -> Result<CandidateDiff> {
-    let (provider, registry, parent_session) = parent.best_of_n_spawn_parts();
     let mut child_session = Session::create(Some(parent_session.id.clone()), None);
     child_session.working_dir = parent_session.working_dir.clone();
     child_session.model = parent_session.model.clone();
@@ -196,8 +278,12 @@ async fn spawn_and_run_candidate(
         allowed.insert(name.to_string());
     }
 
-    let mut child =
-        Agent::new_with_session(provider, registry, child_session, Some(allowed));
+    let mut child = Agent::new_with_session(
+        Arc::clone(provider),
+        registry.clone(),
+        child_session,
+        Some(allowed),
+    );
     child.set_best_of_n_context(run_id.to_string(), candidate_id.to_string());
 
     if let Err(e) = child.run_once_capture_inner(prompt).await {
@@ -328,6 +414,23 @@ impl Agent {
         user_request: &str,
         context_files: &[String],
     ) -> Result<BestOfNRunResult> {
-        run_best_of_n(self, user_request, context_files).await
+        crate::agent::best_of_n_orchestrator::run_best_of_n(
+            self,
+            user_request,
+            context_files,
+        )
+        .await
+    }
+}
+
+/// Send a progress update through the event channel if present.
+fn emit_progress(
+    event_tx: &Option<tokio::sync::mpsc::UnboundedSender<ServerEvent>>,
+    text: &str,
+) {
+    if let Some(tx) = event_tx {
+        let _ = tx.send(ServerEvent::TextDelta {
+            text: format!("[best-of-n] {text}\n"),
+        });
     }
 }
