@@ -87,13 +87,16 @@ echo "Updated stable symlink: $stable_dir/jcode -> $version_dir/jcode"
 echo "Updated current symlink: $current_dir/jcode -> $version_dir/jcode"
 echo "Updated launcher symlink: $install_dir/jcode -> $current_dir/jcode"
 
-# Gracefully reload any running background server onto the binary we just
-# installed (issue #291). `server reload` only reloads when the running daemon
-# is genuinely older, hands live headless/swarm sessions to the new process, and
-# is a no-op when no server is running, so it is safe to call unconditionally.
+# Force-reload any running background server onto the binary we just installed
+# (issue #291). Unconditional `--force` is required after install: version
+# comparison on an older daemon can report "already current" while the process
+# image is still the previous build (stale /proc mapping vs updated symlink).
+# Hands live headless/swarm sessions to the new process; no-op if no server.
 if [ "${JCODE_SKIP_SERVER_RELOAD:-}" != "1" ]; then
-  if "$install_dir/jcode" server reload </dev/null >/dev/null 2>&1; then
-    echo "Reloaded the running jcode server onto $hash (if one was active)."
+  if "$install_dir/jcode" server reload --force </dev/null >/dev/null 2>&1; then
+    echo "Force-reloaded the running jcode server onto $hash (if one was active)."
+  else
+    echo "Warning: server reload --force failed; restart serve manually if tools look stale."
   fi
 fi
 

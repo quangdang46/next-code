@@ -42,7 +42,13 @@ enum HashlineEditInput {
     },
     /// Oh-my-pi shape: one `input` string with `[path#TAG]` headers.
     /// Optional `file_path` overrides the path in the first header.
+    ///
+    /// Accepts `patch` as an alias for `input` so callers can send
+    /// `{ "patch": "..." }` without `file_path` (multi-file sections still
+    /// resolve from headers). `{ "file_path", "patch" }` still matches
+    /// [`HashlineEditInput::Patch`] first.
     Input {
+        #[serde(alias = "patch")]
         input: String,
         #[serde(default)]
         intent: Option<String>,
