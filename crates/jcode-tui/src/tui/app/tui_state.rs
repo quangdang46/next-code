@@ -684,7 +684,79 @@ impl crate::tui::TuiState for App {
     }
 
     fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> {
-        self.agent_trees.clone()
+        if !self.agent_trees.is_empty() {
+            return self.agent_trees.clone();
+        }
+        // Auto-populate from running items if no explicit agent tree was set.
+        let mut trees = Vec::new();
+        // Create a "main" leader tree
+        let mut leader = crate::tui::agent_tree::AgentTreeNode {
+            agent_name: "agent".to_string(),
+            status: if self.is_processing {
+                crate::tui::agent_tree::AgentStatus::Running
+            } else {
+                crate::tui::agent_tree::AgentStatus::Idle
+            },
+            tool_use_count: 0,
+            token_count: 0,
+            is_leaf: false,
+            is_leader: true,
+            children: Vec::new(),
+            session_id: None,
+            activity: if self.is_processing {
+                Some("processing…".to_string())
+            } else {
+                None
+            },
+        };
+
+        // Add subagent status entry
+        if let Some(status) = &self.subagent_status {
+            leader.children.push(crate::tui::agent_tree::AgentTreeNode {
+                agent_name: "subagent".to_string(),
+                status: crate::tui::agent_tree::AgentStatus::Running,
+                tool_use_count: 0,
+                token_count: 0,
+                is_leaf: true,
+                is_leader: false,
+                children: Vec::new(),
+                session_id: Some(self.session.id.clone()),
+                activity: Some(format!("{}", status)),
+            });
+        }
+
+        // Add swarm members
+        for member in &self.remote_swarm_members {
+            let st = match member.status.as_str() {
+                "running" | "processing" => crate::tui::agent_tree::AgentStatus::Running,
+                "completed" | "done" | "ok" => crate::tui::agent_tree::AgentStatus::Completed,
+                "failed" | "error" => crate::tui::agent_tree::AgentStatus::Failed,
+                "stopped" | "cancelled" => crate::tui::agent_tree::AgentStatus::Stopped,
+                _ => crate::tui::agent_tree::AgentStatus::Running,
+            };
+            let detail = match (&member.detail, &member.output_tail) {
+                (Some(d), Some(t)) => Some(format!("{} — {}", d, t.lines().last().unwrap_or(t))),
+                (Some(d), None) => Some(d.clone()),
+                (None, Some(t)) => Some(t.lines().last().unwrap_or(t).to_string()),
+                (None, None) => None,
+            };
+            leader.children.push(crate::tui::agent_tree::AgentTreeNode {
+                agent_name: member.friendly_name.clone().unwrap_or_else(|| member.session_id.clone()),
+                status: st,
+                tool_use_count: 0,
+                token_count: 0,
+                is_leaf: true,
+                is_leader: false,
+                children: Vec::new(),
+                session_id: Some(member.session_id.clone()),
+                activity: detail,
+            });
+        }
+
+        if !leader.children.is_empty() || leader.activity.is_some() {
+            trees.push(leader);
+        }
+        trees
     }
 
     fn running_items(&self) -> crate::tui::RunningItemsState {
