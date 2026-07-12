@@ -116,6 +116,28 @@ impl App {
             result.keyword_prompt
         };
 
+        // Config-on best-of-N reminder (even without $bestofn keyword).
+        let best_of_n_prompt = {
+            let bon = &crate::config::config().best_of_n;
+            if bon.enabled() {
+                Some(format!(
+                    "# Best-of-N editing is ON (mode={}, count={})\n\
+                     For non-trivial multi-approach edits: best_of_n_edit → propose_* drafts → best_of_n_apply.\n\
+                     Skip for one-line / trivial fixes.\n",
+                    bon.mode.as_str(),
+                    bon.effective_count()
+                ))
+            } else {
+                None
+            }
+        };
+        let combined_keyword_prompt = match (keyword_prompt, best_of_n_prompt) {
+            (Some(k), Some(b)) => Some(format!("{k}\n{b}")),
+            (Some(k), None) => Some(k),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+
         // Inject priority-tier notes into the system prompt so they survive compaction.
         let working_dir = self
             .session
@@ -132,7 +154,7 @@ impl App {
             self.session.is_canary,
             memory_prompt,
             working_dir,
-            keyword_prompt,
+            combined_keyword_prompt,
             notepad_prompt.as_deref(),
         );
         self.append_current_turn_system_reminder(&mut split);
