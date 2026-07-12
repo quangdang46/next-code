@@ -254,10 +254,11 @@ allow_fuzzy = false
 [best_of_n]
 # Parallel candidate editing: spawn N agents, pick the best diff.
 # mode = "off"   # default: disabled — normal single-edit path
-# mode = "auto"  # run N candidates, auto-select best, apply silently
-# mode = "show"  # run N candidates, present diffs to user for selection
+# mode = "auto"  # run N candidates on $bestofn / edit-like prompts, auto-apply best
+# mode = "show"  # same as auto for now (interactive picker not implemented yet)
 # count = 3      # number of parallel candidates (min 2)
 # Override with env: JCODE_BEST_OF_N_MODE, JCODE_BEST_OF_N_COUNT
+# Manual tool path: best_of_n_edit → propose_* drafts → best_of_n_apply
 
 [acp]
 # Agent Client Protocol adapter compatibility profile: standard, extended, or full.

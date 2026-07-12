@@ -732,6 +732,7 @@ fn launch_manual_subagent(app: &mut App, spec: ManualSubagentSpec) {
             title: None,
         }));
 
+        let bon = crate::tool::get_best_of_n_handle();
         let ctx = crate::tool::ToolContext {
             session_id: session_id.clone(),
             message_id: message_id.clone(),
@@ -740,8 +741,14 @@ fn launch_manual_subagent(app: &mut App, spec: ManualSubagentSpec) {
             stdin_request_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
-            best_of_n_run_id: None,
-            best_of_n_candidate_id: None,
+            best_of_n_run_id: bon.as_ref().map(|h| h.run_id.clone()),
+            best_of_n_candidate_id: bon.as_ref().and_then(|h| {
+                if h.candidate_id.is_empty() {
+                    None
+                } else {
+                    Some(h.candidate_id.clone())
+                }
+            }),
         };
 
         let start = Instant::now();

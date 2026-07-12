@@ -35,7 +35,9 @@ pub use options::{
     DetectOptions, MatchMode, ProcessTurnOptions, process_turn_options_from_config,
 };
 pub use registry::{KeywordEntry, WorkflowKind, list_canonical_keywords};
-pub use state::{ModeChip, ModeState, clear_modes, clear_modes_if_session_start, mode_chips};
+pub use state::{
+    ModeChip, ModeState, clear_modes, clear_modes_if_session_start, load_state, mode_chips,
+};
 pub use visual::{KeywordHighlight, compute_highlights, compute_highlights_with};
 pub use workflow::executor::DeferredSpawn;
 pub use workflow::executor::{

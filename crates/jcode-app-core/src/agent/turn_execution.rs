@@ -19,6 +19,28 @@ impl Agent {
     }
 
     pub async fn run_once_capture(&mut self, user_message: &str) -> Result<String> {
+        // Auto best-of-N: when mode is auto/show and user triggered $bestofn (or
+        // mode is auto with an explicit edit-like request), run the orchestrator
+        // instead of a normal single-agent turn.
+        if let Some(bon_result) = self.maybe_auto_best_of_n(user_message).await? {
+            self.add_message(
+                Role::User,
+                vec![ContentBlock::Text {
+                    text: user_message.to_string(),
+                    cache_control: None,
+                }],
+            );
+            self.add_message(
+                Role::Assistant,
+                vec![ContentBlock::Text {
+                    text: bon_result.clone(),
+                    cache_control: None,
+                }],
+            );
+            self.session.save()?;
+            return Ok(bon_result);
+        }
+
         self.add_message(
             Role::User,
             vec![ContentBlock::Text {
@@ -38,6 +60,95 @@ impl Agent {
             }
         }
         result
+    }
+
+    /// If best-of-N should auto-run for this user message, execute it and return
+    /// a summary string. Returns `Ok(None)` when the normal turn path should run.
+    async fn maybe_auto_best_of_n(&self, user_message: &str) -> Result<Option<String>> {
+        let cfg = crate::config::config().best_of_n.clone();
+        if !cfg.enabled() {
+            return Ok(None);
+        }
+
+        // Avoid recursion: child agents already have best_of_n context set.
+        if self.best_of_n_run_id.is_some() {
+            return Ok(None);
+        }
+
+        let detections = jcode_keywords::detect_keywords(user_message);
+        let keyword_triggered = detections
+            .iter()
+            .any(|d| d.entry.workflow == jcode_keywords::WorkflowKind::BestOfN);
+
+        // Sticky mode from a prior $bestofn in this project.
+        let working_dir = self.working_dir().map(std::path::PathBuf::from);
+        let sticky = jcode_keywords::load_state(working_dir.as_deref())
+            .active_modes
+            .iter()
+            .any(|m| m.workflow == jcode_keywords::WorkflowKind::BestOfN && !m.is_expired());
+
+        // Only auto-run when user explicitly invoked $bestofn / sticky mode, or
+        // when mode is auto and the message looks like an edit request.
+        let should_run = keyword_triggered
+            || sticky
+            || (cfg.mode.is_auto() && looks_like_edit_request(user_message));
+
+        if !should_run {
+            return Ok(None);
+        }
+
+        crate::logging::info(&format!(
+            "[best-of-n] auto-trigger (keyword={}, sticky={}, mode={})",
+            keyword_triggered,
+            sticky,
+            cfg.mode.as_str()
+        ));
+
+        // show mode: still run auto-select for now, but label the result so the
+        // user knows interactive picker is not implemented yet.
+        let show_note = if matches!(cfg.mode, jcode_best_of_n::BestOfNMode::Show) {
+            "\n(Note: mode=show picker UI is not implemented yet; auto-applied best candidate.)\n"
+        } else {
+            ""
+        };
+
+        match self.run_best_of_n(user_message, &[]).await {
+            Ok(result) => {
+                let winner = result
+                    .candidates
+                    .get(result.winner_index)
+                    .map(|c| c.strategy.label.as_str())
+                    .unwrap_or("unknown");
+                let files = if result.files_applied.is_empty() {
+                    "  (none)".to_string()
+                } else {
+                    result
+                        .files_applied
+                        .iter()
+                        .map(|f| format!("  - {f}"))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                Ok(Some(format!(
+                    "BEST-OF-N MODE ENABLED!\n\
+                     {show_note}\
+                     Candidates: {}\n\
+                     Winner: #{} ({})\n\
+                     Reason: {}\n\
+                     Files applied:\n{}",
+                    result.candidates.len(),
+                    result.winner_index,
+                    winner,
+                    result.selection_reason,
+                    files,
+                )))
+            }
+            Err(e) => {
+                crate::logging::warn(&format!("[best-of-n] auto-run failed: {e}"));
+                // Fall through to normal turn on failure.
+                Ok(None)
+            }
+        }
     }
 
     /// Inner run_once_capture used by child agents spawned by the orchestrator.
@@ -162,6 +273,27 @@ impl Agent {
                             .await;
                 });
             }
+        }
+
+        // Auto best-of-N before streaming turn (same rules as run_once_capture).
+        if let Some(bon_result) = self.maybe_auto_best_of_n(user_message).await? {
+            self.add_message(Role::User, blocks);
+            self.add_message(
+                Role::Assistant,
+                vec![ContentBlock::Text {
+                    text: bon_result.clone(),
+                    cache_control: None,
+                }],
+            );
+            crate::telemetry::record_turn();
+            self.session.save()?;
+            // Emit as a single assistant text event so TUI still sees a reply.
+            let _ = event_tx.send(ServerEvent::TextDelta {
+                text: bon_result,
+            });
+            let _ = event_tx.send(ServerEvent::MessageEnd);
+            self.current_turn_system_reminder = None;
+            return Ok(());
         }
 
         self.add_message(Role::User, blocks);
@@ -1175,4 +1307,36 @@ impl Agent {
             }
         }
     }
+}
+
+/// Heuristic: does this user message look like an edit/implement request?
+/// Used only when best-of-N mode is already `auto` and the user did not
+/// explicitly type `$bestofn` — keeps auto-trigger from firing on pure Q&A.
+fn looks_like_edit_request(msg: &str) -> bool {
+    let lower = msg.to_ascii_lowercase();
+    // Explicit keyword always handled elsewhere; skip pure cancels.
+    if lower.contains("canceljcode") || lower.contains("stopjcode") {
+        return false;
+    }
+    const VERBS: &[&str] = &[
+        "fix",
+        "implement",
+        "refactor",
+        "rewrite",
+        "change",
+        "update",
+        "add ",
+        "remove ",
+        "delete ",
+        "edit ",
+        "patch",
+        "migrate",
+        "rename",
+        "extract",
+        "sửa",
+        "thêm",
+        "xóa",
+        "viết",
+    ];
+    VERBS.iter().any(|v| lower.contains(v))
 }
