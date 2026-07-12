@@ -1,3 +1,4 @@
+pub(crate) mod agent_tree;
 pub mod account_picker;
 pub(crate) mod app;
 
