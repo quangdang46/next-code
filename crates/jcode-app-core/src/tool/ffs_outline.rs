@@ -90,7 +90,9 @@ impl Tool for FfsOutlineTool {
         let mut output = String::new();
         // Mint hashline TAG so outline anchors can feed the `edit` tool.
         let tag = crate::tool::hashline_snapshots::record(&file_path, &content, None);
-        let header = crate::tool::hashline_snapshots::format_header(&file_path, &tag);
+        let display_path = params.file.trim_start_matches("./");
+        // Prefer model-facing path (not basename-only) so edit headers resolve uniquely.
+        let header = format!("[{display_path}#{tag}]");
         output.push_str(&header);
         output.push_str("\n\n");
 

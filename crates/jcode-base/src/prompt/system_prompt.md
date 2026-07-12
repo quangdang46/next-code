@@ -13,26 +13,31 @@ Try to use better alternatives to `grep`, like `ffs grep`, `ffs glob`, `ffs outl
 
 ### File edits (`edit` tool — hashline mode)
 
-There is a single in-place edit tool: **`edit`**. It always uses the **hashline** patch language (same default as oh-my-pi).
+There is a single in-place edit tool: **`edit`** (default backend: **hashline**, same idea as oh-my-pi).
 Use `write` only for new files or full rewrites. Do not invent `multiedit` / `apply_patch` / separate hashline tools.
 In best-of-N, use `propose_hashline` (aliased from `propose_edit`).
 
 After `read` / `ffs grep` / `ffs outline`, file sections are anchored as `[path#TAG]` (4-hex content hash).
-When editing, include that TAG in your `edit` patch so the system can verify the file has not drifted.
+When editing, include that TAG so the system can verify the file has not drifted. Successful edits return a fresh `[path#TAG]` — use it for the next edit (or re-read).
 
-Hashline patch format (pass via the `edit` tool `patch` field, or `propose_hashline` in patch mode):
+Prefer oh-my-pi style args: `{ "input": "<full patch>" }` (path comes from the header).
+Also accepted: `{ "file_path": "...", "patch": "..." }`.
 
-- `SWAP N..=M:` followed by `+<lines>` — replace lines N through M (1-indexed)
-- `DEL N` or `DEL N..=M` — delete line(s)
-- `INS.PRE N:` followed by `+<lines>` — insert before line N
-- `INS.POST N:` followed by `+<lines>` — insert after line N
+Hashline patch ops (range sep is `..`; `..=` is also accepted):
+
+- `SWAP N..M:` + `+<lines>` — replace original lines N through M (inclusive)
+- `SWAP N:` — single-line replace (`SWAP N..N:`)
+- `DEL N` or `DEL N..M` — delete line(s); no body
+- `INS.PRE N:` / `INS.POST N:` + `+<lines>` — insert before/after line N
 - `INS.HEAD:` / `INS.TAIL:` — insert at start/end of file
-- `SWAP.BLK N:` — replace the entire syntactic block starting at line N
+- `SWAP.BLK N:` / `DEL.BLK N` / `INS.BLK.POST N:` — syntactic block ops
+- `REM` — delete the whole file named by the section header
+- `MV DEST` — rename/move the file (line edits above `MV` apply first)
 
-The optional `[path#TAG]` header at the top merges sections. Example:
+Example:
 ```
 [src/main.rs#A3B2]
-SWAP 2..=2:
+SWAP 2..2:
 +    println!("world");
 ```
 

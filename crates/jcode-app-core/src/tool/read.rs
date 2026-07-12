@@ -190,18 +190,13 @@ impl Tool for ReadTool {
         // Read file
         let content = tokio::fs::read_to_string(&path).await?;
 
-        // Mint a hashline snapshot so the model can quote `[path#TAG]` in `edit`.
-        // Matches oh-my-pi: read/search emit anchors for the default hashline edit mode.
-        let tag = crate::tool::hashline_snapshots::record(&path, &content, None);
-        let header = crate::tool::hashline_snapshots::format_header(&path, &tag);
-
-        // Single-pass: count lines while building output
-        let mut output = String::with_capacity(header.len() + 1 + range.limit.min(2000) * 80);
-        output.push_str(&header);
-        output.push('\n');
+        // Single-pass: count lines while building output and track which lines
+        // the model actually saw (oh-my-pi seenLines for hashline edit guards).
         let mut total_lines = 0usize;
         let mut truncated_line_count = 0usize;
         let end_exclusive = range.offset + range.limit;
+        let mut seen_lines: Vec<usize> = Vec::with_capacity(range.limit.min(2000));
+        let mut body = String::with_capacity(range.limit.min(2000) * 80);
         {
             use std::fmt::Write;
             for (i, line) in content.lines().enumerate() {
@@ -214,21 +209,41 @@ impl Tool for ReadTool {
                     continue;
                 }
                 let line_num = i + 1;
+                seen_lines.push(line_num);
                 if line.len() > MAX_LINE_LEN {
                     truncated_line_count += 1;
                     let _ = writeln!(
-                        output,
+                        body,
                         "{:>5}\t{}...",
                         line_num,
                         crate::util::truncate_str(line, MAX_LINE_LEN)
                     );
                 } else {
-                    let _ = writeln!(output, "{:>5}\t{}", line_num, line);
+                    let _ = writeln!(body, "{:>5}\t{}", line_num, line);
                 }
             }
         }
 
         let end = end_exclusive.min(total_lines);
+
+        // Mint a hashline snapshot with seen-line provenance so `edit` can reject
+        // anchors on lines never displayed (elided / off-range).
+        let tag = crate::tool::hashline_snapshots::record(
+            &path,
+            &content,
+            if seen_lines.is_empty() {
+                None
+            } else {
+                Some(&seen_lines)
+            },
+        );
+        // Prefer the model-facing path string so tags match what edit headers use.
+        let display_path = params.file_path.trim_start_matches("./");
+        let header = format!("[{display_path}#{tag}]");
+        let mut output = String::with_capacity(header.len() + 1 + body.len());
+        output.push_str(&header);
+        output.push('\n');
+        output.push_str(&body);
 
         // Publish file touch event for swarm coordination
         Bus::global().publish(BusEvent::FileTouch(FileTouch {

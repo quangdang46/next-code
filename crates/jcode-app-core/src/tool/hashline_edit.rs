@@ -5,6 +5,7 @@ use crate::tool::hashline_snapshots;
 use anyhow::Result;
 use async_trait::async_trait;
 use hashline::{anchor, document::FileContent, hash as hashline_hash};
+use hashline::types::FileOp as HashlineFileOp;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::path::Path;
@@ -26,15 +27,29 @@ impl HashlineEditTool {
     }
 }
 
+/// Model-facing inputs for the single `edit` tool (hashline backend).
+///
+/// Order of untagged variants matters: more specific shapes first.
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum HashlineEditInput {
+    /// Classic jcode shape: explicit path + patch body.
     Patch {
         file_path: String,
         #[serde(default)]
         intent: Option<String>,
         patch: String,
     },
+    /// Oh-my-pi shape: one `input` string with `[path#TAG]` headers.
+    /// Optional `file_path` overrides the path in the first header.
+    Input {
+        input: String,
+        #[serde(default)]
+        intent: Option<String>,
+        #[serde(default)]
+        file_path: Option<String>,
+    },
+    /// Legacy anchor + old/new string mode.
     Structured {
         file_path: String,
         #[serde(default)]
@@ -60,7 +75,10 @@ impl Tool for HashlineEditTool {
         "edit"
     }
     fn description(&self) -> &str {
-        "Apply source edits using the hashline patch language (default edit tool). Pass a patch with [path#TAG] headers from your latest read/search output. Ops: SWAP/DEL/INS (and .BLK variants). Prefer this over any legacy edit/patch tools."
+        "Apply source edits using the hashline patch language (default edit tool). \
+         Prefer `{input}` with `[path#TAG]` headers from read/search (oh-my-pi style), \
+         or `{file_path, patch}`. Ops: SWAP/DEL/INS (and .BLK), plus REM/MV. \
+         Range syntax: `N..M` (also accepts `N..=M`)."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -68,8 +86,18 @@ impl Tool for HashlineEditTool {
             "type": "object",
             "properties": {
                 "intent": super::intent_schema_property(),
-                "file_path": { "type": "string" },
-                "patch": { "type": "string", "description": "Hashline patch with [path#TAG] + SWAP/DEL/INS ops." },
+                "input": {
+                    "type": "string",
+                    "description": "Full hashline patch (preferred). Sections start with [path#TAG]; ops SWAP/DEL/INS/REM/MV."
+                },
+                "file_path": {
+                    "type": "string",
+                    "description": "Target file. Required with `patch`; optional override when using `input` with a header."
+                },
+                "patch": {
+                    "type": "string",
+                    "description": "Hashline patch body (use with file_path). Same language as `input`."
+                },
                 "anchor": { "oneOf": [
                     { "type": "object", "required": ["line", "hash"], "properties": { "line": { "type": "integer" }, "hash": { "type": "string" } } },
                     { "type": "string" }
@@ -81,13 +109,33 @@ impl Tool for HashlineEditTool {
     }
 
     async fn execute(&self, input: Value, ctx: ToolContext) -> Result<ToolOutput> {
-        let params: HashlineEditInput = serde_json::from_value(input)?;
+        let params: HashlineEditInput = serde_json::from_value(input).map_err(|e| {
+            anyhow::anyhow!(
+                "invalid edit args ({e}). Use `input` with a [path#TAG] patch, \
+                 or `file_path` + `patch` (SWAP/DEL/INS/REM/MV)."
+            )
+        })?;
         match params {
             HashlineEditInput::Patch {
                 file_path,
                 intent,
                 patch,
             } => execute_patch(file_path, intent, patch, ctx).await,
+            HashlineEditInput::Input {
+                input,
+                intent,
+                file_path,
+            } => {
+                let path = file_path
+                    .or_else(|| extract_path_from_patch(&input))
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "edit `input` must start with `[path#TAG]` (from your latest read/search) \
+                             or include `file_path`"
+                        )
+                    })?;
+                execute_patch(path, intent, input, ctx).await
+            }
             HashlineEditInput::Structured {
                 file_path,
                 intent,
@@ -108,74 +156,53 @@ async fn execute_patch(
     ctx: ToolContext,
 ) -> Result<ToolOutput> {
     let path = ctx.resolve_path(Path::new(&file_path));
-    if !path.exists() {
-        return Err(anyhow::anyhow!("File not found: {file_path}"));
-    }
-    let raw = tokio::fs::read_to_string(&path).await?;
-    let content = hashline::normalize::normalize_to_lf(&raw);
+    let (edits, pw, file_op, _has_block) = hashline::parser::parse_patch(&patch);
 
-    let (edits, pw, _file_op, _has_block) = hashline::parser::parse_patch(&patch);
-    if edits.is_empty() {
+    // REM is a whole-file op with no line edits.
+    if matches!(file_op, Some(HashlineFileOp::Remove)) {
+        return execute_remove(&file_path, &path, intent, &pw, ctx).await;
+    }
+
+    if edits.is_empty() && file_op.is_none() {
         let m = if pw.is_empty() {
-            "empty patch".into()
+            "empty patch — provide SWAP/DEL/INS ops (or REM/MV)".into()
         } else {
             format!("empty patch: {}", pw.join("; "))
         };
         return Err(anyhow::anyhow!("{m}"));
     }
 
-    let new_text = {
-        let snap_tag = extract_tag(&patch);
-        let snapshot = snap_tag
-            .as_ref()
-            .and_then(|t| hashline_snapshots::by_hash(&path, t));
-        match &snapshot {
-            Some(snap) => {
-                let al = collect_anchor_lines(&edits);
-                if !hashline_snapshots::lines_were_seen(snap.seen_lines.as_ref(), &al) {
-                    return Err(anyhow::anyhow!("edit refs unseen lines — re-read first"));
-                }
-                let ctag = hashline_snapshots::compute_file_tag(&content);
-                if ctag != snap.hash {
-                    let store = hashline_snapshots::global();
-                    let recovered = {
-                        let guard = store.read().expect("hashline snapshots lock poisoned");
-                        try_recover(&*guard, &path, &content, &snap.hash, &edits)
-                    };
-                    if let Some(rec) = recovered {
-                        let mut msg = format!("Recovered {file_path}: file changed since read");
-                        if !rec.warnings.is_empty() {
-                            msg.push_str(&format!(" ({})", rec.warnings.join("; ")));
-                        }
-                        atomic_write(&path, &rec.text).await?;
-                        hashline_snapshots::record(&path, &rec.text, None);
-                        return Ok(ToolOutput::new(msg).with_title(file_path));
-                    }
-                    return Err(anyhow::anyhow!(
-                        "File changed (tag {}→{}) and recovery failed. Re-read.",
-                        snap.hash,
-                        ctag
-                    ));
-                }
-                apply_edits_to_text(&content, &edits)
-                    .map_err(|e| anyhow::anyhow!("{e}"))?
-                    .text
-            }
-            None => {
-                apply_edits_to_text(&content, &edits)
-                    .map_err(|e| anyhow::anyhow!("{e}"))?
-                    .text
-            }
-        }
+    if !path.exists() {
+        return Err(anyhow::anyhow!(
+            "File not found: {file_path}. Create new files with `write`; hashline only edits existing files."
+        ));
+    }
+
+    let raw = tokio::fs::read_to_string(&path).await?;
+    let content = hashline::normalize::normalize_to_lf(&raw);
+
+    let new_text = if edits.is_empty() {
+        // MV-only: keep content, then rename below.
+        content.clone()
+    } else {
+        apply_patch_with_snapshot(&file_path, &path, &content, &patch, &edits).await?
     };
 
     let ch = xxhash64(&content);
-    let nd = new_text == content || new_text == format!("{content}\n");
-    if let Err(e) = NOOP_GUARD.record(path.to_path_buf(), !nd, ch) {
-        return Err(anyhow::anyhow!("{e}"));
-    }
-    if nd {
-        return Ok(ToolOutput::new(format!("(no change) {file_path}")));
+    let nd = edits.is_empty()
+        || new_text == content
+        || new_text == format!("{content}\n");
+    if !edits.is_empty() {
+        if let Err(e) = NOOP_GUARD.record(path.to_path_buf(), !nd, ch) {
+            return Err(anyhow::anyhow!("{e}"));
+        }
+        if nd {
+            return Ok(ToolOutput::new(format!(
+                "(no change) {file_path}\n\
+                 Patch applied cleanly but body rows are byte-identical to the file at the targeted lines. \
+                 Re-read before issuing another edit; do not widen the payload."
+            )));
+        }
     }
 
     let le = hashline::normalize::detect_line_ending(&raw);
@@ -184,21 +211,176 @@ async fn execute_patch(
     } else {
         new_text
     };
-    atomic_write(&path, &ft).await?;
-    NOOP_GUARD.reset(&path);
-    hashline_snapshots::record(&path, &ft, None);
+
+    // Line edits first (if any), then optional rename.
+    if !edits.is_empty() {
+        atomic_write(&path, &ft).await?;
+        NOOP_GUARD.reset(&path);
+        hashline_snapshots::record(&path, &ft, None);
+    }
+
+    let mut final_path = path.clone();
+    let mut final_display = file_path.clone();
+    let mut did_rename = false;
+    if let Some(HashlineFileOp::Rename(dest)) = file_op {
+        let dest_path = ctx.resolve_path(Path::new(&dest));
+        if let Some(parent) = dest_path.parent() {
+            tokio::fs::create_dir_all(parent).await.ok();
+        }
+        tokio::fs::rename(&path, &dest_path).await.map_err(|e| {
+            anyhow::anyhow!(
+                "MV failed ({} → {}): {e}",
+                path.display(),
+                dest_path.display()
+            )
+        })?;
+        hashline_snapshots::invalidate(&path);
+        // Re-record snapshot under the destination key.
+        if let Ok(moved) = tokio::fs::read_to_string(&dest_path).await {
+            hashline_snapshots::record(&dest_path, &moved, None);
+        }
+        final_path = dest_path;
+        final_display = dest;
+        did_rename = true;
+        publish_file_event(
+            &ctx,
+            intent.clone(),
+            &final_path,
+            FileOp::Edit,
+            format!("hashline MV {file_path} → {final_display}"),
+        );
+    } else if !edits.is_empty() {
+        publish_edit_event(&ctx, intent.clone(), &final_path, 1, 1, None);
+    }
 
     let ws = if pw.is_empty() {
         String::new()
     } else {
         format!(" (warnings: {})", pw.join("; "))
     };
-    publish_edit_event(&ctx, intent, &path, 1, 1, None);
-    Ok(ToolOutput::new(format!(
-        "Edited {file_path}: {} edits applied{ws}",
-        edits.len()
-    ))
-    .with_title(file_path))
+
+    let new_tag = hashline_snapshots::head(&final_path)
+        .map(|s| s.hash)
+        .unwrap_or_else(|| {
+            std::fs::read_to_string(&final_path)
+                .map(|t| hashline_snapshots::compute_file_tag(&t))
+                .unwrap_or_else(|_| "????".into())
+        });
+    let header = format!("[{final_display}#{new_tag}]");
+
+    let summary = if edits.is_empty() && did_rename {
+        format!("Moved {file_path} → {final_display}{ws}\n{header}")
+    } else if did_rename {
+        format!(
+            "Edited + moved {file_path} → {final_display}: {} edits applied{ws}\n{header}",
+            edits.len()
+        )
+    } else {
+        format!(
+            "Edited {final_display}: {} edits applied{ws}\n{header}",
+            edits.len()
+        )
+    };
+
+    Ok(ToolOutput::new(summary).with_title(final_display))
+}
+
+async fn execute_remove(
+    file_path: &str,
+    path: &Path,
+    intent: Option<String>,
+    warnings: &[String],
+    ctx: ToolContext,
+) -> Result<ToolOutput> {
+    if !path.exists() {
+        return Err(anyhow::anyhow!("File not found: {file_path}"));
+    }
+    tokio::fs::remove_file(path)
+        .await
+        .map_err(|e| anyhow::anyhow!("REM failed for {file_path}: {e}"))?;
+    hashline_snapshots::invalidate(path);
+    NOOP_GUARD.reset(&path.to_path_buf());
+    let ws = if warnings.is_empty() {
+        String::new()
+    } else {
+        format!(" (warnings: {})", warnings.join("; "))
+    };
+    publish_file_event(
+        &ctx,
+        intent,
+        path,
+        FileOp::Edit,
+        format!("hashline REM deleted {file_path}"),
+    );
+    Ok(ToolOutput::new(format!("Deleted {file_path}{ws}")).with_title(file_path.to_string()))
+}
+
+async fn apply_patch_with_snapshot(
+    file_path: &str,
+    path: &Path,
+    content: &str,
+    patch: &str,
+    edits: &[hashline::types::Edit],
+) -> Result<String> {
+    let snap_tag = extract_tag(patch);
+    let snapshot = snap_tag
+        .as_ref()
+        .and_then(|t| hashline_snapshots::by_hash(path, t));
+    match &snapshot {
+        Some(snap) => {
+            let al = collect_anchor_lines(edits);
+            if !hashline_snapshots::lines_were_seen(snap.seen_lines.as_ref(), &al) {
+                let missing: Vec<usize> = match snap.seen_lines.as_ref() {
+                    Some(seen) => al.into_iter().filter(|l| !seen.contains(l)).collect(),
+                    None => Vec::new(),
+                };
+                let missing_txt = if missing.is_empty() {
+                    String::new()
+                } else {
+                    format!(
+                        " Unseen lines: {}.",
+                        missing
+                            .iter()
+                            .map(|n| n.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                };
+                return Err(anyhow::anyhow!(
+                    "edit refs lines not shown in your latest read/search for {file_path}.{missing_txt} \
+                     Re-read those lines first (only lines displayed as LINE:TEXT / numbered rows are editable)."
+                ));
+            }
+            let ctag = hashline_snapshots::compute_file_tag(content);
+            if ctag != snap.hash {
+                let store = hashline_snapshots::global();
+                let recovered = {
+                    let guard = store.read().expect("hashline snapshots lock poisoned");
+                    try_recover(&*guard, path, content, &snap.hash, edits)
+                };
+                if let Some(rec) = recovered {
+                    // Apply recovered text through the normal write path so we still
+                    // mint a fresh [path#TAG] in the tool result (oh-my-pi style).
+                    return Ok(rec.text);
+                }
+                return Err(anyhow::anyhow!(
+                    "File changed since your last read (tag {}→{}) and recovery failed. \
+                     Re-read {file_path} and re-issue the edit with the fresh [path#TAG].",
+                    snap.hash,
+                    ctag
+                ));
+            }
+            apply_edits_to_text(content, edits)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .map(|r| r.text)
+        }
+        None => {
+            // Soft allow when no snapshot (tests / ad-hoc). Prefer TAG from read.
+            apply_edits_to_text(content, edits)
+                .map_err(|e| anyhow::anyhow!("{e}"))
+                .map(|r| r.text)
+        }
+    }
 }
 
 fn apply_edits_to_text(
@@ -248,6 +430,27 @@ fn extract_tag(patch: &str) -> Option<String> {
     }
 }
 
+/// First section path from a `[path#TAG]` or `[path]` header line.
+fn extract_path_from_patch(patch: &str) -> Option<String> {
+    for line in patch.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if !(line.starts_with('[') && line.ends_with(']')) {
+            // Non-header first non-empty line → no path in patch.
+            return None;
+        }
+        let inner = &line[1..line.len() - 1];
+        let path = inner.split('#').next()?.trim();
+        if path.is_empty() {
+            return None;
+        }
+        return Some(path.to_string());
+    }
+    None
+}
+
 fn try_recover(
     store: &dyn hashline::snapshot_store::SnapshotStore,
     path: &Path,
@@ -267,17 +470,20 @@ fn try_recover(
 
 fn collect_anchor_lines(edits: &[hashline::types::Edit]) -> Vec<usize> {
     use hashline::types::{Cursor, Edit};
-    edits
-        .iter()
-        .filter_map(|e| match e {
+    let mut lines = Vec::new();
+    for e in edits {
+        match e {
             Edit::Insert { cursor, .. } => match cursor {
-                Cursor::BeforeAnchor(a) | Cursor::AfterAnchor(a) => Some(a.line),
-                _ => None,
+                Cursor::BeforeAnchor(a) | Cursor::AfterAnchor(a) => lines.push(a.line),
+                Cursor::Bof | Cursor::Eof => {}
             },
-            Edit::Delete { anchor, .. } => Some(anchor.line),
-            Edit::Block { anchor, .. } => Some(anchor.line),
-        })
-        .collect()
+            Edit::Delete { anchor, .. } => lines.push(anchor.line),
+            Edit::Block { anchor, .. } => lines.push(anchor.line),
+        }
+    }
+    lines.sort_unstable();
+    lines.dedup();
+    lines
 }
 
 fn xxhash64(text: &str) -> u64 {
@@ -321,12 +527,12 @@ async fn execute_old(
                 nc
             };
             atomic_write(&path, &ft).await?;
-            hashline_snapshots::record(&path, &ft, None);
+            let tag = hashline_snapshots::record(&path, &ft, None);
             publish_edit_event(&ctx, intent, &path, sl, el, None);
-            Ok(
-                ToolOutput::new(format!("Edited {file_path}: lines {sl}-{el} ({method})"))
-                    .with_title(file_path),
-            )
+            Ok(ToolOutput::new(format!(
+                "Edited {file_path}: lines {sl}-{el} ({method})\n[{file_path}#{tag}]"
+            ))
+            .with_title(file_path))
         }
         OldAnchor::Str(anchor_str) => {
             if old_string.is_some() {
@@ -351,12 +557,12 @@ async fn execute_old(
                 nc
             };
             atomic_write(&path, &ft).await?;
-            hashline_snapshots::record(&path, &ft, None);
+            let tag = hashline_snapshots::record(&path, &ft, None);
             publish_edit_event(&ctx, intent, &path, line, line, None);
-            Ok(
-                ToolOutput::new(format!("Edited {file_path}: line {line} replaced"))
-                    .with_title(file_path),
-            )
+            Ok(ToolOutput::new(format!(
+                "Edited {file_path}: line {line} replaced\n[{file_path}#{tag}]"
+            ))
+            .with_title(file_path))
         }
     }
 }
@@ -396,6 +602,23 @@ fn publish_edit_event(
         intent: intent.filter(|v| !v.trim().is_empty()),
         summary: Some(format!("hashline edit lines {sl}-{el}")),
         detail,
+    }));
+}
+
+fn publish_file_event(
+    ctx: &ToolContext,
+    intent: Option<String>,
+    path: &Path,
+    op: FileOp,
+    summary: String,
+) {
+    Bus::global().publish(BusEvent::FileTouch(FileTouch {
+        session_id: ctx.session_id.clone(),
+        path: path.to_path_buf(),
+        op,
+        intent: intent.filter(|v| !v.trim().is_empty()),
+        summary: Some(summary),
+        detail: None,
     }));
 }
 
@@ -501,4 +724,54 @@ fn verify_xxh32_anchor(content: &str, anchor_line: usize, expected_hash: &str) -
         .map_err(|e| anyhow::anyhow!("{e}"))?;
     anchor::resolve(&a, &fc).map_err(|e| anyhow::anyhow!("anchor resolve: {e}"))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extract_tag_from_header() {
+        assert_eq!(
+            extract_tag("[src/main.rs#a3b2]\nSWAP 1:\n+x\n"),
+            Some("A3B2".into())
+        );
+        assert_eq!(extract_tag("SWAP 1:\n+x\n"), None);
+    }
+
+    #[test]
+    fn extract_path_from_header() {
+        assert_eq!(
+            extract_path_from_patch("[src/main.rs#A3B2]\nSWAP 1:\n+x\n"),
+            Some("src/main.rs".into())
+        );
+        assert_eq!(
+            extract_path_from_patch("[foo.rs]\nREM\n"),
+            Some("foo.rs".into())
+        );
+        assert_eq!(extract_path_from_patch("SWAP 1:\n+x\n"), None);
+    }
+
+    #[test]
+    fn parse_rem_file_op() {
+        let (edits, _w, file_op, _) = hashline::parser::parse_patch("[x.rs#ABCD]\nREM\n");
+        assert!(edits.is_empty());
+        assert_eq!(file_op, Some(HashlineFileOp::Remove));
+    }
+
+    #[test]
+    fn parse_mv_file_op() {
+        let (edits, _w, file_op, _) =
+            hashline::parser::parse_patch("[x.rs#ABCD]\nMV y.rs\n");
+        assert!(edits.is_empty());
+        assert_eq!(file_op, Some(HashlineFileOp::Rename("y.rs".into())));
+    }
+
+    #[test]
+    fn parse_swap_range_dotdot() {
+        let (edits, warnings, file_op, _) =
+            hashline::parser::parse_patch("[x.rs#ABCD]\nSWAP 2..2:\n+hello\n");
+        assert!(file_op.is_none(), "warnings={warnings:?}");
+        assert!(!edits.is_empty(), "warnings={warnings:?}");
+    }
 }
