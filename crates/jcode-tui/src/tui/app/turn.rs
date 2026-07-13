@@ -154,6 +154,7 @@ impl App {
                                         self.view_teammate_selection = false;
                                         self.teammate_view_messages.clear();
                                         self.teammate_view_hard_attached = false;
+                                        self.teammate_view_abort_armed = false;
                                         self.push_display_message(DisplayMessage::system("Interrupted"));
                                         return Ok(());
                                     }
@@ -383,6 +384,7 @@ impl App {
                                         self.view_teammate_selection = false;
                                         self.teammate_view_messages.clear();
                                         self.teammate_view_hard_attached = false;
+                                        self.teammate_view_abort_armed = false;
                                         self.push_display_message(DisplayMessage::system("Interrupted"));
                                         return Ok(());
                                     }
@@ -1377,6 +1379,7 @@ impl App {
                                             self.view_teammate_selection = false;
                                             self.teammate_view_messages.clear();
                                             self.teammate_view_hard_attached = false;
+                                            self.teammate_view_abort_armed = false;
                                             self.push_display_message(DisplayMessage::system("Interrupted"));
                                             return Ok(());
                                         }

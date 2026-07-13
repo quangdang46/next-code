@@ -1400,6 +1400,8 @@ pub struct App {
     pub teammate_view_return_session_id: Option<String>,
     /// True while hard-attached to a child session via resume.
     pub teammate_view_hard_attached: bool,
+    /// Double-Esc arm: first Esc aborts turn, second exits soft view (CC-ish).
+    pub teammate_view_abort_armed: bool,
     /// Agent tree for conversation rendering (Claude Code style).
     pub agent_trees: Vec<super::agent_tree::AgentTreeNode>,
     /// True while actively viewing a teammate (CC `viewSelectionMode === 'viewing-agent'`).

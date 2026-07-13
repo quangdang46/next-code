@@ -93,8 +93,8 @@ pub(in crate::tui::app) async fn submit_prepared_remote_input(
         return Ok(());
     }
 
-    // Soft teammate view (CC): route typed input to the viewed agent session
-    // via NotifySession instead of the leader send path.
+    // Soft teammate view (CC): route typed input to the viewed agent via
+    // CommMessage DM (preferred) or NotifySession fallback.
     if let Some(sid) = app.viewing_teammate_session_id.clone() {
         if !app.teammate_view_hard_attached {
             let content = prepared.expanded.clone();
@@ -103,7 +103,21 @@ pub(in crate::tui::app) async fn submit_prepared_remote_input(
             app.display_messages_version = app.display_messages_version.wrapping_add(1);
             app.input.clear();
             app.cursor_pos = 0;
-            match remote.notify_session(&sid, &content).await {
+            app.teammate_view_abort_armed = false;
+            let from = app
+                .remote_session_id
+                .clone()
+                .unwrap_or_else(|| sid.clone());
+            let result = match remote.comm_message_dm(&from, &sid, &content).await {
+                Ok(id) => Ok(id),
+                Err(e) => {
+                    crate::logging::warn(&format!(
+                        "comm_message_dm failed ({e}); falling back to notify_session"
+                    ));
+                    remote.notify_session(&sid, &content).await
+                }
+            };
+            match result {
                 Ok(_) => {
                     app.set_status_notice("Sent to viewed agent");
                     app.refresh_teammate_soft_view();

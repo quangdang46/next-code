@@ -325,12 +325,43 @@ async fn handle_remote_key_internal(
             crate::tui::app::tui_state::TeammateNavAction::ResumeSession { session_id } => {
                 app.workspace_client.queue_resume_session(session_id);
             }
-            crate::tui::app::tui_state::TeammateNavAction::NotifySession {
+            crate::tui::app::tui_state::TeammateNavAction::MessageAgent {
                 session_id,
                 message,
             } => {
-                if let Err(e) = remote.notify_session(&session_id, &message).await {
-                    app.set_status_notice(format!("Notify agent failed: {e}"));
+                let from = app
+                    .remote_session_id
+                    .clone()
+                    .unwrap_or_else(|| session_id.clone());
+                if let Err(e) = remote
+                    .comm_message_dm(&from, &session_id, &message)
+                    .await
+                {
+                    // Fallback: notify_session injects into target.
+                    if let Err(e2) = remote.notify_session(&session_id, &message).await {
+                        app.set_status_notice(format!("Message agent failed: {e} / {e2}"));
+                    }
+                }
+            }
+            crate::tui::app::tui_state::TeammateNavAction::StopAgent {
+                target_session,
+                force,
+            } => {
+                let from = app
+                    .remote_session_id
+                    .clone()
+                    .unwrap_or_else(|| target_session.clone());
+                if let Err(e) = remote.comm_stop(&from, &target_session, force).await {
+                    app.set_status_notice(format!("Stop agent failed: {e}"));
+                }
+            }
+            crate::tui::app::tui_state::TeammateNavAction::AbortAgentTurn { session_id } => {
+                // Soft-interrupt busy agent (closest to CC abort current turn).
+                if let Err(e) = remote
+                    .notify_session(&session_id, "[leader interrupted your current turn]")
+                    .await
+                {
+                    app.set_status_notice(format!("Abort turn failed: {e}"));
                 }
             }
         }

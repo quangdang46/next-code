@@ -2356,10 +2356,20 @@ impl App {
                 super::tui_state::TeammateNavAction::ResumeSession { session_id } => {
                     self.workspace_client.queue_resume_session(session_id);
                 }
-                super::tui_state::TeammateNavAction::NotifySession { message, .. } => {
+                super::tui_state::TeammateNavAction::MessageAgent { message, .. } => {
                     self.set_status_notice(format!(
-                        "Agent notify queued (local): {}",
-                        message.chars().take(40).collect::<String>()
+                        "Agent DM needs remote session: {}",
+                        message.chars().take(48).collect::<String>()
+                    ));
+                }
+                super::tui_state::TeammateNavAction::AbortAgentTurn { session_id } => {
+                    self.set_status_notice(format!(
+                        "Abort turn for {session_id} needs remote session"
+                    ));
+                }
+                super::tui_state::TeammateNavAction::StopAgent { target_session, .. } => {
+                    self.set_status_notice(format!(
+                        "Stop {target_session} requires remote (swarm) session"
                     ));
                 }
             }

@@ -772,10 +772,26 @@ impl crate::tui::TuiState for App {
                 .map(ToString::to_string)
                 .unwrap_or_else(|| short_session_label(&member.session_id));
 
+            // Tree stats from swarm runtime + tool intents (CC tool uses · tokens).
+            let tool_use_count = member
+                .todo_items
+                .iter()
+                .map(|t| t.tool_intents.len() as u32)
+                .sum();
+            // Encode elapsed seconds into token_count display path when no tokens:
+            // render shows " · N tokens" only if token_count > 0 — we put stats
+            // into activity suffix instead via member_tree_stats.
+            let stats = crate::tui::teammate_view::member_tree_stats(member);
+            let activity = match (activity, stats) {
+                (Some(a), Some(s)) => Some(format!("{a} · {s}")),
+                (None, Some(s)) => Some(s),
+                (a, None) => a,
+            };
+
             children.push(AgentTreeNode {
                 agent_name: name,
                 status: st,
-                tool_use_count: 0,
+                tool_use_count,
                 token_count: 0,
                 is_leaf: true,
                 is_leader: false,
@@ -2339,6 +2355,7 @@ impl App {
         self.viewing_teammate_session_id = Some(session_id.to_string());
         self.view_teammate_selection = true;
         self.teammate_view_hard_attached = false;
+        self.teammate_view_abort_armed = false;
         self.agent_tree_selecting = false;
         self.display_messages_version = self.display_messages_version.wrapping_add(1);
         self.scroll_offset = 0;
@@ -2381,6 +2398,7 @@ impl App {
         self.view_teammate_selection = false;
         self.teammate_view_messages.clear();
         self.teammate_view_hard_attached = false;
+        self.teammate_view_abort_armed = false;
         // Keep return session id only if hard-attach exit will consume it.
         self.agent_tree_selecting = false;
         self.selected_agent_tree_index = -1;
@@ -2431,8 +2449,25 @@ impl App {
             return Some(TeammateNavAction::Handled);
         }
 
-        // Esc while soft-viewing → back to leader transcript (CC exitTeammateView).
+        // Esc while soft-viewing:
+        // CC: if teammate still running → abort current turn only; if terminal → exit view.
         if matches!(code, KeyCode::Esc) && self.viewing_teammate_session_id.is_some() {
+            use crate::tui::teammate_view::{find_member, member_is_running};
+            let sid = self.viewing_teammate_session_id.clone().unwrap();
+            if let Some(m) = find_member(&self.remote_swarm_members, &sid) {
+                if member_is_running(m) {
+                    self.set_status_notice("Aborting teammate turn… (Esc again to exit view)");
+                    // Track double-esc: if already aborting, exit.
+                    if self.teammate_view_abort_armed {
+                        self.teammate_view_abort_armed = false;
+                        self.exit_teammate_view_local("Exited teammate view");
+                        return Some(TeammateNavAction::Handled);
+                    }
+                    self.teammate_view_abort_armed = true;
+                    return Some(TeammateNavAction::AbortAgentTurn { session_id: sid });
+                }
+            }
+            self.teammate_view_abort_armed = false;
             self.exit_teammate_view_local("Exited teammate view");
             return Some(TeammateNavAction::Handled);
         }
@@ -2478,7 +2513,7 @@ impl App {
             return None;
         }
 
-        // 'k' kill selected running teammate (CC) — notify stop-ish via notify + notice.
+        // 'k' kill selected running teammate (CC) — CommStop.
         if matches!(code, KeyCode::Char('k'))
             && self.agent_tree_selecting
             && self.selected_agent_tree_index >= 0
@@ -2488,10 +2523,9 @@ impl App {
             if let Some(sid) = child_session_id_at(&trees, idx) {
                 let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
                 self.set_status_notice(format!("Stopping @{label}…"));
-                // Soft: inject stop instruction via notify (server soft-interrupts busy).
-                return Some(TeammateNavAction::NotifySession {
-                    session_id: sid,
-                    message: "/stop".to_string(),
+                return Some(TeammateNavAction::StopAgent {
+                    target_session: sid,
+                    force: false,
                 });
             }
         }
@@ -2555,7 +2589,12 @@ impl App {
 pub(crate) enum TeammateNavAction {
     Handled,
     ResumeSession { session_id: String },
-    NotifySession { session_id: String, message: String },
+    /// DM into viewed/selected agent (CommMessage preferred).
+    MessageAgent { session_id: String, message: String },
+    /// Native swarm stop (CC kill).
+    StopAgent { target_session: String, force: bool },
+    /// Soft-interrupt / wake agent turn without leaving view (CC Esc while running).
+    AbortAgentTurn { session_id: String },
 }
 
 /// Parse a subagent status string into `(@)name` + activity.

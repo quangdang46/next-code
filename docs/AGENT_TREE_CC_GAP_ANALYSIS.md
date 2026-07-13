@@ -5,6 +5,29 @@
 **CC clone:** `/tmp/feature-research/claude-code` (`claude-code-best/claude-code`)  
 **User report:** Tree UI ok-ish, but **cannot truly jump into subagent session**.
 
+### Implementation status (commit `0cf47e8f7`)
+
+| Gap | Status |
+|-----|--------|
+| G1 Transcript takeover | **Done** — soft view swaps `display_messages()` to reconstructed pane |
+| G2 Live message buffer | **Partial** — rebuilt from SwarmStatus `output_tail` each snapshot (not full tool stream) |
+| G3 Input routing | **Done** — `NotifySession` to viewed sid while soft-viewing |
+| G4 View header | **Done** — full-width header above messages |
+| G5 Enter = enter | **Done** — soft view; Shift+Enter hard-attach |
+| G6 Hard attach | **Done** — `resume_session` + Esc returns to leader |
+| G7 Data from swarm members | **Done** — not only `running_items` |
+| G8 Esc abort turn | Partial — Esc exits view; hard-attach uses resume |
+| G9 Auto-exit kill/fail | **Done** on SwarmStatus |
+| G10 Kill `k` | **Partial** — NotifySession `/stop` (not native kill API) |
+| G11 Hide row | **Done** |
+| G12 Footer pills | Open |
+| G13 Tokens/tool uses | Open (need bus progress) |
+| G14 Click | Open |
+| G15 Preview lines | Open |
+| G16 Color identity | Partial palette only |
+
+**Honest parity estimate after this commit:** ~75–85% of CC UX surface (navigation + soft zoom + inject). Full tool-stream message fidelity + native kill still block true **>95%**.
+
 ---
 
 ## 1. What Claude Code actually does (source of truth)
