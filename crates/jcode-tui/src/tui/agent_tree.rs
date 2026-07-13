@@ -53,11 +53,26 @@ impl AgentStatus {
 
     pub fn activity_fallback(&self) -> Option<&'static str> {
         match self {
+            // Prefer a verb that matches swarm status language when we have no
+            // richer task_label/detail/output_tail.
             AgentStatus::Running => Some("working…"),
             AgentStatus::Completed => Some("done"),
             AgentStatus::Failed => Some("failed"),
             AgentStatus::Stopped => Some("cancelled"),
             AgentStatus::Idle => Some("idle"),
+        }
+    }
+
+    /// Prefer the raw swarm status string when it is a human verb
+    /// (e.g. "processing" → "processing…"), else fall back.
+    pub fn activity_from_raw_status(raw: &str) -> Option<String> {
+        let t = raw.trim().to_ascii_lowercase();
+        match t.as_str() {
+            "processing" | "running" | "active" | "starting" | "connecting" | "thinking"
+            | "searching" | "editing" | "reading" | "writing" => {
+                Some(format!("{t}…"))
+            }
+            _ => None,
         }
     }
 }
@@ -151,6 +166,7 @@ pub fn pick_member_activity(
     detail: Option<&str>,
     output_tail: Option<&str>,
     status: &AgentStatus,
+    raw_status: Option<&str>,
 ) -> Option<String> {
     for candidate in [task_label, detail] {
         if let Some(s) = candidate.map(str::trim).filter(|s| is_meaningful_activity(s)) {
@@ -173,6 +189,11 @@ pub fn pick_member_activity(
                 line.to_string()
             };
             return Some(truncated);
+        }
+    }
+    if let Some(raw) = raw_status {
+        if let Some(from_raw) = AgentStatus::activity_from_raw_status(raw) {
+            return Some(from_raw);
         }
     }
     status.activity_fallback().map(ToString::to_string)
@@ -216,7 +237,8 @@ fn render_node(
         rgb_color(c.0, c.1, c.2)
     };
 
-    // Claude Code: leader uses ┌─ / ╒═; children ├─ / └─.
+    // Claude Code: leader uses ┌─ / ╒═ when highlighted (running); children ├─ / └─.
+    // Keep single-cell-friendly glyphs (box-drawing width 1 each).
     let tree_char = if depth == 0 {
         if is_leader && matches!(node.status, AgentStatus::Running) {
             "╒═ "
@@ -239,6 +261,7 @@ fn render_node(
     };
 
     let mut spans: Vec<Span<'static>> = vec![
+        // Claude Code pads with ~3 spaces before the tree char.
         Span::raw("  ".repeat(depth + 1)),
         Span::styled(
             tree_char,
@@ -256,21 +279,26 @@ fn render_node(
         ),
     ];
 
-    let activity = node
-        .activity
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| is_meaningful_activity(s))
-        .map(ToString::to_string)
-        .or_else(|| {
-            if is_leader && depth == 0 && !matches!(node.status, AgentStatus::Running) {
-                None
-            } else {
+    // Claude Code TeammateSpinnerTree: leader activity/verb is ONLY shown when
+    // the leader is *backgrounded* (viewing a teammate). While the main
+    // session is foregrounded, leader is just `╒═ team-lead` — the spinner
+    // line above already carries connecting/thinking/streaming. Showing
+    // `team-lead: processing…` next to `connecting… 7s` is redundant noise.
+    let show_activity = !(is_leader && depth == 0);
+    let activity = if show_activity {
+        node.activity
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| is_meaningful_activity(s))
+            .map(ToString::to_string)
+            .or_else(|| {
                 node.status
                     .activity_fallback()
                     .map(ToString::to_string)
-            }
-        });
+            })
+    } else {
+        None
+    };
 
     if let Some(activity) = activity {
         spans.push(Span::styled(
@@ -361,11 +389,8 @@ mod tests {
             is_leader: true,
             children,
             session_id: None,
-            activity: if running {
-                Some("processing…".to_string())
-            } else {
-                None
-            },
+            // Foreground leader: name only (spinner line owns the verb).
+            activity: None,
             todo_progress: None,
         }
     }
@@ -419,6 +444,30 @@ mod tests {
                 .any(|t| t.contains("@badger") && t.contains("searching")),
             "child missing: {texts:?}"
         );
+        // Leader must NOT carry ": processing…" while foregrounded (CC parity).
+        let leader_line = texts.iter().find(|t| t.contains("team-lead")).unwrap();
+        assert!(
+            !leader_line.contains(": processing") && !leader_line.contains(": working"),
+            "leader should be name-only when foregrounded: {leader_line}"
+        );
+    }
+
+    #[test]
+    fn pick_member_activity_uses_raw_processing_status() {
+        let activity = pick_member_activity(None, None, None, &AgentStatus::Running, Some("processing"));
+        assert_eq!(activity.as_deref(), Some("processing…"));
+    }
+
+    #[test]
+    fn pick_member_activity_skips_numeric_junk() {
+        let activity = pick_member_activity(
+            Some("2"),
+            Some("2/5"),
+            Some("3\n"),
+            &AgentStatus::Running,
+            None,
+        );
+        assert_eq!(activity.as_deref(), Some("working…"));
     }
 
     #[test]
@@ -450,17 +499,6 @@ mod tests {
         assert!(!is_meaningful_activity("  "));
         assert!(is_meaningful_activity("processing…"));
         assert!(is_meaningful_activity("searching files"));
-    }
-
-    #[test]
-    fn pick_member_activity_skips_numeric_junk() {
-        let activity = pick_member_activity(
-            Some("2"),
-            Some("2/5"),
-            Some("3\n"),
-            &AgentStatus::Running,
-        );
-        assert_eq!(activity.as_deref(), Some("working…"));
     }
 
     #[test]

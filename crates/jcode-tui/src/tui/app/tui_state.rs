@@ -751,6 +751,7 @@ impl crate::tui::TuiState for App {
                 member.detail.as_deref(),
                 member.output_tail.as_deref(),
                 &st,
+                Some(member.status.as_str()),
             );
 
             let name = member
@@ -783,6 +784,8 @@ impl crate::tui::TuiState for App {
         let leader = AgentTreeNode {
             // Fixed label like Claude Code — never session title / prompt text.
             agent_name: "team-lead".to_string(),
+            // Running ⇒ ╒═ glyph; activity is intentionally empty while the
+            // main session is foregrounded (spinner line owns the verb).
             status: if self.is_processing {
                 AgentStatus::Running
             } else {
@@ -794,11 +797,7 @@ impl crate::tui::TuiState for App {
             is_leader: true,
             children,
             session_id: Some(self.session.id.clone()),
-            activity: if self.is_processing {
-                Some("processing…".to_string())
-            } else {
-                None
-            },
+            activity: None,
             todo_progress: None,
         };
 
