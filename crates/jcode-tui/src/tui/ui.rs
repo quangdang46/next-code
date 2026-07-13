@@ -2683,24 +2683,23 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         0
     };
     let notification_height: u16 = if app.has_notification() { 1 } else { 0 };
-    // Claude Code-style activity spinner + TeammateSpinnerTree live in the
-    // conversation chrome (above the input separator), not on the status bar
-    // and not as a sticky transcript section (that glued trees under user
-    // prompts like `1> 2` / Interrupted banners).
+    // Spinner stays above the input (connecting/thinking). Agent tree sits
+    // *below* the input, above the status bar — bottom chrome — so it does not
+    // crowd the prompt line. Still not a sticky transcript section.
     let show_conversation_spinner = app.is_processing()
         && app.streaming_text().is_empty()
         && !matches!(app.status(), ProcessingStatus::Idle);
     let agent_tree_lines =
         crate::tui::agent_tree::render(&app.agent_trees(), &app.agent_tree_view_state());
     let agent_tree_height = agent_tree_lines.len() as u16;
-    let conversation_activity_height: u16 =
-        u16::from(show_conversation_spinner) + agent_tree_height;
+    let conversation_activity_height: u16 = u16::from(show_conversation_spinner);
     // Elastic overscroll status line revealed when the user scrolls past the
     // bottom of the transcript. Rendered directly below the input line.
     let overscroll_height: u16 = if app.chat_overscroll_active() { 1 } else { 0 };
     let fixed_height = 1            // status bar
         + queued_height
         + swarm_strip_height
+        + agent_tree_height         // teammate tree below input
         + notification_height
         + inline_block_height
         + inline_ui_gap_height
@@ -2781,8 +2780,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let use_packed = content_height + fixed_height <= available_height;
 
     // Two-level layout: top (messages + queued) grows to fill, bottom (input +
-    // strip + status) is exact height so the swarm strip sits immediately above
-    // the status bar (upstream v0.42+ strip placement).
+    // tree + strip + status) is exact height so chrome sits at the bottom.
     // 3 = top sep + bottom sep + status; + conversation activity when processing.
     let bottom_fixed = notification_height
         + inline_block_height
@@ -2790,6 +2788,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         + 3
         + conversation_activity_height
         + input_height
+        + agent_tree_height
         + swarm_strip_height
         + running_items_height
         + overscroll_height
@@ -2820,39 +2819,42 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         .constraints(vec![
             Constraint::Length(inline_block_height),  // 0 Inline UI
             Constraint::Length(inline_ui_gap_height), // 1 Inline UI/input spacing
-            Constraint::Length(conversation_activity_height), // 2 Conversation activity spinner
+            Constraint::Length(conversation_activity_height), // 2 Spinner only (above input)
             Constraint::Length(1),                    // 3 Top separator (─── History)
             Constraint::Length(input_height),         // 4 Input
             Constraint::Length(1),                    // 5 Bottom separator (───)
-            Constraint::Length(swarm_strip_height),   // 6 Swarm strip (above status)
-            Constraint::Length(1),                    // 7 Status bar
-            Constraint::Length(notification_height),  // 8 Notification line (below status)
-            Constraint::Length(running_items_height), // 9 Running items (quickbar)
-            Constraint::Length(overscroll_height),    // 10 Overscroll status line
-            Constraint::Length(donut_height),         // 11 Donut animation
+            Constraint::Length(agent_tree_height),    // 6 Teammate tree (below input)
+            Constraint::Length(swarm_strip_height),   // 7 Swarm strip (above status)
+            Constraint::Length(1),                    // 8 Status bar
+            Constraint::Length(notification_height),  // 9 Notification line (below status)
+            Constraint::Length(running_items_height), // 10 Running items (quickbar)
+            Constraint::Length(overscroll_height),    // 11 Overscroll status line
+            Constraint::Length(donut_height),         // 12 Donut animation
         ])
         .split(top_bottom[1]);
     // Indices: 0 inline, 1 gap, 2 activity, 3 top sep, 4 input, 5 bot sep,
-    // 6 swarm, 7 status, 8 notification, 9 running, 10 overscroll, 11 donut
-    let status_area = bottom_chunks[7];
+    // 6 agent tree, 7 swarm, 8 status, 9 notification, 10 running, 11 overscroll, 12 donut
+    let status_area = bottom_chunks[8];
     record_status_area(status_area);
 
-    // Claude Code-style activity spinner + teammate tree above the input.
+    // Processing spinner only — above the input (connecting / thinking).
     if conversation_activity_height > 0 {
         clear_area(frame, bottom_chunks[2]);
-        let mut chrome_lines: Vec<Line<'static>> = Vec::new();
-        if show_conversation_spinner {
-            let elapsed = app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0);
-            chrome_lines.push(input_ui::conversation_activity_line(app, elapsed));
-        }
-        chrome_lines.extend(agent_tree_lines);
-        frame.render_widget(Paragraph::new(chrome_lines), bottom_chunks[2]);
+        let elapsed = app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0);
+        let line = input_ui::conversation_activity_line(app, elapsed);
+        frame.render_widget(Paragraph::new(line), bottom_chunks[2]);
+    }
+
+    // Teammate tree below the input (bottom chrome), not crowding the prompt.
+    if agent_tree_height > 0 {
+        clear_area(frame, bottom_chunks[6]);
+        frame.render_widget(Paragraph::new(agent_tree_lines), bottom_chunks[6]);
     }
 
     // Draw the inline swarm strip directly above the status line if present.
     if swarm_strip_height > 0 {
-        clear_area(frame, bottom_chunks[6]);
-        frame.render_widget(Paragraph::new(swarm_strip_lines.clone()), bottom_chunks[6]);
+        clear_area(frame, bottom_chunks[7]);
+        frame.render_widget(Paragraph::new(swarm_strip_lines.clone()), bottom_chunks[7]);
     }
 
     // Capture layout info for visual debug
@@ -3083,20 +3085,20 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         ));
         frame.render_widget(Paragraph::new(sep_line), bottom_chunks[5]);
     }
-    // Status bar below swarm strip
+    // Status bar below swarm strip / agent tree
     input_ui::draw_status(frame, app, status_area, pending_count);
     if notification_height > 0 {
-        input_ui::draw_notification(frame, app, bottom_chunks[8]);
+        input_ui::draw_notification(frame, app, bottom_chunks[9]);
     }
     // Running items list (quickbar) below status
     if running_items_height > 0 {
-        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[9]);
+        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[10]);
     }
     if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, bottom_chunks[10]);
+        input_ui::draw_overscroll_status(frame, app, bottom_chunks[11]);
     }
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, bottom_chunks[11]);
+        animations::draw_idle_animation(frame, app, bottom_chunks[12]);
     }
 
     // Draw info widget overlays (skip during idle animation - they look out of place)
