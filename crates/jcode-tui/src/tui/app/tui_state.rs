@@ -2359,7 +2359,9 @@ impl App {
         self.agent_tree_selecting = false;
         self.display_messages_version = self.display_messages_version.wrapping_add(1);
         self.scroll_offset = 0;
-        self.set_status_notice(format!("Viewing → @{label}  (Esc return · shift+enter hard-attach)"));
+        self.set_status_notice(format!(
+            "Soft preview @{label} (not full session) · Enter switches for real · Esc exit"
+        ));
     }
 
     /// Refresh soft-view transcript from latest SwarmStatus snapshot.
@@ -2563,19 +2565,34 @@ impl App {
             }
             let idx = self.selected_agent_tree_index as usize;
             if let Some(sid) = child_session_id_at(&trees, idx) {
-                if hard {
-                    // Hard attach: stash leader, resume child session.
-                    let leader = self.remote_session_id.clone();
-                    self.teammate_view_return_session_id = leader;
-                    self.viewing_teammate_session_id = Some(sid.clone());
-                    self.view_teammate_selection = true;
-                    self.teammate_view_hard_attached = true;
-                    self.agent_tree_selecting = false;
-                    self.set_status_notice("Hard-attaching to agent session…");
-                    return Some(TeammateNavAction::ResumeSession { session_id: sid });
+                // Claude Code shows the agent's real messages in-process.
+                // jcode swarm agents are separate sessions — soft-view only has
+                // SwarmStatus snapshots (often empty output_tail + the spawn
+                // prompt stuck in `detail`), which is NOT a real switch.
+                // Default Enter/f = hard-attach (resume_session = true switch).
+                // Shift+Enter = soft status preview only.
+                let soft_preview = hard; // Shift+Enter
+                if soft_preview {
+                    self.enter_teammate_soft_view(&sid);
+                    return Some(TeammateNavAction::Handled);
                 }
-                self.enter_teammate_soft_view(&sid);
-                return Some(TeammateNavAction::Handled);
+                let leader = self.remote_session_id.clone();
+                if leader.as_deref() == Some(sid.as_str()) {
+                    self.set_status_notice("Already on this session");
+                    self.agent_tree_selecting = false;
+                    return Some(TeammateNavAction::Handled);
+                }
+                self.teammate_view_return_session_id = leader;
+                self.viewing_teammate_session_id = Some(sid.clone());
+                self.view_teammate_selection = true;
+                self.teammate_view_hard_attached = true;
+                self.teammate_view_messages.clear();
+                self.agent_tree_selecting = false;
+                let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
+                self.set_status_notice(format!(
+                    "Switching into @{label}… (Esc returns to team-lead)"
+                ));
+                return Some(TeammateNavAction::ResumeSession { session_id: sid });
             }
             return Some(TeammateNavAction::Handled);
         }

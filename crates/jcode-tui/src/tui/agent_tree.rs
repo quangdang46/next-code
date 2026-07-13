@@ -221,7 +221,8 @@ pub struct AgentTreeViewState {
 /// Claude Code hint strings (TeammateSpinnerLine / teammateSelectHint.ts).
 /// Use ASCII arrows — Unicode ↑↓ also tofu on some fonts.
 pub const TEAMMATE_SELECT_HINT: &str = "shift+up/down to select";
-pub const TEAMMATE_VIEW_HINT: &str = "enter to view";
+/// Enter hard-switches into the agent session (real transcript). Soft preview = Shift+Enter.
+pub const TEAMMATE_VIEW_HINT: &str = "enter to switch session";
 
 /// Render the agent tree into a Vec of styled lines.
 ///
