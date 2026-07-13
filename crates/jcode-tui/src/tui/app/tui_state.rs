@@ -693,12 +693,15 @@ impl crate::tui::TuiState for App {
             pick_member_activity, AgentStatus, AgentTreeNode,
         };
 
+        let hard = self.teammate_view_hard_attached;
         // CC hide row: collapsed tree returns null until re-expanded.
-        if self.agent_tree_hidden && !self.agent_tree_selecting {
+        // Exception: while hard-attached we MUST keep the switch tree visible so
+        // the user can still Shift+↑/↓ back to team-lead (CC free switch).
+        if self.agent_tree_hidden && !self.agent_tree_selecting && !hard {
             return Vec::new();
         }
 
-        if !self.agent_trees.is_empty() {
+        if !self.agent_trees.is_empty() && !hard {
             // Explicit trees still get terminal pruning + running-only filter so
             // a stuck cancelled child cannot outlive the live spinner (Claude
             // Code only renders running teammates).
@@ -714,7 +717,8 @@ impl crate::tui::TuiState for App {
 
         // Auto-populate from live subagent / swarm state.
         // Claude Code TeammateSpinnerTree: flat list under fixed "team-lead",
-        // hidden entirely when no running teammates.
+        // hidden entirely when no running teammates — *except* hard-attach,
+        // where we rebuild from the pre-switch snapshot so free nav survives.
         let mut children: Vec<AgentTreeNode> = Vec::new();
 
         // In-process tool subagent (single status string).
@@ -742,17 +746,44 @@ impl crate::tui::TuiState for App {
             }
         }
 
+        // Live members if present; else the hard-attach snapshot (child session
+        // almost never receives the leader's SwarmStatus feed).
+        let members: &[crate::protocol::SwarmMemberStatus] =
+            if !self.remote_swarm_members.is_empty() {
+                &self.remote_swarm_members
+            } else {
+                &self.teammate_view_swarm_snapshot
+            };
+        let viewing_sid = self.viewing_teammate_session_id.as_deref();
+        let leader_sid = if hard {
+            self.teammate_view_return_session_id
+                .clone()
+                .or_else(|| self.resume_session_id.clone())
+                .unwrap_or_else(|| self.session.id.clone())
+        } else {
+            self.session.id.clone()
+        };
+
         // Swarm / remote members as *flat* siblings (not nested spawn tree).
-        // Nesting by report_back_to looks like the broken screenshot
-        // (`@chick` → `@butterfly`) and is not how CC's spinner tree works.
-        for member in &self.remote_swarm_members {
-            // Skip self if it appears in the member list.
-            if member.session_id == self.session.id {
+        for member in members {
+            // Skip the leader row itself if it appears in the member list.
+            if member.session_id == leader_sid {
+                continue;
+            }
+            // When hard-attached we are ON a child session; don't skip "self"
+            // — that is the currently viewed agent and must stay selectable.
+            if !hard && member.session_id == self.session.id {
                 continue;
             }
             let st = AgentStatus::from_swarm_status(&member.status);
+            let is_viewing = viewing_sid == Some(member.session_id.as_str());
             // Live tree: only running members (CC getRunningTeammatesSorted).
-            if !matches!(st, AgentStatus::Running) {
+            // Hard-attach roster: keep non-terminal + the agent we are viewing.
+            if hard {
+                if st.is_terminal() && !is_viewing {
+                    continue;
+                }
+            } else if !matches!(st, AgentStatus::Running) {
                 continue;
             }
 
@@ -772,25 +803,33 @@ impl crate::tui::TuiState for App {
                 .map(ToString::to_string)
                 .unwrap_or_else(|| short_session_label(&member.session_id));
 
-            // Tree stats from swarm runtime + tool intents (CC tool uses · tokens).
             let tool_use_count = member
                 .todo_items
                 .iter()
                 .map(|t| t.tool_intents.len() as u32)
                 .sum();
-            // Encode elapsed seconds into token_count display path when no tokens:
-            // render shows " · N tokens" only if token_count > 0 — we put stats
-            // into activity suffix instead via member_tree_stats.
             let stats = crate::tui::teammate_view::member_tree_stats(member);
             let activity = match (activity, stats) {
                 (Some(a), Some(s)) => Some(format!("{a} · {s}")),
                 (None, Some(s)) => Some(s),
                 (a, None) => a,
             };
+            let activity = if is_viewing {
+                Some(match activity {
+                    Some(a) => format!("viewing · {a}"),
+                    None => "viewing".to_string(),
+                })
+            } else {
+                activity
+            };
 
             children.push(AgentTreeNode {
                 agent_name: name,
-                status: st,
+                status: if is_viewing {
+                    AgentStatus::Running
+                } else {
+                    st
+                },
                 tool_use_count,
                 token_count: 0,
                 is_leaf: true,
@@ -802,8 +841,35 @@ impl crate::tui::TuiState for App {
             });
         }
 
+        // Hard-attach fallback: snapshot empty / missing current agent — still
+        // render a switchable roster so the user is never stranded without nav.
+        if hard {
+            let have_viewing = children.iter().any(|c| c.session_id.as_deref() == viewing_sid);
+            if !have_viewing {
+                if let Some(sid) = viewing_sid {
+                    let name = self
+                        .teammate_view_agent_name
+                        .clone()
+                        .unwrap_or_else(|| short_session_label(sid));
+                    children.push(AgentTreeNode {
+                        agent_name: name,
+                        status: AgentStatus::Running,
+                        tool_use_count: 0,
+                        token_count: 0,
+                        is_leaf: true,
+                        is_leader: false,
+                        children: Vec::new(),
+                        session_id: Some(sid.to_string()),
+                        activity: Some("viewing".to_string()),
+                        todo_progress: None,
+                    });
+                }
+            }
+        }
+
         // Claude Code: if (teammateTasks.length === 0) return null.
-        if children.is_empty() {
+        // Hard-attach always shows team-lead so Esc/Enter-on-lead still works.
+        if children.is_empty() && !hard {
             return Vec::new();
         }
 
@@ -812,8 +878,10 @@ impl crate::tui::TuiState for App {
             agent_name: "team-lead".to_string(),
             // Running ⇒ ╒═ glyph; activity is intentionally empty while the
             // main session is foregrounded (spinner line owns the verb).
-            status: if self.is_processing {
+            status: if self.is_processing && !hard {
                 AgentStatus::Running
+            } else if hard {
+                AgentStatus::Idle
             } else {
                 AgentStatus::Idle
             },
@@ -822,8 +890,12 @@ impl crate::tui::TuiState for App {
             is_leaf: false,
             is_leader: true,
             children,
-            session_id: Some(self.session.id.clone()),
-            activity: None,
+            session_id: Some(leader_sid),
+            activity: if hard {
+                Some("esc/enter to return".to_string())
+            } else {
+                None
+            },
             todo_progress: None,
         };
 
@@ -1986,7 +2058,11 @@ impl crate::tui::TuiState for App {
 
     fn viewing_teammate_member(&self) -> Option<crate::protocol::SwarmMemberStatus> {
         let sid = self.viewing_teammate_session_id.as_deref()?;
-        crate::tui::teammate_view::find_member(&self.remote_swarm_members, sid).cloned()
+        crate::tui::teammate_view::find_member(&self.remote_swarm_members, sid)
+            .or_else(|| {
+                crate::tui::teammate_view::find_member(&self.teammate_view_swarm_snapshot, sid)
+            })
+            .cloned()
     }
 
     fn now_millis(&self) -> u64 {
@@ -2406,6 +2482,8 @@ impl App {
         self.view_teammate_selection = false;
         self.teammate_view_messages.clear();
         self.teammate_view_hard_attached = false;
+        self.teammate_view_return_session_id = None;
+        self.teammate_view_swarm_snapshot.clear();
         self.teammate_view_abort_armed = false;
         // Keep return session id only if hard-attach exit will consume it.
         self.agent_tree_selecting = false;
@@ -2424,7 +2502,8 @@ impl App {
         self.agent_tree_hidden = false;
         self.teammate_view_abort_armed = false;
         if self.teammate_view_hard_attached {
-            // Stay in hard-attach; clear only soft-view buffer.
+            // Stay in hard-attach; clear only soft-view buffer. Keep snapshot
+            // so the switch tree still paints after interrupt.
             self.teammate_view_messages.clear();
             self.view_teammate_selection = true;
             return;
@@ -2435,6 +2514,7 @@ impl App {
         self.teammate_view_messages.clear();
         self.teammate_view_hard_attached = false;
         self.teammate_view_return_session_id = None;
+        self.teammate_view_swarm_snapshot.clear();
     }
 
     /// Begin hard-attach into a swarm agent session (true transcript switch).
@@ -2446,18 +2526,23 @@ impl App {
     /// Returns `true` when hard-attach state was armed (caller should resume).
     pub(crate) fn begin_teammate_hard_attach(&mut self, session_id: &str, label: &str) -> bool {
         // Prefer live remote session, then resume target, then local session id.
-        let leader = self
-            .remote_session_id
-            .clone()
-            .or_else(|| self.resume_session_id.clone())
-            .or_else(|| {
-                let id = self.session.id.as_str();
-                if id.is_empty() {
-                    None
-                } else {
-                    Some(id.to_string())
-                }
-            });
+        // When already hard-attached, keep the ORIGINAL team-lead return id so
+        // free agent↔agent switches do not lose the path home.
+        let leader = if self.teammate_view_hard_attached {
+            self.teammate_view_return_session_id.clone()
+        } else {
+            None
+        }
+        .or_else(|| self.remote_session_id.clone())
+        .or_else(|| self.resume_session_id.clone())
+        .or_else(|| {
+            let id = self.session.id.as_str();
+            if id.is_empty() {
+                None
+            } else {
+                Some(id.to_string())
+            }
+        });
         if leader.as_deref() == Some(session_id) {
             self.set_status_notice("Already on this session");
             return false;
@@ -2468,6 +2553,10 @@ impl App {
             ));
             return false;
         }
+        // Freeze roster once (before resume clears remote_swarm_members).
+        if self.teammate_view_swarm_snapshot.is_empty() && !self.remote_swarm_members.is_empty() {
+            self.teammate_view_swarm_snapshot = self.remote_swarm_members.clone();
+        }
         self.teammate_view_return_session_id = leader;
         self.viewing_teammate_session_id = Some(session_id.to_string());
         self.teammate_view_agent_name = Some(label.to_string());
@@ -2475,12 +2564,32 @@ impl App {
         self.teammate_view_hard_attached = true;
         self.teammate_view_messages.clear();
         self.teammate_view_abort_armed = false;
-        self.agent_tree_selecting = false;
-        self.selected_agent_tree_index = -1;
+        // Stay in selecting mode so Shift+↑/↓ free-switch is obvious after land.
+        self.agent_tree_hidden = false;
+        self.agent_tree_selecting = true;
+        // Highlight the agent we are entering (index among children).
+        // Prefer live members, then hard-attach snapshot (same order as tree).
+        let members: &[crate::protocol::SwarmMemberStatus] =
+            if !self.remote_swarm_members.is_empty() {
+                &self.remote_swarm_members
+            } else {
+                &self.teammate_view_swarm_snapshot
+            };
+        let leader_sid = self
+            .teammate_view_return_session_id
+            .as_deref()
+            .unwrap_or("");
+        let selected = members
+            .iter()
+            .filter(|m| m.session_id != leader_sid)
+            .position(|m| m.session_id == session_id)
+            .map(|i| i as i32)
+            .unwrap_or(0);
+        self.selected_agent_tree_index = selected;
         // Durable notice text (still only 3s in status_notice) — real chrome is
-        // TeammateViewHeader + bottom separator + status bar return spans.
+        // TeammateViewHeader + tree switcher + status bar return spans.
         self.set_status_notice(format!(
-            "Viewing @{label} · esc return to team lead"
+            "Viewing @{label} · shift+↑/↓ switch · enter team-lead / esc return"
         ));
         true
     }
@@ -2573,8 +2682,9 @@ impl App {
 
         // Shift+Up/Down — expand hidden tree + step selection.
         // Indices: -1 leader, 0..n-1 children, n = hide row (CC).
+        // Hard-attach always keeps a switch tree (snapshot), so never no-op.
         if shift && matches!(code, KeyCode::Up | KeyCode::Down) {
-            if child_count == 0 && !was_hidden {
+            if child_count == 0 && !was_hidden && !self.teammate_view_hard_attached {
                 return None;
             }
             self.agent_tree_hidden = false;
@@ -2628,14 +2738,14 @@ impl App {
         if confirm && self.agent_tree_selecting {
             let hard = shift && matches!(code, KeyCode::Enter);
             if self.selected_agent_tree_index < 0 {
-                // Leader → exit view.
+                // Leader → exit view (CC free switch back to team-lead).
                 if self.viewing_teammate_session_id.is_some() || self.teammate_view_hard_attached {
                     if self.teammate_view_hard_attached {
                         if let Some(leader) = self.teammate_view_return_session_id.take() {
-                            self.teammate_view_hard_attached = false;
-                            self.viewing_teammate_session_id = None;
-                            self.view_teammate_selection = false;
+                            // Keep hard_attached chrome until resume lands (remote.rs).
                             self.agent_tree_selecting = false;
+                            self.selected_agent_tree_index = -1;
+                            self.set_status_notice("Returning to team lead…");
                             return Some(TeammateNavAction::ResumeSession { session_id: leader });
                         }
                     }

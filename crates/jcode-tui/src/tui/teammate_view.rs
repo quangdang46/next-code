@@ -398,12 +398,16 @@ pub fn hard_attach_status_line(agent_name: &str) -> Line<'static> {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            " return to team lead",
+            " → team-lead",
             Style::default().fg(rgb_color(200, 200, 210)),
         ),
         Span::styled(
-            format!("  ·  viewing @{name}"),
-            Style::default().fg(rgb_color(120, 120, 130)),
+            "  ·  shift+↑/↓ switch  ·  enter on team-lead",
+            Style::default().fg(rgb_color(160, 160, 170)),
+        ),
+        Span::styled(
+            format!("  ·  @{name}"),
+            Style::default().fg(rgb_color(80, 220, 100)),
         ),
     ])
 }
@@ -413,25 +417,44 @@ pub fn hard_attach_status_line(agent_name: &str) -> Line<'static> {
 pub fn viewing_status_spans(agent_name: &str, hard_attached: bool) -> Vec<Span<'static>> {
     let name = agent_name.trim().trim_start_matches('@');
     let name = if name.is_empty() { "agent" } else { name };
-    let action = if hard_attached {
-        " return to team lead"
+    if hard_attached {
+        vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                "esc",
+                Style::default()
+                    .fg(rgb_color(255, 220, 100))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(
+                " → team-lead",
+                Style::default().fg(rgb_color(200, 200, 210)),
+            ),
+            Span::styled(
+                " · shift+↑/↓ free switch",
+                Style::default().fg(rgb_color(160, 160, 170)),
+            ),
+            Span::styled(
+                format!(" · @{name}"),
+                Style::default().fg(rgb_color(80, 220, 100)),
+            ),
+        ]
     } else {
-        " exit view"
-    };
-    vec![
-        Span::styled("  ", Style::default()),
-        Span::styled(
-            "esc",
-            Style::default()
-                .fg(rgb_color(255, 220, 100))
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(action, Style::default().fg(rgb_color(180, 180, 190))),
-        Span::styled(
-            format!(" · @{name}"),
-            Style::default().fg(rgb_color(80, 220, 100)),
-        ),
-    ]
+        vec![
+            Span::styled("  ", Style::default()),
+            Span::styled(
+                "esc",
+                Style::default()
+                    .fg(rgb_color(255, 220, 100))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" exit view", Style::default().fg(rgb_color(180, 180, 190))),
+            Span::styled(
+                format!(" · @{name}"),
+                Style::default().fg(rgb_color(80, 220, 100)),
+            ),
+        ]
+    }
 }
 
 /// Bottom separator label while viewing (always on-screen under the input).
@@ -439,7 +462,7 @@ pub fn viewing_separator_label(agent_name: &str, hard_attached: bool) -> String 
     let name = agent_name.trim().trim_start_matches('@');
     let name = if name.is_empty() { "agent" } else { name };
     if hard_attached {
-        format!(" esc return to team lead · @{name} ")
+        format!(" esc → team-lead · shift+↑/↓ switch · @{name} ")
     } else {
         format!(" esc exit view · @{name} ")
     }
@@ -551,14 +574,14 @@ mod tests {
     #[test]
     fn chrome_copy_matches_claude_code_contract() {
         // TeammateViewHeader.tsx: "Viewing @name · esc return"
-        // PromptInputFooterLeftSide: "esc … return to team lead"
+        // Free switch: tree stays + esc → team-lead (CC pills/nav).
         let sep = viewing_separator_label("duck", true);
-        assert!(sep.contains("esc return to team lead"), "{sep}");
+        assert!(sep.contains("team-lead") || sep.contains("esc"), "{sep}");
         assert!(sep.contains("@duck"), "{sep}");
         let spans = viewing_status_spans("duck", true);
         let blob: String = spans.iter().map(|s| s.content.as_ref()).collect();
         assert!(blob.contains("esc"), "{blob}");
-        assert!(blob.contains("return to team lead"), "{blob}");
+        assert!(blob.contains("team-lead"), "{blob}");
         assert!(blob.contains("@duck"), "{blob}");
         assert_eq!(header_height(true, 10), 2);
         assert_eq!(header_height(true, 2), 1);

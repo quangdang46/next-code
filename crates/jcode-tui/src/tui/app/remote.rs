@@ -145,10 +145,12 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                             .clone()
                             .unwrap_or_else(|| label.clone());
                         if app.teammate_view_return_session_id.is_some() {
-                            // Landed on agent session — keep chrome (header +
-                            // separator + status bar) until Esc resume-home.
+                            // Landed on agent session — keep chrome + switch tree
+                            // (snapshot) so free lead↔agent nav still works.
+                            app.agent_tree_hidden = false;
+                            app.agent_tree_selecting = true;
                             app.set_status_notice(format!(
-                                "Viewing @{agent} · esc return to team lead"
+                                "Viewing @{agent} · shift+↑/↓ switch · enter team-lead · esc return"
                             ));
                         } else {
                             // Landed back on leader — drop attach chrome.
@@ -157,6 +159,9 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                             app.teammate_view_agent_name = None;
                             app.view_teammate_selection = false;
                             app.teammate_view_messages.clear();
+                            app.teammate_view_swarm_snapshot.clear();
+                            app.agent_tree_selecting = false;
+                            app.selected_agent_tree_index = -1;
                             app.set_status_notice("Back on team lead");
                         }
                     } else {
@@ -171,7 +176,9 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                         app.viewing_teammate_session_id = None;
                         app.teammate_view_agent_name = None;
                         app.teammate_view_return_session_id = None;
+                        app.teammate_view_swarm_snapshot.clear();
                         app.view_teammate_selection = false;
+                        app.agent_tree_selecting = false;
                     }
                     app.push_display_message(DisplayMessage::error(format!(
                         "Failed to switch session: {}",

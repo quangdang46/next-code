@@ -1918,7 +1918,9 @@ pub(super) fn draw_input(
         hint_shown = true;
         let name = app.teammate_view_agent_name().unwrap_or("agent");
         let hint = if app.teammate_view_hard_attached() {
-            format!("  Viewing @{name} · esc return to team lead")
+            format!(
+                "  Viewing @{name} · esc → team-lead · shift+↑/↓ free switch · enter on team-lead"
+            )
         } else {
             format!("  Soft preview @{name} · esc exit · Enter = full session")
         };

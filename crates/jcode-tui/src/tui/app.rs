@@ -1402,6 +1402,12 @@ pub struct App {
     pub teammate_view_return_session_id: Option<String>,
     /// True while hard-attached to a child session via resume.
     pub teammate_view_hard_attached: bool,
+    /// Swarm roster frozen at hard-attach time.
+    ///
+    /// Child sessions usually do not receive leader SwarmStatus, so
+    /// `remote_swarm_members` is empty after resume — without this snapshot the
+    /// agent tree vanishes and the user loses Claude Code free lead↔agent nav.
+    pub teammate_view_swarm_snapshot: Vec<crate::protocol::SwarmMemberStatus>,
     /// Double-Esc arm: first Esc aborts turn, second exits soft view (CC-ish).
     pub teammate_view_abort_armed: bool,
     /// Agent tree for conversation rendering (Claude Code style).
