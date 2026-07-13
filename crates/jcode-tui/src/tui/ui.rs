@@ -2683,17 +2683,17 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         0
     };
     let notification_height: u16 = if app.has_notification() { 1 } else { 0 };
-    // Claude Code-style activity spinner lives in the conversation chrome
-    // (above the input separator), not on the status bar. Show while processing
-    // and there is no streaming text yet (streaming text is its own section).
-    let conversation_activity_height: u16 = if app.is_processing()
+    // Claude Code-style activity spinner + TeammateSpinnerTree live in the
+    // conversation chrome (above the input separator), not on the status bar
+    // and not as a sticky transcript section (that glued trees under user
+    // prompts like `1> 2` / Interrupted banners).
+    let show_conversation_spinner = app.is_processing()
         && app.streaming_text().is_empty()
-        && !matches!(app.status(), ProcessingStatus::Idle)
-    {
-        1
-    } else {
-        0
-    };
+        && !matches!(app.status(), ProcessingStatus::Idle);
+    let agent_tree_lines = crate::tui::agent_tree::render(&app.agent_trees());
+    let agent_tree_height = agent_tree_lines.len() as u16;
+    let conversation_activity_height: u16 =
+        u16::from(show_conversation_spinner) + agent_tree_height;
     // Elastic overscroll status line revealed when the user scrolls past the
     // bottom of the transcript. Rendered directly below the input line.
     let overscroll_height: u16 = if app.chat_overscroll_active() { 1 } else { 0 };
@@ -2836,12 +2836,16 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let status_area = bottom_chunks[7];
     record_status_area(status_area);
 
-    // Claude Code-style activity spinner above the input (conversation chrome).
+    // Claude Code-style activity spinner + teammate tree above the input.
     if conversation_activity_height > 0 {
         clear_area(frame, bottom_chunks[2]);
-        let elapsed = app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0);
-        let line = input_ui::conversation_activity_line(app, elapsed);
-        frame.render_widget(Paragraph::new(line), bottom_chunks[2]);
+        let mut chrome_lines: Vec<Line<'static>> = Vec::new();
+        if show_conversation_spinner {
+            let elapsed = app.elapsed().map(|d| d.as_secs_f32()).unwrap_or(0.0);
+            chrome_lines.push(input_ui::conversation_activity_line(app, elapsed));
+        }
+        chrome_lines.extend(agent_tree_lines);
+        frame.render_widget(Paragraph::new(chrome_lines), bottom_chunks[2]);
     }
 
     // Draw the inline swarm strip directly above the status line if present.

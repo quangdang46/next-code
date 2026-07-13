@@ -727,6 +727,15 @@ pub(in crate::tui::app) fn handle_server_event(
             app.stream_message_ended = false;
             app.processing_started = None;
             app.current_message_id = None;
+            // Claude Code only renders the teammate tree while agents are
+            // running. After an interrupt the live tree must disappear — do not
+            // leave cancelled members that can paint under "Interrupted".
+            app.subagent_status = None;
+            app.agent_trees.clear();
+            // Hard-clear: mark-cancelled alone still feeds swarm cards/strip and
+            // can race with a late SwarmStatus snapshot. Live spinner tree reads
+            // this vec; empty ⇒ tree null (CC TeammateSpinnerTree).
+            app.remote_swarm_members.clear();
             remote.clear_pending();
             remote.reset_call_output_tokens_seen();
             let auto_poked = app.schedule_auto_poke_followup_if_needed()

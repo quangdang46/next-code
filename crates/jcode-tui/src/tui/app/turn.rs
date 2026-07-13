@@ -144,6 +144,9 @@ impl App {
                                         self.stream_buffer.clear();
                                         self.streaming_tool_calls.clear();
                                         self.schedule_queued_dispatch_after_interrupt();
+                                        self.subagent_status = None;
+                                        self.agent_trees.clear();
+                                        self.remote_swarm_members.clear();
                                         self.push_display_message(DisplayMessage::system("Interrupted"));
                                         return Ok(());
                                     }
@@ -363,6 +366,9 @@ impl App {
                                         self.stream_buffer.clear();
                                         self.streaming_tool_calls.clear();
                                         self.schedule_queued_dispatch_after_interrupt();
+                                        self.subagent_status = None;
+                                        self.agent_trees.clear();
+                                        self.remote_swarm_members.clear();
                                         self.push_display_message(DisplayMessage::system("Interrupted"));
                                         return Ok(());
                                     }
@@ -1347,6 +1353,9 @@ impl App {
                                             self.streaming_tool_calls.clear();
                                             self.batch_progress = None;
                                             self.schedule_queued_dispatch_after_interrupt();
+                                            self.subagent_status = None;
+                                            self.agent_trees.clear();
+                                            self.remote_swarm_members.clear();
                                             self.push_display_message(DisplayMessage::system("Interrupted"));
                                             return Ok(());
                                         }

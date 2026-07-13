@@ -684,64 +684,85 @@ impl crate::tui::TuiState for App {
     }
 
     fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> {
-        if !self.agent_trees.is_empty() {
-            return self.agent_trees.clone();
-        }
-        // Auto-populate from running items if no explicit agent tree was set.
-        let mut trees = Vec::new();
-        // Create a "main" leader tree
-        let mut leader = crate::tui::agent_tree::AgentTreeNode {
-            agent_name: "agent".to_string(),
-            status: if self.is_processing {
-                crate::tui::agent_tree::AgentStatus::Running
-            } else {
-                crate::tui::agent_tree::AgentStatus::Idle
-            },
-            tool_use_count: 0,
-            token_count: 0,
-            is_leaf: false,
-            is_leader: true,
-            children: Vec::new(),
-            session_id: None,
-            activity: if self.is_processing {
-                Some("processing…".to_string())
-            } else {
-                None
-            },
+        use crate::tui::agent_tree::{
+            pick_member_activity, AgentStatus, AgentTreeNode,
         };
 
-        // Add subagent status entry
-        if let Some(status) = &self.subagent_status {
-            leader.children.push(crate::tui::agent_tree::AgentTreeNode {
-                agent_name: "subagent".to_string(),
-                status: crate::tui::agent_tree::AgentStatus::Running,
-                tool_use_count: 0,
-                token_count: 0,
-                is_leaf: true,
-                is_leader: false,
-                children: Vec::new(),
-                session_id: Some(self.session.id.clone()),
-                activity: Some(format!("{}", status)),
-            });
+        if !self.agent_trees.is_empty() {
+            // Explicit trees still get terminal pruning + running-only filter so
+            // a stuck cancelled child cannot outlive the live spinner (Claude
+            // Code only renders running teammates).
+            let mut trees = self.agent_trees.clone();
+            for tree in &mut trees {
+                tree.prune_terminal_leaves();
+                tree.keep_running_children_only();
+            }
+            // Only keep trees that still have running children (CC null rule).
+            trees.retain(|t| t.children.iter().any(AgentTreeNode::has_active_work));
+            return trees;
         }
 
-        // Add swarm members
+        // Auto-populate from live subagent / swarm state.
+        // Claude Code TeammateSpinnerTree: flat list under fixed "team-lead",
+        // hidden entirely when no running teammates.
+        let mut children: Vec<AgentTreeNode> = Vec::new();
+
+        // In-process tool subagent (single status string).
+        if let Some(status) = &self.subagent_status {
+            let trimmed = status.trim();
+            if !trimmed.is_empty() {
+                let (name, activity) = parse_subagent_status_label(trimmed);
+                let activity = if crate::tui::agent_tree::is_meaningful_activity(&activity) {
+                    activity
+                } else {
+                    "working…".to_string()
+                };
+                children.push(AgentTreeNode {
+                    agent_name: name,
+                    status: AgentStatus::Running,
+                    tool_use_count: 0,
+                    token_count: 0,
+                    is_leaf: true,
+                    is_leader: false,
+                    children: Vec::new(),
+                    session_id: Some(self.session.id.clone()),
+                    activity: Some(activity),
+                    todo_progress: None,
+                });
+            }
+        }
+
+        // Swarm / remote members as *flat* siblings (not nested spawn tree).
+        // Nesting by report_back_to looks like the broken screenshot
+        // (`@chick` → `@butterfly`) and is not how CC's spinner tree works.
         for member in &self.remote_swarm_members {
-            let st = match member.status.as_str() {
-                "running" | "processing" => crate::tui::agent_tree::AgentStatus::Running,
-                "completed" | "done" | "ok" => crate::tui::agent_tree::AgentStatus::Completed,
-                "failed" | "error" => crate::tui::agent_tree::AgentStatus::Failed,
-                "stopped" | "cancelled" => crate::tui::agent_tree::AgentStatus::Stopped,
-                _ => crate::tui::agent_tree::AgentStatus::Running,
-            };
-            let detail = match (&member.detail, &member.output_tail) {
-                (Some(d), Some(t)) => Some(format!("{} — {}", d, t.lines().last().unwrap_or(t))),
-                (Some(d), None) => Some(d.clone()),
-                (None, Some(t)) => Some(t.lines().last().unwrap_or(t).to_string()),
-                (None, None) => None,
-            };
-            leader.children.push(crate::tui::agent_tree::AgentTreeNode {
-                agent_name: member.friendly_name.clone().unwrap_or_else(|| member.session_id.clone()),
+            // Skip self if it appears in the member list.
+            if member.session_id == self.session.id {
+                continue;
+            }
+            let st = AgentStatus::from_swarm_status(&member.status);
+            // Live tree: only running members (CC getRunningTeammatesSorted).
+            if !matches!(st, AgentStatus::Running) {
+                continue;
+            }
+
+            let activity = pick_member_activity(
+                member.task_label.as_deref(),
+                member.detail.as_deref(),
+                member.output_tail.as_deref(),
+                &st,
+            );
+
+            let name = member
+                .friendly_name
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(ToString::to_string)
+                .unwrap_or_else(|| short_session_label(&member.session_id));
+
+            children.push(AgentTreeNode {
+                agent_name: name,
                 status: st,
                 tool_use_count: 0,
                 token_count: 0,
@@ -749,14 +770,39 @@ impl crate::tui::TuiState for App {
                 is_leader: false,
                 children: Vec::new(),
                 session_id: Some(member.session_id.clone()),
-                activity: detail,
+                activity,
+                todo_progress: member.todo_progress,
             });
         }
 
-        if !leader.children.is_empty() || leader.activity.is_some() {
-            trees.push(leader);
+        // Claude Code: if (teammateTasks.length === 0) return null.
+        if children.is_empty() {
+            return Vec::new();
         }
-        trees
+
+        let leader = AgentTreeNode {
+            // Fixed label like Claude Code — never session title / prompt text.
+            agent_name: "team-lead".to_string(),
+            status: if self.is_processing {
+                AgentStatus::Running
+            } else {
+                AgentStatus::Idle
+            },
+            tool_use_count: 0,
+            token_count: 0,
+            is_leaf: false,
+            is_leader: true,
+            children,
+            session_id: Some(self.session.id.clone()),
+            activity: if self.is_processing {
+                Some("processing…".to_string())
+            } else {
+                None
+            },
+            todo_progress: None,
+        };
+
+        vec![leader]
     }
 
     fn running_items(&self) -> crate::tui::RunningItemsState {
@@ -2247,6 +2293,51 @@ impl App {
             return Some(crate::tui::SwarmPanelAction::ToggleFocus);
         }
         None
+    }
+}
+
+/// Parse a subagent status string into `(@)name` + activity.
+///
+/// Accepts shapes like `"@badger: searching"`, `"badger — editing"`, or a bare
+/// status blob (falls back to name `"subagent"`).
+fn parse_subagent_status_label(status: &str) -> (String, String) {
+    let status = status.trim();
+    // "@name: activity" or "name: activity"
+    if let Some((name, rest)) = status.split_once(':') {
+        let name = name.trim().trim_start_matches('@');
+        let rest = rest.trim();
+        if !name.is_empty() && !rest.is_empty() && !name.contains(' ') {
+            return (name.to_string(), rest.to_string());
+        }
+    }
+    // "name — activity" / "name - activity"
+    for sep in [" — ", " – ", " - "] {
+        if let Some((name, rest)) = status.split_once(sep) {
+            let name = name.trim().trim_start_matches('@');
+            let rest = rest.trim();
+            if !name.is_empty() && !rest.is_empty() && !name.contains(' ') {
+                return (name.to_string(), rest.to_string());
+            }
+        }
+    }
+    ("subagent".to_string(), status.to_string())
+}
+
+/// Short label for a session id when no friendly name is available.
+fn short_session_label(session_id: &str) -> String {
+    let id = session_id.trim();
+    if id.is_empty() {
+        return "agent".to_string();
+    }
+    // session_foo_123_abc → prefer last non-empty segment, capped.
+    let tail = id
+        .rsplit(|c| c == '_' || c == '-' || c == '/')
+        .find(|s| !s.is_empty())
+        .unwrap_or(id);
+    if tail.len() > 12 {
+        format!("{}…", &tail[..11])
+    } else {
+        tail.to_string()
     }
 }
 
