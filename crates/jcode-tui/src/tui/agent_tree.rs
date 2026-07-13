@@ -221,22 +221,32 @@ pub struct AgentTreeViewState {
 /// Claude Code hint strings (TeammateSpinnerLine / teammateSelectHint.ts).
 /// Use ASCII arrows — Unicode ↑↓ also tofu on some fonts.
 pub const TEAMMATE_SELECT_HINT: &str = "shift+up/down to select";
-/// Enter hard-switches into the agent session (real transcript). Soft preview = Shift+Enter.
-pub const TEAMMATE_VIEW_HINT: &str = "enter to switch session";
+/// CC Enter = enterTeammateView (soft transcript swap). Shift+Enter = hard session.
+pub const TEAMMATE_VIEW_HINT: &str = "enter to view · shift+enter full session";
+/// While already viewing: how to get back / free-switch.
+pub const TEAMMATE_RETURN_HINT: &str = "esc → team-lead · shift+up/down switch";
 
 /// Render the agent tree into a Vec of styled lines.
 ///
-/// Empty input / no running teammates → no lines (Claude Code returns null).
+/// Empty input / no teammates → no lines (Claude Code returns null).
+/// Exception: while *viewing* an agent the tree must stay painted so the user
+/// can free-switch back to team-lead (CC keeps TeammateSpinnerTree / pills).
 pub fn render(trees: &[AgentTreeNode], view: &AgentTreeViewState) -> Vec<Line<'static>> {
     if trees.is_empty() {
         return Vec::new();
     }
     let mut lines = Vec::new();
+    let viewing = view.viewing_session_id.is_some();
 
     for tree in trees {
-        // Claude Code: if (teammateTasks.length === 0) return null.
+        // Claude Code: if (teammateTasks.length === 0) return null — unless we
+        // are mid-view and the builder left a switch roster in place.
+        let has_child = !tree.children.is_empty();
         let has_running_child = tree.children.iter().any(AgentTreeNode::has_active_work);
-        if !has_running_child {
+        if !has_child {
+            continue;
+        }
+        if !has_running_child && !viewing {
             continue;
         }
         // Flat CC tree: only paint depth-0 leader + depth-1 children for
@@ -244,12 +254,9 @@ pub fn render(trees: &[AgentTreeNode], view: &AgentTreeViewState) -> Vec<Line<'s
         render_node(tree, 0, true, true, -1, view, &mut lines);
 
         // CC hide row (index === teammateCount) — only in selection mode.
-        if view.selecting {
-            let child_n = tree
-                .children
-                .iter()
-                .filter(|c| c.has_active_work())
-                .count() as i32;
+        // Hide is suppressed while hard/soft viewing so free-switch is simpler.
+        if view.selecting && !viewing {
+            let child_n = tree.children.len() as i32;
             let is_hide_selected = view.selected_index == child_n;
             let pointer = if is_hide_selected { ">" } else { " " };
             let mut spans = vec![
@@ -298,11 +305,12 @@ pub fn render_plain(trees: &[AgentTreeNode]) -> Vec<Line<'static>> {
 }
 
 /// Count selectable children under the first leader tree (for key navigation).
+///
+/// Uses **all** children the builder put in the tree. Do not re-filter by
+/// `has_active_work` — hard-attach snapshots intentionally keep Idle roster
+/// rows so free lead↔agent switch survives after `resume_session`.
 pub fn selectable_child_count(trees: &[AgentTreeNode]) -> usize {
-    trees
-        .first()
-        .map(|t| t.children.iter().filter(|c| c.has_active_work()).count())
-        .unwrap_or(0)
+    trees.first().map(|t| t.children.len()).unwrap_or(0)
 }
 
 /// Session id of the child at flat index `idx` (0-based), if any.
@@ -310,21 +318,14 @@ pub fn child_session_id_at(trees: &[AgentTreeNode], idx: usize) -> Option<String
     let leader = trees.first()?;
     leader
         .children
-        .iter()
-        .filter(|c| c.has_active_work())
-        .nth(idx)
+        .get(idx)
         .and_then(|c| c.session_id.clone())
 }
 
 /// Display name of the child at flat index `idx`.
 pub fn child_label_at(trees: &[AgentTreeNode], idx: usize) -> Option<String> {
     let leader = trees.first()?;
-    leader
-        .children
-        .iter()
-        .filter(|c| c.has_active_work())
-        .nth(idx)
-        .map(|c| c.agent_name.clone())
+    leader.children.get(idx).map(|c| c.agent_name.clone())
 }
 
 fn render_node(
@@ -470,8 +471,22 @@ fn render_node(
         }
     }
 
-    // Hints — TeammateSpinnerLine
-    if is_highlighted && !view.selecting {
+    // Hints — TeammateSpinnerLine / free-switch chrome
+    if is_viewing {
+        spans.push(Span::styled(
+            " · viewing",
+            Style::default()
+                .fg(rgb_color(255, 220, 100))
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
+    if is_leader && depth == 0 && view.viewing_session_id.is_some() {
+        // Always label the path home on the team-lead row while viewing.
+        spans.push(Span::styled(
+            format!(" · {TEAMMATE_RETURN_HINT}"),
+            Style::default().fg(rgb_color(255, 220, 100)),
+        ));
+    } else if is_highlighted && !view.selecting && view.viewing_session_id.is_none() {
         spans.push(Span::styled(
             format!(" · {TEAMMATE_SELECT_HINT}"),
             Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
@@ -483,30 +498,24 @@ fn render_node(
             Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
         ));
     }
-    if is_viewing {
+    if is_selected && is_leader && depth == 0 && view.viewing_session_id.is_some() {
         spans.push(Span::styled(
-            " · viewing",
-            Style::default().fg(rgb_color(255, 220, 100)),
+            " · enter to return",
+            Style::default()
+                .fg(rgb_color(255, 220, 100))
+                .add_modifier(Modifier::BOLD),
         ));
     }
 
     out.push(Line::from(spans));
 
-    // Flat children: assign selection indices 0..n-1 in display order.
+    // Flat children: selection indices 0..n-1 in tree order (all children).
+    // Builder already decided who is in the tree — do not re-filter by status
+    // or Idle rows lose indices and free-switch breaks.
     let child_count = node.children.len();
-    let mut flat_idx: i32 = 0;
     for (i, child) in node.children.iter().enumerate() {
         let child_is_last = i + 1 == child_count;
-        let child_row = if depth == 0 {
-            let idx = flat_idx;
-            if child.has_active_work() {
-                flat_idx += 1;
-            }
-            idx
-        } else {
-            // Nested: no flat selection index
-            -99
-        };
+        let child_row = if depth == 0 { i as i32 } else { -99 };
         render_node(
             child,
             depth + 1,
@@ -534,6 +543,15 @@ mod tests {
     use super::*;
 
     fn child(name: &str, status: AgentStatus, activity: Option<&str>) -> AgentTreeNode {
+        child_with_sid(name, status, activity, None)
+    }
+
+    fn child_with_sid(
+        name: &str,
+        status: AgentStatus,
+        activity: Option<&str>,
+        session_id: Option<&str>,
+    ) -> AgentTreeNode {
         AgentTreeNode {
             agent_name: name.to_string(),
             status,
@@ -542,7 +560,7 @@ mod tests {
             is_leaf: true,
             is_leader: false,
             children: Vec::new(),
-            session_id: None,
+            session_id: session_id.map(ToString::to_string),
             activity: activity.map(ToString::to_string),
             todo_progress: None,
         }
@@ -657,6 +675,78 @@ mod tests {
             leader.contains("┌─") || leader.contains("┌"),
             "leader tree glyph missing: {leader}"
         );
+    }
+
+    #[test]
+    fn free_switch_while_viewing_keeps_tree_and_return_path() {
+        // Hard-attach snapshot: one Idle + one viewing Running — both must be
+        // selectable so Shift+↑ can reach team-lead and Enter returns home.
+        let tree = leader(
+            vec![
+                child_with_sid("duck", AgentStatus::Running, Some("viewing"), Some("ses_duck")),
+                child_with_sid("pig", AgentStatus::Idle, Some("idle"), Some("ses_pig")),
+            ],
+            false,
+        );
+        let view = AgentTreeViewState {
+            selecting: true,
+            selected_index: -1, // team-lead selected → path home
+            viewing_session_id: Some("ses_duck".into()),
+        };
+        let trees = vec![tree];
+        assert_eq!(
+            selectable_child_count(&trees),
+            2,
+            "Idle roster rows must stay selectable for free switch"
+        );
+        assert_eq!(
+            child_session_id_at(&trees, 0).as_deref(),
+            Some("ses_duck")
+        );
+        assert_eq!(child_session_id_at(&trees, 1).as_deref(), Some("ses_pig"));
+        let texts: Vec<String> = render(&trees, &view).iter().map(line_text).collect();
+        assert!(
+            !texts.is_empty(),
+            "tree must stay visible while viewing: {texts:?}"
+        );
+        let lead = texts.iter().find(|t| t.contains("team-lead")).expect("lead");
+        assert!(
+            lead.contains(TEAMMATE_RETURN_HINT) || lead.contains("esc"),
+            "team-lead must show return path while viewing: {lead}"
+        );
+        assert!(
+            lead.contains("enter to return") || lead.contains('>'),
+            "selected team-lead must be obvious: {lead}"
+        );
+        let duck = texts.iter().find(|t| t.contains("@duck")).expect("duck");
+        assert!(
+            duck.contains("viewing"),
+            "viewed agent must be marked: {duck}"
+        );
+        // No hide row while viewing.
+        assert!(
+            !texts.iter().any(|t| t.contains("hide")),
+            "hide row suppressed while viewing: {texts:?}"
+        );
+    }
+
+    #[test]
+    fn selection_indices_are_dense_for_idle_and_running() {
+        // Regression: previously Idle children shared flat indices with Running
+        // (flat_idx only advanced on has_active_work) → broken free switch.
+        let tree = leader(
+            vec![
+                child_with_sid("a", AgentStatus::Idle, None, Some("ses_a")),
+                child_with_sid("b", AgentStatus::Running, Some("work"), Some("ses_b")),
+            ],
+            true,
+        );
+        let trees = vec![tree];
+        assert_eq!(selectable_child_count(&trees), 2);
+        assert_eq!(child_label_at(&trees, 0).as_deref(), Some("a"));
+        assert_eq!(child_label_at(&trees, 1).as_deref(), Some("b"));
+        assert_eq!(child_session_id_at(&trees, 0).as_deref(), Some("ses_a"));
+        assert_eq!(child_session_id_at(&trees, 1).as_deref(), Some("ses_b"));
     }
 
     #[test]
