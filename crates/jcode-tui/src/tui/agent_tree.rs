@@ -219,7 +219,8 @@ pub struct AgentTreeViewState {
 }
 
 /// Claude Code hint strings (TeammateSpinnerLine / teammateSelectHint.ts).
-pub const TEAMMATE_SELECT_HINT: &str = "shift + ↑/↓ to select";
+/// Use ASCII arrows — Unicode ↑↓ also tofu on some fonts.
+pub const TEAMMATE_SELECT_HINT: &str = "shift+up/down to select";
 pub const TEAMMATE_VIEW_HINT: &str = "enter to view";
 
 /// Render the agent tree into a Vec of styled lines.
@@ -308,20 +309,12 @@ fn render_node(
         rgb_color(c.0, c.1, c.2)
     };
 
-    // Claude Code: leader ╒═ when highlighted; children ├─ / └─; selected uses
-    // double-line ╘═ / ╞═ variants.
+    // Single-line box drawing only. Double-line forms (╒═ ╘═ ╞═) render as
+    // empty tofu □ in many terminal fonts — the user's screenshot showed blank
+    // boxes before "team-lead" / "@pig". CC uses double-line; we prefer
+    // reliability over glyph fidelity until a font-probe exists.
     let tree_char = if depth == 0 {
-        if is_highlighted {
-            "╒═ "
-        } else {
-            "┌─ "
-        }
-    } else if is_selected {
-        if is_last_sibling {
-            "╘═ "
-        } else {
-            "╞═ "
-        }
+        "┌─ "
     } else if is_last_sibling {
         "└─ "
     } else {
@@ -336,14 +329,16 @@ fn render_node(
         format!("@{}", node.agent_name)
     };
 
-    // CC: paddingLeft(3) + pointer(1) + space + treeChar.
-    let pointer = if is_selected { "›" } else { " " };
+    // Selection pointer: plain ASCII `>` — always visible (Unicode › often tofu).
+    let pointer = if is_selected { ">" } else { " " };
     let mut spans: Vec<Span<'static>> = vec![
         Span::raw("  ".repeat(depth.max(1))),
         Span::styled(
             format!("{pointer} "),
             if is_selected {
-                Style::default().fg(rgb_color(255, 220, 100)).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(rgb_color(255, 220, 100))
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             },
@@ -602,10 +597,19 @@ mod tests {
         };
         let texts: Vec<String> = render(&[tree], &view).iter().map(line_text).collect();
         let child = texts.iter().find(|t| t.contains("@dragon")).unwrap();
-        assert!(child.contains('›') || child.contains("›"), "pointer missing: {child}");
+        assert!(
+            child.contains('>') || child.starts_with(">") || child.contains("> "),
+            "pointer missing: {child}"
+        );
         assert!(
             child.contains(TEAMMATE_VIEW_HINT),
             "enter-to-view hint missing: {child}"
+        );
+        // Single-line tree chars must appear (not empty tofu double-line).
+        let leader = texts.iter().find(|t| t.contains("team-lead")).unwrap();
+        assert!(
+            leader.contains("┌─") || leader.contains("┌"),
+            "leader tree glyph missing: {leader}"
         );
     }
 
