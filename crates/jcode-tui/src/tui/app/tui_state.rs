@@ -2416,9 +2416,58 @@ impl App {
         }
     }
 
+    /// On interrupt: drop soft preview / tree selection, but **never** wipe
+    /// hard-attach chrome or `return_session_id` — Esc must still resume leader.
+    pub(crate) fn clear_teammate_view_on_interrupt(&mut self) {
+        self.agent_tree_selecting = false;
+        self.selected_agent_tree_index = -1;
+        self.agent_tree_hidden = false;
+        self.teammate_view_abort_armed = false;
+        if self.teammate_view_hard_attached {
+            // Stay in hard-attach; clear only soft-view buffer.
+            self.teammate_view_messages.clear();
+            self.view_teammate_selection = true;
+            return;
+        }
+        self.viewing_teammate_session_id = None;
+        self.teammate_view_agent_name = None;
+        self.view_teammate_selection = false;
+        self.teammate_view_messages.clear();
+        self.teammate_view_hard_attached = false;
+        self.teammate_view_return_session_id = None;
+    }
+
     /// Begin hard-attach into a swarm agent session (true transcript switch).
-    pub(crate) fn begin_teammate_hard_attach(&mut self, session_id: &str, label: &str) {
-        let leader = self.remote_session_id.clone();
+    ///
+    /// Claude Code does not resume sockets — it swaps `task.messages` in-process
+    /// and keeps `viewingAgentTaskId` until Esc. jcode must hard-resume the agent
+    /// session, so we **must** remember the leader session for Esc return, and
+    /// keep durable chrome (`hard_attached` + agent name) until resume-home.
+    /// Returns `true` when hard-attach state was armed (caller should resume).
+    pub(crate) fn begin_teammate_hard_attach(&mut self, session_id: &str, label: &str) -> bool {
+        // Prefer live remote session, then resume target, then local session id.
+        let leader = self
+            .remote_session_id
+            .clone()
+            .or_else(|| self.resume_session_id.clone())
+            .or_else(|| {
+                let id = self.session.id.as_str();
+                if id.is_empty() {
+                    None
+                } else {
+                    Some(id.to_string())
+                }
+            });
+        if leader.as_deref() == Some(session_id) {
+            self.set_status_notice("Already on this session");
+            return false;
+        }
+        if leader.is_none() {
+            self.set_status_notice(format!(
+                "Cannot switch into @{label}: no team-lead session id to return to"
+            ));
+            return false;
+        }
         self.teammate_view_return_session_id = leader;
         self.viewing_teammate_session_id = Some(session_id.to_string());
         self.teammate_view_agent_name = Some(label.to_string());
@@ -2428,9 +2477,12 @@ impl App {
         self.teammate_view_abort_armed = false;
         self.agent_tree_selecting = false;
         self.selected_agent_tree_index = -1;
+        // Durable notice text (still only 3s in status_notice) — real chrome is
+        // TeammateViewHeader + bottom separator + status bar return spans.
         self.set_status_notice(format!(
-            "Switching into @{label}…  Esc = return to team-lead"
+            "Viewing @{label} · esc return to team lead"
         ));
+        true
     }
 
     /// Claude Code `useBackgroundTaskNavigation`.
@@ -2463,7 +2515,15 @@ impl App {
         // Esc while hard-attached → resume leader (CC "esc return to team lead").
         // Keep hard_attached chrome until resume completes (remote.rs clears it).
         if matches!(code, KeyCode::Esc) && self.teammate_view_hard_attached {
-            if let Some(leader) = self.teammate_view_return_session_id.clone() {
+            let leader = self.teammate_view_return_session_id.clone().or_else(|| {
+                // Defensive: never leave the user stranded on the agent session
+                // without a return target if return id was lost.
+                self.resume_session_id.clone().filter(|id| {
+                    Some(id.as_str()) != self.viewing_teammate_session_id.as_deref()
+                        && Some(id.as_str()) != self.remote_session_id.as_deref()
+                })
+            });
+            if let Some(leader) = leader {
                 let name = self
                     .teammate_view_agent_name
                     .clone()
@@ -2471,10 +2531,13 @@ impl App {
                 // Mark return in progress: clear return id so resume handler
                 // knows this is "going home" (return_session_id empty + hard).
                 self.teammate_view_return_session_id = None;
-                self.set_status_notice(format!("Returning to team-lead (leaving @{name})…"));
+                self.set_status_notice(format!("Returning to team lead (leaving @{name})…"));
                 return Some(TeammateNavAction::ResumeSession { session_id: leader });
             }
-            self.exit_teammate_view_local("Exited teammate view");
+            // No leader id — clear chrome only (cannot resume). Surface that.
+            self.exit_teammate_view_local(
+                "Exited view chrome (no team-lead session id — use session picker)",
+            );
             return Some(TeammateNavAction::Handled);
         }
 
@@ -2609,8 +2672,10 @@ impl App {
                     self.agent_tree_selecting = false;
                     return Some(TeammateNavAction::Handled);
                 }
-                self.begin_teammate_hard_attach(&sid, &label);
-                return Some(TeammateNavAction::ResumeSession { session_id: sid });
+                if self.begin_teammate_hard_attach(&sid, &label) {
+                    return Some(TeammateNavAction::ResumeSession { session_id: sid });
+                }
+                return Some(TeammateNavAction::Handled);
             }
             return Some(TeammateNavAction::Handled);
         }

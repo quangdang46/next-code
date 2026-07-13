@@ -2688,8 +2688,15 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Elastic overscroll status line revealed when the user scrolls past the
     // bottom of the transcript. Rendered directly below the input line.
     let overscroll_height: u16 = if app.chat_overscroll_active() { 1 } else { 0 };
-    // CC footer: "esc to return to team lead" while hard-attached into an agent.
-    let return_bar_height: u16 = if app.teammate_view_hard_attached() { 1 } else { 0 };
+    // CC footer: durable "esc return to team lead" while viewing (soft or hard).
+    // Soft view also needs an obvious exit; hard-attach must never hide this.
+    let return_bar_height: u16 = if app.viewing_teammate_session_id().is_some()
+        || app.teammate_view_hard_attached()
+    {
+        1
+    } else {
+        0
+    };
     let fixed_height = 1            // status bar
         + queued_height
         + swarm_strip_height
@@ -2855,7 +2862,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         frame.render_widget(Paragraph::new(swarm_strip_lines.clone()), bottom_chunks[7]);
     }
 
-    // CC footer: "esc return to team lead" while hard-attached.
+    // CC footer line: always visible while viewing (soft or hard-attach).
     if return_bar_height > 0 {
         clear_area(frame, bottom_chunks[8]);
         let name = app.teammate_view_agent_name().unwrap_or("agent");
@@ -2932,12 +2939,13 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
 
     // Messages area is top_chunks[0] within the chat column (already excludes diagram).
     // CC TeammateViewHeader is ALWAYS shown while viewing — soft preview OR hard-attach.
-    // Hard-attach previously hid this chrome, so users could not find "esc return".
+    // Prefer 1-line header over dropping chrome entirely on short terminals.
     let full_messages_area = top_chunks[0];
     let is_viewing_teammate = app.viewing_teammate_session_id().is_some()
         || app.teammate_view_hard_attached();
-    let header_h = crate::tui::teammate_view::header_height(is_viewing_teammate);
-    let (header_area, messages_area) = if header_h > 0 && full_messages_area.height > header_h {
+    let header_h =
+        crate::tui::teammate_view::header_height(is_viewing_teammate, full_messages_area.height);
+    let (header_area, messages_area) = if header_h > 0 {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(header_h), Constraint::Min(1)])
@@ -3117,13 +3125,47 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         user_count + pending_count + 1,
         &mut debug_capture,
     );
-    // Bottom separator line ─── below input
+    // Bottom separator line ─── below input.
+    // While viewing, embed the CC return hint in this always-visible row so the
+    // user cannot miss how to leave the agent session (status notices expire in 3s).
     let bot_sep_w = bottom_chunks[5].width as usize;
     if bot_sep_w > 12 {
-        let sep_line = Line::from(Span::styled(
-            "─".repeat(bot_sep_w),
-            Style::default().fg(rgb(50, 55, 65)),
-        ));
+        let viewing = app.viewing_teammate_session_id().is_some()
+            || app.teammate_view_hard_attached();
+        let sep_line = if viewing {
+            let name = app.teammate_view_agent_name().unwrap_or("agent");
+            let label = crate::tui::teammate_view::viewing_separator_label(
+                name,
+                app.teammate_view_hard_attached(),
+            );
+            let label_w = label.chars().count();
+            if bot_sep_w > label_w + 4 {
+                let left = (bot_sep_w - label_w) / 2;
+                let right = bot_sep_w - label_w - left;
+                Line::from(vec![
+                    Span::styled("─".repeat(left), Style::default().fg(rgb(80, 90, 50))),
+                    Span::styled(
+                        label,
+                        Style::default()
+                            .fg(rgb(255, 220, 100))
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled("─".repeat(right), Style::default().fg(rgb(80, 90, 50))),
+                ])
+            } else {
+                Line::from(Span::styled(
+                    label.chars().take(bot_sep_w).collect::<String>(),
+                    Style::default()
+                        .fg(rgb(255, 220, 100))
+                        .add_modifier(Modifier::BOLD),
+                ))
+            }
+        } else {
+            Line::from(Span::styled(
+                "─".repeat(bot_sep_w),
+                Style::default().fg(rgb(50, 55, 65)),
+            ))
+        };
         frame.render_widget(Paragraph::new(sep_line), bottom_chunks[5]);
     }
     // Status bar below swarm strip / agent tree / return bar

@@ -147,14 +147,7 @@ impl App {
                                         self.subagent_status = None;
                                         self.agent_trees.clear();
                                         self.remote_swarm_members.clear();
-                                        self.agent_tree_selecting = false;
-                                        self.selected_agent_tree_index = -1;
-                                        self.agent_tree_hidden = false;
-                                        self.viewing_teammate_session_id = None;
-                                        self.view_teammate_selection = false;
-                                        self.teammate_view_messages.clear();
-                                        self.teammate_view_hard_attached = false;
-                                        self.teammate_view_abort_armed = false;
+                                        self.clear_teammate_view_on_interrupt();
                                         self.push_display_message(DisplayMessage::system("Interrupted"));
                                         return Ok(());
                                     }
@@ -377,14 +370,7 @@ impl App {
                                         self.subagent_status = None;
                                         self.agent_trees.clear();
                                         self.remote_swarm_members.clear();
-                                        self.agent_tree_selecting = false;
-                                        self.selected_agent_tree_index = -1;
-                                        self.agent_tree_hidden = false;
-                                        self.viewing_teammate_session_id = None;
-                                        self.view_teammate_selection = false;
-                                        self.teammate_view_messages.clear();
-                                        self.teammate_view_hard_attached = false;
-                                        self.teammate_view_abort_armed = false;
+                                        self.clear_teammate_view_on_interrupt();
                                         self.push_display_message(DisplayMessage::system("Interrupted"));
                                         return Ok(());
                                     }
@@ -1372,14 +1358,7 @@ impl App {
                                             self.subagent_status = None;
                                             self.agent_trees.clear();
                                             self.remote_swarm_members.clear();
-                                            self.agent_tree_selecting = false;
-                                            self.selected_agent_tree_index = -1;
-                                            self.agent_tree_hidden = false;
-                                            self.viewing_teammate_session_id = None;
-                                            self.view_teammate_selection = false;
-                                            self.teammate_view_messages.clear();
-                                            self.teammate_view_hard_attached = false;
-                                            self.teammate_view_abort_armed = false;
+                                            self.clear_teammate_view_on_interrupt();
                                             self.push_display_message(DisplayMessage::system("Interrupted"));
                                             return Ok(());
                                         }

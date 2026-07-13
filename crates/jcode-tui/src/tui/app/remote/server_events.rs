@@ -736,14 +736,9 @@ pub(in crate::tui::app) fn handle_server_event(
             // can race with a late SwarmStatus snapshot. Live spinner tree reads
             // this vec; empty ⇒ tree null (CC TeammateSpinnerTree).
             app.remote_swarm_members.clear();
-            app.agent_tree_selecting = false;
-            app.selected_agent_tree_index = -1;
-            app.agent_tree_hidden = false;
-            app.viewing_teammate_session_id = None;
-            app.view_teammate_selection = false;
-            app.teammate_view_messages.clear();
-            app.teammate_view_hard_attached = false;
-            // Keep return session if mid hard-attach; user can still Esc resume.
+            // Soft preview cleared; hard-attach chrome + return_session_id kept
+            // so Esc can still resume team-lead (CC exitTeammateView only).
+            app.clear_teammate_view_on_interrupt();
             remote.clear_pending();
             remote.reset_call_output_tokens_seen();
             let auto_poked = app.schedule_auto_poke_followup_if_needed()

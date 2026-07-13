@@ -310,8 +310,15 @@ pub fn member_is_terminal(member: &SwarmMemberStatus) -> bool {
     )
 }
 
-/// CC TeammateViewHeader — always visible while viewing (soft OR hard-attach).
-/// Hard-attach is the real session switch; chrome must still say how to return.
+/// Claude Code `TeammateViewHeader` — sticky above transcript while viewing.
+///
+/// CC source (`TeammateViewHeader.tsx`):
+///   Viewing @{name} · esc return
+///   {task.prompt}
+///
+/// jcode hard-attach is a real `resume_session` (CC keeps one process and swaps
+/// `task.messages`). Chrome still must match CC wording and stay visible for
+/// the whole attach lifetime — not a 3s status notice.
 pub fn draw_viewing_chrome(
     frame: &mut Frame,
     area: Rect,
@@ -319,62 +326,58 @@ pub fn draw_viewing_chrome(
     hard_attached: bool,
     member: Option<&SwarmMemberStatus>,
 ) {
-    if area.height == 0 || area.width < 10 {
+    if area.height == 0 || area.width < 8 {
         return;
     }
     let name = agent_name.trim().trim_start_matches('@');
     let name = if name.is_empty() { "agent" } else { name };
+    // CC teammate name is bold green-ish identity color.
     let name_color = rgb_color(80, 220, 100);
-    let dim = Style::default().fg(rgb_color(100, 100, 110));
-    let accent = rgb_color(255, 220, 100);
+    let dim = Style::default().fg(rgb_color(140, 140, 150));
+    let accent = Style::default()
+        .fg(rgb_color(255, 220, 100))
+        .add_modifier(Modifier::BOLD);
 
-    let mode = if hard_attached {
-        "In agent session"
-    } else {
-        "Soft preview"
-    };
-
-    let mut status_bits: Vec<String> = Vec::new();
-    if let Some(m) = member {
-        status_bits.push(m.status.clone());
-        if let Some(secs) = m.runtime.elapsed_secs {
-            status_bits.push(format_elapsed(secs));
-        }
-    }
-
+    // Line 1 — exact CC contract: "Viewing @name · esc return"
     let mut lines: Vec<Line<'static>> = vec![Line::from(vec![
-        Span::styled(
-            format!("{mode} "),
-            Style::default().fg(rgb_color(200, 200, 210)),
-        ),
+        Span::styled("Viewing ", Style::default().fg(rgb_color(220, 220, 230))),
         Span::styled(
             format!("@{name}"),
             Style::default()
                 .fg(name_color)
                 .add_modifier(Modifier::BOLD),
         ),
-        if status_bits.is_empty() {
-            Span::raw("")
-        } else {
-            Span::styled(format!(" · {}", status_bits.join(" · ")), dim)
-        },
         Span::styled(" · ", dim),
-        Span::styled("esc", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
-        Span::styled(
-            if hard_attached {
-                " return to team-lead"
-            } else {
-                " exit preview"
-            },
-            dim,
-        ),
+        Span::styled("esc", accent),
+        Span::styled(" return", dim),
     ])];
 
+    // Line 2 — CC shows task.prompt; we show task_label / status / hard-attach note.
     if area.height >= 2 {
-        let second = if hard_attached {
-            "You are inside this agent's full transcript. Press Esc to go back to the coordinator."
+        let second = if let Some(m) = member {
+            let task = m
+                .task_label
+                .as_deref()
+                .map(str::trim)
+                .filter(|s| !s.is_empty() && !looks_like_spawn_meta_prompt(s))
+                .map(|s| truncate_chars(s, 120));
+            if let Some(task) = task {
+                task
+            } else {
+                let mut bits = vec![m.status.clone()];
+                if let Some(secs) = m.runtime.elapsed_secs {
+                    bits.push(format_elapsed(secs));
+                }
+                if hard_attached {
+                    format!("{} · full session (esc → team lead)", bits.join(" · "))
+                } else {
+                    format!("{} · soft preview (Enter = full session)", bits.join(" · "))
+                }
+            }
+        } else if hard_attached {
+            "Full agent session · press esc to return to team lead".to_string()
         } else {
-            "Preview only (no full history). Press Enter on the tree to hard-switch into the session."
+            "Soft preview · press Enter for full session, esc to exit".to_string()
         };
         lines.push(Line::from(Span::styled(second, dim)));
     }
@@ -382,7 +385,8 @@ pub fn draw_viewing_chrome(
     frame.render_widget(Paragraph::new(lines), area);
 }
 
-/// Sticky footer line while hard-attached (CC footer "esc to return to team lead").
+/// Sticky bottom chrome while hard-attached (CC footer
+/// `KeyboardShortcutHint shortcut="esc" action="return to team lead"`).
 pub fn hard_attach_status_line(agent_name: &str) -> Line<'static> {
     let name = agent_name.trim().trim_start_matches('@');
     let name = if name.is_empty() { "agent" } else { name };
@@ -394,15 +398,60 @@ pub fn hard_attach_status_line(agent_name: &str) -> Line<'static> {
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
-            format!(" return to team-lead  ·  viewing @{name}"),
-            Style::default().fg(rgb_color(160, 160, 170)),
+            " return to team lead",
+            Style::default().fg(rgb_color(200, 200, 210)),
+        ),
+        Span::styled(
+            format!("  ·  viewing @{name}"),
+            Style::default().fg(rgb_color(120, 120, 130)),
         ),
     ])
 }
 
-pub fn header_height(viewing: bool) -> u16 {
-    if viewing {
+/// Durable status-bar spans (CC `PromptInputFooterLeftSide` while viewing).
+/// Always shown while hard-attached or soft-viewing — not a 3s notice.
+pub fn viewing_status_spans(agent_name: &str, hard_attached: bool) -> Vec<Span<'static>> {
+    let name = agent_name.trim().trim_start_matches('@');
+    let name = if name.is_empty() { "agent" } else { name };
+    let action = if hard_attached {
+        " return to team lead"
+    } else {
+        " exit view"
+    };
+    vec![
+        Span::styled("  ", Style::default()),
+        Span::styled(
+            "esc",
+            Style::default()
+                .fg(rgb_color(255, 220, 100))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(action, Style::default().fg(rgb_color(180, 180, 190))),
+        Span::styled(
+            format!(" · @{name}"),
+            Style::default().fg(rgb_color(80, 220, 100)),
+        ),
+    ]
+}
+
+/// Bottom separator label while viewing (always on-screen under the input).
+pub fn viewing_separator_label(agent_name: &str, hard_attached: bool) -> String {
+    let name = agent_name.trim().trim_start_matches('@');
+    let name = if name.is_empty() { "agent" } else { name };
+    if hard_attached {
+        format!(" esc return to team lead · @{name} ")
+    } else {
+        format!(" esc exit view · @{name} ")
+    }
+}
+
+pub fn header_height(viewing: bool, available: u16) -> u16 {
+    if !viewing {
+        0
+    } else if available >= 3 {
         2
+    } else if available >= 2 {
+        1
     } else {
         0
     }
@@ -497,5 +546,22 @@ mod tests {
         assert!(member_is_terminal(&m));
         m.status = "running".into();
         assert!(member_is_running(&m));
+    }
+
+    #[test]
+    fn chrome_copy_matches_claude_code_contract() {
+        // TeammateViewHeader.tsx: "Viewing @name · esc return"
+        // PromptInputFooterLeftSide: "esc … return to team lead"
+        let sep = viewing_separator_label("duck", true);
+        assert!(sep.contains("esc return to team lead"), "{sep}");
+        assert!(sep.contains("@duck"), "{sep}");
+        let spans = viewing_status_spans("duck", true);
+        let blob: String = spans.iter().map(|s| s.content.as_ref()).collect();
+        assert!(blob.contains("esc"), "{blob}");
+        assert!(blob.contains("return to team lead"), "{blob}");
+        assert!(blob.contains("@duck"), "{blob}");
+        assert_eq!(header_height(true, 10), 2);
+        assert_eq!(header_height(true, 2), 1);
+        assert_eq!(header_height(false, 10), 0);
     }
 }

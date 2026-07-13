@@ -145,9 +145,10 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                             .clone()
                             .unwrap_or_else(|| label.clone());
                         if app.teammate_view_return_session_id.is_some() {
-                            // Landed on agent session — keep chrome + return bar.
+                            // Landed on agent session — keep chrome (header +
+                            // separator + status bar) until Esc resume-home.
                             app.set_status_notice(format!(
-                                "In @{agent}  ·  Esc = return to team-lead"
+                                "Viewing @{agent} · esc return to team lead"
                             ));
                         } else {
                             // Landed back on leader — drop attach chrome.
@@ -156,7 +157,7 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                             app.teammate_view_agent_name = None;
                             app.view_teammate_selection = false;
                             app.teammate_view_messages.clear();
-                            app.set_status_notice("Back on team-lead");
+                            app.set_status_notice("Back on team lead");
                         }
                     } else {
                         app.set_status_notice(format!("Session → {}", label));
