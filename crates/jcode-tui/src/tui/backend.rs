@@ -593,6 +593,20 @@ impl RemoteConnection {
         self.send_request(request).await
     }
 
+    /// Inject a message into another session (CC injectUserMessageToTeammate).
+    /// Idle sessions start a turn immediately; busy ones soft-interrupt.
+    pub async fn notify_session(&mut self, session_id: &str, message: &str) -> Result<u64> {
+        let id = self.next_request_id;
+        let request = Request::NotifySession {
+            id,
+            session_id: session_id.to_string(),
+            message: message.to_string(),
+        };
+        self.next_request_id += 1;
+        self.send_request(request).await?;
+        Ok(id)
+    }
+
     /// Request a wider compacted-history window for the active session.
     pub async fn get_compacted_history(&mut self, visible_messages: usize) -> Result<u64> {
         let id = self.next_request_id;

@@ -738,8 +738,12 @@ pub(in crate::tui::app) fn handle_server_event(
             app.remote_swarm_members.clear();
             app.agent_tree_selecting = false;
             app.selected_agent_tree_index = -1;
+            app.agent_tree_hidden = false;
             app.viewing_teammate_session_id = None;
             app.view_teammate_selection = false;
+            app.teammate_view_messages.clear();
+            app.teammate_view_hard_attached = false;
+            // Keep return session if mid hard-attach; user can still Esc resume.
             remote.clear_pending();
             remote.reset_call_output_tokens_seen();
             let auto_poked = app.schedule_auto_poke_followup_if_needed()
@@ -1597,6 +1601,10 @@ pub(in crate::tui::app) fn handle_server_event(
                 // Treat member data like a visible message mutation so both the
                 // full-frame and body caches rebuild immediately.
                 app.bump_display_messages_version();
+            }
+            // Soft teammate view: refresh reconstructed transcript (CC task.messages).
+            if app.viewing_teammate_session_id.is_some() {
+                app.refresh_teammate_soft_view();
             }
             // Swarm cards are embedded in the transcript. A member snapshot can
             // arrive after the spawn tool result, so request a frame immediately

@@ -318,9 +318,22 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
-    // Claude Code useBackgroundTaskNavigation: Shift+↑/↓ / Enter / Esc on the
-    // teammate spinner tree (only when running subagents exist).
-    if app.handle_agent_tree_navigation_key(code, modifiers) {
+    // Claude Code useBackgroundTaskNavigation: Shift+↑/↓ / Enter / Esc / k / f.
+    if let Some(nav) = app.handle_agent_tree_navigation_key(code, modifiers) {
+        match nav {
+            crate::tui::app::tui_state::TeammateNavAction::Handled => {}
+            crate::tui::app::tui_state::TeammateNavAction::ResumeSession { session_id } => {
+                app.workspace_client.queue_resume_session(session_id);
+            }
+            crate::tui::app::tui_state::TeammateNavAction::NotifySession {
+                session_id,
+                message,
+            } => {
+                if let Err(e) = remote.notify_session(&session_id, &message).await {
+                    app.set_status_notice(format!("Notify agent failed: {e}"));
+                }
+            }
+        }
         return Ok(());
     }
 

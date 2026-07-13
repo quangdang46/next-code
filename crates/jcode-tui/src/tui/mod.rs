@@ -1,4 +1,5 @@
 pub(crate) mod agent_tree;
+pub(crate) mod teammate_view;
 pub mod account_picker;
 pub(crate) mod app;
 
@@ -527,6 +528,14 @@ pub trait TuiState {
 
     /// Teammate view: session_id being viewed (None = not in teammate view).
     fn viewing_teammate_session_id(&self) -> Option<&str> {
+        None
+    }
+    /// Soft-view only (true when hard-attached via resume_session).
+    fn teammate_view_hard_attached(&self) -> bool {
+        false
+    }
+    /// Swarm member snapshot for the viewed session (soft-view header/body).
+    fn viewing_teammate_member(&self) -> Option<crate::protocol::SwarmMemberStatus> {
         None
     }
     /// Working directory for this session

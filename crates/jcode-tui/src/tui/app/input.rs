@@ -2349,7 +2349,20 @@ impl App {
 
         // Claude Code teammate spinner tree navigation (Shift+↑/↓ / Enter / Esc).
         // Must run before prompt-history Up/Down so Shift+Up selects agents.
-        if self.handle_agent_tree_navigation_key(code, modifiers) {
+        // Local mode: hard-attach/notify are remote-only; soft view still works.
+        if let Some(nav) = self.handle_agent_tree_navigation_key(code, modifiers) {
+            match nav {
+                super::tui_state::TeammateNavAction::Handled => {}
+                super::tui_state::TeammateNavAction::ResumeSession { session_id } => {
+                    self.workspace_client.queue_resume_session(session_id);
+                }
+                super::tui_state::TeammateNavAction::NotifySession { message, .. } => {
+                    self.set_status_notice(format!(
+                        "Agent notify queued (local): {}",
+                        message.chars().take(40).collect::<String>()
+                    ));
+                }
+            }
             return Ok(());
         }
 

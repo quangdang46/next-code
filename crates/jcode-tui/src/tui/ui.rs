@@ -2349,16 +2349,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         overlays::draw_permission_dialog_overlay(frame, area, app);
     }
 
-    // Teammate view panel (CCB style): full panel when viewing a subagent's stream
-    if app.viewing_teammate_session_id().is_some() {
-        let panel_area = Rect {
-            x: area.x + area.width.saturating_sub(60).min(4),
-            y: area.y + 1,
-            width: area.width.min(60).min(area.width - 4),
-            height: 8.min(area.height.saturating_sub(2)),
-        };
-        overlays::draw_teammate_view_panel(frame, panel_area, app);
-    }
+    // Soft teammate view uses full transcript takeover (display_messages override)
+    // + header in the messages column — not a corner stub panel.
 
     if let Some(picker_cell) = app.session_picker_overlay() {
         let mut picker = picker_cell.borrow_mut();
@@ -2925,7 +2917,20 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let draw_start = Instant::now();
 
     // Messages area is top_chunks[0] within the chat column (already excludes diagram).
-    let messages_area = top_chunks[0];
+    // Soft teammate view reserves a 2-line header (CC TeammateViewHeader).
+    let full_messages_area = top_chunks[0];
+    let soft_viewing = app.viewing_teammate_session_id().is_some()
+        && !app.teammate_view_hard_attached();
+    let header_h = crate::tui::teammate_view::header_height(soft_viewing);
+    let (header_area, messages_area) = if header_h > 0 && full_messages_area.height > header_h {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(header_h), Constraint::Min(1)])
+            .split(full_messages_area);
+        (Some(chunks[0]), chunks[1])
+    } else {
+        (None, full_messages_area)
+    };
     let _ = swarm_strip_height;
     note_chat_layout(ChatLayoutMetrics {
         chat_area,
@@ -2949,6 +2954,26 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         diff_pane_area,
         Some(bottom_chunks[5]), // bottom separator
     );
+
+    // Draw Viewing header (CC TeammateViewHeader).
+    if let Some(h_area) = header_area {
+        if let Some(m) = app.viewing_teammate_member() {
+            crate::tui::teammate_view::draw_header(frame, h_area, &m);
+        } else if let Some(sid) = app.viewing_teammate_session_id() {
+            let dim = Style::default().fg(rgb(100, 100, 110));
+            let line = Line::from(vec![
+                Span::styled("Viewing ", Style::default().fg(rgb(200, 200, 210))),
+                Span::styled(
+                    format!("session {sid}"),
+                    Style::default()
+                        .fg(rgb(80, 220, 100))
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(" · esc return", dim),
+            ]);
+            frame.render_widget(Paragraph::new(line), h_area);
+        }
+    }
 
     let margins = if onboarding_welcome {
         onboarding::draw_onboarding_welcome(frame, app, messages_area);

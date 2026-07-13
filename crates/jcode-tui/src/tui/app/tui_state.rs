@@ -448,7 +448,12 @@ impl App {
 
 impl crate::tui::TuiState for App {
     fn display_messages(&self) -> &[DisplayMessage] {
-        &self.display_messages
+        // CC: displayedMessages = viewedAgentTask.messages when viewing.
+        if self.viewing_teammate_session_id.is_some() && !self.teammate_view_hard_attached {
+            &self.teammate_view_messages
+        } else {
+            &self.display_messages
+        }
     }
 
     fn display_user_message_count(&self) -> usize {
@@ -687,6 +692,11 @@ impl crate::tui::TuiState for App {
         use crate::tui::agent_tree::{
             pick_member_activity, AgentStatus, AgentTreeNode,
         };
+
+        // CC hide row: collapsed tree returns null until re-expanded.
+        if self.agent_tree_hidden && !self.agent_tree_selecting {
+            return Vec::new();
+        }
 
         if !self.agent_trees.is_empty() {
             // Explicit trees still get terminal pruning + running-only filter so
@@ -1950,6 +1960,15 @@ impl crate::tui::TuiState for App {
         self.viewing_teammate_session_id.as_deref()
     }
 
+    fn teammate_view_hard_attached(&self) -> bool {
+        self.teammate_view_hard_attached
+    }
+
+    fn viewing_teammate_member(&self) -> Option<crate::protocol::SwarmMemberStatus> {
+        let sid = self.viewing_teammate_session_id.as_deref()?;
+        crate::tui::teammate_view::find_member(&self.remote_swarm_members, sid).cloned()
+    }
+
     fn now_millis(&self) -> u64 {
         self.app_started.elapsed().as_millis() as u64
     }
@@ -2302,63 +2321,141 @@ impl App {
         None
     }
 
-    /// Claude Code `useBackgroundTaskNavigation` — only active when the spinner
-    /// tree has running children (subagents / swarm members).
+    /// Enter soft teammate view (CC `enterTeammateView`).
+    pub(crate) fn enter_teammate_soft_view(&mut self, session_id: &str) {
+        use crate::tui::teammate_view::{build_view_messages, find_member};
+
+        let Some(member) = find_member(&self.remote_swarm_members, session_id) else {
+            self.set_status_notice(format!(
+                "Cannot view {session_id}: not in swarm member list"
+            ));
+            return;
+        };
+        let label = member
+            .friendly_name
+            .clone()
+            .unwrap_or_else(|| session_id.to_string());
+        self.teammate_view_messages = build_view_messages(member);
+        self.viewing_teammate_session_id = Some(session_id.to_string());
+        self.view_teammate_selection = true;
+        self.teammate_view_hard_attached = false;
+        self.agent_tree_selecting = false;
+        self.display_messages_version = self.display_messages_version.wrapping_add(1);
+        self.scroll_offset = 0;
+        self.set_status_notice(format!("Viewing → @{label}  (Esc return · shift+enter hard-attach)"));
+    }
+
+    /// Refresh soft-view transcript from latest SwarmStatus snapshot.
+    pub(crate) fn refresh_teammate_soft_view(&mut self) {
+        use crate::tui::teammate_view::{
+            build_view_messages, find_member, member_is_terminal,
+        };
+
+        let Some(sid) = self.viewing_teammate_session_id.clone() else {
+            return;
+        };
+        if self.teammate_view_hard_attached {
+            return;
+        }
+        let Some(member) = find_member(&self.remote_swarm_members, &sid) else {
+            // CC useTeammateViewAutoExit: task gone → exit.
+            self.exit_teammate_view_local("Teammate left swarm");
+            return;
+        };
+        // Stay on completed so user can review (CC); eject only on kill/fail-ish.
+        if matches!(
+            member.status.trim().to_ascii_lowercase().as_str(),
+            "killed" | "failed" | "error" | "crashed"
+        ) {
+            self.exit_teammate_view_local("Teammate failed/killed");
+            return;
+        }
+        let _ = member_is_terminal(member); // keep for future auto-exit policy
+        self.teammate_view_messages = build_view_messages(member);
+        self.display_messages_version = self.display_messages_version.wrapping_add(1);
+    }
+
+    /// Exit soft view only (no resume). Used when already on leader session.
+    pub(crate) fn exit_teammate_view_local(&mut self, notice: &str) {
+        self.viewing_teammate_session_id = None;
+        self.view_teammate_selection = false;
+        self.teammate_view_messages.clear();
+        self.teammate_view_hard_attached = false;
+        // Keep return session id only if hard-attach exit will consume it.
+        self.agent_tree_selecting = false;
+        self.selected_agent_tree_index = -1;
+        self.display_messages_version = self.display_messages_version.wrapping_add(1);
+        if !notice.is_empty() {
+            self.set_status_notice(notice);
+        }
+    }
+
+    /// Claude Code `useBackgroundTaskNavigation`.
     ///
-    /// Keys (from TeammateSpinnerTree + useBackgroundTaskNavigation.ts):
-    /// - `Shift+↑/↓`: enter/step selection (`selectedIPAgentIndex`)
-    /// - `Enter` while selecting a child: enter teammate view
-    /// - `Enter` on leader: exit teammate view back to team-lead
-    /// - `Esc`: exit selecting mode, or exit viewing mode
+    /// Returns `Some(action)` when the remote event loop must perform async work
+    /// (hard-attach / return / notify). Otherwise updates local state only.
     pub(crate) fn handle_agent_tree_navigation_key(
         &mut self,
         code: crossterm::event::KeyCode,
         modifiers: crossterm::event::KeyModifiers,
-    ) -> bool {
+    ) -> Option<TeammateNavAction> {
         use crate::tui::agent_tree::{
             child_label_at, child_session_id_at, selectable_child_count,
         };
         use crossterm::event::{KeyCode, KeyModifiers};
 
+        // Temporarily un-hide so we can count children for selection.
+        let was_hidden = self.agent_tree_hidden;
+        if was_hidden {
+            self.agent_tree_hidden = false;
+        }
         let trees = self.agent_trees();
+        if was_hidden && !self.agent_tree_selecting {
+            self.agent_tree_hidden = true;
+        }
         let child_count = selectable_child_count(&trees);
 
-        // Esc while viewing a teammate → back to leader (even if tree emptied).
+        let shift = modifiers.contains(KeyModifiers::SHIFT);
+
+        // Esc while hard-attached → resume leader session.
+        if matches!(code, KeyCode::Esc) && self.teammate_view_hard_attached {
+            if let Some(leader) = self.teammate_view_return_session_id.take() {
+                self.teammate_view_hard_attached = false;
+                self.viewing_teammate_session_id = None;
+                self.view_teammate_selection = false;
+                self.teammate_view_messages.clear();
+                self.set_status_notice("Returning to team-lead…");
+                return Some(TeammateNavAction::ResumeSession { session_id: leader });
+            }
+            self.exit_teammate_view_local("Exited teammate view");
+            return Some(TeammateNavAction::Handled);
+        }
+
+        // Esc while soft-viewing → back to leader transcript (CC exitTeammateView).
         if matches!(code, KeyCode::Esc) && self.viewing_teammate_session_id.is_some() {
-            self.viewing_teammate_session_id = None;
-            self.view_teammate_selection = false;
-            self.agent_tree_selecting = false;
-            self.selected_agent_tree_index = -1;
-            self.set_status_notice("Exited teammate view");
-            return true;
+            self.exit_teammate_view_local("Exited teammate view");
+            return Some(TeammateNavAction::Handled);
         }
 
         // Esc while selecting → leave selection mode (CC).
         if matches!(code, KeyCode::Esc) && self.agent_tree_selecting {
             self.agent_tree_selecting = false;
             self.selected_agent_tree_index = -1;
-            return true;
+            return Some(TeammateNavAction::Handled);
         }
 
-        if child_count == 0 {
-            // No running subagents → tree is null; don't steal keys.
-            if self.agent_tree_selecting {
-                self.agent_tree_selecting = false;
-                self.selected_agent_tree_index = -1;
-            }
-            return false;
-        }
-
-        let shift = modifiers.contains(KeyModifiers::SHIFT);
-
-        // Shift+Up/Down — step selection (wrap leader ↔ children).
+        // Shift+Up/Down — expand hidden tree + step selection.
+        // Indices: -1 leader, 0..n-1 children, n = hide row (CC).
         if shift && matches!(code, KeyCode::Up | KeyCode::Down) {
-            let max_idx = child_count as i32 - 1; // last child (no "hide" row yet)
+            if child_count == 0 && !was_hidden {
+                return None;
+            }
+            self.agent_tree_hidden = false;
+            let max_idx = child_count as i32; // hide row at n
             if !self.agent_tree_selecting {
-                // First step expands selection and parks on leader (CC).
                 self.agent_tree_selecting = true;
                 self.selected_agent_tree_index = -1;
-                return true;
+                return Some(TeammateNavAction::Handled);
             }
             let cur = self.selected_agent_tree_index;
             let next = if matches!(code, KeyCode::Down) {
@@ -2373,36 +2470,92 @@ impl App {
                 cur - 1
             };
             self.selected_agent_tree_index = next;
-            return true;
+            return Some(TeammateNavAction::Handled);
         }
 
-        // Enter while selecting.
-        if matches!(code, KeyCode::Enter) && self.agent_tree_selecting {
-            if self.selected_agent_tree_index < 0 {
-                // Leader selected → exit any teammate view.
-                if self.viewing_teammate_session_id.is_some() {
-                    self.viewing_teammate_session_id = None;
-                    self.view_teammate_selection = false;
-                    self.set_status_notice("Back to team-lead");
-                }
-                self.agent_tree_selecting = false;
-                self.selected_agent_tree_index = -1;
-                return true;
-            }
+        // Need children for Enter/k/f unless already viewing.
+        if child_count == 0 && !self.agent_tree_selecting {
+            return None;
+        }
+
+        // 'k' kill selected running teammate (CC) — notify stop-ish via notify + notice.
+        if matches!(code, KeyCode::Char('k'))
+            && self.agent_tree_selecting
+            && self.selected_agent_tree_index >= 0
+            && (self.selected_agent_tree_index as usize) < child_count
+        {
             let idx = self.selected_agent_tree_index as usize;
             if let Some(sid) = child_session_id_at(&trees, idx) {
                 let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
-                self.viewing_teammate_session_id = Some(sid);
-                self.view_teammate_selection = true;
-                self.agent_tree_selecting = false;
-                self.set_status_notice(format!("Viewing → @{label}  (Esc to exit)"));
-                return true;
+                self.set_status_notice(format!("Stopping @{label}…"));
+                // Soft: inject stop instruction via notify (server soft-interrupts busy).
+                return Some(TeammateNavAction::NotifySession {
+                    session_id: sid,
+                    message: "/stop".to_string(),
+                });
             }
-            return true;
         }
 
-        false
+        // Enter / 'f' while selecting.
+        let confirm = matches!(code, KeyCode::Enter)
+            || (matches!(code, KeyCode::Char('f')) && self.agent_tree_selecting);
+        if confirm && self.agent_tree_selecting {
+            let hard = shift && matches!(code, KeyCode::Enter);
+            if self.selected_agent_tree_index < 0 {
+                // Leader → exit view.
+                if self.viewing_teammate_session_id.is_some() || self.teammate_view_hard_attached {
+                    if self.teammate_view_hard_attached {
+                        if let Some(leader) = self.teammate_view_return_session_id.take() {
+                            self.teammate_view_hard_attached = false;
+                            self.viewing_teammate_session_id = None;
+                            self.view_teammate_selection = false;
+                            self.agent_tree_selecting = false;
+                            return Some(TeammateNavAction::ResumeSession { session_id: leader });
+                        }
+                    }
+                    self.exit_teammate_view_local("Back to team-lead");
+                }
+                self.agent_tree_selecting = false;
+                self.selected_agent_tree_index = -1;
+                return Some(TeammateNavAction::Handled);
+            }
+            if self.selected_agent_tree_index as usize == child_count {
+                // Hide row (CC).
+                self.agent_tree_hidden = true;
+                self.agent_tree_selecting = false;
+                self.selected_agent_tree_index = -1;
+                self.set_status_notice("Agent tree hidden (shift+up/down to show)");
+                return Some(TeammateNavAction::Handled);
+            }
+            let idx = self.selected_agent_tree_index as usize;
+            if let Some(sid) = child_session_id_at(&trees, idx) {
+                if hard {
+                    // Hard attach: stash leader, resume child session.
+                    let leader = self.remote_session_id.clone();
+                    self.teammate_view_return_session_id = leader;
+                    self.viewing_teammate_session_id = Some(sid.clone());
+                    self.view_teammate_selection = true;
+                    self.teammate_view_hard_attached = true;
+                    self.agent_tree_selecting = false;
+                    self.set_status_notice("Hard-attaching to agent session…");
+                    return Some(TeammateNavAction::ResumeSession { session_id: sid });
+                }
+                self.enter_teammate_soft_view(&sid);
+                return Some(TeammateNavAction::Handled);
+            }
+            return Some(TeammateNavAction::Handled);
+        }
+
+        None
     }
+}
+
+/// Async follow-ups for teammate navigation (processed by remote key loop).
+#[derive(Debug, Clone)]
+pub(crate) enum TeammateNavAction {
+    Handled,
+    ResumeSession { session_id: String },
+    NotifySession { session_id: String, message: String },
 }
 
 /// Parse a subagent status string into `(@)name` + activity.

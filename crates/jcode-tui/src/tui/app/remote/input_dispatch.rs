@@ -1,5 +1,6 @@
 use super::super::{PendingRemoteMessage, PendingSplitPrompt};
 use super::*;
+use jcode_tui_messages::DisplayMessage;
 
 #[expect(
     clippy::too_many_arguments,
@@ -90,6 +91,29 @@ pub(in crate::tui::app) async fn submit_prepared_remote_input(
         app.pending_prompt_after_model_switch = Some(prepared);
         app.set_status_notice("Prompt queued until model switch completes");
         return Ok(());
+    }
+
+    // Soft teammate view (CC): route typed input to the viewed agent session
+    // via NotifySession instead of the leader send path.
+    if let Some(sid) = app.viewing_teammate_session_id.clone() {
+        if !app.teammate_view_hard_attached {
+            let content = prepared.expanded.clone();
+            app.teammate_view_messages
+                .push(DisplayMessage::user(prepared.raw_input.clone()));
+            app.display_messages_version = app.display_messages_version.wrapping_add(1);
+            app.input.clear();
+            app.cursor_pos = 0;
+            match remote.notify_session(&sid, &content).await {
+                Ok(_) => {
+                    app.set_status_notice("Sent to viewed agent");
+                    app.refresh_teammate_soft_view();
+                }
+                Err(e) => {
+                    app.set_status_notice(format!("Failed to message agent: {e}"));
+                }
+            }
+            return Ok(());
+        }
     }
 
     // Submitting before the bootstrap History payload has been applied is racy:

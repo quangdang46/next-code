@@ -241,6 +241,51 @@ pub fn render(trees: &[AgentTreeNode], view: &AgentTreeViewState) -> Vec<Line<'s
         // Flat CC tree: only paint depth-0 leader + depth-1 children for
         // selection indices. Nested grandchildren (if any) still recurse.
         render_node(tree, 0, true, true, -1, view, &mut lines);
+
+        // CC hide row (index === teammateCount) — only in selection mode.
+        if view.selecting {
+            let child_n = tree
+                .children
+                .iter()
+                .filter(|c| c.has_active_work())
+                .count() as i32;
+            let is_hide_selected = view.selected_index == child_n;
+            let pointer = if is_hide_selected { ">" } else { " " };
+            let mut spans = vec![
+                Span::raw("  "),
+                Span::styled(
+                    format!("{pointer} "),
+                    if is_hide_selected {
+                        Style::default()
+                            .fg(rgb_color(255, 220, 100))
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                    },
+                ),
+                Span::styled(
+                    "└─ ",
+                    Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+                ),
+                Span::styled(
+                    "hide",
+                    if is_hide_selected {
+                        Style::default()
+                            .fg(rgb_color(255, 220, 100))
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2))
+                    },
+                ),
+            ];
+            if is_hide_selected {
+                spans.push(Span::styled(
+                    " · enter to collapse",
+                    Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+                ));
+            }
+            lines.push(Line::from(spans));
+        }
     }
 
     lines
