@@ -1,18 +1,25 @@
 //! Agent tree data + rendering — Claude Code `TeammateSpinnerTree` parity.
 //!
-//! Reference: `claude-code` `TeammateSpinnerTree` / `TeammateSpinnerLine` /
-//! `AgentProgressLine` (see `/tmp/feature-research/claude-code/src/components/Spinner/`).
+//! Reference (read these, don't invent UX):
+//! - `/tmp/feature-research/claude-code/src/components/Spinner/TeammateSpinnerTree.tsx`
+//! - `/tmp/feature-research/claude-code/src/components/Spinner/TeammateSpinnerLine.tsx`
+//! - `/tmp/feature-research/claude-code/src/hooks/useBackgroundTaskNavigation.ts`
+//! - `/tmp/feature-research/claude-code/src/state/teammateViewHelpers.ts`
 //!
-//! Rules (match Claude Code):
-//! 1. **Only render when there is at least one running teammate / subagent.**
-//!    `if (teammateTasks.length === 0) return null`.
-//! 2. **Flat list under a fixed leader** (`team-lead`) — not nested spawn trees,
-//!    and never glued under a user prompt in the transcript.
-//! 3. **Terminal members are evicted** (completed / failed / cancelled) — never
-//!    leave `@name: cancelled` under an Interrupted banner.
-//! 4. **Activity is a real verb/description** — never a bare number like `2`
-//!    (todo counters belong in dim stats: ` · 2/5`).
-//! 5. Live chrome only (conversation activity area), not a sticky chat section.
+//! Claude Code rules:
+//! 1. **Only render when `getRunningTeammatesSorted(tasks).length > 0`.**
+//!    No subagents → tree is null. Normal single-agent turns never show a tree.
+//! 2. **Flat list under fixed `team-lead`** (not nested spawn graphs).
+//! 3. **Interactive selection** (`useBackgroundTaskNavigation`):
+//!    - `Shift+↑/↓` steps selection: leader(-1) ↔ teammates(0..n-1) ↔ hide(n)
+//!    - `Enter` on a teammate → `enterTeammateView` (switch transcript/view)
+//!    - `Esc` exits selecting / viewing
+//!    - Hint: `shift + ↑/↓ to select` / `enter to view`
+//! 4. **Terminal members are evicted** — never sticky `@name: cancelled`.
+//! 5. Live chrome with spinner (not a sticky transcript section).
+//! 6. Alternative CC surface: footer **pills** when tree mode is off
+//!    (`PromptInputFooterLeftSide` + `BackgroundTaskStatus`) — jcode maps this
+//!    partially via swarm strip / running_items; tree is the spinner-tree mode.
 
 use ratatui::prelude::*;
 use crate::tui::color_support::rgb as rgb_color;
@@ -199,10 +206,26 @@ pub fn pick_member_activity(
     status.activity_fallback().map(ToString::to_string)
 }
 
+/// Interactive selection state — mirrors CC `selectedIPAgentIndex` +
+/// `viewSelectionMode === 'selecting-agent' | 'viewing-agent'`.
+#[derive(Debug, Clone, Default)]
+pub struct AgentTreeViewState {
+    /// True while Shift+↑/↓ selection mode is active.
+    pub selecting: bool,
+    /// `-1` = leader, `0..n-1` = flat children (same order as `leader.children`).
+    pub selected_index: i32,
+    /// Session id of the teammate currently being viewed (if any).
+    pub viewing_session_id: Option<String>,
+}
+
+/// Claude Code hint strings (TeammateSpinnerLine / teammateSelectHint.ts).
+pub const TEAMMATE_SELECT_HINT: &str = "shift + ↑/↓ to select";
+pub const TEAMMATE_VIEW_HINT: &str = "enter to view";
+
 /// Render the agent tree into a Vec of styled lines.
 ///
 /// Empty input / no running teammates → no lines (Claude Code returns null).
-pub fn render(trees: &[AgentTreeNode]) -> Vec<Line<'static>> {
+pub fn render(trees: &[AgentTreeNode], view: &AgentTreeViewState) -> Vec<Line<'static>> {
     if trees.is_empty() {
         return Vec::new();
     }
@@ -210,15 +233,51 @@ pub fn render(trees: &[AgentTreeNode]) -> Vec<Line<'static>> {
 
     for tree in trees {
         // Claude Code: if (teammateTasks.length === 0) return null.
-        // A lone leader with no running children is not a spinner tree.
         let has_running_child = tree.children.iter().any(AgentTreeNode::has_active_work);
         if !has_running_child {
             continue;
         }
-        render_node(tree, 0, true, tree.is_leader, &mut lines);
+        // Flat CC tree: only paint depth-0 leader + depth-1 children for
+        // selection indices. Nested grandchildren (if any) still recurse.
+        render_node(tree, 0, true, true, -1, view, &mut lines);
     }
 
     lines
+}
+
+/// Convenience for tests / non-interactive callers.
+pub fn render_plain(trees: &[AgentTreeNode]) -> Vec<Line<'static>> {
+    render(trees, &AgentTreeViewState::default())
+}
+
+/// Count selectable children under the first leader tree (for key navigation).
+pub fn selectable_child_count(trees: &[AgentTreeNode]) -> usize {
+    trees
+        .first()
+        .map(|t| t.children.iter().filter(|c| c.has_active_work()).count())
+        .unwrap_or(0)
+}
+
+/// Session id of the child at flat index `idx` (0-based), if any.
+pub fn child_session_id_at(trees: &[AgentTreeNode], idx: usize) -> Option<String> {
+    let leader = trees.first()?;
+    leader
+        .children
+        .iter()
+        .filter(|c| c.has_active_work())
+        .nth(idx)
+        .and_then(|c| c.session_id.clone())
+}
+
+/// Display name of the child at flat index `idx`.
+pub fn child_label_at(trees: &[AgentTreeNode], idx: usize) -> Option<String> {
+    let leader = trees.first()?;
+    leader
+        .children
+        .iter()
+        .filter(|c| c.has_active_work())
+        .nth(idx)
+        .map(|c| c.agent_name.clone())
 }
 
 fn render_node(
@@ -226,10 +285,22 @@ fn render_node(
     depth: usize,
     is_last_sibling: bool,
     is_leader: bool,
+    row_index: i32, // flat selection index: -1 leader, 0.. for children
+    view: &AgentTreeViewState,
     out: &mut Vec<Line<'static>>,
 ) {
     let status_c = status_color(&node.status);
-    let name_color = if is_leader {
+    let is_selected = view.selecting && view.selected_index == row_index;
+    let is_viewing = view
+        .viewing_session_id
+        .as_ref()
+        .zip(node.session_id.as_ref())
+        .is_some_and(|(v, s)| v == s);
+    let is_highlighted = is_selected || is_viewing || (is_leader && depth == 0 && view.viewing_session_id.is_none());
+
+    let name_color = if is_selected {
+        rgb_color(255, 220, 100) // selection highlight
+    } else if is_leader {
         rgb_color(AGENT_TREE_COLOR.0, AGENT_TREE_COLOR.1, AGENT_TREE_COLOR.2)
     } else {
         let idx = depth.saturating_sub(1).min(AGENT_CHILD_COLORS.len() - 1);
@@ -237,13 +308,19 @@ fn render_node(
         rgb_color(c.0, c.1, c.2)
     };
 
-    // Claude Code: leader uses ┌─ / ╒═ when highlighted (running); children ├─ / └─.
-    // Keep single-cell-friendly glyphs (box-drawing width 1 each).
+    // Claude Code: leader ╒═ when highlighted; children ├─ / └─; selected uses
+    // double-line ╘═ / ╞═ variants.
     let tree_char = if depth == 0 {
-        if is_leader && matches!(node.status, AgentStatus::Running) {
+        if is_highlighted {
             "╒═ "
         } else {
             "┌─ "
+        }
+    } else if is_selected {
+        if is_last_sibling {
+            "╘═ "
+        } else {
+            "╞═ "
         }
     } else if is_last_sibling {
         "└─ "
@@ -252,7 +329,6 @@ fn render_node(
     };
 
     let display_name = if is_leader && depth == 0 {
-        // Fixed identity like Claude Code "team-lead" — never session titles.
         node.agent_name.clone()
     } else if node.agent_name.starts_with('@') {
         node.agent_name.clone()
@@ -260,9 +336,18 @@ fn render_node(
         format!("@{}", node.agent_name)
     };
 
+    // CC: paddingLeft(3) + pointer(1) + space + treeChar.
+    let pointer = if is_selected { "›" } else { " " };
     let mut spans: Vec<Span<'static>> = vec![
-        // Claude Code pads with ~3 spaces before the tree char.
-        Span::raw("  ".repeat(depth + 1)),
+        Span::raw("  ".repeat(depth.max(1))),
+        Span::styled(
+            format!("{pointer} "),
+            if is_selected {
+                Style::default().fg(rgb_color(255, 220, 100)).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            },
+        ),
         Span::styled(
             tree_char,
             Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
@@ -271,7 +356,7 @@ fn render_node(
             display_name,
             Style::default()
                 .fg(name_color)
-                .add_modifier(if is_leader {
+                .add_modifier(if is_highlighted {
                     Modifier::BOLD
                 } else {
                     Modifier::empty()
@@ -279,12 +364,16 @@ fn render_node(
         ),
     ];
 
-    // Claude Code TeammateSpinnerTree: leader activity/verb is ONLY shown when
-    // the leader is *backgrounded* (viewing a teammate). While the main
-    // session is foregrounded, leader is just `╒═ team-lead` — the spinner
-    // line above already carries connecting/thinking/streaming. Showing
-    // `team-lead: processing…` next to `connecting… 7s` is redundant noise.
-    let show_activity = !(is_leader && depth == 0);
+    // Leader activity only when backgrounded (viewing a teammate).
+    let leader_backgrounded = is_leader && depth == 0 && view.viewing_session_id.is_some();
+    let show_activity = if is_leader && depth == 0 {
+        leader_backgrounded
+    } else {
+        // When a child is selected/highlighted, CC hides its activity text
+        // (main spinner already shows the verb). Keep activity when not selected.
+        !is_selected
+    };
+
     let activity = if show_activity {
         node.activity
             .as_deref()
@@ -292,9 +381,13 @@ fn render_node(
             .filter(|s| is_meaningful_activity(s))
             .map(ToString::to_string)
             .or_else(|| {
-                node.status
-                    .activity_fallback()
-                    .map(ToString::to_string)
+                if is_leader && depth == 0 {
+                    Some("processing…".to_string())
+                } else {
+                    node.status
+                        .activity_fallback()
+                        .map(ToString::to_string)
+                }
             })
     } else {
         None
@@ -336,13 +429,52 @@ fn render_node(
         }
     }
 
+    // Hints — TeammateSpinnerLine
+    if is_highlighted && !view.selecting {
+        spans.push(Span::styled(
+            format!(" · {TEAMMATE_SELECT_HINT}"),
+            Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+        ));
+    }
+    if is_selected && !is_leader && view.viewing_session_id.is_none() {
+        spans.push(Span::styled(
+            format!(" · {TEAMMATE_VIEW_HINT}"),
+            Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+        ));
+    }
+    if is_viewing {
+        spans.push(Span::styled(
+            " · viewing",
+            Style::default().fg(rgb_color(255, 220, 100)),
+        ));
+    }
+
     out.push(Line::from(spans));
 
-    // Flat teammates preferred; recursion kept for intentional nested nodes.
+    // Flat children: assign selection indices 0..n-1 in display order.
     let child_count = node.children.len();
+    let mut flat_idx: i32 = 0;
     for (i, child) in node.children.iter().enumerate() {
         let child_is_last = i + 1 == child_count;
-        render_node(child, depth + 1, child_is_last, false, out);
+        let child_row = if depth == 0 {
+            let idx = flat_idx;
+            if child.has_active_work() {
+                flat_idx += 1;
+            }
+            idx
+        } else {
+            // Nested: no flat selection index
+            -99
+        };
+        render_node(
+            child,
+            depth + 1,
+            child_is_last,
+            false,
+            child_row,
+            view,
+            out,
+        );
     }
 }
 
@@ -407,7 +539,7 @@ mod tests {
         );
         tree.prune_terminal_leaves();
         tree.keep_running_children_only();
-        let lines = render(&[tree]);
+        let lines = render_plain(&[tree]);
         assert!(
             lines.is_empty(),
             "Claude Code hides the tree when no teammates are running; got: {:?}",
@@ -418,7 +550,7 @@ mod tests {
     #[test]
     fn render_hides_lone_leader_with_no_children() {
         let tree = leader(vec![], true);
-        let lines = render(&[tree]);
+        let lines = render_plain(&[tree]);
         assert!(
             lines.is_empty(),
             "no teammates → null (CC TeammateSpinnerTree); got: {:?}",
@@ -432,7 +564,7 @@ mod tests {
             vec![child("badger", AgentStatus::Running, Some("searching…"))],
             true,
         );
-        let lines = render(&[tree]);
+        let lines = render_plain(&[tree]);
         let texts: Vec<String> = lines.iter().map(line_text).collect();
         assert!(
             texts.iter().any(|t| t.contains("team-lead")),
@@ -449,6 +581,31 @@ mod tests {
         assert!(
             !leader_line.contains(": processing") && !leader_line.contains(": working"),
             "leader should be name-only when foregrounded: {leader_line}"
+        );
+        // Hint for shift selection when not actively selecting.
+        assert!(
+            leader_line.contains(TEAMMATE_SELECT_HINT),
+            "expected select hint: {leader_line}"
+        );
+    }
+
+    #[test]
+    fn render_selection_shows_pointer_and_view_hint() {
+        let tree = leader(
+            vec![child("dragon", AgentStatus::Running, Some("processing…"))],
+            true,
+        );
+        let view = AgentTreeViewState {
+            selecting: true,
+            selected_index: 0,
+            viewing_session_id: None,
+        };
+        let texts: Vec<String> = render(&[tree], &view).iter().map(line_text).collect();
+        let child = texts.iter().find(|t| t.contains("@dragon")).unwrap();
+        assert!(child.contains('›') || child.contains("›"), "pointer missing: {child}");
+        assert!(
+            child.contains(TEAMMATE_VIEW_HINT),
+            "enter-to-view hint missing: {child}"
         );
     }
 
@@ -479,7 +636,7 @@ mod tests {
             ],
             true,
         );
-        let texts: Vec<String> = render(&[tree]).iter().map(line_text).collect();
+        let texts: Vec<String> = render_plain(&[tree]).iter().map(line_text).collect();
         assert_eq!(texts.len(), 3, "leader + 2 flat children: {texts:?}");
         // Both children at same indent depth (one leading indent block beyond leader).
         let chick = texts.iter().find(|t| t.contains("@chick")).unwrap();
@@ -506,7 +663,7 @@ mod tests {
         let mut node = child("butterfly", AgentStatus::Running, None);
         node.todo_progress = Some((2, 5));
         let tree = leader(vec![node], true);
-        let texts: Vec<String> = render(&[tree]).iter().map(line_text).collect();
+        let texts: Vec<String> = render_plain(&[tree]).iter().map(line_text).collect();
         let line = texts.iter().find(|t| t.contains("@butterfly")).unwrap();
         assert!(
             line.contains("· 2/5"),
@@ -555,7 +712,7 @@ mod tests {
         nested.is_leaf = false;
         nested.children = vec![child("leaf", AgentStatus::Running, Some("read"))];
         let tree = leader(vec![nested], true);
-        let texts: Vec<String> = render(&[tree]).iter().map(line_text).collect();
+        let texts: Vec<String> = render_plain(&[tree]).iter().map(line_text).collect();
         assert!(
             texts.iter().any(|t| t.contains("@leaf")),
             "nested grandchild not rendered: {texts:?}"

@@ -272,6 +272,10 @@ pub trait TuiState {
     fn running_items(&self) -> RunningItemsState;
     /// Agent tree for conversation rendering (Claude Code style tree).
     fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> { Vec::new() }
+    /// Interactive selection state for the agent tree (CC Shift+↑/↓ / Enter).
+    fn agent_tree_view_state(&self) -> crate::tui::agent_tree::AgentTreeViewState {
+        crate::tui::agent_tree::AgentTreeViewState::default()
+    }
     fn time_since_activity(&self) -> Option<Duration>;
     /// Whether the terminal is currently focused (receiving key events).
     /// Always true in this fork — upstream's FocusLost handling is not ported.

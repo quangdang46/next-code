@@ -1398,8 +1398,12 @@ pub struct App {
     /// Agent tree for conversation rendering (Claude Code style).
     /// Populated from running items / communicate tool results every frame.
     pub agent_trees: Vec<super::agent_tree::AgentTreeNode>,
-    /// Selection mode: true when user is in selecting-teammate mode.
+    /// True while actively viewing a teammate (CC `viewSelectionMode === 'viewing-agent'`).
     pub view_teammate_selection: bool,
+    /// True while Shift+↑/↓ selection is active (CC `viewSelectionMode === 'selecting-agent'`).
+    pub agent_tree_selecting: bool,
+    /// CC `selectedIPAgentIndex`: `-1` = team-lead, `0..n-1` = running children.
+    pub selected_agent_tree_index: i32,
     /// When true, auto-continuation after each turn is disabled.
     pub goal_continuation_disabled: bool,
     /// Agent snapshot cache: (filename, mtime) for detecting changes.

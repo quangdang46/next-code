@@ -2690,7 +2690,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let show_conversation_spinner = app.is_processing()
         && app.streaming_text().is_empty()
         && !matches!(app.status(), ProcessingStatus::Idle);
-    let agent_tree_lines = crate::tui::agent_tree::render(&app.agent_trees());
+    let agent_tree_lines =
+        crate::tui::agent_tree::render(&app.agent_trees(), &app.agent_tree_view_state());
     let agent_tree_height = agent_tree_lines.len() as u16;
     let conversation_activity_height: u16 =
         u16::from(show_conversation_spinner) + agent_tree_height;

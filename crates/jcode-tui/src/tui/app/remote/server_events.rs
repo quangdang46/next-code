@@ -736,6 +736,10 @@ pub(in crate::tui::app) fn handle_server_event(
             // can race with a late SwarmStatus snapshot. Live spinner tree reads
             // this vec; empty ⇒ tree null (CC TeammateSpinnerTree).
             app.remote_swarm_members.clear();
+            app.agent_tree_selecting = false;
+            app.selected_agent_tree_index = -1;
+            app.viewing_teammate_session_id = None;
+            app.view_teammate_selection = false;
             remote.clear_pending();
             remote.reset_call_output_tokens_seen();
             let auto_poked = app.schedule_auto_poke_followup_if_needed()

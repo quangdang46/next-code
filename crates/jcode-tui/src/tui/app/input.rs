@@ -2347,6 +2347,12 @@ impl App {
             return Ok(());
         }
 
+        // Claude Code teammate spinner tree navigation (Shift+↑/↓ / Enter / Esc).
+        // Must run before prompt-history Up/Down so Shift+Up selects agents.
+        if self.handle_agent_tree_navigation_key(code, modifiers) {
+            return Ok(());
+        }
+
         // The onboarding simulator owns all key handling while active so the
         // real onboarding handlers never fire (no real logins/imports).
         if self.handle_onboarding_sim_key(code, modifiers) {

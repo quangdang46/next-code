@@ -318,6 +318,12 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
+    // Claude Code useBackgroundTaskNavigation: Shift+↑/↓ / Enter / Esc on the
+    // teammate spinner tree (only when running subagents exist).
+    if app.handle_agent_tree_navigation_key(code, modifiers) {
+        return Ok(());
+    }
+
     if input::is_next_prompt_new_session_hotkey(code, modifiers) {
         app.toggle_next_prompt_new_session_routing();
         return Ok(());

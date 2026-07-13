@@ -804,6 +804,14 @@ impl crate::tui::TuiState for App {
         vec![leader]
     }
 
+    fn agent_tree_view_state(&self) -> crate::tui::agent_tree::AgentTreeViewState {
+        crate::tui::agent_tree::AgentTreeViewState {
+            selecting: self.agent_tree_selecting,
+            selected_index: self.selected_agent_tree_index,
+            viewing_session_id: self.viewing_teammate_session_id.clone(),
+        }
+    }
+
     fn running_items(&self) -> crate::tui::RunningItemsState {
         let mut items: Vec<crate::tui::RunningItem> = Vec::new();
         // 1. Batch subcalls (running tools from batch progress)
@@ -2292,6 +2300,108 @@ impl App {
             return Some(crate::tui::SwarmPanelAction::ToggleFocus);
         }
         None
+    }
+
+    /// Claude Code `useBackgroundTaskNavigation` — only active when the spinner
+    /// tree has running children (subagents / swarm members).
+    ///
+    /// Keys (from TeammateSpinnerTree + useBackgroundTaskNavigation.ts):
+    /// - `Shift+↑/↓`: enter/step selection (`selectedIPAgentIndex`)
+    /// - `Enter` while selecting a child: enter teammate view
+    /// - `Enter` on leader: exit teammate view back to team-lead
+    /// - `Esc`: exit selecting mode, or exit viewing mode
+    pub(crate) fn handle_agent_tree_navigation_key(
+        &mut self,
+        code: crossterm::event::KeyCode,
+        modifiers: crossterm::event::KeyModifiers,
+    ) -> bool {
+        use crate::tui::agent_tree::{
+            child_label_at, child_session_id_at, selectable_child_count,
+        };
+        use crossterm::event::{KeyCode, KeyModifiers};
+
+        let trees = self.agent_trees();
+        let child_count = selectable_child_count(&trees);
+
+        // Esc while viewing a teammate → back to leader (even if tree emptied).
+        if matches!(code, KeyCode::Esc) && self.viewing_teammate_session_id.is_some() {
+            self.viewing_teammate_session_id = None;
+            self.view_teammate_selection = false;
+            self.agent_tree_selecting = false;
+            self.selected_agent_tree_index = -1;
+            self.set_status_notice("Exited teammate view");
+            return true;
+        }
+
+        // Esc while selecting → leave selection mode (CC).
+        if matches!(code, KeyCode::Esc) && self.agent_tree_selecting {
+            self.agent_tree_selecting = false;
+            self.selected_agent_tree_index = -1;
+            return true;
+        }
+
+        if child_count == 0 {
+            // No running subagents → tree is null; don't steal keys.
+            if self.agent_tree_selecting {
+                self.agent_tree_selecting = false;
+                self.selected_agent_tree_index = -1;
+            }
+            return false;
+        }
+
+        let shift = modifiers.contains(KeyModifiers::SHIFT);
+
+        // Shift+Up/Down — step selection (wrap leader ↔ children).
+        if shift && matches!(code, KeyCode::Up | KeyCode::Down) {
+            let max_idx = child_count as i32 - 1; // last child (no "hide" row yet)
+            if !self.agent_tree_selecting {
+                // First step expands selection and parks on leader (CC).
+                self.agent_tree_selecting = true;
+                self.selected_agent_tree_index = -1;
+                return true;
+            }
+            let cur = self.selected_agent_tree_index;
+            let next = if matches!(code, KeyCode::Down) {
+                if cur >= max_idx {
+                    -1
+                } else {
+                    cur + 1
+                }
+            } else if cur <= -1 {
+                max_idx
+            } else {
+                cur - 1
+            };
+            self.selected_agent_tree_index = next;
+            return true;
+        }
+
+        // Enter while selecting.
+        if matches!(code, KeyCode::Enter) && self.agent_tree_selecting {
+            if self.selected_agent_tree_index < 0 {
+                // Leader selected → exit any teammate view.
+                if self.viewing_teammate_session_id.is_some() {
+                    self.viewing_teammate_session_id = None;
+                    self.view_teammate_selection = false;
+                    self.set_status_notice("Back to team-lead");
+                }
+                self.agent_tree_selecting = false;
+                self.selected_agent_tree_index = -1;
+                return true;
+            }
+            let idx = self.selected_agent_tree_index as usize;
+            if let Some(sid) = child_session_id_at(&trees, idx) {
+                let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
+                self.viewing_teammate_session_id = Some(sid);
+                self.view_teammate_selection = true;
+                self.agent_tree_selecting = false;
+                self.set_status_notice(format!("Viewing → @{label}  (Esc to exit)"));
+                return true;
+            }
+            return true;
+        }
+
+        false
     }
 }
 
