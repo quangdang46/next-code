@@ -530,9 +530,13 @@ pub trait TuiState {
     fn viewing_teammate_session_id(&self) -> Option<&str> {
         None
     }
-    /// Soft-view only (true when hard-attached via resume_session).
+    /// True when hard-attached via resume_session (CC viewing-agent with real session).
     fn teammate_view_hard_attached(&self) -> bool {
         false
+    }
+    /// Display name for the attached/previewed agent (for chrome).
+    fn teammate_view_agent_name(&self) -> Option<&str> {
+        None
     }
     /// Swarm member snapshot for the viewed session (soft-view header/body).
     fn viewing_teammate_member(&self) -> Option<crate::protocol::SwarmMemberStatus> {

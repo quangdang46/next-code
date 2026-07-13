@@ -135,13 +135,45 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                 Ok(()) => {
                     let label = crate::id::extract_session_name(&target_session)
                         .map(|name| name.to_string())
-                        .unwrap_or(target_session);
-                    app.set_status_notice(format!("Workspace → {}", label));
+                        .unwrap_or_else(|| target_session.clone());
+                    // Teammate hard-attach lifecycle (CC viewing chrome):
+                    // - enter agent: hard_attached + return_session_id set
+                    // - leave agent: hard_attached still true, return_session_id cleared
+                    if app.teammate_view_hard_attached {
+                        let agent = app
+                            .teammate_view_agent_name
+                            .clone()
+                            .unwrap_or_else(|| label.clone());
+                        if app.teammate_view_return_session_id.is_some() {
+                            // Landed on agent session — keep chrome + return bar.
+                            app.set_status_notice(format!(
+                                "In @{agent}  ·  Esc = return to team-lead"
+                            ));
+                        } else {
+                            // Landed back on leader — drop attach chrome.
+                            app.teammate_view_hard_attached = false;
+                            app.viewing_teammate_session_id = None;
+                            app.teammate_view_agent_name = None;
+                            app.view_teammate_selection = false;
+                            app.teammate_view_messages.clear();
+                            app.set_status_notice("Back on team-lead");
+                        }
+                    } else {
+                        app.set_status_notice(format!("Session → {}", label));
+                    }
                     return true;
                 }
                 Err(err) => {
+                    // Failed hard-attach — clear stuck chrome so user is not trapped.
+                    if app.teammate_view_hard_attached {
+                        app.teammate_view_hard_attached = false;
+                        app.viewing_teammate_session_id = None;
+                        app.teammate_view_agent_name = None;
+                        app.teammate_view_return_session_id = None;
+                        app.view_teammate_selection = false;
+                    }
                     app.push_display_message(DisplayMessage::error(format!(
-                        "Failed to switch workspace session: {}",
+                        "Failed to switch session: {}",
                         err
                     )));
                     needs_redraw = true;

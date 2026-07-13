@@ -813,10 +813,18 @@ async fn handle_remote_key_internal(
                 return Ok(());
             }
             KeyCode::Esc => {
-                if app.viewing_teammate_session_id.is_some() {
-                    app.viewing_teammate_session_id = None;
-                    app.view_teammate_selection = false;
-                    app.set_status_notice("Exited teammate view");
+                // Hard-attach: must resume leader, not only clear a flag.
+                if app.teammate_view_hard_attached {
+                    if let Some(leader) = app.teammate_view_return_session_id.clone() {
+                        app.teammate_view_return_session_id = None;
+                        app.set_status_notice("Returning to team-lead…");
+                        app.workspace_client.queue_resume_session(leader);
+                        app.running_items_state.visible = false;
+                        return Ok(());
+                    }
+                }
+                if app.viewing_teammate_session_id.is_some() && !app.teammate_view_hard_attached {
+                    app.exit_teammate_view_local("Exited teammate view");
                     return Ok(());
                 }
                 if app.running_items_state.detail_open {

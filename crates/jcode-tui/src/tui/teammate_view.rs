@@ -310,27 +310,41 @@ pub fn member_is_terminal(member: &SwarmMemberStatus) -> bool {
     )
 }
 
-pub fn draw_header(frame: &mut Frame, area: Rect, member: &SwarmMemberStatus) {
+/// CC TeammateViewHeader — always visible while viewing (soft OR hard-attach).
+/// Hard-attach is the real session switch; chrome must still say how to return.
+pub fn draw_viewing_chrome(
+    frame: &mut Frame,
+    area: Rect,
+    agent_name: &str,
+    hard_attached: bool,
+    member: Option<&SwarmMemberStatus>,
+) {
     if area.height == 0 || area.width < 10 {
         return;
     }
-    let name = member
-        .friendly_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .unwrap_or("agent");
+    let name = agent_name.trim().trim_start_matches('@');
+    let name = if name.is_empty() { "agent" } else { name };
     let name_color = rgb_color(80, 220, 100);
     let dim = Style::default().fg(rgb_color(100, 100, 110));
+    let accent = rgb_color(255, 220, 100);
 
-    let mut status_bits = vec![member.status.clone()];
-    if let Some(secs) = member.runtime.elapsed_secs {
-        status_bits.push(format_elapsed(secs));
+    let mode = if hard_attached {
+        "In agent session"
+    } else {
+        "Soft preview"
+    };
+
+    let mut status_bits: Vec<String> = Vec::new();
+    if let Some(m) = member {
+        status_bits.push(m.status.clone());
+        if let Some(secs) = m.runtime.elapsed_secs {
+            status_bits.push(format_elapsed(secs));
+        }
     }
 
     let mut lines: Vec<Line<'static>> = vec![Line::from(vec![
         Span::styled(
-            "Soft preview ",
+            format!("{mode} "),
             Style::default().fg(rgb_color(200, 200, 210)),
         ),
         Span::styled(
@@ -339,20 +353,51 @@ pub fn draw_header(frame: &mut Frame, area: Rect, member: &SwarmMemberStatus) {
                 .fg(name_color)
                 .add_modifier(Modifier::BOLD),
         ),
+        if status_bits.is_empty() {
+            Span::raw("")
+        } else {
+            Span::styled(format!(" · {}", status_bits.join(" · ")), dim)
+        },
+        Span::styled(" · ", dim),
+        Span::styled("esc", Style::default().fg(accent).add_modifier(Modifier::BOLD)),
         Span::styled(
-            format!(" · {} · Enter = full session", status_bits.join(" · ")),
+            if hard_attached {
+                " return to team-lead"
+            } else {
+                " exit preview"
+            },
             dim,
         ),
     ])];
 
     if area.height >= 2 {
-        lines.push(Line::from(Span::styled(
-            "Esc exit preview · Shift+Enter stays here · real chat needs Enter hard-switch",
-            dim,
-        )));
+        let second = if hard_attached {
+            "You are inside this agent's full transcript. Press Esc to go back to the coordinator."
+        } else {
+            "Preview only (no full history). Press Enter on the tree to hard-switch into the session."
+        };
+        lines.push(Line::from(Span::styled(second, dim)));
     }
 
     frame.render_widget(Paragraph::new(lines), area);
+}
+
+/// Sticky footer line while hard-attached (CC footer "esc to return to team lead").
+pub fn hard_attach_status_line(agent_name: &str) -> Line<'static> {
+    let name = agent_name.trim().trim_start_matches('@');
+    let name = if name.is_empty() { "agent" } else { name };
+    Line::from(vec![
+        Span::styled(
+            "  esc",
+            Style::default()
+                .fg(rgb_color(255, 220, 100))
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(" return to team-lead  ·  viewing @{name}"),
+            Style::default().fg(rgb_color(160, 160, 170)),
+        ),
+    ])
 }
 
 pub fn header_height(viewing: bool) -> u16 {

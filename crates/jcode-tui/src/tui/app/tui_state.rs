@@ -1980,6 +1980,10 @@ impl crate::tui::TuiState for App {
         self.teammate_view_hard_attached
     }
 
+    fn teammate_view_agent_name(&self) -> Option<&str> {
+        self.teammate_view_agent_name.as_deref()
+    }
+
     fn viewing_teammate_member(&self) -> Option<crate::protocol::SwarmMemberStatus> {
         let sid = self.viewing_teammate_session_id.as_deref()?;
         crate::tui::teammate_view::find_member(&self.remote_swarm_members, sid).cloned()
@@ -2353,6 +2357,7 @@ impl App {
             .unwrap_or_else(|| session_id.to_string());
         self.teammate_view_messages = build_view_messages(member);
         self.viewing_teammate_session_id = Some(session_id.to_string());
+        self.teammate_view_agent_name = Some(label.clone());
         self.view_teammate_selection = true;
         self.teammate_view_hard_attached = false;
         self.teammate_view_abort_armed = false;
@@ -2360,7 +2365,7 @@ impl App {
         self.display_messages_version = self.display_messages_version.wrapping_add(1);
         self.scroll_offset = 0;
         self.set_status_notice(format!(
-            "Soft preview @{label} (not full session) · Enter switches for real · Esc exit"
+            "Soft preview @{label} · Enter = full session · Esc exit"
         ));
     }
 
@@ -2397,6 +2402,7 @@ impl App {
     /// Exit soft view only (no resume). Used when already on leader session.
     pub(crate) fn exit_teammate_view_local(&mut self, notice: &str) {
         self.viewing_teammate_session_id = None;
+        self.teammate_view_agent_name = None;
         self.view_teammate_selection = false;
         self.teammate_view_messages.clear();
         self.teammate_view_hard_attached = false;
@@ -2408,6 +2414,23 @@ impl App {
         if !notice.is_empty() {
             self.set_status_notice(notice);
         }
+    }
+
+    /// Begin hard-attach into a swarm agent session (true transcript switch).
+    pub(crate) fn begin_teammate_hard_attach(&mut self, session_id: &str, label: &str) {
+        let leader = self.remote_session_id.clone();
+        self.teammate_view_return_session_id = leader;
+        self.viewing_teammate_session_id = Some(session_id.to_string());
+        self.teammate_view_agent_name = Some(label.to_string());
+        self.view_teammate_selection = true;
+        self.teammate_view_hard_attached = true;
+        self.teammate_view_messages.clear();
+        self.teammate_view_abort_armed = false;
+        self.agent_tree_selecting = false;
+        self.selected_agent_tree_index = -1;
+        self.set_status_notice(format!(
+            "Switching into @{label}…  Esc = return to team-lead"
+        ));
     }
 
     /// Claude Code `useBackgroundTaskNavigation`.
@@ -2437,14 +2460,18 @@ impl App {
 
         let shift = modifiers.contains(KeyModifiers::SHIFT);
 
-        // Esc while hard-attached → resume leader session.
+        // Esc while hard-attached → resume leader (CC "esc return to team lead").
+        // Keep hard_attached chrome until resume completes (remote.rs clears it).
         if matches!(code, KeyCode::Esc) && self.teammate_view_hard_attached {
-            if let Some(leader) = self.teammate_view_return_session_id.take() {
-                self.teammate_view_hard_attached = false;
-                self.viewing_teammate_session_id = None;
-                self.view_teammate_selection = false;
-                self.teammate_view_messages.clear();
-                self.set_status_notice("Returning to team-lead…");
+            if let Some(leader) = self.teammate_view_return_session_id.clone() {
+                let name = self
+                    .teammate_view_agent_name
+                    .clone()
+                    .unwrap_or_else(|| "agent".into());
+                // Mark return in progress: clear return id so resume handler
+                // knows this is "going home" (return_session_id empty + hard).
+                self.teammate_view_return_session_id = None;
+                self.set_status_notice(format!("Returning to team-lead (leaving @{name})…"));
                 return Some(TeammateNavAction::ResumeSession { session_id: leader });
             }
             self.exit_teammate_view_local("Exited teammate view");
@@ -2571,27 +2598,18 @@ impl App {
                 // prompt stuck in `detail`), which is NOT a real switch.
                 // Default Enter/f = hard-attach (resume_session = true switch).
                 // Shift+Enter = soft status preview only.
-                let soft_preview = hard; // Shift+Enter
+                let soft_preview = hard; // Shift+Enter = soft preview only
+                let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
                 if soft_preview {
                     self.enter_teammate_soft_view(&sid);
                     return Some(TeammateNavAction::Handled);
                 }
-                let leader = self.remote_session_id.clone();
-                if leader.as_deref() == Some(sid.as_str()) {
+                if self.remote_session_id.as_deref() == Some(sid.as_str()) {
                     self.set_status_notice("Already on this session");
                     self.agent_tree_selecting = false;
                     return Some(TeammateNavAction::Handled);
                 }
-                self.teammate_view_return_session_id = leader;
-                self.viewing_teammate_session_id = Some(sid.clone());
-                self.view_teammate_selection = true;
-                self.teammate_view_hard_attached = true;
-                self.teammate_view_messages.clear();
-                self.agent_tree_selecting = false;
-                let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
-                self.set_status_notice(format!(
-                    "Switching into @{label}… (Esc returns to team-lead)"
-                ));
+                self.begin_teammate_hard_attach(&sid, &label);
                 return Some(TeammateNavAction::ResumeSession { session_id: sid });
             }
             return Some(TeammateNavAction::Handled);

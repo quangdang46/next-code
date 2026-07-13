@@ -2688,10 +2688,13 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // Elastic overscroll status line revealed when the user scrolls past the
     // bottom of the transcript. Rendered directly below the input line.
     let overscroll_height: u16 = if app.chat_overscroll_active() { 1 } else { 0 };
+    // CC footer: "esc to return to team lead" while hard-attached into an agent.
+    let return_bar_height: u16 = if app.teammate_view_hard_attached() { 1 } else { 0 };
     let fixed_height = 1            // status bar
         + queued_height
         + swarm_strip_height
         + agent_tree_height         // teammate tree below input
+        + return_bar_height         // esc return chrome
         + notification_height
         + inline_block_height
         + inline_ui_gap_height
@@ -2782,6 +2785,7 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         + input_height
         + agent_tree_height
         + swarm_strip_height
+        + return_bar_height
         + running_items_height
         + overscroll_height
         + donut_height;
@@ -2816,17 +2820,19 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
             Constraint::Length(input_height),         // 4 Input
             Constraint::Length(1),                    // 5 Bottom separator (───)
             Constraint::Length(agent_tree_height),    // 6 Teammate tree (below input)
-            Constraint::Length(swarm_strip_height),   // 7 Swarm strip (above status)
-            Constraint::Length(1),                    // 8 Status bar
-            Constraint::Length(notification_height),  // 9 Notification line (below status)
-            Constraint::Length(running_items_height), // 10 Running items (quickbar)
-            Constraint::Length(overscroll_height),    // 11 Overscroll status line
-            Constraint::Length(donut_height),         // 12 Donut animation
+            Constraint::Length(swarm_strip_height),   // 7 Swarm strip
+            Constraint::Length(return_bar_height),    // 8 Esc return bar (hard-attach)
+            Constraint::Length(1),                    // 9 Status bar
+            Constraint::Length(notification_height),  // 10 Notification line
+            Constraint::Length(running_items_height), // 11 Running items (quickbar)
+            Constraint::Length(overscroll_height),    // 12 Overscroll status line
+            Constraint::Length(donut_height),         // 13 Donut animation
         ])
         .split(top_bottom[1]);
     // Indices: 0 inline, 1 gap, 2 activity, 3 top sep, 4 input, 5 bot sep,
-    // 6 agent tree, 7 swarm, 8 status, 9 notification, 10 running, 11 overscroll, 12 donut
-    let status_area = bottom_chunks[8];
+    // 6 agent tree, 7 swarm, 8 return bar, 9 status, 10 notification, 11 running,
+    // 12 overscroll, 13 donut
+    let status_area = bottom_chunks[9];
     record_status_area(status_area);
 
     // Processing spinner only — above the input (connecting / thinking).
@@ -2847,6 +2853,14 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     if swarm_strip_height > 0 {
         clear_area(frame, bottom_chunks[7]);
         frame.render_widget(Paragraph::new(swarm_strip_lines.clone()), bottom_chunks[7]);
+    }
+
+    // CC footer: "esc return to team lead" while hard-attached.
+    if return_bar_height > 0 {
+        clear_area(frame, bottom_chunks[8]);
+        let name = app.teammate_view_agent_name().unwrap_or("agent");
+        let line = crate::tui::teammate_view::hard_attach_status_line(name);
+        frame.render_widget(Paragraph::new(line), bottom_chunks[8]);
     }
 
     // Capture layout info for visual debug
@@ -2917,11 +2931,12 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     let draw_start = Instant::now();
 
     // Messages area is top_chunks[0] within the chat column (already excludes diagram).
-    // Soft teammate view reserves a 2-line header (CC TeammateViewHeader).
+    // CC TeammateViewHeader is ALWAYS shown while viewing — soft preview OR hard-attach.
+    // Hard-attach previously hid this chrome, so users could not find "esc return".
     let full_messages_area = top_chunks[0];
-    let soft_viewing = app.viewing_teammate_session_id().is_some()
-        && !app.teammate_view_hard_attached();
-    let header_h = crate::tui::teammate_view::header_height(soft_viewing);
+    let is_viewing_teammate = app.viewing_teammate_session_id().is_some()
+        || app.teammate_view_hard_attached();
+    let header_h = crate::tui::teammate_view::header_height(is_viewing_teammate);
     let (header_area, messages_area) = if header_h > 0 && full_messages_area.height > header_h {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -2955,24 +2970,25 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         Some(bottom_chunks[5]), // bottom separator
     );
 
-    // Draw Viewing header (CC TeammateViewHeader).
+    // Draw Viewing header (CC TeammateViewHeader) — soft AND hard-attach.
     if let Some(h_area) = header_area {
-        if let Some(m) = app.viewing_teammate_member() {
-            crate::tui::teammate_view::draw_header(frame, h_area, &m);
-        } else if let Some(sid) = app.viewing_teammate_session_id() {
-            let dim = Style::default().fg(rgb(100, 100, 110));
-            let line = Line::from(vec![
-                Span::styled("Viewing ", Style::default().fg(rgb(200, 200, 210))),
-                Span::styled(
-                    format!("session {sid}"),
-                    Style::default()
-                        .fg(rgb(80, 220, 100))
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(" · esc return", dim),
-            ]);
-            frame.render_widget(Paragraph::new(line), h_area);
-        }
+        let name = app
+            .teammate_view_agent_name()
+            .map(str::to_string)
+            .or_else(|| {
+                app.viewing_teammate_member()
+                    .and_then(|m| m.friendly_name.clone())
+            })
+            .or_else(|| app.viewing_teammate_session_id().map(str::to_string))
+            .unwrap_or_else(|| "agent".into());
+        let member = app.viewing_teammate_member();
+        crate::tui::teammate_view::draw_viewing_chrome(
+            frame,
+            h_area,
+            &name,
+            app.teammate_view_hard_attached(),
+            member.as_ref(),
+        );
     }
 
     let margins = if onboarding_welcome {
@@ -3110,20 +3126,20 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
         ));
         frame.render_widget(Paragraph::new(sep_line), bottom_chunks[5]);
     }
-    // Status bar below swarm strip / agent tree
+    // Status bar below swarm strip / agent tree / return bar
     input_ui::draw_status(frame, app, status_area, pending_count);
     if notification_height > 0 {
-        input_ui::draw_notification(frame, app, bottom_chunks[9]);
+        input_ui::draw_notification(frame, app, bottom_chunks[10]);
     }
     // Running items list (quickbar) below status
     if running_items_height > 0 {
-        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[10]);
+        crate::tui::ui_running_items::draw_running_items(frame, app, bottom_chunks[11]);
     }
     if overscroll_height > 0 {
-        input_ui::draw_overscroll_status(frame, app, bottom_chunks[11]);
+        input_ui::draw_overscroll_status(frame, app, bottom_chunks[12]);
     }
     if donut_height > 0 {
-        animations::draw_idle_animation(frame, app, bottom_chunks[12]);
+        animations::draw_idle_animation(frame, app, bottom_chunks[13]);
     }
 
     // Draw info widget overlays (skip during idle animation - they look out of place)

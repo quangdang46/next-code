@@ -1394,6 +1394,8 @@ pub struct App {
     pub pending_permission_at: Option<std::time::Instant>,
     /// Soft teammate view (CC `viewingAgentTaskId`): session id of viewed swarm agent.
     pub viewing_teammate_session_id: Option<String>,
+    /// Friendly name for chrome while hard-attached (swarm list may be empty on child).
+    pub teammate_view_agent_name: Option<String>,
     /// Transcript reconstructed for soft view (CC `task.messages` mirror).
     pub teammate_view_messages: Vec<DisplayMessage>,
     /// After hard-attach (`resume_session`), resume this session on Esc.
