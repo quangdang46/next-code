@@ -120,7 +120,7 @@ fn test_split_prompt_does_not_inject_session_context_per_turn() {
 
 #[test]
 fn sponsored_discovery_is_not_injected_into_the_system_prompt() {
-    let (split, _) = build_system_prompt_split(None, &[], false, None, None);
+    let (split, _) = build_system_prompt_split(None, &[], false, None, None, None, None);
     assert!(!split.static_part.contains("Discoverable Tools"));
     assert!(!split.static_part.contains("discover_tools"));
 }
