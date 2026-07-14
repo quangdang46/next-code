@@ -183,6 +183,30 @@ fn test_event_roundtrip() -> Result<()> {
 }
 
 #[test]
+fn test_swarm_member_message_event_roundtrip() -> Result<()> {
+    let event = ServerEvent::SwarmMemberMessage {
+        swarm_id: "swarm_1".into(),
+        message: crate::SwarmMemberMessage {
+            session_id: "ses_duck".into(),
+            message_id: "ses_duck:output_tail".into(),
+            role: "assistant".into(),
+            content: "tick 3".into(),
+            tool_name: None,
+        },
+    };
+    let json = encode_event(&event);
+    assert!(json.contains("\"type\":\"swarm_member_message\""));
+    let decoded = parse_event_json(json.trim())?;
+    let ServerEvent::SwarmMemberMessage { swarm_id, message } = decoded else {
+        return Err(anyhow!("wrong event type: {json}"));
+    };
+    assert_eq!(swarm_id, "swarm_1");
+    assert_eq!(message.session_id, "ses_duck");
+    assert_eq!(message.content, "tick 3");
+    Ok(())
+}
+
+#[test]
 fn test_session_renamed_event_roundtrip() -> Result<()> {
     let event = ServerEvent::SessionRenamed {
         session_id: "sess_123".to_string(),

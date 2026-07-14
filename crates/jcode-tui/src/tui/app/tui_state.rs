@@ -742,6 +742,7 @@ impl crate::tui::TuiState for App {
                     session_id: Some(self.session.id.clone()),
                     activity: Some(activity),
                     todo_progress: None,
+                    preview_line: None,
                 });
             }
         }
@@ -823,6 +824,22 @@ impl crate::tui::TuiState for App {
                 activity
             };
 
+            let preview_line = self
+                .teammate_transcripts
+                .get(&member.session_id)
+                .and_then(|b| crate::tui::teammate_view::preview_line_from_messages(b))
+                .or_else(|| {
+                    member
+                        .output_tail
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(|s| {
+                            let last = s.lines().last().unwrap_or(s);
+                            crate::tui::teammate_view::truncate_chars_public(last, 80)
+                        })
+                });
+
             children.push(AgentTreeNode {
                 agent_name: name,
                 status: if is_viewing {
@@ -838,6 +855,7 @@ impl crate::tui::TuiState for App {
                 session_id: Some(member.session_id.clone()),
                 activity,
                 todo_progress: member.todo_progress,
+                preview_line,
             });
         }
 
@@ -862,6 +880,7 @@ impl crate::tui::TuiState for App {
                         session_id: Some(sid.to_string()),
                         activity: Some("viewing".to_string()),
                         todo_progress: None,
+                        preview_line: None,
                     });
                 }
             }
@@ -897,6 +916,7 @@ impl crate::tui::TuiState for App {
                 None
             },
             todo_progress: None,
+            preview_line: None,
         };
 
         vec![leader]
@@ -2467,6 +2487,23 @@ impl App {
         }
     }
 
+    /// Bootstrap lead-side buffer from SwarmStatus when the live stream is empty.
+    pub(crate) fn seed_teammate_transcript_from_member(
+        &mut self,
+        session_id: &str,
+        member: &crate::protocol::SwarmMemberStatus,
+    ) {
+        use crate::tui::teammate_view::seed_messages_from_member;
+        let entry = self.teammate_transcripts.entry(session_id.to_string()).or_default();
+        if !entry.is_empty() {
+            return;
+        }
+        let seeded = seed_messages_from_member(member);
+        if seeded.iter().any(|m| m.role == "assistant" || m.role == "tool" || m.title.as_deref() == Some("task")) {
+            *entry = seeded;
+        }
+    }
+
     /// Enter soft teammate view (CC `enterTeammateView`).
     ///
     /// Stays on the leader session — free lead↔agent switch via Shift+↑/↓ + Enter.
@@ -2475,7 +2512,8 @@ impl App {
         use crate::tui::teammate_view::{build_view_messages, find_member};
 
         let member = find_member(&self.remote_swarm_members, session_id)
-            .or_else(|| find_member(&self.teammate_view_swarm_snapshot, session_id));
+            .or_else(|| find_member(&self.teammate_view_swarm_snapshot, session_id))
+            .cloned();
         let Some(member) = member else {
             self.set_status_notice(format!(
                 "Cannot view {session_id}: not in swarm member list"
@@ -2486,20 +2524,23 @@ impl App {
             .friendly_name
             .clone()
             .unwrap_or_else(|| session_id.to_string());
+        // Bootstrap buffer from snapshot so Enter soft is never empty when
+        // SwarmStatus already has output_tail / tools.
+        self.seed_teammate_transcript_from_member(session_id, &member);
         // Prefer live transcript buffer when present (Phase 2).
         if let Some(buf) = self.teammate_transcripts.get(session_id) {
             if !buf.is_empty() {
                 let mut msgs = Vec::with_capacity(buf.len() + 1);
                 msgs.push(jcode_tui_messages::DisplayMessage::system(format!(
-                    "Status preview @{label} · live stream buffer · esc exit · Enter = full session"
+                    "Viewing @{label} · esc → team-lead · shift+enter full session"
                 )));
                 msgs.extend(buf.iter().cloned());
                 self.teammate_view_messages = msgs;
             } else {
-                self.teammate_view_messages = build_view_messages(member);
+                self.teammate_view_messages = build_view_messages(&member);
             }
         } else {
-            self.teammate_view_messages = build_view_messages(member);
+            self.teammate_view_messages = build_view_messages(&member);
         }
         self.viewing_teammate_session_id = Some(session_id.to_string());
         self.teammate_view_agent_name = Some(label.clone());
@@ -2574,7 +2615,7 @@ impl App {
             if !buf.is_empty() {
                 let mut msgs = Vec::with_capacity(buf.len() + 1);
                 msgs.push(jcode_tui_messages::DisplayMessage::system(format!(
-                    "Status preview @{label} · live stream buffer · esc exit · Enter = full session"
+                    "Viewing @{label} · esc → team-lead · shift+enter full session"
                 )));
                 msgs.extend(buf.iter().cloned());
                 self.teammate_view_messages = msgs;
@@ -2875,7 +2916,9 @@ impl App {
             let idx = self.selected_agent_tree_index as usize;
             if let Some(sid) = child_session_id_at(&trees, idx) {
                 let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
-                self.set_status_notice(format!("Stopping @{label}…"));
+                self.set_status_notice(format!(
+                    "Stopping @{label}… (k = CommStop · esc cancels selection)"
+                ));
                 return Some(TeammateNavAction::StopAgent {
                     target_session: sid,
                     force: false,

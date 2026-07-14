@@ -98,6 +98,8 @@ pub struct AgentTreeNode {
     pub activity: Option<String>,
     /// Optional todo progress `(done, total)` shown as dim ` · d/t`.
     pub todo_progress: Option<(u32, u32)>,
+    /// Last stream/tool line preview under the child (CC-ish last message peek).
+    pub preview_line: Option<String>,
 }
 
 impl AgentTreeNode {
@@ -549,6 +551,24 @@ fn render_node(
 
     out.push(Line::from(spans));
 
+    // Preview line under children (last stream/tool snippet).
+    if !is_leader
+        && depth > 0
+        && let Some(preview) = node
+            .preview_line
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+    {
+        out.push(Line::from(vec![
+            Span::raw("  ".repeat(depth.max(1) + 1)),
+            Span::styled(
+                format!("  {preview}"),
+                Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+            ),
+        ]));
+    }
+
     // Flat children: selection indices 0..n-1 in tree order (all children).
     // Builder already decided who is in the tree — do not re-filter by status
     // or Idle rows lose indices and free-switch breaks.
@@ -603,6 +623,7 @@ mod tests {
             session_id: session_id.map(ToString::to_string),
             activity: activity.map(ToString::to_string),
             todo_progress: None,
+            preview_line: None,
         }
     }
 
@@ -623,6 +644,7 @@ mod tests {
             // Foreground leader: name only (spinner line owns the verb).
             activity: None,
             todo_progress: None,
+            preview_line: None,
         }
     }
 

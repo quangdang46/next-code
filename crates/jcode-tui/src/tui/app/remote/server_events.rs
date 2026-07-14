@@ -1586,6 +1586,11 @@ pub(in crate::tui::app) fn handle_server_event(
         ServerEvent::SwarmStatus { members } => {
             let members_changed = app.remote_swarm_members != members;
             if app.swarm_enabled {
+                // Seed empty transcript buffers so soft-view / tree previews have
+                // content even before the first SwarmMemberMessage arrives.
+                for m in &members {
+                    app.seed_teammate_transcript_from_member(&m.session_id, m);
+                }
                 app.remote_swarm_members = members;
                 persist_swarm_status_snapshot(app);
             } else {

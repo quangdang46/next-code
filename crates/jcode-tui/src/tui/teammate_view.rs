@@ -20,6 +20,77 @@ use crate::tui::color_support::rgb as rgb_color;
 const MAX_DETAIL_CHARS: usize = 120;
 const MAX_TASK_LABEL_CHARS: usize = 160;
 
+/// Seed lead-side transcript lines from a SwarmStatus member snapshot.
+/// Used when the live `SwarmMemberMessage` stream has not filled the buffer yet.
+pub fn seed_messages_from_member(member: &SwarmMemberStatus) -> Vec<DisplayMessage> {
+    let mut out = Vec::new();
+    let name = member
+        .friendly_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("agent");
+
+    if let Some(task) = member
+        .task_label
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty() && !looks_like_spawn_meta_prompt(s))
+    {
+        out.push(
+            DisplayMessage::user(truncate_chars(task, MAX_TASK_LABEL_CHARS)).with_title("task"),
+        );
+    }
+
+    for t in &member.todo_items {
+        for tool in &t.tool_intents {
+            let st = tool.status.to_ascii_lowercase();
+            let line = format!("{} ({st}): {}", tool.tool_name, truncate_chars(&tool.intent, 120));
+            let key = if tool.tool_call_id.is_empty() {
+                format!("{}:tool:{}", member.session_id, tool.tool_name)
+            } else {
+                format!("{}:tool:{}", member.session_id, tool.tool_call_id)
+            };
+            out.push(DisplayMessage::system(format!("[{}] {line}", tool.tool_name)).with_title(key));
+        }
+    }
+
+    if let Some(tail) = member
+        .output_tail
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        out.push(
+            DisplayMessage::assistant(truncate_chars(tail, 4000)).with_title("stream"),
+        );
+    } else if out.is_empty() {
+        out.push(DisplayMessage::system(format!(
+            "@{name}: no stream yet (waiting for SwarmMemberMessage / output_tail)"
+        )));
+    }
+    out
+}
+
+/// Last non-empty display line for tree preview under a child row.
+pub fn preview_line_from_messages(msgs: &[DisplayMessage]) -> Option<String> {
+    msgs.iter()
+        .rev()
+        .find(|m| {
+            let t = m.content.trim();
+            !t.is_empty()
+                && (m.role == "assistant"
+                    || m.role == "tool"
+                    || m.title.as_deref() == Some("stream")
+                    || m.title.as_deref() == Some("task"))
+        })
+        .map(|m| {
+            let line = m.content.lines().last().unwrap_or(m.content.as_str()).trim();
+            truncate_chars(line, 80)
+        })
+        .filter(|s| !s.is_empty())
+}
+
 /// Build a short soft-preview transcript (not a full agent session).
 pub fn build_view_messages(member: &SwarmMemberStatus) -> Vec<DisplayMessage> {
     let name = member
@@ -167,13 +238,18 @@ fn looks_like_spawn_meta_prompt(s: &str) -> bool {
     long || markers.iter().any(|m| lower.contains(m))
 }
 
-fn truncate_chars(s: &str, max: usize) -> String {
+pub(crate) fn truncate_chars(s: &str, max: usize) -> String {
     if s.chars().count() <= max {
         return s.to_string();
     }
     let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
     out.push('…');
     out
+}
+
+/// Public alias for tree preview callers.
+pub(crate) fn truncate_chars_public(s: &str, max: usize) -> String {
+    truncate_chars(s, max)
 }
 
 fn short_model(model: &str) -> String {
@@ -598,6 +674,22 @@ mod tests {
         assert!(member_is_terminal(&m));
         m.status = "running".into();
         assert!(member_is_running(&m));
+    }
+
+    #[test]
+    fn seed_messages_from_member_uses_tail_and_tools() {
+        let m = sample_member();
+        let msgs = seed_messages_from_member(&m);
+        assert!(
+            msgs.iter().any(|x| x.role == "assistant" && x.content.contains("tick")),
+            "{msgs:?}"
+        );
+        assert!(
+            msgs.iter().any(|x| x.content.contains("bash")),
+            "tools: {msgs:?}"
+        );
+        let preview = preview_line_from_messages(&msgs).expect("preview");
+        assert!(preview.contains("tick") || preview.contains("bash"), "{preview}");
     }
 
     #[test]
