@@ -147,11 +147,10 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                         if app.teammate_view_return_session_id.is_some() {
                             // Landed on agent session — keep chrome + switch tree
                             // (snapshot) so free lead↔agent nav still works.
+                            // Header owns "Viewing @name · esc return" (CC).
                             app.agent_tree_hidden = false;
                             app.agent_tree_selecting = true;
-                            app.set_status_notice(format!(
-                                "Viewing @{agent} · shift+↑/↓ switch · enter team-lead · esc return"
-                            ));
+                            let _ = agent;
                         } else {
                             // Landed back on leader — drop attach chrome.
                             app.teammate_view_hard_attached = false;
@@ -162,7 +161,6 @@ pub(super) async fn handle_tick(app: &mut App, remote: &mut RemoteConnection) ->
                             app.teammate_view_swarm_snapshot.clear();
                             app.agent_tree_selecting = false;
                             app.selected_agent_tree_index = -1;
-                            app.set_status_notice("Back on team lead");
                         }
                     } else {
                         app.set_status_notice(format!("Session → {}", label));

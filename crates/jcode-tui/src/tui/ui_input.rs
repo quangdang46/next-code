@@ -252,8 +252,7 @@ pub(super) fn input_hint_line_height(app: &dyn TuiState) -> u16 {
     u16::from(
         shell_mode_hint(mode).is_some()
             || app.next_prompt_new_session_armed()
-            || ((app.viewing_teammate_session_id().is_some() || app.teammate_view_hard_attached())
-                && app.input().is_empty())
+            // No extra input hint while viewing — TeammateViewHeader owns esc.
             || (app.is_processing() && !app.input().is_empty()),
     )
 }
@@ -755,25 +754,8 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
     }
 
     let mut right_align_facts = false;
-    // Claude Code PromptInputFooterLeftSide: while viewing a teammate, show a
-    // durable "esc return to team lead" hint — never only a 3s status_notice.
-    let viewing_return_line = {
-        let viewing = app.viewing_teammate_session_id().is_some()
-            || app.teammate_view_hard_attached();
-        if viewing {
-            let name = app.teammate_view_agent_name().unwrap_or("agent");
-            Some(Line::from(crate::tui::teammate_view::viewing_status_spans(
-                name,
-                app.teammate_view_hard_attached(),
-            )))
-        } else {
-            None
-        }
-    };
-    let line = if let Some(view_line) = viewing_return_line {
-        // Highest priority chrome while in teammate view (hard or soft).
-        view_line
-    } else if let Some(build_progress) = crate::build::read_build_progress() {
+    // CC TeammateViewHeader owns esc chrome — status bar stays normal.
+    let line = if let Some(build_progress) = crate::build::read_build_progress() {
         let spinner = super::activity_indicator(elapsed, 12.5);
         Line::from(vec![
             Span::styled(spinner, Style::default().fg(rgb(255, 193, 7))),
@@ -1910,24 +1892,6 @@ pub(super) fn draw_input(
         lines.push(Line::from(Span::styled(
             hint,
             Style::default().fg(rgb(120, 200, 255)),
-        )));
-    } else if (app.viewing_teammate_session_id().is_some() || app.teammate_view_hard_attached())
-        && input_text.is_empty()
-    {
-        // CC: while viewing, the escape path is always labeled near the prompt.
-        hint_shown = true;
-        let name = app.teammate_view_agent_name().unwrap_or("agent");
-        let hint = if app.teammate_view_hard_attached() {
-            format!(
-                "  Viewing @{name} · esc → team-lead · shift+↑/↓ free switch · enter on team-lead"
-            )
-        } else {
-            format!("  Soft preview @{name} · esc exit · Enter = full session")
-        };
-        hint_line = Some(hint.trim().to_string());
-        lines.push(Line::from(Span::styled(
-            hint,
-            Style::default().fg(rgb(255, 220, 100)),
         )));
     } else if app.is_processing() && !input_text.is_empty() {
         hint_shown = true;

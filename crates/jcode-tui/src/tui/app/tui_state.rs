@@ -910,11 +910,8 @@ impl crate::tui::TuiState for App {
             is_leader: true,
             children,
             session_id: Some(leader_sid),
-            activity: if hard {
-                Some("esc/enter to return".to_string())
-            } else {
-                None
-            },
+            // CC: leader shows activity only when backgrounded (verb/idle), not key spam.
+            activity: None,
             todo_progress: None,
             preview_line: None,
         };
@@ -2530,12 +2527,8 @@ impl App {
         // Prefer live transcript buffer when present (Phase 2).
         if let Some(buf) = self.teammate_transcripts.get(session_id) {
             if !buf.is_empty() {
-                let mut msgs = Vec::with_capacity(buf.len() + 1);
-                msgs.push(jcode_tui_messages::DisplayMessage::system(format!(
-                    "Viewing @{label} · esc → team-lead · shift+enter full session"
-                )));
-                msgs.extend(buf.iter().cloned());
-                self.teammate_view_messages = msgs;
+                // Content only — chrome is TeammateViewHeader (CC layout).
+                self.teammate_view_messages = buf.clone();
             } else {
                 self.teammate_view_messages = build_view_messages(&member);
             }
@@ -2563,20 +2556,8 @@ impl App {
         self.selected_agent_tree_index = selected;
         self.display_messages_version = self.display_messages_version.wrapping_add(1);
         self.scroll_offset = 0;
-        let has_buf = self
-            .teammate_transcripts
-            .get(session_id)
-            .map(|b| !b.is_empty())
-            .unwrap_or(false);
-        self.set_status_notice(if has_buf {
-            format!(
-                "Viewing @{label} (live buffer) · esc → team-lead · shift+enter full session"
-            )
-        } else {
-            format!(
-                "Status preview @{label} · esc exit · shift+enter full session"
-            )
-        });
+        // CC: no status-notice novel on enter — TeammateViewHeader owns chrome.
+        let _ = label;
     }
 
     /// Refresh soft-view transcript from live buffer and/or SwarmStatus snapshot.
@@ -2613,12 +2594,7 @@ impl App {
             .unwrap_or_else(|| sid.clone());
         if let Some(buf) = self.teammate_transcripts.get(&sid) {
             if !buf.is_empty() {
-                let mut msgs = Vec::with_capacity(buf.len() + 1);
-                msgs.push(jcode_tui_messages::DisplayMessage::system(format!(
-                    "Viewing @{label} · esc → team-lead · shift+enter full session"
-                )));
-                msgs.extend(buf.iter().cloned());
-                self.teammate_view_messages = msgs;
+                self.teammate_view_messages = buf.clone();
                 self.display_messages_version = self.display_messages_version.wrapping_add(1);
                 return;
             }
@@ -2738,11 +2714,8 @@ impl App {
             .map(|i| i as i32)
             .unwrap_or(0);
         self.selected_agent_tree_index = selected;
-        // Durable notice text (still only 3s in status_notice) — real chrome is
-        // TeammateViewHeader + tree switcher + status bar return spans.
-        self.set_status_notice(format!(
-            "In @{label} session (real) · ↑/↓ switch · enter team-lead / esc return"
-        ));
+        // CC: no status-notice novel — TeammateViewHeader owns "Viewing · esc return".
+        let _ = label;
         true
     }
 
@@ -2792,13 +2765,11 @@ impl App {
                 // Mark return in progress: clear return id so resume handler
                 // knows this is "going home" (return_session_id empty + hard).
                 self.teammate_view_return_session_id = None;
-                self.set_status_notice(format!("Returning to team lead (leaving @{name})…"));
+                let _ = name;
                 return Some(TeammateNavAction::ResumeSession { session_id: leader });
             }
-            // No leader id — clear chrome only (cannot resume). Surface that.
-            self.exit_teammate_view_local(
-                "Exited view chrome (no team-lead session id — use session picker)",
-            );
+            // No leader id — clear chrome only (cannot resume).
+            self.exit_teammate_view_local("");
             return Some(TeammateNavAction::Handled);
         }
 
@@ -2813,7 +2784,7 @@ impl App {
             use crate::tui::teammate_view::{find_member, member_is_running};
             // Selecting team-lead row → exit view (clear free-switch path).
             if self.agent_tree_selecting && self.selected_agent_tree_index < 0 {
-                self.exit_teammate_view_local("Back to team-lead");
+                self.exit_teammate_view_local("");
                 return Some(TeammateNavAction::Handled);
             }
             let sid = self.viewing_teammate_session_id.clone().unwrap();
@@ -2821,20 +2792,18 @@ impl App {
                 .or_else(|| find_member(&self.teammate_view_swarm_snapshot, &sid));
             if let Some(m) = member {
                 if member_is_running(m) {
-                    self.set_status_notice(
-                        "Aborting teammate turn… (Esc again / enter team-lead to return)",
-                    );
                     if self.teammate_view_abort_armed {
                         self.teammate_view_abort_armed = false;
-                        self.exit_teammate_view_local("Back to team-lead");
+                        self.exit_teammate_view_local("");
                         return Some(TeammateNavAction::Handled);
                     }
+                    // First Esc aborts turn; second Esc exits (CC stop behavior).
                     self.teammate_view_abort_armed = true;
                     return Some(TeammateNavAction::AbortAgentTurn { session_id: sid });
                 }
             }
             self.teammate_view_abort_armed = false;
-            self.exit_teammate_view_local("Back to team-lead");
+            self.exit_teammate_view_local("");
             return Some(TeammateNavAction::Handled);
         }
 
@@ -2945,11 +2914,10 @@ impl App {
                         if let Some(leader) = self.teammate_view_return_session_id.take() {
                             self.agent_tree_selecting = true;
                             self.selected_agent_tree_index = -1;
-                            self.set_status_notice("Returning to team lead…");
                             return Some(TeammateNavAction::ResumeSession { session_id: leader });
                         }
                     }
-                    self.exit_teammate_view_local("Back to team-lead");
+                    self.exit_teammate_view_local("");
                 }
                 self.agent_tree_selecting = false;
                 self.selected_agent_tree_index = -1;
@@ -2963,7 +2931,6 @@ impl App {
                 self.agent_tree_hidden = true;
                 self.agent_tree_selecting = false;
                 self.selected_agent_tree_index = -1;
-                self.set_status_notice("Agent tree hidden (↓ at bottom or shift+↑/↓ to show)");
                 return Some(TeammateNavAction::Handled);
             }
             let idx = self.selected_agent_tree_index as usize;
@@ -2972,7 +2939,6 @@ impl App {
                 if self.remote_session_id.as_deref() == Some(sid.as_str())
                     && self.teammate_view_hard_attached
                 {
-                    self.set_status_notice(format!("Already in @{label} session"));
                     return Some(TeammateNavAction::Handled);
                 }
                 // Soft = SwarmStatus preview only (NOT real agent messages).

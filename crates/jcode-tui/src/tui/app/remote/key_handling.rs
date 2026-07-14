@@ -803,7 +803,8 @@ async fn handle_remote_key_internal(
                         app.running_items_state.detail_open = false;
                         app.viewing_teammate_session_id = Some(sid.clone());
                         app.view_teammate_selection = true;
-                        app.set_status_notice(format!("Viewing → {}  (Esc to exit)", label));
+                        app.teammate_view_agent_name = Some(label);
+                        // Header owns "Viewing @name · esc return".
                         return Ok(());
                     }
                     app.running_items_state.detail_open = false;
@@ -817,14 +818,13 @@ async fn handle_remote_key_internal(
                 if app.teammate_view_hard_attached {
                     if let Some(leader) = app.teammate_view_return_session_id.clone() {
                         app.teammate_view_return_session_id = None;
-                        app.set_status_notice("Returning to team-lead…");
                         app.workspace_client.queue_resume_session(leader);
                         app.running_items_state.visible = false;
                         return Ok(());
                     }
                 }
                 if app.viewing_teammate_session_id.is_some() && !app.teammate_view_hard_attached {
-                    app.exit_teammate_view_local("Exited teammate view");
+                    app.exit_teammate_view_local("");
                     return Ok(());
                 }
                 if app.running_items_state.detail_open {

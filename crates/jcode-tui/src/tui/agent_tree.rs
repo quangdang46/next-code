@@ -229,17 +229,14 @@ pub struct AgentTreeViewState {
     pub viewing_session_id: Option<String>,
 }
 
-/// Selection hints.
+/// Selection hints — match CC TeammateSpinnerLine (short, only when relevant).
 ///
-/// CC spinner tree (`teammateSelectHint.ts`) is literally
-/// `"shift + ↑/↓ to select"`. CC footer tasks/bg_agent uses bare ↑/↓ after
-/// focusing with `↓ manage`. jcode: Shift always works; bare ↓ also works when
-/// the transcript is already at the bottom (no more messages to scroll).
-pub const TEAMMATE_SELECT_HINT: &str = "↓ at bottom or shift+↑/↓ to select";
-/// Enter = soft view (live buffer when available). Shift+Enter = hard full session.
-pub const TEAMMATE_VIEW_HINT: &str = "enter = view · shift+enter full session";
-/// While already viewing: how to get back / free-switch.
-pub const TEAMMATE_RETURN_HINT: &str = "esc → team-lead · ↑/↓ switch";
+/// CC (`teammateSelectHint.ts`): `"shift + ↑/↓ to select"`.
+/// jcode also accepts bare ↓ at chat bottom, but we keep the CC wording in-tree
+/// so the chrome stays clean (long multi-path hints live only in docs).
+pub const TEAMMATE_SELECT_HINT: &str = "shift + ↑/↓ to select";
+/// CC: `enter to view` when a child is selected and not foregrounded.
+pub const TEAMMATE_VIEW_HINT: &str = "enter to view";
 
 /// Render the agent tree into a Vec of styled lines.
 ///
@@ -513,39 +510,20 @@ fn render_node(
         }
     }
 
-    // Hints — TeammateSpinnerLine / free-switch chrome
-    if is_viewing {
-        spans.push(Span::styled(
-            " · viewing",
-            Style::default()
-                .fg(rgb_color(255, 220, 100))
-                .add_modifier(Modifier::BOLD),
-        ));
-    }
-    if is_leader && depth == 0 && view.viewing_session_id.is_some() {
-        // Always label the path home on the team-lead row while viewing.
-        spans.push(Span::styled(
-            format!(" · {TEAMMATE_RETURN_HINT}"),
-            Style::default().fg(rgb_color(255, 220, 100)),
-        ));
-    } else if is_highlighted && !view.selecting && view.viewing_session_id.is_none() {
+    // Hints — exact CC TeammateSpinnerLine / TeammateSpinnerTree:
+    // - select hint when highlighted (leader or child), even mid-view
+    // - "enter to view" when selected and not foregrounded (same wording for lead)
+    // - no "esc return" / "viewing" / "enter to return" spam (header owns esc)
+    if is_highlighted {
         spans.push(Span::styled(
             format!(" · {TEAMMATE_SELECT_HINT}"),
             Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
         ));
     }
-    if is_selected && !is_leader && view.viewing_session_id.is_none() {
+    if is_selected && !is_viewing {
         spans.push(Span::styled(
             format!(" · {TEAMMATE_VIEW_HINT}"),
             Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
-        ));
-    }
-    if is_selected && is_leader && depth == 0 && view.viewing_session_id.is_some() {
-        spans.push(Span::styled(
-            " · enter to return",
-            Style::default()
-                .fg(rgb_color(255, 220, 100))
-                .add_modifier(Modifier::BOLD),
         ));
     }
 
@@ -755,16 +733,13 @@ mod tests {
     }
 
     #[test]
-    fn select_hint_mentions_bottom_down() {
-        // Documented UX: bare ↓ at chat bottom also selects (not only Shift).
+    fn select_hint_matches_claude_code_wording() {
+        // teammateSelectHint.ts: "shift + ↑/↓ to select"
         assert!(
-            TEAMMATE_SELECT_HINT.contains('↓') || TEAMMATE_SELECT_HINT.contains("down"),
+            TEAMMATE_SELECT_HINT.contains("shift") && TEAMMATE_SELECT_HINT.contains("select"),
             "{TEAMMATE_SELECT_HINT}"
         );
-        assert!(
-            TEAMMATE_VIEW_HINT.contains("real session") || TEAMMATE_VIEW_HINT.contains("enter"),
-            "{TEAMMATE_VIEW_HINT}"
-        );
+        assert_eq!(TEAMMATE_VIEW_HINT, "enter to view");
     }
 
     #[test]
@@ -800,19 +775,24 @@ mod tests {
             "tree must stay visible while viewing: {texts:?}"
         );
         let lead = texts.iter().find(|t| t.contains("team-lead")).expect("lead");
+        // CC TeammateSpinnerTree: selected lead while viewing → "enter to view"
+        // (same string as children — not "enter to return" / esc spam).
         assert!(
-            lead.contains(TEAMMATE_RETURN_HINT) || lead.contains("esc"),
-            "team-lead must show return path while viewing: {lead}"
+            lead.contains(TEAMMATE_VIEW_HINT) || lead.contains('>'),
+            "selected team-lead must show enter to view: {lead}"
         );
         assert!(
-            lead.contains("enter to return") || lead.contains('>'),
-            "selected team-lead must be obvious: {lead}"
+            !lead.contains("esc →") && !lead.contains("esc return"),
+            "esc return belongs in header, not tree: {lead}"
+        );
+        assert!(
+            !lead.contains("enter to return"),
+            "CC uses enter to view for lead, not enter to return: {lead}"
         );
         let duck = texts.iter().find(|t| t.contains("@duck")).expect("duck");
-        assert!(
-            duck.contains("viewing"),
-            "viewed agent must be marked: {duck}"
-        );
+        // Foregrounded child is bold/highlighted; no forced "· viewing" label.
+        assert!(duck.contains("@duck"), "viewed agent missing: {duck}");
+        assert!(!duck.contains(" · viewing"), "no viewing badge: {duck}");
         // No hide row while viewing.
         assert!(
             !texts.iter().any(|t| t.contains("hide")),

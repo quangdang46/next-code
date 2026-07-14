@@ -2518,7 +2518,8 @@ impl App {
                             self.running_items_state.detail_open = false;
                             self.viewing_teammate_session_id = Some(sid.clone());
                             self.view_teammate_selection = true;
-                            self.set_status_notice(format!("Viewing → {}  (Esc to exit)", label));
+                            self.teammate_view_agent_name = Some(label);
+                            // Header owns "Viewing @name · esc return".
                             return Ok(());
                         }
                         // No session to switch to: close detail
@@ -2534,7 +2535,7 @@ impl App {
                         // Exit teammate view
                         let _sid = self.viewing_teammate_session_id.take();
                         self.view_teammate_selection = false;
-                        self.set_status_notice("Exited teammate view");
+                        self.teammate_view_agent_name = None;
                         return Ok(());
                     }
                     if self.running_items_state.detail_open {

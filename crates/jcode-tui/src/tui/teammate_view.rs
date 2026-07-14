@@ -65,9 +65,7 @@ pub fn seed_messages_from_member(member: &SwarmMemberStatus) -> Vec<DisplayMessa
             DisplayMessage::assistant(truncate_chars(tail, 4000)).with_title("stream"),
         );
     } else if out.is_empty() {
-        out.push(DisplayMessage::system(format!(
-            "@{name}: no stream yet (waiting for SwarmMemberMessage / output_tail)"
-        )));
+        out.push(DisplayMessage::system(format!("@{name}: no stream yet")));
     }
     out
 }
@@ -102,18 +100,8 @@ pub fn build_view_messages(member: &SwarmMemberStatus) -> Vec<DisplayMessage> {
 
     let mut msgs = Vec::new();
 
-    // Compact banner — do not paste spawn prompt here.
-    let mut header = format!("Preview @{name} (soft-view · not full session)");
-    let mut meta = vec![member.status.clone()];
-    if let Some(model) = member.runtime.model.as_deref().filter(|s| !s.is_empty()) {
-        meta.push(short_model(model));
-    }
-    if let Some(secs) = member.runtime.elapsed_secs {
-        meta.push(format_elapsed(secs));
-    }
-    header.push_str(&format!("\n{}", meta.join(" · ")));
-    header.push_str("\nEnter hard-switches into this session · Esc returns · Shift+Enter = this preview");
-    msgs.push(DisplayMessage::system(header));
+    // No chrome banner in the transcript body — TeammateViewHeader owns that
+    // (CC has only header + messages). Keep content-only rows below.
 
     // Short task label only (truncated). Full spawn blobs go to detail often.
     if let Some(task) = member
@@ -126,11 +114,8 @@ pub fn build_view_messages(member: &SwarmMemberStatus) -> Vec<DisplayMessage> {
         // Skip if it looks like the coordinator meta-prompt (user paste to test UI).
         if !looks_like_spawn_meta_prompt(&task) {
             msgs.push(DisplayMessage::user(task).with_title("task"));
-        } else {
-            msgs.push(DisplayMessage::system(
-                "task: (spawn brief omitted — use Enter to open full agent session)",
-            ));
         }
+        // Meta spawn briefs are omitted entirely (header already names the agent).
     }
 
     // Detail: only if short and not a meta-prompt dump.
@@ -207,12 +192,10 @@ pub fn build_view_messages(member: &SwarmMemberStatus) -> Vec<DisplayMessage> {
         for chunk in split_stream_chunks(tail) {
             msgs.push(DisplayMessage::assistant(chunk));
         }
-    } else if tool_lines.is_empty() {
-        // Single empty-state — never spam this on every refresh as duplicates
-        // of long detail text.
-        msgs.push(DisplayMessage::system(
-            "No live stream yet (output_tail empty). Press Enter to hard-switch into the agent session for full history.",
-        ));
+    } else if tool_lines.is_empty() && member.todo_items.is_empty() {
+        // Quiet empty-state only when there is truly nothing to show.
+        // Keybindings live in TeammateViewHeader / tree, not here.
+        msgs.push(DisplayMessage::system("No live stream yet."));
     }
 
     msgs
@@ -388,13 +371,12 @@ pub fn member_is_terminal(member: &SwarmMemberStatus) -> bool {
 
 /// Claude Code `TeammateViewHeader` — sticky above transcript while viewing.
 ///
-/// CC source (`TeammateViewHeader.tsx`):
+/// Exact CC layout (`TeammateViewHeader.tsx`):
 ///   Viewing @{name} · esc return
-///   {task.prompt}
+///   {task.prompt}          // dim, second line only
 ///
-/// jcode hard-attach is a real `resume_session` (CC keeps one process and swaps
-/// `task.messages`). Chrome still must match CC wording and stay visible for
-/// the whole attach lifetime — not a 3s status notice.
+/// Do **not** pile return hints here, in the tree, status bar, separator, and
+/// input hint all at once — that is what made the UI noisy vs CC.
 pub fn draw_viewing_chrome(
     frame: &mut Frame,
     area: Rect,
@@ -407,23 +389,15 @@ pub fn draw_viewing_chrome(
     }
     let name = agent_name.trim().trim_start_matches('@');
     let name = if name.is_empty() { "agent" } else { name };
-    // CC teammate name is bold green-ish identity color.
     let name_color = rgb_color(80, 220, 100);
     let dim = Style::default().fg(rgb_color(140, 140, 150));
     let accent = Style::default()
-        .fg(rgb_color(255, 220, 100))
+        .fg(rgb_color(200, 200, 210))
         .add_modifier(Modifier::BOLD);
 
-    // Line 1 — hard: CC "Viewing @name · esc return"
-    // Soft: honest "Status preview" (not task.messages).
-    let prefix = if hard_attached {
-        "Viewing "
-    } else {
-        "Status preview "
-    };
-    let git = short_client_git_hash();
-    let mut line1 = vec![
-        Span::styled(prefix, Style::default().fg(rgb_color(220, 220, 230))),
+    // Line 1 — CC: "Viewing @name · esc return" (same wording soft + hard).
+    let mut lines: Vec<Line<'static>> = vec![Line::from(vec![
+        Span::styled("Viewing ", Style::default().fg(rgb_color(220, 220, 230))),
         Span::styled(
             format!("@{name}"),
             Style::default()
@@ -432,145 +406,56 @@ pub fn draw_viewing_chrome(
         ),
         Span::styled(" · ", dim),
         Span::styled("esc", accent),
-        Span::styled(
-            if hard_attached {
-                " return"
-            } else {
-                " exit"
-            },
-            dim,
-        ),
-    ];
-    if !git.is_empty() {
-        line1.push(Span::styled(format!(" · {git}"), dim));
-    }
-    let mut lines: Vec<Line<'static>> = vec![Line::from(line1)];
+        Span::styled(" return", dim),
+    ])];
 
-    // Line 2 — CC shows task.prompt; we show task_label / status / hard-attach note.
+    // Line 2 — CC: task prompt only (dim). No extra keybinding spam.
     if area.height >= 2 {
         let second = if let Some(m) = member {
-            let task = m
-                .task_label
+            m.task_label
                 .as_deref()
                 .map(str::trim)
                 .filter(|s| !s.is_empty() && !looks_like_spawn_meta_prompt(s))
-                .map(|s| truncate_chars(s, 120));
-            if let Some(task) = task {
-                task
-            } else {
-                let mut bits = vec![m.status.clone()];
-                if let Some(secs) = m.runtime.elapsed_secs {
-                    bits.push(format_elapsed(secs));
-                }
-                if hard_attached {
-                    format!("{} · full session (esc → team lead)", bits.join(" · "))
-                } else {
-                    format!(
-                        "{} · status only — Enter = real session",
-                        bits.join(" · ")
-                    )
-                }
-            }
-        } else if hard_attached {
-            "Full agent session · press esc to return to team lead".to_string()
+                .map(|s| truncate_chars(s, 120))
+                .or_else(|| {
+                    // Soft without a clean task: one short status word, not a novel.
+                    if !hard_attached {
+                        Some(m.status.clone())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default()
         } else {
-            "Status only (not full agent history) · Enter = real session · esc exit".to_string()
+            String::new()
         };
-        lines.push(Line::from(Span::styled(second, dim)));
+        if !second.is_empty() {
+            lines.push(Line::from(Span::styled(second, dim)));
+        }
     }
 
     frame.render_widget(Paragraph::new(lines), area);
 }
 
-fn short_client_git_hash() -> String {
-    let h = jcode_build_meta::GIT_HASH.trim();
-    if h.is_empty() || h == "unknown" {
-        return String::new();
-    }
-    h.chars().take(9).collect()
+/// CC puts esc only in `TeammateViewHeader` — no status-bar / footer fragment.
+/// Kept as empty so any leftover call site stays silent.
+pub fn viewing_footer_hint_spans() -> Vec<Span<'static>> {
+    Vec::new()
 }
 
-/// Sticky bottom chrome while hard-attached (CC footer
-/// `KeyboardShortcutHint shortcut="esc" action="return to team lead"`).
-pub fn hard_attach_status_line(agent_name: &str) -> Line<'static> {
-    let name = agent_name.trim().trim_start_matches('@');
-    let name = if name.is_empty() { "agent" } else { name };
-    Line::from(vec![
-        Span::styled(
-            "  esc",
-            Style::default()
-                .fg(rgb_color(255, 220, 100))
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            " → team-lead",
-            Style::default().fg(rgb_color(200, 200, 210)),
-        ),
-        Span::styled(
-            "  ·  shift+↑/↓ switch  ·  enter on team-lead",
-            Style::default().fg(rgb_color(160, 160, 170)),
-        ),
-        Span::styled(
-            format!("  ·  @{name}"),
-            Style::default().fg(rgb_color(80, 220, 100)),
-        ),
-    ])
+/// @deprecated — no dedicated return bar (header owns esc).
+pub fn hard_attach_status_line(_agent_name: &str) -> Line<'static> {
+    Line::from("")
 }
 
-/// Durable status-bar spans (CC `PromptInputFooterLeftSide` while viewing).
-/// Always shown while hard-attached or soft-viewing — not a 3s notice.
-pub fn viewing_status_spans(agent_name: &str, hard_attached: bool) -> Vec<Span<'static>> {
-    let name = agent_name.trim().trim_start_matches('@');
-    let name = if name.is_empty() { "agent" } else { name };
-    if hard_attached {
-        vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(
-                "esc",
-                Style::default()
-                    .fg(rgb_color(255, 220, 100))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                " → team-lead",
-                Style::default().fg(rgb_color(200, 200, 210)),
-            ),
-            Span::styled(
-                " · shift+↑/↓ free switch",
-                Style::default().fg(rgb_color(160, 160, 170)),
-            ),
-            Span::styled(
-                format!(" · @{name}"),
-                Style::default().fg(rgb_color(80, 220, 100)),
-            ),
-        ]
-    } else {
-        vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(
-                "esc",
-                Style::default()
-                    .fg(rgb_color(255, 220, 100))
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(" exit view", Style::default().fg(rgb_color(180, 180, 190))),
-            Span::styled(
-                format!(" · @{name}"),
-                Style::default().fg(rgb_color(80, 220, 100)),
-            ),
-        ]
-    }
+/// @deprecated — status bar no longer hijacks with a full replacement line.
+pub fn viewing_status_spans(_agent_name: &str, _hard_attached: bool) -> Vec<Span<'static>> {
+    Vec::new()
 }
 
-/// Bottom separator label while viewing (always on-screen under the input).
-pub fn viewing_separator_label(agent_name: &str, hard_attached: bool) -> String {
-    let name = agent_name.trim().trim_start_matches('@');
-    let name = if name.is_empty() { "agent" } else { name };
-    if hard_attached {
-        format!(" esc → team-lead · shift+↑/↓ switch · @{name} ")
-    } else {
-        format!(" esc exit view · @{name} ")
-    }
+/// @deprecated separator stays plain ─── (CC has no hint in the rule).
+pub fn viewing_separator_label(_agent_name: &str, _hard_attached: bool) -> String {
+    String::new()
 }
 
 pub fn header_height(viewing: bool, available: u16) -> u16 {
@@ -637,26 +522,42 @@ mod tests {
             !blob.contains("Dùng tool swarm"),
             "must not dump spawn meta-prompt: {blob}"
         );
+        // Tools/todos still render; empty-state only when there is nothing else.
         assert!(
-            blob.contains("hard-switch") || blob.contains("full session") || blob.contains("Enter"),
-            "should point user to hard-switch: {blob}"
+            blob.contains("bash") || blob.contains("step one") || blob.contains("status:"),
+            "expected tools/todos/status without stream: {blob}"
         );
-        // Only one empty-state / hard-switch hint line
-        let empty_count = msgs
-            .iter()
-            .filter(|m| {
-                m.content.contains("No live stream")
-                    || m.content.contains("hard-switch")
-                    || m.content.contains("output_tail empty")
-            })
-            .count();
-        assert!(empty_count >= 1, "expected empty/hard-switch hint: {blob}");
+        assert!(
+            !blob.contains("hard-switch") && !blob.contains("shift+enter"),
+            "no keybinding novel in body: {blob}"
+        );
+    }
+
+    #[test]
+    fn build_view_empty_state_is_quiet() {
+        let mut m = sample_member();
+        m.detail = None;
+        m.task_label = None;
+        m.output_tail = None;
+        m.todo_items.clear();
+        m.todo_progress = None;
+        let msgs = build_view_messages(&m);
+        let blob: String = msgs.iter().map(|x| x.content.clone()).collect();
+        assert!(
+            blob.contains("No live stream"),
+            "expected quiet empty-state: {blob}"
+        );
+        assert!(
+            !blob.contains("hard-switch") && !blob.contains("shift+enter"),
+            "no keybinding novel: {blob}"
+        );
     }
 
     #[test]
     fn build_view_messages_includes_stream_and_tools() {
         let msgs = build_view_messages(&sample_member());
-        assert!(msgs.iter().any(|m| m.content.contains("Preview @duck")));
+        // No chrome banner in body (TeammateViewHeader owns that).
+        assert!(!msgs.iter().any(|m| m.content.contains("esc return")));
         assert!(msgs.iter().any(|m| m.role == "assistant" && m.content.contains("tick")));
         assert!(msgs.iter().any(|m| m.content.contains("bash")));
     }
@@ -694,16 +595,12 @@ mod tests {
 
     #[test]
     fn chrome_copy_matches_claude_code_contract() {
-        // TeammateViewHeader.tsx: "Viewing @name · esc return"
-        // Free switch: tree stays + esc → team-lead (CC pills/nav).
-        let sep = viewing_separator_label("duck", true);
-        assert!(sep.contains("team-lead") || sep.contains("esc"), "{sep}");
-        assert!(sep.contains("@duck"), "{sep}");
-        let spans = viewing_status_spans("duck", true);
-        let blob: String = spans.iter().map(|s| s.content.as_ref()).collect();
-        assert!(blob.contains("esc"), "{blob}");
-        assert!(blob.contains("team-lead"), "{blob}");
-        assert!(blob.contains("@duck"), "{blob}");
+        // TeammateViewHeader.tsx: "Viewing @name · esc return" only.
+        // No footer/status esc fragment (CC has none).
+        assert!(viewing_footer_hint_spans().is_empty());
+        assert!(viewing_status_spans("duck", true).is_empty());
+        // Separator is plain (no embedded hint).
+        assert!(viewing_separator_label("duck", true).is_empty());
         assert_eq!(header_height(true, 10), 2);
         assert_eq!(header_height(true, 2), 1);
         assert_eq!(header_height(false, 10), 0);
