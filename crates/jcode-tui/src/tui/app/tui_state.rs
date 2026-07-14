@@ -2459,7 +2459,7 @@ impl App {
         self.display_messages_version = self.display_messages_version.wrapping_add(1);
         self.scroll_offset = 0;
         self.set_status_notice(format!(
-            "Viewing @{label} · esc → team-lead · shift+↑/↓ free switch · shift+enter full session"
+            "Status preview @{label} (not full agent transcript) · esc exit · enter = real session"
         ));
     }
 
@@ -2607,7 +2607,7 @@ impl App {
         // Durable notice text (still only 3s in status_notice) — real chrome is
         // TeammateViewHeader + tree switcher + status bar return spans.
         self.set_status_notice(format!(
-            "Viewing @{label} · shift+↑/↓ switch · enter team-lead / esc return"
+            "In @{label} session (real) · ↑/↓ switch · enter team-lead / esc return"
         ));
         true
     }
@@ -2711,12 +2711,33 @@ impl App {
             return Some(TeammateNavAction::Handled);
         }
 
-        // Shift+Up/Down — expand hidden tree + step selection.
-        // Indices: -1 leader, 0..n-1 children, n = hide row (CC, only when not viewing).
-        // While viewing / hard-attached: no hide row — free-switch is lead ↔ agents only.
-        if shift && matches!(code, KeyCode::Up | KeyCode::Down) {
-            let viewing = self.viewing_teammate_session_id.is_some()
-                || self.teammate_view_hard_attached;
+        // Agent selection stepping.
+        //
+        // Claude Code Best has TWO surfaces (verified in clone):
+        // 1) Spinner tree (`useBackgroundTaskNavigation.ts`): **Shift+↑/↓ only**
+        //    (hint: "shift + ↑/↓ to select"). Bare ↓ does NOT step the tree.
+        // 2) Footer tasks/bg_agent pills: bare ↑/↓ once the footer is focused
+        //    (`footer:down` / `footer:up` in defaultBindings.ts).
+        //
+        // jcode merges the useful bits: Shift+↑/↓ always (CC tree), AND bare
+        // ↑/↓ when already selecting/viewing, AND bare ↓ when the transcript is
+        // already pinned to the bottom (scroll would no-op / overscroll) — so
+        // "no more messages → ↓ through agents" works without forcing Shift.
+        let viewing = self.viewing_teammate_session_id.is_some()
+            || self.teammate_view_hard_attached;
+        let at_chat_bottom = !self.auto_scroll_paused;
+        let input_empty = self.input.trim().is_empty();
+        let arrow_nav = matches!(code, KeyCode::Up | KeyCode::Down);
+        let bare_arrow = !shift && arrow_nav;
+        let shift_arrow = shift && arrow_nav;
+        // Bare ↓ at bottom with agents: enter/step selection (footer-like).
+        // Bare ↑/↓ while already selecting/viewing: step without Shift.
+        let bare_steps_agents = bare_arrow
+            && child_count > 0
+            && (self.agent_tree_selecting
+                || viewing
+                || (matches!(code, KeyCode::Down) && at_chat_bottom && input_empty));
+        if shift_arrow || bare_steps_agents {
             if child_count == 0 && !was_hidden && !viewing {
                 return None;
             }
@@ -2730,7 +2751,7 @@ impl App {
             if !self.agent_tree_selecting {
                 self.agent_tree_selecting = true;
                 // When already viewing an agent, start selection on that agent so
-                // one Shift+↑ reaches team-lead (path home is one step away).
+                // one ↑ reaches team-lead (path home is one step away).
                 if let Some(sid) = self.viewing_teammate_session_id.as_deref() {
                     let idx = (0..child_count)
                         .find(|&i| child_session_id_at(&trees, i).as_deref() == Some(sid))
@@ -2738,6 +2759,7 @@ impl App {
                         .unwrap_or(0);
                     self.selected_agent_tree_index = idx;
                 } else {
+                    // CC stepTeammateSelection first step parks on leader (-1).
                     self.selected_agent_tree_index = -1;
                 }
                 return Some(TeammateNavAction::Handled);
@@ -2780,22 +2802,27 @@ impl App {
             }
         }
 
-        // Enter / 'f' while selecting — Claude Code free-switch contract:
-        //   Enter / f     → enterTeammateView (soft, stay on leader, free switch)
-        //   Shift+Enter   → hard resume_session (full child transcript)
-        //   Enter team-lead → exit view / resume leader
-        // When already hard-attached, Enter on an agent hard-switches (no soft).
+        // Enter / 'f' while selecting.
+        //
+        // Claude Code Best: Enter → enterTeammateView which swaps to the agent's
+        // REAL `task.messages` (in-process spawn, `spawnInProcessTeammate` +
+        // `inProcessRunner` stream-append). That is a real agent transcript.
+        //
+        // jcode has no per-agent `task.messages` on the client — only SwarmStatus
+        // snapshots. Soft view is therefore a **status preview**, not a real
+        // spawn transcript. Default Enter/f = **hard resume_session** (the real
+        // child session). Shift+Enter = soft status preview only.
         let confirm = matches!(code, KeyCode::Enter)
             || (matches!(code, KeyCode::Char('f')) && self.agent_tree_selecting);
         if confirm && self.agent_tree_selecting {
-            let want_hard = (shift && matches!(code, KeyCode::Enter))
-                || self.teammate_view_hard_attached;
+            let want_soft_preview = shift
+                && matches!(code, KeyCode::Enter)
+                && !self.teammate_view_hard_attached;
             if self.selected_agent_tree_index < 0 {
-                // Leader → exit view (CC free switch back to team-lead).
+                // Leader → exit view / resume team-lead.
                 if self.viewing_teammate_session_id.is_some() || self.teammate_view_hard_attached {
                     if self.teammate_view_hard_attached {
                         if let Some(leader) = self.teammate_view_return_session_id.take() {
-                            // Keep hard_attached chrome until resume lands (remote.rs).
                             self.agent_tree_selecting = true;
                             self.selected_agent_tree_index = -1;
                             self.set_status_notice("Returning to team lead…");
@@ -2808,7 +2835,7 @@ impl App {
                 self.selected_agent_tree_index = -1;
                 return Some(TeammateNavAction::Handled);
             }
-            // Hide row only when not viewing (suppressed in render while viewing).
+            // Hide row only when not viewing.
             if !self.viewing_teammate_session_id.is_some()
                 && !self.teammate_view_hard_attached
                 && self.selected_agent_tree_index as usize == child_count
@@ -2816,33 +2843,25 @@ impl App {
                 self.agent_tree_hidden = true;
                 self.agent_tree_selecting = false;
                 self.selected_agent_tree_index = -1;
-                self.set_status_notice("Agent tree hidden (shift+up/down to show)");
+                self.set_status_notice("Agent tree hidden (↓ at bottom or shift+↑/↓ to show)");
                 return Some(TeammateNavAction::Handled);
             }
             let idx = self.selected_agent_tree_index as usize;
             if let Some(sid) = child_session_id_at(&trees, idx) {
                 let label = child_label_at(&trees, idx).unwrap_or_else(|| sid.clone());
-                // Already on this child session (hard-attach).
                 if self.remote_session_id.as_deref() == Some(sid.as_str())
                     && self.teammate_view_hard_attached
                 {
-                    self.set_status_notice(format!("Already viewing @{label}"));
+                    self.set_status_notice(format!("Already in @{label} session"));
                     return Some(TeammateNavAction::Handled);
                 }
-                // Soft path = CC enterTeammateView (free switch, no socket hop).
-                if !want_hard {
-                    if self.viewing_teammate_session_id.as_deref() == Some(sid.as_str())
-                        && !self.teammate_view_hard_attached
-                    {
-                        self.set_status_notice(format!(
-                            "Already viewing @{label} · esc → team-lead · shift+enter full session"
-                        ));
-                        return Some(TeammateNavAction::Handled);
-                    }
+                // Soft = SwarmStatus preview only (NOT real agent messages).
+                if want_soft_preview {
                     self.enter_teammate_soft_view(&sid);
                     return Some(TeammateNavAction::Handled);
                 }
-                // Hard path = full child session.
+                // Hard = real child session (resume). Free-switch tree kept via
+                // swarm snapshot until Esc / enter team-lead.
                 if self.begin_teammate_hard_attach(&sid, &label) {
                     return Some(TeammateNavAction::ResumeSession { session_id: sid });
                 }

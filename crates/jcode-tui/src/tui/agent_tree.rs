@@ -218,13 +218,18 @@ pub struct AgentTreeViewState {
     pub viewing_session_id: Option<String>,
 }
 
-/// Claude Code hint strings (TeammateSpinnerLine / teammateSelectHint.ts).
-/// Use ASCII arrows — Unicode ↑↓ also tofu on some fonts.
-pub const TEAMMATE_SELECT_HINT: &str = "shift+up/down to select";
-/// CC Enter = enterTeammateView (soft transcript swap). Shift+Enter = hard session.
-pub const TEAMMATE_VIEW_HINT: &str = "enter to view · shift+enter full session";
+/// Selection hints.
+///
+/// CC spinner tree (`teammateSelectHint.ts`) is literally
+/// `"shift + ↑/↓ to select"`. CC footer tasks/bg_agent uses bare ↑/↓ after
+/// focusing with `↓ manage`. jcode: Shift always works; bare ↓ also works when
+/// the transcript is already at the bottom (no more messages to scroll).
+pub const TEAMMATE_SELECT_HINT: &str = "↓ at bottom or shift+↑/↓ to select";
+/// Enter opens the **real** child session (hard resume). Soft status preview =
+/// Shift+Enter (jcode has no CC task.messages buffer).
+pub const TEAMMATE_VIEW_HINT: &str = "enter = real session · shift+enter status preview";
 /// While already viewing: how to get back / free-switch.
-pub const TEAMMATE_RETURN_HINT: &str = "esc → team-lead · shift+up/down switch";
+pub const TEAMMATE_RETURN_HINT: &str = "esc → team-lead · ↑/↓ switch";
 
 /// Render the agent tree into a Vec of styled lines.
 ///
@@ -674,6 +679,19 @@ mod tests {
         assert!(
             leader.contains("┌─") || leader.contains("┌"),
             "leader tree glyph missing: {leader}"
+        );
+    }
+
+    #[test]
+    fn select_hint_mentions_bottom_down() {
+        // Documented UX: bare ↓ at chat bottom also selects (not only Shift).
+        assert!(
+            TEAMMATE_SELECT_HINT.contains('↓') || TEAMMATE_SELECT_HINT.contains("down"),
+            "{TEAMMATE_SELECT_HINT}"
+        );
+        assert!(
+            TEAMMATE_VIEW_HINT.contains("real session") || TEAMMATE_VIEW_HINT.contains("enter"),
+            "{TEAMMATE_VIEW_HINT}"
         );
     }
 
