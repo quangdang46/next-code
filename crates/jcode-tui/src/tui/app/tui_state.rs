@@ -689,9 +689,7 @@ impl crate::tui::TuiState for App {
     }
 
     fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> {
-        use crate::tui::agent_tree::{
-            pick_member_activity, AgentStatus, AgentTreeNode,
-        };
+        use crate::tui::agent_tree::{AgentStatus, AgentTreeNode, pick_member_activity};
 
         let hard = self.teammate_view_hard_attached;
         // CC hide row: collapsed tree returns null until re-expanded.
@@ -842,11 +840,7 @@ impl crate::tui::TuiState for App {
 
             children.push(AgentTreeNode {
                 agent_name: name,
-                status: if is_viewing {
-                    AgentStatus::Running
-                } else {
-                    st
-                },
+                status: if is_viewing { AgentStatus::Running } else { st },
                 tool_use_count,
                 token_count: 0,
                 is_leaf: true,
@@ -862,7 +856,9 @@ impl crate::tui::TuiState for App {
         // Hard-attach fallback: snapshot empty / missing current agent — still
         // render a switchable roster so the user is never stranded without nav.
         if hard {
-            let have_viewing = children.iter().any(|c| c.session_id.as_deref() == viewing_sid);
+            let have_viewing = children
+                .iter()
+                .any(|c| c.session_id.as_deref() == viewing_sid);
             if !have_viewing {
                 if let Some(sid) = viewing_sid {
                     let name = self
@@ -2457,17 +2453,17 @@ impl App {
         let display = match message.role.as_str() {
             "user" => DisplayMessage::user(content).with_title(key.clone()),
             "tool" => {
-                let tool = message
-                    .tool_name
-                    .clone()
-                    .unwrap_or_else(|| "tool".into());
+                let tool = message.tool_name.clone().unwrap_or_else(|| "tool".into());
                 DisplayMessage::system(format!("[{tool}] {content}")).with_title(key.clone())
             }
             "system" => DisplayMessage::system(content).with_title(key.clone()),
             _ => DisplayMessage::assistant(content).with_title(key.clone()),
         };
         let buf = self.teammate_transcripts.entry(sid.clone()).or_default();
-        if let Some(pos) = buf.iter().position(|m| m.title.as_deref() == Some(key.as_str())) {
+        if let Some(pos) = buf
+            .iter()
+            .position(|m| m.title.as_deref() == Some(key.as_str()))
+        {
             buf[pos] = display;
         } else {
             buf.push(display);
@@ -2491,12 +2487,17 @@ impl App {
         member: &crate::protocol::SwarmMemberStatus,
     ) {
         use crate::tui::teammate_view::seed_messages_from_member;
-        let entry = self.teammate_transcripts.entry(session_id.to_string()).or_default();
+        let entry = self
+            .teammate_transcripts
+            .entry(session_id.to_string())
+            .or_default();
         if !entry.is_empty() {
             return;
         }
         let seeded = seed_messages_from_member(member);
-        if seeded.iter().any(|m| m.role == "assistant" || m.role == "tool" || m.title.as_deref() == Some("task")) {
+        if seeded.iter().any(|m| {
+            m.role == "assistant" || m.role == "tool" || m.title.as_deref() == Some("task")
+        }) {
             *entry = seeded;
         }
     }
@@ -2562,9 +2563,7 @@ impl App {
 
     /// Refresh soft-view transcript from live buffer and/or SwarmStatus snapshot.
     pub(crate) fn refresh_teammate_soft_view(&mut self) {
-        use crate::tui::teammate_view::{
-            build_view_messages, find_member, member_is_terminal,
-        };
+        use crate::tui::teammate_view::{build_view_messages, find_member, member_is_terminal};
 
         let Some(sid) = self.viewing_teammate_session_id.clone() else {
             return;
@@ -2588,10 +2587,7 @@ impl App {
             return;
         }
         let _ = member_is_terminal(member);
-        let label = member
-            .friendly_name
-            .clone()
-            .unwrap_or_else(|| sid.clone());
+        let label = member.friendly_name.clone().unwrap_or_else(|| sid.clone());
         if let Some(buf) = self.teammate_transcripts.get(&sid) {
             if !buf.is_empty() {
                 self.teammate_view_messages = buf.clone();
@@ -2728,9 +2724,7 @@ impl App {
         code: crossterm::event::KeyCode,
         modifiers: crossterm::event::KeyModifiers,
     ) -> Option<TeammateNavAction> {
-        use crate::tui::agent_tree::{
-            child_label_at, child_session_id_at, selectable_child_count,
-        };
+        use crate::tui::agent_tree::{child_label_at, child_session_id_at, selectable_child_count};
         use crossterm::event::{KeyCode, KeyModifiers};
 
         // Temporarily un-hide so we can count children for selection.
@@ -2826,8 +2820,8 @@ impl App {
         // ↑/↓ when already selecting/viewing, AND bare ↓ when the transcript is
         // already pinned to the bottom (scroll would no-op / overscroll) — so
         // "no more messages → ↓ through agents" works without forcing Shift.
-        let viewing = self.viewing_teammate_session_id.is_some()
-            || self.teammate_view_hard_attached;
+        let viewing =
+            self.viewing_teammate_session_id.is_some() || self.teammate_view_hard_attached;
         let at_chat_bottom = !self.auto_scroll_paused;
         let input_empty = self.input.trim().is_empty();
         let arrow_nav = matches!(code, KeyCode::Up | KeyCode::Down);
@@ -2905,8 +2899,8 @@ impl App {
         let confirm = matches!(code, KeyCode::Enter)
             || (matches!(code, KeyCode::Char('f')) && self.agent_tree_selecting);
         if confirm && self.agent_tree_selecting {
-            let want_soft_preview = !self.teammate_view_hard_attached
-                && !(shift && matches!(code, KeyCode::Enter));
+            let want_soft_preview =
+                !self.teammate_view_hard_attached && !(shift && matches!(code, KeyCode::Enter));
             if self.selected_agent_tree_index < 0 {
                 // Leader → exit view / resume team-lead.
                 if self.viewing_teammate_session_id.is_some() || self.teammate_view_hard_attached {
@@ -2964,13 +2958,23 @@ impl App {
 #[derive(Debug, Clone)]
 pub(crate) enum TeammateNavAction {
     Handled,
-    ResumeSession { session_id: String },
+    ResumeSession {
+        session_id: String,
+    },
     /// DM into viewed/selected agent (CommMessage preferred).
-    MessageAgent { session_id: String, message: String },
+    MessageAgent {
+        session_id: String,
+        message: String,
+    },
     /// Native swarm stop (CC kill).
-    StopAgent { target_session: String, force: bool },
+    StopAgent {
+        target_session: String,
+        force: bool,
+    },
     /// Soft-interrupt / wake agent turn without leaving view (CC Esc while running).
-    AbortAgentTurn { session_id: String },
+    AbortAgentTurn {
+        session_id: String,
+    },
 }
 
 /// Parse a subagent status string into `(@)name` + activity.

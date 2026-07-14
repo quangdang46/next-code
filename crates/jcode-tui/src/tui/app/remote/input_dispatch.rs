@@ -104,10 +104,7 @@ pub(in crate::tui::app) async fn submit_prepared_remote_input(
             app.input.clear();
             app.cursor_pos = 0;
             app.teammate_view_abort_armed = false;
-            let from = app
-                .remote_session_id
-                .clone()
-                .unwrap_or_else(|| sid.clone());
+            let from = app.remote_session_id.clone().unwrap_or_else(|| sid.clone());
             let result = match remote.comm_message_dm(&from, &sid, &content).await {
                 Ok(id) => Ok(id),
                 Err(e) => {

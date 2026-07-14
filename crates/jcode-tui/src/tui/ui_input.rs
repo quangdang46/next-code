@@ -744,10 +744,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     format!("✨ {}", labels.join(" · ")),
                     Style::default().fg(chip_color),
                 ));
-                spans.push(Span::styled(
-                    " (canceljcode)",
-                    Style::default().fg(dimmed),
-                ));
+                spans.push(Span::styled(" (canceljcode)", Style::default().fg(dimmed)));
             }
         }
         spans
@@ -800,10 +797,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         }
         if let ProcessingStatus::RunningTool(ref name) = app.status() {
             spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
-            spans.push(Span::styled(
-                name.clone(),
-                Style::default().fg(dim_color()),
-            ));
+            spans.push(Span::styled(name.clone(), Style::default().fg(dim_color())));
             spans.push(Span::styled(
                 " · Alt+B bg",
                 Style::default().fg(rgb(100, 100, 100)),

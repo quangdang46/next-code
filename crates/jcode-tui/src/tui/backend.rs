@@ -652,11 +652,7 @@ impl RemoteConnection {
     }
 
     /// Request a tool-call summary for a swarm member (enriches soft-view).
-    pub async fn comm_summary(
-        &mut self,
-        session_id: &str,
-        target_session: &str,
-    ) -> Result<u64> {
+    pub async fn comm_summary(&mut self, session_id: &str, target_session: &str) -> Result<u64> {
         let id = self.next_request_id;
         let request = Request::CommSummary {
             id,

@@ -11,11 +11,11 @@
 //! - Prefer short task_label + status + tools + output_tail
 //! - One empty-state line if nothing to show (no spam)
 
+use crate::protocol::SwarmMemberStatus;
+use crate::tui::color_support::rgb as rgb_color;
 use jcode_tui_messages::DisplayMessage;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
-use crate::protocol::SwarmMemberStatus;
-use crate::tui::color_support::rgb as rgb_color;
 
 const MAX_DETAIL_CHARS: usize = 120;
 const MAX_TASK_LABEL_CHARS: usize = 160;
@@ -45,13 +45,19 @@ pub fn seed_messages_from_member(member: &SwarmMemberStatus) -> Vec<DisplayMessa
     for t in &member.todo_items {
         for tool in &t.tool_intents {
             let st = tool.status.to_ascii_lowercase();
-            let line = format!("{} ({st}): {}", tool.tool_name, truncate_chars(&tool.intent, 120));
+            let line = format!(
+                "{} ({st}): {}",
+                tool.tool_name,
+                truncate_chars(&tool.intent, 120)
+            );
             let key = if tool.tool_call_id.is_empty() {
                 format!("{}:tool:{}", member.session_id, tool.tool_name)
             } else {
                 format!("{}:tool:{}", member.session_id, tool.tool_call_id)
             };
-            out.push(DisplayMessage::system(format!("[{}] {line}", tool.tool_name)).with_title(key));
+            out.push(
+                DisplayMessage::system(format!("[{}] {line}", tool.tool_name)).with_title(key),
+            );
         }
     }
 
@@ -61,9 +67,7 @@ pub fn seed_messages_from_member(member: &SwarmMemberStatus) -> Vec<DisplayMessa
         .map(str::trim)
         .filter(|s| !s.is_empty())
     {
-        out.push(
-            DisplayMessage::assistant(truncate_chars(tail, 4000)).with_title("stream"),
-        );
+        out.push(DisplayMessage::assistant(truncate_chars(tail, 4000)).with_title("stream"));
     } else if out.is_empty() {
         out.push(DisplayMessage::system(format!("@{name}: no stream yet")));
     }
@@ -83,7 +87,12 @@ pub fn preview_line_from_messages(msgs: &[DisplayMessage]) -> Option<String> {
                     || m.title.as_deref() == Some("task"))
         })
         .map(|m| {
-            let line = m.content.lines().last().unwrap_or(m.content.as_str()).trim();
+            let line = m
+                .content
+                .lines()
+                .last()
+                .unwrap_or(m.content.as_str())
+                .trim();
             truncate_chars(line, 80)
         })
         .filter(|s| !s.is_empty())
@@ -305,11 +314,7 @@ fn format_elapsed(secs: u64) -> String {
 
 pub fn member_tree_stats(member: &SwarmMemberStatus) -> Option<String> {
     let mut parts = Vec::new();
-    let tool_n: usize = member
-        .todo_items
-        .iter()
-        .map(|t| t.tool_intents.len())
-        .sum();
+    let tool_n: usize = member.todo_items.iter().map(|t| t.tool_intents.len()).sum();
     if tool_n > 0 {
         parts.push(format!(
             "{tool_n} tool {}",
@@ -400,9 +405,7 @@ pub fn draw_viewing_chrome(
         Span::styled("Viewing ", Style::default().fg(rgb_color(220, 220, 230))),
         Span::styled(
             format!("@{name}"),
-            Style::default()
-                .fg(name_color)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(name_color).add_modifier(Modifier::BOLD),
         ),
         Span::styled(" · ", dim),
         Span::styled("esc", accent),
@@ -473,7 +476,7 @@ pub fn header_height(viewing: bool, available: u16) -> u16 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{SwarmToolIntent, SwarmTodoItem};
+    use crate::protocol::{SwarmTodoItem, SwarmToolIntent};
 
     fn sample_member() -> SwarmMemberStatus {
         SwarmMemberStatus {
@@ -558,7 +561,10 @@ mod tests {
         let msgs = build_view_messages(&sample_member());
         // No chrome banner in body (TeammateViewHeader owns that).
         assert!(!msgs.iter().any(|m| m.content.contains("esc return")));
-        assert!(msgs.iter().any(|m| m.role == "assistant" && m.content.contains("tick")));
+        assert!(
+            msgs.iter()
+                .any(|m| m.role == "assistant" && m.content.contains("tick"))
+        );
         assert!(msgs.iter().any(|m| m.content.contains("bash")));
     }
 
@@ -582,7 +588,8 @@ mod tests {
         let m = sample_member();
         let msgs = seed_messages_from_member(&m);
         assert!(
-            msgs.iter().any(|x| x.role == "assistant" && x.content.contains("tick")),
+            msgs.iter()
+                .any(|x| x.role == "assistant" && x.content.contains("tick")),
             "{msgs:?}"
         );
         assert!(
@@ -590,7 +597,10 @@ mod tests {
             "tools: {msgs:?}"
         );
         let preview = preview_line_from_messages(&msgs).expect("preview");
-        assert!(preview.contains("tick") || preview.contains("bash"), "{preview}");
+        assert!(
+            preview.contains("tick") || preview.contains("bash"),
+            "{preview}"
+        );
     }
 
     #[test]

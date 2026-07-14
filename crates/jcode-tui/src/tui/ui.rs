@@ -2929,8 +2929,8 @@ fn draw_inner(frame: &mut Frame, app: &dyn TuiState) {
     // CC TeammateViewHeader is ALWAYS shown while viewing — soft preview OR hard-attach.
     // Prefer 1-line header over dropping chrome entirely on short terminals.
     let full_messages_area = top_chunks[0];
-    let is_viewing_teammate = app.viewing_teammate_session_id().is_some()
-        || app.teammate_view_hard_attached();
+    let is_viewing_teammate =
+        app.viewing_teammate_session_id().is_some() || app.teammate_view_hard_attached();
     let header_h =
         crate::tui::teammate_view::header_height(is_viewing_teammate, full_messages_area.height);
     let (header_area, messages_area) = if header_h > 0 {

@@ -1,7 +1,7 @@
-pub(crate) mod agent_tree;
-pub(crate) mod teammate_view;
 pub mod account_picker;
+pub(crate) mod agent_tree;
 pub(crate) mod app;
+pub(crate) mod teammate_view;
 
 #[derive(Clone)]
 pub struct ContextSnapshot {
@@ -272,7 +272,9 @@ pub trait TuiState {
     /// Running items state (tools, subagents, background tasks) for the interactive list.
     fn running_items(&self) -> RunningItemsState;
     /// Agent tree for conversation rendering (Claude Code style tree).
-    fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> { Vec::new() }
+    fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> {
+        Vec::new()
+    }
     /// Interactive selection state for the agent tree (CC Shift+↑/↓ / Enter).
     fn agent_tree_view_state(&self) -> crate::tui::agent_tree::AgentTreeViewState {
         crate::tui::agent_tree::AgentTreeViewState::default()

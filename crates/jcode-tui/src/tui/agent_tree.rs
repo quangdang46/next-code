@@ -21,8 +21,8 @@
 //!    (`PromptInputFooterLeftSide` + `BackgroundTaskStatus`) — jcode maps this
 //!    partially via swarm strip / running_items; tree is the spinner-tree mode.
 
-use ratatui::prelude::*;
 use crate::tui::color_support::rgb as rgb_color;
+use ratatui::prelude::*;
 
 /// Status of an agent in the agent tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -50,9 +50,7 @@ impl AgentStatus {
             "ready" | "idle" => AgentStatus::Idle,
             "completed" | "done" | "ok" | "success" => AgentStatus::Completed,
             "failed" | "error" | "crashed" => AgentStatus::Failed,
-            "stopped" | "cancelled" | "canceled" | "interrupted" | "killed" => {
-                AgentStatus::Stopped
-            }
+            "stopped" | "cancelled" | "canceled" | "interrupted" | "killed" => AgentStatus::Stopped,
             // Unknown statuses must NOT default to Running (would never prune).
             _ => AgentStatus::Idle,
         }
@@ -76,9 +74,7 @@ impl AgentStatus {
         let t = raw.trim().to_ascii_lowercase();
         match t.as_str() {
             "processing" | "running" | "active" | "starting" | "connecting" | "thinking"
-            | "searching" | "editing" | "reading" | "writing" => {
-                Some(format!("{t}…"))
-            }
+            | "searching" | "editing" | "reading" | "writing" => Some(format!("{t}…")),
             _ => None,
         }
     }
@@ -169,8 +165,7 @@ pub fn is_meaningful_activity(s: &str) -> bool {
         return false;
     }
     // Pure numeric / fraction / percent counters belong in stats, not `: activity`.
-    if t
-        .chars()
+    if t.chars()
         .all(|c| c.is_ascii_digit() || matches!(c, '/' | '.' | '%' | ' '))
     {
         return false;
@@ -187,7 +182,10 @@ pub fn pick_member_activity(
     raw_status: Option<&str>,
 ) -> Option<String> {
     for candidate in [task_label, detail] {
-        if let Some(s) = candidate.map(str::trim).filter(|s| is_meaningful_activity(s)) {
+        if let Some(s) = candidate
+            .map(str::trim)
+            .filter(|s| is_meaningful_activity(s))
+        {
             return Some(s.to_string());
         }
     }
@@ -339,11 +337,7 @@ pub fn selection_max_index(child_count: usize, viewing: bool) -> i32 {
 pub fn step_selected_index(cur: i32, child_count: usize, viewing: bool, down: bool) -> i32 {
     let max_idx = selection_max_index(child_count, viewing);
     if down {
-        if cur >= max_idx {
-            -1
-        } else {
-            cur + 1
-        }
+        if cur >= max_idx { -1 } else { cur + 1 }
     } else if cur <= -1 {
         max_idx
     } else {
@@ -354,10 +348,7 @@ pub fn step_selected_index(cur: i32, child_count: usize, viewing: bool, down: bo
 /// Session id of the child at flat index `idx` (0-based), if any.
 pub fn child_session_id_at(trees: &[AgentTreeNode], idx: usize) -> Option<String> {
     let leader = trees.first()?;
-    leader
-        .children
-        .get(idx)
-        .and_then(|c| c.session_id.clone())
+    leader.children.get(idx).and_then(|c| c.session_id.clone())
 }
 
 /// Display name of the child at flat index `idx`.
@@ -382,7 +373,8 @@ fn render_node(
         .as_ref()
         .zip(node.session_id.as_ref())
         .is_some_and(|(v, s)| v == s);
-    let is_highlighted = is_selected || is_viewing || (is_leader && depth == 0 && view.viewing_session_id.is_none());
+    let is_highlighted =
+        is_selected || is_viewing || (is_leader && depth == 0 && view.viewing_session_id.is_none());
 
     let name_color = if is_selected {
         rgb_color(255, 220, 100) // selection highlight
@@ -465,9 +457,7 @@ fn render_node(
                 if is_leader && depth == 0 {
                     Some("processing…".to_string())
                 } else {
-                    node.status
-                        .activity_fallback()
-                        .map(ToString::to_string)
+                    node.status.activity_fallback().map(ToString::to_string)
                 }
             })
     } else {
@@ -554,15 +544,7 @@ fn render_node(
     for (i, child) in node.children.iter().enumerate() {
         let child_is_last = i + 1 == child_count;
         let child_row = if depth == 0 { i as i32 } else { -99 };
-        render_node(
-            child,
-            depth + 1,
-            child_is_last,
-            false,
-            child_row,
-            view,
-            out,
-        );
+        render_node(child, depth + 1, child_is_last, false, child_row, view, out);
     }
 }
 
@@ -748,7 +730,12 @@ mod tests {
         // selectable so Shift+↑ can reach team-lead and Enter returns home.
         let tree = leader(
             vec![
-                child_with_sid("duck", AgentStatus::Running, Some("viewing"), Some("ses_duck")),
+                child_with_sid(
+                    "duck",
+                    AgentStatus::Running,
+                    Some("viewing"),
+                    Some("ses_duck"),
+                ),
                 child_with_sid("pig", AgentStatus::Idle, Some("idle"), Some("ses_pig")),
             ],
             false,
@@ -764,17 +751,17 @@ mod tests {
             2,
             "Idle roster rows must stay selectable for free switch"
         );
-        assert_eq!(
-            child_session_id_at(&trees, 0).as_deref(),
-            Some("ses_duck")
-        );
+        assert_eq!(child_session_id_at(&trees, 0).as_deref(), Some("ses_duck"));
         assert_eq!(child_session_id_at(&trees, 1).as_deref(), Some("ses_pig"));
         let texts: Vec<String> = render(&trees, &view).iter().map(line_text).collect();
         assert!(
             !texts.is_empty(),
             "tree must stay visible while viewing: {texts:?}"
         );
-        let lead = texts.iter().find(|t| t.contains("team-lead")).expect("lead");
+        let lead = texts
+            .iter()
+            .find(|t| t.contains("team-lead"))
+            .expect("lead");
         // CC TeammateSpinnerTree: selected lead while viewing → "enter to view"
         // (same string as children — not "enter to return" / esc spam).
         assert!(
@@ -821,7 +808,8 @@ mod tests {
 
     #[test]
     fn pick_member_activity_uses_raw_processing_status() {
-        let activity = pick_member_activity(None, None, None, &AgentStatus::Running, Some("processing"));
+        let activity =
+            pick_member_activity(None, None, None, &AgentStatus::Running, Some("processing"));
         assert_eq!(activity.as_deref(), Some("processing…"));
     }
 
@@ -875,10 +863,7 @@ mod tests {
         let tree = leader(vec![node], true);
         let texts: Vec<String> = render_plain(&[tree]).iter().map(line_text).collect();
         let line = texts.iter().find(|t| t.contains("@butterfly")).unwrap();
-        assert!(
-            line.contains("· 2/5"),
-            "todo should be dim stats: {line}"
-        );
+        assert!(line.contains("· 2/5"), "todo should be dim stats: {line}");
         assert!(
             !line.contains(": 2") && !line.contains(": 2/5"),
             "todo must not be the activity: {line}"

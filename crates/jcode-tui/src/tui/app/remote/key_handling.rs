@@ -333,10 +333,7 @@ async fn handle_remote_key_internal(
                     .remote_session_id
                     .clone()
                     .unwrap_or_else(|| session_id.clone());
-                if let Err(e) = remote
-                    .comm_message_dm(&from, &session_id, &message)
-                    .await
-                {
+                if let Err(e) = remote.comm_message_dm(&from, &session_id, &message).await {
                     // Fallback: notify_session injects into target.
                     if let Err(e2) = remote.notify_session(&session_id, &message).await {
                         app.set_status_notice(format!("Message agent failed: {e} / {e2}"));
