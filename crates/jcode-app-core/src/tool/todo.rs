@@ -1,7 +1,9 @@
 use super::{Tool, ToolContext, ToolOutput};
 use crate::bus::{Bus, BusEvent, TodoEvent};
 use crate::todo::{
-    LOW_HILL_CLIMBABILITY, TodoGoal, TodoItem, load_goals, load_todos, save_goals, save_todos,
+    LOW_HILL_CLIMBABILITY, TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE,
+    TODO_OWNERSHIP_CONTINUATION_MESSAGE, TodoGoal, TodoItem, load_goals, load_todos,
+    newly_completed_groups_have_sufficient_ownership, save_goals, save_todos,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -115,15 +117,32 @@ fn take_reframe_nudges(goals: &[TodoGoal], todos: &[TodoItem]) -> Vec<String> {
         if !group_open {
             continue;
         }
-        let label = goal.group.as_deref().unwrap_or("the current goal");
-        nudges.push(format!(
-            "Goal '{}' has low hill-climbability ({}). Reframe it into a quantifiable, \
-             verifiable objective (set the goal's `objective`, e.g. a metric plus target, and \
-             build a harness that measures it).",
-            label, score
-        ));
+        nudges.push(TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE.to_string());
     }
     nudges
+}
+
+fn build_todo_output(
+    todos: Vec<TodoItem>,
+    goals: Vec<TodoGoal>,
+    continuations: impl IntoIterator<Item = String>,
+) -> Result<ToolOutput> {
+    let remaining = todos
+        .iter()
+        .filter(|todo| todo.status != "completed")
+        .count();
+    let mut text = serde_json::to_string_pretty(&todos)?;
+    if !goals.is_empty() {
+        text.push_str("\n\nGoals:\n");
+        text.push_str(&serde_json::to_string_pretty(&goals)?);
+    }
+    for continuation in continuations {
+        text.push_str("\n\n");
+        text.push_str(&continuation);
+    }
+    Ok(ToolOutput::new(text)
+        .with_title(format!("{} todos", remaining))
+        .with_metadata(json!({"todos": todos, "goals": goals})))
 }
 
 /// Leniently normalize raw todo-tool arguments before strict deserialization.
@@ -166,7 +185,12 @@ fn normalize_todo_input(mut input: Value) -> Value {
                 let Some(fields) = item.as_object_mut() else {
                     continue;
                 };
-                for key in ["confidence", "completion_confidence", "hill_climbability"] {
+                for key in [
+                    "confidence",
+                    "completion_confidence",
+                    "hill_climbability",
+                    "end_to_end_ownership",
+                ] {
                     if let Some(value) = fields.get_mut(key) {
                         coerce_value_to_integer(value);
                     }
@@ -210,7 +234,11 @@ impl Tool for TodoTool {
     }
 
     fn description(&self) -> &str {
-        "Read or update the todo list. Include confidence for each item, update it as evidence accumulates while working, and include completion_confidence when marking an item completed. Rate each goal's hill_climbability via the goals param: how measurable and iterable progress toward it is."
+        // SECURITY/EVAL: This is model-visible calibration text. Keep it
+        // deliberately handwritten. Never generate it from gate constants or
+        // interpolate private thresholds, because that would teach the model
+        // how to target the evaluator instead of reporting an honest assessment.
+        "Read or update structured todo items and optional goal-level assessments."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -249,23 +277,23 @@ impl Tool for TodoTool {
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100,
-                                "description": "Current confidence, 0-100, that this todo can be completed correctly. Set when creating the todo, and update it as evidence accumulates while working (each validation or test that passes justifies a step up). Confidence should rise in evidence-backed steps, not jump to 100 at the end."
+                                "description": "Self-assessed confidence, 0-100, that this todo can be completed correctly."
                             },
                             "completion_confidence": {
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100,
-                                "description": "Confidence, 0-100, that this todo is correctly completed. Set when marking the todo completed; omit until then."
+                                "description": "Self-assessed confidence, 0-100, that this todo was completed correctly. Use only for completed items."
                             }
                         }
                     }
                 },
                 "goals": {
                     "type": "array",
-                    "description": "Goal-level assessments, one per todo group (use group: null for an ungrouped flat list, which is one implicit goal). Rate how hill-climbable each goal is and state its measurable objective when one exists. Stored goals for groups not mentioned in a write are retained.",
+                    "description": "Optional goal-level assessments, one per todo group. Use group: null for an ungrouped list. Stored assessments for groups omitted from an update are retained.",
                     "items": {
                         "type": "object",
-                        "required": ["hill_climbability"],
+                        "required": ["hill_climbability", "feedback_loop"],
                         "properties": {
                             "group": {
                                 "type": "string",
@@ -275,11 +303,21 @@ impl Tool for TodoTool {
                                 "type": "integer",
                                 "minimum": 0,
                                 "maximum": 100,
-                                "description": "How hill-climbable this goal is, 0-100: can progress be measured against a quantifiable, verifiable objective and iterated on? Scores below 90 trigger recurring reframe guidance on every applicable todo write. High scores should have a clear metric and stated objective (e.g. p50 grep latency under 50ms, all targeted tests pass)."
+                                "description": "Self-assessment, 0-100, of how readily progress toward this goal can be measured and compared across iterations."
                             },
                             "objective": {
                                 "type": "string",
-                                "description": "The measurable objective progress climbs toward, e.g. 'p50 grep latency under 50ms on the repo corpus'. State one whenever it exists; a high hill_climbability without an objective is not credible."
+                                "description": "Optional concise statement of the intended measurable outcome."
+                            },
+                            "feedback_loop": {
+                                "type": "string",
+                                "description": "Concrete process, observation, or check used to compare progress across iterations."
+                            },
+                            "end_to_end_ownership": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 100,
+                                "description": "Completion-time self-assessment, 0-100, of whether the full intended user outcome and its necessary follow-through were delivered, rather than only the immediate implementation. Use only when completing the goal."
                             }
                         }
                     }
@@ -300,10 +338,18 @@ impl Tool for TodoTool {
             let previous = load_todos(&ctx.session_id).unwrap_or_default();
             let mut todos = params.todos.unwrap_or_else(|| previous.clone());
             merge_confidence_history(&previous, &mut todos);
-            save_todos(&ctx.session_id, &todos).and_then(|_| {
+            (|| {
                 let stored_goals = load_goals(&ctx.session_id).unwrap_or_default();
                 let goals = merge_goals(&stored_goals, params.goals);
+                if !newly_completed_groups_have_sufficient_ownership(&previous, &todos, &goals) {
+                    return build_todo_output(
+                        previous,
+                        stored_goals,
+                        [TODO_OWNERSHIP_CONTINUATION_MESSAGE.to_string()],
+                    );
+                }
                 let nudges = take_reframe_nudges(&goals, &todos);
+                save_todos(&ctx.session_id, &todos)?;
                 save_goals(&ctx.session_id, &goals)?;
 
                 Bus::global().publish(BusEvent::TodoUpdated(TodoEvent {
@@ -312,33 +358,13 @@ impl Tool for TodoTool {
                     at: chrono::Utc::now(),
                 }));
 
-                let remaining = todos.iter().filter(|t| t.status != "completed").count();
-                let mut text = serde_json::to_string_pretty(&todos)?;
-                if !goals.is_empty() {
-                    text.push_str("\n\nGoals:\n");
-                    text.push_str(&serde_json::to_string_pretty(&goals)?);
-                }
-                for nudge in &nudges {
-                    text.push_str("\n\n");
-                    text.push_str(nudge);
-                }
-                Ok(ToolOutput::new(text)
-                    .with_title(format!("{} todos", remaining))
-                    .with_metadata(json!({"todos": todos, "goals": goals})))
-            })
+                build_todo_output(todos, goals, nudges)
+            })()
         } else {
             (|| {
                 let todos = load_todos(&ctx.session_id)?;
                 let goals = load_goals(&ctx.session_id).unwrap_or_default();
-                let remaining = todos.iter().filter(|t| t.status != "completed").count();
-                let mut text = serde_json::to_string_pretty(&todos)?;
-                if !goals.is_empty() {
-                    text.push_str("\n\nGoals:\n");
-                    text.push_str(&serde_json::to_string_pretty(&goals)?);
-                }
-                Ok(ToolOutput::new(text)
-                    .with_title(format!("{} todos", remaining))
-                    .with_metadata(json!({"todos": todos, "goals": goals})))
+                build_todo_output(todos, goals, Vec::new())
             })()
         };
         result.map_err(|err| {
@@ -397,7 +423,70 @@ mod tests {
         assert!(goal_props.contains_key("group"));
         assert!(goal_props.contains_key("hill_climbability"));
         assert!(goal_props.contains_key("objective"));
-        assert_eq!(goal_props.len(), 3);
+        assert!(goal_props.contains_key("feedback_loop"));
+        assert!(goal_props.contains_key("end_to_end_ownership"));
+        assert_eq!(goal_props.len(), 5);
+
+        let goal_required = props["goals"]["items"]["required"]
+            .as_array()
+            .expect("goals should advertise required fields");
+        assert!(
+            goal_required
+                .iter()
+                .any(|value| value == "hill_climbability")
+        );
+        assert!(goal_required.iter().any(|value| value == "feedback_loop"));
+
+        let ownership_description = goal_props["end_to_end_ownership"]
+            .get("description")
+            .and_then(Value::as_str)
+            .expect("ownership should have a neutral description");
+        assert!(ownership_description.contains("Use only when completing the goal."));
+        assert!(ownership_description.contains("full intended user outcome"));
+        assert!(ownership_description.contains("necessary follow-through"));
+        assert!(!ownership_description.contains("90"));
+        assert!(!ownership_description.contains("91"));
+        assert!(
+            !ownership_description
+                .to_ascii_lowercase()
+                .contains("threshold")
+        );
+
+        let hill_description = goal_props["hill_climbability"]
+            .get("description")
+            .and_then(Value::as_str)
+            .expect("hill-climbability should describe the assessment neutrally");
+        assert!(!hill_description.contains(&LOW_HILL_CLIMBABILITY.to_string()));
+        assert!(!hill_description.to_ascii_lowercase().contains("threshold"));
+
+        let model_visible_schema = serde_json::to_string(&schema)
+            .expect("todo schema should serialize")
+            .to_ascii_lowercase();
+        for disclosure in [
+            "threshold",
+            "quality gate",
+            "internal quality check",
+            "not jump",
+            "test that passes",
+            "isn't high enough",
+        ] {
+            assert!(
+                !model_visible_schema.contains(disclosure),
+                "model-visible todo schema disclosed calibration wording: {disclosure}"
+            );
+        }
+        for domain_hint in [
+            "visual quality",
+            "screenshot",
+            "browser",
+            "viewport",
+            "console error",
+        ] {
+            assert!(
+                !model_visible_schema.contains(domain_hint),
+                "model-visible todo schema biased visual-work feedback: {domain_hint}"
+            );
+        }
     }
 
     fn parse(input: Value) -> Result<TodoInput, serde_json::Error> {
@@ -466,7 +555,7 @@ mod tests {
     fn accepts_goals_including_string_coercion() {
         let input = json!({
             "goals": [
-                {"group": "optimize grep", "hill_climbability": "95", "objective": "p50 under 50ms"},
+                {"group": "optimize grep", "hill_climbability": "95", "objective": "p50 under 50ms", "feedback_loop": "run the grep benchmark and compare p50"},
                 {"hill_climbability": 20}
             ]
         });
@@ -474,6 +563,13 @@ mod tests {
         let goals = parsed.goals.expect("goals present");
         assert_eq!(goals[0].hill_climbability, Some(95));
         assert_eq!(goals[0].objective.as_deref(), Some("p50 under 50ms"));
+        assert_eq!(
+            goals[0].feedback_loop.as_deref(),
+            Some("run the grep benchmark and compare p50")
+        );
+        // Runtime parsing remains backward-compatible with stored or older
+        // provider payloads even though the advertised schema requires the field.
+        assert_eq!(goals[1].feedback_loop, None);
         assert_eq!(goals[1].group, None);
     }
 
@@ -510,15 +606,39 @@ mod tests {
     }
 
     #[test]
+    fn ownership_gate_output_preserves_the_saved_todo_card() {
+        let todos = vec![open_todo(Some("ship"))];
+        let goals = vec![goal(Some("ship"), 96)];
+        let output = build_todo_output(
+            todos.clone(),
+            goals.clone(),
+            [TODO_OWNERSHIP_CONTINUATION_MESSAGE.to_string()],
+        )
+        .expect("ownership gate should produce a structured todo result");
+
+        assert_eq!(output.title.as_deref(), Some("1 todos"));
+        assert!(output.output.starts_with('['));
+        assert!(output.output.contains("\"status\": \"in_progress\""));
+        assert!(output.output.contains(TODO_OWNERSHIP_CONTINUATION_MESSAGE));
+        assert_eq!(
+            output.metadata,
+            Some(json!({"todos": todos, "goals": goals}))
+        );
+    }
+
+    #[test]
     fn reframe_nudge_recurs_for_every_low_open_goal_write() {
         let todos = vec![open_todo(Some("design"))];
-        let goals = vec![goal(Some("design"), 89), goal(Some("perf"), 90)];
+        let goals = vec![goal(Some("design"), 95), goal(Some("perf"), 96)];
         let nudges = take_reframe_nudges(&goals, &todos);
         assert_eq!(nudges.len(), 1);
-        assert!(nudges[0].contains("design"));
-        assert!(!nudges[0].contains("open-ended"));
-        assert!(!nudges[0].contains("checkpoints"));
-        // A subsequent write receives the same guidance until the score reaches 90.
+        assert_eq!(nudges[0], TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE);
+        assert!(!nudges[0].contains("95"));
+        assert!(nudges[0].contains("hill-climbability"));
+        assert!(!nudges[0].to_ascii_lowercase().contains("threshold"));
+        assert!(!nudges[0].to_ascii_lowercase().contains("gate"));
+        // A subsequent write receives the same generic guidance while the
+        // private condition remains applicable.
         assert_eq!(take_reframe_nudges(&goals, &todos).len(), 1);
     }
 
@@ -537,7 +657,7 @@ mod tests {
         let goals = vec![goal(None, 15)];
         let nudges = take_reframe_nudges(&goals, &todos);
         assert_eq!(nudges.len(), 1);
-        assert!(nudges[0].contains("the current goal"));
+        assert_eq!(nudges[0], TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE);
     }
 
     #[test]

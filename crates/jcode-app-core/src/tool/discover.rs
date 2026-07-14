@@ -13,6 +13,23 @@ use std::time::Instant;
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_RESPONSE_BYTES: usize = 64 * 1024;
 const DISCOVERY_REQUEST_ID_HEADER: &str = "x-jcode-discovery-request-id";
+const DISCOVERY_BENCHMARK_HEADER: &str = "x-jcode-discovery-benchmark";
+const DISCOVERY_BENCHMARK_ENV: &str = "JCODE_DISCOVERY_BENCHMARK";
+const DISCOVERY_QUERY_MIN_CHARS: usize = 20;
+const DISCOVERY_QUERY_MAX_CHARS: usize = 500;
+const DISCOVERY_REASON_MIN_CHARS: usize = 40;
+const DISCOVERY_REASON_MAX_CHARS: usize = 2_000;
+
+fn discovery_benchmark_run() -> bool {
+    std::env::var(DISCOVERY_BENCHMARK_ENV)
+        .ok()
+        .is_some_and(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes"
+            )
+        })
+}
 
 #[derive(Debug)]
 struct DiscoveryFetchResult {
@@ -66,6 +83,7 @@ fn record_discovery_telemetry(
         result_count,
         query_present,
         reason_present,
+        benchmark_run: discovery_benchmark_run(),
         endpoint,
     });
 }
@@ -102,6 +120,283 @@ struct DiscoverToolsInput {
     tool: Option<String>,
 }
 
+#[derive(Debug)]
+struct DiscoveryInputError {
+    message: String,
+    failure_reason: &'static str,
+}
+
+fn validate_discovery_text(
+    value: Option<&str>,
+    field: &'static str,
+    min_chars: usize,
+    max_chars: usize,
+) -> std::result::Result<String, DiscoveryInputError> {
+    let value = value.unwrap_or_default().trim();
+    if value.is_empty() {
+        return Err(DiscoveryInputError {
+            message: format!(
+                "discovery {field} is required; write a specific summary without private data"
+            ),
+            failure_reason: if field == "query" {
+                "missing_query"
+            } else {
+                "missing_reason"
+            },
+        });
+    }
+
+    let chars = value.chars().count();
+    if chars < min_chars {
+        return Err(DiscoveryInputError {
+            message: format!(
+                "discovery {field} is too short; provide at least {min_chars} characters of specific, non-private context"
+            ),
+            failure_reason: if field == "query" {
+                "query_too_short"
+            } else {
+                "reason_too_short"
+            },
+        });
+    }
+    if chars > max_chars {
+        return Err(DiscoveryInputError {
+            message: format!(
+                "discovery {field} is too long; summarize it in at most {max_chars} characters without private data"
+            ),
+            failure_reason: if field == "query" {
+                "query_too_long"
+            } else {
+                "reason_too_long"
+            },
+        });
+    }
+    if contains_recognizable_secret(value) {
+        return Err(DiscoveryInputError {
+            message: format!(
+                "discovery {field} appears to contain a secret or financial credential; replace it with a non-sensitive description"
+            ),
+            failure_reason: if field == "query" {
+                "query_sensitive_data"
+            } else {
+                "reason_sensitive_data"
+            },
+        });
+    }
+    if !has_sufficient_detail(value, field) {
+        return Err(DiscoveryInputError {
+            message: format!(
+                "discovery {field} is not specific enough; describe the capability and task constraints in distinct words without private data"
+            ),
+            failure_reason: if field == "query" {
+                "query_not_specific"
+            } else {
+                "reason_not_specific"
+            },
+        });
+    }
+    Ok(value.to_string())
+}
+
+fn has_sufficient_detail(value: &str, field: &str) -> bool {
+    let words: Vec<String> = value
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| word.chars().count() >= 2)
+        .map(str::to_ascii_lowercase)
+        .collect();
+    let mut unique = words.clone();
+    unique.sort_unstable();
+    unique.dedup();
+    let (min_words, min_unique) = if field == "query" { (4, 3) } else { (7, 5) };
+    words.len() >= min_words && unique.len() >= min_unique
+}
+
+/// A deliberately high-confidence last-line defense before model-authored
+/// Discovery text leaves the client. This complements, rather than replaces,
+/// the schema instruction to summarize the need instead of copying user data.
+fn contains_recognizable_secret(value: &str) -> bool {
+    let lower = value.to_ascii_lowercase();
+    if (lower.contains("-----begin ") && lower.contains("private key-----"))
+        || contains_credential_assignment(&lower)
+        || contains_email_address(value)
+        || contains_ssn(value)
+        || contains_credential_url(value)
+        || contains_international_phone_number(value)
+    {
+        return true;
+    }
+
+    if contains_prefixed_secret(value) || contains_payment_card_sequence(value) {
+        return true;
+    }
+
+    value.split_whitespace().any(|token| {
+        let token = token.trim_matches(|c: char| {
+            matches!(
+                c,
+                '"' | '\'' | '`' | '(' | ')' | '[' | ']' | '{' | '}' | ',' | ';'
+            )
+        });
+        looks_like_jwt(token)
+    }) || contains_bearer_token(&lower)
+}
+
+fn contains_prefixed_secret(value: &str) -> bool {
+    const SECRET_PREFIXES: &[&str] = &[
+        "sk_live_",
+        "rk_live_",
+        "sk_test_",
+        "rk_test_",
+        "sk-proj-",
+        "ghp_",
+        "gho_",
+        "ghu_",
+        "ghs_",
+        "github_pat_",
+        "xoxb-",
+        "xoxp-",
+        "xoxa-",
+        "xoxr-",
+        "npm_",
+        "jck_live_",
+    ];
+    value.split_whitespace().any(|token| {
+        let token = token.trim_matches(|c: char| !c.is_ascii_alphanumeric() && !"_-".contains(c));
+        let lower = token.to_ascii_lowercase();
+        SECRET_PREFIXES
+            .iter()
+            .any(|prefix| lower.starts_with(prefix) && token.len() >= prefix.len() + 8)
+            || (token.starts_with("AKIA") && token.len() == 20)
+            || (token.starts_with("AIza") && token.len() >= 35)
+    })
+}
+
+fn contains_credential_assignment(lower: &str) -> bool {
+    const LABELS: &[&str] = &[
+        "api_key",
+        "api-key",
+        "apikey",
+        "access_token",
+        "auth_token",
+        "client_secret",
+        "secret_key",
+        "password",
+        "passwd",
+    ];
+    LABELS.iter().any(|label| {
+        lower.match_indices(label).any(|(index, _)| {
+            let rest = &lower[index + label.len()..];
+            let rest = rest.trim_start();
+            let Some(rest) = rest.strip_prefix(['=', ':']) else {
+                return false;
+            };
+            let candidate =
+                rest.trim_start_matches(|c: char| c.is_whitespace() || "'\"`".contains(c));
+            candidate
+                .split(|c: char| c.is_whitespace() || "'\"`,;".contains(c))
+                .next()
+                .is_some_and(|token| token.len() >= 8)
+        })
+    })
+}
+
+fn contains_bearer_token(lower: &str) -> bool {
+    lower.match_indices("bearer ").any(|(index, _)| {
+        lower[index + "bearer ".len()..]
+            .split_whitespace()
+            .next()
+            .is_some_and(|token| token.trim_matches(|c: char| ",;.'\"`".contains(c)).len() >= 12)
+    })
+}
+
+fn contains_email_address(value: &str) -> bool {
+    value.split_whitespace().any(|token| {
+        let token = token.trim_matches(|c: char| ",;:()[]{}<>\"'`".contains(c));
+        let Some((local, domain)) = token.split_once('@') else {
+            return false;
+        };
+        !local.is_empty()
+            && domain
+                .rsplit_once('.')
+                .is_some_and(|(host, suffix)| !host.is_empty() && suffix.len() >= 2)
+    })
+}
+
+fn contains_ssn(value: &str) -> bool {
+    value.split_whitespace().any(|token| {
+        let token = token.trim_matches(|c: char| !c.is_ascii_digit() && c != '-');
+        let parts: Vec<&str> = token.split('-').collect();
+        parts.len() == 3
+            && parts[0].len() == 3
+            && parts[1].len() == 2
+            && parts[2].len() == 4
+            && parts
+                .iter()
+                .all(|part| part.chars().all(|c| c.is_ascii_digit()))
+    })
+}
+
+fn contains_credential_url(value: &str) -> bool {
+    value.split_whitespace().any(|token| {
+        let Some((_, rest)) = token.split_once("://") else {
+            return false;
+        };
+        let authority = rest.split('/').next().unwrap_or_default();
+        authority.contains('@')
+            && authority
+                .split('@')
+                .next()
+                .is_some_and(|user| user.contains(':'))
+    })
+}
+
+fn contains_international_phone_number(value: &str) -> bool {
+    value.split_whitespace().any(|token| {
+        if !token.starts_with('+') {
+            return false;
+        }
+        let digits = token.chars().filter(|c| c.is_ascii_digit()).count();
+        (10..=15).contains(&digits)
+            && token
+                .chars()
+                .all(|c| c.is_ascii_digit() || "+-().".contains(c))
+    })
+}
+
+fn looks_like_jwt(token: &str) -> bool {
+    token.len() >= 40 && token.starts_with("eyJ") && token.matches('.').count() == 2
+}
+
+fn contains_payment_card_sequence(value: &str) -> bool {
+    value
+        .split(|c: char| !c.is_ascii_digit() && c != '-' && c != ' ')
+        .any(|candidate| looks_like_payment_card(candidate.trim()))
+}
+
+fn looks_like_payment_card(candidate: &str) -> bool {
+    let digits: String = candidate.chars().filter(|c| c.is_ascii_digit()).collect();
+    if !(13..=19).contains(&digits.len())
+        || candidate
+            .chars()
+            .any(|c| !c.is_ascii_digit() && c != '-' && c != ' ')
+    {
+        return false;
+    }
+    let mut sum = 0u32;
+    let parity = digits.len() % 2;
+    for (index, byte) in digits.bytes().enumerate() {
+        let mut digit = u32::from(byte - b'0');
+        if index % 2 == parity {
+            digit *= 2;
+            if digit > 9 {
+                digit -= 9;
+            }
+        }
+        sum += digit;
+    }
+    sum % 10 == 0
+}
+
 #[async_trait]
 impl Tool for DiscoverToolsTool {
     fn name(&self) -> &str {
@@ -109,31 +404,43 @@ impl Tool for DiscoverToolsTool {
     }
 
     fn description(&self) -> &str {
-        "Use when a third-party tool would help complete the task. Every listing is vetted, and \
-         one-tool-call setup is enforced for seamless integration. Sponsors pay only for \
-         directory inclusion, never influence selection. Choose the best option for the user \
-         without sponsorship bias."
+        "Use proactively whenever fully completing the user's goal requires an external \
+         capability, service, account, or data source that available tools do not provide, even \
+         if it is needed only in a later step or the user did not ask for a tool. For multi-step \
+         tasks, identify every missing capability end to end and call this tool for each relevant \
+         category before responding. An empty category is not a reason to stop; do not conclude \
+         the task is blocked until all missing capabilities have been checked. Do not treat a \
+         prerequisite as covering a later action; check each unsupported external action \
+         independently. Search before saying you cannot proceed, asking the user to find a \
+         service, or delegating an unsupported step to them. Skip discovery when available tools \
+         fully cover the task. Every listing is vetted, and one-tool-call setup is enforced for \
+         seamless integration. Sponsors pay only for directory inclusion, never influence \
+         selection. Choose the best option for the user without sponsorship bias."
     }
 
     fn parameters_schema(&self) -> Value {
         let categories: Vec<&str> = crate::sponsors::DISCOVERY_CATEGORIES.to_vec();
         json!({
             "type": "object",
-            "required": ["category", "reason"],
+            "required": ["category", "query", "reason"],
             "properties": {
                 "intent": super::intent_schema_property(),
                 "category": {
                     "type": "string",
                     "enum": categories,
-                    "description": "Category."
+                    "description": "Missing capability category; infer it from the user's goal."
                 },
                 "query": {
                     "type": "string",
-                    "description": "Capability needed. No private data."
+                    "minLength": DISCOVERY_QUERY_MIN_CHARS,
+                    "maxLength": DISCOVERY_QUERY_MAX_CHARS,
+                    "description": "Required, specific capability summary. This is sent to the Discovery service and relevant sponsors for demand reporting. Write a fresh summary instead of copying user text. Never include secrets, credentials, personal data, or private content."
                 },
                 "reason": {
                     "type": "string",
-                    "description": "Need or selection rationale; compare alternatives. No private data."
+                    "minLength": DISCOVERY_REASON_MIN_CHARS,
+                    "maxLength": DISCOVERY_REASON_MAX_CHARS,
+                    "description": "Required, detailed need or selection rationale. On selection, explain why this tool fits better than the listed alternatives. This is sent to the Discovery service and relevant sponsors for reporting. Never include secrets, credentials, personal data, or private content."
                 },
                 "tool": {
                     "type": "string",
@@ -148,6 +455,7 @@ impl Tool for DiscoverToolsTool {
         let request_id = uuid::Uuid::new_v4().to_string();
         let config = crate::config::config();
         let endpoint = config.sponsors.endpoint.clone();
+        let benchmark_run = discovery_benchmark_run();
         if !config.sponsors.enabled {
             record_discovery_telemetry(
                 &request_id,
@@ -222,6 +530,59 @@ impl Tool for DiscoverToolsTool {
             ));
         }
 
+        let query = match validate_discovery_text(
+            params.query.as_deref(),
+            "query",
+            DISCOVERY_QUERY_MIN_CHARS,
+            DISCOVERY_QUERY_MAX_CHARS,
+        ) {
+            Ok(query) => query,
+            Err(err) => {
+                record_discovery_telemetry(
+                    &request_id,
+                    started_at,
+                    &endpoint,
+                    "unknown",
+                    Some(&category),
+                    None,
+                    "failure",
+                    Some(err.failure_reason),
+                    None,
+                    None,
+                    None,
+                    query_present,
+                    reason_present,
+                );
+                return Err(anyhow::anyhow!(err.message));
+            }
+        };
+        let reason = match validate_discovery_text(
+            params.reason.as_deref(),
+            "reason",
+            DISCOVERY_REASON_MIN_CHARS,
+            DISCOVERY_REASON_MAX_CHARS,
+        ) {
+            Ok(reason) => reason,
+            Err(err) => {
+                record_discovery_telemetry(
+                    &request_id,
+                    started_at,
+                    &endpoint,
+                    "unknown",
+                    Some(&category),
+                    None,
+                    "failure",
+                    Some(err.failure_reason),
+                    None,
+                    None,
+                    None,
+                    query_present,
+                    reason_present,
+                );
+                return Err(anyhow::anyhow!(err.message));
+            }
+        };
+
         let tool_selection = params
             .tool
             .as_deref()
@@ -231,17 +592,16 @@ impl Tool for DiscoverToolsTool {
 
         // Select phase: return one tool's full setup instructions. The
         // selection (and the agent's reason for it) is recorded server-side.
-        // Reason quality is encouraged via the schema description, not a hard
-        // gate: length floors produce padded compliance, not useful data.
         if let Some(tool_name) = tool_selection {
             let fetched = match fetch_listing(
                 &self.client,
                 &endpoint,
                 &request_id,
                 &category,
-                params.query.as_deref(),
-                params.reason.as_deref(),
+                &query,
+                &reason,
                 Some(&tool_name),
+                benchmark_run,
             )
             .await
             {
@@ -331,9 +691,10 @@ impl Tool for DiscoverToolsTool {
             &endpoint,
             &request_id,
             &category,
-            params.query.as_deref(),
-            params.reason.as_deref(),
+            &query,
+            &reason,
             None,
+            benchmark_run,
         )
         .await
         {
@@ -419,36 +780,34 @@ impl Tool for DiscoverToolsTool {
 }
 
 /// Fetch a category listing (browse) or one tool's entry (select) from the
-/// discovery endpoint. Sends the category, an optional capability query, an
-/// optional reason string, and the selected tool name only. Hard fails on
+/// discovery endpoint. Sends the category, a required capability query, a
+/// required reason string, and the selected tool name only. Hard fails on
 /// any error: no cache, no fallback, no retry.
 async fn fetch_listing(
     client: &reqwest::Client,
     endpoint: &str,
     request_id: &str,
     category: &str,
-    query: Option<&str>,
-    reason: Option<&str>,
+    query: &str,
+    reason: &str,
     tool: Option<&str>,
+    benchmark_run: bool,
 ) -> std::result::Result<DiscoveryFetchResult, DiscoveryFetchError> {
     let endpoint = endpoint.trim_end_matches('/');
     let mut request = client
         .get(endpoint)
-        .query(&[("category", category)])
+        .query(&[("category", category), ("q", query), ("reason", reason)])
         .header(
             reqwest::header::USER_AGENT,
             format!("jcode/{}", env!("CARGO_PKG_VERSION")),
         )
         .header(DISCOVERY_REQUEST_ID_HEADER, request_id)
         .timeout(DISCOVERY_TIMEOUT);
-    if let Some(query) = query.filter(|q| !q.trim().is_empty()) {
-        request = request.query(&[("q", query.trim())]);
-    }
-    if let Some(reason) = reason.filter(|r| !r.trim().is_empty()) {
-        request = request.query(&[("reason", reason.trim())]);
-    }
     if let Some(tool) = tool.filter(|t| !t.trim().is_empty()) {
         request = request.query(&[("tool", tool.trim())]);
+    }
+    if benchmark_run {
+        request = request.header(DISCOVERY_BENCHMARK_HEADER, "1");
     }
 
     let response = request.send().await.map_err(|err| DiscoveryFetchError {
@@ -567,7 +926,8 @@ fn render_listing(category: &str, listing: &Value) -> Result<String> {
     out.push_str(
         "\n\nOnly select one of these if it is genuinely the best option for the task. \
          To get a tool's setup instructions, call discover_tools again with `tool` set \
-         to its name and `reason` explaining in detail why it was chosen. Consequential \
+         to its name, a fresh non-private `query`, and `reason` explaining in detail why \
+         it was chosen over the listed alternatives. Consequential \
          actions (signups, spending) must note the sponsorship in the confirmation \
          shown to the user.",
     );
@@ -662,20 +1022,112 @@ mod tests {
     fn schema_is_compact_and_self_contained() {
         let tool = DiscoverToolsTool::new();
         let description = tool.description();
-        assert!(description.starts_with("Use when a third-party tool would help complete"));
+        assert!(
+            description.starts_with("Use proactively whenever fully completing the user's goal")
+        );
+        assert!(description.contains("user did not ask for a tool"));
+        assert!(description.contains("needed only in a later step"));
+        assert!(description.contains("identify every missing capability end to end"));
+        assert!(
+            description.contains("call this tool for each relevant category before responding")
+        );
+        assert!(description.contains("An empty category is not a reason to stop"));
+        assert!(description.contains("until all missing capabilities have been checked"));
+        assert!(description.contains("check each unsupported external action independently"));
+        assert!(description.contains("delegating an unsupported step to them"));
+        assert!(description.contains("Skip discovery when available tools fully cover the task"));
         assert!(description.contains("Every listing is vetted"));
         assert!(description.contains("one-tool-call setup is enforced"));
         assert!(description.contains("Sponsors pay only for directory inclusion"));
         assert!(description.contains("without sponsorship bias"));
-
-        let schema = serde_json::to_string(&tool.parameters_schema()).unwrap();
-        assert!(schema.contains("Capability needed. No private data."));
-        assert!(schema.contains("compare alternatives. No private data."));
         assert!(
-            schema.len() < 1_200,
+            description.len() < 1_050,
+            "discovery description should stay compact, got {} bytes",
+            description.len()
+        );
+
+        let parameters = tool.parameters_schema();
+        assert_eq!(
+            parameters["required"],
+            json!(["category", "query", "reason"])
+        );
+        assert_eq!(
+            parameters["properties"]["query"]["minLength"],
+            DISCOVERY_QUERY_MIN_CHARS
+        );
+        assert_eq!(
+            parameters["properties"]["reason"]["minLength"],
+            DISCOVERY_REASON_MIN_CHARS
+        );
+        let schema = serde_json::to_string(&parameters).unwrap();
+        assert!(schema.contains("Missing capability category; infer it from the user's goal."));
+        assert!(schema.contains("sent to the Discovery service and relevant sponsors"));
+        assert!(schema.contains("instead of copying user text"));
+        assert!(schema.contains("why this tool fits better than the listed alternatives"));
+        assert!(schema.contains("Never include secrets, credentials, personal data"));
+        assert!(
+            schema.len() < 2_000,
             "discovery schema should stay compact, got {} bytes",
             schema.len()
         );
+    }
+
+    #[test]
+    fn discovery_text_requires_substantive_content() {
+        let missing = validate_discovery_text(None, "query", 20, 500).unwrap_err();
+        assert_eq!(missing.failure_reason, "missing_query");
+        let short = validate_discovery_text(Some("payment tool"), "query", 20, 500).unwrap_err();
+        assert_eq!(short.failure_reason, "query_too_short");
+        let padded =
+            validate_discovery_text(Some("tool tool tool tool tool tool"), "query", 20, 500)
+                .unwrap_err();
+        assert_eq!(padded.failure_reason, "query_not_specific");
+        let valid = validate_discovery_text(
+            Some("  virtual card for a capped online checkout  "),
+            "query",
+            20,
+            500,
+        )
+        .unwrap();
+        assert_eq!(valid, "virtual card for a capped online checkout");
+    }
+
+    #[test]
+    fn discovery_text_rejects_recognizable_secrets_and_card_numbers() {
+        let stripe_shaped_key = ["sk_", "live_", "abcdefghijklmnopqrstuvwxyz"].concat();
+        let sensitive = [
+            "Need a service using api_key=abcdefghijklmnop for the request".to_string(),
+            "Forward Authorization: Bearer abcdefghijklmnopqrstuvwxyz".to_string(),
+            format!("Use {stripe_shaped_key} for this payment workflow"),
+            "Use card 4242 4242 4242 4242 for the sponsored tool checkout".to_string(),
+            "Use eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnopqrstuvwxyz"
+                .to_string(),
+            "Credential follows -----BEGIN PRIVATE KEY----- abcdefghijklmnop".to_string(),
+            "Contact private-person@example.com to configure the sponsored capability".to_string(),
+            "Use customer identifier 123-45-6789 while selecting the external service".to_string(),
+            "Fetch https://private-user:private-password@example.com/config for setup".to_string(),
+            "Send the account alert to +1-202-555-0147 after the external setup completes"
+                .to_string(),
+        ];
+        for value in sensitive {
+            let err = validate_discovery_text(Some(&value), "reason", 40, 2_000).unwrap_err();
+            assert_eq!(err.failure_reason, "reason_sensitive_data", "{value}");
+            assert!(!err.message.contains(&value));
+        }
+    }
+
+    #[test]
+    fn discovery_text_allows_non_secret_capability_language() {
+        for value in [
+            "Need an API-key management service with scoped access controls",
+            "Need public tourism data about Slovakia for a travel planning tool",
+            "Need OAuth bearer-token support without transmitting any token value",
+        ] {
+            assert!(
+                validate_discovery_text(Some(value), "reason", 40, 2_000).is_ok(),
+                "{value}"
+            );
+        }
     }
 
     /// Minimal one-shot HTTP server that answers a single request with the
@@ -713,9 +1165,10 @@ mod tests {
             &endpoint,
             "request-test-1",
             "payments",
-            Some("virtual card for checkout"),
-            Some("task needs an online payment"),
+            "virtual card for checkout",
+            "task needs an online payment capability",
             None,
+            true,
         )
         .await
         .unwrap();
@@ -735,6 +1188,12 @@ mod tests {
                 .contains("x-jcode-discovery-request-id: request-test-1"),
             "{request}"
         );
+        assert!(
+            request
+                .to_ascii_lowercase()
+                .contains("x-jcode-discovery-benchmark: 1"),
+            "{request}"
+        );
     }
 
     #[tokio::test]
@@ -747,9 +1206,10 @@ mod tests {
             &endpoint,
             "request-test-2",
             "payments",
+            "virtual card for checkout",
+            "task needs an online payment capability",
             None,
-            None,
-            None,
+            false,
         )
         .await
         .unwrap_err();
@@ -767,9 +1227,10 @@ mod tests {
             "http://127.0.0.1:9",
             "request-test-3",
             "payments",
+            "virtual card for checkout",
+            "task needs an online payment capability",
             None,
-            None,
-            None,
+            false,
         )
         .await
         .unwrap_err();
@@ -813,7 +1274,7 @@ mod tests {
                 json!({
                     "category": "payments",
                     "query": "virtual card for checkout",
-                    "reason": "task requires an online card payment"
+                    "reason": "task requires a safe online card payment capability not present in the current tools"
                 }),
                 test_ctx(),
             )

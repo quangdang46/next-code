@@ -167,6 +167,38 @@ pub enum MarkdownSpacingMode {
     Document,
 }
 
+/// How LaTeX math is rendered in terminal markdown.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LatexRenderingMode {
+    /// Preserve the original LaTeX source and delimiters.
+    None,
+    /// Convert supported notation to terminal-friendly Unicode text.
+    Unicode,
+    /// Typeset formulas to PNG and display them with the terminal image protocol.
+    #[default]
+    Image,
+}
+
+impl LatexRenderingMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Unicode => "unicode",
+            Self::Image => "image",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "none" | "raw" | "off" => Some(Self::None),
+            "unicode" | "terminal" | "text" => Some(Self::Unicode),
+            "image" | "images" | "png" => Some(Self::Image),
+            _ => None,
+        }
+    }
+}
+
 impl MarkdownSpacingMode {
     pub fn label(self) -> &'static str {
         match self {
@@ -774,7 +806,7 @@ pub struct AutoReviewConfig {
 /// placement (discoverability), never recommendations. Each session's first
 /// use of `discover_tools` is disclosed in the UI with a
 /// `(sponsored discovery)` tag; using a discovered tool afterwards carries no
-/// extra tag. See <https://solosystems.dev/sponsored-discovery>.
+/// extra tag. See <https://jcode.sh/sponsored-discovery>.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SponsorsConfig {
@@ -791,7 +823,7 @@ impl Default for SponsorsConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            endpoint: "https://api.solosystems.dev/v1/discovery".to_string(),
+            endpoint: "https://api.jcode.sh/v1/discovery".to_string(),
         }
     }
 }
@@ -865,9 +897,9 @@ pub struct KeybindingsConfig {
     /// transcript (default: "alt+x")
     pub todo_card_toggle: String,
     /// Focus/unfocus the inline swarm panel for keyboard navigation (default:
-    /// "alt+n"; press again to cycle agents, alt+↑/↓ select, alt+o pop out,
-    /// esc exits). Active only when `agents.swarm_spawn_mode = "inline"` and
-    /// the session manages swarm agents.
+    /// "alt+n"; alt+↑/↓ select, alt+o pops out, alt+shift+p opens the swarm
+    /// prompt, esc exits). Active only when `agents.swarm_spawn_mode = "inline"`
+    /// and the session manages swarm agents.
     pub swarm_panel_focus: String,
     /// Spawn a fresh jcode session in a new terminal window (default: unbound).
     /// Example: "alt+enter".
@@ -986,6 +1018,8 @@ pub struct DisplayConfig {
     pub diagram_mode: DiagramDisplayMode,
     /// Markdown block spacing style (compact/document, default: compact)
     pub markdown_spacing: MarkdownSpacingMode,
+    /// LaTeX rendering style (none/unicode/image, default: image)
+    pub latex_rendering: LatexRenderingMode,
     /// Pin read images to side pane (default: true)
     pub pin_images: bool,
     /// Show idle animation before first prompt (default: true)
@@ -1044,6 +1078,7 @@ impl Default for DisplayConfig {
             reasoning_display: Some(ReasoningDisplayMode::Current),
             diagram_mode: DiagramDisplayMode::default(),
             markdown_spacing: MarkdownSpacingMode::default(),
+            latex_rendering: LatexRenderingMode::default(),
             idle_animation: true,
             prompt_entry_animation: true,
             disabled_animations: Vec::new(),

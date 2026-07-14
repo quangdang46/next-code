@@ -1550,11 +1550,11 @@ impl App {
             self.pending_history_anchor = Some(anchor);
             self.auto_scroll_paused = true;
             self.maybe_queue_compacted_history_load();
-            // Force a full repaint: ratatui's diff does not re-emit the trailing
+            // Soft full repaint: ratatui's diff does not re-emit the trailing
             // cell after a wide grapheme (emoji/CJK) when the symbol is unchanged,
             // so terminals like kitty/foot leave a stale "ghost" char from the
-            // previous frame. See ratatui issue #2357. A clean redraw avoids it.
-            self.force_full_redraw = true;
+            // previous frame. See ratatui issue #2357 / jcode issue #404.
+            self.request_full_repaint();
             return true;
         }
         let before = (self.scroll_offset, self.auto_scroll_paused);
@@ -1577,9 +1577,8 @@ impl App {
         self.maybe_queue_compacted_history_load_with_overshoot(overshoot);
         let changed = before != (self.scroll_offset, self.auto_scroll_paused);
         if changed {
-            // See note above (ratatui #2357): force a clean repaint on scroll so
-            // wide-grapheme trailing cells cannot leave a ghost character.
-            self.force_full_redraw = true;
+            // See note above (ratatui #2357 / #404): soft full repaint on scroll.
+            self.request_full_repaint();
         }
         changed
     }
@@ -1612,8 +1611,8 @@ impl App {
             }
             anchor.lines_from_bottom = anchor.lines_from_bottom.saturating_sub(amount);
             self.pending_history_anchor = Some(anchor);
-            // ratatui #2357: clean repaint on scroll to avoid wide-grapheme ghosts.
-            self.force_full_redraw = true;
+            // ratatui #2357 / #404: soft full repaint on scroll.
+            self.request_full_repaint();
             return true;
         }
         if !self.auto_scroll_paused {
@@ -1649,8 +1648,8 @@ impl App {
             self.scroll_offset != before
         };
         if changed {
-            // ratatui #2357: clean repaint on scroll to avoid wide-grapheme ghosts.
-            self.force_full_redraw = true;
+            // ratatui #2357 / #404: soft full repaint on scroll.
+            self.request_full_repaint();
         }
         changed
     }

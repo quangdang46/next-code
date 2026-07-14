@@ -148,6 +148,11 @@ reasoning_display = "current"
 # Markdown spacing style: "compact" (chat/TUI) or "document" (docs-like)
 # markdown_spacing = "compact"
 
+# LaTeX rendering: "none" (show source), "unicode" (terminal text), or "image" (typeset PNG, default).
+# Image mode uses `latex` + `dvipng`, or `pdflatex` + `pdftocairo` as a fallback.
+# When neither toolchain is available, formulas fall back to Unicode.
+latex_rendering = "image"
+
 # Show idle animation before first prompt (default: true)
 idle_animation = true
 
@@ -590,6 +595,17 @@ desktop_notifications = true
 # jade_relay_reply_enabled = false   # Deliver cloud prompts to one configured live session.
 # jade_relay_launch_enabled = false  # Allow cloud device commands to open headed local sessions.
 # jade_relay_launch_working_dir = "" # Optional default cwd for launched sessions.
+
+# [sponsors]
+# Sponsored discovery (enabled by default; set enabled = false to opt out).
+# When enabled, the agent gains a `discover_tools` tool listing third-party
+# developer tools from jcode's hosted sponsor manifest. Sponsors buy
+# placement (discoverability), never recommendations; each session's first
+# use of discover_tools is disclosed in the UI with a (sponsored discovery)
+# tag.
+# See https://jcode.sh/sponsored-discovery
+# enabled = true
+# endpoint = "https://api.jcode.sh/v1/discovery"
 	"#;
 
         // Substitute platform-specific defaults from the keybinding registry.

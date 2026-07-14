@@ -8,7 +8,7 @@ let cachedDiscoveryDetailColumns = null;
 // web-only fields live in the web_details table (see migration 0016): the
 // events table sits one column shy of D1's 100-column cap, so wide event
 // shapes go in detail tables per the session_details / turn_details pattern.
-const WEB_EVENTS = ["web_pageview", "web_cta_click"];
+const WEB_EVENTS = ["web_pageview", "web_cta_click", "web_vital", "web_error"];
 
 // Token subscription plan lifecycle events, plus account_linked, the
 // analytics<->account join anchor (telemetry_id + account_id).
@@ -40,7 +40,10 @@ const KNOWN_EVENTS = [...CLI_EVENTS, ...WEB_EVENTS, ...SUBSCRIPTION_EVENTS];
 // allowlisted origins are echoed back explicitly so the policy keeps working
 // if ALLOWED_ORIGIN is ever narrowed.
 const WEB_ALLOWED_ORIGINS = new Set([
+  "https://jcode.sh",
+  "https://www.jcode.sh",
   "https://solosystems.dev",
+  "https://www.solosystems.dev",
   "https://solosystems.pages.dev",
 ]);
 
@@ -149,7 +152,8 @@ const FIREHOSE_SCHEMA = {
 // here: never reorder or repurpose a position.
 // ---------------------------------------------------------------------------
 const FIREHOSE_WEB_SCHEMA = {
-  // blob1..blob20 (strings); 17 used, 3 free for future appends.
+  // blob1..blob20 (strings); full. Append-only: metric_name, rating, and
+  // error_kind were added in migration 0018 without moving existing fields.
   blobs: [
     "event",
     "version",
@@ -168,9 +172,12 @@ const FIREHOSE_WEB_SCHEMA = {
     "account_id",
     "tier",
     "model",
+    "metric_name",
+    "rating",
+    "error_kind",
   ],
-  // double1..double20 (numbers); 1 used, 19 free.
-  doubles: ["is_ci"],
+  // double1..double20 (numbers); metric_value was appended as double2.
+  doubles: ["is_ci", "metric_value"],
   // index1 (sampling key): visitor_id for web events, telemetry_id otherwise.
   indexes: ["visitor_id_or_telemetry_id"],
 };
@@ -187,7 +194,7 @@ const FIREHOSE_DISCOVERY_SCHEMA = {
   doubles: [
     "is_ci", "is_git_checkout", "ran_from_cargo", "http_status",
     "latency_ms", "response_bytes", "result_count", "query_present",
-    "reason_present", "custom_endpoint",
+    "reason_present", "custom_endpoint", "benchmark_run",
   ],
 };
 
@@ -246,7 +253,7 @@ function writeDiscoveryFirehose(env, body) {
   }
   const boolFields = new Set([
     "is_ci", "is_git_checkout", "ran_from_cargo", "query_present",
-    "reason_present", "custom_endpoint",
+    "reason_present", "custom_endpoint", "benchmark_run",
   ]);
   try {
     sink.writeDataPoint({
@@ -489,7 +496,8 @@ async function emergencyPrune(env) {
 //   they are never pruned here.
 // - web_pageview is the high-volume website row; keep a 90-day raw tail in D1
 //   (matching firehose retention) and prune beyond it. web_cta_click is the
-//   low-volume conversion anchor; keep 12 months.
+//   low-volume conversion anchor; keep 12 months. Web vitals need only a
+//   30-day performance window; classified web errors remain useful for 90 days.
 // - subscription_activated and account_linked are identity/revenue anchors and
 //   are never pruned (like install / feedback).
 const RETENTION_DAYS = {
@@ -502,6 +510,8 @@ const RETENTION_DAYS = {
   session_crash: 365,
   web_pageview: 90,
   web_cta_click: 365,
+  web_vital: 30,
+  web_error: 90,
   subscription_login: 180,
   subscription_router_error: 90,
   subscription_budget_exhausted: 365,
@@ -1200,6 +1210,7 @@ async function insertDiscoveryDetails(env, body, columns) {
     ["query_present", boolToInt(body.query_present)],
     ["reason_present", boolToInt(body.reason_present)],
     ["custom_endpoint", boolToInt(body.custom_endpoint)],
+    ["benchmark_run", boolToInt(body.benchmark_run)],
   ].filter(([name]) => columns.has(name));
   if (values.length > 1) {
     await insertDynamic(env, "discovery_details", values);
@@ -1219,6 +1230,10 @@ async function insertWebDetails(env, body, columns) {
     ["utm_medium", body.utm_medium || null],
     ["utm_campaign", body.utm_campaign || null],
     ["cta", body.cta || null],
+    ["metric_name", body.metric_name || null],
+    ["metric_value", body.metric_value ?? null],
+    ["rating", body.rating || null],
+    ["error_kind", body.error_kind || null],
   ].filter(([name]) => columns.has(name));
   if (values.length > 1) {
     await insertDynamic(env, "web_details", values);
@@ -1239,6 +1254,37 @@ function normalizeWebEvent(body) {
   }
   if (body.event === "web_cta_click" && (typeof body.cta !== "string" || body.cta.length === 0)) {
     return "Missing cta";
+  }
+  if (body.event === "web_vital") {
+    const metricNames = new Set(["CLS", "FCP", "INP", "LCP", "TTFB"]);
+    const ratings = new Set(["good", "needs-improvement", "poor"]);
+    if (!metricNames.has(body.metric_name)) {
+      return "Invalid metric_name";
+    }
+    if (typeof body.metric_value !== "number" || !Number.isFinite(body.metric_value) || body.metric_value < 0) {
+      return "Invalid metric_value";
+    }
+    if (!ratings.has(body.rating)) {
+      return "Invalid rating";
+    }
+    const cap = body.metric_name === "CLS" ? 10 : 300_000;
+    body.metric_value = Math.min(body.metric_value, cap);
+  }
+  if (body.event === "web_error") {
+    const errorKinds = new Set(["script", "promise", "resource"]);
+    if (!errorKinds.has(body.error_kind)) {
+      return "Invalid error_kind";
+    }
+    // Keep only route-level context for errors. In particular, do not retain
+    // referrer or campaign values that may contain full URLs or query strings.
+    for (const field of ["referrer", "utm_source", "utm_medium", "utm_campaign", "cta"]) {
+      delete body[field];
+    }
+  }
+  // Error payloads are classification-only. Never retain messages, stacks,
+  // filenames, or full URLs even if a caller includes them.
+  for (const field of ["message", "error_message", "stack", "url", "filename", "source_url"]) {
+    delete body[field];
   }
   body.visitor_id = body.visitor_id.slice(0, 96);
   body.id = body.id || body.visitor_id;
@@ -1311,6 +1357,7 @@ function normalizeDiscoveryEvent(body) {
   body.latency_ms = Math.max(0, Math.min(300_000, Number(body.latency_ms) || 0));
   body.response_bytes = body.response_bytes == null ? null : Math.max(0, Math.min(1_048_576, Number(body.response_bytes) || 0));
   body.result_count = body.result_count == null ? null : Math.max(0, Math.min(10_000, Number(body.result_count) || 0));
+  body.benchmark_run = body.benchmark_run === true;
   return null;
 }
 

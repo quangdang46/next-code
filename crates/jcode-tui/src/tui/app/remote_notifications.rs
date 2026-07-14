@@ -116,33 +116,6 @@ fn file_activity_summary_line(operation: &str, summary: Option<&str>) -> String 
         .unwrap_or_else(|| capitalize(operation))
 }
 
-fn format_file_activity_message(
-    path: &str,
-    operation: &str,
-    intent: Option<&str>,
-    summary: Option<&str>,
-    detail: Option<&str>,
-) -> String {
-    let mut message = format!(
-        "`{}`\n\n{}",
-        compact_swarm_path(path),
-        file_activity_summary_line(operation, summary)
-    );
-
-    if let Some(intent) = intent.map(str::trim).filter(|intent| !intent.is_empty()) {
-        message.push_str("\n\nIntent: ");
-        message.push_str(intent);
-    }
-
-    if let Some(detail) = detail.map(str::trim).filter(|detail| !detail.is_empty()) {
-        message.push_str("\n\n```text\n");
-        message.push_str(&sanitize_code_fence_content(detail));
-        message.push_str("\n```");
-    }
-
-    message
-}
-
 /// Single-line file-activity body for compact notifications mode: keeps the
 /// compacted path and the summary line, dropping the intent and diff preview.
 fn format_file_activity_message_compact(
@@ -162,6 +135,30 @@ pub(super) fn present_swarm_notification(
     notification_type: &NotificationType,
     message: &str,
     compact: bool,
+) -> SwarmNotificationPresentation {
+    let mut presentation =
+        present_swarm_notification_inner(sender, notification_type, message, compact);
+    // Sender-provided tldr: store the full body but render it collapsed to the
+    // tldr line with an expand control. The status line shows the tldr too.
+    if let NotificationType::Message {
+        tldr: Some(tldr), ..
+    } = notification_type
+    {
+        let tldr = tldr.trim();
+        if !tldr.is_empty() && !presentation.message.trim().is_empty() {
+            presentation.status_notice = format!("{} · {}", presentation.status_notice, tldr);
+            presentation.message =
+                jcode_tui_messages::encode_collapsible_swarm_content(tldr, &presentation.message);
+        }
+    }
+    presentation
+}
+
+fn present_swarm_notification_inner(
+    sender: &str,
+    notification_type: &NotificationType,
+    message: &str,
+    _compact: bool,
 ) -> SwarmNotificationPresentation {
     let trimmed = message.trim();
     match notification_type {
@@ -230,8 +227,13 @@ pub(super) fn present_swarm_notification(
                     "Background task update".to_string()
                 },
             },
+            Some("swarm_await") => SwarmNotificationPresentation {
+                title: "🐝 Swarm await".to_string(),
+                message: crate::tui::ui::compact_swarm_await_summary(trimmed),
+                status_notice: "🐝 Swarm await finished".to_string(),
+            },
             Some(other) => SwarmNotificationPresentation {
-                title: format!("{} · {}", capitalize(other), sender),
+                title: format!("Swarm · {}", sender),
                 message: trimmed.to_string(),
                 status_notice: format!("{} update", capitalize(other)),
             },
@@ -252,21 +254,61 @@ pub(super) fn present_swarm_notification(
             intent,
             summary,
             detail,
-        } => SwarmNotificationPresentation {
-            title: format!("File activity · {}", sender),
-            message: if compact {
+        } => {
+            let summary_line =
                 format_file_activity_message_compact(path, operation, summary.as_deref())
-            } else {
-                format_file_activity_message(
-                    path,
-                    operation,
-                    intent.as_deref(),
-                    summary.as_deref(),
-                    detail.as_deref(),
-                )
-            },
-            status_notice: format!("File activity · {}", compact_swarm_path(path)),
-        },
+                    .replace('`', "");
+            let mut detail_parts = Vec::new();
+            if let Some(intent) = intent
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                detail_parts.push(format!("Intent: {intent}"));
+            }
+            if let Some(detail) = detail
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                detail_parts.push(format!(
+                    "```text\n{}\n```",
+                    sanitize_code_fence_content(detail)
+                ));
+            }
+            let detail_body = detail_parts.join("\n\n");
+            let has_details = intent
+                .as_deref()
+                .is_some_and(|value| !value.trim().is_empty())
+                || detail
+                    .as_deref()
+                    .is_some_and(|value| !value.trim().is_empty());
+            let conflict = operation.to_ascii_lowercase().contains("conflict")
+                || summary.as_deref().is_some_and(|value| {
+                    let value = value.to_ascii_lowercase();
+                    value.contains("conflict") || value.contains("concurrent")
+                });
+            SwarmNotificationPresentation {
+                title: format!(
+                    "{} · {}",
+                    if conflict {
+                        "File conflict"
+                    } else {
+                        "File activity"
+                    },
+                    sender
+                ),
+                message: if has_details {
+                    jcode_tui_messages::encode_collapsible_swarm_content(
+                        &summary_line,
+                        &detail_body,
+                    )
+                } else {
+                    summary_line
+                },
+                status_notice: format!("File activity · {}", compact_swarm_path(path)),
+            }
+        }
     }
 }
 
@@ -290,6 +332,49 @@ mod tests {
     }
 
     #[test]
+    fn present_swarm_notification_with_tldr_encodes_collapsed_content() {
+        let presentation = present_swarm_notification(
+            "sheep",
+            &NotificationType::Message {
+                scope: Some("dm".to_string()),
+                channel: None,
+                tldr: Some("fixed the flaky test".to_string()),
+            },
+            "DM from sheep: The flaky test was caused by a race in the setup helper. I rewrote it to use a barrier and verified 200 consecutive runs pass.",
+            false,
+        );
+
+        let parsed = jcode_tui_messages::parse_collapsible_swarm_content(&presentation.message)
+            .expect("tldr message should encode collapsible content");
+        assert!(!parsed.expanded);
+        assert_eq!(parsed.tldr, "fixed the flaky test");
+        assert!(parsed.body.contains("race in the setup helper"));
+        assert!(
+            presentation.status_notice.contains("fixed the flaky test"),
+            "{}",
+            presentation.status_notice
+        );
+    }
+
+    #[test]
+    fn present_swarm_notification_without_tldr_keeps_plain_content() {
+        let presentation = present_swarm_notification(
+            "sheep",
+            &NotificationType::Message {
+                scope: Some("dm".to_string()),
+                channel: None,
+                tldr: None,
+            },
+            "DM from sheep: short note",
+            false,
+        );
+        assert!(
+            jcode_tui_messages::parse_collapsible_swarm_content(&presentation.message).is_none()
+        );
+        assert_eq!(presentation.message, "short note");
+    }
+
+    #[test]
     fn present_swarm_notification_formats_task_assignments_as_tasks() {
         let presentation = present_swarm_notification(
             "sheep",
@@ -308,6 +393,26 @@ mod tests {
             "Implement compaction asymptotic fixes - You own the compaction task."
         );
         assert_eq!(presentation.status_notice, "Task assigned by sheep");
+    }
+
+    #[test]
+    fn present_swarm_notification_compacts_swarm_await_without_report_prose() {
+        let presentation = present_swarm_notification(
+            "swarm await",
+            &NotificationType::Message {
+                scope: Some("swarm_await".to_string()),
+                channel: None,
+                tldr: None,
+            },
+            "🐝 **Swarm await finished**\n\nAll members done. All 2 members are done: fox, wolf\n\nMember statuses:\n  ✓ fox (completed)\n  ✓ wolf (completed)\n\nCompletion reports:\n\n--- fox (completed) ---\nParser tests pass.",
+            false,
+        );
+
+        assert_eq!(presentation.title, "🐝 Swarm await");
+        assert_eq!(presentation.message, "✓ 2/2");
+        assert!(!presentation.message.contains("fox"));
+        assert!(!presentation.message.contains("Parser tests"));
+        assert_eq!(presentation.status_notice, "🐝 Swarm await finished");
     }
 
     #[test]
@@ -403,24 +508,16 @@ mod tests {
         );
 
         assert_eq!(presentation.title, "File activity · moss");
-        assert!(
-            presentation
-                .message
-                .contains("`…/jcode/src/tool/communicate.rs`")
+        let parsed = jcode_tui_messages::parse_collapsible_swarm_content(&presentation.message)
+            .expect("file activity with details should be collapsible");
+        assert_eq!(
+            parsed.tldr,
+            "…/jcode/src/tool/communicate.rs · Edited lines 323-348 (1 occurrence)"
         );
+        assert!(parsed.body.contains("Intent: wire swarm intent display"));
         assert!(
-            presentation
-                .message
-                .contains("Edited lines 323-348 (1 occurrence)")
-        );
-        assert!(
-            presentation
-                .message
-                .contains("Intent: wire swarm intent display")
-        );
-        assert!(
-            presentation
-                .message
+            parsed
+                .body
                 .contains("```text\n323- old line\n323+ new line\n```")
         );
         assert_eq!(
@@ -445,25 +542,14 @@ mod tests {
         );
 
         assert_eq!(presentation.title, "File activity · moss");
+        let parsed = jcode_tui_messages::parse_collapsible_swarm_content(&presentation.message)
+            .expect("compact mode should retain collapsible details");
         assert_eq!(
-            presentation.message,
-            "`…/jcode/src/tool/communicate.rs` · Edited lines 323-348 (1 occurrence)"
+            parsed.tldr,
+            "…/jcode/src/tool/communicate.rs · Edited lines 323-348 (1 occurrence)"
         );
-        assert!(
-            !presentation.message.contains('\n'),
-            "compact file activity body should be a single line: {:?}",
-            presentation.message
-        );
-        assert!(
-            !presentation.message.contains("Intent:"),
-            "compact mode should drop the intent line: {:?}",
-            presentation.message
-        );
-        assert!(
-            !presentation.message.contains("```"),
-            "compact mode should drop the diff preview: {:?}",
-            presentation.message
-        );
+        assert!(parsed.body.contains("Intent: wire swarm intent display"));
+        assert!(parsed.body.contains("323- old line"));
         assert_eq!(
             presentation.status_notice,
             "File activity · …/jcode/src/tool/communicate.rs"

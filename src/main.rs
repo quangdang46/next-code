@@ -74,13 +74,36 @@ fn parse_alloc_tuning(value: Option<&str>, default: i32) -> i32 {
 #[cfg(not(all(target_os = "linux", not(feature = "jemalloc"))))]
 fn configure_system_allocator() {}
 
+#[cfg(windows)]
 fn main() -> Result<()> {
+    // Windows executables default to a much smaller main-thread stack than the
+    // Unix environments where most development happens. The CLI/provider setup
+    // path can exceed that reserve before Tokio takes over, producing an
+    // unrecoverable STATUS_STACK_OVERFLOW. Keep the linker defaults unchanged
+    // for every auxiliary binary and run the Jcode entry point on a deliberately
+    // sized stack instead.
+    const WINDOWS_MAIN_STACK_SIZE: usize = 8 * 1024 * 1024;
+    match std::thread::Builder::new()
+        .name("jcode-main".to_string())
+        .stack_size(WINDOWS_MAIN_STACK_SIZE)
+        .spawn(run_main)?
+        .join()
+    {
+        Ok(result) => result,
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
+}
+
+#[cfg(not(windows))]
+fn main() -> Result<()> {
+    run_main()
+}
+
+fn run_main() -> Result<()> {
     // Log panics before abort so we can diagnose OOM / SIGKILL causes.
     let orig_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        // Write panic info to stderr even inside catch_unwind.
         eprintln!("\n\x1b[31m*** jcode PANIC ***\x1b[0m {}", info);
-        // Also dump to file for post-mortem debugging.
         if let Ok(jcode_dir) = jcode::storage::jcode_dir() {
             let panic_log = jcode_dir.join("panic.log");
             let msg = format!("{}: {}\n", chrono::Utc::now().to_rfc3339(), info);

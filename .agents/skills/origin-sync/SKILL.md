@@ -838,3 +838,111 @@ rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control
 cargo check -p jcode
 ```
 
+### Lesson 4: Swarm FullPage / soft-repaint / history fingerprint (Category H hybrid UI)
+
+**Recorded**: 2026-07-14 (PR #486 / `sync-pr-483`). **Severity**: dead feature + remote perf.
+
+When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while **tui_state / ui / gallery** take upstream:
+
+1. **Live swarm FullPage dead**: `cycle_swarm_panel_view()` + `swarm_panel_full_page` + `render_swarm_page_lines` exist, but hotkeys still call `toggle_swarm_panel_focus()` (2-state). Full page never arms.
+   - **Fix**: `input.rs` + `remote/key_handling.rs` must call `cycle_swarm_panel_view()` (Chat → Controls → FullPage).
+   - **Check**:
+     ```bash
+     rg -n 'cycle_swarm_panel_view|toggle_swarm_panel_focus' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
+     # expect: cycle at hotkey sites; toggle only if unused helper remains
+     ```
+
+2. **Soft full-repaint (issue #404)**: Upstream scroll uses `force_full_repaint` + sentinel buffer invalidation (no ED2 clear). Fork lean-origin `run_shell` only hard-clears → scroll can flash image placeholders.
+   - **Port**: `FullFrameInvalidation` / `invalidate_previous_terminal_buffer` in `run_shell.rs`; `App::request_full_repaint()`; navigation scroll arms **soft** repaint. Keep fork **HardClear** via `clear_terminal_for_full_redraw` (no DSR `Terminal::clear()`).
+   - **Check**:
+     ```bash
+     rg -n 'request_full_repaint|SoftRepaint|force_full_repaint' crates/jcode-tui/src/tui/app/run_shell.rs crates/jcode-tui/src/tui/app/navigation.rs
+     ```
+
+3. **History fingerprint**: Upstream skips re-applying identical remote History payloads (`history_payload_fingerprint` + image length match). Keep-ours on `server_events` drops this → reconnect/watchdog rebuilds multi-MB transcripts for free.
+   - **Port** helpers + wire into `ServerEvent::History` apply path; unit module `history_dedup_tests`.
+   - **Check**:
+     ```bash
+     rg -n 'should_skip_identical_history_payload|history_payload_fingerprint' crates/jcode-tui/src/tui/app/remote/server_events.rs
+     ```
+
+4. **Do NOT take full upstream** of: `ui_input.rs` (fork status bar + keyword chips), `state_ui_input_helpers.rs` (would drop `$` / `@` FFS / `/permissions`), `turn.rs` with `biased;`.
+
+### 2026-07-14 — PR #486 / upstream v0.44..v0.47 origin-sync
+
+**Branch**: `sync-pr-483` → https://github.com/quangdang46/jcode/pull/486 (supersedes conflicted cross-repo PR #483).
+**Worktree**: `.worktrees/sync-pr-483` from `origin/master`.
+**Upstream tip**: `f7f5898cf` (v0.47.0). **~98 commits**. Merge: `5a39725d1`.
+
+**Status**: ✅ `cargo check -p jcode` / `jcode-tui` clean. Package **0.32.0**. Lesson 2/3 OK.
+
+| Category | What |
+|----------|------|
+| ✨ Feature | Live swarm page, compact swarm surfaces, nested tree, todo quality gates 96, LaTeX images, drag-drop files, onboarding arch review, telemetry/Windows |
+| 🔀 Keep | Extracted deps; `$skill`; agentgrep **removed** (FFS); `ui_input` fork status bar; `ui_prepare` near origin body cache |
+| 🐛 P0 fix | Wire Alt+N to `cycle_swarm_panel_view` (`0e416b5f0`) |
+| 🍒 Cherry-pick | History fingerprint + image retain match; soft full-repaint (#404) with fork-safe HardClear |
+
+**Post-merge MUST-check**:
+```bash
+rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
+rg -n 'cycle_swarm_panel_view' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
+rg -n 'should_skip_identical_history_payload|request_full_repaint|SoftRepaint' crates/jcode-tui/src/tui/app
+cargo check -p jcode
+```
+
+### Lesson 4: Swarm FullPage / soft-repaint / history fingerprint (Category H hybrid UI)
+
+**Recorded**: 2026-07-14 (PR #486 / `sync-pr-483`). **Severity**: dead feature + remote perf.
+
+When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while **tui_state / ui / gallery** take upstream:
+
+1. **Live swarm FullPage dead**: `cycle_swarm_panel_view()` + `swarm_panel_full_page` + `render_swarm_page_lines` exist, but hotkeys still call `toggle_swarm_panel_focus()` (2-state). Full page never arms.
+   - **Fix**: `input.rs` + `remote/key_handling.rs` must call `cycle_swarm_panel_view()` (Chat → Controls → FullPage).
+   - **Check**:
+     ```bash
+     rg -n 'cycle_swarm_panel_view|toggle_swarm_panel_focus' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
+     # expect: cycle at hotkey sites; toggle only if unused helper remains
+     ```
+
+2. **Soft full-repaint (issue #404)**: Upstream scroll uses `force_full_repaint` + sentinel buffer invalidation (no ED2 clear). Fork lean-origin `run_shell` only hard-clears → scroll can flash image placeholders.
+   - **Port**: `FullFrameInvalidation` / `invalidate_previous_terminal_buffer` in `run_shell.rs`; `App::request_full_repaint()`; navigation scroll arms **soft** repaint. Keep fork **HardClear** via `clear_terminal_for_full_redraw` (no DSR `Terminal::clear()`).
+   - **Check**:
+     ```bash
+     rg -n 'request_full_repaint|SoftRepaint|force_full_repaint' crates/jcode-tui/src/tui/app/run_shell.rs crates/jcode-tui/src/tui/app/navigation.rs
+     ```
+
+3. **History fingerprint**: Upstream skips re-applying identical remote History payloads (`history_payload_fingerprint` + image length match). Keep-ours on `server_events` drops this → reconnect/watchdog rebuilds multi-MB transcripts for free.
+   - **Port** helpers + wire into `ServerEvent::History` apply path; unit module `history_dedup_tests`.
+   - **Check**:
+     ```bash
+     rg -n 'should_skip_identical_history_payload|history_payload_fingerprint' crates/jcode-tui/src/tui/app/remote/server_events.rs
+     ```
+
+4. **Do NOT take full upstream** of: `ui_input.rs` (fork status bar + keyword chips), `state_ui_input_helpers.rs` (would drop `$` / `@` FFS / `/permissions`), `turn.rs` with `biased;`.
+
+### 2026-07-14 — PR #486 / upstream v0.44..v0.47 origin-sync
+
+**Branch**: `sync-pr-483` → https://github.com/quangdang46/jcode/pull/486 (supersedes conflicted cross-repo PR #483).
+**Worktree**: `.worktrees/sync-pr-483` from `origin/master`.
+**Upstream tip**: `f7f5898cf` (v0.47.0). **~98 commits**. Merge: `5a39725d1`.
+
+**Status**: ✅ `cargo check -p jcode` / `jcode-tui` clean. Package **0.32.0**. Lesson 2/3 OK.
+
+| Category | What |
+|----------|------|
+| ✨ Feature | Live swarm page, compact swarm surfaces, nested tree, todo quality gates 96, LaTeX images, drag-drop files, onboarding arch review, telemetry/Windows |
+| 🔀 Keep | Extracted deps; `$skill`; agentgrep **removed** (FFS); `ui_input` fork status bar; `ui_prepare` near origin body cache |
+| 🐛 P0 fix | Wire Alt+N to `cycle_swarm_panel_view` (`0e416b5f0`) |
+| 🍒 Cherry-pick | History fingerprint + image retain match; soft full-repaint (#404) with fork-safe HardClear |
+
+**Post-merge MUST-check**:
+```bash
+rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
+rg -n 'cycle_swarm_panel_view' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
+rg -n 'should_skip_identical_history_payload|request_full_repaint|SoftRepaint' crates/jcode-tui/src/tui/app
+cargo check -p jcode
+```
+
