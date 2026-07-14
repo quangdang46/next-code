@@ -30,6 +30,20 @@ This repo (quangdang46/jcode) is a fork of `1jehuang/jcode`. Several modules hav
 - On Windows, the equivalents are `%LOCALAPPDATA%\\jcode\\bin\\jcode.exe` for the launcher, `%LOCALAPPDATA%\\jcode\\builds\\stable\\jcode.exe` for stable, and `%LOCALAPPDATA%\\jcode\\builds\\versions\\<version>\\jcode.exe` for immutable installs; `scripts/install.ps1` currently installs the stable channel.
 - Ensure `~/.local/bin` is **before** `~/.cargo/bin` in `PATH`.
 
+### After install (agent-tree / TUI work)
+
+`scripts/install_release.sh` updates symlinks but **running `jcode serve` keeps the old binary mapped**. Always restart serve after install:
+
+```bash
+# Prefer the helper:
+bash scripts/restart_local_serve.sh
+
+# Or manually: kill the serve PID, then:
+#   jcode serve   # or: jcode --provider auto serve
+```
+
+Confirm the live binary: `lsof -p $(pgrep -f 'builds/.*/jcode' | head -1) | grep txt` should show the same hash as `readlink ~/.jcode/builds/current/jcode`. The TUI shows a short client git hash in teammate-view chrome while viewing an agent.
+
 ## Notepad (compaction-resistant notes)
 
 The notepad (`crates/jcode-base/src/notepad.rs`, `crates/jcode-app-core/src/tool/notepad.rs`) is a 3-tier file-based store under `<working_dir>/.jcode/notepad/` that lets the model persist short notes across turns and across compaction.
