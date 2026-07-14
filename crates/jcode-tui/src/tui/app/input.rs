@@ -1934,15 +1934,21 @@ pub(super) fn handle_pre_control_shortcuts(
         return true;
     }
 
-    // Inline swarm panel: Alt+W focuses/unfocuses the managed-agents panel.
-    // While focused, j/k navigate, o pops out the selected agent, esc exits.
+    // Swarm views: Alt+N cycles chat → inline controls → full live page → chat.
+    // Selection/open/prompt controls stay available in both active views, while
+    // plain typing continues to flow to the chat input.
     if app.toggle_keys.swarm_panel_focus.matches(code, modifiers) {
-        let focused = app.toggle_swarm_panel_focus();
-        app.set_status_notice(if focused {
-            "Swarm panel: focused (j/k select, o pop out, esc)"
-        } else {
-            "Swarm panel: unfocused"
-        });
+        match app.cycle_swarm_panel_view() {
+            super::tui_state::SwarmPanelView::Chat => {
+                app.set_status_notice("Swarm view closed");
+            }
+            super::tui_state::SwarmPanelView::Controls => {
+                app.set_status_notice("Swarm: alt+n full page · alt+↑/↓ select · alt+o open · esc");
+            }
+            super::tui_state::SwarmPanelView::FullPage => {
+                app.set_status_notice("Swarm page: alt+n chat · alt+↑/↓ select · alt+o open · esc");
+            }
+        }
         return true;
     }
     {
