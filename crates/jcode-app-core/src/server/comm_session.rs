@@ -711,7 +711,7 @@ pub(super) async fn spawn_swarm_agent(
     // before completion-report boilerplate is appended) so the swarm strip
     // and member lists can show the task, not just the animal name.
     if let Some(ref task_text) = initial_message {
-        set_member_task_label(&new_session_id, task_text, swarm_members).await;
+        set_member_task_label(&new_session_id, task_text, swarm_members, swarms_by_id).await;
     }
     let swarm_state = SwarmState {
         members: Arc::clone(swarm_members),

@@ -1,15 +1,15 @@
-//! Soft teammate / swarm-agent view — status preview only.
+//! Teammate view — Claude Code invariant:
 //!
-//! **Important (vs Claude Code):** CC `enterTeammateView` swaps the main
-//! transcript to `task.messages` — the agent's *real* conversation. jcode
-//! swarm agents are separate remote sessions; SwarmStatus only carries
-//! `detail` / `output_tail` / todos. Soft-view is a lightweight preview.
-//! **True session switch** is hard-attach (`resume_session`) — default Enter.
+//! **Each subagent has a Message-level transcript; view = swap to that
+//! transcript** (or empty). Never show lead messages while viewing.
 //!
-//! Soft-view rules:
-//! - Never dump the full spawn prompt as the body (often stuffed into `detail`)
-//! - Prefer short task_label + status + tools + output_tail
-//! - One empty-state line if nothing to show (no spam)
+//! jcode multi-session mapping:
+//! - **Hard attach** (`resume_session`) = full child session history (primary Enter)
+//! - **Soft buffer** (`teammate_transcripts` / `SwarmMemberMessage`) = live mirror
+//!   while staying on the lead socket (only when Message-level content exists)
+//!
+//! Soft body is **not** a SwarmStatus status-dump. Empty until stream/seed has
+//! user|assistant|tool content (CC: never fall through to leader).
 
 use crate::protocol::SwarmMemberStatus;
 use crate::tui::color_support::rgb as rgb_color;
@@ -17,19 +17,36 @@ use jcode_tui_messages::DisplayMessage;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
-const MAX_DETAIL_CHARS: usize = 120;
 const MAX_TASK_LABEL_CHARS: usize = 160;
 
+/// True when `msgs` looks like a real agent conversation (CC `task.messages`),
+/// not a pure status/chrome novel.
+pub fn is_message_level_transcript(msgs: &[DisplayMessage]) -> bool {
+    msgs.iter().any(|m| {
+        let t = m.content.trim();
+        if t.is_empty() {
+            return false;
+        }
+        match m.role.as_str() {
+            "user" | "assistant" | "tool" => true,
+            "system" => {
+                // Tool rows may be system-shaped with [tool] prefix; count them.
+                t.starts_with('[')
+                    && !t.starts_with("status:")
+                    && !t.contains("no stream yet")
+                    && !t.contains("No live stream")
+            }
+            _ => false,
+        }
+    })
+}
+
 /// Seed lead-side transcript lines from a SwarmStatus member snapshot.
-/// Used when the live `SwarmMemberMessage` stream has not filled the buffer yet.
+///
+/// Message-level only: task (user), tools, assistant tail.
+/// Returns **empty** when nothing real yet (CC empty-until-bootstrap).
 pub fn seed_messages_from_member(member: &SwarmMemberStatus) -> Vec<DisplayMessage> {
     let mut out = Vec::new();
-    let name = member
-        .friendly_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .unwrap_or("agent");
 
     if let Some(task) = member
         .task_label
@@ -68,8 +85,6 @@ pub fn seed_messages_from_member(member: &SwarmMemberStatus) -> Vec<DisplayMessa
         .filter(|s| !s.is_empty())
     {
         out.push(DisplayMessage::assistant(truncate_chars(tail, 4000)).with_title("stream"));
-    } else if out.is_empty() {
-        out.push(DisplayMessage::system(format!("@{name}: no stream yet")));
     }
     out
 }
@@ -98,116 +113,13 @@ pub fn preview_line_from_messages(msgs: &[DisplayMessage]) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
-/// Build a short soft-preview transcript (not a full agent session).
+/// Message-level snapshot for soft buffer / tree seed.
+///
+/// **Empty when nothing real** — CC never fills view with status novels.
+/// Prefer live `SwarmMemberMessage` buffer; this is the SwarmStatus fallback.
 pub fn build_view_messages(member: &SwarmMemberStatus) -> Vec<DisplayMessage> {
-    let name = member
-        .friendly_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .unwrap_or("agent");
-
-    let mut msgs = Vec::new();
-
-    // No chrome banner in the transcript body — TeammateViewHeader owns that
-    // (CC has only header + messages). Keep content-only rows below.
-
-    // Short task label only (truncated). Full spawn blobs go to detail often.
-    if let Some(task) = member
-        .task_label
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
-        let task = truncate_chars(task, MAX_TASK_LABEL_CHARS);
-        // Skip if it looks like the coordinator meta-prompt (user paste to test UI).
-        if !looks_like_spawn_meta_prompt(&task) {
-            msgs.push(DisplayMessage::user(task).with_title("task"));
-        }
-        // Meta spawn briefs are omitted entirely (header already names the agent).
-    }
-
-    // Detail: only if short and not a meta-prompt dump.
-    if let Some(detail) = member
-        .detail
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
-        if !looks_like_spawn_meta_prompt(detail) {
-            let d = truncate_chars(detail, MAX_DETAIL_CHARS);
-            msgs.push(
-                DisplayMessage::system(format!("status: {} — {d}", member.status))
-                    .with_title(format!("@{name}")),
-            );
-        } else {
-            msgs.push(
-                DisplayMessage::system(format!("status: {}", member.status))
-                    .with_title(format!("@{name}")),
-            );
-        }
-    } else {
-        msgs.push(
-            DisplayMessage::system(format!("status: {}", member.status))
-                .with_title(format!("@{name}")),
-        );
-    }
-
-    let tool_lines = collect_tool_activity_lines(member);
-    if !tool_lines.is_empty() {
-        msgs.push(DisplayMessage::system(tool_lines.join("\n")).with_title("tools"));
-    }
-
-    if !member.todo_items.is_empty() {
-        let mut lines = Vec::new();
-        for t in &member.todo_items {
-            let mark = match t.status.to_ascii_lowercase().as_str() {
-                "completed" | "done" => "✓",
-                "in_progress" | "running" => "…",
-                "cancelled" | "canceled" => "○",
-                _ => "·",
-            };
-            lines.push(format!("{mark} {}", truncate_chars(&t.content, 100)));
-            for tool in t.tool_intents.iter().take(3) {
-                let st = match tool.status.to_ascii_lowercase().as_str() {
-                    "running" => "…",
-                    "completed" | "done" => "✓",
-                    "error" | "failed" => "✗",
-                    _ => "·",
-                };
-                lines.push(format!(
-                    "    {st} {} — {}",
-                    tool.tool_name,
-                    truncate_chars(&tool.intent, 80)
-                ));
-            }
-        }
-        if let Some((done, total)) = member.todo_progress {
-            lines.push(format!("({done}/{total})"));
-        }
-        msgs.push(DisplayMessage::todos(lines.join("\n")));
-    } else if let Some((done, total)) = member.todo_progress {
-        if total > 0 {
-            msgs.push(DisplayMessage::system(format!("todos: {done}/{total}")));
-        }
-    }
-
-    if let Some(tail) = member
-        .output_tail
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-    {
-        for chunk in split_stream_chunks(tail) {
-            msgs.push(DisplayMessage::assistant(chunk));
-        }
-    } else if tool_lines.is_empty() && member.todo_items.is_empty() {
-        // Quiet empty-state only when there is truly nothing to show.
-        // Keybindings live in TeammateViewHeader / tree, not here.
-        msgs.push(DisplayMessage::system("No live stream yet."));
-    }
-
-    msgs
+    // Same path as seed: task + tools + stream only.
+    seed_messages_from_member(member)
 }
 
 /// True if text looks like the coordinator's long spawn / UI-test instruction
@@ -251,55 +163,6 @@ fn short_model(model: &str) -> String {
     } else {
         short.to_string()
     }
-}
-
-fn collect_tool_activity_lines(member: &SwarmMemberStatus) -> Vec<String> {
-    let mut lines = Vec::new();
-    for t in &member.todo_items {
-        for tool in &t.tool_intents {
-            let status_lc = tool.status.to_ascii_lowercase();
-            let st = match status_lc.as_str() {
-                "running" => "running",
-                "completed" | "done" => "done",
-                "error" | "failed" => "error",
-                _ => status_lc.as_str(),
-            };
-            let mut line = format!(
-                "├─ {} ({st}): {}",
-                tool.tool_name,
-                truncate_chars(&tool.intent, 80)
-            );
-            if let Some(p) = &tool.progress {
-                let unit = p.unit.as_deref().unwrap_or("");
-                line.push_str(&format!(" · {}/{}{}", p.current, p.total, unit));
-            }
-            lines.push(line);
-        }
-    }
-    if lines.len() > 12 {
-        let omitted = lines.len() - 12;
-        lines.truncate(12);
-        lines.push(format!("└─ … +{omitted} more"));
-    } else if let Some(last) = lines.last_mut() {
-        *last = last.replacen("├─", "└─", 1);
-    }
-    lines
-}
-
-fn split_stream_chunks(tail: &str) -> Vec<String> {
-    let paragraphs: Vec<&str> = tail
-        .split("\n\n")
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .collect();
-    if paragraphs.len() > 1 {
-        return paragraphs.into_iter().map(str::to_string).collect();
-    }
-    let lines: Vec<&str> = tail.lines().collect();
-    if lines.len() <= 40 {
-        return vec![tail.to_string()];
-    }
-    lines.chunks(40).map(|c| c.join("\n")).collect()
 }
 
 fn format_elapsed(secs: u64) -> String {
@@ -525,19 +388,16 @@ mod tests {
             !blob.contains("Dùng tool swarm"),
             "must not dump spawn meta-prompt: {blob}"
         );
-        // Tools/todos still render; empty-state only when there is nothing else.
+        // Tools still seed; no status novel.
         assert!(
-            blob.contains("bash") || blob.contains("step one") || blob.contains("status:"),
-            "expected tools/todos/status without stream: {blob}"
+            blob.contains("bash") || blob.contains("hostname"),
+            "expected tool rows without stream: {blob}"
         );
-        assert!(
-            !blob.contains("hard-switch") && !blob.contains("shift+enter"),
-            "no keybinding novel in body: {blob}"
-        );
+        assert!(!blob.contains("status:"), "no status dump in body: {blob}");
     }
 
     #[test]
-    fn build_view_empty_state_is_quiet() {
+    fn build_view_empty_when_nothing_real() {
         let mut m = sample_member();
         m.detail = None;
         m.task_label = None;
@@ -545,27 +405,29 @@ mod tests {
         m.todo_items.clear();
         m.todo_progress = None;
         let msgs = build_view_messages(&m);
-        let blob: String = msgs.iter().map(|x| x.content.clone()).collect();
-        assert!(
-            blob.contains("No live stream"),
-            "expected quiet empty-state: {blob}"
-        );
-        assert!(
-            !blob.contains("hard-switch") && !blob.contains("shift+enter"),
-            "no keybinding novel: {blob}"
-        );
+        // CC: empty until bootstrap — never fall through to lead with a novel.
+        assert!(msgs.is_empty(), "expected empty transcript: {msgs:?}");
+        assert!(!is_message_level_transcript(&msgs));
     }
 
     #[test]
     fn build_view_messages_includes_stream_and_tools() {
         let msgs = build_view_messages(&sample_member());
-        // No chrome banner in body (TeammateViewHeader owns that).
         assert!(!msgs.iter().any(|m| m.content.contains("esc return")));
         assert!(
             msgs.iter()
                 .any(|m| m.role == "assistant" && m.content.contains("tick"))
         );
         assert!(msgs.iter().any(|m| m.content.contains("bash")));
+        assert!(is_message_level_transcript(&msgs));
+    }
+
+    #[test]
+    fn message_level_rejects_status_only() {
+        let msgs = vec![DisplayMessage::system("status: running")];
+        assert!(!is_message_level_transcript(&msgs));
+        let msgs = vec![DisplayMessage::assistant("hello")];
+        assert!(is_message_level_transcript(&msgs));
     }
 
     #[test]

@@ -810,7 +810,13 @@ fn spawn_assigned_task_run(
             &swarms_by_id,
         )
         .await;
-        set_member_task_label(&target_session, &assignment_text, &swarm_members).await;
+        set_member_task_label(
+            &target_session,
+            &assignment_text,
+            &swarm_members,
+            &swarms_by_id,
+        )
+        .await;
         update_member_status(
             &target_session,
             "running",
@@ -1741,7 +1747,13 @@ async fn handle_comm_assign_task_with_mode(
     };
     let queued_task_prompt = append_swarm_completion_report_instructions(&notification);
     let assignment_text = combine_assignment_text(&content, message.as_deref());
-    set_member_task_label(&target_session, &assignment_text, swarm_members).await;
+    set_member_task_label(
+        &target_session,
+        &assignment_text,
+        swarm_members,
+        swarms_by_id,
+    )
+    .await;
     update_member_status(
         &target_session,
         "queued",
