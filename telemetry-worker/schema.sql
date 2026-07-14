@@ -127,8 +127,9 @@ CREATE INDEX IF NOT EXISTS idx_events_feedback_rating ON events(feedback_rating)
 CREATE INDEX IF NOT EXISTS idx_events_account_id ON events(account_id);
 CREATE INDEX IF NOT EXISTS idx_events_event_tier_created ON events(event, tier, created_at);
 
--- Website beacon detail rows (web_pageview / web_cta_click), keyed by
--- event_id like session_details / turn_details. Added in migration 0016.
+-- Website beacon detail rows (web_pageview / web_cta_click / web_vital /
+-- web_error), keyed by event_id like session_details / turn_details. Added in
+-- migration 0016 and extended with privacy-safe quality fields in 0018.
 CREATE TABLE IF NOT EXISTS web_details (
     event_id TEXT PRIMARY KEY,
     path TEXT,
@@ -138,6 +139,10 @@ CREATE TABLE IF NOT EXISTS web_details (
     utm_medium TEXT,
     utm_campaign TEXT,
     cta TEXT,
+    metric_name TEXT,
+    metric_value REAL,
+    rating TEXT,
+    error_kind TEXT,
     FOREIGN KEY (event_id) REFERENCES events(event_id)
 );
 
@@ -162,6 +167,7 @@ CREATE TABLE IF NOT EXISTS discovery_details (
     query_present INTEGER NOT NULL DEFAULT 0,
     reason_present INTEGER NOT NULL DEFAULT 0,
     custom_endpoint INTEGER NOT NULL DEFAULT 0,
+    benchmark_run INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (event_id) REFERENCES events(event_id)
 );
 
@@ -170,6 +176,7 @@ CREATE INDEX IF NOT EXISTS idx_discovery_phase_outcome ON discovery_details(phas
 CREATE INDEX IF NOT EXISTS idx_discovery_category_outcome ON discovery_details(category, outcome);
 CREATE INDEX IF NOT EXISTS idx_discovery_selected_tool ON discovery_details(selected_tool);
 CREATE INDEX IF NOT EXISTS idx_discovery_failure_reason ON discovery_details(failure_reason);
+CREATE INDEX IF NOT EXISTS idx_discovery_benchmark_run ON discovery_details(benchmark_run);
 
 CREATE TABLE IF NOT EXISTS session_details (
     event_id TEXT PRIMARY KEY,

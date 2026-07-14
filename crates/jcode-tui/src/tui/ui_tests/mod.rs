@@ -143,8 +143,10 @@ struct TestState {
     cache_ttl_status: Option<crate::tui::CacheTtlInfo>,
     status_notice: Option<String>,
     swarm_members: Vec<crate::protocol::SwarmMemberStatus>,
+    transcript_swarm_members: Option<Vec<crate::protocol::SwarmMemberStatus>>,
     swarm_panel_selected: usize,
     swarm_panel_focused: bool,
+    swarm_panel_full_page: bool,
 }
 
 impl crate::tui::TuiState for TestState {

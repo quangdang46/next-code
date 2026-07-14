@@ -5,6 +5,35 @@ fn test_simple_markdown() {
 }
 
 #[test]
+fn test_latex_none_mode_helpers_preserve_source_and_delimiters() {
+    assert_eq!(
+        line_to_string(&Line::from(raw_math_inline_span(r"x^2 + \alpha"))),
+        "$x^2 + \\alpha$"
+    );
+    let display: Vec<String> = raw_math_display_lines(r"\frac{x}{y}")
+        .iter()
+        .map(line_to_string)
+        .collect();
+    assert_eq!(display[1], "│ $$");
+    assert_eq!(display[2], "│ \\frac{x}{y}");
+    assert_eq!(display[3], "│ $$");
+}
+
+#[test]
+fn test_latex_unicode_mode_helpers_convert_supported_notation() {
+    assert_eq!(
+        line_to_string(&Line::from(math_inline_span(r"x^2 + \alpha"))),
+        "x² + α"
+    );
+    let display: Vec<String> = math_display_lines(r"\frac{x+1}{y}")
+        .iter()
+        .map(line_to_string)
+        .collect();
+    assert!(display.iter().any(|line| line.contains("x+1")));
+    assert!(display.iter().any(|line| line.contains('─')));
+}
+
+#[test]
 fn test_code_block() {
     let lines = render_markdown("```rust\nfn main() {}\n```");
     assert!(!lines.is_empty());
@@ -172,6 +201,43 @@ fn test_table_width_wrapping_with_three_columns_stays_within_limit() {
         "expected all rendered table lines to fit width 24, got {} in {:?}",
         max_width,
         rendered
+    );
+}
+
+#[test]
+fn test_math_in_table_stays_within_constrained_width() {
+    let md = "| Formula | Result |\n| - | - |\n| $\\frac{x+1}{y}$ | $\\alpha_2 + x^2$ |";
+    let rendered: Vec<String> = render_markdown_with_width(md, Some(24))
+        .iter()
+        .map(line_to_string)
+        .collect();
+
+    assert!(rendered.iter().any(|line| line.contains("x+1")), "{rendered:?}");
+    assert!(rendered.iter().any(|line| line.contains("α₂")), "{rendered:?}");
+    assert!(
+        rendered.iter().map(|line| line.width()).max().unwrap_or(0) <= 24,
+        "table math exceeded width: {rendered:?}"
+    );
+}
+
+#[test]
+fn test_math_in_list_and_blockquote_wraps_without_losing_gutter() {
+    let md = "- Compute $\\frac{x+1}{y}$ for the long explanatory value\n\n> Result is $\\alpha_2 + x^2$ with a quoted explanation";
+    let rendered: Vec<String> = render_markdown_with_width(md, Some(24))
+        .iter()
+        .map(line_to_string)
+        .filter(|line| !line.is_empty())
+        .collect();
+
+    assert!(rendered.iter().any(|line| line.contains("x+1")), "{rendered:?}");
+    assert!(rendered.iter().any(|line| line.contains("α₂")), "{rendered:?}");
+    assert!(
+        rendered.iter().any(|line| line.starts_with("│ ")),
+        "blockquote gutter was not preserved: {rendered:?}"
+    );
+    assert!(
+        rendered.iter().map(|line| line.width()).max().unwrap_or(0) <= 48,
+        "structured math grew unexpectedly wide: {rendered:?}"
     );
 }
 

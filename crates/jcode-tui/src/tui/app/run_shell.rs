@@ -86,6 +86,10 @@ pub(super) struct StatusSpinnerRenderer {
 }
 
 impl StatusSpinnerRenderer {
+    pub(super) fn spinner_only_available(&self, app: &App) -> bool {
+        status_spinner_only_symbol(app).is_some()
+    }
+
     pub(super) fn invalidate(&mut self) {
         self.last_frame = None;
     }
@@ -189,23 +193,31 @@ impl StatusSpinnerRenderer {
         app: &App,
         terminal: &mut DefaultTerminal,
     ) -> Result<bool> {
-        let Some(symbol) = status_spinner_only_symbol(app) else {
+        let status_symbol = status_spinner_only_symbol(app);
+        if status_symbol.is_none() {
             return Ok(false);
-        };
-        let Some(area) = crate::tui::ui::last_status_area() else {
-            return Ok(false);
-        };
+        }
         let Some(previous_frame) = self.last_frame.as_ref() else {
             return Ok(false);
         };
-        if !render_status_spinner_into_buffer(previous_frame, area, symbol) {
+        let status_area = crate::tui::ui::last_status_area();
+        let status_patchable = status_symbol
+            .zip(status_area)
+            .is_some_and(|(symbol, area)| {
+                render_status_spinner_into_buffer(previous_frame, area, symbol)
+            });
+        if !status_patchable {
             return Ok(false);
         }
 
         let next_frame = {
             let current_buffer = terminal.current_buffer_mut();
             current_buffer.clone_from(previous_frame);
-            render_status_spinner_into_buffer_mut(current_buffer, area, symbol);
+            if let Some((symbol, area)) = status_symbol.zip(status_area)
+                && status_patchable
+            {
+                render_status_spinner_into_buffer_mut(current_buffer, area, symbol);
+            }
             current_buffer.clone()
         };
 
@@ -370,7 +382,7 @@ impl App {
             } else {
                 // Wait for input or redraw tick
                 tokio::select! {
-                    _ = status_spinner_interval.tick(), if status_spinner_only_symbol(&self).is_some() => {
+                    _ = status_spinner_interval.tick(), if status_spinner_renderer.spinner_only_available(&self) => {
                         if !status_spinner_renderer.draw_status_spinner_only(&self, &mut terminal)? {
                             needs_redraw = true;
                         }
@@ -531,7 +543,7 @@ impl App {
                 }
 
                 tokio::select! {
-                    _ = status_spinner_interval.tick(), if status_spinner_only_symbol(&self).is_some() => {
+                    _ = status_spinner_interval.tick(), if status_spinner_renderer.spinner_only_available(&self) => {
                         if !status_spinner_renderer.draw_status_spinner_only(&self, &mut terminal)? {
                             needs_redraw = true;
                         }

@@ -41,8 +41,9 @@ impl App {
     pub(super) fn show_todo_card(&mut self) {
         let session_id = self.active_client_session_id().map(str::to_string);
         let todos = load_current_session_todos(session_id.as_deref());
-        let content = serde_json::to_string(&todos).unwrap_or_else(|_| "[]".to_string());
-        self.todo_card_rendered_hash = hash_todos_payload(session_id.as_deref(), &todos, &[]);
+        let goals = load_current_session_goals(session_id.as_deref());
+        let content = todo_card_payload_json(&todos, &goals);
+        self.todo_card_rendered_hash = hash_todos_payload(session_id.as_deref(), &todos, &goals);
 
         if let Some(idx) = self.latest_todo_card_index() {
             if idx + 1 == self.display_messages.len() {
@@ -63,12 +64,13 @@ impl App {
         };
         let session_id = self.active_client_session_id().map(str::to_string);
         let todos = load_current_session_todos(session_id.as_deref());
-        let next_hash = hash_todos_payload(session_id.as_deref(), &todos, &[]);
+        let goals = load_current_session_goals(session_id.as_deref());
+        let next_hash = hash_todos_payload(session_id.as_deref(), &todos, &goals);
         if next_hash == self.todo_card_rendered_hash {
             return false;
         }
         self.todo_card_rendered_hash = next_hash;
-        let content = serde_json::to_string(&todos).unwrap_or_else(|_| "[]".to_string());
+        let content = todo_card_payload_json(&todos, &goals);
         self.replace_display_message_content(idx, content)
     }
 
@@ -283,6 +285,14 @@ fn load_current_session_goals(session_id: Option<&str>) -> Vec<crate::todo::Todo
     crate::todo::load_goals(session_id).unwrap_or_default()
 }
 
+fn todo_card_payload_json(todos: &[TodoItem], goals: &[crate::todo::TodoGoal]) -> String {
+    serde_json::to_string(&serde_json::json!({
+        "todos": todos,
+        "goals": goals,
+    }))
+    .unwrap_or_else(|_| r#"{"todos":[],"goals":[]}"#.to_string())
+}
+
 fn build_todos_view_markdown(
     session_id: Option<&str>,
     todos: &[TodoItem],
@@ -418,7 +428,7 @@ fn format_goal_markdown(goals: &[crate::todo::TodoGoal], group: Option<&str>) ->
     };
     let mut line = String::new();
     if let Some(score) = goal.hill_climbability {
-        line.push_str(&format!("\n- Hill-climbability: **{}%**", score));
+        line.push_str(&format!("\n- Hill climbability: **{}%**", score));
         line.push('\n');
     }
     if let Some(objective) = goal
@@ -427,6 +437,16 @@ fn format_goal_markdown(goals: &[crate::todo::TodoGoal], group: Option<&str>) ->
         .filter(|objective| !objective.trim().is_empty())
     {
         line.push_str(&format!("- Objective: {}\n", objective.trim()));
+    }
+    if let Some(feedback_loop) = goal
+        .feedback_loop
+        .as_deref()
+        .filter(|feedback_loop| !feedback_loop.trim().is_empty())
+    {
+        line.push_str(&format!("- Feedback loop: {}\n", feedback_loop.trim()));
+    }
+    if let Some(score) = goal.end_to_end_ownership {
+        line.push_str(&format!("- End-to-end ownership: **{}%**\n", score));
     }
     line
 }
@@ -595,6 +615,8 @@ fn hash_todos_payload(
         goal.group.hash(&mut hasher);
         goal.hill_climbability.hash(&mut hasher);
         goal.objective.hash(&mut hasher);
+        goal.feedback_loop.hash(&mut hasher);
+        goal.end_to_end_ownership.hash(&mut hasher);
     }
     hasher.finish()
 }
@@ -716,6 +738,10 @@ mod tests {
                 group: Some("optimize rendering".to_string()),
                 hill_climbability: Some(90),
                 objective: Some("frame time under 8ms".to_string()),
+                feedback_loop: Some(
+                    "run the frame benchmark and compare p95 frame time".to_string(),
+                ),
+                end_to_end_ownership: Some(85),
                 ..Default::default()
             }],
         );
@@ -725,11 +751,20 @@ mod tests {
             "{markdown}"
         );
         assert!(
-            markdown.contains("- Hill-climbability: **90%**"),
+            markdown.contains("- Hill climbability: **90%**"),
             "{markdown}"
         );
         assert!(
             markdown.contains("- Objective: frame time under 8ms"),
+            "{markdown}"
+        );
+        assert!(
+            markdown
+                .contains("- Feedback loop: run the frame benchmark and compare p95 frame time"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("- End-to-end ownership: **85%**"),
             "{markdown}"
         );
         assert!(markdown.contains("## scrollback (0/1)"), "{markdown}");
@@ -760,6 +795,19 @@ mod tests {
             hill_climbability: Some(30),
             ..Default::default()
         }];
+        let after = hash_todos_payload(Some("session_test"), &todos, &goals);
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn todos_view_hash_changes_when_feedback_loop_changes() {
+        let todos = vec![todo("g", "Goal hash", "pending", "high", Some(80), None)];
+        let mut goals = vec![crate::todo::TodoGoal {
+            feedback_loop: Some("run test A".to_string()),
+            ..Default::default()
+        }];
+        let before = hash_todos_payload(Some("session_test"), &todos, &goals);
+        goals[0].feedback_loop = Some("run test B".to_string());
         let after = hash_todos_payload(Some("session_test"), &todos, &goals);
         assert_ne!(before, after);
     }

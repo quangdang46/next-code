@@ -1,31 +1,121 @@
-//! Session-local todo persistence (file-backed JSON store).
-
-pub use jcode_task_types::{TodoGoal, TodoItem};
-
-/// Completed todos whose confidence trail ends in an unearned jump: a final
-/// step of [`TODO_CONFIDENCE_SPIKE`]+ points in the tool-maintained
-/// `confidence_history`, or, for todos without a recorded trail, an equally
-/// large gap between planning `confidence` and `completion_confidence`.
-pub const TODO_CONFIDENCE_SPIKE: u8 = 50;
-
-/// Goals with a hill-climbability score strictly below this are considered
-/// low: no credible metric to iterate against. The todo tool nudges the model
-/// once per goal to either reframe the objective into something measurable or
-/// deliberately mark it taste-driven and plan user checkpoints.
-pub const LOW_HILL_CLIMBABILITY: u8 = 40;
-
+use crate::storage;
 use anyhow::Result;
 use std::path::PathBuf;
 
-use crate::bus::{Bus, BusEvent, TodoEvent};
-use crate::storage::{self, read_json, write_json_fast};
+pub use jcode_task_types::{TodoGoal, TodoItem};
 
-/// Prefix for the confidence summary line appended to auto-poke messages.
-pub const TODO_CONFIDENCE_SUMMARY_PREFIX: &str = "Confidence history:";
+/// Minimum passing score for 0-100 quality assessments. Scores below this do
+/// not provide enough evidence to clear their respective quality gate.
+pub const QUALITY_GATE_THRESHOLD: u8 = 96;
 
-/// Build the auto-poke message shown when an agent has incomplete todos.
-pub fn build_auto_poke_message(incomplete: usize) -> String {
-    format!("You have {incomplete} incomplete todo items. Review and update the todo tool.")
+/// Goals with a hill-climbability score strictly below this are considered
+/// low: no credible metric to iterate against. The todo tool nudges the model
+/// on every applicable write to reframe the objective into something
+/// quantifiable and verifiable.
+pub const LOW_HILL_CLIMBABILITY: u8 = QUALITY_GATE_THRESHOLD;
+
+/// Model-facing continuation for the private hill-climbability check. Names the
+/// assessment category without disclosing the score or threshold.
+pub const TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE: &str = "Your hill-climbability is not high enough. First, improve the goal's objective and feedback loop so progress can be measured across iterations. Then call the todo tool again with the revised goal before continuing the task. The goal is to create a strong feedback loop you can iterate against.";
+
+/// Model-facing continuation for the private end-to-end ownership check. Names
+/// the assessment category without disclosing the score or threshold.
+pub const TODO_OWNERSHIP_CONTINUATION_MESSAGE: &str = "Your end-to-end ownership is not high enough to complete this goal. Take ownership of the full user outcome, not just the immediate implementation. Follow the work through every relevant integration and runtime path, resolve consequential gaps, validate the complete workflow, and finish the necessary follow-through.";
+
+/// Model-facing continuation for private completion-confidence checks. Names
+/// the assessment category without disclosing scores, items, or thresholds.
+pub const TODO_COMPLETION_CONTINUATION_MESSAGE: &str = "Your completion confidence is missing or not high enough. Validate the completed result more thoroughly, address any remaining issues, and then reassess whether the work is ready to finalize.";
+const LEGACY_TODO_CONFIDENCE_SUMMARY_PREFIX: &str = "All todos are done. Todo confidence summary:";
+
+fn normalized_group(group: Option<&str>) -> Option<String> {
+    group
+        .map(str::trim)
+        .filter(|group| !group.is_empty())
+        .map(str::to_string)
+}
+
+fn group_is_complete(todos: &[TodoItem], group: &Option<String>) -> bool {
+    let mut matching = todos
+        .iter()
+        .filter(|todo| normalized_group(todo.group.as_deref()) == *group)
+        .peekable();
+    matching.peek().is_some() && matching.all(|todo| todo.status == "completed")
+}
+
+/// Whether every group newly closed by this update has a sufficient assessment
+/// of ownership over its full outcome. Groups completed before this check was
+/// introduced are intentionally grandfathered so existing sessions stay writable.
+pub fn newly_completed_groups_have_sufficient_ownership(
+    previous: &[TodoItem],
+    incoming: &[TodoItem],
+    goals: &[TodoGoal],
+) -> bool {
+    let mut groups: Vec<Option<String>> = Vec::new();
+    for todo in incoming {
+        let group = normalized_group(todo.group.as_deref());
+        if !groups.contains(&group) {
+            groups.push(group);
+        }
+    }
+
+    groups.into_iter().all(|group| {
+        if !group_is_complete(incoming, &group) || group_is_complete(previous, &group) {
+            return true;
+        }
+        goals
+            .iter()
+            .find(|goal| normalized_group(goal.group.as_deref()) == group)
+            .and_then(|goal| goal.end_to_end_ownership)
+            .is_some_and(|score| score >= QUALITY_GATE_THRESHOLD)
+    })
+}
+
+/// Build the synthetic auto-poke continuation prompt sent when the model
+/// stops with incomplete todos. Kept here so every producer (TUI auto-poke,
+/// `jcode run` auto-poke) and the transcript renderer agree on the exact text.
+pub fn build_auto_poke_message(incomplete_count: usize) -> String {
+    format!(
+        "You have {} incomplete todo{}. Continue working, or update the todo tool.",
+        incomplete_count,
+        if incomplete_count == 1 { "" } else { "s" },
+    )
+}
+
+/// True when `message` is a synthetic auto-poke continuation (the
+/// incomplete-todos poke or the todo confidence summary) rather than a real
+/// user prompt.
+///
+/// These are persisted as `Role::User` so the model treats them as a normal
+/// continuation turn, but they are not something the user typed. The live UI
+/// hides them (showing an "Auto-poking..." notice instead), and the session
+/// renderer uses this to avoid re-rendering them as user prompts on
+/// reload/resume/remote attach.
+pub fn is_auto_poke_message(message: &str) -> bool {
+    let trimmed = message.trim();
+    (trimmed.starts_with("You have ")
+        && trimmed.contains(" incomplete todo")
+        && trimmed.ends_with("update the todo tool."))
+        || trimmed.starts_with(TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE)
+        || trimmed.starts_with(TODO_OWNERSHIP_CONTINUATION_MESSAGE)
+        || trimmed.starts_with(TODO_COMPLETION_CONTINUATION_MESSAGE)
+        || trimmed.starts_with(LEGACY_TODO_CONFIDENCE_SUMMARY_PREFIX)
+}
+
+pub fn load_todos(session_id: &str) -> Result<Vec<TodoItem>> {
+    let path = todo_path(session_id)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    storage::read_json(&path).or_else(|_| Ok(Vec::new()))
+}
+
+pub fn todos_exist(session_id: &str) -> Result<bool> {
+    Ok(todo_path(session_id)?.exists())
+}
+
+pub fn save_todos(session_id: &str, todos: &[TodoItem]) -> Result<()> {
+    let path = todo_path(session_id)?;
+    storage::write_json_fast(&path, todos)
 }
 
 fn todo_path(session_id: &str) -> Result<PathBuf> {
@@ -33,121 +123,9 @@ fn todo_path(session_id: &str) -> Result<PathBuf> {
     Ok(base.join("todos").join(format!("{}.json", session_id)))
 }
 
-/// Load todos for a session from disk.
-pub fn load_todos(session_id: &str) -> Result<Vec<TodoItem>> {
-    let path = todo_path(session_id)?;
-    if !path.exists() {
-        return Ok(Vec::new());
-    }
-    read_json(&path).or_else(|_| Ok(Vec::new()))
-}
-
-/// Check if any todos exist for a session.
-pub fn todos_exist(session_id: &str) -> Result<bool> {
-    Ok(todo_path(session_id)?.exists())
-}
-
-/// Save todos for a session to disk + broadcast TodoUpdated event.
-///
-/// Returns `Ok(true)` if a verification nudge should be injected into the
-/// tool result (model just closed 3+ tasks without a verification step).
-/// Caller (TodoTool) reads this and appends reminder text to its output.
-///
-/// Returns `Ok(false)` when no nudge is warranted, or when the save completed
-/// but the verification check did not fire.
-pub fn save_todos(session_id: &str, todos: &[TodoItem]) -> Result<bool> {
-    let path = todo_path(session_id)?;
-    if let Some(parent) = path.parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-        }
-    }
-    // Load previous state to compute verification nudge delta.
-    let previous = load_todos(session_id).unwrap_or_default();
-    let nudge = needs_verification_nudge(&previous, todos);
-    write_json_fast(&path, todos)?;
-    // Broadcast update to subscribers (TUI panel, metrics, etc.).
-    Bus::global().publish(BusEvent::TodoUpdated(TodoEvent {
-        session_id: session_id.to_string(),
-        todos: todos.to_vec(),
-        at: chrono::Utc::now(),
-    }));
-    Ok(nudge)
-}
-
-/// Detect the auto-poke prompt.
-pub fn is_auto_poke_message(message: &str) -> bool {
-    let trimmed = message.trim();
-    (trimmed.starts_with("You have ")
-        && trimmed.contains(" incomplete todo")
-        && trimmed.ends_with("update the todo tool."))
-        || trimmed.starts_with("Confidence: ")
-}
-
-/// Detect close-out 3+ tasks không có verification step.
-/// Source: claude-code v1 verificationNudgeNeeded.
-///
-/// Returns true khi model vừa complete ≥3 task (chưa complete trước đó)
-/// và không có task nào chứa "verif" (case-insensitive). Khi false,
-/// tool không cần inject reminder.
-///
-/// `previous` = state trước save; `updated` = state sau save.
-pub fn needs_verification_nudge(previous: &[TodoItem], updated: &[TodoItem]) -> bool {
-    use std::collections::HashSet;
-    let was_completed: HashSet<&str> = previous
-        .iter()
-        .filter(|t| t.status == "completed")
-        .map(|t| t.content.as_str())
-        .collect();
-    let newly_completed: Vec<&TodoItem> = updated
-        .iter()
-        .filter(|t| t.status == "completed" && !was_completed.contains(t.content.as_str()))
-        .collect();
-    if newly_completed.len() < 3 {
-        return false;
-    }
-    !newly_completed.iter().any(|t| {
-        t.content.to_ascii_lowercase().contains("verif")
-            || t.active_form
-                .as_deref()
-                .map(|s| s.to_ascii_lowercase().contains("verif"))
-                .unwrap_or(false)
-    })
-}
-
-/// Detect completed todos whose confidence trail shows a suspicious jump:
-/// a final leap of [`TODO_CONFIDENCE_SPIKE`]+ points at completion time,
-/// suggesting the model retroactively inflated its confidence rather than
-/// tracking genuine evidence as work progressed.
-pub fn spike_completed_todos(todos: &[TodoItem]) -> Vec<&TodoItem> {
-    todos
-        .iter()
-        .filter(|todo| todo.status == "completed")
-        .filter(|todo| {
-            let history = &todo.confidence_history;
-            match history.len() {
-                0 => {
-                    todo.confidence
-                        .zip(todo.completion_confidence)
-                        .is_some_and(|(first, last)| {
-                            last.saturating_sub(first) >= TODO_CONFIDENCE_SPIKE
-                        })
-                }
-                1 => false,
-                n => history[n - 1].saturating_sub(history[n - 2]) >= TODO_CONFIDENCE_SPIKE,
-            }
-        })
-        .collect()
-}
-
-fn goals_path(session_id: &str) -> Result<PathBuf> {
-    let base = storage::jcode_dir()?;
-    Ok(base
-        .join("todos")
-        .join(format!("{}-goals.json", session_id)))
-}
-
-/// Load goals for a session from disk.
+/// Goal-level assessments live beside the todo list in a separate file so the
+/// todo list format (a bare `Vec<TodoItem>` array) stays readable by every
+/// existing consumer.
 pub fn load_goals(session_id: &str) -> Result<Vec<TodoGoal>> {
     let path = goals_path(session_id)?;
     if !path.exists() {
@@ -210,82 +188,75 @@ pub fn load_session_title(session_id: &str) -> Option<String> {
     derive_session_title(&todos, &goals)
 }
 
-/// Save goals for a session to disk.
 pub fn save_goals(session_id: &str, goals: &[TodoGoal]) -> Result<()> {
     let path = goals_path(session_id)?;
     storage::write_json_fast(&path, goals)
+}
+
+fn goals_path(session_id: &str) -> Result<PathBuf> {
+    let base = storage::jcode_dir()?;
+    Ok(base
+        .join("todos")
+        .join(format!("{}-goals.json", session_id)))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn item(content: &str, status: &str) -> TodoItem {
-        TodoItem {
-            content: content.into(),
-            status: status.into(),
-            ..Default::default()
+    #[test]
+    fn built_auto_poke_messages_are_detected() {
+        assert!(is_auto_poke_message(&build_auto_poke_message(1)));
+        assert!(is_auto_poke_message(&build_auto_poke_message(3)));
+        assert!(is_auto_poke_message(
+            TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE
+        ));
+        assert!(is_auto_poke_message(TODO_OWNERSHIP_CONTINUATION_MESSAGE));
+        assert!(is_auto_poke_message(TODO_COMPLETION_CONTINUATION_MESSAGE));
+        assert!(is_auto_poke_message(LEGACY_TODO_CONFIDENCE_SUMMARY_PREFIX));
+    }
+
+    #[test]
+    fn quality_continuations_are_actionable_without_private_calibration() {
+        for (message, category) in [
+            (
+                TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE,
+                "hill-climbability",
+            ),
+            (TODO_OWNERSHIP_CONTINUATION_MESSAGE, "end-to-end ownership"),
+            (
+                TODO_COMPLETION_CONTINUATION_MESSAGE,
+                "completion confidence",
+            ),
+        ] {
+            let lower = message.to_ascii_lowercase();
+            assert!(lower.contains(category));
+            assert!(!message.chars().any(|ch| ch.is_ascii_digit()));
+            for disclosure in ["threshold", "score", "percent", "below", "quality gate"] {
+                assert!(
+                    !lower.contains(disclosure),
+                    "category-only continuation disclosed {disclosure}: {message}"
+                );
+            }
         }
+
+        assert!(TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE.contains("strong feedback loop"));
+        assert!(TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE.contains("First, improve"));
+        assert!(TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE.contains("call the todo tool again"));
+        assert!(TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE.contains("before continuing the task"));
+        assert!(TODO_OWNERSHIP_CONTINUATION_MESSAGE.contains("full user outcome"));
+        assert!(TODO_OWNERSHIP_CONTINUATION_MESSAGE.contains("complete workflow"));
+        assert!(TODO_OWNERSHIP_CONTINUATION_MESSAGE.contains("necessary follow-through"));
+        assert!(TODO_COMPLETION_CONTINUATION_MESSAGE.contains("Validate the completed result"));
     }
 
     #[test]
-    fn triggers_at_3_no_verif() {
-        let prev = vec![];
-        let updated = vec![
-            item("write code", "completed"),
-            item("run lint", "completed"),
-            item("commit", "completed"),
-        ];
-        assert!(needs_verification_nudge(&prev, &updated));
-    }
-
-    #[test]
-    fn skipped_when_verif_present() {
-        let prev = vec![];
-        let updated = vec![
-            item("write code", "completed"),
-            item("run tests", "completed"),
-            item("verify build", "completed"),
-        ];
-        assert!(!needs_verification_nudge(&prev, &updated));
-    }
-
-    #[test]
-    fn counts_only_newly_completed() {
-        let prev = vec![item("old done", "completed")];
-        let updated = vec![
-            item("old done", "completed"),
-            item("new a", "completed"),
-            item("new b", "completed"),
-        ];
-        assert!(!needs_verification_nudge(&prev, &updated));
-    }
-
-    #[test]
-    fn below_threshold() {
-        let prev = vec![];
-        let updated = vec![item("a", "completed"), item("b", "completed")];
-        assert!(!needs_verification_nudge(&prev, &updated));
-    }
-
-    #[test]
-    fn case_insensitive_verif() {
-        let prev = vec![];
-        let updated = vec![
-            item("Run VERIFICATION", "completed"),
-            item("b", "completed"),
-            item("c", "completed"),
-        ];
-        assert!(!needs_verification_nudge(&prev, &updated));
-    }
-
-    #[test]
-    fn active_form_counts_as_verif() {
-        let prev = vec![];
-        let mut i1 = item("a", "completed");
-        i1.active_form = Some("Verifying x".into());
-        let updated = vec![i1, item("b", "completed"), item("c", "completed")];
-        assert!(!needs_verification_nudge(&prev, &updated));
+    fn real_user_prompts_are_not_detected_as_pokes() {
+        assert!(!is_auto_poke_message("fix the login bug"));
+        assert!(!is_auto_poke_message(
+            "You have 2 incomplete todos. Continue working, or update the todo tool.\n\nalso please fix the tests"
+        ));
+        assert!(!is_auto_poke_message(""));
     }
 
     fn todo(content: &str, status: &str, group: Option<&str>) -> TodoItem {
@@ -294,7 +265,6 @@ mod tests {
             status: status.to_string(),
             priority: "high".to_string(),
             id: content.to_ascii_lowercase().replace(' ', "-"),
-            active_form: None,
             group: group.map(str::to_string),
             confidence: None,
             completion_confidence: None,
@@ -302,6 +272,74 @@ mod tests {
             blocked_by: Vec::new(),
             assigned_to: None,
         }
+    }
+
+    fn ownership_goal(group: Option<&str>, ownership: Option<u8>) -> TodoGoal {
+        TodoGoal {
+            group: group.map(str::to_string),
+            end_to_end_ownership: ownership,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn newly_completed_group_requires_sufficient_end_to_end_ownership() {
+        let previous = vec![todo("work", "in_progress", Some("ship"))];
+        let completed = vec![todo("work", "completed", Some("ship"))];
+
+        for ownership in [None, Some(0), Some(95)] {
+            assert!(!newly_completed_groups_have_sufficient_ownership(
+                &previous,
+                &completed,
+                &[ownership_goal(Some("ship"), ownership)],
+            ));
+        }
+        assert!(newly_completed_groups_have_sufficient_ownership(
+            &previous,
+            &completed,
+            &[ownership_goal(Some("ship"), Some(96))],
+        ));
+    }
+
+    #[test]
+    fn ownership_is_not_required_before_group_completion() {
+        let previous = vec![todo("work", "pending", Some("ship"))];
+        let in_progress = vec![todo("work", "in_progress", Some("ship"))];
+
+        assert!(newly_completed_groups_have_sufficient_ownership(
+            &previous,
+            &in_progress,
+            &[],
+        ));
+    }
+
+    #[test]
+    fn ownership_gate_normalizes_groups_and_supports_ungrouped_work() {
+        let previous = vec![todo("work", "in_progress", Some(" ship "))];
+        let completed = vec![todo("work", "completed", Some("ship"))];
+        assert!(newly_completed_groups_have_sufficient_ownership(
+            &previous,
+            &completed,
+            &[ownership_goal(Some(" ship"), Some(96))],
+        ));
+
+        let previous = vec![todo("work", "in_progress", None)];
+        let completed = vec![todo("work", "completed", None)];
+        assert!(newly_completed_groups_have_sufficient_ownership(
+            &previous,
+            &completed,
+            &[ownership_goal(None, Some(96))],
+        ));
+    }
+
+    #[test]
+    fn ownership_gate_grandfathers_preexisting_completed_groups() {
+        let completed = vec![todo("legacy", "completed", Some("legacy"))];
+        assert!(newly_completed_groups_have_sufficient_ownership(
+            &completed,
+            &completed,
+            &[],
+        ));
     }
 
     #[test]
@@ -338,6 +376,7 @@ mod tests {
             group: None,
             hill_climbability: Some(90),
             objective: Some("All resume naming tests pass".to_string()),
+            ..Default::default()
         }];
 
         assert_eq!(

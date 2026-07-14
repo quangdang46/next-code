@@ -30,13 +30,16 @@ mod mermaid;
 #[path = "markdown_types.rs"]
 mod types;
 
-pub use types::{CopyTargetKind, DiagramDisplayMode, MarkdownSpacingMode, RawCopyTarget};
+pub use types::{
+    CopyTargetKind, DiagramDisplayMode, LatexRenderingMode, MarkdownSpacingMode, RawCopyTarget,
+};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MarkdownConfigSnapshot {
     pub diagram_mode: DiagramDisplayMode,
     pub markdown_spacing: MarkdownSpacingMode,
     pub mermaid_enabled: bool,
+    pub latex_rendering: LatexRenderingMode,
 }
 
 impl Default for MarkdownConfigSnapshot {
@@ -45,6 +48,7 @@ impl Default for MarkdownConfigSnapshot {
             diagram_mode: DiagramDisplayMode::default(),
             markdown_spacing: MarkdownSpacingMode::default(),
             mermaid_enabled: true,
+            latex_rendering: LatexRenderingMode::default(),
         }
     }
 }
@@ -81,6 +85,10 @@ pub fn set_memory_snapshot_hook(hook: fn() -> ProcessMemorySnapshot) {
     }
 }
 
+pub fn set_latex_log_hook(hook: fn(&str)) {
+    latex_image::set_log_hook(hook);
+}
+
 pub(crate) fn config_snapshot() -> MarkdownConfigSnapshot {
     CONFIG_SNAPSHOT_HOOK
         .lock()
@@ -113,6 +121,8 @@ use context::{
     with_streaming_render_context,
 };
 
+#[path = "markdown_latex_image.rs"]
+mod latex_image;
 #[path = "markdown_render_full.rs"]
 mod render_full;
 #[path = "markdown_render_lazy.rs"]
@@ -913,6 +923,10 @@ fn math_inline_span(math: &str) -> Span<'static> {
     )
 }
 
+fn raw_math_inline_span(math: &str) -> Span<'static> {
+    Span::styled(format!("${math}$"), Style::default().fg(math_fg()))
+}
+
 fn math_display_lines(math: &str) -> Vec<Line<'static>> {
     let mut out = Vec::new();
     let dim = Style::default().fg(md_dim_color());
@@ -928,6 +942,42 @@ fn math_display_lines(math: &str) -> Vec<Line<'static>> {
     }
     out.push(Line::from(Span::styled("└─", dim)).left_aligned());
     out
+}
+
+fn raw_math_display_lines(math: &str) -> Vec<Line<'static>> {
+    let dim = Style::default().fg(md_dim_color());
+    let mut out = vec![Line::from(Span::styled("┌─ math (raw) ", dim)).left_aligned()];
+    out.push(Line::from(vec![
+        Span::styled("│ ", dim),
+        Span::styled("$$", Style::default().fg(math_fg())),
+    ]));
+    out.extend(math.lines().map(|line| {
+        Line::from(vec![
+            Span::styled("│ ", dim),
+            Span::styled(line.to_string(), Style::default().fg(math_fg())),
+        ])
+        .left_aligned()
+    }));
+    out.push(Line::from(vec![
+        Span::styled("│ ", dim),
+        Span::styled("$$", Style::default().fg(math_fg())),
+    ]));
+    out.push(Line::from(Span::styled("└─", dim)).left_aligned());
+    out
+}
+
+fn latex_image_lines(
+    math: &str,
+    display: bool,
+    max_width: Option<usize>,
+) -> Option<Vec<Line<'static>>> {
+    match latex_image::render_latex_image(math, display, max_width) {
+        Ok(lines) => Some(lines),
+        Err(error) => {
+            latex_image::report_error(&error);
+            None
+        }
+    }
 }
 fn table_color() -> Color {
     rgb(150, 150, 150)

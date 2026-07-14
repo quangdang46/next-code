@@ -182,7 +182,22 @@ impl App {
         provider: jcode_provider_core::ActiveProvider,
     ) -> Option<crate::auth::ActiveCredential> {
         if route.is_remote {
-            return self.remote_resolved_credential.map(Into::into);
+            if let Some(resolved) = self.remote_resolved_credential {
+                return Some(resolved.into());
+            }
+
+            // Older history payloads and replay snapshots may not carry the
+            // resolved credential, but an explicitly pinned route still tells
+            // us whether this is subscription OAuth or metered API-key usage.
+            // Never guess from the provider family alone: doing so made an
+            // unresolved OpenAI API session render cached subscription limits.
+            return self
+                .session
+                .route_api_method
+                .as_deref()
+                .and_then(jcode_provider_core::AuthRoute::parse)
+                .filter(|auth_route| auth_route.active_provider() == provider)
+                .map(|auth_route| auth_route.resolved_credential().into());
         }
 
         // Authoritative, cache-free answer from the live provider whenever the
@@ -295,8 +310,10 @@ impl App {
 
         let cost_based_usage = || crate::tui::info_widget::UsageInfo {
             provider: crate::tui::info_widget::UsageProvider::CostBased,
+            primary_limit_label: None,
             five_hour: 0.0,
             five_hour_resets_at: None,
+            secondary_limit_label: None,
             seven_day: 0.0,
             seven_day_resets_at: None,
             spark: None,
@@ -313,8 +330,10 @@ impl App {
         match route.provider {
             WidgetProviderKind::Copilot => Some(crate::tui::info_widget::UsageInfo {
                 provider: crate::tui::info_widget::UsageProvider::Copilot,
+                primary_limit_label: None,
                 five_hour: 0.0,
                 five_hour_resets_at: None,
+                secondary_limit_label: None,
                 seven_day: 0.0,
                 seven_day_resets_at: None,
                 spark: None,
@@ -328,18 +347,21 @@ impl App {
                 available: display_input_tokens > 0 || display_output_tokens > 0,
             }),
             WidgetProviderKind::Anthropic => {
-                if matches!(
-                    auth_method,
-                    crate::tui::info_widget::AuthMethod::AnthropicApiKey
-                ) {
-                    return Some(cost_based_usage());
+                match auth_method {
+                    crate::tui::info_widget::AuthMethod::AnthropicApiKey => {
+                        return Some(cost_based_usage());
+                    }
+                    crate::tui::info_widget::AuthMethod::AnthropicOAuth => {}
+                    _ => return None,
                 }
 
                 let usage = crate::usage::get_sync();
                 Some(crate::tui::info_widget::UsageInfo {
                     provider: crate::tui::info_widget::UsageProvider::Anthropic,
+                    primary_limit_label: Some("5-hour".to_string()),
                     five_hour: usage.five_hour,
                     five_hour_resets_at: usage.five_hour_resets_at.clone(),
+                    secondary_limit_label: Some("Weekly".to_string()),
                     seven_day: usage.seven_day,
                     seven_day_resets_at: usage.seven_day_resets_at.clone(),
                     spark: None,
@@ -354,16 +376,21 @@ impl App {
                 })
             }
             WidgetProviderKind::OpenAI => {
-                if matches!(
-                    auth_method,
-                    crate::tui::info_widget::AuthMethod::OpenAIApiKey
-                ) {
-                    return Some(cost_based_usage());
+                match auth_method {
+                    crate::tui::info_widget::AuthMethod::OpenAIApiKey => {
+                        return Some(cost_based_usage());
+                    }
+                    crate::tui::info_widget::AuthMethod::OpenAIOAuth => {}
+                    _ => return None,
                 }
 
                 let openai_usage = crate::usage::get_openai_usage_sync();
                 Some(crate::tui::info_widget::UsageInfo {
                     provider: crate::tui::info_widget::UsageProvider::OpenAI,
+                    primary_limit_label: openai_usage
+                        .five_hour
+                        .as_ref()
+                        .map(|window| window.name.trim_end_matches(" window").to_string()),
                     five_hour: openai_usage
                         .five_hour
                         .as_ref()
@@ -373,6 +400,10 @@ impl App {
                         .five_hour
                         .as_ref()
                         .and_then(|w| w.resets_at.clone()),
+                    secondary_limit_label: openai_usage
+                        .seven_day
+                        .as_ref()
+                        .map(|window| window.name.trim_end_matches(" window").to_string()),
                     seven_day: openai_usage
                         .seven_day
                         .as_ref()
@@ -1637,6 +1668,42 @@ impl crate::tui::TuiState for App {
         }
     }
 
+    fn swarm_members_for_transcript(&self) -> Vec<crate::protocol::SwarmMemberStatus> {
+        if !self.swarm_enabled {
+            return Vec::new();
+        }
+
+        // Start with the ownership-scoped gallery members. Then recover any
+        // exact session IDs recorded by spawn tool results. The latter remains
+        // safe in shared-repository swarms and survives a missing/stale parent
+        // edge in the live member snapshot.
+        let mut members = self.inline_swarm_members();
+        let mut included: std::collections::HashSet<String> = members
+            .iter()
+            .map(|member| member.session_id.clone())
+            .collect();
+        let spawned_ids: std::collections::HashSet<&str> = self
+            .display_messages
+            .iter()
+            .filter_map(|message| message.tool_data.as_ref().map(|tool| (message, tool)))
+            .filter(|(_, tool)| tool.name.eq_ignore_ascii_case("swarm"))
+            .flat_map(|(message, _)| message.content.lines())
+            .filter_map(|line| {
+                line.split_once("Spawned new agent: ")
+                    .map(|(_, id)| id.trim())
+            })
+            .collect();
+
+        for member in &self.remote_swarm_members {
+            if spawned_ids.contains(member.session_id.as_str())
+                && included.insert(member.session_id.clone())
+            {
+                members.push(member.clone());
+            }
+        }
+        members
+    }
+
     fn swarm_panel_selected(&self) -> usize {
         let count = self.inline_swarm_members().len();
         if count == 0 {
@@ -1648,6 +1715,10 @@ impl crate::tui::TuiState for App {
 
     fn swarm_panel_focused(&self) -> bool {
         self.swarm_panel_focused
+    }
+
+    fn swarm_panel_full_page(&self) -> bool {
+        self.swarm_panel_full_page && self.inline_swarm_gallery_active()
     }
 
     fn diagram_focus(&self) -> bool {
@@ -1997,21 +2068,65 @@ impl crate::tui::TuiState for App {
     }
 }
 
+/// The three Alt+N swarm views. Repeated presses cycle in declaration order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SwarmPanelView {
+    Chat,
+    Controls,
+    FullPage,
+}
+
 impl App {
+    /// Cycle chat → inline controls → full live swarm page → chat.
+    pub(crate) fn cycle_swarm_panel_view(&mut self) -> SwarmPanelView {
+        if !self.inline_swarm_gallery_active() {
+            self.swarm_panel_focused = false;
+            self.swarm_panel_full_page = false;
+            return SwarmPanelView::Chat;
+        }
+
+        let next = match (self.swarm_panel_focused, self.swarm_panel_full_page) {
+            (false, _) => SwarmPanelView::Controls,
+            (true, false) => SwarmPanelView::FullPage,
+            (true, true) => SwarmPanelView::Chat,
+        };
+        match next {
+            SwarmPanelView::Chat => {
+                self.swarm_panel_focused = false;
+                self.swarm_panel_full_page = false;
+            }
+            SwarmPanelView::Controls => {
+                self.swarm_panel_focused = true;
+                self.swarm_panel_full_page = false;
+            }
+            SwarmPanelView::FullPage => {
+                self.swarm_panel_focused = true;
+                self.swarm_panel_full_page = true;
+            }
+        }
+        if next != SwarmPanelView::Chat {
+            let count = self.inline_swarm_members().len();
+            self.swarm_panel_selected = self.swarm_panel_selected.min(count.saturating_sub(1));
+        }
+        next
+    }
+
     /// Toggle keyboard focus on the inline swarm panel. Returns the new state.
     /// Focus is only meaningful while the panel is actually visible.
     pub(crate) fn toggle_swarm_panel_focus(&mut self) -> bool {
         if !self.inline_swarm_gallery_active() {
             self.swarm_panel_focused = false;
+            self.swarm_panel_full_page = false;
             return false;
         }
         self.swarm_panel_focused = !self.swarm_panel_focused;
         if self.swarm_panel_focused {
-            // Clamp selection on entry.
             let count = self.inline_swarm_members().len();
             if count > 0 {
                 self.swarm_panel_selected = self.swarm_panel_selected.min(count - 1);
             }
+        } else {
+            self.swarm_panel_full_page = false;
         }
         self.swarm_panel_focused
     }
@@ -2019,6 +2134,7 @@ impl App {
     #[allow(dead_code)]
     pub(crate) fn set_swarm_panel_focus(&mut self, focused: bool) {
         self.swarm_panel_focused = focused && self.inline_swarm_gallery_active();
+        self.swarm_panel_full_page = false;
     }
 
     /// Move the swarm panel selection by `delta` (e.g. +1 for next, -1 for
@@ -2071,6 +2187,7 @@ impl App {
             }
             KeyCode::Esc => {
                 self.swarm_panel_focused = false;
+                self.swarm_panel_full_page = false;
                 true
             }
             _ => false,

@@ -1572,22 +1572,16 @@ pub(in crate::tui::app) fn handle_server_event(
             false
         }
         ServerEvent::SwarmStatus { members } => {
-            let members_changed = app.remote_swarm_members != members;
             if app.swarm_enabled {
                 app.remote_swarm_members = members;
                 persist_swarm_status_snapshot(app);
             } else {
                 app.remote_swarm_members.clear();
             }
-            if members_changed {
-                // The transcript body embeds live cards beneath spawn tool rows.
-                // Treat member data like a visible message mutation so both the
-                // full-frame and body caches rebuild immediately.
-                app.bump_display_messages_version();
-            }
-            // Swarm cards are embedded in the transcript. A member snapshot can
-            // arrive after the spawn tool result, so request a frame immediately
-            // rather than waiting for unrelated model or input activity.
+            // The dedicated swarm page and strip render directly from this live
+            // snapshot. The transcript uses its own stable summary signature, so
+            // do not bump the global message version for output-tail, timer, todo,
+            // or tool-progress updates.
             true
         }
         ServerEvent::SwarmPlan {

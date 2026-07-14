@@ -365,6 +365,9 @@ impl App {
                             .collect(),
                         runtime: crate::protocol::SwarmMemberRuntime {
                             model: Some("gpt-5.6".into()),
+                            provider: Some("OpenAI".into()),
+                            auth_method: Some("OAuth".into()),
+                            effort: Some("high".into()),
                             elapsed_secs: Some(18),
                         },
                     })

@@ -44,6 +44,7 @@ function makeDiscoveryBody(overrides = {}) {
     query_present: true,
     reason_present: true,
     custom_endpoint: false,
+    benchmark_run: true,
     ...overrides,
   });
 }
@@ -91,7 +92,8 @@ function makeDb(plan = {}) {
             return {
               results: [
                 "event_id", "path", "referrer", "visitor_id", "utm_source",
-                "utm_medium", "utm_campaign", "cta",
+                "utm_medium", "utm_campaign", "cta", "metric_name",
+                "metric_value", "rating", "error_kind",
               ].map((name) => ({ name })),
             };
           }
@@ -101,7 +103,7 @@ function makeDb(plan = {}) {
                 "event_id", "request_id", "phase", "category", "selected_tool",
                 "outcome", "failure_reason", "http_status", "latency_ms",
                 "response_bytes", "result_count", "query_present",
-                "reason_present", "custom_endpoint",
+                "reason_present", "custom_endpoint", "benchmark_run",
               ].map((name) => ({ name })),
             };
           }
@@ -193,11 +195,14 @@ test("discovery event is validated, firehosed, and persisted to details", async 
   assert.equal(point.doubles[3], 200);
   assert.equal(point.doubles[4], 125);
   assert.equal(point.doubles[7], 1);
+  assert.equal(point.doubles[10], 1);
 
   const detailInsert = db.executed.find(({ sql }) => /INSERT OR IGNORE INTO discovery_details/.test(sql));
   assert.ok(detailInsert);
   assert.ok(detailInsert.values.includes("11111111-2222-4333-8444-555555555555"));
   assert.ok(detailInsert.values.includes("payments"));
+  const detailColumns = detailInsert.sql.match(/\(([^)]+)\)/)[1].split(", ");
+  assert.equal(detailInsert.values[detailColumns.indexOf("benchmark_run")], 1);
   assert.ok(!detailInsert.values.some((value) => String(value).includes("virtual card")));
 });
 
@@ -421,6 +426,109 @@ test("web events are firehosed to FIREHOSE_WEB with visitor_id as index1", async
   assert.equal(point.blobs[13], "install"); // blob14 = cta
 });
 
+test("web_vital validates, caps, stores, and appends firehose fields", async () => {
+  const db = makeDb();
+  const webFirehose = makeFirehose();
+  const response = await worker.fetch(
+    postRequest(makeWebBody({
+      event: "web_vital",
+      metric_name: "LCP",
+      metric_value: 999_999,
+      rating: "poor",
+      message: "must not persist",
+      url: "https://jcode.sh/private?token=secret",
+    })),
+    { DB: db, FIREHOSE_WEB: webFirehose },
+    makeCtx(),
+  );
+
+  assert.equal(response.status, 200);
+  const detailInsert = db.executed.find(({ sql }) => /INSERT OR IGNORE INTO web_details/.test(sql));
+  assert.ok(detailInsert.sql.includes("metric_name"));
+  assert.ok(detailInsert.sql.includes("metric_value"));
+  assert.ok(detailInsert.sql.includes("rating"));
+  assert.ok(detailInsert.values.includes("LCP"));
+  assert.ok(detailInsert.values.includes(300_000));
+  assert.ok(detailInsert.values.includes("poor"));
+  assert.ok(!detailInsert.values.some((value) => String(value).includes("must not persist")));
+  assert.ok(!detailInsert.values.some((value) => String(value).includes("token=secret")));
+
+  const point = webFirehose.points[0];
+  assert.equal(point.blobs[17], "LCP"); // blob18 = metric_name
+  assert.equal(point.blobs[18], "poor"); // blob19 = rating
+  assert.equal(point.blobs[19], ""); // blob20 = error_kind
+  assert.equal(point.doubles[1], 300_000); // double2 = metric_value
+});
+
+test("web_vital accepts only standard finite nonnegative metrics and ratings", async () => {
+  const invalidBodies = [
+    { metric_name: "FID", metric_value: 1, rating: "good" },
+    { metric_name: "CLS", metric_value: -1, rating: "poor" },
+    { metric_name: "CLS", metric_value: "0.1", rating: "good" },
+    { metric_name: "CLS", metric_value: null, rating: "good" },
+    { metric_name: "CLS", metric_value: 0.1, rating: "okay" },
+  ];
+  for (const fields of invalidBodies) {
+    const response = await worker.fetch(
+      postRequest(makeWebBody({ event: "web_vital", ...fields })),
+      { DB: makeDb(), FIREHOSE_WEB: makeFirehose() },
+      makeCtx(),
+    );
+    assert.equal(response.status, 400, JSON.stringify(fields));
+  }
+
+  const clsDb = makeDb();
+  const clsResponse = await worker.fetch(
+    postRequest(makeWebBody({ event: "web_vital", metric_name: "CLS", metric_value: 99, rating: "poor" })),
+    { DB: clsDb },
+    makeCtx(),
+  );
+  assert.equal(clsResponse.status, 200);
+  const clsInsert = clsDb.executed.find(({ sql }) => /INSERT OR IGNORE INTO web_details/.test(sql));
+  assert.ok(clsInsert.values.includes(10));
+});
+
+test("web_error stores only an allowed coarse classification", async () => {
+  for (const error_kind of ["script", "promise", "resource"]) {
+    const db = makeDb();
+    const webFirehose = makeFirehose();
+    const response = await worker.fetch(
+      postRequest(makeWebBody({
+        event: "web_error",
+        error_kind,
+        error_message: "private failure detail",
+        stack: "secret stack",
+        filename: "https://cdn.example/private.js",
+      })),
+      { DB: db, FIREHOSE_WEB: webFirehose },
+      makeCtx(),
+    );
+    assert.equal(response.status, 200);
+    const detailInsert = db.executed.find(({ sql }) => /INSERT OR IGNORE INTO web_details/.test(sql));
+    assert.ok(detailInsert.values.includes(error_kind));
+    assert.ok(!detailInsert.values.some((value) => /private|secret|cdn\.example|ycombinator/.test(String(value))));
+    assert.equal(webFirehose.points[0].blobs[19], error_kind); // blob20
+  }
+
+  const rejected = await worker.fetch(
+    postRequest(makeWebBody({ event: "web_error", error_kind: "TypeError: secret" })),
+    { DB: makeDb() },
+    makeCtx(),
+  );
+  assert.equal(rejected.status, 400);
+});
+
+test("scheduled retention uses 30 days for web_vital and 90 days for web_error", async () => {
+  const db = makeDb();
+  const ctx = makeCtx();
+  await worker.scheduled({}, { DB: db }, ctx);
+  await Promise.all(ctx.waited);
+
+  const eventDeletes = db.executed.filter(({ sql }) => /DELETE FROM events WHERE id IN/.test(sql));
+  assert.ok(eventDeletes.some(({ values }) => values[0] === "web_vital" && values[1] === "-30 days"));
+  assert.ok(eventDeletes.some(({ values }) => values[0] === "web_error" && values[1] === "-90 days"));
+});
+
 // ---------------------------------------------------------------------------
 // Token subscription plan events
 // ---------------------------------------------------------------------------
@@ -501,18 +609,31 @@ test("account_linked joins telemetry_id and account_id", async () => {
 // CORS for the website beacon
 // ---------------------------------------------------------------------------
 
-test("OPTIONS preflight from solosystems.dev echoes the origin", async () => {
+test("OPTIONS preflight from jcode.sh echoes the origin", async () => {
+  const response = await worker.fetch(
+    new Request(EVENT_URL, {
+      method: "OPTIONS",
+      headers: { Origin: "https://jcode.sh" },
+    }),
+    { DB: makeDb() },
+    makeCtx(),
+  );
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://jcode.sh");
+  assert.equal(response.headers.get("Vary"), "Origin");
+  assert.ok(/POST/.test(response.headers.get("Access-Control-Allow-Methods")));
+});
+
+test("OPTIONS preflight from the production website echoes the origin", async () => {
   const response = await worker.fetch(
     new Request(EVENT_URL, {
       method: "OPTIONS",
       headers: { Origin: "https://solosystems.dev" },
     }),
-    { DB: makeDb() },
+    { DB: makeDb(), ALLOWED_ORIGIN: "https://fallback.example" },
     makeCtx(),
   );
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://solosystems.dev");
   assert.equal(response.headers.get("Vary"), "Origin");
-  assert.ok(/POST/.test(response.headers.get("Access-Control-Allow-Methods")));
 });
 
 test("OPTIONS preflight from pages.dev preview echoes the origin", async () => {
@@ -545,11 +666,11 @@ test("POST responses from the beacon origin carry CORS headers", async () => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Origin: "https://solosystems.dev",
+      Origin: "https://jcode.sh",
     },
     body: JSON.stringify(makeWebBody()),
   });
   const response = await worker.fetch(request, { DB: db }, makeCtx());
   assert.equal(response.status, 200);
-  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://solosystems.dev");
+  assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://jcode.sh");
 });

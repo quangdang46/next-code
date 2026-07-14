@@ -64,6 +64,13 @@ impl InheritedTerminalModes {
     }
 }
 
+fn has_terminal_exec_handoff(
+    is_resuming: bool,
+    inherited_modes: Option<InheritedTerminalModes>,
+) -> bool {
+    is_resuming && inherited_modes.is_some()
+}
+
 /// RAII guard that guarantees the terminal is restored to a sane state when the
 /// TUI runtime ends, even if the run loop returns an error or unwinds via panic.
 ///
@@ -219,12 +226,11 @@ pub fn show_crash_resume_hint() {
     eprintln!();
 }
 
-fn init_tui_terminal() -> Result<ratatui::DefaultTerminal> {
+fn init_tui_terminal(inherited_terminal: bool) -> Result<ratatui::DefaultTerminal> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
         anyhow::bail!("jcode TUI requires an interactive terminal (stdin/stdout must be a TTY)");
     }
-    let is_resuming = std::env::var("JCODE_RESUMING").is_ok();
-    if is_resuming {
+    if inherited_terminal {
         init_tui_terminal_resume()
     } else {
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(ratatui::init)).map_err(|payload| {
@@ -239,7 +245,17 @@ fn init_tui_terminal() -> Result<ratatui::DefaultTerminal> {
 pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)> {
     let is_resuming = std::env::var_os("JCODE_RESUMING").is_some();
     let inherited_theme = std::env::var(INHERITED_THEME_ENV).ok();
-    if is_resuming {
+    let inherited_modes_raw = std::env::var(INHERITED_MODES_ENV).ok();
+    let inherited_modes = inherited_modes_raw
+        .as_deref()
+        .and_then(InheritedTerminalModes::decode);
+    // JCODE_RESUMING describes the session lifecycle, but only a valid modes
+    // handoff proves the previous process deliberately left the terminal live
+    // across exec. A restart used to restore the terminal before exec while the
+    // new process still took the resume path, leaving it on the primary screen
+    // without mouse capture.
+    let inherited_terminal = has_terminal_exec_handoff(is_resuming, inherited_modes);
+    if inherited_terminal {
         // OSC terminal queries are unsafe here because the previous process
         // deliberately exec'd without leaving raw mode or the alternate screen.
         crate::tui::theme_detect::init_theme_mode_for_resume(inherited_theme.as_deref());
@@ -247,15 +263,12 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         // The OSC 11 query needs the cooked terminal and must happen before init.
         crate::tui::theme_detect::init_theme_mode();
     }
-    let terminal = init_tui_terminal()?;
+    let terminal = init_tui_terminal(inherited_terminal)?;
     crate::tui::mermaid::install_jcode_mermaid_hooks();
     crate::tui::markdown::install_jcode_markdown_hooks();
     crate::tui::mermaid::init_picker();
 
     let perf_policy = crate::perf::tui_policy();
-    let inherited_modes = std::env::var(INHERITED_MODES_ENV)
-        .ok()
-        .and_then(|value| InheritedTerminalModes::decode(&value));
     // These private handoff values apply only to this exec boundary. Avoid
     // leaking them into tools or unrelated child jcode processes.
     crate::env::remove_var(INHERITED_MODES_ENV);
@@ -266,12 +279,21 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         keyboard_enhanced: perf_policy.enable_keyboard_enhancement,
         focus_change: perf_policy.enable_focus_change,
     };
-    let modes = if is_resuming {
+    let modes = if inherited_terminal {
         // The previous process intentionally preserved these modes across exec.
-        // Do not emit another enable sequence, especially Kitty's stack-based
-        // PushKeyboardEnhancementFlags. A later normal exit must still disable
-        // the inherited modes, so retain their state in the runtime guard.
-        inherited_modes.unwrap_or(fallback_modes)
+        // Reassert idempotent modes because terminals, multiplexers, or an older
+        // process may have cleared them during the handoff. Do not push Kitty's
+        // stack-based keyboard enhancement flags again. A later normal exit must
+        // still disable every inherited mode, so retain them in the guard.
+        let modes = inherited_modes.unwrap_or(fallback_modes);
+        crossterm::execute!(std::io::stdout(), crossterm::event::EnableBracketedPaste)?;
+        if modes.focus_change {
+            crossterm::execute!(std::io::stdout(), crossterm::event::EnableFocusChange)?;
+        }
+        if modes.mouse_capture {
+            crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+        }
+        modes
     } else {
         let keyboard_enhanced = if perf_policy.enable_keyboard_enhancement {
             tui::enable_keyboard_enhancement()
@@ -293,6 +315,19 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         modes
     };
 
+    crate::logging::info(&format!(
+        "EVENT event=TUI_TERMINAL_MODES phase=initialized pid={} resuming={} handoff={} handoff_raw={} raw_mode={} mouse_capture={} keyboard_enhanced={} focus_change={} idempotent_modes_reasserted={}",
+        std::process::id(),
+        is_resuming,
+        inherited_terminal,
+        inherited_modes_raw.as_deref().unwrap_or("none"),
+        crossterm::terminal::is_raw_mode_enabled().unwrap_or(false),
+        modes.mouse_capture,
+        modes.keyboard_enhanced,
+        modes.focus_change,
+        inherited_terminal,
+    ));
+
     Ok((
         terminal,
         TuiRuntimeGuard::new(TuiRuntimeState {
@@ -304,6 +339,15 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
 }
 
 fn cleanup_tui_runtime(state: &TuiRuntimeState, restore_terminal: bool) {
+    crate::logging::info(&format!(
+        "EVENT event=TUI_TERMINAL_MODES phase=cleanup pid={} restore_terminal={} raw_mode={} mouse_capture={} keyboard_enhanced={} focus_change={}",
+        std::process::id(),
+        restore_terminal,
+        crossterm::terminal::is_raw_mode_enabled().unwrap_or(false),
+        state.mouse_capture,
+        state.keyboard_enhanced,
+        state.focus_change,
+    ));
     if restore_terminal {
         let _ = crossterm::execute!(std::io::stdout(), crossterm::event::DisableBracketedPaste);
         if state.focus_change {
@@ -342,6 +386,7 @@ fn run_result_will_exec(run_result: &crate::tui::RunResult, extra_exec: bool) ->
         || run_result.reload_session.is_some()
         || run_result.rebuild_session.is_some()
         || run_result.update_session.is_some()
+        || run_result.restart_session.is_some()
 }
 
 fn export_tui_exec_handoff(state: &TuiRuntimeState) {
@@ -353,6 +398,13 @@ fn export_tui_exec_handoff(state: &TuiRuntimeState) {
     crate::env::set_var(INHERITED_MODES_ENV, modes.encode());
     let theme = crate::tui::theme_detect::current_theme_label();
     crate::env::set_var(INHERITED_THEME_ENV, theme);
+    crate::logging::info(&format!(
+        "EVENT event=TUI_TERMINAL_MODES phase=exec_handoff pid={} raw_mode={} modes={} theme={}",
+        std::process::id(),
+        crossterm::terminal::is_raw_mode_enabled().unwrap_or(false),
+        modes.encode(),
+        theme,
+    ));
 }
 
 pub fn print_session_resume_hint(session_id: &str) {
@@ -515,6 +567,48 @@ mod tests {
             InheritedTerminalModes::decode("mouse=yes,keyboard=1,focus=1"),
             None
         );
+    }
+
+    #[test]
+    fn resume_requires_valid_terminal_handoff_metadata() {
+        let modes = InheritedTerminalModes {
+            mouse_capture: true,
+            keyboard_enhanced: true,
+            focus_change: true,
+        };
+        assert!(has_terminal_exec_handoff(true, Some(modes)));
+        assert!(!has_terminal_exec_handoff(true, None));
+        assert!(!has_terminal_exec_handoff(false, Some(modes)));
+    }
+
+    #[test]
+    fn every_exec_action_preserves_terminal_modes() {
+        let with = |field: &str| {
+            let mut result = crate::tui::RunResult::default();
+            match field {
+                "reload" => result.reload_session = Some("session_test".into()),
+                "rebuild" => result.rebuild_session = Some("session_test".into()),
+                "update" => result.update_session = Some("session_test".into()),
+                "restart" => result.restart_session = Some("session_test".into()),
+                _ => unreachable!(),
+            }
+            result
+        };
+
+        for field in ["reload", "rebuild", "update", "restart"] {
+            assert!(
+                run_result_will_exec(&with(field), false),
+                "{field} must preserve terminal modes across exec"
+            );
+        }
+        assert!(run_result_will_exec(
+            &crate::tui::RunResult::default(),
+            true
+        ));
+        assert!(!run_result_will_exec(
+            &crate::tui::RunResult::default(),
+            false
+        ));
     }
 
     #[test]

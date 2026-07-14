@@ -432,6 +432,7 @@ fn flat_todo_list_shows_hill_climbability_on_header_in_all_widget_sizes() {
             group: None,
             hill_climbability: Some(85),
             objective: Some("p50 under 50ms".to_string()),
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -456,11 +457,13 @@ fn grouped_todos_show_hill_climbability_on_their_group_headers() {
                 group: Some("optimize grep".to_string()),
                 hill_climbability: Some(90),
                 objective: Some("p50 under 50ms".to_string()),
+                ..Default::default()
             },
             crate::todo::TodoGoal {
                 group: Some("onboarding design".to_string()),
                 hill_climbability: Some(20),
                 objective: None,
+                ..Default::default()
             },
         ],
         ..Default::default()
@@ -502,6 +505,7 @@ fn hill_suffix_renders_safely_at_tiny_sizes() {
             group: Some("a very long group name that must truncate".to_string()),
             hill_climbability: Some(100),
             objective: None,
+            ..Default::default()
         }],
         ..Default::default()
     };
@@ -1659,7 +1663,9 @@ fn placements_never_include_border_only_widgets() {
         }),
         usage_info: Some(UsageInfo {
             provider: UsageProvider::Anthropic,
+            primary_limit_label: Some("5-hour".to_string()),
             five_hour: 0.35,
+            secondary_limit_label: Some("Weekly".to_string()),
             seven_day: 0.62,
             available: true,
             ..Default::default()
