@@ -620,6 +620,32 @@ async fn broadcast_swarm_status_now(
     }
 }
 
+/// Fan out a single structured member transcript line to every session in the swarm.
+pub(super) async fn broadcast_swarm_member_message(
+    swarm_id: &str,
+    message: crate::protocol::SwarmMemberMessage,
+    swarm_members: &Arc<RwLock<HashMap<String, SwarmMember>>>,
+    swarms_by_id: &Arc<RwLock<HashMap<String, HashSet<String>>>>,
+) {
+    let session_ids: Vec<String> = {
+        let swarms = swarms_by_id.read().await;
+        swarms
+            .get(swarm_id)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default()
+    };
+    if session_ids.is_empty() {
+        return;
+    }
+    let event = ServerEvent::SwarmMemberMessage {
+        swarm_id: swarm_id.to_string(),
+        message,
+    };
+    for sid in session_ids {
+        let _ = fanout_session_event(swarm_members, &sid, event.clone()).await;
+    }
+}
+
 pub(super) async fn broadcast_swarm_status(
     swarm_id: &str,
     swarm_members: &Arc<RwLock<HashMap<String, SwarmMember>>>,

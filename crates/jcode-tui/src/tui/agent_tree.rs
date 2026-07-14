@@ -137,6 +137,15 @@ impl AgentTreeNode {
 
 /// Colors for agent tree rendering.
 const AGENT_TREE_COLOR: (u8, u8, u8) = (120, 180, 255);
+fn name_color_index(name: &str) -> usize {
+    let mut h: u32 = 2166136261;
+    for b in name.bytes() {
+        h ^= u32::from(b);
+        h = h.wrapping_mul(16777619);
+    }
+    (h as usize) % AGENT_CHILD_COLORS.len().max(1)
+}
+
 const AGENT_CHILD_COLORS: &[(u8, u8, u8)] = &[
     (80, 220, 100),
     (255, 180, 80),
@@ -225,9 +234,8 @@ pub struct AgentTreeViewState {
 /// focusing with `↓ manage`. jcode: Shift always works; bare ↓ also works when
 /// the transcript is already at the bottom (no more messages to scroll).
 pub const TEAMMATE_SELECT_HINT: &str = "↓ at bottom or shift+↑/↓ to select";
-/// Enter opens the **real** child session (hard resume). Soft status preview =
-/// Shift+Enter (jcode has no CC task.messages buffer).
-pub const TEAMMATE_VIEW_HINT: &str = "enter = real session · shift+enter status preview";
+/// Enter = soft view (live buffer when available). Shift+Enter = hard full session.
+pub const TEAMMATE_VIEW_HINT: &str = "enter = view · shift+enter full session";
 /// While already viewing: how to get back / free-switch.
 pub const TEAMMATE_RETURN_HINT: &str = "esc → team-lead · ↑/↓ switch";
 
@@ -318,6 +326,32 @@ pub fn selectable_child_count(trees: &[AgentTreeNode]) -> usize {
     trees.first().map(|t| t.children.len()).unwrap_or(0)
 }
 
+/// Max selection index: `-1` leader … `0..n-1` children, plus hide row at `n`
+/// when not viewing (CC hide row only outside viewing-agent mode).
+pub fn selection_max_index(child_count: usize, viewing: bool) -> i32 {
+    if viewing {
+        (child_count as i32 - 1).max(-1)
+    } else {
+        child_count as i32
+    }
+}
+
+/// Step selection index with wrap (CC stepTeammateSelection).
+pub fn step_selected_index(cur: i32, child_count: usize, viewing: bool, down: bool) -> i32 {
+    let max_idx = selection_max_index(child_count, viewing);
+    if down {
+        if cur >= max_idx {
+            -1
+        } else {
+            cur + 1
+        }
+    } else if cur <= -1 {
+        max_idx
+    } else {
+        cur - 1
+    }
+}
+
 /// Session id of the child at flat index `idx` (0-based), if any.
 pub fn child_session_id_at(trees: &[AgentTreeNode], idx: usize) -> Option<String> {
     let leader = trees.first()?;
@@ -356,7 +390,8 @@ fn render_node(
     } else if is_leader {
         rgb_color(AGENT_TREE_COLOR.0, AGENT_TREE_COLOR.1, AGENT_TREE_COLOR.2)
     } else {
-        let idx = depth.saturating_sub(1).min(AGENT_CHILD_COLORS.len() - 1);
+        // Stable identity color from agent name (CC identity.color analogue).
+        let idx = name_color_index(&node.agent_name);
         let c = AGENT_CHILD_COLORS[idx];
         rgb_color(c.0, c.1, c.2)
     };
@@ -680,6 +715,21 @@ mod tests {
             leader.contains("┌─") || leader.contains("┌"),
             "leader tree glyph missing: {leader}"
         );
+    }
+
+    #[test]
+    fn step_selected_index_wraps_lead_and_hide() {
+        // Not viewing: -1 lead, 0..1 children, 2 hide
+        assert_eq!(step_selected_index(-1, 2, false, true), 0);
+        assert_eq!(step_selected_index(0, 2, false, true), 1);
+        assert_eq!(step_selected_index(1, 2, false, true), 2);
+        assert_eq!(step_selected_index(2, 2, false, true), -1);
+        assert_eq!(step_selected_index(-1, 2, false, false), 2);
+        // Viewing: no hide row
+        assert_eq!(step_selected_index(1, 2, true, true), -1);
+        assert_eq!(step_selected_index(-1, 2, true, false), 1);
+        assert_eq!(selection_max_index(0, true), -1);
+        assert_eq!(selection_max_index(0, false), 0);
     }
 
     #[test]

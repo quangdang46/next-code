@@ -201,21 +201,55 @@ pub(super) async fn dispatch_background_task_progress(
 /// Update a swarm worker's cached output tail and rebroadcast swarm status so
 /// the coordinator's inline gallery can render the live viewport. The tail is
 /// already capped by the producer; we only store and fan it out.
+///
+/// Also emits [`ServerEvent::SwarmMemberMessage`] so the lead client can keep a
+/// soft-view transcript buffer (Claude Code `task.messages` analogue).
 pub(super) async fn dispatch_swarm_output_tail(
     tail: &crate::bus::SwarmOutputTail,
     swarm_members: &Arc<RwLock<HashMap<String, SwarmMember>>>,
     swarms_by_id: &Arc<RwLock<HashMap<String, HashSet<String>>>>,
 ) {
+    let content = tail.tail.trim();
+    if content.is_empty() {
+        return;
+    }
     let swarm_id = {
         let mut members = swarm_members.write().await;
         let Some(member) = members.get_mut(&tail.session_id) else {
             return;
         };
-        member.output_tail = Some(tail.tail.clone());
+        // Skip no-op tail rewrites to avoid event storms.
+        if member.output_tail.as_deref() == Some(content) {
+            return;
+        }
+        member.output_tail = Some(content.to_string());
         member.swarm_id.clone()
     };
-    if let Some(swarm_id) = swarm_id {
-        super::swarm::broadcast_swarm_status(&swarm_id, swarm_members, swarms_by_id).await;
+    if let Some(ref swarm_id) = swarm_id {
+        super::swarm::broadcast_swarm_status(swarm_id, swarm_members, swarms_by_id).await;
+        // Cap display content for the structured channel.
+        let capped = if content.chars().count() > 4000 {
+            let mut s: String = content.chars().rev().take(4000).collect();
+            s = s.chars().rev().collect();
+            format!("…{s}")
+        } else {
+            content.to_string()
+        };
+        let message = crate::protocol::SwarmMemberMessage {
+            session_id: tail.session_id.clone(),
+            // Upsert key: soft view replaces the live assistant stream line.
+            message_id: format!("{}:output_tail", tail.session_id),
+            role: "assistant".into(),
+            content: capped,
+            tool_name: None,
+        };
+        super::swarm::broadcast_swarm_member_message(
+            swarm_id,
+            message,
+            swarm_members,
+            swarms_by_id,
+        )
+        .await;
     }
 }
 
@@ -291,7 +325,46 @@ pub(super) async fn dispatch_swarm_tool_activity(
 
     if let Some(swarm_id) = swarm_id {
         super::swarm::broadcast_swarm_status(&swarm_id, swarm_members, swarms_by_id).await;
+        let intent = event
+            .intent
+            .as_deref()
+            .or(event.title.as_deref())
+            .unwrap_or("")
+            .trim();
+        let status = event.status.as_str();
+        let content = if intent.is_empty() {
+            format!("{} ({status})", event.tool_name)
+        } else {
+            truncate_chars(&format!("{} ({status}): {intent}", event.tool_name), 400)
+        };
+        let message = crate::protocol::SwarmMemberMessage {
+            session_id: event.session_id.clone(),
+            message_id: if event.tool_call_id.is_empty() {
+                format!("{}:tool:{}", event.session_id, event.tool_name)
+            } else {
+                format!("{}:tool:{}", event.session_id, event.tool_call_id)
+            },
+            role: "tool".into(),
+            content,
+            tool_name: Some(event.tool_name.clone()),
+        };
+        super::swarm::broadcast_swarm_member_message(
+            &swarm_id,
+            message,
+            swarm_members,
+            swarms_by_id,
+        )
+        .await;
     }
+}
+
+fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max.saturating_sub(1)).collect();
+    out.push('…');
+    out
 }
 
 pub(super) async fn dispatch_swarm_runtime_status(

@@ -1606,6 +1606,10 @@ pub(in crate::tui::app) fn handle_server_event(
             // rather than waiting for unrelated model or input activity.
             true
         }
+        ServerEvent::SwarmMemberMessage { message, .. } => {
+            app.apply_teammate_member_message(message);
+            true
+        }
         ServerEvent::SwarmPlan {
             swarm_id,
             version,

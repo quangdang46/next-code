@@ -1408,6 +1408,9 @@ pub struct App {
     /// `remote_swarm_members` is empty after resume — without this snapshot the
     /// agent tree vanishes and the user loses Claude Code free lead↔agent nav.
     pub teammate_view_swarm_snapshot: Vec<crate::protocol::SwarmMemberStatus>,
+    /// Per-agent transcript buffer on the lead client (CC `task.messages` analogue).
+    /// Filled by `ServerEvent::SwarmMemberMessage` while staying on the coordinator.
+    pub teammate_transcripts: std::collections::HashMap<String, Vec<DisplayMessage>>,
     /// Double-Esc arm: first Esc aborts turn, second exits soft view (CC-ish).
     pub teammate_view_abort_armed: bool,
     /// Agent tree for conversation rendering (Claude Code style).

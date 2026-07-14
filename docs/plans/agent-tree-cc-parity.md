@@ -2,9 +2,21 @@
 
 > **Branch:** `feat/agent-tree`  
 > **Baseline HEAD (plan authored):** `bfac54414`  
+> **Implementation progress (this doc):** Phase 0–4 partially landed on `feat/agent-tree` after plan commit.  
 > **Primary reference:** [claude-code-best/claude-code](https://github.com/claude-code-best/claude-code) (local clone: `/tmp/feature-research/claude-code`)  
 > **Secondary:** jcode `docs/SWARM_ARCHITECTURE.md`, `docs/AGENT_TREE_CC_GAP_ANALYSIS.md` (partially stale — re-baselined below)  
 > **Goal:** User can freely navigate team-lead ↔ subagents with CC-grade UX, see **real** agent work (not spawn-meta spam), and always know how to return.
+
+### Implementation status (rolling)
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| 0 Ops | **Done** | `scripts/restart_local_serve.sh`, Agents.md install note, git hash in view chrome |
+| 1 Stabilize | **Done** | `step_selected_index` pure + tests; soft/hard chrome honesty |
+| 2 Protocol | **MVP done** | `SwarmMemberMessage` wire + server emit from output_tail/tools + client buffer |
+| 3 Soft real + key flip | **Done** | Enter = soft (buffer when live); Shift+Enter = hard full session |
+| 4 Polish | **Partial** | Stable name→color hash; kill/pills/preview still open |
+| 5 Harden | **Partial** | Unit tests for selection; full multi-agent stress still open |
 
 ---
 

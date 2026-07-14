@@ -862,6 +862,13 @@ pub enum ServerEvent {
     #[serde(rename = "swarm_status")]
     SwarmStatus { members: Vec<SwarmMemberStatus> },
 
+    /// Live transcript line for a swarm member (lead client buffer ≈ CC task.messages).
+    #[serde(rename = "swarm_member_message")]
+    SwarmMemberMessage {
+        swarm_id: String,
+        message: SwarmMemberMessage,
+    },
+
     /// Full swarm plan snapshot for synchronization and UI rendering.
     #[serde(rename = "swarm_plan")]
     SwarmPlan {

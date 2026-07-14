@@ -2417,6 +2417,56 @@ impl App {
         None
     }
 
+    /// Apply a structured swarm member message into the lead-side buffer
+    /// (Phase 2 protocol — soft view prefers this over bare `output_tail`).
+    pub(crate) fn apply_teammate_member_message(
+        &mut self,
+        message: crate::protocol::SwarmMemberMessage,
+    ) {
+        use jcode_tui_messages::DisplayMessage;
+
+        const MAX_PER_AGENT: usize = 200;
+        let sid = message.session_id.clone();
+        let content = message.content.trim();
+        if content.is_empty() {
+            return;
+        }
+        // Correlation key stored in DisplayMessage.title for upsert/dedupe.
+        let key = if message.message_id.ends_with(":output_tail") {
+            "stream".to_string()
+        } else {
+            message.message_id.clone()
+        };
+        let display = match message.role.as_str() {
+            "user" => DisplayMessage::user(content).with_title(key.clone()),
+            "tool" => {
+                let tool = message
+                    .tool_name
+                    .clone()
+                    .unwrap_or_else(|| "tool".into());
+                DisplayMessage::system(format!("[{tool}] {content}")).with_title(key.clone())
+            }
+            "system" => DisplayMessage::system(content).with_title(key.clone()),
+            _ => DisplayMessage::assistant(content).with_title(key.clone()),
+        };
+        let buf = self.teammate_transcripts.entry(sid.clone()).or_default();
+        if let Some(pos) = buf.iter().position(|m| m.title.as_deref() == Some(key.as_str())) {
+            buf[pos] = display;
+        } else {
+            buf.push(display);
+        }
+        if buf.len() > MAX_PER_AGENT {
+            let drop_n = buf.len() - MAX_PER_AGENT;
+            buf.drain(0..drop_n);
+        }
+        // Live-refresh soft view if this is the agent we are previewing.
+        if self.viewing_teammate_session_id.as_deref() == Some(sid.as_str())
+            && !self.teammate_view_hard_attached
+        {
+            self.refresh_teammate_soft_view();
+        }
+    }
+
     /// Enter soft teammate view (CC `enterTeammateView`).
     ///
     /// Stays on the leader session — free lead↔agent switch via Shift+↑/↓ + Enter.
@@ -2436,7 +2486,21 @@ impl App {
             .friendly_name
             .clone()
             .unwrap_or_else(|| session_id.to_string());
-        self.teammate_view_messages = build_view_messages(member);
+        // Prefer live transcript buffer when present (Phase 2).
+        if let Some(buf) = self.teammate_transcripts.get(session_id) {
+            if !buf.is_empty() {
+                let mut msgs = Vec::with_capacity(buf.len() + 1);
+                msgs.push(jcode_tui_messages::DisplayMessage::system(format!(
+                    "Status preview @{label} · live stream buffer · esc exit · Enter = full session"
+                )));
+                msgs.extend(buf.iter().cloned());
+                self.teammate_view_messages = msgs;
+            } else {
+                self.teammate_view_messages = build_view_messages(member);
+            }
+        } else {
+            self.teammate_view_messages = build_view_messages(member);
+        }
         self.viewing_teammate_session_id = Some(session_id.to_string());
         self.teammate_view_agent_name = Some(label.clone());
         self.view_teammate_selection = true;
@@ -2458,12 +2522,23 @@ impl App {
         self.selected_agent_tree_index = selected;
         self.display_messages_version = self.display_messages_version.wrapping_add(1);
         self.scroll_offset = 0;
-        self.set_status_notice(format!(
-            "Status preview @{label} (not full agent transcript) · esc exit · enter = real session"
-        ));
+        let has_buf = self
+            .teammate_transcripts
+            .get(session_id)
+            .map(|b| !b.is_empty())
+            .unwrap_or(false);
+        self.set_status_notice(if has_buf {
+            format!(
+                "Viewing @{label} (live buffer) · esc → team-lead · shift+enter full session"
+            )
+        } else {
+            format!(
+                "Status preview @{label} · esc exit · shift+enter full session"
+            )
+        });
     }
 
-    /// Refresh soft-view transcript from latest SwarmStatus snapshot.
+    /// Refresh soft-view transcript from live buffer and/or SwarmStatus snapshot.
     pub(crate) fn refresh_teammate_soft_view(&mut self) {
         use crate::tui::teammate_view::{
             build_view_messages, find_member, member_is_terminal,
@@ -2475,7 +2550,9 @@ impl App {
         if self.teammate_view_hard_attached {
             return;
         }
-        let Some(member) = find_member(&self.remote_swarm_members, &sid) else {
+        let Some(member) = find_member(&self.remote_swarm_members, &sid)
+            .or_else(|| find_member(&self.teammate_view_swarm_snapshot, &sid))
+        else {
             // CC useTeammateViewAutoExit: task gone → exit.
             self.exit_teammate_view_local("Teammate left swarm");
             return;
@@ -2488,7 +2565,23 @@ impl App {
             self.exit_teammate_view_local("Teammate failed/killed");
             return;
         }
-        let _ = member_is_terminal(member); // keep for future auto-exit policy
+        let _ = member_is_terminal(member);
+        let label = member
+            .friendly_name
+            .clone()
+            .unwrap_or_else(|| sid.clone());
+        if let Some(buf) = self.teammate_transcripts.get(&sid) {
+            if !buf.is_empty() {
+                let mut msgs = Vec::with_capacity(buf.len() + 1);
+                msgs.push(jcode_tui_messages::DisplayMessage::system(format!(
+                    "Status preview @{label} · live stream buffer · esc exit · Enter = full session"
+                )));
+                msgs.extend(buf.iter().cloned());
+                self.teammate_view_messages = msgs;
+                self.display_messages_version = self.display_messages_version.wrapping_add(1);
+                return;
+            }
+        }
         self.teammate_view_messages = build_view_messages(member);
         self.display_messages_version = self.display_messages_version.wrapping_add(1);
     }
@@ -2742,12 +2835,6 @@ impl App {
                 return None;
             }
             self.agent_tree_hidden = false;
-            // Hide row at n only when not viewing (CC free-switch while viewing).
-            let max_idx = if viewing {
-                (child_count as i32 - 1).max(-1)
-            } else {
-                child_count as i32
-            };
             if !self.agent_tree_selecting {
                 self.agent_tree_selecting = true;
                 // When already viewing an agent, start selection on that agent so
@@ -2764,19 +2851,13 @@ impl App {
                 }
                 return Some(TeammateNavAction::Handled);
             }
-            let cur = self.selected_agent_tree_index;
-            let next = if matches!(code, KeyCode::Down) {
-                if cur >= max_idx {
-                    -1
-                } else {
-                    cur + 1
-                }
-            } else if cur <= -1 {
-                max_idx
-            } else {
-                cur - 1
-            };
-            self.selected_agent_tree_index = next;
+            let down = matches!(code, KeyCode::Down);
+            self.selected_agent_tree_index = crate::tui::agent_tree::step_selected_index(
+                self.selected_agent_tree_index,
+                child_count,
+                viewing,
+                down,
+            );
             return Some(TeammateNavAction::Handled);
         }
 
@@ -2804,20 +2885,16 @@ impl App {
 
         // Enter / 'f' while selecting.
         //
-        // Claude Code Best: Enter → enterTeammateView which swaps to the agent's
-        // REAL `task.messages` (in-process spawn, `spawnInProcessTeammate` +
-        // `inProcessRunner` stream-append). That is a real agent transcript.
-        //
-        // jcode has no per-agent `task.messages` on the client — only SwarmStatus
-        // snapshots. Soft view is therefore a **status preview**, not a real
-        // spawn transcript. Default Enter/f = **hard resume_session** (the real
-        // child session). Shift+Enter = soft status preview only.
+        // Phase 3 (after SwarmMemberMessage buffer):
+        //   Enter / f     → soft view (lead stays; buffer ≈ CC task.messages when
+        //                   stream taps fire; else honest SwarmStatus preview)
+        //   Shift+Enter   → hard resume_session (full child session)
+        // When already hard-attached, Enter on an agent hard-switches.
         let confirm = matches!(code, KeyCode::Enter)
             || (matches!(code, KeyCode::Char('f')) && self.agent_tree_selecting);
         if confirm && self.agent_tree_selecting {
-            let want_soft_preview = shift
-                && matches!(code, KeyCode::Enter)
-                && !self.teammate_view_hard_attached;
+            let want_soft_preview = !self.teammate_view_hard_attached
+                && !(shift && matches!(code, KeyCode::Enter));
             if self.selected_agent_tree_index < 0 {
                 // Leader → exit view / resume team-lead.
                 if self.viewing_teammate_session_id.is_some() || self.teammate_view_hard_attached {

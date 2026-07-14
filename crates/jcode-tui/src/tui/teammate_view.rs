@@ -338,9 +338,16 @@ pub fn draw_viewing_chrome(
         .fg(rgb_color(255, 220, 100))
         .add_modifier(Modifier::BOLD);
 
-    // Line 1 — exact CC contract: "Viewing @name · esc return"
-    let mut lines: Vec<Line<'static>> = vec![Line::from(vec![
-        Span::styled("Viewing ", Style::default().fg(rgb_color(220, 220, 230))),
+    // Line 1 — hard: CC "Viewing @name · esc return"
+    // Soft: honest "Status preview" (not task.messages).
+    let prefix = if hard_attached {
+        "Viewing "
+    } else {
+        "Status preview "
+    };
+    let git = short_client_git_hash();
+    let mut line1 = vec![
+        Span::styled(prefix, Style::default().fg(rgb_color(220, 220, 230))),
         Span::styled(
             format!("@{name}"),
             Style::default()
@@ -349,8 +356,19 @@ pub fn draw_viewing_chrome(
         ),
         Span::styled(" · ", dim),
         Span::styled("esc", accent),
-        Span::styled(" return", dim),
-    ])];
+        Span::styled(
+            if hard_attached {
+                " return"
+            } else {
+                " exit"
+            },
+            dim,
+        ),
+    ];
+    if !git.is_empty() {
+        line1.push(Span::styled(format!(" · {git}"), dim));
+    }
+    let mut lines: Vec<Line<'static>> = vec![Line::from(line1)];
 
     // Line 2 — CC shows task.prompt; we show task_label / status / hard-attach note.
     if area.height >= 2 {
@@ -371,18 +389,29 @@ pub fn draw_viewing_chrome(
                 if hard_attached {
                     format!("{} · full session (esc → team lead)", bits.join(" · "))
                 } else {
-                    format!("{} · soft preview (Enter = full session)", bits.join(" · "))
+                    format!(
+                        "{} · status only — Enter = real session",
+                        bits.join(" · ")
+                    )
                 }
             }
         } else if hard_attached {
             "Full agent session · press esc to return to team lead".to_string()
         } else {
-            "Soft preview · press Enter for full session, esc to exit".to_string()
+            "Status only (not full agent history) · Enter = real session · esc exit".to_string()
         };
         lines.push(Line::from(Span::styled(second, dim)));
     }
 
     frame.render_widget(Paragraph::new(lines), area);
+}
+
+fn short_client_git_hash() -> String {
+    let h = jcode_build_meta::GIT_HASH.trim();
+    if h.is_empty() || h == "unknown" {
+        return String::new();
+    }
+    h.chars().take(9).collect()
 }
 
 /// Sticky bottom chrome while hard-attached (CC footer
