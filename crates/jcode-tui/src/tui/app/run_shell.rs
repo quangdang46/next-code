@@ -80,6 +80,56 @@ pub(crate) fn status_uses_primary_spinner(status: &ProcessingStatus) -> bool {
     false
 }
 
+/// How the next full frame should invalidate ratatui's diff state, if at all.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FullFrameInvalidation {
+    /// Physical clear + full re-emit. Needed when the real screen diverged
+    /// from ratatui's model (native terminal scroll, external commands).
+    /// Uses fork-safe clear without DSR cursor queries.
+    HardClear,
+    /// Sentinel-invalidate the previous buffer: full re-emit with no
+    /// intermediate clear escape (issue #404 / ratatui #2357).
+    SoftRepaint,
+    /// Normal incremental diff.
+    None,
+}
+
+/// Pure routing for `draw_full`: a hard clear supersedes a soft repaint.
+pub(crate) fn full_frame_invalidation(
+    force_full_redraw: bool,
+    force_full_repaint: bool,
+) -> FullFrameInvalidation {
+    if force_full_redraw {
+        FullFrameInvalidation::HardClear
+    } else if force_full_repaint {
+        FullFrameInvalidation::SoftRepaint
+    } else {
+        FullFrameInvalidation::None
+    }
+}
+
+fn full_repaint_sentinel_cell() -> ratatui::buffer::Cell {
+    let mut cell = ratatui::buffer::Cell::EMPTY;
+    cell.set_symbol("\u{FDD0}");
+    cell.fg = ratatui::style::Color::Rgb(1, 2, 3);
+    cell.bg = ratatui::style::Color::Rgb(3, 2, 1);
+    cell
+}
+
+/// Fill ratatui's "previous" buffer with sentinel cells so the next
+/// `Terminal::draw` diff re-emits every cell without ED2 clear flicker.
+pub(crate) fn invalidate_previous_terminal_buffer<B: ratatui::backend::Backend>(
+    terminal: &mut ratatui::Terminal<B>,
+) {
+    terminal.swap_buffers();
+    let sentinel = full_repaint_sentinel_cell();
+    for cell in terminal.current_buffer_mut().content.iter_mut() {
+        *cell = sentinel.clone();
+    }
+    terminal.swap_buffers();
+}
+
+
 #[derive(Default)]
 pub(super) struct StatusSpinnerRenderer {
     last_frame: Option<Buffer>,
@@ -99,28 +149,37 @@ impl StatusSpinnerRenderer {
         app: &mut App,
         terminal: &mut DefaultTerminal,
     ) -> Result<()> {
-        let force_full_redraw = app.force_full_redraw;
+        let invalidation = full_frame_invalidation(app.force_full_redraw, app.force_full_repaint);
+        let force_full_redraw = invalidation != FullFrameInvalidation::None;
         // Wrap the whole frame (optional clear + diff flush) in a synchronized update so the
         // terminal applies every cell change atomically. Without this, ratatui's crossterm
         // backend streams cells one-by-one and eagerly-repainting terminals (and slow/remote or
         // multiplexed sessions) show visible flicker. See issue #282.
         let sync = crossterm::execute!(terminal.backend_mut(), BeginSynchronizedUpdate).is_ok();
         let mut cleared_for_full_redraw = false;
-        if app.force_full_redraw {
-            // Never call Terminal::clear() here: it queries cursor position via DSR (CSI 6n)
-            // and a 2s timeout was fatal for the client mid-session. Fullscreen clear does not
-            // need cursor restore.
-            if let Err(e) = clear_terminal_for_full_redraw(terminal) {
-                crate::logging::warn(&format!(
-                    "Force full redraw clear failed ({e}); continuing with buffer reset only"
-                ));
-                // Still force a full cell rewrite even if the physical clear failed.
-                force_full_buffer_redraw(terminal);
+        let mut soft_repaint_armed = false;
+        match invalidation {
+            FullFrameInvalidation::HardClear => {
+                // Never call Terminal::clear() here: it queries cursor position via DSR (CSI 6n)
+                // and a 2s timeout was fatal for the client mid-session.
+                if let Err(e) = clear_terminal_for_full_redraw(terminal) {
+                    crate::logging::warn(&format!(
+                        "Force full redraw clear failed ({e}); continuing with buffer reset only"
+                    ));
+                    force_full_buffer_redraw(terminal);
+                }
+                cleared_for_full_redraw = true;
+                self.invalidate();
             }
-            cleared_for_full_redraw = true;
-            app.force_full_redraw = false;
-            self.invalidate();
+            FullFrameInvalidation::SoftRepaint => {
+                invalidate_previous_terminal_buffer(terminal);
+                soft_repaint_armed = true;
+                self.invalidate();
+            }
+            FullFrameInvalidation::None => {}
         }
+        app.force_full_redraw = false;
+        app.force_full_repaint = false;
 
         let previous_frame = self.last_frame.as_ref();
         let draw_start = Instant::now();
@@ -144,6 +203,9 @@ impl StatusSpinnerRenderer {
                 if cleared_for_full_redraw {
                     app.force_full_redraw = true;
                 }
+                if soft_repaint_armed {
+                    app.force_full_repaint = true;
+                }
                 return Ok(());
             }
             Err(e) => {
@@ -152,6 +214,9 @@ impl StatusSpinnerRenderer {
                 }
                 if cleared_for_full_redraw {
                     app.force_full_redraw = true;
+                }
+                if soft_repaint_armed {
+                    app.force_full_repaint = true;
                 }
                 return Err(e.into());
             }

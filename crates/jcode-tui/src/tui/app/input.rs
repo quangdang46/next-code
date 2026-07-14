@@ -2829,6 +2829,13 @@ impl App {
         self.force_full_redraw = true;
     }
 
+    /// Arm a soft full repaint (no terminal ED2 clear) so the next frame
+    /// re-emits every cell. Prefer this over `force_full_redraw` for scroll
+    /// and other cases where the model is still authoritative (issue #404).
+    pub(super) fn request_full_repaint(&mut self) {
+        self.force_full_repaint = true;
+    }
+
     pub(super) fn should_redraw_after_resize(&mut self) -> bool {
         const RESIZE_REDRAW_MIN_INTERVAL: std::time::Duration =
             std::time::Duration::from_millis(33);
