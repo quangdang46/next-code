@@ -80,8 +80,9 @@ impl Tool for ProposeEditTool {
         // proposal to and must refuse to run.
         // Prefer ToolContext (set on child agents by orchestrator); fall back to
         // the global handle so the parent agent can also draft proposals.
-        let handle = get_best_of_n_handle()
-            .ok_or_else(|| anyhow::anyhow!("best-of-N handle not initialized — call best_of_n_edit first"))?;
+        let handle = get_best_of_n_handle().ok_or_else(|| {
+            anyhow::anyhow!("best-of-N handle not initialized — call best_of_n_edit first")
+        })?;
         let run_id = ctx
             .best_of_n_run_id
             .as_deref()

@@ -17,8 +17,8 @@ use jcode_best_of_n::{
 };
 
 use crate::agent::Agent;
-use crate::provider::Provider;
 use crate::protocol::ServerEvent;
+use crate::provider::Provider;
 use crate::session::Session;
 use crate::tool::{BestOfNOrchestratorHandle, Registry};
 
@@ -148,7 +148,9 @@ pub async fn run_best_of_n_with_progress(
     );
     crate::logging::info(&format!(
         "[best-of-n] spawning {}/{} candidates for run {}",
-        total, cfg.effective_count(), run_id
+        total,
+        cfg.effective_count(),
+        run_id
     ));
 
     // Spawn all candidates in parallel with a per-candidate timeout.
@@ -167,7 +169,16 @@ pub async fn run_best_of_n_with_progress(
         handles.push(tokio::spawn(async move {
             match tokio::time::timeout(
                 std::time::Duration::from_secs(120),
-                spawn_and_run_candidate(&rid, &candidate_id, &strategy, &prompt, &st, &pv, &rg, &ps),
+                spawn_and_run_candidate(
+                    &rid,
+                    &candidate_id,
+                    &strategy,
+                    &prompt,
+                    &st,
+                    &pv,
+                    &rg,
+                    &ps,
+                ),
             )
             .await
             {
@@ -213,9 +224,7 @@ pub async fn run_best_of_n_with_progress(
         match handle.await {
             Ok(c) => candidates.push(c),
             Err(e) => {
-                crate::logging::warn(&format!(
-                    "[best-of-n] candidate {i} panicked: {e}"
-                ));
+                crate::logging::warn(&format!("[best-of-n] candidate {i} panicked: {e}"));
                 candidates.push(CandidateDiff {
                     candidate_id: CandidateId::new(i),
                     strategy: strategies[i].clone(),
@@ -414,20 +423,12 @@ impl Agent {
         user_request: &str,
         context_files: &[String],
     ) -> Result<BestOfNRunResult> {
-        crate::agent::best_of_n_orchestrator::run_best_of_n(
-            self,
-            user_request,
-            context_files,
-        )
-        .await
+        crate::agent::best_of_n_orchestrator::run_best_of_n(self, user_request, context_files).await
     }
 }
 
 /// Send a progress update through the event channel if present.
-fn emit_progress(
-    event_tx: &Option<tokio::sync::mpsc::UnboundedSender<ServerEvent>>,
-    text: &str,
-) {
+fn emit_progress(event_tx: &Option<tokio::sync::mpsc::UnboundedSender<ServerEvent>>, text: &str) {
     if let Some(tx) = event_tx {
         let _ = tx.send(ServerEvent::TextDelta {
             text: format!("[best-of-n] {text}\n"),

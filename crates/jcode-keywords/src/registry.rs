@@ -198,10 +198,7 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
 
 /// Human-readable list of canonical `$keywords` for help/docs.
 pub fn list_canonical_keywords() -> Vec<&'static str> {
-    build_registry()
-        .iter()
-        .map(|e| e.keyword)
-        .collect()
+    build_registry().iter().map(|e| e.keyword).collect()
 }
 
 #[cfg(test)]
