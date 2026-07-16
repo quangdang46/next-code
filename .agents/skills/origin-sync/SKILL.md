@@ -946,3 +946,26 @@ rg -n 'should_skip_identical_history_payload|request_full_repaint|SoftRepaint' c
 cargo check -p jcode
 ```
 
+### 2026-07-16 — PR #488 / upstream v0.48.0 origin-sync (supersedes #487)
+
+**Branch**: `sync-pr-487` → https://github.com/quangdang46/jcode/pull/488 (cross-repo #487 CONFLICTING).
+**Worktree**: `.worktrees/sync-pr-487` from `master` (`ac1b155a8` post agent-tree).
+**Upstream tip**: `482bd326f` (post v0.48.0 + onboarding/hotkeys). **52 commits**. Merge: `b4f50b4b5` + fix `fff6b5318`.
+
+**Status**: ✅ `cargo check -p jcode` / `jcode-tui` clean. Package **0.32.0**. Lesson 2/3/4 OK. Agent-tree + FFS prompt kept.
+
+| Category | What |
+|----------|------|
+| ✨ Feature | Gmail drafts, discovery catalog, subscription tiers, secure account login, onboarding polish, launch hotkeys, todo intention scoring, telemetry bounds |
+| 🔀 Keep | version 0.32.0; agent-tree nav; FFS system prompt; force server reload; release dry-run artifacts |
+| 🐛 Fix | Deduped App learn_hint/hotkey fields after conflict double-insert |
+
+**Post-merge MUST-check**:
+```bash
+rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
+rg -n 'cycle_swarm_panel_view' crates/jcode-tui/src/tui/app/input.rs
+rg -n 'handle_agent_tree_navigation_key' crates/jcode-tui/src/tui/app/input.rs
+cargo check -p jcode
+```
+

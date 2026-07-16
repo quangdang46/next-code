@@ -129,7 +129,6 @@ pub(crate) fn invalidate_previous_terminal_buffer<B: ratatui::backend::Backend>(
     terminal.swap_buffers();
 }
 
-
 #[derive(Default)]
 pub(super) struct StatusSpinnerRenderer {
     last_frame: Option<Buffer>,

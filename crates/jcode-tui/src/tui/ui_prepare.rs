@@ -497,7 +497,9 @@ fn push_spawned_swarm_card_lines(
     };
     let spinner_frame =
         (app.animation_elapsed() * jcode_tui_render::swarm_gallery::STRIP_SPINNER_FPS) as usize;
-    for line in crate::tui::info_widget::swarm_gallery::render_swarm_chat_card_lines(std::slice::from_ref(member), width.saturating_sub(1) as usize,
+    for line in crate::tui::info_widget::swarm_gallery::render_swarm_chat_card_lines(
+        std::slice::from_ref(member),
+        width.saturating_sub(1) as usize,
     ) {
         out.push(line.alignment(ratatui::layout::Alignment::Left));
     }
@@ -1156,7 +1158,9 @@ fn render_message_into(
                 let spinner_frame = (app.animation_elapsed()
                     * jcode_tui_render::swarm_gallery::STRIP_SPINNER_FPS)
                     as usize;
-                for line in crate::tui::info_widget::swarm_gallery::render_swarm_chat_card_lines(std::slice::from_ref(member), width.saturating_sub(1) as usize,
+                for line in crate::tui::info_widget::swarm_gallery::render_swarm_chat_card_lines(
+                    std::slice::from_ref(member),
+                    width.saturating_sub(1) as usize,
                 ) {
                     acc.push_auto(line.alignment(ratatui::layout::Alignment::Left));
                 }

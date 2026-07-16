@@ -66,6 +66,10 @@ pub(crate) struct Args {
     #[arg(long, global = true, hide = true)]
     pub(crate) fresh_spawn: bool,
 
+    /// Internal: canonical global hotkey that launched this process.
+    #[arg(long, global = true, hide = true, value_name = "CHORD")]
+    pub(crate) spawn_hotkey: Option<String>,
+
     /// Disable auto-detection of jcode repository and self-dev mode
     #[arg(long, global = true)]
     pub(crate) no_selfdev: bool,
@@ -242,6 +246,12 @@ pub(crate) enum Command {
         api_key_env: Option<String>,
     },
 
+    /// Log in to and manage your Jcode account
+    Account {
+        #[command(subcommand)]
+        action: AccountCommand,
+    },
+
     /// Run in simple REPL mode (no TUI)
     Repl,
 
@@ -371,6 +381,10 @@ pub(crate) enum Command {
         /// Internal: run as the macOS hotkey listener process.
         #[arg(long, hide = true)]
         listen_macos_hotkey: bool,
+
+        /// Internal: show a rate-limited shortcut reminder from a CLI SessionStart hook.
+        #[arg(long, hide = true, value_name = "CLI")]
+        notify_cli_launch: Option<String>,
     },
 
     /// Install a launcher so jcode appears in your app launcher
@@ -572,6 +586,26 @@ pub(crate) enum Command {
     /// No npm, no registry, no marketplace.
     #[command(subcommand)]
     Plugin(PluginSubcommand),
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum AccountCommand {
+    /// Open browser-based device authorization and wait for plan activation
+    Login {
+        /// Do not open a browser automatically; print the public approval URL instead
+        #[arg(long, alias = "headless")]
+        no_browser: bool,
+    },
+    /// Show canonical account, plan, and usage status from /v1/me
+    Status {
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+    /// Open the public Jcode account management page
+    Manage,
+    /// Revoke the current key when reachable, then securely clear local state
+    Logout,
 }
 
 #[derive(Subcommand, Debug)]

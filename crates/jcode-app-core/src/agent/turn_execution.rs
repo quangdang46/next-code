@@ -112,13 +112,7 @@ impl Agent {
             ""
         };
 
-        match crate::agent::best_of_n_orchestrator::run_best_of_n(
-            self,
-            user_message,
-            &[],
-        )
-        .await
-        {
+        match crate::agent::best_of_n_orchestrator::run_best_of_n(self, user_message, &[]).await {
             Ok(result) => {
                 let winner = result
                     .candidates
@@ -192,11 +186,27 @@ impl Agent {
         .await
         {
             Ok(r) => {
-                let winner = r.candidates.get(r.winner_index).map(|c| c.strategy.label.as_str()).unwrap_or("?");
-                let files = if r.files_applied.is_empty() { "  (none)".to_string() } else { r.files_applied.iter().map(|f| format!("  - {f}")).collect::<Vec<_>>().join("\n") };
+                let winner = r
+                    .candidates
+                    .get(r.winner_index)
+                    .map(|c| c.strategy.label.as_str())
+                    .unwrap_or("?");
+                let files = if r.files_applied.is_empty() {
+                    "  (none)".to_string()
+                } else {
+                    r.files_applied
+                        .iter()
+                        .map(|f| format!("  - {f}"))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
                 Ok(Some(format!(
                     "BEST-OF-N MODE ENABLED!\nCandidates: {}\nWinner: #{} ({})\nReason: {}\nFiles:\n{}",
-                    r.candidates.len(), r.winner_index, winner, r.selection_reason, files,
+                    r.candidates.len(),
+                    r.winner_index,
+                    winner,
+                    r.selection_reason,
+                    files,
                 )))
             }
             Err(e) => {
@@ -331,7 +341,10 @@ impl Agent {
         }
 
         // Auto best-of-N before streaming turn (same rules as run_once_capture).
-        if let Some(partial) = self.maybe_auto_best_of_n_streaming(user_message, &event_tx).await? {
+        if let Some(partial) = self
+            .maybe_auto_best_of_n_streaming(user_message, &event_tx)
+            .await?
+        {
             self.add_message(Role::User, blocks);
             self.add_message(
                 Role::Assistant,
@@ -342,9 +355,7 @@ impl Agent {
             );
             crate::telemetry::record_turn();
             self.session.save()?;
-            let _ = event_tx.send(ServerEvent::TextDelta {
-                text: partial,
-            });
+            let _ = event_tx.send(ServerEvent::TextDelta { text: partial });
             let _ = event_tx.send(ServerEvent::MessageEnd);
             self.current_turn_system_reminder = None;
             return Ok(());
@@ -468,7 +479,10 @@ impl Agent {
             jcode_keywords::clear_modes_if_session_start(
                 kw_cfg.enabled,
                 kw_cfg.clear_on_session_start,
-                self.session.working_dir.as_deref().map(std::path::Path::new),
+                self.session
+                    .working_dir
+                    .as_deref()
+                    .map(std::path::Path::new),
             );
         }
     }

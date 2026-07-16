@@ -984,6 +984,7 @@ impl RemoteConnection {
             id,
             provider: None,
             auth: None,
+            prefer_strongest: false,
         })
         .await
     }
@@ -995,7 +996,7 @@ impl RemoteConnection {
 
     /// Notify the server about a provider-specific auth change without blocking the caller.
     pub fn notify_auth_changed_for_provider_detached(&mut self, provider: Option<&str>) {
-        self.notify_auth_changed_detached_event(provider, None);
+        self.notify_auth_changed_detached_event(provider, None, false);
     }
 
     /// Notify the server about a typed auth lifecycle change without blocking the caller.
@@ -1003,6 +1004,7 @@ impl RemoteConnection {
         &mut self,
         provider: Option<&str>,
         auth: Option<AuthChanged>,
+        prefer_strongest: bool,
     ) {
         let id = self.next_request_id;
         self.next_request_id += 1;
@@ -1011,6 +1013,7 @@ impl RemoteConnection {
                 id,
                 provider: provider.map(str::to_string),
                 auth,
+                prefer_strongest,
             },
             "notify_auth_changed",
         );
@@ -1429,6 +1432,7 @@ mod tests {
                 id: 1,
                 provider: Some(provider),
                 auth: None,
+                prefer_strongest: false,
             } if provider == "azure-openai"
         ));
     }

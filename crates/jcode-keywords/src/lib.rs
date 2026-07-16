@@ -31,9 +31,7 @@ pub mod workflow;
 
 // Re-exports for convenience
 pub use detector::{DetectedKeyword, detect_keywords, detect_keywords_with};
-pub use options::{
-    DetectOptions, MatchMode, ProcessTurnOptions, process_turn_options_from_config,
-};
+pub use options::{DetectOptions, MatchMode, ProcessTurnOptions, process_turn_options_from_config};
 pub use registry::{KeywordEntry, WorkflowKind, list_canonical_keywords};
 pub use state::{
     ModeChip, ModeState, clear_modes, clear_modes_if_session_start, load_state, mode_chips,

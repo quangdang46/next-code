@@ -29,6 +29,36 @@ fn permanent_telemetry_statuses_trip_the_process_breaker() {
     assert!(!telemetry_status_is_permanent(500));
 }
 
+#[test]
+fn background_delivery_queue_is_bounded() {
+    let (started_tx, started_rx) = std::sync::mpsc::sync_channel(1);
+    let (release_tx, release_rx) = std::sync::mpsc::sync_channel(1);
+    let sender = spawn_background_worker(1, move |_| {
+        let _ = started_tx.send(());
+        let _ = release_rx.recv();
+    })
+    .expect("start test telemetry worker");
+
+    sender
+        .send(serde_json::json!({"event": "first"}))
+        .expect("enqueue first payload");
+    started_rx.recv().expect("worker started first payload");
+    sender
+        .try_send(serde_json::json!({"event": "second"}))
+        .expect("bounded queue accepts one waiting payload");
+    assert!(matches!(
+        sender.try_send(serde_json::json!({"event": "third"})),
+        Err(std::sync::mpsc::TrySendError::Full(_))
+    ));
+
+    release_tx.send(()).expect("release telemetry worker");
+}
+
+#[test]
+fn telemetry_endpoint_uses_production_custom_domain() {
+    assert_eq!(TELEMETRY_ENDPOINT, "https://telemetry.jcode.sh/v1/event");
+}
+
 fn lock_test_env() -> std::sync::MutexGuard<'static, ()> {
     global_test_lock()
 }
@@ -517,6 +547,86 @@ fn test_install_marker_tracks_current_telemetry_id() {
     mark_install_recorded("id-a");
     assert!(install_recorded_for_id("id-a"));
     assert!(!install_recorded_for_id("id-b"));
+
+    if let Some(prev_home) = prev_home {
+        jcode_core::env::set_var("JCODE_HOME", prev_home);
+    } else {
+        jcode_core::env::remove_var("JCODE_HOME");
+    }
+}
+
+#[test]
+fn test_install_conversion_id_is_validated_and_consumed() {
+    let _guard = lock_test_env();
+    let prev_home = std::env::var_os("JCODE_HOME");
+    let temp = tempfile::TempDir::new().expect("create temp dir");
+    jcode_core::env::set_var("JCODE_HOME", temp.path());
+
+    let path = install_conversion_id_path().expect("conversion path");
+    write_private_file(&path, "11111111-2222-4333-8444-555555555555\n");
+    assert_eq!(
+        read_install_conversion_id().as_deref(),
+        Some("11111111-2222-4333-8444-555555555555")
+    );
+    clear_install_conversion_id();
+    assert_eq!(read_install_conversion_id(), None);
+
+    write_private_file(&path, "not-a-conversion-id");
+    assert_eq!(read_install_conversion_id(), None);
+    assert!(!path.exists());
+
+    assert!(install_conversion_id_is_fresh(std::time::SystemTime::now()));
+    assert!(!install_conversion_id_is_fresh(
+        std::time::SystemTime::now() - std::time::Duration::from_secs(91 * 24 * 60 * 60)
+    ));
+
+    if let Some(prev_home) = prev_home {
+        jcode_core::env::set_var("JCODE_HOME", prev_home);
+    } else {
+        jcode_core::env::remove_var("JCODE_HOME");
+    }
+}
+
+#[test]
+fn test_attributed_install_bypasses_existing_install_marker() {
+    let _guard = lock_test_env();
+    let prev_home = std::env::var_os("JCODE_HOME");
+    let temp = tempfile::TempDir::new().expect("create temp dir");
+    jcode_core::env::set_var("JCODE_HOME", temp.path());
+
+    let id = get_or_create_id().expect("telemetry id");
+    mark_install_recorded(&id);
+    assert!(install_recorded_for_id(&id));
+    assert!(read_install_conversion_id().is_none());
+    assert!(!should_record_install_for_id(&id, None));
+
+    let path = install_conversion_id_path().expect("conversion path");
+    write_private_file(&path, "11111111-2222-4333-8444-555555555555\n");
+    assert!(install_recorded_for_id(&id));
+    let conversion_id = read_install_conversion_id();
+    assert!(conversion_id.is_some());
+    assert!(should_record_install_for_id(&id, conversion_id.as_deref()));
+
+    if let Some(prev_home) = prev_home {
+        jcode_core::env::set_var("JCODE_HOME", prev_home);
+    } else {
+        jcode_core::env::remove_var("JCODE_HOME");
+    }
+}
+
+#[test]
+fn test_install_conversion_id_is_removed_when_telemetry_is_disabled() {
+    let _guard = lock_test_env();
+    let prev_home = std::env::var_os("JCODE_HOME");
+    let temp = tempfile::TempDir::new().expect("create temp dir");
+    jcode_core::env::set_var("JCODE_HOME", temp.path());
+    let path = install_conversion_id_path().expect("conversion path");
+    write_private_file(&path, "11111111-2222-4333-8444-555555555555\n");
+
+    jcode_core::env::set_var("JCODE_NO_TELEMETRY", "1");
+    record_install_if_first_run();
+    jcode_core::env::remove_var("JCODE_NO_TELEMETRY");
+    assert!(!path.exists());
 
     if let Some(prev_home) = prev_home {
         jcode_core::env::set_var("JCODE_HOME", prev_home);

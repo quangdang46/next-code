@@ -34,6 +34,7 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
@@ -188,6 +189,11 @@ struct KvCacheBaseline {
     /// the new (often smaller) history look like a broken prefix and produces a
     /// spurious `harness:_prefix_changed` miss.
     session_id: Option<String>,
+    /// Effective prompt size of the last completed request. This includes input,
+    /// cache-read, and cache-creation tokens for split-accounting providers like
+    /// Anthropic. It is the reusable cached prefix, meaning what gets resent if
+    /// the cache goes cold, not the bare `input` field, which for split providers
+    /// is only the uncached remainder of that one request.
     input_tokens: u64,
     completed_at: Instant,
     provider: String,
@@ -333,10 +339,8 @@ pub(super) enum SessionPickerMode {
     /// Opt-in active sessions manager: the picker scoped to live (open)
     /// sessions, showing which are still working vs ready for input.
     ActiveSessions,
-    /// First-run onboarding "continue where you left off" single-select picker.
-    Onboarding {
-        cli: onboarding_flow::ExternalCli,
-    },
+    /// First-run onboarding action picker.
+    Onboarding,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -906,6 +910,10 @@ pub struct App {
     /// Active guided first-run onboarding flow (model select -> continue ->
     /// transcript pick -> suggestions). `None` when not onboarding.
     onboarding_flow: Option<onboarding_flow::OnboardingFlow>,
+    /// Shared cancellation guard for delayed post-login model catalog refreshes.
+    /// Onboarding completion clears it so a late catalog result cannot override
+    /// the model after the user has moved into a normal session.
+    onboarding_auto_model_selection_active: Arc<AtomicBool>,
     /// One-shot guard: have we evaluated whether to auto-start the onboarding
     /// flow on startup yet? The fresh-install path logs in at the CLI before the
     /// TUI launches, so no in-TUI login event fires; this lets us still begin the
@@ -1760,11 +1768,11 @@ impl App {
         // suspended TUI), where the age is genuinely informative.
         let message = match trigger {
             ColdCacheWarningTrigger::IdleExpiry => format!(
-                "🧊 Prompt cache went cold: ~{} tok resent with your next message (/cache to extend)",
+                "🧊 Prompt cache went cold · next turn may resend ~{} tok · /cache extends",
                 token_label
             ),
             ColdCacheWarningTrigger::RequestStart => format!(
-                "🧊 Prompt cache went cold {} ago: ~{} tok may be resent on this request",
+                "🧊 Prompt cache went cold {} ago · this request may resend ~{} tok",
                 crate::tui::format_compact_age(expired_ago_secs),
                 token_label
             ),

@@ -713,6 +713,9 @@ pub(in crate::tui::app) fn handle_server_event(
             if let Some(key) = App::experimental_feature_key_for_tool(&tool_call) {
                 app.note_experimental_feature_use(key);
             }
+            if tool_call.name == "swarm" {
+                app.maybe_surface_swarm_config_hint();
+            }
             if let Some(tc) = app.streaming_tool_calls.iter_mut().find(|tc| tc.id == id) {
                 tc.input = parsed_input;
                 tc.refresh_intent_from_input();

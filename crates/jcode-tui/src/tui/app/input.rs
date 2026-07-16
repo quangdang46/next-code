@@ -15,8 +15,8 @@ use base64::Engine;
 use crossterm::event::{EventStream, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
 use ratatui::DefaultTerminal;
-use std::path::PathBuf;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::{Duration, Instant};
 
@@ -738,7 +738,6 @@ pub(super) fn handle_paste(app: &mut App, text: String) {
                 content,
             );
         });
-        return;
     } else {
         handle_text_paste(app, text);
     }
@@ -2544,7 +2543,10 @@ impl App {
         let mut modifiers = modifiers;
         ctrl_bracket_fallback_to_esc(&mut code, &mut modifiers);
 
-        if handle_modal_key(self, code, modifiers)? {
+        // The onboarding simulator owns all key handling while active so the
+        // real onboarding handlers and simulated modal overlays never fire (no
+        // real logins/imports or action selection).
+        if self.handle_onboarding_sim_key(code, modifiers) {
             return Ok(());
         }
 
@@ -2580,6 +2582,10 @@ impl App {
         // The onboarding simulator owns all key handling while active so the
         // real onboarding handlers never fire (no real logins/imports).
         if self.handle_onboarding_sim_key(code, modifiers) {
+            return Ok(());
+        }
+
+        if handle_modal_key(self, code, modifiers)? {
             return Ok(());
         }
 

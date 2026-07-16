@@ -4,8 +4,8 @@ use crate::tool::hashline_loop_guard::NoopGuard;
 use crate::tool::hashline_snapshots;
 use anyhow::Result;
 use async_trait::async_trait;
-use hashline::{anchor, document::FileContent, hash as hashline_hash};
 use hashline::types::FileOp as HashlineFileOp;
+use hashline::{anchor, document::FileContent, hash as hashline_hash};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::path::Path;
@@ -275,9 +275,7 @@ async fn execute_one_section(
     };
 
     let ch = xxhash64(&content);
-    let nd = edits.is_empty()
-        || new_text == content
-        || new_text == format!("{content}\n");
+    let nd = edits.is_empty() || new_text == content || new_text == format!("{content}\n");
     if !edits.is_empty() {
         if let Err(e) = NOOP_GUARD.record(path.to_path_buf(), !nd, ch) {
             return Err(anyhow::anyhow!("{e}"));
@@ -543,12 +541,9 @@ fn split_patch_sections(patch: &str) -> Vec<(String, String)> {
 
     let mut sections = Vec::with_capacity(header_indices.len());
     for (i, &start) in header_indices.iter().enumerate() {
-        let end = header_indices
-            .get(i + 1)
-            .copied()
-            .unwrap_or(lines.len());
-        let path = parse_header_line(lines[start])
-            .expect("header index always points at a valid header");
+        let end = header_indices.get(i + 1).copied().unwrap_or(lines.len());
+        let path =
+            parse_header_line(lines[start]).expect("header index always points at a valid header");
         let mut body = lines[start..end].join("\n");
         // Preserve a trailing newline when the original section had one
         // (last section only, and only if the full patch ends with \n).
@@ -925,8 +920,7 @@ mod tests {
 
     #[test]
     fn parse_mv_file_op() {
-        let (edits, _w, file_op, _) =
-            hashline::parser::parse_patch("[x.rs#ABCD]\nMV y.rs\n");
+        let (edits, _w, file_op, _) = hashline::parser::parse_patch("[x.rs#ABCD]\nMV y.rs\n");
         assert!(edits.is_empty());
         assert_eq!(file_op, Some(HashlineFileOp::Rename("y.rs".into())));
     }

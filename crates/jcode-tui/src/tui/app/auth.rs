@@ -118,9 +118,10 @@ impl App {
             } else {
                 ""
             };
-            let tier_suffix = match model.min_tier {
-                crate::subscription_catalog::JcodeTier::Plus => "",
-                crate::subscription_catalog::JcodeTier::Flagship => " [Flagship]",
+            let tier_suffix = if model.min_tier == crate::subscription_catalog::JcodeTier::Plus {
+                String::new()
+            } else {
+                format!(" [{}]", model.min_tier.display_name())
             };
             message.push_str(&format!(
                 "  - {} - {}{}{}\n      - {}\n      - {}\n",
@@ -187,9 +188,25 @@ impl App {
                             ));
                         }
                         Err(error) => {
-                            crate::logging::info(&format!(
-                                "jcode subscription status fetch failed (offline?): {}",
-                                error
+                            let message = if error
+                                .downcast_ref::<crate::subscription_api::AccountApiError>()
+                                == Some(&crate::subscription_api::AccountApiError::Unauthorized)
+                            {
+                                let _ = crate::subscription_catalog::clear_account_credentials();
+                                "Jcode Account Status\n\nThe saved account key was revoked or expired. Local credentials were cleared. Use /account jcode login to sign in again."
+                                    .to_string()
+                            } else {
+                                format!(
+                                    "Jcode Account Status\n\nCould not load /v1/me: {}\n\nThe local credential was retained. Retry /account jcode status, open /account jcode manage, or use /account jcode logout.",
+                                    error
+                                )
+                            };
+                            crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
+                                crate::bus::UiActivity::background(
+                                    Some(session_id),
+                                    message,
+                                    Some("Jcode account status unavailable"),
+                                ),
                             ));
                         }
                     }
@@ -292,26 +309,13 @@ impl App {
     ) {
         use crate::provider_catalog::LoginProviderTarget;
 
+        if matches!(provider.target, LoginProviderTarget::Jcode) {
+            self.start_jcode_account_logout();
+            return;
+        }
+
         let result: anyhow::Result<String> = (|| match provider.target {
-            LoginProviderTarget::Jcode => {
-                Self::clear_api_key_login(
-                    crate::subscription_catalog::JCODE_API_KEY_ENV,
-                    crate::subscription_catalog::JCODE_ENV_FILE,
-                )?;
-                for env_key in [
-                    crate::subscription_catalog::JCODE_API_BASE_ENV,
-                    crate::subscription_catalog::JCODE_ACCOUNT_ID_ENV,
-                    crate::subscription_catalog::JCODE_ACCOUNT_EMAIL_ENV,
-                    crate::subscription_catalog::JCODE_TIER_ENV,
-                ] {
-                    crate::provider_catalog::save_env_value_to_env_file(
-                        env_key,
-                        crate::subscription_catalog::JCODE_ENV_FILE,
-                        None,
-                    )?;
-                }
-                Ok("Logged out of jcode subscription.".to_string())
-            }
+            LoginProviderTarget::Jcode => unreachable!("handled above"),
             LoginProviderTarget::Claude => {
                 let removed = crate::auth::claude::clear_accounts()?;
                 Ok(format!("Logged out of {} Anthropic account(s).", removed))
@@ -631,14 +635,241 @@ impl App {
 
     fn start_jcode_login(&mut self) {
         self.push_display_message(DisplayMessage::system(
-            "Jcode Subscription Login\n\n\
-             This doesn't exist yet.\n\n\
-             This would be a jcode subscription for a curated list of models chosen for good compatibility with jcode. It would work similarly to OpenRouter, but jcode would pick the best model/provider routes by balancing price, performance, KV cache support, latency, and throughput. Right now, the model of choice would be DeepSeek V4 Pro.\n\n\
-             The goal would be to maximize the amount of token usage you get for your subscription. The plan is to stay around zero profit until jcode can beat raw API prices while providing some level of competitive subsidization. This subscription would be required for the mobile app version.\n\n\
-             If you are interested in this, please send feedback letting me know."
+            "Jcode Account Login\n\nRequesting a secure browser approval flow. No email or API key will be requested in the terminal."
                 .to_string(),
         ));
-        self.set_status_notice("Login: jcode unavailable");
+        self.set_status_notice("Jcode account: requesting browser approval");
+        let session_id = self.session.id.clone();
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            self.push_display_message(DisplayMessage::error(
+                "Jcode account login requires the async runtime.".to_string(),
+            ));
+            return;
+        };
+        handle.spawn(async move {
+            use crate::subscription_api::{
+                ActivationOutcome, PollingBackoff, TokenPollOutcome,
+            };
+            use std::time::Duration;
+
+            let publish = |message: String, status: &'static str| {
+                crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
+                    crate::bus::UiActivity::background(
+                        Some(session_id.clone()),
+                        message,
+                        Some(status),
+                    ),
+                ));
+            };
+            let client = crate::provider::shared_http_client();
+            let api_base = crate::subscription_api::configured_api_base();
+            let device = match crate::subscription_api::request_device_authorization(
+                &client,
+                &api_base,
+                Some(crate::subscription_catalog::JcodeTier::Pro),
+            )
+            .await
+            {
+                Ok(device) => device,
+                Err(error) => {
+                    publish(
+                        format!(
+                            "Jcode Account Login\n\nCould not start browser approval: {}\n\nRetry /account jcode login. No credential was saved.",
+                            error
+                        ),
+                        "Jcode account login failed",
+                    );
+                    return;
+                }
+            };
+
+            let opened = App::open_auth_browser(&device.verification_uri_complete);
+            publish(
+                format!(
+                    "Jcode Account Login\n\n{}\n\nApprove the request in the same browser. Jcode is waiting for the single-use exchange.{}",
+                    device.verification_uri_complete,
+                    if opened {
+                        ""
+                    } else {
+                        "\n\nThe browser could not be opened automatically. Open the public URL above manually."
+                    }
+                ),
+                "Jcode account: waiting for browser approval",
+            );
+
+            let approved = {
+                let deadline = tokio::time::Instant::now()
+                    + Duration::from_secs(device.expires_in.max(device.interval));
+                let mut backoff = PollingBackoff::new(Duration::from_secs(device.interval));
+                loop {
+                    let delay = backoff.delay();
+                    if tokio::time::Instant::now() + delay >= deadline {
+                        break Err("Browser approval timed out. No credential was saved.".to_string());
+                    }
+                    tokio::time::sleep(delay).await;
+                    match crate::subscription_api::poll_device_token_once(
+                        &client,
+                        &api_base,
+                        &device.device_code,
+                    )
+                    .await
+                    {
+                        Ok(TokenPollOutcome::Pending) => backoff.on_pending(),
+                        Ok(TokenPollOutcome::SlowDown { retry_after }) => {
+                            backoff.on_slow_down(retry_after)
+                        }
+                        Ok(TokenPollOutcome::Approved(key)) => break Ok(key),
+                        Ok(TokenPollOutcome::Expired) => break Err(
+                            "The browser approval expired or was already exchanged. Start a new login."
+                                .to_string(),
+                        ),
+                        Ok(TokenPollOutcome::Denied) => break Err(
+                            "Jcode account login was canceled or denied in the browser."
+                                .to_string(),
+                        ),
+                        Err(error) if error.is_temporary() => backoff.on_offline_error(),
+                        Err(error) => break Err(error.to_string()),
+                    }
+                }
+            };
+            let approved = match approved {
+                Ok(approved) => approved,
+                Err(error) => {
+                    publish(
+                        format!("Jcode Account Login\n\n{error}\n\nRetry /account jcode login."),
+                        "Jcode account login stopped",
+                    );
+                    return;
+                }
+            };
+
+            if let Err(error) = crate::subscription_catalog::persist_account_credentials(
+                &approved.api_key,
+                Some(&approved.account_id),
+                Some(&approved.email),
+                Some(&approved.tier),
+            ) {
+                publish(
+                    format!("Jcode Account Login\n\nBrowser approval succeeded, but secure credential persistence failed: {error}"),
+                    "Jcode account credential save failed",
+                );
+                return;
+            }
+            crate::auth::AuthStatus::invalidate_cache();
+            publish(
+                format!(
+                    "Jcode Account Approved\n\nSigned in as {}. The key is stored with owner-only permissions. Waiting for an active paid plan on /v1/me...",
+                    approved.email
+                ),
+                "Jcode account: waiting for plan activation",
+            );
+
+            match crate::subscription_api::poll_for_paid_activation(
+                &client,
+                &api_base,
+                &approved.api_key,
+                crate::subscription_api::ACTIVATION_TIMEOUT,
+                Duration::from_secs(device.interval.max(2)),
+            )
+            .await
+            {
+                ActivationOutcome::Active(me) => publish(
+                    format!(
+                        "Jcode Account Ready\n\n{} is active for {}.\n\nStatus: /account jcode status\nManage: /account jcode manage\nLogout: /account jcode logout",
+                        me.parsed_tier()
+                            .map(|tier| tier.display_name().to_string())
+                            .unwrap_or(me.tier),
+                        me.email
+                    ),
+                    "Jcode account plan active",
+                ),
+                ActivationOutcome::Canceled(_) => publish(
+                    "Jcode Account Login\n\nCheckout was canceled. The valid account key remains saved, but no paid plan is active.\n\nStatus: /account jcode status\nManage: /account jcode manage\nLogout: /account jcode logout".to_string(),
+                    "Jcode account plan not active",
+                ),
+                ActivationOutcome::TimedOut { last_error_was_offline } => publish(
+                    format!(
+                        "Jcode Account Login\n\nPlan activation was not confirmed before timeout{}. The valid account key remains saved.\n\nStatus: /account jcode status\nManage: /account jcode manage\nLogout: /account jcode logout",
+                        if last_error_was_offline { " because the API remained unreachable" } else { "" }
+                    ),
+                    "Jcode account activation pending",
+                ),
+                ActivationOutcome::Revoked | ActivationOutcome::Denied => {
+                    let _ = crate::subscription_catalog::clear_account_credentials();
+                    publish(
+                        "Jcode Account Login\n\nThe issued key was revoked or denied during activation checks. Local credentials were cleared. Retry /account jcode login.".to_string(),
+                        "Jcode account key rejected",
+                    );
+                }
+            }
+        });
+    }
+
+    pub(super) fn open_jcode_account_management(&mut self) {
+        let url = crate::subscription_catalog::JCODE_ACCOUNT_URL;
+        let opened = Self::open_auth_browser(url);
+        self.push_display_message(DisplayMessage::system(format!(
+            "Jcode Account Management\n\n{}{}",
+            url,
+            if opened {
+                "\n\nOpened in your browser."
+            } else {
+                "\n\nThe browser could not be opened automatically. Open the public URL above manually."
+            }
+        )));
+        self.set_status_notice("Jcode account management");
+    }
+
+    pub(super) fn start_jcode_account_logout(&mut self) {
+        self.set_status_notice("Jcode account: logging out");
+        let session_id = self.session.id.clone();
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            let result = crate::subscription_catalog::clear_account_credentials();
+            match result {
+                Ok(()) => self.push_display_message(DisplayMessage::system(
+                    "Jcode account credentials and cache were cleared locally. Remote revocation could not be attempted without the async runtime."
+                        .to_string(),
+                )),
+                Err(error) => self.push_display_message(DisplayMessage::error(format!(
+                    "Failed to clear local Jcode account credentials: {error}"
+                ))),
+            }
+            return;
+        };
+        handle.spawn(async move {
+            let api_key = crate::subscription_catalog::configured_api_key();
+            let remote = if let Some(api_key) = api_key.as_deref() {
+                crate::subscription_api::revoke_current_key(
+                    &crate::provider::shared_http_client(),
+                    &crate::subscription_api::configured_api_base(),
+                    api_key,
+                )
+                .await
+            } else {
+                Ok(())
+            };
+            let local = crate::subscription_catalog::clear_account_credentials();
+            crate::auth::AuthStatus::invalidate_cache();
+            let message = match local {
+                Err(error) => format!(
+                    "Jcode Account Logout\n\nFailed to securely clear local credentials: {error}"
+                ),
+                Ok(()) => match (api_key.is_some(), remote) {
+                    (false, _) => "Jcode Account Logout\n\nNo local credential was present. Local account cache is clear.".to_string(),
+                    (true, Ok(())) => "Jcode Account Logout\n\nThe current key was revoked. Local credentials and account cache were securely cleared.".to_string(),
+                    (true, Err(crate::subscription_api::AccountApiError::Unauthorized)) => "Jcode Account Logout\n\nThe key was already revoked. Local credentials and account cache were securely cleared.".to_string(),
+                    (true, Err(crate::subscription_api::AccountApiError::Offline(_))) => "Jcode Account Logout\n\nLocal credentials and account cache were securely cleared. The API was offline, so remote revocation could not be confirmed.".to_string(),
+                    (true, Err(error)) => format!("Jcode Account Logout\n\nLocal credentials and account cache were securely cleared. Remote revocation could not be confirmed: {error}"),
+                },
+            };
+            crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
+                crate::bus::UiActivity::background(
+                    Some(session_id),
+                    message,
+                    Some("Jcode account logout complete"),
+                ),
+            ));
+        });
     }
 
     pub(super) fn start_claude_login_for_account(&mut self, label: &str) {
@@ -2413,6 +2644,33 @@ impl App {
         }
     }
 
+    pub(super) fn onboarding_should_prefer_strongest_model(&self) -> bool {
+        if !self.onboarding_flow_active() {
+            return false;
+        }
+
+        let provider_config = &crate::config::config().provider;
+        let has_explicit_default = provider_config
+            .default_provider
+            .as_deref()
+            .is_some_and(|provider| !provider.trim().is_empty())
+            || provider_config
+                .default_model
+                .as_deref()
+                .is_some_and(|model| !model.trim().is_empty());
+        let runtime_provider_forced =
+            std::env::var("JCODE_FORCE_PROVIDER")
+                .ok()
+                .is_some_and(|value| {
+                    matches!(
+                        value.trim().to_ascii_lowercase().as_str(),
+                        "1" | "true" | "yes" | "on"
+                    )
+                });
+
+        !has_explicit_default && !runtime_provider_forced
+    }
+
     fn trigger_provider_auth_changed(
         &mut self,
         provider_hint: Option<&str>,
@@ -2434,6 +2692,7 @@ impl App {
         let provider_hint = provider_hint.map(str::to_string);
         let session_id = self.session.id.clone();
         let select_local_model = !self.is_remote;
+        let auto_selection_active = Arc::clone(&self.onboarding_auto_model_selection_active);
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
                 let activation = crate::auth::lifecycle::activate_auth_change(
@@ -2441,6 +2700,7 @@ impl App {
                 );
                 provider.on_auth_changed();
                 if select_local_model && activation.provider_id.is_some() {
+                    let model_before_catalog_wait = provider.model();
                     // Hot initialization is synchronous, but provider catalogs can
                     // arrive shortly afterward. Retry briefly so a first-run import
                     // selects the strongest live route rather than validating the
@@ -2450,24 +2710,62 @@ impl App {
                             tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
                         }
                         let routes = provider.model_routes();
-                        let current_model = (!prefer_strongest).then(|| provider.model());
-                        let Some(model) = crate::auth::lifecycle::provider_model_to_select_after_auth(
-                            &activation,
-                            current_model.as_deref(),
-                            &routes,
-                        ) else {
-                            if prefer_strongest {
-                                continue;
+                        let selection = if prefer_strongest {
+                            if !auto_selection_active.load(std::sync::atomic::Ordering::Acquire)
+                                || provider.model() != model_before_catalog_wait
+                            {
+                                break;
                             }
+                            let Some(route) =
+                                crate::auth::lifecycle::globally_preferred_default_route(&routes)
+                            else {
+                                continue;
+                            };
+                            let exact_route = crate::provider::RouteSelection::from_model_route(&route);
+                            let default_selection =
+                                crate::provider::MultiProvider::default_model_selection_from_route(
+                                    &route.model,
+                                    &route.api_method,
+                                    &route.provider,
+                                );
+                            Some((
+                                route.model,
+                                exact_route.routed_model_spec(),
+                                default_selection.provider_key,
+                                Some(exact_route),
+                            ))
+                        } else {
+                            let current_model = provider.model();
+                            crate::auth::lifecycle::provider_model_to_select_after_auth(
+                                &activation,
+                                Some(&current_model),
+                                &routes,
+                            )
+                            .map(|model| {
+                                let model_request =
+                                    activation.model_switch_request(provider.name(), &model);
+                                let provider_key = crate::provider::MultiProvider::session_provider_key_for_model_request(
+                                    &model_request,
+                                    provider.name(),
+                                );
+                                (model, model_request, provider_key, None)
+                            })
+                        };
+                        let Some((model, model_request, provider_key, exact_route)) = selection else {
                             break;
                         };
-                        let model_request =
-                            activation.model_switch_request(provider.name(), &model);
-                        if provider.set_model(&model_request).is_ok() {
-                            let provider_key = crate::provider::MultiProvider::session_provider_key_for_model_request(
-                                &model_request,
-                                provider.name(),
-                            );
+                        if prefer_strongest
+                            && (!auto_selection_active
+                                .load(std::sync::atomic::Ordering::Acquire)
+                                || provider.model() != model_before_catalog_wait)
+                        {
+                            break;
+                        }
+                        let applied = exact_route.as_ref().map_or_else(
+                            || provider.set_model(&model_request),
+                            |selection| provider.set_route_selection(selection),
+                        );
+                        if applied.is_ok() {
                             crate::bus::Bus::global().publish_models_updated();
                             crate::bus::Bus::global().publish(
                                 crate::bus::BusEvent::ProviderModelActivated {
@@ -2496,15 +2794,28 @@ impl App {
             provider.on_auth_changed();
             if select_local_model && activation.provider_id.is_some() {
                 let routes = provider.model_routes();
-                let current_model = (!prefer_strongest).then(|| provider.model());
-                if let Some(model) = crate::auth::lifecycle::provider_model_to_select_after_auth(
-                    &activation,
-                    current_model.as_deref(),
-                    &routes,
-                ) {
-                    let model_request = activation.model_switch_request(provider.name(), &model);
-                    if provider.set_model(&model_request).is_ok() {
-                        self.finalize_model_switch(&model_request);
+                if prefer_strongest {
+                    if let Some(route) =
+                        crate::auth::lifecycle::globally_preferred_default_route(&routes)
+                    {
+                        let selection = crate::provider::RouteSelection::from_model_route(&route);
+                        let model_request = selection.routed_model_spec();
+                        if provider.set_route_selection(&selection).is_ok() {
+                            self.finalize_model_switch(&model_request);
+                        }
+                    }
+                } else {
+                    let current_model = provider.model();
+                    if let Some(model) = crate::auth::lifecycle::provider_model_to_select_after_auth(
+                        &activation,
+                        Some(&current_model),
+                        &routes,
+                    ) {
+                        let model_request =
+                            activation.model_switch_request(provider.name(), &model);
+                        if provider.set_model(&model_request).is_ok() {
+                            self.finalize_model_switch(&model_request);
+                        }
                     }
                 }
             }
@@ -2839,7 +3150,11 @@ impl App {
             if Self::login_provider_is_azure(&login.provider) {
                 self.activate_azure_runtime_model_after_login();
             } else {
-                let prefer_strongest = self.onboarding_flow_active();
+                let prefer_strongest = self.onboarding_should_prefer_strongest_model();
+                if prefer_strongest {
+                    self.onboarding_auto_model_selection_active
+                        .store(true, std::sync::atomic::Ordering::Release);
+                }
                 self.trigger_provider_auth_changed(Some(&login.provider), prefer_strongest);
             }
             // First-run onboarding: once the user has authenticated on a fresh

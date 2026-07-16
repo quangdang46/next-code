@@ -101,11 +101,7 @@ impl Tool for FfsOutlineTool {
         let tag = crate::tool::hashline_snapshots::record(
             &file_path,
             &content,
-            if seen.is_empty() {
-                None
-            } else {
-                Some(&seen)
-            },
+            if seen.is_empty() { None } else { Some(&seen) },
         );
         let display_path = params.file.trim_start_matches("./");
         // Prefer model-facing path (not basename-only) so edit headers resolve uniquely.

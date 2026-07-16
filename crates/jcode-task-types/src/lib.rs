@@ -194,7 +194,7 @@ fn default_pending_status() -> String {
     "pending".to_string()
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TodoItem {
     pub content: String,
     pub status: String,
@@ -238,11 +238,19 @@ pub struct TodoItem {
 /// while "design an onboarding screen" is not because success is a taste
 /// judgment. Items like "read the auth code" have no meaningful score of
 /// their own, so the score lives here instead of on `TodoItem`.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TodoGoal {
     /// Group label this goal describes. `None` covers the ungrouped list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
+    /// The user's underlying reason or desired outcome for this goal, kept
+    /// distinct from the agent's measurable objective and validation loop.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_intention: Option<String>,
+    /// How well the current goal, objective, and planned work align with the
+    /// user's stated request and underlying intention, from 0-100.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub user_intention_alignment: Option<u8>,
     /// How hill-climbable this goal is, from 0-100: can progress be measured
     /// against a quantifiable, verifiable objective and iterated on?
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -261,6 +269,29 @@ pub struct TodoGoal {
     /// validation, cleanup, and explicit disclosure of remaining gaps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end_to_end_ownership: Option<u8>,
+}
+
+/// A goal field changed by a todo-tool update. This lets transcript renderers
+/// show a concise quality-gate refinement instead of repeating the full plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TodoGoalField {
+    UserIntention,
+    UserIntentionAlignment,
+    HillClimbability,
+    Objective,
+    FeedbackLoop,
+    EndToEndOwnership,
+}
+
+/// Before/after state for one changed todo goal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TodoGoalChange {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before: Option<TodoGoal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after: Option<TodoGoal>,
+    pub fields: Vec<TodoGoalField>,
 }
 
 use std::collections::HashMap;

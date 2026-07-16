@@ -16,6 +16,7 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Connect) => "jcode:client".to_string(),
         Some(Command::Run { .. }) => "jcode run".to_string(),
         Some(Command::Login { .. }) => "jcode login".to_string(),
+        Some(Command::Account { .. }) => "jcode account".to_string(),
         Some(Command::Repl) => "jcode repl".to_string(),
         Some(Command::Update) => "jcode update".to_string(),
         Some(Command::Version { .. }) => "jcode version".to_string(),
@@ -40,9 +41,12 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Dictate { .. }) => "jcode dictate".to_string(),
         Some(Command::SetupHotkey {
             listen_macos_hotkey,
+            notify_cli_launch,
         }) => {
             if *listen_macos_hotkey {
                 "jcode hotkey listener".to_string()
+            } else if notify_cli_launch.is_some() {
+                "jcode shortcut reminder".to_string()
             } else {
                 "jcode hotkey setup".to_string()
             }
