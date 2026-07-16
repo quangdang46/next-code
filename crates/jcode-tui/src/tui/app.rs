@@ -1258,32 +1258,6 @@ pub struct App {
     input_undo_stack: Vec<(String, usize)>,
     // Short-lived notice for status feedback (model switch, cycle diff mode, etc.)
     status_notice: Option<(String, Instant)>,
-    // Distinct learned-keybinding nudge ("you keep doing X the slow way, press
-    // <key>"). Rendered in its own pop-out color, separate from status_notice,
-    // and shown at most once per session.
-    learn_hint: Option<(String, Instant)>,
-    // Whether a learned-keybinding nudge has already been surfaced this session.
-    learn_hint_shown_this_session: bool,
-    // Whether the swarm-config-is-a-prompt hint has been surfaced this session.
-    swarm_hint_shown_this_session: bool,
-    // Whether the inline sponsored-discovery policy detail has been attached
-    // this session. It appears once, on the first discover_tools result.
-    sponsor_disclosure_shown_this_session: bool,
-    // Inline hotkey feedback: "you just pressed X → does Y" for rarely-used
-    // known chords, or "X isn't bound · nearest: ..." for unknown chords.
-    // Rendered in the same pop-out slot as learn_hint.
-    hotkey_feedback: Option<(String, Instant)>,
-    // Lazily-loaded persisted per-action hotkey usage counters.
-    hotkey_usage: Option<hotkey_feedback::HotkeyUsageState>,
-    // Per-chord counts of unknown-hotkey notices shown this session.
-    unknown_hotkey_seen: std::collections::HashMap<String, u32>,
-    // When the last unknown-hotkey notice was shown, for rate limiting.
-    last_unknown_hotkey_notice: Option<Instant>,
-    // Persistent startup notice card (e.g. launch-hotkeys / welcome tip) shown on
-    // the idle screen of a fresh session. Stashed so it can be re-applied after
-    // the remote History bootstrap clears the transcript for a brand-new session,
-    // which otherwise makes the card flash for a moment and disappear.
-    pending_startup_notice: Option<(String, String)>,
     // Experimental feature warnings already shown in this session.
     experimental_feature_warnings_seen: HashSet<String>,
     // Active first-use experimental warning for the currently running tool.
