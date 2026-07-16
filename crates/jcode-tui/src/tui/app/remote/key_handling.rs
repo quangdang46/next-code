@@ -318,6 +318,53 @@ async fn handle_remote_key_internal(
         return Ok(());
     }
 
+    // Claude Code useBackgroundTaskNavigation: Shift+↑/↓ / Enter / Esc / k / f.
+    if let Some(nav) = app.handle_agent_tree_navigation_key(code, modifiers) {
+        match nav {
+            crate::tui::app::tui_state::TeammateNavAction::Handled => {}
+            crate::tui::app::tui_state::TeammateNavAction::ResumeSession { session_id } => {
+                app.workspace_client.queue_resume_session(session_id);
+            }
+            crate::tui::app::tui_state::TeammateNavAction::MessageAgent {
+                session_id,
+                message,
+            } => {
+                let from = app
+                    .remote_session_id
+                    .clone()
+                    .unwrap_or_else(|| session_id.clone());
+                if let Err(e) = remote.comm_message_dm(&from, &session_id, &message).await {
+                    // Fallback: notify_session injects into target.
+                    if let Err(e2) = remote.notify_session(&session_id, &message).await {
+                        app.set_status_notice(format!("Message agent failed: {e} / {e2}"));
+                    }
+                }
+            }
+            crate::tui::app::tui_state::TeammateNavAction::StopAgent {
+                target_session,
+                force,
+            } => {
+                let from = app
+                    .remote_session_id
+                    .clone()
+                    .unwrap_or_else(|| target_session.clone());
+                if let Err(e) = remote.comm_stop(&from, &target_session, force).await {
+                    app.set_status_notice(format!("Stop agent failed: {e}"));
+                }
+            }
+            crate::tui::app::tui_state::TeammateNavAction::AbortAgentTurn { session_id } => {
+                // Soft-interrupt busy agent (closest to CC abort current turn).
+                if let Err(e) = remote
+                    .notify_session(&session_id, "[leader interrupted your current turn]")
+                    .await
+                {
+                    app.set_status_notice(format!("Abort turn failed: {e}"));
+                }
+            }
+        }
+        return Ok(());
+    }
+
     if input::is_next_prompt_new_session_hotkey(code, modifiers) {
         app.toggle_next_prompt_new_session_routing();
         return Ok(());
@@ -759,7 +806,8 @@ async fn handle_remote_key_internal(
                         app.running_items_state.detail_open = false;
                         app.viewing_teammate_session_id = Some(sid.clone());
                         app.view_teammate_selection = true;
-                        app.set_status_notice(format!("Viewing → {}  (Esc to exit)", label));
+                        app.teammate_view_agent_name = Some(label);
+                        // Header owns "Viewing @name · esc return".
                         return Ok(());
                     }
                     app.running_items_state.detail_open = false;
@@ -769,10 +817,17 @@ async fn handle_remote_key_internal(
                 return Ok(());
             }
             KeyCode::Esc => {
-                if app.viewing_teammate_session_id.is_some() {
-                    app.viewing_teammate_session_id = None;
-                    app.view_teammate_selection = false;
-                    app.set_status_notice("Exited teammate view");
+                // Hard-attach: must resume leader, not only clear a flag.
+                if app.teammate_view_hard_attached {
+                    if let Some(leader) = app.teammate_view_return_session_id.clone() {
+                        app.teammate_view_return_session_id = None;
+                        app.workspace_client.queue_resume_session(leader);
+                        app.running_items_state.visible = false;
+                        return Ok(());
+                    }
+                }
+                if app.viewing_teammate_session_id.is_some() && !app.teammate_view_hard_attached {
+                    app.exit_teammate_view_local("");
                     return Ok(());
                 }
                 if app.running_items_state.detail_open {

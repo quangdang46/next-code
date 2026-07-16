@@ -252,6 +252,7 @@ pub(super) fn input_hint_line_height(app: &dyn TuiState) -> u16 {
     u16::from(
         shell_mode_hint(mode).is_some()
             || app.next_prompt_new_session_armed()
+            // No extra input hint while viewing — TeammateViewHeader owns esc.
             || (app.is_processing() && !app.input().is_empty()),
     )
 }
@@ -267,6 +268,9 @@ pub(super) fn input_prompt(app: &dyn TuiState) -> (&'static str, Color) {
         ("$ ", shell_mode_color())
     } else if app.is_processing() {
         ("… ", queued_color())
+    } else if app.teammate_view_hard_attached() || app.viewing_teammate_session_id().is_some() {
+        // CC colors the prompt border with the teammate identity while viewing.
+        ("› ", rgb(80, 220, 100))
     } else if app.active_skill().is_some() {
         ("» ", accent_color())
     } else {
@@ -740,16 +744,14 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     format!("✨ {}", labels.join(" · ")),
                     Style::default().fg(chip_color),
                 ));
-                spans.push(Span::styled(
-                    " (canceljcode)",
-                    Style::default().fg(dimmed),
-                ));
+                spans.push(Span::styled(" (canceljcode)", Style::default().fg(dimmed)));
             }
         }
         spans
     }
 
     let mut right_align_facts = false;
+    // CC TeammateViewHeader owns esc chrome — status bar stays normal.
     let line = if let Some(build_progress) = crate::build::read_build_progress() {
         let spinner = super::activity_indicator(elapsed, 12.5);
         Line::from(vec![
@@ -795,10 +797,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
         }
         if let ProcessingStatus::RunningTool(ref name) = app.status() {
             spans.push(Span::styled(" · ", Style::default().fg(dim_color())));
-            spans.push(Span::styled(
-                name.clone(),
-                Style::default().fg(dim_color()),
-            ));
+            spans.push(Span::styled(name.clone(), Style::default().fg(dim_color())));
             spans.push(Span::styled(
                 " · Alt+B bg",
                 Style::default().fg(rgb(100, 100, 100)),

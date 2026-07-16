@@ -1028,6 +1028,18 @@ pub(in crate::tui::app) fn handle_server_event(
             app.stream_message_ended = false;
             app.processing_started = None;
             app.current_message_id = None;
+            // Claude Code only renders the teammate tree while agents are
+            // running. After an interrupt the live tree must disappear — do not
+            // leave cancelled members that can paint under "Interrupted".
+            app.subagent_status = None;
+            app.agent_trees.clear();
+            // Hard-clear: mark-cancelled alone still feeds swarm cards/strip and
+            // can race with a late SwarmStatus snapshot. Live spinner tree reads
+            // this vec; empty ⇒ tree null (CC TeammateSpinnerTree).
+            app.remote_swarm_members.clear();
+            // Soft preview cleared; hard-attach chrome + return_session_id kept
+            // so Esc can still resume team-lead (CC exitTeammateView only).
+            app.clear_teammate_view_on_interrupt();
             remote.clear_pending();
             remote.reset_call_output_tokens_seen();
             let auto_poked = app.schedule_auto_poke_followup_if_needed()
@@ -1924,15 +1936,27 @@ pub(in crate::tui::app) fn handle_server_event(
         }
         ServerEvent::SwarmStatus { members } => {
             if app.swarm_enabled {
+                // Seed empty transcript buffers so soft-view / tree previews have
+                // content even before the first SwarmMemberMessage arrives.
+                for m in &members {
+                    app.seed_teammate_transcript_from_member(&m.session_id, m);
+                }
                 app.remote_swarm_members = members;
                 persist_swarm_status_snapshot(app);
             } else {
                 app.remote_swarm_members.clear();
             }
-            // The dedicated swarm page and strip render directly from this live
-            // snapshot. The transcript uses its own stable summary signature, so
-            // do not bump the global message version for output-tail, timer, todo,
-            // or tool-progress updates.
+            // Dedicated swarm page/strip read this live snapshot; transcript uses
+            // its own stable summary signature — do not bump global message version
+            // for output-tail / timer / todo / tool-progress churn.
+            // Soft teammate view: refresh Message-level buffer (CC task.messages).
+            if app.viewing_teammate_session_id.is_some() {
+                app.refresh_teammate_soft_view();
+            }
+            true
+        }
+        ServerEvent::SwarmMemberMessage { message, .. } => {
+            app.apply_teammate_member_message(message);
             true
         }
         ServerEvent::SwarmPlan {

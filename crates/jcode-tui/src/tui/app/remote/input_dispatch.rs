@@ -1,5 +1,6 @@
 use super::super::{PendingRemoteMessage, PendingSplitPrompt};
 use super::*;
+use jcode_tui_messages::DisplayMessage;
 
 #[expect(
     clippy::too_many_arguments,
@@ -90,6 +91,40 @@ pub(in crate::tui::app) async fn submit_prepared_remote_input(
         app.pending_prompt_after_model_switch = Some(prepared);
         app.set_status_notice("Prompt queued until model switch completes");
         return Ok(());
+    }
+
+    // Soft teammate view (CC): route typed input to the viewed agent via
+    // CommMessage DM (preferred) or NotifySession fallback.
+    if let Some(sid) = app.viewing_teammate_session_id.clone() {
+        if !app.teammate_view_hard_attached {
+            let content = prepared.expanded.clone();
+            app.teammate_view_messages
+                .push(DisplayMessage::user(prepared.raw_input.clone()));
+            app.display_messages_version = app.display_messages_version.wrapping_add(1);
+            app.input.clear();
+            app.cursor_pos = 0;
+            app.teammate_view_abort_armed = false;
+            let from = app.remote_session_id.clone().unwrap_or_else(|| sid.clone());
+            let result = match remote.comm_message_dm(&from, &sid, &content).await {
+                Ok(id) => Ok(id),
+                Err(e) => {
+                    crate::logging::warn(&format!(
+                        "comm_message_dm failed ({e}); falling back to notify_session"
+                    ));
+                    remote.notify_session(&sid, &content).await
+                }
+            };
+            match result {
+                Ok(_) => {
+                    app.set_status_notice("Sent to viewed agent");
+                    app.refresh_teammate_soft_view();
+                }
+                Err(e) => {
+                    app.set_status_notice(format!("Failed to message agent: {e}"));
+                }
+            }
+            return Ok(());
+        }
     }
 
     // Submitting before the bootstrap History payload has been applied is racy:

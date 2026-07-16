@@ -1394,11 +1394,37 @@ pub struct App {
     pub running_items_state: super::RunningItemsState,
     /// When the current permission dialog was shown (for auto-timeout).
     pub pending_permission_at: Option<std::time::Instant>,
-    /// Teammate view: session_id of the subagent being viewed (CCB teammate view style).
-    /// When set, the UI shows this subagent's stream inline instead of switching sessions.
+    /// Soft teammate view (CC `viewingAgentTaskId`): session id of viewed swarm agent.
     pub viewing_teammate_session_id: Option<String>,
-    /// Selection mode: true when user is in selecting-teammate mode.
+    /// Friendly name for chrome while hard-attached (swarm list may be empty on child).
+    pub teammate_view_agent_name: Option<String>,
+    /// Transcript reconstructed for soft view (CC `task.messages` mirror).
+    pub teammate_view_messages: Vec<DisplayMessage>,
+    /// After hard-attach (`resume_session`), resume this session on Esc.
+    pub teammate_view_return_session_id: Option<String>,
+    /// True while hard-attached to a child session via resume.
+    pub teammate_view_hard_attached: bool,
+    /// Swarm roster frozen at hard-attach time.
+    ///
+    /// Child sessions usually do not receive leader SwarmStatus, so
+    /// `remote_swarm_members` is empty after resume — without this snapshot the
+    /// agent tree vanishes and the user loses Claude Code free lead↔agent nav.
+    pub teammate_view_swarm_snapshot: Vec<crate::protocol::SwarmMemberStatus>,
+    /// Per-agent transcript buffer on the lead client (CC `task.messages` analogue).
+    /// Filled by `ServerEvent::SwarmMemberMessage` while staying on the coordinator.
+    pub teammate_transcripts: std::collections::HashMap<String, Vec<DisplayMessage>>,
+    /// Double-Esc arm: first Esc aborts turn, second exits soft view (CC-ish).
+    pub teammate_view_abort_armed: bool,
+    /// Agent tree for conversation rendering (Claude Code style).
+    pub agent_trees: Vec<super::agent_tree::AgentTreeNode>,
+    /// True while actively viewing a teammate (CC `viewSelectionMode === 'viewing-agent'`).
     pub view_teammate_selection: bool,
+    /// True while Shift+↑/↓ selection is active (CC `viewSelectionMode === 'selecting-agent'`).
+    pub agent_tree_selecting: bool,
+    /// CC `selectedIPAgentIndex`: `-1` = team-lead, `0..n-1` = children, `n` = hide.
+    pub selected_agent_tree_index: i32,
+    /// CC hide row: tree collapsed until Shift+↓ expands again.
+    pub agent_tree_hidden: bool,
     /// When true, auto-continuation after each turn is disabled.
     pub goal_continuation_disabled: bool,
     /// Agent snapshot cache: (filename, mtime) for detecting changes.

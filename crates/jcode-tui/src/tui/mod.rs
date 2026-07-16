@@ -1,5 +1,7 @@
 pub mod account_picker;
+pub(crate) mod agent_tree;
 pub(crate) mod app;
+pub(crate) mod teammate_view;
 
 #[derive(Clone)]
 pub struct ContextSnapshot {
@@ -269,6 +271,14 @@ pub trait TuiState {
     fn batch_progress(&self) -> Option<crate::bus::BatchProgress>;
     /// Running items state (tools, subagents, background tasks) for the interactive list.
     fn running_items(&self) -> RunningItemsState;
+    /// Agent tree for conversation rendering (Claude Code style tree).
+    fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> {
+        Vec::new()
+    }
+    /// Interactive selection state for the agent tree (CC Shift+↑/↓ / Enter).
+    fn agent_tree_view_state(&self) -> crate::tui::agent_tree::AgentTreeViewState {
+        crate::tui::agent_tree::AgentTreeViewState::default()
+    }
     fn time_since_activity(&self) -> Option<Duration>;
     /// Whether the terminal is currently focused (receiving key events).
     /// Always true in this fork — upstream's FocusLost handling is not ported.
@@ -532,6 +542,18 @@ pub trait TuiState {
 
     /// Teammate view: session_id being viewed (None = not in teammate view).
     fn viewing_teammate_session_id(&self) -> Option<&str> {
+        None
+    }
+    /// True when hard-attached via resume_session (CC viewing-agent with real session).
+    fn teammate_view_hard_attached(&self) -> bool {
+        false
+    }
+    /// Display name for the attached/previewed agent (for chrome).
+    fn teammate_view_agent_name(&self) -> Option<&str> {
+        None
+    }
+    /// Swarm member snapshot for the viewed session (soft-view header/body).
+    fn viewing_teammate_member(&self) -> Option<crate::protocol::SwarmMemberStatus> {
         None
     }
     /// Working directory for this session

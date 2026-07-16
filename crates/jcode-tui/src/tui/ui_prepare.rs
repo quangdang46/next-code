@@ -711,6 +711,12 @@ fn prepare_messages_inner(app: &dyn TuiState, width: u16, height: u16) -> Prepar
     };
     let streaming_ms = streaming_start.elapsed().as_secs_f64() * 1000.0;
 
+    // Agent tree lives in conversation chrome (spinner area), not the
+    // scrollable transcript — Claude Code mounts TeammateSpinnerTree on the
+    // spinner, never under the last user prompt. Keep the section empty so
+    // Interrupted / user messages don't glue a zombie tree underneath them.
+    let agent_tree_prepared = Arc::new(empty_prepared_messages());
+
     let is_initial_empty = app.onboarding_preview_mode()
         || (app.display_messages().is_empty()
             && !app.is_processing()
@@ -819,6 +825,7 @@ fn prepare_messages_inner(app: &dyn TuiState, width: u16, height: u16) -> Prepar
         (PreparedSectionKind::BatchProgress, batch_progress_prepared),
         (PreparedSectionKind::Reasoning, reasoning_prepared),
         (PreparedSectionKind::Streaming, streaming_prepared),
+        (PreparedSectionKind::AgentTree, agent_tree_prepared),
     ]);
     super::note_full_prep_phase_metrics(super::FullPrepPhaseMetrics {
         header_ms,

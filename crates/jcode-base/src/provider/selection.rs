@@ -60,9 +60,20 @@ impl MultiProvider {
             return None;
         }
 
-        std::env::var("JCODE_ACTIVE_PROVIDER")
+        let active = std::env::var("JCODE_ACTIVE_PROVIDER")
             .ok()
-            .and_then(|value| Self::parse_provider_hint(&value))
+            .and_then(|value| Self::parse_provider_hint(&value))?;
+
+        // CLI init for Gemini/Cursor/Antigravity uses a standalone runtime and
+        // explicitly unlocks the multi-provider router. A previous auth-change
+        // bug locked these via JCODE_FORCE_PROVIDER, which then blocked every
+        // switch to named OpenAI-compatible profiles (e.g. `9router:xxx`).
+        // Ignore force pins for these providers so stale process env cannot
+        // keep MultiProvider locked after login.
+        match active {
+            ActiveProvider::Gemini | ActiveProvider::Cursor | ActiveProvider::Antigravity => None,
+            other => Some(other),
+        }
     }
 
     pub(super) fn provider_label(provider: ActiveProvider) -> &'static str {

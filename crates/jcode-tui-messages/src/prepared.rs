@@ -127,6 +127,8 @@ pub enum PreparedSectionKind {
     Streaming,
     /// Inline images rendered in the transcript flow (below the body).
     InlineImages,
+    /// Agent tree (Claude Code style subagent tree in conversation).
+    AgentTree,
 }
 
 #[derive(Clone)]

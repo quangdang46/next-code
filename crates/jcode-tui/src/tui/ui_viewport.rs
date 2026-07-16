@@ -494,6 +494,7 @@ pub(super) fn draw_messages(
     } else {
         0
     };
+    let _ = PreparedSectionKind::AgentTree; // agent tree is always rendered when non-empty
     let content_margins = compute_visible_margins(
         &visible_lines,
         &visible_user_indices,

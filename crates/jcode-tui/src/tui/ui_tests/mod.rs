@@ -258,6 +258,9 @@ impl crate::tui::TuiState for TestState {
     fn running_items(&self) -> crate::tui::RunningItemsState {
         crate::tui::RunningItemsState::default()
     }
+    fn agent_trees(&self) -> Vec<crate::tui::agent_tree::AgentTreeNode> {
+        Vec::new()
+    }
     fn time_since_activity(&self) -> Option<Duration> {
         self.time_since_activity
     }

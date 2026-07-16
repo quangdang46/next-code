@@ -433,6 +433,22 @@ impl PlanGraphStatus {
     }
 }
 
+/// One structured message for a swarm member, mirrored to the lead client so
+/// soft teammate-view can show a real-ish transcript without `resume_session`.
+/// (Claude Code: `task.messages` on in-process teammates.)
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SwarmMemberMessage {
+    pub session_id: String,
+    /// Stable id for upsert/dedupe (e.g. `"{sid}:output_tail"` or tool call id).
+    pub message_id: String,
+    /// `user` | `assistant` | `system` | `tool`
+    pub role: String,
+    /// Capped plain text / summary for display.
+    pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_name: Option<String>,
+}
+
 /// Swarm member status for lifecycle updates
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SwarmMemberStatus {

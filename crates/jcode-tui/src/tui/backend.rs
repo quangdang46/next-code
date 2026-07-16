@@ -593,6 +593,78 @@ impl RemoteConnection {
         self.send_request(request).await
     }
 
+    /// Inject a message into another session (CC injectUserMessageToTeammate).
+    /// Idle sessions start a turn immediately; busy ones soft-interrupt.
+    pub async fn notify_session(&mut self, session_id: &str, message: &str) -> Result<u64> {
+        let id = self.next_request_id;
+        let request = Request::NotifySession {
+            id,
+            session_id: session_id.to_string(),
+            message: message.to_string(),
+        };
+        self.next_request_id += 1;
+        self.send_request(request).await?;
+        Ok(id)
+    }
+
+    /// Swarm DM from the active session to a teammate (preferred over notify
+    /// when still on the coordinator session).
+    pub async fn comm_message_dm(
+        &mut self,
+        from_session: &str,
+        to_session: &str,
+        message: &str,
+    ) -> Result<u64> {
+        let id = self.next_request_id;
+        let request = Request::CommMessage {
+            id,
+            from_session: from_session.to_string(),
+            message: message.to_string(),
+            to_session: Some(to_session.to_string()),
+            channel: None,
+            delivery: None,
+            wake: Some(true),
+            tldr: None,
+        };
+        self.next_request_id += 1;
+        self.send_request(request).await?;
+        Ok(id)
+    }
+
+    /// Stop a swarm agent session (CC kill teammate). `session_id` is the
+    /// coordinator/requester; `target_session` is the member to stop.
+    pub async fn comm_stop(
+        &mut self,
+        session_id: &str,
+        target_session: &str,
+        force: bool,
+    ) -> Result<u64> {
+        let id = self.next_request_id;
+        let request = Request::CommStop {
+            id,
+            session_id: session_id.to_string(),
+            target_session: target_session.to_string(),
+            force: Some(force),
+        };
+        self.next_request_id += 1;
+        self.send_request(request).await?;
+        Ok(id)
+    }
+
+    /// Request a tool-call summary for a swarm member (enriches soft-view).
+    pub async fn comm_summary(&mut self, session_id: &str, target_session: &str) -> Result<u64> {
+        let id = self.next_request_id;
+        let request = Request::CommSummary {
+            id,
+            session_id: session_id.to_string(),
+            target_session: target_session.to_string(),
+            limit: Some(20),
+        };
+        self.next_request_id += 1;
+        self.send_request(request).await?;
+        Ok(id)
+    }
+
     /// Request a wider compacted-history window for the active session.
     pub async fn get_compacted_history(&mut self, visible_messages: usize) -> Result<u64> {
         let id = self.next_request_id;

@@ -1027,21 +1027,27 @@ fn direct_provider_activation(provider_id: &str) -> Option<ProviderActivation> {
             RuntimeProviderId::Bedrock,
             ActiveProvider::Bedrock,
         )),
-        "cursor" => Some(ProviderActivation::locked(
+        // Cursor / Gemini / Antigravity match CLI init (`unlock_model_provider` +
+        // active-provider hint). Locking them on auth-change was a bug: a TUI
+        // Gemini login set `JCODE_FORCE_PROVIDER=1`, and every later switch to a
+        // named OpenAI-compatible profile (e.g. `9router:xxx`) failed with
+        // "--provider is locked to Gemini" until the process restarted without
+        // the stale force env.
+        "cursor" => Some(ProviderActivation::unlocked(
             RuntimeProviderId::Cursor,
-            ActiveProvider::Cursor,
+            Some(ActiveProvider::Cursor),
         )),
         "copilot" => Some(ProviderActivation::locked(
             RuntimeProviderId::Copilot,
             ActiveProvider::Copilot,
         )),
-        "gemini" => Some(ProviderActivation::locked(
+        "gemini" => Some(ProviderActivation::unlocked(
             RuntimeProviderId::Gemini,
-            ActiveProvider::Gemini,
+            Some(ActiveProvider::Gemini),
         )),
-        "antigravity" => Some(ProviderActivation::locked(
+        "antigravity" => Some(ProviderActivation::unlocked(
             RuntimeProviderId::Antigravity,
-            ActiveProvider::Antigravity,
+            Some(ActiveProvider::Antigravity),
         )),
         _ => None,
     }
@@ -1323,18 +1329,22 @@ mod tests {
         // leak keys into this process during the matrix run.
         let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().expect("sandbox");
 
-        for (provider, runtime, active) in [
-            ("claude", "claude", "claude"),
-            ("claude-api", "claude-api", "claude"),
-            ("openai", "openai", "openai"),
-            ("openai-api", "openai-api", "openai"),
-            ("openrouter", "openrouter", "openrouter"),
-            ("jcode", "jcode", "openrouter"),
-            ("bedrock", "bedrock", "bedrock"),
-            ("cursor", "cursor", "cursor"),
-            ("copilot", "copilot", "copilot"),
-            ("gemini", "gemini", "gemini"),
-            ("antigravity", "antigravity", "antigravity"),
+        // (provider, runtime, active, force_locked)
+        // Cursor/Gemini/Antigravity stay unlocked so a login does not pin the
+        // multi-provider router forever (matches CLI init + keeps custom
+        // OpenAI-compatible profiles switchable after e.g. a Gemini OAuth).
+        for (provider, runtime, active, force_locked) in [
+            ("claude", "claude", "claude", true),
+            ("claude-api", "claude-api", "claude", true),
+            ("openai", "openai", "openai", true),
+            ("openai-api", "openai-api", "openai", true),
+            ("openrouter", "openrouter", "openrouter", true),
+            ("jcode", "jcode", "openrouter", true),
+            ("bedrock", "bedrock", "bedrock", true),
+            ("cursor", "cursor", "cursor", false),
+            ("copilot", "copilot", "copilot", true),
+            ("gemini", "gemini", "gemini", false),
+            ("antigravity", "antigravity", "antigravity", false),
         ] {
             crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
             crate::env::remove_var("JCODE_ACTIVE_PROVIDER");
@@ -1354,8 +1364,44 @@ mod tests {
                 std::env::var("JCODE_ACTIVE_PROVIDER").as_deref(),
                 Ok(active)
             );
-            assert_eq!(std::env::var("JCODE_FORCE_PROVIDER").as_deref(), Ok("1"));
+            if force_locked {
+                assert_eq!(
+                    std::env::var("JCODE_FORCE_PROVIDER").as_deref(),
+                    Ok("1"),
+                    "{provider} should lock the multi-provider router"
+                );
+            } else {
+                assert!(
+                    std::env::var_os("JCODE_FORCE_PROVIDER").is_none(),
+                    "{provider} auth must not set JCODE_FORCE_PROVIDER (got {:?})",
+                    std::env::var_os("JCODE_FORCE_PROVIDER")
+                );
+            }
         }
+    }
+
+    #[test]
+    fn gemini_auth_change_does_not_lock_router_against_openai_compatible_profiles() {
+        // Repro for: after Gemini login, `/model` → custom named profile
+        // (`9router:xxx`) failed with "--provider is locked to Gemini".
+        let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().expect("sandbox");
+        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
+        crate::env::remove_var("JCODE_ACTIVE_PROVIDER");
+        crate::env::remove_var("JCODE_FORCE_PROVIDER");
+
+        let _ = activate_auth_change(&AuthActivationRequest::new(
+            None,
+            Some(AuthChanged::new("gemini")),
+        ));
+
+        assert_eq!(
+            std::env::var("JCODE_ACTIVE_PROVIDER").as_deref(),
+            Ok("gemini")
+        );
+        assert!(
+            std::env::var_os("JCODE_FORCE_PROVIDER").is_none(),
+            "gemini auth must leave the multi-provider router unlocked"
+        );
     }
 
     #[test]
@@ -1366,42 +1412,49 @@ mod tests {
 
         let mut covered = Vec::new();
         for provider in crate::provider_catalog::login_providers() {
-            let Some((normalized, runtime, active, switch_prefix)) = (match provider.target {
-                crate::provider_catalog::LoginProviderTarget::Jcode => {
-                    Some(("jcode", "jcode", "openrouter", "openrouter"))
-                }
-                crate::provider_catalog::LoginProviderTarget::Claude => {
-                    Some(("claude", "claude", "claude", "claude-oauth"))
-                }
-                crate::provider_catalog::LoginProviderTarget::ClaudeApiKey => {
-                    Some(("claude-api", "claude-api", "claude", "claude-api"))
-                }
-                crate::provider_catalog::LoginProviderTarget::OpenAi => {
-                    Some(("openai", "openai", "openai", "openai-oauth"))
-                }
-                crate::provider_catalog::LoginProviderTarget::OpenAiApiKey => {
-                    Some(("openai-api", "openai-api", "openai", "openai-api"))
-                }
-                crate::provider_catalog::LoginProviderTarget::OpenRouter => {
-                    Some(("openrouter", "openrouter", "openrouter", "openrouter"))
-                }
-                crate::provider_catalog::LoginProviderTarget::Bedrock => {
-                    Some(("bedrock", "bedrock", "bedrock", "bedrock"))
-                }
-                crate::provider_catalog::LoginProviderTarget::Cursor => {
-                    Some(("cursor", "cursor", "cursor", "cursor"))
-                }
-                crate::provider_catalog::LoginProviderTarget::Copilot => {
-                    Some(("copilot", "copilot", "copilot", "copilot"))
-                }
-                crate::provider_catalog::LoginProviderTarget::Gemini => {
-                    Some(("gemini", "gemini", "gemini", "gemini"))
-                }
-                crate::provider_catalog::LoginProviderTarget::Antigravity => {
-                    Some(("antigravity", "antigravity", "antigravity", "antigravity"))
-                }
-                _ => None,
-            }) else {
+            // (normalized, runtime, active, switch_prefix, force_locked)
+            let Some((normalized, runtime, active, switch_prefix, force_locked)) =
+                (match provider.target {
+                    crate::provider_catalog::LoginProviderTarget::Jcode => {
+                        Some(("jcode", "jcode", "openrouter", "openrouter", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::Claude => {
+                        Some(("claude", "claude", "claude", "claude-oauth", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::ClaudeApiKey => {
+                        Some(("claude-api", "claude-api", "claude", "claude-api", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::OpenAi => {
+                        Some(("openai", "openai", "openai", "openai-oauth", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::OpenAiApiKey => {
+                        Some(("openai-api", "openai-api", "openai", "openai-api", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::OpenRouter => {
+                        Some(("openrouter", "openrouter", "openrouter", "openrouter", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::Bedrock => {
+                        Some(("bedrock", "bedrock", "bedrock", "bedrock", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::Cursor => {
+                        Some(("cursor", "cursor", "cursor", "cursor", false))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::Copilot => {
+                        Some(("copilot", "copilot", "copilot", "copilot", true))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::Gemini => {
+                        Some(("gemini", "gemini", "gemini", "gemini", false))
+                    }
+                    crate::provider_catalog::LoginProviderTarget::Antigravity => Some((
+                        "antigravity",
+                        "antigravity",
+                        "antigravity",
+                        "antigravity",
+                        false,
+                    )),
+                    _ => None,
+                })
+            else {
                 continue;
             };
 
@@ -1449,7 +1502,21 @@ mod tests {
                 std::env::var("JCODE_ACTIVE_PROVIDER").as_deref(),
                 Ok(active)
             );
-            assert_eq!(std::env::var("JCODE_FORCE_PROVIDER").as_deref(), Ok("1"));
+            if force_locked {
+                assert_eq!(
+                    std::env::var("JCODE_FORCE_PROVIDER").as_deref(),
+                    Ok("1"),
+                    "{} should lock the multi-provider router",
+                    provider.id
+                );
+            } else {
+                assert!(
+                    std::env::var_os("JCODE_FORCE_PROVIDER").is_none(),
+                    "{} auth must not set JCODE_FORCE_PROVIDER (got {:?})",
+                    provider.id,
+                    std::env::var_os("JCODE_FORCE_PROVIDER")
+                );
+            }
             assert_eq!(
                 activation.model_switch_request("ignored-runtime", "shared-model"),
                 format!("{switch_prefix}:shared-model"),

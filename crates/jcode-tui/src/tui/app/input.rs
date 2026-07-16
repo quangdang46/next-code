@@ -2548,6 +2548,35 @@ impl App {
             return Ok(());
         }
 
+        // Claude Code teammate spinner tree navigation (Shift+↑/↓ / Enter / Esc).
+        // Must run before prompt-history Up/Down so Shift+Up selects agents.
+        // Local mode: hard-attach/notify are remote-only; soft view still works.
+        if let Some(nav) = self.handle_agent_tree_navigation_key(code, modifiers) {
+            match nav {
+                super::tui_state::TeammateNavAction::Handled => {}
+                super::tui_state::TeammateNavAction::ResumeSession { session_id } => {
+                    self.workspace_client.queue_resume_session(session_id);
+                }
+                super::tui_state::TeammateNavAction::MessageAgent { message, .. } => {
+                    self.set_status_notice(format!(
+                        "Agent DM needs remote session: {}",
+                        message.chars().take(48).collect::<String>()
+                    ));
+                }
+                super::tui_state::TeammateNavAction::AbortAgentTurn { session_id } => {
+                    self.set_status_notice(format!(
+                        "Abort turn for {session_id} needs remote session"
+                    ));
+                }
+                super::tui_state::TeammateNavAction::StopAgent { target_session, .. } => {
+                    self.set_status_notice(format!(
+                        "Stop {target_session} requires remote (swarm) session"
+                    ));
+                }
+            }
+            return Ok(());
+        }
+
         // The onboarding simulator owns all key handling while active so the
         // real onboarding handlers never fire (no real logins/imports).
         if self.handle_onboarding_sim_key(code, modifiers) {
@@ -2690,7 +2719,8 @@ impl App {
                             self.running_items_state.detail_open = false;
                             self.viewing_teammate_session_id = Some(sid.clone());
                             self.view_teammate_selection = true;
-                            self.set_status_notice(format!("Viewing → {}  (Esc to exit)", label));
+                            self.teammate_view_agent_name = Some(label);
+                            // Header owns "Viewing @name · esc return".
                             return Ok(());
                         }
                         // No session to switch to: close detail
@@ -2706,7 +2736,7 @@ impl App {
                         // Exit teammate view
                         let _sid = self.viewing_teammate_session_id.take();
                         self.view_teammate_selection = false;
-                        self.set_status_notice("Exited teammate view");
+                        self.teammate_view_agent_name = None;
                         return Ok(());
                     }
                     if self.running_items_state.detail_open {

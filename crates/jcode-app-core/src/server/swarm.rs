@@ -677,6 +677,32 @@ async fn broadcast_swarm_status_now(
     }
 }
 
+/// Fan out a single structured member transcript line to every session in the swarm.
+pub(super) async fn broadcast_swarm_member_message(
+    swarm_id: &str,
+    message: crate::protocol::SwarmMemberMessage,
+    swarm_members: &Arc<RwLock<HashMap<String, SwarmMember>>>,
+    swarms_by_id: &Arc<RwLock<HashMap<String, HashSet<String>>>>,
+) {
+    let session_ids: Vec<String> = {
+        let swarms = swarms_by_id.read().await;
+        swarms
+            .get(swarm_id)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default()
+    };
+    if session_ids.is_empty() {
+        return;
+    }
+    let event = ServerEvent::SwarmMemberMessage {
+        swarm_id: swarm_id.to_string(),
+        message,
+    };
+    for sid in session_ids {
+        let _ = fanout_session_event(swarm_members, &sid, event.clone()).await;
+    }
+}
+
 pub(super) async fn broadcast_swarm_status(
     swarm_id: &str,
     swarm_members: &Arc<RwLock<HashMap<String, SwarmMember>>>,
@@ -1161,17 +1187,46 @@ pub(super) async fn remove_session_from_swarm(
 /// assignment. Unlike `detail` (transient status text), the label survives
 /// status churn so UIs can always answer "what was this agent for?". A later
 /// assignment overwrites the label: the member is now doing that task.
+///
+/// Also fans out a Message-level `SwarmMemberMessage` (role=user) so the lead
+/// soft-buffer can show the spawn prompt as the first transcript line — Claude
+/// Code appends the initial prompt to `task.messages` at runner start.
 pub(super) async fn set_member_task_label(
     session_id: &str,
     task_text: &str,
     swarm_members: &Arc<RwLock<HashMap<String, SwarmMember>>>,
+    swarms_by_id: &Arc<RwLock<HashMap<String, HashSet<String>>>>,
 ) {
     let Some(label) = jcode_swarm_core::derive_swarm_task_label(task_text) else {
         return;
     };
-    let mut members = swarm_members.write().await;
-    if let Some(member) = members.get_mut(session_id) {
-        member.task_label = Some(label);
+    let swarm_id = {
+        let mut members = swarm_members.write().await;
+        let Some(member) = members.get_mut(session_id) else {
+            return;
+        };
+        member.task_label = Some(label.clone());
+        member.swarm_id.clone()
+    };
+    if let Some(swarm_id) = swarm_id {
+        let content = {
+            let max = 500usize;
+            if label.chars().count() <= max {
+                label
+            } else {
+                let mut s: String = label.chars().take(max.saturating_sub(1)).collect();
+                s.push('…');
+                s
+            }
+        };
+        let message = crate::protocol::SwarmMemberMessage {
+            session_id: session_id.to_string(),
+            message_id: format!("{session_id}:task"),
+            role: "user".into(),
+            content,
+            tool_name: None,
+        };
+        broadcast_swarm_member_message(&swarm_id, message, swarm_members, swarms_by_id).await;
     }
 }
 
