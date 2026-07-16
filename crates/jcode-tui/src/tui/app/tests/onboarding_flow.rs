@@ -210,7 +210,7 @@ fn import_review_collects_checked_logins() {
     ])
     .unwrap();
     // The default is the summary screen with Continue preselected.
-    assert!(!review.choosing);
+    assert!(review.choosing.is_none());
     assert!(review.continue_focused);
     assert_eq!(review.total(), 3);
     // All pre-checked: the default action imports everything.
@@ -219,7 +219,7 @@ fn import_review_collects_checked_logins() {
 
     // Switch to the checkbox list and uncheck the middle login (cursor on row 1).
     review.enter_choose_mode();
-    assert!(review.choosing);
+    assert!(review.choosing.is_some());
     assert_eq!(review.position(), 1);
     review.cursor_down();
     review.toggle_current();
@@ -1348,7 +1348,7 @@ fn import_summary_defaults_to_continue_and_enter_imports_all() {
         ])
         .unwrap();
         // The summary screen is the default and lands on Continue.
-        assert!(!review.choosing);
+        assert!(review.choosing.is_none());
         assert!(review.continue_focused);
         if let Some(flow) = app.onboarding_flow.as_mut() {
             flow.phase = OnboardingPhase::Login {
@@ -1491,7 +1491,7 @@ fn import_summary_choose_pill_opens_checkbox_list() {
             Some(OnboardingPhase::Login {
                 import: Some(review),
             }) => {
-                assert!(review.choosing);
+                assert!(review.choosing.is_some());
                 assert!(!review.continue_focused);
                 assert_eq!(review.cursor, 0);
                 assert_eq!(review.checked_count(), 2);
@@ -1505,7 +1505,7 @@ fn import_summary_choose_pill_opens_checkbox_list() {
             crate::tui::OnboardingWelcomeKind::Login {
                 import: Some(prompt),
                 ..
-            } => assert!(prompt.choosing),
+            } => assert!(prompt.choosing.is_some()),
             other => panic!("expected Login welcome with import prompt, got {other:?}"),
         }
     });

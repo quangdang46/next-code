@@ -368,6 +368,9 @@ mod tests {
             }],
             runtime: crate::protocol::SwarmMemberRuntime {
                 model: Some("gpt-4.1".into()),
+                provider: None,
+                auth_method: None,
+                effort: None,
                 elapsed_secs: Some(42),
             },
         }

@@ -720,7 +720,6 @@ fn test_render_batch_subcall_line_shows_model_provided_intent() {
 }
 
 #[test]
-#[test]
 fn test_ffs_grep_summary_shows_query() {
     let tool = ToolCall {
         id: "ffs-grep-query".to_string(),

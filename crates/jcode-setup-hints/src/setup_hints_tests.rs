@@ -32,6 +32,8 @@ fn first_three_launches_can_include_hotkey_notice_too() {
     let state = SetupHintsState {
         launch_count: 2,
         hotkey_configured: true,
+        // Notice is opt-in: default state dismisses it.
+        startup_spawn_hint_dismissed: false,
         ..SetupHintsState::default()
     };
 

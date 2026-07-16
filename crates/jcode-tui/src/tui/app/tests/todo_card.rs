@@ -137,6 +137,7 @@ fn refresh_todo_card_updates_content_when_goal_scores_change() {
         confidence_history: Vec::new(),
         blocked_by: Vec::new(),
         assigned_to: None,
+            active_form: None,
     }];
     let goal = |score| crate::todo::TodoGoal {
         group: None,

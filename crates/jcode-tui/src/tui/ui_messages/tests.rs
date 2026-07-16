@@ -555,6 +555,7 @@ fn render_todos_message_shows_goal_scores_and_feedback() {
         confidence_history: vec![80, 85],
         blocked_by: Vec::new(),
         assigned_to: None,
+            active_form: None,
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
@@ -607,6 +608,7 @@ fn render_todos_message_uses_readable_semantic_colors() {
         confidence_history: Vec::new(),
         blocked_by: Vec::new(),
         assigned_to: None,
+            active_form: None,
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
@@ -649,6 +651,7 @@ fn render_todos_message_wraps_goal_scores_at_narrow_widths() {
         confidence_history: Vec::new(),
         blocked_by: Vec::new(),
         assigned_to: None,
+            active_form: None,
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
@@ -710,6 +713,7 @@ fn render_todo_tool_result_uses_borderless_card_with_goal_scores() {
         confidence_history: vec![85, 92],
         blocked_by: Vec::new(),
         assigned_to: None,
+            active_form: None,
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
@@ -775,7 +779,7 @@ fn render_todo_quality_gate_retry_shows_only_changed_goal_fields() {
         group: Some("todo rendering".to_string()),
         confidence: Some(92),
         ..Default::default()
-    }];
+}];
     let before = crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
         user_intention: Some("See current work at a glance".to_string()),
@@ -853,7 +857,7 @@ fn parse_todo_tool_output_accepts_timestamp_only_header() {
         status: "in_progress".to_string(),
         priority: "high".to_string(),
         ..Default::default()
-    }];
+}];
     let content = format!(
         "[2026-07-13T19:51:50.261Z] [todo] {}",
         serde_json::to_string(&todos).unwrap()
@@ -896,7 +900,7 @@ fn unbiased_visual_prompt_retry_renders_complete_feedback_change() {
         group: Some("pelican-bike-animation".to_string()),
         confidence: Some(90),
         ..Default::default()
-    }];
+}];
     let render = |goal: crate::todo::TodoGoal,
                   continuation: Option<&str>,
                   tool_data: Option<crate::message::ToolCall>| {
@@ -1010,7 +1014,7 @@ fn visually_appealing_prompt_batched_retry_renders_complete_todo_card() {
         group: Some("pelican-bike".to_string()),
         confidence: Some(95),
         ..Default::default()
-    }];
+}];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("pelican-bike".to_string()),
         user_intention: None,
@@ -1094,7 +1098,7 @@ fn render_ownership_gated_todo_result_keeps_the_full_card() {
         group: Some("ship outcome".to_string()),
         confidence: Some(95),
         ..Default::default()
-    }];
+}];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("ship outcome".to_string()),
         hill_climbability: Some(100),
