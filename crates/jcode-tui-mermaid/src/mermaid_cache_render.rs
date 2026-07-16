@@ -218,21 +218,11 @@ impl MermaidCache {
         }
 
         let selected = if let Some(min_w) = min_width {
-            // The inner `else { return None; }` is intentional — collapsing into a
-            // let-chain would silently fall through to the outer `else` and change
-            // semantics (return None vs. picking the widest fallback). Likewise
-            // the `?` rewrite would force the function to return `Result` just to
-            // preserve the early-return path.
-            #[allow(clippy::collapsible_if, clippy::question_mark)]
-            if let Some(candidate) = candidates
+            candidates
                 .iter()
                 .filter(|(_, w, _)| cached_width_satisfies(*w, Some(min_w)))
                 .min_by_key(|(_, w, _)| *w)
-            {
-                candidate.clone()
-            } else {
-                return None;
-            }
+                .cloned()?
         } else {
             candidates
                 .iter()

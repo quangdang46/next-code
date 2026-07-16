@@ -34,6 +34,7 @@ use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
@@ -188,6 +189,11 @@ struct KvCacheBaseline {
     /// the new (often smaller) history look like a broken prefix and produces a
     /// spurious `harness:_prefix_changed` miss.
     session_id: Option<String>,
+    /// Effective prompt size of the last completed request. This includes input,
+    /// cache-read, and cache-creation tokens for split-accounting providers like
+    /// Anthropic. It is the reusable cached prefix, meaning what gets resent if
+    /// the cache goes cold, not the bare `input` field, which for split providers
+    /// is only the uncached remainder of that one request.
     input_tokens: u64,
     completed_at: Instant,
     provider: String,
@@ -333,10 +339,8 @@ pub(super) enum SessionPickerMode {
     /// Opt-in active sessions manager: the picker scoped to live (open)
     /// sessions, showing which are still working vs ready for input.
     ActiveSessions,
-    /// First-run onboarding "continue where you left off" single-select picker.
-    Onboarding {
-        cli: onboarding_flow::ExternalCli,
-    },
+    /// First-run onboarding action picker.
+    Onboarding,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -906,6 +910,10 @@ pub struct App {
     /// Active guided first-run onboarding flow (model select -> continue ->
     /// transcript pick -> suggestions). `None` when not onboarding.
     onboarding_flow: Option<onboarding_flow::OnboardingFlow>,
+    /// Shared cancellation guard for delayed post-login model catalog refreshes.
+    /// Onboarding completion clears it so a late catalog result cannot override
+    /// the model after the user has moved into a normal session.
+    onboarding_auto_model_selection_active: Arc<AtomicBool>,
     /// One-shot guard: have we evaluated whether to auto-start the onboarding
     /// flow on startup yet? The fresh-install path logs in at the CLI before the
     /// TUI launches, so no in-TUI login event fires; this lets us still begin the
@@ -1250,6 +1258,32 @@ pub struct App {
     input_undo_stack: Vec<(String, usize)>,
     // Short-lived notice for status feedback (model switch, cycle diff mode, etc.)
     status_notice: Option<(String, Instant)>,
+    // Distinct learned-keybinding nudge ("you keep doing X the slow way, press
+    // <key>"). Rendered in its own pop-out color, separate from status_notice,
+    // and shown at most once per session.
+    learn_hint: Option<(String, Instant)>,
+    // Whether a learned-keybinding nudge has already been surfaced this session.
+    learn_hint_shown_this_session: bool,
+    // Whether the swarm-config-is-a-prompt hint has been surfaced this session.
+    swarm_hint_shown_this_session: bool,
+    // Whether the inline sponsored-discovery policy detail has been attached
+    // this session. It appears once, on the first discover_tools result.
+    sponsor_disclosure_shown_this_session: bool,
+    // Inline hotkey feedback: "you just pressed X → does Y" for rarely-used
+    // known chords, or "X isn't bound · nearest: ..." for unknown chords.
+    // Rendered in the same pop-out slot as learn_hint.
+    hotkey_feedback: Option<(String, Instant)>,
+    // Lazily-loaded persisted per-action hotkey usage counters.
+    hotkey_usage: Option<hotkey_feedback::HotkeyUsageState>,
+    // Per-chord counts of unknown-hotkey notices shown this session.
+    unknown_hotkey_seen: std::collections::HashMap<String, u32>,
+    // When the last unknown-hotkey notice was shown, for rate limiting.
+    last_unknown_hotkey_notice: Option<Instant>,
+    // Persistent startup notice card (e.g. launch-hotkeys / welcome tip) shown on
+    // the idle screen of a fresh session. Stashed so it can be re-applied after
+    // the remote History bootstrap clears the transcript for a brand-new session,
+    // which otherwise makes the card flash for a moment and disappear.
+    pending_startup_notice: Option<(String, String)>,
     // Experimental feature warnings already shown in this session.
     experimental_feature_warnings_seen: HashSet<String>,
     // Active first-use experimental warning for the currently running tool.
@@ -1760,11 +1794,11 @@ impl App {
         // suspended TUI), where the age is genuinely informative.
         let message = match trigger {
             ColdCacheWarningTrigger::IdleExpiry => format!(
-                "🧊 Prompt cache went cold: ~{} tok resent with your next message (/cache to extend)",
+                "🧊 Prompt cache went cold · next turn may resend ~{} tok · /cache extends",
                 token_label
             ),
             ColdCacheWarningTrigger::RequestStart => format!(
-                "🧊 Prompt cache went cold {} ago: ~{} tok may be resent on this request",
+                "🧊 Prompt cache went cold {} ago · this request may resend ~{} tok",
                 crate::tui::format_compact_age(expired_ago_secs),
                 token_label
             ),

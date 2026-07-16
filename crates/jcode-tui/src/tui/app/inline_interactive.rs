@@ -2118,7 +2118,7 @@ impl App {
                     }
                     "Active sessions loaded"
                 }
-                SessionPickerMode::Onboarding { .. } => return false,
+                SessionPickerMode::Onboarding => return false,
             };
             self.set_status_notice(notice);
             return true;
@@ -2150,9 +2150,9 @@ impl App {
                 self.set_status_notice("Active sessions loaded");
                 true
             }
-            // Onboarding loads its scoped transcript list synchronously, so it
+            // Onboarding constructs its action-only picker synchronously, so it
             // never flows through this async path.
-            SessionPickerMode::Onboarding { .. } => false,
+            SessionPickerMode::Onboarding => false,
         }
     }
 
@@ -2576,10 +2576,8 @@ impl App {
             OverlayAction::Continue => {}
             OverlayAction::Close => {
                 self.session_picker_overlay = None;
-                if let SessionPickerMode::Onboarding { cli } = self.session_picker_mode {
-                    // Escaping the onboarding picker = "skip continue"; show the
-                    // suggestion cards rather than dropping the user nowhere.
-                    let _ = cli;
+                if self.session_picker_mode == SessionPickerMode::Onboarding {
+                    // Escaping the onboarding choice starts a clean new session.
                     self.session_picker_mode = SessionPickerMode::Resume;
                     self.onboarding_show_suggestions();
                 } else {
@@ -2587,15 +2585,8 @@ impl App {
                 }
             }
             OverlayAction::Selected(result)
-                if matches!(
-                    self.session_picker_mode,
-                    SessionPickerMode::Onboarding { .. }
-                ) =>
+                if matches!(self.session_picker_mode, SessionPickerMode::Onboarding) =>
             {
-                let cli = match self.session_picker_mode {
-                    SessionPickerMode::Onboarding { cli } => cli,
-                    _ => unreachable!(),
-                };
                 let ids = match result {
                     PickerResult::Selected(ids)
                     | PickerResult::SelectedInNewTerminal(ids)
@@ -2606,24 +2597,20 @@ impl App {
                         // and show the onboarding suggestion cards.
                         self.session_picker_overlay = None;
                         self.session_picker_mode = SessionPickerMode::Resume;
-                        let _ = cli;
                         self.onboarding_show_suggestions();
                         return Ok(());
                     }
                     PickerResult::ReviewRecentProject => {
                         self.session_picker_overlay = None;
                         self.session_picker_mode = SessionPickerMode::Resume;
-                        let _ = cli;
-                        self.onboarding_prepare_recent_project_review();
-                        self.follow_chat_bottom_for_typing();
-                        self.submit_input();
+                        self.onboarding_start_recent_project_review();
                         return Ok(());
                     }
                 };
                 self.session_picker_overlay = None;
                 self.session_picker_mode = SessionPickerMode::Resume;
                 if ids.is_empty() {
-                    self.onboarding_fallback_to_session_search(cli);
+                    self.onboarding_show_suggestions();
                 } else {
                     // Single-select: resume only the first chosen transcript.
                     self.handle_session_picker_current_terminal_selection(&ids[..1]);

@@ -11,10 +11,10 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEv
 use jcode_session_types::SessionStatus;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Padding, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, List, ListItem, ListState, Paragraph},
 };
 use std::collections::HashSet;
 use std::io::IsTerminal;
@@ -33,8 +33,6 @@ mod render;
 
 #[cfg(test)]
 use loading::collect_recent_session_stems;
-pub(crate) use loading::latest_external_cli_session_secs;
-pub(crate) use loading::load_external_cli_sessions_grouped_multi;
 use loading::{build_messages_preview, build_search_index, crashed_sessions_from_all_sessions};
 pub use loading::{
     invalidate_session_list_cache, load_cached_sessions_grouped, load_servers, load_sessions,
@@ -679,12 +677,11 @@ impl SessionPicker {
         self.rebuild_items();
     }
 
-    /// Turn this picker into the first-run onboarding action/resume experience.
-    /// The clean new-session action starts highlighted, followed by a read-only
-    /// recent-project architecture review and then the resumable transcript list.
+    /// Turn this picker into the first-run action-only experience. The suggested
+    /// Git-based bug review starts highlighted above the blank-session action.
     pub fn activate_onboarding_banner(&mut self, banner_lines: Vec<Line<'static>>) {
         self.onboarding_banner = Some(banner_lines);
-        self.onboarding_action = Some(OnboardingAction::StartNewSession);
+        self.onboarding_action = Some(OnboardingAction::ReviewRecentProject);
     }
 
     /// Whether the onboarding banner experience is active.
@@ -2006,45 +2003,51 @@ impl SessionPicker {
         frame.render_widget(Paragraph::new(preview_lines), header_area);
     }
 
-    /// Render the reserved top band for the first-run onboarding experience:
-    /// the formatted prompt followed by the fresh-session and read-only review
-    /// actions.
+    /// Render the suggested first-run prompt as the primary centered action,
+    /// with the blank-session escape hatch kept secondary in the bottom-right.
     fn render_onboarding_band(&self, frame: &mut Frame, area: Rect) {
         if area.height == 0 {
             return;
         }
         let accent = rgb(186, 139, 255);
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(accent))
-            .padding(Padding::horizontal(1));
-        let inner = block.inner(area);
-        frame.render_widget(block, area);
+        let inner = area.inner(Margin {
+            horizontal: 2,
+            vertical: 1,
+        });
         if inner.height == 0 {
             return;
         }
 
-        // Reserve the last two lines for the onboarding actions.
-        let prompt_height = inner.height.saturating_sub(2);
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(prompt_height),
-                Constraint::Length(1),
-                Constraint::Length(1),
-            ])
-            .split(inner);
-
+        let content_width = inner.width.min(108);
+        let content_x = inner.x + inner.width.saturating_sub(content_width) / 2;
         let prompt_lines = self.onboarding_banner.clone().unwrap_or_default();
-        if prompt_height > 0 {
+        let prompt_height = prompt_lines
+            .iter()
+            .map(|line| {
+                let width = line.width().max(1) as u16;
+                width.div_ceil(content_width.max(1))
+            })
+            .sum::<u16>()
+            .min(inner.height.saturating_sub(2));
+        let review_y = inner.y + inner.height.saturating_sub(1) / 2;
+        let prompt_y = review_y
+            .saturating_sub(prompt_height.saturating_add(2))
+            .max(inner.y);
+        let prompt_area = Rect {
+            x: content_x,
+            y: prompt_y,
+            width: content_width,
+            height: prompt_height.min(review_y.saturating_sub(prompt_y)),
+        };
+
+        if prompt_area.height > 0 {
             let prompt = Paragraph::new(prompt_lines)
-                .alignment(Alignment::Left)
+                .alignment(Alignment::Center)
                 .wrap(ratatui::widgets::Wrap { trim: false });
-            frame.render_widget(prompt, chunks[0]);
+            frame.render_widget(prompt, prompt_area);
         }
 
-        let action_line = |label: &'static str, selected: bool, hint: &'static str| {
+        let action_line = |label: &'static str, selected: bool| {
             let (cap_style, body_style) = if selected {
                 (
                     Style::default().fg(accent),
@@ -2063,36 +2066,34 @@ impl SessionPicker {
                 Span::styled("\u{25D6}", cap_style),
                 Span::styled(format!(" {label} "), body_style),
                 Span::styled("\u{25D7}", cap_style),
-                Span::styled(hint, Style::default().fg(rgb(120, 120, 130))),
             ])
         };
-
-        let start_selected = self.onboarding_start_new_highlighted();
-        frame.render_widget(
-            Paragraph::new(action_line(
-                "Start a new session",
-                start_selected,
-                if start_selected {
-                    "  Enter starts fresh · ↓ review or resume"
-                } else {
-                    "  ↑ starts fresh"
-                },
-            )),
-            chunks[1],
-        );
 
         let review_selected = self.onboarding_review_recent_project_highlighted();
         frame.render_widget(
             Paragraph::new(action_line(
-                "Review my recent project's architecture",
+                "Find bugs in what I've been working on",
                 review_selected,
-                if review_selected {
-                    "  Enter runs a read-only audit · ↓ resumes"
-                } else {
-                    "  Use ↑↓ to select"
-                },
-            )),
-            chunks[2],
+            ))
+            .alignment(Alignment::Center),
+            Rect {
+                x: inner.x,
+                y: review_y,
+                width: inner.width,
+                height: 1,
+            },
+        );
+
+        let start_selected = self.onboarding_start_new_highlighted();
+        frame.render_widget(
+            Paragraph::new(action_line("Start a new session", start_selected))
+                .alignment(Alignment::Right),
+            Rect {
+                x: inner.x,
+                y: inner.y + inner.height.saturating_sub(1),
+                width: inner.width,
+                height: 1,
+            },
         );
     }
 
@@ -2100,6 +2101,15 @@ impl SessionPicker {
         let has_banner = self.crashed_sessions.is_some();
         let has_search = self.search_active || !self.search_query.is_empty();
         let has_onboarding = self.onboarding_banner.is_some();
+        // The first-run picker is action-only. Do not render the session list or
+        // preview panes underneath it, which would make this look like `/resume`.
+        if has_onboarding && self.visible_sessions.is_empty() {
+            self.last_list_area = None;
+            self.last_preview_area = None;
+            self.render_onboarding_band(frame, frame.area());
+            return;
+        }
+
         // Build vertical constraints
         let mut v_constraints = Vec::new();
         if has_onboarding {

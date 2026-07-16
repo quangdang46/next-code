@@ -46,6 +46,16 @@ struct DiscoveryFetchError {
     response_bytes: Option<u64>,
 }
 
+struct DiscoveryRequestContext<'a> {
+    client: &'a reqwest::Client,
+    endpoint: &'a str,
+    request_id: &'a str,
+    category: &'a str,
+    query: &'a str,
+    reason: &'a str,
+    benchmark_run: bool,
+}
+
 impl fmt::Display for DiscoveryFetchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.message)
@@ -89,14 +99,14 @@ fn record_discovery_telemetry(
 }
 
 /// `discover_tools`: fetch discoverable third-party tools for a category from
-/// the hosted sponsored-discovery manifest.
+/// the hosted partner directory.
 ///
-/// Disclosure contract: sponsors buy placement (discoverability), never
-/// recommendations. Every session that uses this tool renders a
-/// `(sponsored discovery)` disclosure line in the UI on first use. The
-/// request carries only the category, a short search query, and a reason
-/// string, which the discovery service stores for transparency and billing.
-/// It must never include session content or private information.
+/// Disclosure contract: some providers may share revenue with Jcode, but
+/// partnership status never influences recommendations. Every session that
+/// uses this tool renders a concise disclosure with a learn-more link on first
+/// use. The request carries only the category, a short search query, and a
+/// reason string, which the discovery service stores for transparency and
+/// reporting. It must never include session content or private information.
 pub struct DiscoverToolsTool {
     client: reqwest::Client,
 }
@@ -111,6 +121,8 @@ impl DiscoverToolsTool {
 
 #[derive(Deserialize)]
 struct DiscoverToolsInput {
+    #[serde(default)]
+    action: Option<String>,
     category: String,
     #[serde(default)]
     query: Option<String>,
@@ -118,6 +130,57 @@ struct DiscoverToolsInput {
     reason: Option<String>,
     #[serde(default)]
     tool: Option<String>,
+    #[serde(default)]
+    suggestion_kind: Option<String>,
+    #[serde(default)]
+    product_name: Option<String>,
+    #[serde(default)]
+    product_url: Option<String>,
+    #[serde(default)]
+    gap_evidence: Option<String>,
+    #[serde(default)]
+    requirements: Option<Vec<String>>,
+    #[serde(default)]
+    prior_request_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DiscoveryAction {
+    Browse,
+    Select,
+    Suggest,
+}
+
+impl DiscoveryAction {
+    fn parse(action: Option<&str>, has_tool: bool) -> Result<Self> {
+        match action.map(str::trim).filter(|value| !value.is_empty()) {
+            None => Ok(if has_tool { Self::Select } else { Self::Browse }),
+            Some("browse") if !has_tool => Ok(Self::Browse),
+            Some("select") if has_tool => Ok(Self::Select),
+            Some("suggest") if !has_tool => Ok(Self::Suggest),
+            Some("browse") => Err(anyhow::anyhow!(
+                "discovery action 'browse' cannot include `tool`; use action 'select'"
+            )),
+            Some("select") => Err(anyhow::anyhow!(
+                "discovery action 'select' requires the selected `tool` name"
+            )),
+            Some("suggest") => Err(anyhow::anyhow!(
+                "discovery action 'suggest' cannot include `tool`; use `product_name` for a known product"
+            )),
+            Some(other) => Err(anyhow::anyhow!(
+                "unknown discovery action '{other}'. Available: browse, select, suggest"
+            )),
+        }
+    }
+}
+
+struct ValidatedSuggestion {
+    kind: String,
+    product_name: Option<String>,
+    product_url: Option<String>,
+    gap_evidence: Option<String>,
+    requirements: Vec<String>,
+    prior_request_id: String,
 }
 
 #[derive(Debug)]
@@ -394,7 +457,7 @@ fn looks_like_payment_card(candidate: &str) -> bool {
         }
         sum += digit;
     }
-    sum % 10 == 0
+    sum.is_multiple_of(10)
 }
 
 #[async_trait]
@@ -412,10 +475,12 @@ impl Tool for DiscoverToolsTool {
          the task is blocked until all missing capabilities have been checked. Do not treat a \
          prerequisite as covering a later action; check each unsupported external action \
          independently. Search before saying you cannot proceed, asking the user to find a \
-         service, or delegating an unsupported step to them. Skip discovery when available tools \
-         fully cover the task. Every listing is vetted, and one-tool-call setup is enforced for \
-         seamless integration. Sponsors pay only for directory inclusion, never influence \
-         selection. Choose the best option for the user without sponsorship bias."
+         service, or delegating an unsupported step to them. If a browse has no suitable result, \
+         submit one `suggest` action for maintainer review, then continue without promising it \
+         will be added. Skip discovery when available tools fully cover the task. Every listing is \
+         vetted, and one-tool-call setup is enforced. Some providers are Jcode partners and may \
+         share revenue with Jcode when a referred user becomes a customer. Partnership status \
+         never influences selection. Choose the best option based only on fit."
     }
 
     fn parameters_schema(&self) -> Value {
@@ -425,6 +490,11 @@ impl Tool for DiscoverToolsTool {
             "required": ["category", "query", "reason"],
             "properties": {
                 "intent": super::intent_schema_property(),
+                "action": {
+                    "type": "string",
+                    "enum": ["browse", "select", "suggest"],
+                    "description": "Discovery phase. Defaults to select when `tool` is set, otherwise browse. Use suggest only after a browse found no suitable catalog entry."
+                },
                 "category": {
                     "type": "string",
                     "enum": categories,
@@ -434,17 +504,48 @@ impl Tool for DiscoverToolsTool {
                     "type": "string",
                     "minLength": DISCOVERY_QUERY_MIN_CHARS,
                     "maxLength": DISCOVERY_QUERY_MAX_CHARS,
-                    "description": "Required, specific capability summary. This is sent to the Discovery service and relevant sponsors for demand reporting. Write a fresh summary instead of copying user text. Never include secrets, credentials, personal data, or private content."
+                    "description": "Required capability summary. Browse/select text may be sent to relevant partners for demand reporting. Suggest text goes only to Jcode maintainers. Write a fresh summary instead of copying user text. Never include secrets, credentials, personal data, or private content."
                 },
                 "reason": {
                     "type": "string",
                     "minLength": DISCOVERY_REASON_MIN_CHARS,
                     "maxLength": DISCOVERY_REASON_MAX_CHARS,
-                    "description": "Required, detailed need or selection rationale. On selection, explain why this tool fits better than the listed alternatives. This is sent to the Discovery service and relevant sponsors for reporting. Never include secrets, credentials, personal data, or private content."
+                    "description": "Required rationale. For select, explain why the tool fits better than alternatives. For suggest, explain why browse results were unsuitable. Browse/select text may reach relevant partners; suggest text goes only to Jcode maintainers. Never include private data."
                 },
                 "tool": {
                     "type": "string",
-                    "description": "Tool name to select."
+                    "description": "Catalog tool name to select when action=select."
+                },
+                "suggestion_kind": {
+                    "type": "string",
+                    "enum": ["known_product", "capability_gap"],
+                    "description": "Required for action=suggest. Use known_product only when confident the public product exists; otherwise use capability_gap."
+                },
+                "product_name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 100,
+                    "description": "Required only for a known_product suggestion. Public product, package, service, or MCP name."
+                },
+                "product_url": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Optional public HTTPS URL for a known_product suggestion. Never include credentials or private URLs."
+                },
+                "gap_evidence": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Optional concise explanation of which browse results were close and why they did not fit. Sent only to Jcode maintainers."
+                },
+                "requirements": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": { "type": "string", "minLength": 3, "maxLength": 240 },
+                    "description": "Optional concrete public constraints the catalog addition should satisfy. Sent only to Jcode maintainers."
+                },
+                "prior_request_id": {
+                    "type": "string",
+                    "description": "Required for action=suggest. Use the Browse request ID returned by the preceding successful browse in this category."
                 }
             }
         })
@@ -473,7 +574,7 @@ impl Tool for DiscoverToolsTool {
                 false,
             );
             return Err(anyhow::anyhow!(
-                "sponsored discovery is disabled (set [sponsors] enabled = true in config.toml)"
+                "partner discovery is disabled (set [sponsors] enabled = true in config.toml)"
             ));
         }
 
@@ -589,22 +690,71 @@ impl Tool for DiscoverToolsTool {
             .map(str::trim)
             .filter(|t| !t.is_empty())
             .map(str::to_ascii_lowercase);
+        let action = DiscoveryAction::parse(params.action.as_deref(), tool_selection.is_some())?;
+        let discovery_request = DiscoveryRequestContext {
+            client: &self.client,
+            endpoint: &endpoint,
+            request_id: &request_id,
+            category: &category,
+            query: &query,
+            reason: &reason,
+            benchmark_run,
+        };
+
+        if action == DiscoveryAction::Suggest {
+            let suggestion = validate_suggestion(&params)?;
+            let fetched = match submit_suggestion(&discovery_request, &suggestion).await {
+                Ok(result) => result,
+                Err(err) => {
+                    record_discovery_telemetry(
+                        &request_id,
+                        started_at,
+                        &endpoint,
+                        "suggest",
+                        Some(&category),
+                        None,
+                        "failure",
+                        Some(err.failure_reason),
+                        err.http_status,
+                        err.response_bytes,
+                        None,
+                        query_present,
+                        reason_present,
+                    );
+                    return Err(err.into());
+                }
+            };
+            let rendered =
+                render_suggestion(&category, &query, &reason, &suggestion, &fetched.listing)?;
+            record_discovery_telemetry(
+                &request_id,
+                started_at,
+                &endpoint,
+                "suggest",
+                Some(&category),
+                None,
+                "success",
+                None,
+                Some(fetched.http_status),
+                Some(fetched.response_bytes),
+                Some(1),
+                query_present,
+                reason_present,
+            );
+            return Ok(ToolOutput::new(rendered)
+                .with_title("catalog suggestion".to_string())
+                .with_metadata(json!({
+                    "catalog_suggestion": true,
+                    "category": category,
+                    "suggestion_kind": suggestion.kind,
+                    "suggestion_status": fetched.listing.get("status").and_then(Value::as_str),
+                })));
+        }
 
         // Select phase: return one tool's full setup instructions. The
         // selection (and the agent's reason for it) is recorded server-side.
         if let Some(tool_name) = tool_selection {
-            let fetched = match fetch_listing(
-                &self.client,
-                &endpoint,
-                &request_id,
-                &category,
-                &query,
-                &reason,
-                Some(&tool_name),
-                benchmark_run,
-            )
-            .await
-            {
+            let fetched = match fetch_listing(&discovery_request, Some(&tool_name)).await {
                 Ok(result) => result,
                 Err(err) => {
                     record_discovery_telemetry(
@@ -676,28 +826,17 @@ impl Tool for DiscoverToolsTool {
             return Ok(ToolOutput::new(rendered)
                 .with_title(format!(
                     "{tool_name} {}",
-                    crate::sponsors::SPONSORED_DISCOVERY_TAG
+                    crate::sponsors::DISCOVERY_DISCLOSURE_TAG
                 ))
                 .with_metadata(json!({
                     "sponsored_discovery": true,
                     "category": category,
                     "selected_tool": tool_name,
-                    "disclosure_url": crate::sponsors::SPONSORED_DISCOVERY_URL,
+                    "disclosure_url": crate::sponsors::DISCOVERY_PARTNERS_URL,
                 })));
         }
 
-        let fetched = match fetch_listing(
-            &self.client,
-            &endpoint,
-            &request_id,
-            &category,
-            &query,
-            &reason,
-            None,
-            benchmark_run,
-        )
-        .await
-        {
+        let fetched = match fetch_listing(&discovery_request, None).await {
             Ok(result) => result,
             Err(err) => {
                 record_discovery_telemetry(
@@ -718,7 +857,7 @@ impl Tool for DiscoverToolsTool {
                 return Err(err.into());
             }
         };
-        let rendered = match render_listing(&category, &fetched.listing) {
+        let rendered = match render_listing(&category, &fetched.listing, &request_id) {
             Ok(rendered) => rendered,
             Err(err) => {
                 record_discovery_telemetry(
@@ -769,12 +908,12 @@ impl Tool for DiscoverToolsTool {
             .with_title(format!(
                 "{} {}",
                 category,
-                crate::sponsors::SPONSORED_DISCOVERY_TAG
+                crate::sponsors::DISCOVERY_DISCLOSURE_TAG
             ))
             .with_metadata(json!({
                 "sponsored_discovery": true,
                 "category": category,
-                "disclosure_url": crate::sponsors::SPONSORED_DISCOVERY_URL,
+                "disclosure_url": crate::sponsors::DISCOVERY_PARTNERS_URL,
             })))
     }
 }
@@ -784,29 +923,28 @@ impl Tool for DiscoverToolsTool {
 /// required reason string, and the selected tool name only. Hard fails on
 /// any error: no cache, no fallback, no retry.
 async fn fetch_listing(
-    client: &reqwest::Client,
-    endpoint: &str,
-    request_id: &str,
-    category: &str,
-    query: &str,
-    reason: &str,
+    context: &DiscoveryRequestContext<'_>,
     tool: Option<&str>,
-    benchmark_run: bool,
 ) -> std::result::Result<DiscoveryFetchResult, DiscoveryFetchError> {
-    let endpoint = endpoint.trim_end_matches('/');
-    let mut request = client
+    let endpoint = context.endpoint.trim_end_matches('/');
+    let mut request = context
+        .client
         .get(endpoint)
-        .query(&[("category", category), ("q", query), ("reason", reason)])
+        .query(&[
+            ("category", context.category),
+            ("q", context.query),
+            ("reason", context.reason),
+        ])
         .header(
             reqwest::header::USER_AGENT,
             format!("jcode/{}", env!("CARGO_PKG_VERSION")),
         )
-        .header(DISCOVERY_REQUEST_ID_HEADER, request_id)
+        .header(DISCOVERY_REQUEST_ID_HEADER, context.request_id)
         .timeout(DISCOVERY_TIMEOUT);
     if let Some(tool) = tool.filter(|t| !t.trim().is_empty()) {
         request = request.query(&[("tool", tool.trim())]);
     }
-    if benchmark_run {
+    if context.benchmark_run {
         request = request.header(DISCOVERY_BENCHMARK_HEADER, "1");
     }
 
@@ -858,6 +996,246 @@ async fn fetch_listing(
     })
 }
 
+async fn submit_suggestion(
+    context: &DiscoveryRequestContext<'_>,
+    suggestion: &ValidatedSuggestion,
+) -> std::result::Result<DiscoveryFetchResult, DiscoveryFetchError> {
+    let endpoint = format!("{}/suggestions", context.endpoint.trim_end_matches('/'));
+    let mut request = context
+        .client
+        .post(endpoint)
+        .header(
+            reqwest::header::USER_AGENT,
+            format!("jcode/{}", env!("CARGO_PKG_VERSION")),
+        )
+        .header(DISCOVERY_REQUEST_ID_HEADER, context.request_id)
+        .json(&json!({
+            "category": context.category,
+            "query": context.query,
+            "reason": context.reason,
+            "suggestion_kind": suggestion.kind,
+            "product_name": suggestion.product_name,
+            "product_url": suggestion.product_url,
+            "gap_evidence": suggestion.gap_evidence,
+            "requirements": suggestion.requirements,
+            "prior_request_id": suggestion.prior_request_id,
+        }))
+        .timeout(DISCOVERY_TIMEOUT);
+    if context.benchmark_run {
+        request = request.header(DISCOVERY_BENCHMARK_HEADER, "1");
+    }
+    let response = request.send().await.map_err(|err| DiscoveryFetchError {
+        message: format!("catalog suggestion unavailable: {err}"),
+        failure_reason: if err.is_timeout() {
+            "timeout"
+        } else if err.is_connect() {
+            "connect_error"
+        } else {
+            "transport_error"
+        },
+        http_status: None,
+        response_bytes: None,
+    })?;
+    let status = response.status();
+    let duplicate = status == reqwest::StatusCode::CONFLICT;
+    if !status.is_success() && !duplicate {
+        return Err(DiscoveryFetchError {
+            message: format!("catalog suggestion unavailable: HTTP {status}"),
+            failure_reason: "http_error",
+            http_status: Some(status.as_u16()),
+            response_bytes: response.content_length(),
+        });
+    }
+    let body = response.bytes().await.map_err(|err| DiscoveryFetchError {
+        message: format!("catalog suggestion unavailable: {err}"),
+        failure_reason: "body_error",
+        http_status: Some(status.as_u16()),
+        response_bytes: None,
+    })?;
+    if body.len() > MAX_RESPONSE_BYTES {
+        return Err(DiscoveryFetchError {
+            message: format!(
+                "catalog suggestion response too large ({} bytes)",
+                body.len()
+            ),
+            failure_reason: "response_too_large",
+            http_status: Some(status.as_u16()),
+            response_bytes: Some(body.len() as u64),
+        });
+    }
+    let listing = serde_json::from_slice(&body).map_err(|err| DiscoveryFetchError {
+        message: format!("catalog suggestion returned invalid JSON: {err}"),
+        failure_reason: "invalid_json",
+        http_status: Some(status.as_u16()),
+        response_bytes: Some(body.len() as u64),
+    })?;
+    Ok(DiscoveryFetchResult {
+        listing,
+        http_status: status.as_u16(),
+        response_bytes: body.len() as u64,
+    })
+}
+
+fn validate_suggestion(params: &DiscoverToolsInput) -> Result<ValidatedSuggestion> {
+    let kind = params
+        .suggestion_kind
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("action 'suggest' requires `suggestion_kind`"))?;
+    if !matches!(kind, "known_product" | "capability_gap") {
+        return Err(anyhow::anyhow!(
+            "unknown suggestion_kind '{kind}'. Available: known_product, capability_gap"
+        ));
+    }
+
+    let product_name = params
+        .product_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    if kind == "known_product" && product_name.is_none() {
+        return Err(anyhow::anyhow!(
+            "known_product suggestions require a public `product_name`"
+        ));
+    }
+    if kind == "capability_gap" && product_name.is_some() {
+        return Err(anyhow::anyhow!(
+            "capability_gap suggestions cannot include `product_name`; use known_product instead"
+        ));
+    }
+    if let Some(name) = product_name.as_deref() {
+        validate_suggestion_text(name, "product_name", 2, 100, false)?;
+    }
+
+    let product_url = normalize_suggestion_url(params.product_url.as_deref())?;
+    if kind == "capability_gap" && product_url.is_some() {
+        return Err(anyhow::anyhow!(
+            "capability_gap suggestions cannot include `product_url`; use known_product instead"
+        ));
+    }
+
+    let gap_evidence = params
+        .gap_evidence
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+    if let Some(evidence) = gap_evidence.as_deref() {
+        validate_suggestion_text(evidence, "gap_evidence", 10, 500, true)?;
+    }
+
+    let supplied_requirements = params.requirements.as_deref().unwrap_or_default();
+    if supplied_requirements.len() > 8 {
+        return Err(anyhow::anyhow!(
+            "catalog suggestions accept at most 8 public requirements"
+        ));
+    }
+    let requirements = supplied_requirements
+        .iter()
+        .map(|requirement| {
+            let requirement = requirement.trim();
+            validate_suggestion_text(requirement, "requirement", 3, 240, false)?;
+            Ok(requirement.to_string())
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let prior_request_id = params
+        .prior_request_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            anyhow::anyhow!("action 'suggest' requires `prior_request_id` from a successful browse")
+        })?;
+    let parsed = uuid::Uuid::parse_str(prior_request_id)
+        .map_err(|_| anyhow::anyhow!("prior_request_id must be a valid browse request UUID"))?;
+    if parsed.get_version_num() != 4 {
+        return Err(anyhow::anyhow!(
+            "prior_request_id must be the version-4 UUID returned by a browse"
+        ));
+    }
+
+    Ok(ValidatedSuggestion {
+        kind: kind.to_string(),
+        product_name,
+        product_url,
+        gap_evidence,
+        requirements,
+        prior_request_id: prior_request_id.to_string(),
+    })
+}
+
+fn validate_suggestion_text(
+    value: &str,
+    field: &str,
+    min_chars: usize,
+    max_chars: usize,
+    require_detail: bool,
+) -> Result<()> {
+    let chars = value.chars().count();
+    if chars < min_chars {
+        return Err(anyhow::anyhow!(
+            "catalog suggestion {field} is too short; provide at least {min_chars} characters"
+        ));
+    }
+    if chars > max_chars {
+        return Err(anyhow::anyhow!(
+            "catalog suggestion {field} is too long; use at most {max_chars} characters"
+        ));
+    }
+    if contains_recognizable_secret(value) {
+        return Err(anyhow::anyhow!(
+            "catalog suggestion {field} appears to contain private or sensitive data"
+        ));
+    }
+    if require_detail && !has_sufficient_detail(value, "query") {
+        return Err(anyhow::anyhow!(
+            "catalog suggestion {field} is not specific enough"
+        ));
+    }
+    Ok(())
+}
+
+fn normalize_suggestion_url(value: Option<&str>) -> Result<Option<String>> {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(None);
+    };
+    if value.chars().count() > 500 {
+        return Err(anyhow::anyhow!(
+            "catalog suggestion product_url is too long; use at most 500 characters"
+        ));
+    }
+    let mut url = reqwest::Url::parse(value)
+        .map_err(|_| anyhow::anyhow!("product_url must be a valid public HTTPS URL"))?;
+    let host = url.host_str().unwrap_or_default().to_ascii_lowercase();
+    let private_host = host == "localhost"
+        || host.ends_with(".local")
+        || host.starts_with("127.")
+        || host.starts_with("10.")
+        || host.starts_with("192.168.")
+        || host.starts_with("169.254.")
+        || host
+            .strip_prefix("172.")
+            .and_then(|rest| rest.split('.').next())
+            .and_then(|octet| octet.parse::<u8>().ok())
+            .is_some_and(|octet| (16..=31).contains(&octet));
+    if url.scheme() != "https"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || host.is_empty()
+        || private_host
+    {
+        return Err(anyhow::anyhow!(
+            "product_url must be a public HTTPS URL without credentials"
+        ));
+    }
+    url.set_query(None);
+    url.set_fragment(None);
+    Ok(Some(url.to_string()))
+}
+
 /// Extract structured MCP setups (`mcp: { command, args }`) from a listing
 /// for provenance matching. Entries without an `mcp` descriptor are skipped.
 fn extract_mcp_setups(listing: &Value) -> Vec<crate::sponsors::provenance::DiscoveredSetup> {
@@ -897,20 +1275,20 @@ fn extract_mcp_setups_from(tools: &[Value]) -> Vec<crate::sponsors::provenance::
 /// `{ "tools": [{ "name": "...", "blurb": "...", "url": "..." }] }`. Setup
 /// instructions are not part of browse results: the agent selects a tool
 /// (with a reason) to get them.
-fn render_listing(category: &str, listing: &Value) -> Result<String> {
+fn render_listing(category: &str, listing: &Value, request_id: &str) -> Result<String> {
     let tools = listing
         .get("tools")
         .and_then(|v| v.as_array())
         .ok_or_else(|| anyhow::anyhow!("discovery returned no tool list"))?;
     if tools.is_empty() {
         return Ok(format!(
-            "No discoverable tools in category '{category}' right now."
+            "No discoverable tools in category '{category}' right now.\n\nBrowse request ID: `{request_id}`\n\nIf this catalog gap matters to the task, call discover_tools again with action `suggest` and this `prior_request_id`."
         ));
     }
     let mut out = format!(
-        "Discoverable tools in '{category}' (sponsored discovery: placement, not preference; \
-         details: {}):\n",
-        crate::sponsors::SPONSORED_DISCOVERY_URL
+        "Discoverable tools in '{category}' (Jcode tool directory; recommendations must be based \
+         only on fit; details: {}):\n",
+        crate::sponsors::DISCOVERY_PARTNERS_URL
     );
     for tool in tools {
         let name = tool.get("name").and_then(|v| v.as_str()).unwrap_or("?");
@@ -925,11 +1303,62 @@ fn render_listing(category: &str, listing: &Value) -> Result<String> {
     }
     out.push_str(
         "\n\nOnly select one of these if it is genuinely the best option for the task. \
-         To get a tool's setup instructions, call discover_tools again with `tool` set \
-         to its name, a fresh non-private `query`, and `reason` explaining in detail why \
-         it was chosen over the listed alternatives. Consequential \
-         actions (signups, spending) must note the sponsorship in the confirmation \
+         To get a tool's setup instructions, call discover_tools again with action `select` \
+         and `tool` set to its name. If none is suitable, call it with action `suggest` and \
+         the browse request ID below so maintainers receive the catalog gap. Consequential \
+         actions (signups, spending) must note the partnership in the confirmation \
          shown to the user.",
+    );
+    out.push_str(&format!("\n\nBrowse request ID: `{request_id}`"));
+    Ok(out)
+}
+
+fn render_suggestion(
+    category: &str,
+    query: &str,
+    reason: &str,
+    suggestion: &ValidatedSuggestion,
+    response: &Value,
+) -> Result<String> {
+    let status = response
+        .get("status")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow::anyhow!("catalog suggestion returned no status"))?;
+    if !matches!(status, "received" | "duplicate") {
+        return Err(anyhow::anyhow!(
+            "catalog suggestion returned unknown status '{status}'"
+        ));
+    }
+    let suggestion_id = response
+        .get("suggestion_id")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let mut out = format!(
+        "Catalog suggestion {}.\n\nSuggestion ID: {suggestion_id}\nCategory: {category}\nKind: {}\nCapability: {query}\nCatalog gap: {reason}",
+        if status == "duplicate" {
+            "already recorded"
+        } else {
+            "submitted"
+        },
+        suggestion.kind
+    );
+    if let Some(name) = suggestion.product_name.as_deref() {
+        out.push_str(&format!("\nProduct: {name}"));
+    }
+    if let Some(url) = suggestion.product_url.as_deref() {
+        out.push_str(&format!("\nPublic URL: {url}"));
+    }
+    if let Some(evidence) = suggestion.gap_evidence.as_deref() {
+        out.push_str(&format!("\nGap evidence: {evidence}"));
+    }
+    if !suggestion.requirements.is_empty() {
+        out.push_str("\nRequirements:");
+        for requirement in &suggestion.requirements {
+            out.push_str(&format!("\n- {requirement}"));
+        }
+    }
+    out.push_str(
+        "\n\nStatus: received for Jcode maintainer review. Suggestions are not sent to partners. This does not mean Jcode has partnered with the tool or that it is approved or available.",
     );
     Ok(out)
 }
@@ -946,9 +1375,9 @@ fn render_selection(category: &str, tool_name: &str, listing: &Value) -> Result<
         .unwrap_or(tool_name);
     let blurb = tool.get("blurb").and_then(|v| v.as_str()).unwrap_or("");
     let mut out = format!(
-        "Selected '{name}' from '{category}' (sponsored discovery: placement, not \
-         preference; details: {}):\n\n{name}: {blurb}",
-        crate::sponsors::SPONSORED_DISCOVERY_URL
+        "Selected '{name}' from '{category}' (Jcode tool directory; selection must be based only \
+         on fit; details: {}):\n\n{name}: {blurb}",
+        crate::sponsors::DISCOVERY_PARTNERS_URL
     );
     if let Some(url) = tool.get("url").and_then(|v| v.as_str()) {
         out.push_str(&format!(" ({url})"));
@@ -957,7 +1386,7 @@ fn render_selection(category: &str, tool_name: &str, listing: &Value) -> Result<
         out.push_str(&format!("\n\nSetup: {setup}"));
     }
     out.push_str(
-        "\n\nConsequential actions (signups, spending) must note the sponsorship in \
+        "\n\nConsequential actions (signups, spending) must note the partnership in \
          the confirmation shown to the user.",
     );
     Ok(out)
@@ -974,22 +1403,37 @@ mod tests {
                 {"name": "agentcard", "blurb": "virtual payment cards", "url": "https://agentcard.example"},
             ]
         });
-        let out = render_listing("payments", &listing).unwrap();
+        let out =
+            render_listing("payments", &listing, "11111111-2222-4333-8444-555555555555").unwrap();
         assert!(out.contains("agentcard"));
         assert!(out.contains("virtual payment cards"));
-        assert!(out.contains("sponsored discovery"));
-        assert!(out.contains("placement, not preference"));
+        assert!(out.contains("Jcode tool directory"));
+        assert!(out.contains("recommendations must be based only on fit"));
     }
 
     #[test]
     fn render_listing_rejects_missing_tools() {
-        assert!(render_listing("payments", &json!({})).is_err());
+        assert!(
+            render_listing(
+                "payments",
+                &json!({}),
+                "11111111-2222-4333-8444-555555555555"
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn render_listing_handles_empty_category() {
-        let out = render_listing("payments", &json!({"tools": []})).unwrap();
+        let out = render_listing(
+            "payments",
+            &json!({"tools": []}),
+            "11111111-2222-4333-8444-555555555555",
+        )
+        .unwrap();
         assert!(out.contains("No discoverable tools"));
+        assert!(out.contains("Browse request ID"));
+        assert!(out.contains("action `suggest`"));
     }
 
     #[test]
@@ -997,8 +1441,11 @@ mod tests {
         let listing = json!({
             "tools": [{"name": "agentcard", "blurb": "virtual cards", "url": "https://a.example"}]
         });
-        let out = render_listing("payments", &listing).unwrap();
-        assert!(out.contains("call discover_tools again with `tool`"));
+        let out =
+            render_listing("payments", &listing, "11111111-2222-4333-8444-555555555555").unwrap();
+        assert!(out.contains("action `select`"));
+        assert!(out.contains("action `suggest`"));
+        assert!(out.contains("Browse request ID"));
     }
 
     #[test]
@@ -1014,7 +1461,8 @@ mod tests {
         let out = render_selection("payments", "agentcard", &listing).unwrap();
         assert!(out.contains("Selected 'agentcard'"));
         assert!(out.contains("Setup: npm install -g agentcard"));
-        assert!(out.contains("sponsored discovery"));
+        assert!(out.contains("Jcode tool directory"));
+        assert!(out.contains("selection must be based only on fit"));
         assert!(render_selection("payments", "ghost", &json!({})).is_err());
     }
 
@@ -1035,13 +1483,16 @@ mod tests {
         assert!(description.contains("until all missing capabilities have been checked"));
         assert!(description.contains("check each unsupported external action independently"));
         assert!(description.contains("delegating an unsupported step to them"));
+        assert!(description.contains("submit one `suggest` action"));
+        assert!(description.contains("without promising it will be added"));
         assert!(description.contains("Skip discovery when available tools fully cover the task"));
         assert!(description.contains("Every listing is vetted"));
         assert!(description.contains("one-tool-call setup is enforced"));
-        assert!(description.contains("Sponsors pay only for directory inclusion"));
-        assert!(description.contains("without sponsorship bias"));
+        assert!(description.contains("Some providers are Jcode partners"));
+        assert!(description.contains("Partnership status never influences selection"));
+        assert!(description.contains("Choose the best option based only on fit"));
         assert!(
-            description.len() < 1_050,
+            description.len() < 1_200,
             "discovery description should stay compact, got {} bytes",
             description.len()
         );
@@ -1061,15 +1512,152 @@ mod tests {
         );
         let schema = serde_json::to_string(&parameters).unwrap();
         assert!(schema.contains("Missing capability category; infer it from the user's goal."));
-        assert!(schema.contains("sent to the Discovery service and relevant sponsors"));
+        assert!(schema.contains("Suggest text goes only to Jcode maintainers"));
         assert!(schema.contains("instead of copying user text"));
-        assert!(schema.contains("why this tool fits better than the listed alternatives"));
+        assert!(schema.contains("explain why the tool fits better than alternatives"));
         assert!(schema.contains("Never include secrets, credentials, personal data"));
+        assert!(schema.contains("known_product"));
+        assert!(schema.contains("capability_gap"));
+        assert!(schema.contains("prior_request_id"));
         assert!(
-            schema.len() < 2_000,
+            schema.len() < 4_500,
             "discovery schema should stay compact, got {} bytes",
             schema.len()
         );
+    }
+
+    #[test]
+    fn discovery_action_is_explicit_but_backwards_compatible() {
+        assert_eq!(
+            DiscoveryAction::parse(None, false).unwrap(),
+            DiscoveryAction::Browse
+        );
+        assert_eq!(
+            DiscoveryAction::parse(None, true).unwrap(),
+            DiscoveryAction::Select
+        );
+        assert_eq!(
+            DiscoveryAction::parse(Some("suggest"), false).unwrap(),
+            DiscoveryAction::Suggest
+        );
+        assert!(DiscoveryAction::parse(Some("select"), false).is_err());
+        assert!(DiscoveryAction::parse(Some("browse"), true).is_err());
+        assert!(DiscoveryAction::parse(Some("suggest"), true).is_err());
+    }
+
+    #[test]
+    fn suggestion_validation_distinguishes_product_and_capability_gap() {
+        let capability = DiscoverToolsInput {
+            action: Some("suggest".to_string()),
+            category: "payments".to_string(),
+            query: Some("manage Stripe sandbox products through scoped agent access".to_string()),
+            reason: Some(
+                "the current payment listing only provides cards and cannot manage Stripe test data"
+                    .to_string(),
+            ),
+            tool: None,
+            suggestion_kind: Some("capability_gap".to_string()),
+            product_name: None,
+            product_url: None,
+            gap_evidence: Some(
+                "Agentcard provides virtual cards rather than sandbox catalog administration."
+                    .to_string(),
+            ),
+            requirements: Some(vec!["Scoped authentication without secret keys".to_string()]),
+            prior_request_id: Some("11111111-2222-4333-8444-555555555555".to_string()),
+        };
+        let validated = validate_suggestion(&capability).unwrap();
+        assert_eq!(validated.kind, "capability_gap");
+        assert!(validated.product_name.is_none());
+
+        let mut known = capability;
+        known.suggestion_kind = Some("known_product".to_string());
+        known.product_name = Some("Example Stripe MCP".to_string());
+        known.product_url = Some("https://example.com/tool?via=jcode#setup".to_string());
+        let validated = validate_suggestion(&known).unwrap();
+        assert_eq!(
+            validated.product_name.as_deref(),
+            Some("Example Stripe MCP")
+        );
+        assert_eq!(
+            validated.product_url.as_deref(),
+            Some("https://example.com/tool")
+        );
+    }
+
+    #[test]
+    fn suggestion_validation_rejects_private_or_mismatched_fields() {
+        let mut input = DiscoverToolsInput {
+            action: Some("suggest".to_string()),
+            category: "databases".to_string(),
+            query: Some("managed database provisioning through scoped agent access".to_string()),
+            reason: Some(
+                "the current catalog does not include a database provisioning integration"
+                    .to_string(),
+            ),
+            tool: None,
+            suggestion_kind: Some("known_product".to_string()),
+            product_name: Some("Private database tool".to_string()),
+            product_url: Some("https://user:password@example.com/setup".to_string()),
+            gap_evidence: None,
+            requirements: Some(Vec::new()),
+            prior_request_id: Some("11111111-2222-4333-8444-555555555555".to_string()),
+        };
+        assert!(validate_suggestion(&input).is_err());
+        input.product_url = None;
+        input.suggestion_kind = Some("capability_gap".to_string());
+        assert!(validate_suggestion(&input).is_err());
+        input.product_name = None;
+        input.requirements = Some(vec!["api_key=abcdefghijklmnop".to_string()]);
+        assert!(validate_suggestion(&input).is_err());
+    }
+
+    #[test]
+    fn optional_suggestion_fields_accept_explicit_nulls() {
+        let input: DiscoverToolsInput = serde_json::from_value(json!({
+            "action": "browse",
+            "category": "payments",
+            "query": "compare agent payment card tools for controlled automated purchasing",
+            "reason": "visually verify discovery results with useful catalog details in the interface",
+            "tool": null,
+            "suggestion_kind": null,
+            "product_name": null,
+            "product_url": null,
+            "gap_evidence": null,
+            "requirements": null,
+            "prior_request_id": null
+        }))
+        .unwrap();
+
+        assert!(input.requirements.is_none());
+        assert!(input.tool.is_none());
+    }
+
+    #[test]
+    fn render_suggestion_is_clear_about_review_status_and_recipient() {
+        let suggestion = ValidatedSuggestion {
+            kind: "known_product".to_string(),
+            product_name: Some("Stripe sandbox MCP".to_string()),
+            product_url: Some("https://example.com/stripe-mcp".to_string()),
+            gap_evidence: Some("The listed card tool cannot manage Stripe objects.".to_string()),
+            requirements: vec!["Scoped test-mode access".to_string()],
+            prior_request_id: "11111111-2222-4333-8444-555555555555".to_string(),
+        };
+        let out = render_suggestion(
+            "payments",
+            "manage Stripe sandbox products and recurring prices",
+            "the listed payment tool cannot administer Stripe test data",
+            &suggestion,
+            &json!({
+                "suggestion_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+                "status": "received"
+            }),
+        )
+        .unwrap();
+        assert!(out.contains("Catalog suggestion submitted"));
+        assert!(out.contains("Product: Stripe sandbox MCP"));
+        assert!(out.contains("Suggestions are not sent to partners"));
+        assert!(out.contains("does not mean Jcode has partnered with the tool"));
     }
 
     #[test]
@@ -1099,11 +1687,11 @@ mod tests {
             "Need a service using api_key=abcdefghijklmnop for the request".to_string(),
             "Forward Authorization: Bearer abcdefghijklmnopqrstuvwxyz".to_string(),
             format!("Use {stripe_shaped_key} for this payment workflow"),
-            "Use card 4242 4242 4242 4242 for the sponsored tool checkout".to_string(),
+            "Use card 4242 4242 4242 4242 for the partner tool checkout".to_string(),
             "Use eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijklmnopqrstuvwxyz"
                 .to_string(),
             "Credential follows -----BEGIN PRIVATE KEY----- abcdefghijklmnop".to_string(),
-            "Contact private-person@example.com to configure the sponsored capability".to_string(),
+            "Contact private-person@example.com to configure the partner capability".to_string(),
             "Use customer identifier 123-45-6789 while selecting the external service".to_string(),
             "Fetch https://private-user:private-password@example.com/config for setup".to_string(),
             "Send the account alert to +1-202-555-0147 after the external setup completes"
@@ -1155,23 +1743,30 @@ mod tests {
         (format!("http://{addr}"), handle)
     }
 
+    fn test_discovery_request<'a>(
+        client: &'a reqwest::Client,
+        endpoint: &'a str,
+        request_id: &'a str,
+        benchmark_run: bool,
+    ) -> DiscoveryRequestContext<'a> {
+        DiscoveryRequestContext {
+            client,
+            endpoint,
+            request_id,
+            category: "payments",
+            query: "virtual card for checkout",
+            reason: "task needs an online payment capability",
+            benchmark_run,
+        }
+    }
+
     #[tokio::test]
     async fn fetch_listing_round_trips_and_sends_only_expected_params() {
         let body = json!({"tools": [{"name": "agentcard", "blurb": "virtual cards", "url": "https://a.example"}]}).to_string();
         let (endpoint, server) = one_shot_server("HTTP/1.1 200 OK", body).await;
         let client = reqwest::Client::new();
-        let listing = fetch_listing(
-            &client,
-            &endpoint,
-            "request-test-1",
-            "payments",
-            "virtual card for checkout",
-            "task needs an online payment capability",
-            None,
-            true,
-        )
-        .await
-        .unwrap();
+        let request = test_discovery_request(&client, &endpoint, "request-test-1", true);
+        let listing = fetch_listing(&request, None).await.unwrap();
         assert_eq!(listing.listing["tools"][0]["name"], "agentcard");
         assert_eq!(listing.http_status, 200);
         assert!(listing.response_bytes > 0);
@@ -1201,18 +1796,8 @@ mod tests {
         let (endpoint, _server) =
             one_shot_server("HTTP/1.1 500 Internal Server Error", "{}".to_string()).await;
         let client = reqwest::Client::new();
-        let err = fetch_listing(
-            &client,
-            &endpoint,
-            "request-test-2",
-            "payments",
-            "virtual card for checkout",
-            "task needs an online payment capability",
-            None,
-            false,
-        )
-        .await
-        .unwrap_err();
+        let request = test_discovery_request(&client, &endpoint, "request-test-2", false);
+        let err = fetch_listing(&request, None).await.unwrap_err();
         assert!(err.to_string().contains("discovery unavailable"));
         assert_eq!(err.failure_reason, "http_error");
         assert_eq!(err.http_status, Some(500));
@@ -1222,20 +1807,96 @@ mod tests {
     async fn fetch_listing_hard_fails_when_endpoint_unreachable() {
         // Reserved port with no listener: connection refused, no fallback.
         let client = reqwest::Client::new();
-        let err = fetch_listing(
-            &client,
-            "http://127.0.0.1:9",
-            "request-test-3",
-            "payments",
-            "virtual card for checkout",
-            "task needs an online payment capability",
-            None,
-            false,
-        )
-        .await
-        .unwrap_err();
+        let request =
+            test_discovery_request(&client, "http://127.0.0.1:9", "request-test-3", false);
+        let err = fetch_listing(&request, None).await.unwrap_err();
         assert!(err.to_string().contains("discovery unavailable"));
         assert_eq!(err.failure_reason, "connect_error");
+    }
+
+    #[tokio::test]
+    async fn submit_suggestion_posts_structured_maintainer_only_payload() {
+        let body = json!({
+            "suggestion_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "status": "received",
+            "message": "received"
+        })
+        .to_string();
+        let (endpoint, server) = one_shot_server("HTTP/1.1 202 Accepted", body).await;
+        let suggestion = ValidatedSuggestion {
+            kind: "known_product".to_string(),
+            product_name: Some("Stripe sandbox MCP".to_string()),
+            product_url: Some("https://example.com/stripe-mcp".to_string()),
+            gap_evidence: Some(
+                "Agentcard provides cards rather than Stripe object administration.".to_string(),
+            ),
+            requirements: vec!["Scoped test-mode access".to_string()],
+            prior_request_id: "11111111-2222-4333-8444-555555555555".to_string(),
+        };
+        let client = reqwest::Client::new();
+        let request = DiscoveryRequestContext {
+            client: &client,
+            endpoint: &endpoint,
+            request_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            category: "payments",
+            query: "manage Stripe sandbox products through scoped agent access",
+            reason: "the current payment listing only provides cards and cannot manage Stripe test data",
+            benchmark_run: true,
+        };
+        let result = submit_suggestion(&request, &suggestion).await.unwrap();
+        assert_eq!(result.http_status, 202);
+        assert_eq!(result.listing["status"], "received");
+
+        let request = server.await.unwrap();
+        let lower = request.to_ascii_lowercase();
+        assert!(
+            request.starts_with("POST /suggestions HTTP/1.1"),
+            "{request}"
+        );
+        assert!(
+            lower.contains("x-jcode-discovery-request-id: aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+            "{request}"
+        );
+        assert!(
+            lower.contains("x-jcode-discovery-benchmark: 1"),
+            "{request}"
+        );
+        assert!(request.contains("\"suggestion_kind\":\"known_product\""));
+        assert!(request.contains("\"prior_request_id\":\"11111111-2222-4333-8444-555555555555\""));
+        assert!(request.contains("\"product_name\":\"Stripe sandbox MCP\""));
+        assert!(request.contains("\"requirements\":[\"Scoped test-mode access\"]"));
+    }
+
+    #[tokio::test]
+    async fn submit_suggestion_treats_duplicate_receipt_as_success() {
+        let body = json!({
+            "suggestion_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            "status": "duplicate",
+            "message": "already recorded"
+        })
+        .to_string();
+        let (endpoint, _server) = one_shot_server("HTTP/1.1 409 Conflict", body).await;
+        let suggestion = ValidatedSuggestion {
+            kind: "capability_gap".to_string(),
+            product_name: None,
+            product_url: None,
+            gap_evidence: None,
+            requirements: Vec::new(),
+            prior_request_id: "11111111-2222-4333-8444-555555555555".to_string(),
+        };
+        let client = reqwest::Client::new();
+        let request = DiscoveryRequestContext {
+            client: &client,
+            endpoint: &endpoint,
+            request_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+            category: "payments",
+            query: "manage Stripe sandbox products through scoped agent access",
+            reason: "the current payment listing only provides cards and cannot manage Stripe test data",
+            benchmark_run: false,
+        };
+        let result = submit_suggestion(&request, &suggestion).await.unwrap();
+        assert_eq!(result.http_status, 409);
+        assert_eq!(result.listing["status"], "duplicate");
     }
 
     fn test_ctx() -> crate::tool::ToolContext {
@@ -1282,10 +1943,14 @@ mod tests {
             .unwrap();
 
         assert!(output.output.contains("agentcard"));
-        assert!(output.output.contains("sponsored discovery"));
-        assert!(output.output.contains("placement, not preference"));
+        assert!(output.output.contains("Jcode tool directory"));
+        assert!(
+            output
+                .output
+                .contains("recommendations must be based only on fit")
+        );
         let title = output.title.unwrap();
-        assert!(title.contains("(sponsored discovery)"), "{title}");
+        assert!(title.contains("(partner discovery disclosure)"), "{title}");
         let meta = output.metadata.unwrap();
         assert_eq!(meta["sponsored_discovery"], true);
 

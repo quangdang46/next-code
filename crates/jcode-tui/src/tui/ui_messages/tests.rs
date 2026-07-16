@@ -39,6 +39,95 @@ fn render_system_message_forces_system_color_on_all_spans() {
 }
 
 #[test]
+fn render_cold_cache_warning_is_always_one_width_bounded_line() {
+    let saved = crate::tui::markdown::center_code_blocks();
+    let msg = DisplayMessage::system(
+        "🧊 Prompt cache went cold · next turn may resend ~96K tok · /cache extends",
+    );
+
+    for centered in [false, true] {
+        crate::tui::markdown::set_center_code_blocks(centered);
+        for width in [80_u16, 50, 30] {
+            let lines = render_system_message(&msg, width, crate::config::DiffDisplayMode::Off);
+            assert_eq!(
+                lines.len(),
+                1,
+                "cold-cache notice wrapped at width {width} (centered={centered}): {lines:?}"
+            );
+            let text = extract_line_text(&lines[0]);
+            assert!(
+                !text.contains('\n'),
+                "cold-cache notice contains a newline: {text:?}"
+            );
+            assert!(
+                lines[0].width() <= width as usize,
+                "cold-cache notice width {} exceeds {width}: {text:?}",
+                lines[0].width()
+            );
+            assert!(
+                text.contains("Prompt cache went cold"),
+                "cold-cache identity was truncated away: {text:?}"
+            );
+            if width < 80 {
+                assert!(
+                    text.ends_with('…'),
+                    "narrow cold-cache notice should end in an ellipsis: {text:?}"
+                );
+            }
+            for span in &lines[0].spans {
+                assert_eq!(span.style.fg, Some(system_message_color()));
+            }
+        }
+    }
+
+    crate::tui::markdown::set_center_code_blocks(saved);
+}
+
+#[test]
+fn render_compact_launch_and_divergence_notices_as_one_line() {
+    let saved = crate::tui::markdown::center_code_blocks();
+    let notices = [
+        DisplayMessage::system(
+            "Configured Jcode launch hotkeys (niri):\nSuper+; → jcode (/home/user/project)\n\nBound system-wide.",
+        )
+        .with_title("Launch hotkeys"),
+        DisplayMessage::system(
+            "Update diverged. Press Ctrl+Y to let a jcode agent merge local and upstream (or run `git pull` / `git rebase` yourself).",
+        )
+        .with_title("Update"),
+    ];
+
+    for centered in [false, true] {
+        crate::tui::markdown::set_center_code_blocks(centered);
+        for msg in &notices {
+            for width in [80_u16, 50, 30] {
+                let lines = render_system_message(msg, width, crate::config::DiffDisplayMode::Off);
+                assert_eq!(
+                    lines.len(),
+                    1,
+                    "compact notice wrapped at width {width} (centered={centered}): {lines:?}"
+                );
+                let text = extract_line_text(&lines[0]);
+                assert!(!text.contains('\n'), "notice contains a newline: {text:?}");
+                assert!(
+                    lines[0].width() <= width as usize,
+                    "notice width {} exceeds {width}: {text:?}",
+                    lines[0].width()
+                );
+                if width < 80 {
+                    assert!(
+                        text.ends_with('…'),
+                        "narrow compact notice should end in an ellipsis: {text:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    crate::tui::markdown::set_center_code_blocks(saved);
+}
+
+#[test]
 fn render_system_message_renders_markdown_formatting() {
     let msg = DisplayMessage::system(
         "**bold** and `code` and # heading\n- bullet item\n[link](http://example.com)",
@@ -441,9 +530,8 @@ fn render_todos_message_shows_grouped_card_with_status_glyphs() {
     // Completed items show completion confidence; open ones planning confidence.
     assert!(plain.contains("80→95%"), "{plain}");
     assert!(plain.contains("80%"), "{plain}");
-    // Only open items carry the high-priority marker.
-    assert!(!plain.contains("Wire the hotkey (high)"), "{plain}");
-    assert!(plain.contains("Render the card (high)"), "{plain}");
+    // Priority remains metadata and is not repeated in the visible item label.
+    assert!(!plain.contains("(high)"), "{plain}");
     assert!(
         !plain.contains('╭'),
         "todo card should be borderless:\n{plain}"
@@ -470,6 +558,8 @@ fn render_todos_message_shows_goal_scores_and_feedback() {
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
+        user_intention: Some("Keep the agent aligned with the user's request".to_string()),
+        user_intention_alignment: Some(98),
         hill_climbability: Some(95),
         objective: Some("Readable at 80 columns".to_string()),
         feedback_loop: Some("Inspect a debug frame".to_string()),
@@ -485,7 +575,11 @@ fn render_todos_message_shows_goal_scores_and_feedback() {
         .join("\n");
 
     assert!(
-        plain.contains("Hill climbability 95% · Ownership 90%"),
+        plain.contains("User intention alignment 98% · Hill climbability 95% · Ownership 90%"),
+        "{plain}"
+    );
+    assert!(
+        plain.contains("User intention · Keep the agent aligned with the user's request"),
         "{plain}"
     );
     assert!(
@@ -496,7 +590,8 @@ fn render_todos_message_shows_goal_scores_and_feedback() {
         plain.contains("Feedback · Inspect a debug frame"),
         "{plain}"
     );
-    assert!(plain.contains("● Render the card (high) · 85%"), "{plain}");
+    assert!(plain.contains("● Render the card · 85%"), "{plain}");
+    assert!(!plain.contains("(high)"), "{plain}");
 }
 
 #[test]
@@ -515,6 +610,8 @@ fn render_todos_message_uses_readable_semantic_colors() {
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
+        user_intention: None,
+        user_intention_alignment: Some(98),
         hill_climbability: Some(95),
         objective: Some("Readable metadata".to_string()),
         feedback_loop: None,
@@ -534,10 +631,9 @@ fn render_todos_message_uses_readable_semantic_colors() {
     assert_eq!(color_for("todo rendering"), Some(todo_group_color()));
     assert_eq!(color_for("Readable metadata"), Some(todo_meta_color()));
     assert_eq!(color_for("● "), Some(asap_color()));
-    assert_eq!(color_for(" (high)"), Some(rgb(235, 175, 95)));
+    assert_eq!(color_for(" (high)"), None);
     assert_eq!(color_for(" · 85%"), Some(todo_confidence_color()));
     assert_ne!(todo_meta_color(), dim_color());
-    assert_ne!(asap_color(), rgb(235, 175, 95));
 }
 
 #[test]
@@ -556,6 +652,8 @@ fn render_todos_message_wraps_goal_scores_at_narrow_widths() {
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
+        user_intention: None,
+        user_intention_alignment: Some(98),
         hill_climbability: Some(95),
         objective: None,
         feedback_loop: None,
@@ -571,6 +669,7 @@ fn render_todos_message_wraps_goal_scores_at_narrow_widths() {
         .collect::<Vec<_>>()
         .join("\n");
 
+    assert!(plain.contains("User intention alignment 98%"), "{plain}");
     assert!(plain.contains("Hill climbability 95%"), "{plain}");
     assert!(plain.contains("Ownership 90%"), "{plain}");
     assert!(
@@ -614,6 +713,8 @@ fn render_todo_tool_result_uses_borderless_card_with_goal_scores() {
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("todo rendering".to_string()),
+        user_intention: Some("See current work at a glance".to_string()),
+        user_intention_alignment: Some(97),
         hill_climbability: Some(95),
         objective: Some("Readable card".to_string()),
         feedback_loop: Some("Inspect the rendered frame".to_string()),
@@ -649,13 +750,11 @@ fn render_todo_tool_result_uses_borderless_card_with_goal_scores() {
     assert!(!plain.contains("Todos"), "{plain}");
     assert!(plain.contains("todo rendering  ●"), "{plain}");
     assert!(
-        plain.contains("Hill climbability 95% · Ownership 92%"),
+        plain.contains("User intention alignment 97% · Hill climbability 95% · Ownership 92%"),
         "{plain}"
     );
-    assert!(
-        plain.contains("● Render the todo result (high) · 92%"),
-        "{plain}"
-    );
+    assert!(plain.contains("● Render the todo result · 92%"), "{plain}");
+    assert!(!plain.contains("(high)"), "{plain}");
     assert!(
         !plain.contains('╭'),
         "todo tool result should be borderless:\n{plain}"
@@ -664,6 +763,86 @@ fn render_todo_tool_result_uses_borderless_card_with_goal_scores() {
         !plain.contains("todo 1 items"),
         "generic tool row leaked:\n{plain}"
     );
+}
+
+#[test]
+fn render_todo_quality_gate_retry_shows_only_changed_goal_fields() {
+    let todos = vec![crate::todo::TodoItem {
+        id: "render".to_string(),
+        content: "Render the entire unchanged todo plan".to_string(),
+        status: "in_progress".to_string(),
+        priority: "high".to_string(),
+        group: Some("todo rendering".to_string()),
+        confidence: Some(92),
+        ..Default::default()
+    }];
+    let before = crate::todo::TodoGoal {
+        group: Some("todo rendering".to_string()),
+        user_intention: Some("See current work at a glance".to_string()),
+        user_intention_alignment: Some(99),
+        hill_climbability: Some(90),
+        objective: Some("Keep the todo card concise".to_string()),
+        feedback_loop: Some("Inspect one frame".to_string()),
+        end_to_end_ownership: None,
+    };
+    let after = crate::todo::TodoGoal {
+        hill_climbability: Some(98),
+        feedback_loop: Some(
+            "Render before and after fixtures and assert unchanged fields are absent".to_string(),
+        ),
+        ..before.clone()
+    };
+    let updates = vec![crate::todo::TodoGoalChange {
+        before: Some(before),
+        after: Some(after.clone()),
+        fields: vec![
+            crate::todo::TodoGoalField::HillClimbability,
+            crate::todo::TodoGoalField::FeedbackLoop,
+        ],
+    }];
+    let content = format!(
+        "{}\n\nGoals:\n{}\n\nGoal updates:\n{}\n\n{}",
+        serde_json::to_string_pretty(&todos).unwrap(),
+        serde_json::to_string_pretty(&vec![after]).unwrap(),
+        serde_json::to_string_pretty(&updates).unwrap(),
+        crate::todo::TODO_HILL_CLIMBABILITY_CONTINUATION_MESSAGE,
+    );
+    let msg = DisplayMessage {
+        role: "tool".to_string(),
+        content,
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: Some("1 todos".to_string()),
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_todo_update".to_string(),
+            name: "todo".to_string(),
+            input: serde_json::Value::Null,
+            intent: Some("Refine the todo feedback loop".to_string()),
+            thought_signature: None,
+        }),
+    };
+
+    let plain = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off)
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(plain.contains("todo rendering  updated"), "{plain}");
+    assert!(plain.contains("Hill climbability 90% → 98%"), "{plain}");
+    assert!(
+        plain.contains(
+            "Feedback · Render before and after fixtures and assert unchanged fields are absent"
+        ),
+        "{plain}"
+    );
+    assert!(
+        !plain.contains("Render the entire unchanged todo plan"),
+        "{plain}"
+    );
+    assert!(!plain.contains("User intention alignment"), "{plain}");
+    assert!(!plain.contains("Keep the todo card concise"), "{plain}");
+    assert!(!plain.contains("See current work at a glance"), "{plain}");
 }
 
 #[test]
@@ -680,11 +859,12 @@ fn parse_todo_tool_output_accepts_timestamp_only_header() {
         serde_json::to_string(&todos).unwrap()
     );
 
-    let (parsed, goals) = parse_todo_tool_output(&content).expect("timestamped todo payload");
-    assert_eq!(parsed.len(), 1);
-    assert_eq!(parsed[0].id, todos[0].id);
-    assert_eq!(parsed[0].content, todos[0].content);
-    assert!(goals.is_empty());
+    let parsed = parse_todo_tool_output(&content).expect("timestamped todo payload");
+    assert_eq!(parsed.todos.len(), 1);
+    assert_eq!(parsed.todos[0].id, todos[0].id);
+    assert_eq!(parsed.todos[0].content, todos[0].content);
+    assert!(parsed.goals.is_empty());
+    assert!(parsed.goal_updates.is_empty());
 }
 
 #[test]
@@ -747,6 +927,8 @@ fn unbiased_visual_prompt_retry_renders_complete_feedback_change() {
     let initial = render(
         crate::todo::TodoGoal {
             group: Some("pelican-bike-animation".to_string()),
+            user_intention: None,
+            user_intention_alignment: None,
             hill_climbability: Some(90),
             objective: Some(
                 "Create a polished, working pelican-riding-a-bike animation using only HTML, CSS, and vanilla JavaScript."
@@ -775,6 +957,8 @@ fn unbiased_visual_prompt_retry_renders_complete_feedback_change() {
     let revised = render(
         crate::todo::TodoGoal {
             group: Some("pelican-bike-animation".to_string()),
+            user_intention: None,
+            user_intention_alignment: None,
             hill_climbability: Some(98),
             objective: Some(REVISED_OBJECTIVE.to_string()),
             feedback_loop: Some(REVISED_FEEDBACK.to_string()),
@@ -829,6 +1013,8 @@ fn visually_appealing_prompt_batched_retry_renders_complete_todo_card() {
     }];
     let goals = vec![crate::todo::TodoGoal {
         group: Some("pelican-bike".to_string()),
+        user_intention: None,
+        user_intention_alignment: None,
         hill_climbability: Some(98),
         objective: Some(OBJECTIVE.to_string()),
         feedback_loop: Some(FEEDBACK.to_string()),
@@ -1399,6 +1585,465 @@ fn render_tool_message_shows_token_badge() {
     assert_eq!(badge_span.style.fg, Some(rgb(118, 118, 118)));
 }
 
+fn gmail_draft_message(content: &str, input: serde_json::Value) -> DisplayMessage {
+    DisplayMessage {
+        role: "tool".to_string(),
+        content: content.to_string(),
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: None,
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_gmail_draft".to_string(),
+            name: "gmail".to_string(),
+            input,
+            intent: None,
+            thought_signature: None,
+        }),
+    }
+}
+
+#[test]
+fn render_tool_message_shows_gmail_draft_card() {
+    let msg = gmail_draft_message(
+        "Draft created successfully.\nDraft ID: draft_123\nTo: bob@example.com\nSubject: Project update",
+        serde_json::json!({
+            "action": "draft",
+            "to": "bob@example.com",
+            "subject": "Project update",
+            "body": "Hi Bob,\n\nThe release is ready for review."
+        }),
+    );
+
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(plain.contains("Gmail draft created · draft_123"), "{plain}");
+    assert!(
+        !plain.contains('✉'),
+        "draft card should not show an icon: {plain}"
+    );
+    assert!(plain.contains("To: bob@example.com"), "{plain}");
+    assert!(plain.contains("Subject: Project update"), "{plain}");
+    assert!(
+        plain.contains("The release is ready for review."),
+        "{plain}"
+    );
+    assert!(
+        !plain.contains("\"body\""),
+        "must not leak raw JSON: {plain}"
+    );
+}
+
+#[test]
+fn render_gmail_draft_card_marks_failures_and_empty_fields() {
+    let msg = gmail_draft_message(
+        "Error: Gmail draft creation failed",
+        serde_json::json!({ "action": "draft", "body": "" }),
+    );
+
+    let lines = render_tool_message(&msg, 80, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(plain.contains("Gmail draft failed"), "{plain}");
+    assert!(plain.contains("(recipient missing)"), "{plain}");
+    assert!(plain.contains("(no subject)"), "{plain}");
+    assert!(plain.contains("(empty body)"), "{plain}");
+}
+
+#[test]
+fn render_gmail_draft_card_wraps_attachments_and_shows_complete_long_body() {
+    let body = (1..=30)
+        .map(|index| format!("body line {index}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let msg = gmail_draft_message(
+        "Draft created successfully.\nDraft ID: draft_long",
+        serde_json::json!({
+            "action": "draft",
+            "to": "a-very-long-recipient-address@example.com",
+            "subject": "A subject that should wrap cleanly in a narrow transcript",
+            "body": body,
+            "attachments": [
+                "/tmp/a-very-long-quarterly-report-filename.pdf",
+                "/tmp/notes.txt"
+            ]
+        }),
+    );
+
+    let lines = render_tool_message(&msg, 48, crate::config::DiffDisplayMode::Off);
+    let rendered = lines.iter().map(extract_line_text).collect::<Vec<_>>();
+    let plain = rendered.join("\n");
+    let compact = without_whitespace(&plain.replace('│', ""));
+
+    assert!(
+        compact.contains("To:a-very-long-recipient-address@example.com"),
+        "{plain}"
+    );
+    assert!(
+        compact.contains("Subject:Asubjectthatshouldwrapcleanlyinanarrowtranscript"),
+        "{plain}"
+    );
+    assert!(
+        compact
+            .contains("Attachments:/tmp/a-very-long-quarterly-report-filename.pdf,/tmp/notes.txt"),
+        "{plain}"
+    );
+    assert!(plain.contains("body line 18"), "{plain}");
+    assert!(plain.contains("body line 19"), "{plain}");
+    assert!(plain.contains("body line 30"), "{plain}");
+    assert!(
+        !plain.contains("more lines"),
+        "body must not be truncated: {plain}"
+    );
+    assert!(
+        lines.iter().all(|line| line.width() <= 47),
+        "draft card exceeded row width: {rendered:?}"
+    );
+}
+
+#[test]
+fn render_gmail_draft_card_preserves_html_like_body_text() {
+    let msg = gmail_draft_message(
+        "Draft created successfully.\nDraft ID: draft_html",
+        serde_json::json!({
+            "action": "draft",
+            "to": "web@example.com",
+            "subject": "HTML-ish content",
+            "body": "<p>Hello <strong>team</strong></p>"
+        }),
+    );
+
+    let plain = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off)
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.contains("<p>Hello <strong>team</strong></p>"),
+        "{plain}"
+    );
+}
+
+#[test]
+fn render_batch_tool_message_shows_nested_gmail_draft_card() {
+    let msg = DisplayMessage {
+        role: "tool".to_string(),
+        content: "--- [1] gmail ---\nDraft created successfully.\nDraft ID: nested_123\nTo: nested@example.com\nSubject: Nested\n\nCompleted: 1 succeeded, 0 failed".to_string(),
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: None,
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_batch_gmail".to_string(),
+            name: "batch".to_string(),
+            input: serde_json::json!({
+                "tool_calls": [{
+                    "tool": "gmail",
+                    "parameters": {
+                        "action": "draft",
+                        "to": "nested@example.com",
+                        "subject": "Nested",
+                        "body": "Created inside a batch"
+                    }
+                }]
+            }),
+            intent: None,
+            thought_signature: None,
+        }),
+    };
+
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.contains("Gmail draft created · nested_123"),
+        "{plain}"
+    );
+    assert!(plain.contains("Created inside a batch"), "{plain}");
+}
+
+#[test]
+fn render_batch_tool_message_shows_flat_and_nested_subcall_intents() {
+    let msg = DisplayMessage {
+        role: "tool".to_string(),
+        content: "--- [1] read ---\nflat output\n\n--- [2] read ---\nnested output\n\nCompleted: 2 succeeded, 0 failed".to_string(),
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: None,
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_batch_intents".to_string(),
+            name: "batch".to_string(),
+            input: serde_json::json!({
+                "tool_calls": [
+                    {
+                        "tool": "read",
+                        "intent": "Inspect flat batch input",
+                        "file_path": "src/flat.rs"
+                    },
+                    {
+                        "tool": "read",
+                        "parameters": {
+                            "intent": "Inspect nested batch input",
+                            "file_path": "src/nested.rs"
+                        }
+                    }
+                ]
+            }),
+            intent: None,
+            thought_signature: None,
+        }),
+    };
+
+    let plain = render_tool_message(&msg, 120, crate::config::DiffDisplayMode::Off)
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.contains("read · Inspect flat batch input ·"),
+        "{plain}"
+    );
+    assert!(
+        plain.contains("read · Inspect nested batch input ·"),
+        "{plain}"
+    );
+    assert!(plain.contains("flat.rs"), "{plain}");
+    assert!(plain.contains("nested.rs"), "{plain}");
+}
+
+fn discovery_message(content: &str, input: serde_json::Value) -> DisplayMessage {
+    DisplayMessage {
+        role: "tool".to_string(),
+        content: content.to_string(),
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: None,
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_discovery".to_string(),
+            name: "discover_tools".to_string(),
+            input,
+            intent: None,
+            thought_signature: None,
+        }),
+    }
+}
+
+fn first_discovery_message(content: &str, input: serde_json::Value) -> DisplayMessage {
+    let mut message = discovery_message(content, input);
+    message.title = Some(crate::sponsors::DISCOVERY_DISCLOSURE_TAG.to_string());
+    message
+}
+
+#[test]
+fn render_tool_message_shows_discovery_browse_results_and_rationale() {
+    let msg = first_discovery_message(
+        "Discoverable tools in 'payments' (Jcode tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`",
+        serde_json::json!({
+            "action": "browse",
+            "category": "payments",
+            "query": "manage Stripe sandbox products and recurring prices",
+            "reason": "the task needs test-mode catalog administration through scoped agent access"
+        }),
+    );
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(plain.contains("1 result · payments"), "{plain}");
+    assert!(plain.contains("why: the task needs test-mode"), "{plain}");
+    assert!(plain.contains("agentcard"), "{plain}");
+    assert!(plain.contains("prepaid virtual Visa cards"), "{plain}");
+    assert!(plain.contains("agentcard.sh"), "{plain}");
+    assert!(
+        plain.contains("Jcode partners with tool providers to make their tools discoverable"),
+        "{plain}"
+    );
+    assert!(
+        without_whitespace(&plain).contains("Learnmore:https://jcode.sh/discovery-tools"),
+        "{plain}"
+    );
+    assert!(!plain.contains("sponsored result"), "{plain}");
+    assert!(
+        lines.len() <= 8,
+        "compact discovery details used {} lines: {plain}",
+        lines.len()
+    );
+    assert!(
+        !plain.contains("\n\n"),
+        "compact details contain a blank row: {plain}"
+    );
+    assert!(
+        !plain
+            .chars()
+            .any(|ch| matches!(ch, '╭' | '╮' | '╰' | '╯' | '│')),
+        "discovery details must remain borderless: {plain}"
+    );
+    assert!(
+        !plain.contains("11111111-2222"),
+        "request IDs stay model-only: {plain}"
+    );
+}
+
+#[test]
+fn batched_discovery_renders_first_use_disclosure_inline_once() {
+    let msg = DisplayMessage {
+        role: "tool".to_string(),
+        content: "--- [1] discover_tools ---\nDiscoverable tools in 'payments' (Jcode tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`\n\nCompleted: 1 succeeded, 0 failed".to_string(),
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: Some(crate::sponsors::DISCOVERY_DISCLOSURE_TAG.to_string()),
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_batch_discovery".to_string(),
+            name: "batch".to_string(),
+            input: serde_json::json!({
+                "tool_calls": [{
+                    "tool": "discover_tools",
+                    "parameters": {
+                        "action": "browse",
+                        "category": "payments",
+                        "query": "issue a capped virtual card",
+                        "reason": "the task requires a payment instrument with a hard limit"
+                    }
+                }]
+            }),
+            intent: None,
+            thought_signature: None,
+        }),
+    };
+
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(plain.contains("1 result · payments"), "{plain}");
+    assert_eq!(
+        plain
+            .matches("Jcode partners with tool providers to make their tools discoverable")
+            .count(),
+        1,
+        "the batched first-use notice must render exactly once: {plain}"
+    );
+    assert!(
+        !plain
+            .chars()
+            .any(|ch| matches!(ch, '╭' | '╮' | '╰' | '╯' | '│')),
+        "batched discovery details must remain borderless: {plain}"
+    );
+}
+
+#[test]
+fn render_tool_message_shows_selected_discovery_setup() {
+    let msg = discovery_message(
+        "Selected 'agentcard' from 'payments' (Jcode tool directory; selection must be based only on fit; details: https://jcode.sh/discovery-tools):\n\nagentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nSetup: Run `npx -y agentcard-mcp@1.2.3`, then connect the resulting MCP server.\n\nConsequential actions (signups, spending) must note the partnership in the confirmation shown to the user.",
+        serde_json::json!({
+            "action": "select",
+            "category": "payments",
+            "tool": "agentcard",
+            "query": "create a capped virtual card for an online purchase",
+            "reason": "selected because capped cards fit the purchase constraints better than alternatives"
+        }),
+    );
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(plain.contains("selected agentcard"), "{plain}");
+    assert!(!plain.contains("sponsored"), "{plain}");
+    assert!(
+        plain.contains("details: prepaid virtual Visa cards"),
+        "{plain}"
+    );
+    assert!(plain.contains("https://agentcard.sh"), "{plain}");
+    assert!(plain.contains("setup:"), "{plain}");
+    assert!(plain.contains("agentcard-mcp@1.2.3"), "{plain}");
+    assert!(
+        !plain.contains("Jcode partners with tool providers"),
+        "later discovery results must not repeat the first-use notice: {plain}"
+    );
+}
+
+#[test]
+fn render_tool_message_shows_catalog_suggestion_receipt_and_trust_line() {
+    let msg = discovery_message(
+        "Catalog suggestion submitted.\n\nSuggestion ID: aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\nCategory: payments\nKind: known_product\nCapability: manage Stripe sandbox products\nCatalog gap: no matching catalog entry\nProduct: Stripe sandbox MCP\nPublic URL: https://example.com/stripe-mcp\n\nStatus: received for Jcode maintainer review. Suggestions are not sent to partners. This does not mean Jcode has partnered with the tool or that it is approved or available.",
+        serde_json::json!({
+            "action": "suggest",
+            "category": "payments",
+            "query": "manage Stripe sandbox products and recurring prices through scoped agent access",
+            "reason": "the listed payment tool only provides cards and cannot administer Stripe test data",
+            "suggestion_kind": "known_product",
+            "product_name": "Stripe sandbox MCP",
+            "product_url": "https://example.com/stripe-mcp",
+            "gap_evidence": "Agentcard handles cards rather than Stripe test-mode objects.",
+            "requirements": [
+                "Scoped authentication without exposing a secret key",
+                "Create recurring prices in test mode"
+            ],
+            "prior_request_id": "11111111-2222-4333-8444-555555555555"
+        }),
+    );
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Off);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+    assert!(plain.contains("suggestion sent"), "{plain}");
+    assert!(
+        plain.contains("Known product · Stripe sandbox MCP"),
+        "{plain}"
+    );
+    assert!(plain.contains("gap: the listed payment tool"), "{plain}");
+    assert!(plain.contains("needs:"), "{plain}");
+    assert!(plain.contains("Jcode maintainers only"), "{plain}");
+    assert!(plain.contains("not approval or availability"), "{plain}");
+    assert!(
+        !plain.contains("11111111-2222"),
+        "prior request ID must stay hidden: {plain}"
+    );
+}
+
+#[test]
+fn discovery_cards_wrap_within_narrow_transcript_width() {
+    let msg = discovery_message(
+        "Catalog suggestion submitted.\n\nStatus: received for Jcode maintainer review.",
+        serde_json::json!({
+            "action": "suggest",
+            "category": "cloud-infrastructure",
+            "query": "a deliberately long capability description that must wrap cleanly in a narrow terminal",
+            "reason": "the current catalog entries do not satisfy several detailed infrastructure constraints",
+            "suggestion_kind": "capability_gap",
+            "requirements": ["A long requirement that also needs reliable narrow-width wrapping"]
+        }),
+    );
+    let lines = render_tool_message(&msg, 48, crate::config::DiffDisplayMode::Off);
+    assert!(
+        lines.iter().all(|line| line.width() <= 47),
+        "discovery card exceeded width: {:?}",
+        lines.iter().map(extract_line_text).collect::<Vec<_>>()
+    );
+}
+
 #[test]
 fn render_tool_message_colors_high_token_badge() {
     let msg = DisplayMessage {
@@ -1457,6 +2102,113 @@ fn render_tool_message_shows_inline_diff_for_pascal_case_multiedit() {
     assert!(plain.contains("┌─ diff"), "plain={plain}");
     assert!(plain.contains("old line"), "plain={plain}");
     assert!(plain.contains("new line"), "plain={plain}");
+}
+
+#[test]
+fn render_tool_message_shows_numbered_write_result_diff_after_input_compaction() {
+    let msg = DisplayMessage {
+        role: "tool".to_string(),
+        content: "Created /tmp/head-to-head.html (2 lines):\n1+ <!doctype html>\n2+ <html lang=\"en\">\n..."
+            .to_string(),
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: Some("/tmp/head-to-head.html".to_string()),
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_write_compacted".to_string(),
+            name: "write".to_string(),
+            input: serde_json::json!({"file_path": "/tmp/head-to-head.html"}),
+            intent: Some("Create an honest data-driven benchmark comparison page".to_string()),
+            thought_signature: None,
+        }),
+    };
+
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Inline);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        lines[0].spans.iter().any(|span| span.content == "+2"),
+        "plain={plain}"
+    );
+    assert!(plain.contains("┌─ diff"), "plain={plain}");
+    assert!(plain.contains("<!doctype html>"), "plain={plain}");
+    assert!(plain.contains("<html lang=\"en\">"), "plain={plain}");
+}
+
+#[test]
+fn render_tool_message_never_draws_an_empty_edit_diff_frame() {
+    for (name, content) in [
+        ("write", "Created empty.txt (0 lines):\n"),
+        ("edit", "Edited demo.txt: replaced 1 occurrence(s)"),
+        (
+            "multiedit",
+            "Edited demo.txt\n\nTotal: 1 applied, 0 failed\n",
+        ),
+        ("patch", "Patch applied successfully"),
+        ("apply_patch", "✓ demo.txt: modified (1 hunks)"),
+    ] {
+        let msg = DisplayMessage {
+            role: "tool".to_string(),
+            content: content.to_string(),
+            tool_calls: Vec::new(),
+            duration_secs: None,
+            title: Some("demo.txt".to_string()),
+            tool_data: Some(crate::message::ToolCall {
+                id: format!("call_{name}_compacted"),
+                name: name.to_string(),
+                input: serde_json::json!({"file_path": "demo.txt"}),
+                intent: None,
+                thought_signature: None,
+            }),
+        };
+
+        let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Inline);
+        let plain = lines
+            .iter()
+            .map(extract_line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(!plain.contains("┌─ diff"), "tool={name}, plain={plain}");
+        assert!(!plain.contains("(+0 -0)"), "tool={name}, plain={plain}");
+    }
+}
+
+#[test]
+fn render_tool_message_marks_failed_apply_patch_without_empty_diff() {
+    let msg = DisplayMessage {
+        role: "tool".to_string(),
+        content:
+            "[apply_patch] ✗ /tmp/main.rs: Failed to find expected lines in /tmp/main.rs:\nfn missing() {}"
+                .to_string(),
+        tool_calls: Vec::new(),
+        duration_secs: None,
+        title: Some("/tmp/main.rs".to_string()),
+        tool_data: Some(crate::message::ToolCall {
+            id: "call_apply_patch_failed".to_string(),
+            name: "apply_patch".to_string(),
+            input: serde_json::json!({"file_path": "/tmp/main.rs"}),
+            intent: Some("Replace the benchmark placeholder".to_string()),
+            thought_signature: None,
+        }),
+    };
+
+    let lines = render_tool_message(&msg, 100, crate::config::DiffDisplayMode::Inline);
+    let plain = lines
+        .iter()
+        .map(extract_line_text)
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    assert!(
+        plain.trim_start().starts_with("✗ apply_patch"),
+        "plain={plain}"
+    );
+    assert!(!plain.contains("┌─ diff"), "plain={plain}");
+    assert!(!plain.contains("(+0 -0)"), "plain={plain}");
 }
 
 #[test]

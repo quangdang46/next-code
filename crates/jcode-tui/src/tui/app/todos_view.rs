@@ -427,8 +427,24 @@ fn format_goal_markdown(goals: &[crate::todo::TodoGoal], group: Option<&str>) ->
         return String::new();
     };
     let mut line = String::new();
+    if let Some(user_intention) = goal
+        .user_intention
+        .as_deref()
+        .filter(|user_intention| !user_intention.trim().is_empty())
+    {
+        line.push_str(&format!("\n- User intention: {}\n", user_intention.trim()));
+    }
+    if let Some(score) = goal.user_intention_alignment {
+        if line.is_empty() {
+            line.push('\n');
+        }
+        line.push_str(&format!("- User intention alignment: **{}%**\n", score));
+    }
     if let Some(score) = goal.hill_climbability {
-        line.push_str(&format!("\n- Hill climbability: **{}%**", score));
+        if line.is_empty() {
+            line.push('\n');
+        }
+        line.push_str(&format!("- Hill climbability: **{}%**", score));
         line.push('\n');
     }
     if let Some(objective) = goal
@@ -613,6 +629,8 @@ fn hash_todos_payload(
     }
     for goal in goals {
         goal.group.hash(&mut hasher);
+        goal.user_intention.hash(&mut hasher);
+        goal.user_intention_alignment.hash(&mut hasher);
         goal.hill_climbability.hash(&mut hasher);
         goal.objective.hash(&mut hasher);
         goal.feedback_loop.hash(&mut hasher);
@@ -736,18 +754,27 @@ mod tests {
             &[grouped_a, grouped_b, other, ungrouped],
             &[crate::todo::TodoGoal {
                 group: Some("optimize rendering".to_string()),
+                user_intention: Some("make navigation feel immediate".to_string()),
+                user_intention_alignment: Some(96),
                 hill_climbability: Some(90),
                 objective: Some("frame time under 8ms".to_string()),
                 feedback_loop: Some(
                     "run the frame benchmark and compare p95 frame time".to_string(),
                 ),
                 end_to_end_ownership: Some(85),
-                ..Default::default()
             }],
         );
 
         assert!(
             markdown.contains("## optimize rendering (1/2)"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("- User intention: make navigation feel immediate"),
+            "{markdown}"
+        );
+        assert!(
+            markdown.contains("- User intention alignment: **96%**"),
             "{markdown}"
         );
         assert!(
@@ -808,6 +835,32 @@ mod tests {
         }];
         let before = hash_todos_payload(Some("session_test"), &todos, &goals);
         goals[0].feedback_loop = Some("run test B".to_string());
+        let after = hash_todos_payload(Some("session_test"), &todos, &goals);
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn todos_view_hash_changes_when_user_intention_changes() {
+        let todos = vec![todo("g", "Goal hash", "pending", "high", Some(80), None)];
+        let mut goals = vec![crate::todo::TodoGoal {
+            user_intention: Some("reduce friction".to_string()),
+            ..Default::default()
+        }];
+        let before = hash_todos_payload(Some("session_test"), &todos, &goals);
+        goals[0].user_intention = Some("increase clarity".to_string());
+        let after = hash_todos_payload(Some("session_test"), &todos, &goals);
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn todos_view_hash_changes_when_user_intention_alignment_changes() {
+        let todos = vec![todo("g", "Goal hash", "pending", "high", Some(80), None)];
+        let mut goals = vec![crate::todo::TodoGoal {
+            user_intention_alignment: Some(70),
+            ..Default::default()
+        }];
+        let before = hash_todos_payload(Some("session_test"), &todos, &goals);
+        goals[0].user_intention_alignment = Some(95);
         let after = hash_todos_payload(Some("session_test"), &todos, &goals);
         assert_ne!(before, after);
     }

@@ -64,9 +64,9 @@ fn infer_selfdev_action_from_display_text(text: Option<&str>) -> Option<&'static
 #[path = "ui_tools/batch.rs"]
 mod batch;
 
-pub(crate) use batch::batch_subcall_params;
 #[cfg(test)]
 pub(super) use batch::parse_batch_sub_outputs;
+pub(crate) use batch::{batch_subcall_intent, batch_subcall_params};
 pub(super) use batch::{parse_batch_completion_counts, parse_batch_sub_outputs_by_index};
 
 pub(super) fn summarize_unified_patch_input(patch_text: &str) -> String {
@@ -1162,15 +1162,30 @@ pub(super) fn get_tool_summary_with_budget(
             }
         }
         "discover_tools" => {
+            let action = tool
+                .input
+                .get("action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
             let category = tool
                 .input
                 .get("category")
                 .and_then(|v| v.as_str())
                 .unwrap_or("");
-            match tool.input.get("tool").and_then(|v| v.as_str()) {
-                Some(name) => format!("select {}", truncate_end_display(name, bounded(30))),
-                None if !category.is_empty() => format!("browse {}", category),
-                None => "browse".to_string(),
+            if action == "suggest" {
+                let detail = tool
+                    .input
+                    .get("product_name")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| tool.input.get("suggestion_kind").and_then(|v| v.as_str()))
+                    .unwrap_or(category);
+                format!("suggest {}", truncate_end_display(detail, bounded(30)))
+            } else {
+                match tool.input.get("tool").and_then(|v| v.as_str()) {
+                    Some(name) => format!("select {}", truncate_end_display(name, bounded(30))),
+                    None if !category.is_empty() => format!("browse {}", category),
+                    None => "browse".to_string(),
+                }
             }
         }
         "codesearch" => tool
