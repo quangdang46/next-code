@@ -19,8 +19,20 @@ import Testing
     #expect(payload?.code == "123456")
 }
 
+@Test func pairURIParsesNextCodeScheme() {
+    let payload = PairURI.parse("nextcode://pair?host=mybox.ts.net&port=7643&code=123456")
+    #expect(payload?.gateway.host == "mybox.ts.net")
+    #expect(payload?.gateway.port == 7643)
+    #expect(payload?.code == "123456")
+}
+
 @Test func pairURIDefaultsPort() {
     let payload = PairURI.parse("jcode://pair?host=mybox&code=987654")
+    #expect(payload?.gateway.port == Gateway.defaultPort)
+}
+
+@Test func pairURIDefaultsPortForNextCodeScheme() {
+    let payload = PairURI.parse("nextcode://pair?host=mybox&code=987654")
     #expect(payload?.gateway.port == Gateway.defaultPort)
 }
 
@@ -28,6 +40,8 @@ import Testing
     #expect(PairURI.parse("https://example.com/pair?host=x&code=1") == nil)
     #expect(PairURI.parse("jcode://pair?host=&code=1") == nil)
     #expect(PairURI.parse("jcode://pair?host=x") == nil)
+    #expect(PairURI.parse("nextcode://pair?host=&code=1") == nil)
+    #expect(PairURI.parse("nextcode://pair?host=x") == nil)
     #expect(PairURI.parse("not a uri") == nil)
 }
 

@@ -4,19 +4,19 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
-bin=${JCODE_AUTH_MATRIX_BIN:-}
-out_dir=${JCODE_AUTH_MATRIX_OUT:-"$repo_root/target/auth-test-reports"}
-prompt=${JCODE_AUTH_MATRIX_PROMPT:-"Reply with exactly AUTH_TEST_OK and nothing else. Do not call tools."}
-providers=${JCODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}
-mode=${JCODE_AUTH_MATRIX_MODE:-configured}
-keep_going=${JCODE_AUTH_MATRIX_KEEP_GOING:-1}
-per_command_timeout=${JCODE_AUTH_MATRIX_TIMEOUT:-90}
+bin=${NEXT_CODE_AUTH_MATRIX_BIN:-${JCODE_AUTH_MATRIX_BIN:-}}
+out_dir=${NEXT_CODE_AUTH_MATRIX_OUT:-${JCODE_AUTH_MATRIX_OUT:-"$repo_root/target/auth-test-reports"}}
+prompt=${NEXT_CODE_AUTH_MATRIX_PROMPT:-${JCODE_AUTH_MATRIX_PROMPT:-"Reply with exactly AUTH_TEST_OK and nothing else. Do not call tools."}}
+providers=${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-${JCODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}}
+mode=${NEXT_CODE_AUTH_MATRIX_MODE:-${JCODE_AUTH_MATRIX_MODE:-configured}}
+keep_going=${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-${JCODE_AUTH_MATRIX_KEEP_GOING:-1}}
+per_command_timeout=${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-${JCODE_AUTH_MATRIX_TIMEOUT:-90}}
 
 usage() {
   cat <<'EOF'
 Usage: scripts/auth_regression_matrix.sh [options]
 
-Runs jcode auth-test across the auth/provider matrix and writes one JSON report per provider.
+Runs next-code auth-test across the auth/provider matrix and writes one JSON report per provider.
 By default it only tests providers that are configured enough for auth-test to run.
 
 Options:
@@ -24,7 +24,7 @@ Options:
   --configured          Test only configured providers (default)
   --provider NAME       Test one provider. Can be repeated.
   --out DIR             Report directory (default: target/auth-test-reports)
-  --bin PATH            jcode binary to run (default: cargo run --bin jcode --)
+  --bin PATH            next-code binary to run (default: cargo run --bin next-code --)
   --login               Run login before validation for each provider
   --no-smoke            Skip runtime model smoke
   --no-tool-smoke       Skip tool-enabled runtime smoke
@@ -34,7 +34,7 @@ Options:
   -h, --help            Show this help
 
 Environment equivalents:
-  JCODE_AUTH_MATRIX_BIN=/path/to/jcode
+  NEXT_CODE_AUTH_MATRIX_BIN=/path/to/next-code
   JCODE_AUTH_MATRIX_OUT=target/auth-test-reports
   JCODE_AUTH_MATRIX_PROVIDERS="claude deepseek zai"
   JCODE_AUTH_MATRIX_MODE=configured|all
@@ -47,7 +47,7 @@ Environment equivalents:
 Examples:
   scripts/auth_regression_matrix.sh --configured --no-smoke
   scripts/auth_regression_matrix.sh --provider deepseek --provider zai
-  JCODE_AUTH_MATRIX_BIN=target/selfdev/jcode scripts/auth_regression_matrix.sh --all
+  NEXT_CODE_AUTH_MATRIX_BIN=target/selfdev/next-code scripts/auth_regression_matrix.sh --all
 EOF
 }
 
@@ -137,7 +137,7 @@ run_jcode() {
   if [[ -n "$bin" ]]; then
     timeout "$per_command_timeout" "$bin" "$@"
   else
-    timeout "$per_command_timeout" cargo run --quiet --bin jcode -- "$@"
+    timeout "$per_command_timeout" cargo run --quiet --bin next-code -- "$@"
   fi
 }
 

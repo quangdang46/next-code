@@ -11,7 +11,7 @@
     <key>CFBundlePackageType</key>
     <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
     <key>CFBundleDisplayName</key>
-    <string>jcode</string>
+    <string>Next Code</string>
     <key>CFBundleShortVersionString</key>
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
@@ -34,12 +34,13 @@
             <string>com.jcode.mobile.pair</string>
             <key>CFBundleURLSchemes</key>
             <array>
+                <string>nextcode</string>
                 <string>jcode</string>
             </array>
         </dict>
     </array>
     <key>NSCameraUsageDescription</key>
-    <string>Scan the QR code shown by `jcode pair` to connect to your server.</string>
+    <string>Scan the QR code shown by `next-code pair` to connect to your server.</string>
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsLocalNetworking</key>
@@ -50,6 +51,6 @@
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>NSLocalNetworkUsageDescription</key>
-    <string>Connects to jcode servers on your local network or tailnet.</string>
+    <string>Connects to Next Code servers on your local network or tailnet.</string>
 </dict>
 </plist>

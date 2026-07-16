@@ -362,7 +362,7 @@ async fn run_auth_doctor_validation(
         Ok(Ok(())) => "validation passed".to_string(),
         Ok(Err(err)) => err.to_string(),
         Err(_) => format!(
-            "validation timed out after {}s; run `jcode auth-test --provider {}` for detailed output",
+            "validation timed out after {}s; run `next-code auth-test --provider {}` for detailed output",
             AUTH_DOCTOR_VALIDATION_TIMEOUT_SECS, provider.id
         ),
     }
@@ -471,16 +471,16 @@ pub(super) async fn run_provider_current_command(
 
 pub(super) fn run_version_command(emit_json: bool, emit_toon: bool) -> Result<()> {
     let report = VersionReport {
-        version: jcode_build_meta::VERSION.to_string(),
-        semver: jcode_build_meta::SEMVER.to_string(),
-        base_semver: jcode_build_meta::BASE_SEMVER.to_string(),
-        update_semver: jcode_build_meta::UPDATE_SEMVER.to_string(),
-        git_hash: jcode_build_meta::GIT_HASH.to_string(),
-        git_tag: jcode_build_meta::GIT_TAG.to_string(),
+        version: next_code_build_meta::VERSION.to_string(),
+        semver: next_code_build_meta::SEMVER.to_string(),
+        base_semver: next_code_build_meta::BASE_SEMVER.to_string(),
+        update_semver: next_code_build_meta::UPDATE_SEMVER.to_string(),
+        git_hash: next_code_build_meta::GIT_HASH.to_string(),
+        git_tag: next_code_build_meta::GIT_TAG.to_string(),
         build_time: crate::build::current_binary_build_time_string()
             .unwrap_or_else(|| "unknown".to_string()),
-        git_date: jcode_build_meta::GIT_DATE.to_string(),
-        release_build: jcode_build_meta::is_release_build(),
+        git_date: next_code_build_meta::GIT_DATE.to_string(),
+        release_build: next_code_build_meta::is_release_build(),
     };
 
     if emit_json || emit_toon {
@@ -526,8 +526,8 @@ pub(super) async fn run_usage_command(emit_json: bool, emit_toon: bool) -> Resul
         println!("No connected providers");
         println!();
         println!("Next steps:");
-        println!("- Use `jcode login --provider claude` to connect Claude OAuth.");
-        println!("- Use `jcode login --provider openai` to connect ChatGPT / Codex OAuth.");
+        println!("- Use `next-code login --provider claude` to connect Claude OAuth.");
+        println!("- Use `next-code login --provider openai` to connect ChatGPT / Codex OAuth.");
         return Ok(());
     }
 
@@ -586,7 +586,7 @@ fn select_auth_doctor_providers(
         let provider =
             crate::provider_catalog::resolve_login_provider(provider_arg).ok_or_else(|| {
                 anyhow::anyhow!(
-                    "Unknown provider '{}'. Use `jcode provider list` to see valid provider ids.",
+                    "Unknown provider '{}'. Use `next-code provider list` to see valid provider ids.",
                     provider_arg
                 )
             })?;
@@ -687,7 +687,7 @@ pub(super) fn list_cli_providers() -> Vec<ProviderListEntry> {
 }
 
 fn list_catalog_providers(
-    catalog: &[jcode_provider_service::catalog::ProviderInfo],
+    catalog: &[next_code_provider_service::catalog::ProviderInfo],
 ) -> Vec<ProviderListEntry> {
     catalog
         .iter()
@@ -772,14 +772,14 @@ mod tests {
         assert_eq!(before_doctor_provider.status, "not_configured");
         assert!(before_doctor_provider.needs_attention);
         assert!(before_doctor_provider.diagnostics.iter().any(|line| {
-            line == &format!("{} is not configured for jcode yet.", provider.display_name)
+            line == &format!("{} is not configured for next-code yet.", provider.display_name)
         }));
         assert!(
             before_doctor_provider
                 .recommended_actions
                 .iter()
                 .any(|line| {
-                    line == &format!("Connect it: jcode login --provider {}", provider.id)
+                    line == &format!("Connect it: next-code login --provider {}", provider.id)
                 })
         );
 
@@ -843,7 +843,7 @@ mod tests {
                 .iter()
                 .any(|line| {
                     line == &format!(
-                        "Run runtime verification: jcode auth-test --provider {}",
+                        "Run runtime verification: next-code auth-test --provider {}",
                         provider.id
                     )
                 })
@@ -852,7 +852,7 @@ mod tests {
             after_doctor_provider
                 .recommended_actions
                 .iter()
-                .any(|line| { line == "Review current state: jcode auth status --json" })
+                .any(|line| { line == "Review current state: next-code auth status --json" })
         );
     }
 }

@@ -20,7 +20,27 @@ import subprocess
 import sys
 import time
 
-JCODE = os.path.expanduser("~/.jcode/builds/current/jcode")
+def _resolve_next_code_bin() -> str:
+    for key in ("NEXT_CODE_BIN", "JCODE_BIN"):
+        val = os.environ.get(key)
+        if val and os.path.isfile(val) and os.access(val, os.X_OK):
+            return val
+    candidates = [
+        "~/.local/bin/next-code",
+        os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN") or os.path.expanduser("~/.local/bin/next-code"),
+        "~/.next-code/builds/current/next-code",
+        "~/.next-code/builds/current/jcode",
+        "~/.jcode/builds/current/next-code",
+        "~/.jcode/builds/current/jcode",
+    ]
+    for c in candidates:
+        path = os.path.expanduser(c)
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return os.path.expanduser("~/.local/bin/next-code")
+
+
+JCODE = _resolve_next_code_bin()
 
 SGR_FG_RGB = re.compile(rb"38;2;(\d+);(\d+);(\d+)[;m]")
 SGR_FG_256 = re.compile(rb"\x1b\[38;5;(\d+)m")

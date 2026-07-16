@@ -10,7 +10,7 @@
 # the resulting daemon is running v0.22.x.
 #
 # Usage:
-#   cargo build -p jcode --bin jcode
+#   cargo build -p next-code --bin next-code
 #   scripts/stale_server_upgrade_sandbox.sh
 #
 # Linux x86_64 only (uses the published jcode-linux-x86_64 release asset).
@@ -22,7 +22,7 @@ OLD_VERSION="${OLD_VERSION:-v0.14.6}"
 OLD_DIR="${OLD_DIR:-/tmp/jcode-sandbox}"
 OLD_WRAP="$OLD_DIR/jcode-linux-x86_64"
 
-[ -x "$NEW_BIN" ] || { echo "missing new client binary: $NEW_BIN (run: cargo build -p jcode --bin jcode)"; exit 2; }
+[ -x "$NEW_BIN" ] || { echo "missing new client binary: $NEW_BIN (run: cargo build -p next-code --bin next-code)"; exit 2; }
 
 # Fetch + extract the real old release binary if it is not already present.
 if [ ! -x "$OLD_WRAP" ]; then

@@ -13,10 +13,10 @@
 //! stateful context, then verifies the final transform output.
 
 #[cfg(feature = "dcp")]
-use jcode::dcp_bridge;
+use next_code::dcp_bridge;
 #[cfg(feature = "dcp")]
-use jcode::dcp_plugin::DcpPlugin;
-use jcode::message::{ContentBlock, Message, Role};
+use next_code::dcp_plugin::DcpPlugin;
+use next_code::message::{ContentBlock, Message, Role};
 
 /// Build a realistic 100-message coding session with tool call/result pairs.
 ///
@@ -138,9 +138,9 @@ fn build_100_message_session() -> Vec<Message> {
 #[cfg(feature = "dcp")]
 #[test]
 fn dcp_100_message_session_reduces_tokens() {
-    let jcode_messages = build_100_message_session();
+    let next_code_messages = build_100_message_session();
     assert_eq!(
-        jcode_messages.len(),
+        next_code_messages.len(),
         100,
         "should have exactly 100 messages"
     );
@@ -150,29 +150,29 @@ fn dcp_100_message_session_reduces_tokens() {
     plugin.pruner_mut().set_session_id("dcp-integration-test");
 
     // Convert to DCP messages for token counting
-    let dcp_all = dcp_bridge::jcode_to_dcp(&jcode_messages);
+    let dcp_all = dcp_bridge::next_code_to_dcp(&next_code_messages);
     let tokens_before = plugin.pruner().count_messages_tokens(&dcp_all);
 
     // Drive the plugin in growing prefixes (like the DCP smoke test)
     // so stateful strategies can detect patterns across turns.
-    for n in (4..=jcode_messages.len()).step_by(4) {
-        let prefix = &jcode_messages[..n];
+    for n in (4..=next_code_messages.len()).step_by(4) {
+        let prefix = &next_code_messages[..n];
         let _ = plugin.transform(prefix);
     }
 
     // Final pass with the full session
     let output = plugin
-        .transform(&jcode_messages)
+        .transform(&next_code_messages)
         .expect("DcpPlugin::transform should succeed");
 
-    let dcp_output = dcp_bridge::jcode_to_dcp(&output.messages);
+    let dcp_output = dcp_bridge::next_code_to_dcp(&output.messages);
     let tokens_after = plugin.pruner().count_messages_tokens(&dcp_output);
 
     // Log the results
     eprintln!("DCP integration test results:");
     eprintln!(
         "  Messages: {} -> {}",
-        jcode_messages.len(),
+        next_code_messages.len(),
         output.messages.len()
     );
     eprintln!("  Tokens: {} -> {}", tokens_before, tokens_after);
@@ -202,12 +202,12 @@ fn dcp_100_message_session_reduces_tokens() {
         "transform should not produce empty output"
     );
     assert!(
-        output.messages.len() <= jcode_messages.len(),
+        output.messages.len() <= next_code_messages.len(),
         "transform should not invent new messages"
     );
 
     // Verify the bridge round-trip on output
-    let roundtrip = dcp_bridge::dcp_to_jcode(dcp_bridge::jcode_to_dcp(&output.messages));
+    let roundtrip = dcp_bridge::dcp_to_jcode(dcp_bridge::next_code_to_dcp(&output.messages));
     assert_eq!(
         roundtrip.len(),
         output.messages.len(),
@@ -238,27 +238,27 @@ fn dcp_100_message_session_reduces_tokens() {
 #[test]
 fn dcp_plugin_transform_default_mode() {
     // Test through DcpPlugin with default config (AgentMessage mode)
-    let jcode_messages = build_100_message_session();
-    assert_eq!(jcode_messages.len(), 100);
+    let next_code_messages = build_100_message_session();
+    assert_eq!(next_code_messages.len(), 100);
 
     let mut plugin = DcpPlugin::new().expect("DcpPlugin::new should succeed");
     plugin.pruner_mut().set_session_id("dcp-default-test");
 
     // Drive in growing prefixes
-    for n in (4..=jcode_messages.len()).step_by(4) {
-        let prefix = &jcode_messages[..n];
+    for n in (4..=next_code_messages.len()).step_by(4) {
+        let prefix = &next_code_messages[..n];
         let _ = plugin.transform(prefix);
     }
 
     // Final pass
     let output = plugin
-        .transform(&jcode_messages)
+        .transform(&next_code_messages)
         .expect("DcpPlugin::transform should succeed");
 
     eprintln!("DcpPlugin default mode results:");
     eprintln!(
         "  Messages: {} -> {}",
-        jcode_messages.len(),
+        next_code_messages.len(),
         output.messages.len()
     );
     eprintln!("  Tokens saved: {}", output.tokens_saved);
@@ -266,7 +266,7 @@ fn dcp_plugin_transform_default_mode() {
 
     // Verify output is valid regardless of whether pruning triggered
     assert!(!output.messages.is_empty());
-    assert!(output.messages.len() <= jcode_messages.len());
+    assert!(output.messages.len() <= next_code_messages.len());
 }
 
 #[cfg(feature = "dcp")]
@@ -308,7 +308,7 @@ fn dcp_bridge_roundtrip_preserves_content() {
     let messages = build_100_message_session();
 
     // Forward: jcode -> DCP -> jcode
-    let dcp_msgs = dcp_bridge::jcode_to_dcp(&messages);
+    let dcp_msgs = dcp_bridge::next_code_to_dcp(&messages);
     assert_eq!(dcp_msgs.len(), messages.len());
 
     let roundtrip = dcp_bridge::dcp_to_jcode(dcp_msgs);

@@ -135,14 +135,14 @@ sleep 1  # Let recorder initialize
 
 # Start jcode in a new kitty window
 echo "🚀 Starting jcode..."
-kitty --title "jcode-replay" -e bash -c "cd $(pwd) && ~/.cargo/bin/jcode; read -p 'Press Enter to close...'" &
+kitty --title "next-code-replay" -e bash -c "cd $(pwd) && ${NEXT_CODE_BIN:-${JCODE_BIN:-~/.cargo/bin/next-code}}; read -p 'Press Enter to close...'" &
 KITTY_PID=$!
 sleep 2  # Wait for jcode to start
 
 # Focus the new window
 sleep 0.5
-# Find and focus the jcode-replay window
-WINDOW_ID=$(niri msg windows 2>/dev/null | grep -B5 "jcode-replay" | grep -oP 'Window ID \K\d+' | head -1)
+# Find and focus the next-code-replay window
+WINDOW_ID=$(niri msg windows 2>/dev/null | grep -B5 "next-code-replay" | grep -oP 'Window ID \K\d+' | head -1)
 if [ -n "$WINDOW_ID" ]; then
     echo "   Focusing window $WINDOW_ID"
     niri msg action focus-window --id "$WINDOW_ID"

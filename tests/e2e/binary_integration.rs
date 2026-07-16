@@ -37,7 +37,7 @@ use crate::test_support::*;
 //     to a Failed verdict instead of an indefinite hang.
 // ----------------------------------------------------------------------------
 
-/// Test that the jcode binary can run independent with Claude provider
+/// Test that the next-code binary can run independent with Claude provider
 #[tokio::test]
 #[ignore] // Requires Claude credentials
 async fn binary_integration_independent_claude() -> Result<()> {
@@ -49,7 +49,7 @@ async fn binary_integration_independent_claude() -> Result<()> {
             "run",
             "--release",
             "--bin",
-            "jcode",
+            "next-code",
             "--",
             "run",
             "Say 'test-ok' and nothing else",
@@ -69,7 +69,7 @@ async fn binary_integration_independent_claude() -> Result<()> {
     Ok(())
 }
 
-/// Test that the jcode binary can run with OpenAI provider
+/// Test that the next-code binary can run with OpenAI provider
 #[tokio::test]
 #[ignore] // Requires OpenAI/Codex credentials
 async fn binary_integration_openai_provider() -> Result<()> {
@@ -81,7 +81,7 @@ async fn binary_integration_openai_provider() -> Result<()> {
             "run",
             "--release",
             "--bin",
-            "jcode",
+            "next-code",
             "--",
             "--provider",
             "openai",
@@ -108,13 +108,13 @@ async fn binary_integration_openai_provider() -> Result<()> {
     Ok(())
 }
 
-/// Test that jcode version command works
+/// Test that next-code version command works
 #[tokio::test]
 async fn binary_version_command() -> Result<()> {
     use std::process::Command;
     let _env = setup_test_env()?;
 
-    let output = Command::new(env!("CARGO_BIN_EXE_jcode"))
+    let output = Command::new(env!("CARGO_BIN_EXE_next-code"))
         .arg("--version")
         .output()?;
 
@@ -122,8 +122,8 @@ async fn binary_version_command() -> Result<()> {
 
     assert!(output.status.success(), "Version command should succeed");
     assert!(
-        stdout.contains("jcode") || stdout.contains("20"),
-        "Version should contain 'jcode' or date. Got: {}",
+        stdout.contains("next-code") || stdout.contains("jcode") || stdout.contains("20"),
+        "Version should contain 'next-code', 'jcode', or date. Got: {}",
         stdout
     );
 
@@ -132,7 +132,7 @@ async fn binary_version_command() -> Result<()> {
 
 /// Test full server reload handoff against a real spawned server process.
 ///
-/// Requires a built release binary at target/release/jcode because the reload
+/// Requires a built release binary at target/release/next-code because the reload
 /// flow execs into the repo's reload candidate.
 #[tokio::test]
 #[ignore]
@@ -140,7 +140,7 @@ async fn binary_integration_reload_handoff() -> Result<()> {
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        next_code::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",
@@ -149,7 +149,7 @@ async fn binary_integration_reload_handoff() -> Result<()> {
     }
 
     let temp_root = tempfile::Builder::new()
-        .prefix("jcode-reload-e2e-")
+        .prefix("next-code-reload-e2e-")
         .tempdir()?;
     let runtime_dir = temp_root.path().join("runtime");
     let home_dir = temp_root.path().join("home");
@@ -163,19 +163,26 @@ async fn binary_integration_reload_handoff() -> Result<()> {
     let debug_socket_path = runtime_dir.join("jcode-debug.sock");
 
     let stderr_file = std::fs::File::create(&stderr_path)?;
-    let mut child = Command::new(env!("CARGO_BIN_EXE_jcode"))
+    let mut child = Command::new(env!("CARGO_BIN_EXE_next-code"))
         .arg("--no-update")
         .arg("--socket")
         .arg(&socket_path)
         .arg("serve")
         // This test must exercise the real exec-based reload handoff, not the
         // in-process test shortcut used by other e2e cases.
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env_remove("JCODE_TEST_SESSION")
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir)
         .env("JCODE_INSTALL_DIR", &install_dir)
+        .env("NEXT_CODE_DEBUG_CONTROL", "1")
         .env("JCODE_DEBUG_CONTROL", "1")
+        .env("NEXT_CODE_TEMP_SERVER", "1")
         .env("JCODE_TEMP_SERVER", "1")
+        .env("NEXT_CODE_SERVER_OWNER_PID", std::process::id().to_string())
         .env("JCODE_SERVER_OWNER_PID", std::process::id().to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -213,7 +220,7 @@ async fn binary_integration_reload_handoff() -> Result<()> {
         );
 
         let marker_deadline = Instant::now() + Duration::from_secs(20);
-        while jcode::server::reload_marker_active(Duration::from_secs(30)) {
+        while next_code::server::reload_marker_active(Duration::from_secs(30)) {
             if Instant::now() >= marker_deadline {
                 anyhow::bail!("reload marker remained active too long after restart");
             }
@@ -259,7 +266,7 @@ async fn binary_integration_reload_handoff() -> Result<()> {
 
 /// Test repeated self-dev reload handoff against a real TUI client running in a PTY.
 ///
-/// Requires a built release binary at target/release/jcode because the
+/// Requires a built release binary at target/release/next-code because the
 /// self-dev server reload path execs into the repo's reload candidate.
 #[cfg(unix)]
 #[tokio::test]
@@ -268,7 +275,7 @@ async fn binary_integration_selfdev_reload_reconnects_quickly() -> Result<()> {
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        next_code::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",
@@ -277,7 +284,7 @@ async fn binary_integration_selfdev_reload_reconnects_quickly() -> Result<()> {
     }
 
     let temp_root = tempfile::Builder::new()
-        .prefix("jcode-selfdev-reload-e2e-")
+        .prefix("next-code-selfdev-reload-e2e-")
         .tempdir()?;
     let runtime_dir = temp_root.path().join("runtime");
     let home_dir = temp_root.path().join("home");
@@ -286,9 +293,12 @@ async fn binary_integration_selfdev_reload_reconnects_quickly() -> Result<()> {
     std::fs::create_dir_all(&home_dir)?;
     std::fs::create_dir_all(&install_dir)?;
 
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", &home_dir);
-    let _runtime_guard = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
-    let _install_guard = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
+    let _home_legacy = EnvVarGuard::set("JCODE_HOME", &home_dir);
+    let _runtime_guard = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
+    let _runtime_legacy = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
+    let _install_guard = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
+    let _install_legacy = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
 
     let socket_path = runtime_dir.join("jcode.sock");
     let debug_socket_path = runtime_dir.join("jcode-debug.sock");
@@ -299,9 +309,13 @@ async fn binary_integration_selfdev_reload_reconnects_quickly() -> Result<()> {
         .arg("antigravity")
         .arg("self-dev")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env_remove("JCODE_TEST_SESSION")
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir)
         .env("JCODE_INSTALL_DIR", &install_dir);
 
     let mut child = spawn_pty_child(command)?;
@@ -374,7 +388,7 @@ async fn binary_integration_selfdev_client_reload_resumes_session() -> Result<()
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        next_code::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",
@@ -383,7 +397,7 @@ async fn binary_integration_selfdev_client_reload_resumes_session() -> Result<()
     }
 
     let temp_root = tempfile::Builder::new()
-        .prefix("jcode-selfdev-client-reload-e2e-")
+        .prefix("next-code-selfdev-client-reload-e2e-")
         .tempdir()?;
     let runtime_dir = temp_root.path().join("runtime");
     let home_dir = temp_root.path().join("home");
@@ -392,14 +406,17 @@ async fn binary_integration_selfdev_client_reload_resumes_session() -> Result<()
     std::fs::create_dir_all(&home_dir)?;
     std::fs::create_dir_all(&install_dir)?;
 
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", &home_dir);
-    let _runtime_guard = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
-    let _install_guard = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
+    let _home_legacy = EnvVarGuard::set("JCODE_HOME", &home_dir);
+    let _runtime_guard = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
+    let _runtime_legacy = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
+    let _install_guard = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
+    let _install_legacy = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
 
     let socket_path = runtime_dir.join("jcode.sock");
     let debug_socket_path = runtime_dir.join("jcode-debug.sock");
-    let starter_binary = temp_root.path().join("jcode-selfdev-client-starter");
-    std::fs::copy(env!("CARGO_BIN_EXE_jcode"), &starter_binary)?;
+    let starter_binary = temp_root.path().join("next-code-selfdev-client-starter");
+    std::fs::copy(env!("CARGO_BIN_EXE_next-code"), &starter_binary)?;
     let starter_mtime = std::fs::metadata(&release_binary)?
         .modified()?
         .checked_sub(Duration::from_secs(60))
@@ -413,9 +430,13 @@ async fn binary_integration_selfdev_client_reload_resumes_session() -> Result<()
         .arg("antigravity")
         .arg("self-dev")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env_remove("JCODE_TEST_SESSION")
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir)
         .env("JCODE_INSTALL_DIR", &install_dir);
 
     let mut child = spawn_pty_child(command)?;
@@ -536,7 +557,7 @@ async fn binary_integration_selfdev_full_reload_resumes_session_quickly() -> Res
     let _env = setup_test_env()?;
 
     let release_binary =
-        jcode::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
+        next_code::build::release_binary_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")));
     if !release_binary.exists() {
         anyhow::bail!(
             "release binary missing at {} (run `cargo build --release` first)",
@@ -545,7 +566,7 @@ async fn binary_integration_selfdev_full_reload_resumes_session_quickly() -> Res
     }
 
     let temp_root = tempfile::Builder::new()
-        .prefix("jcode-selfdev-full-reload-e2e-")
+        .prefix("next-code-selfdev-full-reload-e2e-")
         .tempdir()?;
     let runtime_dir = temp_root.path().join("runtime");
     let home_dir = temp_root.path().join("home");
@@ -554,14 +575,17 @@ async fn binary_integration_selfdev_full_reload_resumes_session_quickly() -> Res
     std::fs::create_dir_all(&home_dir)?;
     std::fs::create_dir_all(&install_dir)?;
 
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", &home_dir);
-    let _runtime_guard = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
-    let _install_guard = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
+    let _home_legacy = EnvVarGuard::set("JCODE_HOME", &home_dir);
+    let _runtime_guard = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
+    let _runtime_legacy = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
+    let _install_guard = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
+    let _install_legacy = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
 
     let socket_path = runtime_dir.join("jcode.sock");
     let debug_socket_path = runtime_dir.join("jcode-debug.sock");
-    let starter_binary = temp_root.path().join("jcode-selfdev-full-reload-starter");
-    std::fs::copy(env!("CARGO_BIN_EXE_jcode"), &starter_binary)?;
+    let starter_binary = temp_root.path().join("next-code-selfdev-full-reload-starter");
+    std::fs::copy(env!("CARGO_BIN_EXE_next-code"), &starter_binary)?;
     let starter_mtime = std::fs::metadata(&release_binary)?
         .modified()?
         .checked_sub(Duration::from_secs(60))
@@ -575,9 +599,13 @@ async fn binary_integration_selfdev_full_reload_resumes_session_quickly() -> Res
         .arg("antigravity")
         .arg("self-dev")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env_remove("JCODE_TEST_SESSION")
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir)
         .env("JCODE_INSTALL_DIR", &install_dir);
 
     let mut child = spawn_pty_child(command)?;

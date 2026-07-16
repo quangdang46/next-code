@@ -2,7 +2,7 @@
 """Golden-image regression checks for Jcode Desktop gallery captures.
 
 Renders every gallery fixture state headlessly via
-`jcode-desktop --capture-gallery-screens` and compares the PNGs against
+`next-code-desktop --capture-gallery-screens` and compares the PNGs against
 checked-in baselines.
 
 Usage:
@@ -33,7 +33,7 @@ except ImportError:
     sys.exit(2)
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_BIN = ROOT / "target" / "debug" / "jcode-desktop"
+DEFAULT_BIN = ROOT / "target" / "debug" / "next-code-desktop"
 DEFAULT_BASELINE_DIR = ROOT / "tests" / "desktop-gallery-golden"
 
 
@@ -84,7 +84,7 @@ def main() -> int:
     if not args.binary.exists():
         print(
             f"error: desktop binary not found at {args.binary}; build with "
-            "`cargo build -p jcode-desktop --bin jcode-desktop`",
+            "`cargo build -p next-code-desktop --bin next-code-desktop`",
             file=sys.stderr,
         )
         return 2

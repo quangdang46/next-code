@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Headless E2E regression for the edit expand badge shortcut.
 
-This starts a real jcode TUI client inside a pseudo-terminal, prepares a real
+This starts a real next-code TUI client inside a pseudo-terminal, prepares a real
 rendered edit-diff expand-badge fixture through the client debug command, sends
 terminal key bytes to the PTY, and asserts the live TUI state changed.
 
-Run from repo root after building jcode:
+Run from repo root after building next-code:
   python3 tests/e2e/expand_badge_headless.py
 """
 
@@ -68,15 +68,23 @@ def drain_pty(master_fd):
 
 
 def main():
-    binary = os.environ.get("JCODE_E2E_BIN")
+    binary = os.environ.get("NEXT_CODE_E2E_BIN") or os.environ.get("JCODE_E2E_BIN")
     if not binary:
         candidates = [
+            REPO / "target" / "selfdev" / "next-code",
             REPO / "target" / "selfdev" / "jcode",
+            REPO / "target" / "release" / "next-code",
+            REPO / "target" / "release" / "jcode",
+            Path.home() / ".next-code" / "builds" / "current" / "next-code",
+            Path.home() / ".next-code" / "builds" / "current" / "jcode",
+            Path.home() / ".jcode" / "builds" / "current" / "next-code",
             Path.home() / ".jcode" / "builds" / "current" / "jcode",
         ]
         binary = next((str(p) for p in candidates if p.exists()), None)
     if not binary:
-        raise SystemExit("No jcode binary found. Set JCODE_E2E_BIN or build first.")
+        raise SystemExit(
+            "No next-code binary found. Set NEXT_CODE_E2E_BIN (or legacy JCODE_E2E_BIN) or build first."
+        )
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(SOCKET_PATH)

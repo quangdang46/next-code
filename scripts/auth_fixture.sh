@@ -22,12 +22,12 @@ Usage: $(basename "$0") <command> [args...]
 Commands:
   list                         List saved local auth fixtures
   path [name]                  Print fixture root, or a specific fixture path
-  save <name>                  Save the current sandbox JCODE_HOME as a fixture
-  load <name>                  Replace the sandbox JCODE_HOME with a saved fixture
-  reset-sandbox                Remove only the current sandbox JCODE_HOME
+  save <name>                  Save the current sandbox NEXT_CODE_HOME as a fixture
+  load <name>                  Replace the sandbox NEXT_CODE_HOME with a saved fixture
+  reset-sandbox                Remove only the current sandbox NEXT_CODE_HOME
   delete <name>                Delete a saved fixture
   env <name>                   Print exports for running against a loaded fixture
-  run <name> -- <args...>      Load fixture, then run jcode with args in sandbox
+  run <name> -- <args...>      Load fixture, then run next-code with args in sandbox
   help                         Show this help
 
 Environment overrides:
@@ -91,9 +91,9 @@ run_jcode() {
   (
     cd "$repo_root"
     if [[ -x "$binary_path" ]]; then
-      env JCODE_HOME="$jcode_home" JCODE_RUNTIME_DIR="$runtime_dir" "$binary_path" "$@"
+      env NEXT_CODE_HOME="$jcode_home" JCODE_HOME="$jcode_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" "$binary_path" "$@"
     else
-      env JCODE_HOME="$jcode_home" JCODE_RUNTIME_DIR="$runtime_dir" cargo run --bin jcode -- "$@"
+      env NEXT_CODE_HOME="$jcode_home" JCODE_HOME="$jcode_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" cargo run --bin next-code -- "$@"
     fi
   )
 }
@@ -113,7 +113,7 @@ save_fixture() {
   meta=$(metadata_path "$name")
   ensure_parent_dirs
   if [[ ! -d "$jcode_home" ]]; then
-    echo "sandbox JCODE_HOME does not exist: $jcode_home" >&2
+    echo "sandbox NEXT_CODE_HOME does not exist: $jcode_home" >&2
     exit 1
   fi
   mkdir -p "$(dirname "$dst")"
@@ -181,7 +181,7 @@ case "$command" in
   reset-sandbox)
     rm -rf "$jcode_home"
     mkdir -p "$jcode_home" "$runtime_dir"
-    echo "Reset sandbox JCODE_HOME: $jcode_home"
+    echo "Reset sandbox NEXT_CODE_HOME: $jcode_home"
     ;;
   delete)
     name=$(require_name "${1:-}")

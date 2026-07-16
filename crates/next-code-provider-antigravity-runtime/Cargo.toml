@@ -1,0 +1,29 @@
+[package]
+name = "next-code-provider-antigravity-runtime"
+version = "0.1.0"
+edition = "2024"
+description = "Antigravity provider runtime (Google Cloud Code multiplexed Gemini/Claude backend) for jcode, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+
+[lib]
+name = "next_code_provider_antigravity_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+next-code-base = { path = "../next-code-base" }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-provider-antigravity = { path = "../next-code-provider-antigravity" }
+next-code-provider-core = { path = "../next-code-provider-core" }
+next-code-provider-gemini = { path = "../next-code-provider-gemini" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "charset", "http2", "system-proxy", "rustls-tls", "rustls-tls-native-roots"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "time", "rt"] }
+tokio-stream = "0.1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+# The migrated antigravity tests use next-code-base's test-env sandbox.
+next-code-base = { path = "../next-code-base", features = ["test-support"] }
+tempfile = "3"

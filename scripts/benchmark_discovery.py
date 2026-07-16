@@ -32,9 +32,9 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CASES = REPO_ROOT / "scripts" / "discovery_benchmark_cases.json"
 DEFAULT_OUTPUT = REPO_ROOT / "target" / "discovery-benchmark" / "latest.json"
-CATEGORY_SOURCE = REPO_ROOT / "crates" / "jcode-base" / "src" / "sponsors.rs"
+CATEGORY_SOURCE = REPO_ROOT / "crates" / "next-code-base" / "src" / "sponsors.rs"
 BENCHMARK_ENV = "JCODE_DISCOVERY_BENCHMARK"
-BENCHMARK_HEADER = "x-jcode-discovery-benchmark"
+BENCHMARK_HEADER = "x-next-code-discovery-benchmark"
 LISTING_RE = re.compile(r"Discoverable tools in '([^']+)'")
 EMPTY_RE = re.compile(r"No discoverable tools in category '([^']+)'")
 TOOL_RE = re.compile(r"^- ([^:\n]+):", re.MULTILINE)
@@ -91,7 +91,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=90.0, help="Seconds allowed per model attempt.")
     parser.add_argument("--catalog-retries", type=int, default=4)
     parser.add_argument("--retry-delay", type=float, default=0.5)
-    parser.add_argument("--jcode", default=os.environ.get("JCODE_BIN", "jcode"))
+    parser.add_argument("--jcode", "--next-code", dest="jcode", default=os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN") or "next-code")
     parser.add_argument("--model", default=os.environ.get("JCODE_DISCOVERY_BENCHMARK_MODEL", "gpt-5.6-sol"))
     parser.add_argument("--provider", default=os.environ.get("JCODE_DISCOVERY_BENCHMARK_PROVIDER"))
     parser.add_argument(
@@ -621,7 +621,7 @@ def main() -> int:
                 f"missing cases={coverage['missing_cases']}, stale cases={coverage['stale_cases']}"
             )
     else:
-        with tempfile.TemporaryDirectory(prefix="jcode-discovery-benchmark-") as temp_dir:
+        with tempfile.TemporaryDirectory(prefix="next-code-discovery-benchmark-") as temp_dir:
             temporary_root = Path(temp_dir)
             socket_path = temporary_root / "jcode.sock"
             workdir = temporary_root / "workspace"

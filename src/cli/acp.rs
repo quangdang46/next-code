@@ -122,10 +122,10 @@ impl DaemonSession {
         let mut reader = self.reader.lock().await;
         let n = reader.read_line(&mut line).await?;
         if n == 0 {
-            anyhow::bail!("Jcode daemon disconnected");
+            anyhow::bail!("Next Code daemon disconnected");
         }
         let event = serde_json::from_str(&line)
-            .with_context(|| format!("failed to decode Jcode daemon event: {}", line.trim_end()))?;
+            .with_context(|| format!("failed to decode Next Code daemon event: {}", line.trim_end()))?;
         Ok(event)
     }
 }
@@ -220,7 +220,7 @@ impl AcpRuntime {
                     self.write_error_value(
                         id,
                         JSONRPC_METHOD_NOT_FOUND,
-                        format!("Unsupported Jcode ACP extension method: {method}"),
+                        format!("Unsupported Next Code ACP extension method: {method}"),
                     )
                     .await?;
                 }
@@ -272,7 +272,7 @@ impl AcpRuntime {
                 self.write_error_value(
                     id,
                     JSONRPC_INTERNAL_ERROR,
-                    format!("Failed to create Jcode session: {err:#}"),
+                    format!("Failed to create Next Code session: {err:#}"),
                 )
                 .await?;
             }
@@ -325,7 +325,7 @@ impl AcpRuntime {
                 self.write_error_value(
                     id,
                     JSONRPC_INTERNAL_ERROR,
-                    format!("Failed to attach Jcode session '{session_id}': {err:#}"),
+                    format!("Failed to attach Next Code session '{session_id}': {err:#}"),
                 )
                 .await?;
             }
@@ -853,7 +853,7 @@ impl EventMapper {
                 "sessionUpdate": "agent_message_chunk",
                 "content": {
                     "type": "text",
-                    "text": format!("\n[Jcode compacted context: {trigger}]\n"),
+                    "text": format!("\n[Next Code compacted context: {trigger}]\n"),
                 }
             })],
             ServerEvent::SessionRenamed { display_title, .. } => vec![json!({
@@ -864,7 +864,7 @@ impl EventMapper {
                 "sessionUpdate": "agent_message_chunk",
                 "content": {
                     "type": "text",
-                    "text": format!("\n[Jcode MCP status: {}]\n", servers.join(", ")),
+                    "text": format!("\n[Next Code MCP status: {}]\n", servers.join(", ")),
                 }
             })],
             _ => {
@@ -910,6 +910,10 @@ fn initialize_result(params: &Value, profile: AcpProfile) -> Value {
         object.insert(
             "_meta".to_string(),
             json!({
+                "next-code": {
+                    "profile": profile.as_str(),
+                    "extensions": ["raw_server_event"]
+                },
                 "jcode": {
                     "profile": profile.as_str(),
                     "extensions": ["raw_server_event"]
@@ -922,9 +926,9 @@ fn initialize_result(params: &Value, profile: AcpProfile) -> Value {
         "protocolVersion": protocol_version,
         "agentCapabilities": agent_capabilities,
         "agentInfo": {
-            "name": "jcode",
-            "title": "Jcode",
-            "version": jcode_build_meta::PKG_VERSION,
+            "name": "next-code",
+            "title": "Next Code",
+            "version": next_code_build_meta::PKG_VERSION,
         },
         "authMethods": [],
     })
@@ -956,7 +960,7 @@ fn ensure_no_acp_mcp_servers(params: &Value) -> std::result::Result<(), String> 
         None | Some(Value::Null) => Ok(()),
         Some(Value::Array(items)) if items.is_empty() => Ok(()),
         Some(_) => Err(
-            "ACP mcpServers are not supported yet; configure MCP servers in Jcode config.toml"
+            "ACP mcpServers are not supported yet; configure MCP servers in Next Code config.toml"
                 .to_string(),
         ),
     }
@@ -1130,7 +1134,7 @@ mod tests {
     }
 
     #[test]
-    fn initialize_standard_omits_jcode_meta() {
+    fn initialize_standard_omits_next_code_meta() {
         let result = initialize_result(&json!({"protocolVersion": 1}), AcpProfile::Standard);
         assert_eq!(result["protocolVersion"], 1);
         assert!(result["agentCapabilities"].get("_meta").is_none());
@@ -1138,10 +1142,10 @@ mod tests {
     }
 
     #[test]
-    fn initialize_full_advertises_jcode_extension_meta() {
+    fn initialize_full_advertises_next_code_extension_meta() {
         let result = initialize_result(&json!({"protocolVersion": 1}), AcpProfile::Full);
         assert_eq!(
-            result["agentCapabilities"]["_meta"]["jcode"]["profile"],
+            result["agentCapabilities"]["_meta"]["next-code"]["profile"],
             "full"
         );
     }

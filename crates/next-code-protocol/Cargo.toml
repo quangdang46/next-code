@@ -1,0 +1,21 @@
+[package]
+name = "next-code-protocol"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+next-code-batch-types = { path = "../next-code-batch-types" }
+next-code-config-types = { path = "../next-code-config-types" }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-plan = { path = "../next-code-plan" }
+next-code-provider-core = { path = "../next-code-provider-core" }
+next-code-selfdev-types = { path = "../next-code-selfdev-types" }
+next-code-session-types = { path = "../next-code-session-types" }
+next-code-side-panel-types = { path = "../next-code-side-panel-types" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+anyhow = "1"
+rand = "0.9"

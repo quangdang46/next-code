@@ -400,11 +400,11 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             commands::run_pair_command(list, revoke)?;
         }
         Some(Command::Permissions) => {
-            // Deprecated alias: show current mode (same as `jcode permission mode`).
+            // Deprecated alias: show current mode (same as `next-code permission mode`).
             let mode = crate::dcg_bridge::current_mode();
             println!("Current permission mode: {:?}", mode);
             println!(
-                "(The `jcode permissions` command is deprecated; use `jcode permission mode`)"
+                "(The `next-code permissions` command is deprecated; use `next-code permission mode`)"
             );
         }
         Some(Command::Transcript {
@@ -654,7 +654,7 @@ fn resolve_resume_arg(args: &mut Args) -> Result<()> {
                     // for session lifecycle, so an id that is not in the local store
                     // can still be valid server-side. Hard-exiting here dumped the
                     // user back to a shell with "No session found matching ...",
-                    // making jcode unusable after an auto-update (issue #328).
+                    // making next-code unusable after an auto-update (issue #328).
                     // Instead, keep the raw id and let the remote connection resolve
                     // it; if the server cannot find it either, the TUI surfaces a
                     // recoverable message and falls back to a fresh session rather
@@ -669,7 +669,7 @@ fn resolve_resume_arg(args: &mut Args) -> Result<()> {
                     ResumeResolutionFailureAction::Exit => {
                         eprintln!("Error: {}", e);
                         if !output::quiet_enabled() {
-                            eprintln!("\nUse `jcode --resume` to list available sessions.");
+                            eprintln!("\nUse `next-code --resume` to list available sessions.");
                         }
                         std::process::exit(1);
                     }
@@ -923,17 +923,17 @@ async fn try_catalog_provider(
 
     #[allow(unreachable_code, unused_variables)]
     let is_auto = false;
-    use jcode_keyring_store::MockKeyringStore;
-    use jcode_provider_service::ProviderProfile;
-    use jcode_provider_service::boot;
-    use jcode_provider_service::catalog::InMemoryCatalog;
-    use jcode_provider_service::integration::InMemoryIntegration;
-    use jcode_provider_service::route_provider::RouteProvider;
-    use jcode_provider_service::runtime;
-    use jcode_provider_service::runtime::SessionError;
-    use jcode_provider_service::service::ResolvedRoute;
-    use jcode_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
-    use jcode_provider_service::types::ModelId;
+    use next_code_keyring_store::MockKeyringStore;
+    use next_code_provider_service::ProviderProfile;
+    use next_code_provider_service::boot;
+    use next_code_provider_service::catalog::InMemoryCatalog;
+    use next_code_provider_service::integration::InMemoryIntegration;
+    use next_code_provider_service::route_provider::RouteProvider;
+    use next_code_provider_service::runtime;
+    use next_code_provider_service::runtime::SessionError;
+    use next_code_provider_service::service::ResolvedRoute;
+    use next_code_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
+    use next_code_provider_service::types::ModelId;
 
     let catalog = Arc::new(InMemoryCatalog::new());
     let integration = Arc::new(InMemoryIntegration::new());
@@ -1045,8 +1045,8 @@ async fn run_default_command(args: Args) -> Result<()> {
     let already_in_selfdev = crate::cli::selfdev::client_selfdev_requested();
 
     // Record where this interactive launch happened so the system-wide launch
-    // hotkeys can reopen jcode in the last project directory (Cmd+') and the
-    // last jcode repo for self-dev (Cmd+Shift+'). Best-effort; ignored unless a
+    // hotkeys can reopen next-code in the last project directory (Cmd+') and the
+    // last next-code repo for self-dev (Cmd+Shift+'). Best-effort; ignored unless a
     // real TTY and not a fresh-spawn re-entry.
     if !args.fresh_spawn && std::io::IsTerminal::is_terminal(&std::io::stdin()) {
         let repo_dir = build::get_repo_dir();
@@ -1054,7 +1054,7 @@ async fn run_default_command(args: Args) -> Result<()> {
     }
 
     if in_jcode_repo && !already_in_selfdev && !args.no_selfdev {
-        output::stderr_info("📍 Detected jcode repository - enabling self-dev mode");
+        output::stderr_info("📍 Detected next-code repository - enabling self-dev mode");
         output::stderr_info("   Using shared server with self-dev session mode");
         output::stderr_info("   (use --no-selfdev to disable auto-detection)");
         output::stderr_blank_line();
@@ -1111,7 +1111,7 @@ async fn run_default_command(args: Args) -> Result<()> {
         // socket that has no live listener AND whose daemon lock is free, so it
         // can never disturb a running server.
         if server::reap_stale_socket_if_dead(&server::socket_path()).await {
-            output::stderr_info("Removed a stale jcode socket from a previous server.");
+            output::stderr_info("Removed a stale next-code socket from a previous server.");
         }
 
         maybe_prompt_server_bootstrap_login(&provider_choice).await?;

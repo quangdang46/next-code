@@ -25,9 +25,9 @@ pub(crate) enum ProviderAuthArg {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "jcode")]
-#[command(version = jcode_build_meta::VERSION)]
-#[command(about = "J-Code: A coding agent using Claude Max or ChatGPT Pro subscriptions")]
+#[command(name = "next-code")]
+#[command(version = next_code_build_meta::VERSION)]
+#[command(about = "Next Code: A coding agent using Claude Max or ChatGPT Pro subscriptions")]
 pub(crate) struct Args {
     /// Provider to use (e.g. anthropic, openai, gemini, openrouter, or auto-detect).
     /// Accepts legacy short names and IDs from the catalog.
@@ -70,7 +70,7 @@ pub(crate) struct Args {
     #[arg(long, global = true, hide = true, value_name = "CHORD")]
     pub(crate) spawn_hotkey: Option<String>,
 
-    /// Disable auto-detection of jcode repository and self-dev mode
+    /// Disable auto-detection of next-code repository and self-dev mode
     #[arg(long, global = true)]
     pub(crate) no_selfdev: bool,
 
@@ -156,10 +156,10 @@ pub(crate) enum Command {
         server_name: Option<String>,
     },
 
-    /// Run as an Agent Client Protocol (ACP) adapter backed by the Jcode daemon
+    /// Run as an Agent Client Protocol (ACP) adapter backed by the Next Code daemon
     Acp,
 
-    /// Manage the background server daemon (e.g. `jcode server stop`).
+    /// Manage the background server daemon (e.g. `next-code server stop`).
     Server {
         #[command(subcommand)]
         action: ServerCommand,
@@ -188,10 +188,10 @@ pub(crate) enum Command {
 
     /// Login to a provider via OAuth, API key, or local credentials
     Login {
-        /// Provider to log in to. Equivalent to --provider for this command, e.g. `jcode login google`.
+        /// Provider to log in to. Equivalent to --provider for this command, e.g. `next-code login google`.
         // Distinct clap id: the global `--provider` flag also has id "provider";
         // sharing the id makes clap drop the flag inside `login` (so
-        // `jcode login --provider x` errors) and propagate the global default
+        // `next-code login --provider x` errors) and propagate the global default
         // into this positional.
         #[arg(id = "login_provider", value_name = "PROVIDER")]
         provider: Option<String>,
@@ -237,7 +237,7 @@ pub(crate) enum Command {
         #[arg(long)]
         api_base: Option<String>,
 
-        /// OpenAI-compatible API key. If omitted, jcode prompts securely when needed.
+        /// OpenAI-compatible API key. If omitted, next-code prompts securely when needed.
         #[arg(long)]
         api_key: Option<String>,
 
@@ -246,7 +246,7 @@ pub(crate) enum Command {
         api_key_env: Option<String>,
     },
 
-    /// Log in to and manage your Jcode account
+    /// Log in to and manage your Next Code account
     Account {
         #[command(subcommand)]
         action: AccountCommand,
@@ -255,7 +255,7 @@ pub(crate) enum Command {
     /// Run in simple REPL mode (no TUI)
     Repl,
 
-    /// Update jcode to the latest version
+    /// Update next-code to the latest version
     Update,
 
     /// Show build/version information in human or JSON form
@@ -286,7 +286,7 @@ pub(crate) enum Command {
         build: bool,
     },
 
-    /// Debug socket CLI - interact with running jcode server
+    /// Debug socket CLI - interact with running next-code server
     Debug {
         /// Debug command to run (list, start, sessions, create_session, message, tool, state, history, etc.)
         #[arg(default_value = "help")]
@@ -337,7 +337,7 @@ pub(crate) enum Command {
     #[command(subcommand)]
     Permission(PermissionCommand),
 
-    /// Optional Jcode Cloud/Jade integration commands
+    /// Optional Next Code Cloud/Jade integration commands
     #[command(subcommand)]
     Cloud(CloudCommand),
 
@@ -355,12 +355,12 @@ pub(crate) enum Command {
     /// Review and respond to pending ambient permission requests
     Permissions,
 
-    /// Inject externally transcribed text into the active Jcode TUI
+    /// Inject externally transcribed text into the active Next Code TUI
     Transcript {
         /// Transcript text. If omitted, reads from stdin.
         text: Option<String>,
 
-        /// How to apply the transcript inside Jcode
+        /// How to apply the transcript inside Next Code
         #[arg(long, value_enum, default_value = "send")]
         mode: TranscriptModeArg,
 
@@ -369,14 +369,14 @@ pub(crate) enum Command {
         session: Option<String>,
     },
 
-    /// Run configured dictation: send to last-focused jcode client or type raw text
+    /// Run configured dictation: send to last-focused next-code client or type raw text
     Dictate {
-        /// Type the transcript into the focused app instead of sending to jcode
+        /// Type the transcript into the focused app instead of sending to next-code
         #[arg(long)]
         r#type: bool,
     },
 
-    /// Set up the platform global hotkey to launch jcode
+    /// Set up the platform global hotkey to launch next-code
     SetupHotkey {
         /// Internal: run as the macOS hotkey listener process.
         #[arg(long, hide = true)]
@@ -387,7 +387,7 @@ pub(crate) enum Command {
         notify_cli_launch: Option<String>,
     },
 
-    /// Install a launcher so jcode appears in your app launcher
+    /// Install a launcher so next-code appears in your app launcher
     SetupLauncher,
 
     /// Browser automation setup and status
@@ -544,13 +544,13 @@ pub(crate) enum Command {
         coverage_limit: usize,
     },
 
-    /// Run a comprehensive offline health check of the local jcode environment.
+    /// Run a comprehensive offline health check of the local next-code environment.
     ///
     /// Validates config, auth files, shell tools, sessions, storage, MCP config,
     /// resource headroom, and swarm preconditions. Use `--fix` to auto-repair
     /// safe problems (create missing dirs, tighten `auth.json` permissions). This
     /// command is offline and never spends provider balance — use
-    /// `jcode provider-doctor` / `jcode auth-test` for live provider verification.
+    /// `next-code provider-doctor` / `next-code auth-test` for live provider verification.
     Doctor {
         /// Emit the report as JSON (stable schema) for scripting/CI
         #[arg(long, conflicts_with = "toon")]
@@ -574,7 +574,7 @@ pub(crate) enum Command {
         only: Vec<String>,
     },
 
-    /// Save or restore the current set of open jcode windows across a system reboot
+    /// Save or restore the current set of open next-code windows across a system reboot
     Restart {
         #[command(subcommand)]
         action: RestartCommand,
@@ -602,7 +602,7 @@ pub(crate) enum AccountCommand {
         #[arg(long)]
         json: bool,
     },
-    /// Open the public Jcode account management page
+    /// Open the public Next Code account management page
     Manage,
     /// Revoke the current key when reachable, then securely clear local state
     Logout,
@@ -706,7 +706,7 @@ pub(crate) enum CloudSessionsCommand {
 
     /// Upload a specific local session JSON file to Jade cloud storage
     Upload {
-        /// Path to a local Jcode session JSON file
+        /// Path to a local Next Code session JSON file
         session_file: String,
 
         /// Upload without Jade's redaction pass
@@ -717,9 +717,9 @@ pub(crate) enum CloudSessionsCommand {
         jade: JadeCloudOptions,
     },
 
-    /// Upload the newest local Jcode session to Jade cloud storage
+    /// Upload the newest local Next Code session to Jade cloud storage
     UploadLatest {
-        /// Directory containing local Jcode session JSON files
+        /// Directory containing local Next Code session JSON files
         #[arg(long, default_value = "~/.jcode/sessions")]
         sessions_dir: String,
 
@@ -733,7 +733,7 @@ pub(crate) enum CloudSessionsCommand {
 
     /// Sync new or changed local sessions to Jade cloud storage (idempotent; safe to schedule)
     Sync {
-        /// Directory containing local Jcode session JSON files (default: ~/.jcode/sessions)
+        /// Directory containing local Next Code session JSON files (default: ~/.jcode/sessions)
         #[arg(long)]
         sessions_dir: Option<String>,
 
@@ -886,9 +886,9 @@ impl CloudSessionViewFormat {
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum RestartCommand {
-    /// Save a reboot snapshot of currently active jcode windows
+    /// Save a reboot snapshot of currently active next-code windows
     Save {
-        /// Restore this reboot snapshot automatically the next time plain `jcode` starts
+        /// Restore this reboot snapshot automatically the next time plain `next-code` starts
         #[arg(long)]
         auto_restore: bool,
     },
@@ -1141,11 +1141,11 @@ pub(crate) enum ProviderCommand {
         #[arg(long, conflicts_with = "no_api_key")]
         api_key_env: Option<String>,
 
-        /// API key value to store in jcode's private provider env file. Prefer --api-key-stdin for shell history safety.
+        /// API key value to store in next-code's private provider env file. Prefer --api-key-stdin for shell history safety.
         #[arg(long, conflicts_with_all = ["api_key_stdin", "no_api_key"])]
         api_key: Option<String>,
 
-        /// Read the API key from stdin and store it in jcode's private provider env file
+        /// Read the API key from stdin and store it in next-code's private provider env file
         #[arg(long, conflicts_with = "no_api_key")]
         api_key_stdin: bool,
 
@@ -1161,7 +1161,7 @@ pub(crate) enum ProviderCommand {
         #[arg(long)]
         auth_header: Option<String>,
 
-        /// Private env file name under jcode's app config directory for stored API keys
+        /// Private env file name under next-code's app config directory for stored API keys
         #[arg(long)]
         env_file: Option<String>,
 

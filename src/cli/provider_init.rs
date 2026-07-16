@@ -136,7 +136,7 @@ impl ProviderChoice {
         let normalized = s.to_ascii_lowercase().replace('_', "-");
         let s = normalized.as_str();
         Some(match s {
-            "jcode" => Self::Jcode,
+            "jcode" | "next-code" => Self::Jcode,
             "claude" => Self::Claude,
             "anthropic-api" | "claude-api" | "anthropic-key" | "claude-key" => Self::AnthropicApi,
             "claude-subprocess" => Self::Claude,
@@ -202,7 +202,7 @@ impl std::str::FromStr for ProviderChoice {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::provider_choice_from_str(s).ok_or_else(|| {
             format!(
-                "Unknown provider '{}'. Run `jcode login --help` for a list of supported providers.",
+                "Unknown provider '{}'. Run `next-code login --help` for a list of supported providers.",
                 s
             )
         })
@@ -435,7 +435,7 @@ pub fn prompt_login_provider_selection(
     heading: &str,
 ) -> Result<LoginProviderDescriptor> {
     prompt_login_provider_selection_optional(providers, heading)?.ok_or_else(|| {
-        anyhow::anyhow!("Login skipped. Run `jcode login` when you're ready to authenticate.")
+        anyhow::anyhow!("Login skipped. Run `next-code login` when you're ready to authenticate.")
     })
 }
 
@@ -672,7 +672,7 @@ fn provider_label_for_api_key_env(env_key: &str) -> String {
 
 fn provider_login_hint_for_api_key_env(env_key: &str) -> String {
     if env_key == "OPENROUTER_API_KEY" {
-        return "jcode login --provider openrouter".to_string();
+        return "next-code login --provider openrouter".to_string();
     }
 
     crate::provider_catalog::openai_compatible_profiles()
@@ -680,9 +680,9 @@ fn provider_login_hint_for_api_key_env(env_key: &str) -> String {
         .find_map(|profile| {
             let resolved = resolve_openai_compatible_profile(*profile);
             (resolved.api_key_env == env_key)
-                .then(|| format!("jcode login --provider {}", resolved.id))
+                .then(|| format!("next-code login --provider {}", resolved.id))
         })
-        .unwrap_or_else(|| "jcode login".to_string())
+        .unwrap_or_else(|| "next-code login".to_string())
 }
 
 fn ensure_external_api_key_auth_allowed_for_explicit_choice(env_key: &str) -> Result<()> {
@@ -708,7 +708,7 @@ fn ensure_external_api_key_auth_allowed_for_explicit_choice(env_key: &str) -> Re
         return Ok(());
     }
     anyhow::bail!(
-        "Skipped trusting external {} credentials. Run `{}` to authenticate jcode directly.",
+        "Skipped trusting external {} credentials. Run `{}` to authenticate next-code directly.",
         provider_name,
         login_hint
     )
@@ -833,7 +833,7 @@ fn ensure_openai_auth_allowed_for_explicit_choice() -> Result<()> {
     if maybe_prompt_for_generic_oauth_source(
         "OpenAI/Codex",
         auth::external::preferred_unconsented_openai_oauth_source(),
-        "jcode login --provider openai",
+        "next-code login --provider openai",
         false,
         || auth::codex::load_credentials().is_ok(),
     )? {
@@ -851,7 +851,7 @@ fn ensure_openai_auth_allowed_for_explicit_choice() -> Result<()> {
             "OpenAI/Codex",
             "Codex",
             &path,
-            "jcode login --provider openai"
+            "next-code login --provider openai"
         ));
     }
 
@@ -861,7 +861,7 @@ fn ensure_openai_auth_allowed_for_explicit_choice() -> Result<()> {
     }
 
     anyhow::bail!(
-        "Skipped trusting existing ~/.codex/auth.json credentials. Run `jcode login --provider openai` to authenticate jcode directly."
+        "Skipped trusting existing ~/.codex/auth.json credentials. Run `next-code login --provider openai` to authenticate next-code directly."
     )
 }
 
@@ -877,7 +877,7 @@ fn maybe_enable_legacy_codex_auth_for_auto(has_other_provider: bool) -> Result<b
         return maybe_prompt_for_generic_oauth_source(
             "OpenAI/Codex",
             Some(source),
-            "jcode login --provider openai",
+            "next-code login --provider openai",
             true,
             || auth::codex::load_credentials().is_ok(),
         );
@@ -898,7 +898,7 @@ fn maybe_enable_legacy_codex_auth_for_auto(has_other_provider: bool) -> Result<b
             "OpenAI/Codex",
             "Codex",
             &path,
-            "jcode login --provider openai",
+            "next-code login --provider openai",
         ));
         return Ok(false);
     }
@@ -919,7 +919,7 @@ fn ensure_claude_auth_allowed_for_explicit_choice() -> Result<()> {
     if maybe_prompt_for_generic_oauth_source(
         "Claude",
         auth::external::preferred_unconsented_anthropic_oauth_source(),
-        "jcode login --provider claude",
+        "next-code login --provider claude",
         false,
         || auth::claude::load_credentials().is_ok(),
     )? {
@@ -935,7 +935,7 @@ fn ensure_claude_auth_allowed_for_explicit_choice() -> Result<()> {
             "Claude",
             source.display_name(),
             &path,
-            "jcode login --provider claude"
+            "next-code login --provider claude"
         ));
     }
     if prompt_to_trust_external_auth("Claude", source.display_name(), &path)? {
@@ -943,7 +943,7 @@ fn ensure_claude_auth_allowed_for_explicit_choice() -> Result<()> {
         return Ok(());
     }
     anyhow::bail!(
-        "Skipped trusting external Claude credentials. Run `jcode login --provider claude` to authenticate jcode directly."
+        "Skipped trusting external Claude credentials. Run `next-code login --provider claude` to authenticate next-code directly."
     )
 }
 
@@ -959,7 +959,7 @@ fn maybe_enable_claude_auth_for_auto(has_other_provider: bool) -> Result<bool> {
         return maybe_prompt_for_generic_oauth_source(
             "Claude",
             Some(source),
-            "jcode login --provider claude",
+            "next-code login --provider claude",
             true,
             || auth::claude::load_credentials().is_ok(),
         );
@@ -977,7 +977,7 @@ fn maybe_enable_claude_auth_for_auto(has_other_provider: bool) -> Result<bool> {
             "Claude",
             source.display_name(),
             &path,
-            "jcode login --provider claude",
+            "next-code login --provider claude",
         ));
         return Ok(false);
     }
@@ -1002,7 +1002,7 @@ fn ensure_gemini_auth_allowed_for_explicit_choice() -> Result<()> {
     if maybe_prompt_for_generic_oauth_source(
         "Gemini",
         auth::external::preferred_unconsented_gemini_oauth_source(),
-        "jcode login --provider gemini",
+        "next-code login --provider gemini",
         false,
         || auth::gemini::load_tokens().is_ok(),
     )? {
@@ -1018,7 +1018,7 @@ fn ensure_gemini_auth_allowed_for_explicit_choice() -> Result<()> {
             "Gemini",
             "Gemini CLI",
             &path,
-            "jcode login --provider gemini"
+            "next-code login --provider gemini"
         ));
     }
     if prompt_to_trust_external_auth("Gemini", "Gemini CLI", &path)? {
@@ -1026,7 +1026,7 @@ fn ensure_gemini_auth_allowed_for_explicit_choice() -> Result<()> {
         return Ok(());
     }
     anyhow::bail!(
-        "Skipped trusting Gemini CLI credentials. Run `jcode login --provider gemini` to authenticate jcode directly."
+        "Skipped trusting Gemini CLI credentials. Run `next-code login --provider gemini` to authenticate next-code directly."
     )
 }
 
@@ -1046,7 +1046,7 @@ fn maybe_enable_gemini_auth_for_auto(has_other_provider: bool) -> Result<bool> {
         return maybe_prompt_for_generic_oauth_source(
             "Gemini",
             Some(source),
-            "jcode login --provider gemini",
+            "next-code login --provider gemini",
             true,
             || auth::gemini::load_tokens().is_ok(),
         );
@@ -1064,7 +1064,7 @@ fn maybe_enable_gemini_auth_for_auto(has_other_provider: bool) -> Result<bool> {
             "Gemini",
             "Gemini CLI",
             &path,
-            "jcode login --provider gemini",
+            "next-code login --provider gemini",
         ));
         return Ok(false);
     }
@@ -1083,7 +1083,7 @@ fn ensure_antigravity_auth_allowed_for_explicit_choice() -> Result<()> {
     if maybe_prompt_for_generic_oauth_source(
         "Antigravity",
         auth::external::preferred_unconsented_antigravity_oauth_source(),
-        "jcode login --provider antigravity",
+        "next-code login --provider antigravity",
         false,
         || auth::antigravity::load_tokens().is_ok(),
     )? {
@@ -1106,7 +1106,7 @@ fn ensure_copilot_auth_allowed_for_explicit_choice() -> Result<()> {
             "GitHub Copilot",
             source.display_name(),
             &path,
-            "jcode login --provider copilot"
+            "next-code login --provider copilot"
         ));
     }
     if prompt_to_trust_external_auth("GitHub Copilot", source.display_name(), &path)? {
@@ -1114,7 +1114,7 @@ fn ensure_copilot_auth_allowed_for_explicit_choice() -> Result<()> {
         return Ok(());
     }
     anyhow::bail!(
-        "Skipped trusting external Copilot credentials. Run `jcode login --provider copilot` to authenticate jcode directly."
+        "Skipped trusting external Copilot credentials. Run `next-code login --provider copilot` to authenticate next-code directly."
     )
 }
 
@@ -1134,7 +1134,7 @@ fn maybe_enable_copilot_auth_for_auto(has_other_provider: bool) -> Result<bool> 
             "GitHub Copilot",
             source.display_name(),
             &path,
-            "jcode login --provider copilot",
+            "next-code login --provider copilot",
         ));
         return Ok(false);
     }
@@ -1158,7 +1158,7 @@ fn ensure_cursor_auth_allowed_for_explicit_choice() -> Result<()> {
             "Cursor",
             source.display_name(),
             &path,
-            "jcode login --provider cursor"
+            "next-code login --provider cursor"
         ));
     }
     if prompt_to_trust_external_auth("Cursor", source.display_name(), &path)? {
@@ -1166,7 +1166,7 @@ fn ensure_cursor_auth_allowed_for_explicit_choice() -> Result<()> {
         return Ok(());
     }
     anyhow::bail!(
-        "Skipped trusting external Cursor credentials. Run `jcode login --provider cursor` to authenticate jcode directly."
+        "Skipped trusting external Cursor credentials. Run `next-code login --provider cursor` to authenticate next-code directly."
     )
 }
 
@@ -1186,7 +1186,7 @@ fn maybe_enable_cursor_auth_for_auto(has_other_provider: bool) -> Result<bool> {
             "Cursor",
             source.display_name(),
             &path,
-            "jcode login --provider cursor",
+            "next-code login --provider cursor",
         ));
         return Ok(false);
     }
@@ -1320,7 +1320,7 @@ pub async fn login_and_bootstrap_provider(
             disable_subscription_runtime_mode();
             unlock_model_provider();
             crate::env::set_var("JCODE_ACTIVE_PROVIDER", "cursor");
-            Arc::new(jcode_provider_cursor_runtime::CursorCliProvider::new())
+            Arc::new(next_code_provider_cursor_runtime::CursorCliProvider::new())
         }
         LoginProviderTarget::Copilot => {
             disable_subscription_runtime_mode();
@@ -1330,13 +1330,13 @@ pub async fn login_and_bootstrap_provider(
             disable_subscription_runtime_mode();
             unlock_model_provider();
             crate::env::set_var("JCODE_ACTIVE_PROVIDER", "gemini");
-            Arc::new(jcode_provider_gemini_runtime::GeminiProvider::new())
+            Arc::new(next_code_provider_gemini_runtime::GeminiProvider::new())
         }
         LoginProviderTarget::Antigravity => {
             disable_subscription_runtime_mode();
             unlock_model_provider();
             crate::env::set_var("JCODE_ACTIVE_PROVIDER", "antigravity");
-            Arc::new(jcode_provider_antigravity_runtime::AntigravityProvider::new())
+            Arc::new(next_code_provider_antigravity_runtime::AntigravityProvider::new())
         }
         LoginProviderTarget::Google => {
             anyhow::bail!("Google login cannot be used as a model provider bootstrap");
@@ -1424,7 +1424,7 @@ async fn init_provider_with_options(
 
     let provider: Arc<dyn provider::Provider> = match choice {
         ProviderChoice::Jcode => {
-            init_notice("Using Jcode subscription provider (provider locked)");
+            init_notice("Using Next Code subscription provider (provider locked)");
             Arc::new(provider::jcode::JcodeProvider::new())
         }
         ProviderChoice::Claude => {
@@ -1474,7 +1474,7 @@ async fn init_provider_with_options(
             init_notice("Using Cursor native HTTPS provider (experimental)");
             unlock_model_provider();
             crate::env::set_var("JCODE_ACTIVE_PROVIDER", "cursor");
-            Arc::new(jcode_provider_cursor_runtime::CursorCliProvider::new())
+            Arc::new(next_code_provider_cursor_runtime::CursorCliProvider::new())
         }
         ProviderChoice::Copilot => {
             disable_subscription_runtime_mode();
@@ -1495,7 +1495,7 @@ async fn init_provider_with_options(
             }
             unlock_model_provider();
             crate::env::set_var("JCODE_ACTIVE_PROVIDER", "gemini");
-            Arc::new(jcode_provider_gemini_runtime::GeminiProvider::new())
+            Arc::new(next_code_provider_gemini_runtime::GeminiProvider::new())
         }
         ProviderChoice::Openrouter => {
             disable_subscription_runtime_mode();
@@ -1591,13 +1591,13 @@ async fn init_provider_with_options(
                     anyhow::anyhow!("Unknown provider profile '{}'", profile_name)
                 })?;
                 Arc::new(
-                    jcode_provider_openrouter_runtime::OpenRouterProvider::new_named_openai_compatible(
+                    next_code_provider_openrouter_runtime::OpenRouterProvider::new_named_openai_compatible(
                         &profile_name,
                         profile,
                     )?,
                 )
             } else {
-                Arc::new(jcode_provider_openrouter_runtime::OpenRouterProvider::new()?)
+                Arc::new(next_code_provider_openrouter_runtime::OpenRouterProvider::new()?)
             }
         }
         ProviderChoice::Antigravity => {
@@ -1606,7 +1606,7 @@ async fn init_provider_with_options(
             init_notice("Using Antigravity provider (experimental)");
             unlock_model_provider();
             crate::env::set_var("JCODE_ACTIVE_PROVIDER", "antigravity");
-            Arc::new(jcode_provider_antigravity_runtime::AntigravityProvider::new())
+            Arc::new(next_code_provider_antigravity_runtime::AntigravityProvider::new())
         }
         ProviderChoice::Google => {
             disable_subscription_runtime_mode();
@@ -1614,7 +1614,7 @@ async fn init_provider_with_options(
                 "Note: Google/Gmail is not a model provider. Using auto-detect for model provider.",
             );
             init_notice(
-                "Gmail credentials can be configured with `jcode login google`; the gmail tool is enabled by default in the full tool profile.",
+                "Gmail credentials can be configured with `next-code login google`; the gmail tool is enabled by default in the full tool profile.",
             );
             unlock_model_provider();
             Arc::new(provider::MultiProvider::new_fast())
@@ -1764,7 +1764,7 @@ async fn init_provider_with_options(
                 // `/login` flow then activates a provider via the normal
                 // auth-changed path (MultiProvider::on_auth_changed hot-inits the
                 // newly logged-in provider). Only the actual TUI server opts in
-                // via JCODE_DEFERRED_AUTH_BOOTSTRAP, so `jcode run` and other
+                // via JCODE_DEFERRED_AUTH_BOOTSTRAP, so `next-code run` and other
                 // genuinely headless callers still fail loudly.
                 if std::env::var_os("JCODE_DEFERRED_AUTH_BOOTSTRAP").is_some() {
                     crate::logging::info(
@@ -1775,7 +1775,7 @@ async fn init_provider_with_options(
                     Arc::new(multi)
                 } else if non_interactive {
                     anyhow::bail!(
-                        "No credentials configured. Run 'jcode login' or set ANTHROPIC_API_KEY to authenticate."
+                        "No credentials configured. Run 'next-code login' or set ANTHROPIC_API_KEY to authenticate."
                     );
                 } else if !allow_login_bootstrap {
                     anyhow::bail!(

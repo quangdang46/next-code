@@ -83,8 +83,8 @@ static THEME_CACHE: Mutex<Option<ThemeCache>> = Mutex::new(None);
 
 /// Hot-reload aware theme load. Returns the cached theme when the
 /// resolved theme.toml hasn't changed mtime + path since last call.
-pub fn discover_cached(jcode_home: &Path, repo_root: Option<&Path>) -> (Theme, ThemeCacheToken) {
-    let path = resolve_theme_path(jcode_home, repo_root);
+pub fn discover_cached(next_code_home: &Path, repo_root: Option<&Path>) -> (Theme, ThemeCacheToken) {
+    let path = resolve_theme_path(next_code_home, repo_root);
     let mtime = path
         .as_ref()
         .and_then(|p| std::fs::metadata(p).ok())
@@ -96,7 +96,7 @@ pub fn discover_cached(jcode_home: &Path, repo_root: Option<&Path>) -> (Theme, T
 
     let stale = cache.last_mtime != mtime || cache.last_path != path;
     if stale {
-        cache.cached = load_or_default(jcode_home, repo_root);
+        cache.cached = load_or_default(next_code_home, repo_root);
         cache.last_mtime = mtime;
         cache.last_path = path.clone();
     }
@@ -110,10 +110,10 @@ pub fn discover_cached(jcode_home: &Path, repo_root: Option<&Path>) -> (Theme, T
 /// No re-parse, just an mtime + path lookup.
 pub fn theme_changed_since(
     token: &ThemeCacheToken,
-    jcode_home: &Path,
+    next_code_home: &Path,
     repo_root: Option<&Path>,
 ) -> bool {
-    let path = resolve_theme_path(jcode_home, repo_root);
+    let path = resolve_theme_path(next_code_home, repo_root);
     let mtime = path
         .as_ref()
         .and_then(|p| std::fs::metadata(p).ok())
@@ -243,14 +243,14 @@ pub fn parse_toml(toml_str: &str) -> Result<Theme, String> {
 ///
 /// Returns the path of the first found candidate, or `None` if no
 /// theme file is configured.
-pub fn resolve_theme_path(jcode_home: &Path, repo_root: Option<&Path>) -> Option<PathBuf> {
+pub fn resolve_theme_path(next_code_home: &Path, repo_root: Option<&Path>) -> Option<PathBuf> {
     if let Ok(p) = std::env::var("JCODE_THEME") {
         let p = PathBuf::from(p);
         if p.exists() {
             return Some(p);
         }
     }
-    let user = jcode_home.join("theme.toml");
+    let user = next_code_home.join("theme.toml");
     if user.exists() {
         return Some(user);
     }
@@ -265,8 +265,8 @@ pub fn resolve_theme_path(jcode_home: &Path, repo_root: Option<&Path>) -> Option
 
 /// Convenience: load the active theme, falling back to default on
 /// any error (with a warning log message).
-pub fn load_or_default(jcode_home: &Path, repo_root: Option<&Path>) -> Theme {
-    let Some(path) = resolve_theme_path(jcode_home, repo_root) else {
+pub fn load_or_default(next_code_home: &Path, repo_root: Option<&Path>) -> Theme {
+    let Some(path) = resolve_theme_path(next_code_home, repo_root) else {
         return Theme::default();
     };
     let raw = match std::fs::read_to_string(&path) {

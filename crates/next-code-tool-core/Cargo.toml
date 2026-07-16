@@ -1,0 +1,17 @@
+[package]
+name = "next-code-tool-core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "next_code_tool_core"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+next-code-agent-runtime = { path = "../next-code-agent-runtime" }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-tool-types = { path = "../next-code-tool-types" }
+serde_json = "1"
+tokio = { version = "1", features = ["sync"] }

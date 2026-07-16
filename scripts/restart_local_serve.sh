@@ -1,40 +1,69 @@
 #!/usr/bin/env bash
-# Restart local jcode serve on the *current* installed binary.
+# Restart local next-code serve on the *current* installed binary.
 # Use after scripts/install_release.sh so TUI work is not tested against a stale serve.
 set -euo pipefail
 
-current="$(readlink -f "${HOME}/.jcode/builds/current/jcode" 2>/dev/null \
-  || readlink "${HOME}/.jcode/builds/current/jcode" 2>/dev/null \
-  || true)"
+# Prefer ~/.next-code; fall back to legacy ~/.jcode during the rebrand window.
+current=""
+for candidate in \
+  "${HOME}/.next-code/builds/current/next-code" \
+  "${HOME}/.next-code/builds/current/jcode" \
+  "${HOME}/.jcode/builds/current/next-code" \
+  "${HOME}/.jcode/builds/current/jcode"; do
+  if [[ -e "${candidate}" ]]; then
+    resolved="$(readlink -f "${candidate}" 2>/dev/null \
+      || readlink "${candidate}" 2>/dev/null \
+      || printf '%s' "${candidate}")"
+    if [[ -n "${resolved}" && -x "${resolved}" ]]; then
+      current="${resolved}"
+      break
+    fi
+  fi
+done
+
 if [[ -z "${current}" || ! -x "${current}" ]]; then
-  echo "error: no executable at ~/.jcode/builds/current/jcode" >&2
-  exit 1
+  # Also accept PATH launchers.
+  if command -v next-code >/dev/null 2>&1; then
+    current="$(command -v next-code)"
+  elif command -v jcode >/dev/null 2>&1; then
+    current="$(command -v jcode)"
+  else
+    echo "error: no executable at ~/.next-code/builds/current/next-code (or legacy ~/.jcode/...)" >&2
+    exit 1
+  fi
 fi
 
-sock="${JCODE_SOCKET:-}"
+sock="${NEXT_CODE_SOCKET:-${JCODE_SOCKET:-}}"
 if [[ -z "${sock}" ]]; then
   # Match common macOS temp default used by local serve.
-  sock="${TMPDIR:-/tmp}/jcode.sock"
-  sock="${sock%/}/jcode.sock"
-  # Also try the path form without double jcode.sock
-  if [[ ! -S "${sock}" ]]; then
-    sock="${TMPDIR:-/tmp}jcode.sock"
+  base="${TMPDIR:-/tmp}"
+  base="${base%/}"
+  for try in \
+    "${base}/next-code.sock" \
+    "${base}/jcode.sock"; do
+    if [[ -S "${try}" ]]; then
+      sock="${try}"
+      break
+    fi
+  done
+  if [[ -z "${sock}" ]]; then
+    sock="${base}/next-code.sock"
   fi
 fi
 
 echo "binary: ${current}"
-echo "socket: ${sock} (override with JCODE_SOCKET=...)"
+echo "socket: ${sock} (override with NEXT_CODE_SOCKET=...)"
 
 # Kill only processes whose *executable path* is under builds/ (not this script).
 while read -r pid cmd; do
   [[ -z "${pid}" ]] && continue
   case "${cmd}" in
-    *"/jcode/builds/"*serve*|*"/builds/"*"jcode"*serve*)
+    *"/next-code/builds/"*serve*|*"/jcode/builds/"*serve*|*"/builds/"*"next-code"*serve*|*"/builds/"*"jcode"*serve*)
       echo "stopping pid ${pid}"
       kill "${pid}" 2>/dev/null || true
       ;;
   esac
-done < <(ps -ax -o pid=,command= 2>/dev/null | awk '/jcode/ && /serve/ {print $1, $0}')
+done < <(ps -ax -o pid=,command= 2>/dev/null | awk '/next-code|jcode/ && /serve/ {print $1, $0}')
 
 sleep 1
 # Force leftovers that still hold the socket.
@@ -46,7 +75,7 @@ if command -v lsof >/dev/null 2>&1 && [[ -S "${sock}" ]]; then
 fi
 
 mkdir -p "$(dirname "${sock}")" 2>/dev/null || true
-log="${TMPDIR:-/tmp}/jcode-serve-restart.log"
+log="${TMPDIR:-/tmp}/next-code-serve-restart.log"
 nohup "${current}" serve --socket "${sock}" >"${log}" 2>&1 &
 new_pid=$!
 sleep 1
@@ -58,5 +87,5 @@ fi
 echo "started pid ${new_pid}"
 echo "log: ${log}"
 if command -v lsof >/dev/null 2>&1; then
-  lsof -p "${new_pid}" 2>/dev/null | awk '/txt.*jcode/{print "mapped:", $NF; exit}'
+  lsof -p "${new_pid}" 2>/dev/null | awk '/txt.*(next-code|jcode)/{print "mapped:", $NF; exit}'
 fi

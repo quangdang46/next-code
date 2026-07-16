@@ -6,7 +6,17 @@
 set -euo pipefail
 
 NUM_INSTANCES=${1:-40}
-JCODE_BIN="${JCODE_BIN:-$(which jcode)}"
+if [ -n "${NEXT_CODE_BIN:-}" ]; then
+  JCODE_BIN="$NEXT_CODE_BIN"
+elif [ -n "${JCODE_BIN:-}" ]; then
+  :
+elif command -v next-code >/dev/null 2>&1; then
+  JCODE_BIN="$(command -v next-code)"
+elif command -v jcode >/dev/null 2>&1; then
+  JCODE_BIN="$(command -v jcode)"
+else
+  JCODE_BIN="${HOME}/.local/bin/next-code"
+fi
 LOG_DIR="/tmp/jcode-stress-test-$(date +%s)"
 mkdir -p "$LOG_DIR"
 

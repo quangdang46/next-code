@@ -1,0 +1,17 @@
+[package]
+name = "next-code-logging"
+version = "0.1.0"
+edition = "2024"
+description = "File logging, structured events, and thread/task-local logging context for jcode"
+
+[lib]
+name = "next_code_logging"
+path = "src/lib.rs"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+serde_json = { version = "1", features = ["raw_value"] }
+tokio = { version = "1", features = ["rt"] }
+next-code-core = { path = "../next-code-core" }
+next-code-redact = { path = "../next-code-redact" }
+next-code-storage = { path = "../next-code-storage" }

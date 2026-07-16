@@ -32,7 +32,7 @@
 //! ## API
 //!
 //! ```rust,no_run
-//! use jcode::turborag::{Cache, CacheEntry};
+//! use next_code::turborag::{Cache, CacheEntry};
 //!
 //! let cache = Cache::open()?;
 //! if let Some(blob) = cache.get("anthropic/claude-sonnet-4", "src/lib.rs:0..200")? {
@@ -103,7 +103,7 @@ impl Cache {
     /// Open the user-level TurboRAG cache (under `JCODE_HOME`).
     /// Creates the directory layout if it doesn't exist yet.
     pub fn open() -> Result<Self> {
-        let root = jcode_storage::jcode_dir()?.join("turborag");
+        let root = next_code_storage::next_code_dir()?.join("turborag");
         Self::open_at(root)
     }
 

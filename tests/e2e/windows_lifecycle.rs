@@ -13,17 +13,17 @@ struct SpawnedWindowsServer {
 }
 
 impl SpawnedWindowsServer {
-    fn jcode_binary() -> std::path::PathBuf {
+    fn next_code_binary() -> std::path::PathBuf {
         let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let release_binary = manifest_dir
             .join("target")
             .join("x86_64-pc-windows-msvc")
             .join("release")
-            .join("jcode.exe");
+            .join("next-code.exe");
         if release_binary.exists() {
             return release_binary;
         }
-        std::path::PathBuf::from(env!("CARGO_BIN_EXE_jcode"))
+        std::path::PathBuf::from(env!("CARGO_BIN_EXE_next-code"))
     }
 
     fn spawn(prefix: &str) -> Result<Self> {
@@ -37,12 +37,12 @@ impl SpawnedWindowsServer {
         std::fs::create_dir_all(&runtime_dir)?;
         std::fs::create_dir_all(&install_dir)?;
 
-        let socket_path = runtime_dir.join("jcode-windows-lifecycle.sock");
-        let debug_socket_path = runtime_dir.join("jcode-windows-lifecycle-debug.sock");
+        let socket_path = runtime_dir.join("next-code-windows-lifecycle.sock");
+        let debug_socket_path = runtime_dir.join("next-code-windows-lifecycle-debug.sock");
 
         let stdout_file = std::fs::File::create(&stdout_path)?;
         let stderr_file = std::fs::File::create(&stderr_path)?;
-        let mut command = Command::new(Self::jcode_binary());
+        let mut command = Command::new(Self::next_code_binary());
         command
             .arg("--no-update")
             .arg("--socket")
@@ -52,16 +52,27 @@ impl SpawnedWindowsServer {
             .arg("--model")
             .arg("windows-e2e-model")
             .arg("serve")
+            .env_remove("NEXT_CODE_TEST_SESSION")
             .env_remove("JCODE_TEST_SESSION")
+            .env("NEXT_CODE_HOME", &home_dir)
             .env("JCODE_HOME", &home_dir)
+            .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
             .env("JCODE_RUNTIME_DIR", &runtime_dir)
+            .env("NEXT_CODE_INSTALL_DIR", &install_dir)
             .env("JCODE_INSTALL_DIR", &install_dir)
+            .env("NEXT_CODE_NO_TELEMETRY", "1")
             .env("JCODE_NO_TELEMETRY", "1")
+            .env("NEXT_CODE_OPENAI_COMPAT_API_BASE", "http://127.0.0.1:9/v1")
             .env("JCODE_OPENAI_COMPAT_API_BASE", "http://127.0.0.1:9/v1")
+            .env("NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL", "windows-e2e-model")
             .env("JCODE_OPENAI_COMPAT_DEFAULT_MODEL", "windows-e2e-model")
+            .env("NEXT_CODE_OPENAI_COMPAT_LOCAL_ENABLED", "1")
             .env("JCODE_OPENAI_COMPAT_LOCAL_ENABLED", "1")
+            .env("NEXT_CODE_DEBUG_CONTROL", "1")
             .env("JCODE_DEBUG_CONTROL", "1")
+            .env("NEXT_CODE_TEMP_SERVER", "1")
             .env("JCODE_TEMP_SERVER", "1")
+            .env("NEXT_CODE_SERVER_OWNER_PID", std::process::id().to_string())
             .env("JCODE_SERVER_OWNER_PID", std::process::id().to_string())
             .env("RUST_BACKTRACE", "1")
             .stdin(Stdio::null())
@@ -88,22 +99,33 @@ impl SpawnedWindowsServer {
 
     fn apply_env<'a>(&self, command: &'a mut Command) -> &'a mut Command {
         command
+            .env_remove("NEXT_CODE_TEST_SESSION")
             .env_remove("JCODE_TEST_SESSION")
+            .env("NEXT_CODE_HOME", &self.home_dir)
             .env("JCODE_HOME", &self.home_dir)
+            .env("NEXT_CODE_RUNTIME_DIR", &self.runtime_dir)
             .env("JCODE_RUNTIME_DIR", &self.runtime_dir)
+            .env("NEXT_CODE_INSTALL_DIR", &self.install_dir)
             .env("JCODE_INSTALL_DIR", &self.install_dir)
+            .env("NEXT_CODE_NO_TELEMETRY", "1")
             .env("JCODE_NO_TELEMETRY", "1")
+            .env("NEXT_CODE_OPENAI_COMPAT_API_BASE", "http://127.0.0.1:9/v1")
             .env("JCODE_OPENAI_COMPAT_API_BASE", "http://127.0.0.1:9/v1")
+            .env("NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL", "windows-e2e-model")
             .env("JCODE_OPENAI_COMPAT_DEFAULT_MODEL", "windows-e2e-model")
+            .env("NEXT_CODE_OPENAI_COMPAT_LOCAL_ENABLED", "1")
             .env("JCODE_OPENAI_COMPAT_LOCAL_ENABLED", "1")
+            .env("NEXT_CODE_DEBUG_CONTROL", "1")
             .env("JCODE_DEBUG_CONTROL", "1")
+            .env("NEXT_CODE_TEMP_SERVER", "1")
             .env("JCODE_TEMP_SERVER", "1")
+            .env("NEXT_CODE_SERVER_OWNER_PID", std::process::id().to_string())
             .env("JCODE_SERVER_OWNER_PID", std::process::id().to_string())
             .env("RUST_BACKTRACE", "1")
     }
 
-    fn jcode_command(&self) -> Command {
-        let mut command = Command::new(Self::jcode_binary());
+    fn next_code_command(&self) -> Command {
+        let mut command = Command::new(Self::next_code_binary());
         self.apply_env(&mut command);
         command
     }
@@ -116,7 +138,7 @@ impl SpawnedWindowsServer {
         let stderr_path = self._temp_root.path().join(format!("{label}-stderr.log"));
         let stdout_file = std::fs::File::create(&stdout_path)?;
         let stderr_file = std::fs::File::create(&stderr_path)?;
-        let mut command = Command::new(Self::jcode_binary());
+        let mut command = Command::new(Self::next_code_binary());
         self.apply_env(&mut command)
             .arg("--no-update")
             .arg("--socket")
@@ -260,7 +282,7 @@ async fn windows_binary_server_accepts_clients_and_debug_cli() -> Result<()> {
         );
 
         let output = server
-            .jcode_command()
+            .next_code_command()
             .arg("--no-update")
             .arg("--socket")
             .arg(&server.socket_path)

@@ -9,15 +9,15 @@ from harbor.agents.base import BaseAgent
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
-IN_CONTAINER_HOME = "/tmp/jcode-home"
-IN_CONTAINER_RUNTIME = "/tmp/jcode-runtime"
-IN_CONTAINER_INPUT = "/tmp/jcode-input"
-IN_CONTAINER_OUTPUT = "/tmp/jcode-output"
-IN_CONTAINER_BINARY = "/usr/local/bin/jcode"
+IN_CONTAINER_HOME = "/tmp/next-code-home"
+IN_CONTAINER_RUNTIME = "/tmp/next-code-runtime"
+IN_CONTAINER_INPUT = "/tmp/next-code-input"
+IN_CONTAINER_OUTPUT = "/tmp/next-code-output"
+IN_CONTAINER_BINARY = "/usr/local/bin/next-code"
 IN_CONTAINER_LIB_DIR = f"{IN_CONTAINER_RUNTIME}/lib"
 IN_CONTAINER_CA_BUNDLE = f"{IN_CONTAINER_HOME}/ca-certificates.crt"
-DEFAULT_BINARY_PATH = "/tmp/jcode-compat-dist/jcode-linux-x86_64"
-DEFAULT_OPENAI_AUTH_PATH = "~/.jcode/openai-auth.json"
+DEFAULT_BINARY_PATH = "/tmp/next-code-compat-dist/next-code-linux-x86_64"
+DEFAULT_OPENAI_AUTH_PATH = "~/.next-code/openai-auth.json"
 CA_BUNDLE_CANDIDATES = (
     os.environ.get("JCODE_HARBOR_CA_BUNDLE"),
     "/etc/ca-certificates/extracted/tls-ca-bundle.pem",

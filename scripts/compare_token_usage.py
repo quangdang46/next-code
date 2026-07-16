@@ -18,7 +18,7 @@ Usage:
     python scripts/compare_token_usage.py [--verbose] [--runs N]
 
 Requirements:
-    - jcode built and in PATH or at target/release/jcode
+    - jcode built and in PATH or at target/release/next-code
     - claude CLI installed and authenticated
     - Both should use the same model (claude-opus-4-5-20251101 by default)
 """
@@ -67,8 +67,8 @@ class RunResult:
     error: Optional[str] = None
 
 
-def find_jcode_binary() -> str:
-    """Find the jcode binary."""
+def find_next_code_binary() -> str:
+    """Find the next-code binary."""
     # Check target/release first
     repo_root = Path(__file__).parent.parent
     release_binary = repo_root / "target" / "release" / "jcode"
@@ -330,7 +330,7 @@ def run_test_suite(verbose: bool = False, runs: int = 1) -> list:
         "List three primary colors, one per line.",
     ]
 
-    jcode_binary = find_jcode_binary()
+    jcode_binary = find_next_code_binary()
     print(f"Using jcode binary: {jcode_binary}")
     print(f"Running {len(prompts)} prompts, {runs} run(s) each\n")
 

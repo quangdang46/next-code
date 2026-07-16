@@ -1,6 +1,6 @@
 //! `jbench` CLI entry point.
 //!
-//! Dispatches to the [`jcode_jbench`] library for real work.
+//! Dispatches to the [`next_code_jbench`] library for real work.
 
 use std::path::PathBuf;
 
@@ -8,16 +8,16 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 
 #[cfg(feature = "agent-runner")]
-use jcode_jbench::agent_runner::AgentRunConfig;
+use next_code_jbench::agent_runner::AgentRunConfig;
 #[cfg(feature = "agent-runner")]
-use jcode_jbench::types::EvalDataV2;
-use jcode_jbench::types::EvalRun;
+use next_code_jbench::types::EvalDataV2;
+use next_code_jbench::types::EvalRun;
 
 /// Top-level `jbench` CLI.
 #[derive(Debug, Parser)]
 #[command(
     name = "jbench",
-    about = "JBench — jcode's git-commit-reconstruction eval framework",
+    about = "JBench — next-code's git-commit-reconstruction eval framework",
     version
 )]
 struct Cli {
@@ -58,15 +58,15 @@ enum Command {
     Run {
         /// Path to eval data JSON file.
         eval_file: PathBuf,
-        /// Agent ID to run (must be registered in jcode registry).
+        /// Agent ID to run (must be registered in next-code registry).
         #[arg(short, long)]
         agent_id: String,
         /// Output directory for EvalRun JSON files.
         #[arg(short, long)]
         output_dir: PathBuf,
-        /// Path to jcode binary (auto-detected if not set).
+        /// Path to next-code binary (auto-detected if not set).
         #[arg(long)]
-        jcode_binary: Option<PathBuf>,
+        next_code_binary: Option<PathBuf>,
         /// Maximum turns per run.
         #[arg(long, default_value = "100")]
         max_turns: u32,
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
             eval_file: _eval_file,
             agent_id: _agent_id,
             output_dir: _output_dir,
-            jcode_binary: _jcode_binary,
+            next_code_binary: _jcode_binary,
             max_turns: _max_turns,
             timeout_secs: _timeout_secs,
         } => {
@@ -242,7 +242,7 @@ async fn pick_commits_impl(
 }
 
 async fn gen_evals_impl(input: &PathBuf, output: &PathBuf) -> Result<()> {
-    use jcode_jbench::types::{EvalCommit, EvalDataV2};
+    use next_code_jbench::types::{EvalCommit, EvalDataV2};
 
     // Intermediate struct matching the pick-commits output format.
     #[derive(serde::Deserialize)]
@@ -329,7 +329,7 @@ async fn run_impl(
     eval_file: &PathBuf,
     agent_id: &str,
     output_dir: &PathBuf,
-    jcode_binary: Option<&PathBuf>,
+    next_code_binary: Option<&PathBuf>,
     max_turns: u32,
     timeout_secs: u64,
 ) -> Result<()> {
@@ -355,13 +355,13 @@ async fn run_impl(
             max_turns,
             timeout_secs,
             env: eval_data.env.clone(),
-            jcode_binary: jcode_binary.cloned(),
+            next_code_binary: next_code_binary.cloned(),
             ..Default::default()
         };
 
         let result = match tk_timeout(
             Duration::from_secs(timeout_secs),
-            jcode_jbench::agent_runner::run_agent_in_repo(config),
+            next_code_jbench::agent_runner::run_agent_in_repo(config),
         )
         .await
         {
@@ -406,7 +406,7 @@ async fn judge_impl(
 }
 
 async fn meta_analyze_impl(runs_dir: &PathBuf, output: Option<&PathBuf>) -> Result<()> {
-    use jcode_jbench::types::AgentEvalResults;
+    use next_code_jbench::types::AgentEvalResults;
     use std::fs;
 
     let mut all_runs = Vec::new();
@@ -533,8 +533,8 @@ fn civil_from_days(days: i64) -> (i64, u32, u32) {
 ///
 /// The name-status output gives us file paths and status codes; we split
 /// the full diff by file to associate each chunk with the right file.
-fn parse_diffs(name_status: &str, full_diff: &str) -> Vec<jcode_jbench::types::FileDiff> {
-    use jcode_jbench::types::{FileDiff, FileDiffStatus};
+fn parse_diffs(name_status: &str, full_diff: &str) -> Vec<next_code_jbench::types::FileDiff> {
+    use next_code_jbench::types::{FileDiff, FileDiffStatus};
 
     // Parse name-status lines: e.g. "M\tpath/to/file.rs" or "R100\told\tnew".
     let mut file_entries: Vec<(FileDiffStatus, String, Option<String>)> = Vec::new();

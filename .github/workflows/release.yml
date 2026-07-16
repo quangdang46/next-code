@@ -81,17 +81,17 @@ jobs:
             # Debian/Ubuntu containers used by many TB tasks.
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
-            artifact: jcode-linux-x86_64
+            artifact: next-code-linux-x86_64
             compat_container: true
           - os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            artifact: jcode-linux-aarch64
+            artifact: next-code-linux-aarch64
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact: jcode-macos-aarch64
+            artifact: next-code-macos-aarch64
           - os: macos-15-intel
             target: x86_64-apple-darwin
-            artifact: jcode-macos-x86_64
+            artifact: next-code-macos-x86_64
 
     steps:
       - uses: actions/checkout@v4
@@ -159,7 +159,7 @@ jobs:
         if: matrix.compat_container != true
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/jcode dist/${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/next-code dist/${{ matrix.artifact }}
           chmod +x dist/${{ matrix.artifact }}
           cd dist && tar czf ${{ matrix.artifact }}.tar.gz ${{ matrix.artifact }}
 
@@ -192,11 +192,11 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact: jcode-windows-x86_64
+            artifact: next-code-windows-x86_64
             unsigned_artifact: windows-unsigned-x86_64
           - os: windows-11-arm
             target: aarch64-pc-windows-msvc
-            artifact: jcode-windows-aarch64
+            artifact: next-code-windows-aarch64
             unsigned_artifact: windows-unsigned-aarch64
             cargo_args: "--no-default-features --features pdf"
 
@@ -255,7 +255,7 @@ jobs:
       - name: Verify built Windows binary launches
         shell: pwsh
         run: |
-          & "target/${{ matrix.target }}/release/jcode.exe" --version
+          & "target/${{ matrix.target }}/release/next-code.exe" --version
           if ($LASTEXITCODE -ne 0) {
             throw "Built Windows binary failed to run --version"
           }
@@ -264,14 +264,14 @@ jobs:
         shell: pwsh
         run: |
           & ./.github/scripts/verify_windows_install.ps1 `
-            -ArtifactExePath "target/${{ matrix.target }}/release/jcode.exe" `
+            -ArtifactExePath "target/${{ matrix.target }}/release/next-code.exe" `
             -Version "${{ github.ref_name }}"
 
       - name: Stage unsigned binary for signing
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/jcode.exe" "dist/${{ matrix.artifact }}.exe"
+          Copy-Item "target/${{ matrix.target }}/release/next-code.exe" "dist/${{ matrix.artifact }}.exe"
 
       - name: Upload unsigned binary for signing
         uses: actions/upload-artifact@v4
@@ -362,8 +362,8 @@ jobs:
           signing-account-name: ${{ vars.WINDOWS_SIGNING_ACCOUNT }}
           certificate-profile-name: ${{ vars.WINDOWS_SIGNING_CERTIFICATE_PROFILE }}
           files: |
-            ${{ github.workspace }}\artifacts\windows-unsigned-x86_64\jcode-windows-x86_64.exe
-            ${{ github.workspace }}\artifacts\windows-unsigned-aarch64\jcode-windows-aarch64.exe
+            ${{ github.workspace }}\artifacts\windows-unsigned-x86_64\next-code-windows-x86_64.exe
+            ${{ github.workspace }}\artifacts\windows-unsigned-aarch64\next-code-windows-aarch64.exe
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
@@ -373,8 +373,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           $assets = @(
-            @{ Name = 'jcode-windows-x86_64'; Path = 'artifacts/windows-unsigned-x86_64/jcode-windows-x86_64.exe' },
-            @{ Name = 'jcode-windows-aarch64'; Path = 'artifacts/windows-unsigned-aarch64/jcode-windows-aarch64.exe' }
+            @{ Name = 'next-code-windows-x86_64'; Path = 'artifacts/windows-unsigned-x86_64/next-code-windows-x86_64.exe' },
+            @{ Name = 'next-code-windows-aarch64'; Path = 'artifacts/windows-unsigned-aarch64/next-code-windows-aarch64.exe' }
           )
 
           foreach ($asset in $assets) {
@@ -395,25 +395,25 @@ jobs:
       - name: Upload final Windows artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jcode-windows-x86_64
+          name: next-code-windows-x86_64
           path: |
-            dist/jcode-windows-x86_64.exe
-            dist/jcode-windows-x86_64.tar.gz
+            dist/next-code-windows-x86_64.exe
+            dist/next-code-windows-x86_64.tar.gz
 
       - name: Upload final Windows ARM64 artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: jcode-windows-aarch64
+          name: next-code-windows-aarch64
           path: |
-            dist/jcode-windows-aarch64.exe
-            dist/jcode-windows-aarch64.tar.gz
+            dist/next-code-windows-aarch64.exe
+            dist/next-code-windows-aarch64.tar.gz
 
       - name: Publish Windows assets to release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${env:GITHUB_REF_NAME}" dist/jcode-windows-x86_64.exe dist/jcode-windows-x86_64.tar.gz dist/jcode-windows-aarch64.exe dist/jcode-windows-aarch64.tar.gz --clobber
+          gh release upload "${env:GITHUB_REF_NAME}" dist/next-code-windows-x86_64.exe dist/next-code-windows-x86_64.tar.gz dist/next-code-windows-aarch64.exe dist/next-code-windows-aarch64.tar.gz --clobber
 
   build-freebsd:
     name: Build (x86_64-unknown-freebsd)
@@ -457,31 +457,31 @@ jobs:
             export JCODE_RELEASE_BUILD=1
             export JCODE_BUILD_SEMVER="${{ github.ref_name }}"
 
-            echo "::group::cargo build (jcode binary)"
-            cargo build --locked --release -p jcode --bin jcode
+            echo "::group::cargo build (next-code binary)"
+            cargo build --locked --release -p next-code --bin next-code
             echo "::endgroup::"
 
             echo "::group::Verify binary launches"
-            ./target/release/jcode --version
+            ./target/release/next-code --version
             echo "::endgroup::"
 
             mkdir -p dist
-            cp target/release/jcode dist/jcode-freebsd-x86_64
-            chmod +x dist/jcode-freebsd-x86_64
-            cd dist && tar czf jcode-freebsd-x86_64.tar.gz jcode-freebsd-x86_64
+            cp target/release/next-code dist/next-code-freebsd-x86_64
+            chmod +x dist/next-code-freebsd-x86_64
+            cd dist && tar czf next-code-freebsd-x86_64.tar.gz next-code-freebsd-x86_64
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jcode-freebsd-x86_64
-          path: dist/jcode-freebsd-x86_64.tar.gz
+          name: next-code-freebsd-x86_64
+          path: dist/next-code-freebsd-x86_64.tar.gz
 
       - name: Publish asset to release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${GITHUB_REF_NAME}" "dist/jcode-freebsd-x86_64.tar.gz" --clobber
+          gh release upload "${GITHUB_REF_NAME}" "dist/next-code-freebsd-x86_64.tar.gz" --clobber
 
   release:
     name: Finalize release
@@ -496,7 +496,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-          pattern: jcode-*
+          pattern: next-code-*
 
       - name: Generate checksums
         shell: bash
@@ -560,10 +560,10 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           VERSION_NUM="${VERSION#v}"
 
-          LINUX_SHA=$(sha256sum artifacts/jcode-linux-x86_64/jcode-linux-x86_64.tar.gz | cut -d' ' -f1)
-          LINUX_ARM_SHA=$(sha256sum artifacts/jcode-linux-aarch64/jcode-linux-aarch64.tar.gz | cut -d' ' -f1)
-          MACOS_ARM_SHA=$(sha256sum artifacts/jcode-macos-aarch64/jcode-macos-aarch64.tar.gz | cut -d' ' -f1)
-          MACOS_INTEL_SHA=$(sha256sum artifacts/jcode-macos-x86_64/jcode-macos-x86_64.tar.gz | cut -d' ' -f1)
+          LINUX_SHA=$(sha256sum artifacts/next-code-linux-x86_64/next-code-linux-x86_64.tar.gz | cut -d' ' -f1)
+          LINUX_ARM_SHA=$(sha256sum artifacts/next-code-linux-aarch64/next-code-linux-aarch64.tar.gz | cut -d' ' -f1)
+          MACOS_ARM_SHA=$(sha256sum artifacts/next-code-macos-aarch64/next-code-macos-aarch64.tar.gz | cut -d' ' -f1)
+          MACOS_INTEL_SHA=$(sha256sum artifacts/next-code-macos-x86_64/next-code-macos-x86_64.tar.gz | cut -d' ' -f1)
 
           mkdir -p ~/.ssh
           echo "$HOMEBREW_DEPLOY_KEY" > ~/.ssh/deploy_key
@@ -581,45 +581,45 @@ jobs:
 
             on_macos do
               on_arm do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/jcode-macos-aarch64.tar.gz"
+                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-macos-aarch64.tar.gz"
                 sha256 "${MACOS_ARM_SHA}"
 
                 def install
-                  bin.install "jcode-macos-aarch64" => "jcode"
+                  bin.install "next-code-macos-aarch64" => "jcode"
                 end
               end
 
               on_intel do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/jcode-macos-x86_64.tar.gz"
+                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-macos-x86_64.tar.gz"
                 sha256 "${MACOS_INTEL_SHA}"
 
                 def install
-                  bin.install "jcode-macos-x86_64" => "jcode"
+                  bin.install "next-code-macos-x86_64" => "jcode"
                 end
               end
             end
 
             on_linux do
               on_intel do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/jcode-linux-x86_64.tar.gz"
+                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-linux-x86_64.tar.gz"
                 sha256 "${LINUX_SHA}"
 
                 def install
-                  libexec.install "jcode-linux-x86_64", "jcode-linux-x86_64.bin"
+                  libexec.install "next-code-linux-x86_64", "next-code-linux-x86_64.bin"
                   libexec.install Dir["libssl.so*"], Dir["libcrypto.so*"] unless Dir["libssl.so*", "libcrypto.so*"].empty?
                   (bin/"jcode").write <<~SH
                     #!/bin/sh
-                    exec "#{libexec}/jcode-linux-x86_64" "$@"
+                    exec "#{libexec}/next-code-linux-x86_64" "$@"
                   SH
                 end
               end
 
               on_arm do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/jcode-linux-aarch64.tar.gz"
+                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-linux-aarch64.tar.gz"
                 sha256 "${LINUX_ARM_SHA}"
 
                 def install
-                  bin.install "jcode-linux-aarch64" => "jcode"
+                  bin.install "next-code-linux-aarch64" => "jcode"
                 end
               end
             end
@@ -666,8 +666,8 @@ jobs:
           VERSION="${GITHUB_REF_NAME}"
           VERSION_NUM="${VERSION#v}"
 
-          LINUX_SHA=$(sha256sum artifacts/jcode-linux-x86_64/jcode-linux-x86_64.tar.gz | cut -d' ' -f1)
-          LINUX_URL="https://github.com/1jehuang/jcode/releases/download/${VERSION}/jcode-linux-x86_64.tar.gz"
+          LINUX_SHA=$(sha256sum artifacts/next-code-linux-x86_64/next-code-linux-x86_64.tar.gz | cut -d' ' -f1)
+          LINUX_URL="https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-linux-x86_64.tar.gz"
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -698,8 +698,8 @@ jobs:
           sha256sums=('SHA_PLACEHOLDER')
 
           package() {
-              install -Dm755 "${srcdir}/jcode-linux-x86_64" "${pkgdir}/usr/lib/jcode/jcode-linux-x86_64"
-              install -Dm755 "${srcdir}/jcode-linux-x86_64.bin" "${pkgdir}/usr/lib/jcode/jcode-linux-x86_64.bin"
+              install -Dm755 "${srcdir}/next-code-linux-x86_64" "${pkgdir}/usr/lib/jcode/next-code-linux-x86_64"
+              install -Dm755 "${srcdir}/next-code-linux-x86_64.bin" "${pkgdir}/usr/lib/jcode/next-code-linux-x86_64.bin"
               if compgen -G "${srcdir}/libssl.so*" >/dev/null; then
                   install -Dm644 "${srcdir}"/libssl.so* "${pkgdir}/usr/lib/jcode/"
               fi
@@ -707,7 +707,7 @@ jobs:
                   install -Dm644 "${srcdir}"/libcrypto.so* "${pkgdir}/usr/lib/jcode/"
               fi
               mkdir -p "${pkgdir}/usr/bin"
-              ln -s /usr/lib/jcode/jcode-linux-x86_64 "${pkgdir}/usr/bin/jcode"
+              ln -s /usr/lib/jcode/next-code-linux-x86_64 "${pkgdir}/usr/bin/jcode"
           }
           PKGBUILD_END
 
@@ -746,7 +746,7 @@ jobs:
           gh issue list --label "$label" --state open --json number --jq '.[].number' | while read -r issue; do
             [ -n "$issue" ] || continue
             gh issue close "$issue" \
-              --comment "Released in [${GITHUB_REF_NAME}](https://github.com/${repo}/releases/tag/${GITHUB_REF_NAME}). Run \`jcode update\` to get it." \
+              --comment "Released in [${GITHUB_REF_NAME}](https://github.com/${repo}/releases/tag/${GITHUB_REF_NAME}). Run \`next-code update\` to get it." \
               --reason completed
             gh issue edit "$issue" --remove-label "$label" || true
           done

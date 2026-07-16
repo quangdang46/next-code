@@ -17,7 +17,7 @@
 //! ## Quick start
 //!
 //! ```rust,no_run
-//! use jcode::orchestration_api::{OrchestrationRequest, OrchestrationResponse};
+//! use next_code::orchestration_api::{OrchestrationRequest, OrchestrationResponse};
 //!
 //! let req = OrchestrationRequest::new("Refactor the foo module")
 //!     .with_session_id("ci-12345")

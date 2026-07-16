@@ -73,7 +73,7 @@ LINUX_PID=$!
 (
     JCODE_RELEASE_BUILD=1 JCODE_BUILD_SEMVER="$VERSION_NUM" \
         CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}" \
-        cargo build --release --target aarch64-apple-darwin --bin jcode 2>/dev/null
+        cargo build --release --target aarch64-apple-darwin --bin next-code 2>/dev/null
     cp target/aarch64-apple-darwin/release/jcode "$DIST/jcode-macos-aarch64"
     chmod +x "$DIST/jcode-macos-aarch64"
     (cd "$DIST" && tar czf jcode-macos-aarch64.tar.gz jcode-macos-aarch64)

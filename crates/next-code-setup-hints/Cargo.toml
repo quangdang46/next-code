@@ -1,0 +1,28 @@
+[package]
+name = "next-code-setup-hints"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "next_code_setup_hints"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+dirs = "5"
+global-hotkey = "0.7"
+next-code-build-meta = { path = "../next-code-build-meta" }
+next-code-config-types = { path = "../next-code-config-types" }
+next-code-logging = { path = "../next-code-logging" }
+next-code-storage = { path = "../next-code-storage" }
+next-code-terminal-launch = { path = "../next-code-terminal-launch" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+global-hotkey = "0.7"
+
+[dev-dependencies]
+tempfile = "3"

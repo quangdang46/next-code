@@ -1,0 +1,213 @@
+use super::Agent;
+use crate::logging;
+use crate::message::{Message, ToolDefinition};
+
+impl Agent {
+    pub(super) fn log_prompt_prefix_accounting(
+        &self,
+        split: &crate::prompt::SplitSystemPrompt,
+        tools: &[ToolDefinition],
+    ) {
+        let system_tokens = split.estimated_tokens();
+        let tool_tokens = ToolDefinition::aggregate_prompt_token_estimate(tools);
+        let prefix_tokens = system_tokens + tool_tokens;
+        logging::info(&format!(
+            "Prompt prefix estimate: total={} tokens (system={} tools={})",
+            prefix_tokens, system_tokens, tool_tokens
+        ));
+    }
+
+    pub(super) fn build_memory_prompt_nonblocking_shared(
+        &self,
+        messages: std::sync::Arc<[Message]>,
+        _memory_event_tx: Option<crate::memory::MemoryEventSink>,
+    ) -> Option<crate::memory::PendingMemory> {
+        if !self.memory_enabled {
+            return None;
+        }
+
+        let session_id = &self.session.id;
+
+        let pending = if crate::message::ends_with_fresh_user_turn(&messages) {
+            crate::memory::take_pending_memory(session_id)
+        } else {
+            None
+        };
+
+        // Use the persistent memory-agent pipeline as the single source of truth.
+        // Running both this and the legacy MemoryManager background retrieval path
+        // can prepare overlapping pending prompts for the same turn, which makes
+        // memory injection feel overly aggressive.
+        crate::memory_agent::update_context_sync_with_dir(
+            session_id,
+            messages,
+            self.session.working_dir.clone(),
+        );
+
+        pending
+    }
+
+    fn append_current_turn_system_reminder(&self, split: &mut crate::prompt::SplitSystemPrompt) {
+        let Some(reminder) = self
+            .current_turn_system_reminder
+            .as_ref()
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+        else {
+            return;
+        };
+
+        if !split.dynamic_part.is_empty() {
+            split.dynamic_part.push_str("\n\n");
+        }
+        split.dynamic_part.push_str("# System Reminder\n\n");
+        split.dynamic_part.push_str(reminder);
+    }
+
+    /// Build split system prompt for better caching
+    /// Returns static (cacheable) and dynamic (not cached) parts separately
+    pub(super) fn build_system_prompt_split(
+        &self,
+        memory_prompt: Option<&str>,
+    ) -> crate::prompt::SplitSystemPrompt {
+        if let Some(ref override_prompt) = self.system_prompt_override {
+            return crate::prompt::SplitSystemPrompt {
+                static_part: override_prompt.clone(),
+                dynamic_part: String::new(),
+            };
+        }
+
+        let skills = self.current_skills_snapshot();
+        let skill_prompt = self
+            .active_skill
+            .as_ref()
+            .and_then(|name| skills.get(name).map(|skill| skill.get_prompt().to_string()));
+
+        let available_skills: Vec<crate::prompt::SkillInfo> = self
+            .current_skills_snapshot()
+            .list()
+            .iter()
+            .map(|skill| crate::prompt::SkillInfo {
+                name: skill.name.clone(),
+                description: skill.description.clone(),
+            })
+            .collect();
+
+        let working_dir = self
+            .session
+            .working_dir
+            .as_ref()
+            .map(std::path::PathBuf::from);
+
+        // Detect keywords, update mode state, execute workflows, build prompt.
+        // Uses the canonical `process_turn` entry point (shared with the TUI
+        // path in turn_memory.rs) so the two callers cannot drift apart.
+        let keyword_prompt = {
+            let latest_input = self
+                .session
+                .messages
+                .iter()
+                .rev()
+                .find(|m| matches!(m.role, crate::message::Role::User))
+                .and_then(|m| {
+                    m.content.iter().find_map(|b| match b {
+                        crate::message::ContentBlock::Text { text, .. } => Some(text.as_str()),
+                        _ => None,
+                    })
+                })
+                .unwrap_or("");
+            let last_assistant = self
+                .session
+                .messages
+                .iter()
+                .rev()
+                .find(|m| matches!(m.role, crate::message::Role::Assistant))
+                .and_then(|m| {
+                    m.content.iter().find_map(|b| match b {
+                        crate::message::ContentBlock::Text { text, .. } => Some(text.as_str()),
+                        _ => None,
+                    })
+                });
+            let kw_cfg = &crate::config::config().keywords;
+            let opts = next_code_keywords::process_turn_options_from_config(
+                kw_cfg.enabled,
+                &kw_cfg.match_mode,
+                kw_cfg.sticky_turns,
+                kw_cfg.allow_fuzzy,
+            );
+            let result = next_code_keywords::process_turn_with_options(
+                latest_input,
+                last_assistant,
+                working_dir.as_deref(),
+                &self.session.id,
+                &opts,
+            );
+            for conflict in &result.conflicts {
+                crate::logging::warn(&next_code_keywords::conflict::format_warning(conflict));
+            }
+            if !result.deferred_spawns.is_empty() {
+                crate::logging::warn(&format!(
+                    "Keyword workflow: {} spawn action(s) deferred — they will not run until SubagentTool is wired from the agent runtime. (See issue #391 follow-up.)",
+                    result.deferred_spawns.len()
+                ));
+            }
+            result.keyword_prompt
+        };
+
+        // When best-of-N is enabled in config, inject a short reminder even without $bestofn.
+        let best_of_n_prompt = {
+            let bon = &crate::config::config().best_of_n;
+            if bon.enabled() {
+                Some(format!(
+                    "# Best-of-N editing is ON (mode={}, count={})\n\
+                     For non-trivial multi-approach edits: best_of_n_edit → propose_* drafts → best_of_n_apply.\n\
+                     Skip for one-line / trivial fixes.\n",
+                    bon.mode.as_str(),
+                    bon.effective_count()
+                ))
+            } else {
+                None
+            }
+        };
+
+        let combined_keyword_prompt = match (keyword_prompt, best_of_n_prompt) {
+            (Some(k), Some(b)) => Some(format!("{k}\n{b}")),
+            (Some(k), None) => Some(k),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+
+        // Inject priority-tier notes into the system prompt so they survive compaction.
+        let notepad_prompt =
+            crate::notepad::Notepad::new(working_dir.as_deref(), &crate::config::config().notepad)
+                .and_then(|n| n.priority_prompt_block());
+
+        let (mut split, _context_info) = crate::prompt::build_system_prompt_split(
+            skill_prompt.as_deref(),
+            &available_skills,
+            self.session.is_canary,
+            memory_prompt,
+            working_dir.as_deref(),
+            combined_keyword_prompt,
+            notepad_prompt.as_deref(),
+        );
+
+        self.append_current_turn_system_reminder(&mut split);
+        crate::prompt::append_swarm_effort_directive(
+            &mut split,
+            self.provider.reasoning_effort().as_deref(),
+        );
+
+        split
+    }
+
+    /// Non-blocking memory prompt - takes pending result and spawns check for next turn
+    #[cfg(test)]
+    pub(super) fn build_memory_prompt_nonblocking(
+        &self,
+        messages: &[Message],
+        _memory_event_tx: Option<crate::memory::MemoryEventSink>,
+    ) -> Option<crate::memory::PendingMemory> {
+        self.build_memory_prompt_nonblocking_shared(messages.to_vec().into(), _memory_event_tx)
+    }
+}

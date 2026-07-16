@@ -211,7 +211,7 @@ pub fn show_crash_resume_hint() {
 
     if crashed.len() == 1 {
         eprintln!(
-            "\x1b[33m💥 Session \x1b[1m{}\x1b[0m\x1b[33m crashed. Resume with:\x1b[0m  jcode --resume {}",
+            "\x1b[33m💥 Session \x1b[1m{}\x1b[0m\x1b[33m crashed. Resume with:\x1b[0m  next-code --resume {}",
             session_label, id
         );
     } else {
@@ -220,15 +220,15 @@ pub fn show_crash_resume_hint() {
             crashed.len(),
             session_label
         );
-        eprintln!("\x1b[33m   Resume with:\x1b[0m  jcode --resume {}", id);
-        eprintln!("\x1b[33m   List all:\x1b[0m     jcode --resume");
+        eprintln!("\x1b[33m   Resume with:\x1b[0m  next-code --resume {}", id);
+        eprintln!("\x1b[33m   List all:\x1b[0m     next-code --resume");
     }
     eprintln!();
 }
 
 fn init_tui_terminal(inherited_terminal: bool) -> Result<ratatui::DefaultTerminal> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
-        anyhow::bail!("jcode TUI requires an interactive terminal (stdin/stdout must be a TTY)");
+        anyhow::bail!("next-code TUI requires an interactive terminal (stdin/stdout must be a TTY)");
     }
     if inherited_terminal {
         init_tui_terminal_resume()
@@ -270,7 +270,7 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
 
     let perf_policy = crate::perf::tui_policy();
     // These private handoff values apply only to this exec boundary. Avoid
-    // leaking them into tools or unrelated child jcode processes.
+    // leaking them into tools or unrelated child next-code processes.
     crate::env::remove_var(INHERITED_MODES_ENV);
     crate::env::remove_var(INHERITED_THEME_ENV);
 
@@ -419,7 +419,7 @@ fn write_session_resume_hint(mut writer: impl Write, session_id: &str) -> io::Re
         "\x1b[33mSession \x1b[1m{}\x1b[0m\x1b[33m - to resume:\x1b[0m",
         session_name
     )?;
-    writeln!(writer, "  jcode --resume {}", session_id)?;
+    writeln!(writer, "  next-code --resume {}", session_id)?;
     writeln!(writer)?;
     Ok(())
 }
@@ -658,7 +658,7 @@ mod tests {
             let mut output = Vec::new();
             write_session_resume_hint(&mut output, &session_id).unwrap();
             let output = String::from_utf8(output).unwrap();
-            let expected_cmd = format!("jcode --resume {}", session_id);
+            let expected_cmd = format!("next-code --resume {}", session_id);
             assert!(output.contains(&expected_cmd));
             assert!(output.contains("to resume"));
             assert!(!session_id.is_empty());

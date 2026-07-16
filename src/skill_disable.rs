@@ -26,7 +26,7 @@ struct DisabledFile {
 }
 
 fn disabled_file_path() -> Result<PathBuf> {
-    Ok(jcode_storage::jcode_dir()?.join("disabled_skills.toml"))
+    Ok(next_code_storage::next_code_dir()?.join("disabled_skills.toml"))
 }
 
 /// Load the disabled-skills set from disk. Empty when the file

@@ -1,0 +1,16 @@
+[package]
+name = "next-code-provider-openrouter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dirs = "5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+bytes = "1"
+futures = "0.3"
+next-code-core = { path = "../next-code-core" }
+next-code-logging = { path = "../next-code-logging" }
+next-code-message-types = { path = "../next-code-message-types" }
+reqwest = { version = "0.12", default-features = false, features = ["stream"] }

@@ -40,7 +40,7 @@ pub(crate) async fn auth_test_choice_plan(
     }
 
     Ok(AuthTestChoicePlan::Skip(format!(
-        "Skipped: {} local endpoint reported no models. Re-run `jcode auth-test --provider {} --model <local-model>` or set a default model first.",
+        "Skipped: {} local endpoint reported no models. Re-run `next-code auth-test --provider {} --model <local-model>` or set a default model first.",
         resolved.display_name,
         choice.as_arg_value()
     )))
@@ -52,7 +52,7 @@ pub(crate) fn tool_smoke_skip_detail_for_choice(
 ) -> Option<String> {
     if matches!(choice, super::provider_init::ProviderChoice::Cursor) {
         return Some(
-            "Skipped: the Cursor native agent transport is text-only in jcode (it does not expose \
+            "Skipped: the Cursor native agent transport is text-only in next-code (it does not expose \
              tool calls over agent.v1.AgentService/Run). Basic provider smoke still validates chat."
                 .to_string(),
         );
@@ -305,7 +305,7 @@ async fn run_provider_tool_smoke_for_choice(
         validate_auth_test_tool_smoke_transcript(&agent.messages()[transcript_start..], &output)
             .with_context(|| {
                 format!(
-                    "{} tool-enabled smoke prompt did not complete a valid real Jcode tool loop",
+                    "{} tool-enabled smoke prompt did not complete a valid real Next Code tool loop",
                     choice.as_arg_value()
                 )
             })?;

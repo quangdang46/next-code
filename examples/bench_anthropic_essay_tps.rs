@@ -1,8 +1,8 @@
 use anyhow::Result;
 use futures::StreamExt;
-use jcode::message::{ContentBlock, Message, Role, StreamEvent};
-use jcode::provider::Provider;
-use jcode_provider_anthropic_runtime::AnthropicProvider;
+use next_code::message::{ContentBlock, Message, Role, StreamEvent};
+use next_code::provider::Provider;
+use next_code_provider_anthropic_runtime::AnthropicProvider;
 use std::time::Instant;
 
 async fn run_one_with_retry(

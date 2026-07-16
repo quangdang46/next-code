@@ -136,7 +136,7 @@ pub fn hot_update(session_id: &str) -> Result<()> {
 
     match update::check_for_update_blocking() {
         Ok(Some(release)) => {
-            let current = jcode_build_meta::VERSION;
+            let current = next_code_build_meta::VERSION;
             update::print_centered(&format!(
                 "Update available: {} -> {}",
                 current, release.tag_name
@@ -186,7 +186,7 @@ pub fn hot_update(session_id: &str) -> Result<()> {
             }
             update::print_centered(&format!(
                 "Already up to date ({})",
-                jcode_build_meta::VERSION
+                next_code_build_meta::VERSION
             ));
         }
         Err(e) => {
@@ -214,7 +214,7 @@ pub fn get_repo_dir() -> Option<std::path::PathBuf> {
     build::get_repo_dir()
 }
 
-/// Minimum interval between `git fetch` update probes across all jcode
+/// Minimum interval between `git fetch` update probes across all next-code
 /// processes. Every source-build client spawn used to fetch unconditionally,
 /// so spawning N clients at once ran N concurrent `git fetch` + ssh sessions
 /// against the remote. One probe per interval per machine is plenty; a marker
@@ -222,7 +222,7 @@ pub fn get_repo_dir() -> Option<std::path::PathBuf> {
 const UPDATE_FETCH_INTERVAL_SECS: u64 = 15 * 60;
 
 fn claim_update_fetch_slot() -> bool {
-    let Ok(base) = crate::storage::jcode_dir() else {
+    let Ok(base) = crate::storage::next_code_dir() else {
         // Cannot coordinate without a home dir; fall back to probing.
         return true;
     };
@@ -276,7 +276,7 @@ pub fn run_auto_update() -> Result<()> {
     use crate::bus::{Bus, BusEvent, UpdateStatus};
 
     let repo_dir =
-        get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find jcode repository"))?;
+        get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find next-code repository"))?;
 
     update::run_git_pull_ff_only(&repo_dir, true)?;
 
@@ -337,7 +337,7 @@ pub fn run_update() -> Result<()> {
             Ok(Some(release)) => {
                 update::print_centered(&format!(
                     "Downloading {} \u{2192} {}...",
-                    jcode_build_meta::VERSION,
+                    next_code_build_meta::VERSION,
                     release.tag_name
                 ));
                 let _path =
@@ -350,7 +350,7 @@ pub fn run_update() -> Result<()> {
                     })?;
                 update::print_centered(&format!("✅ Updated to {}", release.tag_name));
                 reload_server_after_update("installed update");
-                update::print_centered("Restart jcode to use the new version.");
+                update::print_centered("Restart next-code to use the new version.");
             }
             Ok(None) => {
                 if repair_stale_shared_server_after_update_check() {
@@ -358,7 +358,7 @@ pub fn run_update() -> Result<()> {
                 }
                 update::print_centered(&format!(
                     "Already up to date ({})",
-                    jcode_build_meta::VERSION
+                    next_code_build_meta::VERSION
                 ));
             }
             Err(e) => {
@@ -369,9 +369,9 @@ pub fn run_update() -> Result<()> {
     }
 
     let repo_dir =
-        get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find jcode repository"))?;
+        get_repo_dir().ok_or_else(|| anyhow::anyhow!("Could not find next-code repository"))?;
 
-    update::print_centered(&format!("Updating jcode from {}...", repo_dir.display()));
+    update::print_centered(&format!("Updating next-code from {}...", repo_dir.display()));
 
     update::print_centered("Pulling latest changes (fast-forward only)...");
     update::run_git_pull_ff_only(&repo_dir, true)?;
@@ -433,7 +433,7 @@ fn reload_server_after_update(reason: &str) {
         .map(|(path, _)| path)
         .or_else(|| std::env::current_exe().ok());
     let Some(exe) = exe else {
-        crate::logging::warn("update: could not find jcode binary to reload stale server");
+        crate::logging::warn("update: could not find next-code binary to reload stale server");
         return;
     };
 

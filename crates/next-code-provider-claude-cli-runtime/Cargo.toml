@@ -1,0 +1,21 @@
+[package]
+name = "next-code-provider-claude-cli-runtime"
+version = "0.1.0"
+edition = "2024"
+description = "Deprecated Claude CLI provider runtime (subprocess transport) for jcode, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+
+[lib]
+name = "next_code_provider_claude_cli_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+next-code-base = { path = "../next-code-base" }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-provider-core = { path = "../next-code-provider-core" }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync", "time", "rt", "process", "io-util"] }
+tokio-stream = "0.1"

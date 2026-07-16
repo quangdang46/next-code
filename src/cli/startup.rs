@@ -34,7 +34,7 @@ pub async fn run() -> Result<()> {
         .name("jcode-session-bak-prune".to_string())
         .spawn(crate::session::prune_old_session_backups)
         .ok();
-    logging::info("jcode starting");
+    logging::info("next-code starting");
 
     // Wire config-reload reactions without making config depend on auth/bus:
     // when the config cache reloads, invalidate the auth-status cache and
@@ -47,11 +47,11 @@ pub async fn run() -> Result<()> {
     // registers its external-CLI credential scan here.
     //
     // The encrypted secrets store is registered first so values saved via
-    // `jcode secrets set` are consulted before scanning other tools'
+    // `next-code secrets set` are consulted before scanning other tools'
     // credentials. Both run only after an explicit env var / provider env-file
     // miss, so they never override a value the user set in their environment.
     crate::provider_catalog::register_api_key_fallback_resolver(
-        jcode_secrets::secrets_api_key_resolver,
+        next_code_secrets::secrets_api_key_resolver,
     );
     crate::provider_catalog::register_api_key_fallback_resolver(
         crate::auth::external::load_api_key_for_env,
@@ -139,30 +139,30 @@ pub async fn run() -> Result<()> {
 pub fn register_external_provider_runtimes() {
     crate::provider::external::register_external_provider(
         crate::provider::external::GEMINI_RUNTIME,
-        || std::sync::Arc::new(jcode_provider_gemini_runtime::GeminiProvider::new()),
+        || std::sync::Arc::new(next_code_provider_gemini_runtime::GeminiProvider::new()),
     );
     crate::provider::external::register_external_provider(
         crate::provider::external::CURSOR_RUNTIME,
-        || std::sync::Arc::new(jcode_provider_cursor_runtime::CursorCliProvider::new()),
+        || std::sync::Arc::new(next_code_provider_cursor_runtime::CursorCliProvider::new()),
     );
     crate::provider::external::register_external_provider(
         crate::provider::external::ANTIGRAVITY_RUNTIME,
-        || std::sync::Arc::new(jcode_provider_antigravity_runtime::AntigravityProvider::new()),
+        || std::sync::Arc::new(next_code_provider_antigravity_runtime::AntigravityProvider::new()),
     );
     crate::provider::external::register_external_provider(
         crate::provider::external::CLAUDE_CLI_RUNTIME,
-        || std::sync::Arc::new(jcode_provider_claude_cli_runtime::ClaudeProvider::new()),
+        || std::sync::Arc::new(next_code_provider_claude_cli_runtime::ClaudeProvider::new()),
     );
     crate::provider::external::register_external_provider(
         crate::provider::external::ANTHROPIC_RUNTIME,
-        || std::sync::Arc::new(jcode_provider_anthropic_runtime::AnthropicProvider::new()),
+        || std::sync::Arc::new(next_code_provider_anthropic_runtime::AnthropicProvider::new()),
     );
     // OpenRouter serves several identities (aggregator, pinned API-key
     // runtime, direct OpenAI-compatible profiles, named config profiles)
     // through one concrete type, so it registers a parameterized factory.
     crate::provider::external::register_openrouter_factory(|spec| {
         use crate::provider::external::OpenRouterRuntimeSpec;
-        use jcode_provider_openrouter_runtime::OpenRouterProvider;
+        use next_code_provider_openrouter_runtime::OpenRouterProvider;
         let provider: std::sync::Arc<dyn crate::provider::Provider> = match spec {
             OpenRouterRuntimeSpec::Default => std::sync::Arc::new(OpenRouterProvider::new()?),
             OpenRouterRuntimeSpec::OpenRouterApiKey => {
@@ -178,10 +178,10 @@ pub fn register_external_provider_runtimes() {
         Ok(provider)
     });
     crate::provider::external::register_profile_catalog_refresh(
-        jcode_provider_openrouter_runtime::maybe_schedule_openai_compatible_profile_catalog_refresh,
+        next_code_provider_openrouter_runtime::maybe_schedule_openai_compatible_profile_catalog_refresh,
     );
     crate::provider::external::register_standard_openrouter_catalog_refresh(
-        jcode_provider_openrouter_runtime::maybe_schedule_standard_openrouter_catalog_refresh,
+        next_code_provider_openrouter_runtime::maybe_schedule_standard_openrouter_catalog_refresh,
     );
     // OpenAI's constructor needs Codex credentials on hand; absence means the
     // provider is simply unavailable.
@@ -190,7 +190,7 @@ pub fn register_external_provider_runtimes() {
         || {
             let credentials = crate::auth::codex::load_credentials().ok()?;
             Some(
-                std::sync::Arc::new(jcode_provider_openai_runtime::OpenAIProvider::new(
+                std::sync::Arc::new(next_code_provider_openai_runtime::OpenAIProvider::new(
                     credentials,
                 )) as std::sync::Arc<dyn crate::provider::Provider>,
             )
@@ -204,7 +204,7 @@ pub fn register_external_provider_runtimes() {
         crate::provider::external::COPILOT_RUNTIME,
         || {
             let provider = std::sync::Arc::new(
-                jcode_provider_copilot_runtime::CopilotApiProvider::new().ok()?,
+                next_code_provider_copilot_runtime::CopilotApiProvider::new().ok()?,
             );
             let eager_tier_detection = std::env::var("JCODE_NON_INTERACTIVE").is_err();
             if eager_tier_detection && tokio::runtime::Handle::try_current().is_ok() {
@@ -315,7 +315,7 @@ fn spawn_background_update_check(args: &Args) {
                 && update_available
             {
                 Bus::global().publish(BusEvent::UpdateStatus(UpdateStatus::Available {
-                    current: jcode_build_meta::VERSION.to_string(),
+                    current: next_code_build_meta::VERSION.to_string(),
                     latest: "latest source".to_string(),
                 }));
                 if auto_update {
@@ -332,7 +332,7 @@ fn spawn_background_update_check(args: &Args) {
                         ));
                     }
                 } else {
-                    logging::info("Update available! Run `jcode update` or `/reload` to update.");
+                    logging::info("Update available! Run `next-code update` or `/reload` to update.");
                 }
             } else {
                 Bus::global().publish(BusEvent::UpdateStatus(UpdateStatus::UpToDate));
@@ -367,7 +367,7 @@ fn report_main_error(error: &anyhow::Error) {
     if let Some(session_id) = terminal::get_current_session() {
         output::stderr_blank_line();
         output::stderr_info("\x1b[33mTo restore this session, run:\x1b[0m");
-        output::stderr_info(format!("  jcode --resume {}", session_id));
+        output::stderr_info(format!("  next-code --resume {}", session_id));
         output::stderr_blank_line();
     }
 }
@@ -384,19 +384,19 @@ mod tests {
 
     #[test]
     fn auto_install_allowed_without_live_terminal() {
-        let args = parse_args(&["jcode", "login"]);
+        let args = parse_args(&["next-code", "login"]);
         assert!(should_auto_install_update(&args));
     }
 
     #[test]
     fn auto_install_allowed_with_live_terminal_attached() {
-        let args = parse_args(&["jcode", "login"]);
+        let args = parse_args(&["next-code", "login"]);
         assert!(should_auto_install_update(&args));
     }
 
     #[test]
     fn auto_install_respects_explicit_disable_even_without_terminal() {
-        let mut args = parse_args(&["jcode", "login"]);
+        let mut args = parse_args(&["next-code", "login"]);
         args.auto_update = false;
         assert!(!should_auto_install_update(&args));
     }
@@ -417,7 +417,7 @@ mod tests {
 
     #[test]
     fn update_command_still_skips_background_check_before_auto_install_logic() {
-        let args = parse_args(&["jcode", "update"]);
+        let args = parse_args(&["next-code", "update"]);
         assert!(matches!(args.command, Some(Command::Update)));
         assert!(!should_spawn_background_update_check(&args));
         assert!(should_auto_install_update(&args));
@@ -425,7 +425,7 @@ mod tests {
 
     #[test]
     fn hidden_spawn_hotkey_argument_is_global_and_preserves_canonical_text() {
-        let args = parse_args(&["jcode", "--spawn-hotkey", "shift+cmd+'", "self-dev"]);
+        let args = parse_args(&["next-code", "--spawn-hotkey", "shift+cmd+'", "self-dev"]);
         assert_eq!(args.spawn_hotkey.as_deref(), Some("shift+cmd+'"));
         assert!(matches!(args.command, Some(Command::SelfDev { .. })));
     }

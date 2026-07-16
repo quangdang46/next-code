@@ -1,10 +1,10 @@
 use crate::bus::{Bus, BusEvent};
 use anyhow::Result;
-use jcode_provider_service::boot;
-use jcode_provider_service::catalog::{InMemoryCatalog, ModelInfo, ProviderInfo};
-use jcode_provider_service::integration::InMemoryIntegration;
-use jcode_provider_service::service::ProviderService;
-use jcode_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
+use next_code_provider_service::boot;
+use next_code_provider_service::catalog::{InMemoryCatalog, ModelInfo, ProviderInfo};
+use next_code_provider_service::integration::InMemoryIntegration;
+use next_code_provider_service::service::ProviderService;
+use next_code_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
 use std::sync::Arc;
 
 pub struct ProviderCliService {
@@ -24,7 +24,7 @@ impl ProviderCliService {
         let svc = DefaultProviderService::new(catalog, integration, credential);
         let rt = tokio::runtime::Handle::current();
         rt.block_on(async {
-            boot::register_builtins::<jcode_keyring_store::MockKeyringStore>(
+            boot::register_builtins::<next_code_keyring_store::MockKeyringStore>(
                 svc.catalog(),
                 svc.integration(),
             )

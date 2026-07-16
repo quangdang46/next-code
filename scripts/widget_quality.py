@@ -36,7 +36,7 @@ except ImportError:
     sys.exit(2)
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_BIN = ROOT / "target" / "debug" / "jcode-desktop"
+DEFAULT_BIN = ROOT / "target" / "debug" / "next-code-desktop"
 WIDGET_STATES = [
     "hotkey-help",
     "model-picker",

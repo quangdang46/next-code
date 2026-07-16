@@ -21,8 +21,8 @@ PROBE = "jqx92"
 DEFAULT_TIMEOUT_S = 20.0
 DEFAULT_SETTLE_S = 1.0
 DEFAULT_TOOLS = [
-    "jcode_memory_off",
-    "jcode_memory_on",
+    "next_code_memory_off",
+    "next_code_memory_on",
     "pi",
     "codex",
     "opencode",
@@ -39,7 +39,7 @@ class ToolSpec:
     argv: list[str]
     version_argv: list[str]
     env: dict[str, str] | None = None
-    jcode: bool = False
+    next_code: bool = False
 
 
 @dataclass
@@ -83,7 +83,23 @@ def detect_pi_bin() -> str:
 
 
 def build_specs() -> dict[str, ToolSpec]:
-    jcode = shutil.which("jcode") or str(Path.home() / ".local/bin/jcode")
+    next_code_bin = (
+        os.environ.get("NEXT_CODE_BIN")
+        or os.environ.get("JCODE_BIN")
+        or shutil.which("next-code")
+        or shutil.which("jcode")
+        or next(
+            (
+                str(p)
+                for p in (
+                    Path.home() / ".local/bin/next-code",
+                    Path.home() / ".local/bin/jcode",
+                )
+                if p.is_file()
+            ),
+            str(Path.home() / ".local/bin/next-code"),
+        )
+    )
     codex = shutil.which("codex") or "/usr/bin/codex"
     opencode = shutil.which("opencode") or "/usr/bin/opencode"
     copilot = shutil.which("copilot") or str(Path.home() / ".local/bin/copilot")
@@ -91,19 +107,19 @@ def build_specs() -> dict[str, ToolSpec]:
     claude = shutil.which("claude") or str(Path.home() / ".local/bin/claude")
     agy = shutil.which("agy") or str(Path.home() / ".local/bin/agy")
     specs = {
-        "jcode_memory_off": ToolSpec(
-            name="jcode_memory_off",
-            argv=[jcode, "--no-update", "--no-selfdev"],
-            version_argv=[jcode, "version"],
-            env={"JCODE_NO_TELEMETRY": "1", "JCODE_MEMORY_ENABLED": "0"},
-            jcode=True,
+        "next_code_memory_off": ToolSpec(
+            name="next_code_memory_off",
+            argv=[next_code_bin, "--no-update", "--no-selfdev"],
+            version_argv=[next_code_bin, "version"],
+            env={"NEXT_CODE_NO_TELEMETRY": "1", "JCODE_NO_TELEMETRY": "1", "NEXT_CODE_MEMORY_ENABLED": "0", "JCODE_MEMORY_ENABLED": "0"},
+            next_code=True,
         ),
-        "jcode_memory_on": ToolSpec(
-            name="jcode_memory_on",
-            argv=[jcode, "--no-update", "--no-selfdev"],
-            version_argv=[jcode, "version"],
-            env={"JCODE_NO_TELEMETRY": "1", "JCODE_MEMORY_ENABLED": "1"},
-            jcode=True,
+        "next_code_memory_on": ToolSpec(
+            name="next_code_memory_on",
+            argv=[next_code_bin, "--no-update", "--no-selfdev"],
+            version_argv=[next_code_bin, "version"],
+            env={"NEXT_CODE_NO_TELEMETRY": "1", "JCODE_NO_TELEMETRY": "1", "NEXT_CODE_MEMORY_ENABLED": "1", "JCODE_MEMORY_ENABLED": "1"},
+            next_code=True,
         ),
         "pi": ToolSpec(
             name="pi",
@@ -374,7 +390,7 @@ def run_tool(spec: ToolSpec, sessions: int, cwd: Path, timeout_s: float, settle_
                 bench_auth = Path(env["JCODE_HOME"]) / auth_name
                 if real_auth.exists() and not bench_auth.exists():
                     bench_auth.symlink_to(real_auth)
-            if spec.name == "jcode_memory_on":
+            if spec.name == "next_code_memory_on":
                 real_models = Path.home() / ".jcode" / "models"
                 bench_models = Path(env["JCODE_HOME"]) / "models"
                 if real_models.exists() and not bench_models.exists():
@@ -392,9 +408,9 @@ def run_tool(spec: ToolSpec, sessions: int, cwd: Path, timeout_s: float, settle_
             cleanup_pgids.append(os.getpgid(server_proc.pid))
             if not wait_for_socket(socket_path, timeout_s):
                 raise RuntimeError("jcode server did not become ready")
-            if spec.name == "jcode_memory_on":
+            if spec.name == "next_code_memory_on":
                 time.sleep(max(settle_s, 5.0))
-            per_session_settle = max(settle_s, 2.0) if spec.name == "jcode_memory_on" else settle_s
+            per_session_settle = max(settle_s, 2.0) if spec.name == "next_code_memory_on" else settle_s
             for _ in range(sessions):
                 launches.append(
                     launch_interactive(

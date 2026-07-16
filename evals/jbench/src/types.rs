@@ -3,7 +3,7 @@
 //! These types are direct Rust analogues of BuffBench's TypeScript types
 //! (`/tmp/codebuff/evals/buffbench/types.ts`) with one deliberate
 //! deviation: every field uses `snake_case` in both the Rust definition
-//! and the on-disk JSON form, because the rest of jcode's serialized
+//! and the on-disk JSON form, because the rest of next-code's serialized
 //! formats already follow `snake_case`.
 //!
 //! All public types derive `Debug`, `Clone`, `Serialize`, and
@@ -113,7 +113,7 @@ pub struct EvalDataV2 {
 /// used so we can also store the *averaged* per-dimension scores when
 /// aggregating multiple judges (see `judge::judge_with_three_models`).
 ///
-/// On-disk JSON stays `snake_case` to match the rest of jcode's eval
+/// On-disk JSON stays `snake_case` to match the rest of next-code's eval
 /// outputs, but each score field also accepts the `camelCase` spelling
 /// (`completionScore`, etc.) via `serde(alias = ...)` so we can
 /// deserialize LLM judge responses directly without an intermediate
@@ -182,7 +182,7 @@ pub struct EvalRun {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentEvalResults {
     /// ID of the agent (matches an `AgentDefinition::id` in the
-    /// `jcode-agent-runtime` registry).
+    /// `next-code-agent-runtime` registry).
     pub agent_id: String,
     /// Per-commit runs, in evaluation order.
     pub runs: Vec<EvalRun>,

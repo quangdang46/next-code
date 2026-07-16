@@ -14,7 +14,7 @@
 #                          (base, app-core, tui, setup-hints, telemetry-core, root)
 #
 # Touches are reverted after each run. Requires a clean-enough tree that
-# `scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode` succeeds.
+# `scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code` succeeds.
 #
 # Usage: scripts/bench_selfdev_build.sh [--skip-warmup]
 
@@ -23,7 +23,7 @@ set -euo pipefail
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-build_cmd=(scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode)
+build_cmd=(scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code)
 
 run_build() {
     # Per-phase logs survive later phases, so a mid-benchmark failure (often a

@@ -1,22 +1,22 @@
 <#
 .SYNOPSIS
-    Install jcode on Windows.
+    Install next-code on Windows.
 .DESCRIPTION
-    Downloads the latest jcode release and installs it to %LOCALAPPDATA%\jcode\bin.
+    Downloads the latest next-code release and installs it to %LOCALAPPDATA%\next-code\bin.
 
     One-liner install:
-      irm https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.ps1 | iex
+      irm https://raw.githubusercontent.com/quangdang46/next-code/master/scripts/install.ps1 | iex
 
     Or download and run (allows parameters):
-      & ([scriptblock]::Create((irm https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.ps1)))
+      & ([scriptblock]::Create((irm https://raw.githubusercontent.com/quangdang46/next-code/master/scripts/install.ps1)))
 .PARAMETER InstallDir
-    Override the installation directory (default: $env:LOCALAPPDATA\jcode\bin)
+    Override the installation directory (default: $env:LOCALAPPDATA\next-code\bin)
 .PARAMETER Version
     Override the version tag to install. Required when using a local artifact path.
 .PARAMETER ArtifactExePath
-    Use a local jcode.exe artifact instead of downloading from GitHub.
+    Use a local next-code.exe artifact instead of downloading from GitHub.
 .PARAMETER ArtifactTgzPath
-    Use a local jcode .tar.gz artifact instead of downloading from GitHub.
+    Use a local next-code .tar.gz artifact instead of downloading from GitHub.
 .PARAMETER ConfigureAlacritty
     Install Alacritty through winget when it is not already available.
 .PARAMETER ConfigureHotkey
@@ -44,22 +44,31 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
     exit 1
 }
 
-$Repo = "1jehuang/jcode"
+$Repo = "quangdang46/next-code"
 
 if (-not $InstallDir) {
-    $InstallDir = Join-Path $env:LOCALAPPDATA "jcode\bin"
+    if ($env:NEXT_CODE_INSTALL_DIR) {
+        $InstallDir = $env:NEXT_CODE_INSTALL_DIR
+    } elseif ($env:JCODE_INSTALL_DIR) {
+        $InstallDir = $env:JCODE_INSTALL_DIR
+    } else {
+        $InstallDir = Join-Path $env:LOCALAPPDATA "next-code\bin"
+    }
 }
 
-$JcodeHome = if ($env:JCODE_HOME) {
+$NextCodeHome = if ($env:NEXT_CODE_HOME) {
+    $env:NEXT_CODE_HOME
+} elseif ($env:JCODE_HOME) {
+    # Legacy dual-read: JCODE_HOME still works during the rebrand window.
     $env:JCODE_HOME
 } elseif ($env:USERPROFILE) {
-    Join-Path $env:USERPROFILE ".jcode"
+    Join-Path $env:USERPROFILE ".next-code"
 } else {
-    Join-Path ([Environment]::GetFolderPath("UserProfile")) ".jcode"
+    Join-Path ([Environment]::GetFolderPath("UserProfile")) ".next-code"
 }
 
-$HotkeyDir = Join-Path $JcodeHome "hotkey"
-$SetupHintsPath = Join-Path $JcodeHome "setup_hints.json"
+$HotkeyDir = Join-Path $NextCodeHome "hotkey"
+$SetupHintsPath = Join-Path $NextCodeHome "setup_hints.json"
 
 function Write-Info($msg) { Write-Host $msg -ForegroundColor Blue }
 function Write-Err($msg) { Write-Host "error: $msg" -ForegroundColor Red; exit 1 }
@@ -143,8 +152,8 @@ function Invoke-ProcessWithTimeout {
     $stdoutPath = $null
     $stderrPath = $null
     if ($CaptureOutput) {
-        $stdoutPath = Join-Path $env:TEMP ("jcode-{0}-{1}-stdout.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
-        $stderrPath = Join-Path $env:TEMP ("jcode-{0}-{1}-stderr.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
+        $stdoutPath = Join-Path $env:TEMP ("next-code-{0}-{1}-stdout.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
+        $stderrPath = Join-Path $env:TEMP ("next-code-{0}-{1}-stderr.log" -f $FriendlyName, [guid]::NewGuid().ToString('N'))
         $startParams.RedirectStandardOutput = $stdoutPath
         $startParams.RedirectStandardError = $stderrPath
     }
@@ -265,16 +274,16 @@ function Install-Alacritty {
     return $true
 }
 
-function Stop-JcodeHotkeyListeners {
+function Stop-NextCodeHotkeyListeners {
     try {
         Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe' OR Name = 'pwsh.exe'" -ErrorAction SilentlyContinue |
-            Where-Object { $_.CommandLine -like '*jcode-hotkey*' } |
+            Where-Object { $_.CommandLine -like '*next-code-hotkey*' } |
             ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     } catch {}
 }
 
 function Set-SetupHintsState([bool]$AlacrittyConfigured, [bool]$HotkeyConfigured) {
-    New-Item -ItemType Directory -Path $JcodeHome -Force | Out-Null
+    New-Item -ItemType Directory -Path $NextCodeHome -Force | Out-Null
 
     $state = @{
         launch_count = 0
@@ -311,7 +320,7 @@ function Set-SetupHintsState([bool]$AlacrittyConfigured, [bool]$HotkeyConfigured
     $state | ConvertTo-Json | Set-Content -Path $SetupHintsPath -Encoding UTF8
 }
 
-function Install-JcodeHotkey([string]$JcodeExePath) {
+function Install-NextCodeHotkey([string]$NextCodeExePath) {
     $alacrittyPath = Find-AlacrittyPath
     if (-not $alacrittyPath) {
         Write-Warn "Skipping Alt+; hotkey because Alacritty is not installed"
@@ -319,14 +328,14 @@ function Install-JcodeHotkey([string]$JcodeExePath) {
     }
 
     New-Item -ItemType Directory -Path $HotkeyDir -Force | Out-Null
-    Stop-JcodeHotkeyListeners
+    Stop-NextCodeHotkeyListeners
 
     $escapedAlacritty = $alacrittyPath.Replace("'", "''")
-    $escapedJcodeExe = $JcodeExePath.Replace("'", "''")
+    $escapedNextCodeExe = $NextCodeExePath.Replace("'", "''")
 
-    $ps1Path = Join-Path $HotkeyDir "jcode-hotkey.ps1"
+    $ps1Path = Join-Path $HotkeyDir "next-code-hotkey.ps1"
     $ps1Lines = @(
-        '# jcode Alt+; global hotkey listener',
+        '# next-code Alt+; global hotkey listener',
         '# Auto-generated by scripts/install.ps1. Runs at login via startup shortcut.',
         '',
         'Add-Type @"',
@@ -367,7 +376,7 @@ function Install-JcodeHotkey([string]$JcodeExePath) {
         '    $msg = New-Object HotKeyHelper+MSG',
         '    while ([HotKeyHelper]::GetMessage([ref]$msg, [IntPtr]::Zero, $WM_HOTKEY, $WM_HOTKEY) -ne 0) {',
         '        if ($msg.message -eq $WM_HOTKEY -and $msg.wParam.ToInt32() -eq $HOTKEY_ID) {',
-        "            Start-Process '$escapedAlacritty' -ArgumentList '-e', '$escapedJcodeExe'",
+        "            Start-Process '$escapedAlacritty' -ArgumentList '-e', '$escapedNextCodeExe'",
         '        }',
         '    }',
         '} finally {',
@@ -376,11 +385,11 @@ function Install-JcodeHotkey([string]$JcodeExePath) {
     )
     $ps1Content = $ps1Lines -join "`r`n"
     Set-Content -Path $ps1Path -Value $ps1Content -Encoding UTF8
-    Remove-Item -LiteralPath (Join-Path $HotkeyDir "jcode-hotkey-launcher.vbs") -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $HotkeyDir "next-code-hotkey-launcher.vbs") -Force -ErrorAction SilentlyContinue
 
     $startupDir = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
     New-Item -ItemType Directory -Path $startupDir -Force | Out-Null
-    $startupShortcutPath = (Join-Path $startupDir "jcode-hotkey.lnk").Replace("'", "''")
+    $startupShortcutPath = (Join-Path $startupDir "next-code-hotkey.lnk").Replace("'", "''")
     $escapedPs1Path = $ps1Path.Replace("'", "''")
 
     $shortcutLines = @(
@@ -389,7 +398,7 @@ function Install-JcodeHotkey([string]$JcodeExePath) {
         "`$shortcut = `$shell.CreateShortcut('$startupShortcutPath')",
         "`$shortcut.TargetPath = 'powershell.exe'",
         ("`$shortcut.Arguments = '-NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File ""{0}""'" -f $escapedPs1Path),
-        "`$shortcut.Description = 'jcode Alt+; hotkey listener'",
+        "`$shortcut.Description = 'next-code Alt+; hotkey listener'",
         '$shortcut.WindowStyle = 7',
         '$shortcut.Save()',
         "Write-Output 'OK'"
@@ -409,11 +418,11 @@ function Install-JcodeHotkey([string]$JcodeExePath) {
         Write-Warn "Hotkey will start on next login, but could not be launched immediately"
     }
 
-    Write-Info "Configured Alt+; to launch jcode in Alacritty"
+    Write-Info "Configured Alt+; to launch next-code in Alacritty"
     return $true
 }
 
-function Get-JcodeWindowsArtifact {
+function Get-NextCodeWindowsArtifact {
     $candidates = @()
 
     try {
@@ -427,8 +436,8 @@ function Get-JcodeWindowsArtifact {
 
     foreach ($arch in $candidates) {
         switch -Regex ($arch.Trim()) {
-            '^(X64|AMD64|x86_64)$' { return "jcode-windows-x86_64" }
-            '^(Arm64|ARM64|AARCH64|aarch64)$' { return "jcode-windows-aarch64" }
+            '^(X64|AMD64|x86_64)$' { return "next-code-windows-x86_64" }
+            '^(Arm64|ARM64|AARCH64|aarch64)$' { return "next-code-windows-aarch64" }
         }
     }
 
@@ -436,7 +445,7 @@ function Get-JcodeWindowsArtifact {
     Write-Err "Unsupported architecture: $displayArch (supported: x86_64, ARM64)"
 }
 
-$Artifact = Get-JcodeWindowsArtifact
+$Artifact = Get-NextCodeWindowsArtifact
 
 $ResolvedArtifactExePath = Resolve-OptionalPath $ArtifactExePath
 $ResolvedArtifactTgzPath = Resolve-OptionalPath $ArtifactTgzPath
@@ -465,10 +474,10 @@ $VersionNum = $Version.TrimStart('v')
 $TgzUrl = "https://github.com/$Repo/releases/download/$Version/$Artifact.tar.gz"
 $ExeUrl = "https://github.com/$Repo/releases/download/$Version/$Artifact.exe"
 
-$BuildsDir = Join-Path $env:LOCALAPPDATA "jcode\builds"
+$BuildsDir = Join-Path $NextCodeHome "builds"
 $StableDir = Join-Path $BuildsDir "stable"
 $VersionDir = Join-Path $BuildsDir "versions\$VersionNum"
-$LauncherPath = Join-Path $InstallDir "jcode.exe"
+$LauncherPath = Join-Path $InstallDir "next-code.exe"
 
 $Existing = ""
 if (Test-Path $LauncherPath) {
@@ -477,12 +486,12 @@ if (Test-Path $LauncherPath) {
 
 if ($Existing) {
     if ($Existing -match [regex]::Escape($VersionNum)) {
-        Write-Info "jcode $Version is already installed - reinstalling"
+        Write-Info "next-code $Version is already installed - reinstalling"
     } else {
-        Write-Info "Updating jcode $Existing -> $Version"
+        Write-Info "Updating next-code $Existing -> $Version"
     }
 } else {
-    Write-Info "Installing jcode $Version"
+    Write-Info "Installing next-code $Version"
 }
 Write-Info "  launcher: $LauncherPath"
 
@@ -490,11 +499,11 @@ foreach ($d in @($InstallDir, $StableDir, $VersionDir)) {
     if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
 }
 
-$TempDir = Join-Path $env:TEMP "jcode-install-$(Get-Random)"
+$TempDir = Join-Path $env:TEMP "next-code-install-$(Get-Random)"
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
 
 $DownloadMode = ""
-$DownloadPath = Join-Path $TempDir "jcode.download"
+$DownloadPath = Join-Path $TempDir "next-code.download"
 
 if ($ResolvedArtifactExePath) {
     Write-Info "Using local artifact exe: $ResolvedArtifactExePath"
@@ -526,7 +535,7 @@ if (-not $ResolvedArtifactExePath -and -not $ResolvedArtifactTgzPath -and $Downl
     Assert-FileChecksum -Path $DownloadPath -ExpectedSha256 $expectedSha256 -AssetName $downloadedAssetName
 }
 
-$DestBin = Join-Path $VersionDir "jcode.exe"
+$DestBin = Join-Path $VersionDir "next-code.exe"
 
 if ($DownloadMode -eq "tar") {
     Write-Info "Extracting..."
@@ -543,7 +552,7 @@ if ($DownloadMode -eq "tar") {
     if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Write-Err "git is required to build from source" }
     if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) { Write-Err "cargo is required to build from source" }
 
-    $SrcDir = Join-Path $TempDir "jcode-src"
+    $SrcDir = Join-Path $TempDir "next-code-src"
     Write-Info "Cloning $Repo at $Version..."
     $gitCloneResult = Invoke-ProcessWithTimeout -FilePath "git" -ArgumentList @(
         "clone",
@@ -563,7 +572,7 @@ if ($DownloadMode -eq "tar") {
         Write-Err "Failed to clone $Repo at $Version (exit code: $($gitCloneResult.ExitCode))"
     }
 
-    Write-Info "Building jcode from source (this can take several minutes)..."
+    Write-Info "Building next-code from source (this can take several minutes)..."
     $cargoResult = Invoke-ProcessWithTimeout -FilePath "cargo" -ArgumentList @("build", "--release", "--manifest-path", (Join-Path $SrcDir "Cargo.toml")) -TimeoutSeconds 1800 -FriendlyName "cargo-build" -CaptureOutput
     if ($cargoResult.TimedOut) {
         Write-LogTail -Path $cargoResult.StdoutPath -Label "cargo stdout"
@@ -576,21 +585,25 @@ if ($DownloadMode -eq "tar") {
         Write-Err "cargo build failed (exit code: $($cargoResult.ExitCode))"
     }
 
-    $BuiltBin = Join-Path $SrcDir "target\release\jcode.exe"
+    $BuiltBin = Join-Path $SrcDir "target\release\next-code.exe"
     if (-not (Test-Path $BuiltBin)) { Write-Err "Built binary not found at $BuiltBin" }
     Copy-Item -Path $BuiltBin -Destination $DestBin -Force
 }
 
-Copy-Item -Path $DestBin -Destination (Join-Path $StableDir "jcode.exe") -Force
+Copy-Item -Path $DestBin -Destination (Join-Path $StableDir "next-code.exe") -Force
 Set-Content -Path (Join-Path $BuildsDir "stable-version") -Value $VersionNum
-Copy-Item -Path (Join-Path $StableDir "jcode.exe") -Destination $LauncherPath -Force
+Copy-Item -Path (Join-Path $StableDir "next-code.exe") -Destination $LauncherPath -Force
+
+# Compat copy for one release so existing `jcode` muscle memory keeps working.
+$CompatLauncherPath = Join-Path $InstallDir "jcode.exe"
+Copy-Item -Path (Join-Path $StableDir "next-code.exe") -Destination $CompatLauncherPath -Force
 
 # Gracefully reload any running background server onto the freshly installed
 # binary (issue #291). `server reload` only reloads a genuinely-older daemon,
 # hands its live sessions to the new process, and is a no-op when nothing is
 # running, so it is safe to call unconditionally. Best-effort: never fail the
 # install over it.
-if ($env:JCODE_SKIP_SERVER_RELOAD -ne "1") {
+if ($env:NEXT_CODE_SKIP_SERVER_RELOAD -ne "1" -and $env:JCODE_SKIP_SERVER_RELOAD -ne "1") {
     try {
         & $LauncherPath server reload 2>$null | Out-Null
     } catch {
@@ -618,7 +631,7 @@ if ($ConfigureAlacritty -and -not $SkipAlacrittySetup) {
 }
 
 if ($ConfigureHotkey -and -not $SkipHotkeySetup -and $installedAlacritty) {
-    $configuredHotkey = Install-JcodeHotkey -JcodeExePath $LauncherPath
+    $configuredHotkey = Install-NextCodeHotkey -NextCodeExePath $LauncherPath
 } elseif ($ConfigureHotkey -and -not $installedAlacritty) {
     Write-Warn "Hotkey setup requires Alacritty. Re-run with -ConfigureAlacritty -ConfigureHotkey."
 } else {
@@ -628,7 +641,7 @@ if ($ConfigureHotkey -and -not $SkipHotkeySetup -and $installedAlacritty) {
 Set-SetupHintsState -AlacrittyConfigured:(Test-AlacrittyInstalled) -HotkeyConfigured:$configuredHotkey
 
 Write-Host ""
-Write-Info "jcode $Version installed successfully!"
+Write-Info "next-code $Version installed successfully!"
 Write-Host ""
 
 if (Test-AlacrittyInstalled) {
@@ -639,14 +652,14 @@ if (Test-AlacrittyInstalled) {
 }
 
 if ($configuredHotkey) {
-    Write-Info "Global hotkey ready: Alt+; opens jcode in Alacritty"
+    Write-Info "Global hotkey ready: Alt+; opens next-code in Alacritty"
     Write-Host ""
 }
 
-if (Get-Command jcode -ErrorAction SilentlyContinue) {
-    Write-Info "Run 'jcode' to get started."
+if ((Get-Command next-code -ErrorAction SilentlyContinue) -or (Get-Command jcode -ErrorAction SilentlyContinue)) {
+    Write-Info "Run 'next-code' to get started (compat: 'jcode' also works for this release)."
 } else {
     Write-Host "  Open a new terminal window, then run:"
     Write-Host ""
-    Write-Host "    jcode" -ForegroundColor Green
+    Write-Host "    next-code" -ForegroundColor Green
 }

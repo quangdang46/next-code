@@ -27,11 +27,11 @@ AWS Budget $10 ──▶ SNS jcode-guard-stop ──▶ breaker lambda ──▶
 
 | File | Deployed at | Purpose |
 |---|---|---|
-| `units/jcode-serve.service` | `~ec2-user/.config/systemd/user/` (user unit, linger on) | jcode daemon + gateway, restart always |
-| `units/jcode-pair.service` | `/etc/systemd/system/` | Legacy local pairing HTTP service, now disabled after migration to SSM |
+| `units/next-code-serve.service` | `~ec2-user/.config/systemd/user/` (user unit, linger on) | next-code daemon + gateway, restart always |
+| `units/next-code-pair.service` | `/etc/systemd/system/` | Legacy local pairing HTTP service, now disabled after migration to SSM |
 | `units/idle-autostop.{service,timer}` | `/etc/systemd/system/` | 5-min check, poweroff after 30 min idle |
 | `idle-autostop.sh` | `/usr/local/bin/` | idle = no gateway/SSH clients AND jcode has no outbound :443 (not streaming) |
-| `jcode-pair-service.py` | `/usr/local/bin/` | Legacy tailnet-only fallback; normal pairing now uses SSM |
+| `next-code-pair-service.py` | `/usr/local/bin/` | Legacy tailnet-only fallback; normal pairing now uses SSM |
 | `wake-lambda.py` | Lambda `jcode-phone-wake` (behind API Gateway `8c3wp4cbag`) | wake page: starts instance, polls SSM health, generates pair codes through SSM |
 | `breaker-lambda.py` | Lambda `jcode-guard-breaker` | stops the instance; subscribed to SNS `jcode-guard-stop` |
 | `IAM-LEAST-PRIVILEGE.md` | repository documentation | scoped runtime/deploy policies and lockout-safe `jade-deploy` rotation plan |
@@ -62,7 +62,7 @@ The legacy `AWS/Billing/EstimatedCharges` alarms were removed because the accoun
 
 1. Bookmark the wake link (`https://<api-id>.execute-api.us-east-1.amazonaws.com/#t=<token>`, token stored at `~/.jcode/jcode-phone-wake-token` on the workstation). The URL fragment is not sent in HTTP requests; JavaScript exchanges it for an `Authorization: Bearer` header and keeps it in session storage.
 2. Tap it: the Lambda starts the instance and polls EC2/SSM every 5 s until ready.
-3. Tap "Pair this phone" → Lambda runs `jcode pair` through SSM → 6-digit code + `jcode://` deep link → opens the iOS app paired to `100.109.78.41:7643`.
+3. Tap "Pair this phone" → Lambda runs `jcode pair` through SSM → 6-digit code + `nextcode://` deep link (iOS also accepts legacy `jcode://`) → opens the iOS app paired to `100.109.78.41:7643`.
 4. SSH fallback: connect through Tailscale to `ec2-user@100.109.78.41`, then run `phone`.
 
 ## Security notes
@@ -81,7 +81,7 @@ The legacy `AWS/Billing/EstimatedCharges` alarms were removed because the accoun
 
 1. Launch AL2023 x86_64 with an encrypted 30GB gp3 root volume, the Bedrock + SSM instance role, and a security group with no inbound rules. Associate an Elastic IP for outbound internet while running.
 2. Install jcode, Tailscale, tmux, and git. Join the tailnet as `jcode-phone`; set the jcode gateway host to `100.109.78.41`.
-3. Copy `units/jcode-serve.service` and the idle-autostop unit/script; enable linger and the required services. The legacy pair service is not required.
+3. Copy `units/next-code-serve.service` and the idle-autostop unit/script; enable linger and the required services. The legacy pair service is not required.
 4. Deploy `wake-lambda.py` as `waker.py`, set `WAKE_TOKEN`, `INSTANCE_ID`, and `JCODE_GATEWAY_HOST=100.109.78.41`, and grant scoped EC2/SSM permissions. API Gateway HTTP API routes to the Lambda.
 5. Create the SNS topics/subscriptions and connect the $10 Budget's 100% actual notification to `jcode-guard-stop`.
 6. Enable CloudTrail, Access Analyzer, account-level S3 Block Public Access, EBS encryption by default, and bounded CloudWatch log retention.

@@ -543,7 +543,7 @@ def print_resource_block(title: str, runs: list[dict]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    default_bin = os.environ.get("JCODE_BENCH_BIN") or shutil.which("jcode") or "./target/release/jcode"
+    default_bin = os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN") or os.environ.get("JCODE_BENCH_BIN") or os.environ.get("NEXT_CODE_BENCH_BIN") or shutil.which("next-code") or shutil.which("jcode") or "./target/release/next-code"
     ap.add_argument("binary", nargs="?", default=default_bin)
     ap.add_argument("--runs", type=int, default=5)
     ap.add_argument("--sample-interval-ms", type=float, default=2.0)

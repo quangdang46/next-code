@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use jcode_experiment_flags::{EXPERIMENT_FLAGS, Experiments, Stage};
+use next_code_experiment_flags::{EXPERIMENT_FLAGS, Experiments, Stage};
 
 pub fn run_experiment_list_command(json: bool) -> Result<()> {
     let config = crate::config::config();
@@ -42,35 +42,35 @@ pub fn run_experiment_list_command(json: bool) -> Result<()> {
 pub fn run_experiment_enable_command(key: &str) -> Result<()> {
     if Experiments::resolve_key(key).is_none() {
         anyhow::bail!(
-            "Unknown experiment flag '{key}'. Use 'jcode experiment list' to see valid flags."
+            "Unknown experiment flag '{key}'. Use 'next-code experiment list' to see valid flags."
         );
     }
     let mut config = crate::config::Config::load();
     config.experiments.entries.insert(key.to_string(), true);
     config.save().context("Failed to save config")?;
     crate::config::invalidate_config_cache();
-    eprintln!("[jcode] Experiment '{key}' enabled.");
+    eprintln!("[next-code] Experiment '{key}' enabled.");
     Ok(())
 }
 
 pub fn run_experiment_disable_command(key: &str) -> Result<()> {
     if Experiments::resolve_key(key).is_none() {
         anyhow::bail!(
-            "Unknown experiment flag '{key}'. Use 'jcode experiment list' to see valid flags."
+            "Unknown experiment flag '{key}'. Use 'next-code experiment list' to see valid flags."
         );
     }
     let mut config = crate::config::Config::load();
     config.experiments.entries.insert(key.to_string(), false);
     config.save().context("Failed to save config")?;
     crate::config::invalidate_config_cache();
-    eprintln!("[jcode] Experiment '{key}' disabled.");
+    eprintln!("[next-code] Experiment '{key}' disabled.");
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jcode_experiment_flags::Experiments;
+    use next_code_experiment_flags::Experiments;
 
     #[test]
     fn test_run_experiment_list_json_roundtrip() {
@@ -81,7 +81,7 @@ mod tests {
         let json_str = serde_json::to_string_pretty(&states).unwrap();
         let parsed: Vec<serde_json::Value> = serde_json::from_str(&json_str).unwrap();
         // We should have exactly EXPERIMENT_FLAGS.len() entries.
-        assert_eq!(parsed.len(), jcode_experiment_flags::EXPERIMENT_FLAGS.len());
+        assert_eq!(parsed.len(), next_code_experiment_flags::EXPERIMENT_FLAGS.len());
         // Each entry should have "flag", "key", "enabled", "default_enabled" fields.
         for (i, entry) in parsed.iter().enumerate() {
             assert!(entry.get("flag").is_some(), "missing 'flag' at index {i}");
@@ -97,7 +97,7 @@ mod tests {
     fn test_run_experiment_enable_disable_roundtrip() {
         // Use a temp JCODE_HOME to isolate from user config.
         let tmp = tempfile::tempdir().unwrap();
-        // JCODE_HOME points directly to the jcode data directory.
+        // JCODE_HOME points directly to the next-code data directory.
         // SAFETY: test-only env mutation, single-threaded test harness.
         unsafe {
             std::env::set_var("JCODE_HOME", tmp.path().to_str().unwrap());

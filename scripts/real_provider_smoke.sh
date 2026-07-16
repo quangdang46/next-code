@@ -2,9 +2,9 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-provider=${JCODE_PROVIDER:-auto}
+provider=${NEXT_CODE_PROVIDER:-${JCODE_PROVIDER:-auto}}
 prompt=${1:-"Use the bash tool to run 'pwd', then use the ls tool to list the current directory, then respond with DONE."}
-expect=${JCODE_TRACE_EXPECT:-DONE}
+expect=${NEXT_CODE_TRACE_EXPECT:-${JCODE_TRACE_EXPECT:-DONE}}
 cargo_exec="$repo_root/scripts/cargo_exec.sh"
 
 echo "=== Real Provider Smoke ==="
@@ -29,15 +29,15 @@ fi
 echo ""
 echo "Test 2: Tool harness (network tools enabled)"
 if [[ "${JCODE_REMOTE_CARGO:-0}" == "1" ]]; then
-  (cd "$repo_root" && "$cargo_exec" build --bin jcode-harness)
-  (cd "$repo_root" && ./target/debug/jcode-harness -- --include-network)
+  (cd "$repo_root" && "$cargo_exec" build --bin next-code-harness)
+  (cd "$repo_root" && ./target/debug/next-code-harness -- --include-network)
 else
-  (cd "$repo_root" && cargo run --bin jcode-harness -- --include-network)
+  (cd "$repo_root" && cargo run --bin next-code-harness -- --include-network)
 fi
 
 echo ""
 echo "Test 3: End-to-end trace"
-if [[ ! -x "$repo_root/target/release/jcode" ]]; then
+if [[ ! -x "$repo_root/target/release/next-code" && ! -x "$repo_root/target/release/jcode" ]]; then
   (cd "$repo_root" && "$cargo_exec" build --release)
 fi
 

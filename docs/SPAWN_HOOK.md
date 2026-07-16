@@ -1,8 +1,8 @@
 # Spawn Hook: External Control of Headed Session Spawns
 
-jcode opens new terminal windows in several flows: swarm agent spawning
+next-code opens new terminal windows in several flows: swarm agent spawning
 (`swarm spawn` with `spawn_mode=visible`), resume-in-new-terminal, self-dev
-sessions, restart restores, and jade relay launches. By default jcode detects
+sessions, restart restores, and jade relay launches. By default next-code detects
 an installed terminal emulator (kitty, wezterm, alacritty, gnome-terminal, ...)
 and opens a new OS window.
 
@@ -13,7 +13,7 @@ pane, a tab in a wrapper app like herd, a specific monitor/workspace, etc.
 ## Configuration
 
 ```toml
-# ~/.jcode/config.toml
+# ~/.next-code/config.toml
 [terminal]
 spawn_hook = "tmux new-window"
 ```
@@ -21,28 +21,29 @@ spawn_hook = "tmux new-window"
 Or per-environment:
 
 ```bash
-export JCODE_SPAWN_HOOK="tmux new-window"
+export NEXT_CODE_SPAWN_HOOK="tmux new-window"
 # An empty value disables a config-file hook:
-export JCODE_SPAWN_HOOK=
+export NEXT_CODE_SPAWN_HOOK=
+# Legacy dual-read: JCODE_SPAWN_HOOK / JCODE_SPAWN_* still accepted for one release.
 ```
 
 Env always wins over the config file.
 
 ## Contract
 
-When a headed spawn happens and a hook is configured, jcode runs:
+When a headed spawn happens and a hook is configured, next-code runs:
 
 ```
-<spawn_hook> <jcode-binary> <args...>
+<spawn_hook> <next-code-binary> <args...>
 ```
 
 - The hook command is parsed shell-style (quotes and backslash escapes work),
   but it is executed directly, not through a shell.
-- The jcode binary and its full argument list are appended as extra argv
+- The next-code binary and its full argument list are appended as extra argv
   entries (the familiar `$TERMINAL -e <cmd>` convention).
 - The hook's working directory is the session working directory.
-- The hook process is detached; jcode does not wait for it.
-- If the hook fails to start (binary missing, parse error), jcode logs a
+- The hook process is detached; next-code does not wait for it.
+- If the hook fails to start (binary missing, parse error), next-code logs a
   warning and falls back to its built-in terminal detection.
 
 ### Metadata environment
@@ -51,19 +52,19 @@ The hook (and any terminal spawned by the built-in fallback) receives:
 
 | Variable | Meaning |
 | --- | --- |
-| `JCODE_SPAWN_KIND` | Why the spawn happened: `swarm-agent`, `resume`, `selfdev`, `restart`, `jade-relay` |
-| `JCODE_SPAWN_SESSION_ID` | The jcode session the window will run |
-| `JCODE_SPAWN_TITLE` | Suggested window/tab title (includes session icon + name) |
-| `JCODE_SPAWN_CWD` | Session working directory |
-| `JCODE_SPAWN_PROGRAM` | Path of the jcode binary to execute |
-| `JCODE_SPAWN_COMMAND` | Full command line, shell-escaped, for hooks that take one shell string |
-| `JCODE_SPAWN_SWARM_ID` | (swarm spawns) The swarm the agent joins |
-| `JCODE_SPAWN_COORDINATOR_SESSION_ID` | (swarm spawns) The coordinator session that requested the spawn |
-| `JCODE_FRESH_SPAWN` | `1` when the spawn is a fresh window handoff |
+| `NEXT_CODE_SPAWN_KIND` | Why the spawn happened: `swarm-agent`, `resume`, `selfdev`, `restart`, `jade-relay` |
+| `NEXT_CODE_SPAWN_SESSION_ID` | The next-code session the window will run |
+| `NEXT_CODE_SPAWN_TITLE` | Suggested window/tab title (includes session icon + name) |
+| `NEXT_CODE_SPAWN_CWD` | Session working directory |
+| `NEXT_CODE_SPAWN_PROGRAM` | Path of the next-code binary to execute |
+| `NEXT_CODE_SPAWN_COMMAND` | Full command line, shell-escaped, for hooks that take one shell string |
+| `NEXT_CODE_SPAWN_SWARM_ID` | (swarm spawns) The swarm the agent joins |
+| `NEXT_CODE_SPAWN_COORDINATOR_SESSION_ID` | (swarm spawns) The coordinator session that requested the spawn |
+| `NEXT_CODE_FRESH_SPAWN` | `1` when the spawn is a fresh window handoff |
 
 ### Client terminal environment (multi-terminal routing)
 
-The jcode server process is long-lived: it captures terminal-identifying env
+The next-code server process is long-lived: it captures terminal-identifying env
 vars (`ZELLIJ_SESSION_NAME`, `TMUX`, `DISPLAY`, `KITTY_WINDOW_ID`, ...) once at
 startup. When you later open a *new* terminal/tmux/zellij session and connect a
 client to the same server, the server's copies are stale, so a spawn hook run by
@@ -76,8 +77,8 @@ terminal the user is actually attached to:
 
 - The native variable (e.g. `ZELLIJ_SESSION_NAME`) is overridden with the
   client's value, so hooks that read it directly target the right session.
-- A `JCODE_CLIENT_<NAME>` alias (e.g. `JCODE_CLIENT_ZELLIJ_SESSION_NAME`,
-  `JCODE_CLIENT_TMUX`, `JCODE_CLIENT_DISPLAY`) is also exported so a hook can
+- A `NEXT_CODE_CLIENT_<NAME>` alias (e.g. `NEXT_CODE_CLIENT_ZELLIJ_SESSION_NAME`,
+  `NEXT_CODE_CLIENT_TMUX`, `NEXT_CODE_CLIENT_DISPLAY`) is also exported so a hook can
   explicitly distinguish the client's terminal from the server's.
 
 Covered keys include the terminal multiplexers (zellij, tmux, screen), terminal
@@ -94,7 +95,7 @@ the client actually has set are forwarded.
 spawn_hook = "tmux new-window"
 ```
 
-`tmux new-window <jcode> --resume ses_x` runs the command in a new window of
+`tmux new-window <next-code> --resume ses_x` runs the command in a new window of
 the current tmux server. For panes instead:
 
 ```toml
@@ -116,53 +117,53 @@ at a script:
 
 ```toml
 [terminal]
-spawn_hook = "~/bin/jcode-spawn-router"
+spawn_hook = "~/bin/next-code-spawn-router"
 ```
 
 ```bash
 #!/usr/bin/env bash
-# ~/bin/jcode-spawn-router
-# argv: the jcode command to run ("$@"). Env: JCODE_SPAWN_* metadata.
+# ~/bin/next-code-spawn-router
+# argv: the next-code command to run ("$@"). Env: NEXT_CODE_SPAWN_* metadata.
 
-case "$JCODE_SPAWN_KIND" in
+case "$NEXT_CODE_SPAWN_KIND" in
   swarm-agent)
     # Swarm workers as tmux panes in a window named after the swarm.
-    tmux new-window -n "swarm:${JCODE_SPAWN_SWARM_ID:0:8}" "$@" 2>/dev/null \
+    tmux new-window -n "swarm:${NEXT_CODE_SPAWN_SWARM_ID:0:8}" "$@" 2>/dev/null \
       || tmux split-window "$@"
     ;;
   *)
     # Everything else as a normal terminal window.
-    kitty --title "$JCODE_SPAWN_TITLE" -e "$@" &
+    kitty --title "$NEXT_CODE_SPAWN_TITLE" -e "$@" &
     ;;
 esac
 ```
 
 A hook that exits non-zero after launching nothing will NOT trigger the
-built-in fallback (jcode only falls back when the hook process cannot be
+built-in fallback (next-code only falls back when the hook process cannot be
 started), so a router script should handle its own fallback like the example
 above.
 
 ### Single-shell-string consumers
 
 Some launchers want one shell command string instead of argv. Use
-`$JCODE_SPAWN_COMMAND`:
+`$NEXT_CODE_SPAWN_COMMAND`:
 
 ```bash
 #!/usr/bin/env bash
-zellij action new-pane -- bash -lc "$JCODE_SPAWN_COMMAND"
+zellij action new-pane -- bash -lc "$NEXT_CODE_SPAWN_COMMAND"
 ```
 
 ## Programmatic discovery
 
-Programs that wrap jcode (e.g. herd-style session managers) can set
-`JCODE_SPAWN_HOOK` in the environment of the `jcode` server process they
+Programs that wrap next-code (e.g. herd-style session managers) can set
+`NEXT_CODE_SPAWN_HOOK` in the environment of the `next-code` server process they
 launch. Every headed spawn the server performs, including swarm agents
 requested by coordinators over the socket protocol, will then route through
 the wrapper's hook.
 
 ## Focus hook
 
-When jcode wants to bring an existing session window to the foreground (e.g.
+When next-code wants to bring an existing session window to the foreground (e.g.
 after launching a self-dev window), it normally does a best-effort
 wmctrl/xdotool title search on X11. That doesn't work under Wayland or inside
 multiplexers, and a wrapper that owns placement should also own focus:
@@ -170,15 +171,15 @@ multiplexers, and a wrapper that owns placement should also own focus:
 ```toml
 [terminal]
 spawn_hook = "tmux new-window"
-focus_hook = "~/bin/jcode-focus"   # env: JCODE_FOCUS_SESSION_ID, JCODE_FOCUS_TITLE
+focus_hook = "~/bin/next-code-focus"   # env: NEXT_CODE_FOCUS_SESSION_ID, NEXT_CODE_FOCUS_TITLE
 ```
 
 ```bash
 #!/usr/bin/env bash
-# ~/bin/jcode-focus
+# ~/bin/next-code-focus
 tmux select-window -t "$(tmux list-windows -F '#{window_id} #{window_name}' \
-  | grep -F "$JCODE_FOCUS_TITLE" | head -1 | cut -d' ' -f1)"
+  | grep -F "$NEXT_CODE_FOCUS_TITLE" | head -1 | cut -d' ' -f1)"
 ```
 
-Env override: `JCODE_FOCUS_HOOK` (empty value disables a config-file hook).
-If the hook fails to start, jcode falls back to the built-in focus path.
+Env override: `NEXT_CODE_FOCUS_HOOK` (empty value disables a config-file hook).
+If the hook fails to start, next-code falls back to the built-in focus path.

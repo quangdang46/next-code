@@ -3,4 +3,4 @@
 //! This thin wrapper allows existing `crate::hooks::` import paths to keep
 //! working while the actual implementation lives in `crates/jcode-hooks`.
 
-pub use jcode_hooks::*;
+pub use next_code_hooks::*;

@@ -17,10 +17,10 @@ if [[ "$out_dir" != /* ]]; then
   out_dir="$repo_root/$out_dir"
 fi
 
-artifact="${JCODE_COMPAT_ARTIFACT:-jcode-linux-x86_64}"
+artifact="${JCODE_COMPAT_ARTIFACT:-${NEXT_CODE_COMPAT_ARTIFACT:-next-code-linux-x86_64}}"
 profile="${JCODE_COMPAT_PROFILE:-release}"
 image="${JCODE_COMPAT_IMAGE:-quay.io/pypa/manylinux2014_x86_64}"
-cache_root="${JCODE_COMPAT_CACHE_DIR:-$HOME/.cache/jcode-linux-compat}"
+cache_root="${JCODE_COMPAT_CACHE_DIR:-${NEXT_CODE_COMPAT_CACHE_DIR:-$HOME/.cache/next-code-linux-compat}}"
 target="x86_64-unknown-linux-gnu"
 
 mkdir -p "$out_dir" \
@@ -32,7 +32,7 @@ host_uid="$(id -u)"
 host_gid="$(id -g)"
 
 # Compute git build metadata on the HOST and hand it to the container via a
-# metadata file (read by jcode-build-meta/build.rs through
+# metadata file (read by next-code-build-meta/build.rs through
 # JCODE_BUILD_METADATA_FILE). The repo is bind-mounted into the container and
 # owned by the host UID while git inside the container runs as root, so any
 # in-container `git` call trips git's "dubious ownership" guard
@@ -134,9 +134,9 @@ docker run --rm \
 	    export CARGO_TARGET_DIR=/work/target/linux-compat
 	    export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 	    export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS:--C link-arg=-static-libgcc}"
-	    cargo build --profile "$JCODE_COMPAT_PROFILE" --target "$JCODE_COMPAT_TARGET" -p jcode --bin jcode
+	    cargo build --profile "$JCODE_COMPAT_PROFILE" --target "$JCODE_COMPAT_TARGET" -p next-code --bin next-code
 
-	    cp "$CARGO_TARGET_DIR/$JCODE_COMPAT_TARGET/$JCODE_COMPAT_PROFILE/jcode" "/out/'"$artifact"'.bin"
+	    cp "$CARGO_TARGET_DIR/$JCODE_COMPAT_TARGET/$JCODE_COMPAT_PROFILE/next-code" "/out/'"$artifact"'.bin"
 	    chmod +x "/out/'"$artifact"'.bin"
 	    cat > "/out/'"$artifact"'" <<WRAPPER
 #!/usr/bin/env sh
@@ -164,7 +164,7 @@ WRAPPER
 	    # Preserve the OpenSSL runtime libraries used by the build image. Some
 	    # Terminal-Bench containers are older than the build host and either lack
 	    # libssl entirely or expose a different SONAME. The Harbor adapter uploads
-	    # these sibling libraries and sets LD_LIBRARY_PATH for the jcode process.
+	    # these sibling libraries and sets LD_LIBRARY_PATH for the next-code process.
 	    ldd "/out/'"$artifact"'.bin" \
 	      | awk "/lib(ssl|crypto)[.]so/ { print \$3 }" \
 	      | while read -r lib; do

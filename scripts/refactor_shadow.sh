@@ -16,7 +16,7 @@ ref_profile="${JCODE_REF_PROFILE:-debug}"
 
 case "$ref_profile" in
   debug) default_bin="$repo_root/target/debug/jcode" ;;
-  release) default_bin="$repo_root/target/release/jcode" ;;
+  release) default_bin="$repo_root/target/release/next-code" ;;
   *)
     printf 'error: unsupported JCODE_REF_PROFILE: %s (expected debug or release)\n' "$ref_profile" >&2
     exit 1

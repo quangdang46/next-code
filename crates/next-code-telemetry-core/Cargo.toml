@@ -1,0 +1,27 @@
+[package]
+name = "next-code-telemetry-core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "next_code_telemetry_core"
+path = "src/lib.rs"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+next-code-build-meta = { path = "../next-code-build-meta" }
+next-code-core = { path = "../next-code-core" }
+next-code-logging = { path = "../next-code-logging" }
+next-code-provider-core = { path = "../next-code-provider-core" }
+next-code-selfdev-types = { path = "../next-code-selfdev-types" }
+next-code-storage = { path = "../next-code-storage" }
+next-code-usage-types = { path = "../next-code-usage-types" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "blocking", "charset", "http2", "system-proxy", "rustls-tls", "rustls-tls-native-roots"] }
+serde_json = "1"
+walkdir = "2"
+tokio = { version = "1", features = ["rt"] }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3"

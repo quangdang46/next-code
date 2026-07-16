@@ -254,7 +254,7 @@ fn run_cloud_sessions_helper_command(action: CloudSessionsSubcommand) -> Result<
 }
 
 fn cloud_sessions_config_path() -> Result<PathBuf> {
-    Ok(crate::storage::jcode_dir()?.join("cloud_sessions.json"))
+    Ok(crate::storage::next_code_dir()?.join("cloud_sessions.json"))
 }
 
 fn load_cloud_sessions_config() -> Result<Option<CloudSessionsConfig>> {
@@ -483,7 +483,7 @@ struct SyncCandidate {
 }
 
 fn cloud_sessions_sync_state_path() -> Result<PathBuf> {
-    Ok(crate::storage::jcode_dir()?.join("cloud_sessions_sync.json"))
+    Ok(crate::storage::next_code_dir()?.join("cloud_sessions_sync.json"))
 }
 
 fn load_cloud_sessions_sync_state() -> Result<CloudSessionsSyncState> {
@@ -526,7 +526,7 @@ fn resolve_sync_sessions_dir(override_path: Option<&str>) -> Result<PathBuf> {
     if let Some(path) = override_path.map(str::trim).filter(|path| !path.is_empty()) {
         return Ok(expand_home_path(path));
     }
-    Ok(crate::storage::jcode_dir()?.join("sessions"))
+    Ok(crate::storage::next_code_dir()?.join("sessions"))
 }
 
 fn expand_home_path(path: &str) -> PathBuf {
@@ -1566,7 +1566,7 @@ async fn run_ambient_visible() -> Result<()> {
 
     let _ = crossterm::execute!(
         std::io::stdout(),
-        crossterm::terminal::SetTitle("🤖 jcode ambient cycle")
+        crossterm::terminal::SetTitle("🤖 next-code ambient cycle")
     );
 
     let result = app.run(terminal).await;
@@ -1606,7 +1606,7 @@ pub enum MemorySubcommand {
 }
 
 pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
-    use jcode_memory_types::{MemoryEntry as MemEntry, MemoryScope};
+    use next_code_memory_types::{MemoryEntry as MemEntry, MemoryScope};
 
     let manager = memory::MemoryManager::new();
 
@@ -1773,7 +1773,7 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
         }
 
         MemorySubcommand::ClearTest => {
-            let test_dir = storage::jcode_dir()?.join("memory").join("test");
+            let test_dir = storage::next_code_dir()?.join("memory").join("test");
             if test_dir.exists() {
                 let count = std::fs::read_dir(&test_dir)?.count();
                 std::fs::remove_dir_all(&test_dir)?;
@@ -1791,8 +1791,8 @@ pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Re
     let install_root = dirs::home_dir()
         .map(|h| h.join(".jcode").join("plugins"))
         .unwrap_or_else(|| PathBuf::from("/tmp/jcode-plugins"));
-    let mgr = jcode_plugin_core::PluginManager::new(install_root).await;
-    use jcode_plugin_core::PluginSource;
+    let mgr = next_code_plugin_core::PluginManager::new(install_root).await;
+    use next_code_plugin_core::PluginSource;
 
     match cmd {
         super::args::PluginSubcommand::Load { path } => {
@@ -1869,7 +1869,7 @@ pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Re
                     println!("Plugin '{name}' reloaded");
                 }
                 None => {
-                    eprintln!("Plugin '{name}' not found. Use `jcode plugin load` first.");
+                    eprintln!("Plugin '{name}' not found. Use `next-code plugin load` first.");
                 }
             }
 
@@ -1945,18 +1945,19 @@ pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
         eprintln!("    \x1b[2m[gateway]\x1b[0m");
         eprintln!("    \x1b[2menabled = true\x1b[0m");
         eprintln!("    \x1b[2mport = {}\x1b[0m\n", gw_config.port);
-        eprintln!("  Then restart the jcode server.\n");
+        eprintln!("  Then restart the next-code server.\n");
     }
 
     let code = registry.generate_pairing_code();
     let connect_host = resolve_connect_host(&gw_config.bind_addr);
+    // Prefer nextcode://; iOS PairURI.parse still accepts legacy jcode://.
     let pair_uri = format!(
-        "jcode://pair?host={}&port={}&code={}",
+        "nextcode://pair?host={}&port={}&code={}",
         connect_host, gw_config.port, code
     );
 
     eprintln!();
-    eprintln!("  \x1b[1mScan with the jcode iOS app:\x1b[0m\n");
+    eprintln!("  \x1b[1mScan with the Next Code iOS app:\x1b[0m\n");
     match crate::login_qr::render_unicode_qr(&pair_uri) {
         Ok(qr) => {
             for line in qr.lines() {
@@ -2101,10 +2102,10 @@ pub async fn run_browser(action: &str) -> Result<()> {
                 println!("\nBuilt-in browser tool is ready.");
             } else if status.responding && !status.compatible {
                 println!(
-                    "\nThe browser bridge is connected, but the installed Firefox extension is out of date for this jcode build. Run `jcode browser setup` to repair or update it."
+                    "\nThe browser bridge is connected, but the installed Firefox extension is out of date for this next-code build. Run `next-code browser setup` to repair or update it."
                 );
             } else {
-                println!("\nRun `jcode browser setup` to install or repair it.");
+                println!("\nRun `next-code browser setup` to install or repair it.");
             }
         }
         other => {
@@ -2237,15 +2238,15 @@ pub async fn run_server_reload_command(
     };
 
     // No server? Nothing to reload. This is a success so an installer can call
-    // `jcode server reload` unconditionally after swapping the binary.
+    // `next-code server reload` unconditionally after swapping the binary.
     if !crate::server::has_live_listener(&socket).await {
         // Reap a stale socket left by a crashed daemon so the next launch binds
         // cleanly instead of wedging in a connect-retry loop.
         let reaped = crate::server::reap_stale_socket_if_dead(&socket).await;
         let detail = if reaped {
-            "No running jcode server found; cleared a stale socket.".to_string()
+            "No running next-code server found; cleared a stale socket.".to_string()
         } else {
-            "No running jcode server found; nothing to reload.".to_string()
+            "No running next-code server found; nothing to reload.".to_string()
         };
         return emit(ServerReloadReport {
             socket: socket.display().to_string(),
@@ -2325,7 +2326,7 @@ pub async fn run_server_reload_command(
             reloaded: false,
             already_current: true,
             handoff_ready: true,
-            detail: "jcode server is already running the newest binary; no reload needed."
+            detail: "next-code server is already running the newest binary; no reload needed."
                 .to_string(),
         });
     }
@@ -2338,9 +2339,9 @@ pub async fn run_server_reload_command(
     );
 
     let detail = if handoff_ready {
-        "jcode server reloaded onto the newest binary.".to_string()
+        "next-code server reloaded onto the newest binary.".to_string()
     } else {
-        "jcode server reload requested; the new server is still coming up.".to_string()
+        "next-code server reload requested; the new server is still coming up.".to_string()
     };
 
     emit(ServerReloadReport {
@@ -2369,8 +2370,8 @@ pub async fn run_server_stop_command(force: bool, emit_json: bool, emit_toon: bo
     use std::time::{Duration, Instant};
 
     if !force {
-        let msg = "`jcode server stop` terminates the daemon and drops any live headless/swarm sessions. \
-Prefer `jcode server reload` to pick up an upgrade gracefully. \
+        let msg = "`next-code server stop` terminates the daemon and drops any live headless/swarm sessions. \
+Prefer `next-code server reload` to pick up an upgrade gracefully. \
 Re-run with `--force` if you really want to stop the server.";
         if emit_json || emit_toon {
             let fmt = if emit_toon {
@@ -2420,10 +2421,10 @@ Re-run with `--force` if you really want to stop the server.";
                 match crate::platform::signal_detached_process_group(pid, libc::SIGTERM) {
                     Ok(()) => {
                         signaled_pid = Some(pid);
-                        detail = format!("Sent SIGTERM to jcode server (pid {pid}).");
+                        detail = format!("Sent SIGTERM to next-code server (pid {pid}).");
                     }
                     Err(e) => {
-                        detail = format!("Failed to signal jcode server (pid {pid}): {e}");
+                        detail = format!("Failed to signal next-code server (pid {pid}): {e}");
                     }
                 }
             }
@@ -2432,15 +2433,15 @@ Re-run with `--force` if you really want to stop the server.";
                 match crate::platform::signal_detached_process_group(pid, 0) {
                     Ok(()) => {
                         signaled_pid = Some(pid);
-                        detail = format!("Terminated jcode server (pid {pid}).");
+                        detail = format!("Terminated next-code server (pid {pid}).");
                     }
                     Err(e) => {
-                        detail = format!("Failed to terminate jcode server (pid {pid}): {e}");
+                        detail = format!("Failed to terminate next-code server (pid {pid}): {e}");
                     }
                 }
             }
         } else {
-            detail = format!("Registered jcode server (pid {pid}) is not running.")
+            detail = format!("Registered next-code server (pid {pid}) is not running.")
         }
     } else if had_listener {
         // A listener answers but no registry entry maps to it. We deliberately
@@ -2449,7 +2450,7 @@ Re-run with `--force` if you really want to stop the server.";
         // registry entry.)
         detail = "Found a live server socket with no registry entry.".to_string();
     } else {
-        detail = "No running jcode server found.".to_string();
+        detail = "No running next-code server found.".to_string();
     }
 
     // Wait for the listener to disappear after signalling. Escalate to SIGKILL
@@ -2504,16 +2505,16 @@ Re-run with `--force` if you really want to stop the server.";
             println!("{detail}")
         }
         if stopped && signaled_pid.is_some() {
-            println!("jcode server stopped.")
+            println!("next-code server stopped.")
         } else if stopped && !had_listener && signaled_pid.is_none() {
             // Nothing was running; this is still a success for an installer.
         } else if !stopped {
             println!(
-                "jcode server did not exit cleanly; it may still be shutting down. Re-run if needed."
+                "next-code server did not exit cleanly; it may still be shutting down. Re-run if needed."
             )
         }
         if reaped {
-            println!("Cleared a stale jcode socket.")
+            println!("Cleared a stale next-code socket.")
         }
     }
 

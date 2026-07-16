@@ -1,0 +1,15 @@
+[package]
+name = "next-code-tui-session-picker"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-session-types = { path = "../next-code-session-types" }
+serde = { version = "1", features = ["derive"], optional = true }
+
+[features]
+default = []
+serde = ["dep:serde"]

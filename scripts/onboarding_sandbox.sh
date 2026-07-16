@@ -139,7 +139,7 @@ run_jcode() {
   if [[ -x "$binary_path" ]]; then
     run_in_sandbox "$binary_path" "${prefix[@]}" "$@"
   else
-    run_in_sandbox cargo run --bin jcode -- "${prefix[@]}" "$@"
+    run_in_sandbox cargo run --bin next-code -- "${prefix[@]}" "$@"
   fi
 }
 

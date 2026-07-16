@@ -1,7 +1,7 @@
-//! Handlers for the `jcode secrets` subcommand group.
+//! Handlers for the `next-code secrets` subcommand group.
 //!
 //! Reads and writes the encrypted, OS-keychain-backed secrets store via
-//! [`jcode_secrets::SecretsManager`]. Secret values are only ever printed by
+//! [`next_code_secrets::SecretsManager`]. Secret values are only ever printed by
 //! the explicit `get` command; `set`/`delete`/`list` never echo values.
 //!
 //! Each `run_*` entry point resolves the real manager + scope, then delegates
@@ -12,14 +12,14 @@
 use anyhow::{Context, Result};
 use std::io::Read;
 
-use jcode_secrets::{
+use next_code_secrets::{
     SecretName, SecretScope, SecretsBackendKind, SecretsManager, environment_id_from_cwd,
 };
 use serde::Serialize;
 
 fn manager() -> Result<SecretsManager> {
-    let jcode_home = jcode_storage::jcode_dir().context("resolve jcode home directory")?;
-    SecretsManager::new(jcode_home, SecretsBackendKind::Local)
+    let next_code_home = next_code_storage::next_code_dir().context("resolve next-code home directory")?;
+    SecretsManager::new(next_code_home, SecretsBackendKind::Local)
 }
 
 /// `--env` selects an environment scope keyed to the current git repo / cwd;
@@ -156,7 +156,7 @@ fn get_with(
         return Ok(serde_json::to_string_pretty(&out)?);
     }
     match value {
-        // Raw value so it is scriptable: KEY=$(jcode secrets get NAME)
+        // Raw value so it is scriptable: KEY=$(next-code secrets get NAME)
         Some(v) => Ok(v),
         None => anyhow::bail!("No secret named {} in {} scope", secret_name, scope),
     }
@@ -363,7 +363,7 @@ pub fn run_purge(yes: bool, json: bool, toon: bool) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use jcode_keyring_store::{KeyringStore, MockKeyringStore};
+    use next_code_keyring_store::{KeyringStore, MockKeyringStore};
     use std::sync::Arc;
 
     fn test_manager(dir: &std::path::Path) -> SecretsManager {

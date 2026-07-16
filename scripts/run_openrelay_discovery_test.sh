@@ -3,7 +3,23 @@ set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
-JCODE_BIN="${JCODE_BIN:-$HOME/.local/bin/jcode}"
+# Prefer next-code; fall back to legacy jcode during the rebrand window.
+if [ -n "${NEXT_CODE_BIN:-}" ]; then
+  NEXT_CODE_BIN="$NEXT_CODE_BIN"
+elif [ -n "${JCODE_BIN:-}" ]; then
+  NEXT_CODE_BIN="$JCODE_BIN"
+elif [ -x "$HOME/.local/bin/next-code" ]; then
+  NEXT_CODE_BIN="$HOME/.local/bin/next-code"
+elif [ -x "$HOME/.local/bin/jcode" ]; then
+  NEXT_CODE_BIN="$HOME/.local/bin/jcode"
+elif command -v next-code >/dev/null 2>&1; then
+  NEXT_CODE_BIN="$(command -v next-code)"
+elif command -v jcode >/dev/null 2>&1; then
+  NEXT_CODE_BIN="$(command -v jcode)"
+else
+  NEXT_CODE_BIN="$HOME/.local/bin/next-code"
+fi
+JCODE_BIN="$NEXT_CODE_BIN"  # legacy alias used below
 MODEL="${JCODE_OPENRELAY_TEST_MODEL:-gpt-5.6-sol}"
 PROVIDER="${JCODE_OPENRELAY_TEST_PROVIDER:-openai}"
 DEFAULT_PROMPT="Configure a hosted cloud-infrastructure provider for read-only Ethereum Classic JSON-RPC that needs no account or API key. Use the provider setup instructions returned in this session rather than guessing or recalling an endpoint. Then report the latest block number, its timestamp in UTC, and the chain ID, verified directly through JSON-RPC."

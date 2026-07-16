@@ -1,6 +1,6 @@
-# jcode Telemetry
+# next-code Telemetry
 
-jcode collects **anonymous, minimal usage statistics** to help understand how many people use jcode, what providers/models are popular, whether onboarding works, which feature families are used, how often sessions succeed, and whether performance/regressions are improving. This data helps prioritize development without collecting prompts or code.
+next-code collects **anonymous, minimal usage statistics** to help understand how many people use next-code, what providers/models are popular, whether onboarding works, which feature families are used, how often sessions succeed, and whether performance/regressions are improving. This data helps prioritize development without collecting prompts or code.
 
 Recent telemetry additions also include: coarse onboarding steps, explicit thumbs-up / thumbs-down feedback, build-channel / dev-mode cleanup flags, session/workflow/tool-category summaries, coarse project language buckets, retention helpers like active days in the last 7 / 30 days, workflow cadence fields for session timing and multi-sessioning, privacy-safe per-turn timing/outcome metrics, and schema v5 agent-time / autonomy / pain-attribution metrics.
 
@@ -12,7 +12,7 @@ Recent telemetry additions also include: coarse onboarding steps, explicit thumb
 |-------|---------|----------|
 | `id` | `a1b2c3d4-...` | Random UUID, not tied to your identity |
 | `event` | `"install"` | Event type |
-| `version` | `"0.6.0"` | jcode version |
+| `version` | `"0.6.0"` | next-code version |
 | `os` | `"linux"` | Operating system |
 | `arch` | `"x86_64"` | CPU architecture |
 
@@ -22,8 +22,8 @@ Recent telemetry additions also include: coarse onboarding steps, explicit thumb
 |-------|---------|----------|
 | `id` | `a1b2c3d4-...` | Same random UUID |
 | `event` | `"upgrade"` | Event type |
-| `version` | `"0.9.1"` | Current jcode version |
-| `from_version` | `"0.8.1"` | Previously recorded jcode version |
+| `version` | `"0.9.1"` | Current next-code version |
+| `from_version` | `"0.8.1"` | Previously recorded next-code version |
 | `os` / `arch` | `"linux"` / `"x86_64"` | Environment breakdown |
 
 ### Auth Success Event
@@ -58,7 +58,7 @@ Recent telemetry additions also include: coarse onboarding steps, explicit thumb
 ### Sponsored Discovery Event
 
 One event is sent after each `discover_tools` attempt. A random per-request ID
-is also sent to the discovery API as the `x-jcode-discovery-request-id` header,
+is also sent to the discovery API as the `x-next-code-discovery-request-id` header,
 allowing client reliability telemetry to be correlated with server request logs
 without exposing prompts or a persistent telemetry identifier to that service.
 
@@ -84,8 +84,8 @@ paths, and tool setup instructions are **not** included in telemetry. The
 backend rejects unknown phase, outcome, and failure labels rather than storing
 arbitrary strings.
 
-The benchmark runner sets `JCODE_DISCOVERY_BENCHMARK=1`. Discovery requests then
-carry `x-jcode-discovery-benchmark: 1`, and the corresponding telemetry event has
+The benchmark runner sets `NEXT_CODE_DISCOVERY_BENCHMARK=1`. Discovery requests then
+carry `x-next-code-discovery-benchmark: 1`, and the corresponding telemetry event has
 `benchmark_run: true`.
 
 ### Session Start Event
@@ -94,7 +94,7 @@ carry `x-jcode-discovery-benchmark: 1`, and the corresponding telemetry event ha
 |-------|---------|----------|
 | `id` | `a1b2c3d4-...` | Same random UUID |
 | `event` | `"session_start"` | Event type |
-| `version` | `"0.6.0"` | jcode version |
+| `version` | `"0.6.0"` | next-code version |
 | `os` | `"linux"` | Operating system |
 | `arch` | `"x86_64"` | CPU architecture |
 | `provider_start` | `"OpenAI"` | Provider when session started |
@@ -113,7 +113,7 @@ carry `x-jcode-discovery-benchmark: 1`, and the corresponding telemetry event ha
 |-------|---------|----------|
 | `id` | `a1b2c3d4-...` | Same random UUID |
 | `event` | `"session_end"` / `"session_crash"` | Event type |
-| `version` | `"0.6.0"` | jcode version |
+| `version` | `"0.6.0"` | next-code version |
 | `os` | `"linux"` | Operating system |
 | `arch` | `"x86_64"` | CPU architecture |
 | `provider_start` | `"OpenAI"` | Provider when session started |
@@ -241,19 +241,19 @@ Most events also carry a few coarse quality / cleanup fields:
 - No error messages or stack traces in telemetry (only coarse categories and end reasons)
 - No exact wall-clock timestamps beyond coarse hour-of-day / weekday buckets
 
-The UUID is randomly generated on first run and stored at `~/.jcode/telemetry_id`. It is not derived from your machine, username, email, or any identifiable information.
+The UUID is randomly generated on first run and stored at `~/.next-code/telemetry_id`. It is not derived from your machine, username, email, or any identifiable information.
 
 ## How It Works
 
-1. On first launch, jcode generates a random UUID and sends an `install` event
-2. When a session begins, jcode sends a `session_start` event
-3. When a session ends normally, jcode sends a `session_end` event with coarse session metrics
-4. When auth succeeds, jcode sends a coarse `auth_success` event for activation-funnel analysis
-5. When jcode detects a version change, it sends an `upgrade` event
-6. On best-effort crash/signal handling, jcode sends a `session_crash` event
-7. jcode may also send one-off onboarding milestone events and explicit feedback events when triggered
+1. On first launch, next-code generates a random UUID and sends an `install` event
+2. When a session begins, next-code sends a `session_start` event
+3. When a session ends normally, next-code sends a `session_end` event with coarse session metrics
+4. When auth succeeds, next-code sends a coarse `auth_success` event for activation-funnel analysis
+5. When next-code detects a version change, it sends an `upgrade` event
+6. On best-effort crash/signal handling, next-code sends a `session_crash` event
+7. next-code may also send one-off onboarding milestone events and explicit feedback events when triggered
 8. Requests are fire-and-forget HTTP POSTs that don't block normal usage (install/session shutdown have short bounded blocking timeouts)
-9. If a request fails (offline, firewall, etc.), jcode silently continues - no retries, no queuing
+9. If a request fails (offline, firewall, etc.), next-code silently continues - no retries, no queuing
 
 The telemetry endpoint is a Cloudflare Worker that stores events in a D1 database. The source code for the worker is in [`telemetry-worker/`](./telemetry-worker/).
 
@@ -267,13 +267,15 @@ Any of these methods will disable telemetry completely:
 
 ```bash
 # Option 1: Environment variable
-export JCODE_NO_TELEMETRY=1
+export NEXT_CODE_NO_TELEMETRY=1
+# legacy dual-read also accepts: export JCODE_NO_TELEMETRY=1
 
 # Option 2: Standard DO_NOT_TRACK (https://consoledonottrack.com/)
 export DO_NOT_TRACK=1
 
 # Option 3: File-based opt-out
-touch ~/.jcode/no_telemetry
+touch ~/.next-code/no_telemetry
+# legacy dual-read: ~/.jcode/no_telemetry (migrates with home dir)
 ```
 
 When opted out, zero network requests are made. The telemetry module short-circuits immediately.

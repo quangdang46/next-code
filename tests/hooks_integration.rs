@@ -1,11 +1,11 @@
-//! Integration tests for the jcode-hooks crate.
+//! Integration tests for the next-code-hooks crate.
 //!
 //! Exercises the full hook lifecycle: config parsing, registry construction,
 //! matcher filtering, condition evaluation, parallel dispatch, and aggregated
 //! decision logic.
 
-use jcode_hooks::dispatch::aggregate_decision;
-use jcode_hooks::{
+use next_code_hooks::dispatch::aggregate_decision;
+use next_code_hooks::{
     AgentHandlerConfig, AggregatedDecision, ClassifiedOutcome, CommandHandlerConfig,
     DispatchConfig, HookContext, HookEvent, HookHandlerConfig, HookInput, HookInputBuilder,
     HookMatcher, HookRegistry, HookSettings, HooksConfig, HttpHandlerConfig, MatcherContext,

@@ -1,0 +1,191 @@
+[package]
+name = "next-code-app-core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Application core for jcode: all non-presentation modules (server, agent,
+# provider, auth, session, tool, config, etc.) extracted out of the monolithic
+# root `jcode` crate so they compile as a separate rustc unit. The root `jcode`
+# crate (cli + tui + bin) re-exports this crate's modules via `pub use
+# jcode_app_core::*`, preserving every existing `crate::<module>` path.
+
+[lib]
+name = "next_code_app_core"
+path = "src/lib.rs"
+
+[dependencies]
+# NOTE: the jemalloc allocator stats live in `next-code-base` (process_memory) and
+# local embeddings live in `next-code-base` (embedding); this crate forwards those
+# features to next-code-base rather than depending on the backing crates directly.
+
+# Async runtime
+tokio = { version = "1", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "blocking", "charset", "http2", "system-proxy", "rustls-tls", "rustls-tls-native-roots"] }
+rustls = { version = "0.23", default-features = false, features = ["aws_lc_rs"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+serde_yaml = "0.9"
+toml = "0.8"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# File operations
+glob = "0.3"
+ffs-search = { workspace = true }
+ffs-engine = { workspace = true }
+ignore = "0.4"           # gitignore-aware file walking
+walkdir = "2"
+similar = "2"            # diffing for edits
+
+# Utilities
+dirs = "5"               # home directory
+anyhow = "1"
+thiserror = "1"
+libc = "0.2"             # Unix system calls (flock)
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+urlencoding = "2"        # URL encoding for web search
+uuid = { version = "1", features = ["v4", "v5"] }
+proctitle = "0.1"
+
+# Embeddings (local inference) live in next-code-base; this crate forwards the
+# `embeddings` feature to next-code-base rather than depending on next-code-embedding.
+next-code-gateway-types = { path = "../next-code-gateway-types" }
+next-code-hooks = { path = "../next-code-hooks" }
+next-code-logging = { path = "../next-code-logging" }
+
+# OAuth
+base64 = "0.22"
+sha2 = "0.10"
+rand = "0.9.3"
+hex = "0.4"
+url = "2"
+open = "5"               # Open URLs in browser
+next-code-auth-types = { path = "../next-code-auth-types" }
+next-code-agent-runtime = { path = "../next-code-agent-runtime" }
+next-code-ambient-types = { path = "../next-code-ambient-types" }
+next-code-notify-email = { path = "../next-code-notify-email" }
+next-code-provider-metadata = { path = "../next-code-provider-metadata" }
+next-code-provider-core = { path = "../next-code-provider-core" }
+# NOTE: next-code-app-core does NOT depend on any next-code-tui-* crate. They were
+# unused dead dependency edges here (the TUI declares them itself). Removing
+# them stops a next-code-tui-* edit from cascading a recompile through app-core.
+next-code-import-core = { path = "../next-code-import-core" }
+next-code-update-core = { path = "../next-code-update-core" }
+next-code-terminal-launch = { path = "../next-code-terminal-launch" }
+next-code-terminal-image = { path = "../next-code-terminal-image" }
+next-code-usage-types = { path = "../next-code-usage-types" }
+
+# DCG permission modes (experiment/dcg-permission-modes)
+dcg-core = { git = "https://github.com/quangdang46/destructive_command_guard", branch = "main" }
+
+# Streaming
+tokio-stream = "0.1"
+bytes = "1"
+
+# TUI
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+arboard = "3"              # Clipboard support
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }  # Only PNG/JPEG (skip avif/rav1e, exr, gif, tiff, etc)
+
+# Markdown & syntax highlighting
+unicode-width = "0.2"   # Unicode character display width
+
+# PDF parsing (behind feature flag)
+next-code-pdf = { path = "../next-code-pdf", optional = true }
+next-code-background-types = { path = "../next-code-background-types" }
+next-code-batch-types = { path = "../next-code-batch-types" }
+next-code-build-support = { path = "../next-code-build-support" }
+next-code-build-meta = { path = "../next-code-build-meta" }
+
+# Foundational layer (provider, auth, config, session, message, memory, ...).
+# Re-exported via `pub use jcode_base::*` in lib.rs. default-features=false so
+# this crate controls next-code-base's optional features (see [features] below).
+next-code-base = { path = "../next-code-base", default-features = false }
+next-code-keywords = { path = "../next-code-keywords" }
+next-code-experiment-flags = { path = "../next-code-experiment-flags" }
+next-code-compaction-core = { path = "../next-code-compaction-core" }
+next-code-config-types = { path = "../next-code-config-types" }
+next-code-core = { path = "../next-code-core" }
+next-code-memory-types = { path = "../next-code-memory-types" }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-overnight-core = { path = "../next-code-overnight-core" }
+
+next-code-plan = { path = "../next-code-plan" }
+next-code-plugin-core = { path = "../next-code-plugin-core" }
+next-code-plugin-runtime = { path = "../next-code-plugin-runtime" }
+next-code-swarm-core = { path = "../next-code-swarm-core" }
+next-code-protocol = { path = "../next-code-protocol" }
+ffs-symbol = { workspace = true }
+next-code-selfdev-types = { path = "../next-code-selfdev-types" }
+next-code-session-types = { path = "../next-code-session-types" }
+next-code-setup-hints = { path = "../next-code-setup-hints" }
+next-code-storage = { path = "../next-code-storage" }
+next-code-secrets = { path = "../next-code-secrets" }
+next-code-task-types = { path = "../next-code-task-types" }
+next-code-tool-core = { path = "../next-code-tool-core" }
+next-code-best-of-n = { path = "../next-code-best-of-n" }
+next-code-tool-types = { path = "../next-code-tool-types" }
+next-code-side-panel-types = { path = "../next-code-side-panel-types" }
+
+# Archive extraction (for auto-update)
+flate2 = "1"
+tar = "0.4"
+tempfile = "3"
+hashline = { workspace = true }
+qrcode = { version = "0.14.1", default-features = false }
+# DCP integration (dynamic context pruning)
+dynamic_context_pruning = { git = "https://github.com/quangdang46/dynamic_context_pruning", branch = "main", package = "dynamic_context_pruning", optional = true }
+# RTCO integration (tool output filtering via Rust Token Killer)
+rtco-core = { git = "https://github.com/quangdang46/rust_token_cost_optimizer", branch = "main", optional = true }
+
+[features]
+default = ["pdf", "embeddings"]
+# jemalloc allocator stats live in next-code-base (process_memory); forward there.
+jemalloc = ["next-code-base/jemalloc"]
+jemalloc-prof = ["next-code-base/jemalloc-prof"]
+# local embeddings live in next-code-base (embedding); forward there.
+embeddings = ["next-code-base/embeddings"]
+# PDF text extraction lives in this crate (tool/read.rs).
+pdf = ["dep:next-code-pdf"]
+# bedrock: forwarded to next-code-base (AWS SDK stack)
+bedrock = ["next-code-base/bedrock"]
+# DCP (dynamic context pruning)
+dcp = ["dep:dynamic_context_pruning"]
+# RTCO (tool output filtering via Rust Token Killer)
+rtco = ["dep:rtco-core"]
+# Compiles this crate's test-only helpers/accessors (e.g. the
+# ExternalAuthReviewCandidate read accessors) as `pub` and forwards
+# next-code-base's `test-support` so downstream crates' test targets can reach the
+# whole stack's helpers. Never enabled in normal (non-test) builds.
+test-support = ["next-code-base/test-support"]
+
+[dev-dependencies]
+# Used by async streaming tests (ambient/runner_tests, server/client_actions_tests).
+async-stream = "0.3"
+# Enables next-code-base's test-support helpers (storage::lock_test_env,
+# auth::test_sandbox, bus::reset_models_updated_publish_state_for_tests) for
+# *this* crate's own test target. Feature unification applies this only to
+# test/bench/example builds, not to a normal `cargo build`.
+next-code-base = { path = "../next-code-base", features = ["test-support"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+global-hotkey = "0.7"
+# Native desktop control for the `macos_computer_use` tool (synthetic mouse/keyboard
+# events, cursor positioning, display bounds). `highsierra` enables the
+# CGEventCreateScrollWheelEvent2 binding used for scroll.
+core-graphics = { version = "0.23", features = ["highsierra"] }

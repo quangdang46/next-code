@@ -1,4 +1,4 @@
-# Contributing to jcode
+# Contributing to next-code
 
 Thanks for contributing.
 

@@ -1,9 +1,9 @@
-//! Spawn a jcode agent inside a freshly-prepared repo clone, run a
+//! Spawn a next-code agent inside a freshly-prepared repo clone, run a
 //! single eval task, and capture the resulting diff and trace.
 //!
 //! The runner resolves the configured `agent_id` through the
-//! [`jcode_agent_runtime::AgentRegistry`] (loaded from
-//! `.jcode/agents/*.toml`), spawns the binary as a subprocess in the
+//! [`next_code_agent_runtime::AgentRegistry`] (loaded from
+//! `.next-code/agents/*.toml`), spawns the binary as a subprocess in the
 //! repo working directory, streams the trace, and finally extracts the
 //! unified diff against the parent commit.
 //!
@@ -44,8 +44,8 @@ pub struct AgentRunConfig {
     /// Extra environment variables applied to the agent subprocess on
     /// top of the calling process's environment.
     pub env: HashMap<String, String>,
-    /// Path to the `jcode` binary. Defaults to searching $PATH.
-    pub jcode_binary: Option<PathBuf>,
+    /// Path to the `next-code` binary. Defaults to searching $PATH.
+    pub next_code_binary: Option<PathBuf>,
 }
 
 impl Default for AgentRunConfig {
@@ -57,7 +57,7 @@ impl Default for AgentRunConfig {
             max_turns: 100,
             timeout_secs: 60 * 60,
             env: HashMap::new(),
-            jcode_binary: None,
+            next_code_binary: None,
         }
     }
 }
@@ -70,16 +70,22 @@ pub async fn run_agent_in_repo(config: AgentRunConfig) -> Result<EvalRun> {
     let start = Instant::now();
     let timeout_duration = Duration::from_secs(config.timeout_secs);
 
-    let jcode_bin = config
-        .jcode_binary
+    let next_code_bin = config
+        .next_code_binary
         .clone()
-        .unwrap_or_else(|| PathBuf::from("jcode"));
+        .unwrap_or_else(|| {
+            std::env::var_os("NEXT_CODE_BIN")
+                .or_else(|| std::env::var_os("JCODE_BIN"))
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from("next-code"))
+        });
 
     let mut env_vars: HashMap<String, String> = std::env::vars().collect();
     env_vars.extend(config.env);
+    env_vars.insert("NEXT_CODE_AGENT_ID".to_owned(), config.agent_id.clone());
     env_vars.insert("JCODE_AGENT_ID".to_owned(), config.agent_id.clone());
 
-    let mut child = Command::new(&jcode_bin)
+    let mut child = Command::new(&next_code_bin)
         .current_dir(&config.repo_path)
         .envs(&env_vars)
         .args([
@@ -95,7 +101,7 @@ pub async fn run_agent_in_repo(config: AgentRunConfig) -> Result<EvalRun> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .with_context(|| format!("failed to spawn jcode binary at {:?}", jcode_bin))?;
+        .with_context(|| format!("failed to spawn next-code binary at {:?}", next_code_bin))?;
 
     let mut child_stdin = child.stdin.take().expect("stdin captured");
     let stdout = child.stdout.take().expect("stdout captured");
@@ -136,18 +142,18 @@ pub async fn run_agent_in_repo(config: AgentRunConfig) -> Result<EvalRun> {
             judging: Default::default(),
             cost_usd: 0.0,
             duration_ms: start.elapsed().as_millis() as u64,
-            error: Some("Timed out waiting for jcode subprocess".to_owned()),
+            error: Some("Timed out waiting for next-code subprocess".to_owned()),
         });
     }
 
     let status = child
         .wait()
         .await
-        .context("failed to wait for jcode subprocess")?;
+        .context("failed to wait for next-code subprocess")?;
 
     let diff = extract_diff_from_repo(&config.repo_path).await?;
     let error = if !status.success() {
-        Some(format!("jcode exited with status {:?}", status))
+        Some(format!("next-code exited with status {:?}", status))
     } else {
         None
     };

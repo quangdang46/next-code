@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-jcode Live Monitor - Real-time activity dashboard
+next-code Live Monitor - Real-time activity dashboard
 
-Connects to jcode's debug socket and displays live streaming events.
-Run jcode serve in one terminal, then this monitor in another.
+Connects to next-code's debug socket and displays live streaming events.
+Run next-code serve in one terminal, then this monitor in another.
 
 Usage: ./jcode_monitor.py [--socket PATH]
 """
@@ -54,7 +54,7 @@ class MonitorState:
 
 
 def get_socket_path() -> str:
-    """Get the jcode debug socket path"""
+    """Get the next-code debug socket path"""
     runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
     return os.path.join(runtime_dir, "jcode-debug.sock")
 

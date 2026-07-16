@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="1jehuang/jcode"
+REPO="quangdang46/next-code"
 IS_WINDOWS=false
 IS_TERMUX=false
 INSTALL_STAGE="startup"
@@ -14,8 +14,25 @@ tmpdir=""
 info() { printf '\033[1;34m%s\033[0m\n' "$*"; }
 err()  { printf '\033[1;31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 
+# Prefer NEXT_CODE_* env vars; dual-read legacy JCODE_* for one release.
+next_code_env() {
+  # Usage: next_code_env NEW_VAR LEGACY_VAR [default]
+  _new="$1"; _legacy="$2"; _default="${3-}"
+  _val="$(eval "printf '%s' \"\${$_new-}\"")"
+  if [ -n "$_val" ]; then
+    printf '%s' "$_val"
+    return 0
+  fi
+  _val="$(eval "printf '%s' \"\${$_legacy-}\"")"
+  if [ -n "$_val" ]; then
+    printf '%s' "$_val"
+    return 0
+  fi
+  printf '%s' "$_default"
+}
+
 valid_conversion_id() {
-  printf '%s' "${JCODE_INSTALL_CONVERSION_ID:-}" |
+  printf '%s' "${NEXT_CODE_INSTALL_CONVERSION_ID:-${JCODE_INSTALL_CONVERSION_ID:-}}" |
     grep -Eiq '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
 }
 
@@ -27,32 +44,35 @@ report_install_funnel() {
   stage="$1"
   outcome="$2"
   failure_stage="${3:-}"
-  [ "${JCODE_NO_TELEMETRY:-}" != "1" ] || return 0
+  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY JCODE_NO_TELEMETRY)" != "1" ] || return 0
   [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
   valid_conversion_id || return 0
 
+  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-${JCODE_INSTALL_CONVERSION_ID:-}}"
   payload=$(printf '{"id":"%s","event":"install_funnel","version":"%s","os":"%s","arch":"%s","conversion_id":"%s","stage":"%s","outcome":"%s","source":"installer","install_method":"shell","failure_stage":"%s"}' \
-    "$JCODE_INSTALL_CONVERSION_ID" \
+    "$conversion_id" \
     "$(telemetry_value "$INSTALL_VERSION")" \
     "$(telemetry_value "$INSTALL_OS")" \
     "$(telemetry_value "$INSTALL_ARCH")" \
-    "$JCODE_INSTALL_CONVERSION_ID" \
+    "$conversion_id" \
     "$(telemetry_value "$stage")" \
     "$(telemetry_value "$outcome")" \
     "$(telemetry_value "$failure_stage")")
   curl -fsS --max-time 2 -H 'Content-Type: application/json' \
-    --data "$payload" https://telemetry.jcode.sh/v1/event >/dev/null 2>&1 || true
+    --data "$payload" https://telemetry.next-code.sh/v1/event >/dev/null 2>&1 || true
 }
 
 persist_install_conversion_id() {
-  [ "${JCODE_NO_TELEMETRY:-}" != "1" ] || return 0
+  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY JCODE_NO_TELEMETRY)" != "1" ] || return 0
   [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
   valid_conversion_id || return 0
-  jcode_home="${JCODE_HOME:-$HOME/.jcode}"
-  mkdir -p "$jcode_home" 2>/dev/null || return 0
-  (umask 077; printf '%s\n' "$JCODE_INSTALL_CONVERSION_ID" > "$jcode_home/install_conversion_id") \
+  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-${JCODE_INSTALL_CONVERSION_ID:-}}"
+  # Prefer NEXT_CODE_HOME, then JCODE_HOME (legacy dual-read), then ~/.next-code.
+  next_code_home="$(next_code_env NEXT_CODE_HOME JCODE_HOME "$HOME/.next-code")"
+  mkdir -p "$next_code_home" 2>/dev/null || return 0
+  (umask 077; printf '%s\n' "$conversion_id" > "$next_code_home/install_conversion_id") \
     2>/dev/null || return 0
-  chmod 600 "$jcode_home/install_conversion_id" 2>/dev/null || true
+  chmod 600 "$next_code_home/install_conversion_id" 2>/dev/null || true
 }
 
 install_exit() {
@@ -82,23 +102,23 @@ fi
 case "$OS" in
   Linux)
     case "$ARCH" in
-      x86_64)  ARTIFACT="jcode-linux-x86_64" ;;
-      aarch64|arm64) ARTIFACT="jcode-linux-aarch64" ;;
+      x86_64)  ARTIFACT="next-code-linux-x86_64" ;;
+      aarch64|arm64) ARTIFACT="next-code-linux-aarch64" ;;
       *)       err "Unsupported Linux architecture: $ARCH" ;;
     esac
     ;;
   Darwin)
     case "$ARCH" in
-      arm64)   ARTIFACT="jcode-macos-aarch64" ;;
-      x86_64)  ARTIFACT="jcode-macos-x86_64" ;;
+      arm64)   ARTIFACT="next-code-macos-aarch64" ;;
+      x86_64)  ARTIFACT="next-code-macos-x86_64" ;;
       *)       err "Unsupported macOS architecture: $ARCH" ;;
     esac
     ;;
   MINGW*|MSYS*|CYGWIN*)
     IS_WINDOWS=true
     case "$ARCH" in
-      x86_64|AMD64)  ARTIFACT="jcode-windows-x86_64" ;;
-      aarch64|arm64|ARM64) ARTIFACT="jcode-windows-aarch64" ;;
+      x86_64|AMD64)  ARTIFACT="next-code-windows-x86_64" ;;
+      aarch64|arm64|ARM64) ARTIFACT="next-code-windows-aarch64" ;;
       *)       err "Unsupported Windows architecture: $ARCH" ;;
     esac
     ;;
@@ -110,9 +130,9 @@ esac
 report_install_funnel "installer_start" "success" ""
 
 if [ "$IS_WINDOWS" = true ]; then
-  INSTALL_DIR="${JCODE_INSTALL_DIR:-$LOCALAPPDATA/jcode/bin}"
+  INSTALL_DIR="$(next_code_env NEXT_CODE_INSTALL_DIR JCODE_INSTALL_DIR "$LOCALAPPDATA/next-code/bin")"
 else
-  INSTALL_DIR="${JCODE_INSTALL_DIR:-$HOME/.local/bin}"
+  INSTALL_DIR="$(next_code_env NEXT_CODE_INSTALL_DIR JCODE_INSTALL_DIR "$HOME/.local/bin")"
 fi
 
 # Extract the tag_name value, working for both pretty-printed (multi-line) and
@@ -128,29 +148,37 @@ URL_BIN="https://github.com/$REPO/releases/download/$VERSION/$ARTIFACT"
 
 if [ "$IS_WINDOWS" = true ]; then
   EXE=".exe"
-  builds_dir="$LOCALAPPDATA/jcode/builds"
+  # Prefer NEXT_CODE_HOME / JCODE_HOME; default to %LOCALAPPDATA%/next-code.
+  next_code_home="$(next_code_env NEXT_CODE_HOME JCODE_HOME "$LOCALAPPDATA/next-code")"
+  builds_dir="$next_code_home/builds"
 else
   EXE=""
-  builds_dir="$HOME/.jcode/builds"
+  # Prefer NEXT_CODE_HOME, then JCODE_HOME, then ~/.next-code. The binary dual-reads
+  # ~/.jcode and migrates automatically when ~/.next-code is missing.
+  next_code_home="$(next_code_env NEXT_CODE_HOME JCODE_HOME "$HOME/.next-code")"
+  builds_dir="$next_code_home/builds"
 fi
 stable_dir="$builds_dir/stable"
 current_dir="$builds_dir/current"
 version_dir="$builds_dir/versions"
-launcher_path="$INSTALL_DIR/jcode${EXE}"
+launcher_path="$INSTALL_DIR/next-code${EXE}"
+compat_launcher_path="$INSTALL_DIR/jcode${EXE}"
 
 EXISTING=""
 if [ -x "$launcher_path" ]; then
   EXISTING=$("$launcher_path" --version 2>/dev/null | head -1 || echo "unknown")
+elif [ -x "$compat_launcher_path" ]; then
+  EXISTING=$("$compat_launcher_path" --version 2>/dev/null | head -1 || echo "unknown")
 fi
 
 if [ -n "$EXISTING" ]; then
   if echo "$EXISTING" | grep -qF "${VERSION#v}"; then
-    info "jcode $VERSION is already installed — reinstalling"
+    info "next-code $VERSION is already installed — reinstalling"
   else
-    info "Updating jcode $EXISTING → $VERSION"
+    info "Updating next-code $EXISTING → $VERSION"
   fi
 else
-  info "Installing jcode $VERSION"
+  info "Installing next-code $VERSION"
 fi
 info "  launcher: $launcher_path"
 
@@ -158,9 +186,9 @@ tmpdir=$(mktemp -d)
 
 INSTALL_STAGE="artifact_download"
 download_mode=""
-if curl -fsSL "$URL_TGZ" -o "$tmpdir/jcode.download" 2>/dev/null; then
+if curl -fsSL "$URL_TGZ" -o "$tmpdir/next-code.download" 2>/dev/null; then
   download_mode="tar"
-elif curl -fsSL "$URL_BIN" -o "$tmpdir/jcode.download" 2>/dev/null; then
+elif curl -fsSL "$URL_BIN" -o "$tmpdir/next-code.download" 2>/dev/null; then
   download_mode="bin"
 fi
 
@@ -171,30 +199,34 @@ version="${VERSION#v}"
 dest_version_dir="$version_dir/$version"
 mkdir -p "$dest_version_dir"
 
-bin_name="jcode${EXE}"
+bin_name="next-code${EXE}"
 
 if [ "$download_mode" = "tar" ]; then
-  tar xzf "$tmpdir/jcode.download" -C "$tmpdir"
+  tar xzf "$tmpdir/next-code.download" -C "$tmpdir"
   src_bin="$tmpdir/${ARTIFACT}${EXE}"
   [ -f "$src_bin" ] || err "Downloaded archive did not contain expected binary: ${ARTIFACT}${EXE}"
   find "$tmpdir" -maxdepth 1 -type f \( -name "${ARTIFACT}${EXE}.bin" -o -name 'libssl.so*' -o -name 'libcrypto.so*' \) \
     -exec cp -f {} "$dest_version_dir/" \;
   mv "$src_bin" "$dest_version_dir/$bin_name"
 elif [ "$download_mode" = "bin" ]; then
-  mv "$tmpdir/jcode.download" "$dest_version_dir/$bin_name"
+  mv "$tmpdir/next-code.download" "$dest_version_dir/$bin_name"
 else
   info "No prebuilt asset found for $ARTIFACT in $VERSION; building from source..."
   command -v git >/dev/null 2>&1 || err "git is required to build from source"
   command -v cargo >/dev/null 2>&1 || err "cargo is required to build from source"
 
-  src_dir="$tmpdir/jcode-src"
+  src_dir="$tmpdir/next-code-src"
   git clone --depth 1 --branch "$VERSION" "https://github.com/$REPO.git" "$src_dir" \
     || err "Failed to clone $REPO at $VERSION"
   cargo build --release --manifest-path "$src_dir/Cargo.toml" \
     || err "cargo build failed while building $REPO from source"
 
   src_bin="$src_dir/target/release/$bin_name"
-  [ -f "$src_bin" ] || err "Built binary not found at $src_bin"
+  if [ ! -f "$src_bin" ]; then
+    # Fall back to legacy binary name during the rebrand window.
+    src_bin="$src_dir/target/release/jcode${EXE}"
+  fi
+  [ -f "$src_bin" ] || err "Built binary not found at $src_dir/target/release/$bin_name"
   cp "$src_bin" "$dest_version_dir/$bin_name"
 fi
 
@@ -211,13 +243,13 @@ if [ "$IS_TERMUX" = true ] && [ "$IS_WINDOWS" = false ]; then
     if [ -x "$termux_glibc_linker" ]; then
       if command -v patchelf >/dev/null 2>&1; then
         patchelf --set-interpreter "$termux_glibc_linker" "$dest_version_dir/$bin_name" \
-          || err "Failed to patch jcode ELF interpreter for Termux glibc"
+          || err "Failed to patch next-code ELF interpreter for Termux glibc"
         info "Patched Termux glibc ELF interpreter: $termux_glibc_linker"
       else
-        info "Termux detected: install patchelf with 'pkg install patchelf' and rerun this installer if jcode fails to start."
+        info "Termux detected: install patchelf with 'pkg install patchelf' and rerun this installer if next-code fails to start."
       fi
     else
-      info "Termux detected: install glibc with 'pkg install glibc' if jcode fails due to a missing dynamic linker."
+      info "Termux detected: install glibc with 'pkg install glibc' if next-code fails due to a missing dynamic linker."
     fi
   fi
 fi
@@ -226,6 +258,8 @@ if [ "$IS_WINDOWS" = true ]; then
   cp -f "$dest_version_dir/$bin_name" "$stable_dir/$bin_name"
   printf '%s\n' "$version" > "$builds_dir/stable-version"
   cp -f "$stable_dir/$bin_name" "$launcher_path"
+  # Compat copy for one release so existing `jcode` muscle memory keeps working.
+  cp -f "$stable_dir/$bin_name" "$compat_launcher_path"
 else
   ln -sfn "$dest_version_dir/$bin_name" "$stable_dir/$bin_name"
   printf '%s\n' "$version" > "$builds_dir/stable-version"
@@ -240,6 +274,8 @@ EOF
   else
     ln -sfn "$stable_dir/$bin_name" "$launcher_path"
   fi
+  # Compat symlink for one release.
+  ln -sfn "next-code${EXE}" "$compat_launcher_path"
 fi
 
 if [ "$(uname -s)" = "Darwin" ]; then
@@ -263,12 +299,12 @@ esac
 # installed (so a newer/dev daemon is never downgraded). This is best-effort:
 # it must never fail the install, and it is skipped when no server is running.
 INSTALL_STAGE="server_reload"
-if [ "${JCODE_SKIP_SERVER_RELOAD:-}" != "1" ]; then
+if [ "$(next_code_env NEXT_CODE_SKIP_SERVER_RELOAD JCODE_SKIP_SERVER_RELOAD)" != "1" ]; then
   reload_bin="$launcher_path"
   [ -x "$reload_bin" ] || reload_bin="$stable_dir/$bin_name"
   if [ -x "$reload_bin" ]; then
     if "$reload_bin" server reload </dev/null >/dev/null 2>&1; then
-      info "Reloaded the running jcode server onto $VERSION (if one was active)."
+      info "Reloaded the running next-code server onto $VERSION (if one was active)."
     fi
   fi
 fi
@@ -276,16 +312,16 @@ fi
 if [ "$IS_WINDOWS" = true ]; then
   win_install_dir=$(cygpath -w "$INSTALL_DIR" 2>/dev/null || echo "$INSTALL_DIR")
   echo ""
-  info "✅ jcode $VERSION installed successfully!"
+  info "✅ next-code $VERSION installed successfully!"
   echo ""
-  if command -v jcode >/dev/null 2>&1; then
-    info "Run 'jcode' to get started."
+  if command -v next-code >/dev/null 2>&1 || command -v jcode >/dev/null 2>&1; then
+    info "Run 'next-code' to get started (compat: 'jcode' also works for this release)."
   else
-    echo "  To start using jcode right now, run:"
+    echo "  To start using next-code right now, run:"
     echo ""
-    printf '    \033[1;32mexport PATH="%s:$PATH" && jcode\033[0m\n' "$INSTALL_DIR"
+    printf '    \033[1;32mexport PATH="%s:$PATH" && next-code\033[0m\n' "$INSTALL_DIR"
     echo ""
-    echo "  To add jcode to PATH permanently (PowerShell):"
+    echo "  To add next-code to PATH permanently (PowerShell):"
     echo ""
     printf '    \033[1;32m[Environment]::SetEnvironmentVariable("Path", "%s;" + [Environment]::GetEnvironmentVariable("Path", "User"), "User")\033[0m\n' "$win_install_dir"
   fi
@@ -309,7 +345,7 @@ else
       mkdir -p "$(dirname "$rc")"
     fi
     if ! grep -qF "$INSTALL_DIR" "$rc" 2>/dev/null; then
-      printf '\n# Added by jcode installer\n%s\n' "$PATH_LINE" >> "$rc"
+      printf '\n# Added by next-code installer\n%s\n' "$PATH_LINE" >> "$rc"
       added_to="$added_to $rc"
     fi
   }
@@ -324,7 +360,7 @@ else
     fi
     if ! grep -qF "$INSTALL_DIR" "$rc" 2>/dev/null; then
       {
-        printf '\n# Added by jcode installer\n'
+        printf '\n# Added by next-code installer\n'
         printf 'if not contains "%s" $PATH\n' "$INSTALL_DIR"
         printf '    set -gx PATH "%s" $PATH\n' "$INSTALL_DIR"
         printf 'end\n'
@@ -363,25 +399,25 @@ else
   fi
 
   echo ""
-  info "✅ jcode $VERSION installed successfully!"
+  info "✅ next-code $VERSION installed successfully!"
   echo ""
 
   if [ "$(uname -s)" = "Darwin" ]; then
     if [ "$hotkey_setup_ready" = true ]; then
-      info "Global hotkey ready: Cmd+; launches a new jcode from anywhere, system-wide"
+      info "Global hotkey ready: Cmd+; launches a new next-code from anywhere, system-wide"
     else
-      info "Tip: run 'jcode setup-hotkey' so Cmd+; launches jcode system-wide on macOS"
+      info "Tip: run 'next-code setup-hotkey' so Cmd+; launches next-code system-wide on macOS"
     fi
   fi
 
-  if command -v jcode >/dev/null 2>&1; then
-    info "Run 'jcode' to get started."
+  if command -v next-code >/dev/null 2>&1 || command -v jcode >/dev/null 2>&1; then
+    info "Run 'next-code' to get started (compat: 'jcode' also works for this release)."
   else
-    echo "  To start using jcode right now, run:"
+    echo "  To start using next-code right now, run:"
     echo ""
-    printf '    \033[1;32mexport PATH="%s:\$PATH" && jcode\033[0m\n' "$INSTALL_DIR"
+    printf '    \033[1;32mexport PATH="%s:\$PATH" && next-code\033[0m\n' "$INSTALL_DIR"
     echo ""
-    echo "  Future terminal sessions will have jcode on PATH automatically."
+    echo "  Future terminal sessions will have next-code on PATH automatically."
   fi
 fi
 

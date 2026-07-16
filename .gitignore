@@ -12,6 +12,7 @@ ios_simulator_screenshot.png
 # Local onboarding sandbox + auth fixtures. May contain REAL OAuth tokens copied
 # from $HOME (see scripts/onboarding_sandbox.sh seed-real-logins). Never commit.
 /.tmp/
+/.next-code/generated-images/
 /.jcode/generated-images/
 /telemetry-worker/backups/
 # Local session artifacts (opencode IDE cache, OMO continuation logs, session markdown dumps)
@@ -21,6 +22,7 @@ session-ses_*.md
 target-ttest/
 target-tttest*
 target-tttest*/
+libnext_code_base.rlib
 libjcode_base.rlib
 .DS_Store
 .fastembed_cache/

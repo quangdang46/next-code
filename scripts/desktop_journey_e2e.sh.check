@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Real-window E2E user-journey test for jcode-desktop under niri.
+# Real-window E2E user-journey test for next-code-desktop under niri.
 #
 # Launches the desktop app in a real compositor window, replays scripted
 # "user journeys" with wtype (typing, overlays, scrolling, resizing), and
@@ -20,7 +20,7 @@ set -euo pipefail
 #   resize      shrink and regrow the window via niri
 #
 # Env:
-#   JCODE_DESKTOP_BIN              binary (default target/debug/jcode-desktop)
+#   JCODE_DESKTOP_BIN              binary (default target/debug/next-code-desktop)
 #   JCODE_JOURNEY_TIMEOUT_SECS     per-wait timeout (default 15)
 #   JCODE_JOURNEY_GAP_BUDGET_MS    max acceptable no-paint gap (default 1000)
 #   JCODE_JOURNEY_SCREENSHOT_DIR   if set, save a grim screenshot per step
@@ -28,16 +28,16 @@ set -euo pipefail
 # Requirements: niri, jq, wtype, a Wayland session; grim for screenshots.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="${JCODE_DESKTOP_BIN:-$ROOT_DIR/target/debug/jcode-desktop}"
+BIN="${JCODE_DESKTOP_BIN:-$ROOT_DIR/target/debug/next-code-desktop}"
 TIMEOUT_SECS="${JCODE_JOURNEY_TIMEOUT_SECS:-15}"
 GAP_BUDGET_MS="${JCODE_JOURNEY_GAP_BUDGET_MS:-1000}"
 SCREENSHOT_DIR="${JCODE_JOURNEY_SCREENSHOT_DIR:-}"
-LOG_FILE="$(mktemp -t jcode-desktop-journey.XXXXXX.log)"
+LOG_FILE="$(mktemp -t next-code-desktop-journey.XXXXXX.log)"
 PERF_LOG="${XDG_CACHE_HOME:-$HOME/.cache}/jcode/desktop/performance.log"
 
 if [[ ! -x "$BIN" ]]; then
   echo "desktop binary not found: $BIN" >&2
-  echo "hint: cargo build -p jcode-desktop --bin jcode-desktop" >&2
+  echo "hint: cargo build -p next-code-desktop --bin next-code-desktop" >&2
   exit 2
 fi
 for tool in niri jq wtype; do

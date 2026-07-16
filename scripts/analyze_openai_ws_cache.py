@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze OpenAI persistent-websocket reuse and KV-cache effectiveness from jcode logs.
+"""Analyze OpenAI persistent-websocket reuse and KV-cache effectiveness from next-code logs.
 
 Motivation
 ----------
@@ -23,7 +23,7 @@ Usage
 -----
     python3 scripts/analyze_openai_ws_cache.py [LOGFILE ...]
 
-With no arguments it scans ~/.jcode/logs/jcode-*.log.
+With no arguments it scans ~/.next-code/logs/next-code-*.log (falls back to ~/.jcode/logs/jcode-*.log).
 """
 
 from __future__ import annotations
@@ -39,7 +39,11 @@ def _log_files(argv: list[str]) -> list[str]:
     if argv:
         return argv
     home = os.environ.get("HOME", "")
-    return sorted(glob.glob(os.path.join(home, ".jcode", "logs", "jcode-*.log")))
+    paths = sorted(glob.glob(os.path.join(home, ".next-code", "logs", "next-code-*.log")))
+    paths += sorted(glob.glob(os.path.join(home, ".next-code", "logs", "jcode-*.log")))
+    paths += sorted(glob.glob(os.path.join(home, ".jcode", "logs", "jcode-*.log")))
+    paths += sorted(glob.glob(os.path.join(home, ".jcode", "logs", "next-code-*.log")))
+    return paths
 
 
 _KV_FIELD_RE = re.compile(r"(\w+)=([^\s]+)")

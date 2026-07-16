@@ -28,7 +28,7 @@
 //! ## API
 //!
 //! ```rust,no_run
-//! use jcode::skill_distillation::{record_workflow, WorkflowDraft};
+//! use next_code::skill_distillation::{record_workflow, WorkflowDraft};
 //!
 //! record_workflow(WorkflowDraft {
 //!     session_id: "abc-123".to_string(),
@@ -81,7 +81,7 @@ struct StoredWorkflow {
 }
 
 fn drafts_path() -> Result<PathBuf> {
-    Ok(jcode_storage::jcode_dir()?.join("skill_drafts.jsonl"))
+    Ok(next_code_storage::next_code_dir()?.join("skill_drafts.jsonl"))
 }
 
 /// Append a workflow draft to the persistent JSONL store. Idempotency

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# memory_probe.sh - Reproducible memory probe harness for jcode TUI clients.
+# memory_probe.sh - Reproducible memory probe harness for next-code TUI clients.
 #
 # Spawns a headless tester TUI via the debug socket (tester:spawn) that resumes
 # a LARGE existing session, then records RSS/PSS/rss_anon at fixed phases:
@@ -22,14 +22,15 @@
 # Options:
 #   --session <id>    Session to resume (default: session_hog_1783086065415_4ad4ae66cd43dd5b)
 #   --idle-secs <n>   Idle wait before the idle phase (default: 30)
-#   --binary <path>   Client binary (default: ~/.jcode/builds/current/jcode)
-#   --jcode <path>    jcode CLI used for `jcode debug ...` (default: ~/.local/bin/jcode)
+#   --binary <path>   Client binary (default: ~/.next-code/builds/current/next-code, falls back to ~/.jcode/...)
+#   --jcode <path>    next-code CLI used for `debug ...` (default: ~/.local/bin/next-code, falls back to jcode)
+#   --next-code <path> Alias for --jcode
 #   --cwd <path>      Working directory for the tester (default: $HOME)
 #   --skip-trim       Skip the forced-trim phase
 #   --keep            Do not stop the tester on exit (for manual inspection)
 #   -h | --help       Show this help
 #
-# Requirements: a running jcode server with the debug socket enabled, jq,
+# Requirements: a running next-code server with the debug socket enabled, jq,
 # and (for the trim phase) gdb. Trim prefers `sudo -n gdb` because
 # kernel.yama.ptrace_scope=1 blocks same-uid attach to non-children.
 
@@ -37,8 +38,34 @@ set -euo pipefail
 
 SESSION_ID="session_hog_1783086065415_4ad4ae66cd43dd5b"
 IDLE_SECS=30
-JCODE_BIN="${JCODE_BIN:-$HOME/.local/bin/jcode}"
-CLIENT_BIN="$HOME/.jcode/builds/current/jcode"
+# Prefer next-code; fall back to legacy jcode paths during the rebrand window.
+if [ -n "${NEXT_CODE_BIN:-}" ]; then
+  JCODE_BIN="$NEXT_CODE_BIN"
+elif [ -n "${JCODE_BIN:-}" ]; then
+  :
+elif [ -x "$HOME/.local/bin/next-code" ]; then
+  JCODE_BIN="$HOME/.local/bin/next-code"
+elif [ -x "$HOME/.local/bin/jcode" ]; then
+  JCODE_BIN="$HOME/.local/bin/jcode"
+elif command -v next-code >/dev/null 2>&1; then
+  JCODE_BIN="$(command -v next-code)"
+elif command -v jcode >/dev/null 2>&1; then
+  JCODE_BIN="$(command -v jcode)"
+else
+  JCODE_BIN="$HOME/.local/bin/next-code"
+fi
+
+if [ -x "$HOME/.next-code/builds/current/next-code" ]; then
+  CLIENT_BIN="$HOME/.next-code/builds/current/next-code"
+elif [ -x "$HOME/.next-code/builds/current/jcode" ]; then
+  CLIENT_BIN="$HOME/.next-code/builds/current/jcode"
+elif [ -x "$HOME/.jcode/builds/current/next-code" ]; then
+  CLIENT_BIN="$HOME/.jcode/builds/current/next-code"
+elif [ -x "$HOME/.jcode/builds/current/jcode" ]; then
+  CLIENT_BIN="$HOME/.jcode/builds/current/jcode"
+else
+  CLIENT_BIN="$HOME/.next-code/builds/current/next-code"
+fi
 TESTER_CWD="$HOME"
 SKIP_TRIM=0
 KEEP_TESTER=0
@@ -50,7 +77,7 @@ while [[ $# -gt 0 ]]; do
         --session)   SESSION_ID="$2"; shift 2 ;;
         --idle-secs) IDLE_SECS="$2"; shift 2 ;;
         --binary)    CLIENT_BIN="$2"; shift 2 ;;
-        --jcode)     JCODE_BIN="$2"; shift 2 ;;
+        --jcode|--next-code) JCODE_BIN="$2"; shift 2 ;;
         --cwd)       TESTER_CWD="$2"; shift 2 ;;
         --skip-trim) SKIP_TRIM=1; shift ;;
         --keep)      KEEP_TESTER=1; shift ;;
@@ -63,13 +90,22 @@ log() { printf '[memory_probe] %s\n' "$*" >&2; }
 die() { log "FATAL: $*"; exit 1; }
 
 command -v jq >/dev/null || die "jq is required"
-[[ -x "$JCODE_BIN" ]] || die "jcode CLI not found at $JCODE_BIN"
-[[ -x "$CLIENT_BIN" ]] || CLIENT_BIN="$(command -v jcode)" || die "client binary not found"
-[[ -f "$HOME/.jcode/sessions/${SESSION_ID}.json" ]] \
-    || log "WARN: $HOME/.jcode/sessions/${SESSION_ID}.json not found; resume may create a new session"
+[[ -x "$JCODE_BIN" ]] || die "next-code CLI not found at $JCODE_BIN"
+[[ -x "$CLIENT_BIN" ]] || CLIENT_BIN="$(command -v next-code 2>/dev/null || command -v jcode)" || die "client binary not found"
+SESSION_FILE=""
+for _sess_root in "$HOME/.next-code/sessions" "$HOME/.jcode/sessions"; do
+  if [[ -f "$_sess_root/${SESSION_ID}.json" ]]; then
+    SESSION_FILE="$_sess_root/${SESSION_ID}.json"
+    break
+  fi
+done
+if [[ -z "$SESSION_FILE" ]]; then
+  SESSION_FILE="$HOME/.next-code/sessions/${SESSION_ID}.json"
+  log "WARN: session file not found under ~/.next-code or ~/.jcode; resume may create a new session"
+fi
 
 RUN_ID="probe_$(date -u +%Y%m%dT%H%M%SZ)_$$"
-SESSION_FILE="$HOME/.jcode/sessions/${SESSION_ID}.json"
+SESSION_FILE="${SESSION_FILE:-$HOME/.next-code/sessions/${SESSION_ID}.json}"
 SESSION_BYTES=$(stat -c %s "$SESSION_FILE" 2>/dev/null || echo 0)
 
 TESTER_ID=""

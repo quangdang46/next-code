@@ -25,7 +25,7 @@ pub async fn run_client() -> Result<()> {
         anyhow::bail!("Failed to ping server");
     }
 
-    println!("Connected to J-Code server");
+    println!("Connected to Next Code server");
     println!("Type your message, or 'quit' to exit.\n");
 
     loop {
@@ -123,7 +123,7 @@ pub async fn run_tui_client(
         );
     } else {
         crate::process_title::set_client_generic_title(super::selfdev::client_selfdev_requested());
-        let _ = crossterm::execute!(std::io::stdout(), crossterm::terminal::SetTitle("jcode"));
+        let _ = crossterm::execute!(std::io::stdout(), crossterm::terminal::SetTitle("next-code"));
     }
     startup_profile::mark("terminal_title");
 
@@ -242,7 +242,7 @@ pub async fn run_replay_command(
                         }
                     })
                     .collect::<String>();
-                std::path::PathBuf::from(format!("jcode_swarm_replay_{}_{}.mp4", safe_name, date))
+                std::path::PathBuf::from(format!("next_code_swarm_replay_{}_{}.mp4", safe_name, date))
             } else {
                 std::path::PathBuf::from(output)
             };
@@ -358,7 +358,7 @@ pub async fn run_replay_command(
                     }
                 })
                 .collect::<String>();
-            std::path::PathBuf::from(format!("jcode_replay_{}_{}.mp4", safe_name, date))
+            std::path::PathBuf::from(format!("next_code_replay_{}_{}.mp4", safe_name, date))
         } else {
             std::path::PathBuf::from(output)
         };
@@ -421,42 +421,42 @@ pub use crate::session_launch::{
 pub fn list_sessions() -> Result<()> {
     fn build_resume_target_command(
         exe: &std::path::Path,
-        target: &jcode_tui_session_picker::ResumeTarget,
+        target: &next_code_tui_session_picker::ResumeTarget,
     ) -> (std::path::PathBuf, Vec<String>) {
         match target {
-            jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } => (
+            next_code_tui_session_picker::ResumeTarget::JcodeSession { session_id } => (
                 exe.to_path_buf(),
                 vec!["--resume".to_string(), session_id.clone()],
             ),
-            jcode_tui_session_picker::ResumeTarget::ClaudeCodeSession { session_id, .. } => (
+            next_code_tui_session_picker::ResumeTarget::ClaudeCodeSession { session_id, .. } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
                     crate::import::imported_claude_code_session_id(session_id),
                 ],
             ),
-            jcode_tui_session_picker::ResumeTarget::CodexSession { session_id, .. } => (
+            next_code_tui_session_picker::ResumeTarget::CodexSession { session_id, .. } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
                     crate::import::imported_codex_session_id(session_id),
                 ],
             ),
-            jcode_tui_session_picker::ResumeTarget::PiSession { session_path } => (
+            next_code_tui_session_picker::ResumeTarget::PiSession { session_path } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
                     crate::import::imported_pi_session_id(session_path),
                 ],
             ),
-            jcode_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => (
+            next_code_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
                     crate::import::imported_opencode_session_id(session_id),
                 ],
             ),
-            jcode_tui_session_picker::ResumeTarget::CursorSession { session_id, .. } => (
+            next_code_tui_session_picker::ResumeTarget::CursorSession { session_id, .. } => (
                 exe.to_path_buf(),
                 vec![
                     "--resume".to_string(),
@@ -474,22 +474,22 @@ pub fn list_sessions() -> Result<()> {
     }
 
     fn spawn_target_in_new_terminal(
-        target: &jcode_tui_session_picker::ResumeTarget,
+        target: &next_code_tui_session_picker::ResumeTarget,
         exe: &std::path::Path,
         cwd: &std::path::Path,
     ) -> Result<bool> {
         let (program, args) = build_resume_target_command(exe, target);
         let title = match target {
-            jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } => {
+            next_code_tui_session_picker::ResumeTarget::JcodeSession { session_id } => {
                 resumed_window_title(session_id)
             }
-            jcode_tui_session_picker::ResumeTarget::ClaudeCodeSession { session_id, .. } => {
+            next_code_tui_session_picker::ResumeTarget::ClaudeCodeSession { session_id, .. } => {
                 format!("🧵 Claude Code {}", &session_id[..session_id.len().min(8)])
             }
-            jcode_tui_session_picker::ResumeTarget::CodexSession { session_id, .. } => {
+            next_code_tui_session_picker::ResumeTarget::CodexSession { session_id, .. } => {
                 format!("🧠 Codex {}", &session_id[..session_id.len().min(8)])
             }
-            jcode_tui_session_picker::ResumeTarget::PiSession { session_path } => {
+            next_code_tui_session_picker::ResumeTarget::PiSession { session_path } => {
                 format!(
                     "π Pi {}",
                     std::path::Path::new(session_path)
@@ -498,10 +498,10 @@ pub fn list_sessions() -> Result<()> {
                         .unwrap_or("session")
                 )
             }
-            jcode_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => {
+            next_code_tui_session_picker::ResumeTarget::OpenCodeSession { session_id, .. } => {
                 format!("◌ OpenCode {}", &session_id[..session_id.len().min(8)])
             }
-            jcode_tui_session_picker::ResumeTarget::CursorSession { session_id, .. } => {
+            next_code_tui_session_picker::ResumeTarget::CursorSession { session_id, .. } => {
                 format!("💾 Cursor {}", &session_id[..session_id.len().min(8)])
             }
         };
@@ -520,7 +520,7 @@ pub fn list_sessions() -> Result<()> {
             if targets.len() == 1 {
                 let target = &targets[0];
                 let mut session_cwd = cwd.clone();
-                if let jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } = target
+                if let next_code_tui_session_picker::ResumeTarget::JcodeSession { session_id } = target
                     && let Ok(sess) = session::Session::load(session_id)
                     && let Some(dir) = sess.working_dir.as_deref()
                     && std::path::Path::new(dir).is_dir()
@@ -541,7 +541,7 @@ pub fn list_sessions() -> Result<()> {
 
                 for target in targets {
                     let mut session_cwd = cwd.clone();
-                    if let jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } =
+                    if let next_code_tui_session_picker::ResumeTarget::JcodeSession { session_id } =
                         &target
                         && let Ok(sess) = session::Session::load(session_id)
                         && let Some(dir) = sess.working_dir.as_deref()
@@ -594,7 +594,7 @@ pub fn list_sessions() -> Result<()> {
                     }
                 };
                 let mut session_cwd = cwd.clone();
-                if let jcode_tui_session_picker::ResumeTarget::JcodeSession { session_id } = &target
+                if let next_code_tui_session_picker::ResumeTarget::JcodeSession { session_id } = &target
                     && let Ok(sess) = session::Session::load(session_id)
                     && let Some(dir) = sess.working_dir.as_deref()
                     && std::path::Path::new(dir).is_dir()
@@ -667,7 +667,7 @@ pub fn list_sessions() -> Result<()> {
                             );
                             warned_no_terminal = true;
                         }
-                        eprintln!("  jcode --resume {}", session_id);
+                        eprintln!("  next-code --resume {}", session_id);
                     }
                     Err(e) => {
                         eprintln!("Failed to spawn session {}: {}", session_id, e);

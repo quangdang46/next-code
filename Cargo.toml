@@ -1,5 +1,5 @@
 [package]
-name = "jcode"
+name = "next-code"
 version = "0.32.0"
 description = "Possibly the greatest coding agent ever built — blazing-fast TUI, multi-model, swarm coordination, 30+ tools"
 edition = "2024"
@@ -11,98 +11,98 @@ edition = "2024"
 [workspace]
 members = [
     ".",
-    "crates/jcode-agent-runtime",
-    "crates/jcode-experiment-flags",
-    "crates/jcode-app-core",
-    "crates/jcode-base",
-    "crates/jcode-tui",
-    "crates/jcode-build-meta",
-    "crates/jcode-ambient-types",
-    "crates/jcode-auth-types",
-    "crates/jcode-embedding",
-    "crates/jcode-gateway-types",
-    "crates/jcode-pdf",
-    "crates/jcode-logging",
-    "crates/jcode-background-types",
-    "crates/jcode-batch-types",
-    "crates/jcode-build-support",
-    "crates/jcode-compaction-core",
-    "crates/jcode-config-types",
-    "crates/jcode-core",
-    "crates/jcode-fuzzy",
-    "crates/jcode-memory-types",
-    "crates/jcode-message-types",
-    "crates/jcode-overnight-core",
-    "crates/jcode-plan",
-    "crates/jcode-productivity-core",
-    "crates/jcode-swarm-core",
-    "crates/jcode-protocol",
-    "crates/jcode-selfdev-types",
-    "crates/jcode-session-types",
-    "crates/jcode-setup-hints",
-    "crates/jcode-storage",
-    "crates/jcode-side-panel-types",
-    "crates/jcode-azure-auth",
-    "crates/jcode-notify-email",
-    "crates/jcode-provider-metadata",
-    "crates/jcode-provider-env",
-    "crates/jcode-provider-core",
-    "crates/jcode-provider-bedrock",
-    "crates/jcode-provider-anthropic",
-    "crates/jcode-provider-antigravity",
-    "crates/jcode-provider-copilot",
-    "crates/jcode-provider-openrouter",
-    "crates/jcode-provider-openai",
-    "crates/jcode-provider-gemini",
-    "crates/jcode-provider-service",
-    "crates/jcode-provider-claude-cli-runtime",
-    "crates/jcode-provider-anthropic-runtime",
-    "crates/jcode-provider-antigravity-runtime",
-    "crates/jcode-provider-copilot-runtime",
-    "crates/jcode-provider-cursor-runtime",
-    "crates/jcode-provider-gemini-runtime",
-    "crates/jcode-provider-openai-runtime",
-    "crates/jcode-provider-openrouter-runtime",
-    "crates/jcode-llm-core",
-    "crates/jcode-llm-protocols",
-    "crates/jcode-llm-dialects",
-    "crates/jcode-llm-providers",
-    "crates/jcode-llm-vcr",
-    "crates/jcode-tui-markdown",
-    "crates/jcode-tui-messages",
-    "crates/jcode-usage-types",
-    "crates/jcode-tui-core",
-    "crates/jcode-tui-mermaid",
-    "crates/jcode-task-types",
-    "crates/jcode-tool-core",
-    "crates/jcode-tool-types",
-    "crates/jcode-tui-account-picker",
-    "crates/jcode-tui-anim",
-    "crates/jcode-tui-render",
-    "crates/jcode-tui-visual-debug",
-    "crates/jcode-tui-session-picker",
-    "crates/jcode-tui-style",
-    "crates/jcode-tui-permissions",
-    "crates/jcode-tui-tool-display",
-    "crates/jcode-tui-usage-overlay",
-    "crates/jcode-update-core",
-    "crates/jcode-terminal-launch",
-    "crates/jcode-terminal-image",
-    "crates/jcode-telemetry-core",
-    "crates/jcode-tui-workspace",
-    "crates/jcode-best-of-n",
-    "crates/jcode-desktop",
-    "crates/jcode-hooks",
-    "crates/jcode-keyring-store",
-    "crates/jcode-redact",
-    "crates/jcode-keywords",
-    "crates/jcode-secrets",
-    "crates/jcode-plugin-core",
-    "crates/jcode-plugin-runtime",
-    "crates/jcode-provider-doctor",
-    "crates/jcode-render-core",
+    "crates/next-code-agent-runtime",
+    "crates/next-code-experiment-flags",
+    "crates/next-code-app-core",
+    "crates/next-code-base",
+    "crates/next-code-tui",
+    "crates/next-code-build-meta",
+    "crates/next-code-ambient-types",
+    "crates/next-code-auth-types",
+    "crates/next-code-embedding",
+    "crates/next-code-gateway-types",
+    "crates/next-code-pdf",
+    "crates/next-code-logging",
+    "crates/next-code-background-types",
+    "crates/next-code-batch-types",
+    "crates/next-code-build-support",
+    "crates/next-code-compaction-core",
+    "crates/next-code-config-types",
+    "crates/next-code-core",
+    "crates/next-code-fuzzy",
+    "crates/next-code-memory-types",
+    "crates/next-code-message-types",
+    "crates/next-code-overnight-core",
+    "crates/next-code-plan",
+    "crates/next-code-productivity-core",
+    "crates/next-code-swarm-core",
+    "crates/next-code-protocol",
+    "crates/next-code-selfdev-types",
+    "crates/next-code-session-types",
+    "crates/next-code-setup-hints",
+    "crates/next-code-storage",
+    "crates/next-code-side-panel-types",
+    "crates/next-code-azure-auth",
+    "crates/next-code-notify-email",
+    "crates/next-code-provider-metadata",
+    "crates/next-code-provider-env",
+    "crates/next-code-provider-core",
+    "crates/next-code-provider-bedrock",
+    "crates/next-code-provider-anthropic",
+    "crates/next-code-provider-antigravity",
+    "crates/next-code-provider-copilot",
+    "crates/next-code-provider-openrouter",
+    "crates/next-code-provider-openai",
+    "crates/next-code-provider-gemini",
+    "crates/next-code-provider-service",
+    "crates/next-code-provider-claude-cli-runtime",
+    "crates/next-code-provider-anthropic-runtime",
+    "crates/next-code-provider-antigravity-runtime",
+    "crates/next-code-provider-copilot-runtime",
+    "crates/next-code-provider-cursor-runtime",
+    "crates/next-code-provider-gemini-runtime",
+    "crates/next-code-provider-openai-runtime",
+    "crates/next-code-provider-openrouter-runtime",
+    "crates/next-code-llm-core",
+    "crates/next-code-llm-protocols",
+    "crates/next-code-llm-dialects",
+    "crates/next-code-llm-providers",
+    "crates/next-code-llm-vcr",
+    "crates/next-code-tui-markdown",
+    "crates/next-code-tui-messages",
+    "crates/next-code-usage-types",
+    "crates/next-code-tui-core",
+    "crates/next-code-tui-mermaid",
+    "crates/next-code-task-types",
+    "crates/next-code-tool-core",
+    "crates/next-code-tool-types",
+    "crates/next-code-tui-account-picker",
+    "crates/next-code-tui-anim",
+    "crates/next-code-tui-render",
+    "crates/next-code-tui-visual-debug",
+    "crates/next-code-tui-session-picker",
+    "crates/next-code-tui-style",
+    "crates/next-code-tui-permissions",
+    "crates/next-code-tui-tool-display",
+    "crates/next-code-tui-usage-overlay",
+    "crates/next-code-update-core",
+    "crates/next-code-terminal-launch",
+    "crates/next-code-terminal-image",
+    "crates/next-code-telemetry-core",
+    "crates/next-code-tui-workspace",
+    "crates/next-code-best-of-n",
+    "crates/next-code-desktop",
+    "crates/next-code-hooks",
+    "crates/next-code-keyring-store",
+    "crates/next-code-redact",
+    "crates/next-code-keywords",
+    "crates/next-code-secrets",
+    "crates/next-code-plugin-core",
+    "crates/next-code-plugin-runtime",
+    "crates/next-code-provider-doctor",
+    "crates/next-code-render-core",
     "evals/jbench",
-    "evals/jcode-edit-bench",
+    "evals/next-code-edit-bench",
 
 ]
 
@@ -119,11 +119,11 @@ strum = { version = "0.26", features = ["derive"] }
 regex = "1"
 
 [lib]
-name = "jcode"
+name = "next_code"
 path = "src/lib.rs"
 
 [[bin]]
-name = "jcode"
+name = "next-code"
 path = "src/main.rs"
 
 [[bin]]
@@ -131,7 +131,7 @@ name = "test_api"
 path = "src/bin/test_api.rs"
 
 [[bin]]
-name = "jcode-harness"
+name = "next-code-harness"
 path = "src/bin/harness.rs"
 
 [[bin]]
@@ -156,20 +156,20 @@ required-features = ["dev-bins"]
 
 [dependencies]
 # Hook system for lifecycle events
-jcode-hooks = { path = "crates/jcode-hooks" }
-jcode-keyring-store = { path = "crates/jcode-keyring-store" }
-jcode-plugin-core = { path = "crates/jcode-plugin-core" }
-jcode-plugin-runtime = { path = "crates/jcode-plugin-runtime" }
-jcode-provider-doctor = { path = "crates/jcode-provider-doctor" }
-jcode-provider-anthropic-runtime = { path = "crates/jcode-provider-anthropic-runtime" }
-jcode-provider-antigravity-runtime = { path = "crates/jcode-provider-antigravity-runtime" }
-jcode-provider-claude-cli-runtime = { path = "crates/jcode-provider-claude-cli-runtime" }
-jcode-provider-copilot-runtime = { path = "crates/jcode-provider-copilot-runtime" }
-jcode-provider-cursor-runtime = { path = "crates/jcode-provider-cursor-runtime" }
-jcode-provider-gemini-runtime = { path = "crates/jcode-provider-gemini-runtime" }
-jcode-provider-openai-runtime = { path = "crates/jcode-provider-openai-runtime" }
-jcode-provider-openrouter-runtime = { path = "crates/jcode-provider-openrouter-runtime" }
-jcode-provider-service = { path = "crates/jcode-provider-service" }
+next-code-hooks = { path = "crates/next-code-hooks" }
+next-code-keyring-store = { path = "crates/next-code-keyring-store" }
+next-code-plugin-core = { path = "crates/next-code-plugin-core" }
+next-code-plugin-runtime = { path = "crates/next-code-plugin-runtime" }
+next-code-provider-doctor = { path = "crates/next-code-provider-doctor" }
+next-code-provider-anthropic-runtime = { path = "crates/next-code-provider-anthropic-runtime" }
+next-code-provider-antigravity-runtime = { path = "crates/next-code-provider-antigravity-runtime" }
+next-code-provider-claude-cli-runtime = { path = "crates/next-code-provider-claude-cli-runtime" }
+next-code-provider-copilot-runtime = { path = "crates/next-code-provider-copilot-runtime" }
+next-code-provider-cursor-runtime = { path = "crates/next-code-provider-cursor-runtime" }
+next-code-provider-gemini-runtime = { path = "crates/next-code-provider-gemini-runtime" }
+next-code-provider-openai-runtime = { path = "crates/next-code-provider-openai-runtime" }
+next-code-provider-openrouter-runtime = { path = "crates/next-code-provider-openrouter-runtime" }
+next-code-provider-service = { path = "crates/next-code-provider-service" }
 
 
 # TOON format output for the `jcode run --toon` flag — token-efficient JSON
@@ -234,9 +234,9 @@ uuid = { version = "1", features = ["v4", "v5"] }
 proctitle = "0.1"
 
 # Embeddings (local inference) - behind feature flag (163 crates, slow to compile)
-jcode-embedding = { path = "crates/jcode-embedding", optional = true }
-jcode-gateway-types = { path = "crates/jcode-gateway-types" }
-jcode-logging = { path = "crates/jcode-logging" }
+next-code-embedding = { path = "crates/next-code-embedding", optional = true }
+next-code-gateway-types = { path = "crates/next-code-gateway-types" }
+next-code-logging = { path = "crates/next-code-logging" }
 
 # OAuth
 base64 = "0.22"
@@ -245,31 +245,31 @@ rand = "0.9.3"
 hex = "0.4"
 url = "2"
 open = "5"               # Open URLs in browser
-jcode-auth-types = { path = "crates/jcode-auth-types" }
-jcode-azure-auth = { path = "crates/jcode-azure-auth" }
-jcode-agent-runtime = { path = "crates/jcode-agent-runtime" }
-jcode-ambient-types = { path = "crates/jcode-ambient-types" }
-jcode-notify-email = { path = "crates/jcode-notify-email" }
-jcode-provider-metadata = { path = "crates/jcode-provider-metadata" }
-jcode-provider-core = { path = "crates/jcode-provider-core" }
-jcode-provider-openai = { path = "crates/jcode-provider-openai" }
-jcode-provider-openrouter = { path = "crates/jcode-provider-openrouter" }
-jcode-provider-gemini = { path = "crates/jcode-provider-gemini" }
-jcode-tui-markdown = { path = "crates/jcode-tui-markdown" }
-jcode-tui-messages = { path = "crates/jcode-tui-messages" }
-jcode-tui-core = { path = "crates/jcode-tui-core" }
-jcode-tui-mermaid = { path = "crates/jcode-tui-mermaid" }
-jcode-tui-account-picker = { path = "crates/jcode-tui-account-picker" }
-jcode-tui-render = { path = "crates/jcode-tui-render" }
-jcode-tui-session-picker = { path = "crates/jcode-tui-session-picker", features = ["serde"] }
-jcode-tui-style = { path = "crates/jcode-tui-style" }
-jcode-tui-tool-display = { path = "crates/jcode-tui-tool-display" }
-jcode-tui-usage-overlay = { path = "crates/jcode-tui-usage-overlay" }
-jcode-update-core = { path = "crates/jcode-update-core" }
-jcode-terminal-launch = { path = "crates/jcode-terminal-launch" }
-jcode-terminal-image = { path = "crates/jcode-terminal-image" }
-jcode-tui-workspace = { path = "crates/jcode-tui-workspace" }
-jcode-usage-types = { path = "crates/jcode-usage-types" }
+next-code-auth-types = { path = "crates/next-code-auth-types" }
+next-code-azure-auth = { path = "crates/next-code-azure-auth" }
+next-code-agent-runtime = { path = "crates/next-code-agent-runtime" }
+next-code-ambient-types = { path = "crates/next-code-ambient-types" }
+next-code-notify-email = { path = "crates/next-code-notify-email" }
+next-code-provider-metadata = { path = "crates/next-code-provider-metadata" }
+next-code-provider-core = { path = "crates/next-code-provider-core" }
+next-code-provider-openai = { path = "crates/next-code-provider-openai" }
+next-code-provider-openrouter = { path = "crates/next-code-provider-openrouter" }
+next-code-provider-gemini = { path = "crates/next-code-provider-gemini" }
+next-code-tui-markdown = { path = "crates/next-code-tui-markdown" }
+next-code-tui-messages = { path = "crates/next-code-tui-messages" }
+next-code-tui-core = { path = "crates/next-code-tui-core" }
+next-code-tui-mermaid = { path = "crates/next-code-tui-mermaid" }
+next-code-tui-account-picker = { path = "crates/next-code-tui-account-picker" }
+next-code-tui-render = { path = "crates/next-code-tui-render" }
+next-code-tui-session-picker = { path = "crates/next-code-tui-session-picker", features = ["serde"] }
+next-code-tui-style = { path = "crates/next-code-tui-style" }
+next-code-tui-tool-display = { path = "crates/next-code-tui-tool-display" }
+next-code-tui-usage-overlay = { path = "crates/next-code-tui-usage-overlay" }
+next-code-update-core = { path = "crates/next-code-update-core" }
+next-code-terminal-launch = { path = "crates/next-code-terminal-launch" }
+next-code-terminal-image = { path = "crates/next-code-terminal-image" }
+next-code-tui-workspace = { path = "crates/next-code-tui-workspace" }
+next-code-usage-types = { path = "crates/next-code-usage-types" }
 
 # Streaming
 tokio-stream = "0.1"
@@ -285,41 +285,41 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg"]
 unicode-width = "0.2"   # Unicode character display width
 
 # PDF parsing (behind feature flag)
-jcode-pdf = { path = "crates/jcode-pdf", optional = true }
-jcode-background-types = { path = "crates/jcode-background-types" }
-jcode-batch-types = { path = "crates/jcode-batch-types" }
-jcode-build-support = { path = "crates/jcode-build-support" }
-jcode-build-meta = { path = "crates/jcode-build-meta" }
+next-code-pdf = { path = "crates/next-code-pdf", optional = true }
+next-code-background-types = { path = "crates/next-code-background-types" }
+next-code-batch-types = { path = "crates/next-code-batch-types" }
+next-code-build-support = { path = "crates/next-code-build-support" }
+next-code-build-meta = { path = "crates/next-code-build-meta" }
 # Application core: tooling, agent, dcg, dcp, etc. Re-exported via
 # `pub use jcode_app_core::*` in lib.rs. default-features=false so the root
 # feature set fully controls the downstream features (see [features]).
-jcode-app-core = { path = "crates/jcode-app-core", default-features = false }
+next-code-app-core = { path = "crates/next-code-app-core", default-features = false }
 # Presentation layer: the terminal UI (`tui`) + offline replay (`video_export`),
 # compiled as a separate rustc unit. It re-exports the application core
-# (`jcode-app-core`, which re-exports `jcode-base`), so the root crate (cli +
+# (`next-code-app-core`, which re-exports `next-code-base`), so the root crate (cli +
 # bin) re-exports everything via `pub use jcode_tui::*`. default-features=false
 # so the root feature set fully controls the downstream features (see
 # [features]).
-jcode-tui = { path = "crates/jcode-tui", default-features = false }
-jcode-compaction-core = { path = "crates/jcode-compaction-core" }
-jcode-config-types = { path = "crates/jcode-config-types" }
-jcode-core = { path = "crates/jcode-core" }
-jcode-memory-types = { path = "crates/jcode-memory-types" }
-jcode-message-types = { path = "crates/jcode-message-types" }
-jcode-overnight-core = { path = "crates/jcode-overnight-core" }
-jcode-plan = { path = "crates/jcode-plan" }
-jcode-swarm-core = { path = "crates/jcode-swarm-core" }
-jcode-protocol = { path = "crates/jcode-protocol" }
-jcode-selfdev-types = { path = "crates/jcode-selfdev-types" }
-jcode-session-types = { path = "crates/jcode-session-types" }
-jcode-setup-hints = { path = "crates/jcode-setup-hints" }
-jcode-storage = { path = "crates/jcode-storage" }
-jcode-secrets = { path = "crates/jcode-secrets" }
-jcode-task-types = { path = "crates/jcode-task-types" }
-jcode-tool-core = { path = "crates/jcode-tool-core" }
-jcode-tool-types = { path = "crates/jcode-tool-types" }
-jcode-side-panel-types = { path = "crates/jcode-side-panel-types" }
-jcode-experiment-flags = { path = "crates/jcode-experiment-flags" }
+next-code-tui = { path = "crates/next-code-tui", default-features = false }
+next-code-compaction-core = { path = "crates/next-code-compaction-core" }
+next-code-config-types = { path = "crates/next-code-config-types" }
+next-code-core = { path = "crates/next-code-core" }
+next-code-memory-types = { path = "crates/next-code-memory-types" }
+next-code-message-types = { path = "crates/next-code-message-types" }
+next-code-overnight-core = { path = "crates/next-code-overnight-core" }
+next-code-plan = { path = "crates/next-code-plan" }
+next-code-swarm-core = { path = "crates/next-code-swarm-core" }
+next-code-protocol = { path = "crates/next-code-protocol" }
+next-code-selfdev-types = { path = "crates/next-code-selfdev-types" }
+next-code-session-types = { path = "crates/next-code-session-types" }
+next-code-setup-hints = { path = "crates/next-code-setup-hints" }
+next-code-storage = { path = "crates/next-code-storage" }
+next-code-secrets = { path = "crates/next-code-secrets" }
+next-code-task-types = { path = "crates/next-code-task-types" }
+next-code-tool-core = { path = "crates/next-code-tool-core" }
+next-code-tool-types = { path = "crates/next-code-tool-types" }
+next-code-side-panel-types = { path = "crates/next-code-side-panel-types" }
+next-code-experiment-flags = { path = "crates/next-code-experiment-flags" }
 
 # Archive extraction (for auto-update)
 flate2 = "1"
@@ -341,26 +341,26 @@ aws-sdk-sts = "1.103.0"
 # Use `JCODE_DEV_FEATURE_PROFILE=minimal` for compile-speed probes that need
 # to skip optional default feature stacks.
 default = ["pdf", "embeddings", "dcp", "rtco", "jemalloc", "mmdr-size-api"]
-dev-bins = ["jcode-tui/dev-bins"]
+dev-bins = ["next-code-tui/dev-bins"]
 jemalloc = [
     "dep:tikv-jemallocator",
     "dep:tikv-jemalloc-ctl",
     "dep:tikv-jemalloc-sys",
     "tikv-jemallocator/stats",
     "tikv-jemalloc-ctl/stats",
-    "jcode-tui/jemalloc",
+    "next-code-tui/jemalloc",
 ]
 jemalloc-prof = [
     "jemalloc",
     "tikv-jemallocator/profiling",
     "tikv-jemalloc-ctl/profiling",
-    "jcode-tui/jemalloc-prof",
+    "next-code-tui/jemalloc-prof",
 ]
-embeddings = ["dep:jcode-embedding", "jcode-tui/embeddings"]
-dcp = ["jcode-tui/dcp"]
-rtco = ["jcode-tui/rtco"]
-mmdr-size-api = ["jcode-tui-mermaid/mmdr-size-api"]
-pdf = ["dep:jcode-pdf", "jcode-tui/pdf"]
+embeddings = ["dep:next-code-embedding", "next-code-tui/embeddings"]
+dcp = ["next-code-tui/dcp"]
+rtco = ["next-code-tui/rtco"]
+mmdr-size-api = ["next-code-tui-mermaid/mmdr-size-api"]
+pdf = ["dep:next-code-pdf", "next-code-tui/pdf"]
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Console", "Win32_Globalization"] }
@@ -432,13 +432,13 @@ opt-level = 0
 # dev/selfdev rebuilds, since it only recompiles when the animation code itself
 # changes. The "*" glob above sets the default for dependencies; these explicit
 # package entries take precedence for this one crate in each profile.
-[profile.dev.package."jcode-tui-anim"]
+[profile.dev.package."next-code-tui-anim"]
 opt-level = 3
 
-[profile.selfdev.package."jcode-tui-anim"]
+[profile.selfdev.package."next-code-tui-anim"]
 opt-level = 3
 
-[profile.test.package."jcode-tui-anim"]
+[profile.test.package."next-code-tui-anim"]
 opt-level = 3
 
 # Keep the text-shaping stack optimized even in dev/selfdev/test builds.
@@ -449,7 +449,7 @@ opt-level = 3
 # even though the production release build was smooth. These are stable
 # third-party crates that almost never recompile, so pinning them to opt-level =
 # 3 costs a one-time compile and is then reused across every iterative jcode
-# rebuild (same rationale as jcode-tui-anim above). It does NOT slow down
+# rebuild (same rationale as next-code-tui-anim above). It does NOT slow down
 # recompiles of jcode's own crates.
 [profile.dev.package.cosmic-text]
 opt-level = 3
@@ -554,6 +554,6 @@ async-stream = "0.3"
 # ExternalAuthReviewCandidate read accessors) for the root crate's own cli test
 # target. Feature unification applies this only to test/bench/example builds,
 # never to a normal `cargo build`/release binary.
-jcode-tui = { path = "crates/jcode-tui", features = ["test-support"] }
+next-code-tui = { path = "crates/next-code-tui", features = ["test-support"] }
 
 [build-dependencies]

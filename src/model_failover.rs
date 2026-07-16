@@ -15,7 +15,7 @@
 //! ## API
 //!
 //! ```rust
-//! use jcode::model_failover;
+//! use next_code::model_failover;
 //!
 //! let chain = model_failover::current_chain();   // Vec<FailoverEntry>
 //! for entry in chain {

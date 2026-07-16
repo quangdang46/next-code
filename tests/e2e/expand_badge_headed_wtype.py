@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Headed compositor smoke for Alt+Shift+E expand badge.
 
-Uses kitty remote control to launch a real jcode TUI window, prepares the same
+Uses kitty remote control to launch a real next-code TUI window, prepares the same
 fixture, focuses the window, presses Alt+Shift+E with wtype, and checks state.
 This complements the headless PTY E2E by covering Wayland/compositor mapping.
 """
@@ -96,9 +96,13 @@ def focused_niri_window_id():
 def main():
     if not shutil_which("kitty") or not shutil_which("wtype"):
         raise SystemExit("SKIP: kitty and wtype are required")
-    binary = os.environ.get("JCODE_E2E_BIN", str(REPO / "target" / "selfdev" / "jcode"))
+    binary = (
+        os.environ.get("NEXT_CODE_E2E_BIN")
+        or os.environ.get("JCODE_E2E_BIN")
+        or str(REPO / "target" / "selfdev" / "next-code")
+    )
     kitty_sock = os.environ.get("KITTY_E2E_SOCKET", find_kitty_socket())
-    title = f"JCODE_EXPAND_E2E_{int(time.time())}"
+    title = f"NEXT_CODE_EXPAND_E2E_{int(time.time())}"
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     sock.connect(SOCKET_PATH)
