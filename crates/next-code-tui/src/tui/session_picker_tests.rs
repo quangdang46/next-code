@@ -1130,9 +1130,9 @@ fn onboarding_external_filter_picks_latest_visible_transcript() {
     };
 
     // A non-Codex session that must be filtered out.
-    let next-code = make_session("next_code_one", "next-code", false, SessionStatus::Closed);
+    let next_code = make_session("next_code_one", "next-code", false, SessionStatus::Closed);
 
-    let mut picker = SessionPicker::new(vec![older, next-code, newer]);
+    let mut picker = SessionPicker::new(vec![older, next_code, newer]);
     picker.activate_external_cli_filter(SessionFilterMode::Codex);
 
     assert_eq!(picker.visible_session_count(), 2);
@@ -1151,8 +1151,8 @@ fn onboarding_external_filter_picks_latest_visible_transcript() {
 
 #[test]
 fn onboarding_external_filter_with_no_matches_has_no_target() {
-    let next-code = make_session("next_code_only", "next-code", false, SessionStatus::Closed);
-    let mut picker = SessionPicker::new(vec![next-code]);
+    let next_code = make_session("next_code_only", "next-code", false, SessionStatus::Closed);
+    let mut picker = SessionPicker::new(vec![next_code]);
     picker.activate_external_cli_filter(SessionFilterMode::ClaudeCode);
 
     assert_eq!(picker.visible_session_count(), 0);

@@ -16,7 +16,6 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Connect) => "nc:client".to_string(),
         Some(Command::Run { .. }) => "next-code run".to_string(),
         Some(Command::Login { .. }) => "next-code login".to_string(),
-        Some(Command::Account { .. }) => "next-code account".to_string(),
         Some(Command::Repl) => "next-code repl".to_string(),
         Some(Command::Update) => "next-code update".to_string(),
         Some(Command::Version { .. }) => "next-code version".to_string(),

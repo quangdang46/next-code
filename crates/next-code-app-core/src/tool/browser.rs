@@ -792,7 +792,7 @@ async fn firefox_run_bridge_command(
         };
         if details.contains("Unknown action:") {
             anyhow::bail!(
-                "The connected Firefox browser bridge is missing required support for action '{}'. This usually means the installed extension is older than the browser CLI expected by next-code. Use browser action='status' to confirm, then action='setup' to repair or update the extension.\n\nOriginal bridge error: {}",
+                "The connected Firefox browser bridge is missing required support for action '{}'. This usually means the installed extension is older than the browser CLI expected by next_code. Use browser action='status' to confirm, then action='setup' to repair or update the extension.\n\nOriginal bridge error: {}",
                 action,
                 details
             );

@@ -71,150 +71,6 @@ impl App {
         notices.join("\n")
     }
 
-    #[allow(dead_code)]
-    pub(super) fn show_next_code_subscription_status(&mut self) {
-        let configured_key = crate::subscription_catalog::configured_api_key().is_some();
-        let configured_base = crate::subscription_catalog::configured_api_base()
-            .unwrap_or_else(|| crate::subscription_catalog::DEFAULT_NEXT_CODE_API_BASE.to_string());
-        let runtime_mode = crate::subscription_catalog::is_runtime_mode_enabled();
-        let cached_tier = crate::subscription_catalog::cached_tier();
-
-        let mut message = String::from("Next Code Subscription Status\n\n");
-        message.push_str(&format!(
-            "  - Credentials: {}\n",
-            if configured_key {
-                "configured"
-            } else {
-                "not configured (/login next-code)"
-            }
-        ));
-        message.push_str(&format!(
-            "  - Router base: {}{}\n",
-            configured_base,
-            if crate::subscription_catalog::has_router_base() {
-                ""
-            } else {
-                " (default)"
-            }
-        ));
-        message.push_str(&format!(
-            "  - Tier: {}\n",
-            cached_tier
-                .map(|tier| tier.display_name().to_string())
-                .unwrap_or_else(|| "unknown (treated as Plus)".to_string())
-        ));
-        message.push_str(&format!(
-            "  - Runtime mode: {}\n\n",
-            if runtime_mode {
-                "active for this session"
-            } else {
-                "inactive for this session"
-            }
-        ));
-
-        message.push_str("Catalog\n\n");
-        for model in crate::subscription_catalog::curated_models() {
-            let default_suffix = if model.default_enabled {
-                " (default)"
-            } else {
-                ""
-            };
-            let tier_suffix = if model.min_tier == crate::subscription_catalog::NextCodeTier::Plus {
-                String::new()
-            } else {
-                format!(" [{}]", model.min_tier.display_name())
-            };
-            message.push_str(&format!(
-                "  - {} - {}{}{}\n      - {}\n      - {}\n",
-                model.display_name,
-                model.id,
-                default_suffix,
-                tier_suffix,
-                crate::subscription_catalog::routing_policy_detail(model),
-                model.note
-            ));
-        }
-
-        message.push_str("\nTiers\n\n");
-        for tier in crate::subscription_catalog::NextCodeTier::ALL.iter().copied() {
-            message.push_str(&format!(
-                "  - {} - ${}/mo retail, about ${:.2} usable inference budget\n",
-                tier.display_name(),
-                tier.retail_price_usd(),
-                tier.usable_budget_usd()
-            ));
-        }
-
-        if configured_key {
-            message.push_str("\nFetching account status...");
-        } else {
-            message.push_str("\nLog in with /login next-code to see account usage and tier.");
-        }
-
-        self.push_display_message(DisplayMessage::system(message));
-
-        // With credentials present, fetch live account status (/v1/me) in the
-        // background and surface it via a UiActivity card. Short timeout keeps
-        // this responsive; offline failures degrade to a quiet log line.
-        if configured_key {
-            let session_id = self.session.id.clone();
-            if let Ok(handle) = tokio::runtime::Handle::try_current() {
-                handle.spawn(async move {
-                    match crate::subscription_api::fetch_subscription_me().await {
-                        Ok(me) => {
-                            let tier_label = me
-                                .parsed_tier()
-                                .map(|tier| tier.display_name().to_string())
-                                .unwrap_or_else(|| me.tier.clone());
-                            let resets = me
-                                .usage
-                                .resets_at
-                                .as_deref()
-                                .map(|at| format!(", resets {}", at))
-                                .unwrap_or_default();
-                            crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
-                                crate::bus::UiActivity::background(
-                                    Some(session_id),
-                                    format!(
-                                        "Next Code Subscription Account\n\n  - Email: {}\n  - Tier: {} ({})\n  - Usage: ${:.2} of ${:.2}{}",
-                                        me.email,
-                                        tier_label,
-                                        me.status,
-                                        me.usage.used_usd,
-                                        me.usage.budget_usd,
-                                        resets
-                                    ),
-                                    Some("Subscription: account status loaded"),
-                                ),
-                            ));
-                        }
-                        Err(error) => {
-                            let message = if error
-                                .downcast_ref::<crate::subscription_api::AccountApiError>()
-                                == Some(&crate::subscription_api::AccountApiError::Unauthorized)
-                            {
-                                let _ = crate::subscription_catalog::clear_account_credentials();
-                                "Next Code Account Status\n\nThe saved account key was revoked or expired. Local credentials were cleared. Use /account next-code login to sign in again."
-                                    .to_string()
-                            } else {
-                                format!(
-                                    "Next Code Account Status\n\nCould not load /v1/me: {}\n\nThe local credential was retained. Retry /account next-code status, open /account next-code manage, or use /account next-code logout.",
-                                    error
-                                )
-                            };
-                            crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
-                                crate::bus::UiActivity::background(
-                                    Some(session_id),
-                                    message,
-                                    Some("Next Code account status unavailable"),
-                                ),
-                            ));
-                        }
-                    }
-                });
-            }
-        }
-    }
 
     pub(super) fn show_auth_status(&mut self) {
         let status = crate::auth::AuthStatus::check();
@@ -310,13 +166,8 @@ impl App {
     ) {
         use crate::provider_catalog::LoginProviderTarget;
 
-        if matches!(provider.target, LoginProviderTarget::NextCode) {
-            self.start_next_code_account_logout();
-            return;
-        }
 
         let result: anyhow::Result<String> = (|| match provider.target {
-            LoginProviderTarget::NextCode => unreachable!("handled above"),
             LoginProviderTarget::Claude => {
                 let removed = crate::auth::claude::clear_accounts()?;
                 Ok(format!("Logged out of {} Anthropic account(s).", removed))
@@ -414,24 +265,10 @@ impl App {
         Self::clear_api_key_logout_summary(
             &mut summary,
             &mut errors,
-            "next-code subscription API key",
-            crate::subscription_catalog::NEXT_CODE_API_KEY_ENV,
-            crate::subscription_catalog::NEXT_CODE_ENV_FILE,
+            "OpenRouter",
+            "OPENROUTER_API_KEY",
+            "openrouter.env",
         );
-        for env_key in [
-            crate::subscription_catalog::NEXT_CODE_API_BASE_ENV,
-            crate::subscription_catalog::NEXT_CODE_ACCOUNT_ID_ENV,
-            crate::subscription_catalog::NEXT_CODE_ACCOUNT_EMAIL_ENV,
-            crate::subscription_catalog::NEXT_CODE_TIER_ENV,
-        ] {
-            if let Err(err) = crate::provider_catalog::save_env_value_to_env_file(
-                env_key,
-                crate::subscription_catalog::NEXT_CODE_ENV_FILE,
-                None,
-            ) {
-                errors.push(format!("next-code subscription {}: {}", env_key, err));
-            }
-        }
 
         Self::clear_api_key_logout_summary(
             &mut summary,
@@ -585,7 +422,6 @@ impl App {
                     }
                 }
             }
-            crate::provider_catalog::LoginProviderTarget::NextCode => self.start_jcode_login(),
             crate::provider_catalog::LoginProviderTarget::Claude => self.start_claude_login(),
             crate::provider_catalog::LoginProviderTarget::ClaudeApiKey => {
                 self.start_anthropic_api_key_login()
@@ -634,244 +470,8 @@ impl App {
         self.start_claude_login_for_account(&label);
     }
 
-    fn start_jcode_login(&mut self) {
-        self.push_display_message(DisplayMessage::system(
-            "Next Code Account Login\n\nRequesting a secure browser approval flow. No email or API key will be requested in the terminal."
-                .to_string(),
-        ));
-        self.set_status_notice("Next Code account: requesting browser approval");
-        let session_id = self.session.id.clone();
-        let Ok(handle) = tokio::runtime::Handle::try_current() else {
-            self.push_display_message(DisplayMessage::error(
-                "Next Code account login requires the async runtime.".to_string(),
-            ));
-            return;
-        };
-        handle.spawn(async move {
-            use crate::subscription_api::{
-                ActivationOutcome, PollingBackoff, TokenPollOutcome,
-            };
-            use std::time::Duration;
 
-            let publish = |message: String, status: &'static str| {
-                crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
-                    crate::bus::UiActivity::background(
-                        Some(session_id.clone()),
-                        message,
-                        Some(status),
-                    ),
-                ));
-            };
-            let client = crate::provider::shared_http_client();
-            let api_base = crate::subscription_api::configured_api_base();
-            let device = match crate::subscription_api::request_device_authorization(
-                &client,
-                &api_base,
-                Some(crate::subscription_catalog::NextCodeTier::Pro),
-            )
-            .await
-            {
-                Ok(device) => device,
-                Err(error) => {
-                    publish(
-                        format!(
-                            "Next Code Account Login\n\nCould not start browser approval: {}\n\nRetry /account next-code login. No credential was saved.",
-                            error
-                        ),
-                        "Next Code account login failed",
-                    );
-                    return;
-                }
-            };
 
-            let opened = App::open_auth_browser(&device.verification_uri_complete);
-            publish(
-                format!(
-                    "Next Code Account Login\n\n{}\n\nApprove the request in the same browser. Next Code is waiting for the single-use exchange.{}",
-                    device.verification_uri_complete,
-                    if opened {
-                        ""
-                    } else {
-                        "\n\nThe browser could not be opened automatically. Open the public URL above manually."
-                    }
-                ),
-                "Next Code account: waiting for browser approval",
-            );
-
-            let approved = {
-                let deadline = tokio::time::Instant::now()
-                    + Duration::from_secs(device.expires_in.max(device.interval));
-                let mut backoff = PollingBackoff::new(Duration::from_secs(device.interval));
-                loop {
-                    let delay = backoff.delay();
-                    if tokio::time::Instant::now() + delay >= deadline {
-                        break Err("Browser approval timed out. No credential was saved.".to_string());
-                    }
-                    tokio::time::sleep(delay).await;
-                    match crate::subscription_api::poll_device_token_once(
-                        &client,
-                        &api_base,
-                        &device.device_code,
-                    )
-                    .await
-                    {
-                        Ok(TokenPollOutcome::Pending) => backoff.on_pending(),
-                        Ok(TokenPollOutcome::SlowDown { retry_after }) => {
-                            backoff.on_slow_down(retry_after)
-                        }
-                        Ok(TokenPollOutcome::Approved(key)) => break Ok(key),
-                        Ok(TokenPollOutcome::Expired) => break Err(
-                            "The browser approval expired or was already exchanged. Start a new login."
-                                .to_string(),
-                        ),
-                        Ok(TokenPollOutcome::Denied) => break Err(
-                            "Next Code account login was canceled or denied in the browser."
-                                .to_string(),
-                        ),
-                        Err(error) if error.is_temporary() => backoff.on_offline_error(),
-                        Err(error) => break Err(error.to_string()),
-                    }
-                }
-            };
-            let approved = match approved {
-                Ok(approved) => approved,
-                Err(error) => {
-                    publish(
-                        format!("Next Code Account Login\n\n{error}\n\nRetry /account next-code login."),
-                        "Next Code account login stopped",
-                    );
-                    return;
-                }
-            };
-
-            if let Err(error) = crate::subscription_catalog::persist_account_credentials(
-                &approved.api_key,
-                Some(&approved.account_id),
-                Some(&approved.email),
-                Some(&approved.tier),
-            ) {
-                publish(
-                    format!("Next Code Account Login\n\nBrowser approval succeeded, but secure credential persistence failed: {error}"),
-                    "Next Code account credential save failed",
-                );
-                return;
-            }
-            crate::auth::AuthStatus::invalidate_cache();
-            publish(
-                format!(
-                    "Next Code Account Approved\n\nSigned in as {}. The key is stored with owner-only permissions. Waiting for an active paid plan on /v1/me...",
-                    approved.email
-                ),
-                "Next Code account: waiting for plan activation",
-            );
-
-            match crate::subscription_api::poll_for_paid_activation(
-                &client,
-                &api_base,
-                &approved.api_key,
-                crate::subscription_api::ACTIVATION_TIMEOUT,
-                Duration::from_secs(device.interval.max(2)),
-            )
-            .await
-            {
-                ActivationOutcome::Active(me) => publish(
-                    format!(
-                        "Next Code Account Ready\n\n{} is active for {}.\n\nStatus: /account next-code status\nManage: /account next-code manage\nLogout: /account next-code logout",
-                        me.parsed_tier()
-                            .map(|tier| tier.display_name().to_string())
-                            .unwrap_or(me.tier),
-                        me.email
-                    ),
-                    "Next Code account plan active",
-                ),
-                ActivationOutcome::Canceled(_) => publish(
-                    "Next Code Account Login\n\nCheckout was canceled. The valid account key remains saved, but no paid plan is active.\n\nStatus: /account next-code status\nManage: /account next-code manage\nLogout: /account next-code logout".to_string(),
-                    "Next Code account plan not active",
-                ),
-                ActivationOutcome::TimedOut { last_error_was_offline } => publish(
-                    format!(
-                        "Next Code Account Login\n\nPlan activation was not confirmed before timeout{}. The valid account key remains saved.\n\nStatus: /account next-code status\nManage: /account next-code manage\nLogout: /account next-code logout",
-                        if last_error_was_offline { " because the API remained unreachable" } else { "" }
-                    ),
-                    "Next Code account activation pending",
-                ),
-                ActivationOutcome::Revoked | ActivationOutcome::Denied => {
-                    let _ = crate::subscription_catalog::clear_account_credentials();
-                    publish(
-                        "Next Code Account Login\n\nThe issued key was revoked or denied during activation checks. Local credentials were cleared. Retry /account next-code login.".to_string(),
-                        "Next Code account key rejected",
-                    );
-                }
-            }
-        });
-    }
-
-    pub(super) fn open_next_code_account_management(&mut self) {
-        let url = crate::subscription_catalog::NEXT_CODE_ACCOUNT_URL;
-        let opened = Self::open_auth_browser(url);
-        self.push_display_message(DisplayMessage::system(format!(
-            "Next Code Account Management\n\n{}{}",
-            url,
-            if opened {
-                "\n\nOpened in your browser."
-            } else {
-                "\n\nThe browser could not be opened automatically. Open the public URL above manually."
-            }
-        )));
-        self.set_status_notice("Next Code account management");
-    }
-
-    pub(super) fn start_next_code_account_logout(&mut self) {
-        self.set_status_notice("Next Code account: logging out");
-        let session_id = self.session.id.clone();
-        let Ok(handle) = tokio::runtime::Handle::try_current() else {
-            let result = crate::subscription_catalog::clear_account_credentials();
-            match result {
-                Ok(()) => self.push_display_message(DisplayMessage::system(
-                    "Next Code account credentials and cache were cleared locally. Remote revocation could not be attempted without the async runtime."
-                        .to_string(),
-                )),
-                Err(error) => self.push_display_message(DisplayMessage::error(format!(
-                    "Failed to clear local Next Code account credentials: {error}"
-                ))),
-            }
-            return;
-        };
-        handle.spawn(async move {
-            let api_key = crate::subscription_catalog::configured_api_key();
-            let remote = if let Some(api_key) = api_key.as_deref() {
-                crate::subscription_api::revoke_current_key(
-                    &crate::provider::shared_http_client(),
-                    &crate::subscription_api::configured_api_base(),
-                    api_key,
-                )
-                .await
-            } else {
-                Ok(())
-            };
-            let local = crate::subscription_catalog::clear_account_credentials();
-            crate::auth::AuthStatus::invalidate_cache();
-            let message = match local {
-                Err(error) => format!(
-                    "Next Code Account Logout\n\nFailed to securely clear local credentials: {error}"
-                ),
-                Ok(()) => match (api_key.is_some(), remote) {
-                    (false, _) => "Next Code Account Logout\n\nNo local credential was present. Local account cache is clear.".to_string(),
-                    (true, Ok(())) => "Next Code Account Logout\n\nThe current key was revoked. Local credentials and account cache were securely cleared.".to_string(),
-                    (true, Err(crate::subscription_api::AccountApiError::Unauthorized)) => "Next Code Account Logout\n\nThe key was already revoked. Local credentials and account cache were securely cleared.".to_string(),
-                    (true, Err(crate::subscription_api::AccountApiError::Offline(_))) => "Next Code Account Logout\n\nLocal credentials and account cache were securely cleared. The API was offline, so remote revocation could not be confirmed.".to_string(),
-                    (true, Err(error)) => format!("Next Code Account Logout\n\nLocal credentials and account cache were securely cleared. Remote revocation could not be confirmed: {error}"),
-                },
-            };
-            crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
-                crate::bus::UiActivity::background(
-                    Some(session_id),
-                    message,
-                    Some("Next Code account logout complete"),
-                ),
-            ));
-        });
-    }
 
     pub(super) fn start_claude_login_for_account(&mut self, label: &str) {
         use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -1646,7 +1246,6 @@ impl App {
         let provider_id = openai_compatible_profile
             .map(|profile| profile.id.to_string())
             .unwrap_or_else(|| match key_name {
-                crate::subscription_catalog::NEXT_CODE_API_KEY_ENV => "next-code".to_string(),
                 "OPENROUTER_API_KEY" => "openrouter".to_string(),
                 _ => provider.to_ascii_lowercase().replace(' ', "-"),
             });
@@ -2257,27 +1856,6 @@ impl App {
                                 )
                             }
                         })()
-                    } else if key_name == crate::subscription_catalog::NEXT_CODE_API_KEY_ENV {
-                        (|| {
-                            let mut content = format!("{}={}\n", key_name, key);
-                            if let Some(base) = crate::subscription_catalog::configured_api_base() {
-                                content.push_str(&format!(
-                                    "{}={}\n",
-                                    crate::subscription_catalog::NEXT_CODE_API_BASE_ENV,
-                                    base
-                                ));
-                            }
-
-                            let config_dir = crate::storage::app_config_dir()?;
-                            std::fs::create_dir_all(&config_dir)?;
-                            crate::platform::set_directory_permissions_owner_only(&config_dir)?;
-
-                            let file_path = config_dir.join(&env_file);
-                            std::fs::write(&file_path, content)?;
-                            crate::platform::set_permissions_owner_only(&file_path)?;
-                            crate::env::set_var(&key_name, &key);
-                            Ok(())
-                        })()
                     } else if key_name == crate::provider::bedrock::API_KEY_ENV {
                         (|| {
                             Self::save_named_api_key(&env_file, &key_name, &key)?;
@@ -2331,13 +1909,7 @@ impl App {
                         let model_hint = effective_default_model
                             .map(|m| format!("\nSuggested default model: {}", m))
                             .unwrap_or_default();
-                        let guidance = if key_name == crate::subscription_catalog::NEXT_CODE_API_KEY_ENV
-                        {
-                            format!(
-                                "Use /login next-code to access curated models via your router. If the model list looks stale, run /refresh-model-list.\nDocs: {}",
-                                docs_url
-                            )
-                        } else if let Some(resolved) = resolved_openai_compatible.as_ref() {
+                        let guidance = if let Some(resolved) = resolved_openai_compatible.as_ref() {
                             if resolved.requires_api_key {
                                 "Fetching models now. Next Code will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes. If the model list looks stale, run /refresh-model-list.".to_string()
                             } else {

@@ -30,7 +30,7 @@ impl KeySource {
 }
 
 /// A key binding discovered on the machine that may intercept input before it
-/// reaches next-code.
+/// reaches next_code.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscoveredBinding {
     /// The normalized chord this binding triggers on.

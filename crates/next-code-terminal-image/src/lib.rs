@@ -1,4 +1,4 @@
-//! Low-level terminal image primitives for next-code.
+//! Low-level terminal image primitives for next_code.
 //!
 //! This crate has no dependency on the rest of next-code; it provides:
 //! - [`display`]: terminal image rendering (Kitty / iTerm2 / Sixel) with a

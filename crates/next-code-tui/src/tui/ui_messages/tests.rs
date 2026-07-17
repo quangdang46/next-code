@@ -1854,7 +1854,7 @@ fn first_discovery_message(content: &str, input: serde_json::Value) -> DisplayMe
 #[test]
 fn render_tool_message_shows_discovery_browse_results_and_rationale() {
     let msg = first_discovery_message(
-        "Discoverable tools in 'payments' (Next Code tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`",
+        "Discoverable tools in 'payments' (Next Code tool directory; recommendations must be based only on fit; details: ):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=next-code-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`",
         serde_json::json!({
             "action": "browse",
             "category": "payments",
@@ -1878,7 +1878,7 @@ fn render_tool_message_shows_discovery_browse_results_and_rationale() {
         "{plain}"
     );
     assert!(
-        without_whitespace(&plain).contains("Learnmore:https://jcode.sh/discovery-tools"),
+        without_whitespace(&plain).contains("Learnmore:"),
         "{plain}"
     );
     assert!(!plain.contains("sponsored result"), "{plain}");
@@ -1907,7 +1907,7 @@ fn render_tool_message_shows_discovery_browse_results_and_rationale() {
 fn batched_discovery_renders_first_use_disclosure_inline_once() {
     let msg = DisplayMessage {
         role: "tool".to_string(),
-        content: "--- [1] discover_tools ---\nDiscoverable tools in 'payments' (Next Code tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`\n\nCompleted: 1 succeeded, 0 failed".to_string(),
+        content: "--- [1] discover_tools ---\nDiscoverable tools in 'payments' (Next Code tool directory; recommendations must be based only on fit; details: ):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=next-code-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`\n\nCompleted: 1 succeeded, 0 failed".to_string(),
         tool_calls: Vec::new(),
         duration_secs: None,
         title: Some(crate::sponsors::DISCOVERY_DISCLOSURE_TAG.to_string()),
@@ -1956,7 +1956,7 @@ fn batched_discovery_renders_first_use_disclosure_inline_once() {
 #[test]
 fn render_tool_message_shows_selected_discovery_setup() {
     let msg = discovery_message(
-        "Selected 'agentcard' from 'payments' (Next Code tool directory; selection must be based only on fit; details: https://jcode.sh/discovery-tools):\n\nagentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nSetup: Run `npx -y agentcard-mcp@1.2.3`, then connect the resulting MCP server.\n\nConsequential actions (signups, spending) must note the partnership in the confirmation shown to the user.",
+        "Selected 'agentcard' from 'payments' (Next Code tool directory; selection must be based only on fit; details: ):\n\nagentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=next-code-discovery)\n\nSetup: Run `npx -y agentcard-mcp@1.2.3`, then connect the resulting MCP server.\n\nConsequential actions (signups, spending) must note the partnership in the confirmation shown to the user.",
         serde_json::json!({
             "action": "select",
             "category": "payments",

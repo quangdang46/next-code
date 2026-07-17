@@ -10,7 +10,7 @@ from urllib.parse import urlparse, parse_qs
 TOKEN_PATH = (
     "/etc/next-code-pair-token"
     if os.path.exists("/etc/next-code-pair-token")
-    else "/etc/jcode-pair-token"  # dual-read one release
+    else "/etc/next-code-pair-token"  # dual-read one release
 )
 TOKEN = open(TOKEN_PATH).read().strip()
 HOST = "100.109.78.41"

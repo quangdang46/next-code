@@ -79,12 +79,11 @@ pub mod soft_interrupt_store;
 pub mod sponsors;
 pub mod stdin_detect;
 pub mod storage;
-pub mod subscription_api;
-pub mod subscription_catalog;
 pub mod telegram;
 pub mod telemetry {
-    pub use next_code_telemetry_core::*;
+    pub use crate::telemetry_stub::*;
 }
+mod telemetry_stub;
 pub mod terminal_launch;
 pub mod todo;
 pub mod transport;

@@ -318,7 +318,7 @@ fn append_endorsed_skills(output: &mut String, installed: &std::collections::Has
         return;
     }
 
-    output.push_str("\nEndorsed skills (recommended by next-code)\n");
+    output.push_str("\nEndorsed skills (recommended by next_code)\n");
 
     // Group by category, preserving first-seen order.
     let mut category_order: Vec<&str> = Vec::new();

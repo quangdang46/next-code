@@ -1594,7 +1594,7 @@ fn build_skills_report(app: &App) -> String {
                 .map(|s| s.name.clone())
                 .collect()
         };
-    out.push_str("\nEndorsed skills (recommended by next-code)\n");
+    out.push_str("\nEndorsed skills (recommended by next_code)\n");
     // Group by category, preserving first-seen category order.
     let mut category_order: Vec<&str> = Vec::new();
     for endorsed in crate::skill::endorsed_skills() {

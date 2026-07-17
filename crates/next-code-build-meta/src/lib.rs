@@ -1,4 +1,4 @@
-//! Compile-time build/version metadata for next-code.
+//! Compile-time build/version metadata for next_code.
 //!
 //! The build script (`build.rs`) computes git- and version-derived values and
 //! emits them via `cargo:rustc-env`. This module re-exposes them as `pub const`

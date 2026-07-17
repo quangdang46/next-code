@@ -799,32 +799,21 @@ pub struct AutoReviewConfig {
     pub model: Option<String>,
 }
 
-/// Tool partner discovery configuration.
-///
-/// Partner discovery makes third-party developer tools discoverable to the
-/// agent via a `discover_tools` tool backed by a hosted directory. Some
-/// partners may share revenue with NextCode when a referred user becomes a
-/// customer, but partnership status never influences recommendations. Each
-/// session's first use of `discover_tools` shows a concise disclosure with a
-/// learn-more link.
-/// See <https://jcode.sh/discovery-tools>.
+/// Tool partner discovery configuration (disabled in open-source builds).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SponsorsConfig {
-    /// Enable tool partner discovery. Enabled by default; set to false to opt
-    /// out. When false, no discovery categories are added to the prompt, the
-    /// `discover_tools` tool is not registered, and next-code never contacts the
-    /// discovery endpoint.
+    /// Enable tool partner discovery. Disabled by default in open-source builds.
     pub enabled: bool,
-    /// Base URL of the discovery endpoint.
+    /// Base URL of the discovery endpoint (unused when disabled).
     pub endpoint: String,
 }
 
 impl Default for SponsorsConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
-            endpoint: "https://api.jcode.sh/v1/discovery".to_string(),
+            enabled: false,
+            endpoint: String::new(),
         }
     }
 }

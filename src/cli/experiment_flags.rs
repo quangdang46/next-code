@@ -49,7 +49,7 @@ pub fn run_experiment_enable_command(key: &str) -> Result<()> {
     config.experiments.entries.insert(key.to_string(), true);
     config.save().context("Failed to save config")?;
     crate::config::invalidate_config_cache();
-    eprintln!("[next-code] Experiment '{key}' enabled.");
+    eprintln!("[next_code] Experiment '{key}' enabled.");
     Ok(())
 }
 
@@ -63,7 +63,7 @@ pub fn run_experiment_disable_command(key: &str) -> Result<()> {
     config.experiments.entries.insert(key.to_string(), false);
     config.save().context("Failed to save config")?;
     crate::config::invalidate_config_cache();
-    eprintln!("[next-code] Experiment '{key}' disabled.");
+    eprintln!("[next_code] Experiment '{key}' disabled.");
     Ok(())
 }
 

@@ -775,7 +775,7 @@ rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs && echo "FAIL: b
 3. Restored `ui_prepare.rs` from HEAD (duplicate-fn concat), re-applied upstream swarm-card inject + cache signature
 4. `SwarmInfo` fields: `managed_members`, `selected`, `focused`, `plan_progress`, `spinner_frame`
 5. `process_memory.rs` take upstream retention-trim APIs
-6. Deduped `apply_inline_interactive_filter` onto `jcode_fuzzy::fuzzy_score_tokens`
+6. Deduped `apply_inline_interactive_filter` onto `next_code_fuzzy::fuzzy_score_tokens`
 7. Skill invocation tests updated for `SkillInvocation` + trailing prompt
 
 **Post-merge MUST-check**:

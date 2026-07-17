@@ -12,7 +12,6 @@ mod conversation_search;
 #[cfg(feature = "dcp")]
 mod dcp_compress;
 mod debug_socket;
-mod discover;
 mod edit;
 mod ffs_engine_tools;
 mod ffs_glob;
@@ -757,16 +756,6 @@ impl Registry {
             "conversation_search",
             conversation_search::ConversationSearchTool::new(compaction),
         );
-        // Sponsored discovery is on by default (opt-out); when disabled the
-        // tool is never registered and no discovery endpoint is ever
-        // contacted.
-        if crate::config::config().sponsors.enabled {
-            Self::insert_tool(
-                &mut tools_map,
-                "discover_tools",
-                discover::DiscoverToolsTool::new(),
-            );
-        }
         let session_tools_ms = session_tools_start.elapsed().as_millis();
 
         let write_start = std::time::Instant::now();

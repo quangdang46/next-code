@@ -2053,7 +2053,7 @@ fn install_kde_launch_hotkeys() -> Result<bool> {
 /// Write one executable launch script per resolved hotkey to
 /// `~/.next-code/hotkey/` and return the chord -> script binds. The scripts `cd`
 /// into the target (with `$HOME` fallback for stale/dynamic dirs) and exec the
-/// user's terminal running next-code, so compositor bind lines stay trivial.
+/// user's terminal running next_code, so compositor bind lines stay trivial.
 #[cfg(target_os = "linux")]
 fn write_linux_launch_scripts() -> Result<Vec<linux_env::ScriptBind>> {
     let hotkey_dir = mac_hotkey_support_dir()?;
@@ -2445,7 +2445,7 @@ pub fn run_setup_launcher() -> Result<()> {
         eprintln!();
         match create_windows_desktop_shortcut(&mut state) {
             Ok(()) => {
-                eprintln!("  \x1b[32m✓\x1b[0m Created desktop shortcut: next-code.lnk");
+                eprintln!("  \x1b[32m✓\x1b[0m Created desktop shortcut: next_code.lnk");
                 return Ok(());
             }
             Err(e) => {
@@ -2462,9 +2462,9 @@ pub fn run_setup_launcher() -> Result<()> {
     }
 }
 
-/// Create a desktop shortcut/launcher for next-code.
+/// Create a desktop shortcut/launcher for next_code.
 ///
-/// - macOS: creates a next-code.app bundle in ~/Applications/
+/// - macOS: creates a next_code.app bundle in ~/Applications/
 /// - Windows uses [`windows_setup::create_windows_desktop_shortcut`] via
 ///   `next-code setup-launcher` instead (PowerShell/COM is too slow for the
 ///   startup path).

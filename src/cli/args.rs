@@ -246,12 +246,6 @@ pub(crate) enum Command {
         api_key_env: Option<String>,
     },
 
-    /// Log in to and manage your Next Code account
-    Account {
-        #[command(subcommand)]
-        action: AccountCommand,
-    },
-
     /// Run in simple REPL mode (no TUI)
     Repl,
 
@@ -586,26 +580,6 @@ pub(crate) enum Command {
     /// No npm, no registry, no marketplace.
     #[command(subcommand)]
     Plugin(PluginSubcommand),
-}
-
-#[derive(Subcommand, Debug)]
-pub(crate) enum AccountCommand {
-    /// Open browser-based device authorization and wait for plan activation
-    Login {
-        /// Do not open a browser automatically; print the public approval URL instead
-        #[arg(long, alias = "headless")]
-        no_browser: bool,
-    },
-    /// Show canonical account, plan, and usage status from /v1/me
-    Status {
-        /// Emit JSON instead of human-readable output
-        #[arg(long)]
-        json: bool,
-    },
-    /// Open the public Next Code account management page
-    Manage,
-    /// Revoke the current key when reachable, then securely clear local state
-    Logout,
 }
 
 #[derive(Subcommand, Debug)]

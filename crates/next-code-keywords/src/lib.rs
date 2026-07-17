@@ -1,4 +1,4 @@
-//! Magic keyword system for next-code.
+//! Magic keyword system for next_code.
 //!
 //! Detects keyword triggers in user input (default: **Strict** `$keyword` /
 //! token aliases), manages persistent mode state, builds prompt injections,

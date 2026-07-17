@@ -740,7 +740,7 @@ mod tests {
     }
 
     #[test]
-    fn cleanup_removes_only_old_jcode_logs() {
+    fn cleanup_removes_only_old_next_code_logs() {
         use std::time::{Duration, SystemTime};
 
         let dir = std::env::temp_dir().join(format!(

@@ -42,7 +42,7 @@ fn pair_conflict(a: WorkflowKind, b: WorkflowKind) -> Option<Conflict> {
         (Cancel, other) | (other, Cancel) if other != Cancel => Some(Conflict {
             a: Cancel,
             b: other,
-            reason: "canceljcode will deactivate all other modes",
+            reason: "cancelnext will deactivate all other modes",
         }),
         // deep-interview + ultrawork: interview needs user interaction, ultrawork is autonomous
         (DeepInterview, Ultrawork) | (Ultrawork, DeepInterview) => Some(Conflict {

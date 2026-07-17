@@ -1,7 +1,7 @@
 //! Import Claude Code sessions into next-code
 //!
 //! This module handles discovering, parsing, and converting Claude Code sessions
-//! so they can be resumed within next-code.
+//! so they can be resumed within next_code.
 
 use crate::message::{ContentBlock, Role};
 use crate::session::{Session, SessionStatus, StoredMessage};

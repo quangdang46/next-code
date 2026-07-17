@@ -2,7 +2,7 @@
 //!
 //! Hooks are external commands that next-code runs at well-defined lifecycle
 //! points so other programs can observe or gate agent behavior without
-//! forking next-code. They are configured in `[hooks]` in config.toml (or
+//! forking next_code. They are configured in `[hooks]` in config.toml (or
 //! `NEXT_CODE_HOOK_*` env vars) and follow the same command-line conventions as
 //! `[terminal] spawn_hook`: the command is parsed shell-style but executed
 //! directly (no shell), with `NEXT_CODE_HOOK_*` metadata env vars describing the

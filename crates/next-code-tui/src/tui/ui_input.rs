@@ -744,7 +744,7 @@ pub(super) fn draw_status(frame: &mut Frame, app: &dyn TuiState, area: Rect, pen
                     format!("✨ {}", labels.join(" · ")),
                     Style::default().fg(chip_color),
                 ));
-                spans.push(Span::styled(" (canceljcode)", Style::default().fg(dimmed)));
+                spans.push(Span::styled(" (cancelnext)", Style::default().fg(dimmed)));
             }
         }
         spans

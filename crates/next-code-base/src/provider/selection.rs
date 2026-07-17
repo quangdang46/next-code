@@ -107,7 +107,6 @@ impl MultiProvider {
             LoginProviderTarget::Gemini => Some("gemini"),
             LoginProviderTarget::Antigravity => Some("antigravity"),
             LoginProviderTarget::AutoImport
-            | LoginProviderTarget::NextCode
             | LoginProviderTarget::Azure
             | LoginProviderTarget::Google => None,
         }

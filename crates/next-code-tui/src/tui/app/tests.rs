@@ -721,7 +721,7 @@ fn skills_command_lists_loaded_and_endorsed_skills() {
 
     assert!(content.contains("Loaded skills"), "{content}");
     assert!(
-        content.contains("Endorsed skills (recommended by next-code)"),
+        content.contains("Endorsed skills (recommended by next_code)"),
         "{content}"
     );
     // Every endorsed skill should appear with an install status marker.

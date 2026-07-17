@@ -61,7 +61,7 @@ public enum PairURI {
     public static func parse(_ string: String) -> Payload? {
         guard let components = URLComponents(string: string),
             let scheme = components.scheme?.lowercased(),
-            scheme == "nextcode" || scheme == "jcode", // dual-read legacy nextcode://
+            scheme == "nextcode" || scheme == "next-code", // dual-read legacy nextcode://
             components.host == "pair" || components.path == "pair"
                 || components.host == nil && components.path == "/pair"
         else { return nil }

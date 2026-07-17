@@ -245,7 +245,7 @@ profile = "full"
 disable_base_tools = false
 
 [keywords]
-# Magic keyword / sticky mode workflows ($ultrawork, $ultraqa, canceljcode, …).
+# Magic keyword / sticky mode workflows ($ultrawork, $ultraqa, cancelnext, …).
 # match_mode = "strict"  # default: only $keyword + single-token aliases (ulw, uw)
 # match_mode = "loose"   # also multi-word phrases ("work on", "think hard", …)
 # Override with env: NEXT_CODE_KEYWORDS_MATCH_MODE, NEXT_CODE_KEYWORDS_ENABLED
@@ -603,9 +603,9 @@ desktop_notifications = true
 # share revenue with Next Code when a referred user becomes a customer, but
 # partnership status never influences recommendations. Each session's first
 # use of discover_tools shows a concise disclosure with a learn-more link.
-# See https://jcode.sh/discovery-tools
+# Sponsored discovery disabled in open-source builds.
 # enabled = true
-# endpoint = "https://api.jcode.sh/v1/discovery"
+# endpoint = ""
 	"#;
 
         // Substitute platform-specific defaults from the keybinding registry.

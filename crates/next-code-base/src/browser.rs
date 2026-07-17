@@ -613,7 +613,7 @@ fn install_native_host_manifest() -> Result<bool> {
 
     let manifest = serde_json::json!({
         "name": NATIVE_HOST_NAME,
-        "description": "Native host for Firefox Agent Bridge (managed by next-code)",
+        "description": "Native host for Firefox Agent Bridge (managed by next_code)",
         "path": effective_host,
         "type": "stdio",
         "allowed_extensions": [

@@ -1,17 +1,18 @@
-//! `/support` command: gather diagnostics and open a prefilled support email.
+//! `/support` command: gather diagnostics and open a GitHub issue draft.
 //!
 //! The diagnostics builder is a pure function over [`SupportDiagnostics`] so it
-//! can be unit-tested without an `App`. The command opens a `mailto:` URL via
+//! can be unit-tested without an `App`. The command opens the repo issues URL via
 //! the shared detached opener (which honors NO_BROWSER and test suppression)
-//! and always prints the full email text in the TUI as a fallback for
-//! terminals that cannot open mailto links.
+//! and always prints the full diagnostics text in the TUI as a fallback for
+//! terminals that cannot open a browser.
 
 use super::{App, DisplayMessage};
 
-pub(super) const SUPPORT_EMAIL: &str = "support@jcode.sh";
+pub(super) const SUPPORT_ISSUES_URL: &str =
+    "https://github.com/quangdang46/next-code/issues/new";
 pub(super) const SUPPORT_SUBJECT: &str = "next-code support";
 
-/// Everything the support email body needs. Pure data so the body builder is
+/// Everything the support body needs. Pure data so the body builder is
 /// trivially testable.
 #[derive(Debug, Clone, Default)]
 pub(super) struct SupportDiagnostics {
@@ -29,7 +30,7 @@ pub(super) struct SupportDiagnostics {
     pub last_error: Option<String>,
 }
 
-/// Build the plain-text email body from diagnostics. Pure function.
+/// Build the plain-text issue body from diagnostics. Pure function.
 pub(super) fn build_support_body(d: &SupportDiagnostics) -> String {
     let mut body = String::from("Describe your issue:\n\n\n");
     body.push_str("--- Diagnostics (auto-generated) ---\n");
@@ -57,11 +58,11 @@ pub(super) fn build_support_body(d: &SupportDiagnostics) -> String {
     body
 }
 
-/// Build the `mailto:` URL with subject and body URL-encoded.
-pub(super) fn build_mailto_url(body: &str) -> String {
+/// Build a GitHub "new issue" URL with title and body query params.
+pub(super) fn build_support_url(body: &str) -> String {
     format!(
-        "mailto:{}?subject={}&body={}",
-        SUPPORT_EMAIL,
+        "{}?title={}&body={}",
+        SUPPORT_ISSUES_URL,
         urlencoding::encode(SUPPORT_SUBJECT),
         urlencoding::encode(body)
     )
@@ -96,22 +97,8 @@ fn read_telemetry_id() -> Option<String> {
 }
 
 fn gather_diagnostics(app: &App) -> SupportDiagnostics {
-    use crate::provider_catalog::load_env_value_from_env_or_config;
-    use crate::subscription_catalog as cat;
-
-    // Account identity is only present when a next-code subscription is
-    // configured; skip gracefully otherwise.
-    let has_subscription = cat::has_credentials();
-    let (account_id, account_email, tier) = if has_subscription {
-        (
-            load_env_value_from_env_or_config(cat::NEXT_CODE_ACCOUNT_ID_ENV, cat::NEXT_CODE_ENV_FILE),
-            load_env_value_from_env_or_config(cat::NEXT_CODE_ACCOUNT_EMAIL_ENV, cat::NEXT_CODE_ENV_FILE),
-            cat::cached_tier().map(|t| t.display_name().to_string()),
-        )
-    } else {
-        (None, None, None)
-    };
-
+    // Subscription account identity was removed with the hosted Next Code
+    // commercial provider; leave those fields empty for open-source builds.
     let last_error = app
         .display_messages
         .iter()
@@ -133,9 +120,9 @@ fn gather_diagnostics(app: &App) -> SupportDiagnostics {
         os: std::env::consts::OS.to_string(),
         arch: std::env::consts::ARCH.to_string(),
         telemetry_id: read_telemetry_id(),
-        account_id,
-        account_email,
-        tier,
+        account_id: None,
+        account_email: None,
+        tier: None,
         provider: app.provider_name().to_string(),
         model: app.provider_model(),
         last_error,
@@ -149,25 +136,26 @@ pub(super) fn handle_support_command(app: &mut App, trimmed: &str) -> bool {
 
     let diagnostics = gather_diagnostics(app);
     let body = build_support_body(&diagnostics);
-    let mailto = build_mailto_url(&body);
-    let opened = super::helpers::open_path_or_url_detached(&mailto).is_ok();
+    let url = build_support_url(&body);
+    let opened = super::helpers::open_path_or_url_detached(&url).is_ok();
 
     let mut message = String::new();
     if opened {
-        message.push_str("Opened a support email draft in your mail client.\n\n");
+        message.push_str("Opened a GitHub issue draft in your browser.\n\n");
     } else {
-        message
-            .push_str("Could not open your mail client automatically. Copy the email below.\n\n");
+        message.push_str(
+            "Could not open your browser automatically. Copy the diagnostics below into a new GitHub issue.\n\n",
+        );
     }
-    message.push_str(&format!("To: {}\n", SUPPORT_EMAIL));
-    message.push_str(&format!("Subject: {}\n\n", SUPPORT_SUBJECT));
+    message.push_str(&format!("Issues: {}\n", SUPPORT_ISSUES_URL));
+    message.push_str(&format!("Title: {}\n\n", SUPPORT_SUBJECT));
     message.push_str(&body);
 
     app.push_display_message(DisplayMessage::system(message).with_title("Support"));
     app.set_status_notice(if opened {
-        "Support email draft opened"
+        "GitHub issue draft opened"
     } else {
-        "Support email printed below"
+        "Support diagnostics printed below"
     });
     true
 }
@@ -231,9 +219,11 @@ mod tests {
     }
 
     #[test]
-    fn support_mailto_url_is_correctly_encoded() {
-        let url = build_mailto_url("Describe your issue:\n\nVersion: v1 (abc)");
-        assert!(url.starts_with("mailto:support@jcode.sh?subject=next-code%20support&body="));
+    fn support_url_is_correctly_encoded() {
+        let url = build_support_url("Describe your issue:\n\nVersion: v1 (abc)");
+        assert!(url.starts_with(
+            "https://github.com/quangdang46/next-code/issues/new?title=next-code%20support&body="
+        ));
         // Newlines, spaces, colons, and parens must be percent-encoded.
         assert!(url.contains("Describe%20your%20issue%3A%0A%0AVersion%3A%20v1%20%28abc%29"));
         assert!(!url.contains(' '));

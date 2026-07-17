@@ -286,14 +286,14 @@ impl Experiments {
             match spec.stage {
                 Stage::UnderDevelopment => {
                     eprintln!(
-                        "[next-code] WARNING: UnderDevelopment flag '{}' is enabled. \
+                        "[next_code] WARNING: UnderDevelopment flag '{}' is enabled. \
                          This feature is not ready for production use.",
                         spec.key
                     );
                 }
                 Stage::Deprecated { migration_hint } => {
                     eprintln!(
-                        "[next-code] NOTICE: Deprecated flag '{}' is enabled. {}",
+                        "[next_code] NOTICE: Deprecated flag '{}' is enabled. {}",
                         spec.key, migration_hint
                     );
                 }

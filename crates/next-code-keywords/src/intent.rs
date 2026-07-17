@@ -74,7 +74,7 @@ mod tests {
     fn cancel_always_wins() {
         let detections = vec![
             make_detection("$ultrawork", WorkflowKind::Ultrawork, 10, (0, 10)),
-            make_detection("canceljcode", WorkflowKind::Cancel, 9, (11, 22)),
+            make_detection("cancelnext", WorkflowKind::Cancel, 9, (11, 22)),
         ];
         let result = disambiguate(detections);
         assert!(

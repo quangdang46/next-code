@@ -59,7 +59,7 @@ impl SelfDevTool {
     pub(super) async fn do_setup(&self, ctx: &ToolContext) -> Result<ToolOutput> {
         let mut checks: Vec<SetupCheck> = Vec::new();
 
-        // Rust toolchain: cargo + rustc are required to build next-code.
+        // Rust toolchain: cargo + rustc are required to build next_code.
         match command_version("cargo", &["--version"]) {
             Some(version) => checks.push(SetupCheck::ok("cargo", version)),
             None => checks.push(SetupCheck::missing(
@@ -174,7 +174,7 @@ impl SelfDevTool {
             }
         } else {
             output.push_str(
-                "\nAll prerequisites satisfied. Use `selfdev enter` to start working on next-code.\n",
+                "\nAll prerequisites satisfied. Use `selfdev enter` to start working on next_code.\n",
             );
         }
 

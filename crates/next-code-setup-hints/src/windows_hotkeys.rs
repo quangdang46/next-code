@@ -285,9 +285,9 @@ mod tests {
     fn args_for(entry: &WindowsHotkey) -> String {
         let hotkey = entry.chord.canonical();
         if entry.self_dev {
-            format!(r#"-e "C:\next-code.exe" --spawn-hotkey "{hotkey}" self-dev"#)
+            format!(r#"-e "C:\next_code.exe" --spawn-hotkey "{hotkey}" self-dev"#)
         } else {
-            format!(r#"-e "C:\next-code.exe" --spawn-hotkey "{hotkey}""#)
+            format!(r#"-e "C:\next_code.exe" --spawn-hotkey "{hotkey}""#)
         }
     }
 

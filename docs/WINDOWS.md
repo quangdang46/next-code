@@ -46,7 +46,7 @@ next-code can also offer these options interactively after launch.
 - Launcher: `%LOCALAPPDATA%\next-code\bin\next-code.exe`
 - Stable binary: `%LOCALAPPDATA%\next-code\builds\stable\next-code.exe`
 - Versioned binary: `%LOCALAPPDATA%\next-code\builds\versions\<version>\next-code.exe`
-- User data and configuration: `%USERPROFILE%\.next-code` (legacy `%USERPROFILE%\.jcode` dual-read/migrate)
+- User data and configuration: `%USERPROFILE%\.next-code` (legacy `%USERPROFILE%\.next-code` dual-read/migrate)
 - Compat launcher (one release): `%LOCALAPPDATA%\next-code\bin\next-code.exe` → `next-code.exe`
 
 ### Verify an installation

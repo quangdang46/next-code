@@ -18,8 +18,7 @@ use crate::{
 };
 
 use super::{
-    account, acp, commands, debug, hot_exec, login, output, provider_init, selfdev, terminal,
-    tui_launch,
+    acp, commands, debug, hot_exec, login, output, provider_init, selfdev, terminal, tui_launch,
 };
 use provider_init::ProviderChoice;
 
@@ -207,14 +206,6 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             )
             .await?;
         }
-        Some(Command::Account { action }) => match action {
-            super::args::AccountCommand::Login { no_browser } => {
-                account::run_login(no_browser).await?
-            }
-            super::args::AccountCommand::Status { json } => account::run_status(json).await?,
-            super::args::AccountCommand::Manage => account::run_manage()?,
-            super::args::AccountCommand::Logout => account::run_logout().await?,
-        },
         Some(Command::Repl) => {
             // Try catalog-backed RouteProvider first when the provider string
             // is not a recognized ProviderChoice alias.

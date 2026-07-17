@@ -187,9 +187,6 @@ fn test_mask_email_censors_local_part() {
 #[test]
 fn test_subscription_command_shows_next_code_status_scaffold() {
     let _guard = crate::storage::lock_test_env();
-    crate::subscription_catalog::clear_runtime_env();
-    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV);
-    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_API_BASE_ENV);
 
     let mut app = create_test_app();
     app.input = "/subscription".to_string();

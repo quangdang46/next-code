@@ -86,7 +86,6 @@ next-code-provider-gemini = { path = "../next-code-provider-gemini" }
 next-code-render-core = { path = "../next-code-render-core" }
 next-code-terminal-launch = { path = "../next-code-terminal-launch" }
 next-code-terminal-image = { path = "../next-code-terminal-image" }
-next-code-telemetry-core = { path = "../next-code-telemetry-core" }
 next-code-usage-types = { path = "../next-code-usage-types" }
 
 # Streaming

@@ -132,7 +132,7 @@ const CALLBACK_READ_TIMEOUT_SECS: u64 = 5;
 
 fn bad_request_response(message: &str) -> String {
     let body = format!(
-        "<html><body><h1>Authentication not completed</h1><p>{}</p><p>You can close this tab and return to next-code.</p></body></html>",
+        "<html><body><h1>Authentication not completed</h1><p>{}</p><p>You can close this tab and return to next_code.</p></body></html>",
         message
     );
     format!(
@@ -419,7 +419,7 @@ pub async fn wait_for_callback_async_on_listener(
             continue;
         }
 
-        let body = "<html><body><h1>Success!</h1><p>You can close this window and return to next-code.</p></body></html>";
+        let body = "<html><body><h1>Success!</h1><p>You can close this window and return to next_code.</p></body></html>";
         let response = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
             body.len(),

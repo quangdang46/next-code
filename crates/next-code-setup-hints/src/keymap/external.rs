@@ -1,5 +1,5 @@
 //! Discover global key bindings declared by third-party apps that grab hotkeys
-//! *before* the terminal (and therefore next-code) ever sees them.
+//! *before* the terminal (and therefore next_code) ever sees them.
 //!
 //! macOS lets window managers and automation tools register system-wide hotkeys.
 //! When one of those overlaps a key next-code wants (the classic case is a tiling WM

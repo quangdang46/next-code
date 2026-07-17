@@ -497,25 +497,6 @@ pub const AUTO_IMPORT_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDes
     order: LoginProviderSurfaceOrder::new(Some(1), Some(1), None, None, None),
 };
 
-pub const NEXT_CODE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
-    id: "next-code",
-    display_name: "Next Code",
-    auth_kind: LoginProviderAuthKind::ApiKey,
-    auth_state_key: LoginProviderAuthStateKey::NextCode,
-    auth_status_method: "API key",
-    aliases: &[
-        "next-code",
-        "subscription",
-        "next-code-subscription",
-        "next-code-subscription",
-    ],
-    menu_detail: "curated next-code subscription models",
-    recommended: false,
-    target: LoginProviderTarget::NextCode,
-    order: LoginProviderSurfaceOrder::new(Some(3), Some(3), Some(3), Some(3), Some(3)),
-};
-
-
 pub const OPENAI_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
     id: "openai",
     display_name: "OpenAI",
@@ -1091,13 +1072,12 @@ pub const GOOGLE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescript
     order: LoginProviderSurfaceOrder::new(Some(13), None, None, None, None),
 };
 
-pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 47] = [
+pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 46] = [
     AUTO_IMPORT_LOGIN_PROVIDER,
     CLAUDE_LOGIN_PROVIDER,
     ANTHROPIC_API_LOGIN_PROVIDER,
     OPENAI_LOGIN_PROVIDER,
     OPENAI_API_LOGIN_PROVIDER,
-    NEXT_CODE_LOGIN_PROVIDER,
     OPENROUTER_LOGIN_PROVIDER,
     BEDROCK_LOGIN_PROVIDER,
     AZURE_LOGIN_PROVIDER,

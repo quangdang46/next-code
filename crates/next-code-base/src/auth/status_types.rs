@@ -12,8 +12,6 @@ use serde::Serialize;
 /// the canonical provider auth contract (`ProviderAuthAssessment`).
 #[derive(Debug, Clone, Default)]
 pub struct AuthStatus {
-    /// Next Code subscription router credentials
-    pub next_code: AuthState,
     /// Anthropic provider (Claude models) - via OAuth or API key
     pub anthropic: ProviderAuth,
     /// OpenRouter provider - via API key

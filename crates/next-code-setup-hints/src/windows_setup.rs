@@ -501,10 +501,10 @@ fn prompt_try_it_out(installed_alacritty: bool) {
         "\x1b[32m│\x1b[0m                                                             \x1b[32m│\x1b[0m"
     );
     eprintln!(
-        "\x1b[32m│\x1b[0m    Press \x1b[1mAlt+;\x1b[0m from anywhere to launch next-code.                \x1b[32m│\x1b[0m"
+        "\x1b[32m│\x1b[0m    Press \x1b[1mAlt+;\x1b[0m from anywhere to launch next_code.                \x1b[32m│\x1b[0m"
     );
     eprintln!(
-        "\x1b[32m│\x1b[0m    Inside next-code, \x1b[1mAlt+Shift+;\x1b[0m opens a new session here.      \x1b[32m│\x1b[0m"
+        "\x1b[32m│\x1b[0m    Inside next_code, \x1b[1mAlt+Shift+;\x1b[0m opens a new session here.      \x1b[32m│\x1b[0m"
     );
     if installed_alacritty {
         eprintln!(
@@ -633,7 +633,7 @@ pub(super) fn run_setup_hotkey_windows() -> Result<()> {
     };
 
     eprintln!(
-        "  Setting up global launch hotkeys → {} + next-code...",
+        "  Setting up global launch hotkeys → {} + next_code...",
         terminal_name
     );
 
@@ -680,7 +680,7 @@ pub(super) fn create_windows_desktop_shortcut(state: &mut SetupHintsState) -> Re
     };
 
     let desktop_dir = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Default".into());
-    let shortcut_path = format!("{}\\Desktop\\next-code.lnk", desktop_dir);
+    let shortcut_path = format!("{}\\Desktop\\next_code.lnk", desktop_dir);
 
     let ps_script = format!(
         r#"

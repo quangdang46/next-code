@@ -105,7 +105,6 @@ impl TuiPluginSystem {
     }
 
     /// Forward a key event to every loaded plugin. Returns `true` if any
-    /// plugin handled the key (i.e. its handler set `__nextcode_result.handled` (dual-read: `__jcode_result.handled`)).
     pub async fn handle_key(&self, key: &str) -> bool {
         for plugin in self.plugins.values() {
             if self.invoke_keybinding(plugin, key).await {
@@ -307,7 +306,6 @@ impl TuiPluginSystem {
         let api_ref = &api;
         let js_code_ref = js_code.as_str();
         context.with(|ctx| -> Result<(), PluginError> {
-            // Install globalThis.__nextcode_tui_pi (dual-read: __jcode_tui_pi)
             api_ref
                 .install(&ctx)
                 .map_err(|e| PluginError::Runtime(format!("API install failed: {e}")))?;
@@ -344,13 +342,9 @@ impl TuiPluginSystem {
     /// event handlers by name. The handlers are stored as global functions
     /// callable from Rust later.
     ///
-    /// - `__nextcode_register_keybinding` (dual-read: `__jcode_register_keybinding`)
     ///   Stores `handlerFn` as `globalThis["__nextcode_kb_{plugin_id}_{key}"]`
-    ///   (dual-read: also `__jcode_kb_*`).
     ///
-    /// - `__nextcode_register_tui_event` (dual-read: `__jcode_register_tui_event`)
     ///   Stores `handlerFn` as `globalThis["__nextcode_evt_{plugin_id}_{event}"]`
-    ///   (dual-read: also `__jcode_evt_*`).
     fn install_handler_registration_helpers<'js>(
         ctx: &rquickjs::Ctx<'js>,
         plugin_id: &PluginId,
@@ -365,10 +359,6 @@ impl TuiPluginSystem {
             plugin_id.short_name().replace(['/', '@'], "_")
         );
         // dual-read: legacy prefix still accepted by older plugin stubs
-        let _legacy_kb_prefix = format!(
-            "__jcode_kb_{}_", // dual-read: legacy
-            plugin_id.short_name().replace(['/', '@'], "_")
-        );
         let kb_prefix_for_closure = kb_prefix.clone();
         let register_kb = Function::new(
             ctx.clone(),
@@ -392,16 +382,6 @@ impl TuiPluginSystem {
             )
             .map_err(|e| PluginError::Runtime(format!("Failed to set register_keybinding: {e}")))?;
         // dual-read: legacy plugin global
-        let register_kb_legacy = Function::new(
-            ctx.clone(),
-            |_key: String, _desc: String, handler: rquickjs::Value<'js>| {
-                let _ = handler;
-            },
-        )
-        .map_err(|e| PluginError::Runtime(format!("Failed to create legacy register_keybinding: {e}")))?;
-        globals
-            .set("__jcode_register_keybinding", register_kb_legacy) // dual-read: legacy
-            .map_err(|e| PluginError::Runtime(format!("Failed to set legacy register_keybinding: {e}")))?;
 
         // -- event handler registration helper --
         let evt_prefix = format!(
@@ -409,10 +389,6 @@ impl TuiPluginSystem {
             plugin_id.short_name().replace(['/', '@'], "_")
         );
         // dual-read: legacy prefix
-        let _legacy_evt_prefix = format!(
-            "__jcode_evt_{}_", // dual-read: legacy
-            plugin_id.short_name().replace(['/', '@'], "_")
-        );
         let evt_prefix_for_closure = evt_prefix.clone();
         let register_evt = Function::new(
             ctx.clone(),
@@ -431,22 +407,10 @@ impl TuiPluginSystem {
             .set("__nextcode_register_tui_event", register_evt)
             .map_err(|e| PluginError::Runtime(format!("Failed to set register_tui_event: {e}")))?;
         // dual-read: legacy plugin global
-        let register_evt_legacy = Function::new(
-            ctx.clone(),
-            |_event: String, handler: rquickjs::Value<'js>| {
-                let _ = handler;
-            },
-        )
-        .map_err(|e| PluginError::Runtime(format!("Failed to create legacy register_tui_event: {e}")))?;
-        globals
-            .set("__jcode_register_tui_event", register_evt_legacy) // dual-read: legacy
-            .map_err(|e| PluginError::Runtime(format!("Failed to set legacy register_tui_event: {e}")))?;
 
         // -- expose keybinding/event registration on the TUI API object --
-        // Patch __nextcode_tui_pi / dual-read __jcode_tui_pi keymap.register and eventBus.on
         // to also call the helper functions above.
         if let Ok(tui_obj) = globals.get::<_, Object<'js>>("__nextcode_tui_pi")
-            .or_else(|_| globals.get::<_, Object<'js>>("__jcode_tui_pi")) // dual-read: legacy
         {
             // Wrap keymap.register
             if let Ok(keymap) = tui_obj.get::<_, Object<'js>>("keymap") {
@@ -495,26 +459,19 @@ impl TuiPluginSystem {
     /// Try to invoke a keybinding handler for the given plugin.
     ///
     /// Looks for a global function named `__nextcode_kb_{plugin_id}_{key}`
-    /// (dual-read: also `__jcode_kb_*`).
     /// If found, calls it with the key string and reads
-    /// `globalThis.__nextcode_result.handled` (dual-read: `__jcode_result.handled`).
     async fn invoke_keybinding(&self, plugin: &TuiPlugin, key: &str) -> bool {
         let safe_id = plugin._id.short_name().replace(['/', '@'], "_");
         let fn_name_primary = format!("__nextcode_kb_{}_{}", safe_id, key.replace('+', "_"));
         // dual-read: legacy handler name
-        let fn_name_legacy = format!("__jcode_kb_{}_{}", safe_id, key.replace('+', "_")); // dual-read: legacy
         let key_owned = key.to_string();
 
         let result = plugin.context.with(|ctx| -> Result<bool, PluginError> {
             let globals = ctx.globals();
 
-            // Check if the handler function exists (prefer nextcode, dual-read jcode).
             let func = match globals.get::<_, rquickjs::Function<'_>>(fn_name_primary.as_str()) {
                 Ok(f) => f,
-                Err(_) => match globals.get::<_, rquickjs::Function<'_>>(fn_name_legacy.as_str()) {
-                    Ok(f) => f,
-                    Err(_) => return Ok(false), // No handler registered for this key
-                },
+                Err(_) => return Ok(false), // No handler registered
             };
 
             // Initialize the result slot (dual-read: write both names).
@@ -526,31 +483,16 @@ impl TuiPluginSystem {
             globals
                 .set("__nextcode_result", result_obj)
                 .map_err(|e| PluginError::Runtime(e.to_string()))?;
-            // dual-read: legacy plugins still set/read __jcode_result
-            let result_obj_legacy = rquickjs::Object::new(ctx.clone())
-                .map_err(|e| PluginError::Runtime(e.to_string()))?;
-            result_obj_legacy
-                .set("handled", false)
-                .map_err(|e| PluginError::Runtime(e.to_string()))?;
-            globals
-                .set("__jcode_result", result_obj_legacy) // dual-read: legacy
-                .map_err(|e| PluginError::Runtime(e.to_string()))?;
 
             // Invoke the handler.
             func.call::<_, ()>((key_owned,))
                 .map_err(|e| PluginError::Runtime(format!("Key handler error: {e}")))?;
 
-            // Read back the result (prefer nextcode, dual-read jcode).
             let handled = globals
                 .get::<_, rquickjs::Object<'_>>("__nextcode_result")
                 .ok()
                 .and_then(|o| o.get::<_, bool>("handled").ok())
-                .or_else(|| {
-                    globals
-                        .get::<_, rquickjs::Object<'_>>("__jcode_result") // dual-read: legacy
-                        .ok()
-                        .and_then(|o| o.get::<_, bool>("handled").ok())
-                })
+                
                 .unwrap_or(false);
 
             Ok(handled)
@@ -568,7 +510,6 @@ impl TuiPluginSystem {
     /// Try to invoke a TUI event handler for the given plugin.
     ///
     /// Looks for a global function named `__nextcode_evt_{plugin_id}_{event}`
-    /// (dual-read: also `__jcode_evt_*`).
     /// If found, calls it with the event data JSON and reads back the result.
     async fn invoke_event(
         &self,
@@ -579,7 +520,6 @@ impl TuiPluginSystem {
         let safe_id = plugin._id.short_name().replace(['/', '@'], "_");
         let fn_name_primary = format!("__nextcode_evt_{}_{}", safe_id, event);
         // dual-read: legacy handler name
-        let fn_name_legacy = format!("__jcode_evt_{}_{}", safe_id, event); // dual-read: legacy
         let data_str = data.to_string();
 
         let result = plugin
@@ -587,14 +527,9 @@ impl TuiPluginSystem {
             .with(|ctx| -> Result<HandlerResult, PluginError> {
                 let globals = ctx.globals();
 
-                // Check if the handler function exists (prefer nextcode, dual-read jcode).
                 let func = match globals.get::<_, rquickjs::Function<'_>>(fn_name_primary.as_str()) {
                     Ok(f) => f,
-                    Err(_) => match globals.get::<_, rquickjs::Function<'_>>(fn_name_legacy.as_str())
-                    {
-                        Ok(f) => f,
-                        Err(_) => return Ok(HandlerResult::default()), // No handler
-                    },
+                    Err(_) => return Ok(HandlerResult::default()), // No handler
                 };
 
                 // Initialize the result slot (dual-read: write both names).
@@ -613,29 +548,13 @@ impl TuiPluginSystem {
                     .set("__nextcode_result", result_obj)
                     .map_err(|e| PluginError::Runtime(e.to_string()))?;
                 // dual-read: legacy
-                let result_obj_legacy = rquickjs::Object::new(ctx.clone())
-                    .map_err(|e| PluginError::Runtime(e.to_string()))?;
-                result_obj_legacy
-                    .set("action", "continue")
-                    .map_err(|e| PluginError::Runtime(e.to_string()))?;
-                result_obj_legacy
-                    .set("output", rquickjs::Undefined)
-                    .map_err(|e| PluginError::Runtime(e.to_string()))?;
-                result_obj_legacy
-                    .set("error", rquickjs::Undefined)
-                    .map_err(|e| PluginError::Runtime(e.to_string()))?;
-                globals
-                    .set("__jcode_result", result_obj_legacy) // dual-read: legacy
-                    .map_err(|e| PluginError::Runtime(e.to_string()))?;
 
                 // Invoke the handler with the event data as a JSON string.
                 func.call::<(String,), ()>((data_str.clone(),))
                     .map_err(|e| PluginError::Runtime(format!("Event handler error: {e}")))?;
 
-                // Read back the result (prefer nextcode, dual-read jcode).
                 let result_obj = globals
                     .get::<_, rquickjs::Object<'_>>("__nextcode_result")
-                    .or_else(|_| globals.get::<_, rquickjs::Object<'_>>("__jcode_result")) // dual-read
                     .map_err(|e| PluginError::Runtime(e.to_string()))?;
 
                 let action_str: String = result_obj

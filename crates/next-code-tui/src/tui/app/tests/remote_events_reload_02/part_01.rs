@@ -817,7 +817,7 @@ fn test_swarm_completion_notification_inserts_agent_snapshot_without_report_pros
                 channel: None,
                 tldr: Some("Demo completed".to_string()),
             },
-            message: "Demo completed; README first heading is next-code.".to_string(),
+            message: "Demo completed; README first heading is next_code.".to_string(),
         },
         &mut remote,
     );

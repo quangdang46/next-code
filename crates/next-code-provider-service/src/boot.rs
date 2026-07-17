@@ -48,7 +48,7 @@ impl BuiltinProtocol {
 
 /// A canonical built-in provider. The `models` list is a curated set
 /// matching what `next-code-provider-core::models` exposes today, so the
-/// resolver's output is consistent with the rest of next-code.
+/// resolver's output is consistent with the rest of next_code.
 #[derive(Debug, Clone)]
 pub struct BuiltinProvider {
     pub id: &'static str,

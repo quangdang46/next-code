@@ -180,7 +180,7 @@ fn should_refresh_macos_app_launcher_paths(
 /// Check that `path` exists under its exact byte-for-byte file name.
 ///
 /// macOS system volumes are case-insensitive by default, so a plain
-/// `Path::exists()` on `next-code.app` also matches `Next Code.app`. The legacy-bundle
+/// `Path::exists()` on `next_code.app` also matches `Next Code.app`. The legacy-bundle
 /// check needs an exact-name match or the launcher would refresh itself on
 /// every launch once the new bundle exists.
 fn path_exists_with_exact_name(path: &Path) -> bool {

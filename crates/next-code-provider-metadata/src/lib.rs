@@ -24,7 +24,6 @@ impl LoginProviderAuthKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoginProviderTarget {
     AutoImport,
-    NextCode,
     Claude,
     ClaudeApiKey,
     OpenAi,
@@ -43,7 +42,6 @@ pub enum LoginProviderTarget {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoginProviderAuthStateKey {
     ExternalImport,
-    NextCode,
     Anthropic,
     OpenAi,
     Azure,

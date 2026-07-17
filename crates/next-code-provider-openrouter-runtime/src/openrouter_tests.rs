@@ -949,22 +949,6 @@ fn openrouter_transport_state_distinguishes_runtime_identities() {
     assert!(OpenRouterTransportState::from_current_env(Some("openrouter")).is_real_openrouter());
     next_code_base::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
 
-    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "next-code");
-    assert_eq!(
-        OpenRouterTransportState::from_current_env(Some("next-code")),
-        OpenRouterTransportState::NextCodeSubscription
-    );
-    assert!(!OpenRouterTransportState::from_current_env(Some("next-code")).accrues_user_api_key_cost());
-
-    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "next-code");
-    assert_eq!(
-        OpenRouterTransportState::from_current_env(Some("next-code")),
-        OpenRouterTransportState::NextCodeSubscription
-    );
-    assert!(
-        !OpenRouterTransportState::from_current_env(Some("next-code")).accrues_user_api_key_cost()
-    );
-
     next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openai-compatible");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("openai-compatible")),

@@ -1,4 +1,4 @@
-//! Provider-doctor diagnostics for next-code.
+//! Provider-doctor diagnostics for next_code.
 //!
 //! Sits downstream of `next-code-base` so edits to the doctor cluster do not
 //! rebuild the base -> app-core -> tui spine:

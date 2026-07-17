@@ -634,7 +634,7 @@ fn build_spawn_command(term: &str, command: &TerminalCommand, cwd: &Path) -> Opt
             // `open -a Terminal <binary> --args ...` does NOT execute the binary with
             // arguments; it asks Terminal to open the file as a document. On a default
             // macOS install (where Apple Terminal is the only available terminal), that
-            // means split/resume spawns silently fail to launch next-code. Use AppleScript's
+            // means split/resume spawns silently fail to launch next_code. Use AppleScript's
             // `do script` so the command actually runs in a new Terminal window.
             cmd = Command::new("osascript");
             cmd.args(["-e", &macos_terminal_applescript(command, cwd)]);
@@ -806,7 +806,7 @@ mod tests {
             script,
             "cd '/work/dir' && exec '/usr/local/bin/next-code' '--resume' 'abc-123'"
         );
-        // Must actually exec next-code, not the broken `open -a Terminal <file>` form.
+        // Must actually exec next_code, not the broken `open -a Terminal <file>` form.
         assert!(script.contains("exec '/usr/local/bin/next-code'"));
     }
 

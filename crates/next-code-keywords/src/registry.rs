@@ -91,8 +91,8 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
                 description: "Goal tracking — durable goal + token budget across turns",
             },
             KeywordEntry {
-                keyword: "canceljcode",
-                aliases: &["stopjcode"],
+                keyword: "cancelnext",
+                aliases: &["stopnext"],
                 phrase_aliases: &[],
                 priority: 9,
                 workflow: WorkflowKind::Cancel,

@@ -103,7 +103,7 @@ impl App {
                 "/overnight <hours>[h|m] [mission]\nStart one overnight coordinator with a target wake/report time. The coordinator prioritizes verifiable, low-risk work, maintains structured logs, updates review notes, and generates a review HTML page.\n\n/overnight status\nShow the latest overnight run status.\n\n/overnight log\nShow recent overnight events.\n\n/overnight review\nOpen the generated review page.\n\n/overnight cancel\nRequest cancellation after the current coordinator turn reaches a safe boundary."
             }
             "dictate" | "dictation" => {
-                "/dictate\nRun the configured external speech-to-text command and inject the transcript into next-code.\n\nConfigure [dictation] in ~/.next-code/config.toml:\n  command       shell command that prints transcript to stdout,\n                for example ~/.local/bin/my-whisper-script --grammar-target code\n  mode          insert|append|replace|send\n  key           optional hotkey (for example alt+;)\n  timeout_secs  max wait time"
+                "/dictate\nRun the configured external speech-to-text command and inject the transcript into next_code.\n\nConfigure [dictation] in ~/.next-code/config.toml:\n  command       shell command that prints transcript to stdout,\n                for example ~/.local/bin/my-whisper-script --grammar-target code\n  mode          insert|append|replace|send\n  key           optional hotkey (for example alt+;)\n  timeout_secs  max wait time"
             }
             "poke" => {
                 "/poke [on|off|status]\nPoke the model to resume when it has stopped with incomplete todos.\n\n\
@@ -153,7 +153,7 @@ impl App {
                 "/usage\nFetch and display usage limits for connected providers. This command only reports real connected-provider usage windows and reset times."
             }
             "changelog" => "/changelog\nShow recent changes embedded in this build.",
-            "quit" => "/quit\nExit next-code.",
+            "quit" => "/quit\nExit next_code.",
             "config" => {
                 "/config\nShow active configuration.\n\n/config init\nCreate default config file.\n\n/config edit\nOpen config in $EDITOR."
             }

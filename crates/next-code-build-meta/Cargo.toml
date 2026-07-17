@@ -6,7 +6,7 @@ publish = false
 
 # Single source of truth for compile-time build/version metadata.
 #
-# The build script computes the same NEXT_CODE_* values (dual-read: legacy `JCODE_*`)
+# The build script computes the same NEXT_CODE_* values
 # that historically lived in the root crate's build.rs and emits them
 # via `cargo:rustc-env`. Downstream code reads them through the `pub const`
 # accessors below (e.g. `next_code_build_meta::VERSION`) instead of

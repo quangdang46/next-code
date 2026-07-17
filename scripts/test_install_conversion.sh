@@ -29,7 +29,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 case "$url" in
-  *telemetry.jcode.sh*) printf '%s\n' "$payload" >> "$INSTALL_TELEMETRY_LOG" ;;
+  *telemetry.next-code.sh*) printf '%s\n' "$payload" >> "$INSTALL_TELEMETRY_LOG" ;;
   *api.github.com*)
     [ "${FAIL_RELEASE:-0}" != "1" ] || exit 22
     printf '{"tag_name":"v1.2.3"}\n'

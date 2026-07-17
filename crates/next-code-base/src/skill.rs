@@ -699,7 +699,7 @@ pub struct EndorsedSkill {
     pub install: Option<&'static str>,
 }
 
-/// Curated list of skills endorsed by next-code. Used by the `/skills` command to
+/// Curated list of skills endorsed by next_code. Used by the `/skills` command to
 /// show users which recommended skills they have installed and which they are
 /// missing. This is the single source of truth for endorsed skills.
 ///
@@ -876,7 +876,7 @@ pub const ENDORSED_SKILLS: &[EndorsedSkill] = &[
     },
 ];
 
-/// Return the curated list of skills endorsed by next-code.
+/// Return the curated list of skills endorsed by next_code.
 pub fn endorsed_skills() -> &'static [EndorsedSkill] {
     ENDORSED_SKILLS
 }

@@ -61,16 +61,11 @@ impl Default for PluginManifest {
 
 impl PluginManifest {
     pub fn from_package_json(value: &serde_json::Value) -> Result<Self, PluginError> {
-        // dual-read: package.json schema field is still `jcode` (legacy) or `pi`;
-        // also accept `nextcode` as the rebranded key.
         let section = value
             .get("nextcode")
-            .or_else(|| value.get("jcode")) // dual-read: legacy package.json field
             .or_else(|| value.get("pi"))
             .ok_or_else(|| {
-                PluginError::InvalidManifest(
-                    "missing 'nextcode', 'jcode', or 'pi' field".into(), // dual-read: legacy
-                )
+                PluginError::InvalidManifest("missing 'nextcode' or 'pi' field".into())
             })?;
         serde_json::from_value(section.clone())
             .map_err(|e| PluginError::InvalidManifest(e.to_string()))
@@ -200,10 +195,9 @@ pub enum SettingSchema {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PluginEngines {
-    /// Host version requirement. Field name stays `jcode` in JSON for dual-read
-    /// compat with existing plugins (serde rename not applied during compat window).
+    /// Host version requirement (JSON field: `nextcode`).
     #[serde(default, alias = "nextcode")]
-    pub jcode: Option<String>, // dual-read: legacy
+    pub nextcode: Option<String>,
 }
 
 /// Tier of risk/privilege a tool carries. Adapted from oh-my-pi's ToolTier.

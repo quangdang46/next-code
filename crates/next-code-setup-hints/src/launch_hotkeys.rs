@@ -68,7 +68,7 @@ pub(crate) struct ResolvedLaunchHotkey {
     /// Stable file name for this entry's launch script.
     pub script_file_name: String,
     /// Shell snippet that `cd`s into the target directory (with a `$HOME`
-    /// fallback) before launching next-code.
+    /// fallback) before launching next_code.
     pub cd_prefix: String,
     /// Original configured directory target. May be a sentinel such as `$HOME`,
     /// `$LAST_DIR`, or `$LAST_REPO`; direct launchers resolve it at fire time.

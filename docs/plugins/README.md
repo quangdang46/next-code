@@ -33,7 +33,7 @@ next-code plugins are TypeScript or JavaScript modules that run inside a QuickJS
 - **Persist state** -- use `nextcode.kv` for durable cross-session key-value storage.
 - **Read configuration** -- access plugin-specific settings from `config.toml`.
 
-Plugins have **no access** to Node.js built-ins, DOM, `require()`, or `process`. All host interaction goes through the `nextcode` global object injected by the runtime (dual-read: also `jcode`).
+Plugins have **no access** to Node.js built-ins, DOM, `require()`, or `process`. All host interaction goes through the `nextcode` global object injected by the runtime (dual-read: also `next-code`).
 
 ### What You Can Build
 
@@ -145,7 +145,7 @@ Before a plugin loads, next-code runs static analysis to detect:
 
 ## Manifest Format
 
-Plugins declare their identity and capabilities via a manifest. For npm packages, the manifest lives in `package.json` under the `"nextcode"` key (dual-read: legacy `"jcode"`). For local files, the manifest is the exported default object.
+Plugins declare their identity and capabilities via a manifest. For npm packages, the manifest lives in `package.json` under the `"nextcode"` key (dual-read: legacy `"next-code"`). For local files, the manifest is the exported default object.
 
 ### package.json (npm plugins)
 
@@ -221,7 +221,7 @@ interface PluginEntry {
 
 ## TypeScript API Reference
 
-All plugin APIs are available through the global `nextcode` object (injected as `__nextcode_api`; dual-read: also `jcode` / `__jcode_api`).
+All plugin APIs are available through the global `nextcode` object (injected as `__nextcode_api`; also `__nextcode_api`).
 
 ### `nextcode.id`
 
@@ -1562,7 +1562,7 @@ next-code-plugin-custom-tools
 ### Versioning
 
 Follow semver. The `engines.nextcode` field specifies the minimum next-code version
-(dual-read: legacy `engines.jcode` is still accepted):
+(dual-read: legacy `engines.next-code` is still accepted):
 
 ```json
 {

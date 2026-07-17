@@ -4,7 +4,7 @@
 //! Anthropic thinking blocks) can stall a stream for >180s while still being
 //! healthy. The hard-coded `Duration::from_secs(180)` was triggering false
 //! "Stream stalled" errors. Make it configurable so users with slow models
-//! can extend the budget without forking next-code.
+//! can extend the budget without forking next_code.
 //!
 //! Resolution order:
 //!

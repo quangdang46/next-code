@@ -1,4 +1,4 @@
-/** dual-read: legacy plugins may use `jcode` instead of `nextcode`. */
+/** dual-read: legacy plugins may use `next-code` instead of `nextcode`. */
 /**
  * Example Plugin for next-code
  *
@@ -8,7 +8,7 @@
  *
  * Plugins run in QuickJS sandboxes with no DOM, no Node.js built-ins,
  * and limited global objects. The runtime injects a `nextcode` global
- * (dual-read: also `jcode`) that provides all plugin APIs.
+ * (dual-read: also `next-code`) that provides all plugin APIs.
  *
  * Plugin lifecycle:
  *   1. Discovery  ─ next-code scans plugin directories / npm cache / config

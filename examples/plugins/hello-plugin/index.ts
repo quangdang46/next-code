@@ -1,4 +1,4 @@
-/** dual-read: legacy plugins may use `jcode` instead of `nextcode`. */
+/** dual-read: legacy plugins may use `next-code` instead of `nextcode`. */
 // Hello Plugin — real working example for next-code's plugin system.
 //
 // This file is:
@@ -7,7 +7,7 @@
 //   2. Transpiled by next-code-plugin-runtime::Transpiler (SWC, TypeScript -> JS)
 //   3. Evaluated by next-code-plugin-runtime::SandboxContext (QuickJS)
 //   4. The `nextcode` object is injected by next-code-plugin-runtime::api::PluginApiBindings
-//      (dual-read: legacy plugins may use `jcode` / `__jcode_api`)
+//      exposed as nextcode / __nextcode_api
 //
 // Available APIs on `nextcode` (plugin global):
 //   nextcode.on(event, handler)              — register event handler

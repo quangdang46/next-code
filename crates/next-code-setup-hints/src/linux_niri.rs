@@ -152,7 +152,7 @@ fn launch_shell_command(
     let term_q = sh_single_quote(terminal);
     let chord_q = sh_single_quote(chord);
     let subcmd = if self_dev { " self-dev" } else { "" };
-    // cd with $HOME fallback, then exec the terminal running next-code.
+    // cd with $HOME fallback, then exec the terminal running next_code.
     format!(
         "if [ -d {dir_q} ]; then cd {dir_q}; else cd \"$HOME\"; fi; exec {term_q} {exe_q} --spawn-hotkey {chord_q}{subcmd}",
         dir_q = dir_q,

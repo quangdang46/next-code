@@ -35,7 +35,7 @@ pub mod checkpoints {
     pub const TOOL_CALL_PARSE: &str = "tool_call_parse";
     pub const TOOL_EXECUTION_LOOP: &str = "tool_execution_loop";
     pub const TOOL_RESULT_FOLLOWUP: &str = "tool_result_followup";
-    pub const REAL_NEXT_CODE_TOOL_SMOKE: &str = "real_jcode_tool_smoke";
+    pub const REAL_NEXT_CODE_TOOL_SMOKE: &str = "real_next_code_tool_smoke";
     /// Observe-only: did the model expose its reasoning (`streamed`), hide it
     /// behind an opaque signal (`opaque`, e.g. Gemini-3 / OpenAI), or emit none
     /// (`none`)? Never required for user-readiness; hiding reasoning is a pass.
@@ -1017,7 +1017,7 @@ pub fn format_provider_test_coverage_report(
 ) -> String {
     let mut out = String::new();
     out.push_str("# Provider test coverage\n\n");
-    out.push_str("Developer/live verification evidence recorded by next-code. This is evidence, not a guarantee of future provider availability.\n\n");
+    out.push_str("Developer/live verification evidence recorded by next_code. This is evidence, not a guarantee of future provider availability.\n\n");
     out.push_str(&format!("Provider: {}\n", provider_query));
     out.push_str(&format!("Model: {}\n\n", model_query));
 

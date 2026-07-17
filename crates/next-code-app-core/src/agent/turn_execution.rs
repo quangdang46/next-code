@@ -1383,7 +1383,7 @@ impl Agent {
 fn looks_like_edit_request(msg: &str) -> bool {
     let lower = msg.to_ascii_lowercase();
     // Explicit keyword always handled elsewhere; skip pure cancels.
-    if lower.contains("canceljcode") || lower.contains("stopjcode") {
+    if lower.contains("cancelnext") || lower.contains("stopnext") {
         return false;
     }
     const VERBS: &[&str] = &[

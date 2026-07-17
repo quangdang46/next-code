@@ -76,7 +76,7 @@ impl SlotContent {
 pub type SlotRegistry = tokio::sync::RwLock<HashMap<String, SlotContent>>;
 
 /// Provides the TUI-specific API surface exposed to JS plugins as
-/// `globalThis.__nextcode_tui_pi` (dual-read: also `__jcode_tui_pi`).
+/// `globalThis.__nextcode_tui_pi`.
 ///
 /// Sub-APIs: route, keymap, ui, slot, theme, kv, eventBus.
 pub struct TuiPluginApi {
@@ -117,7 +117,7 @@ impl TuiPluginApi {
         }
     }
 
-    /// Install the `__nextcode_tui_pi` global on the QuickJS context (dual-read: `__jcode_tui_pi`).
+    /// Install the `__nextcode_tui_pi` global on the QuickJS context.
     pub fn install<'js>(&self, ctx: &Ctx<'js>) -> Result<(), rquickjs::Error> {
         let tui = Object::new(ctx.clone())?;
 
@@ -130,8 +130,6 @@ impl TuiPluginApi {
         tui.set("eventBus", self.make_event_bus_api(ctx)?)?;
 
         ctx.globals().set("__nextcode_tui_pi", tui.clone())?;
-        // dual-read: legacy plugin TUI global
-        ctx.globals().set("__jcode_tui_pi", tui)?; // dual-read: legacy
         Ok(())
     }
 

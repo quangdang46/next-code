@@ -737,7 +737,7 @@ fn test_resolve_resume_target_to_next_code_imports_claude_code_session() {
 /// Regression for silent data loss: the picker hides the imported next-code session
 /// (any `imported_*` stem) and only shows the external `claude:<id>` entry, so
 /// re-selecting a Claude session re-enters `import_session_from_file`. If the
-/// user already resumed and continued that imported session inside next-code, a
+/// user already resumed and continued that imported session inside next_code, a
 /// blind re-import previously overwrote the snapshot and dropped the next-code-side
 /// messages. The continuation must be preserved instead.
 #[test]

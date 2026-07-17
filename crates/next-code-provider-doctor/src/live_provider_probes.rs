@@ -1013,7 +1013,7 @@ pub async fn run_live_claude_native_stream_smoke(
 ///      produces a coherent final answer.
 ///
 /// This single round-trip is the evidence for the `tool_call_parse`,
-/// `tool_execution_loop`, `tool_result_followup`, and `real_jcode_tool_smoke` (legacy checkpoint id)
+/// `tool_execution_loop`, `tool_result_followup`, and `real_next_code_tool_smoke` (legacy checkpoint id)
 /// checkpoints (mirroring how the OpenAI-compatible tool probe derives all
 /// four from one exchange).
 pub async fn run_live_claude_native_tool_smoke(
@@ -1335,7 +1335,7 @@ pub async fn run_live_antigravity_native_stream_smoke(
 /// reproduces the `400 ... "Function call is missing a thought_signature ...
 /// position N"` field failure (a single round-trip cannot). Evidence for the
 /// `tool_call_parse`, `tool_execution_loop`, `tool_result_followup`, and
-/// `real_jcode_tool_smoke` (legacy checkpoint id) checkpoints.
+/// `real_next_code_tool_smoke` (legacy checkpoint id) checkpoints.
 pub async fn run_live_antigravity_native_tool_smoke(
     model: &str,
 ) -> anyhow::Result<next_code_base::live_tests::LiveVerificationStage> {

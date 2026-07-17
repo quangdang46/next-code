@@ -41,7 +41,7 @@ fn first_three_launches_can_include_hotkey_notice_too() {
     let (_, message) = hints.display_message.expect("expected display message");
     assert!(!message.contains("Alt+C"));
     assert!(message.contains("Cmd+;"));
-    // The notice should make clear the hotkey works globally, not just inside next-code.
+    // The notice should make clear the hotkey works globally, not just inside next_code.
     assert!(message.contains("system-wide"));
     // All three launch hotkeys should be mentioned.
     assert!(message.contains("Cmd+'"));

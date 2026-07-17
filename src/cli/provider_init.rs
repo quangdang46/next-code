@@ -24,7 +24,6 @@ use crate::external_auth::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderChoice {
-    NextCode,
     Claude,
     AnthropicApi,
     #[deprecated(
@@ -81,7 +80,6 @@ impl ProviderChoice {
     #[allow(deprecated)]
     pub fn as_arg_value(&self) -> &'static str {
         match self {
-            Self::NextCode => "next-code",
             Self::Claude => "claude",
             Self::AnthropicApi => "anthropic-api",
             Self::ClaudeSubprocess => "claude-subprocess",
@@ -137,7 +135,6 @@ impl ProviderChoice {
         let normalized = s.to_ascii_lowercase().replace('_', "-");
         let s = normalized.as_str();
         Some(match s {
-            "next-code" => Self::NextCode,
             "claude" => Self::Claude,
             "anthropic-api" | "claude-api" | "anthropic-key" | "claude-key" => Self::AnthropicApi,
             "claude-subprocess" => Self::Claude,
@@ -212,10 +209,6 @@ impl std::str::FromStr for ProviderChoice {
 
 #[allow(deprecated)]
 const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescriptor)] = &[
-    (
-        ProviderChoice::NextCode,
-        crate::provider_catalog::NEXT_CODE_LOGIN_PROVIDER,
-    ),
     (
         ProviderChoice::Claude,
         crate::provider_catalog::CLAUDE_LOGIN_PROVIDER,
@@ -1220,14 +1213,15 @@ fn explicit_credential_mode(choice: &ProviderChoice) -> Option<provider::Credent
 }
 
 fn disable_subscription_runtime_mode() {
-    crate::subscription_catalog::clear_runtime_env();
+    // Hosted subscription runtime was removed; keep the helper as a no-op so
+    // BYO-key provider init paths stay unchanged.
 }
 
 fn disable_subscription_runtime_mode_preserving_active_provider_profile() {
     if product_env_os("PROVIDER_PROFILE_ACTIVE").is_some()
         || product_env_os("NAMED_PROVIDER_PROFILE").is_some()
     {
-        crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV);
+        // nothing to clear for subscription mode
     } else {
         disable_subscription_runtime_mode();
     }
@@ -1272,7 +1266,6 @@ pub async fn login_and_bootstrap_provider(
             disable_subscription_runtime_mode();
             Arc::new(provider::MultiProvider::new())
         }
-        LoginProviderTarget::NextCode => Arc::new(provider::jcode::NextCodeProvider::new()),
         LoginProviderTarget::Claude | LoginProviderTarget::ClaudeApiKey => {
             disable_subscription_runtime_mode();
             Arc::new(provider::MultiProvider::new())
@@ -1424,10 +1417,6 @@ async fn init_provider_with_options(
     };
 
     let provider: Arc<dyn provider::Provider> = match choice {
-        ProviderChoice::NextCode => {
-            init_notice("Using Next Code subscription provider (provider locked)");
-            Arc::new(provider::jcode::NextCodeProvider::new())
-        }
         ProviderChoice::Claude => {
             disable_subscription_runtime_mode();
             ensure_claude_auth_allowed_for_explicit_choice()?;

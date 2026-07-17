@@ -171,7 +171,6 @@ fn test_set_model_rejects_cross_provider_without_creds() {
     let _guard = crate::storage::lock_test_env();
     let runtime = enter_test_runtime();
     let _enter = runtime.enter();
-    crate::subscription_catalog::clear_runtime_env();
     crate::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
     crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
 

@@ -102,7 +102,7 @@ struct SearchInput {
     /// Restrict Next Code sessions by canary flag.
     #[serde(default)]
     canary: Option<bool>,
-    /// Restrict source: next-code, claude, codex, pi, opencode, cursor, or all.
+    /// Restrict source: next_code, claude, codex, pi, opencode, cursor, or all.
     #[serde(default)]
     source: Option<String>,
     /// Include external session sources discovered by the session picker. Defaults to true.
@@ -578,7 +578,7 @@ fn normalize_source_filter(raw: Option<&str>) -> std::result::Result<Option<Stri
             Ok(Some(normalized.replace("claude-code", "claude")))
         }
         _ => Err(format!(
-            "source must be one of all, next-code, claude, codex, pi, opencode, or cursor; received {source}."
+            "source must be one of all, next_code, claude, codex, pi, opencode, or cursor; received {source}."
         )),
     }
 }

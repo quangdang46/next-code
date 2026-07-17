@@ -252,7 +252,7 @@ pub async fn login(no_browser: bool) -> Result<AntigravityTokens> {
                 redirect_uri
             );
             eprintln!(
-                "If the browser lands on a loopback error page instead of returning to next-code, copy the full URL from the address bar and re-run with `--no-browser` to paste it manually."
+                "If the browser lands on a loopback error page instead of returning to next_code, copy the full URL from the address bar and re-run with `--no-browser` to paste it manually."
             );
             match tokio::time::timeout(
                 std::time::Duration::from_secs(300),

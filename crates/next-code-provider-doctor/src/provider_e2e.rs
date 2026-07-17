@@ -1298,7 +1298,6 @@ pub enum NativeProviderKind {
     Cursor,
     Copilot,
     Bedrock,
-    NextCode,
     Azure,
 }
 
@@ -1311,7 +1310,6 @@ impl NativeProviderKind {
             "cursor" => Some(Self::Cursor),
             "copilot" => Some(Self::Copilot),
             "bedrock" => Some(Self::Bedrock),
-            "next-code" => Some(Self::NextCode),
             "azure-openai" => Some(Self::Azure),
             _ => None,
         }
@@ -1389,24 +1387,6 @@ impl NativeProviderKind {
                 auth_env_key: Some("AWS_BEARER_TOKEN_BEDROCK"),
                 login_hint: "next-code login --provider bedrock",
             },
-            Self::NextCode => NativeProviderSpec {
-                provider_id: "next-code",
-                label: "Next Code Subscription",
-                // The Next Code subscription runtime routes through the OpenRouter
-                // transport, so its catalog routes carry the `openrouter`
-                // api_method/label and switch with the `openrouter:` prefix even
-                // though its runtime identity is `next-code`.
-                contract: WiringContract {
-                    api_method: "openrouter".to_string(),
-                    route_provider: "auto".to_string(),
-                    expected_runtime: "next-code",
-                    expected_namespace: None,
-                    switch_prefix: "openrouter:".to_string(),
-                },
-                auth_source: "Next Code subscription API key (NEXT_CODE_API_KEY)",
-                auth_env_key: Some("NEXT_CODE_API_KEY"),
-                login_hint: "next-code login --provider next-code",
-            },
             Self::Azure => NativeProviderSpec {
                 provider_id: "azure-openai",
                 label: "Azure OpenAI",
@@ -1479,7 +1459,6 @@ impl NativeProviderKind {
             Self::Bedrock => {
                 std::sync::Arc::new(next_code_base::provider::bedrock::BedrockProvider::new())
             }
-            Self::NextCode => std::sync::Arc::new(next_code_base::provider::jcode::NextCodeProvider::new()),
             Self::Azure => {
                 // Azure OpenAI is the OpenRouter transport configured via Azure
                 // env; apply that env (endpoint/key/header wiring) before building
@@ -1548,15 +1527,6 @@ impl NativeProviderKind {
                 }
                 Ok("AWS Bedrock credential resolved".to_string())
             }
-            Self::NextCode => {
-                if !next_code_base::subscription_catalog::has_credentials() {
-                    anyhow::bail!(
-                        "no Next Code subscription credential found (set NEXT_CODE_API_KEY or run \
-                         `next-code login --provider next-code`)"
-                    );
-                }
-                Ok("Next Code subscription credential resolved".to_string())
-            }
             Self::Azure => {
                 if !next_code_base::auth::azure::has_configuration() {
                     anyhow::bail!(
@@ -1587,7 +1557,6 @@ impl NativeProviderKind {
             Self::Cursor => &["composer", "fast", "mini"],
             Self::Copilot => &["mini", "haiku", "flash", "fast"],
             Self::Bedrock => &["haiku", "micro", "lite", "mini", "flash"],
-            Self::NextCode => &["mini", "flash", "haiku", "lite", "nano"],
             Self::Azure => &["mini", "nano", "flash", "haiku"],
         };
         for marker in cheap_markers {
@@ -2420,8 +2389,6 @@ mod tests {
             ("cursor", NativeProviderKind::Cursor),
             ("copilot", NativeProviderKind::Copilot),
             ("bedrock", NativeProviderKind::Bedrock),
-            ("next-code", NativeProviderKind::NextCode),
-            ("next-code", NativeProviderKind::NextCode),
             ("azure-openai", NativeProviderKind::Azure),
         ] {
             assert_eq!(NativeProviderKind::from_normalized(id), Some(expected));
@@ -2430,6 +2397,7 @@ mod tests {
         assert_eq!(NativeProviderKind::from_normalized("claude"), None);
         assert_eq!(NativeProviderKind::from_normalized("antigravity"), None);
         assert_eq!(NativeProviderKind::from_normalized("openrouter"), None);
+        assert_eq!(NativeProviderKind::from_normalized("next-code"), None);
     }
 
     #[test]
@@ -2442,7 +2410,6 @@ mod tests {
             NativeProviderKind::Cursor,
             NativeProviderKind::Copilot,
             NativeProviderKind::Bedrock,
-            NativeProviderKind::NextCode,
             NativeProviderKind::Azure,
         ] {
             let spec = kind.spec();
@@ -2540,8 +2507,7 @@ mod tests {
             NativeProviderKind::Cursor,
             NativeProviderKind::Copilot,
             NativeProviderKind::Bedrock,
-            NativeProviderKind::NextCode,
-            NativeProviderKind::Azure,
+            NativeProviderKind::            NativeProviderKind::Azure,
         ] {
             let id = kind.spec().provider_id;
             assert!(

@@ -816,32 +816,13 @@ mod tests {
     }
 
     #[test]
-    fn plugin_manifest_from_package_json_requires_jcode_or_pi_field() { // dual-read: legacy
-        // dual-read: legacy package.json field `jcode` still accepted
+    fn plugin_manifest_from_package_json_requires_nextcode_or_pi_field() { // dual-read: legacy
         let json = serde_json::json!({"name": "test"});
         let result = PluginManifest::from_package_json(&json);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("missing"));
     }
 
-    #[test]
-    fn plugin_manifest_from_package_json_with_jcode_field() { // dual-read: legacy
-        // dual-read: legacy package.json field `jcode`
-        let json = serde_json::json!({
-            "name": "test-plugin",
-            // dual-read: legacy package.json key
-            "jcode": { // dual-read: legacy
-                "name": "test-plugin",
-                "package_name": "test-plugin",
-                "version": "1.0.0",
-                "kind": "server"
-            }
-        });
-        let manifest = PluginManifest::from_package_json(&json).unwrap();
-        assert_eq!(manifest.name, "test-plugin");
-        assert_eq!(manifest.version, "1.0.0");
-        assert_eq!(manifest.kind, PluginKind::Server);
-    }
 
     #[test]
     fn plugin_manifest_from_package_json_with_pi_field() {
@@ -859,17 +840,6 @@ mod tests {
         assert_eq!(manifest.kind, PluginKind::Tui);
     }
 
-    #[test]
-    fn plugin_manifest_from_package_json_jcode_takes_precedence() { // dual-read: legacy
-        // dual-read: legacy `jcode` key vs `pi`
-        let json = serde_json::json!({
-            // dual-read: legacy package.json key
-            "jcode": { "name": "a", "package_name": "a", "version": "1.0.0" }, // dual-read: legacy
-            "pi": { "name": "b", "package_name": "b", "version": "2.0.0" }
-        });
-        let manifest = PluginManifest::from_package_json(&json).unwrap();
-        assert_eq!(manifest.version, "1.0.0");
-    }
 
     #[test]
     fn plugin_manifest_serde_roundtrip() {
@@ -1072,17 +1042,14 @@ mod tests {
     #[test]
     fn plugin_engines_default() {
         let engines = PluginEngines::default();
-        assert!(engines.jcode.is_none()); // dual-read: engines.jcode schema field
     }
 
     #[test]
     fn plugin_engines_serde() {
         let engines = PluginEngines {
-            jcode: Some(">=0.9.0".into()), // dual-read: engines.jcode schema field
         };
         let json = serde_json::to_string(&engines).unwrap();
         let deserialized: PluginEngines = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.jcode.unwrap(), ">=0.9.0"); // dual-read: engines.jcode
     }
 
     #[test]

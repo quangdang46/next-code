@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn detect_cancel() {
-        let results = strict("canceljcode");
+        let results = strict("cancelnext");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].entry.workflow, WorkflowKind::Cancel);
     }

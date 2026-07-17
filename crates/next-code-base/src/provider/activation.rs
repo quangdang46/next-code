@@ -9,7 +9,6 @@ use next_code_provider_core::{ActiveProvider, provider_key};
 /// transport, but its runtime identity is still Azure OpenAI.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RuntimeProviderId {
-    NextCode,
     Claude,
     ClaudeApiKey,
     OpenAi,
@@ -28,7 +27,6 @@ pub enum RuntimeProviderId {
 impl RuntimeProviderId {
     pub const fn key(self) -> &'static str {
         match self {
-            Self::NextCode => "next-code",
             Self::Claude => "claude",
             Self::ClaudeApiKey => "claude-api",
             Self::OpenAi => "openai",
@@ -47,7 +45,6 @@ impl RuntimeProviderId {
 
     pub const fn label(self) -> &'static str {
         match self {
-            Self::NextCode => "Next Code Subscription",
             Self::Claude => "Anthropic/Claude",
             Self::ClaudeApiKey => "Anthropic API",
             Self::OpenAi => "OpenAI",
@@ -152,20 +149,10 @@ impl ProviderActivation {
         }
     }
 
-    pub fn next_code_subscription(model: impl Into<String>) -> Self {
-        Self::locked(RuntimeProviderId::NextCode, ActiveProvider::OpenRouter)
-            .with_model_hint("NEXT_CODE_OPENROUTER_MODEL", model)
-    }
 
     pub fn apply_env(&self) -> Result<()> {
         crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", self.runtime_id.key());
         match self.runtime_id {
-            RuntimeProviderId::NextCode => {
-                crate::env::set_var(
-                    "NEXT_CODE_OPENROUTER_TRANSPORT_STATE",
-                    "next-code-subscription",
-                )
-            }
             RuntimeProviderId::OpenRouter => {
                 crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "openrouter-api-key")
             }

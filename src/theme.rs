@@ -34,7 +34,7 @@
 //! Color values must be a 7-char hex string (`#RRGGBB`). Lower or
 //! upper case both accepted. Any other format causes the loader to
 //! return [`Theme::default()`] and log a warning, matching the
-//! 'graceful fallback' behavior of the rest of next-code.
+//! 'graceful fallback' behavior of the rest of next_code.
 
 use crate::env::product_env;
 use serde::Deserialize;

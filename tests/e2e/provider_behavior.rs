@@ -937,7 +937,7 @@ async fn test_system_prompt_no_claude_code_identity() -> Result<()> {
     // Should identify as next-code
     assert!(
         lower_identity.contains("next-code") || lower_identity.contains("next code"),
-        "System prompt should identify as next-code. Found: {}",
+        "System prompt should identify as next_code. Found: {}",
         identity_portion
     );
 

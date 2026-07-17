@@ -15,7 +15,7 @@ impl WorkflowHandler for CancelHandler {
     }
 
     fn build_prompt(&self) -> String {
-        "# canceljcode — All Modes Cancelled\n\n\
+        "# cancelnext — All Modes Cancelled\n\n\
          Returning to normal operation."
             .to_string()
     }

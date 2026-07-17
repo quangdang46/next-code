@@ -526,7 +526,7 @@ impl CredentialMode {
 /// Channel for sending provider-native tool results back to a provider bridge.
 pub type NativeToolResultSender = tokio::sync::mpsc::Sender<NativeToolResult>;
 
-/// Native tool result to send back to provider bridges that delegate tool execution to next-code.
+/// Native tool result to send back to provider bridges that delegate tool execution to next_code.
 #[derive(Debug, Clone, Serialize)]
 pub struct NativeToolResult {
     #[serde(rename = "type")]

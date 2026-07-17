@@ -14,7 +14,6 @@ mod failover;
 mod fingerprint;
 pub mod gemini;
 mod image_clamp;
-pub mod jcode;
 pub mod models;
 mod multi_provider;
 pub mod openai;

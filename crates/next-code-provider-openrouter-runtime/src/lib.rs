@@ -304,9 +304,6 @@ pub enum OpenRouterTransportState {
     /// Real OpenRouter BYOK. The provider implementation is both the runtime identity
     /// and the HTTP transport.
     OpenRouterApiKey,
-    /// next-code subscription access currently reuses the OpenRouter HTTP slot, but is
-    /// not user BYOK/OpenRouter billing.
-    NextCodeSubscription,
     /// A direct OpenAI-compatible endpoint that needs a user key, Azure credential,
     /// or provider-profile secret while reusing the OpenRouter-compatible transport.
     DirectApiKey,
@@ -324,12 +321,7 @@ impl OpenRouterTransportState {
             .map(|value| value.trim().to_ascii_lowercase())
             .filter(|value| !value.is_empty());
 
-        if matches!(
-            runtime_provider.as_deref(),
-            Some("next-code")
-        ) {
-            return Self::NextCodeSubscription;
-        }
+        
 
         if matches!(runtime_provider.as_deref(), Some("openrouter")) {
             return Self::OpenRouterApiKey;
@@ -364,18 +356,13 @@ impl OpenRouterTransportState {
             "openrouter" | "openrouter-api-key" | "openrouter_byok" | "openrouter-byok" => {
                 Some(Self::OpenRouterApiKey)
             }
-            "next-code"
-            | "next-code-subscription"
-            | "subscription"
-            | "next-code"
-            | "next-code-subscription" => Some(Self::NextCodeSubscription),
             "direct" | "direct-api-key" | "openai-compatible" | "compatible-api-key" => {
                 Some(Self::DirectApiKey)
             }
             "direct-no-auth" | "no-auth" | "local" => Some(Self::DirectNoAuth),
             other => {
                 next_code_base::logging::warn(&format!(
-                    "Ignoring invalid {} '{}'; expected openrouter-api-key, next-code-subscription, direct-api-key, or direct-no-auth",
+                    "Ignoring invalid {} '{}'; expected openrouter-api-key, direct-api-key, or direct-no-auth",
                     OPENROUTER_TRANSPORT_STATE_ENV, other
                 ));
                 None

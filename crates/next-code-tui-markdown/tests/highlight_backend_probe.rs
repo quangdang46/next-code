@@ -68,7 +68,7 @@ fn workload() -> Vec<(&'static str, &'static str)> {
         ),
         (
             "sh",
-            "for pid in $(pgrep -f next-code); do awk '/VmRSS/{print $2}' /proc/$pid/status; done",
+            "for pid in $(pgrep -f next_code); do awk '/VmRSS/{print $2}' /proc/$pid/status; done",
         ),
         (
             "toml",

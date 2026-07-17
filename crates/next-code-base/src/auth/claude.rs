@@ -605,7 +605,7 @@ pub fn load_credentials() -> Result<ClaudeCredentials> {
         return Ok(creds);
     }
 
-    anyhow::bail!("No Claude OAuth credentials found (checked Claude Code, next-code, OpenCode)")
+    anyhow::bail!("No Claude OAuth credentials found (checked Claude Code, next_code, OpenCode)")
 }
 
 /// Load credentials for a specific next-code account by label.

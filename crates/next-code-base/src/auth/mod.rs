@@ -147,7 +147,6 @@ fn log_auth_status_snapshot(event: &str, status: &AuthStatus) {
         event,
         "all",
         &[
-            ("next-code", auth_state_label(status.next_code)),
             ("claude", auth_state_label(status.anthropic.state)),
             ("openai", auth_state_label(status.openai)),
             ("openrouter", auth_state_label(status.openrouter)),
@@ -276,7 +275,6 @@ impl AuthStatus {
     /// Returns true if at least one provider has usable credentials.
     pub fn has_any_available(&self) -> bool {
         self.anthropic.state == AuthState::Available
-            || self.next_code == AuthState::Available
             || self.openai == AuthState::Available
             || self.openrouter == AuthState::Available
             || self.azure == AuthState::Available
@@ -303,7 +301,6 @@ impl AuthStatus {
             vec![
                 ("surface", surface.to_string()),
                 ("any_available", self.has_any_available().to_string()),
-                ("next-code", self.next_code.label().to_string()),
                 ("anthropic", self.anthropic.state.label().to_string()),
                 ("anthropic_oauth", self.anthropic.has_oauth.to_string()),
                 ("anthropic_api", self.anthropic.has_api_key.to_string()),
@@ -342,7 +339,6 @@ impl AuthStatus {
                     AuthState::NotConfigured
                 }
             }
-            LoginProviderAuthStateKey::NextCode => self.next_code,
             LoginProviderAuthStateKey::Anthropic => self.anthropic.state,
             LoginProviderAuthStateKey::OpenAi => self.openai,
             LoginProviderAuthStateKey::Azure => self.azure,
@@ -360,13 +356,6 @@ impl AuthStatus {
         match provider.target {
             crate::provider_catalog::LoginProviderTarget::AutoImport => {
                 if Self::has_any_untrusted_external_auth() {
-                    AuthState::Available
-                } else {
-                    AuthState::NotConfigured
-                }
-            }
-            crate::provider_catalog::LoginProviderTarget::NextCode => {
-                if crate::subscription_catalog::has_credentials() {
                     AuthState::Available
                 } else {
                     AuthState::NotConfigured
@@ -434,23 +423,6 @@ impl AuthStatus {
                     "Existing external logins detected".to_string()
                 } else {
                     "No importable external logins found".to_string()
-                }
-            }
-            crate::provider_catalog::LoginProviderTarget::NextCode => {
-                if self.state_for_provider(provider) == AuthState::Available {
-                    if crate::subscription_catalog::has_router_base() {
-                        format!(
-                            "API key (`{}`) + router base",
-                            crate::subscription_catalog::NEXT_CODE_API_KEY_ENV
-                        )
-                    } else {
-                        format!(
-                            "API key (`{}`), router base pending",
-                            crate::subscription_catalog::NEXT_CODE_API_KEY_ENV
-                        )
-                    }
-                } else {
-                    "not configured".to_string()
                 }
             }
             crate::provider_catalog::LoginProviderTarget::OpenRouter => {
@@ -597,23 +569,6 @@ impl AuthStatus {
                 AuthRefreshSupport::ExternalManaged,
                 AuthValidationMethod::TrustedImportScan,
             ),
-            crate::provider_catalog::LoginProviderTarget::NextCode => {
-                let (source, detail) = summarize_sources(vec![
-                    env_source(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV),
-                    config_source(
-                        crate::subscription_catalog::NEXT_CODE_API_KEY_ENV,
-                        crate::subscription_catalog::NEXT_CODE_ENV_FILE,
-                        "~/.config/next-code/next-code-subscription.env",
-                    ),
-                ]);
-                (
-                    source,
-                    detail,
-                    AuthExpiryConfidence::NotApplicable,
-                    AuthRefreshSupport::NotApplicable,
-                    AuthValidationMethod::PresenceCheck,
-                )
-            }
             crate::provider_catalog::LoginProviderTarget::OpenRouter => {
                 let (source, detail) = summarize_sources(vec![
                     env_source("OPENROUTER_API_KEY"),
@@ -817,7 +772,6 @@ fn build_auth_status_uncached(mode: AuthProbeMode) -> (AuthStatus, Vec<(&'static
     let mut status = AuthStatus::default();
     let mut timings = Vec::new();
 
-    record_auth_probe_step(&mut timings, "next-code", || probe_next_code_status(&mut status));
     record_auth_probe_step(&mut timings, "anthropic", || {
         probe_anthropic_status(&mut status)
     });
@@ -877,11 +831,6 @@ fn token_state(result: anyhow::Result<bool>) -> AuthState {
     }
 }
 
-fn probe_next_code_status(status: &mut AuthStatus) {
-    if crate::subscription_catalog::has_credentials() {
-        status.next_code = AuthState::Available;
-    }
-}
 
 fn probe_anthropic_status(status: &mut AuthStatus) {
     let mut anthropic = ProviderAuth::default();
@@ -1143,7 +1092,6 @@ fn assessment_for_key(
                 AuthValidationMethod::TimestampCheck,
             )
         }
-        LoginProviderAuthStateKey::NextCode
         | LoginProviderAuthStateKey::Azure
         | LoginProviderAuthStateKey::Bedrock
         | LoginProviderAuthStateKey::OpenRouterLike

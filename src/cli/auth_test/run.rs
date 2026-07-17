@@ -742,7 +742,7 @@ fn persist_auth_test_live_verification_event(
             "tool_smoke" => {
                 let tool_smoke_skipped = auth_test_step_is_skipped(step);
                 if !tool_smoke_skipped {
-                    capabilities.push("real_jcode_tool_smoke");
+                    capabilities.push("real_next_code_tool_smoke");
                 }
                 expected.push(crate::live_tests::checkpoints::TOOL_CALL_PARSE);
                 expected.push(crate::live_tests::checkpoints::TOOL_EXECUTION_LOOP);

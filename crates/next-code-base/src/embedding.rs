@@ -1,4 +1,4 @@
-//! Embedding facade for next-code.
+//! Embedding facade for next_code.
 //!
 //! The heavy ONNX/tokenizer implementation lives in the `next-code-embedding`
 //! workspace crate so unchanged embedding code can stay cached across self-dev

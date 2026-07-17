@@ -1,4 +1,4 @@
-//! Productivity report generation for next-code.
+//! Productivity report generation for next_code.
 //!
 //! Scans local session transcripts (with an incremental cache), computes
 //! interesting + shareable usage statistics, and renders them as both Markdown

@@ -1219,10 +1219,9 @@ impl App {
         use crate::auth::AuthState;
         let status = crate::auth::AuthStatus::check_fast();
         // (display name, provider-key, state)
-        let providers: [(&str, &str, AuthState); 8] = [
+        let providers: [(&str, &str, AuthState); 7] = [
             ("Anthropic (Claude)", "anthropic", status.anthropic.state),
             ("OpenAI", "openai", status.openai),
-            ("Next Code subscription", "next-code", status.next_code),
             ("Gemini", "gemini", status.gemini),
             ("GitHub Copilot", "copilot", status.copilot),
             ("Cursor", "cursor", status.cursor),

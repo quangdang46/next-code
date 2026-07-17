@@ -1,109 +1,38 @@
-//! Partner discovery: shared constants and provenance tracking.
-//!
-//! Partner discovery makes third-party developer tools discoverable to the
-//! agent through the `discover_tools` tool, backed by a hosted manifest. All
-//! agent-facing guidance lives in that tool's schema rather than the system
-//! prompt.
-//! Some providers may share revenue with Next Code when users choose their tools.
-//! Partnership status never influences recommendations. The relationship is
-//! disclosed in the UI with a link to <https://jcode.sh/discovery-tools>.
-//!
-//! Design constraints (see the discovery-tools page for the public
-//! version of this policy):
-//! - Solo Systems vets every listing and enforces one-tool-call setup at the
-//!   sponsor-platform admission layer for seamless harness integration.
-//! - Discovery is on by default and can be opted out of with
-//!   `[sponsors] enabled = false` in config.toml.
-//! - The category list below is a shipped constant, so building the tool schema
-//!   never requires a network request.
-//! - Tools within a category live server-side and are fetched on demand by
-//!   `discover_tools`. If the request fails, the tool fails plainly. There is
-//!   no cache and no offline fallback.
-//! - Requests carry only discovery fields (category, query, tool, and reason),
-//!   never session content.
+//! Sponsored tool discovery was removed for the open-source next-code fork.
+//! Kept as empty stubs so leftover UI/MCP call sites compile.
 
-/// Public URL explaining Next Code's tool-provider partnerships.
-pub const DISCOVERY_PARTNERS_URL: &str = "https://jcode.sh/discovery-tools";
-
-/// Provenance tagging and coarse usage metering for MCP servers connected
-/// as a result of a discovery listing.
-pub mod provenance;
-
-/// Internal marker used to render the first discovery disclosure in a session.
+pub const DISCOVERY_PARTNERS_URL: &str = "";
 pub const DISCOVERY_DISCLOSURE_TAG: &str = "(partner discovery disclosure)";
+pub const DISCOVERY_DISCLOSURE_NOTICE: &str = "";
+pub const DISCOVERY_CATEGORIES: &[&str] = &[];
 
-/// First-use-per-session disclosure detail rendered inline with discovery.
-pub const DISCOVERY_DISCLOSURE_NOTICE: &str = "Next Code partners with tool providers to make their \
-     tools discoverable. Learn more: https://jcode.sh/discovery-tools";
-
-/// Categories in which discoverable tools exist. Shipped as a constant so the
-/// tool schema never depends on the network. The tools within each category are
-/// served by the discovery endpoint.
-pub const DISCOVERY_CATEGORIES: &[&str] = &[
-    "payments",
-    "code-review",
-    "databases",
-    "browser-automation",
-    "deployment",
-    "observability",
-    "authentication",
-    "security",
-    "storage",
-    "analytics",
-    "web-search",
-    "web-data",
-    "cloud-infrastructure",
-    "compliance-and-privacy",
-    "integration-platforms",
-    "email-messaging",
-    "ai-models",
-    "other",
-];
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn categories_are_nonempty_and_lowercase() {
-        assert!(!DISCOVERY_CATEGORIES.is_empty());
-        for cat in DISCOVERY_CATEGORIES {
-            assert!(!cat.is_empty());
-            assert_eq!(cat.to_ascii_lowercase(), *cat);
-            assert!(!cat.contains(' '), "categories are slugs: {cat}");
-        }
+pub mod provenance {
+    #[derive(Debug, Clone)]
+    pub struct DiscoveredSetup {
+        pub sponsor: String,
+        pub command: String,
+        pub args: Vec<String>,
     }
 
-    #[test]
-    fn categories_match_the_public_discovery_taxonomy() {
-        assert_eq!(
-            DISCOVERY_CATEGORIES,
-            &[
-                "payments",
-                "code-review",
-                "databases",
-                "browser-automation",
-                "deployment",
-                "observability",
-                "authentication",
-                "security",
-                "storage",
-                "analytics",
-                "web-search",
-                "web-data",
-                "cloud-infrastructure",
-                "compliance-and-privacy",
-                "integration-platforms",
-                "email-messaging",
-                "ai-models",
-                "other",
-            ]
-        );
+    #[derive(Debug, Clone)]
+    pub struct ProvenanceReport {
+        pub sponsor: String,
+        pub connects: u32,
+        pub calls: u32,
+        pub errors: u32,
     }
 
-    #[test]
-    fn discovery_is_enabled_by_default() {
-        let config = crate::config::Config::default();
-        assert!(config.sponsors.enabled);
+    pub fn on_tool_call(_server: &str, _is_error: bool) {}
+    pub fn on_server_connected(_name: &str, _command: &str, _args: &[String]) -> Option<String> {
+        None
+    }
+    pub fn flush_now() {}
+    pub fn reset_for_tests() {}
+    pub fn record_discovered_setups(_setups: Vec<DiscoveredSetup>) {}
+    pub fn is_tagged(_name: &str) -> bool {
+        false
+    }
+    pub fn drain_pending_for_tests() -> Vec<ProvenanceReport> {
+        Vec::new()
     }
 }

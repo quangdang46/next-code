@@ -1,4 +1,4 @@
-/// Example workspace-crate plugin for next-code.
+/// Example workspace-crate plugin for next_code.
 /// Demonstrates how a crate inside the workspace can act as a plugin
 /// by referencing next-code-plugin-core types.
 

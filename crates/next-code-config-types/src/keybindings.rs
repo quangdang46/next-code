@@ -318,7 +318,7 @@ pub const KEYBINDING_DEFAULTS: &[KeybindingDefault] = &[
         id: "new_terminal",
         description: "Spawn a fresh next-code session in a new terminal window",
         // Companion to the system-wide launch hotkey (Cmd+; / Alt+;): the
-        // shifted variant spawns a new session from inside next-code, reusing the
+        // shifted variant spawns a new session from inside next_code, reusing the
         // current session's working directory. Note: many macOS terminals
         // intercept Cmd combos, so this only fires when the terminal forwards
         // the key to the TUI.

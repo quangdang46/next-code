@@ -36,7 +36,7 @@ pub const GEMINI_API_KEY_ENV_FILE: &str = "gemini.env";
 /// Unlike the OAuth Code Assist path (which talks to cloudcode-pa with a free
 /// quota tier), an API key authenticates directly against
 /// `generativelanguage.googleapis.com` and uses the key's own quota. Preferring
-/// the env var keeps it consistent with every other API-key provider in next-code.
+/// the env var keeps it consistent with every other API-key provider in next_code.
 pub fn api_key() -> Option<String> {
     for env_key in GEMINI_API_KEY_ENV_VARS {
         if let Some(key) = crate::provider_catalog::load_api_key_from_env_or_config(

@@ -4,7 +4,7 @@
 > **Baseline HEAD (plan authored):** `bfac54414`  
 > **Implementation progress (this doc):** Phase 0–4 partially landed on `feat/agent-tree` after plan commit.  
 > **Primary reference:** [claude-code-best/claude-code](https://github.com/claude-code-best/claude-code) (local clone: `/tmp/feature-research/claude-code`)  
-> **Secondary:** jcode `docs/SWARM_ARCHITECTURE.md`, `docs/AGENT_TREE_CC_GAP_ANALYSIS.md` (partially stale — re-baselined below)  
+> **Secondary:** next-code `docs/SWARM_ARCHITECTURE.md`, `docs/AGENT_TREE_CC_GAP_ANALYSIS.md` (partially stale — re-baselined below)  
 > **Goal:** User can freely navigate team-lead ↔ subagents with CC-grade UX, see **real** agent work (not spawn-meta spam), and always know how to return.
 
 ### Implementation status (rolling)
@@ -24,7 +24,7 @@
 
 Claude Code treats “enter subagent” as an **in-process view switch**: `spawnInProcessTeammate` creates a task with `messages[]`; the runner appends every user/assistant/tool chunk; `enterTeammateView` only sets `viewingAgentTaskId` and the REPL swaps `displayedMessages = task.messages`. Esc / Enter on team-lead exits. No socket resume.
 
-jcode swarm members are **separate remote sessions**. Today we have:
+next-code swarm members are **separate remote sessions**. Today we have:
 
 | Mode | What it is | Real transcript? | Free switch? |
 |------|------------|------------------|--------------|
@@ -99,11 +99,11 @@ Footer path (separate surface):
 | Confirm | Enter / f | `enterTeammateView` |
 | Exit view | Esc (or Enter on team-lead while selecting) | |
 
-jcode currently merges: Shift always + **bare ↓ when chat already at bottom** + bare ↑/↓ while selecting/viewing. That is intentional ergonomics, not a 1:1 CC tree map — document in UI hints.
+next-code currently merges: Shift always + **bare ↓ when chat already at bottom** + bare ↑/↓ while selecting/viewing. That is intentional ergonomics, not a 1:1 CC tree map — document in UI hints.
 
 ---
 
-## 3. Current jcode baseline (as of `bfac54414`)
+## 3. Current next-code baseline (as of `bfac54414`)
 
 ### 3.1 What works
 
@@ -136,7 +136,7 @@ jcode currently merges: Shift always + **bare ↓ when chat already at bottom** 
 
 ```
 CC:   one process  → task.messages[]  → UI swap
-jcode: multi-session → SwarmStatus snapshots + resume_session
+next-code: multi-session → SwarmStatus snapshots + resume_session
 ```
 
 Soft view cannot become “real” without either:
@@ -247,11 +247,11 @@ ServerEvent::SwarmMemberTranscript {
 | Task | Detail | Done when |
 |------|--------|-----------|
 | 0.1 Install discipline | After every ship: `scripts/install_release.sh --fast` | Symlink → new hash |
-| 0.2 Kill stale serve | Document one-liner; optional `jcode serve --force` | `lsof -p $PID` → new binary |
+| 0.2 Kill stale serve | Document one-liner; optional `next-code serve --force` | `lsof -p $PID` → new binary |
 | 0.3 Version surface | Status notice or `/debug` shows short hash | User can confirm build |
 | 0.4 Manual script | Checklist in §8 | Run once green |
 
-**Files:** `scripts/install_release.sh`, optionally `crates/jcode-tui` status line / `Agents.md` note.
+**Files:** `scripts/install_release.sh`, optionally `crates/next-code-tui` status line / `Agents.md` note.
 
 ---
 
@@ -262,11 +262,11 @@ Goal: **Hard attach free-switch is boringly reliable.** No new protocol.
 | # | Task | Files | Acceptance |
 |---|------|-------|------------|
 | 1.1 | Audit bare-↓ only when `!auto_scroll_paused` + empty input; no steal of prompt history | `tui_state.rs` `handle_agent_tree_navigation_key` | History Up/Down still works when not at bottom |
-| 1.2 | Unit tests: selection indices dense; viewing paints return hint; hard attach keeps `return_session_id` across agent hop | `agent_tree.rs`, new tests on pure helpers | `cargo test -p jcode-tui free_switch selection` |
+| 1.2 | Unit tests: selection indices dense; viewing paints return hint; hard attach keeps `return_session_id` across agent hop | `agent_tree.rs`, new tests on pure helpers | `cargo test -p next-code-tui free_switch selection` |
 | 1.3 | Hard attach: never clear snapshot until home; leader row always `esc/enter return` | `tui_state.rs`, `agent_tree.rs`, `remote.rs` | After Enter agent, tree still shows lead+agent |
 | 1.4 | Esc path single owner (no double-clear return id) | `key_handling.rs`, `tui_state.rs` | Esc from hard → lead once |
 | 1.5 | Soft labels honest: “status preview (not full transcript)” | `teammate_view.rs`, notices | No claim of full history on soft |
-| 1.6 | Document key contract in tree hints | `agent_tree.rs` constants | Matches product table §2.3+jcode merge |
+| 1.6 | Document key contract in tree hints | `agent_tree.rs` constants | Matches product table §2.3+next-code merge |
 
 **Exit criteria Phase 1:** Manual §8 path 1–6 passes on freshly installed binary; no stranded hard attach without chrome.
 
@@ -278,8 +278,8 @@ Goal: Lead client can hold a **real-ish** buffer per agent without resuming.
 
 | # | Task | Files (expected) | Acceptance |
 |---|------|------------------|------------|
-| 2.1 | Design wire DTO + caps + versioning | `jcode-protocol` | Serialize tests |
-| 2.2 | Server: on assistant/tool events for swarm members, append + broadcast | `jcode-app-core` server bus / swarm | Coordinator receives events when worker streams |
+| 2.1 | Design wire DTO + caps + versioning | `next-code-protocol` | Serialize tests |
+| 2.2 | Server: on assistant/tool events for swarm members, append + broadcast | `next-code-app-core` server bus / swarm | Coordinator receives events when worker streams |
 | 2.3 | Cap store per member in swarm state | swarm member struct | Memory bounded |
 | 2.4 | Client: `teammate_transcripts` map; apply events | `server_events.rs`, `app.rs` | Buffer grows while on lead |
 | 2.5 | Bootstrap: `GetSwarmMemberTranscript` or piggyback first soft enter | backend + server | Enter soft mid-run shows history not empty |
@@ -339,18 +339,18 @@ Goal: **Enter soft becomes CC-like**; hard is opt-in.
 
 | Area | Path |
 |------|------|
-| Nav / enter / exit | `crates/jcode-tui/src/tui/app/tui_state.rs` |
-| Keys remote | `crates/jcode-tui/src/tui/app/remote/key_handling.rs` |
-| Soft input | `crates/jcode-tui/src/tui/app/remote/input_dispatch.rs` |
-| Resume lifecycle | `crates/jcode-tui/src/tui/app/remote.rs` |
-| Server events | `crates/jcode-tui/src/tui/app/remote/server_events.rs` |
-| Soft render | `crates/jcode-tui/src/tui/teammate_view.rs` |
-| Tree render | `crates/jcode-tui/src/tui/agent_tree.rs` |
-| Layout chrome | `crates/jcode-tui/src/tui/ui.rs`, `ui_input.rs` |
-| App fields | `crates/jcode-tui/src/tui/app.rs` |
-| Wire | `crates/jcode-protocol/src/{lib,wire}.rs` |
-| Tail + future stream | `crates/jcode-app-core/src/server/background_tasks.rs`, swarm broadcast |
-| Resume API | `crates/jcode-tui/src/tui/backend.rs` (`resume_session`, `comm_message_dm`) |
+| Nav / enter / exit | `crates/next-code-tui/src/tui/app/tui_state.rs` |
+| Keys remote | `crates/next-code-tui/src/tui/app/remote/key_handling.rs` |
+| Soft input | `crates/next-code-tui/src/tui/app/remote/input_dispatch.rs` |
+| Resume lifecycle | `crates/next-code-tui/src/tui/app/remote.rs` |
+| Server events | `crates/next-code-tui/src/tui/app/remote/server_events.rs` |
+| Soft render | `crates/next-code-tui/src/tui/teammate_view.rs` |
+| Tree render | `crates/next-code-tui/src/tui/agent_tree.rs` |
+| Layout chrome | `crates/next-code-tui/src/tui/ui.rs`, `ui_input.rs` |
+| App fields | `crates/next-code-tui/src/tui/app.rs` |
+| Wire | `crates/next-code-protocol/src/{lib,wire}.rs` |
+| Tail + future stream | `crates/next-code-app-core/src/server/background_tasks.rs`, swarm broadcast |
+| Resume API | `crates/next-code-tui/src/tui/backend.rs` (`resume_session`, `comm_message_dm`) |
 
 ---
 
@@ -555,7 +555,7 @@ Week 3:
 
 ## 15. Out of scope (this plan)
 
-- Making jcode teammates true in-process ALS like CC Node (would be a different architecture project).  
+- Making next-code teammates true in-process ALS like CC Node (would be a different architecture project).  
 - Desktop/web UI for teammate view.  
 - Replacing swarm multi-session model.  
 - Full tool_result fidelity in soft buffer (summaries OK for v1).
@@ -564,7 +564,7 @@ Week 3:
 
 ## 16. One-page cheat sheet for implementers
 
-1. **CC enter = swap `task.messages`.** jcode multi-session ⇒ hard resume is real today; soft needs Phase 2 stream.  
+1. **CC enter = swap `task.messages`.** next-code multi-session ⇒ hard resume is real today; soft needs Phase 2 stream.  
 2. **Do not flip Enter to soft until buffer is real.**  
 3. **Always ship install + restart serve before claiming UX fixed.**  
 4. **Free switch = tree selection + return id + snapshot**, not more chrome spam.  
@@ -577,6 +577,6 @@ Week 3:
 
 - Local CC: `/tmp/feature-research/claude-code`  
 - Upstream: https://github.com/claude-code-best/claude-code  
-- jcode swarm: `docs/SWARM_ARCHITECTURE.md`  
+- next-code swarm: `docs/SWARM_ARCHITECTURE.md`  
 - Prior gap notes: `docs/AGENT_TREE_CC_GAP_ANALYSIS.md` (status table outdated; use this plan)  
 - Branch work: `feat/agent-tree` commits through `bfac54414`

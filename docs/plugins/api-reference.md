@@ -20,7 +20,7 @@ Complete TypeScript type definitions for the next-code plugin system. All types 
 
 ## Plugin Global (`nextcode`)
 
-The `nextcode` object is injected into the QuickJS sandbox as `__nextcode_api` (dual-read: also `jcode` / `__jcode_api`) and provides all plugin APIs.
+The `nextcode` object is injected into the QuickJS sandbox as `__nextcode_api` and provides all plugin APIs.
 
 ```typescript
 interface PluginApi {
@@ -193,7 +193,7 @@ interface PluginFeature {
 
 ```typescript
 interface PluginEngines {
-  /** Required next-code version range (e.g., ">=0.9.0"). Prefer `nextcode`; dual-read also accepts legacy `jcode`. */
+  /** Required next-code version range (e.g., ">=0.9.0"). Prefer `nextcode`; dual-read also accepts legacy `next-code`. */
   nextcode?: string;
   /** @deprecated dual-read legacy key — prefer `nextcode` */
   next-code?: string;
