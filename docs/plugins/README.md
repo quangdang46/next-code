@@ -30,10 +30,10 @@ next-code plugins are TypeScript or JavaScript modules that run inside a QuickJS
 - **Listen to events** -- react to tool calls, session lifecycle, messages, and more.
 - **Register custom tools** -- add new tools the model can invoke.
 - **Modify behavior** -- block or modify tool inputs/outputs, inject system prompts, suppress notifications.
-- **Persist state** -- use `pi.kv` for durable cross-session key-value storage.
+- **Persist state** -- use `nextcode.kv` for durable cross-session key-value storage.
 - **Read configuration** -- access plugin-specific settings from `config.toml`.
 
-Plugins have **no access** to Node.js built-ins, DOM, `require()`, or `process`. All host interaction goes through the `pi` global object injected by the runtime.
+Plugins have **no access** to Node.js built-ins, DOM, `require()`, or `process`. All host interaction goes through the `nextcode` global object injected by the runtime (dual-read: also `jcode`).
 
 ### What You Can Build
 
@@ -66,12 +66,12 @@ const manifest = {
 };
 
 // Register an event handler
-pi.on('TurnStart', (event) => {
-  pi.logger.info(`[hello-plugin] Turn started in session ${event.session_id}`);
+nextcode.on('TurnStart', (event) => {
+  nextcode.logger.info(`[hello-plugin] Turn started in session ${event.session_id}`);
 });
 
 // Register a custom tool
-pi.registerTool({
+nextcode.registerTool({
   name: 'hello_greet',
   description: 'Greet someone by name',
   parameters: {
@@ -145,7 +145,7 @@ Before a plugin loads, next-code runs static analysis to detect:
 
 ## Manifest Format
 
-Plugins declare their identity and capabilities via a manifest. For npm packages, the manifest lives in `package.json` under the `"next-code"` (or `"pi"`) key. For local files, the manifest is the exported default object.
+Plugins declare their identity and capabilities via a manifest. For npm packages, the manifest lives in `package.json` under the `"nextcode"` key (dual-read: legacy `"jcode"`). For local files, the manifest is the exported default object.
 
 ### package.json (npm plugins)
 
@@ -154,7 +154,7 @@ Plugins declare their identity and capabilities via a manifest. For npm packages
   "name": "next-code-plugin-analytics",
   "version": "1.0.0",
   "main": "dist/server.js",
-  "next-code": {
+  "nextcode": {
     "name": "analytics",
     "package_name": "next-code-plugin-analytics",
     "version": "1.0.0",
@@ -173,7 +173,7 @@ Plugins declare their identity and capabilities via a manifest. For npm packages
       "read_config": true
     },
     "engines": {
-      "next-code": ">=0.9.0"
+      "nextcode": ">=0.9.0"
     },
     "tags": ["analytics", "telemetry"]
   }
@@ -195,7 +195,7 @@ Plugins declare their identity and capabilities via a manifest. For npm packages
 | `capabilities` | `PluginCapabilities` | No | Required capabilities |
 | `features` | `Record<string, PluginFeature>` | No | Toggleable features |
 | `settings` | `Record<string, SettingSchema>` | No | User-configurable settings |
-| `engines` | `{ next-code?: string }` | No | Required next-code version range |
+| `engines` | `{ nextcode?: string }` | No | Required next-code version range |
 | `icon` | `string` | No | Icon path or URL |
 | `homepage` | `string` | No | Project homepage URL |
 | `repository` | `string` | No | Source repository URL |
@@ -221,36 +221,36 @@ interface PluginEntry {
 
 ## TypeScript API Reference
 
-All plugin APIs are available through the global `pi` object (injected as `__jcode_pi`).
+All plugin APIs are available through the global `nextcode` object (injected as `__nextcode_api`; dual-read: also `jcode` / `__jcode_api`).
 
-### `pi.id`
+### `nextcode.id`
 
 ```typescript
-pi.id: string
+nextcode.id: string
 ```
 
 The plugin's unique identifier. Format: `npm:package-name` or `file:/path/to/plugin.ts`.
 
-### `pi.name`
+### `nextcode.name`
 
 ```typescript
-pi.name: string
+nextcode.name: string
 ```
 
-The plugin's display name (same as `pi.id` for most plugins).
+The plugin's display name (same as `nextcode.id` for most plugins).
 
-### `pi.version`
+### `nextcode.version`
 
 ```typescript
-pi.version: string
+nextcode.version: string
 ```
 
 The plugin's version string.
 
-### `pi.on(eventName, handler)`
+### `nextcode.on(eventName, handler)`
 
 ```typescript
-pi.on(event: string, handler: (event: any) => void | HandlerResult): void
+nextcode.on(event: string, handler: (event: any) => void | HandlerResult): void
 ```
 
 Register an event handler. The handler receives an event object whose shape depends on the event type. See [Event Reference](#event-reference) for all events and their fields.
@@ -262,11 +262,11 @@ Register an event handler. The handler receives an event object whose shape depe
 **Example:**
 
 ```typescript
-pi.on('TurnStart', (event) => {
-  pi.logger.info(`Turn ${event.turn_number} started`);
+nextcode.on('TurnStart', (event) => {
+  nextcode.logger.info(`Turn ${event.turn_number} started`);
 });
 
-pi.on('PreToolUse', (event) => {
+nextcode.on('PreToolUse', (event) => {
   if (event.tool_name === 'rm') {
     return { action: 'block', output: 'Blocked by policy' };
   }
@@ -274,10 +274,10 @@ pi.on('PreToolUse', (event) => {
 });
 ```
 
-### `pi.registerTool(toolDefinition)`
+### `nextcode.registerTool(toolDefinition)`
 
 ```typescript
-pi.registerTool(tool: {
+nextcode.registerTool(tool: {
   name: string;
   description: string;
   parameters: JSONSchema;
@@ -287,10 +287,10 @@ pi.registerTool(tool: {
 
 Register a custom tool that the model can invoke. See [Tool Registration](#tool-registration) for details.
 
-### `pi.getConfig(key)`
+### `nextcode.getConfig(key)`
 
 ```typescript
-pi.getConfig(key: string): string
+nextcode.getConfig(key: string): string
 ```
 
 Read a plugin configuration value from the global next-code config. Returns an empty string if not set.
@@ -301,14 +301,14 @@ Read a plugin configuration value from the global next-code config. Returns an e
 **Example:**
 
 ```typescript
-const apiKey = pi.getConfig('my-plugin.apiKey');
-const maxResults = parseInt(pi.getConfig('my-plugin.maxResults') || '10', 10);
+const apiKey = nextcode.getConfig('my-plugin.apiKey');
+const maxResults = parseInt(nextcode.getConfig('my-plugin.maxResults') || '10', 10);
 ```
 
-### `pi.logger`
+### `nextcode.logger`
 
 ```typescript
-pi.logger: {
+nextcode.logger: {
   info(message: string): void;
   warn(message: string): void;
   error(message: string): void;
@@ -321,16 +321,16 @@ Structured logger that writes to next-code's tracing system. Messages appear in 
 **Example:**
 
 ```typescript
-pi.logger.info('[my-plugin] Starting up');
-pi.logger.warn('[my-plugin] Deprecated config key used');
-pi.logger.error('[my-plugin] Failed to parse input');
-pi.logger.debug('[my-plugin] Internal state: ' + JSON.stringify(state));
+nextcode.logger.info('[my-plugin] Starting up');
+nextcode.logger.warn('[my-plugin] Deprecated config key used');
+nextcode.logger.error('[my-plugin] Failed to parse input');
+nextcode.logger.debug('[my-plugin] Internal state: ' + JSON.stringify(state));
 ```
 
-### `pi.kv`
+### `nextcode.kv`
 
 ```typescript
-pi.kv: {
+nextcode.kv: {
   get(key: string): string;
   set(key: string, value: string): void;
 }
@@ -342,17 +342,17 @@ Durable key-value storage that persists across sessions. Backed by the runtime's
 
 ```typescript
 // Save state
-pi.kv.set('my-plugin.counter', JSON.stringify({ count: 42 }));
+nextcode.kv.set('my-plugin.counter', JSON.stringify({ count: 42 }));
 
 // Restore state
-const saved = pi.kv.get('my-plugin.counter');
+const saved = nextcode.kv.get('my-plugin.counter');
 const counter = saved ? JSON.parse(saved) : { count: 0 };
 ```
 
-### `pi.sleep(ms)`
+### `nextcode.sleep(ms)`
 
 ```typescript
-pi.sleep(ms: number): void
+nextcode.sleep(ms: number): void
 ```
 
 Block the current execution for the specified number of milliseconds. Use sparingly -- this blocks the sandbox thread.
@@ -360,13 +360,13 @@ Block the current execution for the specified number of milliseconds. Use sparin
 **Example:**
 
 ```typescript
-pi.sleep(100); // Wait 100ms
+nextcode.sleep(100); // Wait 100ms
 ```
 
-### `pi.uuid()`
+### `nextcode.uuid()`
 
 ```typescript
-pi.uuid(): string
+nextcode.uuid(): string
 ```
 
 Generate a new UUID v4 string.
@@ -374,13 +374,13 @@ Generate a new UUID v4 string.
 **Example:**
 
 ```typescript
-const requestId = pi.uuid();
+const requestId = nextcode.uuid();
 ```
 
-### `pi.cwd`
+### `nextcode.cwd`
 
 ```typescript
-pi.cwd: string
+nextcode.cwd: string
 ```
 
 The current working directory of the next-code process.
@@ -388,14 +388,14 @@ The current working directory of the next-code process.
 **Example:**
 
 ```typescript
-pi.logger.info(`Working directory: ${pi.cwd}`);
+nextcode.logger.info(`Working directory: ${nextcode.cwd}`);
 ```
 
 ---
 
 ## Event Reference
 
-Events are dispatched to handlers registered via `pi.on()`. Each event has specific input fields and optional output fields that allow modification.
+Events are dispatched to handlers registered via `nextcode.on()`. Each event has specific input fields and optional output fields that allow modification.
 
 ### Event Categories
 
@@ -436,7 +436,7 @@ Fired **before** a tool is executed. Can block or modify the tool input.
 
 **Example:**
 ```typescript
-pi.on('PreToolUse', (event) => {
+nextcode.on('PreToolUse', (event) => {
   // Block dangerous tools
   if (event.tool_name === 'Bash' && event.tool_input.command?.includes('rm -rf')) {
     return { block: 'Blocked dangerous command' };
@@ -478,8 +478,8 @@ Fired **after** a tool returns successfully. Can modify the output.
 
 **Example:**
 ```typescript
-pi.on('PostToolUse', (event) => {
-  pi.logger.info(`Tool ${event.tool_name} took ${event.duration_ms}ms`);
+nextcode.on('PostToolUse', (event) => {
+  nextcode.logger.info(`Tool ${event.tool_name} took ${event.duration_ms}ms`);
 
   // Track metrics
   totalToolDuration += event.duration_ms;
@@ -569,10 +569,10 @@ Fired when a session ends. Use for cleanup and state persistence.
 
 **Example:**
 ```typescript
-pi.on('SessionEnd', () => {
+nextcode.on('SessionEnd', () => {
   // Persist state before shutdown
-  pi.kv.set('my-plugin.data', JSON.stringify(collectedData));
-  pi.logger.info('State saved, shutting down');
+  nextcode.kv.set('my-plugin.data', JSON.stringify(collectedData));
+  nextcode.logger.info('State saved, shutting down');
 });
 ```
 
@@ -638,7 +638,7 @@ Fired when an agent starts. Can inject additional system prompt text.
 
 **Example:**
 ```typescript
-pi.on('AgentStart', (event) => {
+nextcode.on('AgentStart', (event) => {
   return {
     additional_system_prompt: [
       'Always use the example_hello tool for greetings.',
@@ -798,7 +798,7 @@ Fired when a permission decision is needed. Can approve, deny, or defer to user.
 
 **Example:**
 ```typescript
-pi.on('PermissionRequest', (event) => {
+nextcode.on('PermissionRequest', (event) => {
   // Auto-approve Read tool
   if (event.tool_name === 'Read') {
     return { decision: 'allow', message: 'Auto-approved by plugin' };
@@ -881,7 +881,7 @@ Fired when the user submits a prompt. Can modify the prompt.
 
 **Example:**
 ```typescript
-pi.on('UserPromptSubmit', (event) => {
+nextcode.on('UserPromptSubmit', (event) => {
   // Auto-prepend context
   if (event.content.startsWith('/code ')) {
     return {
@@ -933,7 +933,7 @@ Fired for system notifications. Can suppress or modify.
 
 **Example:**
 ```typescript
-pi.on('Notification', (event) => {
+nextcode.on('Notification', (event) => {
   // Suppress noisy notifications
   if (event.message.includes('cache hit')) {
     return { suppress: true };
@@ -945,7 +945,7 @@ pi.on('Notification', (event) => {
 
 ## Tool Registration
 
-Register custom tools that the model can invoke via `pi.registerTool()`.
+Register custom tools that the model can invoke via `nextcode.registerTool()`.
 
 ### Tool Definition
 
@@ -991,7 +991,7 @@ The handler can return any JSON-serializable value:
 
 ```typescript
 // Return a string
-pi.registerTool({
+nextcode.registerTool({
   name: 'greet',
   description: 'Say hello',
   parameters: { type: 'object', properties: { name: { type: 'string' } }, required: ['name'] },
@@ -999,7 +999,7 @@ pi.registerTool({
 });
 
 // Return an object
-pi.registerTool({
+nextcode.registerTool({
   name: 'stats',
   description: 'Get statistics',
   parameters: { type: 'object', properties: {} },
@@ -1007,7 +1007,7 @@ pi.registerTool({
 });
 
 // Return a number
-pi.registerTool({
+nextcode.registerTool({
   name: 'count',
   description: 'Get the count',
   parameters: { type: 'object', properties: {} },
@@ -1021,11 +1021,11 @@ Prefix your tools to avoid conflicts:
 
 ```typescript
 // Good: prefixed with plugin name
-pi.registerTool({ name: 'analytics_report', ... });
-pi.registerTool({ name: 'analytics_reset', ... });
+nextcode.registerTool({ name: 'analytics_report', ... });
+nextcode.registerTool({ name: 'analytics_reset', ... });
 
 // Bad: generic name likely to conflict
-pi.registerTool({ name: 'report', ... });
+nextcode.registerTool({ name: 'report', ... });
 ```
 
 ### Tool Execution Flow
@@ -1049,7 +1049,7 @@ Plugins declare required capabilities in their manifest. The runtime enforces th
 |------------|------|-------------|
 | `fs_read` | `string[]` | Allowed read paths (e.g., `["$HOME/.next-code/data"]`) |
 | `fs_write` | `string[]` | Allowed write paths |
-| `network` | `string[]` | Allowed hosts (e.g., `["api.github.com"]`) |
+| `network` | `string[]` | Allowed hosts (e.g., `["anextcode.github.com"]`) |
 | `shell` | `boolean` | Allow shell command execution |
 | `register_tools` | `boolean` | Allow registering custom tools |
 | `register_commands` | `boolean` | Allow registering CLI commands |
@@ -1098,7 +1098,7 @@ const manifest = {
     fs_write: ['$HOME/.next-code/data/my-plugin'],
 
     // Network access to specific hosts
-    network: ['api.github.com', 'api.openai.com'],
+    network: ['anextcode.github.com', 'anextcode.openai.com'],
 
     // Tool registration
     register_tools: true,
@@ -1129,7 +1129,7 @@ capabilities: {
 
 ```typescript
 capabilities: {
-  network: ['api.github.com'],  // Matches https://api.github.com/v1/...
+  network: ['anextcode.github.com'],  // Matches https://anextcode.github.com/v1/...
 }
 ```
 
@@ -1454,10 +1454,10 @@ The QuickJS sandbox does **not** provide:
 - `process`, `__dirname`, `__filename`
 - Node.js built-ins (`fs`, `path`, `http`, etc.)
 - DOM APIs
-- `setTimeout`/`setInterval` (use `pi.sleep()` instead)
+- `setTimeout`/`setInterval` (use `nextcode.sleep()` instead)
 - Dynamic `import()`
 
-All host interaction must go through `pi.*` methods.
+All host interaction must go through `nextcode.*` methods.
 
 ---
 
@@ -1510,7 +1510,7 @@ next-code-plugin-my-feature/
       "register_tools": true
     },
     "engines": {
-      "next-code": ">=0.9.0"
+      "nextcode": ">=0.9.0"
     }
   }
 }
@@ -1561,12 +1561,13 @@ next-code-plugin-custom-tools
 
 ### Versioning
 
-Follow semver. The `engines.next-code` field specifies the minimum next-code version:
+Follow semver. The `engines.nextcode` field specifies the minimum next-code version
+(dual-read: legacy `engines.jcode` is still accepted):
 
 ```json
 {
   "engines": {
-    "next-code": ">=0.9.0"
+    "nextcode": ">=0.9.0"
   }
 }
 ```
@@ -1577,18 +1578,18 @@ Follow semver. The `engines.next-code` field specifies the minimum next-code ver
 
 ### Q: Can I use npm packages in my plugin?
 
-**A:** No. The QuickJS sandbox does not support `require()` or dynamic `import()`. All functionality must be implemented using the built-in `pi.*` APIs or plain JavaScript.
+**A:** No. The QuickJS sandbox does not support `require()` or dynamic `import()`. All functionality must be implemented using the built-in `nextcode.*` APIs or plain JavaScript.
 
 ### Q: How do I persist data across sessions?
 
-**A:** Use `pi.kv.set(key, value)` and `pi.kv.get(key)`. Values are strings, so serialize objects with `JSON.stringify()`.
+**A:** Use `nextcode.kv.set(key, value)` and `nextcode.kv.get(key)`. Values are strings, so serialize objects with `JSON.stringify()`.
 
 ```typescript
 // Save
-pi.kv.set('my-plugin.data', JSON.stringify({ count: 42 }));
+nextcode.kv.set('my-plugin.data', JSON.stringify({ count: 42 }));
 
 // Load
-const data = JSON.parse(pi.kv.get('my-plugin.data') || '{}');
+const data = JSON.parse(nextcode.kv.get('my-plugin.data') || '{}');
 ```
 
 ### Q: Can my plugin make HTTP requests?
@@ -1597,7 +1598,7 @@ const data = JSON.parse(pi.kv.get('my-plugin.data') || '{}');
 
 ### Q: How do I debug my plugin?
 
-**A:** Use `pi.logger.debug()` for detailed logging, and run next-code with `RUST_LOG=next_code_plugin_runtime=debug` to see all plugin activity. Check `next-code plugin audit` for event dispatch history.
+**A:** Use `nextcode.logger.debug()` for detailed logging, and run next-code with `RUST_LOG=next_code_plugin_runtime=debug` to see all plugin activity. Check `next-code plugin audit` for event dispatch history.
 
 ### Q: Can multiple plugins handle the same event?
 

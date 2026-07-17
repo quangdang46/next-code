@@ -1,14 +1,14 @@
 //! Live model pricing catalog backed by <https://models.dev>.
 //!
-//! jcode's static pricing tables (`jcode_provider_core::pricing`) only cover
+//! next-code's static pricing tables (`next_code_provider_core::pricing`) only cover
 //! first-party Anthropic/OpenAI models and go stale whenever a provider ships
 //! new models or changes prices. models.dev publishes a free, no-auth JSON
 //! catalog (`https://models.dev/api.json`) with per-model `input`/`output`/
 //! `cache_read`/`cache_write` USD prices per million tokens across 140+
-//! providers, including every OpenAI-compatible profile jcode ships.
+//! providers, including every OpenAI-compatible profile next-code ships.
 //!
 //! This module mirrors the OpenRouter catalog pattern:
-//!   - a 24h disk cache under `~/.jcode/cache/models_dev_pricing.json`,
+//!   - a 24h disk cache under `~/.next-code/cache/models_dev_pricing.json`,
 //!   - synchronous lookups that never block on the network,
 //!   - a background refresh scheduled on cache miss/staleness.
 //!
@@ -16,11 +16,12 @@
 //! then this catalog, then provider-specific sources (OpenRouter endpoints),
 //! and only then a generic fallback.
 
+use crate::env::{product_env_os};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const API_URL: &str = "https://models.dev/api.json";
@@ -48,14 +49,18 @@ struct PricingCache {
 }
 
 /// In-memory pricing cache keyed by the on-disk cache path it was loaded
-/// from, so changing `JCODE_HOME` (tests, multi-home setups) never serves
+/// from, so changing `NEXT_CODE_HOME` (tests, multi-home setups) never serves
 /// pricing that belongs to a different home directory.
-static MEMORY_CACHE: Mutex<Option<(PathBuf, PricingCache)>> = Mutex::new(None);
+///
+/// Held behind an `Arc` so per-route pricing lookups share one parsed catalog
+/// instead of deep-cloning the multi-thousand-model map on every call (that
+/// clone dominated server CPU during client connect bursts).
+static MEMORY_CACHE: Mutex<Option<(PathBuf, Arc<PricingCache>)>> = Mutex::new(None);
 static REFRESH_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
 
 fn cache_path() -> PathBuf {
-    crate::storage::jcode_dir()
-        .unwrap_or_else(|_| PathBuf::from(".").join(".jcode"))
+    crate::storage::next_code_dir()
+        .unwrap_or_else(|_| PathBuf::from(".").join(".next-code"))
         .join("cache")
         .join(CACHE_FILE)
 }
@@ -67,19 +72,20 @@ fn now_unix_secs() -> u64 {
         .unwrap_or(0)
 }
 
-fn load_cache() -> Option<PricingCache> {
+fn load_cache() -> Option<Arc<PricingCache>> {
     let path = cache_path();
     {
         let memory = MEMORY_CACHE.lock().ok()?;
         if let Some((cached_path, cache)) = memory.as_ref()
             && cached_path == &path
         {
-            return Some(cache.clone());
+            return Some(Arc::clone(cache));
         }
     }
     let cache: PricingCache = crate::storage::read_json(&path).ok()?;
+    let cache = Arc::new(cache);
     if let Ok(mut memory) = MEMORY_CACHE.lock() {
-        *memory = Some((path, cache.clone()));
+        *memory = Some((path, Arc::clone(&cache)));
     }
     Some(cache)
 }
@@ -87,18 +93,18 @@ fn load_cache() -> Option<PricingCache> {
 fn save_cache(cache: &PricingCache) {
     let path = cache_path();
     if let Ok(mut memory) = MEMORY_CACHE.lock() {
-        *memory = Some((path.clone(), cache.clone()));
+        *memory = Some((path.clone(), Arc::new(cache.clone())));
     }
     let _ = crate::storage::write_json(&path, cache);
 }
 
-/// Translate a jcode provider key (runtime key, activity source key, or
+/// Translate a next-code provider key (runtime key, activity source key, or
 /// compatible-profile id) to the models.dev provider id.
-pub fn models_dev_provider_id(jcode_provider: &str) -> Option<&'static str> {
-    let key = jcode_provider
+pub fn models_dev_provider_id(next_code_provider: &str) -> Option<&'static str> {
+    let key = next_code_provider
         .trim()
         .strip_prefix("openai-compatible:")
-        .unwrap_or_else(|| jcode_provider.trim());
+        .unwrap_or_else(|| next_code_provider.trim());
     Some(match key {
         "anthropic" | "claude" | "claude:api-key" | "anthropic-api" => "anthropic",
         "openai" | "openai:api-key" | "openai-api" => "openai",
@@ -135,17 +141,17 @@ pub fn models_dev_provider_id(jcode_provider: &str) -> Option<&'static str> {
     })
 }
 
-/// Strip jcode-local suffixes/prefixes a model id may carry before catalog
+/// Strip next-code-local suffixes/prefixes a model id may carry before catalog
 /// lookup (`[1m]` long-context alias, `provider/` prefixes for OpenRouter ids).
 fn normalize_model_id(model: &str) -> &str {
-    jcode_provider_core::model_id::strip_long_context_suffix(model).trim()
+    next_code_provider_core::model_id::strip_long_context_suffix(model).trim()
 }
 
-/// Look up live pricing for `model` under a jcode provider key. Returns `None`
+/// Look up live pricing for `model` under a next-code provider key. Returns `None`
 /// when the catalog has no entry; never blocks on the network. Schedules a
 /// background refresh when the disk cache is missing or stale.
-pub fn lookup(jcode_provider: &str, model: &str) -> Option<ModelCost> {
-    let provider_id = models_dev_provider_id(jcode_provider)?;
+pub fn lookup(next_code_provider: &str, model: &str) -> Option<ModelCost> {
+    let provider_id = models_dev_provider_id(next_code_provider)?;
     let cache = ensure_cache_fresh()?;
     let models = cache.providers.get(provider_id)?;
     let model = normalize_model_id(model);
@@ -161,7 +167,7 @@ pub fn lookup(jcode_provider: &str, model: &str) -> Option<ModelCost> {
 }
 
 /// Return the freshest cache available, scheduling a refresh if needed.
-fn ensure_cache_fresh() -> Option<PricingCache> {
+fn ensure_cache_fresh() -> Option<Arc<PricingCache>> {
     let cache = load_cache();
     let stale = cache
         .as_ref()
@@ -179,13 +185,13 @@ pub fn schedule_refresh() {
     // Keep tests hermetic: never hit the network from test builds (the
     // `test-support` feature also covers downstream crates' test targets via
     // feature unification), and let users opt out entirely.
-    // JCODE_FORCE_PRICING_REFRESH=1 re-enables the fetch for manual e2e checks
+    // NEXT_CODE_FORCE_PRICING_REFRESH=1 re-enables the fetch for manual e2e checks
     // (e.g. `cargo run --example pricing_e2e_check`, which builds with
     // test-support unified in).
-    let forced = std::env::var_os("NEXT_CODE_FORCE_PRICING_REFRESH").is_some();
+    let forced = product_env_os("FORCE_PRICING_REFRESH").is_some();
     if !forced
         && (cfg!(any(test, feature = "test-support"))
-            || std::env::var_os("NEXT_CODE_DISABLE_PRICING_REFRESH").is_some())
+            || product_env_os("DISABLE_PRICING_REFRESH").is_some())
     {
         return;
     }
@@ -352,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_key_mapping_covers_jcode_providers() {
+    fn provider_key_mapping_covers_next_code_providers() {
         assert_eq!(models_dev_provider_id("claude:api-key"), Some("anthropic"));
         assert_eq!(models_dev_provider_id("openai:api-key"), Some("openai"));
         assert_eq!(

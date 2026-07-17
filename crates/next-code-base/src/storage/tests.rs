@@ -36,7 +36,7 @@ fn harden_secret_file_permissions_sets_owner_only_modes() {
 }
 
 #[test]
-fn user_home_path_uses_external_dir_under_jcode_home() {
+fn user_home_path_uses_external_dir_under_next_code_home() {
     let _guard = lock_test_env();
     let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
@@ -74,7 +74,7 @@ fn validate_external_auth_file_rejects_symlink() {
 }
 
 #[test]
-fn app_config_dir_uses_jcode_home_when_set() {
+fn app_config_dir_uses_next_code_home_when_set() {
     let _guard = lock_test_env();
     let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");

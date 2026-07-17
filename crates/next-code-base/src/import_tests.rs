@@ -489,7 +489,7 @@ fn test_import_claude_session_uses_recovered_live_transcript() {
 }
 
 #[test]
-fn test_import_pi_session_creates_jcode_snapshot() {
+fn test_import_pi_session_creates_next_code_snapshot() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
@@ -520,7 +520,7 @@ fn test_import_pi_session_creates_jcode_snapshot() {
 }
 
 #[test]
-fn test_import_opencode_session_creates_jcode_snapshot() {
+fn test_import_opencode_session_creates_next_code_snapshot() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());

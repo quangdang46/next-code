@@ -366,7 +366,7 @@ mod tests {
     fn sha256sums_accepts_standard_and_binary_lines() {
         let checksums = parse_sha256sums(
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  next-code-linux-x86_64\n\
-             bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb *jcode-macos-aarch64\n",
+             bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb *next-code-macos-aarch64\n",
         )
         .unwrap();
         assert_eq!(

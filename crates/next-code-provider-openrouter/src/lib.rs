@@ -345,19 +345,29 @@ fn configured_cache_namespace() -> String {
     sanitize_cache_namespace(&raw)
 }
 
-fn cache_path_for_namespace(namespace: &str) -> PathBuf {
-    let namespace = sanitize_cache_namespace(namespace);
+/// Product-home relative cache file: prefer `.next-code`, dual-read `.jcode`.
+/// When neither exists, returns the canonical `.next-code` path so writers
+/// land on the new name.
+fn product_cache_file(file_name: &str) -> PathBuf {
     if let Ok(path) = product_env("HOME") {
-        return PathBuf::from(path)
-            .join("cache")
-            .join(format!("{}_models.json", namespace));
+        return PathBuf::from(path).join("cache").join(file_name);
     }
 
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".jcode")
-        .join("cache")
-        .join(format!("{}_models.json", namespace))
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let primary = home.join(".next-code").join("cache").join(file_name);
+    if primary.exists() {
+        return primary;
+    }
+    let legacy = home.join(".jcode").join("cache").join(file_name);
+    if legacy.exists() {
+        return legacy;
+    }
+    primary
+}
+
+fn cache_path_for_namespace(namespace: &str) -> PathBuf {
+    let namespace = sanitize_cache_namespace(namespace);
+    product_cache_file(&format!("{}_models.json", namespace))
 }
 
 fn cache_path() -> PathBuf {
@@ -555,11 +565,7 @@ fn save_disk_cache_with_source_to_path(
 fn endpoints_cache_path(model: &str) -> PathBuf {
     let safe_name = model.replace('/', "__");
     let namespace = configured_cache_namespace();
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".jcode")
-        .join("cache")
-        .join(format!("{}_endpoints_{}.json", namespace, safe_name))
+    product_cache_file(&format!("{}_endpoints_{}.json", namespace, safe_name))
 }
 
 pub fn load_endpoints_disk_cache_public(model: &str) -> Option<(Vec<EndpointInfo>, u64)> {

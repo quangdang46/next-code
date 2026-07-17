@@ -214,7 +214,7 @@ impl std::str::FromStr for ProviderChoice {
 const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescriptor)] = &[
     (
         ProviderChoice::Jcode,
-        crate::provider_catalog::JCODE_LOGIN_PROVIDER,
+        crate::provider_catalog::NEXT_CODE_LOGIN_PROVIDER,
     ),
     (
         ProviderChoice::Claude,
@@ -1227,7 +1227,7 @@ fn disable_subscription_runtime_mode_preserving_active_provider_profile() {
     if product_env_os("PROVIDER_PROFILE_ACTIVE").is_some()
         || product_env_os("NAMED_PROVIDER_PROFILE").is_some()
     {
-        crate::env::remove_var(crate::subscription_catalog::JCODE_SUBSCRIPTION_ACTIVE_ENV);
+        crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV);
     } else {
         disable_subscription_runtime_mode();
     }

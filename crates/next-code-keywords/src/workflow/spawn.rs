@@ -1,10 +1,10 @@
 //! Sub-agent spawning utility for workflow execution.
 //!
 //! Provides helpers to spawn child agents using the same pattern as `SubagentTool`
-//! in `jcode-app-core/src/tool/task.rs`.
+//! in `next-code-app-core/src/tool/task.rs`.
 //!
 //! The actual spawning implementation is registered via [`set_spawn_impl`] by
-//! `jcode-app-core` at startup. Until then, [`spawn_agent`] returns a placeholder.
+//! `next-code-app-core` at startup. Until then, [`spawn_agent`] returns a placeholder.
 
 use super::{SpawnResult, SpawnSpec};
 use std::sync::{LazyLock, Mutex};
@@ -18,7 +18,7 @@ pub type SpawnFn = dyn Fn(&SpawnSpec) -> SpawnResult + Send + Sync;
 
 static SPAWN_IMPL: LazyLock<Mutex<Option<Box<SpawnFn>>>> = LazyLock::new(|| Mutex::new(None));
 
-/// Register the real spawn implementation. Called by `jcode-app-core` at startup.
+/// Register the real spawn implementation. Called by `next-code-app-core` at startup.
 /// Panics if already registered (idempotent — second call is a no-op).
 pub fn set_spawn_impl(impl_fn: Box<SpawnFn>) {
     let mut guard = SPAWN_IMPL.lock().unwrap_or_else(|e| e.into_inner());

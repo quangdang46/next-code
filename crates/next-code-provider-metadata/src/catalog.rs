@@ -497,18 +497,27 @@ pub const AUTO_IMPORT_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDes
     order: LoginProviderSurfaceOrder::new(Some(1), Some(1), None, None, None),
 };
 
-pub const JCODE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+pub const NEXT_CODE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
     id: "next-code",
-    display_name: "Next Code Subscription",
+    display_name: "Next Code",
     auth_kind: LoginProviderAuthKind::ApiKey,
     auth_state_key: LoginProviderAuthStateKey::Jcode,
     auth_status_method: "API key",
-    aliases: &["jcode", "subscription", "jcode-subscription", "next-code-subscription"],
+    aliases: &[
+        "jcode",
+        "subscription",
+        "jcode-subscription",
+        "next-code-subscription",
+    ],
     menu_detail: "curated next-code subscription models",
     recommended: false,
     target: LoginProviderTarget::Jcode,
     order: LoginProviderSurfaceOrder::new(Some(3), Some(3), Some(3), Some(3), Some(3)),
 };
+
+/// Deprecated alias for [`NEXT_CODE_LOGIN_PROVIDER`].
+#[deprecated(note = "renamed to NEXT_CODE_LOGIN_PROVIDER")]
+pub const JCODE_LOGIN_PROVIDER: LoginProviderDescriptor = NEXT_CODE_LOGIN_PROVIDER;
 
 pub const OPENAI_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
     id: "openai",
@@ -1091,7 +1100,7 @@ pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 47] = [
     ANTHROPIC_API_LOGIN_PROVIDER,
     OPENAI_LOGIN_PROVIDER,
     OPENAI_API_LOGIN_PROVIDER,
-    JCODE_LOGIN_PROVIDER,
+    NEXT_CODE_LOGIN_PROVIDER,
     OPENROUTER_LOGIN_PROVIDER,
     BEDROCK_LOGIN_PROVIDER,
     AZURE_LOGIN_PROVIDER,

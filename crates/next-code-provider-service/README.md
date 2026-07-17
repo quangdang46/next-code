@@ -1,4 +1,4 @@
-# jcode-provider-service
+# next-code-provider-service
 
 Catalog → Integration → Credential service traits and shared types for
 next-code's new provider resolution layer.
@@ -60,7 +60,7 @@ build failures, so they are not landed here.
 ## Crate layout
 
 ```
-crates/jcode-provider-service/
+crates/next-code-provider-service/
 ├── Cargo.toml
 ├── README.md                ← this file
 └── src/
@@ -98,7 +98,7 @@ crates/jcode-provider-service/
 | `ProviderInfo` / `ModelInfo`          | catalog      | Catalog entries with metadata + cost.              |
 | `ModelTier`                           | catalog      | Flagship / Standard / Mini / Nano.                 |
 | `ProviderService`                     | service      | Facade bundling catalog + integration + creds.     |
-| `RouteResolver`                       | service      | `(provider, model)` → `jcode_llm_core::Route`.     |
+| `RouteResolver`                       | service      | `(provider, model)` → `next_code_llm_core::Route`.     |
 | `ResolvedRoute`                       | service      | Result of `resolve_route()`.                       |
 
 ---
@@ -114,7 +114,7 @@ crates/jcode-provider-service/
 | `PersistentIntegration<K>`        | HashMap + `CredentialService` | Production login flows.   |
 | `DefaultProviderService`           | Composes the above           | Production runtime.       |
 
-`K` is the concrete `jcode_keyring_store::KeyringStore` — typically
+`K` is the concrete `next_code_keyring_store::KeyringStore` — typically
 `DefaultKeyringStore` (macOS Keychain / Linux Secret Service / Windows
 Credential Manager) in production and `MockKeyringStore` in tests.
 
@@ -128,7 +128,7 @@ See [](./MIGRATION.md) for the complete old → new type/function mapping. The o
 
 | Phase | Plan deliverable                            | Status     | Commit(s) |
 |-------|---------------------------------------------|------------|-----------|
-| 0     | `jcode-provider-service` crate scaffolded   | ✅ done    | `5bfb3f7d` |
+| 0     | `next-code-provider-service` crate scaffolded   | ✅ done    | `5bfb3f7d` |
 | 1     | `CredentialService` (in-memory + keyring)   | ✅ done    | `50722d13` |
 | 2     | `IntegrationService` + OAuth lifecycle      | ✅ done    | `36bc22fd` |
 | 3     | `CatalogService` + `DefaultProviderService` | ✅ done    | `8ecdf5f8` |
@@ -149,19 +149,19 @@ branch.
 
 ```bash
 # Run the smoke-test CLI (writes to your real OS keychain).
-cargo run -p jcode-provider-service --bin providerctl -- list
+cargo run -p next-code-provider-service --bin providerctl -- list
 
 # Save an API key.
-cargo run -p jcode-provider-service --bin providerctl -- login anthropic sk-ant-...
+cargo run -p next-code-provider-service --bin providerctl -- login anthropic sk-ant-...
 
 # Confirm the credential roundtrips.
-cargo run -p jcode-provider-service --bin providerctl -- available
+cargo run -p next-code-provider-service --bin providerctl -- available
 
 # Print a resolved Route as JSON.
-cargo run -p jcode-provider-service --bin providerctl -- resolve anthropic claude-sonnet-4-6
+cargo run -p next-code-provider-service --bin providerctl -- resolve anthropic claude-sonnet-4-6
 
 # Remove the credential.
-cargo run -p jcode-provider-service --bin providerctl -- logout anthropic
+cargo run -p next-code-provider-service --bin providerctl -- logout anthropic
 ```
 
 ---
@@ -169,7 +169,7 @@ cargo run -p jcode-provider-service --bin providerctl -- logout anthropic
 ## Testing
 
 ```bash
-cargo test -p jcode-provider-service
+cargo test -p next-code-provider-service
 ```
 
 51 unit tests cover:
@@ -243,7 +243,7 @@ above).
 | 13 | Retrofit layer keeps `--provider` CLI flag working | ✅ | `retrofit::parse_legacy_provider_flag` + `retrofit::legacy_aliases_for()` for did-you-mean suggestions |
 
 **Test count:** 211 tests, all green (197 lib + 4 modelpicker + 2 providerctl + 10 integration + 1 debug filtered out).
-**Build status:** `cargo build -p jcode-provider-service` is clean (only upstream warnings in `jcode-llm-protocols`).
+**Build status:** `cargo build -p next-code-provider-service` is clean (only upstream warnings in `next-code-llm-protocols`).
 **Branch:** `feature-planning` on `origin`, 40 commits. See  for the old->new type map.
 **Follow-up:** the four 🟡 items depend on fixing the 37 pre-existing compilation errors in `next-code-tui`. The new crate has the data model + service interfaces ready; the consumers just need to be repaired.
 

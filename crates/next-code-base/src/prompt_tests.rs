@@ -126,7 +126,7 @@ fn sponsored_discovery_is_not_injected_into_the_system_prompt() {
 }
 
 #[test]
-fn test_prompt_overlay_files_are_loaded_from_project_and_global_jcode_dirs() {
+fn test_prompt_overlay_files_are_loaded_from_project_and_global_next_code_dirs() {
     let _guard = crate::storage::lock_test_env();
     let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
@@ -173,7 +173,7 @@ fn test_prompt_overlay_files_are_loaded_from_project_and_global_jcode_dirs() {
 }
 
 #[test]
-fn test_preferred_tools_files_are_loaded_from_project_and_global_jcode_dirs() {
+fn test_preferred_tools_files_are_loaded_from_project_and_global_next_code_dirs() {
     let _guard = crate::storage::lock_test_env();
     let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
@@ -368,17 +368,17 @@ fn split_prompt_estimated_tokens_is_positive_when_populated() {
 // Note: `resolve_system_prompt_override` and
 // `load_append_system_prompt_files_from_dir` are internal helpers removed in a
 // refactor. Their coverage is subsumed by
-// `build_system_prompt_full_uses_jcode_system_md_root` (below) and the
+// `build_system_prompt_full_uses_next_code_system_md_root` (below) and the
 // corresponding overlay/preferred-tools loading tests.
 // ---------------------------------------------------------------------------
 
 // (Removed: system_prompt_env_var_replaces_default_root)
-// (Removed: project_jcode_system_md_replaces_default_root)
+// (Removed: project_next_code_system_md_replaces_default_root)
 // (Removed: append_system_prompt_collects_env_and_files_in_order)
 //
 
 #[test]
-fn build_system_prompt_full_uses_jcode_system_md_root() {
+fn build_system_prompt_full_uses_next_code_system_md_root() {
     // NOTE: The `.next-code/SYSTEM.md` root-override mechanism was refactored
     // out of `build_system_prompt_full`. This test is preserved as a basic
     // structural check that the function runs and produces a non-trivial

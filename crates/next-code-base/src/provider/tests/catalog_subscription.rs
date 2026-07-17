@@ -234,7 +234,7 @@ fn test_subscription_model_guard_gates_flagship_models_on_plus_tier() {
     let _guard = crate::storage::lock_test_env();
     let temp_home = tempfile::tempdir().expect("temp home");
     crate::env::set_var("NEXT_CODE_HOME", temp_home.path().to_string_lossy().to_string());
-    crate::env::remove_var(crate::subscription_catalog::JCODE_TIER_ENV);
+    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_TIER_ENV);
     crate::subscription_catalog::clear_runtime_env();
     crate::subscription_catalog::apply_runtime_env();
 
@@ -247,11 +247,11 @@ fn test_subscription_model_guard_gates_flagship_models_on_plus_tier() {
     assert!(error.to_string().contains("Upgrade"), "{error}");
 
     // Flagship tier unlocks Fable too.
-    crate::env::set_var(crate::subscription_catalog::JCODE_TIER_ENV, "flagship");
+    crate::env::set_var(crate::subscription_catalog::NEXT_CODE_TIER_ENV, "flagship");
     assert!(ensure_model_allowed_for_subscription("claude-fable-5").is_ok());
     assert!(ensure_model_allowed_for_subscription("sol").is_ok());
 
-    crate::env::remove_var(crate::subscription_catalog::JCODE_TIER_ENV);
+    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_TIER_ENV);
     crate::env::remove_var("NEXT_CODE_HOME");
     crate::subscription_catalog::clear_runtime_env();
 }
@@ -261,7 +261,7 @@ fn test_filtered_display_models_respects_curated_subscription_catalog() {
     let _guard = crate::storage::lock_test_env();
     let temp_home = tempfile::tempdir().expect("temp home");
     crate::env::set_var("NEXT_CODE_HOME", temp_home.path().to_string_lossy().to_string());
-    crate::env::remove_var(crate::subscription_catalog::JCODE_TIER_ENV);
+    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_TIER_ENV);
     crate::subscription_catalog::clear_runtime_env();
     crate::subscription_catalog::apply_runtime_env();
 
@@ -283,7 +283,7 @@ fn test_filtered_display_models_respects_curated_subscription_catalog() {
         ]
     );
 
-    crate::env::set_var(crate::subscription_catalog::JCODE_TIER_ENV, "flagship");
+    crate::env::set_var(crate::subscription_catalog::NEXT_CODE_TIER_ENV, "flagship");
     let filtered = filtered_display_models(vec![
         "claude-fable-5".to_string(),
         "gpt-5.6-sol".to_string(),
@@ -294,7 +294,7 @@ fn test_filtered_display_models_respects_curated_subscription_catalog() {
         vec!["claude-fable-5".to_string(), "gpt-5.6-sol".to_string()]
     );
 
-    crate::env::remove_var(crate::subscription_catalog::JCODE_TIER_ENV);
+    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_TIER_ENV);
     crate::env::remove_var("NEXT_CODE_HOME");
     crate::subscription_catalog::clear_runtime_env();
 }
@@ -303,7 +303,7 @@ fn test_filtered_display_models_respects_curated_subscription_catalog() {
 fn test_subscription_filters_do_not_activate_from_saved_credentials_alone() {
     let _guard = crate::storage::lock_test_env();
     crate::subscription_catalog::clear_runtime_env();
-    crate::env::set_var(crate::subscription_catalog::JCODE_API_KEY_ENV, "test-key");
+    crate::env::set_var(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV, "test-key");
 
     assert!(ensure_model_allowed_for_subscription("gpt-5.4").is_ok());
     assert_eq!(
@@ -314,6 +314,6 @@ fn test_subscription_filters_do_not_activate_from_saved_credentials_alone() {
         vec!["gpt-5.4".to_string(), "claude-opus-4-8".to_string()]
     );
 
-    crate::env::remove_var(crate::subscription_catalog::JCODE_API_KEY_ENV);
+    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV);
     crate::subscription_catalog::clear_runtime_env();
 }

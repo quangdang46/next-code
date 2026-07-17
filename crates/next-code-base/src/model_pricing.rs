@@ -358,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_key_mapping_covers_jcode_providers() {
+    fn provider_key_mapping_covers_next_code_providers() {
         assert_eq!(models_dev_provider_id("claude:api-key"), Some("anthropic"));
         assert_eq!(models_dev_provider_id("openai:api-key"), Some("openai"));
         assert_eq!(

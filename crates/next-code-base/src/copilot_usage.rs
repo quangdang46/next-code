@@ -140,7 +140,7 @@ mod tests {
     }
 
     #[test]
-    fn usage_path_respects_jcode_home() {
+    fn usage_path_respects_next_code_home() {
         let _env_lock = lock_env();
         clear_tracker();
         let temp = tempfile::tempdir().expect("tempdir");
@@ -150,7 +150,7 @@ mod tests {
     }
 
     #[test]
-    fn save_and_load_roundtrip_under_jcode_home() {
+    fn save_and_load_roundtrip_under_next_code_home() {
         let _env_lock = lock_env();
         clear_tracker();
         let temp = tempfile::tempdir().expect("tempdir");

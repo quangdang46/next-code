@@ -6,7 +6,7 @@ Complete TypeScript type definitions for the next-code plugin system. All types 
 
 ## Table of Contents
 
-- [Plugin Global (`pi`)](#plugin-global-pi)
+- [Plugin Global (`nextcode`)](#plugin-global-nextcode)
 - [Plugin Manifest Types](#plugin-manifest-types)
 - [Event Types](#event-types)
 - [Handler Result Types](#handler-result-types)
@@ -18,9 +18,9 @@ Complete TypeScript type definitions for the next-code plugin system. All types 
 
 ---
 
-## Plugin Global (`pi`)
+## Plugin Global (`nextcode`)
 
-The `pi` object is injected into the QuickJS sandbox as `__jcode_pi` and provides all plugin APIs.
+The `nextcode` object is injected into the QuickJS sandbox as `__nextcode_api` (dual-read: also `jcode` / `__jcode_api`) and provides all plugin APIs.
 
 ```typescript
 interface PluginApi {
@@ -193,8 +193,10 @@ interface PluginFeature {
 
 ```typescript
 interface PluginEngines {
-  /** Required next-code version range (e.g., ">=0.9.0") */
-  next-code?: string;
+  /** Required next-code version range (e.g., ">=0.9.0"). Prefer `nextcode`; dual-read also accepts legacy `jcode`. */
+  nextcode?: string;
+  /** @deprecated dual-read legacy key — prefer `nextcode` */
+  jcode?: string;
 }
 ```
 
@@ -620,7 +622,7 @@ type PermissionDecision = "allow" | "deny" | "ask";
 
 ### ToolDefinition
 
-Used with `pi.registerTool()`:
+Used with `nextcode.registerTool()`:
 
 ```typescript
 interface ToolDefinition {
@@ -668,7 +670,7 @@ interface PluginCapabilities {
   /** Allowed write paths */
   fs_write?: string[];
 
-  /** Allowed network hosts (e.g., ["api.github.com"]) */
+  /** Allowed network hosts (e.g., ["anextcode.github.com"]) */
   network?: string[];
 
   /** Allow shell command execution */

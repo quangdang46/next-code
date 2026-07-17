@@ -139,9 +139,9 @@ fn approved_key_persistence_is_owner_only_and_clear_is_deterministic() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().expect("temp dir");
     let previous_home = std::env::var_os("NEXT_CODE_HOME");
-    let previous_key = std::env::var_os(crate::subscription_catalog::JCODE_API_KEY_ENV);
+    let previous_key = std::env::var_os(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV);
     crate::env::set_var("NEXT_CODE_HOME", temp.path());
-    crate::env::remove_var(crate::subscription_catalog::JCODE_API_KEY_ENV);
+    crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV);
 
     let approved = ApprovedAccountKey {
         api_key: "jck_live_test".to_string(),
@@ -176,7 +176,7 @@ fn approved_key_persistence_is_owner_only_and_clear_is_deterministic() {
         None => crate::env::remove_var("NEXT_CODE_HOME"),
     }
     match previous_key {
-        Some(value) => crate::env::set_var(crate::subscription_catalog::JCODE_API_KEY_ENV, value),
-        None => crate::env::remove_var(crate::subscription_catalog::JCODE_API_KEY_ENV),
+        Some(value) => crate::env::set_var(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV, value),
+        None => crate::env::remove_var(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV),
     }
 }

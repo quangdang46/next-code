@@ -94,7 +94,7 @@ pub fn default_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     Some(
         PathBuf::from(home)
-            .join(".jcode")
+            .join(".next-code")
             .join("provider-defaults.json"),
     )
 }

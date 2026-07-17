@@ -193,7 +193,7 @@ struct ApprovedAccountKeyWire {
 
 pub fn configured_api_base() -> String {
     subscription_catalog::configured_api_base()
-        .unwrap_or_else(|| subscription_catalog::DEFAULT_JCODE_API_BASE.to_string())
+        .unwrap_or_else(|| subscription_catalog::DEFAULT_NEXT_CODE_API_BASE.to_string())
         .trim_end_matches('/')
         .to_string()
 }

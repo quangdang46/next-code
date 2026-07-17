@@ -666,8 +666,8 @@ pub struct SessionSearchResult {
 #[derive(Debug, Clone, Default)]
 pub struct SessionSearchReport {
     pub results: Vec<SessionSearchResult>,
-    pub scanned_jcode_sessions: usize,
-    pub candidate_jcode_sessions: usize,
+    pub scanned_next_code_sessions: usize,
+    pub candidate_next_code_sessions: usize,
     pub scanned_external_sessions: usize,
     pub external_sources: Vec<&'static str>,
     pub read_errors: usize,
@@ -707,9 +707,9 @@ pub fn format_session_search_results(
     ));
 
     output.push_str(&format!(
-        "_Scanned: {} Jcode sessions ({} candidates), {} external sessions{}{}._\n\n",
-        report.scanned_jcode_sessions,
-        report.candidate_jcode_sessions,
+        "_Scanned: {} next-code sessions ({} candidates), {} external sessions{}{}._\n\n",
+        report.scanned_next_code_sessions,
+        report.candidate_next_code_sessions,
         report.scanned_external_sessions,
         if report.external_sources.is_empty() {
             String::new()

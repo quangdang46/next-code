@@ -7,8 +7,8 @@
  * persistence, and capability declarations.
  *
  * Plugins run in QuickJS sandboxes with no DOM, no Node.js built-ins,
- * and limited global objects. The runtime injects a `next-code` global (plugin API name)
- * that provides all plugin APIs.
+ * and limited global objects. The runtime injects a `nextcode` global
+ * (dual-read: also `jcode`) that provides all plugin APIs.
  *
  * Plugin lifecycle:
  *   1. Discovery  ─ next-code scans plugin directories / npm cache / config

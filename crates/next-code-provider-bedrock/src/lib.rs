@@ -52,7 +52,7 @@ pub const API_KEY_ENV: &str = "AWS_BEARER_TOKEN_BEDROCK";
 pub const REGION_ENV: &str = "NEXT_CODE_BEDROCK_REGION";
 #[cfg(not(feature = "aws-sdk"))]
 const NO_AWS_SDK_SUPPORT: &str =
-    "jcode was built without AWS Bedrock support (feature `bedrock` disabled)";
+    "next-code was built without AWS Bedrock support (feature `bedrock` disabled)";
 
 #[derive(Debug, Clone)]
 struct BedrockModelInfo {
@@ -375,7 +375,7 @@ impl BedrockProvider {
         {
             "Bedrock throttled the request. Retry later or request a quota increase."
         } else if lower.contains("region") && lower.contains("missing") {
-            "AWS region is missing. Set AWS_REGION or JCODE_BEDROCK_REGION."
+            "AWS region is missing. Set AWS_REGION or NEXT_CODE_BEDROCK_REGION."
         } else {
             "Bedrock request failed. Check AWS credentials, region, model access, and IAM permissions."
         };

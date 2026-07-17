@@ -398,7 +398,7 @@ fn login_provider_menu_shows_autodetected_auth_and_skip() {
 #[test]
 fn choice_for_login_provider_round_trips_core_targets() {
     assert_eq!(
-        choice_for_login_provider(provider_catalog::JCODE_LOGIN_PROVIDER),
+        choice_for_login_provider(provider_catalog::NEXT_CODE_LOGIN_PROVIDER),
         Some(ProviderChoice::Jcode)
     );
     assert_eq!(

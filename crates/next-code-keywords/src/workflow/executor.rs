@@ -93,8 +93,8 @@ pub fn process_turn_response(
 /// Spawn actions whose execution was deferred to the caller.
 ///
 /// `SpawnAgent` and `SpawnParallel` need access to the agent runtime
-/// (provider, tool registry, etc.) which lives in `jcode-app-core`, not in
-/// `jcode-keywords`. `apply_actions` records the spawn in metadata and
+/// (provider, tool registry, etc.) which lives in `next-code-app-core`, not in
+/// `next-code-keywords`. `apply_actions` records the spawn in metadata and
 /// returns these so the caller can dispatch them via `SubagentTool`.
 #[derive(Debug, Clone)]
 pub struct DeferredSpawn {
@@ -216,7 +216,7 @@ pub struct TurnResult {
     /// modes. Callers are expected to surface these to logs/UI.
     pub conflicts: Vec<crate::conflict::Conflict>,
     /// Spawn actions deferred to the caller because `SubagentTool` lives
-    /// outside `jcode-keywords`. Non-empty means the agent runtime should
+    /// outside `next-code-keywords`. Non-empty means the agent runtime should
     /// dispatch these via `SubagentTool.execute`.
     pub deferred_spawns: Vec<DeferredSpawn>,
 }

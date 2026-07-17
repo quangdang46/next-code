@@ -1,6 +1,6 @@
 # next-code → next-code Rebrand Status
 
-> Snapshot: 2026-07-17 (mop-up verify pass)  
+> Snapshot: 2026-07-17 (final residual sweep)  
 > Branch: `rebrand/next-code`  
 > Contract: [`REBRAND_CONTRACT.md`](./REBRAND_CONTRACT.md) · Allowlist: [`REBRAND_ALLOWLIST.md`](./REBRAND_ALLOWLIST.md)
 
@@ -14,7 +14,7 @@
 | `cargo check -p next-code --bins` | **OK** (warnings only; 0 errors) |
 | `cargo test -p next-code-storage --lib` | **OK** — 8/8 |
 | `cargo test -p next-code-core --lib` | **OK** — 29/29 |
-| `scripts/rebrand/rg_gate.py` | **Red debt meter** — ~1792 unexpected lines / 344 files after allowlist mop |
+| `scripts/rebrand/rg_gate.py` | **Red debt meter** — ~1099 unexpected lines / 289 files after final residual sweep |
 
 **Primary package compiles: YES.**
 
@@ -60,30 +60,30 @@
 
 ---
 
-## Residual counts (2026-07-17 mop-up measure)
+## Residual counts (2026-07-17 final residual sweep)
 
 Filtered scan (excludes `.git`, `target`, `Cargo.lock`, `changelog/**`, `docs/*_PLAN.md`, `docs/plans/**`, `assets/**`, `docs/REBRAND_*`):
 
 | Bucket | Count | Notes |
 |---|---:|---|
-| **Files with residual `jcode` (case-insensitive)** | **~395** | Down from ~1021 at structural cutover |
-| **`JCODE_` tokens in `*.rs`** | **~318** | Dual-read tests, const names, remaining call sites |
-| **`rg_gate` allowlisted hits** | **~1176** | Dual-read, domains, provider module, keyring, beads/origin-sync |
-| **`rg_gate` unexpected hits** | **~1792** | Product string / comment / script debt |
-| **`rg_gate` unexpected files** | **~344** | Gate still red; useful debt meter |
+| **Files with residual `jcode` (case-insensitive)** | **342** | Down from ~395 prior mop / ~1021 at structural cutover |
+| **`JCODE_` tokens in `*.rs`** | **117** | Dual-read tests, dual-name consts, remaining call sites |
+| **`rg_gate` allowlisted hits** | **1091** | Dual-read, domains, provider module, keyring, beads/origin-sync |
+| **`rg_gate` unexpected hits** | **1099** | Product string / comment / script debt |
+| **`rg_gate` unexpected files** | **289** | Gate still red; useful debt meter |
 
 ### Top unexpected debt surfaces (post-allowlist)
 
 | Hits | Path | Class |
 |---:|---|---|
-| 58 | `docs/plugins.md` | narrative docs |
-| 49 | `scripts/dev_cargo.sh` | scripts |
-| 47 | `crates/next-code-terminal-launch/src/lib.rs` | comments / helpers |
-| 46 | `crates/next-code-config-types/src/lib.rs` | config idents / docs |
-| 45 | `crates/next-code-base/src/subscription_catalog.rs` | remaining `JcodeTier` etc. |
+| 46 | `crates/next-code-base/src/subscription_catalog.rs` | dual-name consts / tier labels |
 | 43 | `telemetry-worker/README.md` | infra docs |
-| 34 | `crates/next-code-provider-doctor/src/provider_e2e.rs` | e2e labels / smoke ids |
-| … | scripts, examples, iOS display, Cargo.toml comments | mop follow-ups |
+| 29 | `scripts/dev_cargo.sh` | scripts |
+| 23 | `telemetry-worker/package.json` | package display names |
+| 19 | `scripts/onboarding_sandbox.sh` | scripts |
+| 17 | `crates/next-code-storage/src/lib.rs` | dual-read home paths |
+| 17 | `crates/next-code-base/src/import_tests.rs` | import dual-read fixtures |
+| … | scripts, provider-doctor, Cargo.toml comments | mop follow-ups |
 
 ### By token class (approx)
 
@@ -104,7 +104,7 @@ Filtered scan (excludes `.git`, `target`, `Cargo.lock`, `changelog/**`, `docs/*_
 
 1. Finish remaining env/comment/user-string mop in top residual files (terminal-launch, config-types, subscription_catalog idents, provider-doctor labels).
 2. Scripts (`dev_cargo.sh`, onboarding, benches) prefer `NEXT_CODE_*` with dual-read only where installers need it.
-3. Docs narrative (`docs/plugins.md`, `PARITY.md`, `AGENTS.md`, `RELEASING.md`) — not historical `*_PLAN.md` / changelog.
+3. Docs narrative: **current runbooks cleaned** (`docs/plugins/**`, `docs/plugin-threat-model.md`, `changelog/README.md`, `PLAN_PARITY.md` crate paths, examples plugin comments). Remaining intentional residuals: dual-read notes, domain freeze (`*.jcode.sh`), live keyword ids (`canceljcode`/`stopjcode`), historical `*_PLAN.md` / `docs/plans/**`, REBRAND audit trees.
 4. iOS display / type renames; keep `com.jcode.mobile`.
 5. Telemetry worker package/display names when infra rename is scheduled.
 
@@ -167,4 +167,4 @@ python3 scripts/rebrand/rg_gate.py --max-print 50
 
 ## Summary
 
-Structural rebrand is **complete and builds**. Dual-read env/home/keyring paths are **implemented and tested** (storage 8/8, core 29/29). This mop-up pass rewrote a large share of residual strings/env tokens, fixed compile breakages from mechanical rewrites, and tuned `rg_gate` so intentional dual-read / provider / domain / history noise is allowlisted. **~395 files / ~318 `JCODE_` rust tokens / ~1792 unexpected gate hits** remain as product string debt — gate stays red as a meter until those land. Domains, iOS bundle id, and dual-read shims stay per contract.
+Structural rebrand is **complete and builds**. Dual-read env/home/keyring paths are **implemented and tested** (storage 8/8, core 29/29). Final residual sweep continued narrative/comment/script mop, dual-name const polish, and embedding-path dual-read while preserving provider id aliases and domain/bundle freezes. **342 files / 117 `JCODE_` rust tokens / 1099 unexpected gate hits** remain as product string debt — gate stays red as a meter until those land. Domains, iOS bundle id, and dual-read shims stay per contract.

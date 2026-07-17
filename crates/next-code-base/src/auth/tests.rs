@@ -91,7 +91,7 @@ fn full_and_fast_auth_status_match_for_shared_probe_fields() {
         "NEXT_CODE_HOME",
         "XDG_CONFIG_HOME",
         "HOME",
-        crate::subscription_catalog::JCODE_API_KEY_ENV,
+        crate::subscription_catalog::NEXT_CODE_API_KEY_ENV,
         "ANTHROPIC_API_KEY",
         "OPENAI_API_KEY",
         "OPENROUTER_API_KEY",
@@ -127,7 +127,7 @@ fn full_and_fast_auth_status_match_for_shared_probe_fields() {
     crate::env::set_var("XDG_CONFIG_HOME", &xdg);
     crate::env::set_var("HOME", &home);
     crate::env::set_var(
-        crate::subscription_catalog::JCODE_API_KEY_ENV,
+        crate::subscription_catalog::NEXT_CODE_API_KEY_ENV,
         "next-code-test-key",
     );
     crate::env::set_var("ANTHROPIC_API_KEY", "anthropic-test-key");

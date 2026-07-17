@@ -341,7 +341,7 @@ mod macos {
            // does not implement Drop.
            #[unsafe(super(NSObject))]
            #[thread_kind = MainThreadOnly]
-           #[name = "JcodeMenubarHandler"]
+           #[name = "NextCodeMenubarHandler"]
            struct MenuHandler;
 
            impl MenuHandler {
@@ -356,13 +356,13 @@ mod macos {
                    let Ok(session_id) = object.downcast::<NSString>() else {
                        return;
                    };
-                   launch_jcode_window(vec!["--resume".to_string(), session_id.to_string()]);
+                   launch_next_code_window(vec!["--resume".to_string(), session_id.to_string()]);
                }
 
                /// Launch a brand-new next-code session in a new terminal window.
                #[unsafe(method(newWindow:))]
                fn new_window(&self, _sender: &NSMenuItem) {
-                   launch_jcode_window(Vec::new());
+                   launch_next_code_window(Vec::new());
                }
            }
        );
@@ -376,9 +376,9 @@ mod macos {
 
     /// Launch a next-code window off the main thread so slow terminal startup
     /// (osascript / `open`) never blocks the menu bar UI.
-    fn launch_jcode_window(args: Vec<String>) {
+    fn launch_next_code_window(args: Vec<String>) {
         std::thread::spawn(move || {
-            if let Err(err) = crate::setup_hints::launch_jcode_in_macos_terminal(&args) {
+            if let Err(err) = crate::setup_hints::launch_next_code_in_macos_terminal(&args) {
                 crate::logging::warn(&format!(
                     "menubar: failed to launch next-code window ({args:?}): {err}"
                 ));

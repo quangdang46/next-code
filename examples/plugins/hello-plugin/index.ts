@@ -6,13 +6,14 @@
 //      (looks for *.ts files in ~/.next-code/plugins/ (or legacy ~/.jcode/plugins/) or configured plugin_dirs)
 //   2. Transpiled by next-code-plugin-runtime::Transpiler (SWC, TypeScript -> JS)
 //   3. Evaluated by next-code-plugin-runtime::SandboxContext (QuickJS)
-//   4. The `next-code` object is injected by next-code-plugin-runtime::api::PluginApiBindings
+//   4. The `nextcode` object is injected by next-code-plugin-runtime::api::PluginApiBindings
+//      (dual-read: legacy plugins may use `jcode` / `__jcode_api`)
 //
-// Available APIs on `next-code` (plugin global; next-code v0.29+):
+// Available APIs on `nextcode` (plugin global):
 //   nextcode.on(event, handler)              — register event handler
 //   nextcode.registerTool(toolDef)           — register a tool the LLM can call
 //   nextcode.logger.{info,warn,error,debug}  — log to next-code's tracing system
-//   next-code.kv.{get,set}                    — per-plugin key/value store
+//   nextcode.kv.{get,set}                    — per-plugin key/value store
 //   nextcode.sleep(ms)                       — sleep (capped at 5s)
 //   nextcode.uuid()                          — generate a UUID
 //   nextcode.cwd                             — current working directory (string)

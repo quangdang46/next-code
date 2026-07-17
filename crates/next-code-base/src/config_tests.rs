@@ -566,7 +566,7 @@ fn config_save_invalidates_global_config_cache() {
 }
 
 #[test]
-fn config_env_fingerprint_ignores_runtime_only_jcode_vars() {
+fn config_env_fingerprint_ignores_runtime_only_next_code_vars() {
     let _guard = crate::storage::lock_test_env();
     let prev_runtime_provider = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER");
     let prev_active_provider = std::env::var_os("NEXT_CODE_ACTIVE_PROVIDER");

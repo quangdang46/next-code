@@ -8,7 +8,7 @@ publish = false
 # modules (provider, auth, config, session, message, memory, telemetry, ...)
 # that the server/tool/agent layer depends on. Split out of `next-code-app-core` so
 # the two halves compile as separate rustc units, halving peak compile memory.
-# `next-code-app-core` re-exports this crate (`pub use jcode_base::*`) so that every
+# `next-code-app-core` re-exports this crate (`pub use next_code_base::*`) so that every
 # existing `crate::<module>` path keeps resolving unchanged.
 
 [lib]

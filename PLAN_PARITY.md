@@ -123,7 +123,7 @@ After tools, add the major subsystems as new PARITY.md sections.
 |--------|--------|-------|
 | **XI — Desktop App** | `next-code-desktop/` | Rich text, IPC, animations, gallery, issue browser |
 | **XII — Embedding/Memory Pipeline** | `next-code-embedding/`, `next-code-mempalace-adapter/`, `next-code-memory-types/` | Memory system is partially tracked in VI. Full pipeline includes ONNX model, embedding, memory palace adapter. |
-| **XIII — Auth & Secrets** | `jcode-auth-types/`, `jcode-azure-auth/`, `jcode-keyring-store/`, `jcode-secrets/` | Provider auth, OAuth flows, OS keyring |
+| **XIII — Auth & Secrets** | `next-code-auth-types/`, `next-code-azure-auth/`, `next-code-keyring-store/`, `next-code-secrets/` | Provider auth, OAuth flows, OS keyring |
 | **XIV — Config System** | `next-code-config-types/` | Schema, keybindings, model prefs, hooks config |
 
 ### P2 — Add as sections when convenient

@@ -441,12 +441,12 @@ impl AuthStatus {
                     if crate::subscription_catalog::has_router_base() {
                         format!(
                             "API key (`{}`) + router base",
-                            crate::subscription_catalog::JCODE_API_KEY_ENV
+                            crate::subscription_catalog::NEXT_CODE_API_KEY_ENV
                         )
                     } else {
                         format!(
                             "API key (`{}`), router base pending",
-                            crate::subscription_catalog::JCODE_API_KEY_ENV
+                            crate::subscription_catalog::NEXT_CODE_API_KEY_ENV
                         )
                     }
                 } else {
@@ -599,10 +599,10 @@ impl AuthStatus {
             ),
             crate::provider_catalog::LoginProviderTarget::Jcode => {
                 let (source, detail) = summarize_sources(vec![
-                    env_source(crate::subscription_catalog::JCODE_API_KEY_ENV),
+                    env_source(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV),
                     config_source(
-                        crate::subscription_catalog::JCODE_API_KEY_ENV,
-                        crate::subscription_catalog::JCODE_ENV_FILE,
+                        crate::subscription_catalog::NEXT_CODE_API_KEY_ENV,
+                        crate::subscription_catalog::NEXT_CODE_ENV_FILE,
                         "~/.config/next-code/next-code-subscription.env",
                     ),
                 ]);

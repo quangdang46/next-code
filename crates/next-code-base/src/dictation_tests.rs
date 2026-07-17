@@ -124,7 +124,7 @@ fn read_resumed_session_id_from_cmdline_for_current_process() {
 }
 
 #[test]
-fn extract_session_short_name_from_jcode_window_title() {
+fn extract_session_short_name_from_next_code_window_title() {
     assert_eq!(
         extract_session_short_name_from_window_title("🦢 next-code/cliff Swan [self-dev]"),
         Some("swan".to_string())
@@ -173,7 +173,7 @@ fn remember_and_read_last_focused_session() {
 
 #[cfg(target_os = "linux")]
 #[test]
-fn focused_jcode_session_uses_niri_window_title_when_process_name_is_generic() {
+fn focused_next_code_session_uses_niri_window_title_when_process_name_is_generic() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().expect("tempdir");
     let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());

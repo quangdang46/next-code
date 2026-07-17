@@ -22,7 +22,7 @@ use next_code_provider_antigravity_runtime::AntigravityProvider;
 /// Resolve the per-request timeout for an OpenAI-compatible smoke probe.
 ///
 /// Defaults to `default_secs` (the historical hard-coded values), but callers can
-/// raise it via `JCODE_LIVE_SMOKE_TIMEOUT_SECS` for slow reasoning models (e.g.
+/// raise it via `NEXT_CODE_LIVE_SMOKE_TIMEOUT_SECS` for slow reasoning models (e.g.
 /// NVIDIA's 550B Nemotron Ultra, which emits long hidden reasoning and can take
 /// well over a minute to return a single completion). The override applies a floor
 /// so it can only extend, never shorten, the built-in deadline.
@@ -141,7 +141,7 @@ pub async fn fetch_live_openai_compatible_models(
 }
 
 /// Normalize a model id returned by a provider's `/models` endpoint into the
-/// bare id jcode uses for routing and coverage keys.
+/// bare id next-code uses for routing and coverage keys.
 ///
 /// Google's OpenAI-compatible Gemini surface returns ids prefixed with
 /// `models/` (e.g. `models/gemini-2.5-flash`); chat/stream/tool calls accept
@@ -1013,7 +1013,7 @@ pub async fn run_live_claude_native_stream_smoke(
 ///      produces a coherent final answer.
 ///
 /// This single round-trip is the evidence for the `tool_call_parse`,
-/// `tool_execution_loop`, `tool_result_followup`, and `real_jcode_tool_smoke`
+/// `tool_execution_loop`, `tool_result_followup`, and `real_jcode_tool_smoke` (legacy checkpoint id)
 /// checkpoints (mirroring how the OpenAI-compatible tool probe derives all
 /// four from one exchange).
 pub async fn run_live_claude_native_tool_smoke(
@@ -1237,7 +1237,7 @@ pub async fn run_live_antigravity_native_smoke(
 /// Stage: streaming chat completion.
 ///
 /// The Antigravity runtime delivers `generateContent` as a single response that
-/// jcode re-emits as text deltas, so we assert the runtime produced streamed
+/// next-code re-emits as text deltas, so we assert the runtime produced streamed
 /// text and reached a clean end-of-message rather than requiring many deltas.
 pub async fn run_live_antigravity_native_stream_smoke(
     model: &str,
@@ -1335,7 +1335,7 @@ pub async fn run_live_antigravity_native_stream_smoke(
 /// reproduces the `400 ... "Function call is missing a thought_signature ...
 /// position N"` field failure (a single round-trip cannot). Evidence for the
 /// `tool_call_parse`, `tool_execution_loop`, `tool_result_followup`, and
-/// `real_jcode_tool_smoke` checkpoints.
+/// `real_jcode_tool_smoke` (legacy checkpoint id) checkpoints.
 pub async fn run_live_antigravity_native_tool_smoke(
     model: &str,
 ) -> anyhow::Result<next_code_base::live_tests::LiveVerificationStage> {
@@ -1427,7 +1427,7 @@ pub async fn run_live_native_provider_smoke(
 
 /// Stage: streaming chat completion against an arbitrary native provider.
 ///
-/// Some native runtimes deliver a single coalesced response that jcode re-emits
+/// Some native runtimes deliver a single coalesced response that next-code re-emits
 /// as one or more text deltas, so we assert the runtime produced streamed text
 /// and a clean end-of-message rather than requiring a high delta count.
 pub async fn run_live_native_provider_stream_smoke(

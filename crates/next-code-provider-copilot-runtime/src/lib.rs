@@ -186,19 +186,22 @@ impl CopilotApiProvider {
     }
 
     fn get_or_create_machine_id() -> String {
-        let machine_id_path = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".jcode")
-            .join("machine_id");
-        if let Ok(id) = std::fs::read_to_string(&machine_id_path) {
-            let id = id.trim().to_string();
-            if !id.is_empty() {
-                return id;
+        // Prefer ~/.next-code/machine_id; dual-read legacy ~/.jcode/machine_id.
+        // New writes always go to the canonical path.
+        let home = dirs::home_dir().unwrap_or_default();
+        let primary = home.join(".next-code").join("machine_id");
+        let legacy = home.join(".jcode").join("machine_id");
+        for path in [&primary, &legacy] {
+            if let Ok(id) = std::fs::read_to_string(path) {
+                let id = id.trim().to_string();
+                if !id.is_empty() {
+                    return id;
+                }
             }
         }
         let id = Uuid::new_v4().to_string().replace('-', "");
-        let _ = std::fs::create_dir_all(machine_id_path.parent().unwrap_or(&machine_id_path));
-        let _ = std::fs::write(&machine_id_path, &id);
+        let _ = std::fs::create_dir_all(primary.parent().unwrap_or(&primary));
+        let _ = std::fs::write(&primary, &id);
         id
     }
 

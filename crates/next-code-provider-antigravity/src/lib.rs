@@ -441,7 +441,7 @@ pub fn remap_unsupported_model(model: &str) -> &str {
 /// Whether a resolved Antigravity model id targets a Gemini model.
 ///
 /// Gemini is the backend's native path and accepts every JSON Schema construct
-/// jcode emits, so no schema rewriting is needed for these models.
+/// next-code emits, so no schema rewriting is needed for these models.
 pub fn model_is_gemini(model: &str) -> bool {
     model.trim().to_ascii_lowercase().starts_with("gemini")
 }
@@ -451,7 +451,7 @@ pub fn model_is_gemini(model: &str) -> bool {
 ///
 /// The Antigravity Cloud Code backend multiplexes several upstreams behind one
 /// `generateContent` endpoint, and each upstream validates tool schemas
-/// differently. jcode's emitted schemas are valid JSON Schema draft 2020-12
+/// differently. next-code's emitted schemas are valid JSON Schema draft 2020-12
 /// (verified against the metaschema), but two upstreams reject specific
 /// constructs after their own re-translation:
 ///

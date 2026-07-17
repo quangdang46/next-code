@@ -1,4 +1,4 @@
-//! Compile-time build/version metadata for jcode.
+//! Compile-time build/version metadata for next-code.
 //!
 //! The build script (`build.rs`) computes git- and version-derived values and
 //! emits them via `cargo:rustc-env`. This module re-exposes them as `pub const`
@@ -24,7 +24,8 @@ pub const CHANGELOG: &str = env!("NEXT_CODE_CHANGELOG");
 /// Root crate package version (mirrors the historical `CARGO_PKG_VERSION`).
 pub const PKG_VERSION: &str = env!("NEXT_CODE_PKG_VERSION");
 
-/// Whether this binary was built as a release build (`JCODE_RELEASE_BUILD=1`).
+/// Whether this binary was built as a release build (`NEXT_CODE_RELEASE_BUILD=1`;
+/// dual-read: legacy `JCODE_RELEASE_BUILD=1`).
 pub const fn is_release_build() -> bool {
     option_env!("NEXT_CODE_RELEASE_BUILD").is_some()
 }

@@ -2,7 +2,7 @@
 name = "next-code-provider-openrouter-runtime"
 version = "0.1.0"
 edition = "2024"
-description = "OpenRouter / OpenAI-compatible provider runtime (aggregator + direct profile endpoints) for jcode, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+description = "OpenRouter / OpenAI-compatible provider runtime (aggregator + direct profile endpoints) for next-code, kept downstream of next-code-base so provider edits do not rebuild the app spine"
 
 [lib]
 name = "next_code_provider_openrouter_runtime"

@@ -1,7 +1,7 @@
 //! BestOfN — workflow handler.
 //!
 //! Injects prompt guidance so the model uses the best-of-N tool pipeline.
-//! Real orchestration lives in jcode-app-core (`best_of_n_edit` /
+//! Real orchestration lives in next-code-app-core (`best_of_n_edit` /
 //! `propose_*` / `best_of_n_apply` and `Agent::run_best_of_n`).
 
 use super::{WorkflowAction, WorkflowContext, WorkflowHandler};

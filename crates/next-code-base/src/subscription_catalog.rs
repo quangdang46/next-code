@@ -1,16 +1,43 @@
 use crate::provider_catalog;
 
-pub const JCODE_API_KEY_ENV: &str = "NEXT_CODE_API_KEY";
-pub const JCODE_API_BASE_ENV: &str = "NEXT_CODE_API_BASE";
-pub const JCODE_ACCOUNT_ID_ENV: &str = "NEXT_CODE_ACCOUNT_ID";
-pub const JCODE_ACCOUNT_EMAIL_ENV: &str = "NEXT_CODE_ACCOUNT_EMAIL";
-pub const JCODE_TIER_ENV: &str = "NEXT_CODE_TIER";
-pub const JCODE_ENV_FILE: &str = "next-code-subscription.env";
-pub const JCODE_CACHE_NAMESPACE: &str = "jcode-subscription";
-pub const JCODE_SUBSCRIPTION_ACTIVE_ENV: &str = "NEXT_CODE_SUBSCRIPTION_ACTIVE";
-pub const DEFAULT_JCODE_API_BASE: &str = "https://api.jcode.sh/v1";
-pub const JCODE_PRICING_URL: &str = "https://jcode.sh/pricing";
-pub const JCODE_ACCOUNT_URL: &str = "https://jcode.sh/account";
+// Canonical subscription catalog constants (NEXT_CODE_*).
+pub const NEXT_CODE_API_KEY_ENV: &str = "NEXT_CODE_API_KEY";
+pub const NEXT_CODE_API_BASE_ENV: &str = "NEXT_CODE_API_BASE";
+pub const NEXT_CODE_ACCOUNT_ID_ENV: &str = "NEXT_CODE_ACCOUNT_ID";
+pub const NEXT_CODE_ACCOUNT_EMAIL_ENV: &str = "NEXT_CODE_ACCOUNT_EMAIL";
+pub const NEXT_CODE_TIER_ENV: &str = "NEXT_CODE_TIER";
+pub const NEXT_CODE_ENV_FILE: &str = "next-code-subscription.env";
+/// Cache namespace for the managed subscription (kept as `jcode-subscription`
+/// so existing on-disk caches continue to hit during the dual-read window).
+pub const NEXT_CODE_CACHE_NAMESPACE: &str = "jcode-subscription";
+pub const NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV: &str = "NEXT_CODE_SUBSCRIPTION_ACTIVE";
+pub const DEFAULT_NEXT_CODE_API_BASE: &str = "https://api.jcode.sh/v1";
+pub const NEXT_CODE_PRICING_URL: &str = "https://jcode.sh/pricing";
+pub const NEXT_CODE_ACCOUNT_URL: &str = "https://jcode.sh/account";
+
+// Deprecated JCODE_* aliases — equal to the NEXT_CODE_* names above.
+#[deprecated(note = "renamed to NEXT_CODE_API_KEY_ENV")]
+pub const JCODE_API_KEY_ENV: &str = NEXT_CODE_API_KEY_ENV;
+#[deprecated(note = "renamed to NEXT_CODE_API_BASE_ENV")]
+pub const JCODE_API_BASE_ENV: &str = NEXT_CODE_API_BASE_ENV;
+#[deprecated(note = "renamed to NEXT_CODE_ACCOUNT_ID_ENV")]
+pub const JCODE_ACCOUNT_ID_ENV: &str = NEXT_CODE_ACCOUNT_ID_ENV;
+#[deprecated(note = "renamed to NEXT_CODE_ACCOUNT_EMAIL_ENV")]
+pub const JCODE_ACCOUNT_EMAIL_ENV: &str = NEXT_CODE_ACCOUNT_EMAIL_ENV;
+#[deprecated(note = "renamed to NEXT_CODE_TIER_ENV")]
+pub const JCODE_TIER_ENV: &str = NEXT_CODE_TIER_ENV;
+#[deprecated(note = "renamed to NEXT_CODE_ENV_FILE")]
+pub const JCODE_ENV_FILE: &str = NEXT_CODE_ENV_FILE;
+#[deprecated(note = "renamed to NEXT_CODE_CACHE_NAMESPACE")]
+pub const JCODE_CACHE_NAMESPACE: &str = NEXT_CODE_CACHE_NAMESPACE;
+#[deprecated(note = "renamed to NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV")]
+pub const JCODE_SUBSCRIPTION_ACTIVE_ENV: &str = NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV;
+#[deprecated(note = "renamed to DEFAULT_NEXT_CODE_API_BASE")]
+pub const DEFAULT_JCODE_API_BASE: &str = DEFAULT_NEXT_CODE_API_BASE;
+#[deprecated(note = "renamed to NEXT_CODE_PRICING_URL")]
+pub const JCODE_PRICING_URL: &str = NEXT_CODE_PRICING_URL;
+#[deprecated(note = "renamed to NEXT_CODE_ACCOUNT_URL")]
+pub const JCODE_ACCOUNT_URL: &str = NEXT_CODE_ACCOUNT_URL;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum JcodeTier {
@@ -196,7 +223,7 @@ pub fn effective_tier() -> JcodeTier {
 
 /// The last tier reported by the backend, if any was persisted.
 pub fn cached_tier() -> Option<JcodeTier> {
-    provider_catalog::load_env_value_from_env_or_config(JCODE_TIER_ENV, JCODE_ENV_FILE)
+    provider_catalog::load_env_value_from_env_or_config(NEXT_CODE_TIER_ENV, NEXT_CODE_ENV_FILE)
         .as_deref()
         .and_then(JcodeTier::parse)
 }
@@ -204,8 +231,8 @@ pub fn cached_tier() -> Option<JcodeTier> {
 /// Persist the last-known tier reported by the backend (`None` clears it).
 pub fn store_cached_tier(tier: Option<JcodeTier>) -> anyhow::Result<()> {
     provider_catalog::save_env_value_to_env_file(
-        JCODE_TIER_ENV,
-        JCODE_ENV_FILE,
+        NEXT_CODE_TIER_ENV,
+        NEXT_CODE_ENV_FILE,
         tier.map(JcodeTier::as_str),
     )
 }
@@ -227,11 +254,11 @@ pub fn routing_policy_detail(model: &CuratedModel) -> String {
 }
 
 pub fn configured_api_key() -> Option<String> {
-    provider_catalog::load_env_value_from_env_or_config(JCODE_API_KEY_ENV, JCODE_ENV_FILE)
+    provider_catalog::load_env_value_from_env_or_config(NEXT_CODE_API_KEY_ENV, NEXT_CODE_ENV_FILE)
 }
 
 pub fn configured_api_base() -> Option<String> {
-    provider_catalog::load_env_value_from_env_or_config(JCODE_API_BASE_ENV, JCODE_ENV_FILE)
+    provider_catalog::load_env_value_from_env_or_config(NEXT_CODE_API_BASE_ENV, NEXT_CODE_ENV_FILE)
 }
 
 pub fn has_credentials() -> bool {
@@ -252,12 +279,12 @@ pub fn persist_account_credentials(
     }
 
     for (key, value) in [
-        (JCODE_API_KEY_ENV, Some(api_key)),
-        (JCODE_ACCOUNT_ID_ENV, nonempty(account_id)),
-        (JCODE_ACCOUNT_EMAIL_ENV, nonempty(email)),
-        (JCODE_TIER_ENV, nonempty(tier)),
+        (NEXT_CODE_API_KEY_ENV, Some(api_key)),
+        (NEXT_CODE_ACCOUNT_ID_ENV, nonempty(account_id)),
+        (NEXT_CODE_ACCOUNT_EMAIL_ENV, nonempty(email)),
+        (NEXT_CODE_TIER_ENV, nonempty(tier)),
     ] {
-        provider_catalog::save_env_value_to_env_file(key, JCODE_ENV_FILE, value)?;
+        provider_catalog::save_env_value_to_env_file(key, NEXT_CODE_ENV_FILE, value)?;
     }
     ensure_account_credential_permissions()
 }
@@ -267,12 +294,12 @@ pub fn persist_account_credentials(
 /// configuration, not an authorization credential.
 pub fn clear_account_credentials() -> anyhow::Result<()> {
     for key in [
-        JCODE_API_KEY_ENV,
-        JCODE_ACCOUNT_ID_ENV,
-        JCODE_ACCOUNT_EMAIL_ENV,
-        JCODE_TIER_ENV,
+        NEXT_CODE_API_KEY_ENV,
+        NEXT_CODE_ACCOUNT_ID_ENV,
+        NEXT_CODE_ACCOUNT_EMAIL_ENV,
+        NEXT_CODE_TIER_ENV,
     ] {
-        provider_catalog::save_env_value_to_env_file(key, JCODE_ENV_FILE, None)?;
+        provider_catalog::save_env_value_to_env_file(key, NEXT_CODE_ENV_FILE, None)?;
     }
     clear_runtime_env();
     ensure_account_credential_permissions()
@@ -283,7 +310,7 @@ fn nonempty(value: Option<&str>) -> Option<&str> {
 }
 
 pub fn account_credential_path() -> anyhow::Result<std::path::PathBuf> {
-    Ok(crate::storage::app_config_dir()?.join(JCODE_ENV_FILE))
+    Ok(crate::storage::app_config_dir()?.join(NEXT_CODE_ENV_FILE))
 }
 
 /// Re-harden and verify the subscription file after every credential mutation.
@@ -315,7 +342,7 @@ pub fn has_router_base() -> bool {
 }
 
 pub fn is_runtime_mode_enabled() -> bool {
-    std::env::var(JCODE_SUBSCRIPTION_ACTIVE_ENV)
+    std::env::var(NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV)
         .ok()
         .map(|value| {
             matches!(
@@ -327,14 +354,14 @@ pub fn is_runtime_mode_enabled() -> bool {
 }
 
 pub fn apply_runtime_env() {
-    crate::env::set_var(JCODE_SUBSCRIPTION_ACTIVE_ENV, "1");
+    crate::env::set_var(NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV, "1");
     crate::env::set_var(
         "NEXT_CODE_OPENROUTER_API_BASE",
-        configured_api_base().unwrap_or_else(|| DEFAULT_JCODE_API_BASE.to_string()),
+        configured_api_base().unwrap_or_else(|| DEFAULT_NEXT_CODE_API_BASE.to_string()),
     );
-    crate::env::set_var("NEXT_CODE_OPENROUTER_API_KEY_NAME", JCODE_API_KEY_ENV);
-    crate::env::set_var("NEXT_CODE_OPENROUTER_ENV_FILE", JCODE_ENV_FILE);
-    crate::env::set_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", JCODE_CACHE_NAMESPACE);
+    crate::env::set_var("NEXT_CODE_OPENROUTER_API_KEY_NAME", NEXT_CODE_API_KEY_ENV);
+    crate::env::set_var("NEXT_CODE_OPENROUTER_ENV_FILE", NEXT_CODE_ENV_FILE);
+    crate::env::set_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", NEXT_CODE_CACHE_NAMESPACE);
     crate::env::set_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES", "0");
     crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "jcode-subscription");
     crate::env::remove_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH");
@@ -343,7 +370,7 @@ pub fn apply_runtime_env() {
 }
 
 pub fn clear_runtime_env() {
-    crate::env::remove_var(JCODE_SUBSCRIPTION_ACTIVE_ENV);
+    crate::env::remove_var(NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV);
     crate::env::remove_var("NEXT_CODE_OPENROUTER_API_BASE");
     crate::env::remove_var("NEXT_CODE_OPENROUTER_API_KEY_NAME");
     crate::env::remove_var("NEXT_CODE_OPENROUTER_ENV_FILE");
@@ -459,7 +486,7 @@ mod tests {
     #[test]
     fn effective_tier_defaults_to_plus_when_unknown() {
         let _guard = crate::storage::lock_test_env();
-        crate::env::remove_var(JCODE_TIER_ENV);
+        crate::env::remove_var(NEXT_CODE_TIER_ENV);
         let temp = tempfile::tempdir().expect("temp home");
         crate::env::set_var("NEXT_CODE_HOME", temp.path().to_string_lossy().to_string());
 
@@ -470,12 +497,12 @@ mod tests {
         assert!(is_model_allowed_for_current_tier("gpt-5.6-sol"));
         assert!(!is_model_allowed_for_current_tier("claude-fable-5"));
 
-        crate::env::set_var(JCODE_TIER_ENV, "mystery");
+        crate::env::set_var(NEXT_CODE_TIER_ENV, "mystery");
         assert_eq!(cached_tier(), None);
         assert_eq!(effective_tier(), JcodeTier::Plus);
 
         for tier in [JcodeTier::Pro, JcodeTier::Max, JcodeTier::Ultra] {
-            crate::env::set_var(JCODE_TIER_ENV, tier.as_str());
+            crate::env::set_var(NEXT_CODE_TIER_ENV, tier.as_str());
             assert_eq!(effective_tier(), tier);
             assert!(is_model_allowed_for_current_tier("claude-opus-4-8"));
             assert!(is_model_allowed_for_current_tier("gpt-5.5"));
@@ -483,7 +510,7 @@ mod tests {
             assert!(!is_model_allowed_for_current_tier("claude-fable-5"));
         }
 
-        crate::env::remove_var(JCODE_TIER_ENV);
+        crate::env::remove_var(NEXT_CODE_TIER_ENV);
         store_cached_tier(Some(JcodeTier::Flagship)).expect("persist tier");
         assert_eq!(cached_tier(), Some(JcodeTier::Flagship));
         assert!(is_model_allowed_for_current_tier("claude-fable-5"));
@@ -493,7 +520,7 @@ mod tests {
         assert_eq!(cached_tier(), None);
 
         crate::env::remove_var("NEXT_CODE_HOME");
-        crate::env::remove_var(JCODE_TIER_ENV);
+        crate::env::remove_var(NEXT_CODE_TIER_ENV);
     }
 
     #[test]

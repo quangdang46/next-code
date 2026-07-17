@@ -213,8 +213,8 @@ fn bench_real_session_search_corpus() {
         eprintln!(
             "BENCH query={query} elapsed_ms={} scanned={} candidates={} results={} truncated={}",
             start.elapsed().as_millis(),
-            report.scanned_jcode_sessions,
-            report.candidate_jcode_sessions,
+            report.scanned_next_code_sessions,
+            report.candidate_next_code_sessions,
             report.results.len(),
             report.truncated
         );
@@ -235,7 +235,7 @@ fn bench_real_session_search_corpus() {
         eprintln!(
             "BENCH_EXTERNAL query={query} elapsed_ms={} scanned_next_code={} scanned_external={} sources={:?} results={} truncated={}",
             start.elapsed().as_millis(),
-            report.scanned_jcode_sessions,
+            report.scanned_next_code_sessions,
             report.scanned_external_sessions,
             report.external_sources,
             report.results.len(),
@@ -586,7 +586,7 @@ fn external_codex_sessions_are_searchable_without_next_code_session_dir() {
         options.context_after = 1;
         let report = run_report(home, "external-codex-needle", &options);
 
-        assert_eq!(report.scanned_jcode_sessions, 0);
+        assert_eq!(report.scanned_next_code_sessions, 0);
         assert!(report.scanned_external_sessions >= 1);
         assert_eq!(report.external_sources, vec!["codex"]);
         assert_eq!(report.results.len(), 1);
@@ -645,7 +645,7 @@ fn external_cursor_sessions_are_searchable_without_next_code_session_dir() {
         options.source_filter = Some("cursor".to_string());
         let report = run_report(home, "external-cursor-needle", &options);
 
-        assert_eq!(report.scanned_jcode_sessions, 0);
+        assert_eq!(report.scanned_next_code_sessions, 0);
         assert!(report.scanned_external_sessions >= 1);
         assert_eq!(report.external_sources, vec!["cursor"]);
         assert_eq!(report.results.len(), 1);

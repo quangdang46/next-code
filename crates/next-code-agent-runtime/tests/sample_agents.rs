@@ -1,9 +1,9 @@
 //! Integration test: load the bundled sample agents in
-//! `<project>/.jcode/agents/` and assert the registry behaves as
-//! documented.
+//! `<project>/.jcode/agents/` (legacy sample path; dual-read with
+//! `.next-code/agents/`) and assert the registry behaves as documented.
 //!
 //! Lives in `tests/` so it exercises the public API the way real callers
-//! will (the `jcode` binary, the future `cli/agents` module, etc.).
+//! will (the `next-code` binary, the future `cli/agents` module, etc.).
 //!
 //! If a future PR moves the sample agents elsewhere, update `SAMPLES_DIR`.
 
@@ -19,7 +19,7 @@ use next_code_agent_runtime::{
 /// chooses.
 fn samples_dir() -> PathBuf {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // crates/jcode-agent-runtime → ../../ .jcode/agents
+    // crates/next-code-agent-runtime → ../../.jcode/agents (sample path on disk)
     crate_dir
         .parent()
         .unwrap()
@@ -84,7 +84,7 @@ fn file_picker_sample_has_expected_shape() {
     let resolved = agent.resolve_model("session-model");
     assert_eq!(
         resolved, "session-model",
-        "no JCODE_ROUTING_ROUTINE → session default"
+        "no NEXT_CODE_ROUTING_ROUTINE → session default"
     );
 }
 
@@ -173,7 +173,7 @@ fn basher_sample_has_expected_shape() {
     let resolved = agent.resolve_model("session-model");
     assert_eq!(
         resolved, "session-model",
-        "no JCODE_ROUTING_ROUTINE → session default"
+        "no NEXT_CODE_ROUTING_ROUTINE → session default"
     );
 }
 

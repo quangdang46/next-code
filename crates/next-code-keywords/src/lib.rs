@@ -1,4 +1,4 @@
-//! Magic keyword system for jcode.
+//! Magic keyword system for next-code.
 //!
 //! Detects keyword triggers in user input (default: **Strict** `$keyword` /
 //! token aliases), manages persistent mode state, builds prompt injections,
@@ -11,7 +11,7 @@
 //!     ↓
 //! detector::detect_keywords_with(Strict) → DetectedKeyword
 //!     ↓
-//! state::update_modes_with_limit() → ModeState (.jcode/state/modes.toml)
+//! state::update_modes_with_limit() → ModeState (.next-code/state/modes.toml)
 //!     ↓
 //! workflow::executor::process_turn_with_options()
 //!     ↓

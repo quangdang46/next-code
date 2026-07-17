@@ -2220,7 +2220,7 @@ fn runtime_display_name_for_profile_runtime_instance() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("next-code-home");
-    let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _next_code_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env();
@@ -2313,7 +2313,7 @@ fn named_profile_extra_body_threads_into_provider() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("next-code-home");
-    let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _next_code_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env();
@@ -2695,7 +2695,7 @@ fn user_named_profile_prefix_is_stripped_even_without_profile_id() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("next-code-home");
-    let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _next_code_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env();

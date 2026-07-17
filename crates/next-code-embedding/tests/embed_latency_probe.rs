@@ -8,19 +8,15 @@
 //! ~100 MB stayed resident indefinitely.
 //!
 //! Run with:
-//!   cargo test -p jcode-embedding --test embed_latency_probe -- --ignored --nocapture
+//!   cargo test -p next-code-embedding --test embed_latency_probe -- --ignored --nocapture
 //!
 //! Requires the MiniLM model to be installed (~/.next-code/models/all-MiniLM-L6-v2).
 
 use std::path::PathBuf;
 
 fn model_dir() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME").map(PathBuf::from)?;
-    let dir = home
-        .join(".jcode")
-        .join("models")
-        .join(next_code_embedding::MODEL_NAME);
-    dir.join("model.onnx").exists().then_some(dir)
+    next_code_embedding::default_model_dir()
+        .filter(|dir| dir.join("model.onnx").exists())
 }
 
 #[test]

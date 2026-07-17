@@ -67,7 +67,7 @@ pub use next_code_plugin_core::ToolTier;
 /// uses canonical internal names (`agentgrep`, `bash`). This mapping ensures
 /// all of those forms resolve correctly.
 ///
-/// This lives in `jcode-tool-types` (rather than the tool `Registry`) so that
+/// This lives in `next-code-tool-types` (rather than the tool `Registry`) so that
 /// low-level crates such as config can normalize tool names without depending
 /// on the full tool subsystem.
 pub fn resolve_tool_name(name: &str) -> &str {

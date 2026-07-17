@@ -273,7 +273,7 @@ const FULL_PIPELINE_LABELS: &[(&str, &str)] = &[
     (checkpoints::TOOL_CALL_PARSE, "Tool-call parse"),
     (checkpoints::TOOL_EXECUTION_LOOP, "Tool execution loop"),
     (checkpoints::TOOL_RESULT_FOLLOWUP, "Tool-result followup"),
-    (checkpoints::REAL_JCODE_TOOL_SMOKE, "Real Jcode tool smoke"),
+    (checkpoints::REAL_JCODE_TOOL_SMOKE, "Real next-code tool smoke"),
     (checkpoints::REASONING_CAPABILITY, "Reasoning capability"),
 ];
 

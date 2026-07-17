@@ -921,12 +921,12 @@ fn api_key_env_bindings_for_provider(provider_id: &str) -> Vec<(String, String)>
         )],
         "next-code" | "jcode" => vec![
             (
-                crate::subscription_catalog::JCODE_API_KEY_ENV.to_string(),
-                crate::subscription_catalog::JCODE_ENV_FILE.to_string(),
+                crate::subscription_catalog::NEXT_CODE_API_KEY_ENV.to_string(),
+                crate::subscription_catalog::NEXT_CODE_ENV_FILE.to_string(),
             ),
             (
-                crate::subscription_catalog::JCODE_API_BASE_ENV.to_string(),
-                crate::subscription_catalog::JCODE_ENV_FILE.to_string(),
+                crate::subscription_catalog::NEXT_CODE_API_BASE_ENV.to_string(),
+                crate::subscription_catalog::NEXT_CODE_ENV_FILE.to_string(),
             ),
         ],
         "bedrock" => vec![
@@ -1399,9 +1399,9 @@ mod tests {
             ("openai", "openai", "OpenAI"),
             ("openai-key", "openai-api", "OpenAI API"),
             ("openrouter", "openrouter", "OpenRouter"),
-            ("subscription", "next-code", "Next Code Subscription"),
-            ("jcode", "next-code", "Next Code Subscription"),
-            ("next-code", "next-code", "Next Code Subscription"),
+            ("subscription", "next-code", "Next Code"),
+            ("jcode", "next-code", "Next Code"),
+            ("next-code", "next-code", "Next Code"),
             ("bedrock", "bedrock", "AWS Bedrock"),
             ("cursor", "cursor", "Cursor"),
             ("copilot", "copilot", "GitHub Copilot"),

@@ -2,7 +2,7 @@
 name = "next-code-provider-anthropic-runtime"
 version = "0.1.0"
 edition = "2024"
-description = "Direct Anthropic Messages API provider runtime (OAuth + API key, SSE streaming) for jcode, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+description = "Direct Anthropic Messages API provider runtime (OAuth + API key, SSE streaming) for next-code, kept downstream of next-code-base so provider edits do not rebuild the app spine"
 
 [lib]
 name = "next_code_provider_anthropic_runtime"

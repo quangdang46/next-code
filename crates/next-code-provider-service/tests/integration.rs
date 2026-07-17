@@ -328,7 +328,7 @@ async fn end_to_end_recents_persist_across_sessions() {
         .unwrap();
 
     // Pre-condition: the prefs file (under our tmp home) starts empty.
-    let prefs_path = tmp_home.join(".jcode").join("model_prefs.json");
+    let prefs_path = tmp_home.join(".next-code").join("model_prefs.json");
     let _ = std::fs::remove_file(&prefs_path);
     assert!(ModelPrefs::load(&prefs_path).unwrap().recents.is_empty());
 

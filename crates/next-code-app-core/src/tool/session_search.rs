@@ -623,7 +623,7 @@ fn search_sessions_blocking(
         let mut files = collection.files;
         if !files.is_empty() {
             files.sort_unstable_by(|a, b| b.mtime.cmp(&a.mtime));
-            report.scanned_jcode_sessions = files.len();
+            report.scanned_next_code_sessions = files.len();
 
             if !options.include_current {
                 files.retain(|candidate| candidate.session_id_hint != options.current_session_id);
@@ -661,7 +661,7 @@ fn search_sessions_blocking(
                     }
                 };
                 candidates.sort_unstable_by(|a, b| b.mtime.cmp(&a.mtime));
-                report.candidate_jcode_sessions = candidates.len();
+                report.candidate_next_code_sessions = candidates.len();
                 if using_index {
                     let indexed_budget = indexed_candidate_budget(options);
                     if candidates.len() > indexed_budget {

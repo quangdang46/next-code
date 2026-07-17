@@ -1,18 +1,18 @@
-# Migration from old `jcode-provider-core` types to `jcode-provider-service`
+# Migration from old `next-code-provider-core` types to `next-code-provider-service`
 
 This document maps every type and function in the *old* provider
 vocabulary to its *new* equivalent. Use it as a checklist when
 migrating a consumer from the old code path to the new one.
 
 The actual deletion of the old types is gated on the
-`jcode-tui` crate compiling cleanly (Phase 6 of
-`docs/plans/JCODE_PROVIDER.md`). Until that happens, the old
+`next-code-tui` crate compiling cleanly (Phase 6 of
+`docs/plans/JCODE_PROVIDER.md` — historical plan filename). Until that happens, the old
 types stay in place; new code should target the equivalents
 listed here.
 
 ## Old → New type mapping
 
-| Old (in `jcode-provider-core`) | New (in `jcode-provider-service`) |
+| Old (in `next-code-provider-core`) | New (in `next-code-provider-service`) |
 |-------------------------------|-------------------------------------|
 | `auth_mode::AuthMode`         | `integration::AuthMethod` |
 | `auth_mode::AuthRoute`        | `service::ProviderProfile` (with auth suffix) |
@@ -64,15 +64,15 @@ listed here.
 | `bin/providerctl` | CLI smoke test |
 | `bin/modelpicker` | Interactive TUI picker |
 
-## Phase 7 deletion plan (gated on `jcode-tui` repair)
+## Phase 7 deletion plan (gated on `next-code-tui` repair)
 
 ```bash
-# Once the 37 pre-existing errors in jcode-tui are fixed:
-rm -rf crates/jcode-provider-app/                                    # ✅ already done
-rm crates/jcode-provider-core/src/auth_mode.rs                       # blocked on jcode-base + jcode-app-core
-rm crates/jcode-provider-core/src/selection.rs                       # blocked on jcode-base
-rm src/cli/provider_init.rs                                          # blocked on jcode-tui + jcode-tui-core
-# Edit: crates/jcode-provider-core/src/models.rs to delegate to Catalog
+# Once the 37 pre-existing errors in next-code-tui are fixed:
+rm -rf crates/next-code-provider-app/                                    # ✅ already done
+rm crates/next-code-provider-core/src/auth_mode.rs                       # blocked on next-code-base + next-code-app-core
+rm crates/next-code-provider-core/src/selection.rs                       # blocked on next-code-base
+rm src/cli/provider_init.rs                                          # blocked on next-code-tui + next-code-tui-core
+# Edit: crates/next-code-provider-core/src/models.rs to delegate to Catalog
 ```
 
 Each blocked file has a one-line migration: every consumer can be

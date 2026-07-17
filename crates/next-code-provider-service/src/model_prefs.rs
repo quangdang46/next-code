@@ -138,7 +138,7 @@ pub enum PrefsError {
 /// Default path: `~/.next-code/model_prefs.json`.
 pub fn default_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
-    Some(PathBuf::from(home).join(".jcode").join("model_prefs.json"))
+    Some(PathBuf::from(home).join(".next-code").join("model_prefs.json"))
 }
 
 #[cfg(test)]

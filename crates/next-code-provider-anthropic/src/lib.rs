@@ -793,8 +793,8 @@ pub struct ApiTool {
 // Provider implementation delegating to AnthropicMessagesProtocol + route
 // ---------------------------------------------------------------------------
 
-/// Helper: convert a jcode-message-types `ContentBlock` to a
-/// jcode-llm-core `ContentPart`.
+/// Helper: convert a next-code-message-types `ContentBlock` to a
+/// next-code-llm-core `ContentPart`.
 fn content_block_to_part(block: &ContentBlock) -> Option<ContentPart> {
     match block {
         ContentBlock::Text { text, .. } => Some(ContentPart::Text { text: text.clone() }),
@@ -829,7 +829,7 @@ fn content_block_to_part(block: &ContentBlock) -> Option<ContentPart> {
     }
 }
 
-/// Helper: convert a jcode-message-types `Message` to a jcode-llm-core `Message`.
+/// Helper: convert a next-code-message-types `Message` to a next-code-llm-core `Message`.
 fn message_to_part(msg: &Message) -> next_code_llm_core::schema::Message {
     let content: Vec<ContentPart> = msg
         .content
@@ -846,8 +846,8 @@ fn message_to_part(msg: &Message) -> next_code_llm_core::schema::Message {
     }
 }
 
-/// Helper: convert a jcode-message-types `ToolDefinition` to a
-/// jcode-llm-core `ToolDefinition`.
+/// Helper: convert a next-code-message-types `ToolDefinition` to a
+/// next-code-llm-core `ToolDefinition`.
 fn tool_def_to_core(tool: &ToolDefinition) -> next_code_llm_core::schema::ToolDefinition {
     next_code_llm_core::schema::ToolDefinition {
         name: tool.name.clone(),

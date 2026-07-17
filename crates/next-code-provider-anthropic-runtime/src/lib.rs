@@ -1,6 +1,6 @@
 //! Direct Anthropic Messages API provider runtime (OAuth subscription + API
 //! key, SSE streaming, service tiers, reasoning efforts), moved out of
-//! `jcode-base` so provider edits compile only this crate plus a binary
+//! `next-code-base` so provider edits compile only this crate plus a binary
 //! relink instead of rebuilding the base -> app-core -> tui spine. The
 //! binary's composition root registers [`AnthropicProvider`] with
 //! `next_code_base::provider::external` at startup.
@@ -358,7 +358,7 @@ const RETRY_BASE_DELAY_MS: u64 = 1000;
 
 /// Default max output tokens for Anthropic models.
 /// Set to 32k to avoid truncating long tool calls (e.g. writing large files).
-/// Override with JCODE_ANTHROPIC_MAX_TOKENS env var.
+/// Override with NEXT_CODE_ANTHROPIC_MAX_TOKENS env var (legacy: JCODE_ANTHROPIC_MAX_TOKENS).
 const DEFAULT_MAX_TOKENS: u32 = 32_768;
 
 /// Cached OAuth credentials
@@ -404,9 +404,9 @@ impl AnthropicProvider {
     /// The `claude` login provider is specifically the OAuth/subscription path,
     /// while `claude-api` is the API-key path. The doctor must test the path
     /// implied by the provider id under test, regardless of what
-    /// `JCODE_RUNTIME_PROVIDER` happens to be in the current process (e.g. a
+    /// `NEXT_CODE_RUNTIME_PROVIDER` happens to be in the current process (e.g. a
     /// self-dev session may have it set to `claude-api`). This also updates
-    /// `JCODE_RUNTIME_PROVIDER` so any provider instances the probes build
+    /// `NEXT_CODE_RUNTIME_PROVIDER` so any provider instances the probes build
     /// afterwards inherit the same mode. Errors if the requested credential is
     /// not available, so the doctor can record a clear AUTH failure.
     pub fn pin_credential_mode_for_doctor(&self, oauth: bool) -> Result<()> {
@@ -790,7 +790,7 @@ impl AnthropicProvider {
             && !oauth::claude_scopes_have_inference(&fresh_creds.scopes)
         {
             anyhow::bail!(
-                "Claude OAuth credentials are missing the required user:inference scope (scopes: {}). Run `jcode login --provider claude` to mint a fresh Claude.ai OAuth token, or import/use a fresh Claude Code login.",
+                "Claude OAuth credentials are missing the required user:inference scope (scopes: {}). Run `next-code login --provider claude` to mint a fresh Claude.ai OAuth token, or import/use a fresh Claude Code login.",
                 fresh_creds.scopes.join(" ")
             );
         }
@@ -1502,7 +1502,7 @@ async fn run_stream_with_retries(
                         Err(refresh_err) => {
                             let _ = tx
                                 .send(Err(anyhow::anyhow!(
-                                    "{}\n\nAutomatic Claude OAuth refresh failed: {}\nRun `jcode login --provider claude` (preferred) or `claude`, then retry.",
+                                    "{}\n\nAutomatic Claude OAuth refresh failed: {}\nRun `next-code login --provider claude` (preferred) or `claude`, then retry.",
                                     e,
                                     refresh_err
                                 )))
@@ -1604,7 +1604,7 @@ async fn run_stream_with_retries(
                 if is_oauth && is_oauth_auth_error(&error_str) {
                     let _ = tx
                         .send(Err(anyhow::anyhow!(
-                            "{}\n\nClaude OAuth authentication failed. Run `jcode login --provider claude` (preferred) or `claude`, then retry.",
+                            "{}\n\nClaude OAuth authentication failed. Run `next-code login --provider claude` (preferred) or `claude`, then retry.",
                             e
                         )))
                         .await;
@@ -1784,7 +1784,7 @@ async fn stream_response(
     };
 
     // Idle timeout between streamed chunks. Configurable via
-    // `[provider] stream_idle_timeout_secs` / `JCODE_STREAM_IDLE_TIMEOUT_SECS`
+    // `[provider] stream_idle_timeout_secs` / `NEXT_CODE_STREAM_IDLE_TIMEOUT_SECS`
     // so slow reasoning models don't trip a premature timeout (issue #434).
     let sse_chunk_timeout = next_code_base::provider::stream_idle_timeout();
 
@@ -2120,7 +2120,7 @@ fn process_sse_event(
             if let Ok(parsed) = serde_json::from_str::<MessageStartEvent>(&event.data) {
                 // The server echoes the model that actually served the request.
                 // Log it so we can confirm there was no silent server-side
-                // substitution (and surface it under JCODE_LOG_SERVED_MODEL).
+                // substitution (and surface it under NEXT_CODE_LOG_SERVED_MODEL).
                 if let Some(served) = parsed.message.model.as_deref() {
                     next_code_base::logging::info(&format!("Anthropic served model={}", served));
                     if product_env("LOG_SERVED_MODEL").is_ok() {

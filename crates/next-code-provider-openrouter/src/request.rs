@@ -86,7 +86,7 @@ pub fn sanitize_tool_parameters_schema(schema: &Value) -> Value {
 ///
 /// This stays in the OpenRouter leaf crate so provider-specific message normalization,
 /// tool-call repair, and reasoning-content compatibility do not type-check inside
-/// `jcode-base` on every provider edit.
+/// `next-code-base` on every provider edit.
 pub fn build_chat_messages(
     messages: &[Message],
     system: &str,

@@ -263,7 +263,7 @@ A tool with `ToolTier::Read` in `Permissive` mode:
 
 - **QuickJS sandbox escape**: If an attacker achieves arbitrary code execution within the QuickJS runtime (via a vulnerability in `rquickjs` or the QuickJS C engine), they would control the sandbox thread. From there they could:
   - Call the injected Rust functions (`make_sleep_fn`, `make_uuid_fn`, `make_kv_get_fn`) with arbitrary arguments.
-  - Access the `__jcode_api` global (also bound as `jcode`) which exposes all `PluginApiBindings`.
+  - Access the `__nextcode_api` global (also bound as `nextcode`; dual-read: `__jcode_api` / `jcode`) which exposes all `PluginApiBindings`.
   - Attempt to find memory corruption bugs in the FFI boundary between QuickJS and Rust.
   
   Mitigation: the API surface is intentionally small (on, registerTool, logger, kv, sleep, uuid, getConfig, cwd). Each function validates its arguments at the QuickJS-to-Rust boundary. There is no `require()`, no `fetch()`, no `process` access.

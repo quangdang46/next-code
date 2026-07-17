@@ -421,6 +421,54 @@ pub fn is_model_available(model_dir: &Path) -> bool {
     model_dir.join("model.onnx").exists() && model_dir.join("tokenizer.json").exists()
 }
 
+/// Resolve the default MiniLM model directory under the product home.
+///
+/// Prefers `~/.next-code/models/<MODEL_NAME>`, dual-reads legacy
+/// `~/.jcode/models/<MODEL_NAME>` when the canonical path is missing.
+/// Honors `$NEXT_CODE_HOME` / `$JCODE_HOME` when set.
+pub fn default_model_dir() -> Option<std::path::PathBuf> {
+    product_models_dir(MODEL_NAME)
+}
+
+/// Resolve `…/models/<name>` under the product home with dual-read of the
+/// legacy `~/.jcode` tree. Returns the first existing candidate, or the
+/// canonical `~/.next-code/models/<name>` path when neither exists (so
+/// downloaders write to the new location).
+pub fn product_models_dir(model_name: &str) -> Option<std::path::PathBuf> {
+    let home = product_home_dir()?;
+    let primary = home.join("models").join(model_name);
+    if is_model_available(&primary) {
+        return Some(primary);
+    }
+    // Dual-read: if NEXT_CODE_HOME/JCODE_HOME is set, that *is* the product
+    // home (already dual-resolved). Also probe the real ~/.jcode when the
+    // product home is the default ~/.next-code and the model only exists on
+    // the legacy path.
+    if let Some(user_home) = dirs_home() {
+        let legacy = user_home.join(".jcode").join("models").join(model_name);
+        if legacy != primary && is_model_available(&legacy) {
+            return Some(legacy);
+        }
+    }
+    Some(primary)
+}
+
+fn product_home_dir() -> Option<std::path::PathBuf> {
+    if let Ok(path) = std::env::var("NEXT_CODE_HOME") {
+        return Some(std::path::PathBuf::from(path));
+    }
+    if let Ok(path) = std::env::var("JCODE_HOME") {
+        return Some(std::path::PathBuf::from(path));
+    }
+    dirs_home().map(|h| h.join(".next-code"))
+}
+
+fn dirs_home() -> Option<std::path::PathBuf> {
+    std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("USERPROFILE").map(std::path::PathBuf::from))
+}
+
 fn download_model(model_dir: &Path) -> Result<()> {
     let model_dir = model_dir.to_path_buf();
     match std::thread::spawn(move || download_model_blocking(&model_dir)).join() {
@@ -521,9 +569,7 @@ mod tests {
     /// Skipped automatically if the model isn't present locally.
     #[test]
     fn minilm_related_beats_unrelated_if_present() {
-        let dir = std::env::var_os("HOME")
-            .map(|h| std::path::PathBuf::from(h).join(".jcode/models/all-MiniLM-L6-v2"))
-            .filter(|d| is_model_available(d));
+        let dir = default_model_dir().filter(|d| is_model_available(d));
         match dir {
             Some(d) => related_beats_unrelated(&d),
             None => eprintln!("skip: MiniLM model not present locally"),
@@ -538,7 +584,7 @@ mod tests {
     #[test]
     fn alt_model_related_beats_unrelated_if_present() {
         let dir = std::env::var_os("HOME")
-            .map(|h| std::path::PathBuf::from(h).join("jcode-memory-bench/models/e5-small-v2"))
+            .map(|h| std::path::PathBuf::from(h).join("next-code-memory-bench/models/e5-small-v2"))
             .filter(|d| is_model_available(d));
         let Some(d) = dir else {
             eprintln!("skip: e5-small-v2 model not present locally");
@@ -561,7 +607,7 @@ mod tests {
     #[test]
     fn cross_encoder_scores_relevant_higher_if_present() {
         let dir = std::env::var_os("HOME")
-            .map(|h| std::path::PathBuf::from(h).join("jcode-memory-bench/models/ce-minilm-l6"))
+            .map(|h| std::path::PathBuf::from(h).join("next-code-memory-bench/models/ce-minilm-l6"))
             .filter(|d| d.join("model.onnx").exists() && d.join("tokenizer.json").exists());
         let Some(d) = dir else {
             eprintln!("skip: cross-encoder model not present locally");

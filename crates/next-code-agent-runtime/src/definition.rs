@@ -7,7 +7,8 @@
 //! Definitions are loaded from TOML files in three locations (highest
 //! priority first):
 //!
-//!   1. `.jcode/agents/<id>.toml` (project-local, committed to repo)
+//!   1. `.next-code/agents/<id>.toml` (project-local, committed to repo;
+//!      dual-read: legacy `.jcode/agents/`)
 //!   2. `~/.next-code/agents/<id>.toml` (user-global)
 //!   3. Embedded built-in agents bundled with the binary
 //!
@@ -28,7 +29,7 @@
 //! camelCase TS) so prior art is reusable. Differences:
 //!
 //! - No `model` field as required string — replaced by tier + override.
-//! - No `providerOptions` — jcode's session has a single provider.
+//! - No `providerOptions` — next-code's session has a single provider.
 //! - `handle_steps` is a future addition (programmatic agents arrive in
 //!   Phase 2); for now agents are pure prompted.
 
@@ -72,7 +73,7 @@ pub struct AgentDefinition {
     // Model selection
     // -----------------------------------------------------------------
     /// Optional tier slot to prefer when running this agent. The slot is
-    /// resolved against `JCODE_ROUTING_<TIER>` env vars at run time.
+    /// resolved against `NEXT_CODE_ROUTING_<TIER>` env vars at run time.
     /// Falls back to the session's current model if unset.
     ///
     /// See `tier.rs` for the full resolution algorithm.

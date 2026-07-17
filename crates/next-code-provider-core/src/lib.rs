@@ -496,7 +496,7 @@ pub enum CredentialMode {
 }
 
 impl CredentialMode {
-    /// Resolve the runtime-env pin (JCODE_*_AUTH / route aliases) for a
+    /// Resolve the runtime-env pin (NEXT_CODE_*_AUTH / route aliases) for a
     /// dual-auth provider through the canonical auth_mode vocabulary.
     pub fn from_runtime_env(provider: DualAuthProvider) -> Self {
         match runtime_env_pinned_mode(provider) {

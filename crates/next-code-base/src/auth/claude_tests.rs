@@ -57,7 +57,7 @@ fn next_code_auth_file_roundtrip() {
 }
 
 #[test]
-fn next_code_path_respects_jcode_home() {
+fn next_code_path_respects_next_code_home() {
     let _lock = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());

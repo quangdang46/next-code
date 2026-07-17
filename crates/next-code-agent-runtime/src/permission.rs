@@ -1,7 +1,7 @@
 //! Per-agent permission mode for tool execution safety.
 //!
 //! Mirrors `dcg_core::Mode` but is intentionally self-contained in the
-//! dependency-light `jcode-agent-runtime` crate. The runtime converts
+//! dependency-light `next-code-agent-runtime` crate. The runtime converts
 //! this enum to `dcg_core::Mode` at spawn time.
 //!
 //! ## Design
@@ -26,7 +26,7 @@ use std::fmt;
 /// Per-agent permission mode for tool execution safety.
 ///
 /// This enum intentionally mirrors `dcg_core::Mode` (from the
-/// `destructive_command_guard` crate) so that `jcode-agent-runtime`
+/// `destructive_command_guard` crate) so that `next-code-agent-runtime`
 /// does not need to depend on `dcg-core` directly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]

@@ -1,6 +1,6 @@
 //! Mode state — persistent activation state for keyword-triggered workflows.
 //!
-//! State is persisted to `.jcode/state/modes.toml` (project-local) or
+//! State is persisted to `.next-code/state/modes.toml` (project-local) or
 //! `~/.next-code/state/modes.toml` (global fallback).
 
 use chrono::Utc;
@@ -146,7 +146,7 @@ pub fn load_state(working_dir: Option<&Path>) -> ModeState {
             Ok(state) => state,
             Err(e) => {
                 eprintln!(
-                    "[jcode-keywords] failed to parse mode state at {}: {} — using default",
+                    "[next-code-keywords] failed to parse mode state at {}: {} — using default",
                     path.display(),
                     e,
                 );
@@ -155,7 +155,7 @@ pub fn load_state(working_dir: Option<&Path>) -> ModeState {
         },
         Err(e) => {
             eprintln!(
-                "[jcode-keywords] failed to read mode state at {}: {} — using default",
+                "[next-code-keywords] failed to read mode state at {}: {} — using default",
                 path.display(),
                 e,
             );
@@ -179,13 +179,13 @@ pub fn save_state(state: &ModeState, working_dir: Option<&Path>) {
 fn state_path(working_dir: Option<&Path>) -> PathBuf {
     // Project-local takes priority
     if let Some(dir) = working_dir {
-        return dir.join(".jcode").join("state").join("modes.toml");
+        return dir.join(".next-code").join("state").join("modes.toml");
     }
 
     // Global fallback
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".jcode")
+        .join(".next-code")
         .join("state")
         .join("modes.toml")
 }
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn load_state_missing_file_returns_default() {
         let tmp = TempDir::new().unwrap();
-        // Use a subdir that definitely doesn't have .jcode/state/modes.toml
+        // Use a subdir that definitely doesn't have .next-code/state/modes.toml
         let state = load_state(Some(tmp.path()));
         assert!(state.active_modes.is_empty());
     }

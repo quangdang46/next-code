@@ -22,7 +22,7 @@ use crate::types::ProviderId;
 
 const OAUTH_LABEL: &str = "oauth";
 const ATTEMPT_INDEX_KEY: &str = "__oauth_attempts__";
-const ATTEMPT_INDEX_SERVICE: &str = "jcode-provider-service";
+const ATTEMPT_INDEX_SERVICE: &str = "next-code-provider-service";
 const ATTEMPT_PREFIX: &str = "oauth-attempt:";
 
 /// Integration service backed by a [`CredentialService`] for persistence

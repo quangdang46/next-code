@@ -668,14 +668,14 @@ fn test_anthropic_signed_thinking_replayed_in_request_blocks() {
 }
 
 #[tokio::test]
-#[ignore = "live smoke: requires ANTHROPIC_API_KEY, or set JCODE_LIVE_ANTHROPIC_ALLOW_OAUTH=1 to use Claude OAuth credentials"]
+#[ignore = "live smoke: requires ANTHROPIC_API_KEY, or set NEXT_CODE_LIVE_ANTHROPIC_ALLOW_OAUTH=1 to use Claude OAuth credentials"]
 async fn live_anthropic_reasoning_smoke() -> Result<()> {
     let _env_lock = next_code_base::storage::lock_test_env();
     let using_api_key = std::env::var_os("ANTHROPIC_API_KEY").is_some();
     let allow_oauth = std::env::var_os("NEXT_CODE_LIVE_ANTHROPIC_ALLOW_OAUTH").is_some();
     if !using_api_key && !allow_oauth {
         eprintln!(
-            "skipping live Anthropic smoke: set ANTHROPIC_API_KEY or JCODE_LIVE_ANTHROPIC_ALLOW_OAUTH=1"
+            "skipping live Anthropic smoke: set ANTHROPIC_API_KEY or NEXT_CODE_LIVE_ANTHROPIC_ALLOW_OAUTH=1"
         );
         return Ok(());
     }
@@ -728,7 +728,7 @@ async fn live_anthropic_reasoning_smoke() -> Result<()> {
     if require_thinking {
         assert!(
             thinking_bytes > 0,
-            "live Anthropic response did not include thinking deltas despite JCODE_LIVE_ANTHROPIC_REQUIRE_THINKING"
+            "live Anthropic response did not include thinking deltas despite NEXT_CODE_LIVE_ANTHROPIC_REQUIRE_THINKING"
         );
     }
     Ok(())

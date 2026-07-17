@@ -2,7 +2,7 @@
 //!
 //! ## Lookup paths (highest priority first)
 //!
-//! 1. **Project-local**: `<cwd>/.jcode/agents/*.toml`
+//! 1. **Project-local**: `<cwd>/.next-code/agents/*.toml` (dual-read: `.jcode/agents/`)
 //! 2. **User-global**: `~/.next-code/agents/*.toml`
 //! 3. **Builtins** registered programmatically via [`AgentRegistry::register_builtin`]
 //!
@@ -35,7 +35,7 @@ pub enum AgentSource {
     Builtin,
     /// Loaded from `~/.next-code/agents/<file>`.
     UserGlobal { path: PathBuf },
-    /// Loaded from `<project>/.jcode/agents/<file>`. Highest priority.
+    /// Loaded from `<project>/.next-code/agents/<file>` (dual-read: `.jcode/agents/`). Highest priority.
     ProjectLocal { path: PathBuf },
 }
 
@@ -329,7 +329,7 @@ pub enum SourceKind {
     Managed,
     /// User-global agents at ~/.next-code/agents/.
     UserGlobal,
-    /// Project-local agents at .jcode/agents/.
+    /// Project-local agents at .next-code/agents/ (dual-read: .jcode/agents/).
     ProjectLocal,
 }
 

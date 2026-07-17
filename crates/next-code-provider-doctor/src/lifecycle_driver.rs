@@ -506,7 +506,7 @@ impl AuthLifecycleDriver {
                 resolved.default_model.as_deref().unwrap_or("none")
             ));
             transcript.push(format!(
-                "**{} API key saved.**\n\nStored at `{}`.\nFetching models now. Jcode will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes.",
+                "**{} API key saved.**\n\nStored at `{}`.\nFetching models now. next-code will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes.",
                 spec.provider_label,
                 self.sandbox.env_file_path(&resolved.env_file).display()
             ));
@@ -522,7 +522,7 @@ impl AuthLifecycleDriver {
                 .to_string(),
         );
         transcript.push(
-            "**Auth Model Routes Updating**\n\nCredentials are reloaded. Jcode is pushing an updated model catalog snapshot to connected clients."
+            "**Auth Model Routes Updating**\n\nCredentials are reloaded. next-code is pushing an updated model catalog snapshot to connected clients."
                 .to_string(),
         );
         let mut updated = format!(
