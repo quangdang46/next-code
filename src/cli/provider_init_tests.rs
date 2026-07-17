@@ -150,10 +150,6 @@ fn test_server_bootstrap_login_selection_preserves_order() {
     );
     assert_eq!(
         resolve_login_selection("4", &providers).map(|provider| provider.id),
-        Some("next-code")
-    );
-    assert_eq!(
-        resolve_login_selection("5", &providers).map(|provider| provider.id),
         Some("copilot")
     );
 }
@@ -170,23 +166,23 @@ fn test_auto_init_login_selection_preserves_order() {
         Some("anthropic-api")
     );
     assert_eq!(
-        resolve_login_selection("11", &providers).map(|provider| provider.id),
+        resolve_login_selection("10", &providers).map(|provider| provider.id),
         Some("alibaba-coding-plan")
     );
     assert_eq!(
-        resolve_login_selection("12", &providers).map(|provider| provider.id),
+        resolve_login_selection("11", &providers).map(|provider| provider.id),
         Some("cursor")
     );
     assert_eq!(
-        resolve_login_selection("13", &providers).map(|provider| provider.id),
+        resolve_login_selection("12", &providers).map(|provider| provider.id),
         Some("copilot")
     );
     assert_eq!(
-        resolve_login_selection("14", &providers).map(|provider| provider.id),
+        resolve_login_selection("13", &providers).map(|provider| provider.id),
         Some("gemini")
     );
     assert_eq!(
-        resolve_login_selection("15", &providers).map(|provider| provider.id),
+        resolve_login_selection("14", &providers).map(|provider| provider.id),
         Some("antigravity")
     );
 }
