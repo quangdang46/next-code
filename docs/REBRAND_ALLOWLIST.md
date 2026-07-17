@@ -32,23 +32,22 @@ Historical image names (e.g. `docs/jcode_reddit_dashboard.png`) may keep filenam
 
 ---
 
-## 2. Compat dual-read (intentional residuals)
+## 2. Hard cut (no dual-read)
 
-These remain until the **compat removal** version (contract §2.5):
+**Do not** keep `JCODE_` / `.jcode` / keyring dual-read shims. Product paths are
+`NEXT_CODE_*` and `~/.next-code` / `.next-code` only.
+
+Frozen residuals that still contain the string `jcode` (not migration shims):
 
 | Pattern / example | Reason |
 |---|---|
-| `JCODE_` dual-read env aliases | Env migration |
-| `~/.jcode` / `.jcode/` dual-read paths | Storage migration |
-| `jcode-provider-service` dual keyring read | Credential migration |
-| `jcode-secrets` dual keyring read | Credential migration |
-| `jcode://` dual URL scheme registration | Deep-link migration |
-| `com.jcode.mobile` | **App Store bundle id — keep forever until explicit App Store rename** |
-| Binary alias comments mentioning `jcode` | Install symlink docs |
-| `legacy_jcode` / `old_jcode` / `jcode_compat` helper names | Explicit shim symbols |
-| Comments: `// compat: jcode`, `// dual-read jcode` | Documented shims |
+| `com.jcode.mobile` | **App Store bundle id — keep until explicit App Store rename** |
+| `provider/jcode.rs` / `pub mod jcode` / `provider::jcode` | First-party provider module id |
+| `canceljcode` / `stopjcode` | Product keyword IDs |
+| `*.jcode.sh` | Domain freeze (§5) |
 
-Gate: lines containing `dual-read`, `compat:`, `legacy_jcode`, `jcode_compat`, or `com.jcode.mobile` are allowlisted.
+Gate still allowlists historical `dual-read` / `compat:` **comment lines** so docs
+can describe the removal; runtime code must not implement those shims.
 
 ---
 
@@ -85,9 +84,13 @@ Must **not** be rewritten — they impersonate or match external products:
 |---|---|
 | Cloudflare D1 `database_name` values containing `jcode` if kept historical | Infra rename is a separate migration |
 | Wrangler / worker names documented as historical | Pending infra rename |
+| `jcode-telemetry` / `jcode_*_firehose` | Historical telemetry dataset names |
 | `telemetry.jcode.sh` / `api.jcode.sh` / `jcode.sh` | **Domain freeze** (contract §2.3) |
 
 Gate: lines matching `*.jcode.sh` or `jcode\.sh` are allowlisted until DNS decision.
+
+Telemetry dataset names matching `jcode-telemetry` or `jcode_(telemetry|web|discovery|install)_firehose`
+are allowlisted until the infra migration is scheduled.
 
 ---
 
@@ -120,6 +123,7 @@ Rare tokens that match case-insensitive `jcode` search but are not product brand
 | Pattern | Reason |
 |---|---|
 | (add as discovered) | e.g. unrelated hex, base64, third-party crate names |
+| `canceljcode` / `stopjcode` | Product keyword IDs retained for workflow compatibility |
 
 If a hit is a true false positive, add a narrow pattern here rather than silencing the whole file.
 
@@ -147,6 +151,9 @@ DO_NOT_TRACK
 (?:^|[^\w])jbench(?:[^\w]|$)
 [\w.-]*jcode\.sh\b
 \bjcode\.sh\b
+canceljcode|stopjcode
+\bjcode-telemetry\b
+\bjcode_(?:telemetry|web|discovery|install)_firehose\b
 formerly jcode
 renamed from jcode
 upstream jcode
@@ -161,13 +168,15 @@ falls?\s+back\s+to\s+[`']?JCODE_
 falls?\s+back\s+to\s+[`']?\.?jcode
 PROJECT_DIR_CANDIDATES
 # first-party provider product module (not package rename debt)
+(?:pub\s+)?mod jcode\b
 provider::jcode
+provider/jcode\.rs
 \bJcodeProvider\b
 LoginProviderTarget::Jcode
 RuntimeProviderId::Jcode
 \bJCODE_LOGIN_PROVIDER\b
 start_jcode_login|login_jcode_flow
-# dual-read keyring / transport / subscription namespace
+# frozen historical service / transport names (not dual-read shims)
 jcode-provider-service
 jcode-secrets
 jcode-subscription

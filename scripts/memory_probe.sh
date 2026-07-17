@@ -38,10 +38,10 @@ set -euo pipefail
 
 SESSION_ID="session_hog_1783086065415_4ad4ae66cd43dd5b"
 IDLE_SECS=30
-# Prefer next-code; fall back to legacy jcode paths during the rebrand window.
+# Prefer next-code; fall back to legacy next-code paths during the rebrand window.
 if [ -n "${NEXT_CODE_BIN:-}" ]; then
   NEXT_CODE_BIN="$NEXT_CODE_BIN"
-elif [ -n "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]; then
+elif [ -n "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" ]; then
   :
 elif [ -x "$HOME/.local/bin/next-code" ]; then
   NEXT_CODE_BIN="$HOME/.local/bin/next-code"
@@ -77,7 +77,7 @@ while [[ $# -gt 0 ]]; do
         --session)   SESSION_ID="$2"; shift 2 ;;
         --idle-secs) IDLE_SECS="$2"; shift 2 ;;
         --binary)    CLIENT_BIN="$2"; shift 2 ;;
-        --next-code|--next-code) JCODE_BIN="$2"; shift 2 ;;
+        --next-code|--next-code) NEXT_CODE_BIN="$2"; shift 2 ;;
         --cwd)       TESTER_CWD="$2"; shift 2 ;;
         --skip-trim) SKIP_TRIM=1; shift ;;
         --keep)      KEEP_TESTER=1; shift ;;
@@ -90,7 +90,7 @@ log() { printf '[memory_probe] %s\n' "$*" >&2; }
 die() { log "FATAL: $*"; exit 1; }
 
 command -v jq >/dev/null || die "jq is required"
-[[ -x "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]] || die "next-code CLI not found at ${NEXT_CODE_BIN:-${JCODE_BIN:-}}"
+[[ -x "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" ]] || die "next-code CLI not found at ${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}"
 [[ -x "$CLIENT_BIN" ]] || CLIENT_BIN="$(command -v next-code 2>/dev/null || command -v next-code)" || die "client binary not found"
 SESSION_FILE=""
 for _sess_root in "$HOME/.next-code/sessions" "$HOME/.next-code/sessions"; do
@@ -118,7 +118,7 @@ SPAWN_EPOCH_MS=""
 cleanup() {
     local rc=$?
     if [[ -n "$TESTER_ID" && "$KEEP_TESTER" -ne 1 ]]; then
-        "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" debug "tester:${TESTER_ID}:stop" >/dev/null 2>&1 || true
+        "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" debug "tester:${TESTER_ID}:stop" >/dev/null 2>&1 || true
         log "stopped tester $TESTER_ID"
     elif [[ -n "$TESTER_ID" ]]; then
         log "kept tester $TESTER_ID (pid $TESTER_PID) running (--keep)"
@@ -286,7 +286,7 @@ EOF
 chmod +x "$WRAPPER"
 
 log "spawning headless tester (binary wrapper resumes $SESSION_ID, ${SESSION_BYTES} byte session file)"
-SPAWN_OUT="$("${NEXT_CODE_BIN:-${JCODE_BIN:-}}" debug "tester:spawn {\"binary\":\"$WRAPPER\",\"cwd\":\"$TESTER_CWD\",\"cols\":120,\"rows\":40}")" \
+SPAWN_OUT="$("${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" debug "tester:spawn {\"binary\":\"$WRAPPER\",\"cwd\":\"$TESTER_CWD\",\"cols\":120,\"rows\":40}")" \
     || die "tester:spawn failed: $SPAWN_OUT"
 SPAWN_EPOCH_MS="$(now_ms)"
 TESTER_ID="$(jq -r '.id // empty' <<<"$SPAWN_OUT")"
@@ -294,7 +294,7 @@ TESTER_PID="$(jq -r '.pid // empty' <<<"$SPAWN_OUT")"
 [[ -n "$TESTER_ID" && -n "$TESTER_PID" ]] || die "could not parse tester:spawn response: $SPAWN_OUT"
 log "tester $TESTER_ID pid $TESTER_PID"
 
-TESTER_INFO="$("${NEXT_CODE_BIN:-${JCODE_BIN:-}}" debug tester:list | jq -c --arg id "$TESTER_ID" '.[] | select(.id == $id)')"
+TESTER_INFO="$("${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" debug tester:list | jq -c --arg id "$TESTER_ID" '.[] | select(.id == $id)')"
 CMD_PATH="$(jq -r '.debug_cmd_path' <<<"$TESTER_INFO")"
 RESP_PATH="$(jq -r '.debug_response_path' <<<"$TESTER_INFO")"
 [[ -n "$CMD_PATH" && -n "$RESP_PATH" ]] || die "could not resolve tester debug paths"

@@ -47,7 +47,7 @@ public protocol CredentialStore: Sendable {
 /// unavailable (e.g. unsigned simulator builds returning
 /// `errSecMissingEntitlement`). Real signed builds use the keychain.
 public struct KeychainCredentialStore: CredentialStore {
-    private static let service = "com.jcode.mobile.servers"
+    private static let service = "@@COM_NEXT_CODE_MOBILE@@.servers"
     private static let account = "paired-servers"
 
     public init() {}

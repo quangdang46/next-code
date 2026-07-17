@@ -2,19 +2,19 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-provider=${NEXT_CODE_PROVIDER:-${JCODE_PROVIDER:-auto}}
+provider=${NEXT_CODE_PROVIDER:-${NEXT_CODE_PROVIDER:-auto}}
 prompt=${1:-"Use the bash tool to run 'pwd', then use the ls tool to list the current directory, then respond with DONE."}
-expect=${NEXT_CODE_TRACE_EXPECT:-${JCODE_TRACE_EXPECT:-DONE}}
+expect=${NEXT_CODE_TRACE_EXPECT:-${NEXT_CODE_TRACE_EXPECT:-DONE}}
 cargo_exec="$repo_root/scripts/cargo_exec.sh"
 
 echo "=== Real Provider Smoke ==="
 echo "Provider: ${provider}"
 
-if [[ "${NEXT_CODE_REAL_PROVIDER_TEST_API:-${JCODE_REAL_PROVIDER_TEST_API:-1}}" == "1" ]]; then
-  if [[ "${provider}" == "claude" && "${NEXT_CODE_USE_DIRECT_API:-${JCODE_USE_DIRECT_API:-0}}" != "1" ]]; then
+if [[ "${NEXT_CODE_REAL_PROVIDER_TEST_API:-${NEXT_CODE_REAL_PROVIDER_TEST_API:-1}}" == "1" ]]; then
+  if [[ "${provider}" == "claude" && "${NEXT_CODE_USE_DIRECT_API:-${NEXT_CODE_USE_DIRECT_API:-0}}" != "1" ]]; then
     echo ""
     echo "Test 1: Claude CLI smoke (test_api)"
-    if [[ "${NEXT_CODE_REMOTE_CARGO:-${JCODE_REMOTE_CARGO:-0}}" == "1" ]]; then
+    if [[ "${NEXT_CODE_REMOTE_CARGO:-${NEXT_CODE_REMOTE_CARGO:-0}}" == "1" ]]; then
       (cd "$repo_root" && "$cargo_exec" build --bin test_api)
       (cd "$repo_root" && ./target/debug/test_api)
     else
@@ -22,13 +22,13 @@ if [[ "${NEXT_CODE_REAL_PROVIDER_TEST_API:-${JCODE_REAL_PROVIDER_TEST_API:-1}}" 
     fi
   else
     echo ""
-    echo "Test 1: Skipping test_api (provider=${provider}, JCODE_USE_DIRECT_API=${NEXT_CODE_USE_DIRECT_API:-${JCODE_USE_DIRECT_API:-0}})"
+    echo "Test 1: Skipping test_api (provider=${provider}, NEXT_CODE_USE_DIRECT_API=${NEXT_CODE_USE_DIRECT_API:-${NEXT_CODE_USE_DIRECT_API:-0}})"
   fi
 fi
 
 echo ""
 echo "Test 2: Tool harness (network tools enabled)"
-if [[ "${NEXT_CODE_REMOTE_CARGO:-${JCODE_REMOTE_CARGO:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_REMOTE_CARGO:-${NEXT_CODE_REMOTE_CARGO:-0}}" == "1" ]]; then
   (cd "$repo_root" && "$cargo_exec" build --bin next-code-harness)
   (cd "$repo_root" && ./target/debug/next-code-harness -- --include-network)
 else
@@ -45,7 +45,7 @@ workdir=$(mktemp -d)
 trap 'rm -rf "$workdir"' EXIT
 
 set +e
-output=$(JCODE_HOME="$workdir" PATH="$repo_root/target/release:$PATH" \
+output=$(NEXT_CODE_HOME="$workdir" PATH="$repo_root/target/release:$PATH" \
   next-code run --no-update --trace --provider "$provider" "$prompt" 2>&1)
 status=$?
 set -e

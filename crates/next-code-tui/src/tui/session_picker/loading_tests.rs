@@ -126,8 +126,8 @@ fn cached_grouped_sessions_round_trip_from_disk() {
         search_index: "cache test".to_string(),
         server_name: None,
         server_icon: None,
-        source: SessionSource::Jcode,
-        resume_target: ResumeTarget::JcodeSession {
+        source: SessionSource::NextCode,
+        resume_target: ResumeTarget::NextCodeSession {
             session_id: "session_cache_test_1770000000000".to_string(),
         },
         external_path: None,

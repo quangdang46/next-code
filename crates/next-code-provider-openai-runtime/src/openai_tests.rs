@@ -89,7 +89,7 @@ async fn test_persistent_ws_state() -> (PersistentWsState, tokio::task::JoinHand
 
 struct LiveOpenAITestEnv {
     _lock: MutexGuard<'static, ()>,
-    _jcode_home: EnvVarGuard,
+    _next_code_home: EnvVarGuard,
     _transport: EnvVarGuard,
     _temp: tempfile::TempDir,
 }
@@ -102,7 +102,7 @@ impl LiveOpenAITestEnv {
         };
 
         let temp = tempfile::Builder::new()
-            .prefix("jcode-openai-live-")
+            .prefix("next-code-openai-live-")
             .tempdir()?;
         let target_auth = temp
             .path()
@@ -121,7 +121,7 @@ impl LiveOpenAITestEnv {
 
         Ok(Some(Self {
             _lock: lock,
-            _jcode_home: next_code_home,
+            _next_code_home: next_code_home,
             _transport: transport,
             _temp: temp,
         }))

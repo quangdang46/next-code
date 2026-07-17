@@ -180,9 +180,9 @@ fn repeated_external_resume_reuses_the_imported_snapshot() {
         session_path: transcript.to_string_lossy().to_string(),
     };
 
-    let first = resolve_resume_target_to_jcode(&target).unwrap();
+    let first = resolve_resume_target_to_next_code(&target).unwrap();
     std::fs::remove_file(&transcript).unwrap();
-    let second = resolve_resume_target_to_jcode(&target).unwrap();
+    let second = resolve_resume_target_to_next_code(&target).unwrap();
     assert_eq!(first, second);
     assert!(Session::load(&imported_claude_code_session_id("cached")).is_ok());
 }
@@ -236,7 +236,7 @@ fn cached_imported_session_preserves_existing_history_verbatim() {
     legacy.save().unwrap();
 
     let resolved =
-        resolve_resume_target_to_jcode(&next_code_session_types::ResumeTarget::CodexSession {
+        resolve_resume_target_to_next_code(&next_code_session_types::ResumeTarget::CodexSession {
             session_id: "legacy-tools".to_string(),
             session_path: temp
                 .path()
@@ -247,7 +247,7 @@ fn cached_imported_session_preserves_existing_history_verbatim() {
         .unwrap();
     assert_eq!(
         resolved,
-        next_code_session_types::ResumeTarget::JcodeSession {
+        next_code_session_types::ResumeTarget::NextCodeSession {
             session_id: imported_id.clone(),
         }
     );
@@ -639,7 +639,7 @@ fn test_import_opencode_session_creates_next_code_snapshot() {
 }
 
 #[test]
-fn test_resolve_resume_target_to_jcode_imports_codex_session() {
+fn test_resolve_resume_target_to_next_code_imports_codex_session() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
@@ -657,7 +657,7 @@ fn test_resolve_resume_target_to_jcode_imports_codex_session() {
         .unwrap();
 
     let resolved =
-        resolve_resume_target_to_jcode(&next_code_session_types::ResumeTarget::CodexSession {
+        resolve_resume_target_to_next_code(&next_code_session_types::ResumeTarget::CodexSession {
             session_id: "codex-resolve-test".to_string(),
             session_path: codex_dir
                 .join("rollout.jsonl")
@@ -668,7 +668,7 @@ fn test_resolve_resume_target_to_jcode_imports_codex_session() {
 
     assert_eq!(
         resolved,
-        next_code_session_types::ResumeTarget::JcodeSession {
+        next_code_session_types::ResumeTarget::NextCodeSession {
             session_id: imported_codex_session_id("codex-resolve-test"),
         }
     );
@@ -678,12 +678,12 @@ fn test_resolve_resume_target_to_jcode_imports_codex_session() {
 
 /// The resume picker builds a `ClaudeCodeSession` target with id `claude:<id>`
 /// and a transcript path; selecting it routes through
-/// `resolve_resume_target_to_jcode`, which must import the transcript and hand
+/// `resolve_resume_target_to_next_code`, which must import the transcript and hand
 /// back a resumable `imported_cc_<id>` next-code session. This guards the full
 /// detect -> import -> resume round-trip for Claude Code (previously only Codex
 /// had coverage here).
 #[test]
-fn test_resolve_resume_target_to_jcode_imports_claude_code_session() {
+fn test_resolve_resume_target_to_next_code_imports_claude_code_session() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
@@ -701,7 +701,7 @@ fn test_resolve_resume_target_to_jcode_imports_claude_code_session() {
         .unwrap();
 
     let resolved =
-        resolve_resume_target_to_jcode(&next_code_session_types::ResumeTarget::ClaudeCodeSession {
+        resolve_resume_target_to_next_code(&next_code_session_types::ResumeTarget::ClaudeCodeSession {
             session_id: "claude-resolve-test".to_string(),
             session_path: transcript_path.to_string_lossy().to_string(),
         })
@@ -710,7 +710,7 @@ fn test_resolve_resume_target_to_jcode_imports_claude_code_session() {
     let imported_id = imported_claude_code_session_id("claude-resolve-test");
     assert_eq!(
         resolved,
-        next_code_session_types::ResumeTarget::JcodeSession {
+        next_code_session_types::ResumeTarget::NextCodeSession {
             session_id: imported_id.clone(),
         }
     );
@@ -741,7 +741,7 @@ fn test_resolve_resume_target_to_jcode_imports_claude_code_session() {
 /// blind re-import previously overwrote the snapshot and dropped the next-code-side
 /// messages. The continuation must be preserved instead.
 #[test]
-fn test_reimporting_claude_session_preserves_jcode_continuation() {
+fn test_reimporting_claude_session_preserves_next_code_continuation() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
@@ -782,14 +782,14 @@ fn test_reimporting_claude_session_preserves_jcode_continuation() {
 
     // Re-selecting the external entry re-enters import; the continuation must survive.
     let resumed =
-        resolve_resume_target_to_jcode(&next_code_session_types::ResumeTarget::ClaudeCodeSession {
+        resolve_resume_target_to_next_code(&next_code_session_types::ResumeTarget::ClaudeCodeSession {
             session_id: "claude-continued".to_string(),
             session_path: transcript_path.to_string_lossy().to_string(),
         })
         .unwrap();
     assert_eq!(
         resumed,
-        next_code_session_types::ResumeTarget::JcodeSession {
+        next_code_session_types::ResumeTarget::NextCodeSession {
             session_id: imported_id.clone(),
         }
     );
@@ -810,7 +810,7 @@ fn test_reimporting_claude_session_preserves_jcode_continuation() {
 }
 
 #[test]
-fn test_import_cursor_session_creates_jcode_snapshot() {
+fn test_import_cursor_session_creates_next_code_snapshot() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
@@ -857,7 +857,7 @@ fn test_import_cursor_session_creates_jcode_snapshot() {
     );
 
     // Resolving the resume target should import and remap to the next-code snapshot.
-    let resumed = crate::import::resolve_resume_target_to_jcode(
+    let resumed = crate::import::resolve_resume_target_to_next_code(
         &next_code_session_types::ResumeTarget::CursorSession {
             session_id: session_id.to_string(),
             session_path: transcript_path.to_string_lossy().to_string(),
@@ -866,7 +866,7 @@ fn test_import_cursor_session_creates_jcode_snapshot() {
     .unwrap();
     assert_eq!(
         resumed,
-        next_code_session_types::ResumeTarget::JcodeSession {
+        next_code_session_types::ResumeTarget::NextCodeSession {
             session_id: imported_cursor_session_id(session_id),
         }
     );

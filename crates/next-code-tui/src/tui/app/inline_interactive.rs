@@ -2251,7 +2251,7 @@ impl App {
             let current_session_id = super::commands::active_session_id(self);
             let mut names = Vec::with_capacity(targets.len());
             for target in targets {
-                let ResumeTarget::JcodeSession { session_id } = target else {
+                let ResumeTarget::NextCodeSession { session_id } = target else {
                     continue;
                 };
                 let queue_position = catchup_queue_position(&current_session_id, session_id);
@@ -2304,7 +2304,7 @@ impl App {
             }
 
             let name = match target {
-                ResumeTarget::JcodeSession { session_id } => {
+                ResumeTarget::NextCodeSession { session_id } => {
                     crate::id::extract_session_name(session_id)
                         .map(|s| s.to_string())
                         .unwrap_or_else(|| session_id.to_string())
@@ -2330,7 +2330,7 @@ impl App {
                     format!("Cursor {}", next_code_core::util::truncate_str(session_id, 8))
                 }
             };
-            let resolved_target = match crate::import::resolve_resume_target_to_jcode(target) {
+            let resolved_target = match crate::import::resolve_resume_target_to_next_code(target) {
                 Ok(target) => target,
                 Err(err) => {
                     failed.push(format!("failed to import {}: {}", name, err));
@@ -2349,7 +2349,7 @@ impl App {
                     // instead of dead-ending with a manual command (issue #203).
                     if targets.len() == 1
                         && spawned == 0
-                        && matches!(resolved_target, ResumeTarget::JcodeSession { .. })
+                        && matches!(resolved_target, ResumeTarget::NextCodeSession { .. })
                     {
                         self.handle_session_picker_current_terminal_selection(
                             std::slice::from_ref(target),
@@ -2409,7 +2409,7 @@ impl App {
         };
 
         let name = match target {
-            ResumeTarget::JcodeSession { session_id } => {
+            ResumeTarget::NextCodeSession { session_id } => {
                 crate::id::extract_session_name(session_id)
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| session_id.to_string())
@@ -2437,7 +2437,7 @@ impl App {
         };
 
         let resolved_target = match target {
-            ResumeTarget::JcodeSession { session_id } => session_id.clone(),
+            ResumeTarget::NextCodeSession { session_id } => session_id.clone(),
             ResumeTarget::ClaudeCodeSession { session_id, .. } => {
                 crate::import::imported_claude_code_session_id(session_id)
             }
@@ -2527,7 +2527,7 @@ impl App {
         // Single recovered session that could not get a new terminal: resume it
         // in the current terminal instead of forcing a manual command (#203).
         if spawned == 0 && recovered.len() == 1 && failed.len() == 1 {
-            self.handle_session_picker_current_terminal_selection(&[ResumeTarget::JcodeSession {
+            self.handle_session_picker_current_terminal_selection(&[ResumeTarget::NextCodeSession {
                 session_id: recovered[0].clone(),
             }]);
             return;

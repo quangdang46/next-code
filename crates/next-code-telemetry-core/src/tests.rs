@@ -3,7 +3,7 @@ use super::*;
 use std::sync::{Mutex, OnceLock};
 
 // All of these tests mutate process-global state: the env-var opt-out tests
-// flip `JCODE_NO_TELEMETRY` / `DO_NOT_TRACK`, while the session tests drive the
+// flip `NEXT_CODE_NO_TELEMETRY` / `DO_NOT_TRACK`, while the session tests drive the
 // global `SESSION_STATE`. They must be serialized against *each other* with a
 // single shared lock. Using two separate locks previously let an env test
 // disable telemetry (`is_enabled() == false`) while a session test was calling
@@ -528,8 +528,8 @@ fn test_onboarding_step_event_serialization_includes_failure_reason() {
 #[test]
 fn test_onboarding_step_milestone_key_includes_provider_and_method() {
     assert_eq!(
-        onboarding_step_milestone_key("auth_success", Some("jcode"), Some("API key")),
-        "auth_success_jcode_api_key"
+        onboarding_step_milestone_key("auth_success", Some("next-code"), Some("API key")),
+        "auth_success_next_code_api_key"
     );
     assert_eq!(
         onboarding_step_milestone_key("login_picker_opened", None, None),

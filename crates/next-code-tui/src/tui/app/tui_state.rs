@@ -1078,7 +1078,7 @@ impl crate::tui::TuiState for App {
     }
 
     fn session_compaction_count(&self) -> usize {
-        if self.is_remote || !self.provider.uses_jcode_compaction() {
+        if self.is_remote || !self.provider.uses_next_code_compaction() {
             return 0;
         }
         self.registry
@@ -1174,7 +1174,7 @@ impl crate::tui::TuiState for App {
 
     fn status_notice(&self) -> Option<String> {
         if !self.is_remote
-            && self.provider.uses_jcode_compaction()
+            && self.provider.uses_next_code_compaction()
             && let Ok(manager) = self.registry.compaction().try_read()
             && manager.is_compacting()
         {
@@ -1252,7 +1252,7 @@ impl crate::tui::TuiState for App {
         let (compaction_count, compaction_summary_chars, is_compacting, compaction_fresh) =
             if self.is_remote {
                 (0, 0, false, true)
-            } else if self.provider.uses_jcode_compaction() {
+            } else if self.provider.uses_next_code_compaction() {
                 match self.registry.compaction().try_read() {
                     Ok(manager) => (
                         manager.compacted_count(),
@@ -1325,7 +1325,7 @@ impl crate::tui::TuiState for App {
                 }
             }
         } else {
-            let skip = if self.provider.uses_jcode_compaction() {
+            let skip = if self.provider.uses_next_code_compaction() {
                 let compaction = self.registry.compaction();
                 let result = compaction
                     .try_read()
@@ -1774,7 +1774,7 @@ impl crate::tui::TuiState for App {
 
         let workspace_animation_tick = self.app_started.elapsed().as_millis() as u64 / 180;
 
-        let compaction_info = if !self.is_remote && self.provider.uses_jcode_compaction() {
+        let compaction_info = if !self.is_remote && self.provider.uses_next_code_compaction() {
             let compaction = self.registry.compaction();
             compaction.try_read().ok().and_then(|manager| {
                 let compacted_messages = manager.compacted_count();
@@ -1833,7 +1833,7 @@ impl crate::tui::TuiState for App {
             observed_context_tokens: self.current_stream_context_tokens(),
             cache_hit_info,
             compaction_info,
-            is_compacting: if !self.is_remote && self.provider.uses_jcode_compaction() {
+            is_compacting: if !self.is_remote && self.provider.uses_next_code_compaction() {
                 let compaction = self.registry.compaction();
                 compaction
                     .try_read()

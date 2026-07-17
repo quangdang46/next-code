@@ -46,7 +46,7 @@ public struct Gateway: Hashable, Sendable {
 
 /// Parses pair deep links from QR codes.
 ///
-/// Accepts both `nextcode://pair?...` (preferred) and legacy `jcode://pair?...` (dual-read).
+/// Accepts both `nextcode://pair?...` (preferred) and legacy `nextcode://pair?...` (dual-read).
 public enum PairURI {
     public struct Payload: Equatable, Sendable {
         public var gateway: Gateway
@@ -61,7 +61,7 @@ public enum PairURI {
     public static func parse(_ string: String) -> Payload? {
         guard let components = URLComponents(string: string),
             let scheme = components.scheme?.lowercased(),
-            scheme == "nextcode" || scheme == "jcode", // dual-read legacy jcode://
+            scheme == "nextcode" || scheme == "jcode", // dual-read legacy nextcode://
             components.host == "pair" || components.path == "pair"
                 || components.host == nil && components.path == "/pair"
         else { return nil }

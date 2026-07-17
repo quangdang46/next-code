@@ -78,7 +78,7 @@ def current_settings(root: Path, args: argparse.Namespace) -> dict[str, Any]:
         "~/.next-code/openai-auth.json",
     ])
     if openai_auth is None:
-        raise SystemExit("OpenAI OAuth file not found. Set JCODE_HARBOR_OPENAI_AUTH or log in first.")
+        raise SystemExit("OpenAI OAuth file not found. Set NEXT_CODE_HARBOR_OPENAI_AUTH or log in first.")
     settings: dict[str, Any] = {
         "schema_version": 1,
         "created_at": dt.datetime.now(dt.UTC).isoformat(),

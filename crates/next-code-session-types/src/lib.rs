@@ -9,7 +9,7 @@ use std::collections::HashSet;
 /// depending on any `next-code-tui-*` crate. The session-picker UI re-exports it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResumeTarget {
-    JcodeSession {
+    NextCodeSession {
         session_id: String,
     },
     ClaudeCodeSession {
@@ -36,7 +36,7 @@ pub enum ResumeTarget {
 impl ResumeTarget {
     pub fn stable_id(&self) -> &str {
         match self {
-            Self::JcodeSession { session_id } => session_id,
+            Self::NextCodeSession { session_id } => session_id,
             Self::ClaudeCodeSession { session_id, .. } => session_id,
             Self::CodexSession { session_id, .. } => session_id,
             Self::PiSession { session_path } => session_path,

@@ -129,7 +129,7 @@ def send_debug_cmd(sock, cmd: str, session_id: str = None, timeout: float = 60) 
     return resp.get('ok', False), resp.get('output', ''), resp.get('error', '')
 
 
-def run_jcode_oauth(prompt: str) -> dict:
+def run_next_code_oauth(prompt: str) -> dict:
     """Run via next-code debug socket using direct OAuth."""
     print(f"\n{'='*60}")
     print("Testing next-code direct OAuth API...")
@@ -231,14 +231,14 @@ def main():
     print(f"\nQuota after Claude CLI: {five_hour_after_cli:.2f}% (delta: +{cli_quota_delta:.4f}%)")
 
     # Test next-code OAuth
-    next_code_result = run_jcode_oauth(TEST_PROMPT)
+    next_code_result = run_next_code_oauth(TEST_PROMPT)
 
     # Check quota after next-code test
     time.sleep(1)  # Wait for API to update
-    usage_after_jcode = get_oauth_usage()
-    five_hour_after_jcode = usage_after_jcode.get('five_hour', {}).get('utilization', 0)
-    next_code_quota_delta = five_hour_after_jcode - five_hour_after_cli
-    print(f"\nQuota after next-code: {five_hour_after_jcode:.2f}% (delta: +{next_code_quota_delta:.4f}%)")
+    usage_after_next_code = get_oauth_usage()
+    five_hour_after_next_code = usage_after_next_code.get('five_hour', {}).get('utilization', 0)
+    next_code_quota_delta = five_hour_after_next_code - five_hour_after_cli
+    print(f"\nQuota after next-code: {five_hour_after_next_code:.2f}% (delta: +{next_code_quota_delta:.4f}%)")
 
     # Summary
     print(f"\n{'='*60}")
@@ -259,7 +259,7 @@ def main():
             print(f"  Cache creation: {usage.get('cache_creation_input_tokens', 0)}")
             print(f"  Cost: ${cost:.6f}")
 
-    print("\njcode Direct OAuth:")
+    print("\nnext-code Direct OAuth:")
     if "error" in next_code_result:
         print(f"  Error: {next_code_result['error']}")
     else:
@@ -307,7 +307,7 @@ PERFORMANCE COMPARISON:
 ACTUAL QUOTA CONSUMPTION (from OAuth API):
   Before tests:     {five_hour_before:.2f}%
   After Claude CLI: {five_hour_after_cli:.2f}%  (+{cli_quota_delta:.4f}%)
-  After next-code:      {five_hour_after_jcode:.2f}%  (+{next_code_quota_delta:.4f}%)
+  After next-code:      {five_hour_after_next_code:.2f}%  (+{next_code_quota_delta:.4f}%)
 
 NOTES:
 - The quota API shows percentage of a large 5-hour window (likely millions of tokens)

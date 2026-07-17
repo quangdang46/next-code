@@ -288,8 +288,8 @@ fn test_sanitize_telemetry_label_strips_ansi_and_controls() {
 #[test]
 fn test_onboarding_step_milestone_key_includes_provider_and_method() {
     assert_eq!(
-        onboarding_step_milestone_key("auth_success", Some("jcode"), Some("API key")),
-        "auth_success_jcode_api_key"
+        onboarding_step_milestone_key("auth_success", Some("next-code"), Some("API key")),
+        "auth_success_next_code_api_key"
     );
     assert_eq!(
         onboarding_step_milestone_key("login_picker_opened", None, None),

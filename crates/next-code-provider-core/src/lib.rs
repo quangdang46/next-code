@@ -390,7 +390,7 @@ pub trait Provider: Send + Sync {
     }
 
     /// Returns true if next-code should proactively run its own summary-based compaction.
-    fn uses_jcode_compaction(&self) -> bool {
+    fn uses_next_code_compaction(&self) -> bool {
         self.supports_compaction()
     }
 
@@ -572,9 +572,6 @@ impl NativeToolResult {
 
 /// Canonical User-Agent for generic outbound Next Code HTTP requests.
 pub const NEXT_CODE_USER_AGENT: &str = concat!("next-code/", env!("CARGO_PKG_VERSION"));
-/// Deprecated alias for [`NEXT_CODE_USER_AGENT`].
-#[deprecated(note = "renamed to NEXT_CODE_USER_AGENT")]
-pub const JCODE_USER_AGENT: &str = NEXT_CODE_USER_AGENT;
 
 /// Read an HTTP error body without hiding failures behind an empty string.
 ///

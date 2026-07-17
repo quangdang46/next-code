@@ -7,7 +7,7 @@
 # Why `prefer_tier = "thinking"`:
 #   Edits need reasoning — a wrong substitution silently breaks the
 #   build or, worse, changes behavior in a way tests don't catch. A
-#   pay-per-token user with `JCODE_ROUTING_THINKING=<premium-model>`
+#   pay-per-token user with `NEXT_CODE_ROUTING_THINKING=<premium-model>`
 #   gets the right tool for the job; subscription users inherit the
 #   session model.
 #
@@ -32,7 +32,7 @@
 
 id = "editor"
 display_name = "Code Editor"
-publisher = "jcode"
+publisher = "next-code"
 version = "0.1.0"
 color = "blue"
 

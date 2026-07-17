@@ -3,7 +3,6 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::Once;
 
 mod active_pids;
 pub use active_pids::{
@@ -25,12 +24,8 @@ pub(crate) mod test_env {
 
     pub fn clear_home_env() {
         next_code_core::env::remove_var("NEXT_CODE_HOME");
-        next_code_core::env::remove_var("JCODE_HOME");
     }
 }
-
-const MIGRATE_MARKER: &str = ".migrated-from-jcode";
-static MIGRATE_LOG_ONCE: Once = Once::new();
 
 /// Platform-aware runtime directory for sockets and ephemeral state.
 ///
@@ -38,8 +33,7 @@ static MIGRATE_LOG_ONCE: Once = Once::new();
 /// - macOS: `$TMPDIR` (per-user, e.g. `/var/folders/xx/.../T/`)
 /// - Fallback: `std::env::temp_dir()`
 ///
-/// Can be overridden with `$NEXT_CODE_RUNTIME_DIR` (canonical) or legacy
-/// `$NEXT_CODE_RUNTIME_DIR`.
+/// Can be overridden with `$NEXT_CODE_RUNTIME_DIR`.
 pub fn runtime_dir() -> PathBuf {
     if let Ok(dir) = next_code_core::env::product_env("RUNTIME_DIR") {
         return PathBuf::from(dir);
@@ -96,48 +90,24 @@ fn ensure_private_runtime_dir(path: &Path) {
 /// Resolve the next-code home directory.
 ///
 /// Resolution order:
-/// 1. `$NEXT_CODE_HOME` (canonical)
-/// 2. `$JCODE_HOME` (legacy dual-read)
-/// 3. `~/.next-code`, migrating from `~/.next-code` when the new dir is missing
-///    and the legacy dir exists.
-///
-/// On a successful one-shot migrate, a `.migrated-from-jcode` marker is written
-/// and a single log line is emitted.
+/// 1. `$NEXT_CODE_HOME`
+/// 2. `~/.next-code`
 pub fn next_code_dir() -> Result<PathBuf> {
     if let Ok(path) = next_code_core::env::product_env("HOME") {
         return Ok(PathBuf::from(path));
     }
 
     let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("No home directory"))?;
-    let new_dir = home.join(".next-code");
-    let legacy_dir = home.join(".jcode");
-
-    if !new_dir.exists() && legacy_dir.exists() {
-        migrate_legacy_home(&legacy_dir, &new_dir);
-    }
-
-    Ok(new_dir)
+    Ok(home.join(".next-code"))
 }
 
-/// Deprecated alias for [`next_code_dir`]. Prefer the new name.
-#[deprecated(note = "use next_code_dir instead")]
-pub fn jcode_dir() -> Result<PathBuf> {
-    next_code_dir()
-}
-
-/// Project-local product directory names, newest first.
-///
-/// Prefer `.next-code/`, fall back to legacy `.jcode/`. Competitor paths such as
-/// `.claude/` are intentionally **not** included here — callers that dual-read
-/// those keep their own explicit fallbacks.
-pub const PROJECT_DIR_CANDIDATES: &[&str] = &[".next-code", ".jcode"];
+/// Project-local product directory name.
+pub const PROJECT_DIR_CANDIDATES: &[&str] = &[".next-code"];
 
 /// Resolve a path under the project-local product directory.
 ///
-/// Tries `<root>/.next-code/<relative>` first, then `<root>/.next-code/<relative>`.
-/// Returns the first candidate that exists. When neither exists, returns the
-/// canonical `.next-code` path so callers that create the path write to the
-/// new name.
+/// Returns `<root>/.next-code/<relative>` when present, otherwise the canonical
+/// `.next-code` path so callers that create the path write there.
 pub fn project_product_path(root: &Path, relative: impl AsRef<Path>) -> PathBuf {
     let relative = relative.as_ref();
     let mut first = None;
@@ -153,11 +123,7 @@ pub fn project_product_path(root: &Path, relative: impl AsRef<Path>) -> PathBuf 
     first.expect("PROJECT_DIR_CANDIDATES is non-empty")
 }
 
-/// Resolve the project-local product root directory itself
-/// (`.next-code` preferred, `.jcode` fallback).
-///
-/// Returns the first existing candidate, or the canonical `.next-code` path
-/// when neither exists.
+/// Resolve the project-local product root directory (`.next-code`).
 pub fn project_product_dir(root: &Path) -> PathBuf {
     let mut first = None;
     for segment in PROJECT_DIR_CANDIDATES {
@@ -172,88 +138,6 @@ pub fn project_product_dir(root: &Path) -> PathBuf {
     first.expect("PROJECT_DIR_CANDIDATES is non-empty")
 }
 
-/// Best-effort migrate of a legacy `~/.jcode` tree into `~/.next-code`.
-///
-/// Prefers `rename` (atomic, free). Falls back to recursive copy when rename
-/// fails (e.g. cross-device). Always writes a marker on success.
-fn migrate_legacy_home(legacy: &Path, new_dir: &Path) {
-    let renamed = std::fs::rename(legacy, new_dir).is_ok();
-    if !renamed {
-        // Cross-device or busy source: copy then leave the legacy tree in place
-        // so a partial failure never destroys data. A later run can rename once
-        // the copy has established the new home.
-        if let Err(e) = copy_dir_recursive(legacy, new_dir) {
-            eprintln!(
-                "next-code: failed to migrate {} -> {}: {e}",
-                legacy.display(),
-                new_dir.display()
-            );
-            return;
-        }
-    }
-
-    let marker = new_dir.join(MIGRATE_MARKER);
-    let _ = std::fs::write(
-        &marker,
-        format!(
-            "migrated-from={}\nmigrated-at={}\n",
-            legacy.display(),
-            chrono_like_now()
-        ),
-    );
-    #[cfg(unix)]
-    {
-        let _ = next_code_core::fs::set_directory_permissions_owner_only(new_dir);
-    }
-
-    MIGRATE_LOG_ONCE.call_once(|| {
-        eprintln!(
-            "next-code: migrated legacy home {} -> {}",
-            legacy.display(),
-            new_dir.display()
-        );
-    });
-}
-
-/// Lightweight UTC-ish timestamp without pulling in chrono as a dep.
-fn chrono_like_now() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    format!("unix:{secs}")
-}
-
-fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(dst)?;
-    for entry in std::fs::read_dir(src)? {
-        let entry = entry?;
-        let ty = entry.file_type()?;
-        let from = entry.path();
-        let to = dst.join(entry.file_name());
-        if ty.is_dir() {
-            copy_dir_recursive(&from, &to)?;
-        } else if ty.is_symlink() {
-            // Best-effort: skip broken/unsupported symlinks rather than fail
-            // the whole migrate. Content files matter more than link shape.
-            #[cfg(unix)]
-            {
-                if let Ok(target) = std::fs::read_link(&from) {
-                    let _ = std::os::unix::fs::symlink(target, &to);
-                }
-            }
-            #[cfg(not(unix))]
-            {
-                let _ = std::fs::copy(&from, &to);
-            }
-        } else {
-            std::fs::copy(&from, &to)?;
-        }
-    }
-    Ok(())
-}
-
 pub fn logs_dir() -> Result<PathBuf> {
     Ok(next_code_dir()?.join("logs"))
 }
@@ -264,9 +148,9 @@ pub fn logs_dir() -> Result<PathBuf> {
 /// `/run/user/<uid>` on Linux) that is wiped on reboot, so it must only hold
 /// sockets and truly ephemeral state. State that has to outlive a reboot,
 /// such as swarm plans and member records, belongs here instead: it resolves
-/// to `~/.next-code/state` (respecting `NEXT_CODE_HOME` / legacy `JCODE_HOME`).
+/// to `~/.next-code/state` (respecting `NEXT_CODE_HOME`).
 ///
-/// When `NEXT_CODE_RUNTIME_DIR` / `JCODE_RUNTIME_DIR` is set (tests and
+/// When `NEXT_CODE_RUNTIME_DIR` is set (tests and
 /// sandboxed temp servers), it takes precedence so isolated runs never touch
 /// the real next-code home.
 pub fn durable_state_dir() -> PathBuf {
@@ -282,12 +166,10 @@ pub fn durable_state_dir() -> PathBuf {
 /// Resolve next-code's app-owned config directory.
 ///
 /// Default location is the platform config dir + `next-code` (for example
-/// `~/.config/next-code` on Linux). When `NEXT_CODE_HOME` / `JCODE_HOME` is
-/// set, sandbox this under `$HOME/config/next-code` so self-dev/tests do not
-/// leak into the user's real config directory.
+/// `~/.config/next-code` on Linux). When `NEXT_CODE_HOME` is set, sandbox this
+/// under `$HOME/config/next-code` so self-dev/tests do not leak into the user's
+/// real config directory.
 ///
-/// Dual-reads the legacy `~/.config/jcode` path only for existence-sensitive
-/// callers via [`legacy_app_config_dir`]; new writes go to `next-code`.
 pub fn app_config_dir() -> Result<PathBuf> {
     if let Ok(path) = next_code_core::env::product_env("HOME") {
         return Ok(PathBuf::from(path).join("config").join("next-code"));
@@ -298,21 +180,9 @@ pub fn app_config_dir() -> Result<PathBuf> {
     Ok(config_dir.join("next-code"))
 }
 
-/// Legacy app config dir (`~/.config/jcode` or `$HOME/config/jcode` under a
-/// sandboxed home). Used for dual-read / permission hardening of pre-rebrand
-/// installs; new writes should use [`app_config_dir`].
-pub fn legacy_app_config_dir() -> Result<PathBuf> {
-    if let Ok(path) = next_code_core::env::product_env("HOME") {
-        return Ok(PathBuf::from(path).join("config").join("jcode"));
-    }
-
-    let config_dir =
-        dirs::config_dir().ok_or_else(|| anyhow::anyhow!("No config directory found"))?;
-    Ok(config_dir.join("jcode"))
-}
 
 /// Resolve a path under the user's home directory, but sandbox it under
-/// `$NEXT_CODE_HOME/external/` (or legacy `$JCODE_HOME/external/`) when a
+/// `$NEXT_CODE_HOME/external/` when a
 /// product home override is set.
 ///
 /// This keeps external provider auth files isolated during tests and sandboxed
@@ -338,10 +208,10 @@ pub fn user_home_path(relative: impl AsRef<Path>) -> Result<PathBuf> {
 ///
 /// This intentionally ignores failures so startup does not fail on exotic
 /// filesystems, but it narrows exposure on typical Unix systems. Hardens both
-/// the new `next-code` and legacy `jcode` config segments when both exist.
+/// the `next-code` config segment when it exists.
 pub fn harden_user_config_permissions() {
     if let Some(config_dir) = dirs::config_dir() {
-        for segment in ["next-code", "jcode"] {
+        for segment in ["next-code"] {
             let dir = config_dir.join(segment);
             if dir.exists() {
                 let _ = next_code_core::fs::set_directory_permissions_owner_only(&dir);
@@ -656,56 +526,8 @@ mod tests {
         let preferred = temp.path().join("preferred");
         std::fs::create_dir_all(&preferred).unwrap();
         next_code_core::env::set_var("NEXT_CODE_HOME", &preferred);
-        next_code_core::env::set_var("JCODE_HOME", temp.path().join("legacy"));
         let got = next_code_dir().unwrap();
         assert_eq!(got, preferred);
-        clear_home_env();
-    }
-
-    #[test]
-    fn falls_back_jcode_home() {
-        let _g = lock_env();
-        clear_home_env();
-        let temp = tempfile::tempdir().expect("tempdir");
-        let legacy = temp.path().join("legacy-home");
-        std::fs::create_dir_all(&legacy).unwrap();
-        next_code_core::env::set_var("JCODE_HOME", &legacy);
-        let got = next_code_dir().unwrap();
-        assert_eq!(got, legacy);
-        clear_home_env();
-    }
-
-    #[test]
-    fn migrates_legacy_home() {
-        let _g = lock_env();
-        clear_home_env();
-        // Point HOME at a temp sandbox so we never touch the real user home.
-        let sandbox = tempfile::tempdir().expect("sandbox");
-        let prev_home = std::env::var_os("HOME");
-        next_code_core::env::set_var("HOME", sandbox.path());
-
-        let legacy = sandbox.path().join(".jcode");
-        let new_dir = sandbox.path().join(".next-code");
-        std::fs::create_dir_all(legacy.join("sessions")).unwrap();
-        std::fs::write(legacy.join("sessions").join("a.json"), b"{}").unwrap();
-
-        assert!(!new_dir.exists());
-        let got = next_code_dir().unwrap();
-        assert_eq!(got, new_dir);
-        assert!(new_dir.exists(), "migrated home must exist");
-        assert!(
-            new_dir.join("sessions").join("a.json").exists(),
-            "session data must migrate"
-        );
-        assert!(
-            new_dir.join(MIGRATE_MARKER).exists(),
-            "marker must be written"
-        );
-
-        match prev_home {
-            Some(h) => next_code_core::env::set_var("HOME", h),
-            None => next_code_core::env::remove_var("HOME"),
-        }
         clear_home_env();
     }
 
@@ -713,23 +535,13 @@ mod tests {
     fn fresh_user_gets_next_code() {
         let _g = lock_env();
         clear_home_env();
-        let sandbox = tempfile::tempdir().expect("sandbox");
-        let prev_home = std::env::var_os("HOME");
-        next_code_core::env::set_var("HOME", sandbox.path());
-
-        // No .next-code, no .next-code yet — resolve to the new path without creating it.
+        // Without NEXT_CODE_HOME, resolve relative to the platform home dir.
+        // (Windows Known Folder APIs ignore temporary HOME/USERPROFILE overrides.)
         let got = next_code_dir().unwrap();
-        assert_eq!(got, sandbox.path().join(".next-code"));
-        assert!(
-            !sandbox.path().join(".next-code").exists(),
-            "fresh resolve must not create the dir"
-        );
-
-        match prev_home {
-            Some(h) => next_code_core::env::set_var("HOME", h),
-            None => next_code_core::env::remove_var("HOME"),
-        }
-        clear_home_env();
+        let expected = dirs::home_dir()
+            .expect("home directory")
+            .join(".next-code");
+        assert_eq!(got, expected);
     }
 
     #[test]
@@ -744,12 +556,12 @@ mod tests {
     }
 
     #[test]
-    fn runtime_dir_dual_reads_legacy() {
+    fn runtime_dir_reads_next_code() {
         let _g = lock_env();
         next_code_core::env::remove_var("NEXT_CODE_RUNTIME_DIR");
         let temp = tempfile::tempdir().expect("tempdir");
-        next_code_core::env::set_var("JCODE_RUNTIME_DIR", temp.path());
+        next_code_core::env::set_var("NEXT_CODE_RUNTIME_DIR", temp.path());
         assert_eq!(runtime_dir(), temp.path());
-        next_code_core::env::remove_var("JCODE_RUNTIME_DIR");
+        next_code_core::env::remove_var("NEXT_CODE_RUNTIME_DIR");
     }
 }

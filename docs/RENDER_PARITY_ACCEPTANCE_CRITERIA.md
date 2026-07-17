@@ -34,7 +34,7 @@ about the residual mismatch probability, not what we tolerate.
 | Pre-switchover deep run | `NEXT_CODE_MD_FUZZ_ITERS=100000` | must pass once, on the exact commit proposed for switchover | p < 3.0e-5 per generated document |
 | Nightly (optional soak) | `NEXT_CODE_MD_FUZZ_ITERS=25000`, rotating `NEXT_CODE_MD_FUZZ_SEED` (e.g. epoch-day) | failures file an issue with repro seed | accumulates coverage across seeds over time |
 
-> Env dual-read: `NEXT_CODE_MD_FUZZ_*` is preferred; legacy `JCODE_MD_FUZZ_*` is dual-read via `product_env` for one release.
+> Env dual-read: `NEXT_CODE_MD_FUZZ_*` is preferred; legacy `NEXT_CODE_MD_FUZZ_*` is dual-read via `product_env` for one release.
 
 
 Rationale for the bound: with N i.i.d. generated documents and 0 observed

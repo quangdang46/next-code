@@ -14,7 +14,7 @@ tmpdir=""
 info() { printf '\033[1;34m%s\033[0m\n' "$*"; }
 err()  { printf '\033[1;31merror: %s\033[0m\n' "$*" >&2; exit 1; }
 
-# Prefer NEXT_CODE_* env vars; dual-read legacy JCODE_* for one release.
+# Prefer NEXT_CODE_* env vars; dual-read legacy NEXT_CODE_* for one release.
 next_code_env() {
   # Usage: next_code_env NEW_VAR LEGACY_VAR [default]
   _new="$1"; _legacy="$2"; _default="${3-}"
@@ -32,7 +32,7 @@ next_code_env() {
 }
 
 valid_conversion_id() {
-  printf '%s' "${NEXT_CODE_INSTALL_CONVERSION_ID:-${JCODE_INSTALL_CONVERSION_ID:-}}" |
+  printf '%s' "${NEXT_CODE_INSTALL_CONVERSION_ID:-${NEXT_CODE_INSTALL_CONVERSION_ID:-}}" |
     grep -Eiq '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
 }
 
@@ -44,11 +44,11 @@ report_install_funnel() {
   stage="$1"
   outcome="$2"
   failure_stage="${3:-}"
-  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY JCODE_NO_TELEMETRY)" != "1" ] || return 0
+  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY NEXT_CODE_NO_TELEMETRY)" != "1" ] || return 0
   [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
   valid_conversion_id || return 0
 
-  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-${JCODE_INSTALL_CONVERSION_ID:-}}"
+  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-${NEXT_CODE_INSTALL_CONVERSION_ID:-}}"
   payload=$(printf '{"id":"%s","event":"install_funnel","version":"%s","os":"%s","arch":"%s","conversion_id":"%s","stage":"%s","outcome":"%s","source":"installer","install_method":"shell","failure_stage":"%s"}' \
     "$conversion_id" \
     "$(telemetry_value "$INSTALL_VERSION")" \
@@ -63,12 +63,12 @@ report_install_funnel() {
 }
 
 persist_install_conversion_id() {
-  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY JCODE_NO_TELEMETRY)" != "1" ] || return 0
+  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY NEXT_CODE_NO_TELEMETRY)" != "1" ] || return 0
   [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
   valid_conversion_id || return 0
-  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-${JCODE_INSTALL_CONVERSION_ID:-}}"
-  # Prefer NEXT_CODE_HOME, then JCODE_HOME (legacy dual-read), then ~/.next-code.
-  next_code_home="$(next_code_env NEXT_CODE_HOME JCODE_HOME "$HOME/.next-code")"
+  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-${NEXT_CODE_INSTALL_CONVERSION_ID:-}}"
+  # Prefer NEXT_CODE_HOME, then NEXT_CODE_HOME (legacy dual-read), then ~/.next-code.
+  next_code_home="$(next_code_env NEXT_CODE_HOME NEXT_CODE_HOME "$HOME/.next-code")"
   mkdir -p "$next_code_home" 2>/dev/null || return 0
   (umask 077; printf '%s\n' "$conversion_id" > "$next_code_home/install_conversion_id") \
     2>/dev/null || return 0
@@ -130,9 +130,9 @@ esac
 report_install_funnel "installer_start" "success" ""
 
 if [ "$IS_WINDOWS" = true ]; then
-  INSTALL_DIR="$(next_code_env NEXT_CODE_INSTALL_DIR JCODE_INSTALL_DIR "$LOCALAPPDATA/next-code/bin")"
+  INSTALL_DIR="$(next_code_env NEXT_CODE_INSTALL_DIR NEXT_CODE_INSTALL_DIR "$LOCALAPPDATA/next-code/bin")"
 else
-  INSTALL_DIR="$(next_code_env NEXT_CODE_INSTALL_DIR JCODE_INSTALL_DIR "$HOME/.local/bin")"
+  INSTALL_DIR="$(next_code_env NEXT_CODE_INSTALL_DIR NEXT_CODE_INSTALL_DIR "$HOME/.local/bin")"
 fi
 
 # Extract the tag_name value, working for both pretty-printed (multi-line) and
@@ -148,14 +148,14 @@ URL_BIN="https://github.com/$REPO/releases/download/$VERSION/$ARTIFACT"
 
 if [ "$IS_WINDOWS" = true ]; then
   EXE=".exe"
-  # Prefer NEXT_CODE_HOME / JCODE_HOME; default to %LOCALAPPDATA%/next-code.
-  next_code_home="$(next_code_env NEXT_CODE_HOME JCODE_HOME "$LOCALAPPDATA/next-code")"
+  # Prefer NEXT_CODE_HOME / NEXT_CODE_HOME; default to %LOCALAPPDATA%/next-code.
+  next_code_home="$(next_code_env NEXT_CODE_HOME NEXT_CODE_HOME "$LOCALAPPDATA/next-code")"
   builds_dir="$next_code_home/builds"
 else
   EXE=""
-  # Prefer NEXT_CODE_HOME, then JCODE_HOME, then ~/.next-code. The binary dual-reads
+  # Prefer NEXT_CODE_HOME, then NEXT_CODE_HOME, then ~/.next-code. The binary dual-reads
   # ~/.next-code and migrates automatically when ~/.next-code is missing.
-  next_code_home="$(next_code_env NEXT_CODE_HOME JCODE_HOME "$HOME/.next-code")"
+  next_code_home="$(next_code_env NEXT_CODE_HOME NEXT_CODE_HOME "$HOME/.next-code")"
   builds_dir="$next_code_home/builds"
 fi
 stable_dir="$builds_dir/stable"
@@ -299,7 +299,7 @@ esac
 # installed (so a newer/dev daemon is never downgraded). This is best-effort:
 # it must never fail the install, and it is skipped when no server is running.
 INSTALL_STAGE="server_reload"
-if [ "$(next_code_env NEXT_CODE_SKIP_SERVER_RELOAD JCODE_SKIP_SERVER_RELOAD)" != "1" ]; then
+if [ "$(next_code_env NEXT_CODE_SKIP_SERVER_RELOAD NEXT_CODE_SKIP_SERVER_RELOAD)" != "1" ]; then
   reload_bin="$launcher_path"
   [ -x "$reload_bin" ] || reload_bin="$stable_dir/$bin_name"
   if [ -x "$reload_bin" ]; then

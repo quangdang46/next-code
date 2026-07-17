@@ -196,7 +196,7 @@ interface PluginEngines {
   /** Required next-code version range (e.g., ">=0.9.0"). Prefer `nextcode`; dual-read also accepts legacy `jcode`. */
   nextcode?: string;
   /** @deprecated dual-read legacy key — prefer `nextcode` */
-  jcode?: string;
+  next-code?: string;
 }
 ```
 

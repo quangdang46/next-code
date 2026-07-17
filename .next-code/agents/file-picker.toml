@@ -6,7 +6,7 @@
 # Why `prefer_tier = "routine"`:
 #   File picking is a fuzzy-search task — a smaller/cheaper model
 #   handles it well. Pay-per-token users who set
-#   `JCODE_ROUTING_ROUTINE=<cheap-model>` save real money here.
+#   `NEXT_CODE_ROUTING_ROUTINE=<cheap-model>` save real money here.
 #   Subscription users (Claude Pro, ChatGPT Plus, ...) inherit the
 #   session model and get correctness without any tier mapping.
 #
@@ -22,7 +22,7 @@
 
 id = "file-picker"
 display_name = "Fletcher the File Fetcher"
-publisher = "jcode"
+publisher = "next-code"
 version = "0.1.0"
 color = "cyan"
 

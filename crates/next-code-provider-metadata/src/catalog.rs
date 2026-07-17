@@ -501,23 +501,20 @@ pub const NEXT_CODE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescr
     id: "next-code",
     display_name: "Next Code",
     auth_kind: LoginProviderAuthKind::ApiKey,
-    auth_state_key: LoginProviderAuthStateKey::Jcode,
+    auth_state_key: LoginProviderAuthStateKey::NextCode,
     auth_status_method: "API key",
     aliases: &[
-        "jcode",
+        "next-code",
         "subscription",
-        "jcode-subscription",
+        "next-code-subscription",
         "next-code-subscription",
     ],
     menu_detail: "curated next-code subscription models",
     recommended: false,
-    target: LoginProviderTarget::Jcode,
+    target: LoginProviderTarget::NextCode,
     order: LoginProviderSurfaceOrder::new(Some(3), Some(3), Some(3), Some(3), Some(3)),
 };
 
-/// Deprecated alias for [`NEXT_CODE_LOGIN_PROVIDER`].
-#[deprecated(note = "renamed to NEXT_CODE_LOGIN_PROVIDER")]
-pub const JCODE_LOGIN_PROVIDER: LoginProviderDescriptor = NEXT_CODE_LOGIN_PROVIDER;
 
 pub const OPENAI_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
     id: "openai",

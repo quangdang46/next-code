@@ -106,13 +106,13 @@ fn persist_approved_key(approved: &ApprovedAccountKey) -> Result<()> {
 /// Full browser-first device login. No email or secret is requested in the
 /// terminal. A valid exchanged key is retained when plan activation times out or
 /// the user cancels activation polling.
-pub(super) async fn login_jcode_device_flow(no_browser: bool) -> Result<LoginCompletion> {
+pub(super) async fn login_next_code_device_flow(no_browser: bool) -> Result<LoginCompletion> {
     let client = crate::provider::shared_http_client();
     let api_base = subscription_api::configured_api_base();
     let device = subscription_api::request_device_authorization(
         &client,
         &api_base,
-        Some(crate::subscription_catalog::JcodeTier::Pro),
+        Some(crate::subscription_catalog::NextCodeTier::Pro),
     )
     .await
     .map_err(anyhow::Error::new)
@@ -219,7 +219,7 @@ pub(super) async fn login_jcode_device_flow(no_browser: bool) -> Result<LoginCom
         }
     };
 
-    crate::telemetry::record_auth_success("jcode-subscription", "device_code_browser");
+    crate::telemetry::record_auth_success("next-code-subscription", "device_code_browser");
     Ok(completion)
 }
 

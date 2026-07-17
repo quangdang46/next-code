@@ -34,50 +34,24 @@ where
     }
 }
 
-/// Read a product-branded environment variable with dual-read.
-///
-/// Tries `NEXT_CODE_{suffix}` first (canonical), then falls back to the
-/// legacy `JCODE_{suffix}` name so existing installs keep working during
-/// the rebrand.
+/// Read a product-branded environment variable (`NEXT_CODE_{suffix}`).
 pub fn product_env(suffix: &str) -> Result<String, std::env::VarError> {
-    let new_key = format!("NEXT_CODE_{suffix}");
-    match std::env::var(&new_key) {
-        Ok(v) => Ok(v),
-        Err(std::env::VarError::NotPresent) => {
-            let old_key = format!("JCODE_{suffix}");
-            std::env::var(old_key)
-        }
-        Err(e) => Err(e),
-    }
+    std::env::var(format!("NEXT_CODE_{suffix}"))
 }
 
 /// Like [`product_env`] but returns [`OsString`] (preserves non-UTF-8 values).
 pub fn product_env_os(suffix: &str) -> Option<OsString> {
-    let new_key = format!("NEXT_CODE_{suffix}");
-    match std::env::var_os(&new_key) {
-        Some(v) => Some(v),
-        None => {
-            let old_key = format!("JCODE_{suffix}");
-            std::env::var_os(old_key)
-        }
-    }
+    std::env::var_os(format!("NEXT_CODE_{suffix}"))
 }
 
-/// Dual-read for env vars that are not simple `NEXT_CODE_`/`JCODE_` suffixes
-/// (for example kill-switches that keep a different prefix).
-///
-/// Tries `new_key` first, then `old_key`.
-pub fn product_var_full(new_key: &str, old_key: &str) -> Result<String, std::env::VarError> {
-    match std::env::var(new_key) {
-        Ok(v) => Ok(v),
-        Err(std::env::VarError::NotPresent) => std::env::var(old_key),
-        Err(e) => Err(e),
-    }
+/// Read a full env key name (for kill-switches that are not `NEXT_CODE_*` suffixes).
+pub fn product_var_full(key: &str) -> Result<String, std::env::VarError> {
+    std::env::var(key)
 }
 
-/// Dual-read for non-suffix env vars returning [`OsString`].
-pub fn product_var_full_os(new_key: &str, old_key: &str) -> Option<OsString> {
-    std::env::var_os(new_key).or_else(|| std::env::var_os(old_key))
+/// Like [`product_var_full`] returning [`OsString`].
+pub fn product_var_full_os(key: &str) -> Option<OsString> {
+    std::env::var_os(key)
 }
 
 #[cfg(test)]
@@ -91,33 +65,29 @@ mod tests {
     }
 
     #[test]
-    fn product_env_prefers_next_code() {
+    fn product_env_reads_next_code() {
         let _g = lock_env();
         set_var("NEXT_CODE_HOME", "/new");
-        set_var("JCODE_HOME", "/old");
         assert_eq!(product_env("HOME").unwrap(), "/new");
         remove_var("NEXT_CODE_HOME");
-        remove_var("JCODE_HOME");
     }
 
     #[test]
-    fn product_env_falls_back_to_jcode() {
+    fn product_env_missing_is_err() {
         let _g = lock_env();
         remove_var("NEXT_CODE_HOME");
-        set_var("JCODE_HOME", "/legacy");
-        assert_eq!(product_env("HOME").unwrap(), "/legacy");
-        remove_var("JCODE_HOME");
+        assert!(product_env("HOME").is_err());
     }
 
     #[test]
-    fn product_var_full_dual_read() {
+    fn product_var_full_reads_key() {
         let _g = lock_env();
         remove_var("NEXT_CODE_HOOKS_CONFIG");
-        set_var("JCODE_HOOKS_CONFIG", "/hooks.toml");
+        set_var("NEXT_CODE_HOOKS_CONFIG", "/hooks.toml");
         assert_eq!(
-            product_var_full("NEXT_CODE_HOOKS_CONFIG", "JCODE_HOOKS_CONFIG").unwrap(),
+            product_var_full("NEXT_CODE_HOOKS_CONFIG").unwrap(),
             "/hooks.toml"
         );
-        remove_var("JCODE_HOOKS_CONFIG");
+        remove_var("NEXT_CODE_HOOKS_CONFIG");
     }
 }

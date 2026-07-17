@@ -12,9 +12,9 @@ set -euo pipefail
 # Requirements: niri, jq, wtype, a Wayland session, and a built next-code-desktop.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="${NEXT_CODE_DESKTOP_BIN:-${JCODE_DESKTOP_BIN:-$ROOT_DIR/target/debug/next-code-desktop}}"
-TIMEOUT_SECS="${NEXT_CODE_DESKTOP_RELOAD_E2E_TIMEOUT_SECS:-${JCODE_DESKTOP_RELOAD_E2E_TIMEOUT_SECS:-15}}"
-LOG_FILE="${NEXT_CODE_DESKTOP_RELOAD_E2E_LOG:-${JCODE_DESKTOP_RELOAD_E2E_LOG:-$(mktemp -t next-code-desktop-reload-e2e.XXXXXX.log)}}"
+BIN="${NEXT_CODE_DESKTOP_BIN:-${NEXT_CODE_DESKTOP_BIN:-$ROOT_DIR/target/debug/next-code-desktop}}"
+TIMEOUT_SECS="${NEXT_CODE_DESKTOP_RELOAD_E2E_TIMEOUT_SECS:-${NEXT_CODE_DESKTOP_RELOAD_E2E_TIMEOUT_SECS:-15}}"
+LOG_FILE="${NEXT_CODE_DESKTOP_RELOAD_E2E_LOG:-${NEXT_CODE_DESKTOP_RELOAD_E2E_LOG:-$(mktemp -t next-code-desktop-reload-e2e.XXXXXX.log)}}"
 
 if [[ ! -x "$BIN" ]]; then
   echo "desktop binary not found or not executable: $BIN" >&2

@@ -220,7 +220,7 @@ const pct = (x) => (x==null?"—":(x*100).toFixed(1)+"%");
 const ms  = (x) => (x==null?"—":x>=1000?(x/1000).toFixed(1)+"s":Math.round(x)+"ms");
 const dec = (x,d=1) => (x==null?"—":Number(x).toFixed(d));
 const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let TOKEN = localStorage.getItem("next_code_dash_token") || localStorage.getItem("jcode_dash_token") || "";  // dual-read: jcode_dash_token one release
+let TOKEN = localStorage.getItem("next_code_dash_token") || localStorage.getItem("next_code_dash_token") || "";  // dual-read: next_code_dash_token one release
 
 function showGate(m){ document.getElementById("app").classList.add("hidden"); document.getElementById("gate").classList.remove("hidden"); document.getElementById("gate-err").textContent = m||""; }
 function showApp(){ document.getElementById("gate").classList.add("hidden"); document.getElementById("app").classList.remove("hidden"); }
@@ -232,7 +232,7 @@ async function load(){
   let res;
   try { res = await fetch("/v1/stats", { headers:{ "Authorization":"Bearer "+TOKEN } }); }
   catch(e){ showGate("network error"); return; }
-  if(res.status===401){ localStorage.removeItem("next_code_dash_token"); localStorage.removeItem("jcode_dash_token"); TOKEN=""; showGate("invalid token"); return; }
+  if(res.status===401){ localStorage.removeItem("next_code_dash_token"); localStorage.removeItem("next_code_dash_token"); TOKEN=""; showGate("invalid token"); return; }
   if(!res.ok){ document.getElementById("content").innerHTML='<div class="err">failed to load ('+res.status+')</div>'; return; }
   render(await res.json());
 }
@@ -484,10 +484,10 @@ function render(d){
   c.innerHTML=H;
 }
 
-document.getElementById("unlock").addEventListener("click",()=>{const v=document.getElementById("token").value.trim();if(!v){document.getElementById("gate-err").textContent="enter a token";return;}TOKEN=v;localStorage.setItem("next_code_dash_token",v); localStorage.removeItem("jcode_dash_token");load();});
+document.getElementById("unlock").addEventListener("click",()=>{const v=document.getElementById("token").value.trim();if(!v){document.getElementById("gate-err").textContent="enter a token";return;}TOKEN=v;localStorage.setItem("next_code_dash_token",v); localStorage.removeItem("next_code_dash_token");load();});
 document.getElementById("token").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("unlock").click();});
 document.getElementById("refresh").addEventListener("click",load);
-document.getElementById("logout").addEventListener("click",()=>{localStorage.removeItem("next_code_dash_token"); localStorage.removeItem("jcode_dash_token");TOKEN="";showGate("");});
+document.getElementById("logout").addEventListener("click",()=>{localStorage.removeItem("next_code_dash_token"); localStorage.removeItem("next_code_dash_token");TOKEN="";showGate("");});
 load();
 </script>
 </body>

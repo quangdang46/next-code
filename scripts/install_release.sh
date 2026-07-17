@@ -7,7 +7,7 @@
 # - ~/.next-code/builds/stable/next-code -> .../versions/<hash>/next-code
 # - ~/.next-code/builds/current/next-code -> .../versions/<hash>/next-code
 # - ~/.local/bin/next-code -> ~/.next-code/builds/current/next-code (launcher)
-# - ~/.local/bin/jcode -> next-code (compat symlink for one release)
+# - ~/.local/bin/next-code -> next-code (compat symlink for one release)
 #
 # Legacy ~/.next-code is dual-read by the binary and migrates automatically when
 # ~/.next-code is missing. Installers write to ~/.next-code going forward.
@@ -15,7 +15,7 @@ set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
-profile="${NEXT_CODE_RELEASE_PROFILE:-${JCODE_RELEASE_PROFILE:-release-lto}}"
+profile="${NEXT_CODE_RELEASE_PROFILE:-${NEXT_CODE_RELEASE_PROFILE:-release-lto}}"
 if [[ "${1:-}" == "--fast" ]]; then
   profile="release"
   shift
@@ -66,12 +66,12 @@ if [[ -z "$hash" ]]; then
   hash="$(date +%Y%m%d%H%M%S)"
 fi
 
-# Prefer NEXT_CODE_HOME, then legacy JCODE_HOME, then ~/.next-code (with legacy
+# Prefer NEXT_CODE_HOME, then legacy NEXT_CODE_HOME, then ~/.next-code (with legacy
 # ~/.next-code builds dir as a last-resort fallback when it already exists alone).
 if [ -n "${NEXT_CODE_HOME:-}" ]; then
   next_code_home="$NEXT_CODE_HOME"
-elif [ -n "${NEXT_CODE_HOME:-${JCODE_HOME:-}}" ]; then
-  next_code_home="${NEXT_CODE_HOME:-${JCODE_HOME:-}}"
+elif [ -n "${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}" ]; then
+  next_code_home="${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}"
 elif [ -d "$HOME/.next-code" ] || [ ! -d "$HOME/.next-code" ]; then
   next_code_home="$HOME/.next-code"
 else
@@ -100,17 +100,17 @@ ln -sfn "$version_dir/next-code" "$current_dir/next-code"
 printf '%s\n' "$hash" > "$builds_dir/current-version"
 
 # Update launcher path to current channel
-install_dir="${NEXT_CODE_INSTALL_DIR:-${JCODE_INSTALL_DIR:-$HOME/.local/bin}}"
+install_dir="${NEXT_CODE_INSTALL_DIR:-${NEXT_CODE_INSTALL_DIR:-$HOME/.local/bin}}"
 mkdir -p "$install_dir"
 ln -sfn "$current_dir/next-code" "$install_dir/next-code"
-# Compat symlink for one release so existing `jcode` muscle memory keeps working.
+# Compat symlink for one release so existing `next-code` muscle memory keeps working.
 ln -sfn "next-code" "$install_dir/next-code"
 
 echo "Installed: $version_dir/next-code"
 echo "Updated stable symlink: $stable_dir/next-code -> $version_dir/next-code"
 echo "Updated current symlink: $current_dir/next-code -> $version_dir/next-code"
 echo "Updated launcher symlink: $install_dir/next-code -> $current_dir/next-code"
-echo "Updated compat symlink: $install_dir/jcode -> next-code"
+echo "Updated compat symlink: $install_dir/next-code -> next-code"
 
 # Configure supported desktop launch hotkeys as part of installation. This is
 # idempotent and best-effort because headless installs may not expose a desktop
@@ -128,7 +128,7 @@ esac
 # comparison on an older daemon can report "already current" while the process
 # image is still the previous build (stale /proc mapping vs updated symlink).
 # Hands live headless/swarm sessions to the new process; no-op if no server.
-if [ "${NEXT_CODE_SKIP_SERVER_RELOAD:-${JCODE_SKIP_SERVER_RELOAD:-}}" != "1" ]; then
+if [ "${NEXT_CODE_SKIP_SERVER_RELOAD:-${NEXT_CODE_SKIP_SERVER_RELOAD:-}}" != "1" ]; then
   if "$install_dir/next-code" server reload --force </dev/null >/dev/null 2>&1; then
     echo "Force-reloaded the running next-code server onto $hash (if one was active)."
   else

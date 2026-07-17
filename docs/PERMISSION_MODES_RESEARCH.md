@@ -629,7 +629,7 @@ dcg-core Engine::evaluate(session, tool_call, mode, effects)
 ### 7.2 Config Hierarchy
 
 ```
-CLI flag > NEXT_CODE_PERMISSION_MODE env (legacy dual-read: `JCODE_PERMISSION_MODE`) > .next-code/config.toml (legacy dual-read: `.jcode/config.toml`) > ~/.next-code/config.toml > Mode::Default
+CLI flag > NEXT_CODE_PERMISSION_MODE env (legacy dual-read: `NEXT_CODE_PERMISSION_MODE`) > .next-code/config.toml (legacy dual-read: `.next-code/config.toml`) > ~/.next-code/config.toml > Mode::Default
 ```
 
 ### 7.3 TOML Config Schema (proposed)

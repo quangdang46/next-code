@@ -7,40 +7,15 @@ pub const NEXT_CODE_ACCOUNT_ID_ENV: &str = "NEXT_CODE_ACCOUNT_ID";
 pub const NEXT_CODE_ACCOUNT_EMAIL_ENV: &str = "NEXT_CODE_ACCOUNT_EMAIL";
 pub const NEXT_CODE_TIER_ENV: &str = "NEXT_CODE_TIER";
 pub const NEXT_CODE_ENV_FILE: &str = "next-code-subscription.env";
-/// Cache namespace for the managed subscription (kept as `jcode-subscription`
-/// so existing on-disk caches continue to hit during the dual-read window).
-pub const NEXT_CODE_CACHE_NAMESPACE: &str = "jcode-subscription";
+/// Cache namespace for the managed subscription.
+pub const NEXT_CODE_CACHE_NAMESPACE: &str = "next-code-subscription";
 pub const NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV: &str = "NEXT_CODE_SUBSCRIPTION_ACTIVE";
 pub const DEFAULT_NEXT_CODE_API_BASE: &str = "https://api.jcode.sh/v1";
 pub const NEXT_CODE_PRICING_URL: &str = "https://jcode.sh/pricing";
 pub const NEXT_CODE_ACCOUNT_URL: &str = "https://jcode.sh/account";
 
-// Deprecated JCODE_* aliases — equal to the NEXT_CODE_* names above.
-#[deprecated(note = "renamed to NEXT_CODE_API_KEY_ENV")]
-pub const JCODE_API_KEY_ENV: &str = NEXT_CODE_API_KEY_ENV;
-#[deprecated(note = "renamed to NEXT_CODE_API_BASE_ENV")]
-pub const JCODE_API_BASE_ENV: &str = NEXT_CODE_API_BASE_ENV;
-#[deprecated(note = "renamed to NEXT_CODE_ACCOUNT_ID_ENV")]
-pub const JCODE_ACCOUNT_ID_ENV: &str = NEXT_CODE_ACCOUNT_ID_ENV;
-#[deprecated(note = "renamed to NEXT_CODE_ACCOUNT_EMAIL_ENV")]
-pub const JCODE_ACCOUNT_EMAIL_ENV: &str = NEXT_CODE_ACCOUNT_EMAIL_ENV;
-#[deprecated(note = "renamed to NEXT_CODE_TIER_ENV")]
-pub const JCODE_TIER_ENV: &str = NEXT_CODE_TIER_ENV;
-#[deprecated(note = "renamed to NEXT_CODE_ENV_FILE")]
-pub const JCODE_ENV_FILE: &str = NEXT_CODE_ENV_FILE;
-#[deprecated(note = "renamed to NEXT_CODE_CACHE_NAMESPACE")]
-pub const JCODE_CACHE_NAMESPACE: &str = NEXT_CODE_CACHE_NAMESPACE;
-#[deprecated(note = "renamed to NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV")]
-pub const JCODE_SUBSCRIPTION_ACTIVE_ENV: &str = NEXT_CODE_SUBSCRIPTION_ACTIVE_ENV;
-#[deprecated(note = "renamed to DEFAULT_NEXT_CODE_API_BASE")]
-pub const DEFAULT_JCODE_API_BASE: &str = DEFAULT_NEXT_CODE_API_BASE;
-#[deprecated(note = "renamed to NEXT_CODE_PRICING_URL")]
-pub const JCODE_PRICING_URL: &str = NEXT_CODE_PRICING_URL;
-#[deprecated(note = "renamed to NEXT_CODE_ACCOUNT_URL")]
-pub const JCODE_ACCOUNT_URL: &str = NEXT_CODE_ACCOUNT_URL;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum JcodeTier {
+pub enum NextCodeTier {
     Plus,
     Pro,
     Max,
@@ -48,13 +23,13 @@ pub enum JcodeTier {
     Flagship,
 }
 
-impl JcodeTier {
-    pub const ALL: &'static [JcodeTier] = &[
-        JcodeTier::Plus,
-        JcodeTier::Pro,
-        JcodeTier::Max,
-        JcodeTier::Ultra,
-        JcodeTier::Flagship,
+impl NextCodeTier {
+    pub const ALL: &'static [NextCodeTier] = &[
+        NextCodeTier::Plus,
+        NextCodeTier::Pro,
+        NextCodeTier::Max,
+        NextCodeTier::Ultra,
+        NextCodeTier::Flagship,
     ];
 
     pub fn retail_price_usd(self) -> u32 {
@@ -111,7 +86,7 @@ impl JcodeTier {
     }
 
     /// Whether an account on this tier may use a model gated at `required`.
-    pub fn allows(self, required: JcodeTier) -> bool {
+    pub fn allows(self, required: NextCodeTier) -> bool {
         self >= required
     }
 }
@@ -132,7 +107,7 @@ pub struct CuratedModel {
     pub default_enabled: bool,
     pub routing_policy: UpstreamRoutingPolicy,
     /// Minimum subscription tier that may use this model.
-    pub min_tier: JcodeTier,
+    pub min_tier: NextCodeTier,
     pub note: &'static str,
 }
 
@@ -143,7 +118,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         aliases: &["claude-opus-4-8", "opus-4-8", "opus 4.8", "claude opus 4.8"],
         default_enabled: true,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
-        min_tier: JcodeTier::Plus,
+        min_tier: NextCodeTier::Plus,
         note: "Frontier model; routed server-side to Anthropic by the next-code router.",
     },
     CuratedModel {
@@ -152,7 +127,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         aliases: &["gpt-5.5", "gpt-5-5", "gpt 5.5"],
         default_enabled: false,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
-        min_tier: JcodeTier::Plus,
+        min_tier: NextCodeTier::Plus,
         note: "Frontier model; routed server-side to OpenAI by the next-code router.",
     },
     CuratedModel {
@@ -161,7 +136,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         aliases: &["claude-fable-5", "fable-5", "fable 5", "claude fable 5"],
         default_enabled: false,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
-        min_tier: JcodeTier::Flagship,
+        min_tier: NextCodeTier::Flagship,
         note: "Flagship-tier model; routed server-side to Anthropic by the next-code router.",
     },
     CuratedModel {
@@ -170,7 +145,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         aliases: &["gpt-5.6-sol", "gpt 5.6 sol", "sol"],
         default_enabled: false,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
-        min_tier: JcodeTier::Plus,
+        min_tier: NextCodeTier::Plus,
         note: "Frontier model; routed server-side to OpenAI by the next-code router.",
     },
 ];
@@ -217,23 +192,23 @@ pub fn is_curated_model(model: &str) -> bool {
 /// `/v1/me` is the source of truth; the last-known tier is persisted to
 /// `next-code-subscription.env` (`NEXT_CODE_TIER`). Unknown/absent tier behaves like
 /// Plus for backward compatibility.
-pub fn effective_tier() -> JcodeTier {
-    cached_tier().unwrap_or(JcodeTier::Plus)
+pub fn effective_tier() -> NextCodeTier {
+    cached_tier().unwrap_or(NextCodeTier::Plus)
 }
 
 /// The last tier reported by the backend, if any was persisted.
-pub fn cached_tier() -> Option<JcodeTier> {
+pub fn cached_tier() -> Option<NextCodeTier> {
     provider_catalog::load_env_value_from_env_or_config(NEXT_CODE_TIER_ENV, NEXT_CODE_ENV_FILE)
         .as_deref()
-        .and_then(JcodeTier::parse)
+        .and_then(NextCodeTier::parse)
 }
 
 /// Persist the last-known tier reported by the backend (`None` clears it).
-pub fn store_cached_tier(tier: Option<JcodeTier>) -> anyhow::Result<()> {
+pub fn store_cached_tier(tier: Option<NextCodeTier>) -> anyhow::Result<()> {
     provider_catalog::save_env_value_to_env_file(
         NEXT_CODE_TIER_ENV,
         NEXT_CODE_ENV_FILE,
-        tier.map(JcodeTier::as_str),
+        tier.map(NextCodeTier::as_str),
     )
 }
 
@@ -363,7 +338,7 @@ pub fn apply_runtime_env() {
     crate::env::set_var("NEXT_CODE_OPENROUTER_ENV_FILE", NEXT_CODE_ENV_FILE);
     crate::env::set_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", NEXT_CODE_CACHE_NAMESPACE);
     crate::env::set_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES", "0");
-    crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "jcode-subscription");
+    crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "next-code-subscription");
     crate::env::remove_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH");
     crate::env::remove_var("NEXT_CODE_OPENROUTER_PROVIDER");
     crate::env::remove_var("NEXT_CODE_OPENROUTER_NO_FALLBACK");
@@ -419,14 +394,14 @@ mod tests {
     #[test]
     fn tier_pricing_matches_launched_plans() {
         let expected = [
-            (JcodeTier::Plus, "plus", "Plus", 10, 18.00),
-            (JcodeTier::Pro, "pro", "Pro", 20, 40.00),
-            (JcodeTier::Max, "max", "Max", 100, 225.00),
-            (JcodeTier::Ultra, "ultra", "Ultra", 200, 500.00),
-            (JcodeTier::Flagship, "flagship", "Flagship", 1000, 3000.00),
+            (NextCodeTier::Plus, "plus", "Plus", 10, 18.00),
+            (NextCodeTier::Pro, "pro", "Pro", 20, 40.00),
+            (NextCodeTier::Max, "max", "Max", 100, 225.00),
+            (NextCodeTier::Ultra, "ultra", "Ultra", 200, 500.00),
+            (NextCodeTier::Flagship, "flagship", "Flagship", 1000, 3000.00),
         ];
 
-        assert_eq!(JcodeTier::ALL, expected.map(|(tier, ..)| tier));
+        assert_eq!(NextCodeTier::ALL, expected.map(|(tier, ..)| tier));
         for (tier, id, display_name, retail_price, usable_budget) in expected {
             assert_eq!(tier.as_str(), id);
             assert_eq!(tier.display_name(), display_name);
@@ -437,21 +412,21 @@ mod tests {
 
     #[test]
     fn tier_parse_round_trips() {
-        for tier in JcodeTier::ALL {
-            assert_eq!(JcodeTier::parse(tier.as_str()), Some(*tier));
+        for tier in NextCodeTier::ALL {
+            assert_eq!(NextCodeTier::parse(tier.as_str()), Some(*tier));
         }
-        assert_eq!(JcodeTier::parse("PLUS"), Some(JcodeTier::Plus));
-        assert_eq!(JcodeTier::parse(" Pro "), Some(JcodeTier::Pro));
-        assert_eq!(JcodeTier::parse("MAX"), Some(JcodeTier::Max));
-        assert_eq!(JcodeTier::parse(" ultra "), Some(JcodeTier::Ultra));
-        assert_eq!(JcodeTier::parse(" Flagship "), Some(JcodeTier::Flagship));
-        assert_eq!(JcodeTier::parse("starter"), None);
+        assert_eq!(NextCodeTier::parse("PLUS"), Some(NextCodeTier::Plus));
+        assert_eq!(NextCodeTier::parse(" Pro "), Some(NextCodeTier::Pro));
+        assert_eq!(NextCodeTier::parse("MAX"), Some(NextCodeTier::Max));
+        assert_eq!(NextCodeTier::parse(" ultra "), Some(NextCodeTier::Ultra));
+        assert_eq!(NextCodeTier::parse(" Flagship "), Some(NextCodeTier::Flagship));
+        assert_eq!(NextCodeTier::parse("starter"), None);
     }
 
     #[test]
     fn tier_gating_follows_catalog_order() {
-        for (account_index, account_tier) in JcodeTier::ALL.iter().copied().enumerate() {
-            for (required_index, required_tier) in JcodeTier::ALL.iter().copied().enumerate() {
+        for (account_index, account_tier) in NextCodeTier::ALL.iter().copied().enumerate() {
+            for (required_index, required_tier) in NextCodeTier::ALL.iter().copied().enumerate() {
                 assert_eq!(
                     account_tier.allows(required_tier),
                     account_index >= required_index,
@@ -467,18 +442,18 @@ mod tests {
     fn model_entitlements_match_paid_tiers() {
         for model in CURATED_MODELS {
             match model.id {
-                "claude-fable-5" => assert_eq!(model.min_tier, JcodeTier::Flagship),
-                _ => assert_eq!(model.min_tier, JcodeTier::Plus),
+                "claude-fable-5" => assert_eq!(model.min_tier, NextCodeTier::Flagship),
+                _ => assert_eq!(model.min_tier, NextCodeTier::Plus),
             }
         }
 
-        for tier in JcodeTier::ALL {
+        for tier in NextCodeTier::ALL {
             assert!(tier.allows(find_curated_model("claude-opus-4-8").unwrap().min_tier));
             assert!(tier.allows(find_curated_model("gpt-5.5").unwrap().min_tier));
             assert!(tier.allows(find_curated_model("gpt-5.6-sol").unwrap().min_tier));
             assert_eq!(
                 tier.allows(find_curated_model("claude-fable-5").unwrap().min_tier),
-                *tier == JcodeTier::Flagship
+                *tier == NextCodeTier::Flagship
             );
         }
     }
@@ -491,7 +466,7 @@ mod tests {
         crate::env::set_var("NEXT_CODE_HOME", temp.path().to_string_lossy().to_string());
 
         assert_eq!(cached_tier(), None);
-        assert_eq!(effective_tier(), JcodeTier::Plus);
+        assert_eq!(effective_tier(), NextCodeTier::Plus);
         assert!(is_model_allowed_for_current_tier("claude-opus-4-8"));
         assert!(is_model_allowed_for_current_tier("gpt-5.5"));
         assert!(is_model_allowed_for_current_tier("gpt-5.6-sol"));
@@ -499,9 +474,9 @@ mod tests {
 
         crate::env::set_var(NEXT_CODE_TIER_ENV, "mystery");
         assert_eq!(cached_tier(), None);
-        assert_eq!(effective_tier(), JcodeTier::Plus);
+        assert_eq!(effective_tier(), NextCodeTier::Plus);
 
-        for tier in [JcodeTier::Pro, JcodeTier::Max, JcodeTier::Ultra] {
+        for tier in [NextCodeTier::Pro, NextCodeTier::Max, NextCodeTier::Ultra] {
             crate::env::set_var(NEXT_CODE_TIER_ENV, tier.as_str());
             assert_eq!(effective_tier(), tier);
             assert!(is_model_allowed_for_current_tier("claude-opus-4-8"));
@@ -511,8 +486,8 @@ mod tests {
         }
 
         crate::env::remove_var(NEXT_CODE_TIER_ENV);
-        store_cached_tier(Some(JcodeTier::Flagship)).expect("persist tier");
-        assert_eq!(cached_tier(), Some(JcodeTier::Flagship));
+        store_cached_tier(Some(NextCodeTier::Flagship)).expect("persist tier");
+        assert_eq!(cached_tier(), Some(NextCodeTier::Flagship));
         assert!(is_model_allowed_for_current_tier("claude-fable-5"));
         assert!(is_model_allowed_for_current_tier("gpt-5.6-sol"));
 

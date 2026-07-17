@@ -1951,7 +1951,7 @@ pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
 
     let code = registry.generate_pairing_code();
     let connect_host = resolve_connect_host(&gw_config.bind_addr);
-    // Prefer nextcode://; iOS PairURI.parse still accepts legacy jcode://.
+    // Prefer nextcode://; iOS PairURI.parse still accepts legacy nextcode://.
     let pair_uri = format!(
         "nextcode://pair?host={}&port={}&code={}",
         connect_host, gw_config.port, code

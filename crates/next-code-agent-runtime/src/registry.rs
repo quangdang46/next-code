@@ -2,7 +2,7 @@
 //!
 //! ## Lookup paths (highest priority first)
 //!
-//! 1. **Project-local**: `<cwd>/.next-code/agents/*.toml` (dual-read: `.jcode/agents/`)
+//! 1. **Project-local**: `<cwd>/.next-code/agents/*.toml` (dual-read: `.next-code/agents/`)
 //! 2. **User-global**: `~/.next-code/agents/*.toml`
 //! 3. **Builtins** registered programmatically via [`AgentRegistry::register_builtin`]
 //!
@@ -35,7 +35,7 @@ pub enum AgentSource {
     Builtin,
     /// Loaded from `~/.next-code/agents/<file>`.
     UserGlobal { path: PathBuf },
-    /// Loaded from `<project>/.next-code/agents/<file>` (dual-read: `.jcode/agents/`). Highest priority.
+    /// Loaded from `<project>/.next-code/agents/<file>` (dual-read: `.next-code/agents/`). Highest priority.
     ProjectLocal { path: PathBuf },
 }
 
@@ -273,7 +273,7 @@ impl AgentRegistry {
     /// `dirs::home_dir()` (omitted here to keep this crate dep-light;
     /// callers pass the resolved home to avoid pulling `dirs`).
     ///
-    /// Dual-reads `.next-code/` (canonical) then legacy `.jcode/` for both
+    /// Dual-reads `.next-code/` (canonical) then legacy `.next-code/` for both
     /// the user home and the project root so pre-rebrand installs keep
     /// working. When both exist, both are loaded (later/legacy wins on name
     /// collision so unmigrated edits remain visible).
@@ -282,7 +282,7 @@ impl AgentRegistry {
         home_dir: Option<&Path>,
         project_root: Option<&Path>,
     ) {
-        const PRODUCT_DIRS: &[&str] = &[".next-code", ".jcode"];
+        const PRODUCT_DIRS: &[&str] = &[".next-code", ".next-code"];
         if let Some(home) = home_dir {
             for segment in PRODUCT_DIRS {
                 let user_dir = home.join(segment).join("agents");
@@ -294,7 +294,7 @@ impl AgentRegistry {
                 }
             }
         }
-        // Managed agents: ~/.next-code/managed-agents/ (and legacy ~/.jcode/)
+        // Managed agents: ~/.next-code/managed-agents/ (and legacy ~/.next-code/)
         // — read-only, lower priority than user-global.
         if let Some(home) = home_dir {
             for segment in PRODUCT_DIRS {
@@ -329,7 +329,7 @@ pub enum SourceKind {
     Managed,
     /// User-global agents at ~/.next-code/agents/.
     UserGlobal,
-    /// Project-local agents at .next-code/agents/ (dual-read: .jcode/agents/).
+    /// Project-local agents at .next-code/agents/ (dual-read: .next-code/agents/).
     ProjectLocal,
 }
 
@@ -591,17 +591,17 @@ display_name = "Reviewer"
     fn discover_standard_paths_reads_both() {
         let home = temp_dir("home");
         let proj = temp_dir("proj");
-        fs::create_dir_all(home.join(".jcode/agents")).unwrap();
-        fs::create_dir_all(proj.join(".jcode/agents")).unwrap();
+        fs::create_dir_all(home.join(".next-code/agents")).unwrap();
+        fs::create_dir_all(proj.join(".next-code/agents")).unwrap();
         write_toml(
-            &home.join(".jcode/agents"),
+            &home.join(".next-code/agents"),
             "user-only.toml",
             r#"id = "user-only"
 display_name = "U"
 "#,
         );
         write_toml(
-            &proj.join(".jcode/agents"),
+            &proj.join(".next-code/agents"),
             "project-only.toml",
             r#"id = "project-only"
 display_name = "P"

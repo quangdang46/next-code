@@ -12,8 +12,8 @@ This document began as a design review. The live hardening described in `README.
 
 Replace it with an assume-role-only principal and three distinct privilege planes:
 
-1. **`JcodePhoneOperator`** for normal deployments and maintenance of the existing stack.
-2. **`JcodePhoneProvisioner`** for infrequent rebuilds, MFA-gated, time-limited, restricted to `us-east-1`, `next-code-phone-*` resources, and bounded runtime roles.
+1. **`NextCodePhoneOperator`** for normal deployments and maintenance of the existing stack.
+2. **`NextCodePhoneProvisioner`** for infrequent rebuilds, MFA-gated, time-limited, restricted to `us-east-1`, `next-code-phone-*` resources, and bounded runtime roles.
 3. **A separate emergency administrator path** protected by MFA and never used by automation. This is required to avoid lockout while removing the existing administrator attachment.
 
 Also replace the instance's `AmazonBedrockFullAccess` with inference-only permissions. The code uses model catalog discovery and `ConverseStream`; it does not need Bedrock administration.
@@ -77,8 +77,8 @@ Assume-only policy for `jade-deploy`:
       "Effect": "Allow",
       "Action": "sts:AssumeRole",
       "Resource": [
-        "arn:aws:iam::302154194530:role/next-code-phone/JcodePhoneOperator",
-        "arn:aws:iam::302154194530:role/next-code-phone/JcodePhoneProvisioner"
+        "arn:aws:iam::302154194530:role/next-code-phone/NextCodePhoneOperator",
+        "arn:aws:iam::302154194530:role/next-code-phone/NextCodePhoneProvisioner"
       ]
     }
   ]
@@ -106,7 +106,7 @@ Require MFA in both role trust policies for a human IAM principal:
 }
 ```
 
-Set `JcodePhoneProvisioner` maximum session duration to one hour. Do not allow either role to change its own trust or permissions.
+Set `NextCodePhoneProvisioner` maximum session duration to one hour. Do not allow either role to change its own trust or permissions.
 
 For unattended CI, use a separate OIDC-federated role restricted to the exact repository, branch/environment, and workflow. Do not weaken the human role's MFA trust for CI.
 
@@ -348,7 +348,7 @@ Replace the `<...>` values after read-only inventory. The API Gateway resource f
       "Sid": "PassInstanceRoleToEc2Only",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::302154194530:role/next-code-phone/runtime/JcodePhoneInstance",
+      "Resource": "arn:aws:iam::302154194530:role/next-code-phone/runtime/NextCodePhoneInstance",
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "ec2.amazonaws.com"
@@ -360,8 +360,8 @@ Replace the `<...>` values after read-only inventory. The API Gateway resource f
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": [
-        "arn:aws:iam::302154194530:role/next-code-phone/runtime/JcodePhoneWakeLambda",
-        "arn:aws:iam::302154194530:role/next-code-phone/runtime/JcodePhoneBreakerLambda"
+        "arn:aws:iam::302154194530:role/next-code-phone/runtime/NextCodePhoneWakeLambda",
+        "arn:aws:iam::302154194530:role/next-code-phone/runtime/NextCodePhoneBreakerLambda"
       ],
       "Condition": {
         "StringEquals": {
@@ -418,10 +418,10 @@ A rebuild inherently needs create/delete privileges on several services. Keep th
 
 Recommended model:
 
-- Human `JcodePhoneProvisioner`: CloudFormation stack operations on `next-code-phone-server*`, read-only diagnostics, and `iam:PassRole` only for `JcodePhoneCloudFormationExecution` with `iam:PassedToService = cloudformation.amazonaws.com`.
-- `JcodePhoneCloudFormationExecution`: service permissions below, usable only by CloudFormation.
+- Human `NextCodePhoneProvisioner`: CloudFormation stack operations on `next-code-phone-server*`, read-only diagnostics, and `iam:PassRole` only for `NextCodePhoneCloudFormationExecution` with `iam:PassedToService = cloudformation.amazonaws.com`.
+- `NextCodePhoneCloudFormationExecution`: service permissions below, usable only by CloudFormation.
 - Every created resource is tagged `Project=next-code-phone-server` and `ManagedBy=cloudformation`.
-- Every created runtime role is under path `/next-code-phone/runtime/` and must carry the `JcodePhoneRuntimeBoundary` permissions boundary.
+- Every created runtime role is under path `/next-code-phone/runtime/` and must carry the `NextCodePhoneRuntimeBoundary` permissions boundary.
 
 Human provisioner policy:
 
@@ -463,7 +463,7 @@ Human provisioner policy:
       "Sid": "PassPhoneCloudFormationExecutionRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::302154194530:role/next-code-phone/JcodePhoneCloudFormationExecution",
+      "Resource": "arn:aws:iam::302154194530:role/next-code-phone/NextCodePhoneCloudFormationExecution",
       "Condition": {
         "StringEquals": {
           "iam:PassedToService": "cloudformation.amazonaws.com"
@@ -560,7 +560,7 @@ These are not required for the IAM replacement, but they materially affect the d
 The migration is complete when:
 
 - `jade-deploy` has no `AdministratorAccess` and no direct AWS service permissions beyond role assumption.
-- Daily deployment and maintenance succeed through `JcodePhoneOperator`.
+- Daily deployment and maintenance succeed through `NextCodePhoneOperator`.
 - A full tagged rebuild can be performed through the MFA-gated provisioner/CloudFormation path.
 - Runtime roles contain only the API calls documented above.
 - An independent emergency administrator path is tested.

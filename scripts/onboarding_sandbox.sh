@@ -7,9 +7,9 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 
-sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-${JCODE_ONBOARDING_SANDBOX:-default}}
+sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-${NEXT_CODE_ONBOARDING_SANDBOX:-default}}
 sandbox_root_default="$repo_root/.tmp/onboarding/$sandbox_name"
-sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-${JCODE_ONBOARDING_DIR:-$sandbox_root_default}}
+sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-${NEXT_CODE_ONBOARDING_DIR:-$sandbox_root_default}}
 next_code_home="$sandbox_root/home"
 runtime_dir="$sandbox_root/runtime"
 
@@ -26,7 +26,7 @@ run_in_sandbox() {
     # NEXT_CODE_CLIENT_SELFDEV_MODE; it cannot unset one inherited from a parent
     # self-dev shell, which would otherwise force every sandbox session canary
     # (suppressing the new-session suggestion cards we are trying to verify).
-    env -u JCODE_CLIENT_SELFDEV_MODE -u JCODE_SELFDEV -u JCODE_CANARY \
+    env -u NEXT_CODE_CLIENT_SELFDEV_MODE -u NEXT_CODE_SELFDEV -u NEXT_CODE_CANARY \
       NEXT_CODE_HOME="$next_code_home" \
       NEXT_CODE_RUNTIME_DIR="$runtime_dir" \
       "$@"
@@ -64,9 +64,9 @@ Commands:
   help                   Show this help
 
 Environment overrides:
-  JCODE_ONBOARDING_SANDBOX   Sandbox name (default: default)
-  JCODE_ONBOARDING_DIR       Explicit sandbox directory
-  JCODE_AUTH_FIXTURE_DIR     Fixture store (default: .tmp/auth-fixtures)
+  NEXT_CODE_ONBOARDING_SANDBOX   Sandbox name (default: default)
+  NEXT_CODE_ONBOARDING_DIR       Explicit sandbox directory
+  NEXT_CODE_AUTH_FIXTURE_DIR     Fixture store (default: .tmp/auth-fixtures)
 
 Examples:
   $(basename "$0") fresh
@@ -109,10 +109,10 @@ open_shell() {
   echo "Opening sandbox shell"
   echo "  NEXT_CODE_HOME=$next_code_home"
   echo "  NEXT_CODE_RUNTIME_DIR=$runtime_dir"
-  env JCODE_HOME="$next_code_home" JCODE_RUNTIME_DIR="$runtime_dir" bash --noprofile --norc
+  env NEXT_CODE_HOME="$next_code_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" bash --noprofile --norc
 }
 
-run_jcode() {
+run_next_code() {
   # The sandbox should behave like a real standalone install, not a self-dev
   # client. Because we launch from inside the repo, next-code would otherwise
   # auto-detect the repository and join the shared self-dev server (remote
@@ -121,18 +121,18 @@ run_jcode() {
   # spawning its own server under the sandbox's NEXT_CODE_RUNTIME_DIR. Set
   # NEXT_CODE_SANDBOX_SELFDEV=1 to opt back into the shared-server behavior.
   local prefix=()
-  if [[ "${NEXT_CODE_SANDBOX_SELFDEV:-${JCODE_SANDBOX_SELFDEV:-0}}" != "1" ]]; then
+  if [[ "${NEXT_CODE_SANDBOX_SELFDEV:-${NEXT_CODE_SANDBOX_SELFDEV:-0}}" != "1" ]]; then
     prefix=(--no-selfdev)
   fi
   # Allow pointing the sandbox at an already-built binary (e.g. the selfdev
   # profile output) without rebuilding the debug binary. Falls back to the
   # debug binary, then to `cargo run`.
-  if [[ -n "${NEXT_CODE_SANDBOX_BIN:-${JCODE_SANDBOX_BIN:-}}" ]]; then
-    if [[ -x "${NEXT_CODE_SANDBOX_BIN:-${JCODE_SANDBOX_BIN:-}}" ]]; then
-      run_in_sandbox "${NEXT_CODE_SANDBOX_BIN:-${JCODE_SANDBOX_BIN:-}}" "${prefix[@]}" "$@"
+  if [[ -n "${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}}" ]]; then
+    if [[ -x "${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}}" ]]; then
+      run_in_sandbox "${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}}" "${prefix[@]}" "$@"
       return
     fi
-    echo "JCODE_SANDBOX_BIN=${NEXT_CODE_SANDBOX_BIN:-${JCODE_SANDBOX_BIN:-}} is not executable" >&2
+    echo "NEXT_CODE_SANDBOX_BIN=${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}} is not executable" >&2
     return 1
   fi
   local binary_path="$repo_root/target/debug/next-code"
@@ -151,7 +151,7 @@ run_auth_fixture() {
 
 # Copy one real file from $HOME into the sandbox's external/ tree, preserving its
 # relative path. next-code resolves every external credential/transcript lookup to
-# ${NEXT_CODE_HOME:-${JCODE_HOME:-}}/external/<same-relative-path-as-$HOME> when JCODE_HOME is set, so
+# ${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}/external/<same-relative-path-as-$HOME> when NEXT_CODE_HOME is set, so
 # seeding here makes your real logins/transcripts visible to the onboarding
 # import + continue steps. Copies (never symlinks: next-code rejects symlinked auth
 # files) and never touches the originals.
@@ -289,14 +289,14 @@ case "$command" in
     open_shell
     ;;
   next-code)
-    run_jcode "$@"
+    run_next_code "$@"
     ;;
   auth-status)
-    run_jcode auth status
+    run_next_code auth status
     ;;
   fresh)
     reset
-    run_jcode "$@"
+    run_next_code "$@"
     ;;
   seed-real-logins)
     seed_real_logins "$@"
@@ -306,7 +306,7 @@ case "$command" in
     seed_real_logins "$@"
     echo
     echo "Launching sandbox next-code with your real logins available to import..."
-    run_jcode
+    run_next_code
     ;;
   login)
     if [[ $# -lt 1 ]]; then
@@ -315,7 +315,7 @@ case "$command" in
     fi
     provider=$1
     shift
-    run_jcode --provider "$provider" login "$@"
+    run_next_code --provider "$provider" login "$@"
     ;;
   fixture-list)
     run_auth_fixture list

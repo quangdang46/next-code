@@ -1,5 +1,5 @@
 //! Deprecated Claude CLI provider runtime (subprocess transport), moved out
-//! of `jcode-base` so provider edits compile only this crate plus a binary
+//! of `next-code-base` so provider edits compile only this crate plus a binary
 //! relink instead of rebuilding the base -> app-core -> tui spine. The
 //! binary's composition root registers [`ClaudeProvider`] with
 //! `next_code_base::provider::external` at startup.
@@ -52,7 +52,7 @@ const AVAILABLE_MODELS: &[&str] = &[
     "claude-opus-4-5-20251101",
 ];
 
-/// Native tools that jcode handles locally (not Claude Code built-ins)
+/// Native tools that next-code handles locally (not Claude Code built-ins)
 const NATIVE_TOOL_NAMES: &[&str] = &["selfdev", "communicate", "memory", "session_search", "bg"];
 
 #[derive(Clone)]

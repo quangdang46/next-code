@@ -122,8 +122,8 @@ async fn binary_version_command() -> Result<()> {
 
     assert!(output.status.success(), "Version command should succeed");
     assert!(
-        stdout.contains("next-code") || stdout.contains("jcode") || stdout.contains("20"),
-        "Version should contain 'next-code', 'jcode', or date. Got: {}",
+        stdout.contains("next-code") || stdout.contains("next-code") || stdout.contains("20"),
+        "Version should contain 'next-code', 'next-code', or date. Got: {}",
         stdout
     );
 

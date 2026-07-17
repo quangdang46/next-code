@@ -5,7 +5,7 @@ use next_code_session_types::SessionStatus;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SessionSource {
-    Jcode,
+    NextCode,
     ClaudeCode,
     Codex,
     Pi,
@@ -16,7 +16,7 @@ pub enum SessionSource {
 impl SessionSource {
     pub fn badge(self) -> Option<&'static str> {
         match self {
-            Self::Jcode => None,
+            Self::NextCode => None,
             Self::ClaudeCode => Some("🧵 Claude Code"),
             Self::Codex => Some("🧠 Codex"),
             Self::Pi => Some("π Pi"),
@@ -268,21 +268,21 @@ mod tests {
     #[test]
     fn source_predicates_cover_provider_and_model_fallbacks() {
         assert!(session_is_claude_code(
-            SessionSource::Jcode,
+            SessionSource::NextCode,
             "imported_cc_123"
         ));
         assert!(session_is_codex(
-            SessionSource::Jcode,
+            SessionSource::NextCode,
             Some("openai/codex-mini")
         ));
-        assert!(session_is_pi(SessionSource::Jcode, Some("pi-main"), None));
+        assert!(session_is_pi(SessionSource::NextCode, Some("pi-main"), None));
         assert!(session_is_pi(
-            SessionSource::Jcode,
+            SessionSource::NextCode,
             None,
             Some("vendor/pi-fast")
         ));
         assert!(session_is_open_code(
-            SessionSource::Jcode,
+            SessionSource::NextCode,
             Some("opencode-go")
         ));
     }

@@ -88,7 +88,7 @@ maybe_enable_sccache() {
   # incremental profiles it produces 0% hits while adding wrapper overhead and
   # misleading "enabled" status. Skip it for incremental builds unless the
   # caller explicitly forces it via NEXT_CODE_SCCACHE=1/on/force.
-  local force_sccache="${NEXT_CODE_SCCACHE:-${JCODE_SCCACHE:-auto}}"
+  local force_sccache="${NEXT_CODE_SCCACHE:-${NEXT_CODE_SCCACHE:-auto}}"
   case "$force_sccache" in
     1|true|yes|on|force) force_sccache="1" ;;
     0|false|no|off|never)
@@ -183,7 +183,7 @@ feature_args_from_profile() {
 }
 
 validate_feature_profile() {
-  local profile="${NEXT_CODE_DEV_FEATURE_PROFILE:-${JCODE_DEV_FEATURE_PROFILE:-default}}"
+  local profile="${NEXT_CODE_DEV_FEATURE_PROFILE:-${NEXT_CODE_DEV_FEATURE_PROFILE:-default}}"
   case "$profile" in
     ""|default|minimal|none|pdf|embeddings|full)
       ;;
@@ -195,7 +195,7 @@ validate_feature_profile() {
 }
 
 build_cargo_argv() {
-  local profile="${NEXT_CODE_DEV_FEATURE_PROFILE:-${JCODE_DEV_FEATURE_PROFILE:-default}}"
+  local profile="${NEXT_CODE_DEV_FEATURE_PROFILE:-${NEXT_CODE_DEV_FEATURE_PROFILE:-default}}"
   if [[ "$profile" == "default" || -z "$profile" ]]; then
     feature_profile_status="default"
     printf '%s\0' "$@"
@@ -276,7 +276,7 @@ cpu_count() {
 # wins, and non-Linux hosts fall back to the cargo/.cargo default.
 select_build_jobs() {
   # Respect an explicit override from either env var.
-  local override="${NEXT_CODE_BUILD_JOBS:-${JCODE_BUILD_JOBS:-${CARGO_BUILD_JOBS:-}}}"
+  local override="${NEXT_CODE_BUILD_JOBS:-${NEXT_CODE_BUILD_JOBS:-${CARGO_BUILD_JOBS:-}}}"
   if [[ -n "$override" ]]; then
     if [[ "$override" =~ ^[0-9]+$ && "$override" -ge 1 ]]; then
       export CARGO_BUILD_JOBS="$override"
@@ -305,7 +305,7 @@ select_build_jobs() {
   # every core while a memory-pressured one backs off before earlyoom kills a
   # build. Tunable per host via NEXT_CODE_BUILD_MIB_PER_JOB.
   mib_per_job_default=1792
-  mib_per_job="${NEXT_CODE_BUILD_MIB_PER_JOB:-${JCODE_BUILD_MIB_PER_JOB:-$mib_per_job_default}}"
+  mib_per_job="${NEXT_CODE_BUILD_MIB_PER_JOB:-${NEXT_CODE_BUILD_MIB_PER_JOB:-$mib_per_job_default}}"
   [[ "$mib_per_job" =~ ^[0-9]+$ && "$mib_per_job" -ge 256 ]] || mib_per_job="$mib_per_job_default"
 
   local mem_available_mib jobs_by_mem jobs
@@ -348,8 +348,8 @@ select_build_jobs() {
 # source fingerprint / mtime path instead of the embedded flag.
 export_git_build_metadata() {
   # Respect any value the caller already set (e.g. release/CI pipelines).
-  if [[ -n "${NEXT_CODE_BUILD_GIT_HASH:-${JCODE_BUILD_GIT_HASH:-}}" ]]; then
-    git_meta_status="external:${NEXT_CODE_BUILD_GIT_HASH:-${JCODE_BUILD_GIT_HASH:-}}"
+  if [[ -n "${NEXT_CODE_BUILD_GIT_HASH:-${NEXT_CODE_BUILD_GIT_HASH:-}}" ]]; then
+    git_meta_status="external:${NEXT_CODE_BUILD_GIT_HASH:-${NEXT_CODE_BUILD_GIT_HASH:-}}"
     return
   fi
   if ! command -v git >/dev/null 2>&1; then
@@ -376,7 +376,7 @@ maybe_configure_low_memory_selfdev() {
     return
   fi
 
-  local mode="${NEXT_CODE_SELFDEV_LOW_MEMORY:-${JCODE_SELFDEV_LOW_MEMORY:-auto}}"
+  local mode="${NEXT_CODE_SELFDEV_LOW_MEMORY:-${NEXT_CODE_SELFDEV_LOW_MEMORY:-auto}}"
   case "$mode" in
     1|true|yes|on|force)
       ;;
@@ -431,8 +431,8 @@ parallel_frontend_toolchain=""
 dev_nightly_toolchain() {
   # Prefer an explicit override, else a `+toolchain` already on the argv, else
   # the first installed nightly toolchain.
-  if [[ -n "${NEXT_CODE_DEV_TOOLCHAIN:-${JCODE_DEV_TOOLCHAIN:-}}" ]]; then
-    printf '%s\n' "${NEXT_CODE_DEV_TOOLCHAIN:-${JCODE_DEV_TOOLCHAIN:-}}"
+  if [[ -n "${NEXT_CODE_DEV_TOOLCHAIN:-${NEXT_CODE_DEV_TOOLCHAIN:-}}" ]]; then
+    printf '%s\n' "${NEXT_CODE_DEV_TOOLCHAIN:-${NEXT_CODE_DEV_TOOLCHAIN:-}}"
     return 0
   fi
   local tc
@@ -443,7 +443,7 @@ dev_nightly_toolchain() {
 }
 
 configure_parallel_frontend() {
-  local requested="${NEXT_CODE_PARALLEL_FRONTEND:-${JCODE_PARALLEL_FRONTEND:-auto}}"
+  local requested="${NEXT_CODE_PARALLEL_FRONTEND:-${NEXT_CODE_PARALLEL_FRONTEND:-auto}}"
   local forced="false"
   case "$requested" in
     0|false|no|off)
@@ -509,7 +509,7 @@ configure_parallel_frontend() {
     return 0
   fi
 
-  local threads="${NEXT_CODE_FRONTEND_THREADS:-${JCODE_FRONTEND_THREADS:-4}}"
+  local threads="${NEXT_CODE_FRONTEND_THREADS:-${NEXT_CODE_FRONTEND_THREADS:-4}}"
   [[ "$threads" =~ ^[0-9]+$ && "$threads" -ge 1 ]] || threads=4
 
   parallel_frontend_toolchain="$tc"
@@ -520,7 +520,7 @@ configure_parallel_frontend() {
 }
 
 configure_linux_linker() {
-  local requested_mode="${NEXT_CODE_FAST_LINKER:-${JCODE_FAST_LINKER:-auto}}"
+  local requested_mode="${NEXT_CODE_FAST_LINKER:-${NEXT_CODE_FAST_LINKER:-auto}}"
   local mode="$requested_mode"
 
   case "$mode" in
@@ -571,8 +571,8 @@ configure_linux_linker() {
 }
 
 print_setup() {
-  if [[ -n "${NEXT_CODE_DEV_FEATURE_PROFILE:-${JCODE_DEV_FEATURE_PROFILE:-}}" && "${JCODE_DEV_FEATURE_PROFILE}" != "default" ]]; then
-    feature_profile_status="${NEXT_CODE_DEV_FEATURE_PROFILE:-${JCODE_DEV_FEATURE_PROFILE:-}}"
+  if [[ -n "${NEXT_CODE_DEV_FEATURE_PROFILE:-${NEXT_CODE_DEV_FEATURE_PROFILE:-}}" && "${NEXT_CODE_DEV_FEATURE_PROFILE}" != "default" ]]; then
+    feature_profile_status="${NEXT_CODE_DEV_FEATURE_PROFILE:-${NEXT_CODE_DEV_FEATURE_PROFILE:-}}"
   fi
   cat <<EOF
 repo_root=$repo_root
@@ -585,7 +585,7 @@ build_jobs_status=$build_jobs_status
 cargo_build_jobs=${CARGO_BUILD_JOBS:-<unset>}
 feature_profile_status=$feature_profile_status
 git_meta_status=$git_meta_status
-build_git_hash=${NEXT_CODE_BUILD_GIT_HASH:-${JCODE_BUILD_GIT_HASH:-<unset>}}
+build_git_hash=${NEXT_CODE_BUILD_GIT_HASH:-${NEXT_CODE_BUILD_GIT_HASH:-<unset>}}
 rustc_wrapper=${RUSTC_WRAPPER:-<unset>}
 linker_mode=$selected_linker_mode
 linker_desc=${selected_linker_desc:-<none>}
@@ -595,7 +595,7 @@ EOF
 }
 
 remote_connect_timeout() {
-  local value="${NEXT_CODE_REMOTE_CONNECT_TIMEOUT:-${JCODE_REMOTE_CONNECT_TIMEOUT:-5}}"
+  local value="${NEXT_CODE_REMOTE_CONNECT_TIMEOUT:-${NEXT_CODE_REMOTE_CONNECT_TIMEOUT:-5}}"
   if [[ ! "$value" =~ ^[0-9]+$ || "$value" -lt 1 ]]; then
     value=5
   fi
@@ -606,7 +606,7 @@ remote_tcp_timeout() {
   # Bounded probe used the first time we contact a host (or after the recovery
   # window expires) so an unreachable host fails fast instead of waiting for
   # the full SSH ConnectTimeout. Accepts fractional seconds (GNU timeout).
-  local value="${NEXT_CODE_REMOTE_TCP_TIMEOUT:-${JCODE_REMOTE_TCP_TIMEOUT:-1}}"
+  local value="${NEXT_CODE_REMOTE_TCP_TIMEOUT:-${NEXT_CODE_REMOTE_TCP_TIMEOUT:-1}}"
   if [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
     value=1
   fi
@@ -617,7 +617,7 @@ remote_recovery_tcp_timeout() {
   # Shorter probe used while a host was recently seen down. An up host always
   # answers in a few ms, so this still detects recovery on the next build while
   # keeping per-build cost low during an outage.
-  local value="${NEXT_CODE_REMOTE_RECOVERY_TCP_TIMEOUT:-${JCODE_REMOTE_RECOVERY_TCP_TIMEOUT:-0.3}}"
+  local value="${NEXT_CODE_REMOTE_RECOVERY_TCP_TIMEOUT:-${NEXT_CODE_REMOTE_RECOVERY_TCP_TIMEOUT:-0.3}}"
   if [[ ! "$value" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
     value=0.3
   fi
@@ -629,7 +629,7 @@ remote_down_cache_ttl() {
   # timeout. Recovery is still detected on the very next build; this only
   # controls how long downtime builds stay cheap before reverting to the full
   # probe timeout. Set to 0 to always use the full timeout.
-  local value="${NEXT_CODE_REMOTE_DOWN_TTL:-${JCODE_REMOTE_DOWN_TTL:-300}}"
+  local value="${NEXT_CODE_REMOTE_DOWN_TTL:-${NEXT_CODE_REMOTE_DOWN_TTL:-300}}"
   if [[ ! "$value" =~ ^[0-9]+$ ]]; then
     value=300
   fi
@@ -637,7 +637,7 @@ remote_down_cache_ttl() {
 }
 
 remote_down_cache_path() {
-  local remote="${NEXT_CODE_REMOTE_HOST:-${JCODE_REMOTE_HOST:-}}"
+  local remote="${NEXT_CODE_REMOTE_HOST:-${NEXT_CODE_REMOTE_HOST:-}}"
   local key
   if command -v cksum >/dev/null 2>&1; then
     key="$(printf '%s' "$remote" | cksum | awk '{print $1}')"
@@ -709,13 +709,13 @@ remote_tcp_reachable() {
 }
 
 remote_cargo_preflight() {
-  local remote="${NEXT_CODE_REMOTE_HOST:-${JCODE_REMOTE_HOST:-}}"
+  local remote="${NEXT_CODE_REMOTE_HOST:-${NEXT_CODE_REMOTE_HOST:-}}"
   if [[ -z "$remote" ]]; then
     log "remote cargo requested but NEXT_CODE_REMOTE_HOST is not configured"
     return 1
   fi
 
-  local ssh_bin="${NEXT_CODE_REMOTE_SSH_BIN:-${JCODE_REMOTE_SSH_BIN:-ssh}}"
+  local ssh_bin="${NEXT_CODE_REMOTE_SSH_BIN:-${NEXT_CODE_REMOTE_SSH_BIN:-ssh}}"
   if ! command -v "$ssh_bin" >/dev/null 2>&1; then
     log "remote cargo requested but ssh binary is unavailable: $ssh_bin"
     return 1
@@ -734,7 +734,7 @@ remote_cargo_preflight() {
   # Fast TCP pre-probe to fail fast when the host is offline, unless the
   # connection is proxied (where a direct probe would be wrong) or explicitly
   # disabled via NEXT_CODE_REMOTE_TCP_PROBE=0.
-  local tcp_probe="${NEXT_CODE_REMOTE_TCP_PROBE:-${JCODE_REMOTE_TCP_PROBE:-1}}"
+  local tcp_probe="${NEXT_CODE_REMOTE_TCP_PROBE:-${NEXT_CODE_REMOTE_TCP_PROBE:-1}}"
   case "$tcp_probe" in
     0|false|no|off) tcp_probe="0" ;;
     *) tcp_probe="1" ;;
@@ -754,8 +754,8 @@ remote_cargo_preflight() {
 
   local connect_timeout
   connect_timeout="$(remote_connect_timeout)"
-  local server_alive_interval="${NEXT_CODE_REMOTE_SERVER_ALIVE_INTERVAL:-${JCODE_REMOTE_SERVER_ALIVE_INTERVAL:-10}}"
-  local server_alive_count="${NEXT_CODE_REMOTE_SERVER_ALIVE_COUNT_MAX:-${JCODE_REMOTE_SERVER_ALIVE_COUNT_MAX:-1}}"
+  local server_alive_interval="${NEXT_CODE_REMOTE_SERVER_ALIVE_INTERVAL:-${NEXT_CODE_REMOTE_SERVER_ALIVE_INTERVAL:-10}}"
+  local server_alive_count="${NEXT_CODE_REMOTE_SERVER_ALIVE_COUNT_MAX:-${NEXT_CODE_REMOTE_SERVER_ALIVE_COUNT_MAX:-1}}"
   local output
   if ! output=$("$ssh_bin" \
     -o BatchMode=yes \
@@ -772,7 +772,7 @@ remote_cargo_preflight() {
 }
 
 remote_cargo_fallback_mode() {
-  local mode="${NEXT_CODE_REMOTE_CARGO_FALLBACK:-${JCODE_REMOTE_CARGO_FALLBACK:-local}}"
+  local mode="${NEXT_CODE_REMOTE_CARGO_FALLBACK:-${NEXT_CODE_REMOTE_CARGO_FALLBACK:-local}}"
   case "$mode" in
     local|1|true|yes|on)
       printf 'local\n'
@@ -820,7 +820,7 @@ cargo_test_has_explicit_filter() {
 }
 
 run_local_cargo() {
-  if cargo_test_has_explicit_filter "${cargo_argv[@]}" && [[ "${NEXT_CODE_DEV_CARGO_ALLOW_ZERO_TESTS:-${JCODE_DEV_CARGO_ALLOW_ZERO_TESTS:-0}}" != "1" ]]; then
+  if cargo_test_has_explicit_filter "${cargo_argv[@]}" && [[ "${NEXT_CODE_DEV_CARGO_ALLOW_ZERO_TESTS:-${NEXT_CODE_DEV_CARGO_ALLOW_ZERO_TESTS:-0}}" != "1" ]]; then
     local output_file
     output_file=$(mktemp "${TMPDIR:-/tmp}/next-code-dev-cargo.XXXXXX")
     local status=0
@@ -860,7 +860,7 @@ while IFS= read -r -d '' arg; do
   cargo_argv+=("$arg")
 done < <(build_cargo_argv "$@")
 
-if [[ "${NEXT_CODE_REMOTE_CARGO:-${JCODE_REMOTE_CARGO:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_REMOTE_CARGO:-${NEXT_CODE_REMOTE_CARGO:-0}}" == "1" ]]; then
   if remote_cargo_preflight; then
     log "using remote cargo via scripts/remote_build.sh"
     exec "$repo_root/scripts/remote_build.sh" "${cargo_argv[@]}"

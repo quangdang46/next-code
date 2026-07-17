@@ -6,7 +6,7 @@ migrating a consumer from the old code path to the new one.
 
 The actual deletion of the old types is gated on the
 `next-code-tui` crate compiling cleanly (Phase 6 of
-`docs/plans/JCODE_PROVIDER.md` — historical plan filename). Until that happens, the old
+`docs/plans/NEXT_CODE_PROVIDER.md` — historical plan filename). Until that happens, the old
 types stay in place; new code should target the equivalents
 listed here.
 

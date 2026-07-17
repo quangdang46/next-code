@@ -1179,7 +1179,7 @@ mod tests {
         }
 
         fn save_opencode_cache(&self, source_api_base: &str, model_ids: &[&str]) {
-            let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("JCODE_HOME set");
+            let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("NEXT_CODE_HOME set");
             let cache_dir = std::path::PathBuf::from(next_code_home).join("cache");
             std::fs::create_dir_all(&cache_dir).expect("create cache dir");
             let cache = next_code_provider_openrouter::DiskCache {
@@ -1304,7 +1304,7 @@ mod tests {
     }
 
     fn save_openrouter_catalog_cache(model_ids: &[&str]) {
-        let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("JCODE_HOME set");
+        let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("NEXT_CODE_HOME set");
         let cache_dir = std::path::PathBuf::from(next_code_home).join("cache");
         std::fs::create_dir_all(&cache_dir).expect("create cache dir");
         let cache = next_code_provider_openrouter::DiskCache {

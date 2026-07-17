@@ -86,6 +86,9 @@ LINE_ALLOW = re.compile(
     r"(?:^|[^\w])jbench(?:[^\w]|$)|"
     r"[\w.-]*jcode\.sh\b|"
     r"\bjcode\.sh\b|"
+    r"canceljcode|stopjcode|"
+    r"\bjcode-telemetry\b|"
+    r"\bjcode_(?:telemetry|web|discovery|install)_firehose\b|"
     r"formerly jcode|"
     r"renamed from jcode|"
     r"upstream jcode|"
@@ -103,14 +106,16 @@ LINE_ALLOW = re.compile(
     r"falls?\s+back\s+to\s+[`']?\.?jcode|"
     r"PRODUCT_DIR_CANDIDATES.*\.jcode|"
     r"PROJECT_DIR_CANDIDATES|"
-    # first-party provider product module (not package rename debt)
+    # first-party provider product module / id (not package rename debt)
+    r"(?:pub\s+)?mod jcode\b|"
     r"provider::jcode|"
+    r"provider/jcode\.rs|"
     r"\bJcodeProvider\b|"
     r"LoginProviderTarget::Jcode|"
     r"RuntimeProviderId::Jcode|"
     r"\bJCODE_LOGIN_PROVIDER\b|"
     r"start_jcode_login|login_jcode_flow|"
-    # dual-read keyring / transport / subscription namespace
+    # frozen product / historical service names (not dual-read shims)
     r"jcode-provider-service|"
     r"jcode-secrets|"
     r"jcode-subscription|"
@@ -188,6 +193,9 @@ def path_allowlisted(rel_posix: str) -> bool:
     if rel_posix.startswith(".beads/") or rel_posix == ".beads":
         return True
     if rel_posix.startswith(".agents/skills/origin-sync/"):
+        return True
+    # First-party provider module filename is intentionally still jcode.rs
+    if rel_posix.endswith("/provider/jcode.rs") or rel_posix == "crates/next-code-base/src/provider/jcode.rs":
         return True
     return False
 

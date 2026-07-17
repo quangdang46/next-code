@@ -126,7 +126,7 @@ impl LocalSecretsBackend {
 
         // Atomic, owner-only (0600) write: a crash mid-write cannot truncate or
         // corrupt the existing encrypted store (temp file + fsync + rename, with
-        // a .bak fallback retained by jcode-storage).
+        // a .bak fallback retained by next-code-storage).
         next_code_storage::write_bytes_secret(&self.secrets_path, &encrypted)?;
         Ok(())
     }

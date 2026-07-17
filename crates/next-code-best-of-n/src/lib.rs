@@ -1,7 +1,7 @@
 //! # Best-of-N Editing Engine
 //!
 //! Implements parallel candidate execution with deterministic selection
-//! for jcode's editing tools. Inspired by codebuff's best-of-n pipeline,
+//! for next-code's editing tools. Inspired by codebuff's best-of-n pipeline,
 //! oh-my-pi's benchmark runner, and pi-agent-rust's `select_best_candidate`.
 //!
 //! ## Architecture

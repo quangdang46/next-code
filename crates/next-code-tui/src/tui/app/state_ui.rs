@@ -2017,7 +2017,7 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
                 format!(
                     "- supported: yes\n- mode: {}\n- next-code-managed: {}\n- active summary: {} ({})\n- compacted messages: {}\n- active messages: {}\n- summary chars: {}\n- estimated tokens: {}\n- effective tokens: {}\n- observed tokens: {}\n- usage: {:.1}%\n- compacting now: {}\n- budget: {}",
                     mode,
-                    if app.provider.uses_jcode_compaction() {
+                    if app.provider.uses_next_code_compaction() {
                         "yes"
                     } else {
                         "no"

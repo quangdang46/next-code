@@ -202,7 +202,7 @@ fn next_step_hint(checkpoint: &str) -> String {
         cp::TOOL_CALL_PARSE
         | cp::TOOL_EXECUTION_LOOP
         | cp::TOOL_RESULT_FOLLOWUP
-        | cp::REAL_JCODE_TOOL_SMOKE => {
+        | cp::REAL_NEXT_CODE_TOOL_SMOKE => {
             "  Next: this model did not produce a valid tool call. It may not support tools well."
         }
         _ => "",

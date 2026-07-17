@@ -24,7 +24,7 @@ Or per-environment:
 export NEXT_CODE_SPAWN_HOOK="tmux new-window"
 # An empty value disables a config-file hook:
 export NEXT_CODE_SPAWN_HOOK=
-# Legacy dual-read: JCODE_SPAWN_HOOK / JCODE_SPAWN_* still accepted for one release.
+# Legacy dual-read: NEXT_CODE_SPAWN_HOOK / NEXT_CODE_SPAWN_* still accepted for one release.
 ```
 
 Env always wins over the config file.

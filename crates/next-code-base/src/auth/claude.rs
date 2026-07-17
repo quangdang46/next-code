@@ -75,7 +75,7 @@ pub struct AnthropicAccount {
 /// Multi-account next-code auth.json format.
 /// Backwards-compatible: also reads the old single-account `{"anthropic": {...}}` layout.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct JcodeAuthFile {
+pub struct NextCodeAuthFile {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anthropic_accounts: Vec<AnthropicAccount>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -131,7 +131,7 @@ pub fn login_target_label(requested: Option<&str>) -> Result<String> {
     ))
 }
 
-fn relabel_accounts(auth: &mut JcodeAuthFile) -> bool {
+fn relabel_accounts(auth: &mut NextCodeAuthFile) -> bool {
     let outcome = crate::auth::account_store::relabel_accounts(
         ACCOUNT_LABEL_PREFIX,
         &mut auth.anthropic_accounts,
@@ -296,15 +296,15 @@ pub fn next_code_path() -> Result<PathBuf> {
 // ---- Multi-account helpers ----
 
 /// Read the next-code auth file, auto-migrating from legacy format if needed.
-pub fn load_auth_file() -> Result<JcodeAuthFile> {
+pub fn load_auth_file() -> Result<NextCodeAuthFile> {
     let path = next_code_path()?;
     if !path.exists() {
-        return Ok(JcodeAuthFile::default());
+        return Ok(NextCodeAuthFile::default());
     }
 
     crate::storage::harden_secret_file_permissions(&path);
 
-    let mut auth: JcodeAuthFile = crate::storage::read_json(&path)
+    let mut auth: NextCodeAuthFile = crate::storage::read_json(&path)
         .with_context(|| format!("Could not read next-code credentials from {:?}", path))?;
 
     if auth.anthropic_accounts.is_empty()
@@ -336,10 +336,10 @@ pub fn load_auth_file() -> Result<JcodeAuthFile> {
 }
 
 /// Write the next-code auth file (multi-account format).
-pub fn save_auth_file(auth: &JcodeAuthFile) -> Result<()> {
+pub fn save_auth_file(auth: &NextCodeAuthFile) -> Result<()> {
     let auth_path = next_code_path()?;
 
-    let clean = JcodeAuthFile {
+    let clean = NextCodeAuthFile {
         anthropic_accounts: auth.anthropic_accounts.clone(),
         active_anthropic_account: auth.active_anthropic_account.clone(),
         anthropic: None,
@@ -574,7 +574,7 @@ pub fn load_credentials() -> Result<ClaudeCredentials> {
         expired_candidates.push(("claude-native", creds));
     }
 
-    if let Ok(creds) = load_jcode_credentials() {
+    if let Ok(creds) = load_next_code_credentials() {
         if creds.expires_at > now_ms {
             return Ok(creds);
         }
@@ -627,7 +627,7 @@ pub fn load_credentials_for_account(label: &str) -> Result<ClaudeCredentials> {
 }
 
 /// Load credentials from the active next-code account (multi-account aware).
-fn load_jcode_credentials() -> Result<ClaudeCredentials> {
+fn load_next_code_credentials() -> Result<ClaudeCredentials> {
     let auth = load_auth_file()?;
     if auth.anthropic_accounts.is_empty() {
         anyhow::bail!("No anthropic accounts configured in next-code auth.json");

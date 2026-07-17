@@ -2,13 +2,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Dual-read NEXT_CODE_{suffix} then legacy JCODE_{suffix} (build-script local;
+/// Dual-read NEXT_CODE_{suffix} then legacy NEXT_CODE_{suffix} (build-script local;
 /// cannot depend on next_code_core from a build.rs).
 fn product_env(suffix: &str) -> Result<String, std::env::VarError> {
     let new_key = format!("NEXT_CODE_{suffix}");
     match std::env::var(&new_key) {
         Ok(v) => Ok(v),
-        Err(std::env::VarError::NotPresent) => std::env::var(format!("JCODE_{suffix}")),
+        Err(std::env::VarError::NotPresent) => std::env::var(format!("NEXT_CODE_{suffix}")),
         Err(e) => Err(e),
     }
 }
@@ -181,19 +181,19 @@ fn main() {
         repo_root.join("Cargo.toml").display()
     );
     println!("cargo:rerun-if-env-changed=NEXT_CODE_RELEASE_BUILD");
-    println!("cargo:rerun-if-env-changed=JCODE_RELEASE_BUILD");
+    println!("cargo:rerun-if-env-changed=NEXT_CODE_RELEASE_BUILD");
     println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_SEMVER");
-    println!("cargo:rerun-if-env-changed=JCODE_BUILD_SEMVER");
+    println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_SEMVER");
     // Allow callers to force a metadata refresh (e.g. install scripts) without a
     // full clean, by bumping this env var.
     println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_HASH");
-    println!("cargo:rerun-if-env-changed=JCODE_BUILD_GIT_HASH");
+    println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_HASH");
     println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_DATE");
-    println!("cargo:rerun-if-env-changed=JCODE_BUILD_GIT_DATE");
+    println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_DATE");
     println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_DIRTY");
-    println!("cargo:rerun-if-env-changed=JCODE_BUILD_GIT_DIRTY");
+    println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_DIRTY");
     println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_TAG");
-    println!("cargo:rerun-if-env-changed=JCODE_BUILD_GIT_TAG");
+    println!("cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_TAG");
 }
 
 /// Workspace root, derived from this crate's manifest dir (`crates/next-code-build-meta`).
@@ -287,11 +287,11 @@ fn env_or_metadata_or_git<const N: usize>(
     metadata_key: &str,
     git_args: [&str; N],
 ) -> Option<String> {
-    // Dual-read: prefer env_name (NEXT_CODE_*), fall back to JCODE_* twin.
+    // Dual-read: prefer env_name (NEXT_CODE_*), fall back to NEXT_CODE_* twin.
     let from_env = std::env::var(env_name).ok().or_else(|| {
         env_name
             .strip_prefix("NEXT_CODE_")
-            .map(|suf| format!("JCODE_{suf}"))
+            .map(|suf| format!("NEXT_CODE_{suf}"))
             .and_then(|legacy| std::env::var(legacy).ok())
     });
     from_env

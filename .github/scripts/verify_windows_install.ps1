@@ -34,7 +34,7 @@ $launcherPath = Join-Path $installDir 'next-code.exe'
 $versionDir = Join-Path $localAppData ('next-code\builds\versions\' + $Version.TrimStart('v') + '\next-code.exe')
 $stablePath = Join-Path $localAppData 'next-code\builds\stable\next-code.exe'
 # Compat launcher kept for one release during the rebrand window.
-$compatLauncherPath = Join-Path $installDir 'jcode.exe'
+$compatLauncherPath = Join-Path $installDir 'next-code.exe'
 
 foreach ($path in @($launcherPath, $versionDir, $stablePath, $compatLauncherPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
@@ -56,7 +56,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Installed launcher failed to run --version"
 }
 
-if ($versionOutput -notmatch 'next-code|jcode') {
+if ($versionOutput -notmatch 'next-code|next-code') {
     throw "Installed launcher returned unexpected version output: $versionOutput"
 }
 

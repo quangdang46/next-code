@@ -204,10 +204,10 @@ fn build_resume_command_uses_imported_next_code_session_for_claude_code() {
 
     let binary_name = program.file_name().and_then(|name| name.to_str());
     assert!(
-        matches!(binary_name, Some("next-code") | Some("jcode"))
+        matches!(binary_name, Some("next-code") | Some("next-code"))
             || binary_name.is_some_and(|name| {
                 // Test binaries / local channel wrappers still count as a client launch path.
-                name.contains("next-code") || name.contains("jcode") || name.contains("next_code")
+                name.contains("next-code") || name.contains("next-code") || name.contains("next_code")
             }),
         "unexpected launch binary: {binary_name:?} ({program:?})"
     );
@@ -235,10 +235,10 @@ fn build_resume_command_uses_imported_next_code_session_for_codex() {
 
     let binary_name = program.file_name().and_then(|name| name.to_str());
     assert!(
-        matches!(binary_name, Some("next-code") | Some("jcode"))
+        matches!(binary_name, Some("next-code") | Some("next-code"))
             || binary_name.is_some_and(|name| {
                 // Test binaries / local channel wrappers still count as a client launch path.
-                name.contains("next-code") || name.contains("jcode") || name.contains("next_code")
+                name.contains("next-code") || name.contains("next-code") || name.contains("next_code")
             }),
         "unexpected launch binary: {binary_name:?} ({program:?})"
     );

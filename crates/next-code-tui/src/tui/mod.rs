@@ -1921,7 +1921,7 @@ pub(crate) fn resolve_subscribe_metadata(
     if !selfdev && let Some(dir) = client_working_dir {
         let mut current = Some(dir);
         while let Some(path) = current {
-            if crate::build::is_jcode_repo(path) {
+            if crate::build::is_next_code_repo(path) {
                 selfdev = true;
                 break;
             }

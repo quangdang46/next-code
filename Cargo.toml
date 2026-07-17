@@ -107,7 +107,7 @@ members = [
 ]
 
 # Pin fast_file_search (FFS) to latest main tip (package 0.1.15 / a0bda22).
-# Note: tags v0.9.x diverged from main — jcode tracks main, not those tags.
+# Note: tags v0.9.x diverged from main — this fork tracks main, not those tags.
 # Bump rev when new FFS lands on main.
 [workspace.dependencies]
 ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "a0bda22d16cff8637d162a700dc8f1cbd41d957b" }
@@ -172,7 +172,7 @@ next-code-provider-openrouter-runtime = { path = "crates/next-code-provider-open
 next-code-provider-service = { path = "crates/next-code-provider-service" }
 
 
-# TOON format output for the `jcode run --toon` flag — token-efficient JSON
+# TOON format output for the `next-code run --toon` flag — token-efficient JSON
 # alternative. Pinned to a specific commit SHA so the dependency is reproducible.
 toon = { git = "https://github.com/Dicklesworthstone/toon_rust", package = "tru", rev = "b94f69d" }
 
@@ -291,13 +291,13 @@ next-code-batch-types = { path = "crates/next-code-batch-types" }
 next-code-build-support = { path = "crates/next-code-build-support" }
 next-code-build-meta = { path = "crates/next-code-build-meta" }
 # Application core: tooling, agent, dcg, dcp, etc. Re-exported via
-# `pub use jcode_app_core::*` in lib.rs. default-features=false so the root
+# `pub use next_code_app_core::*` in lib.rs. default-features=false so the root
 # feature set fully controls the downstream features (see [features]).
 next-code-app-core = { path = "crates/next-code-app-core", default-features = false }
 # Presentation layer: the terminal UI (`tui`) + offline replay (`video_export`),
 # compiled as a separate rustc unit. It re-exports the application core
 # (`next-code-app-core`, which re-exports `next-code-base`), so the root crate (cli +
-# bin) re-exports everything via `pub use jcode_tui::*`. default-features=false
+# bin) re-exports everything via `pub use next_code_tui::*`. default-features=false
 # so the root feature set fully controls the downstream features (see
 # [features]).
 next-code-tui = { path = "crates/next-code-tui", default-features = false }
@@ -338,7 +338,7 @@ aws-sdk-sts = "1.103.0"
 [features]
 # Include local ONNX/tokenizer embeddings in default builds so memory recall,
 # semantic retrieval, and embedding-backed features work out of the box.
-# Use `JCODE_DEV_FEATURE_PROFILE=minimal` for compile-speed probes that need
+# Use `NEXT_CODE_DEV_FEATURE_PROFILE=minimal` for compile-speed probes that need
 # to skip optional default feature stacks.
 default = ["pdf", "embeddings", "dcp", "rtco", "jemalloc", "mmdr-size-api"]
 dev-bins = ["next-code-tui/dev-bins"]
@@ -448,9 +448,9 @@ opt-level = 3
 # scrolling real (emoji/markdown-heavy) transcripts janky in dev/selfdev builds
 # even though the production release build was smooth. These are stable
 # third-party crates that almost never recompile, so pinning them to opt-level =
-# 3 costs a one-time compile and is then reused across every iterative jcode
+# 3 costs a one-time compile and is then reused across every iterative next-code
 # rebuild (same rationale as next-code-tui-anim above). It does NOT slow down
-# recompiles of jcode's own crates.
+# recompiles of next-code's own crates.
 [profile.dev.package.cosmic-text]
 opt-level = 3
 [profile.selfdev.package.cosmic-text]
@@ -498,7 +498,7 @@ opt-level = 3
 # Inline transcript images decode (png/zune-jpeg/fdeflate/miniz_oxide), resize
 # (image), and base64-encode (kitty transmit) at draw time; at opt-level 0 a
 # single screenshot costs 100-200ms per decode/resize, which reads as input
-# lag. These are pure pixel crates with no jcode logic, so optimizing them
+# lag. These are pure pixel crates with no next-code logic, so optimizing them
 # does not hurt rebuild times for our own code.
 [profile.dev.package.image]
 opt-level = 3

@@ -46,7 +46,7 @@ impl Default for PowerInhibitor {
 
 impl PowerInhibitor {
     /// Build an inhibitor. The inhibitor is "available" on supported platforms
-    /// unless the `NEXT_CODE_DISABLE_POWER_INHIBIT` (legacy `JCODE_DISABLE_POWER_INHIBIT`) env escape hatch is set.
+    /// unless the `NEXT_CODE_DISABLE_POWER_INHIBIT` (legacy `NEXT_CODE_DISABLE_POWER_INHIBIT`) env escape hatch is set.
     ///
     /// The user-facing config toggle is intentionally *not* baked in here: the
     /// caller evaluates it per-reconcile (via [`PowerInhibitor::set_active`]) so

@@ -31,11 +31,11 @@
     <array>
         <dict>
             <key>CFBundleURLName</key>
-            <string>com.jcode.mobile.pair</string>
+            <string>@@COM_NEXT_CODE_MOBILE@@.pair</string>
             <key>CFBundleURLSchemes</key>
             <array>
                 <string>nextcode</string>
-                <string>jcode</string>
+                <string>next-code</string>
             </array>
         </dict>
     </array>

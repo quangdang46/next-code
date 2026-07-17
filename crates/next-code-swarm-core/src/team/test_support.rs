@@ -1,5 +1,5 @@
 //! Test-only helpers: a process-wide serial guard that isolates the
-//! filesystem base dir (`JCODE_TEAMS_BASE_OVERRIDE`) per test so concurrent
+//! filesystem base dir (`NEXT_CODE_TEAMS_BASE_OVERRIDE`) per test so concurrent
 //! tests never race on the env var.
 
 use std::sync::{Mutex, MutexGuard, OnceLock};

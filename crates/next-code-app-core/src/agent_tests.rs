@@ -87,7 +87,7 @@ impl Provider for NativeAutoCompactionProvider {
         true
     }
 
-    fn uses_jcode_compaction(&self) -> bool {
+    fn uses_next_code_compaction(&self) -> bool {
         false
     }
 

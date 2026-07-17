@@ -1,6 +1,6 @@
 # Code Quality 10/10 Plan
 
-This document defines the quality target for jcode, the standards required to reach it, and the phased execution plan to get there without destabilizing the product.
+This document defines the quality target for next-code, the standards required to reach it, and the phased execution plan to get there without destabilizing the product.
 
 ## Goal
 

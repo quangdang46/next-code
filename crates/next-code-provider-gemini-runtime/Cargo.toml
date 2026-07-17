@@ -2,7 +2,7 @@
 name = "next-code-provider-gemini-runtime"
 version = "0.1.0"
 edition = "2024"
-description = "Gemini provider runtime (Code Assist OAuth + Developer API key) for jcode, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+description = "Gemini provider runtime (Code Assist OAuth + Developer API key) for next-code, kept downstream of next-code-base so provider edits do not rebuild the app spine"
 
 [lib]
 name = "next_code_provider_gemini_runtime"

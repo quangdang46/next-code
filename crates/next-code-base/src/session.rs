@@ -267,7 +267,7 @@ pub fn derive_session_provider_key(provider_name: &str) -> Option<String> {
     let normalized_name = provider_name.trim().to_ascii_lowercase();
     if matches!(
         normalized_name.as_str(),
-        "jcode" | "next-code" | "next code subscription" | "jcode subscription"
+        "next-code" | "next code subscription" | "next-code subscription"
     ) {
         return Some("next-code".to_string());
     }

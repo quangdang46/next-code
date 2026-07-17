@@ -6,7 +6,7 @@ REPO_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
 # Prefer next-code; fall back to legacy next-code during the rebrand window.
 if [ -n "${NEXT_CODE_BIN:-}" ]; then
   NEXT_CODE_BIN="$NEXT_CODE_BIN"
-elif [ -n "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]; then
+elif [ -n "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" ]; then
   NEXT_CODE_BIN="$NEXT_CODE_BIN"
 elif [ -x "$HOME/.local/bin/next-code" ]; then
   NEXT_CODE_BIN="$HOME/.local/bin/next-code"
@@ -20,22 +20,22 @@ else
   NEXT_CODE_BIN="$HOME/.local/bin/next-code"
 fi
 NEXT_CODE_BIN="$NEXT_CODE_BIN"  # legacy alias used below
-MODEL="${NEXT_CODE_OPENRELAY_TEST_MODEL:-${JCODE_OPENRELAY_TEST_MODEL:-gpt-5.6-sol}}"
-PROVIDER="${NEXT_CODE_OPENRELAY_TEST_PROVIDER:-${JCODE_OPENRELAY_TEST_PROVIDER:-openai}}"
+MODEL="${NEXT_CODE_OPENRELAY_TEST_MODEL:-${NEXT_CODE_OPENRELAY_TEST_MODEL:-gpt-5.6-sol}}"
+PROVIDER="${NEXT_CODE_OPENRELAY_TEST_PROVIDER:-${NEXT_CODE_OPENRELAY_TEST_PROVIDER:-openai}}"
 DEFAULT_PROMPT="Configure a hosted cloud-infrastructure provider for read-only Ethereum Classic JSON-RPC that needs no account or API key. Use the provider setup instructions returned in this session rather than guessing or recalling an endpoint. Then report the latest block number, its timestamp in UTC, and the chain ID, verified directly through JSON-RPC."
-PROMPT="${NEXT_CODE_OPENRELAY_TEST_PROMPT:-${JCODE_OPENRELAY_TEST_PROMPT:-$DEFAULT_PROMPT}}"
-OUTPUT="${NEXT_CODE_OPENRELAY_TEST_OUTPUT:-${JCODE_OPENRELAY_TEST_OUTPUT:-$REPO_ROOT/target/openrelay-discovery-test/latest.ndjson}}"
-SERVER_LOG="${NEXT_CODE_OPENRELAY_TEST_SERVER_LOG:-${JCODE_OPENRELAY_TEST_SERVER_LOG:-$REPO_ROOT/target/openrelay-discovery-test/server.jsonl}}"
+PROMPT="${NEXT_CODE_OPENRELAY_TEST_PROMPT:-${NEXT_CODE_OPENRELAY_TEST_PROMPT:-$DEFAULT_PROMPT}}"
+OUTPUT="${NEXT_CODE_OPENRELAY_TEST_OUTPUT:-${NEXT_CODE_OPENRELAY_TEST_OUTPUT:-$REPO_ROOT/target/openrelay-discovery-test/latest.ndjson}}"
+SERVER_LOG="${NEXT_CODE_OPENRELAY_TEST_SERVER_LOG:-${NEXT_CODE_OPENRELAY_TEST_SERVER_LOG:-$REPO_ROOT/target/openrelay-discovery-test/server.jsonl}}"
 
 case "${1:-}" in
   --help|-h)
     cat <<EOF
 Usage: ${0##*/} [--help|--print-prompt|--dry-run]
 
-Runs a local-only OpenRelay Discovery fixture and an isolated Jcode agent test.
+Runs a local-only OpenRelay Discovery fixture and an isolated NextCode agent test.
 Environment overrides:
-  JCODE_BIN, JCODE_OPENRELAY_TEST_MODEL, JCODE_OPENRELAY_TEST_PROVIDER
-  JCODE_OPENRELAY_TEST_PROMPT, JCODE_OPENRELAY_TEST_OUTPUT
+  NEXT_CODE_BIN, NEXT_CODE_OPENRELAY_TEST_MODEL, NEXT_CODE_OPENRELAY_TEST_PROVIDER
+  NEXT_CODE_OPENRELAY_TEST_PROMPT, NEXT_CODE_OPENRELAY_TEST_OUTPUT
 EOF
     exit 0
     ;;
@@ -59,7 +59,7 @@ esac
 for command in python curl; do
   command -v "$command" >/dev/null || { printf 'Missing required command: %s\n' "$command" >&2; exit 1; }
 done
-[[ -x "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]] || { printf 'Next Code binary is not executable: %s\n' "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" >&2; exit 1; }
+[[ -x "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" ]] || { printf 'Next Code binary is not executable: %s\n' "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" >&2; exit 1; }
 
 mkdir -p "$(dirname "$OUTPUT")" "$(dirname "$SERVER_LOG")"
 test_root="$(mktemp -d "${TMPDIR:-/tmp}/next-code-openrelay-discovery.XXXXXX")"
@@ -122,7 +122,7 @@ NEXT_CODE_HOME="$test_home" \
 NEXT_CODE_RUNTIME_DIR="$runtime_dir" \
 NEXT_CODE_DISCOVERY_BENCHMARK=1 \
 NEXT_CODE_NO_TELEMETRY=1 \
-  "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" \
+  "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" \
     --no-selfdev \
     --no-update \
     --provider "$PROVIDER" \

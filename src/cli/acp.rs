@@ -530,7 +530,7 @@ impl AcpRuntime {
                 }
                 other => {
                     if self.profile.is_extended() {
-                        self.write_jcode_extension_event(&attached_id, &other)
+                        self.write_next_code_extension_event(&attached_id, &other)
                             .await?;
                     }
                 }
@@ -611,7 +611,7 @@ impl AcpRuntime {
                 }
             };
             if self.profile.is_extended() {
-                self.write_jcode_extension_event(&session.session_id, &event)
+                self.write_next_code_extension_event(&session.session_id, &event)
                     .await?;
             }
             match event {
@@ -677,13 +677,13 @@ impl AcpRuntime {
         .await
     }
 
-    async fn write_jcode_extension_event(
+    async fn write_next_code_extension_event(
         &self,
         session_id: &str,
         event: &ServerEvent,
     ) -> Result<()> {
         self.write_notification(
-            "_jcode/server_event",
+            "_next_code/server_event",
             json!({
                 "sessionId": session_id,
                 "event": serde_json::to_value(event).unwrap_or(Value::Null),
@@ -914,7 +914,7 @@ fn initialize_result(params: &Value, profile: AcpProfile) -> Value {
                     "profile": profile.as_str(),
                     "extensions": ["raw_server_event"]
                 },
-                "jcode": {
+                "next-code": {
                     "profile": profile.as_str(),
                     "extensions": ["raw_server_event"]
                 }

@@ -1,5 +1,5 @@
 //! Antigravity provider runtime (Google Cloud Code backend multiplexing
-//! Gemini/Claude/gpt-oss upstreams), moved out of `jcode-base` so provider
+//! Gemini/Claude/gpt-oss upstreams), moved out of `next-code-base` so provider
 //! edits compile only this crate plus a binary relink instead of rebuilding
 //! the base -> app-core -> tui spine. The binary's composition root registers
 //! [`AntigravityProvider`] with `next_code_base::provider::external` at startup.
@@ -112,7 +112,7 @@ impl AntigravityProvider {
     /// provider-doctor's native Antigravity driver.
     ///
     /// Antigravity authenticates exclusively via the Google OAuth tokens minted
-    /// by `jcode login --provider antigravity`; there is no API-key path. This
+    /// by `next-code login --provider antigravity`; there is no API-key path. This
     /// loads (and refreshes if needed) those tokens through the exact same code
     /// path inference uses, returning only the resolved Google account email so
     /// the doctor can confirm the credential without ever surfacing the token
@@ -201,7 +201,7 @@ impl AntigravityProvider {
 
         // No backend-advertised default: pick a usable catalog model. Prefer a
         // Gemini model, which works reliably with tool use on this backend.
-        // Claude models on the Cloud Code backend currently reject jcode's tool
+        // Claude models on the Cloud Code backend currently reject next-code's tool
         // schemas (they require JSON Schema draft 2020-12), so they are a poor
         // automatic default even when listed first in the catalog.
         let catalog = self.fetched_catalog();
@@ -261,7 +261,7 @@ impl AntigravityProvider {
         // path the resolved model uses. The Cloud Code backend forwards each
         // model family to a different upstream (Gemini-native, Gemini->Anthropic,
         // or an OpenAI-compatible bridge), and each upstream rejects a different
-        // construct. Gemini-native accepts everything jcode emits, so Gemini
+        // construct. Gemini-native accepts everything next-code emits, so Gemini
         // models pass through unchanged. See `antigravity_compatible_schema`.
         if let Some(tools) = tools.as_mut() {
             for tool in tools.iter_mut() {
@@ -504,7 +504,7 @@ impl Provider for AntigravityProvider {
             if let Some(content) = candidate.content {
                 // Gemini 3 attaches a `thoughtSignature` to function-call parts
                 // (and occasionally to a standalone preceding part). Emit tool
-                // calls through the standard ToolUseStart/End path so jcode
+                // calls through the standard ToolUseStart/End path so next-code
                 // drives the multi-turn loop, and replay the signature via a
                 // dedicated ToolUseSignature event so it can be persisted on the
                 // ToolUse block and resent on later turns (required by the

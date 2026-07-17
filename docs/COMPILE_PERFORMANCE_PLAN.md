@@ -186,12 +186,12 @@ Use it when capturing comparable before/after numbers for refactors.
 - 2026-05-05: removed unused `reqwest/blocking` from `jcode-provider-core`; static search showed
   no blocking API usage in that crate. Validation: `cargo check --profile selfdev -p
   jcode-provider-core` and full `cargo check --profile selfdev -p jcode --bin jcode` passed.
-- 2026-05-03: added `JCODE_DEV_FEATURE_PROFILE` to `scripts/dev_cargo.sh` so compile-speed probes and
+- 2026-05-03: added `NEXT_CODE_DEV_FEATURE_PROFILE` to `scripts/dev_cargo.sh` so compile-speed probes and
   narrow inner-loop builds can consistently select feature sets without repeating Cargo flags. Profiles:
   `default`, `minimal`/`none` (`--no-default-features`), `pdf` (`--no-default-features --features pdf`),
   `embeddings` (`--no-default-features --features embeddings`), and `full` (`--features embeddings,pdf`).
   The wrapper leaves explicit `--features` / `--no-default-features` cargo args untouched. Validation on
-  this machine: `JCODE_DEV_FEATURE_PROFILE=minimal scripts/dev_cargo.sh check -p jcode --lib --quiet` passed.
+  this machine: `NEXT_CODE_DEV_FEATURE_PROFILE=minimal scripts/dev_cargo.sh check -p jcode --lib --quiet` passed.
 - 2026-05-03: disabled Cargo auto-discovery for root binary targets and moved developer-only helper
   binaries (`tui_bench`, `session_memory_bench`, `mermaid_side_panel_probe`) behind the opt-in
   `dev-bins` feature. This keeps broad normal checks focused on production/test targets while preserving
@@ -281,10 +281,10 @@ Start with the highest-leverage cache boundaries:
 - 2026-05-23: reverted that default-feature split because embedding-backed
   memory recall and semantic retrieval should work out of the box in normal
   builds. Default builds now enable both `pdf` and `embeddings`; developers who
-  need compile-speed probes can use `JCODE_DEV_FEATURE_PROFILE=minimal` or
-  `JCODE_DEV_FEATURE_PROFILE=pdf` to skip the local inference stack. Full local
+  need compile-speed probes can use `NEXT_CODE_DEV_FEATURE_PROFILE=minimal` or
+  `NEXT_CODE_DEV_FEATURE_PROFILE=pdf` to skip the local inference stack. Full local
   inference remains available explicitly via `--features embeddings` or
-  `JCODE_DEV_FEATURE_PROFILE=full` when testing non-default feature paths.
+  `NEXT_CODE_DEV_FEATURE_PROFILE=full` when testing non-default feature paths.
   Validation target: `cargo tree -p jcode --edges normal --depth 1` should
   include both `jcode-pdf` and `jcode-embedding`; `--no-default-features` should
   include neither.
@@ -708,12 +708,12 @@ scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode --quiet
 scripts/dev_cargo.sh --print-setup
 ```
 
-For narrower feature-set probes, set `JCODE_DEV_FEATURE_PROFILE` instead of spelling out Cargo flags:
+For narrower feature-set probes, set `NEXT_CODE_DEV_FEATURE_PROFILE` instead of spelling out Cargo flags:
 
 ```bash
-JCODE_DEV_FEATURE_PROFILE=minimal scripts/dev_cargo.sh check -p jcode --lib --quiet
-JCODE_DEV_FEATURE_PROFILE=pdf scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode --quiet
-JCODE_DEV_FEATURE_PROFILE=full scripts/dev_cargo.sh check -p jcode --lib --quiet
+NEXT_CODE_DEV_FEATURE_PROFILE=minimal scripts/dev_cargo.sh check -p jcode --lib --quiet
+NEXT_CODE_DEV_FEATURE_PROFILE=pdf scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode --quiet
+NEXT_CODE_DEV_FEATURE_PROFILE=full scripts/dev_cargo.sh check -p jcode --lib --quiet
 ```
 
 This is especially useful because default `jcode` enables both `embeddings` and `pdf`; in the current
@@ -736,7 +736,7 @@ The wrapper:
 - uses `sccache` automatically when available **for non-incremental builds only**
 - prefers `lld` locally on Linux x86_64
 - uses the fast `selfdev` Cargo profile for self-dev build/reload workflows
-- can inject a named feature profile via `JCODE_DEV_FEATURE_PROFILE` unless explicit feature args are present
+- can inject a named feature profile via `NEXT_CODE_DEV_FEATURE_PROFILE` unless explicit feature args are present
 - avoids hard-forcing a linker mode that may be broken on a given machine
 - can print the currently selected cache/linker setup with `--print-setup`
 

@@ -107,7 +107,7 @@ impl MultiProvider {
             LoginProviderTarget::Gemini => Some("gemini"),
             LoginProviderTarget::Antigravity => Some("antigravity"),
             LoginProviderTarget::AutoImport
-            | LoginProviderTarget::Jcode
+            | LoginProviderTarget::NextCode
             | LoginProviderTarget::Azure
             | LoginProviderTarget::Google => None,
         }
@@ -311,7 +311,7 @@ impl MultiProvider {
     fn session_provider_key_from_provider_name(provider_name: &str) -> Option<String> {
         let normalized = provider_name.trim().to_ascii_lowercase();
         let key = match normalized.as_str() {
-            "jcode" | "next-code" | "next code subscription" | "jcode subscription" => "next-code",
+            "next-code" | "next code subscription" | "next-code subscription" => "next-code",
             "anthropic" | "claude" | "claude cli" => "claude",
             "openai" => "openai",
             "github copilot" | "copilot" => "copilot",

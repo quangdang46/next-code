@@ -766,7 +766,7 @@ fn route_matches_activation(route: &ModelRoute, activation: &AuthActivationResul
                 crate::provider::ModelRouteApiMethod::CodeAssistOAuth
             );
         }
-        "next-code" | "jcode" => {
+        "next-code" => {
             // The Next Code subscription runtime is the OpenRouter transport with a
             // curated catalog, so its routes carry the `openrouter` api_method
             // even though the runtime identity is `next-code`.
@@ -863,9 +863,9 @@ fn normalized_login_provider_id(provider_id: &str) -> Option<&'static str> {
         }
         "openrouter" => Some("openrouter"),
         "next-code"
-        | "jcode"
+        | "next-code"
         | "subscription"
-        | "jcode-subscription"
+        | "next-code-subscription"
         | "next-code-subscription" => Some("next-code"),
         "bedrock" | "aws-bedrock" | "aws_bedrock" => Some("bedrock"),
         "cursor" => Some("cursor"),
@@ -919,7 +919,7 @@ fn api_key_env_bindings_for_provider(provider_id: &str) -> Vec<(String, String)>
             "OPENROUTER_API_KEY".to_string(),
             "openrouter.env".to_string(),
         )],
-        "next-code" | "jcode" => vec![
+        "next-code" => vec![
             (
                 crate::subscription_catalog::NEXT_CODE_API_KEY_ENV.to_string(),
                 crate::subscription_catalog::NEXT_CODE_ENV_FILE.to_string(),
@@ -1133,8 +1133,8 @@ fn direct_provider_activation(provider_id: &str) -> Option<ProviderActivation> {
             RuntimeProviderId::OpenRouter,
             ActiveProvider::OpenRouter,
         )),
-        "next-code" | "jcode" => Some(ProviderActivation::locked(
-            RuntimeProviderId::Jcode,
+        "next-code" => Some(ProviderActivation::locked(
+            RuntimeProviderId::NextCode,
             ActiveProvider::OpenRouter,
         )),
         "bedrock" => Some(ProviderActivation::locked(
@@ -1185,7 +1185,7 @@ pub fn model_switch_request_for_provider_id(
         Some("claude-api") => format!("claude-api:{}", model),
         Some("openai") => format!("openai-oauth:{}", model),
         Some("openai-api") => format!("openai-api:{}", model),
-        Some("openrouter") | Some("next-code") | Some("jcode") => {
+        Some("openrouter") | Some("next-code") | Some("next-code") => {
             format!("openrouter:{}", model)
         }
         Some("bedrock") => format!("bedrock:{}", model),
@@ -1400,7 +1400,7 @@ mod tests {
             ("openai-key", "openai-api", "OpenAI API"),
             ("openrouter", "openrouter", "OpenRouter"),
             ("subscription", "next-code", "Next Code"),
-            ("jcode", "next-code", "Next Code"),
+            ("next-code", "next-code", "Next Code"),
             ("next-code", "next-code", "Next Code"),
             ("bedrock", "bedrock", "AWS Bedrock"),
             ("cursor", "cursor", "Cursor"),
@@ -1459,7 +1459,7 @@ mod tests {
             ("openai", "openai", "openai", "openai", true),
             ("openai-api", "openai-api", "openai-api", "openai", true),
             ("openrouter", "openrouter", "openrouter", "openrouter", true),
-            ("jcode", "next-code", "next-code", "openrouter", true),
+            ("next-code", "next-code", "next-code", "openrouter", true),
             ("next-code", "next-code", "next-code", "openrouter", true),
             ("bedrock", "bedrock", "bedrock", "bedrock", true),
             ("cursor", "cursor", "cursor", "cursor", false),
@@ -1536,7 +1536,7 @@ mod tests {
             // (normalized, runtime, active, switch_prefix, force_locked)
             let Some((normalized, runtime, active, switch_prefix, force_locked)) =
                 (match provider.target {
-                    crate::provider_catalog::LoginProviderTarget::Jcode => {
+                    crate::provider_catalog::LoginProviderTarget::NextCode => {
                         Some(("next-code", "next-code", "openrouter", "openrouter", true))
                     }
                     crate::provider_catalog::LoginProviderTarget::Claude => {

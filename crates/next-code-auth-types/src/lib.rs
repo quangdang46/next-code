@@ -31,7 +31,7 @@ pub enum AuthCredentialSource {
     EnvironmentVariable,
     AppConfigFile,
     /// next-code managed credential file (variant name kept for ABI/compat).
-    JcodeManagedFile,
+    NextCodeManagedFile,
     TrustedExternalFile,
     TrustedExternalAppState,
     LocalCliSession,
@@ -45,7 +45,7 @@ impl AuthCredentialSource {
             Self::None => "none",
             Self::EnvironmentVariable => "environment variable",
             Self::AppConfigFile => "app config file",
-            Self::JcodeManagedFile => "next-code-managed file",
+            Self::NextCodeManagedFile => "next-code-managed file",
             Self::TrustedExternalFile => "trusted external file",
             Self::TrustedExternalAppState => "trusted external app state",
             Self::LocalCliSession => "local CLI session",

@@ -5,7 +5,7 @@
 //! ```text
 //!   SecretsBackend (trait) ← LocalSecretsBackend (age-encrypted file)
 //!   SecretsManager wraps Arc<dyn SecretsBackend>
-//!   KeyringStore (trait in jcode-keyring-store) ← DefaultKeyringStore | MockKeyringStore
+//!   KeyringStore (trait in next-code-keyring-store) ← DefaultKeyringStore | MockKeyringStore
 //! ```
 //!
 //! # Quick Start
@@ -364,7 +364,7 @@ impl SecretsManager {
 /// Canonical OS-keychain service name for the encrypted secrets store.
 pub(crate) const SERVICE_NAME: &str = "next-code-secrets";
 /// Pre-rebrand service name; still dual-read so existing passphrases migrate.
-pub(crate) const LEGACY_SERVICE_NAME: &str = "jcode-secrets";
+pub(crate) const LEGACY_SERVICE_NAME: &str = "next-code-secrets";
 pub(crate) const PASS_ACCOUNT: &str = "local-secrets-passphrase";
 
 /// Load the secrets passphrase, trying the new service name first and

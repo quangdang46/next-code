@@ -45,7 +45,7 @@ const AGENT_PATH: &str = "/agent.v1.AgentService/Run";
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 /// Client version advertised to Cursor's agent service. Must track a currently
 /// served `cursor-agent` CLI build; override at runtime with
-/// `JCODE_CURSOR_CLI_VERSION` if Cursor moves the floor.
+/// `NEXT_CODE_CURSOR_CLI_VERSION` if Cursor moves the floor.
 const CLI_CLIENT_VERSION_DEFAULT: &str = "cli-2026.07.08-0c04a8a";
 
 fn cli_client_version() -> String {

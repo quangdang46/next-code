@@ -136,7 +136,7 @@ fn save_test_openai_compatible_login_config(default_model: &str) {
 }
 
 fn save_test_openrouter_model_cache(namespace: &str, source_api_base: &str, model_ids: &[&str]) {
-    let next_code_home = product_env_os("HOME").expect("test JCODE_HOME should be set");
+    let next_code_home = product_env_os("HOME").expect("test NEXT_CODE_HOME should be set");
     let cache_dir = std::path::PathBuf::from(next_code_home).join("cache");
     std::fs::create_dir_all(&cache_dir).expect("create model cache dir");
     let cache = next_code_provider_openrouter::DiskCache {

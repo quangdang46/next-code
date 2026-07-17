@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Golden-image regression checks for Jcode Desktop gallery captures.
+"""Golden-image regression checks for Next Code Desktop gallery captures.
 
 Renders every gallery fixture state headlessly via
 `next-code-desktop --capture-gallery-screens` and compares the PNGs against
@@ -93,7 +93,7 @@ def main() -> int:
     if args.size:
         baseline_dir = baseline_dir / args.size
 
-    with tempfile.TemporaryDirectory(prefix="jcode-gallery-golden-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="next-code-gallery-golden-") as tmp:
         out_dir = Path(tmp)
         screens = capture(args.binary, out_dir, args.size)
 

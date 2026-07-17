@@ -16,7 +16,7 @@ cd "$(dirname "$0")/.."        # ios/
 HARNESS="TestHarness"
 DEVICE="iPhone 17"
 PUSH_DEMO=""
-BUNDLE_ID="com.jcode.mobile"
+BUNDLE_ID="@@COM_NEXT_CODE_MOBILE@@"
 PORT=7643
 SHOT_DIR="${TMPDIR:-/tmp}/next-code-ios-e2e"
 

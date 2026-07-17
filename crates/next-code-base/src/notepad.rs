@@ -2,7 +2,7 @@
 //!
 //! The notepad stores short text notes across three tiers, each backed by
 //! a plain markdown file in `<working_dir>/.next-code/notepad/`
-//! (legacy `.jcode/notepad/` dual-read):
+//! (legacy `.next-code/notepad/` dual-read):
 //!
 //! - **Priority** – critical context that is injected into the system prompt
 //!   every turn, surviving compaction. The model uses it as always-present
@@ -37,12 +37,13 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Write;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
 #[cfg(unix)]
 use std::os::unix::fs::OpenOptionsExt;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 // ---------------------------------------------------------------------------
 // Tiers
@@ -221,10 +222,10 @@ impl Notepad {
             }
         }
         // Default path dual-reads `.next-code/notepad` then legacy
-        // `.jcode/notepad`. An explicit non-default `config.dir` is used as-is.
+        // `.next-code/notepad`. An explicit non-default `config.dir` is used as-is.
         let base = if configured.is_empty()
             || configured == ".next-code/notepad"
-            || configured == ".jcode/notepad"
+            || configured == ".next-code/notepad"
         {
             match working_dir {
                 Some(wd) => crate::storage::project_product_path(wd, "notepad"),

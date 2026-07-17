@@ -16,7 +16,7 @@ This script quantifies:
   * realized cache hit rate per provider
   * OpenAI zero/low-read events
 
-Use it before/after changing ``JCODE_OPENAI_WS_IDLE_RECONNECT_SECS`` (or the
+Use it before/after changing ``NEXT_CODE_OPENAI_WS_IDLE_RECONNECT_SECS`` (or the
 default) to confirm idle-reconnect churn drops and reuse/cache rates rise.
 
 Usage

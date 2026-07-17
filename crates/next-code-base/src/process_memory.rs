@@ -1053,7 +1053,7 @@ mod tests {
     #[cfg(target_os = "linux")]
     #[test]
     fn parse_proc_status_count_reads_unitless_counters() {
-        let text = "Name:\tjcode\nThreads:\t10\nVmStk:\t     132 kB\n";
+        let text = "Name:\tnext-code\nThreads:\t10\nVmStk:\t     132 kB\n";
         assert_eq!(parse_proc_status_count(text, "Threads:"), Some(10));
         assert_eq!(parse_proc_status_count(text, "Missing:"), None);
     }

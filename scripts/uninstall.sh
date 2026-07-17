@@ -41,13 +41,13 @@ case "$OS" in
   MINGW*|MSYS*|CYGWIN*)
     if [ -n "${NEXT_CODE_HOME:-}" ]; then
       NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
-    elif [ -n "${NEXT_CODE_HOME:-${JCODE_HOME:-}}" ]; then
-      NEXT_CODE_HOME_DIR="$JCODE_HOME"
+    elif [ -n "${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}" ]; then
+      NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
     else
       NEXT_CODE_HOME_DIR="${LOCALAPPDATA:?LOCALAPPDATA not set}/next-code"
     fi
     LEGACY_HOME_DIR="${LOCALAPPDATA}/next-code"
-    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${JCODE_INSTALL_DIR:-$LOCALAPPDATA/next-code/bin}}"
+    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${NEXT_CODE_INSTALL_DIR:-$LOCALAPPDATA/next-code/bin}}"
     LAUNCHER="$LAUNCHER_DIR/next-code.exe"
     LEGACY_LAUNCHER="$LAUNCHER_DIR/next-code.exe"
     # Also check the old default install dir.
@@ -61,13 +61,13 @@ case "$OS" in
   *)
     if [ -n "${NEXT_CODE_HOME:-}" ]; then
       NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
-    elif [ -n "${NEXT_CODE_HOME:-${JCODE_HOME:-}}" ]; then
-      NEXT_CODE_HOME_DIR="$JCODE_HOME"
+    elif [ -n "${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}" ]; then
+      NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
     else
       NEXT_CODE_HOME_DIR="$HOME/.next-code"
     fi
     LEGACY_HOME_DIR="$HOME/.next-code"
-    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${JCODE_INSTALL_DIR:-$HOME/.local/bin}}"
+    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${NEXT_CODE_INSTALL_DIR:-$HOME/.local/bin}}"
     LAUNCHER="$LAUNCHER_DIR/next-code"
     LEGACY_LAUNCHER="$LAUNCHER_DIR/next-code"
     LEGACY_LAUNCHER_DIR=""
@@ -82,7 +82,7 @@ esac
 # Collect removal targets.
 TARGETS=()
 [ -e "$LAUNCHER" ] || [ -L "$LAUNCHER" ] && TARGETS+=("$LAUNCHER (launcher)")
-[ -e "$LEGACY_LAUNCHER" ] || [ -L "$LEGACY_LAUNCHER" ] && TARGETS+=("$LEGACY_LAUNCHER (legacy jcode launcher)")
+[ -e "$LEGACY_LAUNCHER" ] || [ -L "$LEGACY_LAUNCHER" ] && TARGETS+=("$LEGACY_LAUNCHER (legacy next-code launcher)")
 if [ -n "$LEGACY_LAUNCHER_ALT" ] && { [ -e "$LEGACY_LAUNCHER_ALT" ] || [ -L "$LEGACY_LAUNCHER_ALT" ]; }; then
   TARGETS+=("$LEGACY_LAUNCHER_ALT (legacy Windows launcher)")
 fi
@@ -138,7 +138,7 @@ if [ "$ASSUME_YES" = false ]; then
   fi
 fi
 
-# Stop any running next-code / legacy jcode server so files are not recreated mid-wipe.
+# Stop any running next-code / legacy next-code server so files are not recreated mid-wipe.
 if command -v pkill >/dev/null 2>&1; then
   pkill -f 'next-code( .*)? serve' 2>/dev/null || true
   pkill -f 'next-code( .*)? serve' 2>/dev/null || true

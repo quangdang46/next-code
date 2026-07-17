@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 prompt=${1:-"Use the bash tool to run 'pwd', then use the ls tool to list the current directory, then respond with DONE."}
-provider=${NEXT_CODE_PROVIDER:-${JCODE_PROVIDER:-auto}}
+provider=${NEXT_CODE_PROVIDER:-${NEXT_CODE_PROVIDER:-auto}}
 cargo_exec="$repo_root/scripts/cargo_exec.sh"
 
 if [[ ! -x "$repo_root/target/release/next-code" && ! -x "$repo_root/target/release/next-code" ]]; then

@@ -7,11 +7,11 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
 const MACOS_APP_ICON_FILE_NAME: &str = "NextCode.icns";
-// dual-read: source asset filename still `Jcode.icns` until assets rename pass
+// dual-read: source asset filename still `NextCode.icns` until assets rename pass
 const MACOS_APP_ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../assets/app-icons/",
-    "Jcode.icns", // dual-read: asset filename pending rename
+    "NextCode.icns", // dual-read: asset filename pending rename
 ));
 
 pub(super) fn should_refresh_macos_app_launcher(state: &SetupHintsState) -> bool {

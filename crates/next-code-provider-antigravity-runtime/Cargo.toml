@@ -2,7 +2,7 @@
 name = "next-code-provider-antigravity-runtime"
 version = "0.1.0"
 edition = "2024"
-description = "Antigravity provider runtime (Google Cloud Code multiplexed Gemini/Claude backend) for jcode, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+description = "Antigravity provider runtime (Google Cloud Code multiplexed Gemini/Claude backend) for next-code, kept downstream of next-code-base so provider edits do not rebuild the app spine"
 
 [lib]
 name = "next_code_provider_antigravity_runtime"

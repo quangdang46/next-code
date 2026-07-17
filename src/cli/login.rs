@@ -272,7 +272,7 @@ pub async fn run_login_provider(
                 eprintln!("Imported {} existing auth source(s).", imported);
                 Ok(LoginFlowOutcome::Completed)
             }
-            LoginProviderTarget::Jcode => login_jcode_flow(options.no_browser)
+            LoginProviderTarget::NextCode => login_jcode_flow(options.no_browser)
                 .await
                 .map(|_| LoginFlowOutcome::Completed),
             LoginProviderTarget::Claude => login_claude_flow(account_label, options.no_browser)
@@ -461,11 +461,11 @@ async fn notify_running_server_auth_changed_best_effort(provider: Option<&str>) 
 
 async fn login_jcode_flow(no_browser: bool) -> Result<()> {
     eprintln!("Starting next-code subscription sign-in...");
-    let _ = next_code_device::login_jcode_device_flow(no_browser).await?;
+    let _ = next_code_device::login_next_code_device_flow(no_browser).await?;
     Ok(())
 }
 
-pub(crate) async fn run_jcode_account_login(no_browser: bool) -> Result<()> {
+pub(crate) async fn run_next_code_account_login(no_browser: bool) -> Result<()> {
     login_jcode_flow(no_browser).await
 }
 

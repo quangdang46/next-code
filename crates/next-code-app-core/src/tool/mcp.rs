@@ -376,7 +376,7 @@ impl McpManagementTool {
             }
             return Ok(ToolOutput::new(
                 "No servers found in config.\n\n\
-                Add servers to ~/.next-code/mcp.json (global) or .next-code/mcp.json (project):\n\
+                Add servers to ~/.next_code/mcp.json (global) or .next_code/mcp.json (project):\n\
                 {\n  \"servers\": {\n    \"server-name\": {\n      \"command\": \"/path/to/server\",\n      \"args\": [],\n      \"env\": {},\n      \"shared\": true\n    }\n  }\n}\n\n\
                 .claude/mcp.json is also supported for compatibility."
             ).with_title("MCP: Empty config"));

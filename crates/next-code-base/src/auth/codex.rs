@@ -32,7 +32,7 @@ pub struct OpenAiAccount {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct JcodeOpenAiAuthFile {
+pub struct NextCodeOpenAiAuthFile {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub openai_accounts: Vec<OpenAiAccount>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -90,7 +90,7 @@ pub fn login_target_label(requested: Option<&str>) -> Result<String> {
     ))
 }
 
-fn relabel_accounts(auth: &mut JcodeOpenAiAuthFile) -> bool {
+fn relabel_accounts(auth: &mut NextCodeOpenAiAuthFile) -> bool {
     let outcome = crate::auth::account_store::relabel_accounts(
         ACCOUNT_LABEL_PREFIX,
         &mut auth.openai_accounts,
@@ -157,14 +157,14 @@ pub fn has_unconsented_legacy_credentials() -> bool {
     legacy_auth_source_exists() && !legacy_auth_allowed()
 }
 
-pub fn load_auth_file() -> Result<JcodeOpenAiAuthFile> {
+pub fn load_auth_file() -> Result<NextCodeOpenAiAuthFile> {
     let path = next_code_auth_path()?;
     let mut auth = if path.exists() {
         crate::storage::harden_secret_file_permissions(&path);
         crate::storage::read_json(&path)
             .with_context(|| format!("Could not read OpenAI credentials from {:?}", path))?
     } else {
-        JcodeOpenAiAuthFile::default()
+        NextCodeOpenAiAuthFile::default()
     };
 
     if relabel_accounts(&mut auth) {
@@ -177,9 +177,9 @@ pub fn load_auth_file() -> Result<JcodeOpenAiAuthFile> {
     Ok(auth)
 }
 
-pub fn save_auth_file(auth: &JcodeOpenAiAuthFile) -> Result<()> {
+pub fn save_auth_file(auth: &NextCodeOpenAiAuthFile) -> Result<()> {
     let auth_path = next_code_auth_path()?;
-    let clean = JcodeOpenAiAuthFile {
+    let clean = NextCodeOpenAiAuthFile {
         openai_accounts: auth.openai_accounts.clone(),
         active_openai_account: auth.active_openai_account.clone(),
     };
@@ -337,7 +337,7 @@ fn load_oauth_credentials_internal(return_expired: bool) -> Result<CodexCredenti
     let mut expired_candidates: Vec<(&str, CodexCredentials)> = Vec::new();
     let legacy_allowed = legacy_auth_allowed();
 
-    if let Ok(creds) = load_jcode_credentials() {
+    if let Ok(creds) = load_next_code_credentials() {
         if creds
             .expires_at
             .map(|expires_at| expires_at > now_ms)
@@ -435,7 +435,7 @@ pub fn upsert_account_from_tokens(
     upsert_account(account_from_credentials(label, &creds, email))
 }
 
-fn load_jcode_credentials() -> Result<CodexCredentials> {
+fn load_next_code_credentials() -> Result<CodexCredentials> {
     let auth = load_auth_file()?;
     if auth.openai_accounts.is_empty() {
         anyhow::bail!("No OpenAI accounts configured in next-code auth file")

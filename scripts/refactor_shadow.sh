@@ -10,9 +10,9 @@ runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
 default_home="${HOME}/.next-code-refactor"
 default_socket="${runtime_dir}/next-code-refactor-${user_name}.sock"
 
-ref_home="${NEXT_CODE_REF_HOME:-${JCODE_REF_HOME:-$default_home}}"
-ref_socket="${NEXT_CODE_REF_SOCKET:-${JCODE_REF_SOCKET:-$default_socket}}"
-ref_profile="${NEXT_CODE_REF_PROFILE:-${JCODE_REF_PROFILE:-debug}}"
+ref_home="${NEXT_CODE_REF_HOME:-${NEXT_CODE_REF_HOME:-$default_home}}"
+ref_socket="${NEXT_CODE_REF_SOCKET:-${NEXT_CODE_REF_SOCKET:-$default_socket}}"
+ref_profile="${NEXT_CODE_REF_PROFILE:-${NEXT_CODE_REF_PROFILE:-debug}}"
 
 case "$ref_profile" in
   debug) default_bin="$repo_root/target/debug/next-code" ;;
@@ -23,7 +23,7 @@ case "$ref_profile" in
     ;;
 esac
 
-ref_bin="${NEXT_CODE_REF_BIN:-${JCODE_REF_BIN:-$default_bin}}"
+ref_bin="${NEXT_CODE_REF_BIN:-${NEXT_CODE_REF_BIN:-$default_bin}}"
 
 usage() {
   cat <<'USAGE'
@@ -37,14 +37,14 @@ Usage:
 
 What it does:
   - Runs next-code in an isolated refactor environment
-  - Uses separate JCODE_HOME and JCODE_SOCKET
+  - Uses separate NEXT_CODE_HOME and NEXT_CODE_SOCKET
   - Refuses to run against ~/.next-code to protect live sessions
 
 Environment overrides:
-  JCODE_REF_HOME      Isolated home dir (default: ~/.next-code-refactor)
-  JCODE_REF_SOCKET    Isolated socket path
-  JCODE_REF_PROFILE   debug|release (default: debug)
-  JCODE_REF_BIN       Explicit next-code binary path
+  NEXT_CODE_REF_HOME      Isolated home dir (default: ~/.next-code-refactor)
+  NEXT_CODE_REF_SOCKET    Isolated socket path
+  NEXT_CODE_REF_PROFILE   debug|release (default: debug)
+  NEXT_CODE_REF_BIN       Explicit next-code binary path
 USAGE
 }
 
@@ -102,7 +102,7 @@ remove_stale_socket() {
 }
 
 run_isolated() {
-  NEXT_CODE_HOME="$ref_home" JCODE_SOCKET="$ref_socket" "$@"
+  NEXT_CODE_HOME="$ref_home" NEXT_CODE_SOCKET="$ref_socket" "$@"
 }
 
 normalize_args() {
@@ -120,7 +120,7 @@ NEXT_CODE_REF_PROFILE=$ref_profile
 NEXT_CODE_REF_BIN=$ref_bin
 
 # One-off command example:
-NEXT_CODE_HOME=$ref_home JCODE_SOCKET=$ref_socket $ref_bin --version
+NEXT_CODE_HOME=$ref_home NEXT_CODE_SOCKET=$ref_socket $ref_bin --version
 EOF_OUT
 }
 

@@ -23,7 +23,7 @@ fn lock_env() -> std::sync::MutexGuard<'static, ()> {
 #[test]
 #[allow(deprecated)]
 fn test_provider_choice_arg_values() {
-    assert_eq!(ProviderChoice::Jcode.as_arg_value(), "jcode");
+    assert_eq!(ProviderChoice::NextCode.as_arg_value(), "next-code");
     assert_eq!(ProviderChoice::Claude.as_arg_value(), "claude");
     assert_eq!(ProviderChoice::AnthropicApi.as_arg_value(), "anthropic-api");
     assert_eq!(
@@ -151,7 +151,7 @@ fn test_server_bootstrap_login_selection_preserves_order() {
     );
     assert_eq!(
         resolve_login_selection("4", &providers).map(|provider| provider.id),
-        Some("jcode")
+        Some("next-code")
     );
     assert_eq!(
         resolve_login_selection("5", &providers).map(|provider| provider.id),
@@ -193,7 +193,7 @@ fn test_auto_init_login_selection_preserves_order() {
 }
 
 #[test]
-fn test_init_provider_jcode_delegates_runtime_profile_to_wrapper() {
+fn test_init_provider_next_code_delegates_runtime_profile_to_wrapper() {
     let _guard = lock_env();
     let _env_guard = crate::storage::lock_test_env();
     // Sandbox NEXT_CODE_HOME: with the real home, persisted auth/credential state
@@ -210,7 +210,7 @@ fn test_init_provider_jcode_delegates_runtime_profile_to_wrapper() {
 
     let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
     let provider = runtime
-        .block_on(init_provider(&ProviderChoice::Jcode, None))
+        .block_on(init_provider(&ProviderChoice::NextCode, None))
         .expect("init next-code provider");
 
     assert_eq!(provider.name(), "Next Code Subscription");
@@ -225,7 +225,7 @@ fn test_init_provider_jcode_delegates_runtime_profile_to_wrapper() {
     );
     assert_eq!(
         std::env::var("NEXT_CODE_RUNTIME_PROVIDER").ok().as_deref(),
-        Some("jcode")
+        Some("next-code")
     );
     assert_eq!(
         std::env::var("NEXT_CODE_FORCE_PROVIDER").ok().as_deref(),
@@ -399,7 +399,7 @@ fn login_provider_menu_shows_autodetected_auth_and_skip() {
 fn choice_for_login_provider_round_trips_core_targets() {
     assert_eq!(
         choice_for_login_provider(provider_catalog::NEXT_CODE_LOGIN_PROVIDER),
-        Some(ProviderChoice::Jcode)
+        Some(ProviderChoice::NextCode)
     );
     assert_eq!(
         choice_for_login_provider(provider_catalog::OPENROUTER_LOGIN_PROVIDER),

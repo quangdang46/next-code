@@ -6,7 +6,7 @@
 #
 # Why `prefer_tier = "routine"`:
 #   Running a command and paraphrasing its stdout is a cheap+fast task.
-#   A pay-per-token user with `JCODE_ROUTING_ROUTINE=<cheap-model>`
+#   A pay-per-token user with `NEXT_CODE_ROUTING_ROUTINE=<cheap-model>`
 #   keeps the cost of these frequent leaf calls low. Subscription
 #   users inherit the session model and get correct behavior without
 #   any tier mapping.
@@ -31,7 +31,7 @@
 
 id = "basher"
 display_name = "Basher"
-publisher = "jcode"
+publisher = "next-code"
 version = "0.1.0"
 color = "green"
 
@@ -47,7 +47,7 @@ include_message_history = false
 inherit_parent_system_prompt = false
 output_mode = "last_message"
 
-# Single tool: jcode's terminal command runner.
+# Single tool: next-code's terminal command runner.
 tool_names = ["bash"]
 
 # Leaf agent — does not spawn other agents.

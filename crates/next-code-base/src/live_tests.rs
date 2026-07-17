@@ -35,7 +35,7 @@ pub mod checkpoints {
     pub const TOOL_CALL_PARSE: &str = "tool_call_parse";
     pub const TOOL_EXECUTION_LOOP: &str = "tool_execution_loop";
     pub const TOOL_RESULT_FOLLOWUP: &str = "tool_result_followup";
-    pub const REAL_JCODE_TOOL_SMOKE: &str = "real_jcode_tool_smoke";
+    pub const REAL_NEXT_CODE_TOOL_SMOKE: &str = "real_jcode_tool_smoke";
     /// Observe-only: did the model expose its reasoning (`streamed`), hide it
     /// behind an opaque signal (`opaque`, e.g. Gemini-3 / OpenAI), or emit none
     /// (`none`)? Never required for user-readiness; hiding reasoning is a pass.
@@ -162,7 +162,7 @@ const END_TO_END_CHECKPOINTS: &[LiveVerificationCheckpointDefinition] = &[
         description: "The provider accepts tool results and the model completes the final assistant response.",
     },
     LiveVerificationCheckpointDefinition {
-        id: checkpoints::REAL_JCODE_TOOL_SMOKE,
+        id: checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
         label: "Real Next Code tool smoke",
         category: "tools",
         required_for_user_ready: true,
@@ -234,7 +234,7 @@ pub const STRICT_PROVIDER_MODEL_COVERAGE_CHECKPOINTS: &[&str] = &[
     checkpoints::TOOL_CALL_PARSE,
     checkpoints::TOOL_EXECUTION_LOOP,
     checkpoints::TOOL_RESULT_FOLLOWUP,
-    checkpoints::REAL_JCODE_TOOL_SMOKE,
+    checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
 ];
 
 pub fn strict_provider_model_coverage_checkpoint_ids() -> impl Iterator<Item = &'static str> {
@@ -776,11 +776,11 @@ pub struct LiveProviderModelCoveragePair {
     pub latest_recorded_at: DateTime<Utc>,
     /// next-code version string that produced the most recent entry for this pair.
     #[serde(default)]
-    pub latest_jcode_version: String,
+    pub latest_next_code_version: String,
     /// Whether the most recent run came from a dirty (dev) build. Used to label
     /// the run as developer-driven vs user-driven (clean release build).
     #[serde(default)]
-    pub latest_jcode_dirty: bool,
+    pub latest_next_code_dirty: bool,
     pub entries: usize,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub capabilities: Vec<String>,
@@ -1209,7 +1209,7 @@ fn provider_test_coverage_checkpoint_label(checkpoint: &str) -> String {
         checkpoints::TOOL_CALL_PARSE => "Tool call parsed".to_string(),
         checkpoints::TOOL_EXECUTION_LOOP => "Tool execution loop".to_string(),
         checkpoints::TOOL_RESULT_FOLLOWUP => "Tool result follow-up".to_string(),
-        checkpoints::REAL_JCODE_TOOL_SMOKE => "Real next-code tool smoke".to_string(),
+        checkpoints::REAL_NEXT_CODE_TOOL_SMOKE => "Real next-code tool smoke".to_string(),
         other => other.replace('_', " "),
     }
 }
@@ -1220,8 +1220,8 @@ struct ProviderModelCoverageBuilder {
     provider_label: String,
     model: String,
     latest_recorded_at: Option<DateTime<Utc>>,
-    latest_jcode_version: String,
-    latest_jcode_dirty: bool,
+    latest_next_code_version: String,
+    latest_next_code_dirty: bool,
     entries: usize,
     capabilities: BTreeSet<String>,
     source_provider_ids: BTreeSet<String>,
@@ -1247,8 +1247,8 @@ impl ProviderModelCoverageBuilder {
             .unwrap_or(true)
         {
             self.latest_recorded_at = Some(entry.recorded_at);
-            self.latest_jcode_version = entry.next_code_version.clone();
-            self.latest_jcode_dirty = entry.next_code_git_dirty;
+            self.latest_next_code_version = entry.next_code_version.clone();
+            self.latest_next_code_dirty = entry.next_code_git_dirty;
         }
         self.capabilities.extend(entry.capabilities.iter().cloned());
         for (checkpoint, status) in &entry.checkpoint_statuses {
@@ -1282,8 +1282,8 @@ impl ProviderModelCoverageBuilder {
             source_provider_ids: self.source_provider_ids.into_iter().collect(),
             covered,
             latest_recorded_at: self.latest_recorded_at.unwrap_or_else(Utc::now),
-            latest_jcode_version: self.latest_jcode_version,
-            latest_jcode_dirty: self.latest_jcode_dirty,
+            latest_next_code_version: self.latest_next_code_version,
+            latest_next_code_dirty: self.latest_next_code_dirty,
             entries: self.entries,
             capabilities: self.capabilities.into_iter().collect(),
             passed_checkpoints,
@@ -1366,7 +1366,7 @@ pub fn strict_live_provider_model_coverage_summary(
         ) {
             totals.3 += 1;
         }
-        match pair.checkpoint_status(checkpoints::REAL_JCODE_TOOL_SMOKE) {
+        match pair.checkpoint_status(checkpoints::REAL_NEXT_CODE_TOOL_SMOKE) {
             Some(LiveVerificationStageStatus::Passed) => totals.4 += 1,
             Some(LiveVerificationStageStatus::Skipped) => totals.5 += 1,
             _ => {}
@@ -1677,7 +1677,7 @@ const STRICT_PIPELINE_STAGES: &[(&str, &str)] = &[
     (checkpoints::TOOL_CALL_PARSE, "tool-call parse"),
     (checkpoints::TOOL_EXECUTION_LOOP, "tool execution"),
     (checkpoints::TOOL_RESULT_FOLLOWUP, "tool-result followup"),
-    (checkpoints::REAL_JCODE_TOOL_SMOKE, "real tool smoke"),
+    (checkpoints::REAL_NEXT_CODE_TOOL_SMOKE, "real tool smoke"),
 ];
 
 /// Plain-English description of the first thing standing between a pair and
@@ -1707,7 +1707,7 @@ fn doctor_tier_for_stage(stage_id: &str) -> &'static str {
         | checkpoints::TOOL_CALL_PARSE
         | checkpoints::TOOL_EXECUTION_LOOP
         | checkpoints::TOOL_RESULT_FOLLOWUP
-        | checkpoints::REAL_JCODE_TOOL_SMOKE => "full",
+        | checkpoints::REAL_NEXT_CODE_TOOL_SMOKE => "full",
         checkpoints::MODEL_CATALOG_LIVE_ENDPOINT => "catalog",
         _ => "offline",
     }
@@ -2002,7 +2002,7 @@ pub fn format_strict_live_provider_model_coverage_summary(
             let tested = format!(
                 "last tested {} by {}",
                 humanize_time_ago(pair.latest_recorded_at, now),
-                coverage_actor_label(pair.latest_jcode_dirty, &pair.latest_jcode_version),
+                coverage_actor_label(pair.latest_next_code_dirty, &pair.latest_next_code_version),
             );
             let detail = if pair.covered {
                 tested
@@ -2595,7 +2595,7 @@ mod tests {
             checkpoints::TOOL_CALL_PARSE,
             checkpoints::TOOL_EXECUTION_LOOP,
             checkpoints::TOOL_RESULT_FOLLOWUP,
-            checkpoints::REAL_JCODE_TOOL_SMOKE,
+            checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             checkpoints::REASONING_CAPABILITY,
             checkpoints::RESTART_PERSISTENCE,
             checkpoints::NEGATIVE_ERROR_UX,
@@ -2830,7 +2830,7 @@ mod tests {
                     LiveVerificationStageStatus::Skipped,
                 ),
                 (
-                    checkpoints::REAL_JCODE_TOOL_SMOKE,
+                    checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
                     LiveVerificationStageStatus::Skipped,
                 ),
             ]),

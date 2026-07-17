@@ -952,14 +952,14 @@ fn openrouter_transport_state_distinguishes_runtime_identities() {
     next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "next-code");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("next-code")),
-        OpenRouterTransportState::JcodeSubscription
+        OpenRouterTransportState::NextCodeSubscription
     );
     assert!(!OpenRouterTransportState::from_current_env(Some("next-code")).accrues_user_api_key_cost());
 
     next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "next-code");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("next-code")),
-        OpenRouterTransportState::JcodeSubscription
+        OpenRouterTransportState::NextCodeSubscription
     );
     assert!(
         !OpenRouterTransportState::from_current_env(Some("next-code")).accrues_user_api_key_cost()

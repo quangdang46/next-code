@@ -21,7 +21,7 @@ PAGE_SIZE = os.sysconf("SC_PAGE_SIZE")
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Profile resumed next-code PTY burst startup")
-    p.add_argument("--binary", default=(os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or "./target/release/next-code")
+    p.add_argument("--binary", default=((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or "./target/release/next-code")
     p.add_argument("--burst", type=int, default=20)
     p.add_argument("--timeout", type=float, default=15.0)
     p.add_argument("--stagger-ms", type=float, default=0.0)

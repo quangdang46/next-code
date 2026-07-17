@@ -24,7 +24,7 @@ use crate::external_auth::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProviderChoice {
-    Jcode,
+    NextCode,
     Claude,
     AnthropicApi,
     #[deprecated(
@@ -81,7 +81,7 @@ impl ProviderChoice {
     #[allow(deprecated)]
     pub fn as_arg_value(&self) -> &'static str {
         match self {
-            Self::Jcode => "jcode",
+            Self::NextCode => "next-code",
             Self::Claude => "claude",
             Self::AnthropicApi => "anthropic-api",
             Self::ClaudeSubprocess => "claude-subprocess",
@@ -137,7 +137,7 @@ impl ProviderChoice {
         let normalized = s.to_ascii_lowercase().replace('_', "-");
         let s = normalized.as_str();
         Some(match s {
-            "jcode" | "next-code" => Self::Jcode,
+            "next-code" => Self::NextCode,
             "claude" => Self::Claude,
             "anthropic-api" | "claude-api" | "anthropic-key" | "claude-key" => Self::AnthropicApi,
             "claude-subprocess" => Self::Claude,
@@ -213,7 +213,7 @@ impl std::str::FromStr for ProviderChoice {
 #[allow(deprecated)]
 const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescriptor)] = &[
     (
-        ProviderChoice::Jcode,
+        ProviderChoice::NextCode,
         crate::provider_catalog::NEXT_CODE_LOGIN_PROVIDER,
     ),
     (
@@ -1272,7 +1272,7 @@ pub async fn login_and_bootstrap_provider(
             disable_subscription_runtime_mode();
             Arc::new(provider::MultiProvider::new())
         }
-        LoginProviderTarget::Jcode => Arc::new(provider::jcode::JcodeProvider::new()),
+        LoginProviderTarget::NextCode => Arc::new(provider::jcode::NextCodeProvider::new()),
         LoginProviderTarget::Claude | LoginProviderTarget::ClaudeApiKey => {
             disable_subscription_runtime_mode();
             Arc::new(provider::MultiProvider::new())
@@ -1424,9 +1424,9 @@ async fn init_provider_with_options(
     };
 
     let provider: Arc<dyn provider::Provider> = match choice {
-        ProviderChoice::Jcode => {
+        ProviderChoice::NextCode => {
             init_notice("Using Next Code subscription provider (provider locked)");
-            Arc::new(provider::jcode::JcodeProvider::new())
+            Arc::new(provider::jcode::NextCodeProvider::new())
         }
         ProviderChoice::Claude => {
             disable_subscription_runtime_mode();

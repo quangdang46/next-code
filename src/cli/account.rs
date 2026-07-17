@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use crate::subscription_api::{self, AccountApiError};
 
 pub(crate) async fn run_login(no_browser: bool) -> Result<()> {
-    super::login::run_jcode_account_login(no_browser).await
+    super::login::run_next_code_account_login(no_browser).await
 }
 
 pub(crate) async fn run_status(json: bool) -> Result<()> {

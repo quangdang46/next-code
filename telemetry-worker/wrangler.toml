@@ -1,8 +1,8 @@
-name = "jcode-telemetry"
+name = "next-code-telemetry"
 main = "src/worker.js"
 compatibility_date = "2025-01-01"
 
-# Custom domain for the website beacon (jcode-website public/beacon.js posts
+# Custom domain for the website beacon (next-code-website public/beacon.js posts
 # here). Managed as a Workers custom domain, so Cloudflare creates the DNS
 # record and certificate automatically on deploy.
 routes = [
@@ -18,7 +18,7 @@ crons = ["17 4 * * *"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "jcode-telemetry"
+database_name = "next-code-telemetry"
 database_id = "abaa524c-3e90-4ba9-a569-027e78a083c6"
 
 # High-volume firehose: every event is also written to Workers Analytics

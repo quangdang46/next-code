@@ -4,13 +4,13 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
-bin=${NEXT_CODE_AUTH_MATRIX_BIN:-${JCODE_AUTH_MATRIX_BIN:-}}
-out_dir=${NEXT_CODE_AUTH_MATRIX_OUT:-${JCODE_AUTH_MATRIX_OUT:-"$repo_root/target/auth-test-reports"}}
-prompt=${NEXT_CODE_AUTH_MATRIX_PROMPT:-${JCODE_AUTH_MATRIX_PROMPT:-"Reply with exactly AUTH_TEST_OK and nothing else. Do not call tools."}}
-providers=${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-${JCODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}}}
-mode=${NEXT_CODE_AUTH_MATRIX_MODE:-${JCODE_AUTH_MATRIX_MODE:-configured}}
-keep_going=${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-${JCODE_AUTH_MATRIX_KEEP_GOING:-1}}
-per_command_timeout=${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-${JCODE_AUTH_MATRIX_TIMEOUT:-90}}
+bin=${NEXT_CODE_AUTH_MATRIX_BIN:-${NEXT_CODE_AUTH_MATRIX_BIN:-}}
+out_dir=${NEXT_CODE_AUTH_MATRIX_OUT:-${NEXT_CODE_AUTH_MATRIX_OUT:-"$repo_root/target/auth-test-reports"}}
+prompt=${NEXT_CODE_AUTH_MATRIX_PROMPT:-${NEXT_CODE_AUTH_MATRIX_PROMPT:-"Reply with exactly AUTH_TEST_OK and nothing else. Do not call tools."}}
+providers=${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}}}
+mode=${NEXT_CODE_AUTH_MATRIX_MODE:-${NEXT_CODE_AUTH_MATRIX_MODE:-configured}}
+keep_going=${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-1}}
+per_command_timeout=${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-90}}
 
 usage() {
   cat <<'EOF'
@@ -116,13 +116,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${NEXT_CODE_AUTH_MATRIX_LOGIN:-${JCODE_AUTH_MATRIX_LOGIN:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_LOGIN:-${NEXT_CODE_AUTH_MATRIX_LOGIN:-0}}" == "1" ]]; then
   extra_args+=(--login)
 fi
-if [[ "${NEXT_CODE_AUTH_MATRIX_NO_SMOKE:-${JCODE_AUTH_MATRIX_NO_SMOKE:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_NO_SMOKE:-${NEXT_CODE_AUTH_MATRIX_NO_SMOKE:-0}}" == "1" ]]; then
   extra_args+=(--no-smoke)
 fi
-if [[ "${NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE:-${JCODE_AUTH_MATRIX_NO_TOOL_SMOKE:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE:-${NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE:-0}}" == "1" ]]; then
   extra_args+=(--no-tool-smoke)
 fi
 
@@ -133,7 +133,7 @@ fi
 
 mkdir -p "$out_dir"
 
-run_jcode() {
+run_next_code() {
   if [[ -n "$bin" ]]; then
     timeout "$per_command_timeout" "$bin" "$@"
   else
@@ -145,7 +145,7 @@ configured_json="$out_dir/configured-providers.json"
 if [[ "$mode" == "configured" ]]; then
   echo "Discovering configured providers..."
   rm -f "$configured_json"
-  if ! run_jcode auth-test --all-configured --no-smoke --no-tool-smoke --json --output "$configured_json" >/tmp/next-code-auth-matrix-discovery.out 2>/tmp/next-code-auth-matrix-discovery.err; then
+  if ! run_next_code auth-test --all-configured --no-smoke --no-tool-smoke --json --output "$configured_json" >/tmp/next-code-auth-matrix-discovery.out 2>/tmp/next-code-auth-matrix-discovery.err; then
     if [[ -s "$configured_json" ]]; then
       echo "note: configured-provider discovery reported non-ready providers; continuing with per-provider classification" >&2
     else
@@ -184,7 +184,7 @@ for provider in "${selected[@]}"; do
 
   echo "=== auth-test: $provider ==="
   set +e
-  run_jcode "${args[@]}" >"$log" 2>&1
+  run_next_code "${args[@]}" >"$log" 2>&1
   status=$?
   set -e
 

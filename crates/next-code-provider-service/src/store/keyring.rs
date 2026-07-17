@@ -6,14 +6,11 @@
 //! new fields to the struct is backward-compatible (older entries will
 //! deserialize as long as the unknown fields are optional or default).
 //!
-//! Service name: `next-code-provider-service` (canonical).
-//! Legacy dual-read: `jcode-provider-service` — loads fall back and
-//! copy-forward into the new service name; saves write the new name only.
+//! Service name: `next-code-provider-service`.
 //! Account name: the credential id, prefixed with `cred:` for grep-ability
 //! in the keychain CLI
 //! (`security find-generic-password -s next-code-provider-service`).
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -23,7 +20,6 @@ use crate::credential::{Credential, CredentialError, CredentialId, CredentialSer
 use crate::types::ProviderId;
 
 const SERVICE: &str = "next-code-provider-service";
-const LEGACY_SERVICE: &str = "jcode-provider-service";
 const ACCOUNT_PREFIX: &str = "cred:";
 const INDEX_ACCOUNT: &str = "__index__";
 
@@ -52,26 +48,10 @@ impl<K: KeyringStore + 'static> KeyringCredentialStore<K> {
         Self { keyring }
     }
 
-    /// Load a secret, trying the new service name first and falling back to
-    /// the legacy service. On a legacy hit, copy-forward into the new service
-    /// so subsequent reads and the index stay on the canonical name.
-    fn load_dual(&self, account: &str) -> Result<Option<String>, CredentialError> {
-        let new = self
-            .keyring
+    fn load(&self, account: &str) -> Result<Option<String>, CredentialError> {
+        self.keyring
             .load(SERVICE, account)
-            .map_err(|e| CredentialError::Storage(e.to_string()))?;
-        if new.is_some() {
-            return Ok(new);
-        }
-        let legacy = self
-            .keyring
-            .load(LEGACY_SERVICE, account)
-            .map_err(|e| CredentialError::Storage(e.to_string()))?;
-        if let Some(ref value) = legacy {
-            // Best-effort copy-forward; a failure here still returns the value.
-            let _ = self.keyring.save(SERVICE, account, value);
-        }
-        Ok(legacy)
+            .map_err(|e| CredentialError::Storage(e.to_string()))
     }
 
     fn parse_index(raw: Option<String>) -> Result<Vec<CredentialId>, CredentialError> {
@@ -85,62 +65,17 @@ impl<K: KeyringStore + 'static> KeyringCredentialStore<K> {
     fn list_existing_ids(&self) -> Result<Vec<CredentialId>, CredentialError> {
         // We don't have a "list all accounts" primitive on the KeyringStore
         // trait, so the index lives in a single well-known key
-        // (`__index__`) holding a `Vec<String>` of ids. Union the new and
-        // legacy indexes so pre-rebrand credentials remain visible. Legacy
-        // ids are only surfaced when a credential payload still exists, so a
-        // delete that cleared both service names cannot reappear via a stale
-        // legacy index entry.
-        let new_raw = self
+        // (`__index__`) holding a `Vec<String>` of ids.
+        let raw = self
             .keyring
             .load(SERVICE, INDEX_ACCOUNT)
             .map_err(|e| CredentialError::Storage(e.to_string()))?;
-        let legacy_raw = self
-            .keyring
-            .load(LEGACY_SERVICE, INDEX_ACCOUNT)
-            .map_err(|e| CredentialError::Storage(e.to_string()))?;
-
-        let mut ids = Self::parse_index(new_raw)?;
-        let legacy_ids = Self::parse_index(legacy_raw)?;
-        if legacy_ids.is_empty() {
-            return Ok(ids);
-        }
-
-        let mut seen: HashSet<String> = ids.iter().map(|i| i.as_str().to_string()).collect();
-        let mut changed = false;
-        for id in legacy_ids {
-            if seen.contains(id.as_str()) {
-                continue;
-            }
-            let acct = account(&id);
-            let still_present = self
-                .keyring
-                .load(SERVICE, &acct)
-                .ok()
-                .flatten()
-                .is_some()
-                || self
-                    .keyring
-                    .load(LEGACY_SERVICE, &acct)
-                    .ok()
-                    .flatten()
-                    .is_some();
-            if still_present && seen.insert(id.as_str().to_string()) {
-                ids.push(id);
-                changed = true;
-            }
-        }
-        // Copy-forward the unioned index into the new service so later saves
-        // don't need to re-union forever.
-        if changed {
-            let _ = self.write_index(&ids);
-        }
-        Ok(ids)
+        Self::parse_index(raw)
     }
 
     fn write_index(&self, ids: &[CredentialId]) -> Result<(), CredentialError> {
         let raw =
             serde_json::to_string(ids).map_err(|e| CredentialError::Storage(e.to_string()))?;
-        // Writes go to the new service only.
         self.keyring
             .save(SERVICE, INDEX_ACCOUNT, &raw)
             .map_err(|e| CredentialError::Storage(e.to_string()))
@@ -163,7 +98,6 @@ impl<K: KeyringStore + 'static> CredentialService for KeyringCredentialStore<K> 
 
         let raw =
             serde_json::to_string(&cred).map_err(|e| CredentialError::Storage(e.to_string()))?;
-        // Saves write the new service only.
         self.keyring
             .save(SERVICE, &account(&cred.id), &raw)
             .map_err(|e| CredentialError::Storage(e.to_string()))?;
@@ -193,18 +127,16 @@ impl<K: KeyringStore + 'static> CredentialService for KeyringCredentialStore<K> 
 
     async fn get(&self, id: &CredentialId) -> Result<Credential, CredentialError> {
         let raw = self
-            .load_dual(&account(id))?
+            .load(&account(id))?
             .ok_or_else(|| CredentialError::NotFound(id.clone()))?;
         serde_json::from_str(&raw)
             .map_err(|e| CredentialError::Invalid(format!("malformed credential {}: {}", id, e)))
     }
 
     async fn delete(&self, id: &CredentialId) -> Result<(), CredentialError> {
-        // Delete from both services so a legacy-only entry is fully removed.
         self.keyring
             .delete(SERVICE, &account(id))
             .map_err(|e| CredentialError::Storage(e.to_string()))?;
-        let _ = self.keyring.delete(LEGACY_SERVICE, &account(id));
         let mut index = self.list_existing_ids()?;
         index.retain(|i| i != id);
         self.write_index(&index)?;
@@ -313,33 +245,5 @@ mod tests {
         assert_eq!(s.count().await.unwrap(), 0);
         let all = s.list(&"anthropic".into()).await.unwrap();
         assert!(all.is_empty());
-    }
-
-    #[tokio::test]
-    async fn loads_and_copy_forwards_legacy_service() {
-        let keyring = Arc::new(MockKeyringStore::new());
-        let c = cred("anthropic", "legacy", "sk-legacy");
-        let acct = account(&c.id);
-        let raw = serde_json::to_string(&c).unwrap();
-        // Seed only the legacy service + index.
-        keyring
-            .save(LEGACY_SERVICE, &acct, &raw)
-            .expect("seed legacy cred");
-        let index = serde_json::to_string(&vec![&c.id]).unwrap();
-        keyring
-            .save(LEGACY_SERVICE, INDEX_ACCOUNT, &index)
-            .expect("seed legacy index");
-
-        let s = KeyringCredentialStore::new(keyring.clone());
-        let got = s.get(&c.id).await.expect("legacy dual-read");
-        assert_eq!(got.label, "legacy");
-        // Copy-forward: new service should now hold the value.
-        let forwarded = keyring
-            .load(SERVICE, &acct)
-            .expect("load new")
-            .expect("copy-forwarded");
-        assert!(forwarded.contains("sk-legacy"));
-        // Union index surfaces the legacy id.
-        assert_eq!(s.count().await.unwrap(), 1);
     }
 }

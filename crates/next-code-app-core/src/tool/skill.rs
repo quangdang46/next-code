@@ -170,8 +170,8 @@ impl SkillTool {
         let mut output = if skills.is_empty() {
             "No skills loaded.\n\n\
             Skills are loaded from:\n\
-            - ~/.next-code/skills/<skill-name>/SKILL.md (global)\n\
-            - ./.next-code/skills/<skill-name>/SKILL.md (project-local)\n\
+            - ~/.next_code/skills/<skill-name>/SKILL.md (global)\n\
+            - ./.next_code/skills/<skill-name>/SKILL.md (project-local)\n\
             - ./.claude/skills/<skill-name>/SKILL.md (compatibility)\n\n\
             Create a SKILL.md file with YAML frontmatter:\n\
             ---\n\

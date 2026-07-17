@@ -84,8 +84,8 @@ def detect_pi_bin() -> str:
 
 def build_specs() -> dict[str, ToolSpec]:
     next_code_bin = (
-        (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN"))
-        or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN"))
+        ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")))
+        or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")))
         or shutil.which("next-code")
         or shutil.which("next-code")
         or next(
@@ -392,14 +392,14 @@ def run_tool(spec: ToolSpec, sessions: int, cwd: Path, timeout_s: float, settle_
             ):
                 real_auth = Path.home() / ".next-code" / auth_name
                 if not real_auth.exists():
-                    real_auth = Path.home() / ".jcode" / auth_name  # dual-read
+                    real_auth = Path.home() / ".next-code" / auth_name  # dual-read
                 bench_auth = Path(env.get("NEXT_CODE_HOME") or env["NEXT_CODE_HOME"]) / auth_name
                 if real_auth.exists() and not bench_auth.exists():
                     bench_auth.symlink_to(real_auth)
             if spec.name == "next_code_memory_on":
                 real_models = Path.home() / ".next-code" / "models"
                 if not real_models.exists():
-                    real_models = Path.home() / ".jcode" / "models"  # dual-read
+                    real_models = Path.home() / ".next-code" / "models"  # dual-read
                 bench_models = Path(env.get("NEXT_CODE_HOME") or env["NEXT_CODE_HOME"]) / "models"
                 if real_models.exists() and not bench_models.exists():
                     bench_models.symlink_to(real_models)

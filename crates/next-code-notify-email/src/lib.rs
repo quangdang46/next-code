@@ -316,7 +316,7 @@ pub fn build_permission_email_html(
   <div class="timestamp">Sent at {timestamp}</div>
 </div>
 <div class="footer">
-  Sent by jcode ambient mode
+  Sent by next-code ambient mode
 </div>
 </body>
 </html>"#
@@ -409,7 +409,7 @@ fn markdown_to_html_email(markdown: &str) -> String {
 {html_content}
 </div>
 <div class="footer">
-  Sent by jcode ambient mode
+  Sent by next-code ambient mode
 </div>
 </body>
 </html>"#

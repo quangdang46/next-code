@@ -12,7 +12,7 @@ use std::sync::OnceLock;
 use crate::team::spec::{TeamError, TeamResult};
 
 /// tmux session name prefix for team-owned sessions.
-pub const TEAM_SESSION_PREFIX: &str = "jcode-team-";
+pub const TEAM_SESSION_PREFIX: &str = "next-code-team-";
 
 /// `canVisualize()` — only attempt layout work inside a tmux client.
 pub fn can_visualize() -> bool {
@@ -52,7 +52,7 @@ fn run_tmux(args: &[&str]) -> TeamResult<String> {
 /// A member to place in the layout.
 pub struct LayoutMember<'a> {
     pub name: &'a str,
-    /// Command sent into the pane (e.g. `jcode attach --team ... --member ...`).
+    /// Command sent into the pane (e.g. `next-code attach --team ... --member ...`).
     pub attach_cmd: &'a str,
     pub cwd: &'a str,
 }
@@ -203,14 +203,14 @@ fn team_session_regex() -> &'static regex::Regex {
     })
 }
 
-/// Pure helper: extract the run id from a `jcode-team-{uuid}` session name.
+/// Pure helper: extract the run id from a `next-code-team-{uuid}` session name.
 pub fn parse_team_run_id(session_name: &str) -> Option<String> {
     team_session_regex()
         .captures(session_name)
         .map(|c| c[1].to_string())
 }
 
-/// Kill `jcode-team-{uuid}` tmux sessions whose run id is not in `active_run_ids`
+/// Kill `next-code-team-{uuid}` tmux sessions whose run id is not in `active_run_ids`
 /// (port of `sweep-stale-team-sessions.ts`).
 pub fn sweep_stale_team_sessions(active_run_ids: &HashSet<String>) -> TeamResult<Vec<String>> {
     if !can_visualize() {
@@ -248,11 +248,11 @@ mod tests {
     fn parse_team_run_id_matches_only_team_sessions() {
         let uuid = "11111111-2222-4333-8444-555555555555";
         assert_eq!(
-            parse_team_run_id(&format!("jcode-team-{uuid}")).as_deref(),
+            parse_team_run_id(&format!("next-code-team-{uuid}")).as_deref(),
             Some(uuid)
         );
-        assert!(parse_team_run_id("jcode-team-not-a-uuid").is_none());
+        assert!(parse_team_run_id("next-code-team-not-a-uuid").is_none());
         assert!(parse_team_run_id("some-other-session").is_none());
-        assert!(parse_team_run_id(&format!("prefix-jcode-team-{uuid}")).is_none());
+        assert!(parse_team_run_id(&format!("prefix-next-code-team-{uuid}")).is_none());
     }
 }

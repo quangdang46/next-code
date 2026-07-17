@@ -54,7 +54,7 @@ fn to_markdown_latex_mode(
     }
 }
 
-pub fn install_jcode_markdown_hooks() {
+pub fn install_next_code_markdown_hooks() {
     next_code_tui_markdown::set_latex_log_hook(|error| {
         crate::logging::warn(&format!(
             "LaTeX image rendering fell back to Unicode: {error}"

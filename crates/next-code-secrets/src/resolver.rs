@@ -1,10 +1,10 @@
-//! Bridge between [`SecretsManager`] and the `jcode-provider-env` fallback
+//! Bridge between [`SecretsManager`] and the `next-code-provider-env` fallback
 //! resolver registry.
 //!
-//! `jcode-provider-env` exposes `register_api_key_fallback_resolver(fn(&str) ->
+//! `next-code-provider-env` exposes `register_api_key_fallback_resolver(fn(&str) ->
 //! Option<String>)`. Because that registry stores bare function pointers (no
 //! captured state), the resolver here reads from a process-global
-//! [`SecretsManager`] singleton initialised lazily from the jcode home dir.
+//! [`SecretsManager`] singleton initialised lazily from the next-code home dir.
 //!
 //! Lookup order for a given env-var name (e.g. `ANTHROPIC_API_KEY`):
 //! 1. Environment scope derived from the current working directory.
@@ -18,20 +18,20 @@ use std::path::Path;
 
 use crate::{SecretName, SecretScope, SecretsBackendKind, SecretsManager};
 
-/// Build a [`SecretsManager`] for the current jcode home directory.
+/// Build a [`SecretsManager`] for the current next-code home directory.
 ///
 /// Construction is I/O-free — the backend only touches the filesystem and OS
 /// keychain on `get`/`set` — so the manager is built fresh per call rather than
 /// cached. This avoids a transient failure to resolve the home directory being
 /// cached for the rest of the process and silently disabling secret resolution.
 ///
-/// Returns `None` when the jcode home directory cannot be resolved.
+/// Returns `None` when the next-code home directory cannot be resolved.
 pub fn current_manager() -> Option<SecretsManager> {
     let next_code_home = next_code_storage::next_code_dir().ok()?;
     SecretsManager::new(next_code_home, SecretsBackendKind::Local).ok()
 }
 
-/// Fallback resolver for `jcode-provider-env`.
+/// Fallback resolver for `next-code-provider-env`.
 ///
 /// Matches the `fn(&str) -> Option<String>` signature expected by
 /// `next_code_provider_env::register_api_key_fallback_resolver`.

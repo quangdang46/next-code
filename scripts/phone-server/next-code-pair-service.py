@@ -2,7 +2,7 @@
 """Token-protected HTTP service that generates next-code pairing codes.
 
 GET /pair-code?t=<token> -> {"code": "123456", "host": "100.109.78.41", "port": 7643, "uri": "nextcode://pair?..."}
-# dual-accept: iOS also handles jcode://
+# dual-accept: iOS also handles nextcode://
 """
 import http.server, json, re, subprocess, os
 from urllib.parse import urlparse, parse_qs
@@ -42,7 +42,7 @@ class H(http.server.BaseHTTPRequestHandler):
         env["NEXT_CODE_GATEWAY_HOST"] = HOST
         env["NEXT_CODE_GATEWAY_HOST"] = HOST  # dual-read one release
         try:
-            # Prefer next-code; fall back to jcode binary alias for one release.
+            # Prefer next-code; fall back to next-code binary alias for one release.
             out = subprocess.run(
                 [
                     "sudo",
@@ -51,7 +51,7 @@ class H(http.server.BaseHTTPRequestHandler):
                     "-i",
                     "bash",
                     "-lc",
-                    "command -v next-code >/dev/null && exec next-code pair || exec jcode pair",
+                    "command -v next-code >/dev/null && exec next-code pair || exec next-code pair",
                 ],
                 capture_output=True,
                 text=True,
@@ -63,7 +63,7 @@ class H(http.server.BaseHTTPRequestHandler):
             if not m:
                 return self._send(500, {"error": "no code in output", "detail": text[-500:]})
             code = m.group(1) + m.group(2)
-            uri = f"nextcode://pair?host={HOST}&port={PORT}&code={code}"  # prefer nextcode://; iOS still accepts jcode://
+            uri = f"nextcode://pair?host={HOST}&port={PORT}&code={code}"  # prefer nextcode://; iOS still accepts nextcode://
             return self._send(
                 200, {"code": code, "host": HOST, "port": PORT, "uri": uri, "expires_in": 300}
             )

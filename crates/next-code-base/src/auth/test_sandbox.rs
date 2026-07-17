@@ -27,7 +27,7 @@ impl AuthTestSandbox {
             crate::env::remove_var(key);
         }
 
-        std::fs::create_dir_all(temp.path().join("config").join("jcode"))?;
+        std::fs::create_dir_all(temp.path().join("config").join("next-code"))?;
         std::fs::create_dir_all(temp.path().join("external"))?;
         crate::env::set_var("NEXT_CODE_HOME", temp.path());
         crate::provider_catalog::force_apply_openai_compatible_profile_env(None);
@@ -45,7 +45,7 @@ impl AuthTestSandbox {
     }
 
     pub fn config_dir(&self) -> PathBuf {
-        self.root().join("config").join("jcode")
+        self.root().join("config").join("next-code")
     }
 
     pub fn external_dir(&self) -> PathBuf {
@@ -160,7 +160,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sandbox_isolates_jcode_home_and_config_dir() {
+    fn sandbox_isolates_next_code_home_and_config_dir() {
         let sandbox = AuthTestSandbox::new().expect("sandbox");
 
         assert_eq!(

@@ -42,7 +42,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 IOS = HERE.parent
-BUNDLE = "com.jcode.mobile"
+BUNDLE = "@@COM_NEXT_CODE_MOBILE@@"
 APP = IOS / ".build-ios/Build/Products/Debug-iphonesimulator/NextCodeMobile.app"
 PORT = 7643
 TOKEN = "mocktoken0123456789abcdef"

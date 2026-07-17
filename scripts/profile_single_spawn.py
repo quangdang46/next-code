@@ -16,7 +16,7 @@ from pathlib import Path
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Profile a single resumed next-code spawn")
-    parser.add_argument("--binary", default=(os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or "./target/selfdev/next-code")
+    parser.add_argument("--binary", default=((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or "./target/selfdev/next-code")
     parser.add_argument("--timeout", type=float, default=20.0)
     parser.add_argument("--cwd", default=os.getcwd())
     parser.add_argument("--json", action="store_true", help="Emit JSON summary")

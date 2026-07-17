@@ -161,10 +161,10 @@ def run_claude_cli(prompt: str, workdir: str, model: str = "opus") -> RunResult:
         )
 
 
-def run_jcode(prompt: str, workdir: str, next_code_binary: str, model: str = "claude-opus-4-5-20251101") -> RunResult:
+def run_next_code(prompt: str, workdir: str, next_code_binary: str, model: str = "claude-opus-4-5-20251101") -> RunResult:
     """Run next-code and capture token usage from trace output."""
     try:
-        # Create a temporary JCODE_HOME to avoid polluting user's sessions
+        # Create a temporary NEXT_CODE_HOME to avoid polluting user's sessions
         with tempfile.TemporaryDirectory() as tmpdir:
             env = os.environ.copy()
             env["NEXT_CODE_HOME"] = tmpdir
@@ -355,7 +355,7 @@ def run_test_suite(verbose: bool = False, runs: int = 1) -> list:
                 time.sleep(1)
 
                 print("  Running next-code...", end=" ", flush=True)
-                next_code_result = run_jcode(prompt, workdir, next_code_binary)
+                next_code_result = run_next_code(prompt, workdir, next_code_binary)
                 if next_code_result.success:
                     print(f"OK ({next_code_result.usage.total} tokens)")
                 else:

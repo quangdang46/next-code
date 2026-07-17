@@ -144,13 +144,13 @@ fn parse_account_command(trimmed: &str) -> Option<Result<AccountCommand, String>
                 provider_id: provider.id.to_string(),
             },
             "status" if provider.id == "next-code" || provider.id == "next-code" => {
-                AccountCommand::JcodeStatus
+                AccountCommand::NextCodeStatus
             }
             "manage" if provider.id == "next-code" || provider.id == "next-code" => {
-                AccountCommand::JcodeManage
+                AccountCommand::NextCodeManage
             }
             "logout" if provider.id == "next-code" || provider.id == "next-code" => {
-                AccountCommand::JcodeLogout
+                AccountCommand::NextCodeLogout
             }
             "add" => AccountCommand::Add {
                 provider_id: provider.id.to_string(),
@@ -331,9 +331,9 @@ pub(crate) fn execute_account_command_local(app: &mut App, command: AccountComma
                 ))),
             }
         }
-        AccountCommand::JcodeStatus => app.show_jcode_subscription_status(),
-        AccountCommand::JcodeManage => app.open_jcode_account_management(),
-        AccountCommand::JcodeLogout => app.start_jcode_account_logout(),
+        AccountCommand::NextCodeStatus => app.show_next_code_subscription_status(),
+        AccountCommand::NextCodeManage => app.open_next_code_account_management(),
+        AccountCommand::NextCodeLogout => app.start_next_code_account_logout(),
         AccountCommand::Add { provider_id, label } => {
             execute_account_add_local(app, &provider_id, label.as_deref())
         }
@@ -1112,19 +1112,19 @@ mod tests {
         ));
         assert!(matches!(
             parse_account_command("/account next-code status"),
-            Some(Ok(AccountCommand::JcodeStatus))
+            Some(Ok(AccountCommand::NextCodeStatus))
         ));
         assert!(matches!(
             parse_account_command("/account next-code status"),
-            Some(Ok(AccountCommand::JcodeStatus))
+            Some(Ok(AccountCommand::NextCodeStatus))
         ));
         assert!(matches!(
             parse_account_command("/account next-code manage"),
-            Some(Ok(AccountCommand::JcodeManage))
+            Some(Ok(AccountCommand::NextCodeManage))
         ));
         assert!(matches!(
             parse_account_command("/account next-code logout"),
-            Some(Ok(AccountCommand::JcodeLogout))
+            Some(Ok(AccountCommand::NextCodeLogout))
         ));
     }
 

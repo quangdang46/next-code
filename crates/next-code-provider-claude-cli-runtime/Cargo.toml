@@ -2,7 +2,7 @@
 name = "next-code-provider-claude-cli-runtime"
 version = "0.1.0"
 edition = "2024"
-description = "Deprecated Claude CLI provider runtime (subprocess transport) for jcode, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+description = "Deprecated Claude CLI provider runtime (subprocess transport) for next-code, kept downstream of next-code-base so provider edits do not rebuild the app spine"
 
 [lib]
 name = "next_code_provider_claude_cli_runtime"

@@ -49,7 +49,7 @@
 //! than a PNG-cache hit (also enforced by the counter assertions).
 //!
 //! `#[ignore]`-d: run explicitly, twice for fresh nonces, and once with the
-//! legacy SVG-retarget backend (`NEXT_CODE_MMDR_SIZE_API_DISABLE=1 (legacy JCODE_MMDR_SIZE_API_DISABLE=1)` is a
+//! legacy SVG-retarget backend (`NEXT_CODE_MMDR_SIZE_API_DISABLE=1 (legacy NEXT_CODE_MMDR_SIZE_API_DISABLE=1)` is a
 //! compile-time toggle consumed by build.rs, so it triggers a rebuild):
 //!   cargo test -p next-code-tui-mermaid --test layout_cache_cross_width_parity -- --ignored --nocapture
 //!   NEXT_CODE_MMDR_SIZE_API_DISABLE=1 cargo test -p next-code-tui-mermaid --test layout_cache_cross_width_parity -- --ignored --nocapture

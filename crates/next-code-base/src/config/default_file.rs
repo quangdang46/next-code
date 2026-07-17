@@ -11,7 +11,7 @@ impl Config {
         }
 
         let default_content = r#"# next-code configuration file
-# Location: ~/.next-code/config.toml
+# Location: ~/.next_code/config.toml
 #
 # Environment variables override these settings.
 # Run `/config` in next-code to see current settings.
@@ -98,7 +98,7 @@ session_picker_enter = "current-terminal"
 # command = "~/.local/bin/my-whisper-script --grammar-target code"
 command = ""
 
-# How to apply the transcript inside next-code: insert|append|replace|send
+# How to apply the transcript inside next_code: insert|append|replace|send
 mode = "send"
 
 # Optional in-app hotkey to trigger dictation. Set to "off" to disable.
@@ -268,7 +268,7 @@ allow_fuzzy = false
 [acp]
 # Agent Client Protocol adapter compatibility profile: standard, extended, or full.
 # standard emits only spec-compatible ACP messages.
-# extended/full additionally emit ignorable _jcode/* extension notifications.
+# extended/full additionally emit ignorable _next_code/* extension notifications.
 profile = "standard"
 # Tool profile requested when `next-code acp` starts the daemon itself.
 # Existing daemons keep their current server-wide tool config.
@@ -280,7 +280,7 @@ tool_profile = "acp"
 # default_model = "claude-fable-5"
 # Default provider (optional: claude|anthropic-api|openai|openai-api|copilot|openrouter|...)
 # When set, this provider is preferred on startup if available.
-#   claude        = Claude via OAuth/subscription (token in ~/.next-code/auth.json)
+#   claude        = Claude via OAuth/subscription (token in ~/.next_code/auth.json)
 #   anthropic-api = Claude via direct Anthropic API key (ANTHROPIC_API_KEY env
 #                   or ~/.config/next-code/anthropic.env). API-key mode does NOT fall
 #                   back to OAuth; configure the key first.
@@ -436,7 +436,7 @@ swarm_spawn_mode = "visible"
 # macOS only: terminal that the Cmd+; launch hotkey and in-app session spawns
 # open next-code into. One of: ghostty, iterm2, wezterm, warp, alacritty, vscode,
 # terminal (Apple Terminal). Preferred over the legacy
-# ~/.next-code/preferred_terminal.json file. After changing this, re-run
+# ~/.next_code/preferred_terminal.json file. After changing this, re-run
 # `next-code setup-hotkey` so the generated launcher script (Cmd+;) picks it up.
 # preferred = "ghostty"
 

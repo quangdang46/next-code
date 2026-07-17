@@ -7,7 +7,7 @@ fn harden_secret_file_permissions_sets_owner_only_modes() {
     use std::os::unix::fs::PermissionsExt;
 
     let dir = tempfile::TempDir::new().expect("create temp dir");
-    let secret_dir = dir.path().join("jcode");
+    let secret_dir = dir.path().join("next-code");
     std::fs::create_dir_all(&secret_dir).expect("create secret dir");
 
     let secret_file = secret_dir.join("openrouter.env");
@@ -81,7 +81,7 @@ fn app_config_dir_uses_next_code_home_when_set() {
     crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let resolved = app_config_dir().expect("resolve app config dir");
-    assert_eq!(resolved, temp.path().join("config").join("jcode"));
+    assert_eq!(resolved, temp.path().join("config").join("next-code"));
 
     if let Some(prev_home) = prev_home {
         crate::env::set_var("NEXT_CODE_HOME", prev_home);

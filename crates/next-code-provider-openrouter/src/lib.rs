@@ -345,7 +345,7 @@ fn configured_cache_namespace() -> String {
     sanitize_cache_namespace(&raw)
 }
 
-/// Product-home relative cache file: prefer `.next-code`, dual-read `.jcode`.
+/// Product-home relative cache file under `.next-code`.
 /// When neither exists, returns the canonical `.next-code` path so writers
 /// land on the new name.
 fn product_cache_file(file_name: &str) -> PathBuf {
@@ -358,7 +358,7 @@ fn product_cache_file(file_name: &str) -> PathBuf {
     if primary.exists() {
         return primary;
     }
-    let legacy = home.join(".jcode").join("cache").join(file_name);
+    let legacy = home.join(".next-code").join("cache").join(file_name);
     if legacy.exists() {
         return legacy;
     }

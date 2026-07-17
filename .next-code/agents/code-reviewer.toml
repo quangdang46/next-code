@@ -6,7 +6,7 @@
 #
 # Why `prefer_tier = "thinking"`:
 #   Review work benefits from reasoning. A pay-per-token user with
-#   `JCODE_ROUTING_THINKING=<premium-model>` gets the right model
+#   `NEXT_CODE_ROUTING_THINKING=<premium-model>` gets the right model
 #   for the right job; subscription users inherit the session model.
 #
 # Why `inherit_parent_system_prompt = true`:
@@ -21,7 +21,7 @@
 
 id = "code-reviewer"
 display_name = "Code Reviewer"
-publisher = "jcode"
+publisher = "next-code"
 version = "0.1.0"
 color = "purple"
 

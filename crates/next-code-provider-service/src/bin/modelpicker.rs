@@ -1,5 +1,5 @@
 //! `modelpicker` — an interactive TUI picker for the provider/model
-//! catalog. Implements Phase 5 of `docs/plans/JCODE_PROVIDER.md` (historical plan name).
+//! catalog. Implements Phase 5 of `docs/plans/NEXT_CODE_PROVIDER.md` (historical plan name).
 //!
 //! This is a *stand-alone* TUI built on top of the cross-platform
 //! `crossterm` crate so it doesn't depend on the (currently broken)

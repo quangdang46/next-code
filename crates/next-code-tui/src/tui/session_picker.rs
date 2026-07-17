@@ -860,7 +860,7 @@ impl SessionPicker {
         external_path: Option<String>,
     ) -> Option<Vec<PreviewMessage>> {
         match resume_target {
-            ResumeTarget::JcodeSession { session_id } => {
+            ResumeTarget::NextCodeSession { session_id } => {
                 let Ok(session) = Session::load(&session_id) else {
                     return None;
                 };

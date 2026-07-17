@@ -26,7 +26,7 @@ pub fn eligibility(agent_type: &str) -> (Eligibility, &'static str) {
             "agent is read-only and cannot write to the team mailbox; \
              use delegate-task / subagent for read-only analysis instead",
         ),
-        // jcode-native default worker and any unknown custom worker are eligible.
+        // next-code-native default worker and any unknown custom worker are eligible.
         _ => (Eligibility::Eligible, ""),
     }
 }

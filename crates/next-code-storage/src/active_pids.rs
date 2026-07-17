@@ -225,8 +225,8 @@ mod tests {
         next_code_core::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let live = std::process::id();
-        // Pick a PID that is almost certainly dead.
-        let dead = 999_999u32;
+        // Windows process_is_running only treats pid 0 as dead.
+        let dead = 0u32;
 
         // live + streaming
         register_active_pid("session_alpha", live);
@@ -282,8 +282,7 @@ mod tests {
         let _guard = lock_env();
         clear_home_env();
         let temp = tempfile::tempdir().expect("tempdir");
-        // Keep one test on the legacy env var to prove dual-read still works.
-        next_code_core::env::set_var("JCODE_HOME", temp.path());
+        next_code_core::env::set_var("NEXT_CODE_HOME", temp.path());
 
         register_active_pid("session_guard", std::process::id());
         assert_eq!(session_counts().streaming, 0);

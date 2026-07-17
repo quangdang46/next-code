@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Live benchmark for proactive sponsored Discovery triggering.
 
-The runner starts an isolated Jcode server marked with
-JCODE_DISCOVERY_BENCHMARK=1, verifies that every live catalog listing has a
+The runner starts an isolated NextCode server marked with
+NEXT_CODE_DISCOVERY_BENCHMARK=1, verifies that every live catalog listing has a
 natural-language benchmark case, then retries each case until the model calls
 ``discover_tools`` and receives the expected tool in a browse listing.
 
@@ -91,7 +91,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--timeout", type=float, default=90.0, help="Seconds allowed per model attempt.")
     parser.add_argument("--catalog-retries", type=int, default=4)
     parser.add_argument("--retry-delay", type=float, default=0.5)
-    parser.add_argument("--next-code", "--next-code", dest="next-code", default=(os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or "next-code")
+    parser.add_argument("--next-code", "--next-code", dest="next-code", default=((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or "next-code")
     parser.add_argument("--model", default=os.environ.get("NEXT_CODE_DISCOVERY_BENCHMARK_MODEL", "gpt-5.6-sol"))
     parser.add_argument("--provider", default=os.environ.get("NEXT_CODE_DISCOVERY_BENCHMARK_PROVIDER"))
     parser.add_argument(
@@ -280,7 +280,7 @@ def run_debug_command(
     return result.stdout.strip()
 
 
-def fetch_catalog_via_jcode(
+def fetch_catalog_via_next_code(
     args: argparse.Namespace,
     socket_path: Path,
     workdir: Path,
@@ -439,7 +439,7 @@ def run_attempt(args: argparse.Namespace, case: BenchmarkCase, attempt: int, soc
 
 def progress(current: int, total: int, unit: str, message: str) -> None:
     print(
-        "JCODE_PROGRESS "
+        "NEXT_CODE_PROGRESS "
         + json.dumps(
             {
                 "current": current,
@@ -631,7 +631,7 @@ def main() -> int:
                 catalog = (
                     load_catalog_file(args.catalog_file, categories)
                     if args.catalog_file
-                    else fetch_catalog_via_jcode(args, socket_path, workdir, categories)
+                    else fetch_catalog_via_next_code(args, socket_path, workdir, categories)
                 )
                 coverage = validate_catalog_coverage(all_cases, catalog)
                 mismatch = bool(coverage["missing_cases"] or coverage["stale_cases"])

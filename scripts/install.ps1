@@ -59,7 +59,7 @@ if (-not $InstallDir) {
 $NextCodeHome = if ($env:NEXT_CODE_HOME) {
     $env:NEXT_CODE_HOME
 } elseif ($env:NEXT_CODE_HOME) {
-    # Legacy dual-read: JCODE_HOME still works during the rebrand window.
+    # Legacy dual-read: NEXT_CODE_HOME still works during the rebrand window.
     $env:NEXT_CODE_HOME
 } elseif ($env:USERPROFILE) {
     Join-Path $env:USERPROFILE ".next-code"

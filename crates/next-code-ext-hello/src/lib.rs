@@ -1,12 +1,12 @@
-/// Example workspace-crate plugin for jcode.
+/// Example workspace-crate plugin for next-code.
 /// Demonstrates how a crate inside the workspace can act as a plugin
-/// by referencing jcode-plugin-core types.
+/// by referencing next-code-plugin-core types.
 
 use next_code_plugin_core::{PluginManager, PluginSource};
 
 /// Returns a greeting manifest intended for registration.
 pub fn manifest() -> &'static str {
-    "jcode-ext-hello 0.1.0 — example workspace-crate plugin"
+    "next-code-ext-hello 0.1.0 — example workspace-crate plugin"
 }
 
 /// Placeholder showing that PluginManager/PluginSource can be
@@ -14,7 +14,7 @@ pub fn manifest() -> &'static str {
 #[allow(dead_code)]
 fn example_usage() {
     let _src = PluginSource::WorkspaceCrate {
-        crate_name: "jcode-ext-hello".into(),
+        crate_name: "next-code-ext-hello".into(),
     };
     let _mgr: Option<PluginManager> = None;
 }

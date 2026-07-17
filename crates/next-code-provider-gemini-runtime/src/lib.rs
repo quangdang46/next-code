@@ -1,5 +1,5 @@
 //! Gemini provider runtime (Google Code Assist OAuth + official Developer API
-//! key), moved out of `jcode-base` so provider edits compile only this crate
+//! key), moved out of `next-code-base` so provider edits compile only this crate
 //! plus a binary relink instead of rebuilding the base -> app-core -> tui
 //! spine. The binary's composition root registers [`GeminiProvider`] with
 //! `next_code_base::provider::external` at startup.
@@ -136,7 +136,7 @@ impl GeminiProvider {
     /// An official Gemini Developer API key takes precedence over OAuth Code
     /// Assist credentials: it points at `generativelanguage.googleapis.com` with
     /// the key's own (often higher) quota, while OAuth uses the free
-    /// cloudcode-pa tier. Set `JCODE_GEMINI_FORCE_OAUTH=1` to pin OAuth even when
+    /// cloudcode-pa tier. Set `NEXT_CODE_GEMINI_FORCE_OAUTH=1` to pin OAuth even when
     /// a key is present.
     fn auth_mode() -> GeminiAuthMode {
         let force_oauth = product_env("GEMINI_FORCE_OAUTH")

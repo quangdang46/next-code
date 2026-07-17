@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Benchmark and optionally regression-check next-code startup time.
 
-This script runs isolated startup measurements under a temporary JCODE_HOME and
-JCODE_RUNTIME_DIR so it does not interfere with the user's real server, logs, or
+This script runs isolated startup measurements under a temporary NEXT_CODE_HOME and
+NEXT_CODE_RUNTIME_DIR so it does not interfere with the user's real server, logs, or
 credentials.
 
 Cold client startup is measured by launching the normal default client path in a
@@ -49,7 +49,7 @@ class Budget:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("binary", nargs="?", default=(os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or "./target/release/next-code")
+    parser.add_argument("binary", nargs="?", default=((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or "./target/release/next-code")
     parser.add_argument("--runs", type=int, default=5, help="number of startup runs")
     parser.add_argument(
         "--check",

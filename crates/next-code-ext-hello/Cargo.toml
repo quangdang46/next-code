@@ -2,7 +2,7 @@
 name = "next-code-ext-hello"
 version = "0.1.0"
 edition = "2024"
-description = "Example Rust workspace-crate plugin for jcode"
+description = "Example Rust workspace-crate plugin for next-code"
 
 [dependencies]
 next-code-plugin-core = { path = "../next-code-plugin-core" }

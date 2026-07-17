@@ -7,13 +7,13 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 
-sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-${JCODE_ONBOARDING_SANDBOX:-default}}
+sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-${NEXT_CODE_ONBOARDING_SANDBOX:-default}}
 sandbox_root_default="$repo_root/.tmp/onboarding/$sandbox_name"
-sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-${JCODE_ONBOARDING_DIR:-$sandbox_root_default}}
+sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-${NEXT_CODE_ONBOARDING_DIR:-$sandbox_root_default}}
 next_code_home="$sandbox_root/home"
 runtime_dir="$sandbox_root/runtime"
 fixture_root_default="$repo_root/.tmp/auth-fixtures"
-fixture_root=${NEXT_CODE_AUTH_FIXTURE_DIR:-${JCODE_AUTH_FIXTURE_DIR:-$fixture_root_default}}
+fixture_root=${NEXT_CODE_AUTH_FIXTURE_DIR:-${NEXT_CODE_AUTH_FIXTURE_DIR:-$fixture_root_default}}
 
 usage() {
   cat <<EOF
@@ -31,9 +31,9 @@ Commands:
   help                         Show this help
 
 Environment overrides:
-  JCODE_ONBOARDING_SANDBOX     Sandbox name to load into/from (default: default)
-  JCODE_ONBOARDING_DIR         Explicit onboarding sandbox directory
-  JCODE_AUTH_FIXTURE_DIR       Fixture store (default: .tmp/auth-fixtures)
+  NEXT_CODE_ONBOARDING_SANDBOX     Sandbox name to load into/from (default: default)
+  NEXT_CODE_ONBOARDING_DIR         Explicit onboarding sandbox directory
+  NEXT_CODE_AUTH_FIXTURE_DIR       Fixture store (default: .tmp/auth-fixtures)
 
 Notes:
   Fixtures are local developer state under .tmp by default. They may contain real
@@ -86,14 +86,14 @@ copy_dir_contents() {
   fi
 }
 
-run_jcode() {
+run_next_code() {
   local binary_path="$repo_root/target/debug/next-code"
   (
     cd "$repo_root"
     if [[ -x "$binary_path" ]]; then
-      env NEXT_CODE_HOME="$next_code_home" JCODE_HOME="$next_code_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" "$binary_path" "$@"
+      env NEXT_CODE_HOME="$next_code_home" NEXT_CODE_HOME="$next_code_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" NEXT_CODE_RUNTIME_DIR="$runtime_dir" "$binary_path" "$@"
     else
-      env NEXT_CODE_HOME="$next_code_home" JCODE_HOME="$next_code_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" cargo run --bin next-code -- "$@"
+      env NEXT_CODE_HOME="$next_code_home" NEXT_CODE_HOME="$next_code_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" NEXT_CODE_RUNTIME_DIR="$runtime_dir" cargo run --bin next-code -- "$@"
     fi
   )
 }
@@ -123,7 +123,7 @@ save_fixture() {
 name=$name
 saved_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 sandbox_name=$sandbox_name
-source_jcode_home=$next_code_home
+source_next_code_home=$next_code_home
 warning=May contain real local auth tokens. Do not commit or share.
 EOF
   echo "Saved auth fixture '$name' from $next_code_home"
@@ -202,7 +202,7 @@ EOF
       shift
     fi
     load_fixture "$name" >/dev/null
-    run_jcode "$@"
+    run_next_code "$@"
     ;;
   help|-h|--help)
     usage

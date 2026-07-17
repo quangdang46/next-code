@@ -35,7 +35,7 @@
 //! }
 //! ```
 //!
-//! Set `NEXT_CODE_FIXTURE_FILTER=read_` (or legacy `JCODE_FIXTURE_FILTER`) to run only fixtures whose name
+//! Set `NEXT_CODE_FIXTURE_FILTER=read_` (or legacy `NEXT_CODE_FIXTURE_FILTER`) to run only fixtures whose name
 //! contains the substring. Useful while iterating.
 //!
 //! ### Out of scope (#20 follow-ups)

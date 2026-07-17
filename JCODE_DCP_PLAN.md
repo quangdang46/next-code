@@ -16,7 +16,7 @@ Agent::messages_for_provider()
        ├─ [DCP Plugin Layer] ← NEW
        │    ├─ jcode_to_dcp() convert messages
        │    ├─ pruner.transform_messages_with_diff()
-       │    ├─ dcp_to_jcode() convert back
+       │    ├─ dcp_to_next_code() convert back
        │    └─ Return TransformResult { messages, tokens_saved, removed_ids }
        │
        ├─ [CompactionManager] ← EXISTING (unchanged)
@@ -161,7 +161,7 @@ impl DcpPlugin {
             .map_err(|e| format!("DCP transform error: {e:?}"))?;
 
         // 3. Convert DCP → jcode
-        let jcode_messages = dcp_bridge::dcp_to_jcode(result.messages);
+        let jcode_messages = dcp_bridge::dcp_to_next_code(result.messages);
 
         Ok(DcpTransformOutput {
             messages: jcode_messages,

@@ -7,7 +7,7 @@
 //!
 //! Configuration is loaded from three layers (lowest to highest priority):
 //!   1. `~/.next-code/hooks.toml`          (user-level)
-//!   2. `.next-code/hooks.toml` (project-level; dual-read: `.jcode/hooks.toml`)
+//!   2. `.next-code/hooks.toml` (project-level; dual-read: `.next-code/hooks.toml`)
 //!   3. `$NEXT_CODE_HOOKS_CONFIG`          (env-level, path to TOML file)
 //!
 //! Settings from higher-priority layers override lower ones; event handlers
@@ -687,18 +687,18 @@ impl HooksConfig {
 // ---------------------------------------------------------------------------
 
 /// Load hooks configuration from the 3-layer TOML hierarchy, respecting the
-/// `DISABLE_NEXT_CODE_HOOKS` kill-switch (dual-read: `DISABLE_JCODE_HOOKS`).
+/// `DISABLE_NEXT_CODE_HOOKS` kill-switch (dual-read: `DISABLE_NEXT_CODE_HOOKS`).
 ///
 /// Layers (lowest to highest priority):
 ///   1. `~/.next-code/hooks.toml`
-///   2. `<cwd>/.next-code/hooks.toml` (dual-read: `.jcode/hooks.toml`)
+///   2. `<cwd>/.next-code/hooks.toml` (dual-read: `.next-code/hooks.toml`)
 ///   3. Path in `$NEXT_CODE_HOOKS_CONFIG`
 ///
 /// Returns a default (empty) config when the kill-switch env var is set or
 /// when no config files are found.
 pub fn load_hooks_config() -> HooksConfig {
-    // Kill-switch: honour DISABLE_NEXT_CODE_HOOKS (dual-read: DISABLE_JCODE_HOOKS).
-    if product_var_full("DISABLE_NEXT_CODE_HOOKS", "DISABLE_JCODE_HOOKS").is_ok() { // dual-read: legacy
+    // Kill-switch: honour DISABLE_NEXT_CODE_HOOKS (dual-read: DISABLE_NEXT_CODE_HOOKS).
+    if product_var_full("DISABLE_NEXT_CODE_HOOKS").is_ok() {
         eprintln!("[hooks] disabled via DISABLE_NEXT_CODE_HOOKS env var");
         return HooksConfig::default();
     }
@@ -729,7 +729,7 @@ pub fn load_hooks_config() -> HooksConfig {
     merged
 }
 
-/// `$HOME/.next-code/hooks.toml` (dual-read: `$HOME/.jcode/hooks.toml`).
+/// `$HOME/.next-code/hooks.toml` (dual-read: `$HOME/.next-code/hooks.toml`).
 fn user_hooks_config_path() -> Option<PathBuf> {
     let home = dirs::home_dir()?;
     let primary = home.join(".next-code").join("hooks.toml");
@@ -737,14 +737,14 @@ fn user_hooks_config_path() -> Option<PathBuf> {
         return Some(primary);
     }
     // dual-read: legacy home dir
-    let legacy = home.join(".jcode").join("hooks.toml"); // dual-read: legacy
+    let legacy = home.join(".next-code").join("hooks.toml"); // dual-read: legacy
     if legacy.exists() {
         return Some(legacy);
     }
     Some(primary)
 }
 
-/// `<cwd>/.next-code/hooks.toml` (dual-read: `<cwd>/.jcode/hooks.toml`).
+/// `<cwd>/.next-code/hooks.toml` (dual-read: `<cwd>/.next-code/hooks.toml`).
 fn project_hooks_config_path() -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
     let primary = cwd.join(".next-code").join("hooks.toml");
@@ -752,7 +752,7 @@ fn project_hooks_config_path() -> Option<PathBuf> {
         return Some(primary);
     }
     // dual-read: legacy project dir
-    let legacy = cwd.join(".jcode").join("hooks.toml"); // dual-read: legacy
+    let legacy = cwd.join(".next-code").join("hooks.toml"); // dual-read: legacy
     if legacy.exists() {
         return Some(legacy);
     }

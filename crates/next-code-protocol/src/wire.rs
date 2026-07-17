@@ -155,7 +155,7 @@ pub enum Request {
         /// When `true` (the default for backward compatibility), the server
         /// reloads unconditionally. When `false`, the server only reloads if it
         /// detects a strictly-newer reload candidate binary, so callers like
-        /// `jcode server reload` can request a graceful upgrade without risking
+        /// `next-code server reload` can request a graceful upgrade without risking
         /// a downgrade (e.g. a newer self-dev daemon next to an older release).
         #[serde(default = "default_true")]
         force: bool,
@@ -364,7 +364,7 @@ pub enum Request {
         capabilities: Vec<String>,
     },
 
-    /// Send a task to jcode agent
+    /// Send a task to next-code agent
     #[serde(rename = "agent_task")]
     AgentTask {
         id: u64,
@@ -377,7 +377,7 @@ pub enum Request {
         async_: bool,
     },
 
-    /// Query jcode agent's capabilities
+    /// Query next-code agent's capabilities
     #[serde(rename = "agent_capabilities")]
     AgentCapabilities { id: u64 },
 

@@ -481,7 +481,7 @@ async fn test_background_command_progress_marker_updates_status_and_stays_out_of
     let result = tool
             .execute(
                 json!({
-                    "command": "printf '%s\n' 'JCODE_PROGRESS {\"current\":3,\"total\":10,\"unit\":\"steps\",\"message\":\"Building\"}'; sleep 0.1; echo done",
+                    "command": "printf '%s\n' 'NEXT_CODE_PROGRESS {\"current\":3,\"total\":10,\"unit\":\"steps\",\"message\":\"Building\"}'; sleep 0.1; echo done",
                     "run_in_background": true,
                     "notify": false,
                     "wake": false,

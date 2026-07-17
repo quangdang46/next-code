@@ -10,7 +10,7 @@ pub const TEAMS_BASE_OVERRIDE_ENV: &str = "NEXT_CODE_TEAMS_BASE_OVERRIDE";
 
 /// `~/.next-code/teams` — the team base directory (or the override dir in tests).
 ///
-/// Dual-reads legacy `~/.jcode/teams` when the canonical path is missing so
+/// Dual-reads legacy `~/.next-code/teams` when the canonical path is missing so
 /// pre-rebrand team state remains visible; new writes create `.next-code`.
 pub fn teams_base_dir() -> PathBuf {
     if let Some(over) = std::env::var_os(TEAMS_BASE_OVERRIDE_ENV) {
@@ -21,7 +21,7 @@ pub fn teams_base_dir() -> PathBuf {
     if primary.exists() {
         return primary;
     }
-    let legacy = home.join(".jcode").join("teams");
+    let legacy = home.join(".next-code").join("teams");
     if legacy.exists() {
         return legacy;
     }

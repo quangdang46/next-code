@@ -27,7 +27,7 @@ def _resolve_next_code_bin() -> str:
             return val
     candidates = [
         "~/.local/bin/next-code",
-        (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or os.path.expanduser("~/.local/bin/next-code"),
+        ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or os.path.expanduser("~/.local/bin/next-code"),
         "~/.next-code/builds/current/next-code",
         "~/.next-code/builds/current/next-code",
         "~/.next-code/builds/current/next-code",
@@ -40,7 +40,7 @@ def _resolve_next_code_bin() -> str:
     return os.path.expanduser("~/.local/bin/next-code")
 
 
-JCODE = _resolve_next_code_bin()
+NEXT_CODE = _resolve_next_code_bin()
 
 SGR_FG_RGB = re.compile(rb"38;2;(\d+);(\d+);(\d+)[;m]")
 SGR_FG_256 = re.compile(rb"\x1b\[38;5;(\d+)m")
@@ -86,7 +86,7 @@ def run_capture(bg: str, seconds: float = 12.0) -> bytes:
     for k in ("NEXT_CODE_THEME", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TMUX", "STY", "SSH_TTY", "SSH_CONNECTION", "SSH_CLIENT", "KITTY_WINDOW_ID", "GHOSTTY_RESOURCES_DIR", "WEZTERM_PANE", "ZELLIJ"):
         env.pop(k, None)
     proc = subprocess.Popen(
-        [JCODE],
+        [NEXT_CODE],
         stdin=slave,
         stdout=slave,
         stderr=slave,

@@ -207,7 +207,7 @@ fn dcp_100_message_session_reduces_tokens() {
     );
 
     // Verify the bridge round-trip on output
-    let roundtrip = dcp_bridge::dcp_to_jcode(dcp_bridge::next_code_to_dcp(&output.messages));
+    let roundtrip = dcp_bridge::dcp_to_next_code(dcp_bridge::next_code_to_dcp(&output.messages));
     assert_eq!(
         roundtrip.len(),
         output.messages.len(),
@@ -311,7 +311,7 @@ fn dcp_bridge_roundtrip_preserves_content() {
     let dcp_msgs = dcp_bridge::next_code_to_dcp(&messages);
     assert_eq!(dcp_msgs.len(), messages.len());
 
-    let roundtrip = dcp_bridge::dcp_to_jcode(dcp_msgs);
+    let roundtrip = dcp_bridge::dcp_to_next_code(dcp_msgs);
     assert_eq!(roundtrip.len(), messages.len());
 
     // Verify each message preserved its role and text content

@@ -144,15 +144,7 @@ fn source_build_root() -> Result<PathBuf> {
 }
 
 fn source_build_repo_dir() -> Result<PathBuf> {
-    let root = source_build_root()?;
-    let canonical = root.join("next-code");
-    // Dual-read legacy `jcode` checkout path so in-flight source builds keep working.
-    let legacy = root.join("jcode");
-    if canonical.exists() || !legacy.exists() {
-        Ok(canonical)
-    } else {
-        Ok(legacy)
-    }
+    Ok(source_build_root()?.join("next-code"))
 }
 
 fn record_release_update_duration(duration: Duration) {
@@ -1033,8 +1025,8 @@ pub fn download_and_install_blocking_with_progress(
             }
             let dest = extract_dir.join(&file_name);
             entry.unpack(&dest)?;
-            // Accept both current `next-code*` and legacy `jcode*` archive payloads.
-            if (file_name.starts_with("next-code") || file_name.starts_with("jcode"))
+            // Accept both current `next-code*` and legacy `next-code*` archive payloads.
+            if (file_name.starts_with("next-code") || file_name.starts_with("next-code"))
                 && !file_name.ends_with(".bin")
             {
                 extracted_binary = Some(dest);

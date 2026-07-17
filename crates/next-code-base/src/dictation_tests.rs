@@ -1,5 +1,5 @@
 #[cfg(target_os = "linux")]
-use super::focused_jcode_session;
+use super::focused_next_code_session;
 use super::{
     ClientCandidate, extract_session_short_name_from_window_title, last_focused_session,
     normalize_session_short_name, parse_ppid, read_resumed_session_id,
@@ -197,7 +197,7 @@ fn focused_next_code_session_uses_niri_window_title_when_process_name_is_generic
     let _path = EnvVarGuard::set("PATH", path);
 
     assert_eq!(
-        focused_jcode_session().expect("resolve focused session"),
+        focused_next_code_session().expect("resolve focused session"),
         Some("session_swan_123".to_string())
     );
 }

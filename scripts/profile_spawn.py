@@ -18,7 +18,7 @@ by also attributing RESOURCE UTILIZATION to each spawned process:
   * voluntary / involuntary context switches
   * block I/O bytes read/written
 
-Everything runs under an isolated JCODE_HOME / JCODE_RUNTIME_DIR / JCODE_SOCKET
+Everything runs under an isolated NEXT_CODE_HOME / NEXT_CODE_RUNTIME_DIR / NEXT_CODE_SOCKET
 so it never touches the user's real shared server, logs, sessions, or creds.
 
 Two spawn shapes are profiled:
@@ -543,7 +543,7 @@ def print_resource_block(title: str, runs: list[dict]) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    default_bin = (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or os.environ.get("NEXT_CODE_BENCH_BIN") or os.environ.get("NEXT_CODE_BENCH_BIN") or shutil.which("next-code") or shutil.which("next-code") or "./target/release/next-code"
+    default_bin = ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or os.environ.get("NEXT_CODE_BENCH_BIN") or os.environ.get("NEXT_CODE_BENCH_BIN") or shutil.which("next-code") or shutil.which("next-code") or "./target/release/next-code"
     ap.add_argument("binary", nargs="?", default=default_bin)
     ap.add_argument("--runs", type=int, default=5)
     ap.add_argument("--sample-interval-ms", type=float, default=2.0)
@@ -571,7 +571,7 @@ def main() -> int:
     print(f"Binary : {binary}")
     print(f"Size   : {size/1048576:.1f} MB")
     print(f"Runs   : {args.runs}   sample interval: {args.sample_interval_ms} ms")
-    print(f"Host   : {os.cpu_count()} CPUs, isolated JCODE_HOME per run")
+    print(f"Host   : {os.cpu_count()} CPUs, isolated NEXT_CODE_HOME per run")
 
     interval = args.sample_interval_ms / 1000.0
     results: dict = {"binary": binary, "binary_size_bytes": size, "runs": args.runs}

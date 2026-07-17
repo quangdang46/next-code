@@ -212,7 +212,7 @@ pub enum TaskStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TeamRuntimeState {
     pub version: u8,
-    /// UUID v4 — also the tmux session suffix (`jcode-team-{team_run_id}`).
+    /// UUID v4 — also the tmux session suffix (`next-code-team-{team_run_id}`).
     pub team_run_id: String,
     pub team_name: String,
     pub spec_source: SpecSource,
@@ -301,7 +301,7 @@ impl Default for RuntimeBounds {
 pub struct TmuxLayout {
     /// Did we create the session (vs. split the caller's window)?
     pub owned_session: bool,
-    /// `jcode-team-{team_run_id}` when owned, else the caller's session id.
+    /// `next-code-team-{team_run_id}` when owned, else the caller's session id.
     pub target_session_id: String,
     #[serde(default)]
     pub focus_window_id: Option<String>,

@@ -1,5 +1,5 @@
 // `Cell::set_skip` was renamed in ratatui 0.30; see the matching note in
-// crates/jcode-tui-mermaid/src/mermaid_viewport.rs. Pin the old API.
+// crates/next-code-tui-mermaid/src/mermaid_viewport.rs. Pin the old API.
 #![allow(deprecated)]
 
 //! Build a shareable dashboard as an SVG and rasterize it to PNG.
@@ -141,7 +141,7 @@ pub fn render_svg(r: &ProductivityReport) -> String {
     let pad = 56.0;
 
     // ---- Header ----
-    svg.text(pad, 92.0, "jcode", 30.0, ACCENT, 800, "start");
+    svg.text(pad, 92.0, "next-code", 30.0, ACCENT, 800, "start");
     svg.text(pad, 92.0 + 0.0, "", 1.0, TEXT, 400, "start");
     svg.text(
         W - pad,
@@ -361,7 +361,7 @@ pub fn render_svg(r: &ProductivityReport) -> String {
     svg.text(
         W - pad,
         H - 30.0,
-        "generated with jcode  ·  /productivity",
+        "generated with next-code  ·  /productivity",
         16.0,
         ACCENT,
         600,

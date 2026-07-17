@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Origin Sync (fork management)
-This repo (`quangdang46/next-code`) is a rebranded fork of `1jehuang/jcode`. Several modules have been extracted into separate repos. When syncing from upstream, use the `origin-sync` skill: `skill(name="origin-sync")`. It provides a structured workflow for classifying conflicts (extracted-code, local-extension, upstream-only, dep, new-feature) and resolving them correctly.
+This repo (`quangdang46/next-code`) is a rebranded fork of `quangdang46/next-code`. Several modules have been extracted into separate repos. When syncing from upstream, use the `origin-sync` skill: `skill(name="origin-sync")`. It provides a structured workflow for classifying conflicts (extracted-code, local-extension, upstream-only, dep, new-feature) and resolving them correctly.
 
 
 
@@ -23,12 +23,12 @@ This repo (`quangdang46/next-code`) is a rebranded fork of `1jehuang/jcode`. Sev
 
 ## Install Notes
 - `~/.local/bin/next-code` is the launcher symlink used from `PATH`.
-- one-release compat: `jcode` → `next-code` symlink at `~/.local/bin/jcode`.
+- one-release compat: `next-code` → `next-code` symlink at `~/.local/bin/next-code`.
 - `~/.next-code/builds/current/next-code` is the active local/source-build channel; self-dev builds and `scripts/install_release.sh` point the launcher here.
 - `~/.next-code/builds/stable/next-code` is the stable release channel; `scripts/install.sh` installs this and points the launcher here.
 - `~/.next-code/builds/versions/<version>/next-code` stores immutable binaries.
 - `~/.next-code/builds/canary/next-code` still exists for canary/testing flows, but it is not the primary self-dev install path.
-- On Windows, the equivalents are `%LOCALAPPDATA%\\next-code\\bin\\next-code.exe` for the launcher (plus a one-release `jcode.exe` compat entry), `%LOCALAPPDATA%\\next-code\\builds\\stable\\next-code.exe` for stable, and `%LOCALAPPDATA%\\next-code\\builds\\versions\\<version>\\next-code.exe` for immutable installs; `scripts/install.ps1` currently installs the stable channel.
+- On Windows, the equivalents are `%LOCALAPPDATA%\\next-code\\bin\\next-code.exe` for the launcher (plus a one-release `next-code.exe` compat entry), `%LOCALAPPDATA%\\next-code\\builds\\stable\\next-code.exe` for stable, and `%LOCALAPPDATA%\\next-code\\builds\\versions\\<version>\\next-code.exe` for immutable installs; `scripts/install.ps1` currently installs the stable channel.
 - Ensure `~/.local/bin` is **before** `~/.cargo/bin` in `PATH`.
 
 ### After install (agent-tree / TUI work)
@@ -47,7 +47,7 @@ Confirm the live binary: `lsof -p $(pgrep -f 'builds/.*/next-code' | head -1) | 
 
 ## Notepad (compaction-resistant notes)
 
-The notepad (`crates/next-code-base/src/notepad.rs`, `crates/next-code-app-core/src/tool/notepad.rs`) is a 3-tier file-based store under `<working_dir>/.next-code/notepad/` (legacy `.jcode/notepad/` is dual-read) that lets the model persist short notes across turns and across compaction.
+The notepad (`crates/next-code-base/src/notepad.rs`, `crates/next-code-app-core/src/tool/notepad.rs`) is a 3-tier file-based store under `<working_dir>/.next-code/notepad/` (legacy `.next-code/notepad/` is dual-read) that lets the model persist short notes across turns and across compaction.
 
 Tiers:
 - **priority** — auto-injected into the system prompt every turn. Survives compaction because the content is re-read from disk each cycle. Rendered as a fenced code block with a trust marker so the model cannot inject instructions through it.
@@ -63,7 +63,7 @@ Tools (namespaced under `notepad_*`):
 
 Config (under `[notepad]` in `config.toml`):
 - `enabled` (default: `true`) — set to `false` to disable entirely.
-- `dir` (default: `.next-code/notepad`; legacy `.jcode/notepad` dual-read) — must be a relative path with no `..` components; absolute paths and `..` are rejected.
+- `dir` (default: `.next-code/notepad`; legacy `.next-code/notepad` dual-read) — must be a relative path with no `..` components; absolute paths and `..` are rejected.
 - `max_bytes_per_tier` (default: 4096) — the field is byte-based (predictable file size, predictable token cost). Truncation always lands on a UTF-8 char boundary.
 - `require_priority_confirm` (default: `true`) — when enabled, `notepad_write_priority` must include `confirm: true` in its input.
 

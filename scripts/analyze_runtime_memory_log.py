@@ -154,7 +154,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def default_log_dir() -> Path:
-    next_code_home = (os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME")) or (os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME"))
+    next_code_home = ((os.environ.get("NEXT_CODE_HOME") or os.environ.get("NEXT_CODE_HOME")) or (os.environ.get("NEXT_CODE_HOME") or os.environ.get("NEXT_CODE_HOME"))) or ((os.environ.get("NEXT_CODE_HOME") or os.environ.get("NEXT_CODE_HOME")) or (os.environ.get("NEXT_CODE_HOME") or os.environ.get("NEXT_CODE_HOME")))
     if next_code_home:
         return Path(next_code_home).expanduser() / "logs" / "memory"
     home = Path.home()

@@ -312,19 +312,10 @@ impl SelfDevTool {
         }
     }
 
-    /// Resolve the default location for a cloned self-dev source checkout.
-    ///
-    /// Prefers `~/.next-code/source/next-code`; dual-reads the legacy
-    /// `~/.next-code/source/jcode` path when that checkout already exists.
+    /// Resolve the default location for a cloned self-dev source checkout:
+    /// `~/.next-code/source/next-code`.
     fn selfdev_clone_dir() -> Result<std::path::PathBuf> {
-        let root = storage::next_code_dir()?.join("source");
-        let canonical = root.join("next-code");
-        let legacy = root.join("jcode");
-        if canonical.exists() || !legacy.exists() {
-            Ok(canonical)
-        } else {
-            Ok(legacy)
-        }
+        Ok(storage::next_code_dir()?.join("source").join("next-code"))
     }
 
     /// Clone the next-code source into the default self-dev source directory.

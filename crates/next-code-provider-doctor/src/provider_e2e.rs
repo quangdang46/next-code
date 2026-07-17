@@ -273,7 +273,7 @@ const FULL_PIPELINE_LABELS: &[(&str, &str)] = &[
     (checkpoints::TOOL_CALL_PARSE, "Tool-call parse"),
     (checkpoints::TOOL_EXECUTION_LOOP, "Tool execution loop"),
     (checkpoints::TOOL_RESULT_FOLLOWUP, "Tool-result followup"),
-    (checkpoints::REAL_JCODE_TOOL_SMOKE, "Real next-code tool smoke"),
+    (checkpoints::REAL_NEXT_CODE_TOOL_SMOKE, "Real next-code tool smoke"),
     (checkpoints::REASONING_CAPABILITY, "Reasoning capability"),
 ];
 
@@ -387,7 +387,7 @@ const API_DEPENDENT_CHECKPOINTS: &[&str] = &[
     checkpoints::TOOL_CALL_PARSE,
     checkpoints::TOOL_EXECUTION_LOOP,
     checkpoints::TOOL_RESULT_FOLLOWUP,
-    checkpoints::REAL_JCODE_TOOL_SMOKE,
+    checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
     checkpoints::REASONING_CAPABILITY,
 ];
 
@@ -900,7 +900,7 @@ async fn run_native_claude_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::passed(
                     checkpoint,
@@ -914,7 +914,7 @@ async fn run_native_claude_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::failed(
                     checkpoint,
@@ -1244,7 +1244,7 @@ async fn run_native_antigravity_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::passed(
                     checkpoint,
@@ -1258,7 +1258,7 @@ async fn run_native_antigravity_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::failed(
                     checkpoint,
@@ -1298,7 +1298,7 @@ pub enum NativeProviderKind {
     Cursor,
     Copilot,
     Bedrock,
-    Jcode,
+    NextCode,
     Azure,
 }
 
@@ -1311,7 +1311,7 @@ impl NativeProviderKind {
             "cursor" => Some(Self::Cursor),
             "copilot" => Some(Self::Copilot),
             "bedrock" => Some(Self::Bedrock),
-            "jcode" | "next-code" => Some(Self::Jcode),
+            "next-code" => Some(Self::NextCode),
             "azure-openai" => Some(Self::Azure),
             _ => None,
         }
@@ -1389,7 +1389,7 @@ impl NativeProviderKind {
                 auth_env_key: Some("AWS_BEARER_TOKEN_BEDROCK"),
                 login_hint: "next-code login --provider bedrock",
             },
-            Self::Jcode => NativeProviderSpec {
+            Self::NextCode => NativeProviderSpec {
                 provider_id: "next-code",
                 label: "Next Code Subscription",
                 // The Next Code subscription runtime routes through the OpenRouter
@@ -1479,7 +1479,7 @@ impl NativeProviderKind {
             Self::Bedrock => {
                 std::sync::Arc::new(next_code_base::provider::bedrock::BedrockProvider::new())
             }
-            Self::Jcode => std::sync::Arc::new(next_code_base::provider::jcode::JcodeProvider::new()),
+            Self::NextCode => std::sync::Arc::new(next_code_base::provider::jcode::NextCodeProvider::new()),
             Self::Azure => {
                 // Azure OpenAI is the OpenRouter transport configured via Azure
                 // env; apply that env (endpoint/key/header wiring) before building
@@ -1548,7 +1548,7 @@ impl NativeProviderKind {
                 }
                 Ok("AWS Bedrock credential resolved".to_string())
             }
-            Self::Jcode => {
+            Self::NextCode => {
                 if !next_code_base::subscription_catalog::has_credentials() {
                     anyhow::bail!(
                         "no Next Code subscription credential found (set NEXT_CODE_API_KEY or run \
@@ -1587,7 +1587,7 @@ impl NativeProviderKind {
             Self::Cursor => &["composer", "fast", "mini"],
             Self::Copilot => &["mini", "haiku", "flash", "fast"],
             Self::Bedrock => &["haiku", "micro", "lite", "mini", "flash"],
-            Self::Jcode => &["mini", "flash", "haiku", "lite", "nano"],
+            Self::NextCode => &["mini", "flash", "haiku", "lite", "nano"],
             Self::Azure => &["mini", "nano", "flash", "haiku"],
         };
         for marker in cheap_markers {
@@ -1895,7 +1895,7 @@ async fn run_generic_native_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::passed(
                     checkpoint,
@@ -1909,7 +1909,7 @@ async fn run_generic_native_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::failed(
                     checkpoint,
@@ -2200,7 +2200,7 @@ async fn run_full_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::passed(
                     checkpoint,
@@ -2214,7 +2214,7 @@ async fn run_full_api_checks(
                 checkpoints::TOOL_CALL_PARSE,
                 checkpoints::TOOL_EXECUTION_LOOP,
                 checkpoints::TOOL_RESULT_FOLLOWUP,
-                checkpoints::REAL_JCODE_TOOL_SMOKE,
+                checkpoints::REAL_NEXT_CODE_TOOL_SMOKE,
             ] {
                 checks.push(DoctorCheck::failed(
                     checkpoint,
@@ -2420,8 +2420,8 @@ mod tests {
             ("cursor", NativeProviderKind::Cursor),
             ("copilot", NativeProviderKind::Copilot),
             ("bedrock", NativeProviderKind::Bedrock),
-            ("next-code", NativeProviderKind::Jcode),
-            ("next-code", NativeProviderKind::Jcode),
+            ("next-code", NativeProviderKind::NextCode),
+            ("next-code", NativeProviderKind::NextCode),
             ("azure-openai", NativeProviderKind::Azure),
         ] {
             assert_eq!(NativeProviderKind::from_normalized(id), Some(expected));
@@ -2442,7 +2442,7 @@ mod tests {
             NativeProviderKind::Cursor,
             NativeProviderKind::Copilot,
             NativeProviderKind::Bedrock,
-            NativeProviderKind::Jcode,
+            NativeProviderKind::NextCode,
             NativeProviderKind::Azure,
         ] {
             let spec = kind.spec();
@@ -2540,7 +2540,7 @@ mod tests {
             NativeProviderKind::Cursor,
             NativeProviderKind::Copilot,
             NativeProviderKind::Bedrock,
-            NativeProviderKind::Jcode,
+            NativeProviderKind::NextCode,
             NativeProviderKind::Azure,
         ] {
             let id = kind.spec().provider_id;

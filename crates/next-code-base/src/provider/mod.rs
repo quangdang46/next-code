@@ -2360,7 +2360,7 @@ impl Provider for MultiProvider {
                 .unwrap_or(false),
             ActiveProvider::Bedrock => self
                 .bedrock_provider()
-                .map(|o| o.uses_jcode_compaction())
+                .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
@@ -2369,41 +2369,41 @@ impl Provider for MultiProvider {
         }
     }
 
-    fn uses_jcode_compaction(&self) -> bool {
+    fn uses_next_code_compaction(&self) -> bool {
         match self.active_provider() {
             ActiveProvider::Claude => {
                 if self.anthropic_provider().is_some() {
                     true
                 } else {
                     self.claude_provider()
-                        .map(|c| c.uses_jcode_compaction())
+                        .map(|c| c.uses_next_code_compaction())
                         .unwrap_or(false)
                 }
             }
             ActiveProvider::OpenAI => self
                 .openai_provider()
-                .map(|o| o.uses_jcode_compaction())
+                .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
             ActiveProvider::Copilot => self
                 .copilot_provider()
-                .map(|o| o.uses_jcode_compaction())
+                .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
             ActiveProvider::Antigravity => self
                 .antigravity_provider()
-                .map(|o| o.uses_jcode_compaction())
+                .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
             ActiveProvider::Gemini => self
                 .gemini_provider()
-                .map(|o| o.uses_jcode_compaction())
+                .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
             ActiveProvider::Cursor => self
                 .cursor_provider()
-                .map(|o| o.uses_jcode_compaction())
+                .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
             ActiveProvider::Bedrock => false,
             ActiveProvider::OpenRouter => self
                 .active_openrouter_execution_provider()
-                .map(|o| o.uses_jcode_compaction())
+                .map(|o| o.uses_next_code_compaction())
                 .unwrap_or(false),
         }
     }

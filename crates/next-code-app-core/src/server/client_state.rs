@@ -67,7 +67,7 @@ fn history_provider_name_from_session(session: &crate::session::Session) -> Opti
         "gemini" => "Gemini".to_string(),
         "bedrock" => "Bedrock".to_string(),
         "antigravity" => "Antigravity".to_string(),
-        "jcode" | "next-code" => "Next Code".to_string(),
+        "next-code" => "Next Code".to_string(),
         other => other.to_string(),
     };
 

@@ -20,9 +20,9 @@ import Testing
     #expect(payload?.code == "123456")
 }
 
-@Test func pairURIParsesLegacyJcodeScheme() { // dual-read jcode://
-    // dual-read: legacy jcode:// pair URLs still parse during compat window
-    let payload = PairURI.parse("jcode://pair?host=mybox.ts.net&port=7643&code=123456")
+@Test func pairURIParsesLegacyNextCodeScheme() { // dual-read nextcode://
+    // dual-read: legacy nextcode:// pair URLs still parse during compat window
+    let payload = PairURI.parse("nextcode://pair?host=mybox.ts.net&port=7643&code=123456")
     #expect(payload?.gateway.host == "mybox.ts.net")
     #expect(payload?.gateway.port == 7643)
     #expect(payload?.code == "123456")
@@ -33,9 +33,9 @@ import Testing
     #expect(payload?.gateway.port == Gateway.defaultPort)
 }
 
-@Test func pairURIDefaultsPortForLegacyJcodeScheme() { // dual-read jcode://
-    // dual-read: legacy jcode:// defaults port the same way
-    let payload = PairURI.parse("jcode://pair?host=mybox&code=987654")
+@Test func pairURIDefaultsPortForLegacyNextCodeScheme() { // dual-read nextcode://
+    // dual-read: legacy nextcode:// defaults port the same way
+    let payload = PairURI.parse("nextcode://pair?host=mybox&code=987654")
     #expect(payload?.gateway.port == Gateway.defaultPort)
 }
 
@@ -43,8 +43,8 @@ import Testing
     #expect(PairURI.parse("https://example.com/pair?host=x&code=1") == nil)
     #expect(PairURI.parse("nextcode://pair?host=&code=1") == nil)
     #expect(PairURI.parse("nextcode://pair?host=x") == nil)
-    #expect(PairURI.parse("jcode://pair?host=&code=1") == nil)
-    #expect(PairURI.parse("jcode://pair?host=x") == nil)
+    #expect(PairURI.parse("nextcode://pair?host=&code=1") == nil)
+    #expect(PairURI.parse("nextcode://pair?host=x") == nil)
     #expect(PairURI.parse("not a uri") == nil)
 }
 

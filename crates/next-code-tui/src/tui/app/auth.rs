@@ -72,7 +72,7 @@ impl App {
     }
 
     #[allow(dead_code)]
-    pub(super) fn show_jcode_subscription_status(&mut self) {
+    pub(super) fn show_next_code_subscription_status(&mut self) {
         let configured_key = crate::subscription_catalog::configured_api_key().is_some();
         let configured_base = crate::subscription_catalog::configured_api_base()
             .unwrap_or_else(|| crate::subscription_catalog::DEFAULT_NEXT_CODE_API_BASE.to_string());
@@ -119,7 +119,7 @@ impl App {
             } else {
                 ""
             };
-            let tier_suffix = if model.min_tier == crate::subscription_catalog::JcodeTier::Plus {
+            let tier_suffix = if model.min_tier == crate::subscription_catalog::NextCodeTier::Plus {
                 String::new()
             } else {
                 format!(" [{}]", model.min_tier.display_name())
@@ -136,7 +136,7 @@ impl App {
         }
 
         message.push_str("\nTiers\n\n");
-        for tier in crate::subscription_catalog::JcodeTier::ALL.iter().copied() {
+        for tier in crate::subscription_catalog::NextCodeTier::ALL.iter().copied() {
             message.push_str(&format!(
                 "  - {} - ${}/mo retail, about ${:.2} usable inference budget\n",
                 tier.display_name(),
@@ -310,13 +310,13 @@ impl App {
     ) {
         use crate::provider_catalog::LoginProviderTarget;
 
-        if matches!(provider.target, LoginProviderTarget::Jcode) {
-            self.start_jcode_account_logout();
+        if matches!(provider.target, LoginProviderTarget::NextCode) {
+            self.start_next_code_account_logout();
             return;
         }
 
         let result: anyhow::Result<String> = (|| match provider.target {
-            LoginProviderTarget::Jcode => unreachable!("handled above"),
+            LoginProviderTarget::NextCode => unreachable!("handled above"),
             LoginProviderTarget::Claude => {
                 let removed = crate::auth::claude::clear_accounts()?;
                 Ok(format!("Logged out of {} Anthropic account(s).", removed))
@@ -585,7 +585,7 @@ impl App {
                     }
                 }
             }
-            crate::provider_catalog::LoginProviderTarget::Jcode => self.start_jcode_login(),
+            crate::provider_catalog::LoginProviderTarget::NextCode => self.start_jcode_login(),
             crate::provider_catalog::LoginProviderTarget::Claude => self.start_claude_login(),
             crate::provider_catalog::LoginProviderTarget::ClaudeApiKey => {
                 self.start_anthropic_api_key_login()
@@ -667,7 +667,7 @@ impl App {
             let device = match crate::subscription_api::request_device_authorization(
                 &client,
                 &api_base,
-                Some(crate::subscription_catalog::JcodeTier::Pro),
+                Some(crate::subscription_catalog::NextCodeTier::Pro),
             )
             .await
             {
@@ -806,7 +806,7 @@ impl App {
         });
     }
 
-    pub(super) fn open_jcode_account_management(&mut self) {
+    pub(super) fn open_next_code_account_management(&mut self) {
         let url = crate::subscription_catalog::NEXT_CODE_ACCOUNT_URL;
         let opened = Self::open_auth_browser(url);
         self.push_display_message(DisplayMessage::system(format!(
@@ -821,7 +821,7 @@ impl App {
         self.set_status_notice("Next Code account management");
     }
 
-    pub(super) fn start_jcode_account_logout(&mut self) {
+    pub(super) fn start_next_code_account_logout(&mut self) {
         self.set_status_notice("Next Code account: logging out");
         let session_id = self.session.id.clone();
         let Ok(handle) = tokio::runtime::Handle::try_current() else {

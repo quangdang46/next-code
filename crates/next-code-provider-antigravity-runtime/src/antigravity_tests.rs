@@ -274,7 +274,7 @@ fn resolve_model_for_request_default_prefers_gemini_catalog_model() {
 
     // Even though Claude is listed first (and recommended), the default alias
     // resolves to the Gemini model, which works reliably with tool use on the
-    // Cloud Code backend. Claude on this backend rejects jcode's tool schemas.
+    // Cloud Code backend. Claude on this backend rejects next-code's tool schemas.
     assert_eq!(
         provider.resolve_model_for_request("default"),
         "gemini-3-flash"
@@ -478,7 +478,7 @@ fn strip_numeric_schema_bounds_drops_array_and_string_and_object_bounds() {
 
 #[test]
 fn antigravity_compatible_schema_passes_gemini_through_unchanged() {
-    // Gemini is the native backend path; it accepts everything jcode emits, so
+    // Gemini is the native backend path; it accepts everything next-code emits, so
     // the schema must be byte-identical (combiners and numeric bounds intact).
     let schema = serde_json::json!({
         "type": "object",

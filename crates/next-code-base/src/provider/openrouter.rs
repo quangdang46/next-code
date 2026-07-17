@@ -230,7 +230,7 @@ pub enum OpenRouterTransportState {
     OpenRouterApiKey,
     /// Next Code subscription access currently reuses the OpenRouter HTTP slot, but is
     /// not user BYOK/OpenRouter billing.
-    JcodeSubscription,
+    NextCodeSubscription,
     /// A direct OpenAI-compatible endpoint that needs a user key, Azure credential,
     /// or provider-profile secret while reusing the OpenRouter-compatible transport.
     DirectApiKey,
@@ -250,9 +250,9 @@ impl OpenRouterTransportState {
 
         if matches!(
             runtime_provider.as_deref(),
-            Some("jcode" | "next-code")
+            Some("next-code")
         ) {
-            return Self::JcodeSubscription;
+            return Self::NextCodeSubscription;
         }
 
         if matches!(runtime_provider.as_deref(), Some("openrouter")) {
@@ -289,17 +289,17 @@ impl OpenRouterTransportState {
                 Some(Self::OpenRouterApiKey)
             }
             "next-code"
-            | "jcode"
-            | "jcode-subscription"
+            | "next-code"
+            | "next-code-subscription"
             | "subscription"
-            | "next-code-subscription" => Some(Self::JcodeSubscription),
+            | "next-code-subscription" => Some(Self::NextCodeSubscription),
             "direct" | "direct-api-key" | "openai-compatible" | "compatible-api-key" => {
                 Some(Self::DirectApiKey)
             }
             "direct-no-auth" | "no-auth" | "local" => Some(Self::DirectNoAuth),
             other => {
                 crate::logging::warn(&format!(
-                    "Ignoring invalid NEXT_CODE_OPENROUTER_TRANSPORT_STATE (or legacy JCODE_*) '{}'; expected openrouter-api-key, next-code-subscription, direct-api-key, or direct-no-auth",
+                    "Ignoring invalid NEXT_CODE_OPENROUTER_TRANSPORT_STATE (or legacy NEXT_CODE_*) '{}'; expected openrouter-api-key, next-code-subscription, direct-api-key, or direct-no-auth",
                     other
                 ));
                 None

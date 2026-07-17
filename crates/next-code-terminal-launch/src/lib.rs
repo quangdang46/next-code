@@ -796,7 +796,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
-    fn macos_terminal_inner_script_runs_jcode() {
+    fn macos_terminal_inner_script_runs_next_code() {
         let command = TerminalCommand::new(
             std::path::PathBuf::from("/usr/local/bin/next-code"),
             vec!["--resume".to_string(), "abc-123".to_string()],

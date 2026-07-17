@@ -71,7 +71,7 @@ impl TestEnvGuard {
         let temp_home = tempfile::Builder::new()
             .prefix("next-code-e2e-home-")
             .tempdir()?;
-        // Prefer NEXT_CODE_*; dual-write JCODE_* so product dual-read and
+        // Prefer NEXT_CODE_*; dual-write NEXT_CODE_* so product dual-read and
         // still-legacy-only call sites both see the sandbox home.
         let prev_home = std::env::var_os("NEXT_CODE_HOME")
             .or_else(|| std::env::var_os("NEXT_CODE_HOME"));

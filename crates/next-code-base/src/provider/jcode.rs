@@ -7,12 +7,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use std::sync::{Arc, RwLock};
 
-pub struct JcodeProvider {
+pub struct NextCodeProvider {
     inner: MultiProvider,
     selected_model: Arc<RwLock<String>>,
 }
 
-impl JcodeProvider {
+impl NextCodeProvider {
     pub fn new() -> Self {
         crate::subscription_catalog::apply_runtime_env();
         Self::apply_runtime_profile();
@@ -40,14 +40,14 @@ impl JcodeProvider {
     }
 }
 
-impl Default for JcodeProvider {
+impl Default for NextCodeProvider {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[async_trait]
-impl Provider for JcodeProvider {
+impl Provider for NextCodeProvider {
     async fn complete(
         &self,
         messages: &[Message],
@@ -199,8 +199,8 @@ impl Provider for JcodeProvider {
         self.inner.supports_compaction()
     }
 
-    fn uses_jcode_compaction(&self) -> bool {
-        self.inner.uses_jcode_compaction()
+    fn uses_next_code_compaction(&self) -> bool {
+        self.inner.uses_next_code_compaction()
     }
 
     async fn native_compact(
@@ -255,7 +255,7 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
 
         runtime.block_on(async {
-            let provider = JcodeProvider::new();
+            let provider = NextCodeProvider::new();
             assert!(crate::subscription_catalog::is_runtime_mode_enabled());
             assert!(
                 provider
@@ -275,7 +275,7 @@ mod tests {
         let runtime = tokio::runtime::Runtime::new().expect("tokio runtime");
 
         runtime.block_on(async {
-            let provider = JcodeProvider::new();
+            let provider = NextCodeProvider::new();
             assert_eq!(provider.name(), "Next Code Subscription");
             let model = provider.model();
             assert!(

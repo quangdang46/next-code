@@ -62,7 +62,7 @@ The legacy `AWS/Billing/EstimatedCharges` alarms were removed because the accoun
 
 1. Bookmark the wake link (`https://<api-id>.execute-api.us-east-1.amazonaws.com/#t=<token>`, token stored at `~/.next-code/next-code-phone-wake-token` on the workstation). The URL fragment is not sent in HTTP requests; JavaScript exchanges it for an `Authorization: Bearer` header and keeps it in session storage.
 2. Tap it: the Lambda starts the instance and polls EC2/SSM every 5 s until ready.
-3. Tap "Pair this phone" → Lambda runs `next-code pair` through SSM → 6-digit code + `nextcode://` deep link (iOS also accepts legacy `jcode://`) → opens the iOS app paired to `100.109.78.41:7643`.
+3. Tap "Pair this phone" → Lambda runs `next-code pair` through SSM → 6-digit code + `nextcode://` deep link (iOS also accepts legacy `nextcode://`) → opens the iOS app paired to `100.109.78.41:7643`.
 4. SSH fallback: connect through Tailscale to `ec2-user@100.109.78.41`, then run `phone`.
 
 ## Security notes
@@ -75,7 +75,7 @@ The legacy `AWS/Billing/EstimatedCharges` alarms were removed because the accoun
 - CloudTrail records multi-region management events to a private encrypted bucket with 90-day retention. Account-level IAM Access Analyzer and S3 Block Public Access are enabled.
 - API Gateway access logs exclude query strings and authorization headers and expire after 30 days.
 - IAM: the instance role has inference-only access to the configured Opus 4.6 profile plus SSM managed-instance access. Waker Lambda has start/describe EC2 plus narrowly scoped SSM command permissions. Breaker Lambda has stop/describe EC2 plus SNS publish.
-- The deployment access key was rotated and the prior key is inactive. Daily maintenance can use the tested `next-code-operator` profile and `JcodeOperator` role, which cannot create IAM users or terminate instances. `jade-deploy` retains its administrator attachment only as a temporary recovery path until an independent root/MFA login is verified; see `IAM-LEAST-PRIVILEGE.md`.
+- The deployment access key was rotated and the prior key is inactive. Daily maintenance can use the tested `next-code-operator` profile and `NextCodeOperator` role, which cannot create IAM users or terminate instances. `jade-deploy` retains its administrator attachment only as a temporary recovery path until an independent root/MFA login is verified; see `IAM-LEAST-PRIVILEGE.md`.
 
 ## Rebuild from scratch (≈15 min)
 

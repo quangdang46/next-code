@@ -343,7 +343,7 @@ mod tests {
             "copilot",
             "gemini",
             "bedrock",
-            "jcode",
+            "next-code",
             "nonsense",
         ] {
             assert_eq!(AuthRoute::parse(token), None, "{token:?} must be None");

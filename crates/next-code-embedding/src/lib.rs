@@ -423,41 +423,24 @@ pub fn is_model_available(model_dir: &Path) -> bool {
 
 /// Resolve the default MiniLM model directory under the product home.
 ///
-/// Prefers `~/.next-code/models/<MODEL_NAME>`, dual-reads legacy
-/// `~/.jcode/models/<MODEL_NAME>` when the canonical path is missing.
-/// Honors `$NEXT_CODE_HOME` / `$JCODE_HOME` when set.
+/// Uses `~/.next-code/models/<MODEL_NAME>`, or `$NEXT_CODE_HOME/models/<MODEL_NAME>`
+/// when set.
 pub fn default_model_dir() -> Option<std::path::PathBuf> {
     product_models_dir(MODEL_NAME)
 }
 
-/// Resolve `…/models/<name>` under the product home with dual-read of the
-/// legacy `~/.jcode` tree. Returns the first existing candidate, or the
-/// canonical `~/.next-code/models/<name>` path when neither exists (so
-/// downloaders write to the new location).
+/// Resolve `…/models/<name>` under the product home.
+///
+/// Returns the existing `~/.next-code/models/<name>` path when present, otherwise
+/// the canonical path so downloaders write to the new location.
 pub fn product_models_dir(model_name: &str) -> Option<std::path::PathBuf> {
     let home = product_home_dir()?;
     let primary = home.join("models").join(model_name);
-    if is_model_available(&primary) {
-        return Some(primary);
-    }
-    // Dual-read: if NEXT_CODE_HOME/JCODE_HOME is set, that *is* the product
-    // home (already dual-resolved). Also probe the real ~/.jcode when the
-    // product home is the default ~/.next-code and the model only exists on
-    // the legacy path.
-    if let Some(user_home) = dirs_home() {
-        let legacy = user_home.join(".jcode").join("models").join(model_name);
-        if legacy != primary && is_model_available(&legacy) {
-            return Some(legacy);
-        }
-    }
     Some(primary)
 }
 
 fn product_home_dir() -> Option<std::path::PathBuf> {
     if let Ok(path) = std::env::var("NEXT_CODE_HOME") {
-        return Some(std::path::PathBuf::from(path));
-    }
-    if let Ok(path) = std::env::var("JCODE_HOME") {
         return Some(std::path::PathBuf::from(path));
     }
     dirs_home().map(|h| h.join(".next-code"))

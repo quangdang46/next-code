@@ -15,8 +15,8 @@ use crate::team::eligibility::assert_eligible;
 use crate::team::layout::{self, LayoutMember};
 use crate::team::{mailbox, paths, spec::*, state};
 
-/// Spawns a headless member session and returns its session id. In jcode this
-/// wraps `std::process::Command::new("jcode")` + server registration; in tests
+/// Spawns a headless member session and returns its session id. In next-code this
+/// wraps `std::process::Command::new("next-code")` + server registration; in tests
 /// it is a stub.
 pub trait MemberSpawner: Send + Sync {
     fn spawn(&self, run_id: &str, member: &TeamMemberSpec, prompt: &str) -> TeamResult<String>;
@@ -163,7 +163,7 @@ fn find_existing_run(name: &str, lead: &str) -> TeamResult<Option<TeamRuntimeSta
 }
 
 /// Activate the tmux layout for an existing run. `attach_cmd` builds the pane
-/// command for each member (e.g. `jcode attach --team ... --member ...`).
+/// command for each member (e.g. `next-code attach --team ... --member ...`).
 /// No-op outside tmux. Records pane ids + layout into the runtime state.
 pub fn activate_team_layout(
     run_id: &str,
@@ -211,7 +211,7 @@ pub fn activate_team_layout(
     Ok(())
 }
 
-/// Sweep orphaned `jcode-team-*` tmux sessions not in the current active set.
+/// Sweep orphaned `next-code-team-*` tmux sessions not in the current active set.
 /// Call before creating a new team (kept separate from `create_team` so the
 /// latter stays tmux-free and hermetic).
 pub fn sweep_stale_sessions() -> TeamResult<Vec<String>> {

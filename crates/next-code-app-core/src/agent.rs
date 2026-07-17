@@ -856,7 +856,7 @@ impl Agent {
                     let discarded_oversized_native =
                         manager.discard_oversized_openai_native_compaction();
                     let messages = {
-                        if self.provider.uses_jcode_compaction() {
+                        if self.provider.uses_next_code_compaction() {
                             let action =
                                 manager.ensure_context_fits(&messages, self.provider.clone());
                             match action {
@@ -926,7 +926,7 @@ impl Agent {
         }
 
         let fast_snapshot =
-            if !self.provider.uses_jcode_compaction() && self.session.compaction.is_none() {
+            if !self.provider.uses_next_code_compaction() && self.session.compaction.is_none() {
                 let previous_count = self.cache_tracker.previous_message_count();
                 let prefix_hashes = self.session.provider_message_prefix_hashes();
                 let current_count = prefix_hashes.len();

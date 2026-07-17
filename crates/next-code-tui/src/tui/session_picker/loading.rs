@@ -373,7 +373,7 @@ fn session_transcript_contains_query(session: &SessionInfo, query_lower: &str) -
 #[cfg(test)]
 fn transcript_paths_for_session(session: &SessionInfo) -> Vec<PathBuf> {
     match &session.resume_target {
-        ResumeTarget::JcodeSession { session_id } => {
+        ResumeTarget::NextCodeSession { session_id } => {
             let Ok(sessions_dir) = storage::next_code_dir().map(|dir| dir.join("sessions")) else {
                 return Vec::new();
             };
@@ -579,7 +579,7 @@ fn classify_session_source(
         return SessionSource::Cursor;
     }
 
-    SessionSource::Jcode
+    SessionSource::NextCode
 }
 
 fn collect_files_recursive(root: &Path, extension: &str) -> Vec<PathBuf> {
@@ -1587,7 +1587,7 @@ pub(super) fn crashed_sessions_from_all_sessions(
 /// Parse a single next-code session snapshot (+ journal) into a [`SessionInfo`],
 /// returning `None` for empty/imported sessions or read/parse errors. Pulled out
 /// of `load_sessions` so the summary pass can run across a scoped thread pool.
-fn parse_jcode_session_info(
+fn parse_next_code_session_info(
     sessions_dir: &Path,
     stem: &str,
     catchup_seen: &crate::catchup::CatchupSeenSnapshot,
@@ -1673,7 +1673,7 @@ fn parse_jcode_session_info(
         server_name: None,
         server_icon: None,
         source,
-        resume_target: ResumeTarget::JcodeSession {
+        resume_target: ResumeTarget::NextCodeSession {
             session_id: stem.to_string(),
         },
         external_path: None,
@@ -1751,7 +1751,7 @@ pub fn load_sessions() -> Result<Vec<SessionInfo>> {
             let end = (start + window).min(candidates.len());
             let batch = candidates[start..end].to_vec();
             let parsed = parallel_map(batch, move |stem| {
-                parse_jcode_session_info(sessions_dir_ref, &stem, catchup_ref)
+                parse_next_code_session_info(sessions_dir_ref, &stem, catchup_ref)
             });
             for (offset, parsed_session) in parsed.into_iter().enumerate() {
                 if let Some(info) = parsed_session {
@@ -1786,7 +1786,7 @@ pub fn load_sessions() -> Result<Vec<SessionInfo>> {
             .flatten()
             .collect();
             let saved_sessions = parallel_map(gate_passers, move |stem| {
-                parse_jcode_session_info(sessions_dir_ref, &stem, catchup_ref)
+                parse_next_code_session_info(sessions_dir_ref, &stem, catchup_ref)
             });
             sessions.extend(saved_sessions.into_iter().flatten());
         }

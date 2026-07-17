@@ -24,7 +24,7 @@ impl LoginProviderAuthKind {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoginProviderTarget {
     AutoImport,
-    Jcode,
+    NextCode,
     Claude,
     ClaudeApiKey,
     OpenAi,
@@ -43,7 +43,7 @@ pub enum LoginProviderTarget {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoginProviderAuthStateKey {
     ExternalImport,
-    Jcode,
+    NextCode,
     Anthropic,
     OpenAi,
     Azure,
@@ -502,7 +502,7 @@ mod tests {
             Some("next-code")
         );
         assert_eq!(
-            resolve_login_provider("jcode").map(|provider| provider.id),
+            resolve_login_provider("next-code").map(|provider| provider.id),
             Some("next-code")
         );
         assert_eq!(

@@ -19,7 +19,7 @@ Options:
   --profile <name>          Cargo profile to build (default: selfdev)
   --package <name>          Cargo package to build (default: next-code)
   --bin <name>              Cargo binary to build (default: next-code)
-  --feature-profile <name>  JCODE_DEV_FEATURE_PROFILE for dev_cargo.sh (default: default)
+  --feature-profile <name>  NEXT_CODE_DEV_FEATURE_PROFILE for dev_cargo.sh (default: default)
   --json <path>             Write the parsed summary JSON to this path
   --top <n>                 Number of slowest units to print (default: 12)
   -h, --help                Show this help

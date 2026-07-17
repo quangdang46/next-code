@@ -24,7 +24,7 @@
 
 id = "planner"
 display_name = "Planner"
-publisher = "jcode"
+publisher = "next-code"
 version = "0.1.0"
 color = "orange"
 

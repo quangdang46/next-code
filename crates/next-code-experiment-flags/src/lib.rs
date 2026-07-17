@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Stage {
     /// Internal-only, not stable enough for users. Emits warning when enabled.
     UnderDevelopment,
-    /// Ready for early adopters. Visible in `jcode experiment list` and TUI popup.
+    /// Ready for early adopters. Visible in `next-code experiment list` and TUI popup.
     Experimental {
         name: &'static str,
         menu_description: &'static str,
@@ -286,14 +286,14 @@ impl Experiments {
             match spec.stage {
                 Stage::UnderDevelopment => {
                     eprintln!(
-                        "[jcode] WARNING: UnderDevelopment flag '{}' is enabled. \
+                        "[next-code] WARNING: UnderDevelopment flag '{}' is enabled. \
                          This feature is not ready for production use.",
                         spec.key
                     );
                 }
                 Stage::Deprecated { migration_hint } => {
                     eprintln!(
-                        "[jcode] NOTICE: Deprecated flag '{}' is enabled. {}",
+                        "[next-code] NOTICE: Deprecated flag '{}' is enabled. {}",
                         spec.key, migration_hint
                     );
                 }
@@ -561,8 +561,8 @@ pub fn migrate_legacy_to_experiments(
 /// default are NOT migrated, so users who never touched the legacy fields see
 /// no surprise behavior change.
 ///
-/// This variant avoids requiring `jcode-config-types` as a dependency, so the
-/// migration can be driven by the jcode-base config layer with raw TOML values.
+/// This variant avoids requiring `next-code-config-types` as a dependency, so the
+/// migration can be driven by the next-code-base config layer with raw TOML values.
 pub fn migrate_feature_legacy_into(
     experiments: &mut std::collections::BTreeMap<String, bool>,
     dcp_enabled: Option<bool>,

@@ -1,9 +1,9 @@
 //! Lightweight, dependency-minimal secret redaction.
 //!
 //! This crate holds the single canonical `redact_secrets` sanitizer so that
-//! callers which must not pull in the heavier `jcode-secrets` stack (`age`,
-//! `keyring`, ...) — notably `jcode-logging` — can still scrub secrets from
-//! output. `jcode-secrets` re-exports [`redact_secrets`] for backward
+//! callers which must not pull in the heavier `next-code-secrets` stack (`age`,
+//! `keyring`, ...) — notably `next-code-logging` — can still scrub secrets from
+//! output. `next-code-secrets` re-exports [`redact_secrets`] for backward
 //! compatibility.
 //!
 //! **Best-effort:** this is high-precision pattern matching for *secret-shaped*
@@ -12,7 +12,7 @@
 //! Treat it as defense-in-depth, not a substitute for not logging secrets.
 //!
 //! Patterns aggregated from codex `codex-rs/secrets/src/sanitizer.rs`,
-//! oh-my-codex `src/auth/redact.ts`, and jcode's own export / session-history
+//! oh-my-codex `src/auth/redact.ts`, and next-code's own export / session-history
 //! redactors.
 
 use regex::Regex;

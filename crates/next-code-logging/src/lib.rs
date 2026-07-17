@@ -588,9 +588,9 @@ fn cleanup_old_logs_in(log_dir: &std::path::Path, now: chrono::DateTime<Local>) 
         // Only consider our own date-stamped log files.
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
-        let is_jcode_log = (name.starts_with("next-code-") || name.starts_with("next-code-desktop-"))
+        let is_next_code_log = (name.starts_with("next-code-") || name.starts_with("next-code-desktop-"))
             && name.ends_with(".log");
-        if !is_jcode_log {
+        if !is_next_code_log {
             continue;
         }
 

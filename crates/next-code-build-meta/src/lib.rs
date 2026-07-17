@@ -25,7 +25,7 @@ pub const CHANGELOG: &str = env!("NEXT_CODE_CHANGELOG");
 pub const PKG_VERSION: &str = env!("NEXT_CODE_PKG_VERSION");
 
 /// Whether this binary was built as a release build (`NEXT_CODE_RELEASE_BUILD=1`;
-/// dual-read: legacy `JCODE_RELEASE_BUILD=1`).
+/// dual-read: legacy `NEXT_CODE_RELEASE_BUILD=1`).
 pub const fn is_release_build() -> bool {
     option_env!("NEXT_CODE_RELEASE_BUILD").is_some()
 }

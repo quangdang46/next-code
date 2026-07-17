@@ -1,5 +1,5 @@
 // `Cell::set_skip` was renamed in ratatui 0.30; see the matching note in
-// crates/jcode-tui-mermaid/src/mermaid_viewport.rs. Pin the old API.
+// crates/next-code-tui-mermaid/src/mermaid_viewport.rs. Pin the old API.
 #![allow(deprecated)]
 
 //! Transcript scanning with an on-disk incremental cache.

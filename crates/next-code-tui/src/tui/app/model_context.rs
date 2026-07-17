@@ -589,7 +589,7 @@ impl App {
     }
 
     pub(super) fn update_compaction_usage_from_stream(&mut self) {
-        if self.is_remote || !self.provider.uses_jcode_compaction() {
+        if self.is_remote || !self.provider.uses_next_code_compaction() {
             return;
         }
         let Some(tokens) = self.current_stream_context_tokens() else {

@@ -108,8 +108,8 @@ fn desktop_log_path() -> Option<PathBuf> {
                 if primary.exists() {
                     primary
                 } else {
-                    // dual-read: legacy ~/.jcode
-                    let legacy = home.join(".jcode"); // dual-read: legacy
+                    // dual-read: legacy ~/.next-code
+                    let legacy = home.join(".next-code"); // dual-read: legacy
                     if legacy.exists() {
                         legacy
                     } else {

@@ -58,7 +58,7 @@ def fetch_pair_code(ssm):
     host = shlex.quote(HOST)
     command = (
         "sudo -iu ec2-user env "
-        f"NEXT_CODE_GATEWAY_HOST={host} JCODE_GATEWAY_HOST={host} "
+        f"NEXT_CODE_GATEWAY_HOST={host} NEXT_CODE_GATEWAY_HOST={host} "
         "/home/ec2-user/.local/bin/next-code pair"
     )
     command_id = ssm.send_command(
@@ -97,7 +97,7 @@ def fetch_pair_code(ssm):
         "code": code,
         "host": HOST,
         "port": PORT,
-        "uri": f"nextcode://pair?host={HOST}&port={PORT}&code={code}",  # prefer nextcode://; iOS still accepts jcode://
+        "uri": f"nextcode://pair?host={HOST}&port={PORT}&code={code}",  # prefer nextcode://; iOS still accepts nextcode://
         "expires_in": 300,
     }
 

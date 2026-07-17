@@ -358,7 +358,7 @@ const RETRY_BASE_DELAY_MS: u64 = 1000;
 
 /// Default max output tokens for Anthropic models.
 /// Set to 32k to avoid truncating long tool calls (e.g. writing large files).
-/// Override with NEXT_CODE_ANTHROPIC_MAX_TOKENS env var (legacy: JCODE_ANTHROPIC_MAX_TOKENS).
+/// Override with NEXT_CODE_ANTHROPIC_MAX_TOKENS env var (legacy: NEXT_CODE_ANTHROPIC_MAX_TOKENS).
 const DEFAULT_MAX_TOKENS: u32 = 32_768;
 
 /// Cached OAuth credentials

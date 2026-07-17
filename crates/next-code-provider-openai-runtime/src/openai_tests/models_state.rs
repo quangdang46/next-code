@@ -340,7 +340,7 @@ fn resolve_api_base_precedence_and_validation() {
     // Default.
     assert_eq!(OpenAIProvider::resolve_api_base(), OPENAI_API_BASE);
 
-    // JCODE_OPENAI_API_BASE wins over OPENAI_BASE_URL / OPENAI_API_BASE.
+    // NEXT_CODE_OPENAI_API_BASE wins over OPENAI_BASE_URL / OPENAI_API_BASE.
     let _p1 = EnvVarGuard::set("OPENAI_API_BASE", "https://c.example/v1");
     let _p2 = EnvVarGuard::set("OPENAI_BASE_URL", "https://b.example/v1");
     let _p3 = EnvVarGuard::set("NEXT_CODE_OPENAI_API_BASE", "https://a.example/v1");

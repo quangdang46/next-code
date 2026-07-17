@@ -32,7 +32,7 @@ pub use next_code_tui_mermaid::{ImageScrollBenchmark, cache_stat_syscalls};
 #[cfg(feature = "mmdr-size-api")]
 pub use next_code_tui_mermaid::terminal_theme;
 
-pub fn install_jcode_mermaid_hooks() {
+pub fn install_next_code_mermaid_hooks() {
     next_code_tui_mermaid::set_log_hooks(crate::logging::info, crate::logging::warn);
     next_code_tui_mermaid::set_render_completed_hook(|| {
         crate::bus::Bus::global().publish(crate::bus::BusEvent::MermaidRenderCompleted);

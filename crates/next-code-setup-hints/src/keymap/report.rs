@@ -70,7 +70,7 @@ pub fn render_report(cfg: &KeybindingsConfig, snapshot: &KeymapSnapshot) -> Stri
         out.push_str(
             "These keys may be captured by your terminal, macOS, or another app (window\n\
              manager, launcher) before next-code sees them.\n\
-             To fix: rebind the next-code action in ~/.next-code/config.toml under [keybindings],\n\
+             To fix: rebind the next-code action in ~/.next_code/config.toml under [keybindings],\n\
              or change the conflicting shortcut in the other app's settings.\n",
         );
     }

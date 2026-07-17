@@ -15,7 +15,7 @@ use std::time::SystemTime;
 pub fn get_repo_dir() -> Option<PathBuf> {
     if let Ok(path) = product_env("REPO_DIR") {
         let path = PathBuf::from(path);
-        if is_jcode_repo(&path) {
+        if is_next_code_repo(&path) {
             return Some(path);
         }
     }
@@ -34,7 +34,7 @@ pub fn get_repo_dir() -> Option<PathBuf> {
             .parent()
             .and_then(|p| p.parent())
             .and_then(|p| p.parent())
-            && is_jcode_repo(repo)
+            && is_next_code_repo(repo)
         {
             return Some(repo.to_path_buf());
         }
@@ -55,7 +55,7 @@ pub fn get_repo_dir() -> Option<PathBuf> {
 
 pub fn find_repo_in_ancestors(start: &Path) -> Option<PathBuf> {
     for dir in start.ancestors() {
-        if is_jcode_repo(dir) {
+        if is_next_code_repo(dir) {
             return Some(dir.to_path_buf());
         }
     }
@@ -333,10 +333,10 @@ fn non_empty_env_path(name: &str) -> Option<PathBuf> {
 /// Directory for the single launcher path users execute from PATH.
 ///
 /// Defaults to `~/.local/bin` on Unix, `%LOCALAPPDATA%\next-code\bin` on Windows.
-/// Overridable with `NEXT_CODE_INSTALL_DIR` (canonical) or legacy `JCODE_INSTALL_DIR`.
+/// Overridable with `NEXT_CODE_INSTALL_DIR` (canonical) or legacy `NEXT_CODE_INSTALL_DIR`.
 pub fn launcher_dir() -> Result<PathBuf> {
     if let Some(custom) = non_empty_env_path("NEXT_CODE_INSTALL_DIR")
-        .or_else(|| non_empty_env_path("JCODE_INSTALL_DIR"))
+        .or_else(|| non_empty_env_path("NEXT_CODE_INSTALL_DIR"))
     {
         return Ok(custom);
     }
@@ -571,10 +571,7 @@ pub fn preferred_reload_candidate(is_selfdev_session: bool) -> Option<(PathBuf, 
     }
 }
 
-/// Check if a directory is the next-code (or legacy jcode) repository.
-///
-/// Accepts both `name = "next-code"` and `name = "jcode"` so detectors keep
-/// working across the rebrand and for older checkouts / dual-named fixtures.
+/// Check if a directory is the next-code repository (`name = "next-code"`).
 pub fn is_next_code_repo(dir: &Path) -> bool {
     let cargo_toml = dir.join("Cargo.toml");
     if !cargo_toml.exists() {
@@ -586,20 +583,13 @@ pub fn is_next_code_repo(dir: &Path) -> bool {
         return false;
     }
 
-    // Read Cargo.toml and check package name (new + legacy).
     if let Ok(content) = std::fs::read_to_string(&cargo_toml)
-        && (content.contains("name = \"next-code\"") || content.contains("name = \"jcode\""))
+        && content.contains("name = \"next-code\"")
     {
         return true;
     }
 
     false
-}
-
-/// Deprecated alias for [`is_next_code_repo`].
-#[inline]
-pub fn is_jcode_repo(dir: &Path) -> bool {
-    is_next_code_repo(dir)
 }
 
 #[cfg(test)]
@@ -638,15 +628,12 @@ mod tests {
     fn is_next_code_repo_accepts_git_file_for_worktree() {
         let repo = repo_fixture(true, "next-code");
         assert!(is_next_code_repo(repo.path()));
-        assert!(is_jcode_repo(repo.path()));
     }
 
     #[test]
-    fn is_next_code_repo_accepts_legacy_jcode_package_name() {
-        // dual-read: legacy package name still accepted
-        let repo = repo_fixture(false, "jcode");
-        assert!(is_next_code_repo(repo.path()));
-        assert!(is_jcode_repo(repo.path()));
+    fn is_next_code_repo_rejects_other_package_names() {
+        let repo = repo_fixture(false, "other");
+        assert!(!is_next_code_repo(repo.path()));
     }
 
     /// Build a release-style install dir: `next-code` wrapper script + payload.

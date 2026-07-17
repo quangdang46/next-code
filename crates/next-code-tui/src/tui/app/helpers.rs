@@ -707,7 +707,7 @@ pub(super) fn build_resume_command(
     socket: Option<&str>,
 ) -> (PathBuf, Vec<String>, String) {
     match target {
-        ResumeTarget::JcodeSession { session_id } => {
+        ResumeTarget::NextCodeSession { session_id } => {
             let exe = launch_client_executable();
             let args = resume_invocation_args(session_id, socket);
             let title = resumed_window_title(session_id);

@@ -3,7 +3,7 @@
 //! All bearer credentials are sent in authorization headers or JSON response
 //! bodies. They are never placed in URLs, redirects, or diagnostic messages.
 
-use crate::subscription_catalog::{self, JcodeTier};
+use crate::subscription_catalog::{self, NextCodeTier};
 use anyhow::{Context, Result};
 use reqwest::{StatusCode, header::RETRY_AFTER};
 use serde::{Deserialize, Serialize};
@@ -41,8 +41,8 @@ pub struct SubscriptionMe {
 }
 
 impl SubscriptionMe {
-    pub fn parsed_tier(&self) -> Option<JcodeTier> {
-        JcodeTier::parse(&self.tier)
+    pub fn parsed_tier(&self) -> Option<NextCodeTier> {
+        NextCodeTier::parse(&self.tier)
     }
 
     pub fn has_active_paid_plan(&self) -> bool {
@@ -227,7 +227,7 @@ fn error_code(body: &str) -> Option<String> {
 pub async fn request_device_authorization(
     client: &reqwest::Client,
     api_base: &str,
-    requested_tier: Option<JcodeTier>,
+    requested_tier: Option<NextCodeTier>,
 ) -> std::result::Result<DeviceAuthorization, AccountApiError> {
     let url = endpoint_url(api_base, "auth/device");
     let mut payload = serde_json::json!({ "client_name": "next-code-cli" });
@@ -542,7 +542,7 @@ mod tests {
             "manage_url": "https://jcode.sh/account"
         }"#;
         let me: SubscriptionMe = serde_json::from_str(json).expect("parse");
-        assert_eq!(me.parsed_tier(), Some(JcodeTier::Flagship));
+        assert_eq!(me.parsed_tier(), Some(NextCodeTier::Flagship));
         assert!(me.has_active_paid_plan());
         assert_eq!(me.manage_url.as_deref(), Some("https://jcode.sh/account"));
     }
@@ -570,7 +570,7 @@ mod tests {
             vec![],
             r#"{"device_code":"secret","flow_id":"public-flow","verification_uri":"https://jcode.sh/account","verification_uri_complete":"https://jcode.sh/account?flow=public-flow","verify_url":"https://jcode.sh/account?flow=public-flow","expires_in":600,"interval":3}"#.to_string(),
         )]);
-        let result = request_device_authorization(&client(), &base, Some(JcodeTier::Pro))
+        let result = request_device_authorization(&client(), &base, Some(NextCodeTier::Pro))
             .await
             .expect("device auth");
         assert_eq!(result.device_code, "secret");
@@ -585,7 +585,7 @@ mod tests {
             vec![],
             r#"{"device_code":"do-not-echo","verify_url":"https://old.example/login"}"#.to_string(),
         )]);
-        let error = request_device_authorization(&client(), &base, Some(JcodeTier::Pro))
+        let error = request_device_authorization(&client(), &base, Some(NextCodeTier::Pro))
             .await
             .expect_err("legacy response rejected");
         assert_eq!(error, AccountApiError::LegacyBackend);

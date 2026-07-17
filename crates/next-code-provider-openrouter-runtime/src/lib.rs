@@ -306,7 +306,7 @@ pub enum OpenRouterTransportState {
     OpenRouterApiKey,
     /// next-code subscription access currently reuses the OpenRouter HTTP slot, but is
     /// not user BYOK/OpenRouter billing.
-    JcodeSubscription,
+    NextCodeSubscription,
     /// A direct OpenAI-compatible endpoint that needs a user key, Azure credential,
     /// or provider-profile secret while reusing the OpenRouter-compatible transport.
     DirectApiKey,
@@ -326,9 +326,9 @@ impl OpenRouterTransportState {
 
         if matches!(
             runtime_provider.as_deref(),
-            Some("next-code" | "next-code")
+            Some("next-code")
         ) {
-            return Self::JcodeSubscription;
+            return Self::NextCodeSubscription;
         }
 
         if matches!(runtime_provider.as_deref(), Some("openrouter")) {
@@ -365,10 +365,10 @@ impl OpenRouterTransportState {
                 Some(Self::OpenRouterApiKey)
             }
             "next-code"
-            | "jcode-subscription"
+            | "next-code-subscription"
             | "subscription"
             | "next-code"
-            | "next-code-subscription" => Some(Self::JcodeSubscription),
+            | "next-code-subscription" => Some(Self::NextCodeSubscription),
             "direct" | "direct-api-key" | "openai-compatible" | "compatible-api-key" => {
                 Some(Self::DirectApiKey)
             }

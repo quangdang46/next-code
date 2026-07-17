@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Report compile-time isolation risks in the Jcode crate graph.
+"""Report compile-time isolation risks in the NextCode crate graph.
 
 This is advisory by default. Use --strict-target-state only when a migration phase
 has removed the listed temporary violations and we want to prevent regressions.

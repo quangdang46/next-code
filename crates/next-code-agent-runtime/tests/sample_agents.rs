@@ -1,5 +1,5 @@
 //! Integration test: load the bundled sample agents in
-//! `<project>/.jcode/agents/` (legacy sample path; dual-read with
+//! `<project>/.next-code/agents/` (legacy sample path; dual-read with
 //! `.next-code/agents/`) and assert the registry behaves as documented.
 //!
 //! Lives in `tests/` so it exercises the public API the way real callers
@@ -19,13 +19,13 @@ use next_code_agent_runtime::{
 /// chooses.
 fn samples_dir() -> PathBuf {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // crates/next-code-agent-runtime → ../../.jcode/agents (sample path on disk)
+    // crates/next-code-agent-runtime → ../../.next-code/agents (sample path on disk)
     crate_dir
         .parent()
         .unwrap()
         .parent()
         .unwrap()
-        .join(".jcode/agents")
+        .join(".next-code/agents")
 }
 
 #[test]

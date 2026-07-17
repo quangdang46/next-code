@@ -33,7 +33,7 @@ if [[ -z "${current}" || ! -x "${current}" ]]; then
   fi
 fi
 
-sock="${NEXT_CODE_SOCKET:-${JCODE_SOCKET:-}}"
+sock="${NEXT_CODE_SOCKET:-${NEXT_CODE_SOCKET:-}}"
 if [[ -z "${sock}" ]]; then
   # Match common macOS temp default used by local serve.
   base="${TMPDIR:-/tmp}"

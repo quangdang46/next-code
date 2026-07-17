@@ -72,18 +72,18 @@ def main():
     if not binary:
         candidates = [
             REPO / "target" / "selfdev" / "next-code",
-            REPO / "target" / "selfdev" / "jcode",
+            REPO / "target" / "selfdev" / "next-code",
             REPO / "target" / "release" / "next-code",
-            REPO / "target" / "release" / "jcode",
+            REPO / "target" / "release" / "next-code",
             Path.home() / ".next-code" / "builds" / "current" / "next-code",
-            Path.home() / ".next-code" / "builds" / "current" / "jcode",
-            Path.home() / ".jcode" / "builds" / "current" / "next-code",
-            Path.home() / ".jcode" / "builds" / "current" / "jcode",
+            Path.home() / ".next-code" / "builds" / "current" / "next-code",
+            Path.home() / ".next-code" / "builds" / "current" / "next-code",
+            Path.home() / ".next-code" / "builds" / "current" / "next-code",
         ]
         binary = next((str(p) for p in candidates if p.exists()), None)
     if not binary:
         raise SystemExit(
-            "No next-code binary found. Set NEXT_CODE_E2E_BIN (or legacy JCODE_E2E_BIN) or build first."
+            "No next-code binary found. Set NEXT_CODE_E2E_BIN (or legacy NEXT_CODE_E2E_BIN) or build first."
         )
 
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

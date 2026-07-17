@@ -91,8 +91,8 @@ fn make_session_with_flags(
         search_index,
         server_name: None,
         server_icon: None,
-        source: SessionSource::Jcode,
-        resume_target: ResumeTarget::JcodeSession {
+        source: SessionSource::NextCode,
+        resume_target: ResumeTarget::NextCodeSession {
             session_id: id.to_string(),
         },
         external_path: None,
@@ -1003,10 +1003,10 @@ fn test_space_selects_multiple_sessions_and_enter_returns_them() {
             assert_eq!(
                 ids,
                 vec![
-                    ResumeTarget::JcodeSession {
+                    ResumeTarget::NextCodeSession {
                         session_id: "session_newer".to_string(),
                     },
-                    ResumeTarget::JcodeSession {
+                    ResumeTarget::NextCodeSession {
                         session_id: "session_older".to_string(),
                     }
                 ]
@@ -1024,10 +1024,10 @@ fn test_space_selects_multiple_sessions_and_enter_returns_them() {
             assert_eq!(
                 ids,
                 vec![
-                    ResumeTarget::JcodeSession {
+                    ResumeTarget::NextCodeSession {
                         session_id: "session_newer".to_string(),
                     },
-                    ResumeTarget::JcodeSession {
+                    ResumeTarget::NextCodeSession {
                         session_id: "session_older".to_string(),
                     }
                 ]

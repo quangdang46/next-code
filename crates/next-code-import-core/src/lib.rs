@@ -16,7 +16,7 @@ pub type ImportCoreResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync
 /// Returns a slice of at most `max_bytes` bytes, ending at a valid char
 /// boundary so it never panics on multibyte input. This mirrors
 /// `next_code_core::util::truncate_str`, duplicated here to keep this leaf crate
-/// free of the heavier `jcode-core` dependency.
+/// free of the heavier `next-code-core` dependency.
 fn truncate_str(s: &str, max_bytes: usize) -> &str {
     if s.len() <= max_bytes {
         return s;
@@ -1316,7 +1316,7 @@ mod tests {
     fn load_cursor_external_session_skips_subagent_transcripts() {
         use std::io::Write;
         let dir = std::env::temp_dir().join(format!(
-            "jcode-cursor-subagent-{}-{}",
+            "next-code-cursor-subagent-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -1346,7 +1346,7 @@ mod tests {
     fn load_cursor_external_session_parses_content_blocks() {
         use std::io::Write;
         let dir = std::env::temp_dir().join(format!(
-            "jcode-cursor-loader-{}-{}",
+            "next-code-cursor-loader-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -1500,8 +1500,8 @@ mod tests {
         );
         assert_eq!(claude_title_candidate("   "), None);
         assert_eq!(
-            claude_title_candidate("can you fix my jcode server version?"),
-            Some("can you fix my jcode server version?".into())
+            claude_title_candidate("can you fix my next-code server version?"),
+            Some("can you fix my next-code server version?".into())
         );
     }
 

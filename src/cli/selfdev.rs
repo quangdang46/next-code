@@ -26,7 +26,7 @@ fn resolve_or_clone_repo_dir() -> Result<PathBuf> {
 
     let repo_dir = selfdev_clone_dir()?;
     if repo_dir.exists() {
-        if build::is_jcode_repo(&repo_dir) {
+        if build::is_next_code_repo(&repo_dir) {
             return Ok(repo_dir);
         }
 
@@ -67,7 +67,7 @@ fn resolve_or_clone_repo_dir() -> Result<PathBuf> {
         );
     }
 
-    if !build::is_jcode_repo(&repo_dir) {
+    if !build::is_next_code_repo(&repo_dir) {
         anyhow::bail!(
             "Cloned self-dev source is not a valid next-code repository: {}",
             repo_dir.display()

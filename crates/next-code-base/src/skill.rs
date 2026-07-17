@@ -1076,7 +1076,7 @@ mod tests {
     }
 
     #[test]
-    fn load_for_working_dir_reads_project_local_jcode_skills() {
+    fn load_for_working_dir_reads_project_local_next_code_skills() {
         let temp = tempfile::tempdir().expect("tempdir");
         write_test_skill(temp.path(), ".next-code", "wd-only");
 
@@ -1394,7 +1394,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_jcode_skill_wins_over_plugin_skill_with_same_name() {
+    fn explicit_next_code_skill_wins_over_plugin_skill_with_same_name() {
         let temp = tempfile::tempdir().expect("tempdir");
         let plugins_root = temp.path().join("plugins");
 

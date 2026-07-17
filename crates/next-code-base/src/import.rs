@@ -603,7 +603,7 @@ pub fn imported_session_id_for_target(
     target: &next_code_session_types::ResumeTarget,
 ) -> Option<String> {
     match target {
-        next_code_session_types::ResumeTarget::JcodeSession { session_id } => Some(session_id.clone()),
+        next_code_session_types::ResumeTarget::NextCodeSession { session_id } => Some(session_id.clone()),
         next_code_session_types::ResumeTarget::ClaudeCodeSession { session_id, .. } => {
             Some(imported_claude_code_session_id(session_id))
         }
@@ -622,7 +622,7 @@ pub fn imported_session_id_for_target(
     }
 }
 
-pub fn resolve_resume_target_to_jcode(
+pub fn resolve_resume_target_to_next_code(
     target: &next_code_session_types::ResumeTarget,
 ) -> Result<next_code_session_types::ResumeTarget> {
     use next_code_session_types::ResumeTarget;
@@ -631,8 +631,8 @@ pub fn resolve_resume_target_to_jcode(
     let cache_hit;
     let source_label;
     let session_id = match target {
-        ResumeTarget::JcodeSession { session_id } => {
-            return Ok(ResumeTarget::JcodeSession {
+        ResumeTarget::NextCodeSession { session_id } => {
+            return Ok(ResumeTarget::NextCodeSession {
                 session_id: session_id.clone(),
             });
         }
@@ -700,7 +700,7 @@ pub fn resolve_resume_target_to_jcode(
         prepare_start.elapsed().as_millis()
     ));
 
-    Ok(ResumeTarget::JcodeSession { session_id })
+    Ok(ResumeTarget::NextCodeSession { session_id })
 }
 
 pub fn import_external_resume_id(resume_id: &str) -> Result<Option<String>> {

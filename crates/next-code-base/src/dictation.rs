@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Mutex, OnceLock};
 use tokio::time::{Duration, timeout};
 
-const CLIENT_TITLE_PREFIXES: &[&str] = &["nc:d:", "nc:c:", "jcode:d:", "jcode:c:"];
+const CLIENT_TITLE_PREFIXES: &[&str] = &["nc:d:", "nc:c:", "next-code:d:", "next-code:c:"];
 
 #[derive(Debug, Clone)]
 pub struct DictationRun {
@@ -131,7 +131,7 @@ pub fn type_text(text: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn focused_jcode_session() -> Result<Option<String>> {
+pub fn focused_next_code_session() -> Result<Option<String>> {
     let Some(window) = focused_window_niri()? else {
         return Ok(None);
     };
@@ -215,8 +215,8 @@ fn resolve_session_from_window_title(title: &str) -> Option<String> {
 
 fn extract_session_short_name_from_window_title(title: &str) -> Option<String> {
     let (_, rest) = title
-        .split_once("jcode/")
-        .or_else(|| title.split_once("jcode "))?;
+        .split_once("next-code/")
+        .or_else(|| title.split_once("next-code "))?;
     let candidate = rest.split('[').next().unwrap_or(rest).trim();
     let token = candidate.split_whitespace().next_back()?;
     normalize_session_short_name(token)

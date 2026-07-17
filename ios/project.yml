@@ -1,6 +1,6 @@
 name: NextCodeMobile
 options:
-  bundleIdPrefix: com.jcode
+  bundleIdPrefix: com.next-code
   deploymentTarget:
     iOS: "17.0"
   generateEmptyDirectories: true
@@ -25,7 +25,7 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: Sources/NextCodeMobile/Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: com.jcode.mobile
+        PRODUCT_BUNDLE_IDENTIFIER: @@COM_NEXT_CODE_MOBILE@@
         MARKETING_VERSION: "2.0.0"
         CURRENT_PROJECT_VERSION: 1
         TARGETED_DEVICE_FAMILY: "1,2"

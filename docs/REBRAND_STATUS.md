@@ -8,7 +8,7 @@
 
 | Check | Status |
 |---|---|
-| Crate dirs renamed (`crates/next-code-*`) | **Done** — no `jcode-*` crate dirs remain |
+| Crate dirs renamed (`crates/next-code-*`) | **Done** — no `next-code-*` crate dirs remain |
 | Root package / bin names | **Done** — `name = "next-code"`, bin `next-code`, lib `next_code` |
 | Workspace members | **Done** — all `next-code-*` |
 | `cargo check -p next-code --bins` | **OK** (warnings only; 0 errors) |
@@ -32,20 +32,20 @@
 
 | Surface | Location | Behavior |
 |---|---|---|
-| Env dual-read | `crates/next-code-core/src/env.rs` — `product_env` / `product_env_os` / `product_var_full*` | `NEXT_CODE_{suffix}` then `JCODE_{suffix}` |
-| Home dir | `crates/next-code-storage/src/lib.rs` — `next_code_dir` | `$NEXT_CODE_HOME` → `$JCODE_HOME` → `~/.next-code` with auto-migrate from `~/.jcode` |
-| Project dir candidates | `PROJECT_DIR_CANDIDATES` | Prefer `.next-code`, fall back to `.jcode` |
+| Env dual-read | `crates/next-code-core/src/env.rs` — `product_env` / `product_env_os` / `product_var_full*` | `NEXT_CODE_{suffix}` then `NEXT_CODE_{suffix}` |
+| Home dir | `crates/next-code-storage/src/lib.rs` — `next_code_dir` | `$NEXT_CODE_HOME` → `$NEXT_CODE_HOME` → `~/.next-code` with auto-migrate from `~/.next-code` |
+| Project dir candidates | `PROJECT_DIR_CANDIDATES` | Prefer `.next-code`, fall back to `.next-code` |
 | Runtime dir | `runtime_dir()` | via `product_env("RUNTIME_DIR")` |
-| Keyring dual-read | `jcode-provider-service` / `jcode-secrets` | Write new service names; load legacy |
-| Product provider id | `LoginProviderTarget::Jcode` / `provider::jcode::JcodeProvider` | First-party provider surface (not package rename miss) |
+| Keyring dual-read | `next-code-provider-service` / `next-code-secrets` | Write new service names; load legacy |
+| Product provider id | `LoginProviderTarget::NextCode` / `provider::next-code::NextCodeProvider` | First-party provider surface (not package rename miss) |
 | Domains | `*.jcode.sh` | Domain freeze (contract §2.3) |
-| iOS bundle | `com.jcode.mobile` | Keep until App Store rename |
+| iOS bundle | `@@COM_NEXT_CODE_MOBILE@@` | Keep until App Store rename |
 
 ### Mop-up landed this pass
 
 - Bulk string / env rewrite WIP across crates, `src/`, scripts, docs, iOS, CI (~915 files).
 - Env call sites migrated toward `product_env` / `NEXT_CODE_*` with dual-read preserved in `product_env`.
-- Subscription catalog string values moved to `NEXT_CODE_*` / `next-code-subscription.env` (const *names* still `JCODE_*` during compat).
+- Subscription catalog string values moved to `NEXT_CODE_*` / `next-code-subscription.env` (const *names* still `NEXT_CODE_*` during compat).
 - User-facing strings in auth/account flows: “Next Code” / `next-code` where rewritten.
 - Compile fixes after mechanical rewrite:
   - Restored `#[path]` modules in `crates/next-code-tui/src/tui/app/auth.rs` (import was inserted between attribute and `mod`).
@@ -66,8 +66,8 @@ Filtered scan (excludes `.git`, `target`, `Cargo.lock`, `changelog/**`, `docs/*_
 
 | Bucket | Count | Notes |
 |---|---:|---|
-| **Files with residual `jcode` (case-insensitive)** | **342** | Down from ~395 prior mop / ~1021 at structural cutover |
-| **`JCODE_` tokens in `*.rs`** | **117** | Dual-read tests, dual-name consts, remaining call sites |
+| **Files with residual `next-code` (case-insensitive)** | **342** | Down from ~395 prior mop / ~1021 at structural cutover |
+| **`NEXT_CODE_` tokens in `*.rs`** | **117** | Dual-read tests, dual-name consts, remaining call sites |
 | **`rg_gate` allowlisted hits** | **1091** | Dual-read, domains, provider module, keyring, beads/origin-sync |
 | **`rg_gate` unexpected hits** | **1099** | Product string / comment / script debt |
 | **`rg_gate` unexpected files** | **289** | Gate still red; useful debt meter |
@@ -89,11 +89,11 @@ Filtered scan (excludes `.git`, `target`, `Cargo.lock`, `changelog/**`, `docs/*_
 
 | Class | Intent |
 |---|---|
-| `product_env` + dual-read `JCODE_*` fallbacks | **Keep** until compat removal |
-| `JCODE_*_ENV` const names (values often `NEXT_CODE_*`) | Compat window; rename later |
-| `JcodeProvider` / `LoginProviderTarget::Jcode` | Product provider id (allowlisted) |
-| `*.jcode.sh` / `com.jcode.mobile` | Domain / bundle freeze |
-| User-facing `"jcode"` strings / comments | **Debt** — continue mop |
+| `product_env` + dual-read `NEXT_CODE_*` fallbacks | **Keep** until compat removal |
+| `NEXT_CODE_*_ENV` const names (values often `NEXT_CODE_*`) | Compat window; rename later |
+| `NextCodeProvider` / `LoginProviderTarget::NextCode` | Product provider id (allowlisted) |
+| `*.jcode.sh` / `@@COM_NEXT_CODE_MOBILE@@` | Domain / bundle freeze |
+| User-facing `"next-code"` strings / comments | **Debt** — continue mop |
 | Root `*_PLAN.md` historical plans | Skipped by measure globs / gate plan skip |
 
 ---
@@ -105,7 +105,7 @@ Filtered scan (excludes `.git`, `target`, `Cargo.lock`, `changelog/**`, `docs/*_
 1. Finish remaining env/comment/user-string mop in top residual files (terminal-launch, config-types, subscription_catalog idents, provider-doctor labels).
 2. Scripts (`dev_cargo.sh`, onboarding, benches) prefer `NEXT_CODE_*` with dual-read only where installers need it.
 3. Docs narrative: **current runbooks cleaned** (`docs/plugins/**`, `docs/plugin-threat-model.md`, `changelog/README.md`, `PLAN_PARITY.md` crate paths, examples plugin comments). Remaining intentional residuals: dual-read notes, domain freeze (`*.jcode.sh`), live keyword ids (`canceljcode`/`stopjcode`), historical `*_PLAN.md` / `docs/plans/**`, REBRAND audit trees.
-4. iOS display / type renames; keep `com.jcode.mobile`.
+4. iOS display / type renames; keep `@@COM_NEXT_CODE_MOBILE@@`.
 5. Telemetry worker package/display names when infra rename is scheduled.
 
 ### Locked / deferred by contract
@@ -113,11 +113,11 @@ Filtered scan (excludes `.git`, `target`, `Cargo.lock`, `changelog/**`, `docs/*_
 | Item | Policy |
 |---|---|
 | Domains `*.jcode.sh` | Do not rewrite until DNS decision |
-| iOS bundle id `com.jcode.mobile` | Keep until explicit App Store rename |
-| Binary alias `jcode` → `next-code` | One release only |
+| iOS bundle id `@@COM_NEXT_CODE_MOBILE@@` | Keep until explicit App Store rename |
+| Binary alias `next-code` → `next-code` | One release only |
 | Dual-read env/home/keyring/URL | ≥ 1 major / prefer ≥ 6 months |
 | `jbench` | Stay unbranded |
-| Provider product id `Jcode` | Stable id until deliberate auth-state migration |
+| Provider product id `NextCode` | Stable id until deliberate auth-state migration |
 
 ---
 
@@ -125,13 +125,13 @@ Filtered scan (excludes `.git`, `target`, `Cargo.lock`, `changelog/**`, `docs/*_
 
 ```
 next_code_core::env::product_env("X")
-  → NEXT_CODE_X then JCODE_X
+  → NEXT_CODE_X then NEXT_CODE_X
 
 next_code_storage::next_code_dir()
-  → NEXT_CODE_HOME | JCODE_HOME | ~/.next-code
-  → auto-migrate ~/.jcode → ~/.next-code (+ .migrated-from-jcode)
+  → NEXT_CODE_HOME | NEXT_CODE_HOME | ~/.next-code
+  → auto-migrate ~/.next-code → ~/.next-code (+ .migrated-from-next-code)
 
-PROJECT_DIR_CANDIDATES prefer .next-code then .jcode
+PROJECT_DIR_CANDIDATES prefer .next-code then .next-code
 runtime_dir() via product_env("RUNTIME_DIR")
 keyring: next-code-* write, jcode-* dual-read
 ```
@@ -144,8 +144,8 @@ Removal tracked under contract §2.5 — **TODO version not yet filled**.
 
 ```bash
 # Structural
-ls crates | rg 'jcode' || echo 'no jcode crate dirs OK'
-rg 'name\s*=\s*"jcode' -g 'Cargo.toml' || echo 'no package name jcode OK'
+ls crates | rg 'next-code' || echo 'no next-code crate dirs OK'
+rg 'name\s*=\s*"next-code' -g 'Cargo.toml' || echo 'no package name next-code OK'
 
 # Compile + dual-read tests
 cargo check -p next-code --bins
@@ -153,10 +153,10 @@ cargo test -p next-code-storage --lib
 cargo test -p next-code-core --lib
 
 # Residual measure (same globs as mop-up)
-rg -i 'jcode' --glob '!.git/**' --glob '!target/**' --glob '!Cargo.lock' \
+rg -i 'next-code' --glob '!.git/**' --glob '!target/**' --glob '!Cargo.lock' \
   --glob '!changelog/**' --glob '!docs/*_PLAN.md' --glob '!docs/plans/**' \
   --glob '!assets/**' --glob '!docs/REBRAND_*' -l | wc -l
-rg -c 'JCODE_' -g '*.rs' --glob '!.git/**' --glob '!target/**' \
+rg -c 'NEXT_CODE_' -g '*.rs' --glob '!.git/**' --glob '!target/**' \
   | awk -F: '{s+=$2} END{print s+0}'
 
 # Debt meter
@@ -167,4 +167,4 @@ python3 scripts/rebrand/rg_gate.py --max-print 50
 
 ## Summary
 
-Structural rebrand is **complete and builds**. Dual-read env/home/keyring paths are **implemented and tested** (storage 8/8, core 29/29). Final residual sweep continued narrative/comment/script mop, dual-name const polish, and embedding-path dual-read while preserving provider id aliases and domain/bundle freezes. **342 files / 117 `JCODE_` rust tokens / 1099 unexpected gate hits** remain as product string debt — gate stays red as a meter until those land. Domains, iOS bundle id, and dual-read shims stay per contract.
+Structural rebrand is **complete and builds**. Dual-read env/home/keyring paths are **implemented and tested** (storage 8/8, core 29/29). Final residual sweep continued narrative/comment/script mop, dual-name const polish, and embedding-path dual-read while preserving provider id aliases and domain/bundle freezes. **342 files / 117 `NEXT_CODE_` rust tokens / 1099 unexpected gate hits** remain as product string debt — gate stays red as a meter until those land. Domains, iOS bundle id, and dual-read shims stay per contract.

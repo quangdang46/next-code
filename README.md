@@ -14,8 +14,8 @@ Built for multi-session workflows, infinite customizability, and performance.
 
 <br>
 
-<a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-memory-demo.mp4">
-  <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-memory-demo.webp" alt="next-code memory demonstration" width="800">
+<a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.mp4">
+  <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.webp" alt="next-code memory demonstration" width="800">
 </a>
 
 <br>
@@ -32,7 +32,7 @@ Built for multi-session workflows, infinite customizability, and performance.
 
 </div>
 
-> **Renamed from jcode.** The binary is `next-code`. Installers also create a one-release `jcode` → `next-code` compat symlink. Home data defaults to `~/.next-code` (legacy `~/.jcode` is dual-read and migrated). Env vars prefer `NEXT_CODE_*` and still dual-read `JCODE_*`. Project-local dirs prefer `.next-code/` and fall back to `.jcode/`.
+> **Renamed from jcode.** The binary is `next-code`. Installers also create a one-release `jcode` → `next-code` compat symlink. Home data defaults to `~/.next-code` (legacy `~/.next-code` is dual-read and migrated). Env vars prefer `NEXT_CODE_*` and still dual-read `NEXT_CODE_*`. Project-local dirs prefer `.next-code/` and fall back to `.next-code/`.
 
 ```bash
 # macOS & Linux
@@ -256,8 +256,8 @@ versions tested for this corrected memory rerun:
 
 <div align="center">
 
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-performance-demo.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-performance-demo.webp" alt="next-code performance demonstration" width="900">
+  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-performance-demo.mp4">
+    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-performance-demo.webp" alt="next-code performance demonstration" width="900">
   </a>
 
   <p><em>next-code performance demonstration</em></p>
@@ -279,8 +279,8 @@ Memories are automatically consolidated every so often via the ambient mode. Thi
 
 <div align="center">
 
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-memory-demo.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-memory-demo.webp" alt="next-code memory demonstration" width="900">
+  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.mp4">
+    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.webp" alt="next-code memory demonstration" width="900">
   </a>
 
   <p><em>next-code memory demonstration</em></p>
@@ -314,8 +314,8 @@ Spawn two or more agents in the same repo, and they will automatically be manage
 
 <div align="center">
 
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/swarm-demo.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-swarm-demonstration.webp" alt="next-code swarm demonstration" width="900">
+  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/swarm-demo.mp4">
+    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-swarm-demonstration.webp" alt="next-code swarm demonstration" width="900">
   </a>
 
   <p><em>next-code swarm demonstration</em></p>
@@ -669,8 +669,8 @@ This is useful when you want to test with a clean context or run sessions withou
 
 <div align="center">
 
-  <a href="https://github.com/1jehuang/jcode/releases/download/readme-assets/workflow.mp4">
-    <img src="https://github.com/1jehuang/jcode/releases/download/readme-assets/jcode-workflow-demonstration.webp" alt="next-code workflow demonstration" width="900">
+  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/workflow.mp4">
+    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-workflow-demonstration.webp" alt="next-code workflow demonstration" width="900">
   </a>
 
   <p><em>next-code workflow demonstration</em></p>

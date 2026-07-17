@@ -37,7 +37,7 @@ The harness runs three checks against one live client:
 Each byte encoding is tried against a freshly reset fixture so we learn exactly
 which terminal encoding(s) work end to end.
 
-Everything runs in a throwaway JCODE_HOME / runtime dir / socket. The user's
+Everything runs in a throwaway NEXT_CODE_HOME / runtime dir / socket. The user's
 real server and sessions are never touched.
 
 Usage

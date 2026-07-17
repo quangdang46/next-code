@@ -147,7 +147,7 @@ fn log_auth_status_snapshot(event: &str, status: &AuthStatus) {
         event,
         "all",
         &[
-            ("next-code", auth_state_label(status.jcode)),
+            ("next-code", auth_state_label(status.next_code)),
             ("claude", auth_state_label(status.anthropic.state)),
             ("openai", auth_state_label(status.openai)),
             ("openrouter", auth_state_label(status.openrouter)),
@@ -276,7 +276,7 @@ impl AuthStatus {
     /// Returns true if at least one provider has usable credentials.
     pub fn has_any_available(&self) -> bool {
         self.anthropic.state == AuthState::Available
-            || self.jcode == AuthState::Available
+            || self.next_code == AuthState::Available
             || self.openai == AuthState::Available
             || self.openrouter == AuthState::Available
             || self.azure == AuthState::Available
@@ -303,7 +303,7 @@ impl AuthStatus {
             vec![
                 ("surface", surface.to_string()),
                 ("any_available", self.has_any_available().to_string()),
-                ("next-code", self.jcode.label().to_string()),
+                ("next-code", self.next_code.label().to_string()),
                 ("anthropic", self.anthropic.state.label().to_string()),
                 ("anthropic_oauth", self.anthropic.has_oauth.to_string()),
                 ("anthropic_api", self.anthropic.has_api_key.to_string()),
@@ -342,7 +342,7 @@ impl AuthStatus {
                     AuthState::NotConfigured
                 }
             }
-            LoginProviderAuthStateKey::Jcode => self.jcode,
+            LoginProviderAuthStateKey::NextCode => self.next_code,
             LoginProviderAuthStateKey::Anthropic => self.anthropic.state,
             LoginProviderAuthStateKey::OpenAi => self.openai,
             LoginProviderAuthStateKey::Azure => self.azure,
@@ -365,7 +365,7 @@ impl AuthStatus {
                     AuthState::NotConfigured
                 }
             }
-            crate::provider_catalog::LoginProviderTarget::Jcode => {
+            crate::provider_catalog::LoginProviderTarget::NextCode => {
                 if crate::subscription_catalog::has_credentials() {
                     AuthState::Available
                 } else {
@@ -436,7 +436,7 @@ impl AuthStatus {
                     "No importable external logins found".to_string()
                 }
             }
-            crate::provider_catalog::LoginProviderTarget::Jcode => {
+            crate::provider_catalog::LoginProviderTarget::NextCode => {
                 if self.state_for_provider(provider) == AuthState::Available {
                     if crate::subscription_catalog::has_router_base() {
                         format!(
@@ -597,7 +597,7 @@ impl AuthStatus {
                 AuthRefreshSupport::ExternalManaged,
                 AuthValidationMethod::TrustedImportScan,
             ),
-            crate::provider_catalog::LoginProviderTarget::Jcode => {
+            crate::provider_catalog::LoginProviderTarget::NextCode => {
                 let (source, detail) = summarize_sources(vec![
                     env_source(crate::subscription_catalog::NEXT_CODE_API_KEY_ENV),
                     config_source(
@@ -817,7 +817,7 @@ fn build_auth_status_uncached(mode: AuthProbeMode) -> (AuthStatus, Vec<(&'static
     let mut status = AuthStatus::default();
     let mut timings = Vec::new();
 
-    record_auth_probe_step(&mut timings, "next-code", || probe_jcode_status(&mut status));
+    record_auth_probe_step(&mut timings, "next-code", || probe_next_code_status(&mut status));
     record_auth_probe_step(&mut timings, "anthropic", || {
         probe_anthropic_status(&mut status)
     });
@@ -877,9 +877,9 @@ fn token_state(result: anyhow::Result<bool>) -> AuthState {
     }
 }
 
-fn probe_jcode_status(status: &mut AuthStatus) {
+fn probe_next_code_status(status: &mut AuthStatus) {
     if crate::subscription_catalog::has_credentials() {
-        status.jcode = AuthState::Available;
+        status.next_code = AuthState::Available;
     }
 }
 
@@ -1143,7 +1143,7 @@ fn assessment_for_key(
                 AuthValidationMethod::TimestampCheck,
             )
         }
-        LoginProviderAuthStateKey::Jcode
+        LoginProviderAuthStateKey::NextCode
         | LoginProviderAuthStateKey::Azure
         | LoginProviderAuthStateKey::Bedrock
         | LoginProviderAuthStateKey::OpenRouterLike
@@ -1236,7 +1236,7 @@ fn anthropic_oauth_source(status: &AuthStatus) -> Option<(AuthCredentialSource, 
         .is_empty()
     {
         return Some((
-            AuthCredentialSource::JcodeManagedFile,
+            AuthCredentialSource::NextCodeManagedFile,
             "~/.next-code/auth.json".to_string(),
         ));
     }
@@ -1267,7 +1267,7 @@ fn openai_oauth_source(status: &AuthStatus) -> Option<(AuthCredentialSource, Str
         .is_empty()
     {
         return Some((
-            AuthCredentialSource::JcodeManagedFile,
+            AuthCredentialSource::NextCodeManagedFile,
             "~/.next-code/openai-auth.json".to_string(),
         ));
     }
@@ -1292,7 +1292,7 @@ fn gemini_source() -> Option<(AuthCredentialSource, String)> {
         && path.exists()
     {
         return Some((
-            AuthCredentialSource::JcodeManagedFile,
+            AuthCredentialSource::NextCodeManagedFile,
             format!("{}", path.display()),
         ));
     }
@@ -1321,7 +1321,7 @@ fn antigravity_source() -> Option<(AuthCredentialSource, String)> {
         && path.exists()
     {
         return Some((
-            AuthCredentialSource::JcodeManagedFile,
+            AuthCredentialSource::NextCodeManagedFile,
             format!("{}", path.display()),
         ));
     }
@@ -1341,7 +1341,7 @@ fn google_source() -> Option<(AuthCredentialSource, String)> {
         && credentials_path.exists()
     {
         return Some((
-            AuthCredentialSource::JcodeManagedFile,
+            AuthCredentialSource::NextCodeManagedFile,
             format!("{} + {}", credentials_path.display(), tokens_path.display()),
         ));
     }

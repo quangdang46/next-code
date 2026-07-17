@@ -268,14 +268,14 @@ Any of these methods will disable telemetry completely:
 ```bash
 # Option 1: Environment variable
 export NEXT_CODE_NO_TELEMETRY=1
-# legacy dual-read also accepts: export JCODE_NO_TELEMETRY=1
+# legacy dual-read also accepts: export NEXT_CODE_NO_TELEMETRY=1
 
 # Option 2: Standard DO_NOT_TRACK (https://consoledonottrack.com/)
 export DO_NOT_TRACK=1
 
 # Option 3: File-based opt-out
 touch ~/.next-code/no_telemetry
-# legacy dual-read: ~/.jcode/no_telemetry (migrates with home dir)
+# legacy dual-read: ~/.next-code/no_telemetry (migrates with home dir)
 ```
 
 When opted out, zero network requests are made. The telemetry module short-circuits immediately.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Quantitative quality metrics for Jcode Desktop inline widgets.
+"""Quantitative quality metrics for Next Code Desktop inline widgets.
 
 Captures widget states headlessly and scores each card from its PNG plus the
 geometry in the capture manifest:
@@ -143,7 +143,7 @@ def main() -> int:
     states = [s for s in args.states.split(",") if s]
     results = {}
     failed = False
-    with tempfile.TemporaryDirectory(prefix="jcode-widget-quality-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="next-code-widget-quality-") as tmp:
         out = Path(tmp)
         for state in states:
             cmd = [

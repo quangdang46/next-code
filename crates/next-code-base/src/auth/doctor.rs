@@ -26,7 +26,7 @@ pub fn native_doctor_supports_provider(provider_id: &str) -> bool {
                 | "cursor"
                 | "copilot"
                 | "bedrock"
-                | "jcode"
+                | "next-code"
                 | "next-code"
                 | "azure-openai"
         )
@@ -217,7 +217,7 @@ mod tests {
             state: AuthState::Available,
             readiness: crate::auth::AuthReadinessLevel::RequestValid,
             method_detail: "OAuth".to_string(),
-            credential_source: AuthCredentialSource::JcodeManagedFile,
+            credential_source: AuthCredentialSource::NextCodeManagedFile,
             credential_source_detail: "~/.next-code/auth.json".to_string(),
             expiry_confidence: AuthExpiryConfidence::Exact,
             refresh_support: AuthRefreshSupport::Automatic,

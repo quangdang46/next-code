@@ -26,14 +26,14 @@ impl Drop for EnvVarGuard {
 
 #[test]
 fn next_code_auth_file_default_is_empty() {
-    let auth = JcodeAuthFile::default();
+    let auth = NextCodeAuthFile::default();
     assert!(auth.anthropic_accounts.is_empty());
     assert!(auth.active_anthropic_account.is_none());
 }
 
 #[test]
 fn next_code_auth_file_roundtrip() {
-    let auth = JcodeAuthFile {
+    let auth = NextCodeAuthFile {
         anthropic_accounts: vec![AnthropicAccount {
             label: "work".to_string(),
             access: "acc_123".to_string(),
@@ -48,7 +48,7 @@ fn next_code_auth_file_roundtrip() {
     };
 
     let json = serde_json::to_string_pretty(&auth).unwrap();
-    let parsed: JcodeAuthFile = serde_json::from_str(&json).unwrap();
+    let parsed: NextCodeAuthFile = serde_json::from_str(&json).unwrap();
 
     assert_eq!(parsed.anthropic_accounts.len(), 1);
     assert_eq!(parsed.anthropic_accounts[0].label, "work");
@@ -124,7 +124,7 @@ fn load_auth_file_renames_existing_labels_to_numbered_scheme() {
 
 #[test]
 fn next_code_auth_file_multi_account() {
-    let auth = JcodeAuthFile {
+    let auth = NextCodeAuthFile {
         anthropic_accounts: vec![
             AnthropicAccount {
                 label: "personal".to_string(),
@@ -150,7 +150,7 @@ fn next_code_auth_file_multi_account() {
     };
 
     let json = serde_json::to_string(&auth).unwrap();
-    let parsed: JcodeAuthFile = serde_json::from_str(&json).unwrap();
+    let parsed: NextCodeAuthFile = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed.anthropic_accounts.len(), 2);
     assert_eq!(parsed.active_anthropic_account, Some("work".to_string()));
 }
@@ -164,7 +164,7 @@ fn next_code_auth_file_legacy_migration_format() {
             "expires": 12345
         }
     }"#;
-    let parsed: JcodeAuthFile = serde_json::from_str(legacy_json).unwrap();
+    let parsed: NextCodeAuthFile = serde_json::from_str(legacy_json).unwrap();
     assert!(parsed.anthropic_accounts.is_empty());
     assert!(parsed.anthropic.is_some());
 }
@@ -247,7 +247,7 @@ fn anthropic_account_subscription_type_omitted_when_none() {
 
 #[test]
 fn update_account_profile_sets_email() {
-    let mut auth = JcodeAuthFile::default();
+    let mut auth = NextCodeAuthFile::default();
     auth.anthropic_accounts.push(AnthropicAccount {
         label: "test".to_string(),
         access: "acc".to_string(),

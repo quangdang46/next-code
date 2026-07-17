@@ -588,7 +588,7 @@ fn detect_project_profile() -> ProjectProfile {
     let Some(root) = cwd.as_deref() else {
         return profile;
     };
-    profile.repo_present = root.join(".git").exists() || is_jcode_repo_dir(root);
+    profile.repo_present = root.join(".git").exists() || is_next_code_repo_dir(root);
     let mut scanned_files = 0usize;
     for entry in walkdir::WalkDir::new(root)
         .max_depth(3)
@@ -983,7 +983,7 @@ where
 {
     let (sender, receiver) = sync_channel(capacity);
     std::thread::Builder::new()
-        .name("jcode-telemetry".to_string())
+        .name("next-code-telemetry".to_string())
         .spawn(move || {
             while let Ok(payload) = receiver.recv() {
                 deliver(payload);
@@ -1984,11 +1984,11 @@ pub fn current_provider_model() -> Option<(String, String)> {
 
 fn show_first_run_notice() {
     eprintln!("\x1b[90m");
-    eprintln!("  jcode collects anonymous usage statistics (install count, version, OS,");
+    eprintln!("  next-code collects anonymous usage statistics (install count, version, OS,");
     eprintln!("  session activity, tool counts, and crash/exit reasons). No code, filenames,");
     eprintln!("  prompts, or personal data is sent.");
-    eprintln!("  To opt out: export JCODE_NO_TELEMETRY=1");
-    eprintln!("  Details: https://github.com/1jehuang/jcode/blob/master/TELEMETRY.md");
+    eprintln!("  To opt out: export NEXT_CODE_NO_TELEMETRY=1");
+    eprintln!("  Details: https://github.com/quangdang46/next-code/blob/master/TELEMETRY.md");
     eprintln!("\x1b[0m");
 }
 

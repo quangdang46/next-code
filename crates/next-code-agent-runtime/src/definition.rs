@@ -8,7 +8,7 @@
 //! priority first):
 //!
 //!   1. `.next-code/agents/<id>.toml` (project-local, committed to repo;
-//!      dual-read: legacy `.jcode/agents/`)
+//!      dual-read: legacy `.next-code/agents/`)
 //!   2. `~/.next-code/agents/<id>.toml` (user-global)
 //!   3. Embedded built-in agents bundled with the binary
 //!
@@ -592,7 +592,7 @@ mod tests {
             id = "editor"
             display_name = "Code Editor"
             version = "1.2.0"
-            publisher = "jcode"
+            publisher = "next-code"
             prefer_tier = "thinking"
             reasoning = "high"
             tool_names = ["str_replace", "write_file"]
@@ -608,7 +608,7 @@ mod tests {
         d.validate().expect("validate");
         assert_eq!(d.id, "editor");
         assert_eq!(d.version, "1.2.0");
-        assert_eq!(d.publisher.as_deref(), Some("jcode"));
+        assert_eq!(d.publisher.as_deref(), Some("next-code"));
         assert_eq!(d.prefer_tier, Some(ModelTier::Thinking));
         assert_eq!(d.reasoning, Some(ReasoningEffort::High));
         assert_eq!(d.tool_names, vec!["str_replace", "write_file"]);

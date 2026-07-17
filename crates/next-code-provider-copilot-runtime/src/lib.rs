@@ -1,5 +1,5 @@
 //! GitHub Copilot provider runtime (direct API with bearer-token exchange,
-//! tier detection, premium request modes), moved out of `jcode-base` so
+//! tier detection, premium request modes), moved out of `next-code-base` so
 //! provider edits compile only this crate plus a binary relink instead of
 //! rebuilding the base -> app-core -> tui spine. The binary's composition
 //! root registers [`CopilotApiProvider`] with `next_code_base::provider::external`
@@ -186,11 +186,11 @@ impl CopilotApiProvider {
     }
 
     fn get_or_create_machine_id() -> String {
-        // Prefer ~/.next-code/machine_id; dual-read legacy ~/.jcode/machine_id.
+        // Prefer ~/.next-code/machine_id; dual-read legacy ~/.next-code/machine_id.
         // New writes always go to the canonical path.
         let home = dirs::home_dir().unwrap_or_default();
         let primary = home.join(".next-code").join("machine_id");
-        let legacy = home.join(".jcode").join("machine_id");
+        let legacy = home.join(".next-code").join("machine_id");
         for path in [&primary, &legacy] {
             if let Ok(id) = std::fs::read_to_string(path) {
                 let id = id.trim().to_string();
@@ -275,12 +275,12 @@ impl CopilotApiProvider {
 
     /// Detect the user's Copilot tier and set the best default model.
     /// Call this after construction. Fetches a bearer token and queries /models.
-    /// If JCODE_COPILOT_MODEL is set, this is a no-op (user override).
+    /// If NEXT_CODE_COPILOT_MODEL is set, this is a no-op (user override).
     pub async fn detect_tier_and_set_default(&self) {
         let detect_start = std::time::Instant::now();
         if std::env::var("NEXT_CODE_COPILOT_MODEL").is_ok() {
             next_code_base::logging::info(
-                "Copilot model overridden via JCODE_COPILOT_MODEL, skipping tier detection",
+                "Copilot model overridden via NEXT_CODE_COPILOT_MODEL, skipping tier detection",
             );
             self.mark_init_done();
             return;
@@ -658,7 +658,7 @@ impl CopilotApiProvider {
         use futures::StreamExt;
 
         // Idle timeout between streamed chunks. Configurable via
-        // `[provider] stream_idle_timeout_secs` / `JCODE_STREAM_IDLE_TIMEOUT_SECS`
+        // `[provider] stream_idle_timeout_secs` / `NEXT_CODE_STREAM_IDLE_TIMEOUT_SECS`
         // so slow reasoning models don't trip a premature timeout (issue #434).
         let sse_chunk_timeout = next_code_base::provider::stream_idle_timeout();
 

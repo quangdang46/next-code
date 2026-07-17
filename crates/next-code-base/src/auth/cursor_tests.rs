@@ -2,7 +2,7 @@ use super::*;
 use tempfile::TempDir;
 
 #[test]
-fn config_file_path_under_jcode() {
+fn config_file_path_under_next_code() {
     let path = config_file_path().unwrap();
     let path_str = path.to_string_lossy();
     assert!(path_str.contains("next-code"));
@@ -12,7 +12,7 @@ fn config_file_path_under_jcode() {
 #[test]
 fn save_and_load_api_key() {
     let dir = TempDir::new().unwrap();
-    let file = dir.path().join("jcode").join("cursor.env");
+    let file = dir.path().join("next-code").join("cursor.env");
 
     std::fs::create_dir_all(file.parent().unwrap()).unwrap();
     let content = "CURSOR_API_KEY=test_key_123\n";
@@ -107,7 +107,7 @@ fn has_cursor_api_key_from_env() {
 }
 
 #[test]
-fn cursor_auth_file_path_respects_jcode_home() {
+fn cursor_auth_file_path_respects_next_code_home() {
     // Regression: on Linux the auth.json path previously used
     // `dirs::config_dir()` directly, ignoring NEXT_CODE_HOME. That leaked the real
     // `~/.config/cursor/auth.json` into the onboarding sandbox, so a
@@ -133,7 +133,7 @@ fn cursor_auth_file_path_respects_jcode_home() {
 }
 
 #[test]
-fn cursor_vscdb_paths_respect_jcode_home() {
+fn cursor_vscdb_paths_respect_next_code_home() {
     let _guard = crate::storage::lock_test_env();
     let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = TempDir::new().unwrap();

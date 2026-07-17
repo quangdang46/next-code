@@ -573,7 +573,7 @@ fn version_display_candidates() -> Vec<String> {
 #[cfg(test)]
 fn configured_auth_count(auth: &AuthStatus) -> usize {
     [
-        auth.jcode,
+        auth.next_code,
         auth.anthropic.state,
         auth.openrouter,
         auth.azure,
@@ -1362,7 +1362,7 @@ mod tests {
     #[test]
     fn configured_auth_count_includes_non_model_auth_surfaces() {
         let auth = AuthStatus {
-            jcode: AuthState::Available,
+            next_code: AuthState::Available,
             anthropic: ProviderAuth {
                 state: AuthState::Expired,
                 has_oauth: true,

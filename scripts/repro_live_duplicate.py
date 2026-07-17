@@ -20,7 +20,7 @@ carries a UNIQUE marker token ("MARK_xxxx"). If a marker shows up in more
 display_messages than it appears in the server's history, that is the bug,
 caught with the exact trigger isolated.
 
-Everything runs in a throwaway JCODE_HOME / runtime dir / socket, so the
+Everything runs in a throwaway NEXT_CODE_HOME / runtime dir / socket, so the
 user's real server and sessions are never touched.
 
 The suspected triggers (issue "Possible trigger" + "Notes") are exercised in

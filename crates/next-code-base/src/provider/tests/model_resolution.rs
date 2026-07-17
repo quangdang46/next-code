@@ -937,7 +937,7 @@ fn test_named_config_provider_models_appear_in_picker_and_are_selectable() {
     // profile, and selecting the emitted `<name>:<model>` spec must bind the
     // named profile runtime.
     with_clean_provider_test_env(|| {
-        let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("test JCODE_HOME should be set");
+        let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("test NEXT_CODE_HOME should be set");
         std::fs::write(
             std::path::PathBuf::from(next_code_home).join("config.toml"),
             r#"
@@ -2016,7 +2016,7 @@ fn default_named_openai_compatible_provider_uses_direct_compatible_request_path(
     register_test_external_runtimes();
     let temp = tempfile::TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("next-code-home");
-    let _jcode_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _next_code_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = OrEnvVarGuard::set("HOME", temp.path());
     let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env_or();
@@ -2121,7 +2121,7 @@ fn default_named_openai_compatible_with_catalog_uses_direct_compatible_request_p
     register_test_external_runtimes();
     let temp = tempfile::TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("next-code-home");
-    let _jcode_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _next_code_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = OrEnvVarGuard::set("HOME", temp.path());
     let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env_or();
@@ -2211,7 +2211,7 @@ fn runtime_display_name_tracks_active_openai_compatible_profile() {
     register_test_external_runtimes();
     let temp = tempfile::TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("next-code-home");
-    let _jcode_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _next_code_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = OrEnvVarGuard::set("HOME", temp.path());
     let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env_or();

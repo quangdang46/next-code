@@ -586,8 +586,8 @@ jobs:
 
                 def install
                   bin.install "next-code-macos-aarch64" => "next-code"
-                  # Compat symlink for one release so existing `jcode` muscle memory keeps working.
-                  bin.install_symlink "next-code" => "jcode"
+                  # Compat symlink for one release so existing `next-code` muscle memory keeps working.
+                  bin.install_symlink "next-code" => "next-code"
                 end
               end
 
@@ -597,7 +597,7 @@ jobs:
 
                 def install
                   bin.install "next-code-macos-x86_64" => "next-code"
-                  bin.install_symlink "next-code" => "jcode"
+                  bin.install_symlink "next-code" => "next-code"
                 end
               end
             end
@@ -614,7 +614,7 @@ jobs:
                     #!/bin/sh
                     exec "#{libexec}/next-code-linux-x86_64" "$@"
                   SH
-                  bin.install_symlink "next-code" => "jcode"
+                  bin.install_symlink "next-code" => "next-code"
                 end
               end
 
@@ -624,7 +624,7 @@ jobs:
 
                 def install
                   bin.install "next-code-linux-aarch64" => "next-code"
-                  bin.install_symlink "next-code" => "jcode"
+                  bin.install_symlink "next-code" => "next-code"
                 end
               end
             end
@@ -697,8 +697,8 @@ jobs:
           arch=('x86_64')
           url="https://github.com/quangdang46/next-code"
           license=('MIT')
-          provides=('next-code' 'jcode')
-          conflicts=('next-code' 'jcode' 'jcode-bin')
+          provides=('next-code' 'next-code')
+          conflicts=('next-code' 'next-code' 'next-code-bin')
           source=("URL_PLACEHOLDER")
           sha256sums=('SHA_PLACEHOLDER')
 
@@ -714,7 +714,7 @@ jobs:
               mkdir -p "${pkgdir}/usr/bin"
               ln -s /usr/lib/next-code/next-code-linux-x86_64 "${pkgdir}/usr/bin/next-code"
               # Compat symlink for one release.
-              ln -s next-code "${pkgdir}/usr/bin/jcode"
+              ln -s next-code "${pkgdir}/usr/bin/next-code"
           }
           PKGBUILD_END
 
@@ -732,10 +732,10 @@ jobs:
           printf '\tarch = x86_64\n' >> .SRCINFO
           printf '\tlicense = MIT\n' >> .SRCINFO
           printf '\tprovides = next-code\n' >> .SRCINFO
-          printf '\tprovides = jcode\n' >> .SRCINFO
+          printf '\tprovides = next-code\n' >> .SRCINFO
           printf '\tconflicts = next-code\n' >> .SRCINFO
-          printf '\tconflicts = jcode\n' >> .SRCINFO
-          printf '\tconflicts = jcode-bin\n' >> .SRCINFO
+          printf '\tconflicts = next-code\n' >> .SRCINFO
+          printf '\tconflicts = next-code-bin\n' >> .SRCINFO
           printf '\tsource = %s\n' "${LINUX_URL}" >> .SRCINFO
           printf '\tsha256sums = %s\n' "${LINUX_SHA}" >> .SRCINFO
           printf '\npkgname = next-code-bin\n' >> .SRCINFO

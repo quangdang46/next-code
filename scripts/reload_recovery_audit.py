@@ -596,7 +596,7 @@ def render_table(records: list[IntentRecord], hidden_sends: list[Event], show_li
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit self-dev reload recovery handoffs")
-    parser.add_argument("--home", type=pathlib.Path, default=next_code_home(), help="JCODE_HOME path")
+    parser.add_argument("--home", type=pathlib.Path, default=next_code_home(), help="NEXT_CODE_HOME path")
     parser.add_argument("--reload-id", type=str, help="Only show one reload id")
     parser.add_argument("--session", type=str, help="Only show one session id")
     parser.add_argument("--max-log-files", type=int, default=3, help="Newest next-code logs to scan")

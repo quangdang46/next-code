@@ -153,7 +153,7 @@ fn approved_key_persistence_is_owner_only_and_clear_is_deterministic() {
     persist_approved_key(&approved).expect("persist");
     let path = crate::subscription_catalog::account_credential_path().expect("path");
     let content = std::fs::read_to_string(&path).expect("read");
-    assert!(content.contains("JCODE_API_KEY=jck_live_test"));
+    assert!(content.contains("NEXT_CODE_API_KEY=jck_live_test"));
 
     #[cfg(unix)]
     {

@@ -1,11 +1,11 @@
-# Jcode Desktop Build-Out Plan
+# Next Code Desktop Build-Out Plan
 
 Status: Active planning note
 Updated: 2026-05-25
 
 ## Current read
 
-Jcode Desktop has moved past the original blank-canvas prototype. The strongest current thread is a single-session desktop surface with a local GitHub issue browser/cache and background `gh` sync. Recent work added:
+Next Code Desktop has moved past the original blank-canvas prototype. The strongest current thread is a single-session desktop surface with a local GitHub issue browser/cache and background `gh` sync. Recent work added:
 
 - issue-browser renderer extraction
 - issue-browser interactions

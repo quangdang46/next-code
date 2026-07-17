@@ -32,7 +32,7 @@
 next-code (consumer)
 ─────────────────────────────────────────────────────
 CLI flags: --permission-mode, --dangerously-skip-permissions
-Config: .next-code/config.toml (TOML; legacy dual-read: `.jcode/config.toml`)
+Config: .next-code/config.toml (TOML; legacy dual-read: `.next-code/config.toml`)
 TUI: mode cycling (Shift+Tab), permission dialogs
 
 ┌───────────── yolo_classifier.rs ─────────────────┐
@@ -77,7 +77,7 @@ Engine::evaluate(session, tool_call, mode, effects)
 | dcg-core git dep (branch=main) | ✅ Done | `Cargo.toml` |
 | `--permission-mode` CLI flag (6 modes) | ✅ Done | `src/cli/args.rs` |
 | `--dangerously-skip-permissions` CLI flag | ✅ Done | `src/cli/args.rs` |
-| `NEXT_CODE_PERMISSION_MODE` env var (legacy dual-read: `JCODE_PERMISSION_MODE`) | ✅ Done | `src/cli/startup.rs` |
+| `NEXT_CODE_PERMISSION_MODE` env var (legacy dual-read: `NEXT_CODE_PERMISSION_MODE`) | ✅ Done | `src/cli/startup.rs` |
 | dcg_bridge adapter | ✅ Done | `src/dcg_bridge.rs` |
 | BridgeDecision → ActionTier mapping | ✅ Done | `src/safety.rs` |
 | Engine + Session + ProtectedPaths integration | ✅ Done | `src/dcg_bridge.rs` |
@@ -198,7 +198,7 @@ fn handle_shift_tab(current_mode: Mode) -> Mode {
 
 **Resolution chain:**
 ```
-CLI --permission-mode > NEXT_CODE_PERMISSION_MODE env (legacy dual-read: `JCODE_PERMISSION_MODE`) >
+CLI --permission-mode > NEXT_CODE_PERMISSION_MODE env (legacy dual-read: `NEXT_CODE_PERMISSION_MODE`) >
   project .next-code/config.toml > user ~/.next-code/config.toml > Mode::Default
 ```
 
