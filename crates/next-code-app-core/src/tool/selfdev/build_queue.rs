@@ -360,10 +360,7 @@ impl SelfDevTool {
                             &repo_dir,
                             &source_after_build,
                         )?;
-                        let published = if Self::build_command_is_desktop_only(&command) {
-                            Self::validate_desktop_selfdev_binary(&repo_dir, &source_after_build)?;
-                            None
-                        } else {
+                        let published = {
                             let published = build::publish_local_current_build_for_source(
                                 &repo_dir,
                                 &source_after_build,
@@ -380,11 +377,7 @@ impl SelfDevTool {
                             .map(|published| published.version.clone())
                             .or_else(|| Some(source_after_build.version_label.clone()));
                         request.validated = true;
-                        request.last_progress = Some(if published.is_some() {
-                            "published and smoke-tested".to_string()
-                        } else {
-                            "desktop binary built and smoke-tested".to_string()
-                        });
+                        request.last_progress = Some("published and smoke-tested".to_string());
                         request.save()?;
                         result
                     }
@@ -435,49 +428,6 @@ impl SelfDevTool {
         };
         request.save()?;
         Ok(result)
-    }
-
-    fn build_command_is_desktop_only(command: &SelfDevBuildCommand) -> bool {
-        command.display.contains("-p next-code-desktop") && !command.display.contains("-p next-code ")
-    }
-
-    fn validate_desktop_selfdev_binary(repo_dir: &Path, source: &build::SourceState) -> Result<()> {
-        let binary_name = if cfg!(windows) {
-            "next-code-desktop.exe"
-        } else {
-            "next-code-desktop"
-        };
-        let binary = repo_dir
-            .join("target")
-            .join(build::SELFDEV_CARGO_PROFILE)
-            .join(binary_name);
-        if !binary.exists() {
-            anyhow::bail!("Desktop binary not found at {}", binary.display());
-        }
-
-        let output = std::process::Command::new(&binary)
-            .arg("--version")
-            .env("NEXT_CODE_NON_INTERACTIVE", "1")
-            .output()?;
-        if !output.status.success() {
-            anyhow::bail!(
-                "Desktop binary smoke test failed for {} with exit code {:?}: {}",
-                binary.display(),
-                output.status.code(),
-                String::from_utf8_lossy(&output.stderr).trim()
-            );
-        }
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        if !stdout.contains(&source.short_hash) {
-            anyhow::bail!(
-                "Refusing to validate desktop build {} as {}: --version output did not contain git hash {}: {}",
-                binary.display(),
-                source.version_label,
-                source.short_hash,
-                stdout.trim()
-            );
-        }
-        Ok(())
     }
 
     pub(super) async fn do_build(

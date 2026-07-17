@@ -452,8 +452,8 @@ impl SelfDevTool {
                     "reason": { "type": "string" },
                     "target": {
                         "type": "string",
-                        "enum": ["auto", "tui", "desktop", "all"],
-                        "description": "Build target for action=build. auto chooses from changed paths; tui builds next-code; desktop builds next-code-desktop; all builds both."
+                        "enum": ["auto", "tui", "all"],
+                        "description": "Build target for action=build. auto/tui/all all build the next-code CLI/TUI binary."
                     },
                     "command": {
                         "type": "string",

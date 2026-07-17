@@ -30,7 +30,6 @@ FORBIDDEN_INTERNAL_DEPS = {
     "next-code-agent-runtime",
     "next-code-azure-auth",
     "next-code-core",
-    "next-code-desktop",
     "next-code-embedding",
     "next-code-mobile-core",
     "next-code-mobile-sim",

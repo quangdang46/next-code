@@ -121,7 +121,6 @@ After tools, add the major subsystems as new PARITY.md sections.
 
 | Domain | Crates | Notes |
 |--------|--------|-------|
-| **XI — Desktop App** | `next-code-desktop/` | Rich text, IPC, animations, gallery, issue browser |
 | **XII — Embedding/Memory Pipeline** | `next-code-embedding/`, `next-code-mempalace-adapter/`, `next-code-memory-types/` | Memory system is partially tracked in VI. Full pipeline includes ONNX model, embedding, memory palace adapter. |
 | **XIII — Auth & Secrets** | `next-code-auth-types/`, `next-code-azure-auth/`, `next-code-keyring-store/`, `next-code-secrets/` | Provider auth, OAuth flows, OS keyring |
 | **XIV — Config System** | `next-code-config-types/` | Schema, keybindings, model prefs, hooks config |
@@ -133,7 +132,6 @@ After tools, add the major subsystems as new PARITY.md sections.
 | **XV — TUI Framework** | 14 `next-code-tui-*` crates | Individual rendering crates. Low user impact if app-level TUI already tracked. |
 | **XVI — Protocol** | `next-code-protocol/` | Wire protocol, message types. Low impact if session system covers it. |
 | **XVII — Overnight** | `next-code-overnight-core/` | Background overnight processing |
-| **XVIII — Mobile** | `next-code-mobile-core/`, `next-code-mobile-sim/` | Mobile agent runtime |
 | **XIX — Build & Release** | `next-code-build-meta/`, `next-code-build-support/`, `next-code-selfdev-types/` | Dev infrastructure |
 
 ---

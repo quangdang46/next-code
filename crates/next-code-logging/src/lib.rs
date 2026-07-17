@@ -566,7 +566,9 @@ pub fn log_path() -> Option<PathBuf> {
     Some(log_dir.join(format!("next-code-{}.log", date)))
 }
 
-/// Remove daily `next-code-*.log` / `next-code-desktop-*.log` files older than 7 days.
+/// Remove daily `next-code-*.log` files older than 7 days.
+///
+/// Also cleans legacy `next-code-desktop-*.log` files from older installs.
 ///
 /// Scoped deliberately to the date-stamped log files this logger produces. The
 /// log directory also holds non-log data (e.g. `memory/`, `memory-events-*.jsonl`)

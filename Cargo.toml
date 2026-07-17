@@ -90,7 +90,6 @@ members = [
     "crates/next-code-terminal-image",
     "crates/next-code-tui-workspace",
     "crates/next-code-best-of-n",
-    "crates/next-code-desktop",
     "crates/next-code-hooks",
     "crates/next-code-keyring-store",
     "crates/next-code-redact",
@@ -442,21 +441,11 @@ opt-level = 3
 
 # Keep the text-shaping stack optimized even in dev/selfdev/test builds.
 #
-# cosmic-text + rustybuzz + ttf-parser + swash + yazi do all of the desktop
-# transcript glyph shaping. At opt-level = 0 they are 15-40x slower, which made
-# scrolling real (emoji/markdown-heavy) transcripts janky in dev/selfdev builds
-# even though the production release build was smooth. These are stable
-# third-party crates that almost never recompile, so pinning them to opt-level =
-# 3 costs a one-time compile and is then reused across every iterative next-code
-# rebuild (same rationale as next-code-tui-anim above). It does NOT slow down
-# recompiles of next-code's own crates.
-[profile.dev.package.cosmic-text]
-opt-level = 3
-[profile.selfdev.package.cosmic-text]
-opt-level = 3
-[profile.test.package.cosmic-text]
-opt-level = 3
-
+# rustybuzz + ttf-parser (+ related font crates) are used by SVG/usvg paths in
+# the TUI. At opt-level = 0 they are much slower. These are stable third-party
+# crates that almost never recompile, so pinning them to opt-level = 3 costs a
+# one-time compile and is then reused across iterative rebuilds (same rationale
+# as next-code-tui-anim above).
 [profile.dev.package.rustybuzz]
 opt-level = 3
 [profile.selfdev.package.rustybuzz]
@@ -469,20 +458,6 @@ opt-level = 3
 [profile.selfdev.package.ttf-parser]
 opt-level = 3
 [profile.test.package.ttf-parser]
-opt-level = 3
-
-[profile.dev.package.swash]
-opt-level = 3
-[profile.selfdev.package.swash]
-opt-level = 3
-[profile.test.package.swash]
-opt-level = 3
-
-[profile.dev.package.yazi]
-opt-level = 3
-[profile.selfdev.package.yazi]
-opt-level = 3
-[profile.test.package.yazi]
 opt-level = 3
 
 [profile.dev.package.fontdb]

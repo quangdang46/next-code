@@ -78,7 +78,6 @@ scripts/onboarding_sandbox.sh fixture-run normal-openai -- auth-test --provider 
 
 # Run arbitrary next-code commands in the sandbox
 scripts/onboarding_sandbox.sh next-code auth status
-scripts/onboarding_sandbox.sh next-code pair
 ```
 
 ## Reusable local auth fixtures

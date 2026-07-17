@@ -33,7 +33,6 @@ pub(crate) fn initial_title(args: &Args) -> String {
             _ => "next-code ambient".to_string(),
         },
         Some(Command::Cloud(_)) => "next-code cloud".to_string(),
-        Some(Command::Pair { .. }) => "next-code pair".to_string(),
         Some(Command::Permissions) => "next-code permissions".to_string(),
         Some(Command::Permission(_)) => "next-code permission".to_string(),
         Some(Command::Transcript { .. }) => "next-code transcript".to_string(),

@@ -357,7 +357,6 @@ git show origin/master:<file> > <file>  # get our version
 - `crates/next-code-tui/src/tui/app/input.rs` — lazy-init @ picker
 - `crates/next-code-tui/src/tui/ui_tools.rs` — tool summary display arms
 - `crates/next-code-tui/src/tui/app/tui_lifecycle.rs` — App constructor field
-- `crates/next-code-desktop/src/single_session.rs` — tool name match arms
 - `crates/next-code-provider-core/src/anthropic.rs` — tool name mapping
 - `crates/next-code-base/src/provider/Codex.rs` — tool name mapping
 - `crates/next-code-usage-types/src/lib.rs` — telemetry category arms

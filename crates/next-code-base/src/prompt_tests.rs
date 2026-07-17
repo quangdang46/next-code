@@ -307,16 +307,6 @@ fn test_selfdev_prompt_uses_full_selfdev_instructions() {
 }
 
 #[test]
-fn test_selfdev_prompt_uses_desktop_focus_for_desktop_working_dir() {
-    let desktop_dir = std::path::Path::new("/tmp/next-code/crates/next-code-desktop/src");
-    let (prompt, _info) =
-        build_system_prompt_full(None, &[], true, None, Some(desktop_dir), None, None);
-    assert!(prompt.contains("launched from the desktop app context"));
-    assert!(prompt.contains("selfdev build target=desktop"));
-    assert!(!prompt.contains("launched from the TUI/root next-code context"));
-}
-
-#[test]
 fn test_split_selfdev_prompt_defaults_to_tui_focus_for_repo_root() {
     let repo_dir = std::path::Path::new("/tmp/next-code");
     let (split, _info) =

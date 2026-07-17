@@ -388,9 +388,6 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
         Some(Command::Cloud(subcmd)) => {
             commands::run_cloud_command(map_cloud_subcommand(subcmd))?;
         }
-        Some(Command::Pair { list, revoke }) => {
-            commands::run_pair_command(list, revoke)?;
-        }
         Some(Command::Permissions) => {
             // Deprecated alias: show current mode (same as `next-code permission mode`).
             let mode = crate::dcg_bridge::current_mode();

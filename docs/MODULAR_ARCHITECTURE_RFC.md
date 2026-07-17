@@ -77,7 +77,7 @@ Current workspace members from `Cargo.toml` are grouped roughly as follows:
 - heavy or optional integrations: `next-code-embedding`, `next-code-pdf`, `next-code-notify-email`
 - auth and providers: `next-code-azure-auth`, `next-code-provider-core`, `next-code-provider-metadata`, `next-code-provider-openrouter`, `next-code-provider-gemini`
 - TUI extraction seams: `next-code-tui-core`, `next-code-tui-markdown`, `next-code-tui-mermaid`, `next-code-tui-render`, `next-code-tui-workspace`
-- product surfaces outside the main TUI binary: `next-code-desktop`
+- product surfaces outside the main TUI binary (historical; desktop GUI removed)
 
 ### What the root crate still owns
 
@@ -135,7 +135,6 @@ These splits already exist and should be treated as real architectural footholds
 | `next-code-tui-render` | reusable TUI layout/render helpers |
 | `next-code-tui-workspace` | workspace-map data/model/widget rendering |
 | `next-code-terminal-launch` | terminal process launch helpers |
-| `next-code-desktop` | desktop app surface and session/workspace rendering experiments |
 
 These are already aligned with the compile-performance plan's strategy: isolate heavy dependencies and stable helper surfaces first.
 
@@ -359,7 +358,6 @@ Target crates:
 
 - `next-code-cli`: parsing and command dispatch if CLI keeps growing.
 - `next-code-tui`: app state, reducers, key handling, command/input handling, UI orchestration.
-- `next-code-desktop`: already a separate surface.
 - `next-code-selfdev`: self-dev build/reload/customization workflows if they remain a substantial product surface.
 
 Compile-time reason:

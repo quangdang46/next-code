@@ -5,11 +5,10 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::io::{Read, Write};
-use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 
-use crate::{browser, gateway, memory, session, storage, tui};
+use crate::{browser, memory, session, storage, tui};
 
 use super::terminal::init_tui_runtime;
 
@@ -1902,157 +1901,6 @@ pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Re
         }
     }
     Ok(())
-}
-
-pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
-    let mut registry = gateway::DeviceRegistry::load();
-
-    if list {
-        if registry.devices.is_empty() {
-            eprintln!("No paired devices.")
-        } else {
-            eprintln!("\x1b[1mPaired devices:\x1b[0m\n");
-            for device in &registry.devices {
-                let last_seen = &device.last_seen;
-                eprintln!("  \x1b[36m{}\x1b[0m  ({})", device.name, device.id);
-                eprintln!("    Paired: {}  Last seen: {}", device.paired_at, last_seen);
-                if let Some(ref apns) = device.apns_token {
-                    eprintln!("    APNs: {}...", &apns[..apns.len().min(16)]);
-                }
-                eprintln!();
-            }
-        }
-        return Ok(());
-    }
-
-    if let Some(ref target) = revoke {
-        let before = registry.devices.len();
-        registry
-            .devices
-            .retain(|d| d.id != *target && d.name != *target);
-        if registry.devices.len() < before {
-            registry.save()?;
-            eprintln!("\x1b[32m✓\x1b[0m Revoked device: {}", target)
-        } else {
-            eprintln!("\x1b[31m✗\x1b[0m No device found matching: {}", target)
-        }
-        return Ok(());
-    }
-
-    let gw_config = &crate::config::config().gateway;
-
-    if !gw_config.enabled {
-        eprintln!("\x1b[33m⚠\x1b[0m  Gateway is disabled. Enable it in ~/.next-code/config.toml:\n");
-        eprintln!("    \x1b[2m[gateway]\x1b[0m");
-        eprintln!("    \x1b[2menabled = true\x1b[0m");
-        eprintln!("    \x1b[2mport = {}\x1b[0m\n", gw_config.port);
-        eprintln!("  Then restart the next-code server.\n");
-    }
-
-    let code = registry.generate_pairing_code();
-    let connect_host = resolve_connect_host(&gw_config.bind_addr);
-    // Prefer nextcode://; iOS PairURI.parse still accepts legacy nextcode://.
-    let pair_uri = format!(
-        "nextcode://pair?host={}&port={}&code={}",
-        connect_host, gw_config.port, code
-    );
-
-    eprintln!();
-    eprintln!("  \x1b[1mScan with the Next Code iOS app:\x1b[0m\n");
-    match crate::login_qr::render_unicode_qr(&pair_uri) {
-        Ok(qr) => {
-            for line in qr.lines() {
-                eprintln!("  {line}");
-            }
-        }
-        Err(_) => eprintln!("  \x1b[33m(QR code generation failed)\x1b[0m"),
-    }
-    eprintln!();
-    eprintln!(
-        "  Pairing code:  \x1b[1;37m{} {}\x1b[0m   \x1b[2m(expires in 5 minutes)\x1b[0m",
-        &code[..3],
-        &code[3..]
-    );
-    let resolved_hint = format!("{}:{}", connect_host, gw_config.port);
-    let bind_hint = format!("{}:{}", gw_config.bind_addr, gw_config.port);
-    eprintln!("  Connect host:  \x1b[36m{}\x1b[0m", resolved_hint);
-    if connect_host != gw_config.bind_addr {
-        eprintln!("  Bind address:  \x1b[2m{}\x1b[0m", bind_hint);
-    }
-
-    if connect_host == "<your-mac-hostname>" {
-        eprintln!(
-            "\n  \x1b[33mTip:\x1b[0m set NEXT_CODE_GATEWAY_HOST to your reachable Tailscale hostname."
-        );
-    }
-
-    if (gw_config.bind_addr.as_str(), gw_config.port)
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut it| it.next())
-        .is_none()
-    {
-        eprintln!(
-            "  \x1b[33mWarning:\x1b[0m gateway bind address appears invalid: {}",
-            bind_hint
-        );
-    }
-    eprintln!();
-
-    Ok(())
-}
-
-pub fn resolve_connect_host(bind_addr: &str) -> String {
-    if bind_addr == "0.0.0.0" || bind_addr == "::" {
-        if let Some(host) = product_env("GATEWAY_HOST")
-            .ok()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-        {
-            return host;
-        }
-
-        if let Some(host) = detect_tailscale_dns_name() {
-            return host;
-        }
-
-        return std::env::var("HOSTNAME")
-            .ok()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "<your-mac-hostname>".to_string());
-    }
-    bind_addr.to_string()
-}
-
-pub fn parse_tailscale_dns_name(status_json: &[u8]) -> Option<String> {
-    let value: serde_json::Value = serde_json::from_slice(status_json).ok()?;
-    let dns_name = value
-        .get("Self")?
-        .get("DNSName")?
-        .as_str()?
-        .trim()
-        .trim_end_matches('.')
-        .to_string();
-
-    if dns_name.is_empty() {
-        None
-    } else {
-        Some(dns_name)
-    }
-}
-
-pub fn detect_tailscale_dns_name() -> Option<String> {
-    let output = std::process::Command::new("tailscale")
-        .args(["status", "--json"])
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    parse_tailscale_dns_name(&output.stdout)
 }
 
 pub async fn run_browser(action: &str) -> Result<()> {

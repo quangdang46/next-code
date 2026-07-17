@@ -1,8 +1,0 @@
-.build/
-.build-ios/
-NextCodeMobile.xcodeproj/
-DerivedData/
-.DS_Store
-
-# Python harness caches
-TestHarness/__pycache__/

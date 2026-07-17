@@ -8,7 +8,6 @@
     "crates/next-code-base/src/hooks.rs": 1,
     "crates/next-code-base/src/mcp/manager.rs": 9,
     "crates/next-code-base/src/terminal_launch.rs": 4,
-    "crates/next-code-desktop/src/single_session_render/wrapping.rs": 1,
     "crates/next-code-plan/src/dag/ops.rs": 1,
     "crates/next-code-provider-doctor/src/lifecycle_driver.rs": 2,
     "crates/next-code-render-core/src/math.rs": 4,
