@@ -183,11 +183,6 @@ toon = { git = "https://github.com/Dicklesworthstone/toon_rust", package = "tru"
 ffs-search.workspace = true
 ffs-engine.workspace = true
 
-# Memory allocator (reduces fragmentation for long-running server)
-tikv-jemallocator = { version = "0.6", features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
-tikv-jemalloc-ctl = { version = "0.6", optional = true }
-tikv-jemalloc-sys = { version = "0.6", optional = true }
-
 # Async runtime
 tokio = { version = "1", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
 futures = "0.3"
@@ -362,6 +357,13 @@ pdf = ["dep:next-code-pdf", "next-code-tui/pdf"]
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Console", "Win32_Globalization"] }
+
+# Memory allocator (reduces fragmentation for long-running server). jemalloc has
+# no supported native Windows/MSVC build, so it's only pulled in on other targets.
+[target.'cfg(not(windows))'.dependencies]
+tikv-jemallocator = { version = "0.6", features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
+tikv-jemalloc-ctl = { version = "0.6", optional = true }
+tikv-jemalloc-sys = { version = "0.6", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 global-hotkey = "0.7"

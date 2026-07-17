@@ -1041,15 +1041,14 @@ mod tests {
 
     #[test]
     fn plugin_engines_default() {
-        let engines = PluginEngines::default();
+        let _engines = PluginEngines::default();
     }
 
     #[test]
     fn plugin_engines_serde() {
-        let engines = PluginEngines {
-        };
+        let engines = PluginEngines { nextcode: None };
         let json = serde_json::to_string(&engines).unwrap();
-        let deserialized: PluginEngines = serde_json::from_str(&json).unwrap();
+        let _deserialized: PluginEngines = serde_json::from_str(&json).unwrap();
     }
 
     #[test]

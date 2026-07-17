@@ -83,7 +83,7 @@ pub fn stop_signal() -> (Arc<Notify>, impl FnOnce() + Send + 'static) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::attempt::OAuthAttempt;
+    use crate::attempt::{AttemptStatus, OAuthAttempt};
     use crate::credential::CredentialService;
     use crate::integration::{AuthMethod, IntegrationError, LoginProvider};
     use crate::store::PersistentIntegration;

@@ -141,6 +141,7 @@ pub fn default_rotation_labels() -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::credential::CredentialType;
     use crate::store::in_memory::InMemoryCredentialStore;
 
     async fn store_with_3_keys() -> Arc<InMemoryCredentialStore> {

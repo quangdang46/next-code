@@ -454,6 +454,7 @@ mod tests {
             max_turns: None,
             output_mode: OutputMode::LastMessage,
             output_schema: None,
+            color: None,
         }
     }
 

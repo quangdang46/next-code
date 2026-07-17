@@ -282,7 +282,7 @@ impl AgentRegistry {
         home_dir: Option<&Path>,
         project_root: Option<&Path>,
     ) {
-        const PRODUCT_DIRS: &[&str] = &[".next-code", ".next-code"];
+        const PRODUCT_DIRS: &[&str] = &[".next-code", ".jcode"];
         if let Some(home) = home_dir {
             for segment in PRODUCT_DIRS {
                 let user_dir = home.join(segment).join("agents");
@@ -416,6 +416,7 @@ mod tests {
             max_turns: None,
             output_mode: OutputMode::LastMessage,
             output_schema: None,
+            color: None,
         };
         reg.register_builtin(builtin_def.clone()).unwrap();
         assert_eq!(

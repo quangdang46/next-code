@@ -45,7 +45,7 @@ mod macos_terminal;
 mod windows_hotkeys;
 #[cfg(windows)]
 mod windows_setup;
-#[cfg(any(test, target_os = "macos"))]
+#[cfg(any(all(test, not(windows)), target_os = "macos"))]
 use macos_launcher::{install_macos_app_launcher, should_refresh_macos_app_launcher};
 #[cfg(target_os = "macos")]
 use macos_terminal::launch_script_for_macos_terminal;
@@ -1193,7 +1193,7 @@ pub fn maybe_show_setup_hints() -> Option<StartupHints> {
     state.launch_count += 1;
     let _ = state.save();
 
-    #[cfg(any(test, target_os = "macos"))]
+    #[cfg(any(all(test, not(windows)), target_os = "macos"))]
     {
         if should_refresh_macos_app_launcher(&state) {
             let _ = create_desktop_shortcut(&mut state);
