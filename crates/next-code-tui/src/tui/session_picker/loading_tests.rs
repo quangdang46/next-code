@@ -92,9 +92,9 @@ fn trivial_hidden_only_snapshot_detector_keeps_system_plus_visible_message() {
 fn cached_grouped_sessions_round_trip_from_disk() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
-    let _scan_limit = EnvVarGuard::set_str("JCODE_SESSION_PICKER_MAX_SESSIONS", "100");
-    let _include_saved = EnvVarGuard::set_str("JCODE_SESSION_PICKER_INCLUDE_OLD_SAVED", "0");
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+    let _scan_limit = EnvVarGuard::set_str("NEXT_CODE_SESSION_PICKER_MAX_SESSIONS", "100");
+    let _include_saved = EnvVarGuard::set_str("NEXT_CODE_SESSION_PICKER_INCLUDE_OLD_SAVED", "0");
 
     let sessions_dir = temp.path().join("sessions");
     std::fs::create_dir_all(&sessions_dir).expect("create sessions dir");
@@ -155,7 +155,7 @@ fn cached_grouped_sessions_round_trip_from_disk() {
 fn load_sessions_includes_claude_code_sessions_from_external_home() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).expect("create project dir");
@@ -213,7 +213,7 @@ fn load_sessions_includes_claude_code_sessions_from_external_home() {
 fn load_claude_code_preview_reads_transcript_messages() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).expect("create project dir");
@@ -258,7 +258,7 @@ fn load_claude_code_preview_reads_transcript_messages() {
 fn load_sessions_includes_modern_codex_sessions() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let codex_dir = temp.path().join("external/.codex/sessions/2026/04/05");
     std::fs::create_dir_all(&codex_dir).expect("create codex dir");
@@ -432,7 +432,7 @@ fn load_claude_code_preview_reads_only_tail_of_large_transcript() {
 fn load_sessions_prefers_custom_title_over_generated_title() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let mut session = Session::create_with_id(
         "session_customtitle_1770000000000".to_string(),
@@ -469,7 +469,7 @@ fn load_sessions_prefers_custom_title_over_generated_title() {
 fn load_sessions_prefers_todo_group_over_generated_title() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
     let session_id = "session_todotitle_1770000000000";
 
     let mut session = Session::create_with_id(
@@ -522,7 +522,7 @@ fn load_sessions_prefers_todo_group_over_generated_title() {
 fn load_sessions_keeps_custom_title_over_todo_group() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
     let session_id = "session_customtodotitle_1770000000000";
 
     let mut session = Session::create_with_id(
@@ -575,8 +575,8 @@ fn load_sessions_keeps_custom_title_over_todo_group() {
 fn load_sessions_includes_saved_sessions_beyond_scan_limit() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
-    let _scan_limit = EnvVarGuard::set_str("JCODE_SESSION_PICKER_MAX_SESSIONS", "50");
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+    let _scan_limit = EnvVarGuard::set_str("NEXT_CODE_SESSION_PICKER_MAX_SESSIONS", "50");
 
     let mut saved_session = Session::create_with_id(
         "session_saved_beyond_scan_limit".to_string(),
@@ -633,7 +633,7 @@ fn load_sessions_includes_saved_sessions_beyond_scan_limit() {
 fn load_sessions_preserves_snapshot_saved_when_journal_meta_omits_saved() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let mut session = Session::create_with_id(
         "session_saved_legacy_journal".to_string(),
@@ -718,10 +718,10 @@ fn raw_content_system_reminder_detection_handles_arrays_strings_and_unicode() {
 }
 
 #[test]
-fn session_matches_query_searches_jcode_transcript_contents() {
+fn session_matches_query_searches_next_code_transcript_contents() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let mut session = Session::create_with_id(
         "session_transcript_search".to_string(),
@@ -759,7 +759,7 @@ fn session_matches_query_searches_jcode_transcript_contents() {
 fn session_matches_query_searches_external_codex_transcript_contents() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let codex_dir = temp.path().join("external/.codex/sessions/2026/04/19");
     std::fs::create_dir_all(&codex_dir).expect("create codex dir");
@@ -791,7 +791,7 @@ fn session_matches_query_searches_external_codex_transcript_contents() {
 fn benchmark_real_resume_loading_phases() {
     invalidate_session_list_cache();
 
-    let sessions_dir = storage::next_code_dir().expect("jcode dir").join("sessions");
+    let sessions_dir = storage::next_code_dir().expect("next-code dir").join("sessions");
     let scan_limit = session_scan_limit();
     let candidate_limit = session_candidate_window(scan_limit);
 
@@ -909,7 +909,7 @@ fn benchmark_real_resume_loading_phases() {
 }
 
 #[test]
-#[ignore = "developer benchmark: scans the real JCODE_HOME session directory"]
+#[ignore = "developer benchmark: scans the real NEXT_CODE_HOME session directory"]
 fn benchmark_real_resume_loading_reports_timings() {
     invalidate_session_list_cache();
 
@@ -943,7 +943,7 @@ fn benchmark_real_resume_loading_reports_timings() {
 fn benchmark_resume_loading_reports_timings() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let sessions_dir = temp.path().join("sessions");
     std::fs::create_dir_all(&sessions_dir).expect("create sessions dir");
@@ -1005,7 +1005,7 @@ fn onboarding_scoped_loader_returns_only_codex_sessions() {
     use crate::tui::app::onboarding_flow::ExternalCli;
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     // A Codex transcript that the onboarding picker should surface.
     let codex_dir = temp.path().join("external/.codex/sessions/2026/05/01");
@@ -1016,12 +1016,12 @@ fn onboarding_scoped_loader_returns_only_codex_sessions() {
     )
     .expect("write codex transcript");
 
-    // A jcode session that must NOT appear in the scoped Codex view (the whole
+    // A next-code session that must NOT appear in the scoped Codex view (the whole
     // point of the scoped loader is to skip parsing these on onboarding).
     let mut next_code_session = Session::create_with_id(
-        "session_onboarding_jcode_1780000000000".to_string(),
-        Some("/tmp/jcode-onboard".to_string()),
-        Some("Jcode Onboarding".to_string()),
+        "session_onboarding_next_code_1780000000000".to_string(),
+        Some("/tmp/next-code-onboard".to_string()),
+        Some("Next Code Onboarding".to_string()),
     );
     next_code_session.append_stored_message(crate::session::StoredMessage {
         id: "msg-1".to_string(),
@@ -1035,7 +1035,7 @@ fn onboarding_scoped_loader_returns_only_codex_sessions() {
         tool_duration_ms: None,
         token_usage: None,
     });
-    next_code_session.save().expect("save jcode session");
+    next_code_session.save().expect("save next-code session");
 
     let (groups, orphans) = load_external_cli_sessions_grouped(ExternalCli::Codex);
     assert!(groups.is_empty(), "scoped loader produces only orphans");
@@ -1050,7 +1050,7 @@ fn onboarding_scoped_loader_returns_only_codex_sessions() {
         orphans
             .iter()
             .all(|s| matches!(s.resume_target, ResumeTarget::CodexSession { .. })),
-        "scoped Codex load must not include jcode/other-CLI sessions"
+        "scoped Codex load must not include next-code/other-CLI sessions"
     );
 }
 
@@ -1058,8 +1058,8 @@ fn onboarding_scoped_loader_returns_only_codex_sessions() {
 fn parallel_fill_skips_many_recent_empty_sessions_to_reach_scan_limit() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
-    let _scan_limit = EnvVarGuard::set_str("JCODE_SESSION_PICKER_MAX_SESSIONS", "50");
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+    let _scan_limit = EnvVarGuard::set_str("NEXT_CODE_SESSION_PICKER_MAX_SESSIONS", "50");
 
     let sessions_dir = temp.path().join("sessions");
     std::fs::create_dir_all(&sessions_dir).expect("create sessions dir");
@@ -1123,8 +1123,8 @@ fn parallel_fill_skips_many_recent_empty_sessions_to_reach_scan_limit() {
 fn hidden_debug_sessions_do_not_consume_default_resume_budget() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
-    let _scan_limit = EnvVarGuard::set_str("JCODE_SESSION_PICKER_MAX_SESSIONS", "50");
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+    let _scan_limit = EnvVarGuard::set_str("NEXT_CODE_SESSION_PICKER_MAX_SESSIONS", "50");
 
     let push_message = |session: &mut Session, text: &str| {
         session.append_stored_message(crate::session::StoredMessage {
@@ -1156,7 +1156,7 @@ fn hidden_debug_sessions_do_not_consume_default_resume_budget() {
     }
 
     // These newer self-dev/worker sessions are hidden by default. Previously the
-    // loader stopped after the first 50, leaving no ordinary Jcode sessions for
+    // loader stopped after the first 50, leaving no ordinary Next Code sessions for
     // the picker even though older resumable sessions existed.
     for idx in 0..75 {
         let mut session = Session::create_with_id(
@@ -1188,7 +1188,7 @@ fn hidden_debug_sessions_do_not_consume_default_resume_budget() {
 fn session_matches_picker_query_requires_all_tokens_order_independent() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let mut session = Session::create_with_id(
         "session_token_match".to_string(),

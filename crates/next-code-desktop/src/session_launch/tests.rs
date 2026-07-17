@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env_os};
 use super::events::desktop_event_from_server_value;
 use super::*;
 use serde_json::{Value, json};
@@ -191,10 +192,10 @@ fn desktop_event_parser_maps_streaming_server_events() {
     assert_eq!(
         desktop_event_from_server_value(&json!({
             "type": "reloading",
-            "new_socket": "/tmp/jcode-new.sock"
+            "new_socket": "/tmp/next-code-new.sock"
         })),
         Some(DesktopSessionEvent::Reloading {
-            new_socket: Some("/tmp/jcode-new.sock".to_string())
+            new_socket: Some("/tmp/next-code-new.sock".to_string())
         })
     );
     assert_eq!(
@@ -437,7 +438,7 @@ fn desktop_session_worker_slots_are_bounded_and_released() -> Result<()> {
 fn desktop_worker_roundtrips_message_with_fake_server() -> Result<()> {
     let _guard = ENV_LOCK.lock().unwrap();
     let socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-smoke-{}-{}.sock",
+        "next-code-desktop-worker-smoke-{}-{}.sock",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -446,9 +447,9 @@ fn desktop_worker_roundtrips_message_with_fake_server() -> Result<()> {
     ));
     let _ = std::fs::remove_file(&socket_path);
     let listener = UnixListener::bind(&socket_path)?;
-    let previous_socket = std::env::var_os("JCODE_SOCKET");
+    let previous_socket = product_env_os("SOCKET");
     unsafe {
-        std::env::set_var("JCODE_SOCKET", &socket_path);
+        std::env::set_var("NEXT_CODE_SOCKET", &socket_path);
     }
 
     let server = std::thread::spawn(move || fake_desktop_server_roundtrip(listener));
@@ -463,7 +464,7 @@ fn desktop_worker_roundtrips_message_with_fake_server() -> Result<()> {
         command_rx,
     );
 
-    restore_env_var("JCODE_SOCKET", previous_socket);
+    restore_env_var("NEXT_CODE_SOCKET", previous_socket);
     let _ = std::fs::remove_file(&socket_path);
 
     assert_eq!(result?, "session_desktop_fake");
@@ -493,20 +494,20 @@ fn desktop_worker_emits_reloaded_before_real_done_after_fake_reload() -> Result<
         .unwrap()
         .as_nanos();
     let socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-reload-old-{}-{nonce}.sock",
+        "next-code-desktop-worker-reload-old-{}-{nonce}.sock",
         std::process::id(),
     ));
     let new_socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-reload-new-{}-{nonce}.sock",
+        "next-code-desktop-worker-reload-new-{}-{nonce}.sock",
         std::process::id(),
     ));
     let _ = std::fs::remove_file(&socket_path);
     let _ = std::fs::remove_file(&new_socket_path);
     let listener = UnixListener::bind(&socket_path)?;
     let new_listener = UnixListener::bind(&new_socket_path)?;
-    let previous_socket = std::env::var_os("JCODE_SOCKET");
+    let previous_socket = product_env_os("SOCKET");
     unsafe {
-        std::env::set_var("JCODE_SOCKET", &socket_path);
+        std::env::set_var("NEXT_CODE_SOCKET", &socket_path);
     }
 
     let server = std::thread::spawn(move || {
@@ -517,7 +518,7 @@ fn desktop_worker_emits_reloaded_before_real_done_after_fake_reload() -> Result<
 
     let result = run_server_session(None, "hello reload", Vec::new(), Some(event_tx), command_rx);
 
-    restore_env_var("JCODE_SOCKET", previous_socket);
+    restore_env_var("NEXT_CODE_SOCKET", previous_socket);
     let _ = std::fs::remove_file(&socket_path);
 
     assert_eq!(result?, "session_desktop_reload_fake");
@@ -564,20 +565,20 @@ fn desktop_worker_rejects_reconnect_session_id_mismatch() -> Result<()> {
         .unwrap()
         .as_nanos();
     let socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-reload-mismatch-old-{}-{nonce}.sock",
+        "next-code-desktop-worker-reload-mismatch-old-{}-{nonce}.sock",
         std::process::id(),
     ));
     let new_socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-reload-mismatch-new-{}-{nonce}.sock",
+        "next-code-desktop-worker-reload-mismatch-new-{}-{nonce}.sock",
         std::process::id(),
     ));
     let _ = std::fs::remove_file(&socket_path);
     let _ = std::fs::remove_file(&new_socket_path);
     let listener = UnixListener::bind(&socket_path)?;
     let new_listener = UnixListener::bind(&new_socket_path)?;
-    let previous_socket = std::env::var_os("JCODE_SOCKET");
+    let previous_socket = product_env_os("SOCKET");
     unsafe {
-        std::env::set_var("JCODE_SOCKET", &socket_path);
+        std::env::set_var("NEXT_CODE_SOCKET", &socket_path);
     }
 
     let server = std::thread::spawn(move || {
@@ -588,7 +589,7 @@ fn desktop_worker_rejects_reconnect_session_id_mismatch() -> Result<()> {
 
     let result = run_server_session(None, "hello reload", Vec::new(), Some(event_tx), command_rx);
 
-    restore_env_var("JCODE_SOCKET", previous_socket);
+    restore_env_var("NEXT_CODE_SOCKET", previous_socket);
     let _ = std::fs::remove_file(&socket_path);
 
     let error = result.expect_err("reconnect must reject a different session id");
@@ -621,7 +622,7 @@ fn desktop_worker_rejects_reconnect_session_id_mismatch() -> Result<()> {
 fn desktop_worker_rejects_malformed_server_event_lines() -> Result<()> {
     let _guard = ENV_LOCK.lock().unwrap();
     let socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-malformed-{}-{}.sock",
+        "next-code-desktop-worker-malformed-{}-{}.sock",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -630,9 +631,9 @@ fn desktop_worker_rejects_malformed_server_event_lines() -> Result<()> {
     ));
     let _ = std::fs::remove_file(&socket_path);
     let listener = UnixListener::bind(&socket_path)?;
-    let previous_socket = std::env::var_os("JCODE_SOCKET");
+    let previous_socket = product_env_os("SOCKET");
     unsafe {
-        std::env::set_var("JCODE_SOCKET", &socket_path);
+        std::env::set_var("NEXT_CODE_SOCKET", &socket_path);
     }
 
     let server = std::thread::spawn(move || fake_desktop_server_malformed_event(listener));
@@ -647,12 +648,12 @@ fn desktop_worker_rejects_malformed_server_event_lines() -> Result<()> {
         command_rx,
     );
 
-    restore_env_var("JCODE_SOCKET", previous_socket);
+    restore_env_var("NEXT_CODE_SOCKET", previous_socket);
     let _ = std::fs::remove_file(&socket_path);
 
     let error = result.expect_err("malformed JSON must fail the session worker");
     assert!(
-        format!("{error:#}").contains("failed to parse jcode server event"),
+        format!("{error:#}").contains("failed to parse next-code server event"),
         "{error:#}"
     );
     let requests = server.join().unwrap()?;
@@ -717,15 +718,15 @@ fn validate_reload_socket_path_requires_owned_socket_in_current_directory() -> R
         .unwrap()
         .as_nanos();
     let current_socket = std::env::temp_dir().join(format!(
-        "jcode-desktop-reload-validate-current-{}-{nonce}.sock",
+        "next-code-desktop-reload-validate-current-{}-{nonce}.sock",
         std::process::id(),
     ));
     let new_socket = std::env::temp_dir().join(format!(
-        "jcode-desktop-reload-validate-new-{}-{nonce}.sock",
+        "next-code-desktop-reload-validate-new-{}-{nonce}.sock",
         std::process::id(),
     ));
     let non_socket = std::env::temp_dir().join(format!(
-        "jcode-desktop-reload-validate-file-{}-{nonce}",
+        "next-code-desktop-reload-validate-file-{}-{nonce}",
         std::process::id(),
     ));
     let _ = std::fs::remove_file(&current_socket);
@@ -758,7 +759,7 @@ fn validate_reload_socket_path_requires_owned_socket_in_current_directory() -> R
 fn workspace_send_message_uses_shared_server_instead_of_prompt_argv() -> Result<()> {
     let _guard = ENV_LOCK.lock().unwrap();
     let socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-workspace-send-{}-{}.sock",
+        "next-code-desktop-workspace-send-{}-{}.sock",
         std::process::id(),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -767,9 +768,9 @@ fn workspace_send_message_uses_shared_server_instead_of_prompt_argv() -> Result<
     ));
     let _ = std::fs::remove_file(&socket_path);
     let listener = UnixListener::bind(&socket_path)?;
-    let previous_socket = std::env::var_os("JCODE_SOCKET");
+    let previous_socket = product_env_os("SOCKET");
     unsafe {
-        std::env::set_var("JCODE_SOCKET", &socket_path);
+        std::env::set_var("NEXT_CODE_SOCKET", &socket_path);
     }
 
     let server = std::thread::spawn(move || fake_desktop_server_roundtrip(listener));
@@ -782,7 +783,7 @@ fn workspace_send_message_uses_shared_server_instead_of_prompt_argv() -> Result<
 
     let requests = server.join().unwrap()?;
 
-    restore_env_var("JCODE_SOCKET", previous_socket);
+    restore_env_var("NEXT_CODE_SOCKET", previous_socket);
     let _ = std::fs::remove_file(&socket_path);
 
     assert_eq!(requests[0]["target_session_id"], "session_desktop_fake");
@@ -799,20 +800,20 @@ fn desktop_workers_reconnect_independently_across_same_fake_reload() -> Result<(
         .unwrap()
         .as_nanos();
     let socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-multi-reload-old-{}-{nonce}.sock",
+        "next-code-desktop-worker-multi-reload-old-{}-{nonce}.sock",
         std::process::id(),
     ));
     let new_socket_path = std::env::temp_dir().join(format!(
-        "jcode-desktop-worker-multi-reload-new-{}-{nonce}.sock",
+        "next-code-desktop-worker-multi-reload-new-{}-{nonce}.sock",
         std::process::id(),
     ));
     let _ = std::fs::remove_file(&socket_path);
     let _ = std::fs::remove_file(&new_socket_path);
     let listener = UnixListener::bind(&socket_path)?;
     let new_listener = UnixListener::bind(&new_socket_path)?;
-    let previous_socket = std::env::var_os("JCODE_SOCKET");
+    let previous_socket = product_env_os("SOCKET");
     unsafe {
-        std::env::set_var("JCODE_SOCKET", &socket_path);
+        std::env::set_var("NEXT_CODE_SOCKET", &socket_path);
     }
 
     let server = std::thread::spawn(move || {
@@ -844,7 +845,7 @@ fn desktop_workers_reconnect_independently_across_same_fake_reload() -> Result<(
 
     let result_one = client_one.join().unwrap()?;
     let result_two = client_two.join().unwrap()?;
-    restore_env_var("JCODE_SOCKET", previous_socket);
+    restore_env_var("NEXT_CODE_SOCKET", previous_socket);
     let _ = std::fs::remove_file(&socket_path);
 
     let mut results = vec![result_one.clone(), result_two.clone()];

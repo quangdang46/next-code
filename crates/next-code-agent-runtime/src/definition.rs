@@ -8,7 +8,7 @@
 //! priority first):
 //!
 //!   1. `.jcode/agents/<id>.toml` (project-local, committed to repo)
-//!   2. `~/.jcode/agents/<id>.toml` (user-global)
+//!   2. `~/.next-code/agents/<id>.toml` (user-global)
 //!   3. Embedded built-in agents bundled with the binary
 //!
 //! ## Design constraints

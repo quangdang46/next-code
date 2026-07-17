@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import JCodeKit
+@testable import NextCodeKit
 
 private func run(_ events: [ConnectionOutput], from state: SessionState = SessionState())
     -> SessionState

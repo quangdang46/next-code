@@ -1,13 +1,13 @@
 //! Bridge for the 36 OpenAI-compatible provider profiles in
-//! `jcode-provider-metadata`.
+//! `next-code-provider-metadata`.
 //!
 //! Plan §3 Phase 4:
-//!   > `crates/jcode-provider-metadata/src/catalog.rs` — 36
+//!   > `crates/next-code-provider-metadata/src/catalog.rs` — 36
 //!   >   profiles become Integration entries
 //!
 //! The metadata crate has 36 `OpenAiCompatibleProfile` constants
 //! (kimi, zai, opencode, deepseek, ...). They were originally
-//! consumed by the old `jcode-provider-app` catalog stub. This
+//! consumed by the old `next-code-provider-app` catalog stub. This
 //! module translates every profile into:
 //!  - a [`crate::integration::LoginProvider`] entry for the new
 //!    `IntegrationService` (so the runtime can detect and log in to

@@ -28,7 +28,7 @@ use crate::types::EvalRun;
 #[derive(Debug, Clone)]
 pub struct AgentRunConfig {
     /// ID of the agent to run, matching an entry in the
-    /// `jcode-agent-runtime` registry.
+    /// `next-code-agent-runtime` registry.
     pub agent_id: String,
     /// Natural-language prompt to send to the agent (typically
     /// `EvalCommit::prompt`).
@@ -75,7 +75,7 @@ pub async fn run_agent_in_repo(config: AgentRunConfig) -> Result<EvalRun> {
         .clone()
         .unwrap_or_else(|| {
             std::env::var_os("NEXT_CODE_BIN")
-                .or_else(|| std::env::var_os("JCODE_BIN"))
+                .or_else(|| std::env::var_os("NEXT_CODE_BIN"))
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("next-code"))
         });
@@ -83,7 +83,7 @@ pub async fn run_agent_in_repo(config: AgentRunConfig) -> Result<EvalRun> {
     let mut env_vars: HashMap<String, String> = std::env::vars().collect();
     env_vars.extend(config.env);
     env_vars.insert("NEXT_CODE_AGENT_ID".to_owned(), config.agent_id.clone());
-    env_vars.insert("JCODE_AGENT_ID".to_owned(), config.agent_id.clone());
+    env_vars.insert("NEXT_CODE_AGENT_ID".to_owned(), config.agent_id.clone());
 
     let mut child = Command::new(&next_code_bin)
         .current_dir(&config.repo_path)

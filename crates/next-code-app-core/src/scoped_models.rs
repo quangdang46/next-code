@@ -8,9 +8,9 @@
 //!
 //! Resolution order (highest priority first):
 //!
-//! 1. `JCODE_SCOPED_MODELS` env var (set by `--models` CLI flag in
+//! 1. `NEXT_CODE_SCOPED_MODELS` env var (set by `--models` CLI flag in
 //!    `cli::startup::parse_and_prepare_args`).
-//! 2. `provider.scoped_models` config value (`~/.jcode/config.toml`).
+//! 2. `provider.scoped_models` config value (`~/.next-code/config.toml`).
 //! 3. Empty — cycling falls back to the full
 //!    `available_models_for_switching()` list (existing behavior).
 //!
@@ -18,9 +18,10 @@
 //! globs with `*` and `?`. The first non-empty match anywhere in the model id
 //! counts.
 
+use crate::env::{product_env};
 /// Resolve the active allowlist, in priority order.
 pub fn resolve_allowlist() -> Vec<String> {
-    if let Ok(value) = std::env::var("JCODE_SCOPED_MODELS") {
+    if let Ok(value) = product_env("SCOPED_MODELS") {
         let parsed = parse_pattern_list(&value);
         if !parsed.is_empty() {
             return parsed;

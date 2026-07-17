@@ -69,32 +69,32 @@ fn desktop_reduced_motion_env_parses_common_flag_values() {
     assert!(desktop_reduced_motion_enabled_for_env_value(Some(
         OsString::from("reduce")
     )));
-    assert_eq!(DESKTOP_REDUCED_MOTION_ENV, "JCODE_DESKTOP_REDUCED_MOTION");
+    assert_eq!(DESKTOP_REDUCED_MOTION_ENV, "NEXT_CODE_DESKTOP_REDUCED_MOTION");
 }
 
 #[test]
 fn desktop_process_role_parses_internal_flags() {
     assert_eq!(
-        desktop_process_role_from_args(["jcode-desktop"].into_iter()),
+        desktop_process_role_from_args(["next-code-desktop"].into_iter()),
         DesktopProcessRole::StableHost
     );
     assert_eq!(
-        desktop_process_role_from_args(["jcode-desktop", "--desktop-host"].into_iter()),
+        desktop_process_role_from_args(["next-code-desktop", "--desktop-host"].into_iter()),
         DesktopProcessRole::StableHost
     );
     assert_eq!(
-        desktop_process_role_from_args(["jcode-desktop", "--desktop-app-worker"].into_iter()),
+        desktop_process_role_from_args(["next-code-desktop", "--desktop-app-worker"].into_iter()),
         DesktopProcessRole::AppWorker
     );
     assert_eq!(
         desktop_process_role_from_args(
-            ["jcode-desktop", "--desktop-process-role=stable_host"].into_iter()
+            ["next-code-desktop", "--desktop-process-role=stable_host"].into_iter()
         ),
         DesktopProcessRole::StableHost
     );
     assert_eq!(
         desktop_process_role_from_args(
-            ["jcode-desktop", "--desktop-process-role", "app-worker"].into_iter()
+            ["next-code-desktop", "--desktop-process-role", "app-worker"].into_iter()
         ),
         DesktopProcessRole::AppWorker
     );
@@ -235,7 +235,7 @@ fn desktop_session_events_convert_to_worker_wire_events() {
 #[test]
 fn desktop_app_worker_relaunch_replaces_existing_process_role() {
     let relaunch = DesktopRelaunch {
-        binary: PathBuf::from("/tmp/jcode-desktop"),
+        binary: PathBuf::from("/tmp/next-code-desktop"),
         args: vec![
             OsString::from("--workspace"),
             OsString::from("--desktop-process-role=stable_host"),
@@ -254,7 +254,7 @@ fn desktop_app_worker_relaunch_replaces_existing_process_role() {
     );
 
     let relaunch = DesktopRelaunch {
-        binary: PathBuf::from("/tmp/jcode-desktop"),
+        binary: PathBuf::from("/tmp/next-code-desktop"),
         args: vec![
             OsString::from("--desktop-process-role"),
             OsString::from("stable-host"),
@@ -365,7 +365,7 @@ fn desktop_app_build_scene_preserves_existing_display_list() {
 #[test]
 fn desktop_hot_reload_rewrites_resume_to_live_session() {
     let relaunch = DesktopRelaunch {
-        binary: PathBuf::from("/old/jcode-desktop"),
+        binary: PathBuf::from("/old/next-code-desktop"),
         args: vec![
             OsString::from("--fullscreen"),
             OsString::from("--resume"),
@@ -377,9 +377,9 @@ fn desktop_hot_reload_rewrites_resume_to_live_session() {
     single_session.initialize_resumed_session("live-session");
     let app = DesktopApp::SingleSession(single_session);
 
-    let updated = relaunch.for_app(&app, PathBuf::from("/new/jcode-desktop"));
+    let updated = relaunch.for_app(&app, PathBuf::from("/new/next-code-desktop"));
 
-    assert_eq!(updated.binary, PathBuf::from("/new/jcode-desktop"));
+    assert_eq!(updated.binary, PathBuf::from("/new/next-code-desktop"));
     assert_eq!(
         updated.args,
         vec![
@@ -394,7 +394,7 @@ fn desktop_hot_reload_rewrites_resume_to_live_session() {
 #[test]
 fn desktop_hot_reload_drops_resume_when_current_app_is_fresh() {
     let relaunch = DesktopRelaunch {
-        binary: PathBuf::from("/old/jcode-desktop"),
+        binary: PathBuf::from("/old/next-code-desktop"),
         args: vec![
             OsString::from("--resume=stale-session"),
             OsString::from("--fullscreen"),
@@ -402,7 +402,7 @@ fn desktop_hot_reload_drops_resume_when_current_app_is_fresh() {
     };
     let app = fresh_single_session_app();
 
-    let updated = relaunch.for_app(&app, PathBuf::from("/new/jcode-desktop"));
+    let updated = relaunch.for_app(&app, PathBuf::from("/new/next-code-desktop"));
 
     assert_eq!(updated.args, vec![OsString::from("--fullscreen")]);
 }
@@ -415,11 +415,11 @@ fn desktop_hot_reload_persists_workspace_focus_before_spawn() -> Result<()> {
     let temp = unique_desktop_test_dir("desktop-hot-reload-workspace-state")?;
     let state_path = temp.join("desktop-state.json");
     unsafe {
-        std::env::set_var("JCODE_DESKTOP_STATE", &state_path);
+        std::env::set_var("NEXT_CODE_DESKTOP_STATE", &state_path);
     }
 
     let relaunch = DesktopRelaunch {
-        binary: PathBuf::from("/old/jcode-desktop"),
+        binary: PathBuf::from("/old/next-code-desktop"),
         args: vec![OsString::from("--workspace")],
     };
     let cards = vec![
@@ -451,7 +451,7 @@ fn desktop_hot_reload_persists_workspace_focus_before_spawn() -> Result<()> {
     });
     let app = DesktopApp::Workspace(workspace);
 
-    let updated = relaunch.for_app(&app, PathBuf::from("/new/jcode-desktop"));
+    let updated = relaunch.for_app(&app, PathBuf::from("/new/next-code-desktop"));
 
     assert_eq!(updated.args, vec![OsString::from("--workspace")]);
     let saved = desktop_prefs::load_preferences()?.expect("workspace preferences saved");
@@ -460,7 +460,7 @@ fn desktop_hot_reload_persists_workspace_focus_before_spawn() -> Result<()> {
     assert_eq!(saved.space_hold_toggle_ms, 333);
 
     unsafe {
-        std::env::remove_var("JCODE_DESKTOP_STATE");
+        std::env::remove_var("NEXT_CODE_DESKTOP_STATE");
     }
     std::fs::remove_dir_all(temp)?;
     Ok(())
@@ -474,10 +474,10 @@ fn desktop_hot_reload_restarts_default_launched_workspace_as_workspace() -> Resu
     let temp = unique_desktop_test_dir("desktop-hot-reload-default-workspace")?;
     let state_path = temp.join("desktop-state.json");
     unsafe {
-        std::env::set_var("JCODE_DESKTOP_STATE", &state_path);
+        std::env::set_var("NEXT_CODE_DESKTOP_STATE", &state_path);
     }
     let relaunch = DesktopRelaunch {
-        binary: PathBuf::from("/old/jcode-desktop"),
+        binary: PathBuf::from("/old/next-code-desktop"),
         args: Vec::new(),
     };
     let app = DesktopApp::Workspace(Workspace::from_session_cards(vec![
@@ -492,13 +492,13 @@ fn desktop_hot_reload_restarts_default_launched_workspace_as_workspace() -> Resu
         },
     ]));
 
-    let updated = relaunch.for_app(&app, PathBuf::from("/new/jcode-desktop"));
+    let updated = relaunch.for_app(&app, PathBuf::from("/new/next-code-desktop"));
 
-    assert_eq!(updated.binary, PathBuf::from("/new/jcode-desktop"));
+    assert_eq!(updated.binary, PathBuf::from("/new/next-code-desktop"));
     assert_eq!(updated.args, vec![OsString::from("--workspace")]);
 
     unsafe {
-        std::env::remove_var("JCODE_DESKTOP_STATE");
+        std::env::remove_var("NEXT_CODE_DESKTOP_STATE");
     }
     std::fs::remove_dir_all(temp)?;
     Ok(())
@@ -615,7 +615,7 @@ fn desktop_reload_handoff_watcher_releases_ready_child() -> Result<()> {
 
 fn unique_desktop_test_dir(name: &str) -> Result<PathBuf> {
     let dir = std::env::temp_dir().join(format!(
-        "jcode-{name}-{}-{}",
+        "next-code-{name}-{}-{}",
         std::process::id(),
         SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos()
     ));
@@ -2919,7 +2919,7 @@ fn single_session_issues_slash_toggles_local_issue_browser() {
     assert_eq!(app.side_panel().focus, DesktopSidePanelFocus::IssueList);
     assert!(app.draft.is_empty());
     assert!(app.messages.is_empty());
-    assert_eq!(app.side_panel().github_issues.repo, "1jehuang/jcode");
+    assert_eq!(app.side_panel().github_issues.repo, "quangdang46/next-code");
     assert_eq!(
         app.side_panel()
             .github_issues
@@ -2990,7 +2990,7 @@ fn single_session_issue_browser_investigate_injects_context() {
     };
     assert!(images.is_empty());
     assert!(message.contains("GitHub issue mission"));
-    assert!(message.contains("Repository: 1jehuang/jcode"));
+    assert!(message.contains("Repository: quangdang46/next-code"));
     assert!(message.contains("Issue: #337"));
     assert!(message.contains("Mission objective: investigate"));
     assert!(message.contains("Operating instructions:"));
@@ -4790,7 +4790,7 @@ fn single_session_visual_state_smoke_covers_markdown_spinner_and_switcher() {
     assert_visual_text_contains(&switcher_key, "Resume sessions");
     assert_visual_text_contains(
         &switcher_key,
-        "loading recent sessions from ~/.jcode/sessions...",
+        "loading recent sessions from ~/.next-code/sessions...",
     );
 }
 
@@ -5432,7 +5432,7 @@ fn assistant_inline_code_pills_align_after_unicode_list_markers() {
     let size = PhysicalSize::new(1000, 720);
     let mut app = SingleSessionApp::new(None);
     app.messages.push(SingleSessionMessage::assistant(
-        "- `crates/`: shared modules\n- `jcode-provider-*`: model/provider integrations.",
+        "- `crates/`: shared modules\n- `next-code-provider-*`: model/provider integrations.",
     ));
 
     let body_lines = single_session_rendered_body_lines_for_tick(&app, size, 0);
@@ -5768,7 +5768,7 @@ fn single_session_transcript_card_runs_group_card_styles() {
 
 #[test]
 fn code_block_header_placement_is_stable_across_sizes_and_text_scales() {
-    let markdown = "before\n\n```text\njcode-desktop native window input uses winit and renders via wgpu\n  indented code stays code\n```\n\nafter";
+    let markdown = "before\n\n```text\nnext-code-desktop native window input uses winit and renders via wgpu\n  indented code stays code\n```\n\nafter";
     let sizes = [
         PhysicalSize::new(520, 420),
         PhysicalSize::new(900, 640),
@@ -5800,7 +5800,7 @@ fn code_block_header_placement_is_stable_across_sizes_and_text_scales() {
                 lines[header_index + 1..]
                     .iter()
                     .take_while(|line| line.style == SingleSessionLineStyle::Code)
-                    .any(|line| line.text.starts_with("  jcode-desktop")),
+                    .any(|line| line.text.starts_with("  next-code-desktop")),
                 "first code content line should immediately follow header as code at size {size:?}, scale {scale_step}"
             );
 
@@ -5893,7 +5893,7 @@ fn code_block_header_placement_is_stable_across_sizes_and_text_scales() {
 
 #[test]
 fn code_block_header_actual_glyph_rasters_stay_inside_rendered_card() {
-    let markdown = "```text\njcode-desktop\n  indented code\n```";
+    let markdown = "```text\nnext-code-desktop\n  indented code\n```";
     let sizes = [
         PhysicalSize::new(520, 420),
         PhysicalSize::new(900, 640),
@@ -6301,7 +6301,7 @@ fn single_session_tool_events_expand_context_and_collapse_previous_call() {
     });
     app.apply_session_event(session_launch::DesktopSessionEvent::ToolInput {
         id: None,
-        delta: r#"{"command":"cargo test -p jcode-desktop","timeout":120000,"intent":"Run desktop tests"}"#.to_string(),
+        delta: r#"{"command":"cargo test -p next-code-desktop","timeout":120000,"intent":"Run desktop tests"}"#.to_string(),
     });
     app.apply_session_event(session_launch::DesktopSessionEvent::ToolExecuting {
         id: None,
@@ -6316,7 +6316,7 @@ fn single_session_tool_events_expand_context_and_collapse_previous_call() {
 
     let body = app.body_lines().join("\n");
     assert!(body.contains("  ✓ bash · done · tests passed"));
-    assert!(body.contains("$ cargo test -p jcode-desktop"));
+    assert!(body.contains("$ cargo test -p next-code-desktop"));
     assert!(!body.contains("    timeout: 120000"));
     assert_eq!(app.status.as_deref(), Some("tool bash done"));
 
@@ -6433,7 +6433,7 @@ fn single_session_tool_cards_have_native_geometry_and_success_fill() {
     });
     app.apply_session_event(session_launch::DesktopSessionEvent::ToolInput {
         id: Some("tool-card".to_string()),
-        delta: r#"{"command":"cargo check -p jcode-desktop"}"#.to_string(),
+        delta: r#"{"command":"cargo check -p next-code-desktop"}"#.to_string(),
     });
     app.apply_session_event(session_launch::DesktopSessionEvent::ToolFinished {
         id: Some("tool-card".to_string()),
@@ -6591,12 +6591,12 @@ fn single_session_hotkey_help_toggles_discoverable_shortcuts() {
     assert!(help_has_shortcut(
         &help,
         "Super+;",
-        "spawn a self-dev jcode session"
+        "spawn a self-dev next-code session"
     ));
     assert!(help_has_shortcut(
         &help,
         "Super+'",
-        "spawn a jcode session in home"
+        "spawn a next-code session in home"
     ));
     assert!(help_has_shortcut(
         &help,
@@ -7464,7 +7464,7 @@ fn single_session_session_switcher_renders_tui_style_cards_and_role_preview() {
         session_id: "session_design".to_string(),
         title: "Design Session".to_string(),
         subtitle: "active · claude-sonnet-4-5".to_string(),
-        detail: "8 msgs · just now · jcode".to_string(),
+        detail: "8 msgs · just now · next-code".to_string(),
         preview_lines: vec!["user compact card prompt".to_string()],
         detail_lines: vec![
             "user first question".to_string(),
@@ -7830,14 +7830,14 @@ fn single_session_resumed_transcript_hydration_replaces_card_preview() {
 #[test]
 fn desktop_resume_args_are_parsed() {
     assert_eq!(
-        desktop_resume_session_id_from_args(["jcode-desktop", "--resume", "session_beta"]),
+        desktop_resume_session_id_from_args(["next-code-desktop", "--resume", "session_beta"]),
         Some("session_beta".to_string())
     );
     assert_eq!(
-        desktop_resume_session_id_from_args(["jcode-desktop", "--resume=session_gamma"]),
+        desktop_resume_session_id_from_args(["next-code-desktop", "--resume=session_gamma"]),
         Some("session_gamma".to_string())
     );
-    assert_eq!(desktop_resume_session_id_from_args(["jcode-desktop"]), None);
+    assert_eq!(desktop_resume_session_id_from_args(["next-code-desktop"]), None);
 }
 
 #[test]
@@ -8132,7 +8132,7 @@ fn apply_queue_trace_action_to_app(
         },
         QueueTraceAction::Reloading => {
             app.apply_session_event(session_launch::DesktopSessionEvent::Reloading {
-                new_socket: Some("/tmp/jcode-reload-model-test.sock".to_string()),
+                new_socket: Some("/tmp/next-code-reload-model-test.sock".to_string()),
             });
             None
         }
@@ -8257,7 +8257,7 @@ fn single_session_event_loop_auto_drain_ignores_stale_done_after_reload() {
         &mut desktop,
         vec![
             session_launch::DesktopSessionEvent::Reloading {
-                new_socket: Some("/tmp/jcode-reload-event-loop-test.sock".to_string()),
+                new_socket: Some("/tmp/next-code-reload-event-loop-test.sock".to_string()),
             },
             session_launch::DesktopSessionEvent::Done,
         ],
@@ -8291,7 +8291,7 @@ fn single_session_event_loop_auto_drain_after_post_reload_activity_done() {
         &mut desktop,
         vec![
             session_launch::DesktopSessionEvent::Reloading {
-                new_socket: Some("/tmp/jcode-reload-event-loop-test.sock".to_string()),
+                new_socket: Some("/tmp/next-code-reload-event-loop-test.sock".to_string()),
             },
             session_launch::DesktopSessionEvent::Reloaded {
                 session_id: "reload-model-session".to_string(),
@@ -8329,7 +8329,7 @@ fn single_session_event_loop_auto_drain_allows_done_after_reloaded_without_outpu
         &mut desktop,
         vec![
             session_launch::DesktopSessionEvent::Reloading {
-                new_socket: Some("/tmp/jcode-reload-event-loop-test.sock".to_string()),
+                new_socket: Some("/tmp/next-code-reload-event-loop-test.sock".to_string()),
             },
             session_launch::DesktopSessionEvent::Reloaded {
                 session_id: "reload-model-session".to_string(),
@@ -8358,7 +8358,7 @@ fn single_session_event_loop_reload_error_keeps_queue_retryable() {
         &mut desktop,
         vec![
             session_launch::DesktopSessionEvent::Reloading {
-                new_socket: Some("/tmp/jcode-reload-event-loop-test.sock".to_string()),
+                new_socket: Some("/tmp/next-code-reload-event-loop-test.sock".to_string()),
             },
             session_launch::DesktopSessionEvent::Error("reload failed".to_string()),
         ],
@@ -8386,7 +8386,7 @@ fn single_session_event_loop_multiple_reloads_preserve_queued_prompt_order() {
             &mut desktop,
             vec![
                 session_launch::DesktopSessionEvent::Reloading {
-                    new_socket: Some("/tmp/jcode-reload-one.sock".to_string()),
+                    new_socket: Some("/tmp/next-code-reload-one.sock".to_string()),
                 },
                 session_launch::DesktopSessionEvent::Reloaded {
                     session_id: "reload-model-session".to_string(),
@@ -8411,7 +8411,7 @@ fn single_session_event_loop_multiple_reloads_preserve_queued_prompt_order() {
             &mut desktop,
             vec![
                 session_launch::DesktopSessionEvent::Reloading {
-                    new_socket: Some("/tmp/jcode-reload-two.sock".to_string()),
+                    new_socket: Some("/tmp/next-code-reload-two.sock".to_string()),
                 },
                 session_launch::DesktopSessionEvent::Reloaded {
                     session_id: "reload-model-session".to_string(),
@@ -8479,7 +8479,7 @@ fn single_session_reload_queue_state_space_matches_reference_model() {
     let mut trace = Vec::new();
     // Exhaustive DFS over action sequences. Depth 4 (~11k traces) covers every
     // length-<=4 action ordering and stays tractable under the default debug
-    // test profile; depth 5 is ~111k traces and made `cargo test -p jcode-desktop`
+    // test profile; depth 5 is ~111k traces and made `cargo test -p next-code-desktop`
     // appear to hang for over a minute in debug builds.
     visit(&mut trace, 4);
 }
@@ -8920,7 +8920,7 @@ fn desktop_reload_notice_is_visible_without_replacing_window() {
 fn headless_chat_smoke_message_parses_hidden_flag() {
     assert_eq!(
         headless_chat_smoke_message(&[
-            "jcode-desktop".to_string(),
+            "next-code-desktop".to_string(),
             "--headless-chat-smoke".to_string(),
             "reply pong".to_string(),
         ]),
@@ -8928,13 +8928,13 @@ fn headless_chat_smoke_message_parses_hidden_flag() {
     );
     assert_eq!(
         headless_chat_smoke_message(&[
-            "jcode-desktop".to_string(),
+            "next-code-desktop".to_string(),
             "--headless-chat-smoke=reply pong".to_string(),
         ]),
         Some("reply pong".to_string())
     );
     assert_eq!(
-        headless_chat_smoke_message(&["jcode-desktop".to_string()]),
+        headless_chat_smoke_message(&["next-code-desktop".to_string()]),
         None
     );
 }
@@ -8975,16 +8975,16 @@ fn desktop_help_text_documents_desktop_options() {
 
 #[test]
 fn desktop_startup_flags_enable_logging_and_benchmark_mode() {
-    let args = vec!["jcode-desktop".to_string(), "--startup-log".to_string()];
+    let args = vec!["next-code-desktop".to_string(), "--startup-log".to_string()];
     assert!(startup_log_requested(&args));
     assert!(!startup_benchmark_requested(&args));
 
     let args = vec![
-        "jcode-desktop".to_string(),
+        "next-code-desktop".to_string(),
         "--startup-benchmark".to_string(),
     ];
     assert!(startup_benchmark_requested(&args));
-    assert!(!startup_log_requested(&["jcode-desktop".to_string()]));
+    assert!(!startup_log_requested(&["next-code-desktop".to_string()]));
 
     assert!(env_flag_enabled(OsString::from("1")));
     assert!(!env_flag_enabled(OsString::from("false")));
@@ -8994,7 +8994,7 @@ fn desktop_startup_flags_enable_logging_and_benchmark_mode() {
 fn single_session_reload_event_keeps_worker_state_processing() {
     let mut app = SingleSessionApp::new(None);
     app.apply_session_event(session_launch::DesktopSessionEvent::Reloading {
-        new_socket: Some("/tmp/jcode-reload.sock".to_string()),
+        new_socket: Some("/tmp/next-code-reload.sock".to_string()),
     });
 
     assert!(app.has_background_work());
@@ -9781,7 +9781,7 @@ fn long_transcript_keeps_welcome_visual_only() {
 fn single_session_without_session_is_native_fresh_draft() {
     let mut app = SingleSessionApp::new(None);
 
-    assert_eq!(app.status_title(), "Jcode Desktop (Beta) · fresh session");
+    assert_eq!(app.status_title(), "Next Code Desktop (Beta) · fresh session");
     assert!(!app.status_title().contains("Enter send"));
     assert!(!app.status_title().contains("Ctrl+"));
     assert_eq!(
@@ -9864,11 +9864,11 @@ fn default_single_session_app_starts_without_attaching_recent_session() {
 #[test]
 fn desktop_mode_defaults_to_single_session_and_gates_workspace_prototype() {
     assert_eq!(
-        desktop_mode_from_args(["jcode-desktop"]),
+        desktop_mode_from_args(["next-code-desktop"]),
         DesktopMode::SingleSession
     );
     assert_eq!(
-        desktop_mode_from_args(["jcode-desktop", "--workspace"]),
+        desktop_mode_from_args(["next-code-desktop", "--workspace"]),
         DesktopMode::WorkspacePrototype
     );
 }

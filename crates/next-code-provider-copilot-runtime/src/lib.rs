@@ -122,7 +122,7 @@ impl CopilotApiProvider {
     pub fn new() -> Result<Self> {
         let github_token = copilot_auth::load_github_token()?;
         let model =
-            std::env::var("JCODE_COPILOT_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
+            std::env::var("NEXT_CODE_COPILOT_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
 
         let provider = Self {
             client: next_code_provider_core::shared_http_client(),
@@ -148,7 +148,7 @@ impl CopilotApiProvider {
     }
 
     fn env_premium_mode() -> u8 {
-        match std::env::var("JCODE_COPILOT_PREMIUM").ok().as_deref() {
+        match std::env::var("NEXT_CODE_COPILOT_PREMIUM").ok().as_deref() {
             Some("0") => PremiumMode::Zero as u8,
             Some("1") => PremiumMode::OnePerSession as u8,
             _ => PremiumMode::Normal as u8,
@@ -157,7 +157,7 @@ impl CopilotApiProvider {
 
     pub fn new_with_token(github_token: String) -> Self {
         let model =
-            std::env::var("JCODE_COPILOT_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
+            std::env::var("NEXT_CODE_COPILOT_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
 
         let provider = Self {
             client: next_code_provider_core::shared_http_client(),
@@ -179,7 +179,7 @@ impl CopilotApiProvider {
     }
 
     fn startup_prefetch_grace_ms() -> u64 {
-        std::env::var("JCODE_COPILOT_PREFETCH_STARTUP_GRACE_MS")
+        std::env::var("NEXT_CODE_COPILOT_PREFETCH_STARTUP_GRACE_MS")
             .ok()
             .and_then(|s| s.parse::<u64>().ok())
             .unwrap_or(2000)
@@ -275,7 +275,7 @@ impl CopilotApiProvider {
     /// If JCODE_COPILOT_MODEL is set, this is a no-op (user override).
     pub async fn detect_tier_and_set_default(&self) {
         let detect_start = std::time::Instant::now();
-        if std::env::var("JCODE_COPILOT_MODEL").is_ok() {
+        if std::env::var("NEXT_CODE_COPILOT_MODEL").is_ok() {
             next_code_base::logging::info(
                 "Copilot model overridden via JCODE_COPILOT_MODEL, skipping tier detection",
             );

@@ -1,6 +1,6 @@
 //! Hook v2 types — Input/Output protocol, event constants, result enums, and metrics.
 //!
-//! This module defines the complete JSON contract between jcode and hook handlers.
+//! This module defines the complete JSON contract between next-code and hook handlers.
 //! Every hook receives a `HookInput` via stdin and returns a `HookOutput` via stdout.
 
 use chrono::{DateTime, Utc};

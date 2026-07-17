@@ -1,6 +1,6 @@
 //! OAuth attempt state machine.
 //!
-//! Plan Phase 2 deliverable: `crates/jcode-provider-service/src/attempt.rs`.
+//! Plan Phase 2 deliverable: `crates/next-code-provider-service/src/attempt.rs`.
 //!
 //! The OAuth lifecycle has four states:
 //
@@ -22,7 +22,7 @@ use crate::integration::AuthMethod;
 use crate::types::ProviderId;
 
 /// State of an in-flight OAuth login. Created when the user runs
-/// `jcode provider connect anthropic`; expires after 10 minutes
+/// `next-code provider connect anthropic`; expires after 10 minutes
 /// (the opencode standard TTL).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OAuthAttempt {

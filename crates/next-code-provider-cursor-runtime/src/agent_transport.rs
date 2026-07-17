@@ -26,6 +26,7 @@
 //! Response text arrives as `f1.f1.f1` string chunks (assistant answer) and
 //! `f1.f4.f1` chunks (reasoning). A trailing flag-`0x02` frame closes the turn.
 
+use next_code_core::env::{product_env};
 use std::io::Read;
 use std::sync::Arc;
 use std::time::Duration;
@@ -48,7 +49,7 @@ const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLI_CLIENT_VERSION_DEFAULT: &str = "cli-2026.07.08-0c04a8a";
 
 fn cli_client_version() -> String {
-    std::env::var("JCODE_CURSOR_CLI_VERSION")
+    product_env("CURSOR_CLI_VERSION")
         .ok()
         .map(|raw| raw.trim().to_string())
         .filter(|raw| !raw.is_empty())
@@ -56,7 +57,7 @@ fn cli_client_version() -> String {
 }
 
 fn agent_host() -> String {
-    std::env::var("JCODE_CURSOR_AGENT_HOST")
+    product_env("CURSOR_AGENT_HOST")
         .ok()
         .map(|raw| raw.trim().to_string())
         .filter(|raw| !raw.is_empty())

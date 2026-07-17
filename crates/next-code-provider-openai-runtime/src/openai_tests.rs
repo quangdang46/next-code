@@ -116,8 +116,8 @@ impl LiveOpenAITestEnv {
         )?;
         std::fs::copy(source_auth, &target_auth)?;
 
-        let next_code_home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
-        let transport = EnvVarGuard::set("JCODE_OPENAI_TRANSPORT", "https");
+        let next_code_home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+        let transport = EnvVarGuard::set("NEXT_CODE_OPENAI_TRANSPORT", "https");
 
         Ok(Some(Self {
             _lock: lock,
@@ -179,16 +179,16 @@ include!("openai_tests/parsing_tools.rs");
 #[test]
 fn openai_credential_mode_runtime_provider_identity_round_trips() {
     let _guard = next_code_base::storage::lock_test_env();
-    let previous = std::env::var_os("JCODE_RUNTIME_PROVIDER");
+    let previous = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER");
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "openai");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openai");
     assert_eq!(
         OpenAICredentialMode::from_runtime_env(next_code_provider_core::DualAuthProvider::OpenAI),
         OpenAICredentialMode::OAuth,
         "OAuth selection must surface as the OAuth runtime identity"
     );
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "openai-api");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openai-api");
     assert_eq!(
         OpenAICredentialMode::from_runtime_env(next_code_provider_core::DualAuthProvider::OpenAI),
         OpenAICredentialMode::ApiKey,
@@ -196,7 +196,7 @@ fn openai_credential_mode_runtime_provider_identity_round_trips() {
     );
 
     match previous {
-        Some(value) => next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", value),
-        None => next_code_base::env::remove_var("JCODE_RUNTIME_PROVIDER"),
+        Some(value) => next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", value),
+        None => next_code_base::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER"),
     }
 }

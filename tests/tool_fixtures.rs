@@ -94,7 +94,7 @@ fn collect_fixtures() -> Vec<(String, Fixture)> {
         return out;
     };
     let filter = std::env::var("NEXT_CODE_FIXTURE_FILTER")
-        .or_else(|_| std::env::var("JCODE_FIXTURE_FILTER"))
+        .or_else(|_| std::env::var("NEXT_CODE_FIXTURE_FILTER"))
         .ok();
     for entry in entries.flatten() {
         let path = entry.path();

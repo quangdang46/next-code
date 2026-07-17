@@ -1,4 +1,4 @@
-//! Hooks module — lifecycle hooks for jcode events.
+//! Hooks module — lifecycle hooks for next-code events.
 
 pub mod cli;
 pub mod config;

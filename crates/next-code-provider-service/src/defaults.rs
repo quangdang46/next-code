@@ -3,7 +3,7 @@
 //! Persists the user's "default model" choice (per provider, plus a
 //! global default) so the next session picks up where the user left
 //! off. Backed by a simple JSON file under the user's data directory
-//! (default: `~/.jcode/provider-defaults.json`). No migration story
+//! (default: `~/.next-code/provider-defaults.json`). No migration story
 //! is needed — if the file is missing or malformed, defaults fall
 //! back to the catalog's heuristics.
 
@@ -89,7 +89,7 @@ pub enum DefaultsError {
     Invalid(String),
 }
 
-/// Default path: `~/.jcode/provider-defaults.json`.
+/// Default path: `~/.next-code/provider-defaults.json`.
 pub fn default_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     Some(
@@ -105,7 +105,7 @@ mod tests {
 
     #[test]
     fn empty_when_file_missing() {
-        let p = std::env::temp_dir().join("jcode-defaults-missing.json");
+        let p = std::env::temp_dir().join("next-code-defaults-missing.json");
         let _ = std::fs::remove_file(&p);
         let d = ProviderDefaults::load(&p).unwrap();
         assert!(d.global.is_none());
@@ -114,7 +114,7 @@ mod tests {
 
     #[test]
     fn round_trip() {
-        let p = std::env::temp_dir().join("jcode-defaults-rt.json");
+        let p = std::env::temp_dir().join("next-code-defaults-rt.json");
         let _ = std::fs::remove_file(&p);
         let mut d = ProviderDefaults::new();
         d.set_global("anthropic".into(), "claude-sonnet-4-6".into());
@@ -153,7 +153,7 @@ mod tests {
 
     #[test]
     fn invalid_file_surfaces_error() {
-        let p = std::env::temp_dir().join("jcode-defaults-bad.json");
+        let p = std::env::temp_dir().join("next-code-defaults-bad.json");
         std::fs::write(&p, "not json").unwrap();
         let err = ProviderDefaults::load(&p).unwrap_err();
         assert!(matches!(err, DefaultsError::Invalid(_)));

@@ -424,7 +424,7 @@ impl Workspace {
             surfaces: vec![Surface::non_session_state(
                 1,
                 SurfaceKind::Loading,
-                "loading jcode sessions…",
+                "loading next-code sessions…",
                 vec![
                     "reading recent sessions off the UI thread".to_string(),
                     "the workspace will populate as soon as they are ready".to_string(),
@@ -449,7 +449,7 @@ impl Workspace {
             surfaces: vec![Surface::non_session_state(
                 1,
                 SurfaceKind::Empty,
-                "no jcode sessions found",
+                "no next-code sessions found",
                 vec![
                     "start a session in the tui".to_string(),
                     "then restart this desktop prototype".to_string(),

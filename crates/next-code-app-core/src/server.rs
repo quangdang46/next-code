@@ -110,8 +110,8 @@ pub(super) type SessionAgents = Arc<RwLock<HashMap<String, Arc<Mutex<Agent>>>>>;
 pub(super) type ChannelSubscriptions =
     Arc<RwLock<HashMap<String, HashMap<String, HashSet<String>>>>>;
 
-const SERVER_NAME_ENV: &str = "JCODE_SERVER_NAME";
-const SERVER_DISPLAY_NAME_ENV: &str = "JCODE_SERVER_DISPLAY_NAME";
+const SERVER_NAME_ENV: &str = "NEXT_CODE_SERVER_NAME";
+const SERVER_DISPLAY_NAME_ENV: &str = "NEXT_CODE_SERVER_DISPLAY_NAME";
 const MAX_CONFIGURED_SERVER_NAME_LEN: usize = 64;
 const SWARM_TERMINAL_MEMBER_GC_BATCH_SIZE: usize = 64;
 
@@ -1710,7 +1710,7 @@ impl Server {
         if !inhibitor.is_available() {
             // Disabled via the legacy env escape hatch, or unsupported platform.
             crate::logging::info(
-                "power_inhibit: unavailable (unsupported platform or JCODE_DISABLE_POWER_INHIBIT set); not monitoring",
+                "power_inhibit: unavailable (unsupported platform or NEXT_CODE_DISABLE_POWER_INHIBIT set); not monitoring",
             );
             return;
         }
@@ -2073,7 +2073,7 @@ impl Server {
 
     /// Start the server (both main and debug sockets)
     pub async fn run(&self) -> Result<()> {
-        // Ensure socket directory exists (for named sockets like /run/user/1000/jcode/)
+        // Ensure socket directory exists (for named sockets like /run/user/1000/next-code/)
         if let Some(parent) = self.socket_path.parent() {
             std::fs::create_dir_all(parent)?;
         }

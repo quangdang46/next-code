@@ -27,7 +27,7 @@ use super::{ResumeTarget, SessionSource};
 const TRANSCRIPT_SEARCH_CHUNK_BYTES: usize = 64 * 1024;
 
 fn session_scan_limit() -> usize {
-    std::env::var("JCODE_SESSION_PICKER_MAX_SESSIONS")
+    std::env::var("NEXT_CODE_SESSION_PICKER_MAX_SESSIONS")
         .ok()
         .and_then(|raw| raw.trim().parse::<usize>().ok())
         .map(|n| n.clamp(MIN_SESSION_SCAN_LIMIT, MAX_SESSION_SCAN_LIMIT))
@@ -41,7 +41,7 @@ fn session_candidate_window(scan_limit: usize) -> usize {
 }
 
 fn include_old_saved_sessions_on_initial_load() -> bool {
-    std::env::var("JCODE_SESSION_PICKER_INCLUDE_OLD_SAVED")
+    std::env::var("NEXT_CODE_SESSION_PICKER_INCLUDE_OLD_SAVED")
         .ok()
         .is_some_and(|raw| matches!(raw.trim(), "1" | "true" | "TRUE" | "yes" | "YES"))
 }
@@ -1584,7 +1584,7 @@ pub(super) fn crashed_sessions_from_all_sessions(
     })
 }
 
-/// Parse a single jcode session snapshot (+ journal) into a [`SessionInfo`],
+/// Parse a single next-code session snapshot (+ journal) into a [`SessionInfo`],
 /// returning `None` for empty/imported sessions or read/parse errors. Pulled out
 /// of `load_sessions` so the summary pass can run across a scoped thread pool.
 fn parse_jcode_session_info(
@@ -1740,7 +1740,7 @@ pub fn load_sessions() -> Result<Vec<SessionInfo>> {
         // burst of self-dev or swarm workers consume the entire recency budget and
         // crowd out ordinary sessions. Keep a separate bounded debug budget so the
         // test-session toggle still has useful recent entries without making the
-        // default list appear to jump from a handful of Jcode rows straight to old
+        // default list appear to jump from a handful of Next Code rows straight to old
         // external transcripts.
         let mut visible_session_count = 0usize;
         let mut debug_session_count = 0usize;

@@ -1,27 +1,28 @@
 //! Trust store for project-local MCP configs (issue #62).
 //!
-//! Project-local `.jcode/mcp.json` (and the compatibility-fallback
-//! `.claude/mcp.json`) declare commands jcode is willing to execute on
+//! Project-local `.next-code/mcp.json` (and the compatibility-fallback
+//! `.claude/mcp.json`) declare commands next-code is willing to execute on
 //! behalf of the project. In a freshly-cloned repository those commands are
 //! effectively executable configuration shipped by an unverified author.
 //!
-//! When `JCODE_REQUIRE_MCP_TRUST=1` is set (auto-set by `--safe-eval`), the
+//! When `NEXT_CODE_REQUIRE_MCP_TRUST=1` is set (auto-set by `--safe-eval`), the
 //! MCP loader consults this trust store before loading project-local entries.
-//! The store lives at `~/.jcode/mcp_trust.json` and records the SHA-256 of
+//! The store lives at `~/.next-code/mcp_trust.json` and records the SHA-256 of
 //! the on-disk file content keyed by the canonical absolute path. A change
 //! to the file content invalidates the trust entry and forces a re-approval.
 //!
 //! The companion CLI commands are:
 //!
-//!   jcode mcp trust   <path>   # mark the current content of <path> trusted
-//!   jcode mcp revoke  <path>   # remove the entry
-//!   jcode mcp list             # show all trust entries
+//!   next-code mcp trust   <path>   # mark the current content of <path> trusted
+//!   next-code mcp revoke  <path>   # remove the entry
+//!   next-code mcp list             # show all trust entries
 //!
 //! No interactive TUI prompt is implemented in this PR — the issue's
 //! "auditable trust decision" requirement is met by an explicit out-of-band
 //! command. A future PR can add an inline "Trust this MCP config? [y/N]"
 //! prompt that calls into `mark_trusted` here.
 
+use crate::env::{product_env};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -110,7 +111,7 @@ impl McpTrustStore {
 /// Whether the trust gate is active for this process.
 pub fn trust_gate_enabled() -> bool {
     matches!(
-        std::env::var("JCODE_REQUIRE_MCP_TRUST")
+        product_env("REQUIRE_MCP_TRUST")
             .ok()
             .as_deref()
             .map(str::trim),
@@ -124,7 +125,7 @@ mod tests {
 
     fn isolated_home() -> tempfile::TempDir {
         let temp = tempfile::TempDir::new().expect("temp");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         temp
     }
 
@@ -134,7 +135,7 @@ mod tests {
         let _home = isolated_home();
 
         let workdir = tempfile::TempDir::new().expect("workdir");
-        let cfg = workdir.path().join(".jcode/mcp.json");
+        let cfg = workdir.path().join(".next-code/mcp.json");
         std::fs::create_dir_all(cfg.parent().unwrap()).unwrap();
         std::fs::write(&cfg, r#"{"servers":{}}"#).unwrap();
 
@@ -167,7 +168,7 @@ mod tests {
         let _home = isolated_home();
 
         let workdir = tempfile::TempDir::new().expect("workdir");
-        let cfg = workdir.path().join(".jcode/mcp.json");
+        let cfg = workdir.path().join(".next-code/mcp.json");
         std::fs::create_dir_all(cfg.parent().unwrap()).unwrap();
         std::fs::write(&cfg, "{}").unwrap();
 
@@ -182,21 +183,21 @@ mod tests {
     #[test]
     fn trust_gate_enabled_honors_common_truthy_values() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_REQUIRE_MCP_TRUST");
+        let prev = std::env::var_os("NEXT_CODE_REQUIRE_MCP_TRUST");
 
         for v in ["1", "true", "yes", "on"] {
-            crate::env::set_var("JCODE_REQUIRE_MCP_TRUST", v);
+            crate::env::set_var("NEXT_CODE_REQUIRE_MCP_TRUST", v);
             assert!(trust_gate_enabled(), "{v} should enable gate");
         }
         for v in ["0", "false", "no", "off", ""] {
-            crate::env::set_var("JCODE_REQUIRE_MCP_TRUST", v);
+            crate::env::set_var("NEXT_CODE_REQUIRE_MCP_TRUST", v);
             assert!(!trust_gate_enabled(), "{v} should not enable gate");
         }
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_REQUIRE_MCP_TRUST", prev);
+            crate::env::set_var("NEXT_CODE_REQUIRE_MCP_TRUST", prev);
         } else {
-            crate::env::remove_var("JCODE_REQUIRE_MCP_TRUST");
+            crate::env::remove_var("NEXT_CODE_REQUIRE_MCP_TRUST");
         }
     }
 }

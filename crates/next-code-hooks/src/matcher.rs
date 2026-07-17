@@ -55,7 +55,7 @@ pub fn matches(matcher: &HookMatcher, ctx: &MatcherContext) -> bool {
                     Box::leak(Box::new(
                         Regex::new(pattern).unwrap_or_else(|e| {
                             eprintln!(
-                                "[jcode-hooks] invalid regex pattern {:?}: {} — using never-match placeholder",
+                                "[next-code-hooks] invalid regex pattern {:?}: {} — using never-match placeholder",
                                 pattern, e
                             );
                             Regex::new(r"[^\s\S]").expect("never-match placeholder is valid")

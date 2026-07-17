@@ -70,11 +70,11 @@ impl Tool for WebSearchTool {
                 "engine": {
                     "type": "string",
                     "enum": ["duckduckgo", "bing", "searxng"],
-                    "description": "Search engine. Defaults to duckduckgo. Bing uses JCODE_BING_API_KEY when set, otherwise Bing HTML scraping. searxng queries a configured SearXNG instance (JCODE_SEARXNG_URL)."
+                    "description": "Search engine. Defaults to duckduckgo. Bing uses NEXT_CODE_BING_API_KEY when set, otherwise Bing HTML scraping. searxng queries a configured SearXNG instance (NEXT_CODE_SEARXNG_URL)."
                 },
                 "bing_market": {
                     "type": "string",
-                    "description": "Optional Bing market, e.g. en-US or zh-CN. Defaults to JCODE_BING_MARKET or en-US."
+                    "description": "Optional Bing market, e.g. en-US or zh-CN. Defaults to NEXT_CODE_BING_MARKET or en-US."
                 }
             }
         })
@@ -135,8 +135,8 @@ impl Tool for WebSearchTool {
                  DuckDuckGo/Bing engines may be blocked here by TLS fingerprinting \
                  or IP reputation (common on Linux/servers). Workarounds:\n\
                  - Point at a SearXNG instance: set `websearch.searxng_url` (or \
-                 JCODE_SEARXNG_URL) and use engine \"searxng\".\n\
-                 - Or provide a Bing Search API key via JCODE_BING_API_KEY.",
+                 NEXT_CODE_SEARXNG_URL) and use engine \"searxng\".\n\
+                 - Or provide a Bing Search API key via NEXT_CODE_BING_API_KEY.",
                 params.query
             )));
         }
@@ -656,7 +656,7 @@ mod tests {
             </li>
             <li class="b_algo"><h2><a href="https://www.bing.com/aclk">ad</a></h2></li>
             <li class="b_algo">
-              <h2><a href="https://example.org/jcode">Jcode</a></h2>
+              <h2><a href="https://example.org/next-code">Next Code</a></h2>
               <div class="b_caption"><p>Agentic coding.</p></div>
             </li>
         "#;
@@ -666,7 +666,7 @@ mod tests {
         assert_eq!(results[0].title, "Rust & Cargo");
         assert_eq!(results[0].url, "https://example.com/rust");
         assert_eq!(results[0].snippet, "A systems language.");
-        assert_eq!(results[1].title, "Jcode");
+        assert_eq!(results[1].title, "Next Code");
     }
 
     #[test]

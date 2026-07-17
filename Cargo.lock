@@ -6860,6 +6860,7 @@ dependencies = [
  "glyphon",
  "image",
  "libc",
+ "next-code-core",
  "next-code-fuzzy",
  "next-code-tui-messages",
  "pollster",
@@ -6930,6 +6931,7 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "futures",
+ "next-code-core",
  "regex",
  "reqwest 0.11.27",
  "serde",
@@ -7133,6 +7135,7 @@ name = "next-code-plugin-core"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "next-code-core",
  "regex",
  "semver",
  "serde",
@@ -7149,6 +7152,7 @@ dependencies = [
  "chrono",
  "futures",
  "next-code-agent-runtime",
+ "next-code-core",
  "next-code-plugin-core",
  "regex",
  "reqwest 0.12.28",
@@ -7231,6 +7235,7 @@ dependencies = [
  "chrono",
  "futures",
  "next-code-base",
+ "next-code-core",
  "next-code-message-types",
  "next-code-provider-anthropic",
  "next-code-provider-core",
@@ -7310,6 +7315,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "next-code-base",
+ "next-code-core",
  "next-code-message-types",
  "next-code-provider-core",
  "serde",
@@ -7359,6 +7365,7 @@ dependencies = [
  "async-trait",
  "futures",
  "httpdate",
+ "next-code-core",
  "next-code-logging",
  "next-code-message-types",
  "rand 0.9.5",
@@ -7381,6 +7388,7 @@ dependencies = [
  "h2 0.4.15",
  "http 1.4.2",
  "next-code-base",
+ "next-code-core",
  "next-code-message-types",
  "next-code-provider-core",
  "reqwest 0.12.28",
@@ -7401,6 +7409,7 @@ dependencies = [
  "anyhow",
  "futures",
  "next-code-base",
+ "next-code-core",
  "next-code-provider-anthropic-runtime",
  "next-code-provider-antigravity-runtime",
  "next-code-provider-copilot-runtime",
@@ -7445,6 +7454,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "next-code-base",
+ "next-code-core",
  "next-code-message-types",
  "next-code-provider-core",
  "next-code-provider-gemini",
@@ -7494,6 +7504,7 @@ dependencies = [
  "dirs 5.0.1",
  "futures",
  "next-code-base",
+ "next-code-core",
  "next-code-message-types",
  "next-code-provider-core",
  "next-code-provider-openai",
@@ -7533,6 +7544,7 @@ dependencies = [
  "chrono",
  "futures",
  "next-code-base",
+ "next-code-core",
  "next-code-message-types",
  "next-code-provider-core",
  "next-code-provider-metadata",
@@ -7557,6 +7569,7 @@ dependencies = [
  "clap",
  "crossterm 0.28.1",
  "inventory",
+ "next-code-core",
  "next-code-keyring-store",
  "next-code-llm-core",
  "next-code-llm-protocols",
@@ -7633,6 +7646,7 @@ dependencies = [
  "global-hotkey",
  "next-code-build-meta",
  "next-code-config-types",
+ "next-code-core",
  "next-code-logging",
  "next-code-storage",
  "next-code-terminal-launch",
@@ -7722,6 +7736,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "dirs 5.0.1",
+ "next-code-core",
 ]
 
 [[package]]
@@ -7924,6 +7939,7 @@ dependencies = [
 name = "next-code-tui-style"
 version = "0.1.0"
 dependencies = [
+ "next-code-core",
  "ratatui 0.30.2",
 ]
 
@@ -7963,6 +7979,7 @@ dependencies = [
 name = "next-code-tui-workspace"
 version = "0.1.0"
 dependencies = [
+ "next-code-core",
  "ratatui 0.30.2",
 ]
 

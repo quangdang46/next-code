@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 pub mod request;
 pub mod stream;
 
@@ -335,7 +336,7 @@ fn sanitize_cache_namespace(raw: &str) -> String {
 }
 
 fn configured_cache_namespace() -> String {
-    let raw = std::env::var("JCODE_OPENROUTER_CACHE_NAMESPACE")
+    let raw = product_env("OPENROUTER_CACHE_NAMESPACE")
         .ok()
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
@@ -346,7 +347,7 @@ fn configured_cache_namespace() -> String {
 
 fn cache_path_for_namespace(namespace: &str) -> PathBuf {
     let namespace = sanitize_cache_namespace(namespace);
-    if let Ok(path) = std::env::var("JCODE_HOME") {
+    if let Ok(path) = product_env("HOME") {
         return PathBuf::from(path)
             .join("cache")
             .join(format!("{}_models.json", namespace));
@@ -697,7 +698,7 @@ impl ProviderRouting {
 pub fn parse_provider_routing_from_env() -> ProviderRouting {
     let mut routing = ProviderRouting::default();
 
-    if let Ok(providers) = std::env::var("JCODE_OPENROUTER_PROVIDER") {
+    if let Ok(providers) = product_env("OPENROUTER_PROVIDER") {
         let order: Vec<String> = providers
             .split(',')
             .map(|s| s.trim().to_string())
@@ -708,7 +709,7 @@ pub fn parse_provider_routing_from_env() -> ProviderRouting {
         }
     }
 
-    if std::env::var("JCODE_OPENROUTER_NO_FALLBACK").is_ok() {
+    if product_env("OPENROUTER_NO_FALLBACK").is_ok() {
         routing.allow_fallbacks = false;
     }
 

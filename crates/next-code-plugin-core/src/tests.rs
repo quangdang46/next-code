@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn plugin_config_apply_env_overrides_disabled() {
-        with_env_var("JCODE_DISABLE_PLUGINS", "true", || {
+        with_env_var("NEXT_CODE_DISABLE_PLUGINS", "true", || {
             let mut cfg = PluginConfig::default();
             cfg.apply_env_overrides();
             assert_eq!(cfg.mode, Some("none".into()));
@@ -363,7 +363,7 @@ mod tests {
 
     #[test]
     fn plugin_config_apply_env_overrides_skip() {
-        with_env_var("JCODE_SKIP_PLUGINS", "1", || {
+        with_env_var("NEXT_CODE_SKIP_PLUGINS", "1", || {
             let mut cfg = PluginConfig::default();
             cfg.apply_env_overrides();
             assert!(cfg.skip_hooks);
@@ -372,7 +372,7 @@ mod tests {
 
     #[test]
     fn plugin_config_apply_env_overrides_mode() {
-        with_env_var("JCODE_PLUGIN_MODE", "interactive", || {
+        with_env_var("NEXT_CODE_PLUGIN_MODE", "interactive", || {
             let mut cfg = PluginConfig::default();
             cfg.apply_env_overrides();
             assert_eq!(cfg.mode, Some("interactive".into()));
@@ -381,7 +381,7 @@ mod tests {
 
     #[test]
     fn plugin_config_apply_env_overrides_team_worker() {
-        with_env_var("JCODE_TEAM_WORKER", "1", || {
+        with_env_var("NEXT_CODE_TEAM_WORKER", "1", || {
             let mut cfg = PluginConfig::default();
             cfg.apply_env_overrides();
             assert!(cfg.force_deny);
@@ -816,7 +816,8 @@ mod tests {
     }
 
     #[test]
-    fn plugin_manifest_from_package_json_requires_jcode_or_pi_field() {
+    fn plugin_manifest_from_package_json_requires_jcode_or_pi_field() { // dual-read: legacy
+        // dual-read: legacy package.json field `jcode` still accepted
         let json = serde_json::json!({"name": "test"});
         let result = PluginManifest::from_package_json(&json);
         assert!(result.is_err());
@@ -824,10 +825,12 @@ mod tests {
     }
 
     #[test]
-    fn plugin_manifest_from_package_json_with_jcode_field() {
+    fn plugin_manifest_from_package_json_with_jcode_field() { // dual-read: legacy
+        // dual-read: legacy package.json field `jcode`
         let json = serde_json::json!({
             "name": "test-plugin",
-            "jcode": {
+            // dual-read: legacy package.json key
+            "jcode": { // dual-read: legacy
                 "name": "test-plugin",
                 "package_name": "test-plugin",
                 "version": "1.0.0",
@@ -857,9 +860,11 @@ mod tests {
     }
 
     #[test]
-    fn plugin_manifest_from_package_json_jcode_takes_precedence() {
+    fn plugin_manifest_from_package_json_jcode_takes_precedence() { // dual-read: legacy
+        // dual-read: legacy `jcode` key vs `pi`
         let json = serde_json::json!({
-            "jcode": { "name": "a", "package_name": "a", "version": "1.0.0" },
+            // dual-read: legacy package.json key
+            "jcode": { "name": "a", "package_name": "a", "version": "1.0.0" }, // dual-read: legacy
             "pi": { "name": "b", "package_name": "b", "version": "2.0.0" }
         });
         let manifest = PluginManifest::from_package_json(&json).unwrap();
@@ -1067,17 +1072,17 @@ mod tests {
     #[test]
     fn plugin_engines_default() {
         let engines = PluginEngines::default();
-        assert!(engines.jcode.is_none());
+        assert!(engines.jcode.is_none()); // dual-read: engines.jcode schema field
     }
 
     #[test]
     fn plugin_engines_serde() {
         let engines = PluginEngines {
-            jcode: Some(">=0.9.0".into()),
+            jcode: Some(">=0.9.0".into()), // dual-read: engines.jcode schema field
         };
         let json = serde_json::to_string(&engines).unwrap();
         let deserialized: PluginEngines = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.jcode.unwrap(), ">=0.9.0");
+        assert_eq!(deserialized.jcode.unwrap(), ">=0.9.0"); // dual-read: engines.jcode
     }
 
     #[test]

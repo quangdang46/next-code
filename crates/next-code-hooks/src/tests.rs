@@ -1,4 +1,4 @@
-//! Comprehensive integration and unit tests for the jcode-hooks crate.
+//! Comprehensive integration and unit tests for the next-code-hooks crate.
 //!
 //! Covers the full surface area: event parsing (28+1 variants), blocking
 //! semantics, config merge, TOML round-trip, dispatch engine, kill-switch,
@@ -546,13 +546,13 @@ async fn test_dispatch_timeout() {
 }
 
 // ===========================================================================
-// test_kill_switch  (DISABLE_JCODE_HOOKS)
+// test_kill_switch  (DISABLE_NEXT_CODE_HOOKS)
 // ===========================================================================
 
 #[test]
 fn test_kill_switch() {
     // Set the kill-switch env var
-    std::env::set_var("DISABLE_JCODE_HOOKS", "1");
+    std::env::set_var("DISABLE_NEXT_CODE_HOOKS", "1");
 
     let config = load_hooks_config();
 
@@ -562,7 +562,7 @@ fn test_kill_switch() {
     assert!(!config.settings.dry_run);
 
     // Clean up
-    std::env::remove_var("DISABLE_JCODE_HOOKS");
+    std::env::remove_var("DISABLE_NEXT_CODE_HOOKS");
 }
 
 // ===========================================================================

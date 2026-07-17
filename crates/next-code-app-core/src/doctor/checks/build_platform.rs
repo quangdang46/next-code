@@ -11,7 +11,7 @@ pub fn check_build(out: &mut Vec<Finding>) {
     };
     out.push(Finding::ok(
         CheckCategory::Build,
-        format!("jcode {} [{profile}]", next_code_build_meta::VERSION),
+        format!("next-code {} [{profile}]", next_code_build_meta::VERSION),
     ));
 }
 
@@ -31,34 +31,34 @@ pub fn check_platform(out: &mut Vec<Finding>) {
 
     // Active env flags (informational; mirrors the original MVP report).
     let bool_flags = [
-        ("JCODE_OFFLINE", "offline"),
-        ("JCODE_SAFE_EVAL", "safe-eval"),
-        ("JCODE_AMBIENT_DISABLED", "ambient-disabled"),
-        ("JCODE_REQUIRE_MCP_TRUST", "require-mcp-trust"),
-        ("JCODE_NO_UPDATE", "no-update"),
-        ("JCODE_TRACE", "trace"),
+        ("NEXT_CODE_OFFLINE", "offline"),
+        ("NEXT_CODE_SAFE_EVAL", "safe-eval"),
+        ("NEXT_CODE_AMBIENT_DISABLED", "ambient-disabled"),
+        ("NEXT_CODE_REQUIRE_MCP_TRUST", "require-mcp-trust"),
+        ("NEXT_CODE_NO_UPDATE", "no-update"),
+        ("NEXT_CODE_TRACE", "trace"),
     ];
     let mut active: Vec<String> = bool_flags
         .iter()
         .filter(|(env, _)| env_bool(env))
         .map(|(_, label)| (*label).to_string())
         .collect();
-    if env_bool("JCODE_NO_TELEMETRY") || env_bool("DO_NOT_TRACK") {
+    if env_bool("NEXT_CODE_NO_TELEMETRY") || env_bool("DO_NOT_TRACK") {
         active.push("no-telemetry".to_string());
     }
-    if env_bool("JCODE_NO_CONTEXT_FILES") || env_bool("JCODE_NC") {
+    if env_bool("NEXT_CODE_NO_CONTEXT_FILES") || env_bool("NEXT_CODE_NC") {
         active.push("no-context-files".to_string());
     }
-    if env_string("JCODE_SYSTEM_PROMPT").is_some() {
+    if env_string("NEXT_CODE_SYSTEM_PROMPT").is_some() {
         active.push("system-prompt-set".to_string());
     }
-    if env_string("JCODE_APPEND_SYSTEM_PROMPT").is_some() {
+    if env_string("NEXT_CODE_APPEND_SYSTEM_PROMPT").is_some() {
         active.push("append-system-prompt-set".to_string());
     }
-    if let Some(v) = env_string("JCODE_SCOPED_MODELS") {
+    if let Some(v) = env_string("NEXT_CODE_SCOPED_MODELS") {
         active.push(format!("scoped-models={v}"));
     }
-    if let Some(v) = env_string("JCODE_SESSION_NAME") {
+    if let Some(v) = env_string("NEXT_CODE_SESSION_NAME") {
         active.push(format!("session-name={v}"));
     }
     if !active.is_empty() {

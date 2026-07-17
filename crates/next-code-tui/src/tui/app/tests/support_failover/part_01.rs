@@ -13,7 +13,7 @@ use std::sync::{Arc as StdArc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 
 fn cleanup_background_task_files(task_id: &str) {
-    let task_dir = std::env::temp_dir().join("jcode-bg-tasks");
+    let task_dir = std::env::temp_dir().join("next-code-bg-tasks");
     let _ = std::fs::remove_file(task_dir.join(format!("{}.status.json", task_id)));
     let _ = std::fs::remove_file(task_dir.join(format!("{}.output", task_id)));
 }
@@ -176,7 +176,7 @@ impl Provider for OpenRouterSpecCaptureProvider {
 }
 
 fn create_test_app() -> App {
-    ensure_test_jcode_home_if_unset();
+    ensure_test_next_code_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
 
@@ -190,7 +190,7 @@ fn create_test_app() -> App {
 }
 
 fn create_named_provider_test_app(name: &'static str, model: &'static str) -> App {
-    ensure_test_jcode_home_if_unset();
+    ensure_test_next_code_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
 
@@ -216,7 +216,7 @@ fn wait_for_model_picker_load(app: &mut App) {
 }
 
 fn create_refresh_summary_test_app(summary: crate::provider::ModelCatalogRefreshSummary) -> App {
-    ensure_test_jcode_home_if_unset();
+    ensure_test_next_code_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
 
@@ -230,7 +230,7 @@ fn create_refresh_summary_test_app(summary: crate::provider::ModelCatalogRefresh
 }
 
 fn create_openrouter_spec_capture_test_app() -> (App, StdArc<StdMutex<Vec<String>>>) {
-    ensure_test_jcode_home_if_unset();
+    ensure_test_next_code_home_if_unset();
     clear_persisted_test_ui_state();
     crate::tui::ui::clear_test_render_state_for_tests();
 
@@ -324,21 +324,21 @@ fn test_side_panel_snapshot(page_id: &str, title: &str) -> crate::side_panel::Si
     }
 }
 
-fn ensure_test_jcode_home_if_unset() {
+fn ensure_test_next_code_home_if_unset() {
     use std::sync::OnceLock;
 
     static TEST_HOME: OnceLock<std::path::PathBuf> = OnceLock::new();
 
-    if std::env::var_os("JCODE_HOME").is_some() {
+    if std::env::var_os("NEXT_CODE_HOME").is_some() {
         return;
     }
 
     let path = TEST_HOME.get_or_init(|| {
-        let path = std::env::temp_dir().join(format!("jcode-test-home-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("next-code-test-home-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&path);
         path
     });
-    crate::env::set_var("JCODE_HOME", path);
+    crate::env::set_var("NEXT_CODE_HOME", path);
 }
 
 fn clear_persisted_test_ui_state() {
@@ -353,11 +353,11 @@ fn clear_persisted_test_ui_state() {
     crate::auth::AuthStatus::invalidate_cache();
 }
 
-fn with_temp_jcode_home<T>(f: impl FnOnce() -> T) -> T {
+fn with_temp_next_code_home<T>(f: impl FnOnce() -> T) -> T {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("tempdir");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
     crate::auth::claude::set_active_account_override(None);
     crate::auth::codex::set_active_account_override(None);
     crate::auth::AuthStatus::invalidate_cache();
@@ -370,19 +370,19 @@ fn with_temp_jcode_home<T>(f: impl FnOnce() -> T) -> T {
     crate::auth::AuthStatus::invalidate_cache();
     crate::tui::app::helpers::clear_ambient_info_cache_for_tests();
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
     result
 }
 
-fn create_jcode_repo_fixture() -> tempfile::TempDir {
+fn create_next_code_repo_fixture() -> tempfile::TempDir {
     let temp = tempfile::TempDir::new().expect("temp repo");
     std::fs::create_dir_all(temp.path().join(".git")).expect("git dir");
     std::fs::write(
         temp.path().join("Cargo.toml"),
-        "[package]\nname = \"jcode\"\nversion = \"0.1.0\"\n",
+        "[package]\nname = \"next-code\"\nversion = \"0.1.0\"\n",
     )
     .expect("cargo toml");
     temp
@@ -421,7 +421,7 @@ fn create_real_git_repo_fixture() -> tempfile::TempDir {
 
 #[test]
 fn test_handle_turn_error_failover_prompt_manual_mode_shows_system_notice() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         write_test_config("[provider]\ncross_provider_failover = \"manual\"\n");
         let mut app = create_test_app();
         let prompt = crate::provider::ProviderFailoverPrompt {
@@ -450,7 +450,7 @@ fn test_handle_turn_error_failover_prompt_manual_mode_shows_system_notice() {
 
 #[test]
 fn test_handle_turn_error_failover_prompt_countdown_can_switch_and_retry() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         write_test_config("[provider]\ncross_provider_failover = \"countdown\"\n");
         let (mut app, active_provider) = create_switchable_test_app("claude");
         let prompt = crate::provider::ProviderFailoverPrompt {

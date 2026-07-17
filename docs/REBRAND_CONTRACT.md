@@ -32,7 +32,7 @@
 | XDG cache | `~/.cache/jcode` | `~/.cache/next-code` | Abandonable |
 | Runtime socket | `jcode.sock` | `next-code.sock` | Same-release client+server |
 | Daemon lock | `jcode-daemon.lock` | `next-code-daemon.lock` | |
-| Windows install | `%LOCALAPPDATA%\jcode` | `%LOCALAPPDATA%\next-code` | Also migrate `%USERPROFILE%\.jcode` |
+| Windows install | `%LOCALAPPDATA%\jcode` | `%LOCALAPPDATA%\next-code` | Also migrate `%USERPROFILE%\.next-code` |
 | Keyring (providers) | `jcode-provider-service` | **`next-code-provider-service`** | Dual-read + copy-forward |
 | Keyring (secrets) | `jcode-secrets` | **`next-code-secrets`** | Dual-read + copy-forward |
 | User-Agent | `jcode/{ver}` | **`next-code/{ver}`** | |

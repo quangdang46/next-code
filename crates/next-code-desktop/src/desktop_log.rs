@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env_os};
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -50,12 +51,12 @@ fn write(level: &str, args: fmt::Arguments<'_>, mirror_to_stderr: bool) {
         return;
     };
     if let Err(error) = file.write_all(line.as_bytes()) {
-        eprintln!("jcode-desktop: failed to write desktop log: {error}");
+        eprintln!("next-code-desktop: failed to write desktop log: {error}");
         *guard = None;
         return;
     }
     if let Err(error) = file.flush() {
-        eprintln!("jcode-desktop: failed to flush desktop log: {error}");
+        eprintln!("next-code-desktop: failed to flush desktop log: {error}");
         *guard = None;
     }
 }
@@ -70,7 +71,7 @@ fn open_log_file() -> Option<File> {
         && let Err(error) = std::fs::create_dir_all(parent)
     {
         eprintln!(
-            "jcode-desktop: failed to create desktop log directory {}: {error}",
+            "next-code-desktop: failed to create desktop log directory {}: {error}",
             parent.display()
         );
         return None;
@@ -79,7 +80,7 @@ fn open_log_file() -> Option<File> {
         Ok(file) => Some(file),
         Err(error) => {
             eprintln!(
-                "jcode-desktop: failed to open desktop log {}: {error}",
+                "next-code-desktop: failed to open desktop log {}: {error}",
                 path.display()
             );
             None
@@ -88,22 +89,38 @@ fn open_log_file() -> Option<File> {
 }
 
 fn desktop_log_path() -> Option<PathBuf> {
-    if std::env::var_os("JCODE_DESKTOP_LOG").is_some_and(|value| !env_flag_enabled(value)) {
+    if product_env_os("DESKTOP_LOG").is_some_and(|value| !env_flag_enabled(value)) {
         return None;
     }
-    if let Some(path) = std::env::var_os("JCODE_DESKTOP_LOG_PATH") {
+    if let Some(path) = product_env_os("DESKTOP_LOG_PATH") {
         if path.is_empty() {
             return None;
         }
         return Some(PathBuf::from(path));
     }
 
-    let root = std::env::var_os("JCODE_HOME")
+    let root = product_env_os("HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".jcode")))?;
+        .or_else(|| {
+            std::env::var_os("HOME").map(|home| {
+                let home = PathBuf::from(home);
+                let primary = home.join(".next-code");
+                if primary.exists() {
+                    primary
+                } else {
+                    // dual-read: legacy ~/.jcode
+                    let legacy = home.join(".jcode"); // dual-read: legacy
+                    if legacy.exists() {
+                        legacy
+                    } else {
+                        primary
+                    }
+                }
+            })
+        })?;
     Some(
         root.join("logs")
-            .join(format!("jcode-desktop-{}.log", utc_date_label())),
+            .join(format!("next-code-desktop-{}.log", utc_date_label())),
     )
 }
 

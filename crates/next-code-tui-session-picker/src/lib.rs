@@ -26,7 +26,7 @@ impl SessionSource {
     }
 }
 
-// `ResumeTarget` is pure data and now lives in `jcode-session-types` so the
+// `ResumeTarget` is pure data and now lives in `next-code-session-types` so the
 // foundation/import layer can use it without depending on this UI crate. It is
 // re-exported here so existing `next_code_tui_session_picker::ResumeTarget` paths
 // keep working.

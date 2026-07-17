@@ -49,8 +49,8 @@ $Repo = "quangdang46/next-code"
 if (-not $InstallDir) {
     if ($env:NEXT_CODE_INSTALL_DIR) {
         $InstallDir = $env:NEXT_CODE_INSTALL_DIR
-    } elseif ($env:JCODE_INSTALL_DIR) {
-        $InstallDir = $env:JCODE_INSTALL_DIR
+    } elseif ($env:NEXT_CODE_INSTALL_DIR) {
+        $InstallDir = $env:NEXT_CODE_INSTALL_DIR
     } else {
         $InstallDir = Join-Path $env:LOCALAPPDATA "next-code\bin"
     }
@@ -58,9 +58,9 @@ if (-not $InstallDir) {
 
 $NextCodeHome = if ($env:NEXT_CODE_HOME) {
     $env:NEXT_CODE_HOME
-} elseif ($env:JCODE_HOME) {
+} elseif ($env:NEXT_CODE_HOME) {
     # Legacy dual-read: JCODE_HOME still works during the rebrand window.
-    $env:JCODE_HOME
+    $env:NEXT_CODE_HOME
 } elseif ($env:USERPROFILE) {
     Join-Path $env:USERPROFILE ".next-code"
 } else {
@@ -594,8 +594,8 @@ Copy-Item -Path $DestBin -Destination (Join-Path $StableDir "next-code.exe") -Fo
 Set-Content -Path (Join-Path $BuildsDir "stable-version") -Value $VersionNum
 Copy-Item -Path (Join-Path $StableDir "next-code.exe") -Destination $LauncherPath -Force
 
-# Compat copy for one release so existing `jcode` muscle memory keeps working.
-$CompatLauncherPath = Join-Path $InstallDir "jcode.exe"
+# Compat copy for one release so existing `next-code` muscle memory keeps working.
+$CompatLauncherPath = Join-Path $InstallDir "next-code.exe"
 Copy-Item -Path (Join-Path $StableDir "next-code.exe") -Destination $CompatLauncherPath -Force
 
 # Gracefully reload any running background server onto the freshly installed
@@ -603,7 +603,7 @@ Copy-Item -Path (Join-Path $StableDir "next-code.exe") -Destination $CompatLaunc
 # hands its live sessions to the new process, and is a no-op when nothing is
 # running, so it is safe to call unconditionally. Best-effort: never fail the
 # install over it.
-if ($env:NEXT_CODE_SKIP_SERVER_RELOAD -ne "1" -and $env:JCODE_SKIP_SERVER_RELOAD -ne "1") {
+if ($env:NEXT_CODE_SKIP_SERVER_RELOAD -ne "1" -and $env:NEXT_CODE_SKIP_SERVER_RELOAD -ne "1") {
     try {
         & $LauncherPath server reload 2>$null | Out-Null
     } catch {
@@ -656,8 +656,8 @@ if ($configuredHotkey) {
     Write-Host ""
 }
 
-if ((Get-Command next-code -ErrorAction SilentlyContinue) -or (Get-Command jcode -ErrorAction SilentlyContinue)) {
-    Write-Info "Run 'next-code' to get started (compat: 'jcode' also works for this release)."
+if ((Get-Command next-code -ErrorAction SilentlyContinue) -or (Get-Command next-code -ErrorAction SilentlyContinue)) {
+    Write-Info "Run 'next-code' to get started (compat: 'next-code' also works for this release)."
 } else {
     Write-Host "  Open a new terminal window, then run:"
     Write-Host ""

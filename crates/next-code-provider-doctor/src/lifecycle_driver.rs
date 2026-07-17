@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 // The whole file is a pre-existing test/lifecycle fixture that is not yet
 // wired into the live auth-test path. Lint-clean: do not enable any of it
 // from production code until the lifecycle test is connected.
@@ -586,14 +587,14 @@ mod tests {
     }
 
     fn live_cerebras_api_key() -> Option<LiveTestApiKey> {
-        std::env::var("JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY")
+        std::env::var("NEXT_CODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
             .map(|secret| LiveTestApiKey {
                 auth: next_code_base::live_tests::LiveVerificationAuth::from_secret(
                     "env:JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY",
-                    Some("JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY"),
+                    Some("NEXT_CODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY"),
                     &secret,
                 ),
                 secret,
@@ -601,7 +602,7 @@ mod tests {
     }
 
     fn live_opencode_zen_api_key() -> Option<LiveTestApiKey> {
-        if let Some(secret) = std::env::var("JCODE_AUTH_LIFECYCLE_OPENCODE_API_KEY")
+        if let Some(secret) = std::env::var("NEXT_CODE_AUTH_LIFECYCLE_OPENCODE_API_KEY")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
@@ -609,7 +610,7 @@ mod tests {
             return Some(LiveTestApiKey {
                 auth: next_code_base::live_tests::LiveVerificationAuth::from_secret(
                     "env:JCODE_AUTH_LIFECYCLE_OPENCODE_API_KEY",
-                    Some("JCODE_AUTH_LIFECYCLE_OPENCODE_API_KEY"),
+                    Some("NEXT_CODE_AUTH_LIFECYCLE_OPENCODE_API_KEY"),
                     &secret,
                 ),
                 secret,
@@ -1262,7 +1263,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn cerebras_live_opt_in_catalog_lifecycle_uses_isolated_sandbox() {
-        if !env_truthy("JCODE_AUTH_LIFECYCLE_LIVE") {
+        if !env_truthy("NEXT_CODE_AUTH_LIFECYCLE_LIVE") {
             eprintln!(
                 "skipping live Cerebras auth lifecycle test; set JCODE_AUTH_LIFECYCLE_LIVE=1 and JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY"
             );
@@ -1271,8 +1272,8 @@ mod tests {
         let api_key = live_cerebras_api_key()
             .expect("JCODE_AUTH_LIFECYCLE_LIVE=1 requires JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY");
 
-        let spend_smoke = env_truthy("JCODE_AUTH_LIFECYCLE_SMOKE");
-        let stream_smoke = env_truthy("JCODE_AUTH_LIFECYCLE_STREAM_SMOKE");
+        let spend_smoke = env_truthy("NEXT_CODE_AUTH_LIFECYCLE_SMOKE");
+        let stream_smoke = env_truthy("NEXT_CODE_AUTH_LIFECYCLE_STREAM_SMOKE");
         let mut stages = vec![
             next_code_base::live_tests::LiveVerificationStage::passed(
                 next_code_base::live_tests::checkpoints::AUTH_CREDENTIAL_LOADED,
@@ -1483,7 +1484,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn opencode_zen_live_opt_in_tool_call_smoke() {
-        if !env_truthy("JCODE_OPENCODE_ZEN_LIVE_TOOL_TEST") {
+        if !env_truthy("NEXT_CODE_OPENCODE_ZEN_LIVE_TOOL_TEST") {
             eprintln!(
                 "skipping live OpenCode Zen tool-call smoke; set JCODE_OPENCODE_ZEN_LIVE_TOOL_TEST=1 and provide OPENCODE_API_KEY"
             );
@@ -1492,14 +1493,14 @@ mod tests {
         let api_key = live_opencode_zen_api_key().expect(
             "JCODE_OPENCODE_ZEN_LIVE_TOOL_TEST=1 requires OPENCODE_API_KEY or JCODE_AUTH_LIFECYCLE_OPENCODE_API_KEY",
         );
-        let model = std::env::var("JCODE_OPENCODE_ZEN_LIVE_TOOL_MODEL")
+        let model = product_env("OPENCODE_ZEN_LIVE_TOOL_MODEL")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| "kimi-k2.6".to_string());
 
-        let stream_smoke = env_truthy("JCODE_OPENCODE_ZEN_LIVE_STREAM_TEST")
-            || env_truthy("JCODE_AUTH_LIFECYCLE_STREAM_SMOKE");
+        let stream_smoke = env_truthy("NEXT_CODE_OPENCODE_ZEN_LIVE_STREAM_TEST")
+            || env_truthy("NEXT_CODE_AUTH_LIFECYCLE_STREAM_SMOKE");
         let mut stages = vec![
             next_code_base::live_tests::LiveVerificationStage::passed(
                 next_code_base::live_tests::checkpoints::AUTH_CREDENTIAL_LOADED,
@@ -1703,7 +1704,7 @@ mod tests {
 
     #[tokio::test(flavor = "current_thread")]
     async fn issue_driven_openai_compatible_live_target_smoke() {
-        let Some(provider_id) = std::env::var("JCODE_ISSUE_DRIVEN_LIVE_PROVIDER")
+        let Some(provider_id) = product_env("ISSUE_DRIVEN_LIVE_PROVIDER")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
@@ -1722,13 +1723,13 @@ mod tests {
                 provider_id, resolved.api_key_env, resolved.env_file
             )
         });
-        let requested_model = std::env::var("JCODE_ISSUE_DRIVEN_LIVE_MODEL")
+        let requested_model = product_env("ISSUE_DRIVEN_LIVE_MODEL")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
             .or_else(|| resolved.default_model.clone());
-        let spend_smoke = env_truthy("JCODE_ISSUE_DRIVEN_LIVE_COMPLETION_SMOKE");
-        let stream_smoke = env_truthy("JCODE_ISSUE_DRIVEN_LIVE_STREAM_SMOKE");
+        let spend_smoke = env_truthy("NEXT_CODE_ISSUE_DRIVEN_LIVE_COMPLETION_SMOKE");
+        let stream_smoke = env_truthy("NEXT_CODE_ISSUE_DRIVEN_LIVE_STREAM_SMOKE");
 
         let mut stages = vec![
             next_code_base::live_tests::LiveVerificationStage::passed(

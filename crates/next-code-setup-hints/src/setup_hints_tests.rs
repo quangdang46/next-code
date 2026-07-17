@@ -41,7 +41,7 @@ fn first_three_launches_can_include_hotkey_notice_too() {
     let (_, message) = hints.display_message.expect("expected display message");
     assert!(!message.contains("Alt+C"));
     assert!(message.contains("Cmd+;"));
-    // The notice should make clear the hotkey works globally, not just inside jcode.
+    // The notice should make clear the hotkey works globally, not just inside next-code.
     assert!(message.contains("system-wide"));
     // All three launch hotkeys should be mentioned.
     assert!(message.contains("Cmd+'"));
@@ -53,25 +53,25 @@ fn default_resolved_hotkeys_match_legacy_three() {
     // With no config, the resolver reproduces the historical three hotkeys.
     let resolved = launch_hotkeys::resolve_launch_hotkeys(
         &next_code_config_types::LaunchHotkeysConfig::default(),
-        "/usr/local/bin/jcode",
-        "/home/u/.jcode/hotkey/last_dir",
-        "/home/u/.jcode/hotkey/last_repo",
+        "/usr/local/bin/next-code",
+        "/home/u/.next-code/hotkey/last_dir",
+        "/home/u/.next-code/hotkey/last_repo",
     );
     let chords: Vec<&str> = resolved.iter().map(|r| r.chord.as_str()).collect();
     assert_eq!(chords, vec!["cmd+;", "cmd+'", "cmd+shift+'"]);
 
     // Home launch passes no extra subcommand; self-dev passes `self-dev`.
-    let home = launch_hotkeys::shell_command_for(&resolved[0], "/usr/local/bin/jcode");
+    let home = launch_hotkeys::shell_command_for(&resolved[0], "/usr/local/bin/next-code");
     assert!(home.starts_with("cd \"$HOME\"; "));
     assert!(!home.contains("self-dev"));
 
-    let last_dir = launch_hotkeys::shell_command_for(&resolved[1], "/usr/local/bin/jcode");
-    assert!(last_dir.contains("cat '/home/u/.jcode/hotkey/last_dir'"));
+    let last_dir = launch_hotkeys::shell_command_for(&resolved[1], "/usr/local/bin/next-code");
+    assert!(last_dir.contains("cat '/home/u/.next-code/hotkey/last_dir'"));
     assert!(last_dir.contains("cd \"$HOME\""));
 
-    let selfdev = launch_hotkeys::shell_command_for(&resolved[2], "/usr/local/bin/jcode");
-    assert!(selfdev.contains("cat '/home/u/.jcode/hotkey/last_repo'"));
-    assert!(selfdev.contains("'/usr/local/bin/jcode' 'self-dev';"));
+    let selfdev = launch_hotkeys::shell_command_for(&resolved[2], "/usr/local/bin/next-code");
+    assert!(selfdev.contains("cat '/home/u/.next-code/hotkey/last_repo'"));
+    assert!(selfdev.contains("'/usr/local/bin/next-code' 'self-dev';"));
 }
 
 #[test]
@@ -106,21 +106,21 @@ fn baked_repo_hotkey_cds_into_fixed_dir() {
         imported: true,
         entries: vec![next_code_config_types::LaunchHotkeyEntry {
             chord: "cmd+[".to_string(),
-            dir: "/Users/jeremy/jcode-github".to_string(),
-            label: "jcode-github".to_string(),
+            dir: "/Users/jeremy/next-code-github".to_string(),
+            label: "next-code-github".to_string(),
             self_dev: false,
         }],
     };
     let resolved = launch_hotkeys::resolve_launch_hotkeys(
         &config,
-        "/usr/local/bin/jcode",
-        "/home/u/.jcode/hotkey/last_dir",
-        "/home/u/.jcode/hotkey/last_repo",
+        "/usr/local/bin/next-code",
+        "/home/u/.next-code/hotkey/last_dir",
+        "/home/u/.next-code/hotkey/last_repo",
     );
     assert_eq!(resolved.len(), 1);
     assert_eq!(resolved[0].chord, "cmd+[");
-    let cmd = launch_hotkeys::shell_command_for(&resolved[0], "/usr/local/bin/jcode");
-    assert!(cmd.contains("/Users/jeremy/jcode-github"));
+    let cmd = launch_hotkeys::shell_command_for(&resolved[0], "/usr/local/bin/next-code");
+    assert!(cmd.contains("/Users/jeremy/next-code-github"));
     assert!(cmd.contains("cd \"$HOME\""), "must keep a home fallback");
     assert!(!cmd.contains("self-dev"));
 }
@@ -148,14 +148,14 @@ fn install_writes_executable_scripts_and_plan() {
     let dir = tempfile::tempdir().expect("tempdir");
     let resolved = launch_hotkeys::resolve_launch_hotkeys(
         &next_code_config_types::LaunchHotkeysConfig::default(),
-        "/usr/local/bin/jcode",
-        "/home/u/.jcode/hotkey/last_dir",
-        "/home/u/.jcode/hotkey/last_repo",
+        "/usr/local/bin/next-code",
+        "/home/u/.next-code/hotkey/last_dir",
+        "/home/u/.next-code/hotkey/last_repo",
     );
     let plan = super::write_hotkey_launch_scripts(
         dir.path(),
         MacTerminalKind::Ghostty,
-        "/usr/local/bin/jcode",
+        "/usr/local/bin/next-code",
         &resolved,
     )
     .expect("scripts should write");
@@ -181,9 +181,9 @@ fn install_writes_executable_scripts_and_plan() {
 #[test]
 fn mac_hotkey_launch_agent_plist_uses_valid_xml_quotes() {
     let plist = mac_hotkey_launch_agent_plist(
-        "/Applications/Jcode.app/Contents/MacOS/jcode",
-        "/tmp/jcode-hotkey.out.log",
-        "/tmp/jcode-hotkey.err.log",
+        "/Applications/Next Code.app/Contents/MacOS/next-code",
+        "/tmp/next-code-hotkey.out.log",
+        "/tmp/next-code-hotkey.err.log",
         "ghostty",
     );
 
@@ -199,11 +199,11 @@ fn mac_hotkey_launch_agent_plist_uses_valid_xml_quotes() {
 }
 
 #[test]
-fn paused_jcode_shell_command_keeps_failures_visible() {
-    let command = paused_jcode_shell_command("/tmp/jcode");
+fn paused_next_code_shell_command_keeps_failures_visible() {
+    let command = paused_next_code_shell_command("/tmp/next-code");
     assert!(command.contains("Press Enter to close"));
-    assert!(command.contains("Jcode exited with status"));
-    assert!(command.contains("jcode executable not found"));
+    assert!(command.contains("Next Code exited with status"));
+    assert!(command.contains("next-code executable not found"));
 }
 
 #[test]
@@ -269,11 +269,11 @@ fn macos_terminal_notice_only_fires_for_default_terminal_app() {
 
     assert_eq!(
         hints.status_notice.as_deref(),
-        Some("Tip: Terminal.app renders jcode poorly. Try Ghostty, iTerm2, or Alacritty.")
+        Some("Tip: Terminal.app renders next-code poorly. Try Ghostty, iTerm2, or Alacritty.")
     );
     let (title, message) = hints.display_message.expect("expected display message");
     assert_eq!(title, "Terminal");
-    assert!(message.contains("Terminal.app renders jcode poorly"));
+    assert!(message.contains("Terminal.app renders next-code poorly"));
     assert!(message.contains("Ghostty"));
     // It is a plain notice, not an AI handoff prompt.
     assert!(hints.auto_send_message.is_none());
@@ -458,7 +458,7 @@ fn glyph_safe_notice_shows_once_then_debounces() {
     let (title, body) = hint.unwrap().display_message.unwrap();
     assert_eq!(title, "Display");
     assert!(body.contains("quantizes colors"));
-    assert!(body.contains("JCODE_GLYPH_SAFE_MODE=off"));
+    assert!(body.contains("NEXT_CODE_GLYPH_SAFE_MODE=off"));
 
     // Subsequent launches: debounced, no repeat.
     let (hint2, changed2) = glyph_safe_notice_for(true, &mut state);

@@ -185,7 +185,7 @@ fn test_direct_chutes_ignores_legacy_openrouter_catalog_cache() {
         let temp_home = tempfile::tempdir().expect("temp HOME");
         let home = temp_home.path().to_string_lossy().to_string();
         with_env_var("HOME", &home, || {
-            let cache_dir = temp_home.path().join(".jcode").join("cache");
+            let cache_dir = temp_home.path().join(".next-code").join("cache");
             std::fs::create_dir_all(&cache_dir).expect("create cache dir");
             let cached_at = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -416,7 +416,7 @@ fn test_state_space_openrouter_default_survives_switch_to_nvidia_nim() {
             .set_model("nvidia-nim:nvidia/llama-3.1-nemotron-ultra-253b-v1")
             .expect("NVIDIA NIM model should be selectable after OpenRouter default");
         assert!(
-            std::env::var_os("JCODE_OPENROUTER_API_BASE").is_none(),
+            std::env::var_os("NEXT_CODE_OPENROUTER_API_BASE").is_none(),
             "profile route selection should not mutate global OpenRouter API base env"
         );
 
@@ -683,9 +683,9 @@ fn test_set_model_accepts_bare_openai_openrouter_pin_when_openrouter_available()
 fn test_forced_openrouter_treats_claude_like_model_as_provider_local() {
     with_clean_provider_test_env(|| {
         with_env_var("OPENROUTER_API_KEY", "test-openrouter-key", || {
-            with_env_var("JCODE_OPENROUTER_PROVIDER_FEATURES", "0", || {
+            with_env_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES", "0", || {
                 with_env_var(
-                    "JCODE_OPENROUTER_API_BASE",
+                    "NEXT_CODE_OPENROUTER_API_BASE",
                     "https://compat.example.test/v1",
                     || {
                         let openrouter = test_openrouter_runtime()
@@ -728,9 +728,9 @@ fn test_forced_openrouter_treats_claude_like_model_as_provider_local() {
 fn test_forced_openrouter_preserves_custom_at_sign_model_ids() {
     with_clean_provider_test_env(|| {
         with_env_var("OPENROUTER_API_KEY", "test-openrouter-key", || {
-            with_env_var("JCODE_OPENROUTER_PROVIDER_FEATURES", "0", || {
+            with_env_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES", "0", || {
                 with_env_var(
-                    "JCODE_OPENROUTER_API_BASE",
+                    "NEXT_CODE_OPENROUTER_API_BASE",
                     "https://compat.example.test/v1",
                     || {
                         let openrouter = test_openrouter_runtime()
@@ -773,10 +773,10 @@ fn test_forced_openrouter_preserves_custom_at_sign_model_ids() {
 fn test_config_default_provider_openai_compatible_keeps_gpt_model_provider_local() {
     with_clean_provider_test_env(|| {
         with_env_var(
-            "JCODE_OPENAI_COMPAT_API_BASE",
+            "NEXT_CODE_OPENAI_COMPAT_API_BASE",
             "https://compat.example.test/v1",
             || {
-                with_env_var("JCODE_OPENAI_COMPAT_API_KEY_NAME", "OPENAI_API_KEY", || {
+                with_env_var("NEXT_CODE_OPENAI_COMPAT_API_KEY_NAME", "OPENAI_API_KEY", || {
                     with_env_var("OPENAI_API_KEY", "test-compatible-key", || {
                         crate::provider_catalog::force_apply_openai_compatible_profile_env(Some(
                             crate::provider_catalog::OPENAI_COMPAT_PROFILE,
@@ -827,9 +827,9 @@ fn test_config_default_provider_openai_compatible_keeps_gpt_model_provider_local
 fn test_custom_compatible_model_routes_do_not_request_openrouter_rewrite() {
     with_clean_provider_test_env(|| {
         with_env_var("OPENROUTER_API_KEY", "test-openrouter-key", || {
-            with_env_var("JCODE_OPENROUTER_PROVIDER_FEATURES", "0", || {
+            with_env_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES", "0", || {
                 with_env_var(
-                    "JCODE_OPENROUTER_API_BASE",
+                    "NEXT_CODE_OPENROUTER_API_BASE",
                     "https://compat.example.test/v1",
                     || {
                         let openrouter = test_openrouter_runtime()
@@ -937,7 +937,7 @@ fn test_named_config_provider_models_appear_in_picker_and_are_selectable() {
     // profile, and selecting the emitted `<name>:<model>` spec must bind the
     // named profile runtime.
     with_clean_provider_test_env(|| {
-        let next_code_home = std::env::var_os("JCODE_HOME").expect("test JCODE_HOME should be set");
+        let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("test JCODE_HOME should be set");
         std::fs::write(
             std::path::PathBuf::from(next_code_home).join("config.toml"),
             r#"
@@ -1123,8 +1123,8 @@ fn test_profile_prefixed_model_switch_reinitializes_direct_compatible_runtime() 
 #[test]
 fn test_openai_auth_mode_prefixed_model_switch_changes_credentials() {
     with_clean_provider_test_env(|| {
-        let prev_runtime = std::env::var_os("JCODE_RUNTIME_PROVIDER");
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
+        let prev_runtime = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
         crate::env::set_var("OPENAI_API_KEY", "sk-test-openai-api-key");
         crate::auth::codex::upsert_account_from_tokens(
             "openai-1",
@@ -1158,7 +1158,7 @@ fn test_openai_auth_mode_prefixed_model_switch_changes_credentials() {
         let _runtime_guard = rt.enter();
 
         // Route pinning is MultiProvider's job; per-pin token resolution is
-        // covered by jcode-provider-openai-runtime's tests.
+        // covered by next-code-provider-openai-runtime's tests.
         assert_eq!(
             openai.credential_mode(),
             next_code_provider_core::CredentialMode::Auto,
@@ -1182,9 +1182,9 @@ fn test_openai_auth_mode_prefixed_model_switch_changes_credentials() {
         );
 
         if let Some(prev_runtime) = prev_runtime {
-            crate::env::set_var("JCODE_RUNTIME_PROVIDER", prev_runtime);
+            crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", prev_runtime);
         } else {
-            crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
         }
     });
 }
@@ -1227,7 +1227,7 @@ fn test_anthropic_auth_mode_prefixed_model_switch_changes_credentials() {
         let _runtime_guard = rt.enter();
 
         // Route pinning is MultiProvider's job; the concrete token resolution
-        // for each pin is covered by jcode-provider-anthropic-runtime's
+        // for each pin is covered by next-code-provider-anthropic-runtime's
         // credential-mode tests.
         assert_eq!(
             anthropic.credential_mode(),
@@ -1396,7 +1396,7 @@ fn test_config_default_model_with_credential_prefix_applies_model_and_pin() {
             // `claude-api:` must pin the API key; `claude:`/`claude-oauth:`
             // resolve OAuth-first (Auto or explicit OAuth respectively), so the
             // pin must not be ApiKey. Concrete token resolution per pin is
-            // covered by jcode-provider-anthropic-runtime's tests.
+            // covered by next-code-provider-anthropic-runtime's tests.
             if expect_oauth {
                 assert_ne!(
                     anthropic.credential_mode(),
@@ -1943,30 +1943,30 @@ impl Drop for OrEnvVarGuard {
 
 fn isolate_openrouter_autodetect_env_or() -> Vec<OrEnvVarGuard> {
     let mut guards = vec![
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_API_BASE"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_API_KEY_NAME"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_ENV_FILE"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_MODEL"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_ALLOW_NO_AUTH"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_TRANSPORT_STATE"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_PROVIDER_FEATURES"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_MODEL_CATALOG"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_AUTH_HEADER"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_AUTH_HEADER_NAME"),
-        OrEnvVarGuard::remove("JCODE_OPENROUTER_STATIC_MODELS"),
-        OrEnvVarGuard::remove("JCODE_ACTIVE_PROVIDER"),
-        OrEnvVarGuard::remove("JCODE_RUNTIME_PROVIDER"),
-        OrEnvVarGuard::remove("JCODE_NAMED_PROVIDER_PROFILE"),
-        OrEnvVarGuard::remove("JCODE_PROVIDER_PROFILE_NAME"),
-        OrEnvVarGuard::remove("JCODE_PROVIDER_PROFILE_ACTIVE"),
-        OrEnvVarGuard::remove("JCODE_OPENAI_COMPAT_API_BASE"),
-        OrEnvVarGuard::remove("JCODE_OPENAI_COMPAT_API_KEY_NAME"),
-        OrEnvVarGuard::remove("JCODE_OPENAI_COMPAT_ENV_FILE"),
-        OrEnvVarGuard::remove("JCODE_OPENAI_COMPAT_SETUP_URL"),
-        OrEnvVarGuard::remove("JCODE_OPENAI_COMPAT_DEFAULT_MODEL"),
-        OrEnvVarGuard::remove("JCODE_OPENAI_COMPAT_LOCAL_ENABLED"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_API_BASE"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_API_KEY_NAME"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_ENV_FILE"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_MODEL"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_TRANSPORT_STATE"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_MODEL_CATALOG"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_AUTH_HEADER"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_AUTH_HEADER_NAME"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENROUTER_STATIC_MODELS"),
+        OrEnvVarGuard::remove("NEXT_CODE_ACTIVE_PROVIDER"),
+        OrEnvVarGuard::remove("NEXT_CODE_RUNTIME_PROVIDER"),
+        OrEnvVarGuard::remove("NEXT_CODE_NAMED_PROVIDER_PROFILE"),
+        OrEnvVarGuard::remove("NEXT_CODE_PROVIDER_PROFILE_NAME"),
+        OrEnvVarGuard::remove("NEXT_CODE_PROVIDER_PROFILE_ACTIVE"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_API_BASE"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_API_KEY_NAME"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_ENV_FILE"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_SETUP_URL"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL"),
+        OrEnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_LOCAL_ENABLED"),
         OrEnvVarGuard::remove("OPENROUTER_API_KEY"),
     ];
     guards.extend(
@@ -2015,8 +2015,8 @@ fn default_named_openai_compatible_provider_uses_direct_compatible_request_path(
     // factories are registered before startup paths need them.
     register_test_external_runtimes();
     let temp = tempfile::TempDir::new().expect("create temp home");
-    let next_code_home = temp.path().join("jcode-home");
-    let _jcode_home = OrEnvVarGuard::set("JCODE_HOME", &next_code_home);
+    let next_code_home = temp.path().join("next-code-home");
+    let _jcode_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = OrEnvVarGuard::set("HOME", temp.path());
     let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env_or();
@@ -2120,8 +2120,8 @@ fn default_named_openai_compatible_with_catalog_uses_direct_compatible_request_p
     // factories are registered before startup paths need them.
     register_test_external_runtimes();
     let temp = tempfile::TempDir::new().expect("create temp home");
-    let next_code_home = temp.path().join("jcode-home");
-    let _jcode_home = OrEnvVarGuard::set("JCODE_HOME", &next_code_home);
+    let next_code_home = temp.path().join("next-code-home");
+    let _jcode_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = OrEnvVarGuard::set("HOME", temp.path());
     let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env_or();
@@ -2210,8 +2210,8 @@ fn runtime_display_name_tracks_active_openai_compatible_profile() {
     // factories are registered before startup paths need them.
     register_test_external_runtimes();
     let temp = tempfile::TempDir::new().expect("create temp home");
-    let next_code_home = temp.path().join("jcode-home");
-    let _jcode_home = OrEnvVarGuard::set("JCODE_HOME", &next_code_home);
+    let next_code_home = temp.path().join("next-code-home");
+    let _jcode_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = OrEnvVarGuard::set("HOME", temp.path());
     let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env_or();

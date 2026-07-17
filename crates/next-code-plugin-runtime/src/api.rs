@@ -58,10 +58,12 @@ impl PluginApiBindings {
         )?;
         let handlers = Object::new(ctx.clone())?;
         pi.set("_handlers", handlers)?;
-        // Plugin code references `jcode` (e.g. `jcode.on(...)`, `jcode.logger.info(...)`).
-        // This is the same naming convention as omp's `pi` object, but namespaced to jcode.
-        ctx.globals().set("jcode", pi.clone())?;
-        ctx.globals().set("__jcode_api", pi)?;
+        // Plugin code references `nextcode` (e.g. `nextcode.on(...)`, `nextcode.logger.info(...)`).
+        // dual-read: legacy plugins still use `jcode` / `__jcode_api`.
+        ctx.globals().set("nextcode", pi.clone())?;
+        ctx.globals().set("jcode", pi.clone())?; // dual-read: legacy JS global
+        ctx.globals().set("__nextcode_api", pi.clone())?;
+        ctx.globals().set("__jcode_api", pi)?; // dual-read: legacy
         self._bridge.install(ctx)?;
         Ok(())
     }

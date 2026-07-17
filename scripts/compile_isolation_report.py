@@ -139,27 +139,27 @@ def target_state_violations(stats_by_name: dict[str, CrateStats]) -> list[str]:
 
     tui = stats_by_name.get("next-code-tui")
     if tui and "next-code-app-core" in tui.normal_workspace_deps:
-        violations.append("target-state: next-code-tui still directly depends on jcode-app-core")
+        violations.append("target-state: next-code-tui still directly depends on next-code-app-core")
 
     app_core = stats_by_name.get("next-code-app-core")
     if app_core and "next-code-base" in app_core.normal_workspace_deps:
-        violations.append("target-state: next-code-app-core still directly depends on jcode-base")
+        violations.append("target-state: next-code-app-core still directly depends on next-code-base")
 
     base = stats_by_name.get("next-code-base")
     if base:
         for dep in base.normal_workspace_deps:
             if dep in {
                 "next-code-azure-auth",
-                "jcode-provider-gemini",
-                "jcode-provider-openai",
-                "jcode-provider-openrouter",
-                "jcode-notify-email",
-                "jcode-build-support",
+                "next-code-provider-gemini",
+                "next-code-provider-openai",
+                "next-code-provider-openrouter",
+                "next-code-notify-email",
+                "next-code-build-support",
             }:
-                violations.append(f"target-state: jcode-base still depends on leaf/runtime crate {dep}")
+                violations.append(f"target-state: next-code-base still depends on leaf/runtime crate {dep}")
         for dep in base.normal_external_deps:
             if dep.startswith("aws-") or dep in {"aws-types"}:
-                violations.append(f"target-state: jcode-base still depends directly on AWS crate {dep}")
+                violations.append(f"target-state: next-code-base still depends directly on AWS crate {dep}")
 
     for crate in stats_by_name.values():
         for glob in crate.glob_reexports:

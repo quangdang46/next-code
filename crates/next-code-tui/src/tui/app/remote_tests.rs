@@ -611,8 +611,8 @@ fn process_remote_followups_pauses_auto_reload_after_repeated_attempts() {
 fn handle_post_connect_dispatches_reload_followup_even_if_history_snapshot_looks_busy() {
     let _guard = crate::storage::lock_test_env();
     let temp_home = tempfile::TempDir::new().expect("create temp home");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    crate::env::set_var("JCODE_HOME", temp_home.path());
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", temp_home.path());
 
     let session_id = "session_reload_busy_snapshot";
     crate::tool::selfdev::ReloadContext {
@@ -674,9 +674,9 @@ fn handle_post_connect_dispatches_reload_followup_even_if_history_snapshot_looks
         let _ = std::fs::remove_file(path);
     }
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 

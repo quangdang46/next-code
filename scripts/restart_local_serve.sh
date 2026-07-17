@@ -3,13 +3,13 @@
 # Use after scripts/install_release.sh so TUI work is not tested against a stale serve.
 set -euo pipefail
 
-# Prefer ~/.next-code; fall back to legacy ~/.jcode during the rebrand window.
+# Prefer ~/.next-code; fall back to legacy ~/.next-code during the rebrand window.
 current=""
 for candidate in \
   "${HOME}/.next-code/builds/current/next-code" \
-  "${HOME}/.next-code/builds/current/jcode" \
-  "${HOME}/.jcode/builds/current/next-code" \
-  "${HOME}/.jcode/builds/current/jcode"; do
+  "${HOME}/.next-code/builds/current/next-code" \
+  "${HOME}/.next-code/builds/current/next-code" \
+  "${HOME}/.next-code/builds/current/next-code"; do
   if [[ -e "${candidate}" ]]; then
     resolved="$(readlink -f "${candidate}" 2>/dev/null \
       || readlink "${candidate}" 2>/dev/null \
@@ -25,10 +25,10 @@ if [[ -z "${current}" || ! -x "${current}" ]]; then
   # Also accept PATH launchers.
   if command -v next-code >/dev/null 2>&1; then
     current="$(command -v next-code)"
-  elif command -v jcode >/dev/null 2>&1; then
-    current="$(command -v jcode)"
+  elif command -v next-code >/dev/null 2>&1; then
+    current="$(command -v next-code)"
   else
-    echo "error: no executable at ~/.next-code/builds/current/next-code (or legacy ~/.jcode/...)" >&2
+    echo "error: no executable at ~/.next-code/builds/current/next-code (or legacy ~/.next-code/...)" >&2
     exit 1
   fi
 fi
@@ -40,7 +40,7 @@ if [[ -z "${sock}" ]]; then
   base="${base%/}"
   for try in \
     "${base}/next-code.sock" \
-    "${base}/jcode.sock"; do
+    "${base}/next-code.sock"; do
     if [[ -S "${try}" ]]; then
       sock="${try}"
       break
@@ -58,12 +58,12 @@ echo "socket: ${sock} (override with NEXT_CODE_SOCKET=...)"
 while read -r pid cmd; do
   [[ -z "${pid}" ]] && continue
   case "${cmd}" in
-    *"/next-code/builds/"*serve*|*"/jcode/builds/"*serve*|*"/builds/"*"next-code"*serve*|*"/builds/"*"jcode"*serve*)
+    *"/next-code/builds/"*serve*|*"/next-code/builds/"*serve*|*"/builds/"*"next-code"*serve*|*"/builds/"*"next-code"*serve*)
       echo "stopping pid ${pid}"
       kill "${pid}" 2>/dev/null || true
       ;;
   esac
-done < <(ps -ax -o pid=,command= 2>/dev/null | awk '/next-code|jcode/ && /serve/ {print $1, $0}')
+done < <(ps -ax -o pid=,command= 2>/dev/null | awk '/next-code|next-code/ && /serve/ {print $1, $0}')
 
 sleep 1
 # Force leftovers that still hold the socket.
@@ -87,5 +87,5 @@ fi
 echo "started pid ${new_pid}"
 echo "log: ${log}"
 if command -v lsof >/dev/null 2>&1; then
-  lsof -p "${new_pid}" 2>/dev/null | awk '/txt.*(next-code|jcode)/{print "mapped:", $NF; exit}'
+  lsof -p "${new_pid}" 2>/dev/null | awk '/txt.*(next-code|next-code)/{print "mapped:", $NF; exit}'
 fi

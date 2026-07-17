@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -28,20 +29,20 @@ pub struct PluginConfig {
 
 impl PluginConfig {
     pub fn apply_env_overrides(&mut self) {
-        if let Ok(val) = std::env::var("JCODE_DISABLE_PLUGINS")
+        if let Ok(val) = product_env("DISABLE_PLUGINS")
             && (val == "1" || val.eq_ignore_ascii_case("true"))
         {
             self.mode = Some("none".to_string());
         }
-        if let Ok(val) = std::env::var("JCODE_SKIP_PLUGINS")
+        if let Ok(val) = product_env("SKIP_PLUGINS")
             && (val == "1" || val.eq_ignore_ascii_case("true"))
         {
             self.skip_hooks = true;
         }
-        if let Ok(val) = std::env::var("JCODE_PLUGIN_MODE") {
+        if let Ok(val) = product_env("PLUGIN_MODE") {
             self.mode = Some(val);
         }
-        if let Ok(val) = std::env::var("JCODE_TEAM_WORKER")
+        if let Ok(val) = product_env("TEAM_WORKER")
             && (val == "1" || val.eq_ignore_ascii_case("true"))
         {
             self.force_deny = true;
@@ -85,7 +86,7 @@ impl Default for DiscoveryPaths {
             .or_else(|_| std::env::var("USERPROFILE"))
             .map(PathBuf::from)
             .unwrap_or_else(|_| PathBuf::from("."));
-        let next_code_dir = home.join(".jcode");
+        let next_code_dir = home.join(".next-code");
         Self {
             plugin_dirs: vec![next_code_dir.join("plugins")],
             npm_cache: next_code_dir.join("cache").join("packages"),

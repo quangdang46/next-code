@@ -111,8 +111,8 @@ async fn test_socket_model_cycle_supported_models() -> Result<()> {
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = MockProvider::with_models(vec!["gpt-5.2-codex", "claude-opus-4-5-20251101"]);
     let provider: Arc<dyn next_code::provider::Provider> = Arc::new(provider);
@@ -195,8 +195,8 @@ async fn test_resume_restores_model_and_tool_history() -> Result<()> {
     );
     session.save()?;
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     // Default model = claude, resume should switch to gpt-5.2-codex
     let provider = MockProvider::with_models(vec!["claude-opus-4-5-20251101", "gpt-5.2-codex"]);
@@ -279,8 +279,8 @@ async fn test_resume_session_with_local_history_uses_metadata_only_history() -> 
     );
     session.save()?;
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = Arc::new(MockProvider::with_models(vec!["model-a"]));
     provider.queue_response(vec![
@@ -384,7 +384,7 @@ async fn test_resume_session_with_local_history_uses_metadata_only_history() -> 
         debug_run_command(debug_socket_path.clone(), "history", Some(&session.id))
             .await
             .unwrap_or_else(|err| format!("<history error: {err}>")),
-        std::env::var_os("NEXT_CODE_HOME").or_else(|| std::env::var_os("JCODE_HOME"))
+        std::env::var_os("NEXT_CODE_HOME").or_else(|| std::env::var_os("NEXT_CODE_HOME"))
             .and_then(|home| latest_log_excerpt(std::path::Path::new(&home)))
             .unwrap_or_else(|| "<no logs>".to_string())
     );
@@ -407,7 +407,7 @@ async fn test_resume_session_with_local_history_uses_metadata_only_history() -> 
 async fn test_resume_all_sessions_continues_interrupted_live_session() -> Result<()> {
     let _env = setup_test_env()?;
     let runtime_dir = short_runtime_dir(format!(
-        "jcode-resume-all-test-{}",
+        "next-code-resume-all-test-{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -427,8 +427,8 @@ async fn test_resume_all_sessions_continues_interrupted_live_session() -> Result
     );
     session.save()?;
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = MockProvider::with_models(vec!["model-a"]);
     provider.queue_response(vec![
@@ -492,7 +492,7 @@ async fn test_resume_all_sessions_continues_interrupted_live_session() -> Result
 async fn test_resume_session_reports_reload_interruption_for_peer_sessions() -> Result<()> {
     let _env = setup_test_env()?;
     let runtime_dir = short_runtime_dir(format!(
-        "jcode-reload-interruption-test-{}",
+        "next-code-reload-interruption-test-{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
@@ -512,8 +512,8 @@ async fn test_resume_session_reports_reload_interruption_for_peer_sessions() -> 
     );
     session.save()?;
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = Arc::new(MockProvider::with_models(vec!["model-a"]));
     let provider_dyn: Arc<dyn next_code::provider::Provider> = provider.clone();
@@ -574,8 +574,8 @@ async fn test_subscribe_selfdev_hint_marks_canary() -> Result<()> {
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = MockProvider::new();
     let provider: Arc<dyn next_code::provider::Provider> = Arc::new(provider);
@@ -622,14 +622,14 @@ async fn test_subscribe_working_dir_without_selfdev_hint_stays_normal() -> Resul
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let fake_repo = tempfile::tempdir()?;
     std::fs::create_dir_all(fake_repo.path().join(".git"))?;
     std::fs::write(
         fake_repo.path().join("Cargo.toml"),
-        "[package]\nname = \"jcode\"\nversion = \"0.0.0\"\n",
+        "[package]\nname = \"next-code\"\nversion = \"0.0.0\"\n",
     )?;
     let nested_dir = fake_repo.path().join("nested").join("worktree");
     std::fs::create_dir_all(&nested_dir)?;
@@ -685,8 +685,8 @@ async fn test_model_switch_resets_provider_session() -> Result<()> {
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = Arc::new(MockProvider::with_models(vec!["model-a", "model-b"]));
     provider.queue_response(vec![
@@ -784,8 +784,8 @@ async fn test_model_switch_is_per_session() -> Result<()> {
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = Arc::new(MockProvider::with_models(vec!["model-a", "model-b"]));
     provider.queue_response(vec![
@@ -883,7 +883,7 @@ async fn test_model_switch_is_per_session() -> Result<()> {
 }
 
 /// Test that the system prompt does NOT identify the agent as "Claude Code"
-/// The agent should identify as "jcode" or just a generic "coding assistant powered by Claude"
+/// The agent should identify as "next-code" or just a generic "coding assistant powered by Claude"
 #[tokio::test]
 async fn test_system_prompt_no_claude_code_identity() -> Result<()> {
     let _env = setup_test_env()?;
@@ -934,10 +934,10 @@ async fn test_system_prompt_no_claude_code_identity() -> Result<()> {
         identity_portion
     );
 
-    // Should identify as jcode
+    // Should identify as next-code
     assert!(
-        lower_identity.contains("jcode"),
-        "System prompt should identify as jcode. Found: {}",
+        lower_identity.contains("next-code") || lower_identity.contains("next code"),
+        "System prompt should identify as next-code. Found: {}",
         identity_portion
     );
 

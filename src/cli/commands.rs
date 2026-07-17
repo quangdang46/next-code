@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+use crate::env::product_env;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -1378,7 +1379,7 @@ fn resolve_jade_sessions_helper(override_path: Option<&str>) -> Result<PathBuf> 
         return Ok(PathBuf::from(path));
     }
 
-    if let Some(path) = std::env::var_os("JCODE_JADE_SESSIONS_HELPER")
+    if let Some(path) = std::env::var_os("NEXT_CODE_JADE_SESSIONS_HELPER")
         .filter(|path| !path.is_empty())
         .map(PathBuf::from)
     {
@@ -1401,7 +1402,7 @@ fn resolve_jade_sessions_helper(override_path: Option<&str>) -> Result<PathBuf> 
     }
 
     anyhow::bail!(
-        "Could not find Jade session helper. Set --helper PATH or JCODE_JADE_SESSIONS_HELPER. Expected a private helper like ~/jade/scripts/jade_sessions.py"
+        "Could not find Jade session helper. Set --helper PATH or NEXT_CODE_JADE_SESSIONS_HELPER. Expected a private helper like ~/jade/scripts/jade_sessions.py"
     );
 }
 
@@ -1789,8 +1790,8 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
 
 pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()> {
     let install_root = dirs::home_dir()
-        .map(|h| h.join(".jcode").join("plugins"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/jcode-plugins"));
+        .map(|h| h.join(".next-code").join("plugins"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/next-code-plugins"));
     let mgr = next_code_plugin_core::PluginManager::new(install_root).await;
     use next_code_plugin_core::PluginSource;
 
@@ -1941,7 +1942,7 @@ pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
     let gw_config = &crate::config::config().gateway;
 
     if !gw_config.enabled {
-        eprintln!("\x1b[33m⚠\x1b[0m  Gateway is disabled. Enable it in ~/.jcode/config.toml:\n");
+        eprintln!("\x1b[33m⚠\x1b[0m  Gateway is disabled. Enable it in ~/.next-code/config.toml:\n");
         eprintln!("    \x1b[2m[gateway]\x1b[0m");
         eprintln!("    \x1b[2menabled = true\x1b[0m");
         eprintln!("    \x1b[2mport = {}\x1b[0m\n", gw_config.port);
@@ -1981,7 +1982,7 @@ pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
 
     if connect_host == "<your-mac-hostname>" {
         eprintln!(
-            "\n  \x1b[33mTip:\x1b[0m set JCODE_GATEWAY_HOST to your reachable Tailscale hostname."
+            "\n  \x1b[33mTip:\x1b[0m set NEXT_CODE_GATEWAY_HOST to your reachable Tailscale hostname."
         );
     }
 
@@ -2003,7 +2004,7 @@ pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
 
 pub fn resolve_connect_host(bind_addr: &str) -> String {
     if bind_addr == "0.0.0.0" || bind_addr == "::" {
-        if let Some(host) = std::env::var("JCODE_GATEWAY_HOST")
+        if let Some(host) = product_env("GATEWAY_HOST")
             .ok()
             .map(|s| s.trim().to_string())
             .filter(|s| !s.is_empty())
@@ -2570,7 +2571,7 @@ pub async fn run_single_message_command(
 }
 
 fn run_command_auto_poke_enabled() -> bool {
-    std::env::var("JCODE_RUN_AUTO_POKE")
+    product_env("RUN_AUTO_POKE")
         .ok()
         .map(|value| {
             let value = value.trim().to_ascii_lowercase();
@@ -2580,7 +2581,7 @@ fn run_command_auto_poke_enabled() -> bool {
 }
 
 fn run_command_auto_poke_max_turns() -> Option<usize> {
-    std::env::var("JCODE_RUN_AUTO_POKE_MAX_TURNS")
+    product_env("RUN_AUTO_POKE_MAX_TURNS")
         .ok()
         .and_then(|value| value.trim().parse::<usize>().ok())
         .filter(|value| *value > 0)
@@ -2684,7 +2685,7 @@ async fn run_single_message_command_plain_with_auto_poke(
                 }
                 next_message = message;
                 eprintln!(
-                    "Auto-poking: todos complete; sending confidence summary follow-up. Set JCODE_RUN_AUTO_POKE=0 to disable."
+                    "Auto-poking: todos complete; sending confidence summary follow-up. Set NEXT_CODE_RUN_AUTO_POKE=0 to disable."
                 );
                 continue;
             }
@@ -2700,7 +2701,7 @@ async fn run_single_message_command_plain_with_auto_poke(
                 }
                 next_message = message;
                 eprintln!(
-                    "Auto-poking: {} incomplete todo(s). Set JCODE_RUN_AUTO_POKE=0 to disable.",
+                    "Auto-poking: {} incomplete todo(s). Set NEXT_CODE_RUN_AUTO_POKE=0 to disable.",
                     count
                 );
             }

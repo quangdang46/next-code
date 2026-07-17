@@ -3,13 +3,13 @@
 //!
 //! This is a *stand-alone* TUI built on top of the cross-platform
 //! `crossterm` crate so it doesn't depend on the (currently broken)
-//! `jcode-tui` crate. When `jcode-tui` is repaired, the rendering
+//! `next-code-tui` crate. When `next-code-tui` is repaired, the rendering
 //! surface in this binary can be ported into the in-process picker
 //! without changing the data model (which lives in
 //! `next_code_provider_service::tui_picker`).
 //!
 //! Usage:
-//!   modelpicker                 — open the picker (uses ~/.jcode
+//!   modelpicker                 — open the picker (uses ~/.next-code
 //!                                for the credential store; falls
 //!                                back to the mock keyring under
 //!                                the MOCK_KEYRING env var for
@@ -120,7 +120,7 @@ async fn run<B: ratatui::backend::Backend>(
         }
     }
     let mut state = PickerState::new();
-    // Load persisted favorites from ~/.jcode/model_prefs.json
+    // Load persisted favorites from ~/.next-code/model_prefs.json
     // (per the plan: 'f' toggles favorite, persisted to
     // model_prefs.json). Falls back to empty if the file is
     // missing or malformed.
@@ -167,7 +167,7 @@ async fn run<B: ratatui::backend::Backend>(
                 .split(f.area());
             let header = Paragraph::new(Line::from(vec![
                 Span::styled("modelpicker", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw("  jcode provider/model picker — "),
+                Span::raw("  next-code provider/model picker — "),
                 Span::raw(format!("{} rows", state.visible().len())),
             ]))
             .block(Block::default().borders(Borders::ALL).title(" Catalog "));
@@ -256,7 +256,7 @@ async fn run<B: ratatui::backend::Backend>(
                             state
                                 .rebuild_rows(svc.catalog(), &connected, &favorites)
                                 .await?;
-                            // Persist favorites to ~/.jcode/model_prefs.json
+                            // Persist favorites to ~/.next-code/model_prefs.json
                             // (per the plan: 'f' toggles favorite,
                             // persisted to model_prefs.json).
                             if let Some(path) = next_code_provider_service::model_prefs::default_path()

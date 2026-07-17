@@ -60,7 +60,7 @@ fn next_code_auth_file_roundtrip() {
 fn next_code_path_respects_jcode_home() {
     let _lock = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());
 
     assert_eq!(next_code_path().unwrap(), temp.path().join("auth.json"));
     assert_eq!(
@@ -85,7 +85,7 @@ fn next_code_path_respects_jcode_home() {
 fn load_auth_file_renames_existing_labels_to_numbered_scheme() {
     let _lock = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());
     set_active_account_override(None);
 
     let auth_path = temp.path().join("auth.json");
@@ -349,7 +349,7 @@ fn load_claude_code_credentials_does_not_change_external_permissions() {
 
     let _lock = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().expect("tempdir");
-    let _home = EnvVarGuard::set("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());
 
     let path = claude_code_path().expect("claude code path");
     std::fs::create_dir_all(path.parent().unwrap()).expect("create dir");
@@ -529,7 +529,7 @@ fn env_token_absent_yields_none() {
 
 /// Live macOS-only check against a real `Claude Code-credentials` Keychain item.
 /// Ignored by default (mutates/reads the user Keychain). Run with:
-///   cargo test -p jcode-base --lib auth::claude::tests::live_keychain -- --ignored --nocapture
+///   cargo test -p next-code-base --lib auth::claude::tests::live_keychain -- --ignored --nocapture
 #[cfg(target_os = "macos")]
 #[test]
 #[ignore = "live: reads the real macOS Keychain"]

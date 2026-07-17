@@ -5,7 +5,7 @@ use tempfile::TempDir;
 fn config_file_path_under_jcode() {
     let path = config_file_path().unwrap();
     let path_str = path.to_string_lossy();
-    assert!(path_str.contains("jcode"));
+    assert!(path_str.contains("next-code"));
     assert!(path_str.ends_with("cursor.env"));
 }
 
@@ -109,35 +109,35 @@ fn has_cursor_api_key_from_env() {
 #[test]
 fn cursor_auth_file_path_respects_jcode_home() {
     // Regression: on Linux the auth.json path previously used
-    // `dirs::config_dir()` directly, ignoring JCODE_HOME. That leaked the real
+    // `dirs::config_dir()` directly, ignoring NEXT_CODE_HOME. That leaked the real
     // `~/.config/cursor/auth.json` into the onboarding sandbox, so a
     // fresh-install sandbox showed only Cursor as importable while every other
-    // provider correctly looked under `$JCODE_HOME/external/...`.
+    // provider correctly looked under `$NEXT_CODE_HOME/external/...`.
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let path = cursor_auth_file_path().expect("cursor auth path");
     assert!(
         path.starts_with(temp.path().join("external")),
-        "cursor auth path should be under JCODE_HOME/external, got {}",
+        "cursor auth path should be under NEXT_CODE_HOME/external, got {}",
         path.display()
     );
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[test]
 fn cursor_vscdb_paths_respect_jcode_home() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let paths = cursor_vscdb_paths();
     assert!(!paths.is_empty());
@@ -146,9 +146,9 @@ fn cursor_vscdb_paths_respect_jcode_home() {
     }
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
@@ -164,9 +164,9 @@ fn load_access_token_from_auth_file_does_not_change_external_permissions() {
     use std::os::unix::fs::PermissionsExt;
 
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let path = cursor_auth_file_path().expect("cursor auth path");
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -199,9 +199,9 @@ fn load_access_token_from_auth_file_does_not_change_external_permissions() {
     assert_eq!(file_mode, 0o644);
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 

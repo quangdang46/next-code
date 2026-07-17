@@ -11,8 +11,8 @@
 //! * The **pure** renderers ([`render_hyprland_block`], [`render_sway_block`])
 //!   turn resolved launch hotkeys into the exact bind lines we manage. Instead
 //!   of inlining shell one-liners (a quoting minefield across three different
-//!   config grammars), each bind simply executes a launch script jcode writes
-//!   to `~/.jcode/hotkey/`.
+//!   config grammars), each bind simply executes a launch script next-code writes
+//!   to `~/.next-code/hotkey/`.
 //! * [`splice_flat_managed_block`] replaces/creates the sentinel-delimited
 //!   managed region at file scope, leaving every other line untouched.
 //!
@@ -20,19 +20,19 @@
 //! idempotent and a user can hand-remove it cleanly:
 //!
 //! ```text
-//! # >>> jcode launch hotkeys (managed) >>>
-//! bind = SUPER, semicolon, exec, '/home/u/.jcode/hotkey/launch_jcode_0_cmd_semicolon.sh'
-//! # <<< jcode launch hotkeys (managed) <<<
+//! # >>> next-code launch hotkeys (managed) >>>
+//! bind = SUPER, semicolon, exec, '/home/u/.next-code/hotkey/launch_next_code_0_cmd_semicolon.sh'
+//! # <<< next-code launch hotkeys (managed) <<<
 //! ```
 
 use crate::keymap::KeyChord;
 
 /// Opening sentinel for the managed region in `#`-commented configs.
-pub(crate) const HASH_BLOCK_BEGIN: &str = "# >>> jcode launch hotkeys (managed) >>>";
+pub(crate) const HASH_BLOCK_BEGIN: &str = "# >>> next-code launch hotkeys (managed) >>>";
 /// Closing sentinel for the managed region in `#`-commented configs.
-pub(crate) const HASH_BLOCK_END: &str = "# <<< jcode launch hotkeys (managed) <<<";
+pub(crate) const HASH_BLOCK_END: &str = "# <<< next-code launch hotkeys (managed) <<<";
 
-/// A Linux desktop environment / compositor jcode can install launch hotkeys
+/// A Linux desktop environment / compositor next-code can install launch hotkeys
 /// into.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LinuxCompositor {
@@ -140,7 +140,7 @@ pub(crate) struct ScriptBind {
     pub self_dev: bool,
 }
 
-/// Translate a canonical jcode key token into an XKB keysym name (the
+/// Translate a canonical next-code key token into an XKB keysym name (the
 /// vocabulary Hyprland, sway, and i3 all accept). Returns `None` for tokens
 /// with no stable spelling.
 pub(crate) fn xkb_key_name(key: &str) -> Option<String> {
@@ -193,7 +193,7 @@ pub(crate) fn sh_single_quote(input: &str) -> String {
 }
 
 /// Render one Hyprland `bind` line, or `None` if the chord cannot be
-/// expressed. jcode's `cmd` modifier maps to `SUPER`.
+/// expressed. next-code's `cmd` modifier maps to `SUPER`.
 ///
 /// Hyprland's `exec` dispatcher passes the remainder of the line to a shell,
 /// so the script path is single-quoted to survive spaces.
@@ -206,7 +206,7 @@ pub(crate) fn render_hyprland_bind_line(bind: &ScriptBind) -> Option<String> {
     ))
 }
 
-/// Hyprland modifier list (space-separated, e.g. `SUPER SHIFT`). jcode `cmd`
+/// Hyprland modifier list (space-separated, e.g. `SUPER SHIFT`). next-code `cmd`
 /// maps to `SUPER`.
 fn hyprland_mods(chord: &KeyChord) -> String {
     let mut parts: Vec<&str> = Vec::new();
@@ -226,7 +226,7 @@ fn hyprland_mods(chord: &KeyChord) -> String {
 }
 
 /// Render one sway/i3 `bindsym` line, or `None` if the chord cannot be
-/// expressed. jcode's `cmd` maps to `Mod4` (super) and `alt` to `Mod1`.
+/// expressed. next-code's `cmd` maps to `Mod4` (super) and `alt` to `Mod1`.
 ///
 /// i3 (and sway, which accepts the same grammar) treats `,` and `;` as command
 /// separators inside a bind, so the exec payload is a quoted script path with
@@ -265,7 +265,7 @@ pub(crate) fn render_flat_block(
     let mut lines: Vec<String> = Vec::new();
     for bind in binds {
         if let Some(line) = render_line(bind) {
-            lines.push(format!("# jcode: {label}", label = bind.label));
+            lines.push(format!("# next-code: {label}", label = bind.label));
             lines.push(line);
         }
     }
@@ -295,7 +295,7 @@ pub(crate) fn render_sway_block(binds: &[ScriptBind]) -> Option<String> {
 
 /// Render one sxhkd chord + command stanza, or `None` if the chord cannot be
 /// expressed. sxhkd wants lowercase modifier names joined with ` + ` on one
-/// line and the command indented beneath. jcode's `cmd` maps to `super`.
+/// line and the command indented beneath. next-code's `cmd` maps to `super`.
 pub(crate) fn render_sxhkd_stanza(bind: &ScriptBind) -> Option<String> {
     let key = xkb_key_name(&bind.chord.key)?;
     let mut parts: Vec<String> = Vec::new();
@@ -326,7 +326,7 @@ pub(crate) fn render_sxhkd_block(binds: &[ScriptBind]) -> Option<String> {
 }
 
 /// Map a chord onto GNOME's gsettings accelerator syntax, e.g.
-/// `<Super>semicolon` or `<Super><Shift>apostrophe`. jcode's `cmd` maps to
+/// `<Super>semicolon` or `<Super><Shift>apostrophe`. next-code's `cmd` maps to
 /// `<Super>`. Returns `None` for keys with no XKB name.
 pub(crate) fn gnome_binding(chord: &KeyChord) -> Option<String> {
     let key = xkb_key_name(&chord.key)?;
@@ -347,11 +347,11 @@ pub(crate) fn gnome_binding(chord: &KeyChord) -> Option<String> {
     Some(out)
 }
 
-/// The dconf path for jcode's Nth GNOME custom keybinding. Slot-stable so
+/// The dconf path for next-code's Nth GNOME custom keybinding. Slot-stable so
 /// re-installs overwrite rather than accumulate.
 pub(crate) fn gnome_keybinding_path(index: usize) -> String {
     format!(
-        "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/jcode-launch-{index}/"
+        "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/next-code-launch-{index}/"
     )
 }
 
@@ -377,7 +377,7 @@ pub(crate) fn gnome_keybindings(binds: &[ScriptBind]) -> Vec<GnomeKeybinding> {
             let binding = gnome_binding(&bind.chord)?;
             Some(GnomeKeybinding {
                 path: String::new(), // filled below with a stable slot index
-                name: format!("jcode: {}", bind.label),
+                name: format!("next-code: {}", bind.label),
                 command: bind.script.clone(),
                 binding,
             })
@@ -390,9 +390,9 @@ pub(crate) fn gnome_keybindings(binds: &[ScriptBind]) -> Vec<GnomeKeybinding> {
         .collect()
 }
 
-/// Merge jcode's entries into an existing gsettings/dconf string-array value
+/// Merge next-code's entries into an existing gsettings/dconf string-array value
 /// (e.g. `['/a/', '/b/']` or `@as []`), preserving foreign entries and
-/// replacing any previous jcode slots (matched on the `jcode-launch-` marker).
+/// replacing any previous next-code slots (matched on the `next-code-launch-` marker).
 /// Used for GNOME keybinding paths and Cinnamon slot names alike. Pure string
 /// surgery on the GVariant text format so it is unit-testable without dconf.
 pub(crate) fn merge_gnome_keybinding_list(current: &str, ours: &[String]) -> String {
@@ -403,7 +403,7 @@ pub(crate) fn merge_gnome_keybinding_list(current: &str, ours: &[String]) -> Str
         let after = &rest[start + 1..];
         let Some(end) = after.find('\'') else { break };
         let entry = &after[..end];
-        if !entry.contains("jcode-launch-") {
+        if !entry.contains("next-code-launch-") {
             entries.push(entry.to_string());
         }
         rest = &after[end + 1..];
@@ -413,9 +413,9 @@ pub(crate) fn merge_gnome_keybinding_list(current: &str, ours: &[String]) -> Str
     format!("[{}]", quoted.join(", "))
 }
 
-/// Stable dconf slot name for jcode's Nth custom keybinding (Cinnamon/MATE).
+/// Stable dconf slot name for next-code's Nth custom keybinding (Cinnamon/MATE).
 pub(crate) fn dconf_slot_name(index: usize) -> String {
-    format!("jcode-launch-{index}")
+    format!("next-code-launch-{index}")
 }
 
 /// One dconf-backed custom keybinding (GNOME/Cinnamon/MATE all share the
@@ -423,7 +423,7 @@ pub(crate) fn dconf_slot_name(index: usize) -> String {
 /// types).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct DconfKeybinding {
-    /// Slot name, e.g. `jcode-launch-0`.
+    /// Slot name, e.g. `next-code-launch-0`.
     pub slot: String,
     pub name: String,
     pub command: String,
@@ -440,7 +440,7 @@ pub(crate) fn dconf_keybindings(binds: &[ScriptBind]) -> Vec<DconfKeybinding> {
             let binding = gnome_binding(&bind.chord)?;
             Some(DconfKeybinding {
                 slot: String::new(),
-                name: format!("jcode: {}", bind.label),
+                name: format!("next-code: {}", bind.label),
                 command: bind.script.clone(),
                 binding,
             })
@@ -455,7 +455,7 @@ pub(crate) fn dconf_keybindings(binds: &[ScriptBind]) -> Vec<DconfKeybinding> {
 
 /// Map a chord onto KDE's QKeySequence syntax, e.g. `Meta+;` or
 /// `Meta+Shift+'`. KDE uses literal punctuation characters, not XKB names.
-/// jcode's `cmd` maps to `Meta` (the KDE name for Super).
+/// next-code's `cmd` maps to `Meta` (the KDE name for Super).
 pub(crate) fn kde_shortcut(chord: &KeyChord) -> Option<String> {
     let key: String = match chord.key.as_str() {
         k if k.len() == 1 => k.to_uppercase(),
@@ -501,9 +501,9 @@ pub(crate) fn kde_shortcut(chord: &KeyChord) -> Option<String> {
     Some(out)
 }
 
-/// Stable desktop-file name for jcode's Nth KDE launch shortcut.
+/// Stable desktop-file name for next-code's Nth KDE launch shortcut.
 pub(crate) fn kde_desktop_file_name(index: usize) -> String {
-    format!("jcode-launch-{index}.desktop")
+    format!("next-code-launch-{index}.desktop")
 }
 
 /// One KDE launch shortcut: a hidden desktop file plus its
@@ -529,7 +529,7 @@ pub(crate) fn kde_shortcuts(binds: &[ScriptBind]) -> Vec<KdeShortcut> {
         .map(|(index, (bind, shortcut))| KdeShortcut {
             desktop_file_name: kde_desktop_file_name(index),
             desktop_file_body: format!(
-                "[Desktop Entry]\nType=Application\nName=jcode: {label}\nExec={script}\nNoDisplay=true\nStartupNotify=false\nX-KDE-GlobalAccel-CommandShortcut=true\n",
+                "[Desktop Entry]\nType=Application\nName=next-code: {label}\nExec={script}\nNoDisplay=true\nStartupNotify=false\nX-KDE-GlobalAccel-CommandShortcut=true\n",
                 label = bind.label,
                 script = bind.script,
             ),
@@ -538,8 +538,8 @@ pub(crate) fn kde_shortcuts(binds: &[ScriptBind]) -> Vec<KdeShortcut> {
         .collect()
 }
 
-/// Upsert `_launch=` entries for jcode's services into `kglobalshortcutsrc`
-/// INI text: existing `[services][jcode-launch-*.desktop]` sections are
+/// Upsert `_launch=` entries for next-code's services into `kglobalshortcutsrc`
+/// INI text: existing `[services][next-code-launch-*.desktop]` sections are
 /// replaced, other sections are preserved, and missing sections are appended.
 /// Pure so the INI surgery is unit-testable.
 pub(crate) fn upsert_kde_shortcut_sections(current: &str, shortcuts: &[KdeShortcut]) -> String {
@@ -547,7 +547,7 @@ pub(crate) fn upsert_kde_shortcut_sections(current: &str, shortcuts: &[KdeShortc
     let mut skipping = false;
     for line in current.lines() {
         if line.starts_with('[') {
-            skipping = line.starts_with("[services][jcode-launch-");
+            skipping = line.starts_with("[services][next-code-launch-");
         }
         if !skipping {
             out.push(line.to_string());
@@ -622,8 +622,8 @@ fn find_flat_managed_region(config: &str) -> Option<(usize, usize)> {
     Some((line_start, line_end))
 }
 
-/// Build the shell command a launch script uses to open jcode in the user's
-/// terminal, as a `argv`-quoted string (e.g. `'kitty' '/bin/jcode' 'self-dev'`).
+/// Build the shell command a launch script uses to open next-code in the user's
+/// terminal, as a `argv`-quoted string (e.g. `'kitty' '/bin/next-code' 'self-dev'`).
 /// Terminals differ in how they accept a command to run.
 pub(crate) fn terminal_exec_command(
     terminal: &str,
@@ -801,7 +801,7 @@ mod tests {
         assert_eq!(kbs.len(), 2);
         assert_eq!(kbs[0].path, gnome_keybinding_path(0));
         assert_eq!(kbs[1].path, gnome_keybinding_path(1));
-        assert_eq!(kbs[0].name, "jcode: home");
+        assert_eq!(kbs[0].name, "next-code: home");
         assert_eq!(kbs[1].binding, "<Super>bracketleft");
     }
 
@@ -817,7 +817,7 @@ mod tests {
             merge_gnome_keybinding_list("[]", &ours[..1]),
             format!("['{}']", ours[0])
         );
-        // Foreign entries stay; stale jcode slots are dropped before re-adding.
+        // Foreign entries stay; stale next-code slots are dropped before re-adding.
         let current = format!(
             "['/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/', '{}', '{}']",
             gnome_keybinding_path(0),
@@ -825,9 +825,9 @@ mod tests {
         );
         let merged = merge_gnome_keybinding_list(&current, &ours);
         assert!(merged.contains("custom0"));
-        assert!(!merged.contains("jcode-launch-7"));
-        assert_eq!(merged.matches("jcode-launch-0").count(), 1);
-        assert_eq!(merged.matches("jcode-launch-1").count(), 1);
+        assert!(!merged.contains("next-code-launch-7"));
+        assert_eq!(merged.matches("next-code-launch-0").count(), 1);
+        assert_eq!(merged.matches("next-code-launch-1").count(), 1);
         // Idempotent.
         assert_eq!(merge_gnome_keybinding_list(&merged, &ours), merged);
     }
@@ -840,23 +840,23 @@ mod tests {
             bind("cmd+shift+'", "/b.sh", "self-dev", true),
         ]);
         assert_eq!(kbs.len(), 2);
-        assert_eq!(kbs[0].slot, "jcode-launch-0");
-        assert_eq!(kbs[1].slot, "jcode-launch-1");
+        assert_eq!(kbs[0].slot, "next-code-launch-0");
+        assert_eq!(kbs[1].slot, "next-code-launch-1");
         assert_eq!(kbs[0].binding, "<Super>semicolon");
         assert_eq!(kbs[1].binding, "<Super><Shift>apostrophe");
-        assert_eq!(kbs[1].name, "jcode: self-dev");
+        assert_eq!(kbs[1].name, "next-code: self-dev");
     }
 
     #[test]
     fn gnome_list_merge_also_handles_cinnamon_slot_names() {
         // Cinnamon's custom-list holds bare slot names, not dconf paths.
         let ours = vec![dconf_slot_name(0), dconf_slot_name(1)];
-        let current = "['custom0', 'jcode-launch-0', 'jcode-launch-5']";
+        let current = "['custom0', 'next-code-launch-0', 'next-code-launch-5']";
         let merged = merge_gnome_keybinding_list(current, &ours);
         assert!(merged.contains("'custom0'"));
-        assert!(!merged.contains("jcode-launch-5"));
-        assert_eq!(merged.matches("jcode-launch-0").count(), 1);
-        assert!(merged.contains("jcode-launch-1"));
+        assert!(!merged.contains("next-code-launch-5"));
+        assert_eq!(merged.matches("next-code-launch-0").count(), 1);
+        assert!(merged.contains("next-code-launch-1"));
         assert_eq!(merge_gnome_keybinding_list(&merged, &ours), merged);
     }
 
@@ -872,7 +872,7 @@ mod tests {
             bind("cmd+shift+'", "/b.sh", "self-dev", true),
         ]);
         assert_eq!(scs.len(), 2);
-        assert_eq!(scs[0].desktop_file_name, "jcode-launch-0.desktop");
+        assert_eq!(scs[0].desktop_file_name, "next-code-launch-0.desktop");
         assert!(scs[0].desktop_file_body.contains("Exec=/a.sh"));
         assert!(scs[0].desktop_file_body.contains("NoDisplay=true"));
         assert_eq!(scs[1].launch_shortcut, "Meta+Shift+'");
@@ -881,19 +881,19 @@ mod tests {
     #[test]
     fn kde_ini_upsert_replaces_our_sections_and_keeps_others() {
         let scs = kde_shortcuts(&[bind("cmd+;", "/a.sh", "home", false)]);
-        let current = "[services][firefox.desktop]\n_launch=Meta+F\n\n[services][jcode-launch-0.desktop]\n_launch=Meta+X\n\n[services][jcode-launch-9.desktop]\n_launch=Meta+Y\n";
+        let current = "[services][firefox.desktop]\n_launch=Meta+F\n\n[services][next-code-launch-0.desktop]\n_launch=Meta+X\n\n[services][next-code-launch-9.desktop]\n_launch=Meta+Y\n";
         let updated = upsert_kde_shortcut_sections(current, &scs);
         assert!(updated.contains("[services][firefox.desktop]"));
         assert!(updated.contains("_launch=Meta+F"));
         assert_eq!(
             updated
-                .matches("[services][jcode-launch-0.desktop]")
+                .matches("[services][next-code-launch-0.desktop]")
                 .count(),
             1
         );
         assert!(updated.contains("_launch=Meta+;"));
         assert!(!updated.contains("Meta+X"));
-        assert!(!updated.contains("jcode-launch-9"));
+        assert!(!updated.contains("next-code-launch-9"));
         // Idempotent.
         assert_eq!(upsert_kde_shortcut_sections(&updated, &scs), updated);
     }
@@ -916,14 +916,14 @@ mod tests {
     fn hyprland_bind_line_maps_cmd_to_super() {
         let line = render_hyprland_bind_line(&bind(
             "cmd+;",
-            "/home/u/.jcode/hotkey/launch_jcode_0_cmd_semicolon.sh",
-            "jcode",
+            "/home/u/.next-code/hotkey/launch_next_code_0_cmd_semicolon.sh",
+            "next-code",
             false,
         ))
         .unwrap();
         assert_eq!(
             line,
-            "bind = SUPER, semicolon, exec, '/home/u/.jcode/hotkey/launch_jcode_0_cmd_semicolon.sh'"
+            "bind = SUPER, semicolon, exec, '/home/u/.next-code/hotkey/launch_next_code_0_cmd_semicolon.sh'"
         );
 
         let shifted = render_hyprland_bind_line(&bind("cmd+shift+'", "/s.sh", "x", true)).unwrap();
@@ -932,7 +932,7 @@ mod tests {
 
     #[test]
     fn sway_bind_line_maps_cmd_to_mod4_and_alt_to_mod1() {
-        let line = render_sway_bind_line(&bind("cmd+;", "/s.sh", "jcode", false)).unwrap();
+        let line = render_sway_bind_line(&bind("cmd+;", "/s.sh", "next-code", false)).unwrap();
         assert_eq!(
             line,
             "bindsym Mod4+semicolon exec --no-startup-id \"/s.sh\""
@@ -960,16 +960,16 @@ mod tests {
     #[test]
     fn blocks_wrap_sentinels_and_carry_labels() {
         let block = render_hyprland_block(&[
-            bind("cmd+;", "/a.sh", "jcode", false),
+            bind("cmd+;", "/a.sh", "next-code", false),
             bind("cmd+'", "/b.sh", "home", false),
         ])
         .unwrap();
         assert!(block.starts_with(HASH_BLOCK_BEGIN));
         assert!(block.ends_with(HASH_BLOCK_END));
-        assert!(block.contains("# jcode: jcode"));
-        assert!(block.contains("# jcode: home"));
+        assert!(block.contains("# next-code: next-code"));
+        assert!(block.contains("# next-code: home"));
 
-        let sway = render_sway_block(&[bind("cmd+;", "/a.sh", "jcode", false)]).unwrap();
+        let sway = render_sway_block(&[bind("cmd+;", "/a.sh", "next-code", false)]).unwrap();
         assert!(sway.starts_with(HASH_BLOCK_BEGIN));
         assert!(sway.contains("bindsym Mod4+semicolon"));
     }
@@ -1018,25 +1018,25 @@ mod tests {
     #[test]
     fn terminal_exec_command_varies_by_terminal() {
         assert_eq!(
-            terminal_exec_command("kitty", "/bin/jcode", "cmd+;", false),
-            "'kitty' '/bin/jcode' '--spawn-hotkey' 'cmd+;'"
+            terminal_exec_command("kitty", "/bin/next-code", "cmd+;", false),
+            "'kitty' '/bin/next-code' '--spawn-hotkey' 'cmd+;'"
         );
         assert_eq!(
-            terminal_exec_command("alacritty", "/bin/jcode", "cmd+shift+'", true),
-            r#"'alacritty' '-e' '/bin/jcode' '--spawn-hotkey' 'cmd+shift+'\''' 'self-dev'"#
+            terminal_exec_command("alacritty", "/bin/next-code", "cmd+shift+'", true),
+            r#"'alacritty' '-e' '/bin/next-code' '--spawn-hotkey' 'cmd+shift+'\''' 'self-dev'"#
         );
         assert_eq!(
-            terminal_exec_command("wezterm", "/bin/jcode", "cmd+;", false),
-            "'wezterm' 'start' '--' '/bin/jcode' '--spawn-hotkey' 'cmd+;'"
+            terminal_exec_command("wezterm", "/bin/next-code", "cmd+;", false),
+            "'wezterm' 'start' '--' '/bin/next-code' '--spawn-hotkey' 'cmd+;'"
         );
         assert_eq!(
-            terminal_exec_command("foot", "/bin/jcode", "cmd+;", false),
-            "'foot' '/bin/jcode' '--spawn-hotkey' 'cmd+;'"
+            terminal_exec_command("foot", "/bin/next-code", "cmd+;", false),
+            "'foot' '/bin/next-code' '--spawn-hotkey' 'cmd+;'"
         );
         // Full paths keep the path but dispatch on the basename.
         assert_eq!(
-            terminal_exec_command("/usr/bin/ghostty", "/bin/jcode", "cmd+;", false),
-            "'/usr/bin/ghostty' '-e' '/bin/jcode' '--spawn-hotkey' 'cmd+;'"
+            terminal_exec_command("/usr/bin/ghostty", "/bin/next-code", "cmd+;", false),
+            "'/usr/bin/ghostty' '-e' '/bin/next-code' '--spawn-hotkey' 'cmd+;'"
         );
     }
 }

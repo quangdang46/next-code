@@ -130,6 +130,7 @@ If a hit is a true false positive, add a narrow pattern here rather than silenci
 ```
 # path prefixes / globs handled separately in the script
 # (also skips docs/REBRAND_STATUS.md)
+# path-allow: scripts/rebrand/**, docs/REBRAND_*, .beads/**, .agents/skills/origin-sync/**
 
 # line allowlist (any match → OK)
 (?i)dual-?read
@@ -159,6 +160,41 @@ fallback\s+to\s+[`']?JCODE_
 falls?\s+back\s+to\s+[`']?JCODE_
 falls?\s+back\s+to\s+[`']?\.?jcode
 PROJECT_DIR_CANDIDATES
+# first-party provider product module (not package rename debt)
+provider::jcode
+\bJcodeProvider\b
+LoginProviderTarget::Jcode
+RuntimeProviderId::Jcode
+\bJCODE_LOGIN_PROVIDER\b
+start_jcode_login|login_jcode_flow
+# dual-read keyring / transport / subscription namespace
+jcode-provider-service
+jcode-secrets
+jcode-subscription
+LEGACY_SERVICE(?:_NAME)?\s*=\s*["']jcode-
+# dual URL scheme + one-release binary alias
+jcode://
+jcode\.exe\b
+# nix / build dual-export of legacy env names
+\bjcode\s*=\s*next-code\b
+\bJCODE_GIT_(?:HASH|DATE)\b
+# parenthetical dual-read docs
+\(legacy\s+[`']?JCODE_
+or\s+legacy\s+[`']?JCODE_
+or\s+legacy\s+[`']?\.?jcode
+# subscription catalog dual-read const *names* (values already NEXT_CODE_* where rewritten)
+\bDEFAULT_JCODE_API_BASE\b
+\bJCODE_API_KEY_ENV\b
+\bJCODE_API_BASE_ENV\b
+\bJCODE_ACCOUNT_ID_ENV\b
+\bJCODE_ACCOUNT_EMAIL_ENV\b
+\bJCODE_TIER_ENV\b
+\bJCODE_ENV_FILE\b
+\bJCODE_CACHE_NAMESPACE\b
+\bJCODE_SUBSCRIPTION_ACTIVE_ENV\b
+\bJCODE_ACCOUNT_URL\b
+\bJCODE_PRICING_URL\b
+REAL_JCODE_TOOL_SMOKE
 ```
 
 ---

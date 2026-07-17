@@ -9,7 +9,7 @@ Environment=JCODE_BEDROCK_ENABLE=1
 Environment=AWS_REGION=us-east-1
 Environment=NEXT_CODE_BEDROCK_MODEL=us.anthropic.claude-opus-4-6-v1
 Environment=JCODE_BEDROCK_MODEL=us.anthropic.claude-opus-4-6-v1
-ExecStartPre=/bin/rm -f /run/user/1000/jcode-daemon.lock /run/user/1000/jcode.sock /run/user/1000/jcode.sock.hash /run/user/1000/jcode-debug.sock
+ExecStartPre=/bin/rm -f /run/user/1000/next-code-daemon.lock /run/user/1000/next-code.sock /run/user/1000/next-code.sock.hash /run/user/1000/next-code-debug.sock /run/user/1000/jcode-daemon.lock /run/user/1000/jcode.sock /run/user/1000/jcode.sock.hash /run/user/1000/jcode-debug.sock
 ExecStart=/home/ec2-user/.local/bin/next-code --provider bedrock serve
 Restart=always
 RestartSec=5

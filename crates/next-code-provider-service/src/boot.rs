@@ -2,17 +2,17 @@
 //!
 //! Phase 6 prep: this module wires the [`CatalogService`] and
 //! [`IntegrationService`] with the real providers, models, and protocol
-//! routes that the rest of jcode already uses. The
-//! `jcode-llm-protocols` crate ships `route()` / `chat_route()` /
+//! routes that the rest of next-code already uses. The
+//! `next-code-llm-protocols` crate ships `route()` / `chat_route()` /
 //! `responses_route()` functions for Anthropic, OpenAI Chat, and OpenAI
 //! Responses — we copy the protocol/endpoint/framing/transport metadata
 //! out of those routes into our catalog and route resolver so the
-//! `RouteResolver` returns routes that match the actual jcode-llm
+//! `RouteResolver` returns routes that match the actual next-code-llm
 //! protocol implementations.
 //!
 //! No runtime calls into the protocol code are made here; the resolver
 //! still produces a `Route` with the metadata, and the existing
-//! `jcode-llm-protocols` consumers continue to drive their own
+//! `next-code-llm-protocols` consumers continue to drive their own
 //! request/response flow. This module just keeps the two layers
 //! consistent.
 
@@ -47,8 +47,8 @@ impl BuiltinProtocol {
 }
 
 /// A canonical built-in provider. The `models` list is a curated set
-/// matching what `jcode-provider-core::models` exposes today, so the
-/// resolver's output is consistent with the rest of jcode.
+/// matching what `next-code-provider-core::models` exposes today, so the
+/// resolver's output is consistent with the rest of next-code.
 #[derive(Debug, Clone)]
 pub struct BuiltinProvider {
     pub id: &'static str,
@@ -302,7 +302,7 @@ pub async fn register_builtins<K: KeyringStore + 'static>(
 }
 
 /// Concrete `PreparedRoute` for a built-in provider, derived from the
-/// matching `jcode-llm-protocols` protocol. Used by the
+/// matching `next-code-llm-protocols` protocol. Used by the
 /// [`crate::service::RouteResolver`] to make sure the protocol/endpoint/
 /// framing/transport metadata matches the real protocol implementation.
 pub fn builtin_route(bp: &BuiltinProvider, model_id: &str) -> Option<PreparedRoute> {
@@ -314,7 +314,7 @@ pub fn builtin_route(bp: &BuiltinProvider, model_id: &str) -> Option<PreparedRou
         BuiltinProtocol::OpenAiChat => next_code_llm_protocols::openai_chat::chat_route(),
         BuiltinProtocol::OpenAiResponses => {
             let mut r = next_code_llm_protocols::openai_responses::responses_route();
-            // The jcode-llm-protocols default points at api.openai.com;
+            // The next-code-llm-protocols default points at api.openai.com;
             // override the base URL for non-OpenAI providers that
             // use this protocol (e.g. gemini).
             if bp.id != "openai" {

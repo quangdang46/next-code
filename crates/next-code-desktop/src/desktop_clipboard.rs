@@ -77,7 +77,7 @@ pub(crate) fn copy_text_to_clipboard(
         Ok(()) => app.set_single_session_status_label(success_notice),
         Err(error) => {
             desktop_log::error(format_args!(
-                "jcode-desktop: failed to update clipboard after {success_notice}: {error:#}"
+                "next-code-desktop: failed to update clipboard after {success_notice}: {error:#}"
             ));
             app.apply_session_event(session_launch::DesktopSessionEvent::Error(format!(
                 "failed to update clipboard after {success_notice}: {error:#}"

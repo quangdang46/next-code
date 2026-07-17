@@ -1,11 +1,11 @@
 //! User-configurable lifecycle hooks.
 //!
-//! Hooks are external commands that jcode runs at well-defined lifecycle
+//! Hooks are external commands that next-code runs at well-defined lifecycle
 //! points so other programs can observe or gate agent behavior without
-//! forking jcode. They are configured in `[hooks]` in config.toml (or
-//! `JCODE_HOOK_*` env vars) and follow the same command-line conventions as
+//! forking next-code. They are configured in `[hooks]` in config.toml (or
+//! `NEXT_CODE_HOOK_*` env vars) and follow the same command-line conventions as
 //! `[terminal] spawn_hook`: the command is parsed shell-style but executed
-//! directly (no shell), with `JCODE_HOOK_*` metadata env vars describing the
+//! directly (no shell), with `NEXT_CODE_HOOK_*` metadata env vars describing the
 //! event.
 //!
 //! Two dispatch styles:
@@ -13,17 +13,18 @@
 //! - **Observers** (`turn_start`, `turn_end`, `session_start`, `session_end`,
 //!   `post_tool`): spawned detached, fire-and-forget. Failures are logged and
 //!   never affect the agent.
-//! - **Gate** (`pre_tool`): jcode waits (with a timeout) for the hook to
+//! - **Gate** (`pre_tool`): next-code waits (with a timeout) for the hook to
 //!   exit. Exit 0 allows the tool call, exit 2 blocks it and the hook's
 //!   stderr is fed back to the model as the tool error. Any other outcome
 //!   (other exit codes, timeout, spawn failure) fails open with a warning.
 //!
-//! Hook processes get `JCODE_HOOKS_DISABLED=1` in their environment so a
-//! hook that itself invokes jcode does not recursively trigger hooks.
+//! Hook processes get `NEXT_CODE_HOOKS_DISABLED=1` in their environment so a
+//! hook that itself invokes next-code does not recursively trigger hooks.
 
+use crate::env::{product_env_os};
 use std::path::PathBuf;
 
-/// Maximum bytes of JSON payload exported via `JCODE_HOOK_PAYLOAD`.
+/// Maximum bytes of JSON payload exported via `NEXT_CODE_HOOK_PAYLOAD`.
 const PAYLOAD_ENV_LIMIT: usize = 16 * 1024;
 /// Maximum bytes of tool input JSON exported to the pre_tool gate.
 const TOOL_INPUT_ENV_LIMIT: usize = 16 * 1024;
@@ -46,7 +47,7 @@ pub struct HookEvent {
     pub session_id: Option<String>,
     pub cwd: Option<String>,
     /// Extra env fields. Keys are suffixes: ("STATUS", "ok") becomes
-    /// `JCODE_HOOK_STATUS=ok` and `"status": "ok"` in the JSON payload.
+    /// `NEXT_CODE_HOOK_STATUS=ok` and `"status": "ok"` in the JSON payload.
     pub fields: Vec<(&'static str, String)>,
 }
 
@@ -98,14 +99,14 @@ pub fn hook_command(event: &str) -> Option<String> {
 
 /// Whether a hook is configured for `event`. Cheap; used by hot paths to
 /// skip payload construction entirely when no hook is set.
-#[deprecated(note = "Use v2 hooks system via jcode-hooks crate")]
+#[deprecated(note = "Use v2 hooks system via next-code-hooks crate")]
 pub fn hook_configured(event: &str) -> bool {
     hook_command(event).is_some()
 }
 
 /// True when running inside a hook process (recursion guard).
 fn hooks_suppressed() -> bool {
-    std::env::var_os("JCODE_HOOKS_DISABLED").is_some()
+    product_env_os("HOOKS_DISABLED").is_some()
 }
 
 fn expand_home(program: &str) -> PathBuf {
@@ -128,7 +129,7 @@ fn truncate_bytes(value: &str, limit: usize) -> &str {
     &value[..end]
 }
 
-/// JSON payload mirroring the env fields, exported as `JCODE_HOOK_PAYLOAD`.
+/// JSON payload mirroring the env fields, exported as `NEXT_CODE_HOOK_PAYLOAD`.
 fn payload_json(event: &HookEvent) -> String {
     let mut map = serde_json::Map::new();
     map.insert(
@@ -155,18 +156,18 @@ fn payload_json(event: &HookEvent) -> String {
 }
 
 fn apply_event_env(cmd: &mut std::process::Command, event: &HookEvent) {
-    cmd.env("JCODE_HOOKS_DISABLED", "1");
-    cmd.env("JCODE_HOOK_EVENT", event.event);
+    cmd.env("NEXT_CODE_HOOKS_DISABLED", "1");
+    cmd.env("NEXT_CODE_HOOK_EVENT", event.event);
     if let Some(session_id) = &event.session_id {
-        cmd.env("JCODE_HOOK_SESSION_ID", session_id);
+        cmd.env("NEXT_CODE_HOOK_SESSION_ID", session_id);
     }
     if let Some(cwd) = &event.cwd {
-        cmd.env("JCODE_HOOK_CWD", cwd);
+        cmd.env("NEXT_CODE_HOOK_CWD", cwd);
     }
     for (key, value) in &event.fields {
-        cmd.env(format!("JCODE_HOOK_{key}"), value);
+        cmd.env(format!("NEXT_CODE_HOOK_{key}"), value);
     }
-    cmd.env("JCODE_HOOK_PAYLOAD", payload_json(event));
+    cmd.env("NEXT_CODE_HOOK_PAYLOAD", payload_json(event));
 }
 
 fn build_hook_process(
@@ -194,7 +195,7 @@ fn build_hook_process(
 ///
 /// Detached and fire-and-forget: failures are logged, never propagated, and
 /// the hook process cannot block the agent.
-#[deprecated(note = "Use v2 hooks system via jcode-hooks crate")]
+#[deprecated(note = "Use v2 hooks system via next-code-hooks crate")]
 pub fn dispatch_observer(event: HookEvent) {
     let Some(command_line) = hook_command(event.event) else {
         return;
@@ -223,13 +224,13 @@ pub fn dispatch_observer(event: HookEvent) {
 
 /// Run the `pre_tool` gate hook for a tool call, if configured.
 ///
-/// The hook receives `JCODE_HOOK_TOOL_NAME` plus the full tool input JSON on
-/// stdin (and truncated in `JCODE_HOOK_TOOL_INPUT`). Contract:
+/// The hook receives `NEXT_CODE_HOOK_TOOL_NAME` plus the full tool input JSON on
+/// stdin (and truncated in `NEXT_CODE_HOOK_TOOL_INPUT`). Contract:
 ///
 /// - exit 0: allow the tool call
 /// - exit 2: block it; stderr becomes the error shown to the model
 /// - anything else (other exits, timeout, spawn failure): fail open
-#[deprecated(note = "Use v2 hooks system via jcode-hooks crate (PreToolUse event)")]
+#[deprecated(note = "Use v2 hooks system via next-code-hooks crate (PreToolUse event)")]
 pub async fn run_pre_tool_gate(
     session_id: &str,
     working_dir: Option<&str>,
@@ -381,16 +382,16 @@ mod tests {
         }
         let reset = EnvReset(vec![
             (
-                "JCODE_HOOK_PRE_TOOL",
-                std::env::var_os("JCODE_HOOK_PRE_TOOL"),
+                "NEXT_CODE_HOOK_PRE_TOOL",
+                std::env::var_os("NEXT_CODE_HOOK_PRE_TOOL"),
             ),
             (
-                "JCODE_HOOK_PRE_TOOL_TIMEOUT_MS",
-                std::env::var_os("JCODE_HOOK_PRE_TOOL_TIMEOUT_MS"),
+                "NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS",
+                std::env::var_os("NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS"),
             ),
         ]);
-        crate::env::set_var("JCODE_HOOK_PRE_TOOL", hook);
-        crate::env::set_var("JCODE_HOOK_PRE_TOOL_TIMEOUT_MS", timeout_ms.to_string());
+        crate::env::set_var("NEXT_CODE_HOOK_PRE_TOOL", hook);
+        crate::env::set_var("NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS", timeout_ms.to_string());
         reset
     }
 
@@ -404,7 +405,7 @@ mod tests {
         let block = write_executable_script(
             temp.path(),
             "block.sh",
-            "#!/bin/sh\ncat > /dev/null\necho \"dangerous tool: $JCODE_HOOK_TOOL_NAME\" >&2\nexit 2\n",
+            "#!/bin/sh\ncat > /dev/null\necho \"dangerous tool: $NEXT_CODE_HOOK_TOOL_NAME\" >&2\nexit 2\n",
         );
         {
             let _env = gate_test_config(&block.to_string_lossy(), 5000);
@@ -489,13 +490,13 @@ mod tests {
             temp.path(),
             "observe.sh",
             &format!(
-                "#!/bin/sh\nprintf '%s|%s|%s|%s' \"$JCODE_HOOK_EVENT\" \"$JCODE_HOOK_SESSION_ID\" \"$JCODE_HOOK_STATUS\" \"$JCODE_HOOKS_DISABLED\" > {}\n",
+                "#!/bin/sh\nprintf '%s|%s|%s|%s' \"$NEXT_CODE_HOOK_EVENT\" \"$NEXT_CODE_HOOK_SESSION_ID\" \"$NEXT_CODE_HOOK_STATUS\" \"$NEXT_CODE_HOOKS_DISABLED\" > {}\n",
                 crate::terminal_launch::sh_escape(&record.to_string_lossy())
             ),
         );
 
-        let prev = std::env::var_os("JCODE_HOOK_TURN_END");
-        crate::env::set_var("JCODE_HOOK_TURN_END", script.to_string_lossy().to_string());
+        let prev = std::env::var_os("NEXT_CODE_HOOK_TURN_END");
+        crate::env::set_var("NEXT_CODE_HOOK_TURN_END", script.to_string_lossy().to_string());
 
         dispatch_observer(
             HookEvent::new("turn_end")
@@ -514,8 +515,8 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
         match prev {
-            Some(value) => crate::env::set_var("JCODE_HOOK_TURN_END", value),
-            None => crate::env::remove_var("JCODE_HOOK_TURN_END"),
+            Some(value) => crate::env::set_var("NEXT_CODE_HOOK_TURN_END", value),
+            None => crate::env::remove_var("NEXT_CODE_HOOK_TURN_END"),
         }
         assert_eq!(recorded, "turn_end|ses_obs|ok|1");
     }

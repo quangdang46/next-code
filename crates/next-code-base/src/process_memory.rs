@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use crate::logging;
 use anyhow::{Result, anyhow};
 #[cfg(feature = "jemalloc")]
@@ -628,12 +629,12 @@ pub fn release_retained_heap_if_excessive(
     released
 }
 
-/// Retention trim threshold in bytes, from `JCODE_HEAP_RETENTION_TRIM_MB`
+/// Retention trim threshold in bytes, from `NEXT_CODE_HEAP_RETENTION_TRIM_MB`
 /// (in MiB), falling back to [`DEFAULT_RETENTION_TRIM_THRESHOLD_BYTES`].
 /// `0` disables retention-triggered trimming (returns `u64::MAX`).
 pub fn retention_trim_threshold_bytes() -> u64 {
     parse_retention_trim_threshold(
-        std::env::var("JCODE_HEAP_RETENTION_TRIM_MB")
+        product_env("HEAP_RETENTION_TRIM_MB")
             .ok()
             .as_deref(),
     )
@@ -728,7 +729,7 @@ fn default_heap_profile_path() -> Result<PathBuf> {
     let base = crate::storage::next_code_dir()?.join("profiles").join("heap");
     let timestamp = chrono::Utc::now().format("%Y%m%dT%H%M%SZ");
     let pid = std::process::id();
-    Ok(base.join(format!("jcode-{}-{}.heap", pid, timestamp)))
+    Ok(base.join(format!("next-code-{}-{}.heap", pid, timestamp)))
 }
 
 #[cfg(feature = "jemalloc")]

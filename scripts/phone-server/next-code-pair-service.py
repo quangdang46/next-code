@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""Token-protected HTTP service that generates jcode pairing codes.
+"""Token-protected HTTP service that generates next-code pairing codes.
 
-GET /pair-code?t=<token> -> {"code": "123456", "host": "100.109.78.41", "port": 7643, "uri": "nextcode://pair?..."}  # dual-accept: iOS also handles jcode://
+GET /pair-code?t=<token> -> {"code": "123456", "host": "100.109.78.41", "port": 7643, "uri": "nextcode://pair?..."}
+# dual-accept: iOS also handles jcode://
 """
 import http.server, json, re, subprocess, os
 from urllib.parse import urlparse, parse_qs
 
-import os
-TOKEN = open(
-    '/etc/next-code-pair-token' if os.path.exists('/etc/next-code-pair-token') else '/etc/jcode-pair-token'
-).read().strip()
-HOST = '100.109.78.41'
+TOKEN_PATH = (
+    "/etc/next-code-pair-token"
+    if os.path.exists("/etc/next-code-pair-token")
+    else "/etc/jcode-pair-token"  # dual-read one release
+)
+TOKEN = open(TOKEN_PATH).read().strip()
+HOST = "100.109.78.41"
 PORT = 7643
+
 
 class H(http.server.BaseHTTPRequestHandler):
     def log_message(self, *a):
@@ -20,35 +24,51 @@ class H(http.server.BaseHTTPRequestHandler):
     def _send(self, code, obj):
         body = json.dumps(obj).encode()
         self.send_response(code)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Cache-Control', 'no-store')
-        self.send_header('Content-Length', str(len(body)))
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def do_GET(self):
         u = urlparse(self.path)
         q = parse_qs(u.query)
-        if q.get('t', [''])[0] != TOKEN:
-            return self._send(403, {'error': 'forbidden'})
-        if u.path != '/pair-code':
-            return self._send(404, {'error': 'not found'})
+        if q.get("t", [""])[0] != TOKEN:
+            return self._send(403, {"error": "forbidden"})
+        if u.path != "/pair-code":
+            return self._send(404, {"error": "not found"})
         env = dict(os.environ)
-        env['PATH'] = '/home/ec2-user/.local/bin:' + env.get('PATH', '')
-        env['JCODE_GATEWAY_HOST'] = HOST
+        env["PATH"] = "/home/ec2-user/.local/bin:" + env.get("PATH", "")
+        env["NEXT_CODE_GATEWAY_HOST"] = HOST
+        env["NEXT_CODE_GATEWAY_HOST"] = HOST  # dual-read one release
         try:
+            # Prefer next-code; fall back to jcode binary alias for one release.
             out = subprocess.run(
-                ['sudo', '-u', 'ec2-user', '-i', 'jcode', 'pair'],
-                capture_output=True, text=True, timeout=30, env=env,
+                [
+                    "sudo",
+                    "-u",
+                    "ec2-user",
+                    "-i",
+                    "bash",
+                    "-lc",
+                    "command -v next-code >/dev/null && exec next-code pair || exec jcode pair",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=env,
             )
-            text = re.sub(r'\x1b\[[0-9;]*m', '', out.stdout + out.stderr)
-            m = re.search(r'Pairing code:\s+(\d{3})\s(\d{3})', text)
+            text = re.sub(r"\x1b\[[0-9;]*m", "", out.stdout + out.stderr)
+            m = re.search(r"Pairing code:\s+(\d{3})\s(\d{3})", text)
             if not m:
-                return self._send(500, {'error': 'no code in output'})
+                return self._send(500, {"error": "no code in output", "detail": text[-500:]})
             code = m.group(1) + m.group(2)
-            uri = f'nextcode://pair?host={HOST}&port={PORT}&code={code}'  # prefer nextcode://; iOS still accepts jcode://
-            return self._send(200, {'code': code, 'host': HOST, 'port': PORT, 'uri': uri, 'expires_in': 300})
+            uri = f"nextcode://pair?host={HOST}&port={PORT}&code={code}"  # prefer nextcode://; iOS still accepts jcode://
+            return self._send(
+                200, {"code": code, "host": HOST, "port": PORT, "uri": uri, "expires_in": 300}
+            )
         except Exception as e:
-            return self._send(500, {'error': str(e)})
+            return self._send(500, {"error": str(e)})
 
-http.server.HTTPServer(('0.0.0.0', 7644), H).serve_forever()
+
+http.server.HTTPServer(("0.0.0.0", 7644), H).serve_forever()

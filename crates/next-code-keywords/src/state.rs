@@ -1,7 +1,7 @@
 //! Mode state — persistent activation state for keyword-triggered workflows.
 //!
 //! State is persisted to `.jcode/state/modes.toml` (project-local) or
-//! `~/.jcode/state/modes.toml` (global fallback).
+//! `~/.next-code/state/modes.toml` (global fallback).
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};

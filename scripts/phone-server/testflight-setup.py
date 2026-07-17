@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Post-upload TestFlight setup for JCodeMobile.
+"""Post-upload TestFlight setup for NextCodeMobile.
 
 Run after a build reaches App Store Connect (PLA must be accepted):
   /tmp/ascvenv/bin/python scripts/phone-server/testflight-setup.py

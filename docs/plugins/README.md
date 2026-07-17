@@ -1,6 +1,6 @@
-# jcode Plugin Author Guide
+# next-code Plugin Author Guide
 
-A comprehensive guide to building plugins for jcode. Plugins extend jcode with custom event handlers, tools, configuration, and integrations -- all running inside a secure QuickJS sandbox.
+A comprehensive guide to building plugins for next-code. Plugins extend next-code with custom event handlers, tools, configuration, and integrations -- all running inside a secure QuickJS sandbox.
 
 ---
 
@@ -25,7 +25,7 @@ A comprehensive guide to building plugins for jcode. Plugins extend jcode with c
 
 ## Overview
 
-jcode plugins are TypeScript or JavaScript modules that run inside a QuickJS sandbox. They can:
+next-code plugins are TypeScript or JavaScript modules that run inside a QuickJS sandbox. They can:
 
 - **Listen to events** -- react to tool calls, session lifecycle, messages, and more.
 - **Register custom tools** -- add new tools the model can invoke.
@@ -52,14 +52,14 @@ Plugins have **no access** to Node.js built-ins, DOM, `require()`, or `process`.
 
 ### 1. Create a plugin file
 
-Create `~/.jcode/plugins/hello-plugin.ts`:
+Create `~/.next-code/plugins/hello-plugin.ts`:
 
 ```typescript
 // Declare the plugin identity
 const manifest = {
   name: 'hello-plugin',
   version: '1.0.0',
-  description: 'A minimal jcode plugin',
+  description: 'A minimal next-code plugin',
   capabilities: {
     events: ['TurnStart'],
   },
@@ -94,18 +94,18 @@ export default {
 };
 ```
 
-### 2. Start jcode
+### 2. Start next-code
 
 ```bash
-jcode
+next-code
 ```
 
-jcode automatically discovers plugins in `~/.jcode/plugins/` on startup.
+next-code automatically discovers plugins in `~/.next-code/plugins/` on startup.
 
 ### 3. Verify it loaded
 
 ```bash
-jcode plugin list
+next-code plugin list
 ```
 
 You should see `file:hello-plugin.ts` in the output.
@@ -120,7 +120,7 @@ Plugins go through these stages:
 Discovery  -->  Preflight  -->  Load  -->  Activate  -->  Runtime  -->  Unload
 ```
 
-1. **Discovery** -- jcode scans plugin directories, npm cache, and config sources.
+1. **Discovery** -- next-code scans plugin directories, npm cache, and config sources.
 2. **Preflight** -- Static analysis checks for dangerous patterns, undeclared capabilities, and suspicious constructs. Warnings are logged; blocks prevent loading.
 3. **Load** -- TypeScript is transpiled to JavaScript via SWC, then evaluated in a QuickJS sandbox.
 4. **Activate** -- Event handlers and tools registered during module evaluation become active.
@@ -129,7 +129,7 @@ Discovery  -->  Preflight  -->  Load  -->  Activate  -->  Runtime  -->  Unload
 
 ### Preflight Analysis
 
-Before a plugin loads, jcode runs static analysis to detect:
+Before a plugin loads, next-code runs static analysis to detect:
 
 | Pattern | Severity | Effect |
 |---------|----------|--------|
@@ -145,18 +145,18 @@ Before a plugin loads, jcode runs static analysis to detect:
 
 ## Manifest Format
 
-Plugins declare their identity and capabilities via a manifest. For npm packages, the manifest lives in `package.json` under the `"jcode"` (or `"pi"`) key. For local files, the manifest is the exported default object.
+Plugins declare their identity and capabilities via a manifest. For npm packages, the manifest lives in `package.json` under the `"next-code"` (or `"pi"`) key. For local files, the manifest is the exported default object.
 
 ### package.json (npm plugins)
 
 ```json
 {
-  "name": "jcode-plugin-analytics",
+  "name": "next-code-plugin-analytics",
   "version": "1.0.0",
   "main": "dist/server.js",
-  "jcode": {
+  "next-code": {
     "name": "analytics",
-    "package_name": "jcode-plugin-analytics",
+    "package_name": "next-code-plugin-analytics",
     "version": "1.0.0",
     "description": "Track tool usage analytics",
     "author": "Your Name",
@@ -167,13 +167,13 @@ Plugins declare their identity and capabilities via a manifest. For npm packages
       "tui": "dist/tui.js"
     },
     "capabilities": {
-      "fs_write": ["$HOME/.jcode/data/analytics"],
+      "fs_write": ["$HOME/.next-code/data/analytics"],
       "events": ["PreToolUse", "PostToolUse", "TurnStart", "TurnEnd"],
       "register_tools": true,
       "read_config": true
     },
     "engines": {
-      "jcode": ">=0.9.0"
+      "next-code": ">=0.9.0"
     },
     "tags": ["analytics", "telemetry"]
   }
@@ -195,7 +195,7 @@ Plugins declare their identity and capabilities via a manifest. For npm packages
 | `capabilities` | `PluginCapabilities` | No | Required capabilities |
 | `features` | `Record<string, PluginFeature>` | No | Toggleable features |
 | `settings` | `Record<string, SettingSchema>` | No | User-configurable settings |
-| `engines` | `{ jcode?: string }` | No | Required jcode version range |
+| `engines` | `{ next-code?: string }` | No | Required next-code version range |
 | `icon` | `string` | No | Icon path or URL |
 | `homepage` | `string` | No | Project homepage URL |
 | `repository` | `string` | No | Source repository URL |
@@ -293,7 +293,7 @@ Register a custom tool that the model can invoke. See [Tool Registration](#tool-
 pi.getConfig(key: string): string
 ```
 
-Read a plugin configuration value from the global jcode config. Returns an empty string if not set.
+Read a plugin configuration value from the global next-code config. Returns an empty string if not set.
 
 **Parameters:**
 - `key` -- Configuration key (e.g., `"my-plugin.apiKey"`)
@@ -316,7 +316,7 @@ pi.logger: {
 }
 ```
 
-Structured logger that writes to jcode's tracing system. Messages appear in debug logs and can be filtered by level.
+Structured logger that writes to next-code's tracing system. Messages appear in debug logs and can be filtered by level.
 
 **Example:**
 
@@ -383,7 +383,7 @@ const requestId = pi.uuid();
 pi.cwd: string
 ```
 
-The current working directory of the jcode process.
+The current working directory of the next-code process.
 
 **Example:**
 
@@ -1032,7 +1032,7 @@ pi.registerTool({ name: 'report', ... });
 
 When the model invokes a plugin tool:
 
-1. jcode looks up the tool by name in the plugin registry.
+1. next-code looks up the tool by name in the plugin registry.
 2. The tool handler runs inside the QuickJS sandbox.
 3. The return value is serialized and returned to the model.
 4. If the handler throws, the error is reported to the model.
@@ -1047,15 +1047,15 @@ Plugins declare required capabilities in their manifest. The runtime enforces th
 
 | Capability | Type | Description |
 |------------|------|-------------|
-| `fs_read` | `string[]` | Allowed read paths (e.g., `["$HOME/.jcode/data"]`) |
+| `fs_read` | `string[]` | Allowed read paths (e.g., `["$HOME/.next-code/data"]`) |
 | `fs_write` | `string[]` | Allowed write paths |
 | `network` | `string[]` | Allowed hosts (e.g., `["api.github.com"]`) |
 | `shell` | `boolean` | Allow shell command execution |
 | `register_tools` | `boolean` | Allow registering custom tools |
 | `register_commands` | `boolean` | Allow registering CLI commands |
 | `register_providers` | `boolean` | Allow registering LLM providers |
-| `read_config` | `boolean` | Allow reading jcode config |
-| `write_config` | `boolean` | Allow writing jcode config |
+| `read_config` | `boolean` | Allow reading next-code config |
+| `write_config` | `boolean` | Allow writing next-code config |
 | `env_vars` | `string[]` | Allowed environment variables |
 | `events` | `string[]` | Events the plugin can subscribe to |
 | `llm_access` | `boolean` | Allow direct LLM access |
@@ -1092,10 +1092,10 @@ const manifest = {
   version: '1.0.0',
   capabilities: {
     // Read access to specific directories
-    fs_read: ['$HOME/.jcode/data', '$HOME/.config/my-plugin'],
+    fs_read: ['$HOME/.next-code/data', '$HOME/.config/my-plugin'],
 
     // Write access to a specific directory
-    fs_write: ['$HOME/.jcode/data/my-plugin'],
+    fs_write: ['$HOME/.next-code/data/my-plugin'],
 
     // Network access to specific hosts
     network: ['api.github.com', 'api.openai.com'],
@@ -1121,7 +1121,7 @@ const manifest = {
 
 ```typescript
 capabilities: {
-  fs_read: ['$HOME/.jcode/data'],  // Matches $HOME/.jcode/data/anything
+  fs_read: ['$HOME/.next-code/data'],  // Matches $HOME/.next-code/data/anything
 }
 ```
 
@@ -1147,7 +1147,7 @@ capabilities: {
 
 ### config.toml `[plugin]` Section
 
-Plugin configuration lives in jcode's `config.toml`:
+Plugin configuration lives in next-code's `config.toml`:
 
 ```toml
 [plugin]
@@ -1172,7 +1172,7 @@ force_deny = false
 # Plugin sources
 [[plugin.sources]]
 type = "npm"
-package = "jcode-plugin-analytics"
+package = "next-code-plugin-analytics"
 version = "1.0.0"
 
 [[plugin.sources]]
@@ -1260,21 +1260,21 @@ Plugins can declare user-configurable settings in their manifest:
 
 ## Environment Variables
 
-jcode checks these environment variables for plugin system control:
+next-code checks these environment variables for plugin system control:
 
 | Variable | Effect |
 |----------|--------|
-| `JCODE_DISABLE_PLUGINS=1` | Disables all plugins (sets mode to `"none"`) |
-| `JCODE_SKIP_PLUGINS=1` | Skips all plugin hooks (plugins load but don't fire) |
-| `JCODE_PLUGIN_MODE=<mode>` | Override plugin access mode (`"all"`, `"trusted"`, `"none"`, `"interactive"`) |
-| `JCODE_TEAM_WORKER=1` | Force-deny all plugin actions (for automated/team environments) |
+| `NEXT_CODE_DISABLE_PLUGINS=1` | Disables all plugins (sets mode to `"none"`) |
+| `NEXT_CODE_SKIP_PLUGINS=1` | Skips all plugin hooks (plugins load but don't fire) |
+| `NEXT_CODE_PLUGIN_MODE=<mode>` | Override plugin access mode (`"all"`, `"trusted"`, `"none"`, `"interactive"`) |
+| `NEXT_CODE_TEAM_WORKER=1` | Force-deny all plugin actions (for automated/team environments) |
 
 These are **kill switches** -- they take effect immediately and override config.toml settings.
 
 ### Checking Kill Switches
 
 ```bash
-jcode plugin doctor
+next-code plugin doctor
 ```
 
 This command reports active kill switches and can clear them with `--fix`.
@@ -1283,91 +1283,91 @@ This command reports active kill switches and can clear them with `--fix`.
 
 ## CLI Commands
 
-### `jcode plugin list`
+### `next-code plugin list`
 
 List all installed plugins and their states.
 
 ```bash
-jcode plugin list
+next-code plugin list
 ```
 
 Output:
 ```
 Installed plugins:
-  npm:jcode-plugin-analytics   active
+  npm:next-code-plugin-analytics   active
   file:hello-plugin.ts         active
 ```
 
-### `jcode plugin install <source>`
+### `next-code plugin install <source>`
 
 Install a plugin from npm or local path.
 
 ```bash
 # Install from npm
-jcode plugin install jcode-plugin-analytics
+next-code plugin install next-code-plugin-analytics
 
 # Install from local file
-jcode plugin install /path/to/my-plugin.ts
+next-code plugin install /path/to/my-plugin.ts
 
 # Install from local directory
-jcode plugin install /path/to/plugins/
+next-code plugin install /path/to/plugins/
 ```
 
-### `jcode plugin uninstall <id>`
+### `next-code plugin uninstall <id>`
 
 Remove a plugin by its ID.
 
 ```bash
-jcode plugin uninstall npm:jcode-plugin-analytics
-jcode plugin uninstall file:hello-plugin.ts
+next-code plugin uninstall npm:next-code-plugin-analytics
+next-code plugin uninstall file:hello-plugin.ts
 ```
 
-### `jcode plugin info <id>`
+### `next-code plugin info <id>`
 
 Show detailed information about a plugin.
 
 ```bash
-jcode plugin info npm:jcode-plugin-analytics
+next-code plugin info npm:next-code-plugin-analytics
 ```
 
-### `jcode plugin enable <id>`
+### `next-code plugin enable <id>`
 
 Enable a previously disabled plugin.
 
 ```bash
-jcode plugin enable npm:jcode-plugin-analytics
+next-code plugin enable npm:next-code-plugin-analytics
 ```
 
-### `jcode plugin disable <id>`
+### `next-code plugin disable <id>`
 
 Disable an active plugin (keeps it installed but inactive).
 
 ```bash
-jcode plugin disable npm:jcode-plugin-analytics
+next-code plugin disable npm:next-code-plugin-analytics
 ```
 
-### `jcode plugin audit`
+### `next-code plugin audit`
 
 Show the plugin audit trail (event dispatch history).
 
 ```bash
 # Show last 20 entries
-jcode plugin audit
+next-code plugin audit
 
 # Show last 50 entries as JSON
-jcode plugin audit --recent 50 --json
+next-code plugin audit --recent 50 --json
 ```
 
-### `jcode plugin doctor`
+### `next-code plugin doctor`
 
 Diagnose plugin system issues. Can automatically fix problems with `--fix`.
 
 ```bash
 # Check for issues
-jcode plugin doctor
+next-code plugin doctor
 
 # Check and fix
-jcode plugin doctor --fix
+next-code plugin doctor --fix
 ```
 
 Output:
@@ -1386,23 +1386,23 @@ Plugin system status:
 
 ### Local Testing
 
-1. Place your plugin in `~/.jcode/plugins/`:
+1. Place your plugin in `~/.next-code/plugins/`:
 
 ```bash
-cp my-plugin.ts ~/.jcode/plugins/
+cp my-plugin.ts ~/.next-code/plugins/
 ```
 
-2. Start jcode and verify it loads:
+2. Start next-code and verify it loads:
 
 ```bash
-jcode plugin list
-jcode plugin info file:my-plugin.ts
+next-code plugin list
+next-code plugin info file:my-plugin.ts
 ```
 
 3. Check the audit trail to see events:
 
 ```bash
-jcode plugin audit
+next-code plugin audit
 ```
 
 ### Debug Logging
@@ -1410,7 +1410,7 @@ jcode plugin audit
 Enable debug logging to see plugin activity:
 
 ```bash
-RUST_LOG=jcode_plugin_runtime=debug jcode
+RUST_LOG=next_code_plugin_runtime=debug next-code
 ```
 
 This shows:
@@ -1440,7 +1440,7 @@ Test your plugin's preflight analysis locally:
 | Issue | Cause | Fix |
 |-------|-------|-----|
 | Plugin not loading | Preflight block | Remove suspicious patterns |
-| Plugin not loading | Invalid manifest | Check `package.json` `jcode` field |
+| Plugin not loading | Invalid manifest | Check `package.json` `next-code` field |
 | Events not firing | Wrong event names | Check event name casing |
 | Tools not registered | Missing `register_tools` capability | Add to manifest capabilities |
 | Config returns empty | Wrong key format | Use `plugin-name.key` format |
@@ -1466,7 +1466,7 @@ All host interaction must go through `pi.*` methods.
 ### Package Structure
 
 ```
-jcode-plugin-my-feature/
+next-code-plugin-my-feature/
   package.json
   tsconfig.json
   src/
@@ -1483,9 +1483,9 @@ jcode-plugin-my-feature/
 
 ```json
 {
-  "name": "jcode-plugin-my-feature",
+  "name": "next-code-plugin-my-feature",
   "version": "1.0.0",
-  "description": "My awesome jcode plugin",
+  "description": "My awesome next-code plugin",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
@@ -1494,11 +1494,11 @@ jcode-plugin-my-feature/
   "devDependencies": {
     "typescript": "^5.0.0"
   },
-  "jcode": {
+  "next-code": {
     "name": "my-feature",
-    "package_name": "jcode-plugin-my-feature",
+    "package_name": "next-code-plugin-my-feature",
     "version": "1.0.0",
-    "description": "My awesome jcode plugin",
+    "description": "My awesome next-code plugin",
     "author": "Your Name",
     "license": "MIT",
     "kind": "server",
@@ -1510,7 +1510,7 @@ jcode-plugin-my-feature/
       "register_tools": true
     },
     "engines": {
-      "jcode": ">=0.9.0"
+      "next-code": ">=0.9.0"
     }
   }
 }
@@ -1542,8 +1542,8 @@ jcode-plugin-my-feature/
 npm run build
 
 # 2. Test locally
-cp -r . ~/.jcode/cache/packages/jcode-plugin-my-feature/
-jcode plugin install jcode-plugin-my-feature
+cp -r . ~/.next-code/cache/packages/next-code-plugin-my-feature/
+next-code plugin install next-code-plugin-my-feature
 
 # 3. Publish to npm
 npm publish
@@ -1551,22 +1551,22 @@ npm publish
 
 ### Naming Convention
 
-Use the prefix `jcode-plugin-` for discoverability:
+Use the prefix `next-code-plugin-` for discoverability:
 
 ```
-jcode-plugin-analytics
-jcode-plugin-github-integration
-jcode-plugin-custom-tools
+next-code-plugin-analytics
+next-code-plugin-github-integration
+next-code-plugin-custom-tools
 ```
 
 ### Versioning
 
-Follow semver. The `engines.jcode` field specifies the minimum jcode version:
+Follow semver. The `engines.next-code` field specifies the minimum next-code version:
 
 ```json
 {
   "engines": {
-    "jcode": ">=0.9.0"
+    "next-code": ">=0.9.0"
   }
 }
 ```
@@ -1597,7 +1597,7 @@ const data = JSON.parse(pi.kv.get('my-plugin.data') || '{}');
 
 ### Q: How do I debug my plugin?
 
-**A:** Use `pi.logger.debug()` for detailed logging, and run jcode with `RUST_LOG=jcode_plugin_runtime=debug` to see all plugin activity. Check `jcode plugin audit` for event dispatch history.
+**A:** Use `pi.logger.debug()` for detailed logging, and run next-code with `RUST_LOG=next_code_plugin_runtime=debug` to see all plugin activity. Check `next-code plugin audit` for event dispatch history.
 
 ### Q: Can multiple plugins handle the same event?
 
@@ -1605,11 +1605,11 @@ const data = JSON.parse(pi.kv.get('my-plugin.data') || '{}');
 
 ### Q: What happens if my plugin throws an error?
 
-**A:** The error is caught by the sandbox, logged as a warning, and the event dispatch continues with other handlers. The plugin does not crash jcode.
+**A:** The error is caught by the sandbox, logged as a warning, and the event dispatch continues with other handlers. The plugin does not crash next-code.
 
 ### Q: How do I test my plugin without publishing?
 
-**A:** Place the `.ts` or `.js` file in `~/.jcode/plugins/` or configure a local path in `config.toml`:
+**A:** Place the `.ts` or `.js` file in `~/.next-code/plugins/` or configure a local path in `config.toml`:
 
 ```toml
 [[plugin.sources]]
@@ -1630,7 +1630,7 @@ path = "/path/to/my-plugin.ts"
 **A:** Use the CLI:
 
 ```bash
-jcode plugin disable npm:my-plugin
+next-code plugin disable npm:my-plugin
 ```
 
 Or add to `config.toml`:
@@ -1664,5 +1664,5 @@ timeout_ms = 10000
 
 - [API Reference](./api-reference.md) -- Complete TypeScript type definitions
 - [Example Plugin](../../examples/plugins/example-plugin.ts) -- Full working example
-- [Security Model](../SAFETY_SYSTEM.md) -- jcode security architecture
+- [Security Model](../SAFETY_SYSTEM.md) -- next-code security architecture
 - [Config Reference](../CONFIG_REFERENCE.md) -- Full config.toml documentation

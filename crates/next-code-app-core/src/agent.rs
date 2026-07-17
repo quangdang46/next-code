@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+use crate::env::{product_env};
 pub mod best_of_n_orchestrator;
 mod compaction;
 mod environment;
@@ -59,10 +60,10 @@ pub use next_code_agent_runtime::{
     SoftInterruptQueue, SoftInterruptSource, StreamError,
 };
 
-const JCODE_NATIVE_TOOLS: &[&str] = &["selfdev", "communicate"];
+const NEXT_CODE_NATIVE_TOOLS: &[&str] = &["selfdev", "communicate"];
 static RECOVERED_TEXT_WRAPPED_TOOL_CALLS: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
-static JCODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> = LazyLock::new(|| {
+static NEXT_CODE_REPO_SOURCE_STATE: LazyLock<(Option<String>, Option<bool>)> = LazyLock::new(|| {
     crate::build::get_repo_dir()
         .map(|repo_dir| {
             (
@@ -322,7 +323,7 @@ impl Agent {
     }
 
     fn should_track_client_cache(&self) -> bool {
-        match std::env::var("JCODE_TRACK_CLIENT_CACHE") {
+        match product_env("TRACK_CLIENT_CACHE") {
             Ok(value) => {
                 let value = value.trim();
                 !value.is_empty() && value != "0" && !value.eq_ignore_ascii_case("false")
@@ -536,7 +537,7 @@ impl Agent {
         allowed_tools: Option<HashSet<String>>,
     ) -> Self {
         // Same as new() — apply config default_model+provider before build_base.
-        // Server restarts (jcode restart) create agents through this path too.
+        // Server restarts (next-code restart) create agents through this path too.
         // If the session already has a model, the block below re-applies it with
         // the session's provider_key (takes precedence after this).
         apply_config_default_model(provider.as_ref());

@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use crate::audit::AuditTrail;
 use crate::dispatcher::RcuDispatcher;
 use crate::loader::PluginLoader;
@@ -21,13 +22,13 @@ pub fn is_force_deny() -> bool {
 
 pub fn check_kill_switches() {
     use std::sync::atomic::Ordering;
-    if std::env::var("JCODE_DISABLE_PLUGINS").is_ok() {
+    if product_env("DISABLE_PLUGINS").is_ok() {
         DISABLE_ALL_PLUGINS.store(true, Ordering::SeqCst);
     }
-    if std::env::var("JCODE_SKIP_PLUGINS").is_ok() {
+    if product_env("SKIP_PLUGINS").is_ok() {
         SKIP_HOOKS.store(true, Ordering::SeqCst);
     }
-    if std::env::var("JCODE_TEAM_WORKER").is_ok() {
+    if product_env("TEAM_WORKER").is_ok() {
         FORCE_DENY.store(true, Ordering::SeqCst);
     }
 }
@@ -46,7 +47,7 @@ impl PluginSystem {
         check_kill_switches();
 
         if DISABLE_ALL_PLUGINS.load(std::sync::atomic::Ordering::SeqCst) {
-            tracing::info!("Plugins disabled via JCODE_DISABLE_PLUGINS");
+            tracing::info!("Plugins disabled via NEXT_CODE_DISABLE_PLUGINS");
         }
 
         let rt_config = RuntimeConfig::default();
@@ -96,11 +97,11 @@ impl PluginSystem {
         use std::sync::atomic::Ordering;
 
         if DISABLE_ALL_PLUGINS.load(Ordering::SeqCst) {
-            return Err("Plugins are disabled via JCODE_DISABLE_PLUGINS".to_string());
+            return Err("Plugins are disabled via NEXT_CODE_DISABLE_PLUGINS".to_string());
         }
 
         if FORCE_DENY.load(Ordering::SeqCst) {
-            return Err("Plugin tool execution denied via JCODE_TEAM_WORKER".to_string());
+            return Err("Plugin tool execution denied via NEXT_CODE_TEAM_WORKER".to_string());
         }
 
         if SKIP_HOOKS.load(Ordering::SeqCst) {

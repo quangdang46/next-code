@@ -229,9 +229,9 @@ impl Tool for NotepadTool {
             }
             Ok(Err(e)) => Ok(ToolOutput::new(format!(
                 "Notepad operation failed: {e}. The file may be locked by \
-                 another jcode instance; check for a stale \
-                 `<working_dir>/.jcode/notepad/.lock` file and remove it \
-                 if no other jcode is running."
+                 another next-code instance; check for a stale \
+                 `<working_dir>/.next-code/notepad/.lock` file and remove it \
+                 if no other next-code is running."
             ))),
             Err(join_err) => Ok(ToolOutput::new(format!(
                 "Notepad task panicked: {join_err}"
@@ -290,9 +290,9 @@ impl Tool for NotepadPruneTool {
             }
             Err(e) => Ok(ToolOutput::new(format!(
                 "Notepad prune failed: {e}. The file may be locked by \
-                 another jcode instance; check for a stale \
-                 `<working_dir>/.jcode/notepad/.lock` file and remove it \
-                 if no other jcode is running."
+                 another next-code instance; check for a stale \
+                 `<working_dir>/.next-code/notepad/.lock` file and remove it \
+                 if no other next-code is running."
             ))),
         }
     }

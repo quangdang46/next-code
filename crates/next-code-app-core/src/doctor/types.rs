@@ -1,4 +1,4 @@
-//! Core types for `jcode doctor`: severity, categories, findings, report, options.
+//! Core types for `next-code doctor`: severity, categories, findings, report, options.
 
 use serde::Serialize;
 

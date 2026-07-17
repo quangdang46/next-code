@@ -496,7 +496,7 @@ fn test_recover_session_without_tools_preserves_debug_and_canary_flags() {
     app.session.is_debug = true;
     app.session.is_canary = true;
     app.session.testing_build = Some("self-dev".to_string());
-    app.session.working_dir = Some("/tmp/jcode-test".to_string());
+    app.session.working_dir = Some("/tmp/next-code-test".to_string());
     let old_session_id = app.session.id.clone();
 
     app.recover_session_without_tools();
@@ -509,7 +509,7 @@ fn test_recover_session_without_tools_preserves_debug_and_canary_flags() {
     assert!(app.session.is_debug);
     assert!(app.session.is_canary);
     assert_eq!(app.session.testing_build.as_deref(), Some("self-dev"));
-    assert_eq!(app.session.working_dir.as_deref(), Some("/tmp/jcode-test"));
+    assert_eq!(app.session.working_dir.as_deref(), Some("/tmp/next-code-test"));
 
     let _ = std::fs::remove_file(crate::session::session_path(&app.session.id).unwrap());
 }
@@ -816,12 +816,12 @@ fn test_startup_update_error_replaces_checking_card() {
 fn test_selfdev_command_spawns_session_in_test_mode() {
     let _guard = crate::storage::lock_test_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    let prev_test = std::env::var_os("JCODE_TEST_SESSION");
-    crate::env::set_var("JCODE_HOME", temp_home.path());
-    crate::env::set_var("JCODE_TEST_SESSION", "1");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    let prev_test = std::env::var_os("NEXT_CODE_TEST_SESSION");
+    crate::env::set_var("NEXT_CODE_HOME", temp_home.path());
+    crate::env::set_var("NEXT_CODE_TEST_SESSION", "1");
 
-    let repo = create_jcode_repo_fixture();
+    let repo = create_next_code_repo_fixture();
     let mut app = create_test_app();
     app.session.working_dir = Some(repo.path().display().to_string());
 
@@ -847,14 +847,14 @@ fn test_selfdev_command_spawns_session_in_test_mode() {
     );
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
     if let Some(prev_test) = prev_test {
-        crate::env::set_var("JCODE_TEST_SESSION", prev_test);
+        crate::env::set_var("NEXT_CODE_TEST_SESSION", prev_test);
     } else {
-        crate::env::remove_var("JCODE_TEST_SESSION");
+        crate::env::remove_var("NEXT_CODE_TEST_SESSION");
     }
 }
 
@@ -907,7 +907,7 @@ fn test_new_for_remote_restored_queued_messages_stay_queued_until_remote_idle() 
 
 #[test]
 fn test_save_and_restore_startup_submission_preserves_pending_images() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let session_id = "session_startup_prompt";
         App::save_startup_submission_for_session(
             session_id,

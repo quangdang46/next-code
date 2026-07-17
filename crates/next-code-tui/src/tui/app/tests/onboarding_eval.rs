@@ -22,7 +22,7 @@
 //    simulation-checked.)
 //
 // Run the human-readable scorecard with:
-//   cargo test -p jcode-tui onboarding_eval_scorecard -- --nocapture
+//   cargo test -p next-code-tui onboarding_eval_scorecard -- --nocapture
 //
 // NOTE: `include!`d into `crate::tui::app::tests`, which already imports the
 // onboarding types and the `render_onboarding_text` / `create_test_app` test
@@ -449,7 +449,7 @@ fn terminology_is_consistent(screens: &[(&'static str, String)]) -> bool {
 }
 
 /// Compute the four Tier 4 signals by reading the real screens and driving the
-/// real app. `with_temp_jcode_home` must already be active.
+/// real app. `with_temp_next_code_home` must already be active.
 fn tier4_metrics() -> Tier4Metrics {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::ImportReview;
@@ -1205,7 +1205,7 @@ fn looks_like_instruction(line: &str) -> bool {
         || lower.starts_with("select ")
         || lower.starts_with("pick ")
         || lower.starts_with("run ")
-        // A "<command>" CTA: jcode phrases these as both "run /login" and
+        // A "<command>" CTA: next-code phrases these as both "run /login" and
         // "type /login", so recognize both spellings of the same directive.
         || lower.contains("run /")
         || lower.contains("type /")
@@ -1841,7 +1841,7 @@ fn action_row_follows_prose() -> bool {
     let lines: Vec<&str> = text.lines().collect();
     let prose_idx = lines.iter().position(|l| {
         let lc = l.to_ascii_lowercase();
-        lc.contains("welcome to jcode") || lc.contains("log in")
+        lc.contains("welcome to next-code") || lc.contains("log in")
     });
     let action_idx = lines.iter().position(|l| {
         let lc = l.to_ascii_lowercase();
@@ -1894,7 +1894,7 @@ fn tier10_score_w(m: &Tier10Metrics, w: &Tier10Weights) -> f64 {
 
 #[test]
 fn onboarding_eval_scorecard() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let paths = entry_paths();
         let screens = tier3_screens();
 
@@ -2183,7 +2183,7 @@ fn onboarding_eval_scorecard() {
 /// this fails and forces the table to be updated.
 #[test]
 fn onboarding_eval_fidelity_real_transitions() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // Edge: an authenticated start lands on the action-only choice.
         let mut app = create_test_app();
         app.onboarding_flow = None;
@@ -2238,7 +2238,7 @@ fn truncate(s: &str, n: usize) -> String {
 /// transitions diverge from the modeled edges, this fails.
 #[test]
 fn onboarding_eval_graph_fidelity() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // Real transition: authenticated begin -> StartChoice.
         let mut app = create_test_app();
         app.onboarding_flow = None;
@@ -3010,7 +3010,7 @@ fn render_login_picker_overlay_text() -> String {
 
 #[test]
 fn signal_coverage_scorecard() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let registry = signal_registry();
         let scored: Vec<&SignalSpec> = registry.iter().filter(|s| s.status == SignalStatus::Scored).collect();
         let deferred: Vec<&SignalSpec> = registry.iter().filter(|s| s.status == SignalStatus::Deferred).collect();

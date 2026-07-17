@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::DisplayMessageRoleExt;
 use super::keybind::{
     CenteredToggleKeys, ModelSwitchKeys, OptionalBinding, ScrollKeys, WorkspaceNavigationKeys,
@@ -41,7 +42,7 @@ use tokio::sync::RwLock;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AppRuntimeMode {
-    /// Normal product TUI. The client renders state owned by the jcode server.
+    /// Normal product TUI. The client renders state owned by the next-code server.
     RemoteClient,
     /// Deterministic playback of recorded session/server events. Never calls live providers.
     Replay,
@@ -113,7 +114,7 @@ pub(crate) fn extract_input_shell_command(input: &str) -> Option<&str> {
 pub(crate) const COMMAND_SUGGESTION_VISIBLE_LIMIT: usize = 8;
 
 fn active_runtime_provider_key() -> Option<String> {
-    std::env::var("JCODE_RUNTIME_PROVIDER")
+    product_env("RUNTIME_PROVIDER")
         .ok()
         .map(|value| value.trim().to_ascii_lowercase())
         .filter(|value| !value.is_empty())
@@ -936,7 +937,7 @@ pub struct App {
     /// the recovery screen (opens the picker) or onboarding advances.
     onboarding_import_error: Option<String>,
     /// The provider id we were importing/validating when onboarding failed, used
-    /// to target the agent repair brief (`jcode auth-test --provider X`). `None`
+    /// to target the agent repair brief (`next-code auth-test --provider X`). `None`
     /// when unknown.
     onboarding_import_failed_provider: Option<String>,
     /// Pending first-run model-validation request for the new-session screen.
@@ -1477,7 +1478,7 @@ pub struct App {
     /// keypress. Carries the original message payload and the recipient route.
     /// Local sessions resend via `pending_turn` instead.
     pending_fallback_resend: Option<FallbackResendPayload>,
-    /// Interactive "spawn a jcode agent to merge the diverged update" offer shown
+    /// Interactive "spawn a next-code agent to merge the diverged update" offer shown
     /// when the update check finds that the working tree has diverged from HEAD.
     /// Accepted with the same key as the fallback offer.
     pending_merge_offer: Option<PendingMergeOffer>,

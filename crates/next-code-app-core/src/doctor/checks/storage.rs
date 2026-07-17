@@ -1,4 +1,4 @@
-//! Storage checks: `JCODE_HOME` existence/writability (+ `--fix` mkdir) and
+//! Storage checks: `NEXT_CODE_HOME` existence/writability (+ `--fix` mkdir) and
 //! standard subdirectory presence.
 
 use super::super::fix::try_autofix;
@@ -10,9 +10,9 @@ pub fn check_storage(opts: &DoctorOptions, out: &mut Vec<Finding>) {
         Ok(h) => h,
         Err(e) => {
             out.push(
-                Finding::fail(CheckCategory::Storage, "cannot resolve JCODE_HOME")
+                Finding::fail(CheckCategory::Storage, "cannot resolve NEXT_CODE_HOME")
                     .with_detail(e.to_string())
-                    .with_remediation("check $HOME / $JCODE_HOME"),
+                    .with_remediation("check $HOME / $NEXT_CODE_HOME"),
             );
             return;
         }
@@ -21,7 +21,7 @@ pub fn check_storage(opts: &DoctorOptions, out: &mut Vec<Finding>) {
     if !home.exists() {
         let f = Finding::warn(
             CheckCategory::Storage,
-            format!("JCODE_HOME does not exist: {}", home.display()),
+            format!("NEXT_CODE_HOME does not exist: {}", home.display()),
         )
         .with_remediation(format!("mkdir -p {}", home.display()));
         let home2 = home.clone();
@@ -33,12 +33,12 @@ pub fn check_storage(opts: &DoctorOptions, out: &mut Vec<Finding>) {
         match probe_writable(&home) {
             Ok(()) => out.push(Finding::ok(
                 CheckCategory::Storage,
-                format!("JCODE_HOME writable: {}", home.display()),
+                format!("NEXT_CODE_HOME writable: {}", home.display()),
             )),
             Err(e) => out.push(
                 Finding::fail(
                     CheckCategory::Storage,
-                    format!("JCODE_HOME not writable: {}", home.display()),
+                    format!("NEXT_CODE_HOME not writable: {}", home.display()),
                 )
                 .with_detail(e.to_string())
                 .with_remediation(format!("chmod u+w {}", home.display())),

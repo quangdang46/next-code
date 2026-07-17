@@ -37,7 +37,7 @@ pub enum AuthMethod {
         authorization_url: String,
     },
     /// Static API key, read from an env var by default but overridable via
-    /// the `jcode provider connect <p> --api-key=...` CLI.
+    /// the `next-code provider connect <p> --api-key=...` CLI.
     ApiKey { env_var: String },
     /// Bearer token in the `Authorization` header, sourced from the named
     /// env var.

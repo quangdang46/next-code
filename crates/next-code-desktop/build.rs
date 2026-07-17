@@ -24,9 +24,9 @@ fn main() {
         format!("v{pkg_version}-dev ({git_hash})")
     };
 
-    println!("cargo:rustc-env=JCODE_DESKTOP_VERSION={version}");
-    println!("cargo:rustc-env=JCODE_PRODUCT_VERSION={product_version}");
-    println!("cargo:rustc-env=JCODE_DESKTOP_GIT_HASH={git_hash}");
+    println!("cargo:rustc-env=NEXT_CODE_DESKTOP_VERSION={version}");
+    println!("cargo:rustc-env=NEXT_CODE_PRODUCT_VERSION={product_version}");
+    println!("cargo:rustc-env=NEXT_CODE_DESKTOP_GIT_HASH={git_hash}");
     println!("cargo:rerun-if-changed=.git/HEAD");
     println!("cargo:rerun-if-changed=.git/index");
     println!("cargo:rerun-if-changed=Cargo.toml");

@@ -84,12 +84,12 @@ fn no_width_unstable_glyphs_in_tui_sources() {
     let mut violations = Vec::new();
     // All crates that produce user-visible terminal lines.
     for krate in [
-        "jcode-tui",
-        "jcode-tui-messages",
-        "jcode-tui-markdown",
-        "jcode-tui-render",
-        "jcode-tui-tool-display",
-        "jcode-render-core",
+        "next-code-tui",
+        "next-code-tui-messages",
+        "next-code-tui-markdown",
+        "next-code-tui-render",
+        "next-code-tui-tool-display",
+        "next-code-render-core",
     ] {
         scan_dir(&crates_root.join(krate).join("src"), &mut violations);
     }

@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{self, IsTerminal, Write};
@@ -35,7 +36,7 @@ pub const GEMINI_API_KEY_ENV_FILE: &str = "gemini.env";
 /// Unlike the OAuth Code Assist path (which talks to cloudcode-pa with a free
 /// quota tier), an API key authenticates directly against
 /// `generativelanguage.googleapis.com` and uses the key's own quota. Preferring
-/// the env var keeps it consistent with every other API-key provider in jcode.
+/// the env var keeps it consistent with every other API-key provider in next-code.
 pub fn api_key() -> Option<String> {
     for env_key in GEMINI_API_KEY_ENV_VARS {
         if let Some(key) = crate::provider_catalog::load_api_key_from_env_or_config(
@@ -136,12 +137,12 @@ struct GeminiCliOAuthCredentials {
 /// Resolve the Gemini CLI command from the environment or a sensible default.
 ///
 /// Preference order:
-/// 1. `JCODE_GEMINI_CLI_PATH` (supports a full command like `npx @google/gemini-cli`)
+/// 1. `NEXT_CODE_GEMINI_CLI_PATH` (supports a full command like `npx @google/gemini-cli`)
 /// 2. `gemini` on PATH
 /// 3. `npx @google/gemini-cli`
 pub fn gemini_cli_command() -> GeminiCliCommand {
     resolve_gemini_cli_command_with(
-        std::env::var("JCODE_GEMINI_CLI_PATH").ok().as_deref(),
+        product_env("GEMINI_CLI_PATH").ok().as_deref(),
         super::command_exists,
     )
 }
@@ -252,7 +253,7 @@ pub fn load_tokens() -> Result<GeminiTokens> {
         });
     }
 
-    anyhow::bail!("No Gemini OAuth tokens found. Run `jcode login --provider gemini`.")
+    anyhow::bail!("No Gemini OAuth tokens found. Run `next-code login --provider gemini`.")
 }
 
 pub fn save_tokens(tokens: &GeminiTokens) -> Result<()> {
@@ -357,7 +358,7 @@ pub async fn login(no_browser: bool) -> Result<GeminiTokens> {
                 redirect_uri
             );
             eprintln!(
-                "If the page says sign-in succeeded but jcode does not continue within a few seconds, press Ctrl+C and retry with `--no-browser` to use the manual code flow."
+                "If the page says sign-in succeeded but next-code does not continue within a few seconds, press Ctrl+C and retry with `--no-browser` to use the manual code flow."
             );
             match tokio::time::timeout(
                 std::time::Duration::from_secs(300),

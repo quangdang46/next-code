@@ -5,7 +5,7 @@ next-code Live Monitor - Real-time activity dashboard
 Connects to next-code's debug socket and displays live streaming events.
 Run next-code serve in one terminal, then this monitor in another.
 
-Usage: ./jcode_monitor.py [--socket PATH]
+Usage: ./next_code_monitor.py [--socket PATH]
 """
 
 import json
@@ -56,7 +56,7 @@ class MonitorState:
 def get_socket_path() -> str:
     """Get the next-code debug socket path"""
     runtime_dir = os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}")
-    return os.path.join(runtime_dir, "jcode-debug.sock")
+    return os.path.join(runtime_dir, "next-code-debug.sock")
 
 
 def connect_to_socket(path: str) -> Optional[socket.socket]:
@@ -142,7 +142,7 @@ def render_dashboard(state: MonitorState, width: int = 80):
     lines = []
 
     # Header
-    header = f" JCODE MONITOR "
+    header = f" NEXT-CODE MONITOR "
     padding = (width - len(header)) // 2
     lines.append(f"{Colors.BG_BLUE}{Colors.WHITE}{Colors.BOLD}{' ' * padding}{header}{' ' * padding}{Colors.RESET}")
     lines.append("")

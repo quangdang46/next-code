@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+next-code-core = { path = "../next-code-core" }
 ab_glyph = "0.2.32"
 anyhow = "1"
 arboard = { version = "3", features = ["wayland-data-control"] }

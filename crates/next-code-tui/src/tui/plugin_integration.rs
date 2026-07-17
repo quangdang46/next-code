@@ -1,4 +1,4 @@
-//! Integration layer between the jcode TUI and the plugin runtime.
+//! Integration layer between the next-code TUI and the plugin runtime.
 //!
 //! This module bridges [`TuiPluginSystem`] into the synchronous TUI draw loop
 //! and the async event loop. It provides:

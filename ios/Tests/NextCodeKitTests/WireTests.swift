@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import JCodeKit
+@testable import NextCodeKit
 
 // MARK: - Gateway / PairURI
 
@@ -13,39 +13,42 @@ import Testing
 }
 
 @Test func pairURIParsesQRPayload() {
-    let payload = PairURI.parse("jcode://pair?host=mybox.ts.net&port=7643&code=123456")
-    #expect(payload?.gateway.host == "mybox.ts.net")
-    #expect(payload?.gateway.port == 7643)
-    #expect(payload?.code == "123456")
-}
-
-@Test func pairURIParsesNextCodeScheme() {
+    // Preferred scheme
     let payload = PairURI.parse("nextcode://pair?host=mybox.ts.net&port=7643&code=123456")
     #expect(payload?.gateway.host == "mybox.ts.net")
     #expect(payload?.gateway.port == 7643)
     #expect(payload?.code == "123456")
 }
 
+@Test func pairURIParsesLegacyJcodeScheme() { // dual-read jcode://
+    // dual-read: legacy jcode:// pair URLs still parse during compat window
+    let payload = PairURI.parse("jcode://pair?host=mybox.ts.net&port=7643&code=123456")
+    #expect(payload?.gateway.host == "mybox.ts.net")
+    #expect(payload?.gateway.port == 7643)
+    #expect(payload?.code == "123456")
+}
+
 @Test func pairURIDefaultsPort() {
-    let payload = PairURI.parse("jcode://pair?host=mybox&code=987654")
+    let payload = PairURI.parse("nextcode://pair?host=mybox&code=987654")
     #expect(payload?.gateway.port == Gateway.defaultPort)
 }
 
-@Test func pairURIDefaultsPortForNextCodeScheme() {
-    let payload = PairURI.parse("nextcode://pair?host=mybox&code=987654")
+@Test func pairURIDefaultsPortForLegacyJcodeScheme() { // dual-read jcode://
+    // dual-read: legacy jcode:// defaults port the same way
+    let payload = PairURI.parse("jcode://pair?host=mybox&code=987654")
     #expect(payload?.gateway.port == Gateway.defaultPort)
 }
 
 @Test func pairURIRejectsGarbage() {
     #expect(PairURI.parse("https://example.com/pair?host=x&code=1") == nil)
-    #expect(PairURI.parse("jcode://pair?host=&code=1") == nil)
-    #expect(PairURI.parse("jcode://pair?host=x") == nil)
     #expect(PairURI.parse("nextcode://pair?host=&code=1") == nil)
     #expect(PairURI.parse("nextcode://pair?host=x") == nil)
+    #expect(PairURI.parse("jcode://pair?host=&code=1") == nil)
+    #expect(PairURI.parse("jcode://pair?host=x") == nil)
     #expect(PairURI.parse("not a uri") == nil)
 }
 
-// MARK: - Request encoding (must match crates/jcode-protocol/src/wire.rs)
+// MARK: - Request encoding (must match crates/next-code-protocol/src/wire.rs)
 
 private func encodedObject(_ request: Request) throws -> [String: Any] {
     let line = try request.encodedLine()
@@ -258,8 +261,8 @@ private func encodedObject(_ request: Request) throws -> [String: Any] {
         try ServerEvent.decode(line: #"{"type":"reloading"}"#)
             == .reloading(newSocket: nil))
     #expect(
-        try ServerEvent.decode(line: #"{"type":"reloading","new_socket":"/tmp/jcode.sock"}"#)
-            == .reloading(newSocket: "/tmp/jcode.sock"))
+        try ServerEvent.decode(line: #"{"type":"reloading","new_socket":"/tmp/next-code.sock"}"#)
+            == .reloading(newSocket: "/tmp/next-code.sock"))
     #expect(
         try ServerEvent.decode(
             line: #"{"type":"session_close_requested","reason":"taken over"}"#)

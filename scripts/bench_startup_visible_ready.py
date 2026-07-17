@@ -97,9 +97,9 @@ def shutil_which(name: str) -> str | None:
 def build_tool_specs() -> list[ToolSpec]:
     specs = [
         ToolSpec(
-            name="jcode",
-            argv=["jcode", "--no-update", "--no-selfdev"],
-            no_telem_env={"JCODE_NO_TELEMETRY": "1"},
+            name="next-code",
+            argv=["next-code", "--no-update", "--no-selfdev"],
+            no_telem_env={"NEXT_CODE_NO_TELEMETRY": "1"},
             disable_selfdev=True,
         ),
         ToolSpec(name="pi", argv=[detect_pi_bin()]),
@@ -279,7 +279,7 @@ def summarize(samples: list[float | None]) -> dict[str, float | int] | None:
 
 def version_for(spec: ToolSpec) -> str:
     argv = spec.argv[:1]
-    if spec.name == "jcode":
+    if spec.name == "next-code":
         argv = [spec.argv[0], "version"]
     else:
         argv = [spec.argv[0], "--version"]

@@ -2,7 +2,7 @@
 //!
 //! Provides subcommands for listing, enabling/disabling, testing, and
 //! displaying metrics of configured hooks. Designed to be integrated
-//! into the main `jcode` CLI dispatch (e.g. `jcode hooks list`).
+//! into the main `next-code` CLI dispatch (e.g. `next-code hooks list`).
 //!
 //! # Subcommands
 //!
@@ -57,7 +57,7 @@ impl fmt::Display for CliError {
         match self {
             CliError::UnknownEvent(name) => write!(
                 f,
-                "Unknown event '{}'. Use `jcode hooks list` to see valid event names.",
+                "Unknown event '{}'. Use `next-code hooks list` to see valid event names.",
                 name
             ),
             CliError::NoHooksForEvent(name) => {
@@ -106,10 +106,10 @@ impl From<serde_json::Error> for CliError {
 // Public API -- called from the main CLI dispatcher
 // ===========================================================================
 
-/// Entry point for all `jcode hooks` subcommands.
+/// Entry point for all `next-code hooks` subcommands.
 ///
 /// Call this from the main CLI's dispatch function when the user runs
-/// `jcode hooks <subcommand>`.
+/// `next-code hooks <subcommand>`.
 pub async fn run_hooks_command(subcmd: HooksSubcommand) -> Result<(), CliError> {
     match subcmd {
         HooksSubcommand::List { event, json } => run_hooks_list(event, json),
@@ -124,7 +124,7 @@ pub async fn run_hooks_command(subcmd: HooksSubcommand) -> Result<(), CliError> 
     }
 }
 
-/// Subcommands for `jcode hooks`.
+/// Subcommands for `next-code hooks`.
 #[derive(Debug, Clone)]
 pub enum HooksSubcommand {
     /// List all configured hooks, optionally filtered by event name.
@@ -304,7 +304,7 @@ fn handler_to_entry(index: usize, handler: &HookHandlerConfig) -> HandlerEntry {
 /// Enable a hook handler by event name and index.
 ///
 /// Reads the config, modifies the enabled flag on the matching handler,
-/// and writes it back to the project-level `.jcode/hooks.toml`.
+/// and writes it back to the project-level `.next-code/hooks.toml`.
 fn run_hooks_enable(event_name: &str, index: usize) -> Result<(), CliError> {
     set_handler_enabled(event_name, index, true)
 }
@@ -667,10 +667,10 @@ fn count_handler_types(config: &HooksConfig) -> HashMap<String, usize> {
 // Config file I/O
 // ===========================================================================
 
-/// Path to the project-level hooks config file: `<cwd>/.jcode/hooks.toml`.
+/// Path to the project-level hooks config file: `<cwd>/.next-code/hooks.toml`.
 fn project_hooks_config_path() -> Result<PathBuf, CliError> {
     let cwd = std::env::current_dir()?;
-    Ok(cwd.join(".jcode").join("hooks.toml"))
+    Ok(cwd.join(".next-code").join("hooks.toml"))
 }
 
 /// Serialize a [`HooksConfig`] to TOML and write it to the given path.
@@ -690,14 +690,14 @@ fn write_hooks_config(path: &PathBuf, config: &HooksConfig) -> Result<(), CliErr
 /// Print the list of config source paths (for help output when no config exists).
 fn print_config_sources() {
     if let Some(home) = dirs::home_dir() {
-        let user_path = home.join(".jcode").join("hooks.toml");
+        let user_path = home.join(".next-code").join("hooks.toml");
         println!("  User:    {}", user_path.display());
     }
     if let Ok(cwd) = std::env::current_dir() {
-        let project_path = cwd.join(".jcode").join("hooks.toml");
+        let project_path = cwd.join(".next-code").join("hooks.toml");
         println!("  Project: {}", project_path.display());
     }
-    println!("  Env:     $JCODE_HOOKS_CONFIG");
+    println!("  Env:     $NEXT_CODE_HOOKS_CONFIG");
 }
 
 // ===========================================================================

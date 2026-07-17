@@ -2,7 +2,7 @@
 
 //! Server registry for multi-server architecture
 //!
-//! Tracks running servers in `~/.jcode/servers.json` for discovery by clients.
+//! Tracks running servers in `~/.next-code/servers.json` for discovery by clients.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -200,14 +200,14 @@ pub fn socket_dir() -> Result<PathBuf> {
 pub fn server_socket_path(name: &str) -> PathBuf {
     socket_dir()
         .map(|d| d.join(format!("{}.sock", name)))
-        .unwrap_or_else(|_| std::env::temp_dir().join(format!("jcode-{}.sock", name)))
+        .unwrap_or_else(|_| std::env::temp_dir().join(format!("next-code-{}.sock", name)))
 }
 
 /// Get the debug socket path for a named server
 pub fn server_debug_socket_path(name: &str) -> PathBuf {
     socket_dir()
         .map(|d| d.join(format!("{}-debug.sock", name)))
-        .unwrap_or_else(|_| std::env::temp_dir().join(format!("jcode-{}-debug.sock", name)))
+        .unwrap_or_else(|_| std::env::temp_dir().join(format!("next-code-{}-debug.sock", name)))
 }
 
 /// Check if a process is still running

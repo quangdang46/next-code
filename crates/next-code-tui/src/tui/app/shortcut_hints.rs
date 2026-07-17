@@ -135,8 +135,8 @@ mod tests {
     fn nudge_is_throttled_after_max_shows() {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::tempdir().expect("tempdir");
-        let prev = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let id = "resume";
         // First MAX shows produce a message; record each.
@@ -152,9 +152,9 @@ mod tests {
         );
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -162,16 +162,16 @@ mod tests {
     fn unbound_shortcut_yields_no_nudge() {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::tempdir().expect("tempdir");
-        let prev = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         assert!(nudge_message("x", "do the thing", None).is_none());
         assert!(nudge_message("x", "do the thing", Some("   ")).is_none());
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }

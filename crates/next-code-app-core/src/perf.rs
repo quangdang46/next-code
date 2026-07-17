@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use std::sync::OnceLock;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -206,7 +207,7 @@ pub fn tui_policy_for(
 
     // Glyph-safe mode for terminals with a fragile GPU glyph atlas (macOS 26
     // VS Code integrated terminal / Apple Terminal). The primary fix lives in
-    // `jcode-tui-style`: colors are quantized to the 256-palette there, which
+    // `next-code-tui-style`: colors are quantized to the 256-palette there, which
     // bounds the distinct (glyph, color) atlas keys so the animations no longer
     // overflow the cache (#330). Here we only trim full-frame repaint pressure
     // as cheap insurance; decorative animations stay ON so the experience is
@@ -337,7 +338,7 @@ fn detect() -> SystemProfile {
 /// Alacritty) are unaffected and excluded.
 fn detect_fragile_glyph_cache(terminal: &str) -> bool {
     // Opt-out / opt-in override for users who want to force the behavior.
-    if let Ok(raw) = std::env::var("JCODE_GLYPH_SAFE_MODE") {
+    if let Ok(raw) = product_env("GLYPH_SAFE_MODE") {
         match raw.trim().to_ascii_lowercase().as_str() {
             "1" | "true" | "yes" | "on" => return true,
             "0" | "false" | "no" | "off" => return false,
@@ -848,7 +849,7 @@ mod tests {
     fn test_glyph_safe_mode_keeps_animations_and_caps_redraw() {
         // VS Code integrated terminal / Apple Terminal on macOS 26 corrupt the
         // GPU glyph atlas under truecolor color churn (#330). The root-cause fix
-        // is color quantization in jcode-tui-style, so the perf policy keeps
+        // is color quantization in next-code-tui-style, so the perf policy keeps
         // decorative animations ON and only trims full-frame repaint pressure.
         let profile = glyph_safe_profile("vscode");
         let mut display = crate::config::DisplayConfig::default();
@@ -881,9 +882,9 @@ mod tests {
     #[test]
     fn test_detect_fragile_glyph_cache_targets_macos_terminals() {
         // Env override must not leak between cases.
-        let prev = std::env::var("JCODE_GLYPH_SAFE_MODE").ok();
+        let prev = product_env("GLYPH_SAFE_MODE").ok();
         unsafe {
-            std::env::remove_var("JCODE_GLYPH_SAFE_MODE");
+            std::env::remove_var("NEXT_CODE_GLYPH_SAFE_MODE");
         }
         assert!(detect_fragile_glyph_cache("vscode"));
         assert!(detect_fragile_glyph_cache("apple_terminal"));
@@ -892,7 +893,7 @@ mod tests {
         assert!(!detect_fragile_glyph_cache("kitty"));
         if let Some(prev) = prev {
             unsafe {
-                std::env::set_var("JCODE_GLYPH_SAFE_MODE", prev);
+                std::env::set_var("NEXT_CODE_GLYPH_SAFE_MODE", prev);
             }
         }
     }

@@ -5,7 +5,7 @@ pub(crate) fn load_session_cards_for_desktop() -> Vec<workspace::SessionCard> {
         Ok(cards) => cards,
         Err(error) => {
             desktop_log::error(format_args!(
-                "jcode-desktop: failed to load session metadata: {error:#}"
+                "next-code-desktop: failed to load session metadata: {error:#}"
             ));
             Vec::new()
         }
@@ -17,7 +17,7 @@ pub(crate) fn load_crashed_session_cards_for_desktop() -> Vec<workspace::Session
         Ok(cards) => cards,
         Err(error) => {
             desktop_log::error(format_args!(
-                "jcode-desktop: failed to load crashed session metadata: {error:#}"
+                "next-code-desktop: failed to load crashed session metadata: {error:#}"
             ));
             Vec::new()
         }
@@ -28,7 +28,7 @@ pub(crate) fn spawn_recovery_session_count_scan(
     event_loop_proxy: EventLoopProxy<DesktopUserEvent>,
     startup_trace: DesktopStartupTrace,
 ) {
-    if let Err(error) = spawn_bounded_desktop_async_job("jcode-desktop-recovery-scan", move || {
+    if let Err(error) = spawn_bounded_desktop_async_job("next-code-desktop-recovery-scan", move || {
         startup_trace.mark("recovery scan started");
         let recovery_count = load_crashed_session_cards_for_desktop().len();
         startup_trace.mark(&format!(
@@ -39,12 +39,12 @@ pub(crate) fn spawn_recovery_session_count_scan(
             .is_err()
         {
             desktop_log::warn(format_args!(
-                "jcode-desktop: failed to deliver recovery count, event loop is closed"
+                "next-code-desktop: failed to deliver recovery count, event loop is closed"
             ));
         }
     }) {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to start recovery scan: {error:#}"
+            "next-code-desktop: failed to start recovery scan: {error:#}"
         ));
     }
 }
@@ -54,7 +54,7 @@ pub(crate) fn spawn_single_session_card_refresh(
     event_loop_proxy: EventLoopProxy<DesktopUserEvent>,
 ) {
     if let Err(error) =
-        spawn_bounded_desktop_async_job("jcode-desktop-session-card-refresh", move || {
+        spawn_bounded_desktop_async_job("next-code-desktop-session-card-refresh", move || {
             let started = Instant::now();
             let card = load_session_cards_for_desktop()
                 .into_iter()
@@ -69,13 +69,13 @@ pub(crate) fn spawn_single_session_card_refresh(
                 .is_err()
             {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to deliver session card refresh, event loop is closed"
+                    "next-code-desktop: failed to deliver session card refresh, event loop is closed"
                 ));
             }
         })
     {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to start session card refresh: {error:#}"
+            "next-code-desktop: failed to start session card refresh: {error:#}"
         ));
     }
 }
@@ -86,7 +86,7 @@ pub(crate) fn spawn_session_cards_load(
     delay: Duration,
 ) {
     if let Err(error) = spawn_bounded_desktop_async_job(
-        format!("jcode-desktop-session-cards-{purpose:?}"),
+        format!("next-code-desktop-session-cards-{purpose:?}"),
         move || {
             if !delay.is_zero() {
                 std::thread::sleep(delay);
@@ -103,20 +103,20 @@ pub(crate) fn spawn_session_cards_load(
                 .is_err()
             {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to deliver session cards load, event loop is closed"
+                    "next-code-desktop: failed to deliver session cards load, event loop is closed"
                 ));
             }
         },
     ) {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to start session card load: {error:#}"
+            "next-code-desktop: failed to start session card load: {error:#}"
         ));
     }
 }
 
 pub(crate) fn spawn_restore_crashed_sessions(event_loop_proxy: EventLoopProxy<DesktopUserEvent>) {
     if let Err(error) = spawn_bounded_desktop_async_job(
-        "jcode-desktop-restore-crashed-sessions",
+        "next-code-desktop-restore-crashed-sessions",
         move || {
             let started = Instant::now();
             let crashed = load_crashed_session_cards_for_desktop();
@@ -138,13 +138,13 @@ pub(crate) fn spawn_restore_crashed_sessions(event_loop_proxy: EventLoopProxy<De
                 .is_err()
             {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to deliver crashed-session restore result, event loop is closed"
+                    "next-code-desktop: failed to deliver crashed-session restore result, event loop is closed"
                 ));
             }
         },
     ) {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to start crashed-session restore: {error:#}"
+            "next-code-desktop: failed to start crashed-session restore: {error:#}"
         ));
     }
 }
@@ -152,12 +152,12 @@ pub(crate) fn spawn_restore_crashed_sessions(event_loop_proxy: EventLoopProxy<De
 pub(crate) fn spawn_github_issue_sync(
     event_loop_proxy: EventLoopProxy<DesktopUserEvent>,
 ) -> Result<()> {
-    spawn_bounded_desktop_async_job("jcode-desktop-github-issues-sync", move || {
+    spawn_bounded_desktop_async_job("next-code-desktop-github-issues-sync", move || {
         let result = desktop_issue_cache::sync_current_repo_issue_cache()
             .map_err(|error| format!("{error:#}"));
         match &result {
             Ok(summary) => desktop_log::info(format_args!(
-                "jcode-desktop: synced {} GitHub issue(s) for {} in {}ms to {} (comment_threads={} comment_errors={})",
+                "next-code-desktop: synced {} GitHub issue(s) for {} in {}ms to {} (comment_threads={} comment_errors={})",
                 summary.issue_count,
                 summary.repo,
                 summary.elapsed.as_millis(),
@@ -166,7 +166,7 @@ pub(crate) fn spawn_github_issue_sync(
                 summary.comment_fetch_errors
             )),
             Err(error) => desktop_log::warn(format_args!(
-                "jcode-desktop: GitHub issue sync failed: {error}"
+                "next-code-desktop: GitHub issue sync failed: {error}"
             )),
         }
         if event_loop_proxy
@@ -174,7 +174,7 @@ pub(crate) fn spawn_github_issue_sync(
             .is_err()
         {
             desktop_log::warn(format_args!(
-                "jcode-desktop: failed to deliver GitHub issue sync result"
+                "next-code-desktop: failed to deliver GitHub issue sync result"
             ));
         }
     })
@@ -218,7 +218,7 @@ pub(crate) fn start_pending_transcript_hydration(
     };
     let job_session_id = session_id.clone();
     let spawned =
-        spawn_bounded_desktop_async_job("jcode-desktop-transcript-hydration", move || {
+        spawn_bounded_desktop_async_job("next-code-desktop-transcript-hydration", move || {
             let started = Instant::now();
             let result = session_data::load_session_transcript_by_id(&job_session_id)
                 .map_err(|error| format!("{error:#}"));
@@ -231,13 +231,13 @@ pub(crate) fn start_pending_transcript_hydration(
                 .is_err()
             {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to deliver hydrated transcript"
+                    "next-code-desktop: failed to deliver hydrated transcript"
                 ));
             }
         });
     if let Err(error) = spawned {
         desktop_log::warn(format_args!(
-            "jcode-desktop: transcript hydration fell back to blocking load: {error:#}"
+            "next-code-desktop: transcript hydration fell back to blocking load: {error:#}"
         ));
         let result = session_data::load_session_transcript_by_id(&session_id)
             .map_err(|error| format!("{error:#}"));
@@ -250,7 +250,7 @@ pub(crate) fn spawn_desktop_preferences_saver()
 -> Option<mpsc::Sender<workspace::DesktopPreferences>> {
     let (tx, rx) = mpsc::channel::<workspace::DesktopPreferences>();
     match std::thread::Builder::new()
-        .name("jcode-desktop-preferences-saver".to_string())
+        .name("next-code-desktop-preferences-saver".to_string())
         .spawn(move || {
             while let Ok(mut preferences) = rx.recv() {
                 let received_at = Instant::now();
@@ -269,7 +269,7 @@ pub(crate) fn spawn_desktop_preferences_saver()
         Ok(_) => Some(tx),
         Err(error) => {
             desktop_log::error(format_args!(
-                "jcode-desktop: failed to start preferences saver: {error:#}"
+                "next-code-desktop: failed to start preferences saver: {error:#}"
             ));
             None
         }
@@ -288,12 +288,12 @@ pub(crate) fn queue_desktop_preferences_save(
     }
 
     if let Err(error) =
-        spawn_bounded_desktop_async_job("jcode-desktop-preferences-save-once", move || {
+        spawn_bounded_desktop_async_job("next-code-desktop-preferences-save-once", move || {
             save_desktop_preferences_off_ui_thread(preferences, 1, Duration::ZERO);
         })
     {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to queue preferences save: {error:#}"
+            "next-code-desktop: failed to queue preferences save: {error:#}"
         ));
     }
 }

@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 RUNTIME_DIR = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-SOCKET_PATH = os.path.join(RUNTIME_DIR, "jcode-debug.sock")
+SOCKET_PATH = os.path.join(RUNTIME_DIR, "next-code-debug.sock")
 REPO = Path(__file__).resolve().parents[2]
 
 
@@ -98,7 +98,7 @@ def main():
         raise SystemExit("SKIP: kitty and wtype are required")
     binary = (
         os.environ.get("NEXT_CODE_E2E_BIN")
-        or os.environ.get("JCODE_E2E_BIN")
+        or os.environ.get("NEXT_CODE_E2E_BIN")
         or str(REPO / "target" / "selfdev" / "next-code")
     )
     kitty_sock = os.environ.get("KITTY_E2E_SOCKET", find_kitty_socket())

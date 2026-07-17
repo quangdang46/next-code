@@ -33,7 +33,7 @@ impl HashlineEditTool {
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum HashlineEditInput {
-    /// Classic jcode shape: explicit path + patch body.
+    /// Classic next-code shape: explicit path + patch body.
     Patch {
         file_path: String,
         #[serde(default)]
@@ -731,8 +731,8 @@ async fn execute_old(
 async fn atomic_write(path: &Path, content: &str) -> Result<()> {
     let pid = std::process::id();
     let temp_name = match path.file_name().and_then(|n| n.to_str()) {
-        Some(n) => format!("{n}.jcode-tmp.{pid}"),
-        None => format!("jcode-tmp.{pid}"),
+        Some(n) => format!("{n}.next-code-tmp.{pid}"),
+        None => format!("next-code-tmp.{pid}"),
     };
     let tp = path.with_file_name(temp_name);
     if let Err(e) = tokio::fs::write(&tp, content).await {

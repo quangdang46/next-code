@@ -632,8 +632,8 @@ pub(super) async fn dispatch_ui_activity(
         swarm_members,
         session_id,
         ServerEvent::Notification {
-            from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_session: "next-code".to_string(),
+            from_name: Some("Next Code".to_string()),
             notification_type: NotificationType::Message {
                 scope: Some(activity.kind.scope().to_string()),
                 channel: None,

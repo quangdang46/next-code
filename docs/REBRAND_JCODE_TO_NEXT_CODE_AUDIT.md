@@ -22,14 +22,14 @@
 
 - GitHub/repo directory is already **next-code**; product identity in code is still **100% jcode**.
 - Root package/lib/bin: `name = "jcode"` (`/Users/tranquangdang21/Projects/next-code/Cargo.toml`).
-- Distribution is **brew/curl**, not crates.io — still a hard break for installers, PATH, CI artifacts, selfdev, and user data under `~/.jcode`.
+- Distribution is **brew/curl**, not crates.io — still a hard break for installers, PATH, CI artifacts, selfdev, and user data under `~/.next-code`.
 - Hardcoded product URLs still point at `1jehuang/jcode`, `jcode.sh`, `api.jcode.sh`, `telemetry.jcode.sh`.
 
 **Risk posture: HIGH / data-loss capable**
 
 Hard-cutting without dual-read loses:
 
-1. Sessions, OAuth tokens, memory, MCP trust under `~/.jcode`
+1. Sessions, OAuth tokens, memory, MCP trust under `~/.next-code`
 2. Provider keyring (`jcode-provider-service`)
 3. Project-committed `.jcode/` agents/skills
 4. Install PATH + brew formula + CI artifact consumers
@@ -65,7 +65,7 @@ Hard-cutting without dual-read loses:
 | Runtime socket | `jcode.sock` | `next-code.sock` | Same-release client+server |
 | Named socket dir | `runtime/jcode/` | `runtime/next-code/` | |
 | Daemon lock | `jcode-daemon.lock` | `next-code-daemon.lock` | |
-| Windows install | `%LOCALAPPDATA%\jcode` | `%LOCALAPPDATA%\next-code` | Also migrate `%USERPROFILE%\.jcode` |
+| Windows install | `%LOCALAPPDATA%\jcode` | `%LOCALAPPDATA%\next-code` | Also migrate `%USERPROFILE%\.next-code` |
 | Keyring service | `jcode-provider-service` | `next-code-provider-service` | Dual-read + copy-forward |
 | User-Agent | `jcode/{ver}` | `next-code/{ver}` | |
 | Bundle ID | `com.jcode.*` | **decision** | Keep if App Store shipped |
@@ -150,7 +150,7 @@ Hard-cutting without dual-read loses:
 - Proposed: `next-code` (+ optional alias bin `jcode` one release)  
 - Migration: clap, install.sh/ps1, CI, scripts, tests  
 
-**B6 · E-001/E-002 home plane** — `jcode_dir()`: `$JCODE_HOME` → `~/.jcode` (~1037 `JCODE_HOME` hits)  
+**B6 · E-001/E-002 home plane** — `jcode_dir()`: `$JCODE_HOME` → `~/.next-code` (~1037 `JCODE_HOME` hits)  
 - Evidence: `crates/jcode-storage/src/lib.rs:74-81`; install/uninstall; sessions/auth/memory  
 - Proposed: `next_code_dir()` / `NEXT_CODE_HOME` / `~/.next-code`  
 - Migration: First-run rename/copy + `.migrated-from-jcode`; dual-read env  
@@ -178,7 +178,7 @@ Hard-cutting without dual-read loses:
 **H2 · Runtime sockets** — `JCODE_SOCKET`, `jcode.sock`, named dir, daemon lock, Windows pipes  
 - Same-release client+server; hyphen OK on Windows pipe sanitizer  
 
-**H3 · Windows dual layout** — `%LOCALAPPDATA%\jcode` + `%USERPROFILE%\.jcode` + Startup `jcode-hotkey.lnk`  
+**H3 · Windows dual layout** — `%LOCALAPPDATA%\jcode` + `%USERPROFILE%\.next-code` + Startup `jcode-hotkey.lnk`  
 - Migrate both trees; fix uninstall purge; rewrite Startup shortcut  
 
 **H4 · `is_jcode_repo()`** — hard-checks `name = "jcode"` in root Cargo.toml  
@@ -205,7 +205,7 @@ Hard-cutting without dual-read loses:
 
 ### Medium
 
-**M1 · Menubar lock hardcodes `~/.jcode`** (bypasses `JCODE_HOME`) — dual-PID check during coexistence  
+**M1 · Menubar lock hardcodes `~/.next-code`** (bypasses `JCODE_HOME`) — dual-PID check during coexistence  
 **M2 · Agents discovery uses `home.join(".jcode")` not `jcode_dir()`** — centralize during rebrand  
 **M3 · harden_user_config_permissions hardcodes segment** — harden `app_config_dir()` + legacy  
 **M4 · User-Agent / subscription host branding** — UA yes; hosts need product plan  
@@ -217,7 +217,7 @@ Hard-cutting without dual-read loses:
 
 ### Low / bulk mechanical
 
-- Docs/README/AGENTS (~126 `~/.jcode` in md; GitHub URL hits)
+- Docs/README/AGENTS (~126 `~/.next-code` in md; GitHub URL hits)
 - Demo scripts (`record_demo.sh` titles, `/tmp/jcode-demo`)
 - `entities.json` project name `"jcode"`
 - Eval package renames; unbranded bins stay
@@ -252,10 +252,10 @@ next_code_var("HOME") → NEXT_CODE_HOME then JCODE_HOME (log once at debug if l
 - Dynamic prefixes: try `NEXT_CODE_` then `JCODE_` at construction sites  
 
 ### Storage path migration (first run)
-1. If `~/.next-code` missing and `~/.jcode` exists → **rename** (fallback copy)  
+1. If `~/.next-code` missing and `~/.next-code` exists → **rename** (fallback copy)  
 2. Write `~/.next-code/.migrated-from-jcode` + one user-visible log line  
 3. Same for `~/.config/jcode` → `~/.config/next-code`  
-4. Windows: both `%LOCALAPPDATA%\jcode` and `%USERPROFILE%\.jcode`  
+4. Windows: both `%LOCALAPPDATA%\jcode` and `%USERPROFILE%\.next-code`  
 5. Always honor legacy `no_telemetry` if new marker missing (privacy)  
 6. Project: resolve `.next-code/` then `.jcode/` (mirror existing `.claude` dual-read)  
 7. Uninstall `--purge`: clear **both** trees after migrate window  
@@ -311,7 +311,7 @@ Phased so **tree always builds**; freeze decisions in Phase 1 first.
 - [ ] `cargo build` / workspace tests pass with package+bin **`next-code`**
 - [ ] No required package name `jcode` remains except documented alias/compat
 - [ ] `rg -i jcode` over source empty **outside allowlist** (history/compat/upstream/lock)
-- [ ] Fresh install creates `~/.next-code` (or `$NEXT_CODE_HOME`); new users never need `~/.jcode`
+- [ ] Fresh install creates `~/.next-code` (or `$NEXT_CODE_HOME`); new users never need `~/.next-code`
 - [ ] Existing `~/.jcode` auto-migrates (or documented migrate command); credentials load via keyring dual-read
 - [ ] `JCODE_*` works during published dual-read window; `NEXT_CODE_*` is canonical in docs
 - [ ] CLI `--help`, process title, menubar, install/uninstall, AGENTS.md all say **next-code**

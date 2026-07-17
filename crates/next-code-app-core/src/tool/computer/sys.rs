@@ -58,7 +58,7 @@ pub fn run_jxa(script: &str) -> Result<ToolOutput> {
 }
 
 pub fn notify(text: &str, title: Option<&str>) -> Result<ToolOutput> {
-    let title = title.unwrap_or("jcode");
+    let title = title.unwrap_or("next-code");
     osa::run_applescript(&format!(
         "display notification {} with title {}",
         osa::as_quote(text),

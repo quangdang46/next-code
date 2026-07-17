@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
             eval_file: _eval_file,
             agent_id: _agent_id,
             output_dir: _output_dir,
-            next_code_binary: _jcode_binary,
+            next_code_binary: _next_code_binary,
             max_turns: _max_turns,
             timeout_secs: _timeout_secs,
         } => {
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
                     &_eval_file,
                     &_agent_id,
                     &_output_dir,
-                    _jcode_binary.as_ref(),
+                    _next_code_binary.as_ref(),
                     _max_turns,
                     _timeout_secs,
                 )

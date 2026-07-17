@@ -19,7 +19,7 @@ IN_CONTAINER_CA_BUNDLE = f"{IN_CONTAINER_HOME}/ca-certificates.crt"
 DEFAULT_BINARY_PATH = "/tmp/next-code-compat-dist/next-code-linux-x86_64"
 DEFAULT_OPENAI_AUTH_PATH = "~/.next-code/openai-auth.json"
 CA_BUNDLE_CANDIDATES = (
-    os.environ.get("JCODE_HARBOR_CA_BUNDLE"),
+    os.environ.get("NEXT_CODE_HARBOR_CA_BUNDLE") or os.environ.get("NEXT_CODE_HARBOR_CA_BUNDLE"),
     "/etc/ca-certificates/extracted/tls-ca-bundle.pem",
     "/etc/ssl/certs/ca-certificates.crt",
 )
@@ -54,15 +54,15 @@ def _sibling_runtime_lib_candidates(binary: Path, stem: str) -> tuple[str, ...]:
 
 
 JCODE_BINARY = _resolve_existing_file(
-    env_name="JCODE_HARBOR_BINARY",
+    env_name="NEXT_CODE_HARBOR_BINARY" if os.environ.get("NEXT_CODE_HARBOR_BINARY") else "NEXT_CODE_HARBOR_BINARY",
     default_path=DEFAULT_BINARY_PATH,
 )
 OPENAI_AUTH = _resolve_existing_file(
-    env_name="JCODE_HARBOR_OPENAI_AUTH",
+    env_name="NEXT_CODE_HARBOR_OPENAI_AUTH" if os.environ.get("NEXT_CODE_HARBOR_OPENAI_AUTH") else "NEXT_CODE_HARBOR_OPENAI_AUTH",
     default_path=DEFAULT_OPENAI_AUTH_PATH,
 )
 CA_BUNDLE = _resolve_existing_file(
-    env_name="JCODE_HARBOR_CA_BUNDLE",
+    env_name="NEXT_CODE_HARBOR_CA_BUNDLE" if os.environ.get("NEXT_CODE_HARBOR_CA_BUNDLE") else "NEXT_CODE_HARBOR_CA_BUNDLE",
     candidates=CA_BUNDLE_CANDIDATES,
 )
 OPENSSL_RUNTIME_LIBS = tuple(
@@ -70,7 +70,7 @@ OPENSSL_RUNTIME_LIBS = tuple(
     for lib in (
         _resolve_optional_existing_file(
             candidates=(
-                os.environ.get("JCODE_HARBOR_LIBSSL"),
+                os.environ.get("NEXT_CODE_HARBOR_LIBSSL") or os.environ.get("NEXT_CODE_HARBOR_LIBSSL"),
                 *_sibling_runtime_lib_candidates(JCODE_BINARY, "libssl"),
                 "/usr/lib/libssl.so.3",
                 "/usr/lib/x86_64-linux-gnu/libssl.so.3",
@@ -82,7 +82,7 @@ OPENSSL_RUNTIME_LIBS = tuple(
         ),
         _resolve_optional_existing_file(
             candidates=(
-                os.environ.get("JCODE_HARBOR_LIBCRYPTO"),
+                os.environ.get("NEXT_CODE_HARBOR_LIBCRYPTO") or os.environ.get("NEXT_CODE_HARBOR_LIBCRYPTO"),
                 *_sibling_runtime_lib_candidates(JCODE_BINARY, "libcrypto"),
                 "/usr/lib/libcrypto.so.3",
                 "/usr/lib/x86_64-linux-gnu/libcrypto.so.3",
@@ -114,21 +114,21 @@ Task instruction follows:
 
 
 def _benchmark_instruction_preamble() -> str:
-    # Keep Harbor runs aligned with normal TUI/jcode-run prompting by default.
+    # Keep Harbor runs aligned with normal TUI/next-code-run prompting by default.
     # The legacy preamble can still be enabled explicitly for reproducing older
-    # runs, but new benchmark runs should rely on jcode's normal system prompt
+    # runs, but new benchmark runs should rely on next-code's normal system prompt
     # and the official Terminal-Bench task instruction.
-    if os.environ.get("JCODE_HARBOR_LEGACY_PREAMBLE"):
+    if os.environ.get("NEXT_CODE_HARBOR_LEGACY_PREAMBLE"):
         return LEGACY_BENCHMARK_INSTRUCTION_PREAMBLE
-    return os.environ.get("JCODE_HARBOR_EXTRA_PREAMBLE", "")
+    return os.environ.get("NEXT_CODE_HARBOR_EXTRA_PREAMBLE", "")
 
 
 def _load_task_hint() -> str:
-    if not os.environ.get("JCODE_HARBOR_ENABLE_HINTS"):
+    if not os.environ.get("NEXT_CODE_HARBOR_ENABLE_HINTS"):
         return ""
-    task_name = os.environ.get("JCODE_HARBOR_CURRENT_TASK", "").strip()
-    hints_path = os.environ.get("JCODE_HARBOR_TASK_HINTS_FILE", "").strip()
-    extra = os.environ.get("JCODE_HARBOR_EXTRA_PREAMBLE", "").strip()
+    task_name = os.environ.get("NEXT_CODE_HARBOR_CURRENT_TASK", "").strip()
+    hints_path = os.environ.get("NEXT_CODE_HARBOR_TASK_HINTS_FILE", "").strip()
+    extra = os.environ.get("NEXT_CODE_HARBOR_EXTRA_PREAMBLE", "").strip()
     parts: list[str] = []
     if extra:
         parts.append(extra)
@@ -194,7 +194,7 @@ class JcodeHarborAgent(BaseAgent):
 
     @staticmethod
     def name() -> str:
-        return "jcode-harbor"
+        return "next-code-harbor"
 
     def version(self) -> str | None:
         return "compat-openai-oauth"
@@ -219,9 +219,9 @@ class JcodeHarborAgent(BaseAgent):
             f"{IN_CONTAINER_BINARY} --quiet --no-update --no-selfdev version --json",
             env={
                 "HOME": IN_CONTAINER_HOME,
-                "JCODE_HOME": IN_CONTAINER_HOME,
-                "JCODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
-                "JCODE_NO_TELEMETRY": "1",
+                "NEXT_CODE_HOME": IN_CONTAINER_HOME, "NEXT_CODE_HOME": IN_CONTAINER_HOME,
+                "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME, "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
+                "NEXT_CODE_NO_TELEMETRY": "1", "NEXT_CODE_NO_TELEMETRY": "1",
                 "LD_LIBRARY_PATH": IN_CONTAINER_LIB_DIR,
             },
             timeout_sec=60,
@@ -239,13 +239,13 @@ class JcodeHarborAgent(BaseAgent):
 
         env = {
             "HOME": IN_CONTAINER_HOME,
-            "JCODE_HOME": IN_CONTAINER_HOME,
-            "JCODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
-            "JCODE_NO_TELEMETRY": "1",
-            "JCODE_PROVIDER": self._provider_arg,
-            "JCODE_MODEL": self._jcode_model,
-            "JCODE_OPENAI_REASONING_EFFORT": os.environ.get("JCODE_OPENAI_REASONING_EFFORT", "high"),
-            "JCODE_OPENAI_SERVICE_TIER": os.environ.get("JCODE_OPENAI_SERVICE_TIER", "priority"),
+            "NEXT_CODE_HOME": IN_CONTAINER_HOME, "NEXT_CODE_HOME": IN_CONTAINER_HOME,
+            "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME, "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
+            "NEXT_CODE_NO_TELEMETRY": "1", "NEXT_CODE_NO_TELEMETRY": "1",
+            "NEXT_CODE_PROVIDER": self._provider_arg, "NEXT_CODE_PROVIDER": self._provider_arg,
+            "NEXT_CODE_MODEL": self._jcode_model, "NEXT_CODE_MODEL": self._jcode_model,
+            "NEXT_CODE_OPENAI_REASONING_EFFORT": os.environ.get("NEXT_CODE_OPENAI_REASONING_EFFORT") or os.environ.get("NEXT_CODE_OPENAI_REASONING_EFFORT", "high"), "NEXT_CODE_OPENAI_REASONING_EFFORT": os.environ.get("NEXT_CODE_OPENAI_REASONING_EFFORT") or os.environ.get("NEXT_CODE_OPENAI_REASONING_EFFORT", "high"),
+            "NEXT_CODE_OPENAI_SERVICE_TIER": os.environ.get("NEXT_CODE_OPENAI_SERVICE_TIER") or os.environ.get("NEXT_CODE_OPENAI_SERVICE_TIER", "priority"), "NEXT_CODE_OPENAI_SERVICE_TIER": os.environ.get("NEXT_CODE_OPENAI_SERVICE_TIER") or os.environ.get("NEXT_CODE_OPENAI_SERVICE_TIER", "priority"),
             "SSL_CERT_FILE": IN_CONTAINER_CA_BUNDLE,
             "OPENSSL_CERT_FILE": IN_CONTAINER_CA_BUNDLE,
             "LD_LIBRARY_PATH": IN_CONTAINER_LIB_DIR,
@@ -254,13 +254,13 @@ class JcodeHarborAgent(BaseAgent):
         result = await environment.exec(
             command=(
                 'set -e; '
-                'workdir="${JCODE_TASK_WORKDIR:-}"; '
+                'workdir="${NEXT_CODE_TASK_WORKDIR:-${JCODE_TASK_WORKDIR:-}}"; '
                 'if [ -z "$workdir" ]; then '
                 '  if [ -d /app ]; then workdir=/app; else workdir="$(pwd)"; fi; '
                 'fi; '
                 f'instruction="$(cat {IN_CONTAINER_INPUT}/instruction.txt)"; '
                 f'{IN_CONTAINER_BINARY} --quiet --no-update --no-selfdev '
-                '--provider "$JCODE_PROVIDER" --model "$JCODE_MODEL" '
+                '--provider "${NEXT_CODE_PROVIDER:-$JCODE_PROVIDER}" --model "${NEXT_CODE_MODEL:-$JCODE_MODEL}" '
                 '-C "$workdir" run --ndjson "$instruction" '
                 f'> {IN_CONTAINER_OUTPUT}/events.ndjson 2> {IN_CONTAINER_OUTPUT}/stderr.txt'
             ),
@@ -272,7 +272,7 @@ class JcodeHarborAgent(BaseAgent):
         (self.logs_dir / "exec_return_code.txt").write_text(str(result.return_code))
 
         try:
-            await environment.download_dir(IN_CONTAINER_OUTPUT, self.logs_dir / "jcode-output")
+            await environment.download_dir(IN_CONTAINER_OUTPUT, self.logs_dir / "next-code-output")
         except Exception as e:  # noqa: BLE001
             (self.logs_dir / "download_error.txt").write_text(str(e))
 
@@ -280,10 +280,10 @@ class JcodeHarborAgent(BaseAgent):
             "return_code": result.return_code,
             "provider": self._provider_arg,
             "model": self._jcode_model,
-            "jcode_binary": str(JCODE_BINARY),
+            "next_code_binary": str(JCODE_BINARY),
         }
 
-        output_dir = self.logs_dir / "jcode-output"
+        output_dir = self.logs_dir / "next-code-output"
         payload = _load_final_payload(output_dir)
         if payload is not None:
             usage = payload.get("usage") or {}
@@ -295,7 +295,7 @@ class JcodeHarborAgent(BaseAgent):
                 context.n_cache_tokens = cache_read + cache_create
             elif isinstance(cache_read, int):
                 context.n_cache_tokens = cache_read
-            metadata["jcode_result"] = payload
+            metadata["next_code_result"] = payload
 
         result_json_path = output_dir / "result.json"
         if payload is None and result_json_path.exists():
@@ -312,7 +312,7 @@ class JcodeHarborAgent(BaseAgent):
                         context.n_cache_tokens = cache_read + cache_create
                     elif isinstance(cache_read, int):
                         context.n_cache_tokens = cache_read
-                    metadata["jcode_result"] = payload
+                    metadata["next_code_result"] = payload
                 except Exception as e:  # noqa: BLE001
                     metadata["result_parse_error"] = str(e)
                     metadata["raw_result_prefix"] = raw[:1000]

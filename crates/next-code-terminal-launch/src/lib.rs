@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use anyhow::Result;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -312,7 +313,7 @@ pub fn detected_resume_terminal() -> Option<String> {
 #[cfg(unix)]
 pub fn resume_terminal_candidates() -> Vec<String> {
     let mut candidates = Vec::new();
-    if let Ok(term) = std::env::var("JCODE_TERMINAL") {
+    if let Ok(term) = product_env("TERMINAL") {
         push_unique_terminal(&mut candidates, term);
     }
     if let Some(term) = detected_resume_terminal() {
@@ -350,7 +351,7 @@ pub fn resume_terminal_candidates() -> Vec<String> {
 #[cfg(not(unix))]
 pub fn resume_terminal_candidates() -> Vec<String> {
     let mut candidates = Vec::new();
-    if let Ok(term) = std::env::var("JCODE_TERMINAL") {
+    if let Ok(term) = product_env("TERMINAL") {
         push_unique_terminal(&mut candidates, term);
     }
     if let Some(term) = detected_resume_terminal() {
@@ -487,24 +488,24 @@ pub fn expand_home(program: &str) -> PathBuf {
 fn spawn_metadata_env(command: &TerminalCommand, cwd: &Path) -> Vec<(String, String)> {
     let mut env: Vec<(String, String)> = Vec::new();
     if let Some(kind) = &command.kind {
-        env.push(("JCODE_SPAWN_KIND".to_string(), kind.clone()));
+        env.push(("NEXT_CODE_SPAWN_KIND".to_string(), kind.clone()));
     }
     if let Some(session_id) = &command.session_id {
-        env.push(("JCODE_SPAWN_SESSION_ID".to_string(), session_id.clone()));
+        env.push(("NEXT_CODE_SPAWN_SESSION_ID".to_string(), session_id.clone()));
     }
     if let Some(title) = &command.title {
-        env.push(("JCODE_SPAWN_TITLE".to_string(), title.clone()));
+        env.push(("NEXT_CODE_SPAWN_TITLE".to_string(), title.clone()));
     }
     env.push((
-        "JCODE_SPAWN_CWD".to_string(),
+        "NEXT_CODE_SPAWN_CWD".to_string(),
         cwd.to_string_lossy().into_owned(),
     ));
     env.push((
-        "JCODE_SPAWN_PROGRAM".to_string(),
+        "NEXT_CODE_SPAWN_PROGRAM".to_string(),
         command.program.to_string_lossy().into_owned(),
     ));
     env.push((
-        "JCODE_SPAWN_COMMAND".to_string(),
+        "NEXT_CODE_SPAWN_COMMAND".to_string(),
         shell_command(&command_parts(command)),
     ));
     // Re-export the requesting client's terminal env so spawn/focus hooks use
@@ -515,7 +516,7 @@ fn spawn_metadata_env(command: &TerminalCommand, cwd: &Path) -> Vec<(String, Str
     // client's terminal from the server's.
     for (key, value) in &command.client_terminal_env {
         env.push((key.clone(), value.clone()));
-        env.push((format!("JCODE_CLIENT_{key}"), value.clone()));
+        env.push((format!("NEXT_CODE_CLIENT_{key}"), value.clone()));
     }
     env.extend(command.extra_env.iter().cloned());
     env
@@ -549,7 +550,7 @@ pub fn build_hook_spawn_command(
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     if command.fresh_spawn {
-        cmd.env("JCODE_FRESH_SPAWN", "1");
+        cmd.env("NEXT_CODE_FRESH_SPAWN", "1");
     }
     for (key, value) in spawn_metadata_env(command, cwd) {
         cmd.env(key, value);
@@ -565,7 +566,7 @@ fn build_spawn_command(term: &str, command: &TerminalCommand, cwd: &Path) -> Opt
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     if command.fresh_spawn {
-        cmd.env("JCODE_FRESH_SPAWN", "1");
+        cmd.env("NEXT_CODE_FRESH_SPAWN", "1");
     }
 
     match term {
@@ -585,7 +586,7 @@ fn build_spawn_command(term: &str, command: &TerminalCommand, cwd: &Path) -> Opt
                 .args(["-na", "Ghostty", "--args", "-e", "/bin/bash", "-lc"])
                 .arg(shell);
             if command.fresh_spawn {
-                cmd.env("JCODE_FRESH_SPAWN", "1");
+                cmd.env("NEXT_CODE_FRESH_SPAWN", "1");
             }
         }
         "kitty" => {
@@ -725,13 +726,13 @@ mod tests {
 
         assert_eq!(lookup("ZELLIJ_SESSION_NAME").as_deref(), Some("sessionB"));
         assert_eq!(
-            lookup("JCODE_CLIENT_ZELLIJ_SESSION_NAME").as_deref(),
+            lookup("NEXT_CODE_CLIENT_ZELLIJ_SESSION_NAME").as_deref(),
             Some("sessionB")
         );
         assert_eq!(lookup("DISPLAY").as_deref(), Some(":1"));
-        assert_eq!(lookup("JCODE_CLIENT_DISPLAY").as_deref(), Some(":1"));
+        assert_eq!(lookup("NEXT_CODE_CLIENT_DISPLAY").as_deref(), Some(":1"));
         // The first-class spawn metadata still flows through.
-        assert_eq!(lookup("JCODE_SPAWN_KIND").as_deref(), Some("swarm-agent"));
+        assert_eq!(lookup("NEXT_CODE_SPAWN_KIND").as_deref(), Some("swarm-agent"));
     }
 
     #[test]
@@ -741,7 +742,7 @@ mod tests {
             .session_id("ses_plain");
         let env = spawn_metadata_env(&command, Path::new("/tmp/work"));
         assert!(
-            !env.iter().any(|(k, _)| k.starts_with("JCODE_CLIENT_")),
+            !env.iter().any(|(k, _)| k.starts_with("NEXT_CODE_CLIENT_")),
             "no client terminal env should produce no JCODE_CLIENT_* keys"
         );
     }
@@ -895,7 +896,7 @@ mod tests {
         .title("🦊 jcode ses_abc")
         .kind("swarm-agent")
         .session_id("ses_abc")
-        .spawn_env("JCODE_SPAWN_SWARM_ID", "swarm-1")
+        .spawn_env("NEXT_CODE_SPAWN_SWARM_ID", "swarm-1")
         .fresh_spawn();
 
         let cmd = build_hook_spawn_command("tmux-hook --flag", &command, Path::new("/work/dir"))
@@ -917,35 +918,35 @@ mod tests {
         );
 
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_KIND").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_KIND").as_deref(),
             Some("swarm-agent")
         );
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_SESSION_ID").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_SESSION_ID").as_deref(),
             Some("ses_abc")
         );
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_TITLE").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_TITLE").as_deref(),
             Some("🦊 jcode ses_abc")
         );
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_CWD").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_CWD").as_deref(),
             Some("/work/dir")
         );
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_PROGRAM").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_PROGRAM").as_deref(),
             Some("/usr/local/bin/jcode")
         );
         #[cfg(unix)]
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_COMMAND").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_COMMAND").as_deref(),
             Some("'/usr/local/bin/jcode' '--resume' 'ses_abc'")
         );
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_SWARM_ID").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_SWARM_ID").as_deref(),
             Some("swarm-1")
         );
-        assert_eq!(env_value(&cmd, "JCODE_FRESH_SPAWN").as_deref(), Some("1"));
+        assert_eq!(env_value(&cmd, "NEXT_CODE_FRESH_SPAWN").as_deref(), Some("1"));
     }
 
     #[test]
@@ -961,11 +962,11 @@ mod tests {
         let cmd = build_spawn_command("kitty", &command, Path::new("/work/dir"))
             .expect("kitty spawn command should build");
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_KIND").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_KIND").as_deref(),
             Some("resume")
         );
         assert_eq!(
-            env_value(&cmd, "JCODE_SPAWN_SESSION_ID").as_deref(),
+            env_value(&cmd, "NEXT_CODE_SPAWN_SESSION_ID").as_deref(),
             Some("ses_abc")
         );
     }

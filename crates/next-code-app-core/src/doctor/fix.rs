@@ -1,4 +1,4 @@
-//! Auto-repair helpers for `jcode doctor --fix`.
+//! Auto-repair helpers for `next-code doctor --fix`.
 //!
 //! Non-destructive fixes (mkdir, chmod) run inline via [`try_autofix`].
 //! Destructive fixes (quarantining a corrupt file) go through [`quarantine`],

@@ -15,6 +15,7 @@
 //! Uses the Anthropic Messages API directly without the Python SDK.
 //! This provides better control and eliminates the Python dependency.
 
+use next_code_core::env::{product_env};
 use next_code_base::auth;
 use next_code_base::auth::oauth;
 use next_code_provider_core::{EventStream, NativeToolResultSender, Provider};
@@ -446,7 +447,7 @@ impl AnthropicProvider {
     }
 
     pub fn new() -> Self {
-        let model = std::env::var("JCODE_ANTHROPIC_MODEL").unwrap_or_else(|_| {
+        let model = std::env::var("NEXT_CODE_ANTHROPIC_MODEL").unwrap_or_else(|_| {
             if Self::is_usage_exhausted() {
                 "claude-sonnet-4-6".to_string()
             } else {
@@ -461,7 +462,7 @@ impl AnthropicProvider {
             })
         });
 
-        let max_tokens = std::env::var("JCODE_ANTHROPIC_MAX_TOKENS")
+        let max_tokens = product_env("ANTHROPIC_MAX_TOKENS")
             .ok()
             .and_then(|v| v.trim().parse::<u32>().ok())
             .unwrap_or(DEFAULT_MAX_TOKENS);
@@ -866,7 +867,7 @@ impl AnthropicProvider {
         // method that requests will actually use, instead of inferring it from
         // credential presence. `Auto` leaves the existing identity untouched.
         if let Some(route) = mode.auth_route(next_code_provider_core::DualAuthProvider::Anthropic) {
-            next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", route.runtime_provider_key());
+            next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", route.runtime_provider_key());
         }
         // Drop any cached auth snapshot so surfaces that still consult the cheap
         // cached probe (auto-mode resolution, usage availability, account labels)
@@ -1683,7 +1684,7 @@ async fn stream_response(
 ) -> Result<()> {
     use next_code_message_types::ConnectionPhase;
     let requested_model_base = strip_1m_suffix(&request.model).to_ascii_lowercase();
-    if std::env::var("JCODE_ANTHROPIC_DEBUG")
+    if product_env("ANTHROPIC_DEBUG")
         .map(|v| v == "1")
         .unwrap_or(false)
         && let Ok(json) = serde_json::to_string_pretty(&request)
@@ -2122,7 +2123,7 @@ fn process_sse_event(
                 // substitution (and surface it under JCODE_LOG_SERVED_MODEL).
                 if let Some(served) = parsed.message.model.as_deref() {
                     next_code_base::logging::info(&format!("Anthropic served model={}", served));
-                    if std::env::var("JCODE_LOG_SERVED_MODEL").is_ok() {
+                    if product_env("LOG_SERVED_MODEL").is_ok() {
                         eprintln!("[anthropic] served model={served}");
                     }
                     // Anthropic can silently alias an unavailable/retired model
@@ -2158,7 +2159,7 @@ fn process_sse_event(
                             "Anthropic granted service_tier={}",
                             tier
                         ));
-                        if std::env::var("JCODE_LOG_SERVICE_TIER").is_ok() {
+                        if product_env("LOG_SERVICE_TIER").is_ok() {
                             eprintln!("[anthropic] granted service_tier={tier}");
                         }
                     }

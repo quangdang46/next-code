@@ -672,7 +672,7 @@ fn test_anthropic_signed_thinking_replayed_in_request_blocks() {
 async fn live_anthropic_reasoning_smoke() -> Result<()> {
     let _env_lock = next_code_base::storage::lock_test_env();
     let using_api_key = std::env::var_os("ANTHROPIC_API_KEY").is_some();
-    let allow_oauth = std::env::var_os("JCODE_LIVE_ANTHROPIC_ALLOW_OAUTH").is_some();
+    let allow_oauth = std::env::var_os("NEXT_CODE_LIVE_ANTHROPIC_ALLOW_OAUTH").is_some();
     if !using_api_key && !allow_oauth {
         eprintln!(
             "skipping live Anthropic smoke: set ANTHROPIC_API_KEY or JCODE_LIVE_ANTHROPIC_ALLOW_OAUTH=1"
@@ -680,18 +680,18 @@ async fn live_anthropic_reasoning_smoke() -> Result<()> {
         return Ok(());
     }
 
-    let _max_tokens = EnvVarGuard::set_if_missing("JCODE_ANTHROPIC_MAX_TOKENS", "2048");
-    let model = std::env::var("JCODE_LIVE_ANTHROPIC_MODEL")
-        .or_else(|_| std::env::var("JCODE_ANTHROPIC_MODEL"))
+    let _max_tokens = EnvVarGuard::set_if_missing("NEXT_CODE_ANTHROPIC_MAX_TOKENS", "2048");
+    let model = std::env::var("NEXT_CODE_LIVE_ANTHROPIC_MODEL")
+        .or_else(|_| std::env::var("NEXT_CODE_ANTHROPIC_MODEL"))
         .unwrap_or_else(|_| "claude-sonnet-4-6".to_string());
-    let effort = std::env::var("JCODE_LIVE_ANTHROPIC_REASONING_EFFORT")
+    let effort = std::env::var("NEXT_CODE_LIVE_ANTHROPIC_REASONING_EFFORT")
         .unwrap_or_else(|_| "low".to_string());
-    let prompt = std::env::var("JCODE_LIVE_ANTHROPIC_PROMPT")
+    let prompt = std::env::var("NEXT_CODE_LIVE_ANTHROPIC_PROMPT")
         .unwrap_or_else(|_| "Live smoke test: answer exactly OK.".to_string());
-    let system = std::env::var("JCODE_LIVE_ANTHROPIC_SYSTEM").unwrap_or_else(|_| {
+    let system = std::env::var("NEXT_CODE_LIVE_ANTHROPIC_SYSTEM").unwrap_or_else(|_| {
         "You are a live provider smoke test. Keep the answer tiny.".to_string()
     });
-    let require_thinking = std::env::var_os("JCODE_LIVE_ANTHROPIC_REQUIRE_THINKING").is_some();
+    let require_thinking = std::env::var_os("NEXT_CODE_LIVE_ANTHROPIC_REQUIRE_THINKING").is_some();
 
     let provider = AnthropicProvider::new();
     provider.set_model(&model)?;
@@ -1543,16 +1543,16 @@ async fn test_sanitize_dangling_tool_ids_with_dots() {
 #[test]
 fn credential_mode_runtime_provider_identity_round_trips() {
     let _guard = next_code_base::storage::lock_test_env();
-    let previous = std::env::var_os("JCODE_RUNTIME_PROVIDER");
+    let previous = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER");
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "claude");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "claude");
     assert_eq!(
         AnthropicCredentialMode::from_runtime_env(next_code_provider_core::DualAuthProvider::Anthropic),
         AnthropicCredentialMode::OAuth,
         "OAuth selection must surface as the OAuth runtime identity"
     );
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "claude-api");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "claude-api");
     assert_eq!(
         AnthropicCredentialMode::from_runtime_env(next_code_provider_core::DualAuthProvider::Anthropic),
         AnthropicCredentialMode::ApiKey,
@@ -1560,8 +1560,8 @@ fn credential_mode_runtime_provider_identity_round_trips() {
     );
 
     match previous {
-        Some(value) => next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", value),
-        None => next_code_base::env::remove_var("JCODE_RUNTIME_PROVIDER"),
+        Some(value) => next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", value),
+        None => next_code_base::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER"),
     }
 }
 

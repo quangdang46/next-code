@@ -12,6 +12,7 @@ pub(crate) use self::auth_account_commands::{
 pub(super) use self::auth_types::{AccountCommand, PendingAccountInput, PendingLogin};
 
 use super::*;
+use crate::env::product_env;
 use crossterm::event::{KeyCode, KeyModifiers};
 use std::sync::Arc;
 
@@ -21,7 +22,7 @@ fn repeat_char(c: char, n: usize) -> String {
 
 impl App {
     fn open_auth_browser(url: &str) -> bool {
-        // Honors --no-browser/NO_BROWSER/JCODE_NO_BROWSER and never opens real
+        // Honors --no-browser/NO_BROWSER/NEXT_CODE_NO_BROWSER and never opens real
         // browser windows from test binaries (login flows are exercised by TUI
         // tests; without this guard a test run pops OAuth pages on the
         // developer's desktop).
@@ -51,19 +52,19 @@ impl App {
             );
             if let Some(target) = callback_target {
                 notices.push(format!(
-                    "Local callback target {} is unavailable, so jcode is using manual-safe paste completion instead.",
+                    "Local callback target {} is unavailable, so next-code is using manual-safe paste completion instead.",
                     target
                 ));
             } else {
                 notices.push(
-                    "The local callback listener is unavailable, so jcode is using manual-safe paste completion instead."
+                    "The local callback listener is unavailable, so next-code is using manual-safe paste completion instead."
                         .to_string(),
                 );
             }
         }
         if !notices.is_empty() {
             notices.push(format!(
-                "If login still fails, run jcode auth doctor {} for a guided diagnosis.",
+                "If login still fails, run next-code auth doctor {} for a guided diagnosis.",
                 provider_id
             ));
         }
@@ -193,11 +194,11 @@ impl App {
                                 == Some(&crate::subscription_api::AccountApiError::Unauthorized)
                             {
                                 let _ = crate::subscription_catalog::clear_account_credentials();
-                                "Jcode Account Status\n\nThe saved account key was revoked or expired. Local credentials were cleared. Use /account jcode login to sign in again."
+                                "Next Code Account Status\n\nThe saved account key was revoked or expired. Local credentials were cleared. Use /account next-code login to sign in again."
                                     .to_string()
                             } else {
                                 format!(
-                                    "Jcode Account Status\n\nCould not load /v1/me: {}\n\nThe local credential was retained. Retry /account jcode status, open /account jcode manage, or use /account jcode logout.",
+                                    "Next Code Account Status\n\nCould not load /v1/me: {}\n\nThe local credential was retained. Retry /account next-code status, open /account next-code manage, or use /account next-code logout.",
                                     error
                                 )
                             };
@@ -205,7 +206,7 @@ impl App {
                                 crate::bus::UiActivity::background(
                                     Some(session_id),
                                     message,
-                                    Some("Jcode account status unavailable"),
+                                    Some("Next Code account status unavailable"),
                                 ),
                             ));
                         }
@@ -613,7 +614,7 @@ impl App {
                     provider.auth_kind.label(),
                 );
                 self.push_display_message(DisplayMessage::error(
-                    "Google/Gmail login is only available from the CLI right now. Run jcode login --provider google."
+                    "Google/Gmail login is only available from the CLI right now. Run next-code login --provider google."
                         .to_string(),
                 ));
             }
@@ -635,14 +636,14 @@ impl App {
 
     fn start_jcode_login(&mut self) {
         self.push_display_message(DisplayMessage::system(
-            "Jcode Account Login\n\nRequesting a secure browser approval flow. No email or API key will be requested in the terminal."
+            "Next Code Account Login\n\nRequesting a secure browser approval flow. No email or API key will be requested in the terminal."
                 .to_string(),
         ));
-        self.set_status_notice("Jcode account: requesting browser approval");
+        self.set_status_notice("Next Code account: requesting browser approval");
         let session_id = self.session.id.clone();
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
             self.push_display_message(DisplayMessage::error(
-                "Jcode account login requires the async runtime.".to_string(),
+                "Next Code account login requires the async runtime.".to_string(),
             ));
             return;
         };
@@ -674,10 +675,10 @@ impl App {
                 Err(error) => {
                     publish(
                         format!(
-                            "Jcode Account Login\n\nCould not start browser approval: {}\n\nRetry /account jcode login. No credential was saved.",
+                            "Next Code Account Login\n\nCould not start browser approval: {}\n\nRetry /account next-code login. No credential was saved.",
                             error
                         ),
-                        "Jcode account login failed",
+                        "Next Code account login failed",
                     );
                     return;
                 }
@@ -686,7 +687,7 @@ impl App {
             let opened = App::open_auth_browser(&device.verification_uri_complete);
             publish(
                 format!(
-                    "Jcode Account Login\n\n{}\n\nApprove the request in the same browser. Jcode is waiting for the single-use exchange.{}",
+                    "Next Code Account Login\n\n{}\n\nApprove the request in the same browser. Next Code is waiting for the single-use exchange.{}",
                     device.verification_uri_complete,
                     if opened {
                         ""
@@ -694,7 +695,7 @@ impl App {
                         "\n\nThe browser could not be opened automatically. Open the public URL above manually."
                     }
                 ),
-                "Jcode account: waiting for browser approval",
+                "Next Code account: waiting for browser approval",
             );
 
             let approved = {
@@ -724,7 +725,7 @@ impl App {
                                 .to_string(),
                         ),
                         Ok(TokenPollOutcome::Denied) => break Err(
-                            "Jcode account login was canceled or denied in the browser."
+                            "Next Code account login was canceled or denied in the browser."
                                 .to_string(),
                         ),
                         Err(error) if error.is_temporary() => backoff.on_offline_error(),
@@ -736,8 +737,8 @@ impl App {
                 Ok(approved) => approved,
                 Err(error) => {
                     publish(
-                        format!("Jcode Account Login\n\n{error}\n\nRetry /account jcode login."),
-                        "Jcode account login stopped",
+                        format!("Next Code Account Login\n\n{error}\n\nRetry /account next-code login."),
+                        "Next Code account login stopped",
                     );
                     return;
                 }
@@ -750,18 +751,18 @@ impl App {
                 Some(&approved.tier),
             ) {
                 publish(
-                    format!("Jcode Account Login\n\nBrowser approval succeeded, but secure credential persistence failed: {error}"),
-                    "Jcode account credential save failed",
+                    format!("Next Code Account Login\n\nBrowser approval succeeded, but secure credential persistence failed: {error}"),
+                    "Next Code account credential save failed",
                 );
                 return;
             }
             crate::auth::AuthStatus::invalidate_cache();
             publish(
                 format!(
-                    "Jcode Account Approved\n\nSigned in as {}. The key is stored with owner-only permissions. Waiting for an active paid plan on /v1/me...",
+                    "Next Code Account Approved\n\nSigned in as {}. The key is stored with owner-only permissions. Waiting for an active paid plan on /v1/me...",
                     approved.email
                 ),
-                "Jcode account: waiting for plan activation",
+                "Next Code account: waiting for plan activation",
             );
 
             match crate::subscription_api::poll_for_paid_activation(
@@ -775,30 +776,30 @@ impl App {
             {
                 ActivationOutcome::Active(me) => publish(
                     format!(
-                        "Jcode Account Ready\n\n{} is active for {}.\n\nStatus: /account jcode status\nManage: /account jcode manage\nLogout: /account jcode logout",
+                        "Next Code Account Ready\n\n{} is active for {}.\n\nStatus: /account next-code status\nManage: /account next-code manage\nLogout: /account next-code logout",
                         me.parsed_tier()
                             .map(|tier| tier.display_name().to_string())
                             .unwrap_or(me.tier),
                         me.email
                     ),
-                    "Jcode account plan active",
+                    "Next Code account plan active",
                 ),
                 ActivationOutcome::Canceled(_) => publish(
-                    "Jcode Account Login\n\nCheckout was canceled. The valid account key remains saved, but no paid plan is active.\n\nStatus: /account jcode status\nManage: /account jcode manage\nLogout: /account jcode logout".to_string(),
-                    "Jcode account plan not active",
+                    "Next Code Account Login\n\nCheckout was canceled. The valid account key remains saved, but no paid plan is active.\n\nStatus: /account next-code status\nManage: /account next-code manage\nLogout: /account next-code logout".to_string(),
+                    "Next Code account plan not active",
                 ),
                 ActivationOutcome::TimedOut { last_error_was_offline } => publish(
                     format!(
-                        "Jcode Account Login\n\nPlan activation was not confirmed before timeout{}. The valid account key remains saved.\n\nStatus: /account jcode status\nManage: /account jcode manage\nLogout: /account jcode logout",
+                        "Next Code Account Login\n\nPlan activation was not confirmed before timeout{}. The valid account key remains saved.\n\nStatus: /account next-code status\nManage: /account next-code manage\nLogout: /account next-code logout",
                         if last_error_was_offline { " because the API remained unreachable" } else { "" }
                     ),
-                    "Jcode account activation pending",
+                    "Next Code account activation pending",
                 ),
                 ActivationOutcome::Revoked | ActivationOutcome::Denied => {
                     let _ = crate::subscription_catalog::clear_account_credentials();
                     publish(
-                        "Jcode Account Login\n\nThe issued key was revoked or denied during activation checks. Local credentials were cleared. Retry /account jcode login.".to_string(),
-                        "Jcode account key rejected",
+                        "Next Code Account Login\n\nThe issued key was revoked or denied during activation checks. Local credentials were cleared. Retry /account next-code login.".to_string(),
+                        "Next Code account key rejected",
                     );
                 }
             }
@@ -809,7 +810,7 @@ impl App {
         let url = crate::subscription_catalog::JCODE_ACCOUNT_URL;
         let opened = Self::open_auth_browser(url);
         self.push_display_message(DisplayMessage::system(format!(
-            "Jcode Account Management\n\n{}{}",
+            "Next Code Account Management\n\n{}{}",
             url,
             if opened {
                 "\n\nOpened in your browser."
@@ -817,21 +818,21 @@ impl App {
                 "\n\nThe browser could not be opened automatically. Open the public URL above manually."
             }
         )));
-        self.set_status_notice("Jcode account management");
+        self.set_status_notice("Next Code account management");
     }
 
     pub(super) fn start_jcode_account_logout(&mut self) {
-        self.set_status_notice("Jcode account: logging out");
+        self.set_status_notice("Next Code account: logging out");
         let session_id = self.session.id.clone();
         let Ok(handle) = tokio::runtime::Handle::try_current() else {
             let result = crate::subscription_catalog::clear_account_credentials();
             match result {
                 Ok(()) => self.push_display_message(DisplayMessage::system(
-                    "Jcode account credentials and cache were cleared locally. Remote revocation could not be attempted without the async runtime."
+                    "Next Code account credentials and cache were cleared locally. Remote revocation could not be attempted without the async runtime."
                         .to_string(),
                 )),
                 Err(error) => self.push_display_message(DisplayMessage::error(format!(
-                    "Failed to clear local Jcode account credentials: {error}"
+                    "Failed to clear local Next Code account credentials: {error}"
                 ))),
             }
             return;
@@ -852,21 +853,21 @@ impl App {
             crate::auth::AuthStatus::invalidate_cache();
             let message = match local {
                 Err(error) => format!(
-                    "Jcode Account Logout\n\nFailed to securely clear local credentials: {error}"
+                    "Next Code Account Logout\n\nFailed to securely clear local credentials: {error}"
                 ),
                 Ok(()) => match (api_key.is_some(), remote) {
-                    (false, _) => "Jcode Account Logout\n\nNo local credential was present. Local account cache is clear.".to_string(),
-                    (true, Ok(())) => "Jcode Account Logout\n\nThe current key was revoked. Local credentials and account cache were securely cleared.".to_string(),
-                    (true, Err(crate::subscription_api::AccountApiError::Unauthorized)) => "Jcode Account Logout\n\nThe key was already revoked. Local credentials and account cache were securely cleared.".to_string(),
-                    (true, Err(crate::subscription_api::AccountApiError::Offline(_))) => "Jcode Account Logout\n\nLocal credentials and account cache were securely cleared. The API was offline, so remote revocation could not be confirmed.".to_string(),
-                    (true, Err(error)) => format!("Jcode Account Logout\n\nLocal credentials and account cache were securely cleared. Remote revocation could not be confirmed: {error}"),
+                    (false, _) => "Next Code Account Logout\n\nNo local credential was present. Local account cache is clear.".to_string(),
+                    (true, Ok(())) => "Next Code Account Logout\n\nThe current key was revoked. Local credentials and account cache were securely cleared.".to_string(),
+                    (true, Err(crate::subscription_api::AccountApiError::Unauthorized)) => "Next Code Account Logout\n\nThe key was already revoked. Local credentials and account cache were securely cleared.".to_string(),
+                    (true, Err(crate::subscription_api::AccountApiError::Offline(_))) => "Next Code Account Logout\n\nLocal credentials and account cache were securely cleared. The API was offline, so remote revocation could not be confirmed.".to_string(),
+                    (true, Err(error)) => format!("Next Code Account Logout\n\nLocal credentials and account cache were securely cleared. Remote revocation could not be confirmed: {error}"),
                 },
             };
             crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
                 crate::bus::UiActivity::background(
                     Some(session_id),
                     message,
-                    Some("Jcode account logout complete"),
+                    Some("Next Code account logout complete"),
                 ),
             ));
         });
@@ -1645,7 +1646,7 @@ impl App {
         let provider_id = openai_compatible_profile
             .map(|profile| profile.id.to_string())
             .unwrap_or_else(|| match key_name {
-                crate::subscription_catalog::JCODE_API_KEY_ENV => "jcode".to_string(),
+                crate::subscription_catalog::JCODE_API_KEY_ENV => "next-code".to_string(),
                 "OPENROUTER_API_KEY" => "openrouter".to_string(),
                 _ => provider.to_ascii_lowercase().replace(' ', "-"),
             });
@@ -1671,7 +1672,7 @@ impl App {
     fn start_azure_login(&mut self) {
         self.push_display_message(DisplayMessage::system(
             "Azure OpenAI Login\n\n\
-             jcode uses Azure OpenAI's /openai/v1 API with either Microsoft Entra ID or an API key.\n\n\
+             next-code uses Azure OpenAI's /openai/v1 API with either Microsoft Entra ID or an API key.\n\n\
              Enter your Azure OpenAI endpoint, for example https://your-resource.openai.azure.com, or type /cancel to abort."
                 .to_string(),
         ));
@@ -1686,7 +1687,7 @@ impl App {
             "Cursor API Key\n\n\
              Get your API key from: https://cursor.com/settings\n\
              (Dashboard > Integrations > User API Keys)\n\n\
-             jcode will save it securely and use the native Cursor HTTPS transport.\n\n\
+             next-code will save it securely and use the native Cursor HTTPS transport.\n\n\
              Paste your API key below, or type /cancel to abort."
                 .to_string(),
         ));
@@ -2206,7 +2207,7 @@ impl App {
                 // Record the key-save attempt before touching disk. This is the
                 // single most important breadcrumb for issue #312 ("paste API
                 // key for OpenAI-compatible/opencode silently returns to menu"):
-                // it proves the input was received and which env var/file jcode
+                // it proves the input was received and which env var/file next-code
                 // tried to write, without logging the key itself.
                 crate::logging::event_info(
                     "login_api_key_save_attempt",
@@ -2309,7 +2310,7 @@ impl App {
                         if key_name == crate::provider::bedrock::API_KEY_ENV {
                             crate::provider::activation::lock_runtime_provider_key("bedrock");
                             if let Some(default_model) = default_model.as_deref() {
-                                crate::env::set_var("JCODE_BEDROCK_MODEL", default_model);
+                                crate::env::set_var("NEXT_CODE_BEDROCK_MODEL", default_model);
                             }
                         }
 
@@ -2338,15 +2339,15 @@ impl App {
                             )
                         } else if let Some(resolved) = resolved_openai_compatible.as_ref() {
                             if resolved.requires_api_key {
-                                "Fetching models now. Jcode will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes. If the model list looks stale, run /refresh-model-list.".to_string()
+                                "Fetching models now. Next Code will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes. If the model list looks stale, run /refresh-model-list.".to_string()
                             } else {
                                 format!(
-                                    "Local endpoint configured at {}. Fetching models now; Jcode will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes. If the model list looks stale, run /refresh-model-list.",
+                                    "Local endpoint configured at {}. Fetching models now; Next Code will switch to an accessible model returned by the live catalog and show the catalog diff when discovery finishes. If the model list looks stale, run /refresh-model-list.",
                                     endpoint.as_deref().unwrap_or(resolved.api_base.as_str()),
                                 )
                             }
                         } else if key_name == crate::provider::bedrock::API_KEY_ENV {
-                            "You can now use /model to switch to Bedrock models. TUI onboarding saved region us-east-2; for a different region, run jcode login --provider bedrock from a terminal.".to_string()
+                            "You can now use /model to switch to Bedrock models. TUI onboarding saved region us-east-2; for a different region, run next-code login --provider bedrock from a terminal.".to_string()
                         } else if key_name == "OPENROUTER_API_KEY" {
                             "You can now use /model to switch to OpenRouter models. If the model list looks stale, run /refresh-model-list.".to_string()
                         } else {
@@ -2370,7 +2371,7 @@ impl App {
                             success: true,
                             message: format!(
                                 "{}.\n\n\
-                                 Stored at ~/.config/jcode/{}.\n\
+                                 Stored at ~/.config/next-code/{}.\n\
                                  {}{}",
                                 saved_label, env_file, guidance, model_hint
                             ),
@@ -2431,7 +2432,7 @@ impl App {
                         }
                     };
                     if let Err(err) = crate::provider_catalog::save_env_value_to_env_file(
-                        "JCODE_OPENAI_COMPAT_API_BASE",
+                        "NEXT_CODE_OPENAI_COMPAT_API_BASE",
                         crate::provider_catalog::OPENAI_COMPAT_PROFILE.env_file,
                         Some(&normalized),
                     ) {
@@ -2566,8 +2567,8 @@ impl App {
                             provider: "cursor".to_string(),
                             success: true,
                             message: "Cursor API key saved.\n\n\
-                             Stored at ~/.config/jcode/cursor.env.\n\
-                             jcode will use it with the native Cursor HTTPS transport."
+                             Stored at ~/.config/next-code/cursor.env.\n\
+                             next-code will use it with the native Cursor HTTPS transport."
                                 .to_string(),
                         }));
                     }
@@ -2659,7 +2660,7 @@ impl App {
                 .as_deref()
                 .is_some_and(|model| !model.trim().is_empty());
         let runtime_provider_forced =
-            std::env::var("JCODE_FORCE_PROVIDER")
+            product_env("FORCE_PROVIDER")
                 .ok()
                 .is_some_and(|value| {
                     matches!(
@@ -2905,7 +2906,7 @@ impl App {
             crate::bus::UiActivity::catalog(
                 Some(self.session.id.clone()),
                 format!(
-                    "{} Model Discovery Started\n\nSaved credentials are active. Jcode is fetching the live model catalog, will only switch to a model returned by that catalog, and will show what changed when discovery finishes.",
+                    "{} Model Discovery Started\n\nSaved credentials are active. Next Code is fetching the live model catalog, will only switch to a model returned by that catalog, and will show what changed when discovery finishes.",
                     provider_label
                 ),
                 Some(format!("{}: fetching models...", provider_label)),
@@ -3062,7 +3063,7 @@ impl App {
                                 crate::bus::UiActivity::catalog(
                                     Some(session_id),
                                     format!(
-                                        "{} Model Discovery Still Updating\n\nSaved credentials are active, but this local refresh pass did not find a selectable {} route yet. Jcode is still processing the auth-change catalog refresh and will switch once provider routes are available. If the model list still looks stale after the auth catalog update, run /refresh-model-list.",
+                                        "{} Model Discovery Still Updating\n\nSaved credentials are active, but this local refresh pass did not find a selectable {} route yet. Next Code is still processing the auth-change catalog refresh and will switch once provider routes are available. If the model list still looks stale after the auth catalog update, run /refresh-model-list.",
                                         provider_label, provider_label
                                     ),
                                     Some(format!(
@@ -3085,7 +3086,7 @@ impl App {
                             crate::bus::UiActivity::catalog(
                                 Some(session_id),
                                 format!(
-                                    "{} Model Discovery Still Updating\n\nSaved credentials are active, but this local refresh pass failed before the server auth-change catalog refresh finished. Jcode is still processing the auth-change catalog refresh and will switch once provider routes are available. If the model list still looks stale after the auth catalog update, run /refresh-model-list.\n\nLocal refresh error: {}",
+                                    "{} Model Discovery Still Updating\n\nSaved credentials are active, but this local refresh pass failed before the server auth-change catalog refresh finished. Next Code is still processing the auth-change catalog refresh and will switch once provider routes are available. If the model list still looks stale after the auth catalog update, run /refresh-model-list.\n\nLocal refresh error: {}",
                                     provider_label, error
                                 ),
                                 Some(format!(
@@ -3294,7 +3295,7 @@ impl App {
             success: true,
             message: format!(
                 "Azure OpenAI configuration saved.\n\n\
-                 Stored at ~/.config/jcode/{}.\n\
+                 Stored at ~/.config/next-code/{}.\n\
                  {}\n\n\
                  Use /model after your Azure deployment exists. If the model list looks stale, run /refresh-model-list.",
                 crate::auth::azure::ENV_FILE,
@@ -3316,7 +3317,7 @@ fn save_tui_openai_compatible_api_base(
             anyhow::anyhow!("OpenAI-compatible API base must be https://... or http://localhost.")
         })?;
         crate::provider_catalog::save_env_value_to_env_file(
-            "JCODE_OPENAI_COMPAT_API_BASE",
+            "NEXT_CODE_OPENAI_COMPAT_API_BASE",
             crate::provider_catalog::OPENAI_COMPAT_PROFILE.env_file,
             Some(&normalized),
         )?;

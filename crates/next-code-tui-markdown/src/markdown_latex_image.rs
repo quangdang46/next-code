@@ -71,16 +71,16 @@ struct Toolchain {
 impl Toolchain {
     fn from_environment() -> Self {
         Self {
-            latex: std::env::var_os("JCODE_LATEX_COMMAND")
+            latex: std::env::var_os("NEXT_CODE_LATEX_COMMAND")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("latex")),
-            dvipng: std::env::var_os("JCODE_DVIPNG_COMMAND")
+            dvipng: std::env::var_os("NEXT_CODE_DVIPNG_COMMAND")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("dvipng")),
-            pdflatex: std::env::var_os("JCODE_PDFLATEX_COMMAND")
+            pdflatex: std::env::var_os("NEXT_CODE_PDFLATEX_COMMAND")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("pdflatex")),
-            pdftocairo: std::env::var_os("JCODE_PDFTOCAIRO_COMMAND")
+            pdftocairo: std::env::var_os("NEXT_CODE_PDFTOCAIRO_COMMAND")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from("pdftocairo")),
         }
@@ -159,7 +159,7 @@ fn render_artifact_in(
     }
 
     let work = tempfile::Builder::new()
-        .prefix("jcode-latex-")
+        .prefix("next-code-latex-")
         .tempdir()
         .map_err(|e| format!("create LaTeX workspace: {e}"))?;
     let tex_path = work.path().join("formula.tex");
@@ -294,7 +294,7 @@ fn recolor_and_crop(path: &Path, dpi: u16) -> Result<(), String> {
 
 fn cache_dir() -> Result<PathBuf, String> {
     dirs::cache_dir()
-        .map(|path| path.join("jcode").join("latex"))
+        .map(|path| path.join("next-code").join("latex"))
         .ok_or_else(|| "no user cache directory is available".to_string())
 }
 
@@ -316,7 +316,7 @@ fn run_command<const N: usize>(
     args: [&str; N],
     working_dir: &Path,
 ) -> Result<(), String> {
-    let output_path = working_dir.join(".jcode-command-output.log");
+    let output_path = working_dir.join(".next-code-command-output.log");
     let stdout = File::create(&output_path)
         .map_err(|e| format!("create {} diagnostics: {e}", executable.display()))?;
     let stderr = stdout
@@ -458,7 +458,7 @@ mod tests {
     #[test]
     fn missing_toolchain_returns_an_error_without_panicking() {
         let cache = tempfile::tempdir().unwrap();
-        let missing = PathBuf::from("/definitely/missing/jcode-latex-command");
+        let missing = PathBuf::from("/definitely/missing/next-code-latex-command");
         let result = render_artifact_in(
             "unique_missing_toolchain_test_4815162342",
             false,
@@ -512,7 +512,7 @@ mod tests {
         assert_eq!((artifact.width, artifact.height), (7, 3));
         assert!(artifact.path.starts_with(&cache));
 
-        let missing = PathBuf::from("/definitely/missing/jcode-latex-command");
+        let missing = PathBuf::from("/definitely/missing/next-code-latex-command");
         let cached = render_artifact_in(
             r"\frac{x+1}{y}",
             true,

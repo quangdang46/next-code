@@ -80,30 +80,30 @@ fn write_test_api_key(temp: &TempDir, env_file: &str, env_key: &str, value: &str
 
 fn isolate_openrouter_autodetect_env() -> Vec<EnvVarGuard> {
     let mut guards = vec![
-        EnvVarGuard::remove("JCODE_OPENROUTER_API_BASE"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_API_KEY_NAME"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_ENV_FILE"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_MODEL"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_ALLOW_NO_AUTH"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_TRANSPORT_STATE"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_PROVIDER_FEATURES"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_MODEL_CATALOG"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_AUTH_HEADER"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_AUTH_HEADER_NAME"),
-        EnvVarGuard::remove("JCODE_OPENROUTER_STATIC_MODELS"),
-        EnvVarGuard::remove("JCODE_ACTIVE_PROVIDER"),
-        EnvVarGuard::remove("JCODE_RUNTIME_PROVIDER"),
-        EnvVarGuard::remove("JCODE_NAMED_PROVIDER_PROFILE"),
-        EnvVarGuard::remove("JCODE_PROVIDER_PROFILE_NAME"),
-        EnvVarGuard::remove("JCODE_PROVIDER_PROFILE_ACTIVE"),
-        EnvVarGuard::remove("JCODE_OPENAI_COMPAT_API_BASE"),
-        EnvVarGuard::remove("JCODE_OPENAI_COMPAT_API_KEY_NAME"),
-        EnvVarGuard::remove("JCODE_OPENAI_COMPAT_ENV_FILE"),
-        EnvVarGuard::remove("JCODE_OPENAI_COMPAT_SETUP_URL"),
-        EnvVarGuard::remove("JCODE_OPENAI_COMPAT_DEFAULT_MODEL"),
-        EnvVarGuard::remove("JCODE_OPENAI_COMPAT_LOCAL_ENABLED"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_API_BASE"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_API_KEY_NAME"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_ENV_FILE"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_MODEL"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_TRANSPORT_STATE"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_MODEL_CATALOG"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_AUTH_HEADER"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_AUTH_HEADER_NAME"),
+        EnvVarGuard::remove("NEXT_CODE_OPENROUTER_STATIC_MODELS"),
+        EnvVarGuard::remove("NEXT_CODE_ACTIVE_PROVIDER"),
+        EnvVarGuard::remove("NEXT_CODE_RUNTIME_PROVIDER"),
+        EnvVarGuard::remove("NEXT_CODE_NAMED_PROVIDER_PROFILE"),
+        EnvVarGuard::remove("NEXT_CODE_PROVIDER_PROFILE_NAME"),
+        EnvVarGuard::remove("NEXT_CODE_PROVIDER_PROFILE_ACTIVE"),
+        EnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_API_BASE"),
+        EnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_API_KEY_NAME"),
+        EnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_ENV_FILE"),
+        EnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_SETUP_URL"),
+        EnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL"),
+        EnvVarGuard::remove("NEXT_CODE_OPENAI_COMPAT_LOCAL_ENABLED"),
     ];
     guards.extend(
         next_code_base::provider_catalog::openai_compatible_profiles()
@@ -252,7 +252,7 @@ fn openai_compatible_models_endpoint_reads_llamacpp_meta_n_ctx() {
 #[test]
 fn named_openai_compatible_provider_sets_catalog_cache_namespace() {
     let _lock = ENV_LOCK.lock();
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
     let _key = EnvVarGuard::set("TEST_NAMED_COMPAT_KEY", "test-key");
 
     let profile = next_code_base::config::NamedProviderConfig {
@@ -267,7 +267,7 @@ fn named_openai_compatible_provider_sets_catalog_cache_namespace() {
         .expect("named profile should initialize");
 
     assert_eq!(
-        std::env::var("JCODE_OPENROUTER_CACHE_NAMESPACE").as_deref(),
+        std::env::var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE").as_deref(),
         Ok("example-compat")
     );
 }
@@ -275,7 +275,7 @@ fn named_openai_compatible_provider_sets_catalog_cache_namespace() {
 #[test]
 fn named_openai_compatible_provider_exposes_static_models_as_routes() {
     let _lock = ENV_LOCK.lock();
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
     let _key = EnvVarGuard::set("TEST_NAMED_COMPAT_KEY", "test-key");
 
     let profile = next_code_base::config::NamedProviderConfig {
@@ -304,7 +304,7 @@ fn named_openai_compatible_provider_exposes_static_models_as_routes() {
 #[test]
 fn direct_openai_compatible_provider_advertises_image_input_support() {
     let _lock = ENV_LOCK.lock();
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
 
     let profile = next_code_base::config::NamedProviderConfig {
         base_url: "http://localhost:1234/v1".to_string(),
@@ -322,7 +322,7 @@ fn direct_openai_compatible_provider_advertises_image_input_support() {
 #[test]
 fn named_openai_compatible_provider_uses_per_model_image_input_support() {
     let _lock = ENV_LOCK.lock();
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
 
     let profile = next_code_base::config::NamedProviderConfig {
         base_url: "http://localhost:1234/v1".to_string(),
@@ -625,7 +625,7 @@ fn interrupted_reasoning_only_assistant_message_keeps_reasoning_with_content() {
 #[test]
 fn kimi_for_coding_tool_call_message_includes_reasoning_content() {
     let _lock = ENV_LOCK.lock();
-    let _thinking = EnvVarGuard::remove("JCODE_OPENROUTER_THINKING");
+    let _thinking = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_THINKING");
     let (api_base, request_rx) = spawn_single_response_chat_server();
     let provider = OpenRouterProvider {
         api_base,
@@ -808,7 +808,7 @@ fn openai_compatible_profiles_with_unverified_live_catalogs_have_static_fallback
 #[test]
 fn comtegra_profile_uses_endpoint_default_max_tokens() {
     let _lock = ENV_LOCK.lock();
-    let _override = EnvVarGuard::remove("JCODE_OPENROUTER_MAX_TOKENS");
+    let _override = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_MAX_TOKENS");
 
     assert_eq!(
         OpenRouterProvider::configured_max_tokens(Some("comtegra")),
@@ -823,7 +823,7 @@ fn comtegra_profile_uses_endpoint_default_max_tokens() {
 #[test]
 fn max_tokens_env_overrides_profile_default() {
     let _lock = ENV_LOCK.lock();
-    let _override = EnvVarGuard::set("JCODE_OPENROUTER_MAX_TOKENS", "4096");
+    let _override = EnvVarGuard::set("NEXT_CODE_OPENROUTER_MAX_TOKENS", "4096");
 
     assert_eq!(
         OpenRouterProvider::configured_max_tokens(Some("comtegra")),
@@ -834,29 +834,29 @@ fn max_tokens_env_overrides_profile_default() {
 #[test]
 fn test_configured_api_base_accepts_https() {
     let _lock = ENV_LOCK.lock();
-    let prev = std::env::var("JCODE_OPENROUTER_API_BASE").ok();
+    let prev = std::env::var("NEXT_CODE_OPENROUTER_API_BASE").ok();
     next_code_base::env::set_var(
-        "JCODE_OPENROUTER_API_BASE",
+        "NEXT_CODE_OPENROUTER_API_BASE",
         "https://api.groq.com/openai/v1/",
     );
     assert_eq!(configured_api_base(), "https://api.groq.com/openai/v1");
     if let Some(value) = prev {
-        next_code_base::env::set_var("JCODE_OPENROUTER_API_BASE", value);
+        next_code_base::env::set_var("NEXT_CODE_OPENROUTER_API_BASE", value);
     } else {
-        next_code_base::env::remove_var("JCODE_OPENROUTER_API_BASE");
+        next_code_base::env::remove_var("NEXT_CODE_OPENROUTER_API_BASE");
     }
 }
 
 #[test]
 fn test_configured_api_base_rejects_insecure_http_remote() {
     let _lock = ENV_LOCK.lock();
-    let prev = std::env::var("JCODE_OPENROUTER_API_BASE").ok();
-    next_code_base::env::set_var("JCODE_OPENROUTER_API_BASE", "http://example.com/v1");
+    let prev = std::env::var("NEXT_CODE_OPENROUTER_API_BASE").ok();
+    next_code_base::env::set_var("NEXT_CODE_OPENROUTER_API_BASE", "http://example.com/v1");
     assert_eq!(configured_api_base(), DEFAULT_API_BASE);
     if let Some(value) = prev {
-        next_code_base::env::set_var("JCODE_OPENROUTER_API_BASE", value);
+        next_code_base::env::set_var("NEXT_CODE_OPENROUTER_API_BASE", value);
     } else {
-        next_code_base::env::remove_var("JCODE_OPENROUTER_API_BASE");
+        next_code_base::env::remove_var("NEXT_CODE_OPENROUTER_API_BASE");
     }
 }
 
@@ -934,29 +934,29 @@ fn openrouter_transport_state_distinguishes_runtime_identities() {
     assert!(OpenRouterTransportState::from_current_env(None).accrues_user_api_key_cost());
     assert!(OpenRouterTransportState::from_current_env(None).is_real_openrouter());
 
-    next_code_base::env::set_var("JCODE_OPENROUTER_TRANSPORT_STATE", "direct-api-key");
+    next_code_base::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "direct-api-key");
     assert_eq!(
         OpenRouterTransportState::from_current_env(None),
         OpenRouterTransportState::DirectApiKey
     );
-    next_code_base::env::remove_var("JCODE_OPENROUTER_TRANSPORT_STATE");
+    next_code_base::env::remove_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE");
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "openrouter");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openrouter");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("openrouter")),
         OpenRouterTransportState::OpenRouterApiKey
     );
     assert!(OpenRouterTransportState::from_current_env(Some("openrouter")).is_real_openrouter());
-    next_code_base::env::remove_var("JCODE_RUNTIME_PROVIDER");
+    next_code_base::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "jcode");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "jcode");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("jcode")),
         OpenRouterTransportState::JcodeSubscription
     );
     assert!(!OpenRouterTransportState::from_current_env(Some("jcode")).accrues_user_api_key_cost());
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "next-code");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "next-code");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("next-code")),
         OpenRouterTransportState::JcodeSubscription
@@ -965,13 +965,13 @@ fn openrouter_transport_state_distinguishes_runtime_identities() {
         !OpenRouterTransportState::from_current_env(Some("next-code")).accrues_user_api_key_cost()
     );
 
-    next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", "openai-compatible");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openai-compatible");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("openai-compatible")),
         OpenRouterTransportState::DirectApiKey
     );
 
-    next_code_base::env::set_var("JCODE_OPENROUTER_ALLOW_NO_AUTH", "1");
+    next_code_base::env::set_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH", "1");
     assert_eq!(
         OpenRouterTransportState::from_current_env(Some("openai-compatible")),
         OpenRouterTransportState::DirectNoAuth
@@ -981,9 +981,9 @@ fn openrouter_transport_state_distinguishes_runtime_identities() {
             .accrues_user_api_key_cost()
     );
 
-    next_code_base::env::remove_var("JCODE_OPENROUTER_ALLOW_NO_AUTH");
-    next_code_base::env::remove_var("JCODE_RUNTIME_PROVIDER");
-    next_code_base::env::set_var("JCODE_NAMED_PROVIDER_PROFILE", "my-gateway");
+    next_code_base::env::remove_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH");
+    next_code_base::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
+    next_code_base::env::set_var("NEXT_CODE_NAMED_PROVIDER_PROFILE", "my-gateway");
     assert_eq!(
         OpenRouterTransportState::from_current_env(None),
         OpenRouterTransportState::DirectApiKey
@@ -1041,7 +1041,7 @@ fn autodetected_profile_seeds_default_model_and_cache_namespace() {
     let provider = OpenRouterProvider::new().expect("provider");
     assert_eq!(provider.model.blocking_read().clone(), "glm-4.5");
     assert_eq!(
-        std::env::var("JCODE_OPENROUTER_CACHE_NAMESPACE")
+        std::env::var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE")
             .ok()
             .as_deref(),
         Some("zai")
@@ -1325,8 +1325,8 @@ fn openrouter_chat_request_sends_unified_reasoning_effort() {
 }
 
 fn live_openrouter_models() -> Vec<String> {
-    std::env::var("JCODE_LIVE_OPENROUTER_MODELS")
-        .or_else(|_| std::env::var("JCODE_OPENROUTER_MODEL"))
+    std::env::var("NEXT_CODE_LIVE_OPENROUTER_MODELS")
+        .or_else(|_| std::env::var("NEXT_CODE_OPENROUTER_MODEL"))
         .unwrap_or_else(|_| "anthropic/claude-sonnet-4.6".to_string())
         .split([',', '\n'])
         .map(str::trim)
@@ -1377,9 +1377,9 @@ async fn live_openrouter_unified_reasoning_smoke() -> Result<()> {
     };
 
     let models = live_openrouter_models();
-    let effort = std::env::var("JCODE_LIVE_OPENROUTER_REASONING_EFFORT")
+    let effort = std::env::var("NEXT_CODE_LIVE_OPENROUTER_REASONING_EFFORT")
         .unwrap_or_else(|_| "low".to_string());
-    let max_tokens = std::env::var("JCODE_LIVE_OPENROUTER_MAX_TOKENS")
+    let max_tokens = std::env::var("NEXT_CODE_LIVE_OPENROUTER_MAX_TOKENS")
         .ok()
         .and_then(|value| value.trim().parse::<u32>().ok())
         .unwrap_or(1024);
@@ -1496,7 +1496,7 @@ fn openai_compatible_model_catalog_refresh_calls_models_endpoint_and_updates_dis
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _namespace = EnvVarGuard::set(
-        "JCODE_OPENROUTER_CACHE_NAMESPACE",
+        "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
         "test-openai-compatible-flow",
     );
     let (api_base, request_rx) = spawn_single_response_models_server(
@@ -1581,7 +1581,7 @@ fn built_in_openai_compatible_static_models_drop_out_after_live_catalog() {
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _namespace = EnvVarGuard::set(
-        "JCODE_OPENROUTER_CACHE_NAMESPACE",
+        "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
         "test-cerebras-live-catalog-filters-static-fallback",
     );
     let (api_base, _request_rx) = spawn_single_response_models_server(
@@ -1675,12 +1675,12 @@ fn cerebras_live_catalog_models_are_selectable_on_explicit_switch() {
 #[test]
 fn direct_deepseek_profile_uses_static_1m_context_when_catalog_is_absent() {
     let _lock = ENV_LOCK.lock();
-    let _base = EnvVarGuard::set("JCODE_OPENROUTER_API_BASE", "https://api.deepseek.com");
-    let _key_name = EnvVarGuard::set("JCODE_OPENROUTER_API_KEY_NAME", "DEEPSEEK_API_KEY");
+    let _base = EnvVarGuard::set("NEXT_CODE_OPENROUTER_API_BASE", "https://api.deepseek.com");
+    let _key_name = EnvVarGuard::set("NEXT_CODE_OPENROUTER_API_KEY_NAME", "DEEPSEEK_API_KEY");
     let _api_key = EnvVarGuard::set("DEEPSEEK_API_KEY", "test");
-    let _namespace = EnvVarGuard::set("JCODE_OPENROUTER_CACHE_NAMESPACE", "deepseek");
-    let _model = EnvVarGuard::set("JCODE_OPENROUTER_MODEL", "deepseek-v4-flash");
-    let _catalog = EnvVarGuard::set("JCODE_OPENROUTER_MODEL_CATALOG", "0");
+    let _namespace = EnvVarGuard::set("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", "deepseek");
+    let _model = EnvVarGuard::set("NEXT_CODE_OPENROUTER_MODEL", "deepseek-v4-flash");
+    let _catalog = EnvVarGuard::set("NEXT_CODE_OPENROUTER_MODEL_CATALOG", "0");
 
     let provider = OpenRouterProvider::new().expect("provider");
 
@@ -1690,7 +1690,7 @@ fn direct_deepseek_profile_uses_static_1m_context_when_catalog_is_absent() {
 #[test]
 fn named_openai_compatible_model_context_window_overrides_default() {
     let _lock = ENV_LOCK.lock();
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
     let mut config = next_code_base::config::NamedProviderConfig {
         base_url: "https://compat.example.test/v1".to_string(),
         api_key: Some("test".to_string()),
@@ -1717,7 +1717,7 @@ fn named_profile_context_window_survives_provider_qualified_model() {
     // resolve the configured per-model context_window rather than falling
     // through to the (large) provider default and over-budgeting the request.
     let _lock = ENV_LOCK.lock();
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
     let mut config = next_code_base::config::NamedProviderConfig {
         base_url: "http://10.15.15.53:8080/v1".to_string(),
         auth: next_code_base::config::NamedProviderAuth::None,
@@ -1751,7 +1751,7 @@ fn named_openai_compatible_loads_api_key_from_env_file() {
     let _xdg = EnvVarGuard::set("XDG_CONFIG_HOME", temp.path());
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
     let _api_key = EnvVarGuard::remove("CUSTOM_API_KEY");
     write_test_api_key(&temp, "custom.env", "CUSTOM_API_KEY", "from-env-file");
 
@@ -2220,7 +2220,7 @@ fn runtime_display_name_for_profile_runtime_instance() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("jcode-home");
-    let _jcode_home = EnvVarGuard::set("JCODE_HOME", &next_code_home);
+    let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env();
@@ -2237,7 +2237,7 @@ fn runtime_display_name_for_profile_runtime_instance() {
 #[test]
 fn resolve_extra_body_returns_none_when_unset() {
     let _lock = ENV_LOCK.lock();
-    let _guard = EnvVarGuard::remove("JCODE_OPENAI_EXTRA_BODY");
+    let _guard = EnvVarGuard::remove("NEXT_CODE_OPENAI_EXTRA_BODY");
     assert!(OpenRouterProvider::resolve_extra_body(None, "nonexistent.env").is_none());
 }
 
@@ -2245,7 +2245,7 @@ fn resolve_extra_body_returns_none_when_unset() {
 fn resolve_extra_body_parses_env_json_object() {
     let _lock = ENV_LOCK.lock();
     let _guard = EnvVarGuard::set(
-        "JCODE_OPENAI_EXTRA_BODY",
+        "NEXT_CODE_OPENAI_EXTRA_BODY",
         r#"{"chat_template_kwargs":{"thinking":true,"reasoning_effort":"high"}}"#,
     );
     let extra =
@@ -2264,14 +2264,14 @@ fn resolve_extra_body_parses_env_json_object() {
 #[test]
 fn resolve_extra_body_ignores_invalid_env_json() {
     let _lock = ENV_LOCK.lock();
-    let _guard = EnvVarGuard::set("JCODE_OPENAI_EXTRA_BODY", "not-json");
+    let _guard = EnvVarGuard::set("NEXT_CODE_OPENAI_EXTRA_BODY", "not-json");
     assert!(OpenRouterProvider::resolve_extra_body(None, "nonexistent.env").is_none());
 }
 
 #[test]
 fn resolve_extra_body_ignores_non_object_env_json() {
     let _lock = ENV_LOCK.lock();
-    let _guard = EnvVarGuard::set("JCODE_OPENAI_EXTRA_BODY", "[1,2,3]");
+    let _guard = EnvVarGuard::set("NEXT_CODE_OPENAI_EXTRA_BODY", "[1,2,3]");
     assert!(OpenRouterProvider::resolve_extra_body(None, "nonexistent.env").is_none());
 }
 
@@ -2283,7 +2283,7 @@ fn resolve_extra_body_merges_config_and_env_with_env_override() {
         "config_only": 1,
     });
     let _guard = EnvVarGuard::set(
-        "JCODE_OPENAI_EXTRA_BODY",
+        "NEXT_CODE_OPENAI_EXTRA_BODY",
         r#"{"chat_template_kwargs":{"thinking":true},"env_only":2}"#,
     );
     let extra = OpenRouterProvider::resolve_extra_body(Some(&config), "nonexistent.env")
@@ -2303,7 +2303,7 @@ fn resolve_extra_body_merges_config_and_env_with_env_override() {
 #[test]
 fn resolve_extra_body_ignores_non_object_config() {
     let _lock = ENV_LOCK.lock();
-    let _guard = EnvVarGuard::remove("JCODE_OPENAI_EXTRA_BODY");
+    let _guard = EnvVarGuard::remove("NEXT_CODE_OPENAI_EXTRA_BODY");
     let config = serde_json::json!("not an object");
     assert!(OpenRouterProvider::resolve_extra_body(Some(&config), "nonexistent.env").is_none());
 }
@@ -2313,11 +2313,11 @@ fn named_profile_extra_body_threads_into_provider() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("jcode-home");
-    let _jcode_home = EnvVarGuard::set("JCODE_HOME", &next_code_home);
+    let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env();
-    let _extra_guard = EnvVarGuard::remove("JCODE_OPENAI_EXTRA_BODY");
+    let _extra_guard = EnvVarGuard::remove("NEXT_CODE_OPENAI_EXTRA_BODY");
 
     let mut profile = next_code_base::config::NamedProviderConfig {
         base_url: "https://integrate.api.nvidia.com/v1".to_string(),
@@ -2370,7 +2370,7 @@ reasoning_effort = "high"
 
     // And the resolver hands it back unchanged when no env override is set.
     let _lock = ENV_LOCK.lock();
-    let _guard = EnvVarGuard::remove("JCODE_OPENAI_EXTRA_BODY");
+    let _guard = EnvVarGuard::remove("NEXT_CODE_OPENAI_EXTRA_BODY");
     let resolved =
         OpenRouterProvider::resolve_extra_body(profile.extra_body.as_ref(), "nonexistent.env")
             .expect("resolved extra body");
@@ -2653,7 +2653,7 @@ fn named_profile_supports_reasoning_effort_config_override() {
 #[test]
 fn named_profile_construction_reads_openai_reasoning_effort_config() {
     let _lock = ENV_LOCK.lock();
-    let _namespace = EnvVarGuard::remove("JCODE_OPENROUTER_CACHE_NAMESPACE");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
 
     let config = next_code_base::config::NamedProviderConfig {
         base_url: "https://compat.example.test/v1".to_string(),
@@ -2695,7 +2695,7 @@ fn user_named_profile_prefix_is_stripped_even_without_profile_id() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
     let next_code_home = temp.path().join("jcode-home");
-    let _jcode_home = EnvVarGuard::set("JCODE_HOME", &next_code_home);
+    let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
     let _env = isolate_openrouter_autodetect_env();

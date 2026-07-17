@@ -1,4 +1,4 @@
-import JCodeKit
+import NextCodeKit
 import SwiftUI
 
 /// Collapsible tool call card with live status.

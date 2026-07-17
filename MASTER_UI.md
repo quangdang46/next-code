@@ -1,4 +1,4 @@
-# MASTER_UI.md — jcode TUI Redesign Specification
+# MASTER_UI.md — next-code TUI Redesign Specification
 > Full UI/UX spec with ASCII mockups + UX descriptions for every feature
 > Based on research: Claude Code + OpenCode + Codex
 > Stack: Rust + ratatui + crossterm
@@ -400,14 +400,14 @@ Hidden (toggle again):
 Running:
 
 ┌─ Bash ──────────────────────────────────────────────────────────────┐
-│ $ cargo test --lib jcode-tui                                       │
+│ $ cargo test --lib next-code-tui                                       │
 │ ⠋ running... 2.3s                                                  │
 └─────────────────────────────────────────────────────────────────────┘
 
 Completed (success):
 
 ┌─ Bash ──────────────────────────────────────────────────────────────┐
-│ $ cargo test --lib jcode-tui                                       │
+│ $ cargo test --lib next-code-tui                                       │
 │ ✓ exit: 0                                                          │
 │   test result: ok. 42 passed; 0 failed; 0 ignored                  │
 │                                                                    │
@@ -1058,7 +1058,7 @@ First launch (no messages):
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                     │
 │                                                                     │
-│                        jcode                                        │
+│                        next-code                                        │
 │                      v0.1.0                                          │
 │                                                                     │
 │              "What can I help you with?"                             │
@@ -1080,7 +1080,7 @@ Step 1 — Welcome:
 
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                     │
-│                    Welcome to jcode                                  │
+│                    Welcome to next-code                                  │
 │                                                                     │
 │              Let's set up your environment.                         │
 │                                                                     │
@@ -1341,9 +1341,9 @@ Running shell command:
 ┌─ Shell ──────────────────────────────────────────────────────────────┐
 │ $ cargo build --release                                              │
 │                                                                    │
-│    Compiling jcode-tui v0.1.0                                        │
-│    Compiling jcode-core v0.1.0                                       │
-│    Compiling jcode v0.1.0                                            │
+│    Compiling next-code-tui v0.1.0                                        │
+│    Compiling next-code-core v0.1.0                                       │
+│    Compiling next-code v0.1.0                                            │
 │ ⠋ building... 8.5s                                                  │
 └─────────────────────────────────────────────────────────────────────┘
 
@@ -1353,9 +1353,9 @@ Completed shell (scrolling output):
 │ $ cargo build --release                                              │
 │ ✓ exit: 0  (12.3s)                                                  │
 │                                                                    │
-│    Compiling jcode-tui v0.1.0                                        │
-│    Compiling jcode-core v0.1.0                                       │
-│    Compiling jcode v0.1.0                                            │
+│    Compiling next-code-tui v0.1.0                                        │
+│    Compiling next-code-core v0.1.0                                       │
+│    Compiling next-code v0.1.0                                            │
 │     Finished release [optimized] target(s) in 12.3s                  │
 │                                                                    │
 │ [Use up/down to scroll output, Ctrl+C to interrupt]                 │
@@ -1827,15 +1827,15 @@ Trigger: /files, or side panel toggle
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │ 📁 crates/                                                          │
-│  📁 jcode-tui/                                     ~42 files        │
+│  📁 next-code-tui/                                     ~42 files        │
 │   📁 src/                                                           │
 │    📁 tui/                                                          │
 │     📄 app.rs                                    ◄ active           │
 │     📄 keybind.rs                                                   │
 │     📄 ui.rs                                      ≡ modified        │
 │     📄 mod.rs                                                       │
-│  📁 jcode-tui-core/                               ~8 files          │
-│  📁 jcode-tui-style/                              ~6 files          │
+│  📁 next-code-tui-core/                               ~8 files          │
+│  📁 next-code-tui-style/                              ~6 files          │
 │ 📁 docs/                                                             │
 │ 📁 tests/                                                            │
 │ 📄 Cargo.toml                                                        │
@@ -1875,7 +1875,7 @@ Trigger: /config
 │   Language:      en                    ▸ en | vi | ja               │
 │                                                                      │
 │ ▸ Keys & Shortcuts                                                  │
-│   Keybindings:   ~/.jcode/keybinds.json   [e] edit file             │
+│   Keybindings:   ~/.next-code/keybinds.json   [e] edit file             │
 │   Leader Key:    Ctrl+X                  ▸ change                   │
 │   Vim Mode:      off                     ▸ toggle                   │
 │                                                                      │
@@ -1900,7 +1900,7 @@ Trigger: /plugins
 │ Plugins                  ⚡ 3 enabled / 8 available                 │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│ ✓ jcode-pro           1.2.0    Enhanced provider support            │
+│ ✓ next-code-pro           1.2.0    Enhanced provider support            │
 │ ✓ mermaid-rs          0.3.1    Mermaid diagram rendering            │
 │ ✓ swarm-core          0.1.0    Multi-agent orchestration           │
 │ ☐ lsp-support         0.2.0    LSP integration                      │
@@ -1919,9 +1919,9 @@ Trigger: /plugins
 │ Renders Mermaid diagrams inline in the TUI using                      │
 │ the kitty terminal image protocol.                                   │
 │                                                                      │
-│ Author: jcode team                                                   │
+│ Author: next-code team                                                   │
 │ License: MIT                                                         │
-│ Source: ~/.jcode/plugins/mermaid-rs/                                 │
+│ Source: ~/.next-code/plugins/mermaid-rs/                                 │
 │ Dependencies: none                                                    │
 │                                                                      │
 │ [d] disable  [u] uninstall  [b] back                                │
@@ -1943,7 +1943,7 @@ Side panel widget:
 │ feat/tui-redesign          ≡ 3 files modified                       │
 │                                                                      │
 │  M  MASTER_UI.md                                                    │
-│  M  crates/jcode-tui/src/ui.rs                                     │
+│  M  crates/next-code-tui/src/ui.rs                                     │
 │  ?? untracked_file.rs                                               │
 │                                                                      │
 │ Recent commits:                                                      │
@@ -1972,7 +1972,7 @@ Shows version history and changes.
 Trigger: /changelog or on version upgrade
 
 ┌─────────────────────────────────────────────────────────────────────┐
-│ Changelog                               jcode v0.1.0 (Jun 2026)    │
+│ Changelog                               next-code v0.1.0 (Jun 2026)    │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │ v0.1.0 — Jun 26, 2026                                                │
@@ -2033,7 +2033,7 @@ Trigger: Ctrl+` (backtick) or /notifications
 │ ✓ Build successful                          12.3s ago    [dismiss]  │
 │ ⚠ Rate limit approaching (87%)              5m ago      [dismiss]  │
 │ ✓ Sub-agent: research-auth completed         10m ago     [dismiss]  │
-│ ℹ Session saved to ~/.jcode/last_session     15m ago     [dismiss]  │
+│ ℹ Session saved to ~/.next-code/last_session     15m ago     [dismiss]  │
 │ ✗ Connection lost (recovered)                1h ago      [dismiss]  │
 │                                                                      │
 │ ───── older ─────                                                     │
@@ -2121,12 +2121,12 @@ One-time dialog for experimental features.
 │                                                                      │
 │   Enable Continue Mode?                                              │
 │                                                                      │
-│   This lets jcode continue working autonomously after               │
+│   This lets next-code continue working autonomously after               │
 │   a task completes. Use this for overnight runs or                  │
 │   long-running code reviews.                                        │
 │                                                                      │
 │   What it does:                                                      │
-│   • After a task completes, jcode will continue until                │
+│   • After a task completes, next-code will continue until                │
 │     you press Ctrl+C                                                 │
 │   • Runs in a loop: plan → execute → verify → repeat                │
 │   • Tokens are used incrementally                                    │
@@ -2824,13 +2824,13 @@ Customize what appears in the terminal window/tab title.
 Trigger: /title
 
 ┌─ Terminal Title Configuration ─────────────────────────────────────┐
-│ "jcode — project-name — spinner — cwd"   [live preview]           │
+│ "next-code — project-name — spinner — cwd"   [live preview]           │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│ ▸ [✓] App name              jcode                                  │
-│   [✓] Project name          jcode (from Cargo.toml)                │
+│ ▸ [✓] App name              next-code                                  │
+│   [✓] Project name          next-code (from Cargo.toml)                │
 │   [✓] Spinner animation     ⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏                          │
-│   [✓] Current directory     ~/Projects/jcode                      │
+│   [✓] Current directory     ~/Projects/next-code                      │
 │   [ ] Git branch            feat/tui-redesign                      │
 │   [ ] Status indicator      🎯 Fix auth bug                        │
 │   [ ] Model name            sonnet-4                               │
@@ -2846,7 +2846,7 @@ Bottom of the dialog shows the actual rendered title:
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ Terminal title will be:                                             │
-│  jcode — jcode — ⠋ — ~/Projects/jcode                             │
+│  next-code — next-code — ⠋ — ~/Projects/next-code                             │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -2887,7 +2887,7 @@ Terminal-based desktop notifications for key events.
 ```
 Terminal title flash:
 
-┌─ jcode — ⠋ — ✗ Command blocked — ~/Projects ─────────────────────┐
+┌─ next-code — ⠋ — ✗ Command blocked — ~/Projects ─────────────────────┐
                           ↑ notification shown in title
 
 OSC 9 escape sequence (supported by Ghostty, iTerm2, Kitty, Warp, WezTerm):
@@ -2911,7 +2911,7 @@ Turn starts                   | info    | "Working on: Fix auth bug..."
 ### Configuration
 
 ```
-~/.jcode/config.toml:
+~/.next-code/config.toml:
 
 [notifications]
 enabled = true
@@ -3191,7 +3191,7 @@ Metadata side panel on the session screen.
 │ Chat                                 │ Session                     │
 │                                      │ ───────────────────────── │
 │                                      │ Title: Fix auth bug         │
-│                                      │ Workspace: jcode ●          │
+│                                      │ Workspace: next-code ●          │
 │                                      │ Share: 🔗 [copy link]      │
 │                                      │                              │
 │                                      │ ── Context ──               │
@@ -3223,8 +3223,8 @@ Trigger: /workspace
 │ Workspaces                                     [+] create          │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│ ▸ jcode (current)           git worktree    ● active                │
-│   jcode-v2                  git worktree    ○                       │
+│ ▸ next-code (current)           git worktree    ● active                │
+│   next-code-v2                  git worktree    ○                       │
 │   blog                      local           ○                       │
 │                                                                      │
 │ [Enter] switch  [d] delete  [r] rename  [c] create  q:close        │
@@ -3235,7 +3235,7 @@ Create dialog:
 ┌─ Create Workspace ─────────────────────────────────────────────────┐
 │ Workspace name:                                                    │
 │ ┌──────────────────────────────────────────────────────────────┐  │
-│ │ jcode-new                                                    │  │
+│ │ next-code-new                                                    │  │
 │ └──────────────────────────────────────────────────────────────┘  │
 │                                                                     │
 │ Type: (●) git worktree  (○) local directory  (○) clone repo       │
@@ -3253,7 +3253,7 @@ Landing page displayed on app start or /new.
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                                                                      │
-│                        jcode                                        │
+│                        next-code                                        │
 │                                                                      │
 │              ┌──────────────────────────────────────────────┐       │
 │              │  What can I help you with?                   │       │
@@ -3595,7 +3595,7 @@ Compact status bar on session screen showing services status.
 ```
 Shown in the bottom slot area:
 
-│ ~/Projects/jcode    ● MCP:4  ⚠ 1  ● LSP:2  [🔐 1 pending]         │
+│ ~/Projects/next-code    ● MCP:4  ⚠ 1  ● LSP:2  [🔐 1 pending]         │
 │                      ↑ MCP with error   ↑ permission request       │
 
 When disconnected:
@@ -3648,7 +3648,7 @@ When an MCP server requests user input:
 │           └────────────────────────────────────────────────────┘   │
 │                                                                     │
 │   repo:   ┌────────────────────────────────────────────────────┐   │
-│           │ jcode                                              │   │
+│           │ next-code                                              │   │
 │           └────────────────────────────────────────────────────┘   │
 │                                                                     │
 │   title:  ┌────────────────────────────────────────────────────┐   │
@@ -3969,7 +3969,7 @@ Shows:
 │ Name:       ┌────────────────────────────────────────────────────┐  │
 │             │ research-auth                                      │  │
 │             └────────────────────────────────────────────────────┘  │
-│ Source:     (●) Project (./agents/)  (○) User (~/.jcode/agents/)  │
+│ Source:     (●) Project (./agents/)  (○) User (~/.next-code/agents/)  │
 │                                                                     │
 │ Prompt:     ┌────────────────────────────────────────────────────┐ │
 │             │ Research auth patterns in the codebase.           │ │
@@ -4070,7 +4070,7 @@ Research mode activation:
 ┌─ RLM ────────────────────────────────────────────────────────────────┐
 │ 🧪 Research/REPL Mode                                               │
 │                                                                      │
-│   Started at ~/Projects/jcode                                       │
+│   Started at ~/Projects/next-code                                       │
 │   Kernel: Python 3.12 (persistent)                                  │
 │   Tools: python, read, web_search, bash (sandboxed)                 │
 │                                                                      │
@@ -4668,7 +4668,7 @@ MASTER_UI.md now covers: 110 sections + 10 appendices
 │ Codex                      │ ~14  │ 0      │ ~14  │
 │ OpenCode                   │ ~24  │ 0      │ ~24  │
 │ oh-my-pi                   │ ~0   │ 0      │ ~0   │
-│ jcode unique               │ ~5   │ 0      │ ~5   │
+│ next-code unique               │ ~5   │ 0      │ ~5   │
 │ gajae-code                 │ ~0   │ 2      │ ~2   │
 │ kimchi                     │ ~0   │ 4      │ ~4   │
 │ qwen-code                  │ ~0   │ 3      │ ~3   │

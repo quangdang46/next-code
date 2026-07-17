@@ -1,7 +1,7 @@
 //! Issue #113: programmatic orchestration API.
 //!
 //! Tiny request → execution shim that lets external harnesses
-//! (jcode-server bindings, external code review bots, CI runners,
+//! (next-code-server bindings, external code review bots, CI runners,
 //! testing tooling) submit a "spawn an agent task" request without
 //! going through the TUI or the WebSocket gateway.
 //!
@@ -11,7 +11,7 @@
 //!   - No multi-turn (single turn per request)
 //!   - No swarm coordination
 //!
-//! Useful for harnesses that want to drive jcode programmatically
+//! Useful for harnesses that want to drive next-code programmatically
 //! and only need the "send prompt → get final result" surface.
 //!
 //! ## Quick start

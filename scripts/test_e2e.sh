@@ -15,11 +15,11 @@ echo ""
 
 # Test 1: Check binary exists and runs
 echo "Test 1: Check next-code binary..."
-if command -v jcode &> /dev/null; then
-    echo "✓ jcode binary found"
-    jcode --version
+if command -v next-code &> /dev/null; then
+    echo "✓ next-code binary found"
+    next-code --version
 else
-    echo "✗ jcode binary not found"
+    echo "✗ next-code binary not found"
     exit 1
 fi
 
@@ -71,6 +71,6 @@ echo ""
 echo "=== All tests passed! ==="
 echo ""
 echo "To test interactively:"
-echo "  jcode        # Start TUI mode"
-echo "  jcode server # Start server mode"
-echo "  jcode client # Connect to server"
+echo "  next-code        # Start TUI mode"
+echo "  next-code server # Start server mode"
+echo "  next-code client # Connect to server"

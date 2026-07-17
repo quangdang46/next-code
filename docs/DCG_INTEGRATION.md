@@ -1,6 +1,6 @@
-# DCG Integration Plan — jcode Implementation
+# DCG Integration Plan — next-code Implementation
 
-> What to build in `/data/projects/jcode`
+> What to build in `/data/projects/next-code`
 > Synthesized from 9-repo research, dcg-core analysis, 3 rounds QA interview, discussion
 > Date: 2026-05-30
 > Branch: experiment/dcg-permission-modes
@@ -13,7 +13,7 @@
 
 | Topic | Decision | Source |
 |-------|----------|--------|
-| **YOLO classifier** | ✅ Built in jcode only — `src/yolo_classifier.rs` | Discussion |
+| **YOLO classifier** | ✅ Built in next-code only — `src/yolo_classifier.rs` | Discussion |
 | **YOLO model** | Reuse active provider (zero extra cost). 2-stage: fast 64 tokens + thinking 4096 tokens. Fail closed. | Research + Discussion |
 | **YOLO circuit breaker** | 3 consecutive YOLO denials → fallback to interactive prompt | Research + Discussion |
 | **Mode cycling** | Yes, Shift+Tab full cycle (6 modes) in TUI | Round 2 QA |
@@ -29,10 +29,10 @@
 ## 1. Architecture
 
 ```
-jcode (consumer)
+next-code (consumer)
 ─────────────────────────────────────────────────────
 CLI flags: --permission-mode, --dangerously-skip-permissions
-Config: .jcode/config.toml (TOML)
+Config: .next-code/config.toml (TOML; legacy dual-read: `.jcode/config.toml`)
 TUI: mode cycling (Shift+Tab), permission dialogs
 
 ┌───────────── yolo_classifier.rs ─────────────────┐
@@ -77,7 +77,7 @@ Engine::evaluate(session, tool_call, mode, effects)
 | dcg-core git dep (branch=main) | ✅ Done | `Cargo.toml` |
 | `--permission-mode` CLI flag (6 modes) | ✅ Done | `src/cli/args.rs` |
 | `--dangerously-skip-permissions` CLI flag | ✅ Done | `src/cli/args.rs` |
-| `JCODE_PERMISSION_MODE` env var | ✅ Done | `src/cli/startup.rs` |
+| `NEXT_CODE_PERMISSION_MODE` env var (legacy dual-read: `JCODE_PERMISSION_MODE`) | ✅ Done | `src/cli/startup.rs` |
 | dcg_bridge adapter | ✅ Done | `src/dcg_bridge.rs` |
 | BridgeDecision → ActionTier mapping | ✅ Done | `src/safety.rs` |
 | Engine + Session + ProtectedPaths integration | ✅ Done | `src/dcg_bridge.rs` |
@@ -116,7 +116,7 @@ fn handle_shift_tab(current_mode: Mode) -> Mode {
 **UI indicator:**
 ```
 ┌──────────────────────────────────────────────────────┐
-│ jcode v0.13.0  │ 🔒 Plan Mode  │ Claude Opus 4.8    │
+│ next-code v0.13.0  │ 🔒 Plan Mode  │ Claude Opus 4.8    │
 ├──────────────────────────────────────────────────────┤
 │  [Shift+Tab to change mode]                          │
 └──────────────────────────────────────────────────────┘
@@ -198,8 +198,8 @@ fn handle_shift_tab(current_mode: Mode) -> Mode {
 
 **Resolution chain:**
 ```
-CLI --permission-mode > JCODE_PERMISSION_MODE env >
-  project .jcode/config.toml > user ~/.jcode/config.toml > Mode::Default
+CLI --permission-mode > NEXT_CODE_PERMISSION_MODE env (legacy dual-read: `JCODE_PERMISSION_MODE`) >
+  project .next-code/config.toml > user ~/.next-code/config.toml > Mode::Default
 ```
 
 **TOML config:**
@@ -246,9 +246,9 @@ impl DcgBridge {
 
 **What:** LLM-based auto-approval when Mode::Auto is active.
 
-**Why in jcode, NOT dcg-core:**
+**Why in next-code, NOT dcg-core:**
 - dcg consumers use dcg as CLI hook (exit codes), not Rust library
-- Only jcode links dcg-core as Cargo dependency
+- Only next-code links dcg-core as Cargo dependency
 - YOLO needs LLM — consumer-specific
 
 **Two-stage approach (from claude-code):**
@@ -391,7 +391,7 @@ Phase 3.2 TUI Permission Dialogs
 Phase 3.3 Config Loading (TOML)
     │
     ▼
-Phase 3.4 YOLO Classifier (jcode-only, NOT dcg-core)
+Phase 3.4 YOLO Classifier (next-code-only, NOT dcg-core)
 Phase 3.5 Subagent Permissions
 Phase 3.6 MCP Unified Pipeline
 ```

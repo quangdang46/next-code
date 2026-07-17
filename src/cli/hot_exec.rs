@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use anyhow::Result;
 use std::process::Command as ProcessCommand;
 
@@ -39,7 +40,7 @@ pub fn hot_restart(session_id: &str) -> Result<()> {
 
     crate::logging::info(&format!("Restarting with current binary: {:?}", exe));
 
-    crate::env::set_var("JCODE_RESUMING", "1");
+    crate::env::set_var("NEXT_CODE_RESUMING", "1");
 
     let mut cmd = ProcessCommand::new(&exe);
     if is_selfdev {
@@ -54,9 +55,9 @@ pub fn hot_restart(session_id: &str) -> Result<()> {
 pub fn hot_reload(session_id: &str) -> Result<()> {
     let cwd = std::env::current_dir()?;
 
-    crate::env::set_var("JCODE_RESUMING", "1");
+    crate::env::set_var("NEXT_CODE_RESUMING", "1");
 
-    if let Ok(migrate_binary) = std::env::var("JCODE_MIGRATE_BINARY") {
+    if let Ok(migrate_binary) = product_env("MIGRATE_BINARY") {
         let binary_path = std::path::PathBuf::from(&migrate_binary);
         if binary_path.exists() {
             crate::logging::info("Migrating to stable binary...");
@@ -64,7 +65,7 @@ pub fn hot_reload(session_id: &str) -> Result<()> {
             cmd.arg("--resume")
                 .arg(session_id)
                 .arg("--no-update")
-                .env_remove("JCODE_MIGRATE_BINARY")
+                .env_remove("NEXT_CODE_MIGRATE_BINARY")
                 .current_dir(cwd);
             let err = crate::platform::replace_process(&mut cmd);
             return Err(anyhow::anyhow!("Failed to exec {:?}: {}", binary_path, err));
@@ -161,7 +162,7 @@ pub fn hot_update(session_id: &str) -> Result<()> {
 
                     update::print_centered(&format!("Restarting with session {}...", session_id));
 
-                    crate::env::set_var("JCODE_RESUMING", "1");
+                    crate::env::set_var("NEXT_CODE_RESUMING", "1");
 
                     let mut cmd = ProcessCommand::new(&exe);
                     if is_selfdev {
@@ -195,7 +196,7 @@ pub fn hot_update(session_id: &str) -> Result<()> {
         }
     }
 
-    crate::env::set_var("JCODE_RESUMING", "1");
+    crate::env::set_var("NEXT_CODE_RESUMING", "1");
     let exe = std::env::current_exe()?;
     let is_selfdev = crate::cli::selfdev::client_selfdev_requested();
     let mut cmd = ProcessCommand::new(&exe);

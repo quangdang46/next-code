@@ -52,7 +52,7 @@ fn test_skill_prompt_integration() {
     let prompt = build_system_prompt(Some(skill_prompt), &[]);
 
     // The prompt should contain our default system prompt
-    assert!(prompt.contains("Your name is Jcode."));
+    assert!(prompt.contains("Your name is Next Code."));
 
     // The prompt should contain the skill prompt
     assert!(prompt.contains(skill_prompt));
@@ -70,9 +70,9 @@ fn test_skill_prompt_integration() {
 #[test]
 fn test_load_agents_md_files_uses_sandboxed_global_files() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
     std::fs::create_dir_all(temp.path().join("external")).unwrap();
 
     std::fs::write(
@@ -91,9 +91,9 @@ fn test_load_agents_md_files_uses_sandboxed_global_files() {
     assert!(content.contains("sandboxed global agents instructions"));
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
@@ -105,7 +105,7 @@ fn test_session_context_includes_time_timezone_and_system_info() {
     assert!(context.contains("Timezone: UTC"));
     assert!(context.contains("OS: "));
     assert!(context.contains("Architecture: "));
-    assert!(context.contains("Jcode version: "));
+    assert!(context.contains("Next Code version: "));
     assert!(!context.contains("Working directory: "));
     assert!(!context.contains("Git:"));
 }
@@ -128,9 +128,9 @@ fn sponsored_discovery_is_not_injected_into_the_system_prompt() {
 #[test]
 fn test_prompt_overlay_files_are_loaded_from_project_and_global_jcode_dirs() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
     std::fs::create_dir_all(temp.path()).unwrap();
     std::fs::write(
         temp.path().join("prompt-overlay.md"),
@@ -139,9 +139,9 @@ fn test_prompt_overlay_files_are_loaded_from_project_and_global_jcode_dirs() {
     .unwrap();
 
     let project_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(project_dir.path().join(".jcode")).unwrap();
+    std::fs::create_dir_all(project_dir.path().join(".next-code")).unwrap();
     std::fs::write(
-        project_dir.path().join(".jcode/prompt-overlay.md"),
+        project_dir.path().join(".next-code/prompt-overlay.md"),
         "project prompt overlay instructions",
     )
     .unwrap();
@@ -166,18 +166,18 @@ fn test_prompt_overlay_files_are_loaded_from_project_and_global_jcode_dirs() {
     assert!(info.prompt_overlay_chars > 0);
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[test]
 fn test_preferred_tools_files_are_loaded_from_project_and_global_jcode_dirs() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
     std::fs::create_dir_all(temp.path()).unwrap();
     std::fs::write(
         temp.path().join("preferred-tools.md"),
@@ -186,9 +186,9 @@ fn test_preferred_tools_files_are_loaded_from_project_and_global_jcode_dirs() {
     .unwrap();
 
     let project_dir = tempfile::TempDir::new().unwrap();
-    std::fs::create_dir_all(project_dir.path().join(".jcode")).unwrap();
+    std::fs::create_dir_all(project_dir.path().join(".next-code")).unwrap();
     std::fs::write(
-        project_dir.path().join(".jcode/preferred-tools.md"),
+        project_dir.path().join(".next-code/preferred-tools.md"),
         "project preferred tools instructions",
     )
     .unwrap();
@@ -198,7 +198,7 @@ fn test_preferred_tools_files_are_loaded_from_project_and_global_jcode_dirs() {
     assert!(direct.0.is_some(), "expected preferred tools content");
     let direct_content = direct.0.unwrap();
     assert!(
-        direct_content.contains("Project Preferred Tools (.jcode/preferred-tools.md)"),
+        direct_content.contains("Project Preferred Tools (.next-code/preferred-tools.md)"),
         "expected project preferred tools section heading"
     );
     assert!(
@@ -206,7 +206,7 @@ fn test_preferred_tools_files_are_loaded_from_project_and_global_jcode_dirs() {
         "expected project preferred tools content"
     );
     assert!(
-        direct_content.contains("Global Preferred Tools (~/.jcode/preferred-tools.md)"),
+        direct_content.contains("Global Preferred Tools (~/.next-code/preferred-tools.md)"),
         "expected global preferred tools section heading"
     );
     assert!(
@@ -235,18 +235,18 @@ fn test_preferred_tools_files_are_loaded_from_project_and_global_jcode_dirs() {
     assert!(split_info.preferred_tools_chars > 0);
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[test]
 fn test_swarm_prompt_prefers_project_then_global_then_default() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
     std::fs::create_dir_all(temp.path()).unwrap();
 
     let project_dir = tempfile::TempDir::new().unwrap();
@@ -261,9 +261,9 @@ fn test_swarm_prompt_prefers_project_then_global_then_default() {
     assert_eq!(prompt, "global swarm routing");
 
     // Project override wins over global.
-    std::fs::create_dir_all(project_dir.path().join(".jcode")).unwrap();
+    std::fs::create_dir_all(project_dir.path().join(".next-code")).unwrap();
     std::fs::write(
-        project_dir.path().join(".jcode/swarm-prompt.md"),
+        project_dir.path().join(".next-code/swarm-prompt.md"),
         "project swarm routing",
     )
     .unwrap();
@@ -271,14 +271,14 @@ fn test_swarm_prompt_prefers_project_then_global_then_default() {
     assert_eq!(prompt, "project swarm routing");
 
     // A blank project file falls through to global instead of going empty.
-    std::fs::write(project_dir.path().join(".jcode/swarm-prompt.md"), "   \n").unwrap();
+    std::fs::write(project_dir.path().join(".next-code/swarm-prompt.md"), "   \n").unwrap();
     let prompt = load_swarm_prompt(Some(project_dir.path()));
     assert_eq!(prompt, "global swarm routing");
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
@@ -294,37 +294,37 @@ fn test_non_selfdev_prompt_leaves_selfdev_guidance_to_the_tool_schema() {
     let prompt = build_system_prompt(None, &[]);
     assert!(!prompt.contains("Self-Development Access"));
     assert!(!prompt.contains("You have access to the `selfdev` tool in all sessions"));
-    assert!(!prompt.contains("You are working on the jcode codebase itself."));
+    assert!(!prompt.contains("You are working on the next-code codebase itself."));
 }
 
 #[test]
 fn test_selfdev_prompt_uses_full_selfdev_instructions() {
     let prompt = build_system_prompt_with_selfdev(None, &[], true);
-    assert!(prompt.contains("You are working on the jcode codebase itself."));
-    assert!(prompt.contains("launched from the TUI/root jcode context"));
+    assert!(prompt.contains("You are working on the next-code codebase itself."));
+    assert!(prompt.contains("launched from the TUI/root next-code context"));
     assert!(prompt.contains("selfdev build target=tui"));
     assert!(!prompt.contains("Self-Development Access"));
 }
 
 #[test]
 fn test_selfdev_prompt_uses_desktop_focus_for_desktop_working_dir() {
-    let desktop_dir = std::path::Path::new("/tmp/jcode/crates/jcode-desktop/src");
+    let desktop_dir = std::path::Path::new("/tmp/next-code/crates/next-code-desktop/src");
     let (prompt, _info) =
         build_system_prompt_full(None, &[], true, None, Some(desktop_dir), None, None);
     assert!(prompt.contains("launched from the desktop app context"));
     assert!(prompt.contains("selfdev build target=desktop"));
-    assert!(!prompt.contains("launched from the TUI/root jcode context"));
+    assert!(!prompt.contains("launched from the TUI/root next-code context"));
 }
 
 #[test]
 fn test_split_selfdev_prompt_defaults_to_tui_focus_for_repo_root() {
-    let repo_dir = std::path::Path::new("/tmp/jcode");
+    let repo_dir = std::path::Path::new("/tmp/next-code");
     let (split, _info) =
         build_system_prompt_split(None, &[], true, None, Some(repo_dir), None, None);
     assert!(
         split
             .static_part
-            .contains("launched from the TUI/root jcode context")
+            .contains("launched from the TUI/root next-code context")
     );
     assert!(split.static_part.contains("selfdev build target=tui"));
 }
@@ -336,7 +336,7 @@ fn test_selfdev_prompt_prefers_publish_flow_for_active_builds() {
     assert!(prompt.contains("cancel-build"));
     assert!(prompt.contains("selfdev reload"));
     assert!(prompt.contains("fallback when `selfdev build` is not appropriate"));
-    assert!(prompt.contains("scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode"));
+    assert!(prompt.contains("scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code"));
     assert!(prompt.contains("remote build host is configured"));
     assert!(prompt.contains("Do not wait for user input"));
 }
@@ -361,8 +361,8 @@ fn split_prompt_estimated_tokens_is_positive_when_populated() {
 
 // ---------------------------------------------------------------------------
 // Regression tests for issue #22:
-// - .jcode/SYSTEM.md replaces the default system prompt.
-// - .jcode/APPEND_SYSTEM.md (and the CLI/env equivalents) extend it.
+// - .next-code/SYSTEM.md replaces the default system prompt.
+// - .next-code/APPEND_SYSTEM.md (and the CLI/env equivalents) extend it.
 // ---------------------------------------------------------------------------
 //
 // Note: `resolve_system_prompt_override` and
@@ -379,7 +379,7 @@ fn split_prompt_estimated_tokens_is_positive_when_populated() {
 
 #[test]
 fn build_system_prompt_full_uses_jcode_system_md_root() {
-    // NOTE: The `.jcode/SYSTEM.md` root-override mechanism was refactored
+    // NOTE: The `.next-code/SYSTEM.md` root-override mechanism was refactored
     // out of `build_system_prompt_full`. This test is preserved as a basic
     // structural check that the function runs and produces a non-trivial
     // prompt without panicking.
@@ -454,35 +454,35 @@ fn test_context_files_disabled_returns_false_by_default() {
     // NOTE: `context_files_disabled` was removed in a refactor.
     // This test is preserved as a marker — the env-var path is covered
     // by the broader `load_agents_md_from_dir_returns_none_when_disabled`
-    // test below, which uses `JCODE_NO_CONTEXT_FILES`.
+    // test below, which uses `NEXT_CODE_NO_CONTEXT_FILES`.
     let _guard = crate::storage::lock_test_env();
-    crate::env::remove_var("JCODE_NO_CONTEXT_FILES");
+    crate::env::remove_var("NEXT_CODE_NO_CONTEXT_FILES");
     // The env-var check is now integrated into the loading path —
     // there is no standalone `context_files_disabled()` helper.
     // Bypass: just verify the env var is unset.
-    assert!(std::env::var("JCODE_NO_CONTEXT_FILES").is_err());
+    assert!(std::env::var("NEXT_CODE_NO_CONTEXT_FILES").is_err());
 }
 
 #[test]
 fn test_context_files_disabled_returns_true_when_env_set() {
     let _guard = crate::storage::lock_test_env();
-    let prev_val = std::env::var("JCODE_NO_CONTEXT_FILES");
-    crate::env::set_var("JCODE_NO_CONTEXT_FILES", "1");
-    assert_eq!(std::env::var("JCODE_NO_CONTEXT_FILES").as_deref(), Ok("1"));
+    let prev_val = std::env::var("NEXT_CODE_NO_CONTEXT_FILES");
+    crate::env::set_var("NEXT_CODE_NO_CONTEXT_FILES", "1");
+    assert_eq!(std::env::var("NEXT_CODE_NO_CONTEXT_FILES").as_deref(), Ok("1"));
     // Restore previous state
     match prev_val {
-        Ok(val) => crate::env::set_var("JCODE_NO_CONTEXT_FILES", val),
-        Err(_) => crate::env::remove_var("JCODE_NO_CONTEXT_FILES"),
+        Ok(val) => crate::env::set_var("NEXT_CODE_NO_CONTEXT_FILES", val),
+        Err(_) => crate::env::remove_var("NEXT_CODE_NO_CONTEXT_FILES"),
     }
 }
 
 #[test]
 fn test_load_agents_md_from_dir_returns_none_when_disabled() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
-    crate::env::set_var("JCODE_NO_CONTEXT_FILES", "1");
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_NO_CONTEXT_FILES", "1");
 
     // Even with a global AGENTS.md present, loading should be skipped
     std::fs::create_dir_all(temp.path()).unwrap();
@@ -492,22 +492,22 @@ fn test_load_agents_md_from_dir_returns_none_when_disabled() {
     assert!(content.is_none());
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
-    crate::env::remove_var("JCODE_NO_CONTEXT_FILES");
+    crate::env::remove_var("NEXT_CODE_NO_CONTEXT_FILES");
 }
 
 #[test]
 fn test_load_agents_md_from_dir_loads_files_when_not_disabled() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().unwrap();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     // Remove any leftover env var
-    crate::env::remove_var("JCODE_NO_CONTEXT_FILES");
+    crate::env::remove_var("NEXT_CODE_NO_CONTEXT_FILES");
 
     std::fs::create_dir_all(temp.path().join("external")).unwrap();
     std::fs::write(
@@ -526,15 +526,15 @@ fn test_load_agents_md_from_dir_loads_files_when_not_disabled() {
     );
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 // NOTE: The `Args` CLI-flag tests below were removed because the
-// `Args` struct lives in a different crate (`jcode-cli-args`) that
-// is not available in `jcode-base`'s test dependency tree. The
+// `Args` struct lives in a different crate (`next-code-cli-args`) that
+// is not available in `next-code-base`'s test dependency tree. The
 // `--no-context-files` flag is tested end-to-end in the CLI crate's
 // own tests.
 // (Removed: test_cli_flag_no_short_alias)

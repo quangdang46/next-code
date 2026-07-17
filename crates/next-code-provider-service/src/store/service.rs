@@ -165,7 +165,7 @@ impl DefaultProviderService {
     /// `projectModel()` in catalog.ts, which merges `model.api` into
     /// `provider.api` and `model.request` into `provider.request`.
     ///
-    /// For jcode the relevant overrides are `base_url`, `path`, and
+    /// For next-code the relevant overrides are `base_url`, `path`, and
     /// `protocol` on the model. If the model has its own value for any
     /// of these, it wins; otherwise the provider default is used.
     fn project_model(provider: &ProviderInfo, model: &ModelInfo) -> ModelInfo {

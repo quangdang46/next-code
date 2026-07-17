@@ -10,7 +10,7 @@
 //! command instead of a full client probe.
 //!
 //! Run with:
-//!   cargo test -p jcode-tui-markdown --test highlight_backend_probe -- --ignored --nocapture
+//!   cargo test -p next-code-tui-markdown --test highlight_backend_probe -- --ignored --nocapture
 
 use next_code_tui_markdown::highlight_line;
 
@@ -68,7 +68,7 @@ fn workload() -> Vec<(&'static str, &'static str)> {
         ),
         (
             "sh",
-            "for pid in $(pgrep -f jcode); do awk '/VmRSS/{print $2}' /proc/$pid/status; done",
+            "for pid in $(pgrep -f next-code); do awk '/VmRSS/{print $2}' /proc/$pid/status; done",
         ),
         (
             "toml",

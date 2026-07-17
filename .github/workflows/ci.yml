@@ -313,7 +313,7 @@ jobs:
         shell: pwsh
         env:
           NEXT_CODE_E2E_ARTIFACT_DIR: ${{ runner.temp }}/next-code-windows-e2e-logs
-          JCODE_E2E_ARTIFACT_DIR: ${{ runner.temp }}/next-code-windows-e2e-logs
+          NEXT_CODE_E2E_ARTIFACT_DIR: ${{ runner.temp }}/next-code-windows-e2e-logs
         run: |
           New-Item -ItemType Directory -Force -Path $env:NEXT_CODE_E2E_ARTIFACT_DIR | Out-Null
           $tests = @(

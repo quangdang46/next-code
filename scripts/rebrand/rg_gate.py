@@ -102,14 +102,51 @@ LINE_ALLOW = re.compile(
     r"falls?\s+back\s+to\s+[`']?JCODE_|"
     r"falls?\s+back\s+to\s+[`']?\.?jcode|"
     r"PRODUCT_DIR_CANDIDATES.*\.jcode|"
-    r"PROJECT_DIR_CANDIDATES"
+    r"PROJECT_DIR_CANDIDATES|"
+    # first-party provider product module (not package rename debt)
+    r"provider::jcode|"
+    r"\bJcodeProvider\b|"
+    r"LoginProviderTarget::Jcode|"
+    r"RuntimeProviderId::Jcode|"
+    r"\bJCODE_LOGIN_PROVIDER\b|"
+    r"start_jcode_login|login_jcode_flow|"
+    # dual-read keyring / transport / subscription namespace
+    r"jcode-provider-service|"
+    r"jcode-secrets|"
+    r"jcode-subscription|"
+    r"LEGACY_SERVICE(?:_NAME)?\s*=\s*[\"']jcode-|"
+    # dual URL scheme + one-release binary alias
+    r"jcode://|"
+    r"jcode\.exe\b|"
+    # nix / build dual-export of legacy env names
+    r"\bjcode\s*=\s*next-code\b|"
+    r"\bJCODE_GIT_(?:HASH|DATE)\b|"
+    # parenthetical dual-read docs: (legacy `JCODE_…`) / or legacy …
+    r"\(legacy\s+[`']?JCODE_|"
+    r"or\s+legacy\s+[`']?JCODE_|"
+    r"or\s+legacy\s+[`']?\.?jcode|"
+    # subscription catalog dual-read const *names* (values already NEXT_CODE_*)
+    r"\bDEFAULT_JCODE_API_BASE\b|"
+    r"\bJCODE_API_KEY_ENV\b|"
+    r"\bJCODE_API_BASE_ENV\b|"
+    r"\bJCODE_ACCOUNT_ID_ENV\b|"
+    r"\bJCODE_ACCOUNT_EMAIL_ENV\b|"
+    r"\bJCODE_TIER_ENV\b|"
+    r"\bJCODE_ENV_FILE\b|"
+    r"\bJCODE_CACHE_NAMESPACE\b|"
+    r"\bJCODE_SUBSCRIPTION_ACTIVE_ENV\b|"
+    r"\bJCODE_ACCOUNT_URL\b|"
+    r"\bJCODE_PRICING_URL\b|"
+    r"REAL_JCODE_TOOL_SMOKE"
     r")"
 )
 
-# Path allowlist: rebrand tooling may still mention jcode as the *old* name
+# Path allowlist: rebrand tooling + historical process trees
 PATH_ALLOW_SUBSTRINGS = (
     "/scripts/rebrand/",
     "/docs/REBRAND_",
+    "/.beads/",
+    "/.agents/skills/origin-sync/",
 )
 
 
@@ -142,10 +179,15 @@ def path_allowlisted(rel_posix: str) -> bool:
             return True
         if frag in f"/{rel_posix}":
             return True
-    # Explicit: scripts/rebrand/*
+    # Explicit prefixes
     if rel_posix.startswith("scripts/rebrand/"):
         return True
     if rel_posix.startswith("docs/REBRAND_"):
+        return True
+    # Historical issue tracker + origin-sync process docs (not product surface)
+    if rel_posix.startswith(".beads/") or rel_posix == ".beads":
+        return True
+    if rel_posix.startswith(".agents/skills/origin-sync/"):
         return True
     return False
 

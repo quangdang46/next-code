@@ -438,14 +438,14 @@ impl SelfDevTool {
     }
 
     fn build_command_is_desktop_only(command: &SelfDevBuildCommand) -> bool {
-        command.display.contains("-p jcode-desktop") && !command.display.contains("-p jcode ")
+        command.display.contains("-p next-code-desktop") && !command.display.contains("-p next-code ")
     }
 
     fn validate_desktop_selfdev_binary(repo_dir: &Path, source: &build::SourceState) -> Result<()> {
         let binary_name = if cfg!(windows) {
-            "jcode-desktop.exe"
+            "next-code-desktop.exe"
         } else {
-            "jcode-desktop"
+            "next-code-desktop"
         };
         let binary = repo_dir
             .join("target")
@@ -457,7 +457,7 @@ impl SelfDevTool {
 
         let output = std::process::Command::new(&binary)
             .arg("--version")
-            .env("JCODE_NON_INTERACTIVE", "1")
+            .env("NEXT_CODE_NON_INTERACTIVE", "1")
             .output()?;
         if !output.status.success() {
             anyhow::bail!(
@@ -498,7 +498,7 @@ impl SelfDevTool {
             })?;
         let repo_dir =
             SelfDevTool::resolve_repo_dir(ctx.working_dir.as_deref()).ok_or_else(|| {
-                anyhow::anyhow!("Could not find the jcode repository directory for selfdev build")
+                anyhow::anyhow!("Could not find the next-code repository directory for selfdev build")
             })?;
 
         let requested_source = SelfDevTool::requested_source_state(&repo_dir)?;
@@ -902,7 +902,7 @@ impl SelfDevTool {
             .unwrap_or_else(|| command.clone());
         let repo_dir =
             SelfDevTool::resolve_repo_dir(ctx.working_dir.as_deref()).ok_or_else(|| {
-                anyhow::anyhow!("Could not find the jcode repository directory for selfdev test")
+                anyhow::anyhow!("Could not find the next-code repository directory for selfdev test")
             })?;
         let requested_source = SelfDevTool::requested_source_state(&repo_dir)?;
         let shell_command = SelfDevBuildCommand {

@@ -99,13 +99,13 @@ pub(super) fn save_preferred_macos_terminal(terminal: MacTerminalKind) -> Result
 
 pub(super) fn effective_macos_terminal() -> MacTerminalKind {
     // Precedence: config.toml `[terminal] preferred` (discoverable, documented)
-    // > legacy `~/.jcode/preferred_terminal.json` > runtime detection.
+    // > legacy `~/.next-code/preferred_terminal.json` > runtime detection.
     config_preferred_macos_terminal()
         .or_else(load_preferred_macos_terminal)
         .unwrap_or_else(detect_macos_terminal)
 }
 
-/// Read `[terminal] preferred` from `~/.jcode/config.toml`, if present and valid.
+/// Read `[terminal] preferred` from `~/.next-code/config.toml`, if present and valid.
 fn config_preferred_macos_terminal() -> Option<MacTerminalKind> {
     #[derive(Deserialize, Default)]
     struct Wrapper {
@@ -158,13 +158,13 @@ pub(super) fn escape_applescript_text(input: &str) -> String {
     input.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-pub(super) fn paused_jcode_shell_command(exe_path: &str) -> String {
-    paused_jcode_shell_command_with_args(exe_path, &[])
+pub(super) fn paused_next_code_shell_command(exe_path: &str) -> String {
+    paused_next_code_shell_command_with_args(exe_path, &[])
 }
 
-/// Like [`paused_jcode_shell_command`] but passes extra CLI args (each
-/// single-quoted) to the jcode invocation, e.g. `--resume <session-id>`.
-pub(super) fn paused_jcode_shell_command_with_args(exe_path: &str, args: &[String]) -> String {
+/// Like [`paused_next_code_shell_command`] but passes extra CLI args (each
+/// single-quoted) to the next-code invocation, e.g. `--resume <session-id>`.
+pub(super) fn paused_next_code_shell_command_with_args(exe_path: &str, args: &[String]) -> String {
     let escaped_exe = escape_shell_single_quotes(exe_path);
     let mut arg_str = String::new();
     for arg in args {
@@ -173,7 +173,7 @@ pub(super) fn paused_jcode_shell_command_with_args(exe_path: &str, args: &[Strin
         arg_str.push('\'');
     }
     format!(
-        r#"if [ ! -x '{exe}' ]; then printf 'jcode executable not found.\n'; exit 127; fi; '{exe}'{args}; status=$?; if [ "$status" -ne 0 ]; then printf '\nJcode exited with status %s.\n' "$status"; printf 'Press Enter to close... '; read -r _; fi; exit "$status""#,
+        r#"if [ ! -x '{exe}' ]; then printf 'next-code executable not found.\n'; exit 127; fi; '{exe}'{args}; status=$?; if [ "$status" -ne 0 ]; then printf '\nNext Code exited with status %s.\n' "$status"; printf 'Press Enter to close... '; read -r _; fi; exit "$status""#,
         exe = escaped_exe,
         args = arg_str,
     )
@@ -333,23 +333,23 @@ mod tests {
 
     #[test]
     fn paused_shell_command_quotes_extra_args() {
-        let cmd = super::paused_jcode_shell_command_with_args(
-            "/usr/local/bin/jcode",
+        let cmd = super::paused_next_code_shell_command_with_args(
+            "/usr/local/bin/next-code",
             &["--resume".to_string(), "session_fox_123_abc".to_string()],
         );
-        assert!(cmd.contains("'/usr/local/bin/jcode' '--resume' 'session_fox_123_abc';"));
+        assert!(cmd.contains("'/usr/local/bin/next-code' '--resume' 'session_fox_123_abc';"));
 
         // Single quotes in args must be escaped, not break out of quoting.
-        let cmd = super::paused_jcode_shell_command_with_args(
-            "/usr/local/bin/jcode",
+        let cmd = super::paused_next_code_shell_command_with_args(
+            "/usr/local/bin/next-code",
             &["it's".to_string()],
         );
         assert!(cmd.contains(r#"'it'\''s'"#));
 
         // No args matches the plain command.
         assert_eq!(
-            super::paused_jcode_shell_command_with_args("/usr/local/bin/jcode", &[]),
-            super::paused_jcode_shell_command("/usr/local/bin/jcode"),
+            super::paused_next_code_shell_command_with_args("/usr/local/bin/next-code", &[]),
+            super::paused_next_code_shell_command("/usr/local/bin/next-code"),
         );
     }
 
@@ -376,7 +376,7 @@ mod tests {
         // iTerm `command` run in the user's login shell, so a fish/zsh-quirky
         // login shell would otherwise choke ("fish: Unsupported use of '='").
         // Both must wrap the snippet in `/bin/bash -lc`.
-        let shell_command = super::paused_jcode_shell_command("/usr/local/bin/jcode");
+        let shell_command = super::paused_next_code_shell_command("/usr/local/bin/next-code");
         assert!(shell_command.contains("status=$?"));
 
         for terminal in [
@@ -398,7 +398,7 @@ mod tests {
     fn open_command_terminals_pass_snippet_to_bash_not_login_shell() {
         // Ghostty/Alacritty/WezTerm wrap via `open -na ... -e /bin/bash -lc`,
         // so the bash-specific snippet never reaches the login shell.
-        let shell_command = super::paused_jcode_shell_command("/usr/local/bin/jcode");
+        let shell_command = super::paused_next_code_shell_command("/usr/local/bin/next-code");
         for terminal in [
             MacTerminalKind::Ghostty,
             MacTerminalKind::Alacritty,

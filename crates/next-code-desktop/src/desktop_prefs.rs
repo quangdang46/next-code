@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use crate::workspace::{DEFAULT_SPACE_HOLD_TOGGLE_MS, DesktopPreferences, PanelSizePreset};
 use anyhow::{Context, Result};
 use serde_json::{Value, json};
@@ -115,22 +116,22 @@ fn write_preferences_file(path: &Path, bytes: &[u8]) -> Result<()> {
 }
 
 fn preferences_path() -> Result<PathBuf> {
-    if let Ok(path) = std::env::var("JCODE_DESKTOP_STATE") {
+    if let Ok(path) = product_env("DESKTOP_STATE") {
         return Ok(PathBuf::from(path));
     }
 
-    if let Ok(path) = std::env::var("JCODE_HOME") {
-        return Ok(PathBuf::from(path).join("config/jcode/desktop-state.json"));
+    if let Ok(path) = product_env("HOME") {
+        return Ok(PathBuf::from(path).join("config/next-code/desktop-state.json"));
     }
 
     if let Ok(path) = std::env::var("XDG_CONFIG_HOME") {
-        return Ok(PathBuf::from(path).join("jcode/desktop-state.json"));
+        return Ok(PathBuf::from(path).join("next-code/desktop-state.json"));
     }
 
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
         .context("HOME is not set")?;
-    Ok(home.join(".config/jcode/desktop-state.json"))
+    Ok(home.join(".config/next-code/desktop-state.json"))
 }
 
 #[cfg(test)]
@@ -149,11 +150,11 @@ mod tests {
             anyhow::bail!("desktop prefs test env lock poisoned");
         };
         let dir =
-            std::env::temp_dir().join(format!("jcode-desktop-prefs-test-{}", std::process::id()));
+            std::env::temp_dir().join(format!("next-code-desktop-prefs-test-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         let path = dir.join("state.json");
         unsafe {
-            std::env::set_var("JCODE_DESKTOP_STATE", &path);
+            std::env::set_var("NEXT_CODE_DESKTOP_STATE", &path);
         }
 
         let preferences = DesktopPreferences {
@@ -173,7 +174,7 @@ mod tests {
         );
 
         unsafe {
-            std::env::remove_var("JCODE_DESKTOP_STATE");
+            std::env::remove_var("NEXT_CODE_DESKTOP_STATE");
         }
         let _ = fs::remove_dir_all(dir);
         Ok(())
@@ -181,7 +182,7 @@ mod tests {
 
     #[test]
     fn preference_temp_paths_are_unique_and_hidden_next_to_target() {
-        let path = PathBuf::from("/tmp/jcode-desktop-prefs/state.json");
+        let path = PathBuf::from("/tmp/next-code-desktop-prefs/state.json");
         let first = unique_preferences_temp_path(&path);
         let second = unique_preferences_temp_path(&path);
 

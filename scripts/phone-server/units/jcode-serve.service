@@ -1,0 +1,13 @@
+# Compat wrapper for one release — prefer next-code-serve.service.
+# Disable this unit after migrating: systemctl --user disable jcode-serve.service && systemctl --user enable next-code-serve.service
+[Unit]
+Description=COMPAT: redirects to next-code-serve.service (one-release alias)
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl --user start next-code-serve.service
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

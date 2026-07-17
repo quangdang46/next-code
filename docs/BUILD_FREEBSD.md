@@ -1,6 +1,6 @@
-# Building jcode on FreeBSD
+# Building next-code on FreeBSD
 
-Issue [#131](https://github.com/quangdang46/jcode/issues/131) requested
+Issue [#131](https://github.com/quangdang46/next-code/issues/131) requested
 pre-built FreeBSD binaries. We do not currently publish them because
 GitHub Actions does not provide native FreeBSD runners and the cross-compile
 path from Linux to `x86_64-unknown-freebsd` is unreliable for a binary with
@@ -8,7 +8,7 @@ this many native dependencies (ratatui, crossterm, ring, libc subprocess
 plumbing, etc.).
 
 This document covers a **native FreeBSD build** so users on FreeBSD can run
-jcode without waiting for an upstream binary release.
+next-code without waiting for an upstream binary release.
 
 > ⚠️ Tested on FreeBSD 14.x amd64 / arm64. Build times are comparable to a
 > Linux build (~15 minutes cold for `--release` with LTO; ~2 minutes
@@ -30,37 +30,37 @@ pkg install -y rust git pkgconf openssl curl cmake gmake
 ## Build
 
 ```sh
-git clone https://github.com/quangdang46/jcode.git
-cd jcode
-cargo build --release --bin jcode
+git clone https://github.com/quangdang46/next-code.git
+cd next-code
+cargo build --release --bin next-code
 ```
 
-The resulting binary is at `target/release/jcode`. Copy it to a directory
+The resulting binary is at `target/release/next-code`. Copy it to a directory
 on your PATH:
 
 ```sh
 mkdir -p ~/.local/bin
-cp target/release/jcode ~/.local/bin/jcode
+cp target/release/next-code ~/.local/bin/next-code
 ```
 
-Or use the in-tree installer (creates the same `~/.jcode/builds/`
+Or use the in-tree installer (creates the same `~/.next-code/builds/`
 hierarchy as the Linux installer):
 
 ```sh
 ./scripts/install_release.sh
 ```
 
-After install, `~/.local/bin/jcode --version` should print
-`jcode v0.x.x-dev (<git-sha>)`.
+After install, `~/.local/bin/next-code --version` should print
+`next-code v0.x.x-dev (<git-sha>)`.
 
 ## Smoke test
 
 ```sh
-jcode doctor
-jcode --help
+next-code doctor
+next-code --help
 ```
 
-`jcode doctor` is a good first check — it reports the OS, arch, terminal,
+`next-code doctor` is a good first check — it reports the OS, arch, terminal,
 and whether storage / config dirs are reachable. On FreeBSD the platform
 section will show:
 
@@ -73,7 +73,7 @@ section will show:
 
 ## Known gotchas on FreeBSD
 
-1. **Terminal raw mode**: jcode's TUI uses crossterm, which works on
+1. **Terminal raw mode**: next-code's TUI uses crossterm, which works on
    FreeBSD via `termios`. If you're inside `tmux` or `screen` on a remote
    FreeBSD shell, make sure your terminal type is set sensibly
    (`export TERM=xterm-256color` is a safe default).
@@ -105,4 +105,4 @@ machine is the supported path.
 
 - [README.md](../README.md) — main install + provider setup.
 - [BUILDING.md](BUILDING.md) — general build notes (when present).
-- Issue [#131](https://github.com/quangdang46/jcode/issues/131) — tracking.
+- Issue [#131](https://github.com/quangdang46/next-code/issues/131) — tracking.

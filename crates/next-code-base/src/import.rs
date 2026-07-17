@@ -1,7 +1,7 @@
-//! Import Claude Code sessions into jcode
+//! Import Claude Code sessions into next-code
 //!
 //! This module handles discovering, parsing, and converting Claude Code sessions
-//! so they can be resumed within jcode.
+//! so they can be resumed within next-code.
 
 use crate::message::{ContentBlock, Role};
 use crate::session::{Session, SessionStatus, StoredMessage};
@@ -374,7 +374,7 @@ fn find_session_file(session_id: &str) -> Result<PathBuf> {
     anyhow::bail!("Session {} not found", session_id);
 }
 
-/// Convert Claude Code content blocks to jcode ContentBlocks
+/// Convert Claude Code content blocks to next-code ContentBlocks
 fn convert_content_blocks(content: &ClaudeCodeContent) -> Vec<ContentBlock> {
     match content {
         ClaudeCodeContent::Empty => vec![],
@@ -584,10 +584,10 @@ fn normalize_imported_history(session: &mut Session, apply_limits: bool) -> bool
 }
 
 fn reuse_existing_imported_session(session_id: &str) -> bool {
-    // An imported snapshot becomes a normal jcode continuation as soon as the
+    // An imported snapshot becomes a normal next-code continuation as soon as the
     // user resumes it. Never rewrite that snapshot merely because the external
     // transcript changed or because an older import contains structured blocks:
-    // doing so can discard jcode-only turns and journal state. New imports are
+    // doing so can discard next-code-only turns and journal state. New imports are
     // normalized before their first save, while existing imports remain the
     // durable source of truth for subsequent resumes.
     Session::load(session_id).is_ok()
@@ -802,7 +802,7 @@ pub fn import_session_from_file(path: &Path, session_id: &str) -> Result<Session
         }
     }
 
-    // Create jcode session
+    // Create next-code session
     let next_code_session_id = imported_claude_code_session_id(session_id);
 
     let mut session = Session::create_with_id(next_code_session_id, None, title);
@@ -848,7 +848,7 @@ fn finalize_imported_session(
     created_at: DateTime<Utc>,
     updated_at: Option<DateTime<Utc>>,
 ) -> Result<Session> {
-    // Never overwrite a jcode-side continuation with a shorter external
+    // Never overwrite a next-code-side continuation with a shorter external
     // transcript. This protection applies to every importer, not only Claude.
     if crate::session::session_exists(&session.id)
         && let Ok(mut existing) = Session::load(&session.id)

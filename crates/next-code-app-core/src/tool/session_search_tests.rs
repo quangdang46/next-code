@@ -9,16 +9,16 @@ use std::time::Instant;
 fn with_temp_home<T>(f: impl FnOnce(&Path) -> T) -> T {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    let previous_home = std::env::var("JCODE_HOME").ok();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    let previous_home = std::env::var("NEXT_CODE_HOME").ok();
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
     std::fs::create_dir_all(temp.path().join("sessions")).expect("create sessions dir");
 
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(temp.path())));
 
     if let Some(previous_home) = previous_home {
-        crate::env::set_var("JCODE_HOME", previous_home);
+        crate::env::set_var("NEXT_CODE_HOME", previous_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 
     result.unwrap_or_else(|payload| std::panic::resume_unwind(payload))
@@ -183,19 +183,19 @@ fn timestamped_session_collection_respects_recent_limit_without_mtime_stat() {
 }
 
 #[test]
-#[ignore = "local performance benchmark over the real ~/.jcode session corpus"]
+#[ignore = "local performance benchmark over the real ~/.next-code session corpus"]
 fn bench_real_session_search_corpus() {
-    if std::env::var("JCODE_SESSION_SEARCH_BENCH_REAL")
+    if std::env::var("NEXT_CODE_SESSION_SEARCH_BENCH_REAL")
         .ok()
         .as_deref()
         != Some("1")
     {
-        eprintln!("set JCODE_SESSION_SEARCH_BENCH_REAL=1 to run against the real session corpus");
+        eprintln!("set NEXT_CODE_SESSION_SEARCH_BENCH_REAL=1 to run against the real session corpus");
         return;
     }
 
     let sessions_dir = crate::storage::next_code_dir()
-        .expect("jcode dir")
+        .expect("next-code dir")
         .join("sessions");
     let mut options = SearchOptions::for_test("benchmark-current-session");
     options.include_external = false;
@@ -233,7 +233,7 @@ fn bench_real_session_search_corpus() {
         )
         .expect("search succeeds");
         eprintln!(
-            "BENCH_EXTERNAL query={query} elapsed_ms={} scanned_jcode={} scanned_external={} sources={:?} results={} truncated={}",
+            "BENCH_EXTERNAL query={query} elapsed_ms={} scanned_next_code={} scanned_external={} sources={:?} results={} truncated={}",
             start.elapsed().as_millis(),
             report.scanned_jcode_sessions,
             report.scanned_external_sessions,
@@ -537,7 +537,7 @@ fn context_expansion_returns_neighboring_messages_without_matching_hit() {
 }
 
 #[test]
-fn external_codex_sessions_are_searchable_without_jcode_session_dir() {
+fn external_codex_sessions_are_searchable_without_next_code_session_dir() {
     with_temp_home(|home| {
         let codex_dir = home.join("external/.codex/sessions/2026/05/01");
         std::fs::create_dir_all(&codex_dir).expect("create codex dir");
@@ -578,7 +578,7 @@ fn external_codex_sessions_are_searchable_without_jcode_session_dir() {
             .collect::<Vec<_>>()
             .join("\n");
         std::fs::write(codex_dir.join("codex-test.jsonl"), body).expect("write codex jsonl");
-        std::fs::remove_dir_all(home.join("sessions")).expect("remove jcode sessions dir");
+        std::fs::remove_dir_all(home.join("sessions")).expect("remove next-code sessions dir");
 
         let mut options = SearchOptions::for_test("current-session");
         options.source_filter = Some("codex".to_string());
@@ -611,7 +611,7 @@ fn external_codex_sessions_are_searchable_without_jcode_session_dir() {
 }
 
 #[test]
-fn external_cursor_sessions_are_searchable_without_jcode_session_dir() {
+fn external_cursor_sessions_are_searchable_without_next_code_session_dir() {
     with_temp_home(|home| {
         let session_id = "11111111-2222-3333-4444-555555555555";
         let cursor_dir = home.join(format!(
@@ -639,7 +639,7 @@ fn external_cursor_sessions_are_searchable_without_jcode_session_dir() {
             .join("\n");
         std::fs::write(cursor_dir.join(format!("{session_id}.jsonl")), body)
             .expect("write cursor jsonl");
-        std::fs::remove_dir_all(home.join("sessions")).expect("remove jcode sessions dir");
+        std::fs::remove_dir_all(home.join("sessions")).expect("remove next-code sessions dir");
 
         let mut options = SearchOptions::for_test("current-session");
         options.source_filter = Some("cursor".to_string());

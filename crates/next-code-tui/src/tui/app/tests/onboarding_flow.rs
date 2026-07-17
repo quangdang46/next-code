@@ -85,9 +85,9 @@ fn onboarding_test_app() -> App {
 
 #[test]
 fn onboarding_strongest_model_only_runs_without_explicit_defaults() {
-    with_temp_jcode_home(|| {
-        let previous_force = std::env::var_os("JCODE_FORCE_PROVIDER");
-        crate::env::remove_var("JCODE_FORCE_PROVIDER");
+    with_temp_next_code_home(|| {
+        let previous_force = std::env::var_os("NEXT_CODE_FORCE_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
 
         let mut app = onboarding_test_app();
         assert!(app.onboarding_should_prefer_strongest_model());
@@ -104,7 +104,7 @@ fn onboarding_strongest_model_only_runs_without_explicit_defaults() {
 
         config.provider.default_provider = None;
         config.save().expect("clear explicit defaults");
-        crate::env::set_var("JCODE_FORCE_PROVIDER", "1");
+        crate::env::set_var("NEXT_CODE_FORCE_PROVIDER", "1");
         assert!(!app.onboarding_should_prefer_strongest_model());
 
         app.onboarding_auto_model_selection_active
@@ -117,9 +117,9 @@ fn onboarding_strongest_model_only_runs_without_explicit_defaults() {
         );
 
         if let Some(value) = previous_force {
-            crate::env::set_var("JCODE_FORCE_PROVIDER", value);
+            crate::env::set_var("NEXT_CODE_FORCE_PROVIDER", value);
         } else {
-            crate::env::remove_var("JCODE_FORCE_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
         }
     });
 }
@@ -271,7 +271,7 @@ fn import_review_cursor_navigation_wraps() {
 
 #[test]
 fn login_phase_advances_to_model_select_without_telemetry_prompt() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         // Force the bare Login phase (the recovery/import path) so we exercise
@@ -298,7 +298,7 @@ fn login_phase_advances_to_model_select_without_telemetry_prompt() {
 #[test]
 fn login_openai_phase_is_default_when_no_imports() {
     use crate::tui::OnboardingWelcomeKind;
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         // Fresh temp home has no importable logins, so begin_at_login lands on
@@ -321,7 +321,7 @@ fn login_openai_phase_is_default_when_no_imports() {
 
 #[test]
 fn login_openai_no_finishes_onboarding_with_login_hint() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -354,7 +354,7 @@ fn login_openai_no_finishes_onboarding_with_login_hint() {
 
 #[test]
 fn login_openai_arrows_toggle_highlight() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -401,7 +401,7 @@ fn import_review_decision_timer_counts_down_and_times_out() {
 
 #[test]
 fn login_phase_enter_opens_login_picker() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -429,7 +429,7 @@ fn pending_login_entry_is_not_intercepted_by_onboarding_login_phase() {
     // key must NOT be intercepted by the onboarding welcome-screen handler
     // (which would re-open the provider picker), and key characters must not be
     // swallowed as Yes/No navigation.
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -466,7 +466,7 @@ fn openrouter_key_typed_through_full_key_path_does_not_reopen_picker() {
     // flow to the input buffer and Enter must submit the key.
     use crossterm::event::{KeyCode, KeyModifiers};
 
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -510,7 +510,7 @@ fn openrouter_key_typed_through_full_key_path_does_not_reopen_picker() {
         assert!(app.input.is_empty(), "input buffer should clear after submit");
 
         // Crucially: the key must actually be *persisted*, not just "not loop".
-        // It is written to $JCODE_HOME/config/jcode/openrouter.env and exported
+        // It is written to $NEXT_CODE_HOME/config/next-code/openrouter.env and exported
         // to OPENROUTER_API_KEY so the provider can authenticate.
         let env_file = crate::storage::app_config_dir().unwrap().join("openrouter.env");
         let contents = std::fs::read_to_string(&env_file)
@@ -532,7 +532,7 @@ fn import_failure_resets_login_to_manual_prompt() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::ImportReview;
 
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -566,7 +566,7 @@ fn import_review_decline_all_falls_back_to_manual_login() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::ImportReview;
 
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -599,7 +599,7 @@ fn import_review_decline_all_falls_back_to_manual_login() {
 
 #[test]
 fn answering_no_on_continue_prompt_shows_suggestions() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = onboarding_test_app();
         if let Some(flow) = app.onboarding_flow.as_mut() {
             flow.phase = OnboardingPhase::ContinuePrompt {
@@ -620,7 +620,7 @@ fn answering_no_on_continue_prompt_shows_suggestions() {
 
 #[test]
 fn continue_prompt_key_y_consumes_and_advances() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = onboarding_test_app();
         if let Some(flow) = app.onboarding_flow.as_mut() {
             flow.phase = OnboardingPhase::ContinuePrompt {
@@ -674,7 +674,7 @@ fn onboarding_start_choice_is_action_only_and_defaults_to_review() {
 
 #[test]
 fn startup_check_skips_when_session_already_has_activity() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.onboarding_startup_checked = false;
@@ -691,7 +691,7 @@ fn startup_check_skips_when_session_already_has_activity() {
 
 #[test]
 fn startup_check_ignores_synthetic_scaffolding_messages() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.onboarding_startup_checked = false;
@@ -721,7 +721,7 @@ fn startup_check_ignores_synthetic_scaffolding_messages() {
 
 #[test]
 fn startup_check_skips_when_input_is_present() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.onboarding_startup_checked = false;
@@ -736,7 +736,7 @@ fn startup_check_skips_when_input_is_present() {
 
 #[test]
 fn startup_check_is_noop_once_committed() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.onboarding_startup_checked = true;
@@ -750,11 +750,11 @@ fn startup_check_is_noop_once_committed() {
 
 #[test]
 fn startup_check_skips_selfdev_canary_session() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.onboarding_startup_checked = false;
-        // Self-dev / canary sessions (e.g. the niri `jcode self-dev` hotkey) take
+        // Self-dev / canary sessions (e.g. the niri `next-code self-dev` hotkey) take
         // a launch path that never bumps `launch_count`, so without this guard the
         // new-user heuristic would re-onboard on every spawn.
         app.session.is_canary = true;
@@ -881,7 +881,7 @@ fn model_validation_ignores_stale_session_result() {
 #[test]
 fn remote_post_login_validation_waits_for_catalog_refresh() {
     use crate::tui::app::onboarding_flow::OnboardingPendingValidation;
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.is_remote = true;
         // Simulate the state right after a remote login: a pending validation
@@ -904,7 +904,7 @@ fn remote_post_login_validation_waits_for_catalog_refresh() {
 #[test]
 fn local_post_import_validation_waits_for_model_activation() {
     use crate::tui::app::onboarding_flow::OnboardingPendingValidation;
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.is_remote = false;
         app.auth_catalog_refresh_pending = true;
@@ -927,13 +927,13 @@ fn local_post_import_validation_waits_for_model_activation() {
 
 #[test]
 fn startup_check_skips_user_with_established_session_history() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // A low/missing launch_count alone must NOT classify someone as a new
-        // user when their jcode home has a substantial native session history
+        // user when their next-code home has a substantial native session history
         // (e.g. setup_hints.json was reset or lost). Seed >=10 native session
         // files in the temp home.
         let sessions_dir = crate::storage::next_code_dir()
-            .expect("jcode dir")
+            .expect("next-code dir")
             .join("sessions");
         std::fs::create_dir_all(&sessions_dir).expect("create sessions dir");
         for i in 0..10 {
@@ -960,11 +960,11 @@ fn startup_check_skips_user_with_established_session_history() {
 
 #[test]
 fn startup_check_imported_transcripts_do_not_count_as_history() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // Imported Codex/Claude transcripts exist on genuinely fresh installs
         // that chose to import history; they must not suppress onboarding.
         let sessions_dir = crate::storage::next_code_dir()
-            .expect("jcode dir")
+            .expect("next-code dir")
             .join("sessions");
         std::fs::create_dir_all(&sessions_dir).expect("create sessions dir");
         for i in 0..20 {
@@ -1020,7 +1020,7 @@ fn onboarding_state_is_escapable(app: &App) -> bool {
 #[test]
 fn liveness_every_login_phase_has_a_single_keypress_exit() {
     use crate::tui::app::onboarding_flow::OnboardingPhase;
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // Each interactive Login-family phase must leave itself after exactly one
         // decisive key, with no dependence on an async event. We use the "skip /
         // decline" key, which is always synchronous (it never spawns an import).
@@ -1065,7 +1065,7 @@ fn liveness_every_login_phase_has_a_single_keypress_exit() {
 fn liveness_import_review_decline_all_then_enter_escapes() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::{ImportReview, OnboardingPhase};
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // The import list is the richest interactive phase. Declining every login
         // ("n") then committing (Enter) must never spawn an async import (so it
         // can't hang) and must land on the recovery screen, from which a final
@@ -1108,7 +1108,7 @@ fn liveness_import_review_decline_all_then_enter_escapes() {
 #[test]
 fn liveness_stuck_import_is_recovered_by_the_tick_watchdog() {
     use crate::tui::app::onboarding_flow::OnboardingPhase;
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // Simulate the dangerous state: the import was committed (progress screen
         // showing) but its `LoginCompleted` event never arrived. The flow sits in
         // Login{import:None} with `onboarding_import_in_progress` set. Without the
@@ -1156,7 +1156,7 @@ fn liveness_stuck_import_is_recovered_by_the_tick_watchdog() {
 fn liveness_esc_always_exits_onboarding_from_every_guided_phase() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::{ImportReview, OnboardingPhase};
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         // The universal escape hatch: from ANY guided pre-ready phase, a single
         // Esc must leave onboarding to the normal screen. This is the strongest
         // liveness guarantee - it doesn't matter how the flow got wedged, Esc
@@ -1240,7 +1240,7 @@ fn liveness_esc_always_exits_onboarding_from_every_guided_phase() {
 fn import_failure_reason_is_cleaned_and_capitalized() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::{ImportReview, OnboardingPhase};
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -1275,7 +1275,7 @@ fn import_failure_reason_is_cleaned_and_capitalized() {
 #[test]
 fn import_failure_h_key_prepares_agent_repair_brief() {
     use crate::tui::app::onboarding_flow::OnboardingPhase;
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -1300,7 +1300,7 @@ fn import_failure_h_key_prepares_agent_repair_brief() {
             .find(|m| m.content.contains("Agent repair brief"))
             .map(|m| m.content.clone())
             .expect("repair brief message");
-        assert!(brief.contains("jcode auth-test --provider openai --json"), "{brief}");
+        assert!(brief.contains("next-code auth-test --provider openai --json"), "{brief}");
         assert!(brief.contains("--api-key-stdin"), "{brief}");
         assert!(brief.contains("the saved credential was rejected"), "{brief}");
         // The brief was also persisted to a stable path a helper agent can read.
@@ -1308,7 +1308,7 @@ fn import_failure_h_key_prepares_agent_repair_brief() {
             .expect("repair brief path");
         assert!(brief_path.exists(), "brief file should be written: {brief_path:?}");
         let on_disk = std::fs::read_to_string(&brief_path).expect("read brief file");
-        assert!(on_disk.contains("jcode auth-test --provider openai --json"), "{on_disk}");
+        assert!(on_disk.contains("next-code auth-test --provider openai --json"), "{on_disk}");
         assert!(brief.contains(&brief_path.display().to_string()), "brief cites its own path");
         // Staying on the recovery screen, Enter still opens the provider picker.
         assert!(app.handle_onboarding_continue_prompt_key(KeyCode::Enter));
@@ -1319,7 +1319,7 @@ fn import_failure_h_key_prepares_agent_repair_brief() {
 #[test]
 fn import_failure_h_key_is_inert_without_a_recorded_error() {
     use crate::tui::app::onboarding_flow::OnboardingPhase;
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -1338,7 +1338,7 @@ fn import_summary_defaults_to_continue_and_enter_imports_all() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::ImportReview;
 
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();
@@ -1376,7 +1376,7 @@ fn import_continue_reaches_ready_quality_first_openai_model() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::ImportReview;
 
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let legacy_auth = crate::auth::codex::legacy_auth_file_path().expect("legacy auth path");
         std::fs::create_dir_all(legacy_auth.parent().expect("legacy auth parent"))
             .expect("create legacy auth dir");
@@ -1468,7 +1468,7 @@ fn import_summary_choose_pill_opens_checkbox_list() {
     use crate::external_auth::ExternalAuthReviewCandidate;
     use crate::tui::app::onboarding_flow::ImportReview;
 
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.onboarding_flow = None;
         app.begin_onboarding_flow_at_login();

@@ -2,11 +2,11 @@
 //! parse, and tighten `auth.json` permissions to 0600 (unix, auto-fixable).
 //!
 //! Live credential/connectivity verification deliberately stays in
-//! `jcode auth doctor` / `jcode auth-test` / `jcode provider-doctor`.
+//! `next-code auth doctor` / `next-code auth-test` / `next-code provider-doctor`.
 
 use super::super::types::{CheckCategory, DoctorOptions, Finding};
 
-/// (provider, oauth file basename under JCODE_HOME, env vars that count as configured).
+/// (provider, oauth file basename under NEXT_CODE_HOME, env vars that count as configured).
 const PROVIDERS: &[(&str, &str, &[&str])] = &[
     (
         "anthropic",
@@ -48,7 +48,7 @@ pub fn check_auth(opts: &DoctorOptions, out: &mut Vec<Finding>) {
         Err(_) => {
             out.push(Finding::warn(
                 CheckCategory::Auth,
-                "cannot resolve JCODE_HOME; skipping auth checks",
+                "cannot resolve NEXT_CODE_HOME; skipping auth checks",
             ));
             return;
         }
@@ -64,7 +64,7 @@ pub fn check_auth(opts: &DoctorOptions, out: &mut Vec<Finding>) {
         });
         let detail = match (has_oauth, env_hit) {
             (true, Some(e)) => Some(format!("oauth file + env {e} (env wins at runtime)")),
-            (true, None) => Some(format!("oauth file ~/.jcode/{oauth_file}")),
+            (true, None) => Some(format!("oauth file ~/.next-code/{oauth_file}")),
             (false, Some(e)) => Some(format!("env {e}")),
             (false, None) => None,
         };
@@ -79,7 +79,7 @@ pub fn check_auth(opts: &DoctorOptions, out: &mut Vec<Finding>) {
     if configured == 0 {
         out.push(
             Finding::warn(CheckCategory::Auth, "no providers configured")
-                .with_remediation("run `jcode login --provider <name>`"),
+                .with_remediation("run `next-code login --provider <name>`"),
         );
     } else {
         out.push(
@@ -87,7 +87,7 @@ pub fn check_auth(opts: &DoctorOptions, out: &mut Vec<Finding>) {
                 CheckCategory::Auth,
                 format!("{configured} provider(s) configured"),
             )
-            .with_detail("run `jcode auth doctor` / `jcode auth-test` for live verification"),
+            .with_detail("run `next-code auth doctor` / `next-code auth-test` for live verification"),
         );
     }
 
@@ -98,7 +98,7 @@ pub fn check_auth(opts: &DoctorOptions, out: &mut Vec<Finding>) {
         {
             out.push(
                 Finding::fail(CheckCategory::Auth, "auth.json is not valid JSON")
-                    .with_remediation("re-run `jcode login`, or fix/remove auth.json"),
+                    .with_remediation("re-run `next-code login`, or fix/remove auth.json"),
             );
         }
         check_auth_permissions(opts, &auth_json, out);

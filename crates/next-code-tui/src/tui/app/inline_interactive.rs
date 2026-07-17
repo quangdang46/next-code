@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::*;
 use crate::tui::session_picker::{self, OverlayAction, PickerResult, ResumeTarget, SessionPicker};
 use crate::tui::{
@@ -771,7 +772,7 @@ impl App {
             self.cursor_pos = 0;
         }
 
-        if std::env::var("JCODE_LOG_MODEL_PICKER_TIMING").is_ok() {
+        if product_env("LOG_MODEL_PICKER_TIMING").is_ok() {
             crate::logging::info(&format!(
                 "[TIMING] model_picker_open: cache_hit=true, remote={}, simplified={}, routes={}, models={}, entries={}, total={}ms",
                 self.is_remote,
@@ -1512,7 +1513,7 @@ impl App {
         let entries_ms = entries_started.elapsed().as_millis();
         let total_ms = picker_started.elapsed().as_millis();
 
-        if total_ms >= 250 || std::env::var("JCODE_LOG_MODEL_PICKER_TIMING").is_ok() {
+        if total_ms >= 250 || product_env("LOG_MODEL_PICKER_TIMING").is_ok() {
             crate::logging::info(&format!(
                 "[TIMING] model_picker_open: remote={}, simplified={}, routes={}, models={}, entries={}, routes={}ms, grouping={}ms, timestamps={}ms, entries_sort={}ms, total={}ms",
                 self.is_remote,
@@ -2285,7 +2286,7 @@ impl App {
         }
 
         let default_cwd = std::env::current_dir().unwrap_or_default();
-        let socket = std::env::var("JCODE_SOCKET").ok();
+        let socket = product_env("SOCKET").ok();
         let mut spawned = 0usize;
         let mut failed = Vec::new();
         let mut names = Vec::with_capacity(targets.len());
@@ -2343,7 +2344,7 @@ impl App {
                     names.push(name);
                 }
                 Ok(false) | Err(_) => {
-                    // No terminal emulator could be spawned. For a single jcode
+                    // No terminal emulator could be spawned. For a single next-code
                     // session, fall back to resuming in the current terminal
                     // instead of dead-ending with a manual command (issue #203).
                     if targets.len() == 1
@@ -2497,7 +2498,7 @@ impl App {
 
         let exe = launch_client_executable();
         let cwd = std::env::current_dir().unwrap_or_default();
-        let socket = std::env::var("JCODE_SOCKET").ok();
+        let socket = product_env("SOCKET").ok();
         let mut spawned = 0usize;
         let mut failed = Vec::new();
 
@@ -2540,7 +2541,7 @@ impl App {
         } else if spawned > 0 {
             let manual: Vec<String> = failed
                 .iter()
-                .map(|id| format!("  jcode --resume {}", id))
+                .map(|id| format!("  next-code --resume {}", id))
                 .collect();
             self.push_display_message(DisplayMessage::system(format!(
                 "Restored {} session(s) in new windows. {} failed:\n{}",
@@ -2551,7 +2552,7 @@ impl App {
         } else {
             let manual: Vec<String> = recovered
                 .iter()
-                .map(|id| format!("  jcode --resume {}", id))
+                .map(|id| format!("  next-code --resume {}", id))
                 .collect();
             self.push_display_message(DisplayMessage::system(format!(
                 "No terminal found. Resume manually:\n{}",
@@ -3208,7 +3209,7 @@ User's request:
                         let status = std::process::Command::new("sh")
                             .arg("-c")
                             .arg("exec ${VISUAL:-${EDITOR:-vi}} \"$@\"")
-                            .arg("jcode-editor")
+                            .arg("next-code-editor")
                             .arg(&source_path)
                             .status();
                         let _ = crossterm::execute!(
@@ -3478,7 +3479,7 @@ User's request:
                     PickerAction::SetAgentColor { agent_id, color } => {
                         self.inline_interactive_state = None;
                         let home = match dirs::home_dir() {
-                            Some(h) => h.join(".jcode").join("agents"),
+                            Some(h) => h.join(".next-code").join("agents"),
                             None => {
                                 self.set_status_notice("No home dir");
                                 return Ok(());
@@ -3514,7 +3515,7 @@ User's request:
                     PickerAction::SetAgentTools { agent_id, tools } => {
                         self.inline_interactive_state = None;
                         let home = match dirs::home_dir() {
-                            Some(h) => h.join(".jcode").join("agents"),
+                            Some(h) => h.join(".next-code").join("agents"),
                             None => {
                                 self.set_status_notice("No home dir");
                                 return Ok(());

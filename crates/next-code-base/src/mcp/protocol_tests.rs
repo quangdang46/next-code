@@ -4,10 +4,10 @@ use super::*;
 fn load_for_dir_without_project_does_not_load_process_cwd_config() {
     let _guard = crate::storage::lock_test_env();
     let original_cwd = std::env::current_dir().expect("current cwd");
-    let previous_home = std::env::var_os("JCODE_HOME");
+    let previous_home = std::env::var_os("NEXT_CODE_HOME");
     let home = tempfile::tempdir().expect("home tempdir");
     let project = tempfile::tempdir().expect("project tempdir");
-    crate::env::set_var("JCODE_HOME", home.path());
+    crate::env::set_var("NEXT_CODE_HOME", home.path());
     std::env::set_current_dir(project.path()).expect("set project cwd");
     std::fs::write(
         project.path().join(".mcp.json"),
@@ -25,9 +25,9 @@ fn load_for_dir_without_project_does_not_load_process_cwd_config() {
 
     std::env::set_current_dir(original_cwd).expect("restore cwd");
     if let Some(previous_home) = previous_home {
-        crate::env::set_var("JCODE_HOME", previous_home);
+        crate::env::set_var("NEXT_CODE_HOME", previous_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
     result.expect("MCP cwd isolation assertions");
 }
@@ -182,15 +182,15 @@ fn test_load_project_locals_resolves_against_given_dir_not_cwd() {
 
 #[test]
 fn test_load_project_locals_merge_order() {
-    // `.jcode/mcp.json` loads first, then `.mcp.json` overrides same-named
+    // `.next-code/mcp.json` loads first, then `.mcp.json` overrides same-named
     // servers, then `.claude/mcp.json`.
     let temp = tempfile::tempdir().expect("tempdir");
     let project = temp.path();
-    std::fs::create_dir_all(project.join(".jcode")).unwrap();
+    std::fs::create_dir_all(project.join(".next-code")).unwrap();
     std::fs::create_dir_all(project.join(".claude")).unwrap();
     std::fs::write(
-        project.join(".jcode/mcp.json"),
-        r#"{"servers":{"shared-name":{"command":"jcode-bin"},"jcode-only":{"command":"a"}}}"#,
+        project.join(".next-code/mcp.json"),
+        r#"{"servers":{"shared-name":{"command":"next-code-bin"},"next-code-only":{"command":"a"}}}"#,
     )
     .unwrap();
     std::fs::write(
@@ -209,9 +209,9 @@ fn test_load_project_locals_merge_order() {
     assert_eq!(
         config.servers.get("shared-name").unwrap().command,
         "claude-bin",
-        ".mcp.json must override .jcode/mcp.json for same-named servers"
+        ".mcp.json must override .next-code/mcp.json for same-named servers"
     );
-    assert!(config.servers.contains_key("jcode-only"));
+    assert!(config.servers.contains_key("next-code-only"));
     assert!(config.servers.contains_key("legacy-only"));
 }
 

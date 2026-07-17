@@ -899,16 +899,16 @@ mod tests {
     #[test]
     fn idle_input_hint_combines_dir_and_model() {
         assert_eq!(
-            format_idle_input_hint(Some("opus-4.5".to_string()), Some("jcode".to_string())),
-            Some("opus-4.5 · jcode".to_string())
+            format_idle_input_hint(Some("opus-4.5".to_string()), Some("next-code".to_string())),
+            Some("opus-4.5 · next-code".to_string())
         );
         assert_eq!(
             format_idle_input_hint(Some("opus-4.5".to_string()), None),
             Some("opus-4.5".to_string())
         );
         assert_eq!(
-            format_idle_input_hint(None, Some("jcode".to_string())),
-            Some("jcode".to_string())
+            format_idle_input_hint(None, Some("next-code".to_string())),
+            Some("next-code".to_string())
         );
         assert_eq!(format_idle_input_hint(None, None), None);
     }
@@ -1064,7 +1064,7 @@ mod tests {
                 running: vec![crate::message::ToolCall {
                     id: "batch-1-bash".to_string(),
                     name: "bash".to_string(),
-                    input: serde_json::json!({"command": "cargo test -p jcode"}),
+                    input: serde_json::json!({"command": "cargo test -p next-code"}),
                     intent: None,
                     thought_signature: None,
                 }],

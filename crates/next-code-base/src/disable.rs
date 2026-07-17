@@ -1,19 +1,20 @@
-//! Centralized disable registry for all `JCODE_DISABLE_*` env vars.
+//! Centralized disable registry for all `NEXT_CODE_DISABLE_*` env vars.
 //!
 //! A `LazyLock<DisableRegistry>` singleton is loaded once at first access,
 //! caching boolean flags and comma-separated skip lists. Env vars do not
 //! change during process lifetime, so a one-shot load is safe and efficient.
 
+use crate::env::{product_env};
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
 // ─── DisableFlag Enum ───────────────────────────────────────────────
 
-/// Each variant corresponds to a `JCODE_DISABLE_<NAME>=1` env var.
+/// Each variant corresponds to a `NEXT_CODE_DISABLE_<NAME>=1` env var.
 /// Parsed once at startup, cached forever.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 pub enum DisableFlag {
-    /// Master kill-switch: `JCODE_DISABLE_ALL=1` disables everything.
+    /// Master kill-switch: `NEXT_CODE_DISABLE_ALL=1` disables everything.
     All,
     Hooks,
     Plugins,
@@ -49,18 +50,18 @@ impl DisableFlag {
     /// Map flag → env var name.
     pub fn env_var(&self) -> &'static str {
         match self {
-            DisableFlag::All => "JCODE_DISABLE_ALL",
-            DisableFlag::Hooks => "JCODE_DISABLE_HOOKS",
-            DisableFlag::Plugins => "JCODE_DISABLE_PLUGINS",
-            DisableFlag::Memory => "JCODE_DISABLE_MEMORY",
-            DisableFlag::Swarm => "JCODE_DISABLE_SWARM",
-            DisableFlag::Ambient => "JCODE_DISABLE_AMBIENT",
-            DisableFlag::Mcp => "JCODE_DISABLE_MCP",
-            DisableFlag::Compaction => "JCODE_DISABLE_COMPACTION",
-            DisableFlag::Telemetry => "JCODE_DISABLE_TELEMETRY",
-            DisableFlag::Mermaid => "JCODE_DISABLE_MERMAID",
-            DisableFlag::DesktopAnimation => "JCODE_DISABLE_DESKTOP_ANIMATION",
-            DisableFlag::PowerInhibit => "JCODE_DISABLE_POWER_INHIBIT",
+            DisableFlag::All => "NEXT_CODE_DISABLE_ALL",
+            DisableFlag::Hooks => "NEXT_CODE_DISABLE_HOOKS",
+            DisableFlag::Plugins => "NEXT_CODE_DISABLE_PLUGINS",
+            DisableFlag::Memory => "NEXT_CODE_DISABLE_MEMORY",
+            DisableFlag::Swarm => "NEXT_CODE_DISABLE_SWARM",
+            DisableFlag::Ambient => "NEXT_CODE_DISABLE_AMBIENT",
+            DisableFlag::Mcp => "NEXT_CODE_DISABLE_MCP",
+            DisableFlag::Compaction => "NEXT_CODE_DISABLE_COMPACTION",
+            DisableFlag::Telemetry => "NEXT_CODE_DISABLE_TELEMETRY",
+            DisableFlag::Mermaid => "NEXT_CODE_DISABLE_MERMAID",
+            DisableFlag::DesktopAnimation => "NEXT_CODE_DISABLE_DESKTOP_ANIMATION",
+            DisableFlag::PowerInhibit => "NEXT_CODE_DISABLE_POWER_INHIBIT",
         }
     }
 }
@@ -78,7 +79,7 @@ pub struct DisableRegistry {
     disabled_tools: HashSet<String>,
     disabled_animations: HashSet<String>,
     disabled_features: HashSet<String>,
-    /// Cached value of deprecated `JCODE_DISABLE_BASE_TOOLS` env var.
+    /// Cached value of deprecated `NEXT_CODE_DISABLE_BASE_TOOLS` env var.
     base_tools_legacy_disabled: bool,
 }
 
@@ -89,7 +90,7 @@ impl DisableRegistry {
         &INSTANCE
     }
 
-    /// Load and cache ALL `JCODE_DISABLE_*` state at once.
+    /// Load and cache ALL `NEXT_CODE_DISABLE_*` state at once.
     fn load_from_env() -> Self {
         let mut flags: HashSet<DisableFlag> = HashSet::new();
 
@@ -107,12 +108,12 @@ impl DisableRegistry {
         }
 
         // Selective skip lists.
-        let disabled_hooks = parse_comma_list("JCODE_DISABLE_HOOK");
-        let disabled_tools = parse_comma_list("JCODE_DISABLE_TOOL");
-        let disabled_animations = parse_comma_list("JCODE_DISABLE_ANIMATION");
-        let disabled_features = parse_comma_list("JCODE_DISABLE_FEATURE");
+        let disabled_hooks = parse_comma_list("NEXT_CODE_DISABLE_HOOK");
+        let disabled_tools = parse_comma_list("NEXT_CODE_DISABLE_TOOL");
+        let disabled_animations = parse_comma_list("NEXT_CODE_DISABLE_ANIMATION");
+        let disabled_features = parse_comma_list("NEXT_CODE_DISABLE_FEATURE");
 
-        let base_tools_legacy_disabled = std::env::var("JCODE_DISABLE_BASE_TOOLS")
+        let base_tools_legacy_disabled = product_env("DISABLE_BASE_TOOLS")
             .ok()
             .map(|v| is_env_truthy_raw(&v))
             .unwrap_or(false);
@@ -169,9 +170,9 @@ impl DisableRegistry {
         &self.disabled_animations
     }
 
-    /// Is the `JCODE_DISABLE_BASE_TOOLS` legacy flag active?
-    /// This checks both the new `JCODE_DISABLE_TOOL=base` path and the
-    /// deprecated `JCODE_DISABLE_BASE_TOOLS=1` env var.
+    /// Is the `NEXT_CODE_DISABLE_BASE_TOOLS` legacy flag active?
+    /// This checks both the new `NEXT_CODE_DISABLE_TOOL=base` path and the
+    /// deprecated `NEXT_CODE_DISABLE_BASE_TOOLS=1` env var.
     pub fn base_tools_disabled(&self) -> bool {
         self.disabled_tools.contains("base") || self.base_tools_legacy_disabled
     }
@@ -227,43 +228,43 @@ mod tests {
 
     #[test]
     fn test_master_kill_disables_all() {
-        crate::env::set_var("JCODE_DISABLE_ALL", "1");
+        crate::env::set_var("NEXT_CODE_DISABLE_ALL", "1");
         let registry = DisableRegistry::load_from_env();
         assert!(registry.disabled(DisableFlag::All));
         assert!(registry.disabled(DisableFlag::Hooks));
         assert!(registry.disabled(DisableFlag::Plugins));
         assert!(registry.disabled(DisableFlag::Memory));
-        crate::env::remove_var("JCODE_DISABLE_ALL");
+        crate::env::remove_var("NEXT_CODE_DISABLE_ALL");
     }
 
     #[test]
     fn test_hook_kill_disables_all_hooks() {
-        crate::env::set_var("JCODE_DISABLE_HOOKS", "true");
+        crate::env::set_var("NEXT_CODE_DISABLE_HOOKS", "true");
         let registry = DisableRegistry::load_from_env();
         assert!(registry.hook_disabled("pre_tool_use"));
         assert!(registry.hook_disabled("stop"));
-        crate::env::remove_var("JCODE_DISABLE_HOOKS");
+        crate::env::remove_var("NEXT_CODE_DISABLE_HOOKS");
     }
 
     #[test]
     fn test_selective_hook_skip() {
-        crate::env::set_var("JCODE_DISABLE_HOOK", "pre_tool_use,stop");
+        crate::env::set_var("NEXT_CODE_DISABLE_HOOK", "pre_tool_use,stop");
         let registry = DisableRegistry::load_from_env();
         assert!(registry.hook_disabled("pre_tool_use"));
         assert!(registry.hook_disabled("stop"));
         assert!(!registry.hook_disabled("post_tool_use"));
         assert!(!registry.hook_disabled("session_start"));
-        crate::env::remove_var("JCODE_DISABLE_HOOK");
+        crate::env::remove_var("NEXT_CODE_DISABLE_HOOK");
     }
 
     #[test]
     fn test_selective_tool_disable() {
-        crate::env::set_var("JCODE_DISABLE_TOOL", "bash,edit");
+        crate::env::set_var("NEXT_CODE_DISABLE_TOOL", "bash,edit");
         let registry = DisableRegistry::load_from_env();
         assert!(registry.tool_disabled("bash"));
         assert!(registry.tool_disabled("edit"));
         assert!(!registry.tool_disabled("read"));
-        crate::env::remove_var("JCODE_DISABLE_TOOL");
+        crate::env::remove_var("NEXT_CODE_DISABLE_TOOL");
     }
 
     #[test]
@@ -299,24 +300,24 @@ mod tests {
 
     #[test]
     fn test_empty_selective_lists() {
-        crate::env::set_var("JCODE_DISABLE_HOOK", "");
-        crate::env::set_var("JCODE_DISABLE_TOOL", "");
+        crate::env::set_var("NEXT_CODE_DISABLE_HOOK", "");
+        crate::env::set_var("NEXT_CODE_DISABLE_TOOL", "");
         let registry = DisableRegistry::load_from_env();
         assert!(!registry.hook_disabled("any"));
         assert!(!registry.tool_disabled("any"));
-        crate::env::remove_var("JCODE_DISABLE_HOOK");
-        crate::env::remove_var("JCODE_DISABLE_TOOL");
+        crate::env::remove_var("NEXT_CODE_DISABLE_HOOK");
+        crate::env::remove_var("NEXT_CODE_DISABLE_TOOL");
     }
 
     #[test]
     fn test_flag_env_var_names() {
-        assert_eq!(DisableFlag::All.env_var(), "JCODE_DISABLE_ALL");
-        assert_eq!(DisableFlag::Hooks.env_var(), "JCODE_DISABLE_HOOKS");
-        assert_eq!(DisableFlag::Plugins.env_var(), "JCODE_DISABLE_PLUGINS");
-        assert_eq!(DisableFlag::Memory.env_var(), "JCODE_DISABLE_MEMORY");
+        assert_eq!(DisableFlag::All.env_var(), "NEXT_CODE_DISABLE_ALL");
+        assert_eq!(DisableFlag::Hooks.env_var(), "NEXT_CODE_DISABLE_HOOKS");
+        assert_eq!(DisableFlag::Plugins.env_var(), "NEXT_CODE_DISABLE_PLUGINS");
+        assert_eq!(DisableFlag::Memory.env_var(), "NEXT_CODE_DISABLE_MEMORY");
         assert_eq!(
             DisableFlag::PowerInhibit.env_var(),
-            "JCODE_DISABLE_POWER_INHIBIT"
+            "NEXT_CODE_DISABLE_POWER_INHIBIT"
         );
     }
 
@@ -339,11 +340,11 @@ mod tests {
 
     #[test]
     fn test_comma_list_whitespace_handling() {
-        crate::env::set_var("JCODE_DISABLE_TOOL", "  bash , edit  ");
+        crate::env::set_var("NEXT_CODE_DISABLE_TOOL", "  bash , edit  ");
         let registry = DisableRegistry::load_from_env();
         assert!(registry.tool_disabled("bash"));
         assert!(registry.tool_disabled("edit"));
         assert!(!registry.tool_disabled("read"));
-        crate::env::remove_var("JCODE_DISABLE_TOOL");
+        crate::env::remove_var("NEXT_CODE_DISABLE_TOOL");
     }
 }

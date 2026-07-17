@@ -1,3 +1,4 @@
+use crate::env::{product_env_os};
 use super::*;
 
 #[cfg(unix)]
@@ -37,9 +38,9 @@ fn harden_secret_file_permissions_sets_owner_only_modes() {
 #[test]
 fn user_home_path_uses_external_dir_under_jcode_home() {
     let _guard = lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let resolved = user_home_path(".codex/auth.json").expect("resolve user home path");
     assert_eq!(
@@ -51,9 +52,9 @@ fn user_home_path_uses_external_dir_under_jcode_home() {
     );
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
@@ -75,17 +76,17 @@ fn validate_external_auth_file_rejects_symlink() {
 #[test]
 fn app_config_dir_uses_jcode_home_when_set() {
     let _guard = lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let resolved = app_config_dir().expect("resolve app config dir");
     assert_eq!(resolved, temp.path().join("config").join("jcode"));
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 

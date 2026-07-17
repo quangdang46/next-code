@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use anyhow::Result;
 use clap::Parser;
 use std::process::Command as ProcessCommand;
@@ -25,13 +26,13 @@ pub async fn run() -> Result<()> {
     // so it no longer blocks startup. Memory-event logs have a separate,
     // longer (14-day) retention, so prune them on their own background thread.
     std::thread::Builder::new()
-        .name("jcode-memlog-cleanup".to_string())
+        .name("next-code-memlog-cleanup".to_string())
         .spawn(crate::memory_log::cleanup_old_memory_logs)
         .ok();
     // Prune stale per-session `.bak` recovery copies (never the transcripts
     // themselves) so the sessions directory does not grow without bound.
     std::thread::Builder::new()
-        .name("jcode-session-bak-prune".to_string())
+        .name("next-code-session-bak-prune".to_string())
         .spawn(crate::session::prune_old_session_backups)
         .ok();
     logging::info("next-code starting");
@@ -58,7 +59,7 @@ pub async fn run() -> Result<()> {
     );
 
     // Register externally-implemented provider runtimes with the base
-    // provider registry. These crates sit downstream of jcode-base (so
+    // provider registry. These crates sit downstream of next-code-base (so
     // provider edits do not rebuild the app spine), which means base cannot
     // name their concrete types; this composition root wires them up instead.
     register_external_provider_runtimes();
@@ -132,7 +133,7 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-/// Register provider runtimes that live downstream of `jcode-base` with the
+/// Register provider runtimes that live downstream of `next-code-base` with the
 /// base crate's external provider registry. Keep every downstream runtime
 /// registration in this one function so the composition-root wiring stays
 /// discoverable as more providers move out of the base crate.
@@ -206,7 +207,7 @@ pub fn register_external_provider_runtimes() {
             let provider = std::sync::Arc::new(
                 next_code_provider_copilot_runtime::CopilotApiProvider::new().ok()?,
             );
-            let eager_tier_detection = std::env::var("JCODE_NON_INTERACTIVE").is_err();
+            let eager_tier_detection = product_env("NON_INTERACTIVE").is_err();
             if eager_tier_detection && tokio::runtime::Handle::try_current().is_ok() {
                 let p_clone = std::sync::Arc::clone(&provider);
                 tokio::spawn(async move {
@@ -238,7 +239,7 @@ fn parse_and_prepare_args() -> Result<Args> {
     validate_remote_working_dir(args.remote_working_dir.as_deref())?;
 
     if args.trace {
-        crate::env::set_var("JCODE_TRACE", "1");
+        crate::env::set_var("NEXT_CODE_TRACE", "1");
     }
 
     if let Some(ref socket) = args.socket {

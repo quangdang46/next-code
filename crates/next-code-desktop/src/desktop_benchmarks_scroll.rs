@@ -1564,7 +1564,7 @@ pub(crate) fn run_scroll_render_benchmark(frames: usize) -> Result<()> {
             },
             "no_paint_watchdog": {
                 "budget_ms": duration_ms(DESKTOP_NO_PAINT_BUDGET),
-                "log_event": "jcode-desktop-no-paint-profile",
+                "log_event": "next-code-desktop-no-paint-profile",
                 "requests_recovery_redraw": true,
             },
             "end_to_end_stream_flood": end_to_end_stream_flood.to_json(),

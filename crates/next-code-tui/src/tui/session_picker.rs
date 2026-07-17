@@ -975,7 +975,7 @@ impl SessionPicker {
         let (tx, rx) = std::sync::mpsc::channel();
         let thread_session_id = cache_session_id.clone();
         let _ = std::thread::Builder::new()
-            .name("jcode-session-preview-loader".to_string())
+            .name("next-code-session-preview-loader".to_string())
             .spawn(move || {
                 let preview = Self::load_preview_for_target(resume_target, external_path);
                 let _ = tx.send(preview);

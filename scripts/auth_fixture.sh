@@ -7,13 +7,13 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 
-sandbox_name=${JCODE_ONBOARDING_SANDBOX:-default}
+sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-${JCODE_ONBOARDING_SANDBOX:-default}}
 sandbox_root_default="$repo_root/.tmp/onboarding/$sandbox_name"
-sandbox_root=${JCODE_ONBOARDING_DIR:-$sandbox_root_default}
-jcode_home="$sandbox_root/home"
+sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-${JCODE_ONBOARDING_DIR:-$sandbox_root_default}}
+next_code_home="$sandbox_root/home"
 runtime_dir="$sandbox_root/runtime"
 fixture_root_default="$repo_root/.tmp/auth-fixtures"
-fixture_root=${JCODE_AUTH_FIXTURE_DIR:-$fixture_root_default}
+fixture_root=${NEXT_CODE_AUTH_FIXTURE_DIR:-${JCODE_AUTH_FIXTURE_DIR:-$fixture_root_default}}
 
 usage() {
   cat <<EOF
@@ -87,13 +87,13 @@ copy_dir_contents() {
 }
 
 run_jcode() {
-  local binary_path="$repo_root/target/debug/jcode"
+  local binary_path="$repo_root/target/debug/next-code"
   (
     cd "$repo_root"
     if [[ -x "$binary_path" ]]; then
-      env NEXT_CODE_HOME="$jcode_home" JCODE_HOME="$jcode_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" "$binary_path" "$@"
+      env NEXT_CODE_HOME="$next_code_home" JCODE_HOME="$next_code_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" "$binary_path" "$@"
     else
-      env NEXT_CODE_HOME="$jcode_home" JCODE_HOME="$jcode_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" cargo run --bin next-code -- "$@"
+      env NEXT_CODE_HOME="$next_code_home" JCODE_HOME="$next_code_home" NEXT_CODE_RUNTIME_DIR="$runtime_dir" JCODE_RUNTIME_DIR="$runtime_dir" cargo run --bin next-code -- "$@"
     fi
   )
 }
@@ -112,21 +112,21 @@ save_fixture() {
   dst=$(fixture_path "$name")
   meta=$(metadata_path "$name")
   ensure_parent_dirs
-  if [[ ! -d "$jcode_home" ]]; then
-    echo "sandbox NEXT_CODE_HOME does not exist: $jcode_home" >&2
+  if [[ ! -d "$next_code_home" ]]; then
+    echo "sandbox NEXT_CODE_HOME does not exist: $next_code_home" >&2
     exit 1
   fi
   mkdir -p "$(dirname "$dst")"
-  copy_dir_contents "$jcode_home" "$dst"
+  copy_dir_contents "$next_code_home" "$dst"
   chmod -R go-rwx "$(dirname "$dst")" 2>/dev/null || true
   cat > "$meta" <<EOF
 name=$name
 saved_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 sandbox_name=$sandbox_name
-source_jcode_home=$jcode_home
+source_jcode_home=$next_code_home
 warning=May contain real local auth tokens. Do not commit or share.
 EOF
-  echo "Saved auth fixture '$name' from $jcode_home"
+  echo "Saved auth fixture '$name' from $next_code_home"
   echo "Fixture path: $(dirname "$dst")"
 }
 
@@ -140,10 +140,10 @@ load_fixture() {
     echo "Expected: $src" >&2
     exit 1
   fi
-  copy_dir_contents "$src" "$jcode_home"
-  chmod -R go-rwx "$jcode_home" 2>/dev/null || true
+  copy_dir_contents "$src" "$next_code_home"
+  chmod -R go-rwx "$next_code_home" 2>/dev/null || true
   echo "Loaded auth fixture '$name' into sandbox '$sandbox_name'"
-  echo "JCODE_HOME=$jcode_home"
+  echo "JCODE_HOME=$next_code_home"
 }
 
 delete_fixture() {
@@ -179,9 +179,9 @@ case "$command" in
     load_fixture "$name"
     ;;
   reset-sandbox)
-    rm -rf "$jcode_home"
-    mkdir -p "$jcode_home" "$runtime_dir"
-    echo "Reset sandbox NEXT_CODE_HOME: $jcode_home"
+    rm -rf "$next_code_home"
+    mkdir -p "$next_code_home" "$runtime_dir"
+    echo "Reset sandbox NEXT_CODE_HOME: $next_code_home"
     ;;
   delete)
     name=$(require_name "${1:-}")
@@ -191,8 +191,8 @@ case "$command" in
     name=$(require_name "${1:-}")
     load_fixture "$name" >/dev/null
     cat <<EOF
-export JCODE_HOME="$jcode_home"
-export JCODE_RUNTIME_DIR="$runtime_dir"
+export NEXT_CODE_HOME="$next_code_home"
+export NEXT_CODE_RUNTIME_DIR="$runtime_dir"
 EOF
     ;;
   run)

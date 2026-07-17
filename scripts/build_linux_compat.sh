@@ -17,9 +17,9 @@ if [[ "$out_dir" != /* ]]; then
   out_dir="$repo_root/$out_dir"
 fi
 
-artifact="${JCODE_COMPAT_ARTIFACT:-${NEXT_CODE_COMPAT_ARTIFACT:-next-code-linux-x86_64}}"
-profile="${JCODE_COMPAT_PROFILE:-release}"
-image="${JCODE_COMPAT_IMAGE:-quay.io/pypa/manylinux2014_x86_64}"
+artifact="${NEXT_CODE_COMPAT_ARTIFACT:-${JCODE_COMPAT_ARTIFACT:-${NEXT_CODE_COMPAT_ARTIFACT:-next-code-linux-x86_64}}}"
+profile="${NEXT_CODE_COMPAT_PROFILE:-${JCODE_COMPAT_PROFILE:-release}}"
+image="${NEXT_CODE_COMPAT_IMAGE:-${JCODE_COMPAT_IMAGE:-quay.io/pypa/manylinux2014_x86_64}}"
 cache_root="${JCODE_COMPAT_CACHE_DIR:-${NEXT_CODE_COMPAT_CACHE_DIR:-$HOME/.cache/next-code-linux-compat}}"
 target="x86_64-unknown-linux-gnu"
 
@@ -74,15 +74,20 @@ echo "Embedding git metadata: hash=${git_hash:-<none>} tag=${git_tag:-<none>} di
 
 docker run --rm \
   -e CARGO_TERM_COLOR=always \
-  -e JCODE_RELEASE_BUILD="${JCODE_RELEASE_BUILD:-1}" \
-  -e JCODE_BUILD_SEMVER="${JCODE_BUILD_SEMVER:-}" \
-  -e JCODE_BUILD_METADATA_FILE=/jcode-build-meta \
+  -e NEXT_CODE_RELEASE_BUILD="${NEXT_CODE_RELEASE_BUILD:-${JCODE_RELEASE_BUILD:-1}}" \
+  -e JCODE_RELEASE_BUILD="${NEXT_CODE_RELEASE_BUILD:-${JCODE_RELEASE_BUILD:-1}}" \
+  -e NEXT_CODE_BUILD_SEMVER="${NEXT_CODE_BUILD_SEMVER:-${JCODE_BUILD_SEMVER:-}}" \
+  -e JCODE_BUILD_SEMVER="${NEXT_CODE_BUILD_SEMVER:-${JCODE_BUILD_SEMVER:-}}" \
+  -e NEXT_CODE_BUILD_METADATA_FILE=/next-code-build-meta \
+  -e JCODE_BUILD_METADATA_FILE=/next-code-build-meta \
+  -e NEXT_CODE_COMPAT_PROFILE="$profile" \
   -e JCODE_COMPAT_PROFILE="$profile" \
+  -e NEXT_CODE_COMPAT_TARGET="$target" \
   -e JCODE_COMPAT_TARGET="$target" \
   -e HOST_UID="$host_uid" \
   -e HOST_GID="$host_gid" \
   -v "$repo_root:/work" \
-  -v "$metadata_file:/jcode-build-meta:ro" \
+  -v "$metadata_file:/next-code-build-meta:ro" \
   -v "$out_dir:/out" \
   -v "$cache_root/cargo-registry:/root/.cargo/registry" \
   -v "$cache_root/cargo-git:/root/.cargo/git" \
@@ -125,7 +130,7 @@ docker run --rm \
 	    source /root/.cargo/env
 
 	    # Belt-and-suspenders: the host-computed metadata file
-	    # (JCODE_BUILD_METADATA_FILE=/jcode-build-meta) is the primary source of
+	    # (JCODE_BUILD_METADATA_FILE=/next-code-build-meta) is the primary source of
 	    # git hash/date/changelog, but mark the bind-mounted repo as a safe
 	    # directory so any in-container git fallback still works despite the
 	    # host-UID/root-git ownership mismatch (CVE-2022-24765 guard).
@@ -134,9 +139,9 @@ docker run --rm \
 	    export CARGO_TARGET_DIR=/work/target/linux-compat
 	    export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 	    export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS:--C link-arg=-static-libgcc}"
-	    cargo build --profile "$JCODE_COMPAT_PROFILE" --target "$JCODE_COMPAT_TARGET" -p next-code --bin next-code
+	    cargo build --profile "${NEXT_CODE_COMPAT_PROFILE:-${JCODE_COMPAT_PROFILE:-}}" --target "${NEXT_CODE_COMPAT_TARGET:-${JCODE_COMPAT_TARGET:-}}" -p next-code --bin next-code
 
-	    cp "$CARGO_TARGET_DIR/$JCODE_COMPAT_TARGET/$JCODE_COMPAT_PROFILE/next-code" "/out/'"$artifact"'.bin"
+	    cp "$CARGO_TARGET_DIR/${NEXT_CODE_COMPAT_TARGET:-${JCODE_COMPAT_TARGET:-}}/${NEXT_CODE_COMPAT_PROFILE:-${JCODE_COMPAT_PROFILE:-}}/next-code" "/out/'"$artifact"'.bin"
 	    chmod +x "/out/'"$artifact"'.bin"
 	    cat > "/out/'"$artifact"'" <<WRAPPER
 #!/usr/bin/env sh

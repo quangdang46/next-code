@@ -1,8 +1,8 @@
-//! Team management tools — upgraded to drive `jcode-swarm-core::team` runtime.
+//! Team management tools — upgraded to drive `next-code-swarm-core::team` runtime.
 //!
 //! Replaces the old JSON-file CRUD with the full team-mode: member spawn,
 //! file-based mailbox, dependency-aware task board, tmux layout.
-//! Backward-compatible: old `~/.jcode/teams/<name>.json` configs are still
+//! Backward-compatible: old `~/.next-code/teams/<name>.json` configs are still
 //! readable by the status tool.
 
 use super::{Tool, ToolContext, ToolOutput};
@@ -14,12 +14,12 @@ use serde_json::{Value, json};
 use crate::team::{mailbox, runtime, spec::*, state, tasklist};
 
 // ---------------------------------------------------------------------------
-// MemberSpawner: spawns headless jcode agent sessions
+// MemberSpawner: spawns headless next-code agent sessions
 // ---------------------------------------------------------------------------
 
-struct JcodeMemberSpawner;
+struct NextCodeMemberSpawner;
 
-impl runtime::MemberSpawner for JcodeMemberSpawner {
+impl runtime::MemberSpawner for NextCodeMemberSpawner {
     fn spawn(
         &self,
         run_id: &str,
@@ -27,26 +27,26 @@ impl runtime::MemberSpawner for JcodeMemberSpawner {
         prompt: &str,
     ) -> crate::team::spec::TeamResult<String> {
         let member_name = member.name().to_string();
-        let session_id = format!("jcode-team-{}-{}", &run_id[..8], member_name);
+        let session_id = format!("next-code-team-{}-{}", &run_id[..8], member_name);
         crate::logging::info(&format!(
             "spawn team member session run={run_id} member={member_name} session={session_id}"
         ));
-        // Spawn a headless jcode server for this team member.
+        // Spawn a headless next-code server for this team member.
         // The process inherits the parent's PATH and runtime dir access so it
         // can read/write the shared file-based mailbox and task board.
-        // NOTE: env vars JCODE_TEAM_RUN_ID, JCODE_TEAM_MEMBER, and
-        // JCODE_TEAM_PROMPT are inherited by all spawned subprocesses.
+        // NOTE: env vars NEXT_CODE_TEAM_RUN_ID, NEXT_CODE_TEAM_MEMBER, and
+        // NEXT_CODE_TEAM_PROMPT are inherited by all spawned subprocesses.
         // The capability token is deliberately NOT included. See security
         // review finding M5 for the accepted disclosure surface.
-        let bin = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("jcode"));
+        let bin = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("next-code"));
         match std::process::Command::new(&bin)
             .arg("serve")
             .arg("--temporary-server")
             .arg("--owner-pid")
             .arg(std::process::id().to_string())
-            .env("JCODE_TEAM_RUN_ID", run_id)
-            .env("JCODE_TEAM_MEMBER", &member_name)
-            .env("JCODE_TEAM_PROMPT", prompt)
+            .env("NEXT_CODE_TEAM_RUN_ID", run_id)
+            .env("NEXT_CODE_TEAM_MEMBER", &member_name)
+            .env("NEXT_CODE_TEAM_PROMPT", prompt)
             .spawn()
         {
             Ok(child) => {
@@ -155,7 +155,7 @@ impl Tool for TeamCreateTool {
         let _ = runtime::sweep_stale_sessions();
 
         let session_id = ctx.session_id.clone();
-        let spawner = JcodeMemberSpawner;
+        let spawner = NextCodeMemberSpawner;
         let run = tokio::task::spawn_blocking(move || {
             let run = runtime::create_team(spec, &session_id, &spawner)?;
             // Activate tmux layout: read TMUX_PANE / TMUX environment for
@@ -171,7 +171,7 @@ impl Tool for TeamCreateTool {
                     &caller_pane,
                     |m| {
                         format!(
-                            "jcode serve --team-run-id {} --member-name {} 2>/dev/null",
+                            "next-code serve --team-run-id {} --member-name {} 2>/dev/null",
                             run.team_run_id, m.name
                         )
                     },

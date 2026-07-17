@@ -1,15 +1,17 @@
 use super::{
     MacTerminalKind, SetupHintsState, effective_macos_terminal, escape_applescript_text,
-    escape_shell_single_quotes, launch_command_for_macos_terminal, paused_jcode_shell_command,
+    escape_shell_single_quotes, launch_command_for_macos_terminal, paused_next_code_shell_command,
     save_preferred_macos_terminal,
 };
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
-const MACOS_APP_ICON_FILE_NAME: &str = "Jcode.icns";
+const MACOS_APP_ICON_FILE_NAME: &str = "NextCode.icns";
+// dual-read: source asset filename still `Jcode.icns` until assets rename pass
 const MACOS_APP_ICON_BYTES: &[u8] = include_bytes!(concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../assets/app-icons/Jcode.icns"
+    "/../../assets/app-icons/",
+    "Jcode.icns", // dual-read: asset filename pending rename
 ));
 
 pub(super) fn should_refresh_macos_app_launcher(state: &SetupHintsState) -> bool {
@@ -41,7 +43,7 @@ pub(super) fn install_macos_app_launcher() -> Result<(PathBuf, MacTerminalKind)>
     let exe = std::env::current_exe()?;
     let exe_path = exe.to_string_lossy().into_owned();
     let terminal = effective_macos_terminal();
-    let launcher_path = macos_dir.join("jcode-launcher");
+    let launcher_path = macos_dir.join("next-code-launcher");
     let launcher_script = macos_launcher_script(terminal, &exe_path, &app_dir);
     std::fs::write(&launcher_path, launcher_script)?;
     std::fs::write(
@@ -61,17 +63,17 @@ pub(super) fn install_macos_app_launcher() -> Result<(PathBuf, MacTerminalKind)>
 <plist version="1.0">
 <dict>
     <key>CFBundleName</key>
-    <string>Jcode</string>
+    <string>Next Code</string>
     <key>CFBundleDisplayName</key>
-    <string>Jcode</string>
+    <string>Next Code</string>
     <key>CFBundleIdentifier</key>
-    <string>com.jcode.launcher</string>
+    <string>com.nextcode.launcher</string>
     <key>CFBundleVersion</key>
     <string>{version}</string>
     <key>CFBundleShortVersionString</key>
     <string>{version}</string>
     <key>CFBundleExecutable</key>
-    <string>jcode-launcher</string>
+    <string>next-code-launcher</string>
     <key>CFBundleIconFile</key>
     <string>{icon_file}</string>
     <key>CFBundlePackageType</key>
@@ -100,12 +102,12 @@ pub(super) fn install_macos_app_launcher() -> Result<(PathBuf, MacTerminalKind)>
 
 fn macos_app_launcher_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("Could not find home directory")?;
-    Ok(home.join("Applications").join("Jcode.app"))
+    Ok(home.join("Applications").join("Next Code.app"))
 }
 
 fn legacy_macos_app_launcher_dir() -> Result<PathBuf> {
     let home = dirs::home_dir().context("Could not find home directory")?;
-    Ok(home.join("Applications").join("jcode.app"))
+    Ok(home.join("Applications").join("next-code.app"))
 }
 
 fn macos_app_launcher_info_plist_path(app_dir: &Path) -> PathBuf {
@@ -116,7 +118,7 @@ fn macos_app_launcher_executable_path(app_dir: &Path) -> PathBuf {
     app_dir
         .join("Contents")
         .join("MacOS")
-        .join("jcode-launcher")
+        .join("next-code-launcher")
 }
 
 fn macos_app_launcher_icon_path(app_dir: &Path) -> PathBuf {
@@ -178,7 +180,7 @@ fn should_refresh_macos_app_launcher_paths(
 /// Check that `path` exists under its exact byte-for-byte file name.
 ///
 /// macOS system volumes are case-insensitive by default, so a plain
-/// `Path::exists()` on `jcode.app` also matches `Jcode.app`. The legacy-bundle
+/// `Path::exists()` on `next-code.app` also matches `Next Code.app`. The legacy-bundle
 /// check needs an exact-name match or the launcher would refresh itself on
 /// every launch once the new bundle exists.
 fn path_exists_with_exact_name(path: &Path) -> bool {
@@ -196,14 +198,14 @@ fn path_exists_with_exact_name(path: &Path) -> bool {
 fn macos_launcher_script(terminal: MacTerminalKind, exe_path: &str, app_dir: &Path) -> String {
     let app_dir_escaped = escape_shell_single_quotes(&app_dir.to_string_lossy());
     let exe_path_escaped = escape_shell_single_quotes(exe_path);
-    let shell_command = paused_jcode_shell_command(exe_path);
+    let shell_command = paused_next_code_shell_command(exe_path);
     let launch_command = launch_command_for_macos_terminal(terminal, &shell_command);
     let missing_message = escape_applescript_text(&format!(
-        "Jcode could not launch because the executable was not found.\n\nExpected path:\n{}\n\nTry reinstalling jcode or rerun:\njcode setup-launcher",
+        "Next Code could not launch because the executable was not found.\n\nExpected path:\n{}\n\nTry reinstalling next-code or rerun:\nnext-code setup-launcher",
         exe_path
     ));
     let terminal_failure_message = escape_applescript_text(&format!(
-        "Jcode could not open {}.\n\nTry rerunning:\njcode setup-launcher\n\nLauncher log:\n~/.jcode/launcher/macos-launcher.log",
+        "Next Code could not open {}.\n\nTry rerunning:\nnext-code setup-launcher\n\nLauncher log:\n~/.next-code/launcher/macos-launcher.log",
         terminal.label()
     ));
 
@@ -212,19 +214,19 @@ fn macos_launcher_script(terminal: MacTerminalKind, exe_path: &str, app_dir: &Pa
 set -u
 
 PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-LOG_DIR="$HOME/.jcode/launcher"
+LOG_DIR="$HOME/.next-code/launcher"
 LOG_FILE="$LOG_DIR/macos-launcher.log"
 mkdir -p "$LOG_DIR" >/dev/null 2>&1 || true
 
 show_missing_executable() {{
   /usr/bin/osascript <<'APPLESCRIPT' >/dev/null 2>&1 || true
-display alert "Jcode launch failed" message "{missing_message}" as critical
+display alert "Next Code launch failed" message "{missing_message}" as critical
 APPLESCRIPT
 }}
 
 show_terminal_launch_failure() {{
   /usr/bin/osascript <<'APPLESCRIPT' >/dev/null 2>&1 || true
-display alert "Jcode launch failed" message "{terminal_failure_message}" as critical
+display alert "Next Code launch failed" message "{terminal_failure_message}" as critical
 APPLESCRIPT
 }}
 

@@ -90,9 +90,11 @@
 
           # build.rs reads git metadata; supply something deterministic when the
           # store source has no .git/ (Nix typically strips it).
-          # JCODE_GIT_* is still the cargo env name emitted by next-code-build-meta.
+          # JCODE_GIT_* is still the cargo env name emitted by next-code-build-meta (dual-read window).
           JCODE_GIT_HASH = if (self ? rev) then self.rev else "nix-${self.shortRev or "unknown"}";
           JCODE_GIT_DATE = self.lastModifiedDate or "1970-01-01";
+          NEXT_CODE_GIT_HASH = if (self ? rev) then self.rev else "nix-${self.shortRev or "unknown"}";
+          NEXT_CODE_GIT_DATE = self.lastModifiedDate or "1970-01-01";
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
@@ -110,7 +112,7 @@
         packages = {
           default = next-code;
           next-code = next-code;
-          # Legacy alias for one release.
+          # Compat package alias for one release (contract binary alias).
           jcode = next-code;
         };
 
@@ -120,7 +122,7 @@
         };
 
         devShells.default = pkgs.mkShell {
-          inherit (commonArgs) JCODE_GIT_HASH JCODE_GIT_DATE;
+          inherit (commonArgs) JCODE_GIT_HASH JCODE_GIT_DATE NEXT_CODE_GIT_HASH NEXT_CODE_GIT_DATE;
 
           buildInputs = commonArgs.buildInputs;
           nativeBuildInputs =

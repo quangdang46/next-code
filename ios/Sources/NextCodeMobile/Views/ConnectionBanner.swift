@@ -1,4 +1,4 @@
-import JCodeKit
+import NextCodeKit
 import SwiftUI
 
 /// Inline banner shown while the connection is down, with a manual retry.

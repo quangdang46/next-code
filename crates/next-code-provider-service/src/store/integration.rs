@@ -277,10 +277,10 @@ mod tests {
                     authorization_url: "https://claude.ai/oauth/authorize".into(),
                 },
                 AuthMethod::ApiKey {
-                    env_var: "JCODE_TEST_ANTHROPIC_KEY".into(),
+                    env_var: "NEXT_CODE_TEST_ANTHROPIC_KEY".into(),
                 },
             ],
-            env_keys: vec!["JCODE_TEST_ANTHROPIC_KEY".into()],
+            env_keys: vec!["NEXT_CODE_TEST_ANTHROPIC_KEY".into()],
             oauth_preferred: true,
         }
     }
@@ -360,17 +360,17 @@ mod tests {
     async fn detect_picks_up_inline_env() {
         let mut p = anthropic();
         p.auth_methods = vec![AuthMethod::ApiKey {
-            env_var: "JCODE_PERSISTENT_TEST_ENV_KEY".into(),
+            env_var: "NEXT_CODE_PERSISTENT_TEST_ENV_KEY".into(),
         }];
         let svc = make_svc();
         svc.register(p).await.unwrap();
         // SAFETY: test-only env mutation.
-        unsafe { std::env::set_var("JCODE_PERSISTENT_TEST_ENV_KEY", "from-env") };
+        unsafe { std::env::set_var("NEXT_CODE_PERSISTENT_TEST_ENV_KEY", "from-env") };
         let status = svc.detect(&"anthropic".into()).await.unwrap();
-        unsafe { std::env::remove_var("JCODE_PERSISTENT_TEST_ENV_KEY") };
+        unsafe { std::env::remove_var("NEXT_CODE_PERSISTENT_TEST_ENV_KEY") };
         match status {
             ConnectionStatus::InlineEnv { env_var } => {
-                assert_eq!(env_var, "JCODE_PERSISTENT_TEST_ENV_KEY")
+                assert_eq!(env_var, "NEXT_CODE_PERSISTENT_TEST_ENV_KEY")
             }
             other => panic!("expected InlineEnv, got {:?}", other),
         }

@@ -206,7 +206,7 @@ fn prewarm_sender() -> &'static mpsc::Sender<PrewarmRequest> {
     PREWARM_TX.get_or_init(|| {
         let (tx, rx) = mpsc::channel::<PrewarmRequest>();
         if let Err(err) = std::thread::Builder::new()
-            .name("jcode-inline-image-prewarm".to_string())
+            .name("next-code-inline-image-prewarm".to_string())
             .spawn(move || prewarm_worker(rx))
         {
             crate::logging::warn(&format!(

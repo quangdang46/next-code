@@ -150,7 +150,7 @@ pub fn provider_for_model(model: &str) -> Option<&'static str> {
     provider_for_model_with_hint(model, None)
 }
 
-/// Whether `model` resolves to a Claude family jcode classifies statically
+/// Whether `model` resolves to a Claude family next-code classifies statically
 /// (i.e. one whose long-context behavior we have verified). Matches by family
 /// prefix so dated aliases (`claude-opus-4-5-20251101`) and `[1m]` suffixes are
 /// covered, while unknown/future Claude ids fall through to the dynamic cache.

@@ -359,7 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fingerprint_is_deterministic() {
-        let dir = std::env::temp_dir().join("jcode-fp-test-1");
+        let dir = std::env::temp_dir().join("next-code-fp-test-1");
         let path = dir.join("plugin.js");
         tokio::fs::create_dir_all(&dir).await.unwrap();
         tokio::fs::write(&path, "pi.on('Test', () => {});")
@@ -375,7 +375,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fingerprint_changes_when_content_changes() {
-        let dir = std::env::temp_dir().join("jcode-fp-test-2");
+        let dir = std::env::temp_dir().join("next-code-fp-test-2");
         let path = dir.join("plugin.js");
         tokio::fs::create_dir_all(&dir).await.unwrap();
         tokio::fs::write(&path, "version1").await.unwrap();
@@ -392,7 +392,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_fingerprint_nonexistent_file_errors() {
-        let path = PathBuf::from("/tmp/jcode-fp-nonexistent-xyzzy.js");
+        let path = PathBuf::from("/tmp/next-code-fp-nonexistent-xyzzy.js");
         let result = PluginLoader::fingerprint(&path).await;
         assert!(
             result.is_err(),
@@ -406,7 +406,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_path_for_plugin_resolves_file_prefix() {
-        let dir = std::env::temp_dir().join("jcode-path-test-1");
+        let dir = std::env::temp_dir().join("next-code-path-test-1");
         let path = dir.join("my-plugin.js");
         tokio::fs::create_dir_all(&dir).await.unwrap();
         tokio::fs::write(&path, "// test").await.unwrap();
@@ -416,7 +416,7 @@ mod tests {
         let loader = PluginLoader::new(
             DiscoveryPaths {
                 plugin_dirs: vec![],
-                npm_cache: std::env::temp_dir().join("jcode-test-npm-cache"),
+                npm_cache: std::env::temp_dir().join("next-code-test-npm-cache"),
                 tool_dirs: vec![],
             },
             next_code_plugin_core::config::PluginConfig::default(),
@@ -446,7 +446,7 @@ mod tests {
         let loader = PluginLoader::new(
             DiscoveryPaths {
                 plugin_dirs: vec![],
-                npm_cache: std::env::temp_dir().join("jcode-test-npm-cache"),
+                npm_cache: std::env::temp_dir().join("next-code-test-npm-cache"),
                 tool_dirs: vec![],
             },
             next_code_plugin_core::config::PluginConfig::default(),
@@ -472,7 +472,7 @@ mod tests {
         let loader = PluginLoader::new(
             DiscoveryPaths {
                 plugin_dirs: vec![],
-                npm_cache: std::env::temp_dir().join("jcode-test-npm-cache"),
+                npm_cache: std::env::temp_dir().join("next-code-test-npm-cache"),
                 tool_dirs: vec![],
             },
             next_code_plugin_core::config::PluginConfig::default(),
@@ -480,7 +480,7 @@ mod tests {
             runtime,
         );
 
-        let id = PluginId::from("/tmp/jcode-never-loaded.js".to_string());
+        let id = PluginId::from("/tmp/next-code-never-loaded.js".to_string());
         let result = loader.reload(&id).await;
         assert!(
             result.is_err(),
@@ -518,7 +518,7 @@ mod tests {
         );
         let discovery = DiscoveryPaths {
             plugin_dirs: vec![example_dir.clone()],
-            npm_cache: std::env::temp_dir().join("jcode-test-npm-cache-reload"),
+            npm_cache: std::env::temp_dir().join("next-code-test-npm-cache-reload"),
             tool_dirs: vec![],
         };
         let config = next_code_plugin_core::config::PluginConfig::default();
@@ -563,7 +563,7 @@ mod tests {
         );
         let discovery = DiscoveryPaths {
             plugin_dirs: vec![example_dir.clone()],
-            npm_cache: std::env::temp_dir().join("jcode-test-npm-cache-fpr"),
+            npm_cache: std::env::temp_dir().join("next-code-test-npm-cache-fpr"),
             tool_dirs: vec![],
         };
         let config = next_code_plugin_core::config::PluginConfig::default();

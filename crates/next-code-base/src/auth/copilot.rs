@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -152,7 +153,7 @@ impl CopilotApiToken {
 /// 5. ~/.config/github-copilot/hosts.json (legacy Copilot CLI)
 /// 6. ~/.config/github-copilot/apps.json (legacy VS Code)
 /// 7. trusted OpenCode/pi auth.json OAuth entries
-/// 8. optional `gh auth token` fallback when JCODE_COPILOT_ALLOW_GH_AUTH_TOKEN=1
+/// 8. optional `gh auth token` fallback when NEXT_CODE_COPILOT_ALLOW_GH_AUTH_TOKEN=1
 pub fn load_github_token() -> Result<String> {
     // Env vars first: cheap to read and they must win immediately when the
     // user changes them, so they are never served from (or shadowed by) the
@@ -213,13 +214,13 @@ pub fn load_github_token() -> Result<String> {
 
     anyhow::bail!(
         "GitHub Copilot token not found. \
-         Set COPILOT_GITHUB_TOKEN/GH_TOKEN/GITHUB_TOKEN, run `jcode login --provider copilot`, \
-         or set JCODE_COPILOT_ALLOW_GH_AUTH_TOKEN=1 to explicitly reuse `gh auth token`."
+         Set COPILOT_GITHUB_TOKEN/GH_TOKEN/GITHUB_TOKEN, run `next-code login --provider copilot`, \
+         or set NEXT_CODE_COPILOT_ALLOW_GH_AUTH_TOKEN=1 to explicitly reuse `gh auth token`."
     )
 }
 
 fn allow_gh_cli_fallback() -> bool {
-    std::env::var("JCODE_COPILOT_ALLOW_GH_AUTH_TOKEN")
+    product_env("COPILOT_ALLOW_GH_AUTH_TOKEN")
         .ok()
         .map(|value| {
             let value = value.trim();
@@ -431,7 +432,7 @@ pub fn trust_external_auth_source(source: ExternalCopilotAuthSource) -> Result<(
 }
 
 fn copilot_cli_dir() -> PathBuf {
-    if let Ok(path) = std::env::var("JCODE_HOME") {
+    if let Ok(path) = product_env("HOME") {
         return PathBuf::from(path).join("external").join(".copilot");
     }
 
@@ -440,7 +441,7 @@ fn copilot_cli_dir() -> PathBuf {
 }
 
 fn legacy_copilot_config_dir() -> PathBuf {
-    if let Ok(path) = std::env::var("JCODE_HOME") {
+    if let Ok(path) = product_env("HOME") {
         return PathBuf::from(path)
             .join("external")
             .join(".config")
@@ -779,7 +780,7 @@ pub fn save_github_token(token: &str, username: &str) -> Result<()> {
     crate::storage::write_text_secret(&hosts_path, &json)
         .with_context(|| format!("Failed to write {}", hosts_path.display()))?;
 
-    // A token written by jcode's own device-login flow should be immediately
+    // A token written by next-code's own device-login flow should be immediately
     // usable in future sessions. Without this, later reads treat the saved
     // hosts.json as an untrusted external auth source and appear to "lose"
     // the Copilot login after restart/new session.

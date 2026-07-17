@@ -231,7 +231,7 @@ above).
 | 1 | `jcode provider list` shows real-time available providers | ✅ | `providerctl list`, `providerctl available` against boot::boot_default() |
 | 2 | `jcode provider connect <id>` starts OAuth flow | ✅ | `providerctl connect anthropic` — full attempt lifecycle, authorization URL, TTL, optional code path |
 | 3 | `jcode model list` shows dynamic models with cost + capabilities | ✅ | `providerctl model list` — 7 models across 4 providers, with cost/context/capabilities |
-| 4 | `jcode model default <p> <m>` persists and is used next session | ✅ | `providerctl model default anthropic claude-haiku-4-5` → `~/.jcode/provider-defaults.json`; `defaults::ProviderDefaults::resolve()` |
+| 4 | `jcode model default <p> <m>` persists and is used next session | ✅ | `providerctl model default anthropic claude-haiku-4-5` → `~/.next-code/provider-defaults.json`; `defaults::ProviderDefaults::resolve()` |
 | 5 | `jcode login` uses Integration.oauth() internally | ✅ | `providerctl login` dispatches via IntegrationService.save_api_key() or start_oauth() based on registered methods |
 | 6 | `--provider` flag accepts dynamic string | ✅ | `retrofit::parse_legacy_provider_flag` handles all 12+ legacy aliases |
 | 7 | Agent::new() resolves via Catalog → Integration → Route | ✅ | `runtime::start_session()` is the new-shape entry point. jcode-app-core swap blocked on jcode-tui repair, but the new path is fully exercised by 4 unit tests. |

@@ -4,6 +4,7 @@
 //! spine. The binary's composition root registers [`GeminiProvider`] with
 //! `next_code_base::provider::external` at startup.
 
+use next_code_core::env::{product_env};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -98,7 +99,7 @@ impl GeminiProvider {
     }
 
     pub fn new() -> Self {
-        let model = std::env::var("JCODE_GEMINI_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.into());
+        let model = std::env::var("NEXT_CODE_GEMINI_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.into());
         let provider = Self {
             client: gemini_http_client(),
             model: Arc::new(RwLock::new(model)),
@@ -138,7 +139,7 @@ impl GeminiProvider {
     /// cloudcode-pa tier. Set `JCODE_GEMINI_FORCE_OAUTH=1` to pin OAuth even when
     /// a key is present.
     fn auth_mode() -> GeminiAuthMode {
-        let force_oauth = std::env::var("JCODE_GEMINI_FORCE_OAUTH")
+        let force_oauth = product_env("GEMINI_FORCE_OAUTH")
             .map(|value| {
                 let value = value.trim();
                 !value.is_empty() && value != "0" && !value.eq_ignore_ascii_case("false")

@@ -5,7 +5,7 @@
 //!
 //! # Two-stage permission architecture
 //!
-//! jcode already has Stage 1 (tool-level) permission checks via `dcg_bridge`.
+//! next-code already has Stage 1 (tool-level) permission checks via `dcg_bridge`.
 //! This module adds Stage 2 (command-level) evaluation inside tool execution:
 //!
 //! ```text

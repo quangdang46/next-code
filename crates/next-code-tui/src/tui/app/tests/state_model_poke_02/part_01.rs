@@ -844,7 +844,7 @@ fn test_top_level_command_suggestions_include_all_non_hidden_commands() {
 
 #[test]
 fn test_logout_clear_anthropic_accounts_removes_all_accounts_once() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         for index in 1..=3 {
             crate::auth::claude::upsert_account(crate::auth::claude::AnthropicAccount {
                 label: format!("requested-{index}"),
@@ -904,7 +904,7 @@ fn test_help_topic_suggestions_include_catchup_topics() {
 
 #[test]
 fn test_context_command_reports_session_context_snapshot() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.memory_enabled = true;
         app.swarm_enabled = true;
@@ -1021,8 +1021,8 @@ fn test_goals_show_suggestions_include_goal_ids() {
     let temp = tempfile::tempdir().expect("tempdir");
     let project = temp.path().join("repo");
     std::fs::create_dir_all(&project).expect("project dir");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let goal = crate::goal::create_goal(
         crate::goal::GoalCreateInput {
@@ -1045,9 +1045,9 @@ fn test_goals_show_suggestions_include_goal_ids() {
     );
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
@@ -1221,13 +1221,13 @@ fn test_swarm_prompt_command_is_discoverable_in_suggestions_and_help() {
         .command_help("swarm-prompt")
         .expect("/swarm-prompt should have detailed help");
     assert!(help.contains("/swarm-prompt"));
-    assert!(help.contains(".jcode/swarm-prompt.md"));
-    assert!(help.contains("Restart or reload Jcode"));
+    assert!(help.contains(".next-code/swarm-prompt.md"));
+    assert!(help.contains("Restart or reload Next Code"));
 }
 
 #[test]
 fn test_agents_picker_uses_provider_default_when_inherited_model_is_unknown() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.open_agents_picker();
 
@@ -1252,7 +1252,7 @@ fn test_agents_picker_uses_provider_default_when_inherited_model_is_unknown() {
 
 #[test]
 fn test_agent_model_picker_inherit_row_uses_provider_default_when_inherited_model_is_unknown() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         configure_test_remote_models(&mut app);
         app.open_agent_model_picker(crate::tui::AgentModelTarget::Swarm);

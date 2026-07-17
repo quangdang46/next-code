@@ -259,7 +259,7 @@ mod transcript_routing_tests {
     #[tokio::test]
     async fn resolve_transcript_target_session_prefers_last_focused_live_session() {
         let _guard = crate::storage::lock_test_env();
-        let next_code_dir = crate::storage::next_code_dir().expect("jcode dir");
+        let next_code_dir = crate::storage::next_code_dir().expect("next-code dir");
         let active_dir = next_code_dir.join("active_pids");
         std::fs::create_dir_all(&active_dir).expect("create active_pids");
         std::fs::write(active_dir.join("session_focus"), "12345").expect("write active pid");
@@ -316,7 +316,7 @@ mod transcript_routing_tests {
     async fn resolve_transcript_target_session_falls_back_to_most_recent_live_tui_when_last_focused_not_connected()
      {
         let _guard = crate::storage::lock_test_env();
-        let next_code_dir = crate::storage::next_code_dir().expect("jcode dir");
+        let next_code_dir = crate::storage::next_code_dir().expect("next-code dir");
         let active_dir = next_code_dir.join("active_pids");
         std::fs::create_dir_all(&active_dir).expect("create active_pids");
         std::fs::write(active_dir.join("session_stale"), "12345").expect("write active pid");
@@ -403,7 +403,7 @@ mod transcript_routing_tests {
      {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::TempDir::new().expect("tempdir");
-        let _home = EnvVarGuard::set("JCODE_HOME", temp.path());
+        let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());
 
         let active_dir = temp.path().join("active_pids");
         std::fs::create_dir_all(&active_dir).expect("create active_pids");
@@ -419,7 +419,7 @@ mod transcript_routing_tests {
         install_fake_niri(
             &bin_dir,
             focused_process.pid(),
-            "🦢 jcode/cliff Swan [self-dev]",
+            "🦢 next-code/cliff Swan [self-dev]",
         );
         let prev_path = std::env::var_os("PATH").unwrap_or_default();
         let mut path = OsString::from(bin_dir.as_os_str());
@@ -759,25 +759,25 @@ mod debug_execution_tests {
 
     #[test]
     fn debug_message_timeout_secs_reads_valid_env_values() {
-        let _guard = EnvVarGuard::set("JCODE_DEBUG_MESSAGE_TIMEOUT_SECS", "17");
+        let _guard = EnvVarGuard::set("NEXT_CODE_DEBUG_MESSAGE_TIMEOUT_SECS", "17");
         assert_eq!(debug_message_timeout_secs(), Some(17));
     }
 
     #[test]
     fn debug_message_timeout_secs_ignores_missing_empty_invalid_and_zero() {
-        let _guard = EnvVarGuard::remove("JCODE_DEBUG_MESSAGE_TIMEOUT_SECS");
+        let _guard = EnvVarGuard::remove("NEXT_CODE_DEBUG_MESSAGE_TIMEOUT_SECS");
         assert_eq!(debug_message_timeout_secs(), None);
         drop(_guard);
 
-        let _guard = EnvVarGuard::set("JCODE_DEBUG_MESSAGE_TIMEOUT_SECS", "   ");
+        let _guard = EnvVarGuard::set("NEXT_CODE_DEBUG_MESSAGE_TIMEOUT_SECS", "   ");
         assert_eq!(debug_message_timeout_secs(), None);
         drop(_guard);
 
-        let _guard = EnvVarGuard::set("JCODE_DEBUG_MESSAGE_TIMEOUT_SECS", "abc");
+        let _guard = EnvVarGuard::set("NEXT_CODE_DEBUG_MESSAGE_TIMEOUT_SECS", "abc");
         assert_eq!(debug_message_timeout_secs(), None);
         drop(_guard);
 
-        let _guard = EnvVarGuard::set("JCODE_DEBUG_MESSAGE_TIMEOUT_SECS", "0");
+        let _guard = EnvVarGuard::set("NEXT_CODE_DEBUG_MESSAGE_TIMEOUT_SECS", "0");
         assert_eq!(debug_message_timeout_secs(), None);
     }
 }

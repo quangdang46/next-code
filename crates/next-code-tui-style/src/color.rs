@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use ratatui::style::Color;
 use std::sync::OnceLock;
 
@@ -20,7 +21,7 @@ pub fn color_capability() -> ColorCapability {
 /// churn (the macOS 26 "garbled glyphs" bug in the VS Code integrated terminal
 /// and Apple Terminal; see `next_code_app_core::perf` and issue #330). These
 /// renderers key their rasterized-glyph cache on the full 24-bit color, so the
-/// continuous color animations jcode emits (shimmer, rainbow, pulsing tool
+/// continuous color animations Next Code emits (shimmer, rainbow, pulsing tool
 /// colors) generate an effectively unbounded set of atlas entries, overflowing
 /// it and re-rendering stale cached glyphs as boxes.
 ///
@@ -30,10 +31,10 @@ pub fn color_capability() -> ColorCapability {
 /// (Ghostty / iTerm2 / kitty / WezTerm / Alacritty) are unaffected and keep
 /// full truecolor.
 ///
-/// Overridable with `JCODE_GLYPH_SAFE_MODE=on|off` (shared with the perf
+/// Overridable with `NEXT_CODE_GLYPH_SAFE_MODE=on|off` (shared with the perf
 /// policy) so users can force or disable the compatibility behavior.
 fn fragile_glyph_cache_terminal() -> bool {
-    if let Ok(raw) = std::env::var("JCODE_GLYPH_SAFE_MODE") {
+    if let Ok(raw) = product_env("GLYPH_SAFE_MODE") {
         match raw.trim().to_ascii_lowercase().as_str() {
             "1" | "true" | "yes" | "on" => return true,
             "0" | "false" | "no" | "off" => return false,
@@ -471,7 +472,7 @@ mod tests {
         // The explicit off override must win even on a macOS fragile terminal.
         temp_env_scope(
             &[
-                ("JCODE_GLYPH_SAFE_MODE", Some("off")),
+                ("NEXT_CODE_GLYPH_SAFE_MODE", Some("off")),
                 ("TERM_PROGRAM", Some("vscode")),
             ],
             || {
@@ -482,7 +483,7 @@ mod tests {
 
     #[test]
     fn test_fragile_terminal_override_on_forces_quantize() {
-        temp_env_scope(&[("JCODE_GLYPH_SAFE_MODE", Some("on"))], || {
+        temp_env_scope(&[("NEXT_CODE_GLYPH_SAFE_MODE", Some("on"))], || {
             assert!(fragile_glyph_cache_terminal());
         });
     }
@@ -494,14 +495,14 @@ mod tests {
     fn test_detect_color_capability_downgrades_on_fragile_override() {
         temp_env_scope(
             &[
-                ("JCODE_GLYPH_SAFE_MODE", Some("on")),
+                ("NEXT_CODE_GLYPH_SAFE_MODE", Some("on")),
                 ("COLORTERM", Some("truecolor")),
             ],
             || assert_eq!(detect_color_capability(), ColorCapability::Color256),
         );
         temp_env_scope(
             &[
-                ("JCODE_GLYPH_SAFE_MODE", Some("off")),
+                ("NEXT_CODE_GLYPH_SAFE_MODE", Some("off")),
                 ("COLORTERM", Some("truecolor")),
             ],
             || assert_eq!(detect_color_capability(), ColorCapability::TrueColor),
@@ -548,21 +549,21 @@ mod tests {
     fn test_fragile_terminal_detects_vscode_and_apple_terminal() {
         temp_env_scope(
             &[
-                ("JCODE_GLYPH_SAFE_MODE", None),
+                ("NEXT_CODE_GLYPH_SAFE_MODE", None),
                 ("TERM_PROGRAM", Some("vscode")),
             ],
             || assert!(fragile_glyph_cache_terminal()),
         );
         temp_env_scope(
             &[
-                ("JCODE_GLYPH_SAFE_MODE", None),
+                ("NEXT_CODE_GLYPH_SAFE_MODE", None),
                 ("TERM_PROGRAM", Some("Apple_Terminal")),
             ],
             || assert!(fragile_glyph_cache_terminal()),
         );
         temp_env_scope(
             &[
-                ("JCODE_GLYPH_SAFE_MODE", None),
+                ("NEXT_CODE_GLYPH_SAFE_MODE", None),
                 ("TERM_PROGRAM", Some("ghostty")),
             ],
             || assert!(!fragile_glyph_cache_terminal()),

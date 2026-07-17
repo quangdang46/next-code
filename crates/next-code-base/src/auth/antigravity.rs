@@ -2,6 +2,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::io::{self, IsTerminal, Write};
 
+use crate::env::product_env;
+
 const GOOGLE_AUTHORIZE_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO_URL: &str = "https://www.googleapis.com/oauth2/v1/userinfo?alt=json";
@@ -15,9 +17,7 @@ const REDIRECT_PATH: &str = "/oauth-callback";
 const ANTIGRAVITY_CLIENT_ID: &str =
     "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"; // gitleaks:allow
 const ANTIGRAVITY_CLIENT_SECRET: &str = "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"; // gitleaks:allow
-const CLIENT_ID_ENV: &str = "JCODE_ANTIGRAVITY_CLIENT_ID";
-const CLIENT_SECRET_ENV: &str = "JCODE_ANTIGRAVITY_CLIENT_SECRET";
-const VERSION_ENV: &str = "JCODE_ANTIGRAVITY_VERSION";
+// Dual-read via product_env: NEXT_CODE_* first, then legacy JCODE_*.
 const ANTIGRAVITY_VERSION: &str = "1.18.3";
 const ANTIGRAVITY_SCOPES: &[&str] = &[
     "https://www.googleapis.com/auth/cloud-platform",
@@ -34,7 +34,7 @@ const LOAD_ENDPOINTS: &[&str] = &[
 const GOOGLE_OAUTH_USER_AGENT: &str = "google-api-nodejs-client/9.15.1";
 
 fn antigravity_client_id() -> String {
-    std::env::var(CLIENT_ID_ENV)
+    product_env("ANTIGRAVITY_CLIENT_ID")
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -42,7 +42,7 @@ fn antigravity_client_id() -> String {
 }
 
 fn antigravity_client_secret() -> String {
-    std::env::var(CLIENT_SECRET_ENV)
+    product_env("ANTIGRAVITY_CLIENT_SECRET")
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -50,7 +50,7 @@ fn antigravity_client_secret() -> String {
 }
 
 fn antigravity_version() -> String {
-    std::env::var(VERSION_ENV)
+    product_env("ANTIGRAVITY_VERSION")
         .ok()
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
@@ -129,7 +129,7 @@ pub fn load_tokens() -> Result<AntigravityTokens> {
         crate::storage::harden_secret_file_permissions(&path);
         return crate::storage::read_json(&path).map_err(|_| {
             anyhow::anyhow!(
-                "No Antigravity tokens found. Run `jcode login --provider antigravity`."
+                "No Antigravity tokens found. Run `next-code login --provider antigravity`."
             )
         });
     }
@@ -144,7 +144,7 @@ pub fn load_tokens() -> Result<AntigravityTokens> {
         });
     }
 
-    anyhow::bail!("No Antigravity tokens found. Run `jcode login --provider antigravity`.");
+    anyhow::bail!("No Antigravity tokens found. Run `next-code login --provider antigravity`.");
 }
 
 pub fn save_tokens(tokens: &AntigravityTokens) -> Result<()> {
@@ -252,7 +252,7 @@ pub async fn login(no_browser: bool) -> Result<AntigravityTokens> {
                 redirect_uri
             );
             eprintln!(
-                "If the browser lands on a loopback error page instead of returning to jcode, copy the full URL from the address bar and re-run with `--no-browser` to paste it manually."
+                "If the browser lands on a loopback error page instead of returning to next-code, copy the full URL from the address bar and re-run with `--no-browser` to paste it manually."
             );
             match tokio::time::timeout(
                 std::time::Duration::from_secs(300),
@@ -310,7 +310,7 @@ async fn manual_login(
         let _ = open::that(auth_url);
     }
     eprintln!(
-        "After approving access, paste the full callback URL (or query string) here so jcode can verify the login state.\n"
+        "After approving access, paste the full callback URL (or query string) here so next-code can verify the login state.\n"
     );
     eprintln!(
         "If the browser shows a local callback error, copy the full URL from the address bar before closing the tab.\n"
@@ -560,7 +560,7 @@ mod tests {
     fn build_auth_url_includes_antigravity_scope_and_redirect() {
         let _guard = lock_test_env();
         crate::env::set_var(
-            CLIENT_ID_ENV,
+            "NEXT_CODE_ANTIGRAVITY_CLIENT_ID",
             "test-antigravity-client-id.apps.googleusercontent.com",
         );
         let url = build_auth_url(
@@ -575,13 +575,13 @@ mod tests {
         assert!(url.contains("state=state"));
         assert!(url.contains("cloud-platform"));
         assert!(url.contains("experimentsandconfigs"));
-        crate::env::remove_var(CLIENT_ID_ENV);
+        crate::env::remove_var("NEXT_CODE_ANTIGRAVITY_CLIENT_ID");
     }
 
     #[test]
     fn build_auth_url_uses_default_client_id_when_env_missing() {
         let _guard = lock_test_env();
-        crate::env::remove_var(CLIENT_ID_ENV);
+        crate::env::remove_var("NEXT_CODE_ANTIGRAVITY_CLIENT_ID");
         let url = build_auth_url(
             "http://127.0.0.1:51121/oauth-callback",
             "challenge",
@@ -597,13 +597,13 @@ mod tests {
     #[test]
     fn blank_env_vars_fall_back_to_built_in_credentials() {
         let _guard = lock_test_env();
-        crate::env::set_var(CLIENT_ID_ENV, "   ");
+        crate::env::set_var("NEXT_CODE_ANTIGRAVITY_CLIENT_ID", "   ");
         crate::env::set_var(CLIENT_SECRET_ENV, "   ");
 
         assert_eq!(antigravity_client_id(), ANTIGRAVITY_CLIENT_ID);
         assert_eq!(antigravity_client_secret(), ANTIGRAVITY_CLIENT_SECRET);
 
-        crate::env::remove_var(CLIENT_ID_ENV);
+        crate::env::remove_var("NEXT_CODE_ANTIGRAVITY_CLIENT_ID");
         crate::env::remove_var(CLIENT_SECRET_ENV);
     }
 

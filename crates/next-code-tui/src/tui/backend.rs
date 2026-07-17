@@ -5,6 +5,7 @@
 //!
 //! Also provides debug socket events for exposing full TUI state.
 
+use crate::env::{product_env_os};
 use crate::message::ToolCall;
 use crate::protocol::{AuthChanged, FeatureToggle, Request, ServerEvent};
 use crate::server;
@@ -231,7 +232,7 @@ pub struct BackendInfo {
     pub skills: Vec<String>,
 }
 
-/// Remote connection to jcode server
+/// Remote connection to next-code server
 pub struct RemoteConnection {
     reader: BufReader<crate::transport::ReadHalf>,
     writer: Arc<Mutex<WriteHalf>>,
@@ -357,7 +358,7 @@ impl RemoteConnection {
         // draw stalls during scrolling. The TUI hydrates the persisted remote
         // catalog cache for normal `/model` use; explicit refresh paths still
         // request fresh catalog data when needed.
-        if std::env::var_os("JCODE_REMOTE_BOOTSTRAP_MODEL_CATALOG").is_some() {
+        if product_env_os("REMOTE_BOOTSTRAP_MODEL_CATALOG").is_some() {
             conn.send_request(Request::GetModelCatalog {
                 id: conn.next_request_id,
             })

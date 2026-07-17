@@ -1,46 +1,47 @@
+use crate::env::{product_env_os};
 use super::*;
 use crate::provider::models::{ensure_model_allowed_for_subscription, filtered_display_models};
 
 fn with_clean_provider_test_env<T>(f: impl FnOnce() -> T) -> T {
     let _guard = crate::storage::lock_test_env();
-    // Concrete provider runtimes live downstream (jcode-provider-*-runtime),
+    // Concrete provider runtimes live downstream (next-code-provider-*-runtime),
     // so base tests register shared stubs through the same composition-root
     // registry the binary uses. Registration is idempotent (last write wins),
     // and per-test overrides can re-register a different stub.
     register_test_external_runtimes();
     let temp = tempfile::tempdir().expect("tempdir");
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = product_env_os("HOME");
     let prev_subscription =
         std::env::var_os(crate::subscription_catalog::JCODE_SUBSCRIPTION_ACTIVE_ENV);
     let mut profile_env_keys = vec![
         "OPENROUTER_API_KEY",
         "DEEPSEEK_API_KEY",
         "KIMI_API_KEY",
-        "JCODE_OPENROUTER_API_BASE",
-        "JCODE_OPENROUTER_API_KEY_NAME",
-        "JCODE_OPENROUTER_ENV_FILE",
-        "JCODE_OPENROUTER_CACHE_NAMESPACE",
-        "JCODE_OPENROUTER_PROVIDER_FEATURES",
-        "JCODE_OPENROUTER_TRANSPORT_STATE",
-        "JCODE_OPENROUTER_ALLOW_NO_AUTH",
-        "JCODE_OPENROUTER_MODEL_CATALOG",
-        "JCODE_OPENROUTER_MODEL",
-        "JCODE_OPENROUTER_STATIC_MODELS",
-        "JCODE_OPENAI_COMPAT_API_BASE",
-        "JCODE_OPENAI_COMPAT_API_KEY_NAME",
-        "JCODE_OPENAI_COMPAT_ENV_FILE",
-        "JCODE_OPENAI_COMPAT_DEFAULT_MODEL",
-        "JCODE_OPENAI_COMPAT_LOCAL_ENABLED",
+        "NEXT_CODE_OPENROUTER_API_BASE",
+        "NEXT_CODE_OPENROUTER_API_KEY_NAME",
+        "NEXT_CODE_OPENROUTER_ENV_FILE",
+        "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
+        "NEXT_CODE_OPENROUTER_PROVIDER_FEATURES",
+        "NEXT_CODE_OPENROUTER_TRANSPORT_STATE",
+        "NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH",
+        "NEXT_CODE_OPENROUTER_MODEL_CATALOG",
+        "NEXT_CODE_OPENROUTER_MODEL",
+        "NEXT_CODE_OPENROUTER_STATIC_MODELS",
+        "NEXT_CODE_OPENAI_COMPAT_API_BASE",
+        "NEXT_CODE_OPENAI_COMPAT_API_KEY_NAME",
+        "NEXT_CODE_OPENAI_COMPAT_ENV_FILE",
+        "NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL",
+        "NEXT_CODE_OPENAI_COMPAT_LOCAL_ENABLED",
         "OPENAI_COMPAT_API_KEY",
         "OPENAI_API_KEY",
         "ANTHROPIC_API_KEY",
-        "JCODE_RUNTIME_PROVIDER",
-        "JCODE_ACTIVE_PROVIDER",
-        "JCODE_FORCE_PROVIDER",
-        "JCODE_OPENAI_MODEL",
-        "JCODE_NAMED_PROVIDER_PROFILE",
-        "JCODE_PROVIDER_PROFILE_ACTIVE",
-        "JCODE_PROVIDER_PROFILE_NAME",
+        "NEXT_CODE_RUNTIME_PROVIDER",
+        "NEXT_CODE_ACTIVE_PROVIDER",
+        "NEXT_CODE_FORCE_PROVIDER",
+        "NEXT_CODE_OPENAI_MODEL",
+        "NEXT_CODE_NAMED_PROVIDER_PROFILE",
+        "NEXT_CODE_PROVIDER_PROFILE_ACTIVE",
+        "NEXT_CODE_PROVIDER_PROFILE_NAME",
     ];
     for profile in crate::provider_catalog::openai_compatible_profiles() {
         if !profile_env_keys.contains(&profile.api_key_env) {
@@ -51,7 +52,7 @@ fn with_clean_provider_test_env<T>(f: impl FnOnce() -> T) -> T {
         .into_iter()
         .map(|key| (key, std::env::var_os(key)))
         .collect::<Vec<_>>();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
     for (key, _) in &saved_profile_env {
         crate::env::remove_var(key);
     }
@@ -70,9 +71,9 @@ fn with_clean_provider_test_env<T>(f: impl FnOnce() -> T) -> T {
     crate::auth::claude::set_active_account_override(None);
     crate::auth::codex::set_active_account_override(None);
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
     if let Some(prev_subscription) = prev_subscription {
         crate::env::set_var(
@@ -115,7 +116,7 @@ fn with_env_var<T>(key: &str, value: &str, f: impl FnOnce() -> T) -> T {
 fn save_test_openai_compatible_login_config(default_model: &str) {
     let env_file = crate::provider_catalog::OPENAI_COMPAT_PROFILE.env_file;
     crate::provider_catalog::save_env_value_to_env_file(
-        "JCODE_OPENAI_COMPAT_API_BASE",
+        "NEXT_CODE_OPENAI_COMPAT_API_BASE",
         env_file,
         Some("https://example-openai-compatible.test/v1"),
     )
@@ -127,7 +128,7 @@ fn save_test_openai_compatible_login_config(default_model: &str) {
     )
     .expect("save api key");
     crate::provider_catalog::save_env_value_to_env_file(
-        "JCODE_OPENAI_COMPAT_DEFAULT_MODEL",
+        "NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL",
         env_file,
         Some(default_model),
     )
@@ -135,7 +136,7 @@ fn save_test_openai_compatible_login_config(default_model: &str) {
 }
 
 fn save_test_openrouter_model_cache(namespace: &str, source_api_base: &str, model_ids: &[&str]) {
-    let next_code_home = std::env::var_os("JCODE_HOME").expect("test JCODE_HOME should be set");
+    let next_code_home = product_env_os("HOME").expect("test JCODE_HOME should be set");
     let cache_dir = std::path::PathBuf::from(next_code_home).join("cache");
     std::fs::create_dir_all(&cache_dir).expect("create model cache dir");
     let cache = next_code_provider_openrouter::DiskCache {
@@ -162,13 +163,13 @@ fn save_test_openrouter_model_cache(namespace: &str, source_api_base: &str, mode
 
 fn clear_openai_compatible_runtime_env() {
     for key in [
-        "JCODE_OPENAI_COMPAT_API_BASE",
-        "JCODE_OPENAI_COMPAT_API_KEY_NAME",
-        "JCODE_OPENAI_COMPAT_ENV_FILE",
-        "JCODE_OPENAI_COMPAT_DEFAULT_MODEL",
-        "JCODE_OPENAI_COMPAT_LOCAL_ENABLED",
+        "NEXT_CODE_OPENAI_COMPAT_API_BASE",
+        "NEXT_CODE_OPENAI_COMPAT_API_KEY_NAME",
+        "NEXT_CODE_OPENAI_COMPAT_ENV_FILE",
+        "NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL",
+        "NEXT_CODE_OPENAI_COMPAT_LOCAL_ENABLED",
         "OPENAI_COMPAT_API_KEY",
-        "JCODE_OPENROUTER_CACHE_NAMESPACE",
+        "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
     ] {
         crate::env::remove_var(key);
     }
@@ -739,10 +740,10 @@ fn standard_openrouter_catalog_refresh_fires_when_named_profile_owns_slot() {
             // OpenRouter catalog refresh must STILL fire so `/model` can list
             // openrouter.ai models (issue #292). Cache is missing -> not fresh.
             crate::env::set_var(
-                "JCODE_OPENROUTER_API_BASE",
+                "NEXT_CODE_OPENROUTER_API_BASE",
                 "https://integrate.api.nvidia.com/v1",
             );
-            crate::env::set_var("JCODE_OPENROUTER_CACHE_NAMESPACE", "mynvidia");
+            crate::env::set_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", "mynvidia");
 
             // Other tests in this process may already have attempted (or be
             // running) an `openrouter` catalog refresh; clear the process-wide
@@ -754,14 +755,14 @@ fn standard_openrouter_catalog_refresh_fires_when_named_profile_owns_slot() {
                 openrouter::maybe_schedule_standard_openrouter_catalog_refresh(
                     "unit test named profile owns slot"
                 ),
-                "standard OpenRouter refresh must fire even when a named profile sets JCODE_OPENROUTER_* env"
+                "standard OpenRouter refresh must fire even when a named profile sets NEXT_CODE_OPENROUTER_* env"
             );
         });
     });
 }
 
 /// Parameterized test stand-in for provider runtimes that live downstream
-/// (jcode-provider-{gemini,cursor,antigravity}-runtime) and therefore cannot
+/// (next-code-provider-{gemini,cursor,antigravity}-runtime) and therefore cannot
 /// be constructed from base tests. Mirrors each runtime's catalog surface
 /// (static model list plus `ModelRoute`s) so routing/fallback tests stay
 /// meaningful.

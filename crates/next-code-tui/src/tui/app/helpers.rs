@@ -1,6 +1,7 @@
 #![cfg_attr(test, allow(clippy::items_after_test_module))]
 #![allow(clippy::collapsible_if)]
 
+use crate::env::{product_env};
 use crate::todo::TodoItem;
 use crate::tui::info_widget::{AmbientWidgetData, GitInfo, MemoryInfo};
 use crate::tui::session_picker::ResumeTarget;
@@ -81,7 +82,7 @@ pub(crate) fn invalidate_ambient_info_cache() {
 /// Open a file/URL with the system opener, unless suppressed.
 ///
 /// Every TUI-initiated `open::that_detached` must go through here: it honors
-/// NO_BROWSER/JCODE_NO_BROWSER and refuses to open anything from test binaries
+/// NO_BROWSER/NEXT_CODE_NO_BROWSER and refuses to open anything from test binaries
 /// (`browser_suppressed` detects the test harness), so `cargo test` runs never
 /// pop browser windows, image viewers, or OAuth pages on the developer's
 /// desktop.
@@ -90,7 +91,7 @@ pub(crate) fn open_path_or_url_detached(
 ) -> std::io::Result<()> {
     if crate::auth::browser_suppressed(false) {
         return Err(std::io::Error::other(
-            "opening files/URLs is suppressed (NO_BROWSER/JCODE_NO_BROWSER or test harness)",
+            "opening files/URLs is suppressed (NO_BROWSER/NEXT_CODE_NO_BROWSER or test harness)",
         ));
     }
     open::that_detached(target)
@@ -143,7 +144,7 @@ pub(super) fn launch_client_executable() -> PathBuf {
     crate::build::client_update_candidate(next_code_selfdev_types::client_selfdev_requested())
         .map(|(path, _label)| path)
         .or_else(|| std::env::current_exe().ok())
-        .unwrap_or_else(|| PathBuf::from("jcode"))
+        .unwrap_or_else(|| PathBuf::from("next-code"))
 }
 
 pub(super) fn partition_queued_messages(
@@ -194,7 +195,7 @@ pub(super) fn ctrl_bracket_fallback_to_esc(_code: &mut KeyCode, _modifiers: &mut
 
 /// Debug command file path
 pub(super) fn debug_cmd_path() -> PathBuf {
-    if let Ok(path) = std::env::var("JCODE_DEBUG_CMD_PATH") {
+    if let Ok(path) = std::env::var("NEXT_CODE_DEBUG_CMD_PATH") {
         return PathBuf::from(path);
     }
     std::env::temp_dir().join("next_code_debug_cmd")
@@ -202,7 +203,7 @@ pub(super) fn debug_cmd_path() -> PathBuf {
 
 /// Debug response file path
 pub(super) fn debug_response_path() -> PathBuf {
-    if let Ok(path) = std::env::var("JCODE_DEBUG_RESPONSE_PATH") {
+    if let Ok(path) = std::env::var("NEXT_CODE_DEBUG_RESPONSE_PATH") {
         return PathBuf::from(path);
     }
     std::env::temp_dir().join("next_code_debug_response")
@@ -679,7 +680,7 @@ pub(super) fn mask_email(email: &str) -> String {
     format!("{}@{}", masked_local, domain)
 }
 
-/// Spawn a new terminal window that resumes a jcode session.
+/// Spawn a new terminal window that resumes a next-code session.
 /// Returns Ok(true) if a terminal was successfully launched, Ok(false) if no terminal found.
 fn resume_invocation_args(session_id: &str, socket: Option<&str>) -> Vec<String> {
     let mut args = vec![
@@ -793,7 +794,7 @@ pub(super) fn spawn_resume_target_in_new_terminal(
     spawn_command_in_new_terminal(&program, &args, &title, cwd)
 }
 
-/// Build the terminal command used to spawn a brand-new jcode session.
+/// Build the terminal command used to spawn a brand-new next-code session.
 /// Split from `spawn_fresh_session_in_new_terminal` so tests can verify the
 /// invocation without launching a window.
 fn build_fresh_session_command(socket: Option<&str>) -> crate::terminal_launch::TerminalCommand {
@@ -804,12 +805,12 @@ fn build_fresh_session_command(socket: Option<&str>) -> crate::terminal_launch::
         args.push(socket.to_string());
     }
     crate::terminal_launch::TerminalCommand::new(&exe, args)
-        .title("jcode · new session".to_string())
+        .title("next-code · new session".to_string())
         .kind("new-terminal")
         .fresh_spawn()
 }
 
-/// Spawn a brand-new jcode session in a new terminal window, staying on the
+/// Spawn a brand-new next-code session in a new terminal window, staying on the
 /// same server socket when one is configured. Returns Ok(true) when a terminal
 /// was launched, Ok(false) when no supported terminal was found.
 pub(super) fn spawn_fresh_session_in_new_terminal(cwd: &Path) -> anyhow::Result<bool> {
@@ -817,7 +818,7 @@ pub(super) fn spawn_fresh_session_in_new_terminal(cwd: &Path) -> anyhow::Result<
         // Never launch real terminal windows from unit tests.
         return Ok(false);
     }
-    let socket = std::env::var("JCODE_SOCKET").ok();
+    let socket = product_env("SOCKET").ok();
     let command = build_fresh_session_command(socket.as_deref());
     crate::terminal_launch::spawn_command_in_new_terminal(&command, cwd)
 }
@@ -830,9 +831,9 @@ fn resumed_window_title(session_id: &str) -> String {
     let fallback_label = if let Some(server_info) =
         crate::registry::find_server_by_socket_sync(&crate::server::socket_path())
     {
-        format!("jcode/{} {}", server_info.name, session_label)
+        format!("next-code/{} {}", server_info.name, session_label)
     } else {
-        format!("jcode {}", session_label)
+        format!("next-code {}", session_label)
     };
     crate::process_title::terminal_window_title(
         icon,

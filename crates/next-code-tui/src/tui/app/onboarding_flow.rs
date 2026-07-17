@@ -426,7 +426,7 @@ pub(crate) fn detect_external_cli_oauths() -> Vec<ExternalCli> {
 }
 
 /// Resolve a path under the (sandbox-aware) external home so onboarding honors
-/// `JCODE_HOME`/external isolation, matching the import detectors.
+/// `NEXT_CODE_HOME`/external isolation, matching the import detectors.
 fn external_home_path(rel: &str) -> PathBuf {
     crate::storage::user_home_path(rel)
         .ok()
@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn external_oauth_present_requires_nonempty_file() {
-        let dir = std::env::temp_dir().join(format!("jcode-onb-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("next-code-onb-test-{}", std::process::id()));
         let _ = std::fs::create_dir_all(&dir);
         let empty = dir.join("empty.json");
         let full = dir.join("full.json");

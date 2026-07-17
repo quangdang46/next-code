@@ -1,12 +1,12 @@
-//! `jcode-base`: foundational layer of the jcode application core.
+//! `next-code-base`: foundational layer of the next-code application core.
 //!
 //! This crate holds the downward-closed set of modules that the upper
-//! server/tool/agent layer (`jcode-app-core`) depends on: provider, auth,
+//! server/tool/agent layer (`next-code-app-core`) depends on: provider, auth,
 //! config, session, message, memory, telemetry, and their supporting leaves.
 //! Splitting it out lets the two halves compile as separate rustc units so the
 //! largest compilation unit (and its peak memory) is roughly halved.
 //!
-//! `jcode-app-core` re-exports this crate via `pub use next_code_base::*`, so every
+//! `next-code-app-core` re-exports this crate via `pub use next_code_base::*`, so every
 //! existing `crate::<module>` path in the upper layers keeps resolving.
 
 #![allow(

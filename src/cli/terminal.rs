@@ -10,8 +10,8 @@ pub struct TuiRuntimeState {
     focus_change: bool,
 }
 
-const INHERITED_MODES_ENV: &str = "JCODE_TUI_INHERITED_MODES";
-const INHERITED_THEME_ENV: &str = "JCODE_TUI_INHERITED_THEME";
+const INHERITED_MODES_ENV: &str = "NEXT_CODE_TUI_INHERITED_MODES";
+const INHERITED_THEME_ENV: &str = "NEXT_CODE_TUI_INHERITED_THEME";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct InheritedTerminalModes {
@@ -243,13 +243,13 @@ fn init_tui_terminal(inherited_terminal: bool) -> Result<ratatui::DefaultTermina
 }
 
 pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)> {
-    let is_resuming = std::env::var_os("JCODE_RESUMING").is_some();
+    let is_resuming = std::env::var_os("NEXT_CODE_RESUMING").is_some();
     let inherited_theme = std::env::var(INHERITED_THEME_ENV).ok();
     let inherited_modes_raw = std::env::var(INHERITED_MODES_ENV).ok();
     let inherited_modes = inherited_modes_raw
         .as_deref()
         .and_then(InheritedTerminalModes::decode);
-    // JCODE_RESUMING describes the session lifecycle, but only a valid modes
+    // NEXT_CODE_RESUMING describes the session lifecycle, but only a valid modes
     // handoff proves the previous process deliberately left the terminal live
     // across exec. A restart used to restore the terminal before exec while the
     // new process still took the resume path, leaving it on the primary screen

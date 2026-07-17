@@ -127,7 +127,7 @@ fn test_on_auth_changed_refreshes_existing_openai_provider_credentials() {
         .expect("save stale test OpenAI auth");
 
         // The concrete OpenAI runtime lives downstream; token refresh itself is
-        // covered by jcode-provider-openai-runtime's tests. Here we assert the
+        // covered by next-code-provider-openai-runtime's tests. Here we assert the
         // MultiProvider wiring: on_auth_changed must call reload_credentials()
         // on an existing OpenAI runtime instead of replacing it.
         let existing = test_openai_runtime();
@@ -348,7 +348,7 @@ fn test_anthropic_model_routes_keep_plain_4_6_available_without_extra_usage() {
 fn test_on_auth_changed_hot_initializes_openrouter_and_marks_routes_available() {
     with_clean_provider_test_env(|| {
         with_env_var("OPENROUTER_API_KEY", "test-openrouter-key", || {
-            with_env_var("JCODE_OPENROUTER_MODEL_CATALOG", "0", || {
+            with_env_var("NEXT_CODE_OPENROUTER_MODEL_CATALOG", "0", || {
                 let runtime = enter_test_runtime();
                 let _enter = runtime.enter();
 
@@ -604,7 +604,7 @@ fn test_on_auth_changed_hot_initializes_gemini_and_marks_routes_available() {
         let _enter = runtime.enter();
 
         // The concrete Gemini runtime lives downstream in
-        // jcode-provider-gemini-runtime, so base tests register a stub through
+        // next-code-provider-gemini-runtime, so base tests register a stub through
         // the same composition-root registry the binary uses. This also
         // exercises the external-provider hot-init path end to end.
         struct StubGeminiRuntime;
@@ -681,7 +681,7 @@ fn test_on_auth_changed_hot_initializes_cursor_and_marks_routes_available() {
             let _enter = runtime.enter();
 
             // The concrete Cursor runtime lives downstream in
-            // jcode-provider-cursor-runtime; register the shared test stub
+            // next-code-provider-cursor-runtime; register the shared test stub
             // through the same composition-root registry the binary uses.
             external::register_external_provider(external::CURSOR_RUNTIME, || {
                 test_cursor_runtime()

@@ -51,7 +51,7 @@ pub(crate) fn single_session_user_font_family() -> &'static str {
     desktop_font_family_from_index(
         DESKTOP_USER_FONT_INDEX.load(std::sync::atomic::Ordering::Relaxed),
     )
-    .or_else(|| desktop_font_family_from_env("JCODE_DESKTOP_USER_FONT"))
+    .or_else(|| desktop_font_family_from_env("NEXT_CODE_DESKTOP_USER_FONT"))
     .unwrap_or(SINGLE_SESSION_USER_FONT_FAMILY)
 }
 
@@ -59,8 +59,8 @@ pub(crate) fn single_session_assistant_font_family() -> &'static str {
     desktop_font_family_from_index(
         DESKTOP_ASSISTANT_FONT_INDEX.load(std::sync::atomic::Ordering::Relaxed),
     )
-    .or_else(|| desktop_font_family_from_env("JCODE_DESKTOP_AI_FONT"))
-    .or_else(|| desktop_font_family_from_env("JCODE_DESKTOP_ASSISTANT_FONT"))
+    .or_else(|| desktop_font_family_from_env("NEXT_CODE_DESKTOP_AI_FONT"))
+    .or_else(|| desktop_font_family_from_env("NEXT_CODE_DESKTOP_ASSISTANT_FONT"))
     .unwrap_or(SINGLE_SESSION_ASSISTANT_FONT_FAMILY)
 }
 
@@ -373,7 +373,7 @@ pub(crate) struct GitHubIssueBrowserState {
 impl GitHubIssueBrowserState {
     fn sample() -> Self {
         Self {
-            repo: "1jehuang/jcode".to_string(),
+            repo: "quangdang46/next-code".to_string(),
             filter_label: "priority · open · local cache".to_string(),
             selected: 0,
             list_scroll: 0,
@@ -425,7 +425,7 @@ impl GitHubIssueBrowserState {
                     state: GitHubIssueVisualState::Idle,
                     body_lines: vec![
                         "Desktop auth failures currently show a terse provider error.".to_string(),
-                        "It should offer a one-click path to the same diagnostic information as `jcode auth doctor`.".to_string(),
+                        "It should offer a one-click path to the same diagnostic information as `next-code auth doctor`.".to_string(),
                     ],
                     comment_lines: vec!["nice to have after core desktop stability".to_string()],
                     priority_reason: "important UX improvement, but not blocking active work".to_string(),
@@ -1973,7 +1973,7 @@ impl SingleSessionApp {
             Ok(_) => {}
             Err(error) => {
                 crate::desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to hydrate resumed transcript for {session_id}: {error:#}"
+                    "next-code-desktop: failed to hydrate resumed transcript for {session_id}: {error:#}"
                 ));
                 self.error = Some(format!("failed to load transcript: {error:#}"));
             }
@@ -2311,7 +2311,7 @@ impl SingleSessionApp {
     }
 
     pub(crate) fn status_title(&self) -> String {
-        format!("Jcode · {}", self.title())
+        format!("Next Code · {}", self.title())
     }
 
     pub(crate) fn title(&self) -> String {
@@ -3651,7 +3651,7 @@ impl SingleSessionApp {
             Ok(_) => false,
             Err(error) => {
                 crate::desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to hydrate resumed transcript for {session_id}: {error}"
+                    "next-code-desktop: failed to hydrate resumed transcript for {session_id}: {error}"
                 ));
                 self.error = Some(format!("failed to load transcript: {error}"));
                 false
@@ -6458,7 +6458,7 @@ fn session_switcher_styled_lines(
 
     if switcher.loading {
         lines.push(styled_line(
-            "loading recent sessions from ~/.jcode/sessions...",
+            "loading recent sessions from ~/.next-code/sessions...",
             SingleSessionLineStyle::Status,
         ));
     }
@@ -7517,8 +7517,8 @@ const SINGLE_SESSION_HELP_SECTIONS: &[HelpSection] = &[
         title: "window",
         shortcuts: &[
             ("Ctrl+;", "reset/spawn fresh desktop session"),
-            ("Super+;", "spawn a self-dev jcode session"),
-            ("Super+'", "spawn a jcode session in home"),
+            ("Super+;", "spawn a self-dev next-code session"),
+            ("Super+'", "spawn a next-code session in home"),
             ("Ctrl+R", "reload sessions/models while a picker is open"),
             ("Ctrl+?", "toggle this help"),
             ("q", "close help or session info"),
@@ -9383,7 +9383,7 @@ pub(crate) fn single_session_surface(
         },
         title: session
             .map(|session| session.title.clone())
-            .unwrap_or_else(|| "new jcode session".to_string()),
+            .unwrap_or_else(|| "new next-code session".to_string()),
         body_lines: lines.clone(),
         detail_lines: lines,
         transcript_messages: Vec::new(),
@@ -9560,7 +9560,7 @@ mod tests {
         let new = ExternalCliSessionCandidate {
             source: "Codex",
             modified: SystemTime::UNIX_EPOCH + Duration::from_secs(10),
-            working_dir: Some("/home/user/jcode".to_string()),
+            working_dir: Some("/home/user/next-code".to_string()),
             context: Some("implement startup continuation suggestions".to_string()),
         };
 
@@ -9570,14 +9570,14 @@ mod tests {
 
         assert_eq!(
             suggestion,
-            "continue the latest Codex session in jcode: implement startup continuation suggestions"
+            "continue the latest Codex session in next-code: implement startup continuation suggestions"
         );
     }
 
     #[test]
     fn latest_external_cli_suggestion_missing_roots_returns_none() {
         let home =
-            std::env::temp_dir().join(format!("jcode-missing-external-cli-{}", std::process::id()));
+            std::env::temp_dir().join(format!("next-code-missing-external-cli-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&home);
 
         assert_eq!(
@@ -9589,7 +9589,7 @@ mod tests {
     #[test]
     fn latest_external_cli_suggestion_ignores_malformed_jsonl() {
         let home = std::env::temp_dir().join(format!(
-            "jcode-malformed-external-cli-{}-{:?}",
+            "next-code-malformed-external-cli-{}-{:?}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -9661,13 +9661,13 @@ mod tests {
     #[test]
     fn bash_tool_rendering_shows_intent_command_and_background_flag() {
         let lines = rendered_tool_text(
-            "▾ bash running\n  input: {\"intent\":\"run the desktop tests\",\"command\":\"cargo test -p jcode-desktop\",\"run_in_background\":true}",
+            "▾ bash running\n  input: {\"intent\":\"run the desktop tests\",\"command\":\"cargo test -p next-code-desktop\",\"run_in_background\":true}",
             true,
         );
         assert_eq!(
             lines,
             vec![
-                "  ● bash · running · $ cargo test -p jcode-desktop · background: yes",
+                "  ● bash · running · $ cargo test -p next-code-desktop · background: yes",
                 "    waiting for tool output…",
             ]
         );
@@ -9676,7 +9676,7 @@ mod tests {
     #[test]
     fn active_tool_lines_carry_visual_metadata_for_native_cards() {
         let lines = rendered_tool_lines(
-            "▾ bash running\n  input: {\"command\":\"cargo test -p jcode-desktop\"}",
+            "▾ bash running\n  input: {\"command\":\"cargo test -p next-code-desktop\"}",
             true,
         );
 
@@ -9727,13 +9727,13 @@ mod tests {
     #[test]
     fn tool_result_content_renders_inside_inline_widget() {
         let lines = rendered_tool_text(
-            "▾ bash failed: tests failed\n  input: {\"command\":\"cargo test -p jcode-desktop\"}\n  error[E0425]: cannot find value `foo` in this scope\n  test result: FAILED",
+            "▾ bash failed: tests failed\n  input: {\"command\":\"cargo test -p next-code-desktop\"}\n  error[E0425]: cannot find value `foo` in this scope\n  test result: FAILED",
             true,
         );
 
         assert_eq!(
             lines[0],
-            "  ✕ bash · failed · tests failed · $ cargo test -p jcode-desktop"
+            "  ✕ bash · failed · tests failed · $ cargo test -p next-code-desktop"
         );
         assert_eq!(
             lines[1],
@@ -9745,13 +9745,13 @@ mod tests {
     #[test]
     fn inactive_tool_result_compacts_to_metadata_only() {
         let lines = rendered_tool_text(
-            "▸ bash done: tests passed\n  input: {\"command\":\"cargo test -p jcode-desktop\"}\n  test result: ok",
+            "▸ bash done: tests passed\n  input: {\"command\":\"cargo test -p next-code-desktop\"}\n  test result: ok",
             false,
         );
 
         assert_eq!(
             lines,
-            vec!["  ✓ bash · done · tests passed · $ cargo test -p jcode-desktop"]
+            vec!["  ✓ bash · done · tests passed · $ cargo test -p next-code-desktop"]
         );
     }
 

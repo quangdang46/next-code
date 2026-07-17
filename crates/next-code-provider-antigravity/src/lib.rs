@@ -22,7 +22,7 @@ pub const FETCH_MODELS_API_URL: &str =
     "https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels";
 pub const GENERATE_CONTENT_API_URL: &str =
     "https://cloudcode-pa.googleapis.com/v1internal:generateContent";
-const VERSION_ENV: &str = "JCODE_ANTIGRAVITY_VERSION";
+const VERSION_ENV: &str = "NEXT_CODE_ANTIGRAVITY_VERSION";
 pub const ANTIGRAVITY_VERSION: &str = "1.18.3";
 pub const X_GOOG_API_CLIENT: &str = "google-cloud-sdk vscode_cloudshelleditor/0.1";
 const CATALOG_REFRESH_TTL_HOURS: i64 = 6;

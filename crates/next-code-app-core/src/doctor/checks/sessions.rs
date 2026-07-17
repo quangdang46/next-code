@@ -1,4 +1,4 @@
-//! Session integrity: scan `~/.jcode/sessions/<id>.json`, flag transcripts that
+//! Session integrity: scan `~/.next-code/sessions/<id>.json`, flag transcripts that
 //! no longer parse, and (with `--fix`) quarantine corrupt files to a `.bak` and
 //! remove orphan temp files left by interrupted atomic writes.
 
@@ -61,7 +61,7 @@ pub fn check_sessions(opts: &DoctorOptions, out: &mut Vec<Finding>) {
             .unwrap_or("?")
             .to_string();
         let f = Finding::fail(CheckCategory::Sessions, format!("corrupt session: {name}"))
-            .with_remediation("run `jcode doctor --fix` to quarantine (.bak), or delete it");
+            .with_remediation("run `next-code doctor --fix` to quarantine (.bak), or delete it");
         match quarantine(opts, path, "Quarantine corrupt session") {
             Ok(Some(backup)) => out.push(f.fixed(format!("moved to {}", backup.display()))),
             Ok(None) => out.push(f),
@@ -77,7 +77,7 @@ pub fn check_sessions(opts: &DoctorOptions, out: &mut Vec<Finding>) {
                 orphan_tmp.len()
             ),
         )
-        .with_remediation("run `jcode doctor --fix` to remove them");
+        .with_remediation("run `next-code doctor --fix` to remove them");
         if opts.fix
             && (opts.assume_yes || {
                 // Interactive temp removal requires tty confirmation

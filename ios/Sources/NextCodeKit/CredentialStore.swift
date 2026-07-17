@@ -62,7 +62,7 @@ public struct KeychainCredentialStore: CredentialStore {
             return (try? JSONDecoder().decode([ServerCredential].self, from: data)) ?? []
         }
         if status != errSecItemNotFound {
-            NSLog("JCodeKit: keychain read failed (%d), trying file fallback", status)
+            NSLog("NextCodeKit: keychain read failed (%d), trying file fallback", status)
         }
         if let data = try? Data(contentsOf: Self.fallbackURL) {
             return (try? JSONDecoder().decode([ServerCredential].self, from: data)) ?? []
@@ -91,7 +91,7 @@ public struct KeychainCredentialStore: CredentialStore {
             status = SecItemAdd(query as CFDictionary, nil)
         }
         if status != errSecSuccess {
-            NSLog("JCodeKit: keychain write failed (%d), using file fallback", status)
+            NSLog("NextCodeKit: keychain write failed (%d), using file fallback", status)
             persistToFile(data)
         }
     }
@@ -105,7 +105,7 @@ public struct KeychainCredentialStore: CredentialStore {
             )
             try data.write(to: url, options: [.atomic, .completeFileProtection])
         } catch {
-            NSLog("JCodeKit: file fallback write failed: %@", error.localizedDescription)
+            NSLog("NextCodeKit: file fallback write failed: %@", error.localizedDescription)
         }
     }
 
@@ -113,7 +113,7 @@ public struct KeychainCredentialStore: CredentialStore {
         let base =
             FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
             .first ?? FileManager.default.temporaryDirectory
-        return base.appendingPathComponent("jcode-servers.json")
+        return base.appendingPathComponent("next-code-servers.json")
     }
 
     private func baseQuery() -> [String: Any] {

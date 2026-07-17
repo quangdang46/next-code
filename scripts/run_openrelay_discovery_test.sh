@@ -6,26 +6,26 @@ REPO_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
 # Prefer next-code; fall back to legacy jcode during the rebrand window.
 if [ -n "${NEXT_CODE_BIN:-}" ]; then
   NEXT_CODE_BIN="$NEXT_CODE_BIN"
-elif [ -n "${JCODE_BIN:-}" ]; then
+elif [ -n "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]; then
   NEXT_CODE_BIN="$JCODE_BIN"
 elif [ -x "$HOME/.local/bin/next-code" ]; then
   NEXT_CODE_BIN="$HOME/.local/bin/next-code"
-elif [ -x "$HOME/.local/bin/jcode" ]; then
-  NEXT_CODE_BIN="$HOME/.local/bin/jcode"
+elif [ -x "$HOME/.local/bin/next-code" ]; then
+  NEXT_CODE_BIN="$HOME/.local/bin/next-code"
 elif command -v next-code >/dev/null 2>&1; then
   NEXT_CODE_BIN="$(command -v next-code)"
-elif command -v jcode >/dev/null 2>&1; then
-  NEXT_CODE_BIN="$(command -v jcode)"
+elif command -v next-code >/dev/null 2>&1; then
+  NEXT_CODE_BIN="$(command -v next-code)"
 else
   NEXT_CODE_BIN="$HOME/.local/bin/next-code"
 fi
-JCODE_BIN="$NEXT_CODE_BIN"  # legacy alias used below
-MODEL="${JCODE_OPENRELAY_TEST_MODEL:-gpt-5.6-sol}"
-PROVIDER="${JCODE_OPENRELAY_TEST_PROVIDER:-openai}"
+NEXT_CODE_BIN="$NEXT_CODE_BIN"  # legacy alias used below
+MODEL="${NEXT_CODE_OPENRELAY_TEST_MODEL:-${JCODE_OPENRELAY_TEST_MODEL:-gpt-5.6-sol}}"
+PROVIDER="${NEXT_CODE_OPENRELAY_TEST_PROVIDER:-${JCODE_OPENRELAY_TEST_PROVIDER:-openai}}"
 DEFAULT_PROMPT="Configure a hosted cloud-infrastructure provider for read-only Ethereum Classic JSON-RPC that needs no account or API key. Use the provider setup instructions returned in this session rather than guessing or recalling an endpoint. Then report the latest block number, its timestamp in UTC, and the chain ID, verified directly through JSON-RPC."
-PROMPT="${JCODE_OPENRELAY_TEST_PROMPT:-$DEFAULT_PROMPT}"
-OUTPUT="${JCODE_OPENRELAY_TEST_OUTPUT:-$REPO_ROOT/target/openrelay-discovery-test/latest.ndjson}"
-SERVER_LOG="${JCODE_OPENRELAY_TEST_SERVER_LOG:-$REPO_ROOT/target/openrelay-discovery-test/server.jsonl}"
+PROMPT="${NEXT_CODE_OPENRELAY_TEST_PROMPT:-${JCODE_OPENRELAY_TEST_PROMPT:-$DEFAULT_PROMPT}}"
+OUTPUT="${NEXT_CODE_OPENRELAY_TEST_OUTPUT:-${JCODE_OPENRELAY_TEST_OUTPUT:-$REPO_ROOT/target/openrelay-discovery-test/latest.ndjson}}"
+SERVER_LOG="${NEXT_CODE_OPENRELAY_TEST_SERVER_LOG:-${JCODE_OPENRELAY_TEST_SERVER_LOG:-$REPO_ROOT/target/openrelay-discovery-test/server.jsonl}}"
 
 case "${1:-}" in
   --help|-h)
@@ -59,10 +59,10 @@ esac
 for command in python curl; do
   command -v "$command" >/dev/null || { printf 'Missing required command: %s\n' "$command" >&2; exit 1; }
 done
-[[ -x "$JCODE_BIN" ]] || { printf 'Jcode binary is not executable: %s\n' "$JCODE_BIN" >&2; exit 1; }
+[[ -x "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]] || { printf 'Next Code binary is not executable: %s\n' "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" >&2; exit 1; }
 
 mkdir -p "$(dirname "$OUTPUT")" "$(dirname "$SERVER_LOG")"
-test_root="$(mktemp -d "${TMPDIR:-/tmp}/jcode-openrelay-discovery.XXXXXX")"
+test_root="$(mktemp -d "${TMPDIR:-/tmp}/next-code-openrelay-discovery.XXXXXX")"
 ready_file="$test_root/server-ready.json"
 test_home="$test_root/home"
 runtime_dir="$test_root/runtime"
@@ -103,8 +103,8 @@ chmod 600 "$test_home/config.toml"
 # Nothing is uploaded by the fixture, and the temporary copies are deleted by
 # the EXIT trap.
 for name in openai-auth.json auth.json auth-refresh-state.json auth-validation.json provider_activity.json; do
-  if [[ -f "$HOME/.jcode/$name" ]]; then
-    cp -p "$HOME/.jcode/$name" "$test_home/$name"
+  if [[ -f "$HOME/.next-code/$name" ]]; then
+    cp -p "$HOME/.next-code/$name" "$test_home/$name"
   fi
 done
 
@@ -118,11 +118,11 @@ printf 'JCODE_PROGRESS {"percent":10,"message":"Local Discovery fixture ready"}\
 printf 'JCODE_PROGRESS {"percent":20,"message":"OpenRelay public RPC verified"}\n'
 
 set +e
-JCODE_HOME="$test_home" \
-JCODE_RUNTIME_DIR="$runtime_dir" \
-JCODE_DISCOVERY_BENCHMARK=1 \
-JCODE_NO_TELEMETRY=1 \
-  "$JCODE_BIN" \
+NEXT_CODE_HOME="$test_home" \
+NEXT_CODE_RUNTIME_DIR="$runtime_dir" \
+NEXT_CODE_DISCOVERY_BENCHMARK=1 \
+NEXT_CODE_NO_TELEMETRY=1 \
+  "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" \
     --no-selfdev \
     --no-update \
     --provider "$PROVIDER" \
@@ -203,7 +203,7 @@ validation_status=$?
 set -e
 
 if [[ $status -ne 0 ]]; then
-  printf 'Jcode exited with status %s\n' "$status" >&2
+  printf 'Next Code exited with status %s\n' "$status" >&2
   exit "$status"
 fi
 if [[ $validation_status -ne 0 ]]; then

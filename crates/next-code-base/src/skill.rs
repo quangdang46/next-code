@@ -53,7 +53,7 @@ impl SkillRegistry {
     /// direct slash invocation paths. Keeping a single registry prevents slash
     /// commands from seeing a stale startup-only skill snapshot after reloads.
     ///
-    /// Holds GLOBAL skills only (plugins, `~/.jcode/skills/`,
+    /// Holds GLOBAL skills only (plugins, `~/.next-code/skills/`,
     /// `~/.agents/skills/`). Project-local skills are a per-session overlay
     /// composed at read time from the session's workspace root (issue #457);
     /// they must never enter this shared registry, and the daemon's startup
@@ -96,7 +96,7 @@ impl SkillRegistry {
     }
 
     /// Import skills from Claude Code and Codex CLI on first run.
-    /// Only runs if ~/.jcode/skills/ doesn't exist yet.
+    /// Only runs if ~/.next-code/skills/ doesn't exist yet.
     fn import_from_external() {
         let next_code_skills = match crate::storage::next_code_dir() {
             Ok(dir) => dir.join("skills"),
@@ -229,7 +229,7 @@ impl SkillRegistry {
     }
 
     /// Load only the shared global skill sources: Claude Code plugin installs,
-    /// `~/.jcode/skills/`, and `~/.agents/skills/`.
+    /// `~/.next-code/skills/`, and `~/.agents/skills/`.
     ///
     /// This is what the process-wide shared registry holds. Project-local
     /// skills are intentionally excluded: they are a per-session overlay
@@ -242,12 +242,12 @@ impl SkillRegistry {
         let mut registry = Self::default();
 
         // Load skills provided by Claude Code plugins/marketplace installs
-        // first, so explicit jcode/agents skills with the same name win below.
+        // first, so explicit next-code/agents skills with the same name win below.
         if let Some(plugins_root) = Self::claude_plugins_root() {
             registry.load_plugin_skills_from_root(&plugins_root);
         }
 
-        // Load from ~/.jcode/skills/ (jcode's own global skills)
+        // Load from ~/.next-code/skills/ (next-code's own global skills)
         if let Ok(next_code_dir) = crate::storage::next_code_dir() {
             let next_code_skills = next_code_dir.join("skills");
             if next_code_skills.exists() {
@@ -266,7 +266,7 @@ impl SkillRegistry {
     }
 
     /// Load only the project-local skill overlay for a workspace root:
-    /// `./.jcode/skills/`, `./.agents/skills/`, and `./.claude/skills/`.
+    /// `./.next-code/skills/`, `./.agents/skills/`, and `./.claude/skills/`.
     ///
     /// Loaded fresh from disk on access so edits are visible without daemon
     /// restarts and two sessions in different repositories never see each
@@ -309,7 +309,7 @@ impl SkillRegistry {
     }
 
     fn load_project_local_dirs(&mut self, working_dir: Option<&Path>) -> Result<()> {
-        // Prefer ./.next-code/skills/, fall back to legacy ./.jcode/skills/.
+        // Prefer ./.next-code/skills/, fall back to legacy ./.next-code/skills/.
         // Load both when both exist so a partial migrate does not drop skills;
         // later loads (legacy) win on name collision so pre-rebrand edits
         // remain visible until the user consolidates.
@@ -344,7 +344,7 @@ impl SkillRegistry {
 
     /// Load skills provided by Claude Code plugins under `plugins_root`.
     /// Returns the number of skills loaded. Errors are skipped so a broken
-    /// plugin never prevents jcode's own skills from loading.
+    /// plugin never prevents next-code's own skills from loading.
     fn load_plugin_skills_from_root(&mut self, plugins_root: &Path) -> usize {
         let mut count = 0;
         for dir in Self::plugin_skill_dirs_under(plugins_root) {
@@ -570,7 +570,7 @@ impl SkillRegistry {
         self.reload_global()
     }
 
-    /// Reload the shared global skill sources (plugins, `~/.jcode/skills/`,
+    /// Reload the shared global skill sources (plugins, `~/.next-code/skills/`,
     /// `~/.agents/skills/`) into this registry.
     ///
     /// Project-local skills are intentionally NOT loaded here: they are a
@@ -591,12 +591,12 @@ impl SkillRegistry {
         let mut count = 0;
 
         // Load skills provided by Claude Code plugins/marketplace installs
-        // first, so explicit jcode/agents skills with the same name win below.
+        // first, so explicit next-code/agents skills with the same name win below.
         if let Some(plugins_root) = Self::claude_plugins_root() {
             count += self.load_plugin_skills_from_root(&plugins_root);
         }
 
-        // Load from ~/.jcode/skills/ (jcode's own global skills)
+        // Load from ~/.next-code/skills/ (next-code's own global skills)
         if let Ok(next_code_dir) = crate::storage::next_code_dir() {
             let next_code_skills = next_code_dir.join("skills");
             if next_code_skills.exists() {
@@ -683,14 +683,14 @@ impl SkillRegistry {
     }
 }
 
-/// A skill recommended/curated by jcode that the user may want to install.
+/// A skill recommended/curated by next-code that the user may want to install.
 #[derive(Debug, Clone, Copy)]
 pub struct EndorsedSkill {
     /// Skill name (matches the `name` field in SKILL.md and the slash command).
     pub name: &'static str,
     /// One-line description of what the skill does.
     pub description: &'static str,
-    /// Grouping label used to organize the endorsed list (e.g. "jcode",
+    /// Grouping label used to organize the endorsed list (e.g. "next-code",
     /// "NVIDIA CUDA-X").
     pub category: &'static str,
     /// Where users can get the skill (repo path, URL, or short note).
@@ -699,7 +699,7 @@ pub struct EndorsedSkill {
     pub install: Option<&'static str>,
 }
 
-/// Curated list of skills endorsed by jcode. Used by the `/skills` command to
+/// Curated list of skills endorsed by next-code. Used by the `/skills` command to
 /// show users which recommended skills they have installed and which they are
 /// missing. This is the single source of truth for endorsed skills.
 ///
@@ -710,22 +710,22 @@ pub const ENDORSED_SKILLS: &[EndorsedSkill] = &[
     EndorsedSkill {
         name: "optimization",
         description: "Improve performance, latency, throughput, memory usage, or general efficiency by defining metrics, measuring, attributing bottlenecks, and prioritizing macro-optimizations.",
-        category: "jcode",
-        source: "bundled in jcode repo (.jcode/skills/optimization)",
+        category: "next-code",
+        source: "bundled in next-code repo (.next-code/skills/optimization)",
         install: None,
     },
     EndorsedSkill {
         name: "todo-planning-skill",
         description: "Create thorough, well-structured todo lists for long tasks, including reflection, static analysis, verification, and next-step updates.",
-        category: "jcode",
-        source: "bundled with jcode / Claude Code skills",
+        category: "next-code",
+        source: "bundled with next-code / Claude Code skills",
         install: None,
     },
     EndorsedSkill {
         name: "firefox-browser",
         description: "Control the user's Firefox browser with their logins and cookies intact to browse, fill forms, click, screenshot, and read authenticated pages.",
-        category: "jcode",
-        source: "bundled with jcode / Claude Code skills",
+        category: "next-code",
+        source: "bundled with next-code / Claude Code skills",
         install: None,
     },
     // Anthropic official skills (github.com/anthropics/skills, Apache-2.0).
@@ -876,7 +876,7 @@ pub const ENDORSED_SKILLS: &[EndorsedSkill] = &[
     },
 ];
 
-/// Return the curated list of skills endorsed by jcode.
+/// Return the curated list of skills endorsed by next-code.
 pub fn endorsed_skills() -> &'static [EndorsedSkill] {
     ENDORSED_SKILLS
 }
@@ -1078,7 +1078,7 @@ mod tests {
     #[test]
     fn load_for_working_dir_reads_project_local_jcode_skills() {
         let temp = tempfile::tempdir().expect("tempdir");
-        write_test_skill(temp.path(), ".jcode", "wd-only");
+        write_test_skill(temp.path(), ".next-code", "wd-only");
 
         let registry = SkillRegistry::load_for_working_dir(Some(temp.path())).expect("load skills");
 
@@ -1106,7 +1106,7 @@ mod tests {
     #[test]
     fn project_overlay_is_session_scoped_and_composes_over_globals() {
         let temp = tempfile::tempdir().expect("tempdir");
-        write_test_skill(temp.path(), ".jcode", "session-skill");
+        write_test_skill(temp.path(), ".next-code", "session-skill");
 
         // The overlay resolves against the given workspace root, not the
         // process cwd or a shared registry (issue #457).
@@ -1140,7 +1140,7 @@ mod tests {
         // chdir is process-global; serialize with other env-sensitive tests.
         let _env_guard = crate::storage::lock_test_env();
         let temp = tempfile::tempdir().expect("tempdir");
-        write_test_skill(temp.path(), ".jcode", "session-skill");
+        write_test_skill(temp.path(), ".next-code", "session-skill");
 
         let prev_cwd = std::env::current_dir().expect("cwd");
         // reload_global must not pick up project-local skills even when the
@@ -1247,7 +1247,7 @@ mod tests {
     #[test]
     fn registry_contains_reports_loaded_skills() {
         let temp = tempfile::tempdir().expect("tempdir");
-        write_test_skill(temp.path(), ".jcode", "present-skill");
+        write_test_skill(temp.path(), ".next-code", "present-skill");
 
         let registry = SkillRegistry::load_for_working_dir(Some(temp.path())).expect("load skills");
         assert!(registry.contains("present-skill"));
@@ -1401,21 +1401,21 @@ mod tests {
         let install = plugins_root.join("cache/test-marketplace/my-plugin/1.0.0");
         write_plugin_skill_with_description(&install, "shared-name", "plugin version");
 
-        // Explicit jcode skill with the same name.
-        write_test_skill(temp.path(), ".jcode", "shared-name");
+        // Explicit next-code skill with the same name.
+        write_test_skill(temp.path(), ".next-code", "shared-name");
 
         // Mirror load ordering: plugins first, then explicit skill dirs, so
         // the later (explicit) insert wins in the registry map.
         let mut registry = SkillRegistry::default();
         registry.load_plugin_skills_from_root(&plugins_root);
         registry
-            .load_from_dir(&temp.path().join(".jcode/skills"))
+            .load_from_dir(&temp.path().join(".next-code/skills"))
             .expect("load explicit skills");
 
         let skill = registry.get("shared-name").expect("skill present");
         assert_eq!(
             skill.description, "Test skill shared-name",
-            "explicit jcode skill must override the plugin-provided one"
+            "explicit next-code skill must override the plugin-provided one"
         );
     }
 

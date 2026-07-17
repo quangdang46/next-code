@@ -6,7 +6,7 @@
 # reinstall picks up where you left off.
 #
 # Flags:
-#   --purge     Also delete ~/.next-code (and legacy ~/.jcode if present).
+#   --purge     Also delete ~/.next-code (and legacy ~/.next-code if present).
 #   --dry-run   Print what would be removed without deleting anything.
 #   --yes       Skip the confirmation prompt.
 #
@@ -41,18 +41,18 @@ case "$OS" in
   MINGW*|MSYS*|CYGWIN*)
     if [ -n "${NEXT_CODE_HOME:-}" ]; then
       NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
-    elif [ -n "${JCODE_HOME:-}" ]; then
+    elif [ -n "${NEXT_CODE_HOME:-${JCODE_HOME:-}}" ]; then
       NEXT_CODE_HOME_DIR="$JCODE_HOME"
     else
       NEXT_CODE_HOME_DIR="${LOCALAPPDATA:?LOCALAPPDATA not set}/next-code"
     fi
-    LEGACY_HOME_DIR="${LOCALAPPDATA}/jcode"
+    LEGACY_HOME_DIR="${LOCALAPPDATA}/next-code"
     LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${JCODE_INSTALL_DIR:-$LOCALAPPDATA/next-code/bin}}"
     LAUNCHER="$LAUNCHER_DIR/next-code.exe"
-    LEGACY_LAUNCHER="$LAUNCHER_DIR/jcode.exe"
+    LEGACY_LAUNCHER="$LAUNCHER_DIR/next-code.exe"
     # Also check the old default install dir.
-    LEGACY_LAUNCHER_DIR="${LOCALAPPDATA}/jcode/bin"
-    LEGACY_LAUNCHER_ALT="$LEGACY_LAUNCHER_DIR/jcode.exe"
+    LEGACY_LAUNCHER_DIR="${LOCALAPPDATA}/next-code/bin"
+    LEGACY_LAUNCHER_ALT="$LEGACY_LAUNCHER_DIR/next-code.exe"
     BUILDS_DIR="$NEXT_CODE_HOME_DIR/builds"
     LEGACY_BUILDS_DIR="$LEGACY_HOME_DIR/builds"
     USER_DATA_DIR="$NEXT_CODE_HOME_DIR"
@@ -61,15 +61,15 @@ case "$OS" in
   *)
     if [ -n "${NEXT_CODE_HOME:-}" ]; then
       NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
-    elif [ -n "${JCODE_HOME:-}" ]; then
+    elif [ -n "${NEXT_CODE_HOME:-${JCODE_HOME:-}}" ]; then
       NEXT_CODE_HOME_DIR="$JCODE_HOME"
     else
       NEXT_CODE_HOME_DIR="$HOME/.next-code"
     fi
-    LEGACY_HOME_DIR="$HOME/.jcode"
+    LEGACY_HOME_DIR="$HOME/.next-code"
     LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${JCODE_INSTALL_DIR:-$HOME/.local/bin}}"
     LAUNCHER="$LAUNCHER_DIR/next-code"
-    LEGACY_LAUNCHER="$LAUNCHER_DIR/jcode"
+    LEGACY_LAUNCHER="$LAUNCHER_DIR/next-code"
     LEGACY_LAUNCHER_DIR=""
     LEGACY_LAUNCHER_ALT=""
     BUILDS_DIR="$NEXT_CODE_HOME_DIR/builds"
@@ -93,12 +93,12 @@ if [ "$PURGE" = true ]; then
   [ -d "$USER_DATA_DIR" ] && \
     TARGETS+=("$USER_DATA_DIR (ALL user data: config, auth, sessions, logs, memory)")
   [ -d "$LEGACY_USER_DATA_DIR" ] && [ "$LEGACY_USER_DATA_DIR" != "$USER_DATA_DIR" ] && \
-    TARGETS+=("$LEGACY_USER_DATA_DIR (legacy ALL user data under ~/.jcode)")
+    TARGETS+=("$LEGACY_USER_DATA_DIR (legacy ALL user data under ~/.next-code)")
 fi
 
 # Compatibility wrapper installed by some setups.
 SELFDEV_WRAPPER="$HOME/.local/bin/selfdev"
-if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'jcode|next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
+if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code|next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
   TARGETS+=("$SELFDEV_WRAPPER (selfdev wrapper)")
 fi
 
@@ -141,7 +141,7 @@ fi
 # Stop any running next-code / legacy jcode server so files are not recreated mid-wipe.
 if command -v pkill >/dev/null 2>&1; then
   pkill -f 'next-code( .*)? serve' 2>/dev/null || true
-  pkill -f 'jcode( .*)? serve' 2>/dev/null || true
+  pkill -f 'next-code( .*)? serve' 2>/dev/null || true
 fi
 
 remove() {
@@ -162,7 +162,7 @@ else
   remove "$BUILDS_DIR"
   [ "$LEGACY_BUILDS_DIR" != "$BUILDS_DIR" ] && remove "$LEGACY_BUILDS_DIR"
 fi
-if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'jcode|next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
+if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code|next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
   remove "$SELFDEV_WRAPPER"
 fi
 

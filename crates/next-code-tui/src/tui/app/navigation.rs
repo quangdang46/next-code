@@ -1,3 +1,4 @@
+use crate::env::{product_env_os};
 use super::*;
 use crate::tui::ui::input_ui;
 use ratatui::layout::Rect;
@@ -56,7 +57,7 @@ impl MouseScrollTraceState {
 }
 
 fn tui_mouse_scroll_trace_enabled() -> bool {
-    std::env::var_os("JCODE_TUI_SCROLL_TRACE").is_some()
+    product_env_os("TUI_SCROLL_TRACE").is_some()
 }
 
 fn is_mouse_scroll_kind(kind: MouseEventKind) -> bool {
@@ -1553,7 +1554,7 @@ impl App {
             // Soft full repaint: ratatui's diff does not re-emit the trailing
             // cell after a wide grapheme (emoji/CJK) when the symbol is unchanged,
             // so terminals like kitty/foot leave a stale "ghost" char from the
-            // previous frame. See ratatui issue #2357 / jcode issue #404.
+            // previous frame. See ratatui issue #2357 / next-code issue #404.
             self.request_full_repaint();
             return true;
         }

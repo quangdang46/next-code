@@ -120,7 +120,7 @@ fn test_save_input_for_reload_removes_stale_file_when_state_is_empty() {
     app.save_input_for_reload(&session_id);
 
     let path = crate::storage::next_code_dir()
-        .expect("jcode dir")
+        .expect("next-code dir")
         .join(format!("client-input-{}", session_id));
     assert!(path.exists(), "first save should write the reload file");
 

@@ -1,8 +1,8 @@
-//! Goal management backed by local JSON files under `~/.jcode/goals/`.
+//! Goal management backed by local JSON files under `~/.next-code/goals/`.
 //!
-//! Goals live either in the global store (`~/.jcode/goals/`) or in a
-//! project-local store (`<working_dir>/.jcode/goals/`). Per-session
-//! attachments are tracked in `~/.jcode/goals/attachments/<session>.json`.
+//! Goals live either in the global store (`~/.next-code/goals/`) or in a
+//! project-local store (`<working_dir>/.next-code/goals/`). Per-session
+//! attachments are tracked in `~/.next-code/goals/attachments/<session>.json`.
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -14,7 +14,7 @@ use crate::side_panel::{SidePanelSnapshot, focus_page, snapshot_for_session, wri
 use crate::storage::{self, read_json, write_json_fast};
 
 // Re-export task-types so existing callers can keep referring to the same
-// type names (matches upstream `jcode-base::goal` surface).
+// type names (matches upstream `next-code-base::goal` surface).
 pub use next_code_task_types::{Goal, GoalMilestone, GoalScope, GoalStatus, GoalStep, GoalUpdate};
 
 /// Goal display mode.
@@ -87,7 +87,7 @@ fn project_goals_dir(working_dir: Option<&Path>) -> Result<Option<PathBuf>> {
     let Some(dir) = working_dir else {
         return Ok(None);
     };
-    // Prefer `.next-code/goals`, fall back to legacy `.jcode/goals`.
+    // Prefer `.next-code/goals`, fall back to legacy `.next-code/goals`.
     Ok(Some(storage::project_product_path(dir, "goals")))
 }
 

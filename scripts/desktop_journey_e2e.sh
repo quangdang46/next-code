@@ -28,12 +28,12 @@ set -euo pipefail
 # Requirements: niri, jq, wtype, a Wayland session; grim for screenshots.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN="${JCODE_DESKTOP_BIN:-$ROOT_DIR/target/debug/next-code-desktop}"
-TIMEOUT_SECS="${JCODE_JOURNEY_TIMEOUT_SECS:-15}"
-GAP_BUDGET_MS="${JCODE_JOURNEY_GAP_BUDGET_MS:-1000}"
-SCREENSHOT_DIR="${JCODE_JOURNEY_SCREENSHOT_DIR:-}"
+BIN="${NEXT_CODE_DESKTOP_BIN:-${JCODE_DESKTOP_BIN:-$ROOT_DIR/target/debug/next-code-desktop}}"
+TIMEOUT_SECS="${NEXT_CODE_JOURNEY_TIMEOUT_SECS:-${JCODE_JOURNEY_TIMEOUT_SECS:-15}}"
+GAP_BUDGET_MS="${NEXT_CODE_JOURNEY_GAP_BUDGET_MS:-${JCODE_JOURNEY_GAP_BUDGET_MS:-1000}}"
+SCREENSHOT_DIR="${NEXT_CODE_JOURNEY_SCREENSHOT_DIR:-${JCODE_JOURNEY_SCREENSHOT_DIR:-}}"
 LOG_FILE="$(mktemp -t next-code-desktop-journey.XXXXXX.log)"
-PERF_LOG="${XDG_CACHE_HOME:-$HOME/.cache}/jcode/desktop/performance.log"
+PERF_LOG="${XDG_CACHE_HOME:-$HOME/.cache}/next-code/desktop/performance.log"
 
 if [[ ! -x "$BIN" ]]; then
   echo "desktop binary not found: $BIN" >&2

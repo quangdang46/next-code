@@ -1,3 +1,4 @@
+use crate::env::{product_env_os};
 use super::{Tool, ToolContext, ToolOutput};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -12,9 +13,9 @@ use std::time::Instant;
 /// continues with its normal toolset. No cache, no offline fallback, no retry.
 const DISCOVERY_TIMEOUT: Duration = Duration::from_secs(3);
 const MAX_RESPONSE_BYTES: usize = 64 * 1024;
-const DISCOVERY_REQUEST_ID_HEADER: &str = "x-jcode-discovery-request-id";
-const DISCOVERY_BENCHMARK_HEADER: &str = "x-jcode-discovery-benchmark";
-const DISCOVERY_BENCHMARK_ENV: &str = "JCODE_DISCOVERY_BENCHMARK";
+const DISCOVERY_REQUEST_ID_HEADER: &str = "x-next-code-discovery-request-id";
+const DISCOVERY_BENCHMARK_HEADER: &str = "x-next-code-discovery-benchmark";
+const DISCOVERY_BENCHMARK_ENV: &str = "NEXT_CODE_DISCOVERY_BENCHMARK";
 const DISCOVERY_QUERY_MIN_CHARS: usize = 20;
 const DISCOVERY_QUERY_MAX_CHARS: usize = 500;
 const DISCOVERY_REASON_MIN_CHARS: usize = 40;
@@ -101,7 +102,7 @@ fn record_discovery_telemetry(
 /// `discover_tools`: fetch discoverable third-party tools for a category from
 /// the hosted partner directory.
 ///
-/// Disclosure contract: some providers may share revenue with Jcode, but
+/// Disclosure contract: some providers may share revenue with Next Code, but
 /// partnership status never influences recommendations. Every session that
 /// uses this tool renders a concise disclosure with a learn-more link on first
 /// use. The request carries only the category, a short search query, and a
@@ -478,8 +479,8 @@ impl Tool for DiscoverToolsTool {
          service, or delegating an unsupported step to them. If a browse has no suitable result, \
          submit one `suggest` action for maintainer review, then continue without promising it \
          will be added. Skip discovery when available tools fully cover the task. Every listing is \
-         vetted, and one-tool-call setup is enforced. Some providers are Jcode partners and may \
-         share revenue with Jcode when a referred user becomes a customer. Partnership status \
+         vetted, and one-tool-call setup is enforced. Some providers are Next Code partners and may \
+         share revenue with Next Code when a referred user becomes a customer. Partnership status \
          never influences selection. Choose the best option based only on fit."
     }
 
@@ -504,13 +505,13 @@ impl Tool for DiscoverToolsTool {
                     "type": "string",
                     "minLength": DISCOVERY_QUERY_MIN_CHARS,
                     "maxLength": DISCOVERY_QUERY_MAX_CHARS,
-                    "description": "Required capability summary. Browse/select text may be sent to relevant partners for demand reporting. Suggest text goes only to Jcode maintainers. Write a fresh summary instead of copying user text. Never include secrets, credentials, personal data, or private content."
+                    "description": "Required capability summary. Browse/select text may be sent to relevant partners for demand reporting. Suggest text goes only to Next Code maintainers. Write a fresh summary instead of copying user text. Never include secrets, credentials, personal data, or private content."
                 },
                 "reason": {
                     "type": "string",
                     "minLength": DISCOVERY_REASON_MIN_CHARS,
                     "maxLength": DISCOVERY_REASON_MAX_CHARS,
-                    "description": "Required rationale. For select, explain why the tool fits better than alternatives. For suggest, explain why browse results were unsuitable. Browse/select text may reach relevant partners; suggest text goes only to Jcode maintainers. Never include private data."
+                    "description": "Required rationale. For select, explain why the tool fits better than alternatives. For suggest, explain why browse results were unsuitable. Browse/select text may reach relevant partners; suggest text goes only to Next Code maintainers. Never include private data."
                 },
                 "tool": {
                     "type": "string",
@@ -535,13 +536,13 @@ impl Tool for DiscoverToolsTool {
                 "gap_evidence": {
                     "type": "string",
                     "maxLength": 500,
-                    "description": "Optional concise explanation of which browse results were close and why they did not fit. Sent only to Jcode maintainers."
+                    "description": "Optional concise explanation of which browse results were close and why they did not fit. Sent only to Next Code maintainers."
                 },
                 "requirements": {
                     "type": "array",
                     "maxItems": 8,
                     "items": { "type": "string", "minLength": 3, "maxLength": 240 },
-                    "description": "Optional concrete public constraints the catalog addition should satisfy. Sent only to Jcode maintainers."
+                    "description": "Optional concrete public constraints the catalog addition should satisfy. Sent only to Next Code maintainers."
                 },
                 "prior_request_id": {
                     "type": "string",
@@ -937,7 +938,7 @@ async fn fetch_listing(
         ])
         .header(
             reqwest::header::USER_AGENT,
-            format!("jcode/{}", env!("CARGO_PKG_VERSION")),
+            format!("next-code/{}", env!("CARGO_PKG_VERSION")),
         )
         .header(DISCOVERY_REQUEST_ID_HEADER, context.request_id)
         .timeout(DISCOVERY_TIMEOUT);
@@ -1006,7 +1007,7 @@ async fn submit_suggestion(
         .post(endpoint)
         .header(
             reqwest::header::USER_AGENT,
-            format!("jcode/{}", env!("CARGO_PKG_VERSION")),
+            format!("next-code/{}", env!("CARGO_PKG_VERSION")),
         )
         .header(DISCOVERY_REQUEST_ID_HEADER, context.request_id)
         .json(&json!({
@@ -1286,7 +1287,7 @@ fn render_listing(category: &str, listing: &Value, request_id: &str) -> Result<S
         ));
     }
     let mut out = format!(
-        "Discoverable tools in '{category}' (Jcode tool directory; recommendations must be based \
+        "Discoverable tools in '{category}' (Next Code tool directory; recommendations must be based \
          only on fit; details: {}):\n",
         crate::sponsors::DISCOVERY_PARTNERS_URL
     );
@@ -1358,7 +1359,7 @@ fn render_suggestion(
         }
     }
     out.push_str(
-        "\n\nStatus: received for Jcode maintainer review. Suggestions are not sent to partners. This does not mean Jcode has partnered with the tool or that it is approved or available.",
+        "\n\nStatus: received for Next Code maintainer review. Suggestions are not sent to partners. This does not mean Next Code has partnered with the tool or that it is approved or available.",
     );
     Ok(out)
 }
@@ -1375,7 +1376,7 @@ fn render_selection(category: &str, tool_name: &str, listing: &Value) -> Result<
         .unwrap_or(tool_name);
     let blurb = tool.get("blurb").and_then(|v| v.as_str()).unwrap_or("");
     let mut out = format!(
-        "Selected '{name}' from '{category}' (Jcode tool directory; selection must be based only \
+        "Selected '{name}' from '{category}' (Next Code tool directory; selection must be based only \
          on fit; details: {}):\n\n{name}: {blurb}",
         crate::sponsors::DISCOVERY_PARTNERS_URL
     );
@@ -1407,7 +1408,7 @@ mod tests {
             render_listing("payments", &listing, "11111111-2222-4333-8444-555555555555").unwrap();
         assert!(out.contains("agentcard"));
         assert!(out.contains("virtual payment cards"));
-        assert!(out.contains("Jcode tool directory"));
+        assert!(out.contains("Next Code tool directory"));
         assert!(out.contains("recommendations must be based only on fit"));
     }
 
@@ -1461,7 +1462,7 @@ mod tests {
         let out = render_selection("payments", "agentcard", &listing).unwrap();
         assert!(out.contains("Selected 'agentcard'"));
         assert!(out.contains("Setup: npm install -g agentcard"));
-        assert!(out.contains("Jcode tool directory"));
+        assert!(out.contains("Next Code tool directory"));
         assert!(out.contains("selection must be based only on fit"));
         assert!(render_selection("payments", "ghost", &json!({})).is_err());
     }
@@ -1488,7 +1489,7 @@ mod tests {
         assert!(description.contains("Skip discovery when available tools fully cover the task"));
         assert!(description.contains("Every listing is vetted"));
         assert!(description.contains("one-tool-call setup is enforced"));
-        assert!(description.contains("Some providers are Jcode partners"));
+        assert!(description.contains("Some providers are Next Code partners"));
         assert!(description.contains("Partnership status never influences selection"));
         assert!(description.contains("Choose the best option based only on fit"));
         assert!(
@@ -1512,7 +1513,7 @@ mod tests {
         );
         let schema = serde_json::to_string(&parameters).unwrap();
         assert!(schema.contains("Missing capability category; infer it from the user's goal."));
-        assert!(schema.contains("Suggest text goes only to Jcode maintainers"));
+        assert!(schema.contains("Suggest text goes only to Next Code maintainers"));
         assert!(schema.contains("instead of copying user text"));
         assert!(schema.contains("explain why the tool fits better than alternatives"));
         assert!(schema.contains("Never include secrets, credentials, personal data"));
@@ -1573,7 +1574,7 @@ mod tests {
         let mut known = capability;
         known.suggestion_kind = Some("known_product".to_string());
         known.product_name = Some("Example Stripe MCP".to_string());
-        known.product_url = Some("https://example.com/tool?via=jcode#setup".to_string());
+        known.product_url = Some("https://example.com/tool?via=next-code#setup".to_string());
         let validated = validate_suggestion(&known).unwrap();
         assert_eq!(
             validated.product_name.as_deref(),
@@ -1657,7 +1658,7 @@ mod tests {
         assert!(out.contains("Catalog suggestion submitted"));
         assert!(out.contains("Product: Stripe sandbox MCP"));
         assert!(out.contains("Suggestions are not sent to partners"));
-        assert!(out.contains("does not mean Jcode has partnered with the tool"));
+        assert!(out.contains("does not mean Next Code has partnered with the tool"));
     }
 
     #[test]
@@ -1780,13 +1781,13 @@ mod tests {
         assert!(
             request
                 .to_ascii_lowercase()
-                .contains("x-jcode-discovery-request-id: request-test-1"),
+                .contains("x-next-code-discovery-request-id: request-test-1"),
             "{request}"
         );
         assert!(
             request
                 .to_ascii_lowercase()
-                .contains("x-jcode-discovery-benchmark: 1"),
+                .contains("x-next-code-discovery-benchmark: 1"),
             "{request}"
         );
     }
@@ -1854,11 +1855,11 @@ mod tests {
             "{request}"
         );
         assert!(
-            lower.contains("x-jcode-discovery-request-id: aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+            lower.contains("x-next-code-discovery-request-id: aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
             "{request}"
         );
         assert!(
-            lower.contains("x-jcode-discovery-benchmark: 1"),
+            lower.contains("x-next-code-discovery-benchmark: 1"),
             "{request}"
         );
         assert!(request.contains("\"suggestion_kind\":\"known_product\""));
@@ -1916,9 +1917,9 @@ mod tests {
     #[tokio::test]
     async fn execute_end_to_end_with_enabled_config_and_local_server() {
         let _guard = crate::storage::lock_test_env();
-        let prev_home = std::env::var_os("JCODE_HOME");
+        let prev_home = product_env_os("HOME");
         let temp = tempfile::tempdir().unwrap();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let body = json!({"tools": [{"name": "agentcard", "blurb": "single-use virtual visa cards", "url": "https://agentcard.example", "setup": "MCP server: npx agentcard-mcp"}]}).to_string();
         let (endpoint, _server) = one_shot_server("HTTP/1.1 200 OK", body).await;
@@ -1943,7 +1944,7 @@ mod tests {
             .unwrap();
 
         assert!(output.output.contains("agentcard"));
-        assert!(output.output.contains("Jcode tool directory"));
+        assert!(output.output.contains("Next Code tool directory"));
         assert!(
             output
                 .output
@@ -1968,9 +1969,9 @@ mod tests {
         assert!(err.to_string().contains("disabled"));
 
         if let Some(prev) = prev_home {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
         crate::config::Config::invalidate_cache();
     }

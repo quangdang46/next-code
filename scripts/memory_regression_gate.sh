@@ -31,10 +31,10 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SESSION_ID="${JCODE_MEMGATE_SESSION:-session_hog_1783086065415_4ad4ae66cd43dd5b}"
+SESSION_ID="${NEXT_CODE_MEMGATE_SESSION:-${JCODE_MEMGATE_SESSION:-session_hog_1783086065415_4ad4ae66cd43dd5b}}"
 IDLE_SECS=60
-MAX_RSS_ANON_KB="${JCODE_MEMGATE_MAX_RSS_ANON_KB:-56320}"
-MAX_LIVE_HEAP_BYTES="${JCODE_MEMGATE_MAX_LIVE_HEAP_BYTES:-47185920}"
+MAX_RSS_ANON_KB="${NEXT_CODE_MEMGATE_MAX_RSS_ANON_KB:-${JCODE_MEMGATE_MAX_RSS_ANON_KB:-56320}}"
+MAX_LIVE_HEAP_BYTES="${NEXT_CODE_MEMGATE_MAX_LIVE_HEAP_BYTES:-${JCODE_MEMGATE_MAX_LIVE_HEAP_BYTES:-47185920}}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -49,7 +49,7 @@ command -v jq >/dev/null || { echo "jq required" >&2; exit 2; }
 
 # Skip (not fail) when the pinned probe session does not exist on this
 # machine: thresholds are only meaningful against a fixed workload.
-if ! ls "$HOME/.jcode/sessions/${SESSION_ID}"* >/dev/null 2>&1; then
+if ! ls "$HOME/.next-code/sessions/${SESSION_ID}"* >/dev/null 2>&1; then
     echo "JCODE_MEMGATE_RESULT {\"status\":\"skipped\",\"reason\":\"probe session ${SESSION_ID} not found\"}"
     exit 3
 fi
@@ -71,7 +71,7 @@ LIVE_HEAP_BYTES="$(jq -r '.client.allocated_bytes // 0' <<<"$IDLE_LINE")"
 
 # Informational server-side numbers (never gate: server load varies).
 SERVER_INFO="$(jq -cn \
-    --argjson rss "$(awk '/VmRSS/{print $2*1024}' "/proc/$(pgrep -f 'shared-server/jcode serve' | head -1)/status" 2>/dev/null || echo 0)" \
+    --argjson rss "$(awk '/VmRSS/{print $2*1024}' "/proc/$(pgrep -f 'shared-server/next-code serve' | head -1)/status" 2>/dev/null || echo 0)" \
     '{server_rss_bytes: $rss}')"
 
 FAILURES=()

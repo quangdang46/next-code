@@ -28,23 +28,23 @@ fn tracked_env_vars() -> Vec<String> {
         "HOME",
         "APPDATA",
         "XDG_CONFIG_HOME",
-        "JCODE_HOME",
+        "NEXT_CODE_HOME",
         "NO_PROXY",
         "no_proxy",
-        "JCODE_OPENROUTER_API_BASE",
-        "JCODE_OPENROUTER_API_KEY_NAME",
-        "JCODE_OPENROUTER_ENV_FILE",
-        "JCODE_OPENROUTER_CACHE_NAMESPACE",
-        "JCODE_OPENROUTER_PROVIDER_FEATURES",
-        "JCODE_OPENROUTER_ALLOW_NO_AUTH",
-        "JCODE_OPENROUTER_MODEL_CATALOG",
-        "JCODE_OPENROUTER_MODEL",
-        "JCODE_OPENROUTER_STATIC_MODELS",
-        "JCODE_OPENROUTER_AUTH_HEADER",
-        "JCODE_OPENROUTER_AUTH_HEADER_NAME",
-        "JCODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER",
-        "JCODE_OPENROUTER_PROVIDER",
-        "JCODE_OPENROUTER_NO_FALLBACK",
+        "NEXT_CODE_OPENROUTER_API_BASE",
+        "NEXT_CODE_OPENROUTER_API_KEY_NAME",
+        "NEXT_CODE_OPENROUTER_ENV_FILE",
+        "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
+        "NEXT_CODE_OPENROUTER_PROVIDER_FEATURES",
+        "NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH",
+        "NEXT_CODE_OPENROUTER_MODEL_CATALOG",
+        "NEXT_CODE_OPENROUTER_MODEL",
+        "NEXT_CODE_OPENROUTER_STATIC_MODELS",
+        "NEXT_CODE_OPENROUTER_AUTH_HEADER",
+        "NEXT_CODE_OPENROUTER_AUTH_HEADER_NAME",
+        "NEXT_CODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER",
+        "NEXT_CODE_OPENROUTER_PROVIDER",
+        "NEXT_CODE_OPENROUTER_NO_FALLBACK",
         "OPENROUTER_API_KEY",
         "AUTH_FLOW_TEST_KEY",
     ]
@@ -71,7 +71,7 @@ impl TestEnv {
     fn new() -> Result<Self> {
         let lock = lock_env();
         let temp = tempfile::Builder::new()
-            .prefix("jcode-auth-flow-")
+            .prefix("next-code-auth-flow-")
             .tempdir()?;
         let saved = tracked_env_vars()
             .into_iter()
@@ -88,8 +88,8 @@ impl TestEnv {
         next_code::env::set_var("HOME", temp.path());
         next_code::env::set_var("XDG_CONFIG_HOME", temp.path().join("config"));
         next_code::env::set_var("APPDATA", temp.path().join("AppData").join("Roaming"));
-        next_code::env::set_var("NEXT_CODE_HOME", temp.path().join("jcode-home"));
-        next_code::env::set_var("JCODE_HOME", temp.path().join("jcode-home"));
+        next_code::env::set_var("NEXT_CODE_HOME", temp.path().join("next-code-home"));
+        next_code::env::set_var("NEXT_CODE_HOME", temp.path().join("next-code-home"));
         next_code::env::set_var("NO_PROXY", "127.0.0.1,localhost");
         next_code::env::set_var("no_proxy", "127.0.0.1,localhost");
         AuthStatus::invalidate_cache();
@@ -109,21 +109,21 @@ impl TestEnv {
         allow_no_auth: bool,
     ) {
         let _ = self.temp.path();
-        next_code::env::set_var("JCODE_OPENROUTER_API_BASE", api_base);
-        next_code::env::set_var("JCODE_OPENROUTER_API_KEY_NAME", "AUTH_FLOW_TEST_KEY");
-        next_code::env::set_var("JCODE_OPENROUTER_ENV_FILE", "auth-flow-test.env");
-        next_code::env::set_var("JCODE_OPENROUTER_CACHE_NAMESPACE", cache_namespace);
-        next_code::env::set_var("JCODE_OPENROUTER_PROVIDER_FEATURES", "0");
-        next_code::env::set_var("JCODE_OPENROUTER_MODEL_CATALOG", "1");
+        next_code::env::set_var("NEXT_CODE_OPENROUTER_API_BASE", api_base);
+        next_code::env::set_var("NEXT_CODE_OPENROUTER_API_KEY_NAME", "AUTH_FLOW_TEST_KEY");
+        next_code::env::set_var("NEXT_CODE_OPENROUTER_ENV_FILE", "auth-flow-test.env");
+        next_code::env::set_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", cache_namespace);
+        next_code::env::set_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES", "0");
+        next_code::env::set_var("NEXT_CODE_OPENROUTER_MODEL_CATALOG", "1");
         if let Some(key) = key {
             next_code::env::set_var("AUTH_FLOW_TEST_KEY", key);
         } else {
             next_code::env::remove_var("AUTH_FLOW_TEST_KEY");
         }
         if allow_no_auth {
-            next_code::env::set_var("JCODE_OPENROUTER_ALLOW_NO_AUTH", "1");
+            next_code::env::set_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH", "1");
         } else {
-            next_code::env::remove_var("JCODE_OPENROUTER_ALLOW_NO_AUTH");
+            next_code::env::remove_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH");
         }
         AuthStatus::invalidate_cache();
     }
@@ -321,8 +321,8 @@ fn live_models_contract_supports_api_key_header_mode() -> Result<()> {
         Some("sk-header-contract"),
         false,
     );
-    next_code::env::set_var("JCODE_OPENROUTER_AUTH_HEADER", "api-key");
-    next_code::env::set_var("JCODE_OPENROUTER_AUTH_HEADER_NAME", "x-api-key");
+    next_code::env::set_var("NEXT_CODE_OPENROUTER_AUTH_HEADER", "api-key");
+    next_code::env::set_var("NEXT_CODE_OPENROUTER_AUTH_HEADER_NAME", "x-api-key");
 
     let provider = OpenRouterProvider::new()?;
     let models = run_current_thread(provider.fetch_models())?;
@@ -391,7 +391,7 @@ fn model_picker_cache_miss_schedules_single_background_refresh_and_updates_route
         None,
         true,
     );
-    next_code::env::set_var("JCODE_OPENROUTER_MODEL", "background-race-selected-model");
+    next_code::env::set_var("NEXT_CODE_OPENROUTER_MODEL", "background-race-selected-model");
 
     let provider = OpenRouterProvider::new()?;
     run_current_thread(async {
@@ -464,9 +464,9 @@ fn live_model_catalog_failure_keeps_static_and_selected_model_picker_fallbacks()
         Some("sk-catalog-failure"),
         false,
     );
-    next_code::env::set_var("JCODE_OPENROUTER_MODEL", "selected-fallback-model");
+    next_code::env::set_var("NEXT_CODE_OPENROUTER_MODEL", "selected-fallback-model");
     next_code::env::set_var(
-        "JCODE_OPENROUTER_STATIC_MODELS",
+        "NEXT_CODE_OPENROUTER_STATIC_MODELS",
         "selected-fallback-model\nstatic-fallback-model",
     );
 

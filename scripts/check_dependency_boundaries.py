@@ -2,7 +2,7 @@
 """Check lightweight crate dependency boundaries.
 
 Type crates should remain data-contract crates. This guard intentionally starts
-small: it blocks direct dependencies from any `jcode-*-types` crate to root or
+small: it blocks direct dependencies from any `next-code-*-types` crate to root or
 runtime-heavy internal crates. It allows external dependencies for now, while
 making internal domain leaks visible and easy to extend.
 """
@@ -19,35 +19,35 @@ ROOT = Path(__file__).resolve().parents[1]
 # Internal crates that are allowed as dependencies of type crates.
 # Keep this list narrow. Add a crate only if it is itself a data-contract crate.
 ALLOWED_INTERNAL_TYPE_DEPS = {
-    "jcode-message-types",
+    "next-code-message-types",
 }
 
 # Internal crates that type crates must not depend on directly. Most are runtime,
-# provider, UI, storage, or root behavior crates. `jcode-core` is intentionally
+# provider, UI, storage, or root behavior crates. `next-code-core` is intentionally
 # blocked so it does not become the backdoor catch-all dependency for DTO crates.
 FORBIDDEN_INTERNAL_DEPS = {
-    "jcode",
-    "jcode-agent-runtime",
-    "jcode-azure-auth",
-    "jcode-core",
-    "jcode-desktop",
-    "jcode-embedding",
-    "jcode-mobile-core",
-    "jcode-mobile-sim",
-    "jcode-notify-email",
-    "jcode-pdf",
-    "jcode-plan",
-    "jcode-provider-core",
-    "jcode-provider-gemini",
-    "jcode-provider-metadata",
-    "jcode-provider-openrouter",
-    "jcode-protocol",
-    "jcode-terminal-launch",
-    "jcode-tui-core",
-    "jcode-tui-markdown",
-    "jcode-tui-mermaid",
-    "jcode-tui-render",
-    "jcode-tui-workspace",
+    "next-code",
+    "next-code-agent-runtime",
+    "next-code-azure-auth",
+    "next-code-core",
+    "next-code-desktop",
+    "next-code-embedding",
+    "next-code-mobile-core",
+    "next-code-mobile-sim",
+    "next-code-notify-email",
+    "next-code-pdf",
+    "next-code-plan",
+    "next-code-provider-core",
+    "next-code-provider-gemini",
+    "next-code-provider-metadata",
+    "next-code-provider-openrouter",
+    "next-code-protocol",
+    "next-code-terminal-launch",
+    "next-code-tui-core",
+    "next-code-tui-markdown",
+    "next-code-tui-mermaid",
+    "next-code-tui-render",
+    "next-code-tui-workspace",
 }
 
 
@@ -63,7 +63,7 @@ def cargo_metadata() -> dict:
 
 
 def is_type_crate(name: str) -> bool:
-    return name.startswith("jcode-") and name.endswith("-types")
+    return name.startswith("next-code-") and name.endswith("-types")
 
 
 def main() -> int:

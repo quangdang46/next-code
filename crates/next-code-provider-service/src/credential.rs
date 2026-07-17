@@ -6,9 +6,9 @@
 //!   external command).
 //! - [`Credential`] — a credential record with id, label, type, timestamps.
 //! - [`CredentialService`] — async trait for the storage backends
-//!   (in-memory, SQLite, OS keychain via `jcode-keyring-store`).
+//!   (in-memory, SQLite, OS keychain via `next-code-keyring-store`).
 //!
-//! Concrete implementations live in `jcode-provider-service::store` (this
+//! Concrete implementations live in `next-code-provider-service::store` (this
 //! crate's `store` module, see `src/store/`). The `Credential` ids are
 //! UUIDs (string form) so that callers never see row ids from any specific
 //! storage backend.

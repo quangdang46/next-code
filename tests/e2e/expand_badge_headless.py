@@ -21,7 +21,7 @@ import time
 from pathlib import Path
 
 RUNTIME_DIR = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-SOCKET_PATH = os.path.join(RUNTIME_DIR, "jcode-debug.sock")
+SOCKET_PATH = os.path.join(RUNTIME_DIR, "next-code-debug.sock")
 REPO = Path(__file__).resolve().parents[2]
 
 
@@ -68,7 +68,7 @@ def drain_pty(master_fd):
 
 
 def main():
-    binary = os.environ.get("NEXT_CODE_E2E_BIN") or os.environ.get("JCODE_E2E_BIN")
+    binary = os.environ.get("NEXT_CODE_E2E_BIN") or os.environ.get("NEXT_CODE_E2E_BIN")
     if not binary:
         candidates = [
             REPO / "target" / "selfdev" / "next-code",
@@ -102,7 +102,7 @@ def main():
         master_fd, slave_fd = pty.openpty()
         env = os.environ.copy()
         env.setdefault("TERM", "xterm-kitty")
-        env.setdefault("JCODE_CLIENT_SELFDEV_MODE", "1")
+        env.setdefault("NEXT_CODE_CLIENT_SELFDEV_MODE", "1")
         proc = subprocess.Popen(
             [binary, "self-dev", "--resume", session_id],
             stdin=slave_fd,

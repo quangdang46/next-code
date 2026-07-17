@@ -125,7 +125,7 @@ pub(crate) fn forward_app_worker_input(
 ) {
     if let Err(error) = hot_reloader.send_app_worker_input(input) {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to forward input to app worker: {error:#}"
+            "next-code-desktop: failed to forward input to app worker: {error:#}"
         ));
     }
 }
@@ -150,7 +150,7 @@ pub(crate) fn forward_desktop_session_event_batch_to_worker(
         hot_reloader.send_app_worker_message(DesktopHostToWorkerMessage::SessionEvents(wire))
     {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to forward session events to app worker: {error:#}"
+            "next-code-desktop: failed to forward session events to app worker: {error:#}"
         ));
     }
 }
@@ -535,13 +535,13 @@ pub(crate) fn log_desktop_session_event_error(event: &session_launch::DesktopSes
     match event {
         session_launch::DesktopSessionEvent::Error(error) => {
             desktop_log::error(format_args!(
-                "jcode-desktop: session error event: {}",
+                "next-code-desktop: session error event: {}",
                 desktop_log::truncate_for_log(error, 2048)
             ));
         }
         session_launch::DesktopSessionEvent::ModelCatalogError { error } => {
             desktop_log::error(format_args!(
-                "jcode-desktop: model catalog error event: {}",
+                "next-code-desktop: model catalog error event: {}",
                 desktop_log::truncate_for_log(error, 2048)
             ));
         }
@@ -551,7 +551,7 @@ pub(crate) fn log_desktop_session_event_error(event: &session_launch::DesktopSes
             error: Some(error),
         } => {
             desktop_log::error(format_args!(
-                "jcode-desktop: model switch failed model={} provider={} error={}",
+                "next-code-desktop: model switch failed model={} provider={} error={}",
                 desktop_log::truncate_for_log(model, 256),
                 provider_name
                     .as_deref()
@@ -567,7 +567,7 @@ pub(crate) fn log_desktop_session_event_error(event: &session_launch::DesktopSes
             is_error: true,
         } => {
             desktop_log::warn(format_args!(
-                "jcode-desktop: tool failed name={} summary={}",
+                "next-code-desktop: tool failed name={} summary={}",
                 desktop_log::truncate_for_log(name, 256),
                 desktop_log::truncate_for_log(summary, 2048)
             ));

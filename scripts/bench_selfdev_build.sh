@@ -5,11 +5,11 @@
 # day, so build-pipeline changes are hill-climbable:
 #
 #   1. warm no-op        - rebuild with zero changes on the same commit
-#   2. leaf touch        - 1-line change in the root `jcode` bin crate
-#   3. tui touch         - 1-line change in jcode-tui (largest UI crate)
-#   4. core touch        - 1-line change in jcode-app-core (mid-stack crate)
+#   2. leaf touch        - 1-line change in the root `next-code` bin crate
+#   3. tui touch         - 1-line change in next-code-tui (largest UI crate)
+#   4. core touch        - 1-line change in next-code-app-core (mid-stack crate)
 #   5. commit blast      - simulate HEAD moving (JCODE_BUILD_GIT_HASH change),
-#                          which reruns jcode-build-meta's build script and
+#                          which reruns next-code-build-meta's build script and
 #                          recompiles every crate that depends on it
 #                          (base, app-core, tui, setup-hints, telemetry-core, root)
 #
@@ -83,13 +83,13 @@ touch_file "$leaf_file"
 run_build "leaf" || true
 revert_file "$leaf_file"
 
-tui_file="crates/jcode-tui/src/lib.rs"
+tui_file="crates/next-code-tui/src/lib.rs"
 echo "3. tui touch (${tui_file}):"
 touch_file "$tui_file"
 run_build "tui" || true
 revert_file "$tui_file"
 
-core_file="crates/jcode-app-core/src/lib.rs"
+core_file="crates/next-code-app-core/src/lib.rs"
 echo "4. core touch (${core_file}):"
 touch_file "$core_file"
 run_build "core" || true
@@ -112,5 +112,5 @@ echo "done. Interpretation:"
 echo "  - no-op should be a few seconds (cargo fingerprinting + link check)."
 echo "  - leaf/tui/core touches show per-crate recompile + link cost."
 echo "  - commit-blast shows the cost every commit pays because"
-echo "    jcode-build-meta embeds GIT_HASH via env! and jcode-base/app-core/"
+echo "    next-code-build-meta embeds GIT_HASH via env! and next-code-base/app-core/"
 echo "    tui/setup-hints/telemetry-core all depend on it."

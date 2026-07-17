@@ -243,7 +243,7 @@ fn globally_preferred_model_rank(model: &str) -> (u8, usize) {
     if normalized == openai_default {
         return (0, 0);
     }
-    // Some catalogs expose the clean release id instead of jcode's Sol route.
+    // Some catalogs expose the clean release id instead of next-code's Sol route.
     if normalized == "gpt-5.6" {
         return (1, 0);
     }
@@ -309,7 +309,7 @@ const ALL_GEMINI_MODELS: &[&str] = &[
 /// Copilot and Cursor proxy Claude/OpenAI models under their bare canonical ids
 /// (`copilot:claude-opus-4-8`), so they share the same "catalog lists the cheap
 /// model first" hazard as a direct login and get the combined Claude+OpenAI
-/// order. The Claude/OpenAI subscription default bias mirrors jcode's global
+/// order. The Claude/OpenAI subscription default bias mirrors next-code's global
 /// default model. Bedrock/Azure/Gemini/Antigravity are native hosted catalogs
 /// whose route lists are often ordered oldest-first, so they get an explicit
 /// curated order too.
@@ -975,7 +975,7 @@ fn api_key_env_bindings_for_provider(provider_id: &str) -> Vec<(String, String)>
 /// Make freshly saved credentials win over stale env vars inherited by this
 /// process (issue #453).
 ///
-/// `/login` persists API keys to the per-provider env file under the jcode
+/// `/login` persists API keys to the per-provider env file under the next-code
 /// config dir, but credential resolution
 /// ([`crate::provider_catalog::load_api_key_from_env_or_config`]) prefers the
 /// process env var. A long-lived server that inherited a stale
@@ -1143,7 +1143,7 @@ fn direct_provider_activation(provider_id: &str) -> Option<ProviderActivation> {
         )),
         // Cursor / Gemini / Antigravity match CLI init (`unlock_model_provider` +
         // active-provider hint). Locking them on auth-change was a bug: a TUI
-        // Gemini login set `JCODE_FORCE_PROVIDER=1`, and every later switch to a
+        // Gemini login set `NEXT_CODE_FORCE_PROVIDER=1`, and every later switch to a
         // named OpenAI-compatible profile (e.g. `9router:xxx`) failed with
         // "--provider is locked to Gemini" until the process restarted without
         // the stale force env.
@@ -1199,6 +1199,7 @@ pub fn model_switch_request_for_provider_id(
 
 #[cfg(test)]
 mod tests {
+    use crate::env::{product_env, product_env_os};
     use super::*;
     use std::sync::MutexGuard;
 
@@ -1442,8 +1443,8 @@ mod tests {
 
     #[test]
     fn direct_login_provider_activation_sets_runtime_identity_and_active_provider() {
-        // Sandbox JCODE_HOME so activation's env-file credential sync (#453)
-        // cannot read the developer's real ~/.config/jcode/*.env files and
+        // Sandbox NEXT_CODE_HOME so activation's env-file credential sync (#453)
+        // cannot read the developer's real ~/.config/next-code/*.env files and
         // leak keys into this process during the matrix run.
         let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().expect("sandbox");
 
@@ -1466,9 +1467,9 @@ mod tests {
             ("gemini", "gemini", "gemini", "gemini", false),
             ("antigravity", "antigravity", "antigravity", "antigravity", false),
         ] {
-            crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-            crate::env::remove_var("JCODE_ACTIVE_PROVIDER");
-            crate::env::remove_var("JCODE_FORCE_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
 
             let activation = activate_auth_change(&AuthActivationRequest::new(
                 None,
@@ -1477,24 +1478,24 @@ mod tests {
 
             assert_eq!(activation.provider_id.as_deref(), Some(expected_id));
             assert_eq!(
-                std::env::var("JCODE_RUNTIME_PROVIDER").as_deref(),
+                product_env("RUNTIME_PROVIDER").as_deref(),
                 Ok(runtime)
             );
             assert_eq!(
-                std::env::var("JCODE_ACTIVE_PROVIDER").as_deref(),
+                product_env("ACTIVE_PROVIDER").as_deref(),
                 Ok(active)
             );
             if force_locked {
                 assert_eq!(
-                    std::env::var("JCODE_FORCE_PROVIDER").as_deref(),
+                    product_env("FORCE_PROVIDER").as_deref(),
                     Ok("1"),
                     "{provider} should lock the multi-provider router"
                 );
             } else {
                 assert!(
-                    std::env::var_os("JCODE_FORCE_PROVIDER").is_none(),
-                    "{provider} auth must not set JCODE_FORCE_PROVIDER (got {:?})",
-                    std::env::var_os("JCODE_FORCE_PROVIDER")
+                    product_env_os("FORCE_PROVIDER").is_none(),
+                    "{provider} auth must not set NEXT_CODE_FORCE_PROVIDER (got {:?})",
+                    product_env_os("FORCE_PROVIDER")
                 );
             }
         }
@@ -1505,9 +1506,9 @@ mod tests {
         // Repro for: after Gemini login, `/model` → custom named profile
         // (`9router:xxx`) failed with "--provider is locked to Gemini".
         let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().expect("sandbox");
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-        crate::env::remove_var("JCODE_ACTIVE_PROVIDER");
-        crate::env::remove_var("JCODE_FORCE_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
 
         let _ = activate_auth_change(&AuthActivationRequest::new(
             None,
@@ -1515,18 +1516,18 @@ mod tests {
         ));
 
         assert_eq!(
-            std::env::var("JCODE_ACTIVE_PROVIDER").as_deref(),
+            product_env("ACTIVE_PROVIDER").as_deref(),
             Ok("gemini")
         );
         assert!(
-            std::env::var_os("JCODE_FORCE_PROVIDER").is_none(),
+            product_env_os("FORCE_PROVIDER").is_none(),
             "gemini auth must leave the multi-provider router unlocked"
         );
     }
 
     #[test]
     fn direct_login_provider_descriptor_matrix_has_full_lifecycle_parity() {
-        // Sandbox JCODE_HOME for the same reason as the activation matrix
+        // Sandbox NEXT_CODE_HOME for the same reason as the activation matrix
         // above: keep the #453 credential sync away from real env files.
         let _sandbox = crate::auth::test_sandbox::AuthTestSandbox::new().expect("sandbox");
 
@@ -1601,9 +1602,9 @@ mod tests {
                 provider.id
             );
 
-            crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-            crate::env::remove_var("JCODE_ACTIVE_PROVIDER");
-            crate::env::remove_var("JCODE_FORCE_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
 
             let activation = activate_auth_change(&AuthActivationRequest::new(
                 None,
@@ -1615,26 +1616,26 @@ mod tests {
                 Some(provider.display_name)
             );
             assert_eq!(
-                std::env::var("JCODE_RUNTIME_PROVIDER").as_deref(),
+                product_env("RUNTIME_PROVIDER").as_deref(),
                 Ok(runtime)
             );
             assert_eq!(
-                std::env::var("JCODE_ACTIVE_PROVIDER").as_deref(),
+                product_env("ACTIVE_PROVIDER").as_deref(),
                 Ok(active)
             );
             if force_locked {
                 assert_eq!(
-                    std::env::var("JCODE_FORCE_PROVIDER").as_deref(),
+                    product_env("FORCE_PROVIDER").as_deref(),
                     Ok("1"),
                     "{} should lock the multi-provider router",
                     provider.id
                 );
             } else {
                 assert!(
-                    std::env::var_os("JCODE_FORCE_PROVIDER").is_none(),
-                    "{} auth must not set JCODE_FORCE_PROVIDER (got {:?})",
+                    product_env_os("FORCE_PROVIDER").is_none(),
+                    "{} auth must not set NEXT_CODE_FORCE_PROVIDER (got {:?})",
                     provider.id,
-                    std::env::var_os("JCODE_FORCE_PROVIDER")
+                    product_env_os("FORCE_PROVIDER")
                 );
             }
             assert_eq!(
@@ -1686,7 +1687,7 @@ mod tests {
             ("openai", "openai-oauth:shared-model"),
             ("openai-api", "openai-api:shared-model"),
             ("openrouter", "openrouter:shared-model"),
-            ("jcode", "openrouter:shared-model"),
+            ("next-code", "openrouter:shared-model"),
             ("next-code", "openrouter:shared-model"),
             ("subscription", "openrouter:shared-model"),
             ("azure-openai", "openrouter:shared-model"),
@@ -2042,9 +2043,9 @@ mod tests {
 
     #[test]
     fn post_auth_model_selection_prefers_newest_live_release_for_unranked_provider() {
-        let _env = EnvGuard::new(&["JCODE_HOME"]);
+        let _env = EnvGuard::new(&["NEXT_CODE_HOME"]);
         let temp = tempfile::tempdir().expect("tempdir");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         next_code_provider_openrouter::save_disk_cache_with_source_for_namespace(
             "cerebras",
             &[
@@ -2559,7 +2560,7 @@ mod tests {
     }
 
     /// Copilot proxies both families; the cross-family tie-break must prefer the
-    /// Claude flagship over the OpenAI flagship to mirror jcode's default model.
+    /// Claude flagship over the OpenAI flagship to mirror next-code's default model.
     #[test]
     fn post_auth_model_selection_copilot_prefers_claude_family_over_openai() {
         let activation = activation_for_provider_id("copilot");

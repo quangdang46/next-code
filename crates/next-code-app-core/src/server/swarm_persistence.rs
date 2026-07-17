@@ -8,10 +8,10 @@ use std::sync::{Arc, LazyLock, Mutex as StdMutex, Weak};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-/// Directory name under the durable state dir (`~/.jcode/state`).
+/// Directory name under the durable state dir (`~/.next-code/state`).
 const SWARM_STATE_DIR: &str = "swarm";
 /// Pre-0.36 location under the runtime dir (tmpfs on Linux, wiped on reboot).
-const LEGACY_SWARM_STATE_DIR: &str = "jcode-swarm-state";
+const LEGACY_SWARM_STATE_DIR: &str = "next-code-swarm-state";
 
 /// Serialize each swarm's complete snapshot/read/write operation. Callers must
 /// acquire this before reading the independently locked in-memory maps so an

@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 pub(super) use super::commands_improve::{
     build_improve_prompt, build_improve_resume_prompt, build_refactor_prompt,
     build_refactor_resume_prompt, format_improve_status, format_refactor_status,
@@ -478,7 +479,7 @@ pub(super) fn poll_local_transfer_prepare(app: &mut App) -> bool {
                         .filter(|path| path.is_dir())
                         .or_else(|| std::env::current_dir().ok())
                         .unwrap_or_else(|| std::path::PathBuf::from("."));
-                    let socket = std::env::var("JCODE_SOCKET").ok();
+                    let socket = product_env("SOCKET").ok();
                     match super::spawn_in_new_terminal(
                         &exe,
                         &prepared.session_id,
@@ -494,14 +495,14 @@ pub(super) fn poll_local_transfer_prepare(app: &mut App) -> bool {
                         }
                         Ok(false) => {
                             app.push_display_message(DisplayMessage::system(format!(
-                                "↗ Transfer session {} created.\n\nNo terminal was opened automatically. Resume manually:\n\n  jcode --resume {}",
+                                "↗ Transfer session {} created.\n\nNo terminal was opened automatically. Resume manually:\n\n  next-code --resume {}",
                                 prepared.session_name, prepared.session_id
                             )));
                             app.set_status_notice("Transfer session created");
                         }
                         Err(error) => {
                             app.push_display_message(DisplayMessage::error(format!(
-                                "Transfer session {} was created but failed to open a window: {}\n\nResume manually: jcode --resume {}",
+                                "Transfer session {} was created but failed to open a window: {}\n\nResume manually: next-code --resume {}",
                                 prepared.session_name, error, prepared.session_id
                             )));
                             app.set_status_notice("Transfer open failed");
@@ -802,7 +803,7 @@ fn handle_subagent_model_command(app: &mut App, trimmed: &str) -> bool {
 
     if app.is_remote {
         app.push_display_message(DisplayMessage::error(
-            "/subagent-model requires a live jcode server connection in remote mode.".to_string(),
+            "/subagent-model requires a live next-code server connection in remote mode.".to_string(),
         ));
         return true;
     }
@@ -848,7 +849,7 @@ fn handle_subagent_command(app: &mut App, trimmed: &str) -> bool {
 
     if app.is_remote {
         app.push_display_message(DisplayMessage::error(
-            "/subagent requires a live jcode server connection in remote mode.".to_string(),
+            "/subagent requires a live next-code server connection in remote mode.".to_string(),
         ));
         return true;
     }
@@ -899,7 +900,7 @@ pub(super) fn handle_help_command(app: &mut App, trimmed: &str) -> bool {
 }
 
 /// `/keys` shows the keymap diagnostics: detected terminal, discovered terminal
-/// and macOS shortcuts, and any conflicts with jcode's own keybindings.
+/// and macOS shortcuts, and any conflicts with next-code's own keybindings.
 /// `/keys refresh` forces a fresh scan of the machine (otherwise a cached
 /// snapshot up to a day old is reused).
 pub(super) fn handle_keys_command(app: &mut App, trimmed: &str) -> bool {
@@ -1037,7 +1038,7 @@ pub(super) fn handle_log_command(app: &mut App, trimmed: &str) -> bool {
     let note_for_log = if note.is_empty() { "(none)" } else { note };
 
     crate::logging::info(&format!(
-        "JCODE_LOG_MARK id={} session={} provider={} model={} cwd={} note={}",
+        "NEXT_CODE_LOG_MARK id={} session={} provider={} model={} cwd={} note={}",
         marker_id,
         app.session.id,
         app.provider_name(),
@@ -1047,7 +1048,7 @@ pub(super) fn handle_log_command(app: &mut App, trimmed: &str) -> bool {
     ));
 
     let mut message = format!(
-        "Log mark written: {}\n\nAgents can search ~/.jcode/logs/ for JCODE_LOG_MARK or this marker id.",
+        "Log mark written: {}\n\nAgents can search ~/.next-code/logs/ for NEXT_CODE_LOG_MARK or this marker id.",
         marker_id
     );
     if !note.is_empty() {
@@ -1162,7 +1163,7 @@ fn begin_ssh_target_prompt(app: &mut App, name: &str) {
     app.push_display_message(DisplayMessage::system(format!(
         "SSH setup: {}
 
-Step 1/4: Tell Jcode where to connect.
+Step 1/4: Tell Next Code where to connect.
 
 Enter only the SSH target, meaning the part after ssh:
 
@@ -1171,9 +1172,9 @@ Enter only the SSH target, meaning the part after ssh:
 You can also enter an SSH config alias like school.
 
 Security model
-  - Jcode stores this host/user target so you can run /ssh {} later.
-  - Jcode does not ask for or store your SSH password.
-  - If a password is needed, it will be typed into your system ssh prompt, not into Jcode.
+  - Next Code stores this host/user target so you can run /ssh {} later.
+  - Next Code does not ask for or store your SSH password.
+  - If a password is needed, it will be typed into your system ssh prompt, not into Next Code.
 
 Type cancel to stop setup.",
         name, name
@@ -1193,7 +1194,7 @@ Start with:
 
   /ssh school
 
-Jcode will ask for the SSH target, then use your system SSH client for authentication. Jcode never stores SSH passwords."
+Next Code will ask for the SSH target, then use your system SSH client for authentication. Next Code never stores SSH passwords."
                     .to_string(),
             ));
         }
@@ -1216,7 +1217,7 @@ Jcode will ask for the SSH target, then use your system SSH client for authentic
                     .to_string(),
             );
             lines.push("".to_string());
-            lines.push("Security: Jcode stores targets only, never SSH passwords.".to_string());
+            lines.push("Security: Next Code stores targets only, never SSH passwords.".to_string());
             app.push_display_message(DisplayMessage::system(lines.join("\n")));
         }
         Err(error) => app.push_display_message(DisplayMessage::error(format!(
@@ -1239,14 +1240,14 @@ fn connect_ssh_remote(app: &mut App, profile: crate::ssh_remote::SshRemoteProfil
 
 Step 4/4: Connected.
 
-Jcode verified that {} is reachable through your system SSH client.
+Next Code verified that {} is reachable through your system SSH client.
 
 What this means:
   - Authentication is handled by OpenSSH / your SSH agent.
-  - Jcode did not see or store your password.
-  - The SSH connection setup is ready for remote Jcode tools.
+  - Next Code did not see or store your password.
+  - The SSH connection setup is ready for remote Next Code tools.
 
-Next implementation step: start the remote Jcode server over this verified SSH connection.",
+Next implementation step: start the remote Next Code server over this verified SSH connection.",
             profile.name, profile.ssh_target
         )));
         app.set_status_notice(format!("SSH {} connected 4/4", profile.name));
@@ -1260,17 +1261,17 @@ Next implementation step: start the remote Jcode server over this verified SSH c
 
 Step 2/4: Opening secure SSH login terminal.
 
-Jcode could not connect without an interactive login, so it opened a separate terminal running your system ssh command.
+Next Code could not connect without an interactive login, so it opened a separate terminal running your system ssh command.
 
 What to expect in that terminal
   1. OpenSSH may ask for your password or two-factor prompt.
-  2. You type credentials into OpenSSH, not into Jcode.
+  2. You type credentials into OpenSSH, not into Next Code.
   3. After login, SSH creates a temporary background control socket.
   4. The terminal verifies that socket before closing.
 
 Security model
-  - Jcode cannot read what you type in the SSH terminal.
-  - Jcode stores only the target {}.
+  - Next Code cannot read what you type in the SSH terminal.
+  - Next Code stores only the target {}.
   - Close or disconnect later with /ssh disconnect {}.",
                 profile.name, profile.ssh_target, profile.name
             )));
@@ -1281,15 +1282,15 @@ Security model
 
 Step 2/4: Manual login needed.
 
-Jcode could not open a terminal automatically. Run this command yourself:
+Next Code could not open a terminal automatically. Run this command yourself:
 
   ssh -f -M -S {} -N {}
 
-Type your password into that SSH prompt if asked. Jcode will not see or store it.",
+Type your password into that SSH prompt if asked. Next Code will not see or store it.",
             profile.name,
             crate::ssh_remote::control_socket_path(&profile.name)
                 .map(|p| p.display().to_string())
-                .unwrap_or_else(|_| "~/.jcode/ssh-control/remote.sock".to_string()),
+                .unwrap_or_else(|_| "~/.next-code/ssh-control/remote.sock".to_string()),
             profile.ssh_target
         ))),
         Err(error) => app.push_display_message(DisplayMessage::error(format!(
@@ -1512,7 +1513,7 @@ fn git_command_repo_dir(app: &App) -> Result<PathBuf, String> {
         }
 
         return Err(format!(
-            "Unable to run /git: session working directory {} is not accessible from this jcode client.",
+            "Unable to run /git: session working directory {} is not accessible from this next-code client.",
             path.display()
         ));
     }
@@ -2233,7 +2234,7 @@ fn handle_selfdev_command(app: &mut App, trimmed: &str) -> bool {
 
     if rest == "help" {
         app.push_display_message(DisplayMessage::system(
-            "/selfdev\nSpawn a new self-dev jcode session in a separate terminal.\n\n/selfdev <prompt>\nSpawn a new self-dev session and auto-deliver the prompt to it.\n\n/selfdev status\nShow current self-dev/build status."
+            "/selfdev\nSpawn a new self-dev next-code session in a separate terminal.\n\n/selfdev <prompt>\nSpawn a new self-dev session and auto-deliver the prompt to it.\n\n/selfdev status\nShow current self-dev/build status."
                 .to_string(),
         ));
         return true;
@@ -2270,7 +2271,7 @@ fn handle_selfdev_command(app: &mut App, trimmed: &str) -> bool {
                     "Created self-dev session {} but could not auto-open a supported terminal.\n\nRun manually:\n{}",
                     launch.session_id,
                     launch.command_preview().unwrap_or_else(|| format!(
-                        "jcode --resume {} self-dev",
+                        "next-code --resume {} self-dev",
                         launch.session_id
                     ))
                 )
@@ -2678,7 +2679,7 @@ fn build_test_verification_prompt(claim: &str) -> String {
         claim.trim()
     };
     format!(
-        "Run Jcode's /test verification orchestrator for: {target}\n\n\
+        "Run Next Code's /test verification orchestrator for: {target}\n\n\
 Goal: become as sure as reasonably possible before the user checks manually. Do not stop at compile success. Build and execute a verification plan, update todos as needed, and finish with an evidence-backed proof packet.\n\n\
 Required verification layers to consider and run when applicable:\n\
 1. Reproduction-first: if this is a bug, create or identify the exact failing repro and prove it now passes.\n\
@@ -2815,7 +2816,7 @@ pub(super) fn handle_dictation_command(app: &mut App, trimmed: &str) -> bool {
 
     if trimmed.starts_with("/dictate ") || trimmed.starts_with("/dictation ") {
         app.push_display_message(DisplayMessage::error(
-            "Usage: /dictate\nConfigure [dictation] in ~/.jcode/config.toml to customize command, mode, hotkey, and timeout."
+            "Usage: /dictate\nConfigure [dictation] in ~/.next-code/config.toml to customize command, mode, hotkey, and timeout."
                 .to_string(),
         ));
         return true;
@@ -2928,7 +2929,7 @@ fn ensure_swarm_prompt_edit_path(
         Some(path) => PathBuf::from(path),
         None => std::env::current_dir()?,
     };
-    let project_path = project_dir.join(".jcode").join("swarm-prompt.md");
+    let project_path = project_dir.join(".next-code").join("swarm-prompt.md");
     if file_has_nonblank_content(&project_path) {
         return Ok(project_path);
     }
@@ -2960,7 +2961,7 @@ pub(super) fn handle_swarm_prompt_command(app: &mut App, trimmed: &str) -> bool 
         Ok(path) => path,
         Err(error) => {
             app.push_display_message(DisplayMessage::error(format!(
-                "Failed to locate the Jcode config directory: {}",
+                "Failed to locate the Next Code config directory: {}",
                 error
             )));
             return true;
@@ -2995,7 +2996,7 @@ pub(super) fn handle_swarm_prompt_command(app: &mut App, trimmed: &str) -> bool 
     {
         Ok(_) => {
             app.push_display_message(DisplayMessage::system(format!(
-                "Opening the active swarm routing prompt in {}:\n{}\n\nChanges apply after restarting or reloading Jcode because running agent tool registries cache the prompt.",
+                "Opening the active swarm routing prompt in {}:\n{}\n\nChanges apply after restarting or reloading Next Code because running agent tool registries cache the prompt.",
                 editor,
                 path.display()
             )));
@@ -3349,7 +3350,7 @@ pub(super) fn handle_config_command(app: &mut App, trimmed: &str) -> bool {
             app.push_display_message(DisplayMessage {
                 role: "system".to_string(),
                 content: format!(
-                    "Opening config in editor...\n{} {}\n\n*Restart jcode after editing for changes to take effect.*",
+                    "Opening config in editor...\n{} {}\n\n*Restart next-code after editing for changes to take effect.*",
                     editor,
                     path.display()
                 ),
@@ -3456,7 +3457,7 @@ pub(super) fn handle_statusline_command(app: &mut App, trimmed: &str) -> bool {
     match rest.trim() {
         "setup" => {
             app.push_display_message(DisplayMessage::system(
-                "Status line setup: coming soon. Edit ~/.jcode/config.toml [status_line] segments."
+                "Status line setup: coming soon. Edit ~/.next-code/config.toml [status_line] segments."
                     .to_string(),
             ));
             true

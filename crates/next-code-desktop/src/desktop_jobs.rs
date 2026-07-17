@@ -87,7 +87,7 @@ pub(crate) fn spawn_desktop_reasoning_effort_request_queue()
     let latest_generation = Arc::new(AtomicU64::new(0));
     let worker_latest_generation = Arc::clone(&latest_generation);
     std::thread::Builder::new()
-        .name("jcode-desktop-effort-queue".to_string())
+        .name("next-code-desktop-effort-queue".to_string())
         .spawn(move || {
             run_desktop_reasoning_effort_request_queue(request_rx, worker_latest_generation);
         })
@@ -120,7 +120,7 @@ pub(crate) fn run_desktop_reasoning_effort_request_queue(
         }
         if coalesced > 0 {
             desktop_log::info(format_args!(
-                "jcode-desktop: coalesced {coalesced} superseded reasoning effort request(s); applying {}",
+                "next-code-desktop: coalesced {coalesced} superseded reasoning effort request(s); applying {}",
                 desktop_log::truncate_for_log(&request.effort, 64)
             ));
         }
@@ -148,7 +148,7 @@ pub(crate) fn apply_desktop_reasoning_effort_request(
         }
         if let Err(error) = result {
             desktop_log::error(format_args!(
-                "jcode-desktop: reasoning effort sync failed generation={} target_session={}: {error:#}",
+                "next-code-desktop: reasoning effort sync failed generation={} target_session={}: {error:#}",
                 request.generation,
                 request.target_session_id.as_deref().unwrap_or("<current>")
             ));
@@ -160,14 +160,14 @@ pub(crate) fn apply_desktop_reasoning_effort_request(
         }
     } else if let Err(error) = result {
         desktop_log::warn(format_args!(
-            "jcode-desktop: stale reasoning effort sync failed generation={} target_session={}: {error:#}",
+            "next-code-desktop: stale reasoning effort sync failed generation={} target_session={}: {error:#}",
             request.generation,
             request.target_session_id.as_deref().unwrap_or("<current>")
         ));
     } else {
         let dropped = response_rx.try_iter().count();
         desktop_log::info(format_args!(
-            "jcode-desktop: dropped stale reasoning effort response generation={} event_count={dropped}",
+            "next-code-desktop: dropped stale reasoning effort response generation={} event_count={dropped}",
             request.generation
         ));
     }

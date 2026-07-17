@@ -7,7 +7,7 @@ use next_code_task_types::TodoItem;
 
 fn bench_save_load(c: &mut Criterion) {
     let tmp = tempfile::tempdir().unwrap();
-    std::env::set_var("JCODE_HOME", tmp.path());
+    std::env::set_var("NEXT_CODE_HOME", tmp.path());
     let todos: Vec<_> = (0..50)
         .map(|i| TodoItem {
             content: format!("task {i}"),

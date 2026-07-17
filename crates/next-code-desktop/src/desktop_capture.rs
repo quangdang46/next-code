@@ -61,7 +61,7 @@ pub(crate) fn spawn_desktop_stream_simulator(
     session_event_tx: mpsc::Sender<session_launch::DesktopSessionEvent>,
 ) {
     std::thread::Builder::new()
-        .name("jcode-desktop-stream-simulator".to_string())
+        .name("next-code-desktop-stream-simulator".to_string())
         .spawn(move || {
             // Give the window a moment to come up before streaming starts.
             std::thread::sleep(Duration::from_millis(900));
@@ -114,7 +114,7 @@ pub(crate) const DESKTOP_HELP_LINES: &[&str] = &[
     crate::DESKTOP_PRODUCT_NAME,
     "",
     "Usage:",
-    "  jcode-desktop [OPTIONS]",
+    "  next-code-desktop [OPTIONS]",
     "",
     "Options:",
     "  --fullscreen                 Start borderless fullscreen",

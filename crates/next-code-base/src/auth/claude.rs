@@ -57,7 +57,7 @@ pub struct ClaudeCredentials {
     pub subscription_type: Option<String>,
 }
 
-/// Represents a named Anthropic OAuth account stored in jcode's auth.json.
+/// Represents a named Anthropic OAuth account stored in next-code's auth.json.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnthropicAccount {
     pub label: String,
@@ -72,7 +72,7 @@ pub struct AnthropicAccount {
     pub scopes: Vec<String>,
 }
 
-/// Multi-account jcode auth.json format.
+/// Multi-account next-code auth.json format.
 /// Backwards-compatible: also reads the old single-account `{"anthropic": {...}}` layout.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct JcodeAuthFile {
@@ -295,7 +295,7 @@ pub fn next_code_path() -> Result<PathBuf> {
 
 // ---- Multi-account helpers ----
 
-/// Read the jcode auth file, auto-migrating from legacy format if needed.
+/// Read the next-code auth file, auto-migrating from legacy format if needed.
 pub fn load_auth_file() -> Result<JcodeAuthFile> {
     let path = next_code_path()?;
     if !path.exists() {
@@ -305,7 +305,7 @@ pub fn load_auth_file() -> Result<JcodeAuthFile> {
     crate::storage::harden_secret_file_permissions(&path);
 
     let mut auth: JcodeAuthFile = crate::storage::read_json(&path)
-        .with_context(|| format!("Could not read jcode credentials from {:?}", path))?;
+        .with_context(|| format!("Could not read next-code credentials from {:?}", path))?;
 
     if auth.anthropic_accounts.is_empty()
         && let Some(legacy) = auth.anthropic.take()
@@ -335,7 +335,7 @@ pub fn load_auth_file() -> Result<JcodeAuthFile> {
     Ok(auth)
 }
 
-/// Write the jcode auth file (multi-account format).
+/// Write the next-code auth file (multi-account format).
 pub fn save_auth_file(auth: &JcodeAuthFile) -> Result<()> {
     let auth_path = next_code_path()?;
 
@@ -533,7 +533,7 @@ pub fn is_max_subscription() -> bool {
 }
 
 /// Load credentials for the active Anthropic account.
-/// Falls through Claude Code -> jcode accounts -> OpenCode, preferring non-expired tokens.
+/// Falls through Claude Code -> next-code accounts -> OpenCode, preferring non-expired tokens.
 pub fn load_credentials() -> Result<ClaudeCredentials> {
     let now_ms = chrono::Utc::now().timestamp_millis();
 
@@ -563,7 +563,7 @@ pub fn load_credentials() -> Result<ClaudeCredentials> {
     // cheap and never prompts, so it is consulted live on the hot path (after
     // the user has approved importing Claude Code native credentials). The
     // macOS Keychain is NOT read here: it can trigger an interactive unlock
-    // prompt, so it is read once at import time and copied into jcode's own
+    // prompt, so it is read once at import time and copied into next-code's own
     // auth.json (see `import_native_credentials_into_account`).
     if native_source_allowed()
         && let Some(creds) = load_claude_code_env_credentials()
@@ -578,7 +578,7 @@ pub fn load_credentials() -> Result<ClaudeCredentials> {
         if creds.expires_at > now_ms {
             return Ok(creds);
         }
-        expired_candidates.push(("jcode", creds));
+        expired_candidates.push(("next-code", creds));
     }
 
     if opencode_path()
@@ -605,10 +605,10 @@ pub fn load_credentials() -> Result<ClaudeCredentials> {
         return Ok(creds);
     }
 
-    anyhow::bail!("No Claude OAuth credentials found (checked Claude Code, jcode, OpenCode)")
+    anyhow::bail!("No Claude OAuth credentials found (checked Claude Code, next-code, OpenCode)")
 }
 
-/// Load credentials for a specific jcode account by label.
+/// Load credentials for a specific next-code account by label.
 pub fn load_credentials_for_account(label: &str) -> Result<ClaudeCredentials> {
     let auth = load_auth_file()?;
     let account = auth
@@ -626,11 +626,11 @@ pub fn load_credentials_for_account(label: &str) -> Result<ClaudeCredentials> {
     })
 }
 
-/// Load credentials from the active jcode account (multi-account aware).
+/// Load credentials from the active next-code account (multi-account aware).
 fn load_jcode_credentials() -> Result<ClaudeCredentials> {
     let auth = load_auth_file()?;
     if auth.anthropic_accounts.is_empty() {
-        anyhow::bail!("No anthropic accounts configured in jcode auth.json");
+        anyhow::bail!("No anthropic accounts configured in next-code auth.json");
     }
 
     let active_label = get_active_account_override()
@@ -642,7 +642,7 @@ fn load_jcode_credentials() -> Result<ClaudeCredentials> {
         .iter()
         .find(|a| a.label == active_label)
         .or_else(|| auth.anthropic_accounts.first())
-        .context("No anthropic accounts in jcode auth.json")?;
+        .context("No anthropic accounts in next-code auth.json")?;
 
     Ok(ClaudeCredentials {
         access_token: account.access.clone(),
@@ -871,13 +871,13 @@ pub fn trust_native_source() -> Result<()> {
 }
 
 /// Read Claude Code's native credentials once (Keychain or env token) and copy
-/// them into a jcode-managed Anthropic account so future loads and token
-/// refreshes are served from jcode's own `auth.json`.
+/// them into a next-code-managed Anthropic account so future loads and token
+/// refreshes are served from next-code's own `auth.json`.
 ///
 /// This is the durable import path for the macOS Keychain: we do not want to
 /// hit the Keychain on every request (it can prompt to unlock), so we snapshot
 /// the credentials at import time. The OAuth refresh token is long-lived and
-/// rotates into jcode's store on refresh, so the copy stays usable after the
+/// rotates into next-code's store on refresh, so the copy stays usable after the
 /// original Claude Code token expires.
 ///
 /// Returns the label of the account the credentials were stored under.

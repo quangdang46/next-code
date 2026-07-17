@@ -1,6 +1,6 @@
-# jcode Telemetry Worker
+# next-code Telemetry Worker
 
-Cloudflare Worker that receives anonymous telemetry events from jcode.
+Cloudflare Worker that receives anonymous telemetry events from next-code.
 
 ## Dashboard
 
@@ -14,7 +14,7 @@ The worker also serves a visual dashboard so you do not have to run SQL by hand:
 - `POST /v1/event` - unchanged event ingest.
 
 The headline number is **Total users**: distinct, non-CI `telemetry_id`s that
-ever installed jcode OR did meaningful work in it. The page shows every metric
+ever installed next-code OR did meaningful work in it. The page shows every metric
 the API returns, organized into tiers (hero / key cards / diagnostic tables) so
 the important numbers stand out while nothing is hidden. Each user tier (reached
 > total > core) is broader than the one below it, and CI / raw figures are shown
@@ -38,7 +38,7 @@ wrangler d1 execute jcode-telemetry --remote --file=users.sql
 
 Events are dual-written to two stores with different jobs:
 
-1. **Workers Analytics Engine firehose** (`jcode_telemetry_firehose` dataset):
+1. **Workers Analytics Engine firehose** (`next_code_telemetry_firehose` dataset):
    every event, written first. Time-series store with no database size cap and
    ~90-day retention (adaptive sampling on reads; `index1` is the
    `telemetry_id`, so per-user sampling stays accurate). This is the primary
@@ -53,7 +53,7 @@ Events are dual-written to two stores with different jobs:
    curl -s "https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/analytics_engine/sql" \
      -H "Authorization: Bearer $CF_ANALYTICS_TOKEN" \
      -d "SELECT blob9 AS provider, blob11 AS reason, SUM(_sample_interval) AS n
-         FROM jcode_telemetry_firehose
+         FROM next_code_telemetry_firehose
          WHERE blob1 = 'onboarding_step' AND blob8 = 'auth_failed'
            AND timestamp > NOW() - INTERVAL '7' DAY
          GROUP BY provider, reason ORDER BY n DESC"
@@ -132,7 +132,7 @@ npm run deploy
    npm run deploy
    ```
 
-6. Set up custom domain (optional): point `telemetry.jcode.dev` to the worker in Cloudflare dashboard
+6. Set up custom domain (optional): point `telemetry.next-code.dev` to the worker in Cloudflare dashboard
 
 ### Ops helpers
 
@@ -162,7 +162,7 @@ npm run health
 
 ## Event types
 
-CLI events (sent by jcode itself): `install`, `upgrade`, `auth_success`,
+CLI events (sent by next-code itself): `install`, `upgrade`, `auth_success`,
 `onboarding_step`, `feedback`, `session_start`, `turn_end`, `session_end`,
 `session_crash`.
 
@@ -214,7 +214,7 @@ binary downloads are measurable through intent only; shell installs can be joine
 through first launch. Browser privacy opt-outs and un-attributed/manual installs
 are intentionally excluded from the joined funnel. Every conversion-bearing
 event is also written to the dedicated
-`jcode_install_firehose` Analytics Engine dataset before D1, so the 90-day
+`next_code_install_firehose` Analytics Engine dataset before D1, so the 90-day
 funnel is reconstructable during a D1 outage.
 
 ### Token subscription plan events (migration 0016)
@@ -230,7 +230,7 @@ All require `account_id`; `tier` and `model` are attached where relevant
   This is the analytics<->account join anchor: it ties an anonymous CLI
   `telemetry_id` to a subscription `account_id`, and is never pruned.
 
-Web + subscription events are firehosed to the separate `jcode_web_firehose`
+Web + subscription events are firehosed to the separate `next_code_web_firehose`
 dataset (`FIREHOSE_WEB_SCHEMA` in `src/worker.js`, also append-only): the
 main `FIREHOSE_SCHEMA` is at Analytics Engine's 20-blob/20-double capacity.
 For web events `index1` is the `visitor_id`.
@@ -252,7 +252,7 @@ wrangler d1 execute jcode-telemetry --command "SELECT w.path, w.error_kind, COUN
 # Analytics Engine web-vital sample counts (append-only positions from 0018)
 curl -s "https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/analytics_engine/sql" \
   -H "Authorization: Bearer $CF_ANALYTICS_TOKEN" \
-  -d "SELECT blob18 AS metric_name, blob19 AS rating, SUM(_sample_interval) AS samples, AVG(double2) AS avg_value FROM jcode_web_firehose WHERE blob1 = 'web_vital' AND timestamp > NOW() - INTERVAL '7' DAY GROUP BY metric_name, rating ORDER BY metric_name, rating"
+  -d "SELECT blob18 AS metric_name, blob19 AS rating, SUM(_sample_interval) AS samples, AVG(double2) AS avg_value FROM next_code_web_firehose WHERE blob1 = 'web_vital' AND timestamp > NOW() - INTERVAL '7' DAY GROUP BY metric_name, rating ORDER BY metric_name, rating"
 
 # Weekly / monthly active users (canonical: use the rollup so every window
 # shares one "meaningful" definition and includes session_crash + turn_end days).
@@ -384,4 +384,4 @@ wrangler d1 execute jcode-telemetry --command "WITH links AS (SELECT DISTINCT te
 - **D1 100-column cap**: production `events` has 98 columns after migration 0016 and D1 refuses `ALTER TABLE ADD COLUMN` past 100 (`too many columns`). Migration 0005's per-turn/session-cadence columns never applied to production `events`; migration 0013 moved those fields into `turn_details`/`session_details`, and migration 0016 put the web beacon fields in `web_details` for the same reason. Do not add new columns to `events`; add them to the detail tables.
 - Raw events remain the source of truth within their retention windows. The `daily_active_users` table is an ingest-time rollup for cheap dashboard queries and is the durable record beyond those windows.
 - The worker uses `INSERT OR IGNORE` keyed by `event_id`; rollups and detail rows are updated only when the canonical raw event insert succeeds, so client retries do not inflate counts.
-- Telemetry still undercounts users who opt out (`JCODE_NO_TELEMETRY`, `DO_NOT_TRACK`, `~/.jcode/no_telemetry`) or whose network blocks telemetry, and may overcount one person using multiple machines.
+- Telemetry still undercounts users who opt out (`NEXT_CODE_NO_TELEMETRY` (dual-read `JCODE_NO_TELEMETRY`), `DO_NOT_TRACK`, `~/.next-code/no_telemetry`) or whose network blocks telemetry, and may overcount one person using multiple machines.

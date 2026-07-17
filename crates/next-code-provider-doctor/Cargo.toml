@@ -16,6 +16,7 @@ name = "next_code_provider_doctor"
 path = "src/lib.rs"
 
 [dependencies]
+next-code-core = { path = "../next-code-core" }
 anyhow = "1"
 futures = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["json"] }

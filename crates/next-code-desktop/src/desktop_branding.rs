@@ -10,10 +10,10 @@ pub(crate) const DESKTOP_RELEASE_CHANNEL: &str = "Beta";
 
 /// Product name without the release-channel suffix.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(crate) const DESKTOP_PRODUCT_BASE_NAME: &str = "Jcode Desktop";
+pub(crate) const DESKTOP_PRODUCT_BASE_NAME: &str = "Next Code Desktop";
 
 /// Full user-facing product name, including the release channel.
-pub(crate) const DESKTOP_PRODUCT_NAME: &str = "Jcode Desktop (Beta)";
+pub(crate) const DESKTOP_PRODUCT_NAME: &str = "Next Code Desktop (Beta)";
 
 #[cfg(test)]
 mod tests {

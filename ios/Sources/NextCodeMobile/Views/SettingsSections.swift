@@ -1,4 +1,4 @@
-import JCodeKit
+import NextCodeKit
 import SwiftUI
 
 /// Sessions, servers, and info sections, split out to keep view files small.

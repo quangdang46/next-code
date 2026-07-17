@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use super::{
     SelfDevBuildCommand, SelfDevBuildTarget, canary_binary_path, current_binary_path,
     read_current_version, read_shared_server_version, read_stable_version,
@@ -12,7 +13,7 @@ use std::time::SystemTime;
 
 /// Get the jcode repository directory
 pub fn get_repo_dir() -> Option<PathBuf> {
-    if let Ok(path) = std::env::var("JCODE_REPO_DIR") {
+    if let Ok(path) = product_env("REPO_DIR") {
         let path = PathBuf::from(path);
         if is_jcode_repo(&path) {
             return Some(path);
@@ -335,13 +336,13 @@ fn non_empty_env_path(name: &str) -> Option<PathBuf> {
 /// Overridable with `NEXT_CODE_INSTALL_DIR` (canonical) or legacy `JCODE_INSTALL_DIR`.
 pub fn launcher_dir() -> Result<PathBuf> {
     if let Some(custom) = non_empty_env_path("NEXT_CODE_INSTALL_DIR")
-        .or_else(|| non_empty_env_path("JCODE_INSTALL_DIR"))
+        .or_else(|| non_empty_env_path("NEXT_CODE_INSTALL_DIR"))
     {
         return Ok(custom);
     }
 
     if let Some(sandbox_home) = non_empty_env_path("NEXT_CODE_HOME")
-        .or_else(|| non_empty_env_path("JCODE_HOME"))
+        .or_else(|| non_empty_env_path("NEXT_CODE_HOME"))
     {
         return Ok(sandbox_home.join("bin"));
     }

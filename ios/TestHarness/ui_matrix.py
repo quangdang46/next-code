@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Layout efficiency matrix for the jcode iOS app.
+"""Layout efficiency matrix for the next-code iOS app.
 
 A single screenshot only measures one content state. Real UI quality means the
 layout stays efficient across the *range* of content (empty, short, one tool,
@@ -43,11 +43,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 IOS = HERE.parent
 BUNDLE = "com.jcode.mobile"
-APP = IOS / ".build-ios/Build/Products/Debug-iphonesimulator/JCodeMobile.app"
+APP = IOS / ".build-ios/Build/Products/Debug-iphonesimulator/NextCodeMobile.app"
 PORT = 7643
 TOKEN = "mocktoken0123456789abcdef"
 CRED = ('[{"host":"127.0.0.1","port":7643,"token":"%s","serverName":'
-        '"mock-jcode","serverVersion":"mock-0.32.0","pairedAt":770000000}]' % TOKEN)
+        '"mock-next-code","serverVersion":"mock-0.32.0","pairedAt":770000000}]' % TOKEN)
 
 # Default matrix axes. The SE-class device exercises the small-screen end;
 # the a11y content size exercises Dynamic Type pressure on the primary device.
@@ -75,7 +75,7 @@ def sh(cmd, **kw):
 def build_app(device):
     sh("xcodegen generate", cwd=IOS)
     r = sh(
-        "xcodebuild build -project JCodeMobile.xcodeproj -scheme JCodeMobile "
+        "xcodebuild build -project NextCodeMobile.xcodeproj -scheme NextCodeMobile "
         f"-destination 'platform=iOS Simulator,name={device}' "
         "-derivedDataPath .build-ios",
         cwd=IOS,
@@ -161,7 +161,7 @@ def seed_and_launch(device, collect_perf=True):
     ).stdout.strip()
     appsup = Path(container) / "Library/Application Support"
     appsup.mkdir(parents=True, exist_ok=True)
-    (appsup / "jcode-servers.json").write_text(CRED + "\n")
+    (appsup / "next-code-servers.json").write_text(CRED + "\n")
 
     runtime = {}
     t0 = time.monotonic()
@@ -289,7 +289,7 @@ def main():
     ap.add_argument("--no-perf", action="store_true",
                     help="skip runtime (launch/first-frame) measurement")
     ap.add_argument("--out", default=str(Path(os.environ.get("TMPDIR", "/tmp"))
-                                         / "jcode-ui-matrix"))
+                                         / "next-code-ui-matrix"))
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--baseline-json")
     ap.add_argument("--candidate-json")

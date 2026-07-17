@@ -2,7 +2,7 @@
 //!
 //! Two complementary behaviors, both gated behind `display.keybinding_hints`:
 //!
-//! 1. **Rare-hotkey feedback.** When the user presses a chord jcode recognizes
+//! 1. **Rare-hotkey feedback.** When the user presses a chord next-code recognizes
 //!    but they use rarely (or have not used in a long time), we surface a short
 //!    inline note: `⌨ Ctrl+G → toggle scroll bookmark`. Per-action usage counts
 //!    persist across sessions, so the notes stop once an action is familiar.
@@ -38,7 +38,7 @@ const UNKNOWN_NOTICE_MAX_PER_CHORD: u32 = 3;
 
 const STATE_FILE: &str = "hotkey_usage.json";
 
-/// A chord jcode responds to, with a human description of what it does.
+/// A chord next-code responds to, with a human description of what it does.
 #[derive(Debug, Clone)]
 pub(super) struct KnownHotkey {
     pub binding: KeyBinding,
@@ -480,7 +480,7 @@ fn contextual_lookup(
     }
 }
 
-/// Resolve what a chord does, or `None` when jcode has no binding for it.
+/// Resolve what a chord does, or `None` when next-code has no binding for it.
 pub(super) fn lookup(
     registry: &[KnownHotkey],
     input_empty: bool,

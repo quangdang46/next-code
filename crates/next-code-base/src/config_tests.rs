@@ -62,14 +62,14 @@ fn mermaid_feature_defaults_on_and_parses_false() {
 #[test]
 fn mermaid_environment_override_uses_standard_boolean_values() {
     let _guard = crate::storage::lock_test_env();
-    let previous = std::env::var_os("JCODE_ENABLE_MERMAID");
-    crate::env::set_var("JCODE_ENABLE_MERMAID", "off");
+    let previous = std::env::var_os("NEXT_CODE_ENABLE_MERMAID");
+    crate::env::set_var("NEXT_CODE_ENABLE_MERMAID", "off");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
     assert!(!cfg.features.mermaid);
 
-    restore_env_var("JCODE_ENABLE_MERMAID", previous);
+    restore_env_var("NEXT_CODE_ENABLE_MERMAID", previous);
 }
 
 #[test]
@@ -94,12 +94,12 @@ fn latex_rendering_defaults_to_image_and_parses_all_modes() {
 #[test]
 fn latex_rendering_environment_override_accepts_aliases() {
     let _guard = crate::storage::lock_test_env();
-    let previous = std::env::var_os("JCODE_LATEX_RENDERING");
-    crate::env::set_var("JCODE_LATEX_RENDERING", "png");
+    let previous = std::env::var_os("NEXT_CODE_LATEX_RENDERING");
+    crate::env::set_var("NEXT_CODE_LATEX_RENDERING", "png");
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
     assert_eq!(cfg.display.latex_rendering, LatexRenderingMode::Image);
-    restore_env_var("JCODE_LATEX_RENDERING", previous);
+    restore_env_var("NEXT_CODE_LATEX_RENDERING", previous);
 }
 
 #[test]
@@ -148,22 +148,22 @@ fn swarm_spawn_mode_as_str_round_trips() {
 #[test]
 fn test_env_override_swarm_spawn_mode() {
     let _guard = crate::storage::lock_test_env();
-    let prev = std::env::var_os("JCODE_SWARM_SPAWN_MODE");
-    crate::env::set_var("JCODE_SWARM_SPAWN_MODE", "headless");
+    let prev = std::env::var_os("NEXT_CODE_SWARM_SPAWN_MODE");
+    crate::env::set_var("NEXT_CODE_SWARM_SPAWN_MODE", "headless");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
 
     assert_eq!(cfg.agents.swarm_spawn_mode, SwarmSpawnMode::Headless);
 
-    restore_env_var("JCODE_SWARM_SPAWN_MODE", prev);
+    restore_env_var("NEXT_CODE_SWARM_SPAWN_MODE", prev);
 }
 
 #[test]
 fn test_env_override_swarm_model() {
     let _guard = crate::storage::lock_test_env();
-    let prev = std::env::var_os("JCODE_SWARM_MODEL");
-    crate::env::set_var("JCODE_SWARM_MODEL", "claude-opus-4-6");
+    let prev = std::env::var_os("NEXT_CODE_SWARM_MODEL");
+    crate::env::set_var("NEXT_CODE_SWARM_MODEL", "claude-opus-4-6");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
@@ -171,13 +171,13 @@ fn test_env_override_swarm_model() {
     assert_eq!(cfg.agents.swarm_model.as_deref(), Some("claude-opus-4-6"));
 
     // Empty value clears the override back to "inherit".
-    crate::env::set_var("JCODE_SWARM_MODEL", "  ");
+    crate::env::set_var("NEXT_CODE_SWARM_MODEL", "  ");
     let mut cfg = Config::default();
     cfg.agents.swarm_model = Some("preset".to_string());
     cfg.apply_env_overrides();
     assert_eq!(cfg.agents.swarm_model, None);
 
-    restore_env_var("JCODE_SWARM_MODEL", prev);
+    restore_env_var("NEXT_CODE_SWARM_MODEL", prev);
 }
 
 #[test]
@@ -222,32 +222,32 @@ fn hooks_config_defaults_and_parses_from_toml() {
 #[test]
 fn test_env_override_lifecycle_hooks() {
     let _guard = crate::storage::lock_test_env();
-    let prev_turn_end = std::env::var_os("JCODE_HOOK_TURN_END");
-    let prev_timeout = std::env::var_os("JCODE_HOOK_PRE_TOOL_TIMEOUT_MS");
+    let prev_turn_end = std::env::var_os("NEXT_CODE_HOOK_TURN_END");
+    let prev_timeout = std::env::var_os("NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS");
 
-    crate::env::set_var("JCODE_HOOK_TURN_END", "my-notifier --fast");
-    crate::env::set_var("JCODE_HOOK_PRE_TOOL_TIMEOUT_MS", "250");
+    crate::env::set_var("NEXT_CODE_HOOK_TURN_END", "my-notifier --fast");
+    crate::env::set_var("NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS", "250");
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
     assert_eq!(cfg.hooks.turn_end.as_deref(), Some("my-notifier --fast"));
     assert_eq!(cfg.hooks.pre_tool_timeout_ms, 250);
 
     // Empty env value disables a config-file hook.
-    crate::env::set_var("JCODE_HOOK_TURN_END", " ");
+    crate::env::set_var("NEXT_CODE_HOOK_TURN_END", " ");
     let mut cfg = Config::default();
     cfg.hooks.turn_end = Some("from-config".to_string());
     cfg.apply_env_overrides();
     assert_eq!(cfg.hooks.turn_end, None);
 
-    restore_env_var("JCODE_HOOK_TURN_END", prev_turn_end);
-    restore_env_var("JCODE_HOOK_PRE_TOOL_TIMEOUT_MS", prev_timeout);
+    restore_env_var("NEXT_CODE_HOOK_TURN_END", prev_turn_end);
+    restore_env_var("NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS", prev_timeout);
 }
 
 #[test]
 fn test_env_override_spawn_hook() {
     let _guard = crate::storage::lock_test_env();
-    let prev = std::env::var_os("JCODE_SPAWN_HOOK");
-    crate::env::set_var("JCODE_SPAWN_HOOK", "kitty @ launch --type=tab --");
+    let prev = std::env::var_os("NEXT_CODE_SPAWN_HOOK");
+    crate::env::set_var("NEXT_CODE_SPAWN_HOOK", "kitty @ launch --type=tab --");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
@@ -257,33 +257,33 @@ fn test_env_override_spawn_hook() {
     );
 
     // Empty env value disables a config-file hook.
-    crate::env::set_var("JCODE_SPAWN_HOOK", "  ");
+    crate::env::set_var("NEXT_CODE_SPAWN_HOOK", "  ");
     let mut cfg = Config::default();
     cfg.terminal.spawn_hook = Some("tmux new-window".to_string());
     cfg.apply_env_overrides();
     assert_eq!(cfg.terminal.spawn_hook, None);
 
-    restore_env_var("JCODE_SPAWN_HOOK", prev);
+    restore_env_var("NEXT_CODE_SPAWN_HOOK", prev);
 }
 
 #[test]
 fn test_env_override_focus_hook() {
     let _guard = crate::storage::lock_test_env();
-    let prev = std::env::var_os("JCODE_FOCUS_HOOK");
-    crate::env::set_var("JCODE_FOCUS_HOOK", "niri-focus-jcode");
+    let prev = std::env::var_os("NEXT_CODE_FOCUS_HOOK");
+    crate::env::set_var("NEXT_CODE_FOCUS_HOOK", "niri-focus-next-code");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
-    assert_eq!(cfg.terminal.focus_hook.as_deref(), Some("niri-focus-jcode"));
+    assert_eq!(cfg.terminal.focus_hook.as_deref(), Some("niri-focus-next-code"));
 
     // Empty env value disables a config-file hook.
-    crate::env::set_var("JCODE_FOCUS_HOOK", "");
+    crate::env::set_var("NEXT_CODE_FOCUS_HOOK", "");
     let mut cfg = Config::default();
     cfg.terminal.focus_hook = Some("wmctrl -a".to_string());
     cfg.apply_env_overrides();
     assert_eq!(cfg.terminal.focus_hook, None);
 
-    restore_env_var("JCODE_FOCUS_HOOK", prev);
+    restore_env_var("NEXT_CODE_FOCUS_HOOK", prev);
 }
 
 #[test]
@@ -298,10 +298,10 @@ fn test_memory_sidecar_enabled_defaults_true() {
 #[test]
 fn test_env_override_memory_sidecar() {
     let _guard = crate::storage::lock_test_env();
-    let prev_model = std::env::var_os("JCODE_MEMORY_MODEL");
-    let prev_enabled = std::env::var_os("JCODE_MEMORY_SIDECAR_ENABLED");
-    crate::env::set_var("JCODE_MEMORY_MODEL", "claude-haiku-4");
-    crate::env::set_var("JCODE_MEMORY_SIDECAR_ENABLED", "true");
+    let prev_model = std::env::var_os("NEXT_CODE_MEMORY_MODEL");
+    let prev_enabled = std::env::var_os("NEXT_CODE_MEMORY_SIDECAR_ENABLED");
+    crate::env::set_var("NEXT_CODE_MEMORY_MODEL", "claude-haiku-4");
+    crate::env::set_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED", "true");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
@@ -309,8 +309,8 @@ fn test_env_override_memory_sidecar() {
     assert_eq!(cfg.agents.memory_model.as_deref(), Some("claude-haiku-4"));
     assert!(cfg.agents.memory_sidecar_enabled);
 
-    restore_env_var("JCODE_MEMORY_MODEL", prev_model);
-    restore_env_var("JCODE_MEMORY_SIDECAR_ENABLED", prev_enabled);
+    restore_env_var("NEXT_CODE_MEMORY_MODEL", prev_model);
+    restore_env_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED", prev_enabled);
 }
 
 #[test]
@@ -459,9 +459,9 @@ fn tool_config_disabled_only_keeps_full_profile_with_deny_list() {
 #[test]
 fn test_generated_default_config_uses_low_openai_reasoning_effort() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let dir = tempfile::TempDir::new().expect("tempdir");
-    crate::env::set_var("JCODE_HOME", dir.path());
+    crate::env::set_var("NEXT_CODE_HOME", dir.path());
 
     let path = Config::create_default_config_file().expect("create default config file");
     let content = std::fs::read_to_string(path).expect("read default config file");
@@ -514,18 +514,18 @@ fn test_generated_default_config_uses_low_openai_reasoning_effort() {
     assert_eq!(parsed.agents.swarm_spawn_mode, SwarmSpawnMode::Inline);
 
     if let Some(prev) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev);
+        crate::env::set_var("NEXT_CODE_HOME", prev);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[test]
 fn global_config_cache_reloads_after_manual_file_edit() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let dir = tempfile::TempDir::new().expect("tempdir");
-    crate::env::set_var("JCODE_HOME", dir.path());
+    crate::env::set_var("NEXT_CODE_HOME", dir.path());
     Config::invalidate_cache();
 
     let path = Config::path().expect("config path");
@@ -540,16 +540,16 @@ fn global_config_cache_reloads_after_manual_file_edit() {
 
     assert!(crate::config::config().display.centered);
 
-    restore_env_var("JCODE_HOME", prev_home);
+    restore_env_var("NEXT_CODE_HOME", prev_home);
     Config::invalidate_cache();
 }
 
 #[test]
 fn config_save_invalidates_global_config_cache() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let dir = tempfile::TempDir::new().expect("tempdir");
-    crate::env::set_var("JCODE_HOME", dir.path());
+    crate::env::set_var("NEXT_CODE_HOME", dir.path());
     Config::invalidate_cache();
 
     let mut cfg = Config::default();
@@ -561,32 +561,32 @@ fn config_save_invalidates_global_config_cache() {
     cfg.save().expect("save updated config");
     assert!(crate::config::config().display.centered);
 
-    restore_env_var("JCODE_HOME", prev_home);
+    restore_env_var("NEXT_CODE_HOME", prev_home);
     Config::invalidate_cache();
 }
 
 #[test]
 fn config_env_fingerprint_ignores_runtime_only_jcode_vars() {
     let _guard = crate::storage::lock_test_env();
-    let prev_runtime_provider = std::env::var_os("JCODE_RUNTIME_PROVIDER");
-    let prev_active_provider = std::env::var_os("JCODE_ACTIVE_PROVIDER");
-    let prev_display_centered = std::env::var_os("JCODE_DISPLAY_CENTERED");
+    let prev_runtime_provider = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER");
+    let prev_active_provider = std::env::var_os("NEXT_CODE_ACTIVE_PROVIDER");
+    let prev_display_centered = std::env::var_os("NEXT_CODE_DISPLAY_CENTERED");
 
-    crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
-    crate::env::remove_var("JCODE_ACTIVE_PROVIDER");
-    crate::env::remove_var("JCODE_DISPLAY_CENTERED");
+    crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
+    crate::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
+    crate::env::remove_var("NEXT_CODE_DISPLAY_CENTERED");
     let baseline = config_env_fingerprint();
 
-    crate::env::set_var("JCODE_RUNTIME_PROVIDER", "openai");
-    crate::env::set_var("JCODE_ACTIVE_PROVIDER", "openai");
+    crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "openai");
+    crate::env::set_var("NEXT_CODE_ACTIVE_PROVIDER", "openai");
     assert_eq!(baseline, config_env_fingerprint());
 
-    crate::env::set_var("JCODE_DISPLAY_CENTERED", "1");
+    crate::env::set_var("NEXT_CODE_DISPLAY_CENTERED", "1");
     assert_ne!(baseline, config_env_fingerprint());
 
-    restore_env_var("JCODE_RUNTIME_PROVIDER", prev_runtime_provider);
-    restore_env_var("JCODE_ACTIVE_PROVIDER", prev_active_provider);
-    restore_env_var("JCODE_DISPLAY_CENTERED", prev_display_centered);
+    restore_env_var("NEXT_CODE_RUNTIME_PROVIDER", prev_runtime_provider);
+    restore_env_var("NEXT_CODE_ACTIVE_PROVIDER", prev_active_provider);
+    restore_env_var("NEXT_CODE_DISPLAY_CENTERED", prev_display_centered);
 }
 
 #[test]
@@ -619,9 +619,9 @@ fn config_env_fingerprint_tracks_every_apply_env_override_var() {
 #[test]
 fn cached_external_auth_trust_observes_manual_revocation() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let dir = tempfile::TempDir::new().expect("tempdir");
-    crate::env::set_var("JCODE_HOME", dir.path());
+    crate::env::set_var("NEXT_CODE_HOME", dir.path());
     Config::invalidate_cache();
 
     let auth_file = dir.path().join("external-auth.json");
@@ -645,7 +645,7 @@ fn cached_external_auth_trust_observes_manual_revocation() {
         &auth_file
     ));
 
-    restore_env_var("JCODE_HOME", prev_home);
+    restore_env_var("NEXT_CODE_HOME", prev_home);
     Config::invalidate_cache();
 }
 
@@ -727,8 +727,8 @@ fn test_session_picker_resume_action_deserializes_kebab_case() {
 #[test]
 fn test_env_override_auto_server_reload() {
     let _guard = crate::storage::lock_test_env();
-    let prev = std::env::var_os("JCODE_AUTO_SERVER_RELOAD");
-    crate::env::set_var("JCODE_AUTO_SERVER_RELOAD", "false");
+    let prev = std::env::var_os("NEXT_CODE_AUTO_SERVER_RELOAD");
+    crate::env::set_var("NEXT_CODE_AUTO_SERVER_RELOAD", "false");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
@@ -736,19 +736,19 @@ fn test_env_override_auto_server_reload() {
     assert!(!cfg.display.auto_server_reload);
 
     if let Some(prev) = prev {
-        crate::env::set_var("JCODE_AUTO_SERVER_RELOAD", prev);
+        crate::env::set_var("NEXT_CODE_AUTO_SERVER_RELOAD", prev);
     } else {
-        crate::env::remove_var("JCODE_AUTO_SERVER_RELOAD");
+        crate::env::remove_var("NEXT_CODE_AUTO_SERVER_RELOAD");
     }
 }
 
 #[test]
 fn test_env_override_native_scrollbars() {
     let _guard = crate::storage::lock_test_env();
-    let prev_chat = std::env::var_os("JCODE_CHAT_NATIVE_SCROLLBAR");
-    let prev_side = std::env::var_os("JCODE_SIDE_PANEL_NATIVE_SCROLLBAR");
-    crate::env::set_var("JCODE_CHAT_NATIVE_SCROLLBAR", "true");
-    crate::env::set_var("JCODE_SIDE_PANEL_NATIVE_SCROLLBAR", "false");
+    let prev_chat = std::env::var_os("NEXT_CODE_CHAT_NATIVE_SCROLLBAR");
+    let prev_side = std::env::var_os("NEXT_CODE_SIDE_PANEL_NATIVE_SCROLLBAR");
+    crate::env::set_var("NEXT_CODE_CHAT_NATIVE_SCROLLBAR", "true");
+    crate::env::set_var("NEXT_CODE_SIDE_PANEL_NATIVE_SCROLLBAR", "false");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
@@ -757,22 +757,22 @@ fn test_env_override_native_scrollbars() {
     assert!(!cfg.display.native_scrollbars.side_panel);
 
     if let Some(prev) = prev_chat {
-        crate::env::set_var("JCODE_CHAT_NATIVE_SCROLLBAR", prev);
+        crate::env::set_var("NEXT_CODE_CHAT_NATIVE_SCROLLBAR", prev);
     } else {
-        crate::env::remove_var("JCODE_CHAT_NATIVE_SCROLLBAR");
+        crate::env::remove_var("NEXT_CODE_CHAT_NATIVE_SCROLLBAR");
     }
     if let Some(prev) = prev_side {
-        crate::env::set_var("JCODE_SIDE_PANEL_NATIVE_SCROLLBAR", prev);
+        crate::env::set_var("NEXT_CODE_SIDE_PANEL_NATIVE_SCROLLBAR", prev);
     } else {
-        crate::env::remove_var("JCODE_SIDE_PANEL_NATIVE_SCROLLBAR");
+        crate::env::remove_var("NEXT_CODE_SIDE_PANEL_NATIVE_SCROLLBAR");
     }
 }
 
 #[test]
 fn test_env_override_diff_mode_full_inline() {
     let _guard = crate::storage::lock_test_env();
-    let prev = std::env::var_os("JCODE_DIFF_MODE");
-    crate::env::set_var("JCODE_DIFF_MODE", "full-inline");
+    let prev = std::env::var_os("NEXT_CODE_DIFF_MODE");
+    crate::env::set_var("NEXT_CODE_DIFF_MODE", "full-inline");
 
     let mut cfg = Config::default();
     cfg.apply_env_overrides();
@@ -780,18 +780,18 @@ fn test_env_override_diff_mode_full_inline() {
     assert_eq!(cfg.display.diff_mode, DiffDisplayMode::FullInline);
 
     if let Some(prev) = prev {
-        crate::env::set_var("JCODE_DIFF_MODE", prev);
+        crate::env::set_var("NEXT_CODE_DIFF_MODE", prev);
     } else {
-        crate::env::remove_var("JCODE_DIFF_MODE");
+        crate::env::remove_var("NEXT_CODE_DIFF_MODE");
     }
 }
 
 #[test]
 fn test_env_override_trusted_external_auth_splits_source_and_path_entries() {
     let _guard = crate::storage::lock_test_env();
-    let prev = std::env::var_os("JCODE_TRUSTED_EXTERNAL_AUTH_SOURCES");
+    let prev = std::env::var_os("NEXT_CODE_TRUSTED_EXTERNAL_AUTH_SOURCES");
     crate::env::set_var(
-        "JCODE_TRUSTED_EXTERNAL_AUTH_SOURCES",
+        "NEXT_CODE_TRUSTED_EXTERNAL_AUTH_SOURCES",
         "legacy_source,claude_code_credentials|/tmp/auth.json",
     );
 
@@ -805,9 +805,9 @@ fn test_env_override_trusted_external_auth_splits_source_and_path_entries() {
     );
 
     if let Some(prev) = prev {
-        crate::env::set_var("JCODE_TRUSTED_EXTERNAL_AUTH_SOURCES", prev);
+        crate::env::set_var("NEXT_CODE_TRUSTED_EXTERNAL_AUTH_SOURCES", prev);
     } else {
-        crate::env::remove_var("JCODE_TRUSTED_EXTERNAL_AUTH_SOURCES");
+        crate::env::remove_var("NEXT_CODE_TRUSTED_EXTERNAL_AUTH_SOURCES");
     }
 }
 

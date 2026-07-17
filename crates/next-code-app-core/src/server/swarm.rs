@@ -108,7 +108,7 @@ fn swarm_status_debounce_member_threshold() -> usize {
     static CACHED: OnceLock<AtomicUsize> = OnceLock::new();
     CACHED
         .get_or_init(|| {
-            let configured = std::env::var("JCODE_SWARM_STATUS_DEBOUNCE_MEMBER_THRESHOLD")
+            let configured = std::env::var("NEXT_CODE_SWARM_STATUS_DEBOUNCE_MEMBER_THRESHOLD")
                 .ok()
                 .and_then(|value| value.trim().parse::<usize>().ok())
                 .filter(|value| *value > 0)
@@ -122,7 +122,7 @@ fn swarm_status_debounce_ms() -> u64 {
     static CACHED: OnceLock<AtomicU64> = OnceLock::new();
     CACHED
         .get_or_init(|| {
-            let configured = std::env::var("JCODE_SWARM_STATUS_DEBOUNCE_MS")
+            let configured = std::env::var("NEXT_CODE_SWARM_STATUS_DEBOUNCE_MS")
                 .ok()
                 .and_then(|value| value.trim().parse::<u64>().ok())
                 .filter(|value| *value > 0)
@@ -159,21 +159,21 @@ fn log_swarm_lifecycle(phase: &str, fields: Vec<(&str, String)>) {
 
 pub(super) fn swarm_task_heartbeat_interval() -> Duration {
     Duration::from_secs(configured_positive_u64(
-        "JCODE_SWARM_TASK_HEARTBEAT_SECS",
+        "NEXT_CODE_SWARM_TASK_HEARTBEAT_SECS",
         DEFAULT_SWARM_TASK_HEARTBEAT_SECS,
     ))
 }
 
 pub(super) fn swarm_task_stale_after() -> Duration {
     Duration::from_secs(configured_positive_u64(
-        "JCODE_SWARM_TASK_STALE_AFTER_SECS",
+        "NEXT_CODE_SWARM_TASK_STALE_AFTER_SECS",
         DEFAULT_SWARM_TASK_STALE_AFTER_SECS,
     ))
 }
 
 pub(super) fn swarm_task_sweep_interval() -> Duration {
     Duration::from_secs(configured_positive_u64(
-        "JCODE_SWARM_TASK_SWEEP_INTERVAL_SECS",
+        "NEXT_CODE_SWARM_TASK_SWEEP_INTERVAL_SECS",
         DEFAULT_SWARM_TASK_SWEEP_INTERVAL_SECS,
     ))
 }
@@ -183,7 +183,7 @@ pub(super) fn swarm_task_sweep_interval() -> Duration {
 /// history to grow forever.
 pub(super) fn swarm_terminal_member_retention() -> Duration {
     Duration::from_secs(configured_positive_u64(
-        "JCODE_SWARM_TERMINAL_MEMBER_RETENTION_SECS",
+        "NEXT_CODE_SWARM_TERMINAL_MEMBER_RETENTION_SECS",
         DEFAULT_SWARM_TERMINAL_MEMBER_RETENTION_SECS,
     ))
 }
@@ -192,7 +192,7 @@ pub(super) fn swarm_terminal_member_retention() -> Duration {
 /// has elapsed. Startup loading performs the same pruning synchronously.
 pub(super) fn swarm_terminal_member_gc_interval() -> Duration {
     Duration::from_secs(configured_positive_u64(
-        "JCODE_SWARM_TERMINAL_MEMBER_GC_INTERVAL_SECS",
+        "NEXT_CODE_SWARM_TERMINAL_MEMBER_GC_INTERVAL_SECS",
         DEFAULT_SWARM_TERMINAL_MEMBER_GC_INTERVAL_SECS,
     ))
 }
@@ -2075,7 +2075,7 @@ mod tests {
     /// `broadcast_swarm_status_now` snapshots member statuses under
     /// `swarm_members.read()`, drops the guard, then awaits
     /// `fanout_session_event` (a `swarm_members.write()` acquisition) before
-    /// sending. Swarms below `JCODE_SWARM_STATUS_DEBOUNCE_MEMBER_THRESHOLD`
+    /// sending. Swarms below `NEXT_CODE_SWARM_STATUS_DEBOUNCE_MEMBER_THRESHOLD`
     /// (default 2) take this immediate, non-debounced path on every status
     /// change, so two concurrent broadcasts can deliver an old snapshot after
     /// a newer one on the same ordered mpsc channel. A last-write-wins

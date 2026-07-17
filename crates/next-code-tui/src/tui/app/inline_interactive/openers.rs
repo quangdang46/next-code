@@ -126,10 +126,10 @@ impl App {
 
         // Load agent definitions from disk
         let mut registry = next_code_agent_runtime::AgentRegistry::new();
-        let home = dirs::home_dir().map(|h| h.join(".jcode/agents"));
+        let home = dirs::home_dir().map(|h| h.join(".next-code/agents"));
         let cwd = std::env::current_dir()
             .ok()
-            .map(|d| d.join(".jcode/agents"));
+            .map(|d| d.join(".next-code/agents"));
         if let Some(path) = &home {
             let _ = registry.load_directory(path, next_code_agent_runtime::SourceKind::UserGlobal);
         }
@@ -774,7 +774,7 @@ impl App {
     pub(super) fn run_agent_creation_flow(&mut self, template: &str) -> anyhow::Result<String> {
         use std::io::Write;
         let mut tmp = tempfile::Builder::new()
-            .prefix("jcode-agent-")
+            .prefix("next-code-agent-")
             .suffix(".toml")
             .tempfile()?;
         tmp.write_all(template.as_bytes())?;
@@ -783,7 +783,7 @@ impl App {
         let status = std::process::Command::new("sh")
             .arg("-c")
             .arg("exec ${VISUAL:-${EDITOR:-vi}} \"$@\"")
-            .arg("jcode-editor")
+            .arg("next-code-editor")
             .arg(&path)
             .status()?;
         anyhow::ensure!(status.success(), "Editor exited with non-zero status");
@@ -792,7 +792,7 @@ impl App {
         let def = next_code_agent_runtime::AgentRegistry::load_file(&path)?;
 
         if let Some(home) = dirs::home_dir() {
-            let agents_dir = home.join(".jcode/agents");
+            let agents_dir = home.join(".next-code/agents");
             std::fs::create_dir_all(&agents_dir)?;
             let dest = agents_dir.join(format!("{}.toml", def.id));
             std::fs::write(&dest, &content)?;
@@ -996,7 +996,7 @@ pub(crate) fn open_tools_picker(app: &mut App, agent_id: &str) {
 
 pub(crate) fn check_agent_snapshots(app: &mut App) {
     let agents_path = match dirs::home_dir() {
-        Some(h) => h.join(".jcode").join("agents"),
+        Some(h) => h.join(".next-code").join("agents"),
         None => return,
     };
     if !agents_path.is_dir() {
@@ -1183,7 +1183,7 @@ pub(crate) fn save_last_assistant_as_agent(session: &crate::session::Session) ->
         Err(e) => return format!("Invalid agent: {}", e),
     };
     let agents_dir = match dirs::home_dir() {
-        Some(h) => h.join(".jcode").join("agents"),
+        Some(h) => h.join(".next-code").join("agents"),
         None => return "No home dir.".to_string(),
     };
     if let Err(e) = std::fs::create_dir_all(&agents_dir) {

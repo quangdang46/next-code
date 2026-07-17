@@ -154,7 +154,7 @@ if [ "$IS_WINDOWS" = true ]; then
 else
   EXE=""
   # Prefer NEXT_CODE_HOME, then JCODE_HOME, then ~/.next-code. The binary dual-reads
-  # ~/.jcode and migrates automatically when ~/.next-code is missing.
+  # ~/.next-code and migrates automatically when ~/.next-code is missing.
   next_code_home="$(next_code_env NEXT_CODE_HOME JCODE_HOME "$HOME/.next-code")"
   builds_dir="$next_code_home/builds"
 fi
@@ -162,7 +162,7 @@ stable_dir="$builds_dir/stable"
 current_dir="$builds_dir/current"
 version_dir="$builds_dir/versions"
 launcher_path="$INSTALL_DIR/next-code${EXE}"
-compat_launcher_path="$INSTALL_DIR/jcode${EXE}"
+compat_launcher_path="$INSTALL_DIR/next-code${EXE}"
 
 EXISTING=""
 if [ -x "$launcher_path" ]; then
@@ -224,7 +224,7 @@ else
   src_bin="$src_dir/target/release/$bin_name"
   if [ ! -f "$src_bin" ]; then
     # Fall back to legacy binary name during the rebrand window.
-    src_bin="$src_dir/target/release/jcode${EXE}"
+    src_bin="$src_dir/target/release/next-code${EXE}"
   fi
   [ -f "$src_bin" ] || err "Built binary not found at $src_dir/target/release/$bin_name"
   cp "$src_bin" "$dest_version_dir/$bin_name"
@@ -258,7 +258,7 @@ if [ "$IS_WINDOWS" = true ]; then
   cp -f "$dest_version_dir/$bin_name" "$stable_dir/$bin_name"
   printf '%s\n' "$version" > "$builds_dir/stable-version"
   cp -f "$stable_dir/$bin_name" "$launcher_path"
-  # Compat copy for one release so existing `jcode` muscle memory keeps working.
+  # Compat copy for one release so existing `next-code` muscle memory keeps working.
   cp -f "$stable_dir/$bin_name" "$compat_launcher_path"
 else
   ln -sfn "$dest_version_dir/$bin_name" "$stable_dir/$bin_name"
@@ -314,8 +314,8 @@ if [ "$IS_WINDOWS" = true ]; then
   echo ""
   info "✅ next-code $VERSION installed successfully!"
   echo ""
-  if command -v next-code >/dev/null 2>&1 || command -v jcode >/dev/null 2>&1; then
-    info "Run 'next-code' to get started (compat: 'jcode' also works for this release)."
+  if command -v next-code >/dev/null 2>&1 || command -v next-code >/dev/null 2>&1; then
+    info "Run 'next-code' to get started (compat: 'next-code' also works for this release)."
   else
     echo "  To start using next-code right now, run:"
     echo ""
@@ -410,8 +410,8 @@ else
     fi
   fi
 
-  if command -v next-code >/dev/null 2>&1 || command -v jcode >/dev/null 2>&1; then
-    info "Run 'next-code' to get started (compat: 'jcode' also works for this release)."
+  if command -v next-code >/dev/null 2>&1 || command -v next-code >/dev/null 2>&1; then
+    info "Run 'next-code' to get started (compat: 'next-code' also works for this release)."
   else
     echo "  To start using next-code right now, run:"
     echo ""

@@ -263,7 +263,7 @@ async fn test_hello_plugin_e2e() {
     );
     let discovery = DiscoveryPaths {
         plugin_dirs: vec![example_dir.clone()],
-        npm_cache: std::env::temp_dir().join("jcode-test-npm-cache"),
+        npm_cache: std::env::temp_dir().join("next-code-test-npm-cache"),
         tool_dirs: vec![],
     };
     let config = PluginConfig::default();

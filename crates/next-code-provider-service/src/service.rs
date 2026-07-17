@@ -7,7 +7,7 @@
 //! - [`CredentialService`] (credential.rs) — credential storage.
 //!
 //! [`ProviderService`] bundles them into a single `Send + Sync` handle that
-//! the rest of jcode (CLI, TUI, session runner) can hold behind an
+//! the rest of next-code (CLI, TUI, session runner) can hold behind an
 //! `Arc<dyn ProviderService>`. It also exposes the [`RouteResolver`] that
 //! turns a `(provider, model)` request into a fully-prepared
 //! [`next_code_llm_core::route::Route`].
@@ -100,7 +100,7 @@ mod tests {
     #[test]
     fn resolved_route_serializes_without_route_body() {
         // Sanity check that the struct shape is stable. The full route
-        // serialization is covered by `jcode-llm-core`'s own tests.
+        // serialization is covered by `next-code-llm-core`'s own tests.
         let r = ResolvedRoute {
             provider: "anthropic".into(),
             model: "claude-haiku-4-5".into(),

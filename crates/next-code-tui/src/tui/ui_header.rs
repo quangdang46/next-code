@@ -1,3 +1,4 @@
+use crate::env::{product_env, product_env_os};
 use super::box_utils::render_rounded_box;
 use super::changelog::get_unseen_changelog_entries;
 use super::{
@@ -313,7 +314,7 @@ pub(super) fn build_auth_status_line(auth: &AuthStatus, max_width: usize) -> Lin
         auth: &AuthStatus,
     ) -> Option<&'static str> {
         use crate::auth::{ActiveCredential, resolve_dual_credential_auth};
-        let runtime_provider = std::env::var("JCODE_RUNTIME_PROVIDER").ok();
+        let runtime_provider = product_env("RUNTIME_PROVIDER").ok();
         let resolved = resolve_dual_credential_auth(provider, auth, runtime_provider.as_deref())?;
         Some(match (resolved.has_oauth, resolved.has_api_key) {
             (true, true) => match resolved.active {
@@ -419,7 +420,7 @@ pub(super) fn build_auth_status_line(auth: &AuthStatus, max_width: usize) -> Lin
 }
 
 fn header_provider_auth_tag(name: &str, auth: &AuthStatus) -> &'static str {
-    let runtime_provider = std::env::var("JCODE_RUNTIME_PROVIDER").ok();
+    let runtime_provider = product_env("RUNTIME_PROVIDER").ok();
 
     // Anthropic and OpenAI share one credential-resolution source of truth so
     // the header tag never drifts from the info widget / model-switch line. We
@@ -562,9 +563,9 @@ fn semver_minor() -> String {
 
 #[cfg(test)]
 fn version_display_candidates() -> Vec<String> {
-    let full = format!("jcode {}", semver());
-    let core = format!("jcode {}", semver_core());
-    let minor = format!("jcode {}", semver_minor());
+    let full = format!("next-code {}", semver());
+    let core = format!("next-code {}", semver_core());
+    let minor = format!("next-code {}", semver_minor());
     let shortest = semver_minor();
     vec![full, core, minor, shortest]
 }
@@ -705,7 +706,7 @@ pub(super) fn build_persistent_header(app: &dyn TuiState, width: u16) -> Vec<Lin
     } else if server_name.is_none() {
         lines.push(
             Line::from(Span::styled(
-                "JCode".to_string(),
+                "Next Code".to_string(),
                 Style::default().fg(header_name_color()),
             ))
             .alignment(align),
@@ -1003,23 +1004,23 @@ mod tests {
         }
     }
 
-    fn ensure_test_jcode_home_if_unset() {
+    fn ensure_test_next_code_home_if_unset() {
         static TEST_HOME: OnceLock<std::path::PathBuf> = OnceLock::new();
 
-        if std::env::var_os("JCODE_HOME").is_some() {
+        if std::env::var_os("NEXT_CODE_HOME").is_some() {
             return;
         }
 
         let path = TEST_HOME.get_or_init(|| {
-            let path = std::env::temp_dir().join(format!("jcode-test-home-{}", std::process::id()));
+            let path = std::env::temp_dir().join(format!("next-code-test-home-{}", std::process::id()));
             let _ = std::fs::create_dir_all(&path);
             path
         });
-        crate::env::set_var("JCODE_HOME", path);
+        crate::env::set_var("NEXT_CODE_HOME", path);
     }
 
     fn create_test_app() -> crate::tui::app::App {
-        ensure_test_jcode_home_if_unset();
+        ensure_test_next_code_home_if_unset();
 
         let provider: Arc<dyn Provider> = Arc::new(MockProvider);
         let rt = tokio::runtime::Runtime::new().expect("test runtime");
@@ -1287,7 +1288,7 @@ mod tests {
     #[test]
     fn header_model_display_name_sweeps_real_model_catalog() {
         // End-to-end through shorten_model_name + format_model_name +
-        // prettify_model_id, over the model ids jcode actually routes.
+        // prettify_model_id, over the model ids next-code actually routes.
         let cases = [
             // Anthropic
             ("claude-opus-4-5-20251101", "Claude 4.5 Opus"),
@@ -1379,8 +1380,8 @@ mod tests {
     #[test]
     fn header_provider_auth_tag_reports_active_credential_for_openai() {
         let _guard = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_RUNTIME_PROVIDER");
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
+        let prev = product_env_os("RUNTIME_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
         let auth = AuthStatus {
             openai: AuthState::Available,
             openai_has_oauth: true,
@@ -1392,14 +1393,14 @@ mod tests {
         // use (the auth inventory line carries the "both configured" detail).
         assert_eq!(header_provider_auth_tag("openai", &auth), "oauth");
         if let Some(value) = prev {
-            crate::env::set_var("JCODE_RUNTIME_PROVIDER", value);
+            crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", value);
         }
     }
 
     #[test]
     fn header_provider_auth_tag_honors_runtime_selection_and_oauth_first() {
         let _guard = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_RUNTIME_PROVIDER");
+        let prev = product_env_os("RUNTIME_PROVIDER");
 
         let both = AuthStatus {
             anthropic: ProviderAuth {
@@ -1411,22 +1412,22 @@ mod tests {
         };
 
         // Explicit API-key selection wins even when OAuth is available.
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude-api");
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "claude-api");
         assert_eq!(header_provider_auth_tag("anthropic", &both), "api-key");
 
         // Explicit OAuth selection.
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude");
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "claude");
         assert_eq!(header_provider_auth_tag("anthropic", &both), "oauth");
 
         // Auto (unset) prefers OAuth when both credentials are present.
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
         assert_eq!(header_provider_auth_tag("anthropic", &both), "oauth");
 
         // The "claude" display name resolves to the same Anthropic tagging.
         assert_eq!(header_provider_auth_tag("claude", &both), "oauth");
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "claude-api");
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "claude-api");
         assert_eq!(header_provider_auth_tag("claude", &both), "api-key");
-        crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
+        crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
 
         // Auto falls back to the API key when no OAuth credential exists.
         let api_only = AuthStatus {
@@ -1440,19 +1441,19 @@ mod tests {
         assert_eq!(header_provider_auth_tag("anthropic", &api_only), "api-key");
 
         if let Some(value) = prev {
-            crate::env::set_var("JCODE_RUNTIME_PROVIDER", value);
+            crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", value);
         } else {
-            crate::env::remove_var("JCODE_RUNTIME_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
         }
     }
 
     #[test]
     fn build_persistent_header_prefers_configured_model_during_remote_connect() {
         let _guard = crate::storage::lock_test_env();
-        let prev_model = std::env::var_os("JCODE_MODEL");
-        let prev_provider = std::env::var_os("JCODE_PROVIDER");
-        crate::env::set_var("JCODE_MODEL", "gpt-5.4");
-        crate::env::set_var("JCODE_PROVIDER", "openai");
+        let prev_model = product_env_os("MODEL");
+        let prev_provider = product_env_os("PROVIDER");
+        crate::env::set_var("NEXT_CODE_MODEL", "gpt-5.4");
+        crate::env::set_var("NEXT_CODE_PROVIDER", "openai");
 
         let app = crate::tui::app::App::new_for_remote(None);
         let lines = build_persistent_header(&app, 80);
@@ -1466,14 +1467,14 @@ mod tests {
         assert!(!rendered.contains("connecting to server…"));
 
         if let Some(prev_model) = prev_model {
-            crate::env::set_var("JCODE_MODEL", prev_model);
+            crate::env::set_var("NEXT_CODE_MODEL", prev_model);
         } else {
-            crate::env::remove_var("JCODE_MODEL");
+            crate::env::remove_var("NEXT_CODE_MODEL");
         }
         if let Some(prev_provider) = prev_provider {
-            crate::env::set_var("JCODE_PROVIDER", prev_provider);
+            crate::env::set_var("NEXT_CODE_PROVIDER", prev_provider);
         } else {
-            crate::env::remove_var("JCODE_PROVIDER");
+            crate::env::remove_var("NEXT_CODE_PROVIDER");
         }
     }
 
@@ -1555,7 +1556,7 @@ mod tests {
     #[test]
     fn auth_status_line_marks_active_credential_when_both_configured() {
         let _guard = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_RUNTIME_PROVIDER");
+        let prev = product_env_os("RUNTIME_PROVIDER");
         let auth = AuthStatus {
             anthropic: ProviderAuth {
                 state: AuthState::Available,
@@ -1568,8 +1569,8 @@ mod tests {
 
         let rendered_with = |runtime: Option<&str>| {
             match runtime {
-                Some(value) => crate::env::set_var("JCODE_RUNTIME_PROVIDER", value),
-                None => crate::env::remove_var("JCODE_RUNTIME_PROVIDER"),
+                Some(value) => crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", value),
+                None => crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER"),
             }
             build_auth_status_line(&auth, 120)
                 .spans
@@ -1594,8 +1595,8 @@ mod tests {
         );
 
         match prev {
-            Some(value) => crate::env::set_var("JCODE_RUNTIME_PROVIDER", value),
-            None => crate::env::remove_var("JCODE_RUNTIME_PROVIDER"),
+            Some(value) => crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", value),
+            None => crate::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER"),
         }
     }
 

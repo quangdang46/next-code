@@ -1,9 +1,10 @@
+use crate::env::{product_env};
 use crate::session::GitState;
 use std::path::Path;
 use std::process::Command;
 
 pub(super) fn trace_enabled() -> bool {
-    match std::env::var("JCODE_TRACE") {
+    match product_env("TRACE") {
         Ok(value) => {
             let value = value.trim();
             !value.is_empty() && value != "0" && value.to_lowercase() != "false"

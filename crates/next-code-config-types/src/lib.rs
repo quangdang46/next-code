@@ -722,7 +722,7 @@ pub struct TerminalConfig {
     /// One of: `ghostty`, `iterm2`, `wezterm`, `warp`, `alacritty`, `vscode`,
     /// `terminal` (Apple Terminal). When set, this is the source of truth for
     /// which terminal jcode launches into and is preferred over the legacy
-    /// `~/.jcode/preferred_terminal.json` file. Re-run `jcode setup-hotkey`
+    /// `~/.next-code/preferred_terminal.json` file. Re-run `jcode setup-hotkey`
     /// after changing it so the generated launcher script picks up the change.
     ///
     /// macOS only; ignored on other platforms.
@@ -1236,10 +1236,10 @@ impl Default for WebSearchConfig {
             engine: WebSearchEngine::Duckduckgo,
             fallback_engines: vec![WebSearchEngine::Bing],
             bing_api_key: None,
-            bing_api_key_env: "JCODE_BING_API_KEY".to_string(),
+            bing_api_key_env: "NEXT_CODE_BING_API_KEY".to_string(),
             bing_market: "en-US".to_string(),
             searxng_url: None,
-            searxng_url_env: "JCODE_SEARXNG_URL".to_string(),
+            searxng_url_env: "NEXT_CODE_SEARXNG_URL".to_string(),
         }
     }
 }

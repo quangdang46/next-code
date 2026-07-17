@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(dead_code))]
 
+use next_code_core::env::{product_env_os};
 use crate::desktop_log;
 use crate::single_session::{GitHubIssueBrowserState, GitHubIssuePreview, GitHubIssueVisualState};
 use anyhow::{Context, Result};
@@ -253,7 +254,7 @@ fn sync_issue_cache_for_repo_with_runner_and_root(
                 Err(error) => {
                     comment_fetch_errors += 1;
                     desktop_log::warn(format_args!(
-                        "jcode-desktop: failed to refresh comments for GitHub issue {repo}#{number}: {error:#}"
+                        "next-code-desktop: failed to refresh comments for GitHub issue {repo}#{number}: {error:#}"
                     ));
                     existing_comments
                 }
@@ -445,20 +446,20 @@ fn issue_cache_path_for_repo_in_root(root: &Path, repo: &str) -> PathBuf {
 }
 
 pub(crate) fn issue_cache_root() -> PathBuf {
-    if let Some(path) = std::env::var_os("JCODE_DESKTOP_ISSUE_CACHE_DIR") {
+    if let Some(path) = product_env_os("DESKTOP_ISSUE_CACHE_DIR") {
         return PathBuf::from(path);
     }
     next_code_data_dir().join("desktop/github/issues")
 }
 
 fn next_code_data_dir() -> PathBuf {
-    if let Some(path) = std::env::var_os("JCODE_HOME") {
+    if let Some(path) = product_env_os("HOME") {
         return PathBuf::from(path);
     }
     if let Some(home) = std::env::var_os("HOME") {
-        return PathBuf::from(home).join(".jcode");
+        return PathBuf::from(home).join(".next-code");
     }
-    PathBuf::from(".jcode")
+    PathBuf::from(".next-code")
 }
 
 fn repo_cache_key(repo: &str) -> String {
@@ -836,7 +837,7 @@ mod tests {
             .map(|duration| duration.as_nanos())
             .unwrap_or_default();
         std::env::temp_dir().join(format!(
-            "jcode-desktop-issue-cache-{name}-{}-{nanos}",
+            "next-code-desktop-issue-cache-{name}-{}-{nanos}",
             std::process::id()
         ))
     }
@@ -871,8 +872,8 @@ mod tests {
     #[test]
     fn parses_common_github_remote_urls() {
         assert_eq!(
-            parse_github_repo_from_remote("git@github.com:1jehuang/jcode.git").as_deref(),
-            Some("1jehuang/jcode")
+            parse_github_repo_from_remote("git@github.com:quangdang46/next-code.git").as_deref(),
+            Some("quangdang46/next-code")
         );
         assert_eq!(
             parse_github_repo_from_remote("https://github.com/owner/repo.git").as_deref(),

@@ -206,7 +206,7 @@ impl Config {
 
     /// One-time bake of per-repo launch hotkeys from session history.
     ///
-    /// Scans `~/.jcode/sessions` for the directories the user works in most,
+    /// Scans `~/.next-code/sessions` for the directories the user works in most,
     /// ranks them (recency-weighted, git-root folded, home excluded), and writes
     /// a static chord -> directory mapping into config: top repo on `Cmd+;`, home
     /// on `Cmd+'`, and the next repos on `Cmd+[` / `Cmd+]` / `Cmd+\`.
@@ -379,7 +379,7 @@ impl Config {
         }
 
         // The global config snapshot can be initialized before an auth flow saves
-        // a new path-bound trust decision, or before tests switch JCODE_HOME. Fall
+        // a new path-bound trust decision, or before tests switch NEXT_CODE_HOME. Fall
         // back to a fresh load on cache misses so fast auth probes remain correct
         // without penalizing the common already-trusted path.
         Self::load()

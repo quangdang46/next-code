@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Verify light-theme detection end to end.
 
-Spawns the freshly built jcode TUI in a PTY, replies to terminal queries
+Spawns the freshly built next-code TUI in a PTY, replies to terminal queries
 (OSC 10/11 foreground/background, DA, cursor position) advertising either a
 white or black background, captures the rendered output, and compares the SGR
-color usage. On the white background run, jcode should detect a light theme
+color usage. On the white background run, next-code should detect a light theme
 and emit dark foreground colors; on the black run it should keep the normal
 light-on-dark palette.
 """
@@ -21,17 +21,17 @@ import sys
 import time
 
 def _resolve_next_code_bin() -> str:
-    for key in ("NEXT_CODE_BIN", "JCODE_BIN"):
+    for key in ("NEXT_CODE_BIN", "NEXT_CODE_BIN"):
         val = os.environ.get(key)
         if val and os.path.isfile(val) and os.access(val, os.X_OK):
             return val
     candidates = [
         "~/.local/bin/next-code",
-        os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN") or os.path.expanduser("~/.local/bin/next-code"),
+        (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("JCODE_BIN")) or os.path.expanduser("~/.local/bin/next-code"),
         "~/.next-code/builds/current/next-code",
-        "~/.next-code/builds/current/jcode",
-        "~/.jcode/builds/current/next-code",
-        "~/.jcode/builds/current/jcode",
+        "~/.next-code/builds/current/next-code",
+        "~/.next-code/builds/current/next-code",
+        "~/.next-code/builds/current/next-code",
     ]
     for c in candidates:
         path = os.path.expanduser(c)
@@ -83,7 +83,7 @@ def run_capture(bg: str, seconds: float = 12.0) -> bytes:
     env = dict(os.environ)
     env["TERM"] = "xterm-256color"
     env["COLORTERM"] = "truecolor"
-    for k in ("JCODE_THEME", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TMUX", "STY", "SSH_TTY", "SSH_CONNECTION", "SSH_CLIENT", "KITTY_WINDOW_ID", "GHOSTTY_RESOURCES_DIR", "WEZTERM_PANE", "ZELLIJ"):
+    for k in ("NEXT_CODE_THEME", "TERM_PROGRAM", "TERM_PROGRAM_VERSION", "TMUX", "STY", "SSH_TTY", "SSH_CONNECTION", "SSH_CLIENT", "KITTY_WINDOW_ID", "GHOSTTY_RESOURCES_DIR", "WEZTERM_PANE", "ZELLIJ"):
         env.pop(k, None)
     proc = subprocess.Popen(
         [JCODE],
@@ -147,7 +147,7 @@ def main() -> int:
         print("FAIL: not enough SGR samples captured; TUI may not have rendered")
         return 1
 
-    # jcode's dim_color() is rgb(80,80,80); its lightness flip is (175,175,175).
+    # next-code's dim_color() is rgb(80,80,80); its lightness flip is (175,175,175).
     # The dark run must use the native palette and the light run the flipped one.
     if (80, 80, 80) not in dark:
         print("FAIL: dark run missing native dim color (80,80,80)")

@@ -89,7 +89,7 @@ fn test_convert_blocks_content() {
 fn imported_tool_history_is_provider_neutral() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
     let transcript = temp.path().join("tool-history.jsonl");
     std::fs::write(
         &transcript,
@@ -168,7 +168,7 @@ fn imported_history_is_bounded_for_fast_initial_render() {
 fn repeated_external_resume_reuses_the_imported_snapshot() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
     let transcript = temp.path().join("cached.jsonl");
     std::fs::write(
         &transcript,
@@ -191,7 +191,7 @@ fn repeated_external_resume_reuses_the_imported_snapshot() {
 fn cached_imported_session_preserves_existing_history_verbatim() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
     let imported_id = imported_codex_session_id("legacy-tools");
     let mut legacy = Session::create_with_id(imported_id.clone(), None, None);
     legacy.append_stored_message(StoredMessage {
@@ -222,10 +222,10 @@ fn cached_imported_session_preserves_existing_history_verbatim() {
         token_usage: None,
     });
     legacy.append_stored_message(StoredMessage {
-        id: "jcode-continuation".to_string(),
+        id: "next-code-continuation".to_string(),
         role: Role::Assistant,
         content: vec![ContentBlock::Text {
-            text: "continued inside jcode".to_string(),
+            text: "continued inside next-code".to_string(),
             cache_control: None,
         }],
         display_role: None,
@@ -273,7 +273,7 @@ fn message_role_prefilter_accepts_json_whitespace() {
 fn test_discover_projects_uses_sandboxed_external_home() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo");
     std::fs::create_dir_all(&project_dir).unwrap();
@@ -291,7 +291,7 @@ fn test_discover_projects_uses_sandboxed_external_home() {
 fn test_list_claude_code_sessions_uses_live_transcripts_when_index_is_stale() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).unwrap();
@@ -359,7 +359,7 @@ fn test_list_claude_code_sessions_uses_live_transcripts_when_index_is_stale() {
 fn test_list_claude_code_sessions_uses_index_metadata_without_parsing_transcript() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).unwrap();
@@ -405,7 +405,7 @@ fn test_list_claude_code_sessions_uses_index_metadata_without_parsing_transcript
 fn test_list_claude_code_sessions_skips_empty_index_entries_without_messages() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).unwrap();
@@ -445,7 +445,7 @@ fn test_list_claude_code_sessions_skips_empty_index_entries_without_messages() {
 fn test_import_claude_session_uses_recovered_live_transcript() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).unwrap();
@@ -492,7 +492,7 @@ fn test_import_claude_session_uses_recovered_live_transcript() {
 fn test_import_pi_session_creates_jcode_snapshot() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let pi_dir = temp.path().join("external/.pi/agent/sessions/project");
     std::fs::create_dir_all(&pi_dir).unwrap();
@@ -523,7 +523,7 @@ fn test_import_pi_session_creates_jcode_snapshot() {
 fn test_import_opencode_session_creates_jcode_snapshot() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let session_dir = temp
         .path()
@@ -642,7 +642,7 @@ fn test_import_opencode_session_creates_jcode_snapshot() {
 fn test_resolve_resume_target_to_jcode_imports_codex_session() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let codex_dir = temp.path().join("external/.codex/sessions/2026/04/05");
     std::fs::create_dir_all(&codex_dir).unwrap();
@@ -679,14 +679,14 @@ fn test_resolve_resume_target_to_jcode_imports_codex_session() {
 /// The resume picker builds a `ClaudeCodeSession` target with id `claude:<id>`
 /// and a transcript path; selecting it routes through
 /// `resolve_resume_target_to_jcode`, which must import the transcript and hand
-/// back a resumable `imported_cc_<id>` jcode session. This guards the full
+/// back a resumable `imported_cc_<id>` next-code session. This guards the full
 /// detect -> import -> resume round-trip for Claude Code (previously only Codex
 /// had coverage here).
 #[test]
 fn test_resolve_resume_target_to_jcode_imports_claude_code_session() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).unwrap();
@@ -734,17 +734,17 @@ fn test_resolve_resume_target_to_jcode_imports_claude_code_session() {
     assert_eq!(loaded.provider_key.as_deref(), Some("claude-code"));
 }
 
-/// Regression for silent data loss: the picker hides the imported jcode session
+/// Regression for silent data loss: the picker hides the imported next-code session
 /// (any `imported_*` stem) and only shows the external `claude:<id>` entry, so
 /// re-selecting a Claude session re-enters `import_session_from_file`. If the
-/// user already resumed and continued that imported session inside jcode, a
-/// blind re-import previously overwrote the snapshot and dropped the jcode-side
+/// user already resumed and continued that imported session inside next-code, a
+/// blind re-import previously overwrote the snapshot and dropped the next-code-side
 /// messages. The continuation must be preserved instead.
 #[test]
 fn test_reimporting_claude_session_preserves_jcode_continuation() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let project_dir = temp.path().join("external/.claude/projects/demo-project");
     std::fs::create_dir_all(&project_dir).unwrap();
@@ -763,13 +763,13 @@ fn test_reimporting_claude_session_preserves_jcode_continuation() {
     assert_eq!(imported.messages.len(), 2);
     let imported_id = imported_claude_code_session_id("claude-continued");
 
-    // User resumes inside jcode and appends a jcode-only follow-up message.
+    // User resumes inside next-code and appends a next-code-only follow-up message.
     let mut session = Session::load(&imported_id).unwrap();
     session.append_stored_message(StoredMessage {
-        id: "jcode-continuation".to_string(),
+        id: "next-code-continuation".to_string(),
         role: Role::User,
         content: vec![ContentBlock::Text {
-            text: "jcode-only follow up".to_string(),
+            text: "next-code-only follow up".to_string(),
             cache_control: None,
         }],
         display_role: None,
@@ -798,14 +798,14 @@ fn test_reimporting_claude_session_preserves_jcode_continuation() {
     assert_eq!(
         after.messages.len(),
         3,
-        "jcode-side continuation must not be clobbered by re-import"
+        "next-code-side continuation must not be clobbered by re-import"
     );
     let preserved = after.messages.iter().flat_map(|m| m.content.iter()).any(
-        |block| matches!(block, ContentBlock::Text { text, .. } if text == "jcode-only follow up"),
+        |block| matches!(block, ContentBlock::Text { text, .. } if text == "next-code-only follow up"),
     );
     assert!(
         preserved,
-        "the jcode-only follow up message must be preserved"
+        "the next-code-only follow up message must be preserved"
     );
 }
 
@@ -813,7 +813,7 @@ fn test_reimporting_claude_session_preserves_jcode_continuation() {
 fn test_import_cursor_session_creates_jcode_snapshot() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     // Cursor stores transcripts at
     // ~/.cursor/projects/<project>/agent-transcripts/<uuid>/<uuid>.jsonl where the
@@ -856,7 +856,7 @@ fn test_import_cursor_session_creates_jcode_snapshot() {
         "expected assistant text to import: {all_text:?}"
     );
 
-    // Resolving the resume target should import and remap to the jcode snapshot.
+    // Resolving the resume target should import and remap to the next-code snapshot.
     let resumed = crate::import::resolve_resume_target_to_jcode(
         &next_code_session_types::ResumeTarget::CursorSession {
             session_id: session_id.to_string(),

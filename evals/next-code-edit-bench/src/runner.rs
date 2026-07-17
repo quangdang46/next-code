@@ -239,7 +239,7 @@ async fn run_next_code_agent(
     use tokio::process::Command;
 
     let bin = std::env::var("NEXT_CODE_BIN")
-        .or_else(|_| std::env::var("JCODE_BIN"))
+        .or_else(|_| std::env::var("NEXT_CODE_BIN"))
         .unwrap_or_else(|_| "next-code".to_string());
 
     let mut child = Command::new(&bin)

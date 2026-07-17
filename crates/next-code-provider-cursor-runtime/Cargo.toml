@@ -9,6 +9,7 @@ name = "next_code_provider_cursor_runtime"
 path = "src/lib.rs"
 
 [dependencies]
+next-code-core = { path = "../next-code-core" }
 anyhow = "1"
 async-trait = "0.1"
 bytes = "1"

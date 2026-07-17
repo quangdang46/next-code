@@ -1,4 +1,4 @@
-//! `jcode doctor` — comprehensive, offline environment health check with `--fix`.
+//! `next-code doctor` — comprehensive, offline environment health check with `--fix`.
 //!
 //! A registry of independent checks (one per [`CheckCategory`]), each returning
 //! [`Finding`]s that aggregate into a [`DoctorReport`] rendered as grouped text
@@ -8,8 +8,8 @@
 //! up first.
 //!
 //! This command is OFFLINE and never spends provider balance. For live
-//! provider/credential verification use `jcode provider-doctor`,
-//! `jcode auth doctor`, and `jcode auth-test`.
+//! provider/credential verification use `next-code provider-doctor`,
+//! `next-code auth doctor`, and `next-code auth-test`.
 
 mod checks;
 mod fix;
@@ -127,8 +127,8 @@ mod tests {
     #[test]
     fn config_check_flags_bad_toml_in_project() {
         let tmp = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(tmp.path().join(".jcode")).unwrap();
-        std::fs::write(tmp.path().join(".jcode/config.toml"), "this = = broken").unwrap();
+        std::fs::create_dir_all(tmp.path().join(".next-code")).unwrap();
+        std::fs::write(tmp.path().join(".next-code/config.toml"), "this = = broken").unwrap();
         let mut out = Vec::new();
         checks::config::check_config(&opts_for(tmp.path().to_path_buf()), &mut out);
         assert!(

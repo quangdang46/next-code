@@ -1,4 +1,4 @@
--- Website visit -> successful first Jcode launch funnel, last 30 days.
+-- Website visit -> successful first Next Code launch funnel, last 30 days.
 -- Usage:
 --   wrangler d1 execute jcode-telemetry --remote --file=conversion.sql
 

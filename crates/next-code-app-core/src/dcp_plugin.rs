@@ -1,4 +1,4 @@
-//! DCP Plugin — wraps ContextPruner and bridges jcode ↔ DCP types.
+//! DCP Plugin — wraps ContextPruner and bridges next-code ↔ DCP types.
 
 use crate::message::Message as JMsg;
 #[cfg(feature = "dcp")]
@@ -55,7 +55,7 @@ impl DcpPlugin {
         self.pruner.has_pending_work()
     }
 
-    /// Run DCP transform on jcode messages.
+    /// Run DCP transform on next-code messages.
     ///
     /// Returns the transformed messages and a diff of what changed.
     /// If DCP is disabled, returns the input unchanged with changed=false.
@@ -69,7 +69,7 @@ impl DcpPlugin {
             });
         }
 
-        // 1. Convert jcode → DCP
+        // 1. Convert next-code → DCP
         let dcp_messages = crate::dcp_bridge::next_code_to_dcp(messages);
 
         // 2. Run DCP transform with diff
@@ -78,8 +78,8 @@ impl DcpPlugin {
             .transform_messages_with_diff(dcp_messages)
             .map_err(|e| format!("DCP transform error: {e:?}"))?;
 
-        // 3. Convert DCP → jcode
-        let next_code_messages = crate::dcp_bridge::dcp_to_jcode(result.messages);
+        // 3. Convert DCP → next-code
+        let next_code_messages = crate::dcp_bridge::dcp_to_next_code(result.messages);
 
         Ok(DcpTransformOutput {
             messages: next_code_messages,
@@ -113,7 +113,7 @@ impl DcpPlugin {
 
 /// Output of a DCP transform pass.
 pub struct DcpTransformOutput {
-    /// Transformed jcode messages.
+    /// Transformed next-code messages.
     pub messages: Vec<JMsg>,
     /// Estimated tokens saved.
     pub tokens_saved: u64,

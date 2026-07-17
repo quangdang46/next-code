@@ -97,7 +97,7 @@ fn effective_openai_compatible_auth_test_model(
         .filter(|model| !model.is_empty())
         .map(ToString::to_string)
         .or_else(|| {
-            std::env::var("JCODE_OPENROUTER_MODEL")
+            product_env("OPENROUTER_MODEL")
                 .ok()
                 .map(|model| model.trim().to_string())
                 .filter(|model| !model.is_empty())

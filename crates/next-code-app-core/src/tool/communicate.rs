@@ -673,7 +673,7 @@ impl RunPlanReporter {
             .await;
     }
 
-    /// Record an explicit checkpoint (a JCODE_CHECKPOINT-style milestone) on
+    /// Record an explicit checkpoint (a NEXT_CODE_CHECKPOINT-style milestone) on
     /// the background task, so pause/alert moments surface as checkpoint events
     /// in the UI instead of only trailing the output log. No-op inline.
     async fn checkpoint(&self, message: &str) {
@@ -1162,7 +1162,7 @@ fn detect_credential_failure_wave(
     })
 }
 
-/// The `jcode login` invocation most likely to fix a credential wave for
+/// The `next-code login` invocation most likely to fix a credential wave for
 /// `provider`, mapping provider names to their login provider keys.
 fn credential_login_fix_hint(provider: Option<&str>) -> String {
     let lowered = provider.map(str::to_ascii_lowercase);
@@ -1173,7 +1173,7 @@ fn credential_login_fix_hint(provider: Option<&str>) -> String {
         Some(other) if !other.trim().is_empty() => other,
         _ => "<provider>",
     };
-    format!("`jcode login --provider {target}`")
+    format!("`next-code login --provider {target}`")
 }
 
 /// Actionable pause message for a credential-failure wave: names the failed
@@ -1791,7 +1791,7 @@ impl CommunicateTool {
             BASE_DESCRIPTION.to_string()
         } else {
             format!(
-                "{BASE_DESCRIPTION}\n\nSwarm prompt (user-tunable via ~/.jcode/swarm-prompt.md):\n{swarm_prompt}"
+                "{BASE_DESCRIPTION}\n\nSwarm prompt (user-tunable via ~/.next-code/swarm-prompt.md):\n{swarm_prompt}"
             )
         };
         Self { description }

@@ -1,3 +1,4 @@
+use crate::env::product_env;
 use crate::id::{extract_session_name, new_id, new_memorable_session_id_avoiding};
 use crate::message::{ContentBlock, Message, Role};
 pub use crate::storage::{
@@ -8,7 +9,7 @@ use crate::storage::{active_pids_dir, register_active_pid, unregister_active_pid
 
 /// RAII guard that marks a session as actively streaming for its lifetime.
 ///
-/// Wraps the on-disk streaming marker from `jcode-storage` (cleared on every
+/// Wraps the on-disk streaming marker from `next-code-storage` (cleared on every
 /// exit path so presence UIs never show a phantom streaming session) and
 /// additionally holds a macOS power assertion so the system does not
 /// idle-sleep in the middle of a streaming model response.
@@ -23,7 +24,7 @@ impl StreamingGuard {
         Self {
             _marker: crate::storage::StreamingGuard::new(session_id),
             sleep_assertion: crate::platform::PowerAssertion::prevent_user_idle_system_sleep(
-                "Jcode streaming model response",
+                "Next Code streaming model response",
             ),
         }
     }
@@ -249,8 +250,8 @@ fn current_working_dir_string() -> Option<String> {
         .map(|p| p.to_string_lossy().to_string())
 }
 
-fn env_flag_enabled(name: &str) -> bool {
-    std::env::var(name)
+fn env_flag_enabled(suffix: &str) -> bool {
+    product_env(suffix)
         .map(|v| {
             let trimmed = v.trim();
             !trimmed.is_empty() && trimmed != "0" && !trimmed.eq_ignore_ascii_case("false")
@@ -259,7 +260,7 @@ fn env_flag_enabled(name: &str) -> bool {
 }
 
 fn default_is_test_session() -> bool {
-    env_flag_enabled("JCODE_TEST_SESSION")
+    env_flag_enabled("TEST_SESSION")
 }
 
 pub fn derive_session_provider_key(provider_name: &str) -> Option<String> {
@@ -271,21 +272,21 @@ pub fn derive_session_provider_key(provider_name: &str) -> Option<String> {
         return Some("next-code".to_string());
     }
 
-    if let Ok(runtime_provider) = std::env::var("JCODE_RUNTIME_PROVIDER") {
+    if let Ok(runtime_provider) = product_env("RUNTIME_PROVIDER") {
         let runtime_provider = runtime_provider.trim().to_ascii_lowercase();
         if !runtime_provider.is_empty() && runtime_provider != "openai-compatible" {
             return Some(runtime_provider);
         }
     }
 
-    if let Ok(namespace) = std::env::var("JCODE_OPENROUTER_CACHE_NAMESPACE") {
+    if let Ok(namespace) = product_env("OPENROUTER_CACHE_NAMESPACE") {
         let namespace = namespace.trim().to_ascii_lowercase();
         if !namespace.is_empty() {
             return Some(namespace);
         }
     }
 
-    if let Ok(active) = std::env::var("JCODE_ACTIVE_PROVIDER") {
+    if let Ok(active) = product_env("ACTIVE_PROVIDER") {
         let active = active.trim().to_ascii_lowercase();
         if !active.is_empty() {
             return Some(active);
@@ -1054,15 +1055,15 @@ request in this new forked session, using the inherited conversation only as con
         false
     }
 
-    /// Check if this session is working on the jcode repository
+    /// Check if this session is working on the next-code repository
     pub fn is_self_dev(&self) -> bool {
         if let Some(ref dir) = self.working_dir {
-            // Check if working dir contains jcode source
+            // Check if working dir contains next-code source
             let path = std::path::Path::new(dir);
             path.join("Cargo.toml").exists()
                 && path.join("src/main.rs").exists()
                 && std::fs::read_to_string(path.join("Cargo.toml"))
-                    .map(|s| s.contains("name = \"jcode\""))
+                    .map(|s| s.contains("name = \"next-code\""))
                     .unwrap_or(false)
         } else {
             false

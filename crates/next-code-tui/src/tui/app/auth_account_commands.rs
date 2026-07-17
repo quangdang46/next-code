@@ -143,13 +143,13 @@ fn parse_account_command(trimmed: &str) -> Option<Result<AccountCommand, String>
             "login" => AccountCommand::Login {
                 provider_id: provider.id.to_string(),
             },
-            "status" if provider.id == "next-code" || provider.id == "jcode" => {
+            "status" if provider.id == "next-code" || provider.id == "next-code" => {
                 AccountCommand::JcodeStatus
             }
-            "manage" if provider.id == "next-code" || provider.id == "jcode" => {
+            "manage" if provider.id == "next-code" || provider.id == "next-code" => {
                 AccountCommand::JcodeManage
             }
-            "logout" if provider.id == "next-code" || provider.id == "jcode" => {
+            "logout" if provider.id == "next-code" || provider.id == "next-code" => {
                 AccountCommand::JcodeLogout
             }
             "add" => AccountCommand::Add {
@@ -774,7 +774,7 @@ fn save_openai_compat_setting(app: &mut App, setting: OpenAiCompatSetting, value
                 },
                 None => None,
             };
-            ("JCODE_OPENAI_COMPAT_API_BASE", normalized)
+            ("NEXT_CODE_OPENAI_COMPAT_API_BASE", normalized)
         }
         OpenAiCompatSetting::ApiKeyName => {
             if let Some(value) = value
@@ -787,7 +787,7 @@ fn save_openai_compat_setting(app: &mut App, setting: OpenAiCompatSetting, value
                 return;
             }
             (
-                "JCODE_OPENAI_COMPAT_API_KEY_NAME",
+                "NEXT_CODE_OPENAI_COMPAT_API_KEY_NAME",
                 value.map(ToString::to_string),
             )
         }
@@ -801,12 +801,12 @@ fn save_openai_compat_setting(app: &mut App, setting: OpenAiCompatSetting, value
                 return;
             }
             (
-                "JCODE_OPENAI_COMPAT_ENV_FILE",
+                "NEXT_CODE_OPENAI_COMPAT_ENV_FILE",
                 value.map(ToString::to_string),
             )
         }
         OpenAiCompatSetting::DefaultModel => (
-            "JCODE_OPENAI_COMPAT_DEFAULT_MODEL",
+            "NEXT_CODE_OPENAI_COMPAT_DEFAULT_MODEL",
             value.map(ToString::to_string),
         ),
     };
@@ -1101,9 +1101,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_native_jcode_account_actions() {
+    fn parse_native_next_code_account_actions() {
         assert!(matches!(
-            parse_account_command("/account jcode login"),
+            parse_account_command("/account next-code login"),
             Some(Ok(AccountCommand::Login { provider_id })) if provider_id == "next-code"
         ));
         assert!(matches!(
@@ -1111,7 +1111,7 @@ mod tests {
             Some(Ok(AccountCommand::Login { provider_id })) if provider_id == "next-code"
         ));
         assert!(matches!(
-            parse_account_command("/account jcode status"),
+            parse_account_command("/account next-code status"),
             Some(Ok(AccountCommand::JcodeStatus))
         ));
         assert!(matches!(
@@ -1119,11 +1119,11 @@ mod tests {
             Some(Ok(AccountCommand::JcodeStatus))
         ));
         assert!(matches!(
-            parse_account_command("/account jcode manage"),
+            parse_account_command("/account next-code manage"),
             Some(Ok(AccountCommand::JcodeManage))
         ));
         assert!(matches!(
-            parse_account_command("/account jcode logout"),
+            parse_account_command("/account next-code logout"),
             Some(Ok(AccountCommand::JcodeLogout))
         ));
     }
@@ -1134,7 +1134,7 @@ mod tests {
         let markdown = render_auth_doctor_markdown(Some("openai"));
         assert!(markdown.contains("OpenAI (openai)"));
         assert!(markdown.contains("Next steps"));
-        assert!(markdown.contains("jcode login --provider openai"));
-        assert!(markdown.contains("Review current state: jcode auth status --json"));
+        assert!(markdown.contains("next-code login --provider openai"));
+        assert!(markdown.contains("Review current state: next-code auth status --json"));
     }
 }

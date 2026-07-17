@@ -1,16 +1,16 @@
-//! Prompt-template discovery for `jcode prompts list|show` (issue #4 MVP).
+//! Prompt-template discovery for `next-code prompts list|show` (issue #4 MVP).
 //!
 //! A prompt template is a Markdown file that the user can later expand into
 //! the editor via `/<name>`. The interactive expansion + autocomplete +
 //! front-matter / arg substitution pieces are tracked separately; this module
 //! is the discovery + display half so users can drop a template into the
-//! documented directories and confirm jcode sees it before any UI work.
+//! documented directories and confirm next-code sees it before any UI work.
 //!
 //! Discovery order (project beats global on collision):
 //!
-//!   1. `<cwd>/.jcode/prompts/*.md` walking up the ancestor chain (closest
+//!   1. `<cwd>/.next-code/prompts/*.md` walking up the ancestor chain (closest
 //!      to cwd wins for a given name).
-//!   2. `~/.jcode/prompts/*.md` (user-global).
+//!   2. `~/.next-code/prompts/*.md` (user-global).
 //!
 //! Filenames without the `.md` extension become the command name. Names are
 //! validated as kebab-case-friendly (ASCII alphanumeric + `-`/`_`); files
@@ -131,7 +131,7 @@ fn max_mtime_in(working_dir: Option<&Path>) -> SystemTime {
     if let Some(start) = working_dir {
         let mut current: Option<&Path> = Some(start);
         while let Some(d) = current {
-            let dir = d.join(".jcode").join("prompts");
+            let dir = d.join(".next-code").join("prompts");
             if dir.is_dir() {
                 fold_dir_mtimes(&dir, &mut max);
             }
@@ -155,8 +155,8 @@ pub struct PromptTemplate {
     pub name: String,
     /// Source path on disk.
     pub path: PathBuf,
-    /// Origin: `"project"` for `.jcode/prompts/` walked up from cwd,
-    /// `"user"` for `~/.jcode/prompts/`.
+    /// Origin: `"project"` for `.next-code/prompts/` walked up from cwd,
+    /// `"user"` for `~/.next-code/prompts/`.
     pub source: &'static str,
     /// Raw body (file contents). MVP keeps this opaque — front-matter and
     /// `{{name}}` placeholders are parsed in a follow-up PR.
@@ -209,7 +209,7 @@ fn collect_dir_into(out: &mut BTreeMap<String, PromptTemplate>, dir: &Path, sour
     }
 }
 
-/// Walk cwd ancestors then home for `.jcode/prompts/`. Closest-to-cwd wins.
+/// Walk cwd ancestors then home for `.next-code/prompts/`. Closest-to-cwd wins.
 pub fn discover() -> Vec<PromptTemplate> {
     discover_in(std::env::current_dir().ok().as_deref())
 }
@@ -222,7 +222,7 @@ pub fn discover_in(working_dir: Option<&Path>) -> Vec<PromptTemplate> {
     if let Some(start) = working_dir {
         let mut current: Option<&Path> = Some(start);
         while let Some(d) = current {
-            let dir = d.join(".jcode").join("prompts");
+            let dir = d.join(".next-code").join("prompts");
             if dir.is_dir() {
                 collect_dir_into(&mut found, &dir, "project");
             }
@@ -246,7 +246,7 @@ pub fn find_by_name(name: &str) -> Option<PromptTemplate> {
     discover().into_iter().find(|t| t.name == name)
 }
 
-/// Serializable summary for `jcode prompts list --json`.
+/// Serializable summary for `next-code prompts list --json`.
 #[derive(Debug, serde::Serialize)]
 pub struct PromptTemplateSummary<'a> {
     pub name: &'a str,
@@ -275,7 +275,7 @@ pub fn run_list(json: bool) -> Result<()> {
     }
     if templates.is_empty() {
         println!(
-            "No prompt templates found. Drop Markdown files into `.jcode/prompts/` (project) or `~/.jcode/prompts/` (user)."
+            "No prompt templates found. Drop Markdown files into `.next-code/prompts/` (project) or `~/.next-code/prompts/` (user)."
         );
         return Ok(());
     }
@@ -579,9 +579,9 @@ pub fn substitute_placeholders(
 /// Where `prompts new` should drop a freshly-scaffolded template.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NewLocation {
-    /// `<cwd>/.jcode/prompts/<name>.md` (default; project-local).
+    /// `<cwd>/.next-code/prompts/<name>.md` (default; project-local).
     Project,
-    /// `~/.jcode/prompts/<name>.md` (user-global).
+    /// `~/.next-code/prompts/<name>.md` (user-global).
     User,
 }
 
@@ -597,10 +597,10 @@ pub fn run_new(name: &str, location: NewLocation, force: bool) -> Result<PathBuf
     let dir = match location {
         NewLocation::Project => {
             let cwd = std::env::current_dir().context("cannot resolve cwd")?;
-            cwd.join(".jcode").join("prompts")
+            cwd.join(".next-code").join("prompts")
         }
         NewLocation::User => crate::storage::next_code_dir()
-            .context("cannot resolve ~/.jcode")?
+            .context("cannot resolve ~/.next-code")?
             .join("prompts"),
     };
     std::fs::create_dir_all(&dir).with_context(|| format!("failed to create {}", dir.display()))?;
@@ -622,7 +622,7 @@ pub fn run_new(name: &str, location: NewLocation, force: bool) -> Result<PathBuf
            default: bugs\n\
          ---\n\n\
          # {name}\n\n\
-         Replace this body with the prompt jcode should expand when the user\n\
+         Replace this body with the prompt next-code should expand when the user\n\
          types `/{name}` (or `/{name} <args>`).\n\n\
          Example placeholders supported by future expansion work:\n\
          - {{{{focus}}}} — bound to the `focus` arg above (default `bugs`).\n\n\
@@ -642,9 +642,9 @@ mod new_tests {
     #[test]
     fn run_new_writes_starter_template_to_user_dir() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::TempDir::new().expect("temp");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let path = run_new("review", NewLocation::User, false).expect("scaffold");
         assert_eq!(path, temp.path().join("prompts").join("review.md"));
@@ -661,18 +661,18 @@ mod new_tests {
         run_new("review", NewLocation::User, true).expect("force overwrite");
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
     #[test]
     fn run_new_rejects_invalid_names() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::TempDir::new().expect("temp");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         for bad in ["bad name", "with$char", "", "../escape"] {
             let err = run_new(bad, NewLocation::User, false).unwrap_err();
@@ -683,9 +683,9 @@ mod new_tests {
         }
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }
@@ -697,14 +697,14 @@ mod tests {
     #[test]
     fn project_dir_overrides_user_global_on_name_collision() {
         let temp = tempfile::TempDir::new().expect("temp");
-        let proj = temp.path().join(".jcode/prompts");
+        let proj = temp.path().join(".next-code/prompts");
         std::fs::create_dir_all(&proj).unwrap();
         std::fs::write(proj.join("review.md"), "PROJECT_REVIEW_BODY").unwrap();
 
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let user_temp = tempfile::TempDir::new().expect("user");
-        crate::env::set_var("JCODE_HOME", user_temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", user_temp.path());
         let user_dir = user_temp.path().join("prompts");
         std::fs::create_dir_all(&user_dir).unwrap();
         std::fs::write(user_dir.join("review.md"), "USER_REVIEW_BODY").unwrap();
@@ -712,9 +712,9 @@ mod tests {
         let templates = discover_in(Some(temp.path()));
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
 
         let review = templates
@@ -728,7 +728,7 @@ mod tests {
     #[test]
     fn invalid_names_are_skipped() {
         let temp = tempfile::TempDir::new().expect("temp");
-        let proj = temp.path().join(".jcode/prompts");
+        let proj = temp.path().join(".next-code/prompts");
         std::fs::create_dir_all(&proj).unwrap();
         std::fs::write(proj.join("ok-name.md"), "ok").unwrap();
         std::fs::write(proj.join("bad name with spaces.md"), "bad").unwrap();
@@ -736,16 +736,16 @@ mod tests {
         std::fs::write(proj.join("not-markdown.txt"), "ignored").unwrap();
 
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let user_temp = tempfile::TempDir::new().expect("user");
-        crate::env::set_var("JCODE_HOME", user_temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", user_temp.path());
 
         let templates = discover_in(Some(temp.path()));
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
 
         let names: Vec<&str> = templates.iter().map(|t| t.name.as_str()).collect();
@@ -753,26 +753,26 @@ mod tests {
     }
 
     #[test]
-    fn ancestor_walk_finds_template_in_parent_jcode_dir() {
+    fn ancestor_walk_finds_template_in_parent_next_code_dir() {
         let temp = tempfile::TempDir::new().expect("temp");
         let parent = temp.path();
-        let proj = parent.join(".jcode/prompts");
+        let proj = parent.join(".next-code/prompts");
         std::fs::create_dir_all(&proj).unwrap();
         std::fs::write(proj.join("rev.md"), "BODY_FROM_PARENT").unwrap();
         let nested = parent.join("nested/deep");
         std::fs::create_dir_all(&nested).unwrap();
 
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let user_temp = tempfile::TempDir::new().expect("user");
-        crate::env::set_var("JCODE_HOME", user_temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", user_temp.path());
 
         let templates = discover_in(Some(&nested));
 
         if let Some(prev) = prev {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
 
         let rev = templates.iter().find(|t| t.name == "rev").expect("found");
@@ -928,11 +928,11 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_prompt_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let project = temp.path().join("project");
-        let prompts = project.join(".jcode/prompts");
+        let prompts = project.join(".next-code/prompts");
         write_template(&prompts, "review", "Review this.");
 
         let (first, token1) = discover_cached_in(Some(&project));
@@ -943,9 +943,9 @@ mod hot_reload_tests {
         assert_eq!(token1, token2);
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -954,11 +954,11 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_prompt_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let project = temp.path().join("proj2");
-        let prompts = project.join(".jcode/prompts");
+        let prompts = project.join(".next-code/prompts");
         write_template(&prompts, "first", "First.");
 
         let (first, token1) = discover_cached_in(Some(&project));
@@ -973,9 +973,9 @@ mod hot_reload_tests {
         assert_ne!(token1, token2);
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -984,11 +984,11 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_prompt_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let project = temp.path().join("proj3");
-        let prompts = project.join(".jcode/prompts");
+        let prompts = project.join(".next-code/prompts");
         write_template(&prompts, "doomed", "About to be deleted.");
 
         let (first, token1) = discover_cached_in(Some(&project));
@@ -1002,9 +1002,9 @@ mod hot_reload_tests {
         assert_ne!(token1, token2);
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -1013,12 +1013,12 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_prompt_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev_home = std::env::var_os("JCODE_HOME");
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
         let prev_cwd = std::env::current_dir().ok();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         std::env::set_current_dir(temp.path()).unwrap();
 
-        let prompts = temp.path().join(".jcode/prompts");
+        let prompts = temp.path().join(".next-code/prompts");
         write_template(&prompts, "initial", "x");
 
         let (_, token) = discover_cached();
@@ -1033,9 +1033,9 @@ mod hot_reload_tests {
             std::env::set_current_dir(c).ok();
         }
         if let Some(p) = prev_home {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -1044,12 +1044,12 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_prompt_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev_home = std::env::var_os("JCODE_HOME");
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
         let prev_cwd = std::env::current_dir().ok();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         std::env::set_current_dir(temp.path()).unwrap();
 
-        let prompts = temp.path().join(".jcode/prompts");
+        let prompts = temp.path().join(".next-code/prompts");
         write_template(&prompts, "any", "any");
 
         // Epoch token should always differ from current state when files exist.
@@ -1059,9 +1059,9 @@ mod hot_reload_tests {
             std::env::set_current_dir(c).ok();
         }
         if let Some(p) = prev_home {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }

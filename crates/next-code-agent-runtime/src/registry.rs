@@ -3,7 +3,7 @@
 //! ## Lookup paths (highest priority first)
 //!
 //! 1. **Project-local**: `<cwd>/.jcode/agents/*.toml`
-//! 2. **User-global**: `~/.jcode/agents/*.toml`
+//! 2. **User-global**: `~/.next-code/agents/*.toml`
 //! 3. **Builtins** registered programmatically via [`AgentRegistry::register_builtin`]
 //!
 //! When the same id appears in multiple sources, the higher-priority one
@@ -33,7 +33,7 @@ use std::path::{Path, PathBuf};
 pub enum AgentSource {
     /// Compiled into the binary by name. Lowest priority.
     Builtin,
-    /// Loaded from `~/.jcode/agents/<file>`.
+    /// Loaded from `~/.next-code/agents/<file>`.
     UserGlobal { path: PathBuf },
     /// Loaded from `<project>/.jcode/agents/<file>`. Highest priority.
     ProjectLocal { path: PathBuf },
@@ -327,7 +327,7 @@ impl AgentRegistry {
 pub enum SourceKind {
     /// Read-only agents shipped with jcode or installed by admin.
     Managed,
-    /// User-global agents at ~/.jcode/agents/.
+    /// User-global agents at ~/.next-code/agents/.
     UserGlobal,
     /// Project-local agents at .jcode/agents/.
     ProjectLocal,

@@ -37,7 +37,7 @@ pub(crate) struct GitHubIssueBrowserState {
 impl GitHubIssueBrowserState {
     pub(crate) fn sample() -> Self {
         Self {
-            repo: "1jehuang/jcode".to_string(),
+            repo: "quangdang46/next-code".to_string(),
             filter_label: "priority · open · local cache".to_string(),
             selected: 0,
             list_scroll: 0,
@@ -89,7 +89,7 @@ impl GitHubIssueBrowserState {
                     state: GitHubIssueVisualState::Idle,
                     body_lines: vec![
                         "Desktop auth failures currently show a terse provider error.".to_string(),
-                        "It should offer a one-click path to the same diagnostic information as `jcode auth doctor`.".to_string(),
+                        "It should offer a one-click path to the same diagnostic information as `next-code auth doctor`.".to_string(),
                     ],
                     comment_lines: vec!["nice to have after core desktop stability".to_string()],
                     priority_reason: "important UX improvement, but not blocking active work".to_string(),

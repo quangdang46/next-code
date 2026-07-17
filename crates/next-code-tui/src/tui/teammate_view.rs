@@ -3,7 +3,7 @@
 //! **Each subagent has a Message-level transcript; view = swap to that
 //! transcript** (or empty). Never show lead messages while viewing.
 //!
-//! jcode multi-session mapping:
+//! next-code multi-session mapping:
 //! - **Hard attach** (`resume_session`) = full child session history (primary Enter)
 //! - **Soft buffer** (`teammate_transcripts` / `SwarmMemberMessage`) = live mirror
 //!   while staying on the lead socket (only when Message-level content exists)

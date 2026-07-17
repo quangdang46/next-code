@@ -7,7 +7,7 @@
 //! The TUI picker stores favorites and recent selections
 //! in-memory via \`tui_picker::PickerState\`. This module adds
 //! the persistence layer: a JSON file at
-//! \`~/.jcode/model_prefs.json\` that survives process restarts.
+//! \`~/.next-code/model_prefs.json\` that survives process restarts.
 //!
 //! Format:
 //! \`\`\`json
@@ -135,7 +135,7 @@ pub enum PrefsError {
     Invalid(String),
 }
 
-/// Default path: `~/.jcode/model_prefs.json`.
+/// Default path: `~/.next-code/model_prefs.json`.
 pub fn default_path() -> Option<PathBuf> {
     let home = std::env::var_os("HOME")?;
     Some(PathBuf::from(home).join(".jcode").join("model_prefs.json"))
@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn empty_when_file_missing() {
-        let p = std::env::temp_dir().join("jcode-prefs-missing.json");
+        let p = std::env::temp_dir().join("next-code-prefs-missing.json");
         let _ = std::fs::remove_file(&p);
         let prefs = ModelPrefs::load(&p).unwrap();
         assert!(prefs.favorites.is_empty());
@@ -156,7 +156,7 @@ mod tests {
 
     #[test]
     fn round_trip() {
-        let p = std::env::temp_dir().join("jcode-prefs-rt.json");
+        let p = std::env::temp_dir().join("next-code-prefs-rt.json");
         let _ = std::fs::remove_file(&p);
         let mut prefs = ModelPrefs::new();
         prefs.add_favorite("anthropic".into(), "claude-haiku-4-5".into());
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn round_trip_with_default() {
-        let p = std::env::temp_dir().join("jcode-prefs-default-rt.json");
+        let p = std::env::temp_dir().join("next-code-prefs-default-rt.json");
         let _ = std::fs::remove_file(&p);
         let mut prefs = ModelPrefs::new();
         prefs.set_default("anthropic".into(), "claude-haiku-4-5".into());
@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn invalid_file_surfaces_error() {
-        let p = std::env::temp_dir().join("jcode-prefs-bad.json");
+        let p = std::env::temp_dir().join("next-code-prefs-bad.json");
         std::fs::write(&p, "not json").unwrap();
         let err = ModelPrefs::load(&p).unwrap_err();
         assert!(matches!(err, PrefsError::Invalid(_)));

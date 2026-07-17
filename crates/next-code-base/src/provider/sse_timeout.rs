@@ -4,11 +4,11 @@
 //! Anthropic thinking blocks) can stall a stream for >180s while still being
 //! healthy. The hard-coded `Duration::from_secs(180)` was triggering false
 //! "Stream stalled" errors. Make it configurable so users with slow models
-//! can extend the budget without forking jcode.
+//! can extend the budget without forking next-code.
 //!
 //! Resolution order:
 //!
-//!   1. `JCODE_SSE_CHUNK_TIMEOUT_SECS` env var. Must be a positive integer
+//!   1. `NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS` env var. Must be a positive integer
 //!      (`u64`); 0 and non-numeric values fall through to (2).
 //!   2. The provider-supplied default (`default_secs`).
 //!
@@ -27,7 +27,7 @@ pub(crate) fn chunk_timeout(default_secs: u64) -> Duration {
 /// Same as `chunk_timeout`, but returns the raw seconds (useful for log
 /// messages that need to interpolate the resolved value).
 pub(crate) fn chunk_timeout_secs(default_secs: u64) -> u64 {
-    parse_secs_env("JCODE_SSE_CHUNK_TIMEOUT_SECS").unwrap_or(default_secs)
+    parse_secs_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS").unwrap_or(default_secs)
 }
 
 fn parse_secs_env(key: &str) -> Option<u64> {
@@ -60,40 +60,40 @@ mod tests {
     #[test]
     fn falls_back_to_default_when_env_missing() {
         let _lock = crate::storage::lock_test_env();
-        let prev = save_env("JCODE_SSE_CHUNK_TIMEOUT_SECS");
+        let prev = save_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS");
         assert_eq!(chunk_timeout_secs(180), 180);
         assert_eq!(chunk_timeout(180), Duration::from_secs(180));
-        restore_env("JCODE_SSE_CHUNK_TIMEOUT_SECS", prev);
+        restore_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", prev);
     }
 
     #[test]
     fn reads_positive_integer_from_env() {
         let _lock = crate::storage::lock_test_env();
-        let prev = save_env("JCODE_SSE_CHUNK_TIMEOUT_SECS");
-        crate::env::set_var("JCODE_SSE_CHUNK_TIMEOUT_SECS", "600");
+        let prev = save_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS");
+        crate::env::set_var("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", "600");
         assert_eq!(chunk_timeout_secs(180), 600);
-        restore_env("JCODE_SSE_CHUNK_TIMEOUT_SECS", prev);
+        restore_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", prev);
     }
 
     #[test]
     fn rejects_zero_and_garbage() {
         let _lock = crate::storage::lock_test_env();
-        let prev = save_env("JCODE_SSE_CHUNK_TIMEOUT_SECS");
-        crate::env::set_var("JCODE_SSE_CHUNK_TIMEOUT_SECS", "0");
+        let prev = save_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS");
+        crate::env::set_var("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", "0");
         assert_eq!(chunk_timeout_secs(180), 180);
-        crate::env::set_var("JCODE_SSE_CHUNK_TIMEOUT_SECS", "abc");
+        crate::env::set_var("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", "abc");
         assert_eq!(chunk_timeout_secs(180), 180);
-        crate::env::set_var("JCODE_SSE_CHUNK_TIMEOUT_SECS", "  ");
+        crate::env::set_var("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", "  ");
         assert_eq!(chunk_timeout_secs(180), 180);
-        restore_env("JCODE_SSE_CHUNK_TIMEOUT_SECS", prev);
+        restore_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", prev);
     }
 
     #[test]
     fn trims_whitespace() {
         let _lock = crate::storage::lock_test_env();
-        let prev = save_env("JCODE_SSE_CHUNK_TIMEOUT_SECS");
-        crate::env::set_var("JCODE_SSE_CHUNK_TIMEOUT_SECS", "  300  ");
+        let prev = save_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS");
+        crate::env::set_var("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", "  300  ");
         assert_eq!(chunk_timeout_secs(180), 300);
-        restore_env("JCODE_SSE_CHUNK_TIMEOUT_SECS", prev);
+        restore_env("NEXT_CODE_SSE_CHUNK_TIMEOUT_SECS", prev);
     }
 }

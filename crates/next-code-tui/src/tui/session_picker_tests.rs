@@ -634,8 +634,8 @@ fn test_filter_matches_recent_message_content() {
 fn test_loading_preview_refreshes_search_index_for_picker_filtering() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("temp dir");
-    let previous_home = std::env::var("JCODE_HOME").ok();
-    crate::env::set_var("JCODE_HOME", temp.path());
+    let previous_home = std::env::var("NEXT_CODE_HOME").ok();
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let mut session = Session::create_with_id(
         "session_preview_search".to_string(),
@@ -671,9 +671,9 @@ fn test_loading_preview_refreshes_search_index_for_picker_filtering() {
     assert_eq!(picker.visible_sessions.len(), 1);
 
     if let Some(previous_home) = previous_home {
-        crate::env::set_var("JCODE_HOME", previous_home);
+        crate::env::set_var("NEXT_CODE_HOME", previous_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
@@ -1130,9 +1130,9 @@ fn onboarding_external_filter_picks_latest_visible_transcript() {
     };
 
     // A non-Codex session that must be filtered out.
-    let jcode = make_session("next_code_one", "jcode", false, SessionStatus::Closed);
+    let next-code = make_session("next_code_one", "next-code", false, SessionStatus::Closed);
 
-    let mut picker = SessionPicker::new(vec![older, jcode, newer]);
+    let mut picker = SessionPicker::new(vec![older, next-code, newer]);
     picker.activate_external_cli_filter(SessionFilterMode::Codex);
 
     assert_eq!(picker.visible_session_count(), 2);
@@ -1151,8 +1151,8 @@ fn onboarding_external_filter_picks_latest_visible_transcript() {
 
 #[test]
 fn onboarding_external_filter_with_no_matches_has_no_target() {
-    let jcode = make_session("next_code_only", "jcode", false, SessionStatus::Closed);
-    let mut picker = SessionPicker::new(vec![jcode]);
+    let next-code = make_session("next_code_only", "next-code", false, SessionStatus::Closed);
+    let mut picker = SessionPicker::new(vec![next-code]);
     picker.activate_external_cli_filter(SessionFilterMode::ClaudeCode);
 
     assert_eq!(picker.visible_session_count(), 0);
@@ -1214,7 +1214,7 @@ fn onboarding_banner_offers_review_then_new_session() {
 fn onboarding_banner_renders_prompt_and_both_action_rows() {
     let mut picker = SessionPicker::new(Vec::new());
     picker.activate_onboarding_banner(vec![
-        Line::from("Welcome to jcode"),
+        Line::from("Welcome to next-code"),
         Line::from("Choose how to begin."),
     ]);
 
@@ -1235,7 +1235,7 @@ fn onboarding_banner_renders_prompt_and_both_action_rows() {
         .collect::<Vec<_>>();
 
     assert!(
-        text.contains("Welcome to jcode"),
+        text.contains("Welcome to next-code"),
         "onboarding prompt should render in the banner: {text:?}"
     );
     assert!(
@@ -1257,7 +1257,7 @@ fn onboarding_banner_renders_prompt_and_both_action_rows() {
 
     let welcome_y = lines
         .iter()
-        .position(|line| line.contains("Welcome to jcode"))
+        .position(|line| line.contains("Welcome to next-code"))
         .expect("welcome row");
     let review_y = lines
         .iter()
@@ -1351,7 +1351,7 @@ fn buffer_text(picker: &mut SessionPicker, w: u16, h: u16) -> String {
 // Developer benchmarks: profile the operations exercised by the `/resume`
 // overlay. These are `#[ignore]`d so they never run in CI; run them with:
 //
-//   cargo test -p jcode-tui --lib --release -- --ignored --nocapture benchmark_resume_op
+//   cargo test -p next-code-tui --lib --release -- --ignored --nocapture benchmark_resume_op
 //
 // They print human-readable timing lines to stderr. They use synthetic
 // sessions so they are deterministic and independent of the user's session

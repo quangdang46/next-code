@@ -89,6 +89,6 @@ next_code_configure_path() {
 }
 
 # Legacy alias kept for one release so existing callers keep working.
-jcode_configure_path() {
+next_code_configure_path() {
   next_code_configure_path "$@"
 }

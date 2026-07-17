@@ -4,11 +4,11 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
-# Application core for jcode: all non-presentation modules (server, agent,
+# Application core for next-code: all non-presentation modules (server, agent,
 # provider, auth, session, tool, config, etc.) extracted out of the monolithic
-# root `jcode` crate so they compile as a separate rustc unit. The root `jcode`
+# root `next-code` crate so they compile as a separate rustc unit. The root `next-code`
 # crate (cli + tui + bin) re-exports this crate's modules via `pub use
-# jcode_app_core::*`, preserving every existing `crate::<module>` path.
+# next_code_app_core::*`, preserving every existing `crate::<module>` path.
 
 [lib]
 name = "next_code_app_core"
@@ -110,7 +110,7 @@ next-code-build-support = { path = "../next-code-build-support" }
 next-code-build-meta = { path = "../next-code-build-meta" }
 
 # Foundational layer (provider, auth, config, session, message, memory, ...).
-# Re-exported via `pub use jcode_base::*` in lib.rs. default-features=false so
+# Re-exported via `pub use next_code_base::*` in lib.rs. default-features=false so
 # this crate controls next-code-base's optional features (see [features] below).
 next-code-base = { path = "../next-code-base", default-features = false }
 next-code-keywords = { path = "../next-code-keywords" }

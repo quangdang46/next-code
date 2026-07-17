@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-const ALLOW_LEGACY_AUTH_ENV: &str = "JCODE_ALLOW_CODEX_LEGACY_AUTH";
+use crate::env::product_env;
 pub const LEGACY_CODEX_AUTH_SOURCE_ID: &str = "openai_codex_auth_json";
 
 #[derive(Debug, Clone)]
@@ -127,7 +127,7 @@ pub fn trust_legacy_auth_for_future_use() -> Result<()> {
 }
 
 pub fn legacy_auth_allowed() -> bool {
-    std::env::var(ALLOW_LEGACY_AUTH_ENV)
+    product_env("ALLOW_CODEX_LEGACY_AUTH")
         .ok()
         .map(|value| {
             matches!(
@@ -345,7 +345,7 @@ fn load_oauth_credentials_internal(return_expired: bool) -> Result<CodexCredenti
         {
             return Ok(creds);
         }
-        expired_candidates.push(("jcode", creds));
+        expired_candidates.push(("next-code", creds));
     }
 
     #[allow(clippy::collapsible_if)]
@@ -438,7 +438,7 @@ pub fn upsert_account_from_tokens(
 fn load_jcode_credentials() -> Result<CodexCredentials> {
     let auth = load_auth_file()?;
     if auth.openai_accounts.is_empty() {
-        anyhow::bail!("No OpenAI accounts configured in jcode auth file")
+        anyhow::bail!("No OpenAI accounts configured in next-code auth file")
     }
 
     let active_label = get_active_account_override()
@@ -450,7 +450,7 @@ fn load_jcode_credentials() -> Result<CodexCredentials> {
         .iter()
         .find(|account| account.label == active_label)
         .or_else(|| auth.openai_accounts.first())
-        .context("No OpenAI accounts in jcode auth file")?;
+        .context("No OpenAI accounts in next-code auth file")?;
 
     Ok(credentials_from_account(account))
 }
@@ -566,7 +566,7 @@ fn decode_jwt_payload(token: &str) -> Option<Value> {
 /// Derive an access-token expiry (epoch millis) from the JWT `exp` claim.
 ///
 /// The Codex CLI's `auth.json` does not persist an `expires_at`; it only stores
-/// the raw tokens plus a `last_refresh` timestamp. Without an expiry, jcode
+/// the raw tokens plus a `last_refresh` timestamp. Without an expiry, next-code
 /// would never *proactively* refresh an imported token and would send a stale
 /// (often already-expired) access token on the first request, triggering a 401
 /// and an unnecessary "token refresh needed" / re-login. The OpenAI access
@@ -575,7 +575,7 @@ fn decode_jwt_payload(token: &str) -> Option<Value> {
 pub(crate) fn expires_at_from_access_token(access_token: &str) -> Option<i64> {
     let payload = decode_jwt_payload(access_token)?;
     let exp = payload.get("exp")?.as_i64()?;
-    // `exp` is in seconds since epoch; the rest of jcode tracks expiry in millis.
+    // `exp` is in seconds since epoch; the rest of next-code tracks expiry in millis.
     exp.checked_mul(1000)
 }
 

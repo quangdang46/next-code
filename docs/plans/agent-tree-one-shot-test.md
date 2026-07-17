@@ -1,6 +1,6 @@
 # Agent tree — one-shot manual test (after install)
 
-**Binary:** `~/.jcode/builds/current/jcode` (expect hash matching latest `feat/agent-tree`)  
+**Binary:** `~/.next-code/builds/current/jcode` (expect hash matching latest `feat/agent-tree`)  
 **Serve:** must map that same binary (`bash scripts/restart_local_serve.sh` if unsure)
 
 ## Prep

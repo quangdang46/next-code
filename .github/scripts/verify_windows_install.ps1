@@ -21,7 +21,7 @@ $env:LOCALAPPDATA = $localAppData
 $env:APPDATA = $appData
 $env:USERPROFILE = $userProfile
 $env:NEXT_CODE_HOME = $nextCodeHome
-$env:JCODE_HOME = $nextCodeHome
+$env:NEXT_CODE_HOME = $nextCodeHome
 
 $installScript = Join-Path $repoRoot 'scripts\install.ps1'
 

@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import JCodeKit
+@testable import NextCodeKit
 
 /// Scriptable in-memory transport for Connection tests.
 actor FakeTransport: WebSocketTransport {

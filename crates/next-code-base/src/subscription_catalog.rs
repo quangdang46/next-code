@@ -1,13 +1,13 @@
 use crate::provider_catalog;
 
-pub const JCODE_API_KEY_ENV: &str = "JCODE_API_KEY";
-pub const JCODE_API_BASE_ENV: &str = "JCODE_API_BASE";
-pub const JCODE_ACCOUNT_ID_ENV: &str = "JCODE_ACCOUNT_ID";
-pub const JCODE_ACCOUNT_EMAIL_ENV: &str = "JCODE_ACCOUNT_EMAIL";
-pub const JCODE_TIER_ENV: &str = "JCODE_TIER";
-pub const JCODE_ENV_FILE: &str = "jcode-subscription.env";
+pub const JCODE_API_KEY_ENV: &str = "NEXT_CODE_API_KEY";
+pub const JCODE_API_BASE_ENV: &str = "NEXT_CODE_API_BASE";
+pub const JCODE_ACCOUNT_ID_ENV: &str = "NEXT_CODE_ACCOUNT_ID";
+pub const JCODE_ACCOUNT_EMAIL_ENV: &str = "NEXT_CODE_ACCOUNT_EMAIL";
+pub const JCODE_TIER_ENV: &str = "NEXT_CODE_TIER";
+pub const JCODE_ENV_FILE: &str = "next-code-subscription.env";
 pub const JCODE_CACHE_NAMESPACE: &str = "jcode-subscription";
-pub const JCODE_SUBSCRIPTION_ACTIVE_ENV: &str = "JCODE_SUBSCRIPTION_ACTIVE";
+pub const JCODE_SUBSCRIPTION_ACTIVE_ENV: &str = "NEXT_CODE_SUBSCRIPTION_ACTIVE";
 pub const DEFAULT_JCODE_API_BASE: &str = "https://api.jcode.sh/v1";
 pub const JCODE_PRICING_URL: &str = "https://jcode.sh/pricing";
 pub const JCODE_ACCOUNT_URL: &str = "https://jcode.sh/account";
@@ -91,7 +91,7 @@ impl JcodeTier {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UpstreamRoutingPolicy {
-    /// Routing is decided server-side by the jcode router (model -> provider +
+    /// Routing is decided server-side by the next-code router (model -> provider +
     /// org key). The client does not pick upstreams; this is the only policy for
     /// the managed subscription.
     ServerManaged,
@@ -117,7 +117,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         default_enabled: true,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
         min_tier: JcodeTier::Plus,
-        note: "Frontier model; routed server-side to Anthropic by the jcode router.",
+        note: "Frontier model; routed server-side to Anthropic by the next-code router.",
     },
     CuratedModel {
         id: "gpt-5.5",
@@ -126,7 +126,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         default_enabled: false,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
         min_tier: JcodeTier::Plus,
-        note: "Frontier model; routed server-side to OpenAI by the jcode router.",
+        note: "Frontier model; routed server-side to OpenAI by the next-code router.",
     },
     CuratedModel {
         id: "claude-fable-5",
@@ -135,7 +135,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         default_enabled: false,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
         min_tier: JcodeTier::Flagship,
-        note: "Flagship-tier model; routed server-side to Anthropic by the jcode router.",
+        note: "Flagship-tier model; routed server-side to Anthropic by the next-code router.",
     },
     CuratedModel {
         id: "gpt-5.6-sol",
@@ -144,7 +144,7 @@ pub const CURATED_MODELS: &[CuratedModel] = &[
         default_enabled: false,
         routing_policy: UpstreamRoutingPolicy::ServerManaged,
         min_tier: JcodeTier::Plus,
-        note: "Frontier model; routed server-side to OpenAI by the jcode router.",
+        note: "Frontier model; routed server-side to OpenAI by the next-code router.",
     },
 ];
 
@@ -188,7 +188,7 @@ pub fn is_curated_model(model: &str) -> bool {
 /// The effective subscription tier for gating decisions.
 ///
 /// `/v1/me` is the source of truth; the last-known tier is persisted to
-/// `jcode-subscription.env` (`JCODE_TIER`). Unknown/absent tier behaves like
+/// `next-code-subscription.env` (`NEXT_CODE_TIER`). Unknown/absent tier behaves like
 /// Plus for backward compatibility.
 pub fn effective_tier() -> JcodeTier {
     cached_tier().unwrap_or(JcodeTier::Plus)
@@ -238,7 +238,7 @@ pub fn has_credentials() -> bool {
     configured_api_key().is_some()
 }
 
-/// Persist an account API key and its non-secret account metadata in jcode's
+/// Persist an account API key and its non-secret account metadata in next-code's
 /// owner-only subscription file.
 pub fn persist_account_credentials(
     api_key: &str,
@@ -248,7 +248,7 @@ pub fn persist_account_credentials(
 ) -> anyhow::Result<()> {
     let api_key = api_key.trim();
     if api_key.is_empty() {
-        anyhow::bail!("refusing to persist an empty jcode account API key");
+        anyhow::bail!("refusing to persist an empty next-code account API key");
     }
 
     for (key, value) in [
@@ -302,7 +302,7 @@ pub fn ensure_account_credential_permissions() -> anyhow::Result<()> {
         let mode = std::fs::metadata(&path)?.permissions().mode() & 0o777;
         if mode & 0o077 != 0 {
             anyhow::bail!(
-                "jcode account credential file has unsafe permissions {:03o}; expected owner-only access",
+                "next-code account credential file has unsafe permissions {:03o}; expected owner-only access",
                 mode
             );
         }
@@ -329,30 +329,30 @@ pub fn is_runtime_mode_enabled() -> bool {
 pub fn apply_runtime_env() {
     crate::env::set_var(JCODE_SUBSCRIPTION_ACTIVE_ENV, "1");
     crate::env::set_var(
-        "JCODE_OPENROUTER_API_BASE",
+        "NEXT_CODE_OPENROUTER_API_BASE",
         configured_api_base().unwrap_or_else(|| DEFAULT_JCODE_API_BASE.to_string()),
     );
-    crate::env::set_var("JCODE_OPENROUTER_API_KEY_NAME", JCODE_API_KEY_ENV);
-    crate::env::set_var("JCODE_OPENROUTER_ENV_FILE", JCODE_ENV_FILE);
-    crate::env::set_var("JCODE_OPENROUTER_CACHE_NAMESPACE", JCODE_CACHE_NAMESPACE);
-    crate::env::set_var("JCODE_OPENROUTER_PROVIDER_FEATURES", "0");
-    crate::env::set_var("JCODE_OPENROUTER_TRANSPORT_STATE", "jcode-subscription");
-    crate::env::remove_var("JCODE_OPENROUTER_ALLOW_NO_AUTH");
-    crate::env::remove_var("JCODE_OPENROUTER_PROVIDER");
-    crate::env::remove_var("JCODE_OPENROUTER_NO_FALLBACK");
+    crate::env::set_var("NEXT_CODE_OPENROUTER_API_KEY_NAME", JCODE_API_KEY_ENV);
+    crate::env::set_var("NEXT_CODE_OPENROUTER_ENV_FILE", JCODE_ENV_FILE);
+    crate::env::set_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", JCODE_CACHE_NAMESPACE);
+    crate::env::set_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES", "0");
+    crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "jcode-subscription");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_PROVIDER");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_NO_FALLBACK");
 }
 
 pub fn clear_runtime_env() {
     crate::env::remove_var(JCODE_SUBSCRIPTION_ACTIVE_ENV);
-    crate::env::remove_var("JCODE_OPENROUTER_API_BASE");
-    crate::env::remove_var("JCODE_OPENROUTER_API_KEY_NAME");
-    crate::env::remove_var("JCODE_OPENROUTER_ENV_FILE");
-    crate::env::remove_var("JCODE_OPENROUTER_CACHE_NAMESPACE");
-    crate::env::remove_var("JCODE_OPENROUTER_PROVIDER_FEATURES");
-    crate::env::remove_var("JCODE_OPENROUTER_TRANSPORT_STATE");
-    crate::env::remove_var("JCODE_OPENROUTER_ALLOW_NO_AUTH");
-    crate::env::remove_var("JCODE_OPENROUTER_PROVIDER");
-    crate::env::remove_var("JCODE_OPENROUTER_NO_FALLBACK");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_API_BASE");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_API_KEY_NAME");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_ENV_FILE");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_PROVIDER_FEATURES");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_ALLOW_NO_AUTH");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_PROVIDER");
+    crate::env::remove_var("NEXT_CODE_OPENROUTER_NO_FALLBACK");
 }
 
 #[cfg(test)]
@@ -461,7 +461,7 @@ mod tests {
         let _guard = crate::storage::lock_test_env();
         crate::env::remove_var(JCODE_TIER_ENV);
         let temp = tempfile::tempdir().expect("temp home");
-        crate::env::set_var("JCODE_HOME", temp.path().to_string_lossy().to_string());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path().to_string_lossy().to_string());
 
         assert_eq!(cached_tier(), None);
         assert_eq!(effective_tier(), JcodeTier::Plus);
@@ -492,7 +492,7 @@ mod tests {
         store_cached_tier(None).expect("clear tier");
         assert_eq!(cached_tier(), None);
 
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
         crate::env::remove_var(JCODE_TIER_ENV);
     }
 

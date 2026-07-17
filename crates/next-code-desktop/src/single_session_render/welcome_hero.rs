@@ -42,7 +42,7 @@ pub(crate) fn welcome_hero_reveal_progress_for_elapsed(elapsed: Duration) -> f32
 }
 
 pub(crate) fn welcome_hero_runtime_mask_supported(phrase: &str) -> bool {
-    let enabled = std::env::var_os("JCODE_DESKTOP_RUNTIME_HERO_MASK").is_none_or(|value| {
+    let enabled = std::env::var_os("NEXT_CODE_DESKTOP_RUNTIME_HERO_MASK").is_none_or(|value| {
         !matches!(
             value.to_string_lossy().trim().to_ascii_lowercase().as_str(),
             "" | "0" | "false" | "off" | "no"

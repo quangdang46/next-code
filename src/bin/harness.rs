@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 #[derive(Parser)]
-#[command(name = "jcode-harness")]
+#[command(name = "next-code-harness")]
 #[command(about = "Run a deterministic tool harness smoke test")]
 struct Args {
     /// Use an explicit working directory (defaults to a temp folder).
@@ -213,6 +213,6 @@ async fn main() -> Result<()> {
 
 fn create_temp_workspace() -> Result<PathBuf> {
     let mut path = std::env::temp_dir();
-    path.push(format!("jcode-harness-{}", new_id("run")));
+    path.push(format!("next-code-harness-{}", new_id("run")));
     Ok(path)
 }

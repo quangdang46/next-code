@@ -2,9 +2,10 @@
 name = "next-code-plugin-core"
 version = "0.1.0"
 edition = "2024"
-description = "Core types, manifest, security, and event definitions for the jcode plugin system"
+description = "Core types, manifest, security, and event definitions for the next-code plugin system"
 
 [dependencies]
+next-code-core = { path = "../next-code-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 semver = { version = "1.0", features = ["serde"] }

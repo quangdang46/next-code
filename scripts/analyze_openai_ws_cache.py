@@ -23,7 +23,7 @@ Usage
 -----
     python3 scripts/analyze_openai_ws_cache.py [LOGFILE ...]
 
-With no arguments it scans ~/.next-code/logs/next-code-*.log (falls back to ~/.jcode/logs/jcode-*.log).
+With no arguments it scans ~/.next-code/logs/next-code-*.log (falls back to ~/.next-code/logs/next-code-*.log).
 """
 
 from __future__ import annotations
@@ -40,9 +40,9 @@ def _log_files(argv: list[str]) -> list[str]:
         return argv
     home = os.environ.get("HOME", "")
     paths = sorted(glob.glob(os.path.join(home, ".next-code", "logs", "next-code-*.log")))
-    paths += sorted(glob.glob(os.path.join(home, ".next-code", "logs", "jcode-*.log")))
-    paths += sorted(glob.glob(os.path.join(home, ".jcode", "logs", "jcode-*.log")))
-    paths += sorted(glob.glob(os.path.join(home, ".jcode", "logs", "next-code-*.log")))
+    paths += sorted(glob.glob(os.path.join(home, ".next-code", "logs", "next-code-*.log")))
+    paths += sorted(glob.glob(os.path.join(home, ".next-code", "logs", "next-code-*.log")))
+    paths += sorted(glob.glob(os.path.join(home, ".next-code", "logs", "next-code-*.log")))
     return paths
 
 

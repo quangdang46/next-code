@@ -1,7 +1,7 @@
 //! OpenRouter / OpenAI-compatible provider shared helpers (compatibility shim).
 //!
 //! The OpenRouter provider *runtime* (`OpenRouterProvider`) now lives in the
-//! downstream `jcode-provider-openrouter-runtime` crate so provider edits do
+//! downstream `next-code-provider-openrouter-runtime` crate so provider edits do
 //! not rebuild the base -> app-core -> tui spine. The binary's composition
 //! root registers a parameterized factory via
 //! [`crate::provider::external::register_openrouter_factory`].
@@ -11,8 +11,9 @@
 //! - [`OpenRouterTransportState`] (used by the TUI header and auth lifecycle),
 //! - the credential probe (`has_credentials`), and
 //! - re-exports of the pure catalog/cache types from
-//!   `jcode-provider-openrouter`.
+//!   `next-code-provider-openrouter`.
 
+use crate::env::{product_env, product_env_os};
 use crate::provider_catalog::{
     OPENAI_COMPAT_PROFILE, is_safe_env_file_name, is_safe_env_key_name,
     load_api_key_from_env_or_config, normalize_api_base, openai_compatible_profiles,
@@ -80,17 +81,15 @@ pub fn get_api_key() -> Option<String> {
 const DEFAULT_API_BASE: &str = "https://openrouter.ai/api/v1";
 const DEFAULT_API_KEY_NAME: &str = "OPENROUTER_API_KEY";
 const DEFAULT_ENV_FILE: &str = "openrouter.env";
-const OPENROUTER_TRANSPORT_STATE_ENV: &str = "JCODE_OPENROUTER_TRANSPORT_STATE";
-
 fn explicit_openrouter_runtime_configured() -> bool {
     [
-        "JCODE_OPENROUTER_API_BASE",
-        "JCODE_OPENROUTER_API_KEY_NAME",
-        "JCODE_OPENROUTER_ENV_FILE",
-        "JCODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER",
+        "OPENROUTER_API_BASE",
+        "OPENROUTER_API_KEY_NAME",
+        "OPENROUTER_ENV_FILE",
+        "OPENROUTER_DYNAMIC_BEARER_PROVIDER",
     ]
     .iter()
-    .any(|var| std::env::var_os(var).is_some())
+    .any(|suffix| crate::env::product_env_os(suffix).is_some())
 }
 
 fn autodetected_openai_compatible_profile()
@@ -129,7 +128,7 @@ fn autodetected_openai_compatible_profile()
 }
 
 fn configured_api_base() -> String {
-    let raw = std::env::var("JCODE_OPENROUTER_API_BASE")
+    let raw = product_env("OPENROUTER_API_BASE")
         .ok()
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
@@ -137,7 +136,7 @@ fn configured_api_base() -> String {
         .unwrap_or_else(|| DEFAULT_API_BASE.to_string());
     normalize_api_base(&raw).unwrap_or_else(|| {
         crate::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_API_BASE '{}'; using {}",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_API_BASE '{}'; using {}",
             raw, DEFAULT_API_BASE
         ));
         DEFAULT_API_BASE.to_string()
@@ -145,7 +144,7 @@ fn configured_api_base() -> String {
 }
 
 fn configured_api_key_name() -> String {
-    let raw = std::env::var("JCODE_OPENROUTER_API_KEY_NAME")
+    let raw = product_env("OPENROUTER_API_KEY_NAME")
         .ok()
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
@@ -155,7 +154,7 @@ fn configured_api_key_name() -> String {
         raw
     } else {
         crate::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_API_KEY_NAME '{}'; using {}",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_API_KEY_NAME '{}'; using {}",
             raw, DEFAULT_API_KEY_NAME
         ));
         DEFAULT_API_KEY_NAME.to_string()
@@ -163,7 +162,7 @@ fn configured_api_key_name() -> String {
 }
 
 fn configured_env_file_name() -> String {
-    let raw = std::env::var("JCODE_OPENROUTER_ENV_FILE")
+    let raw = product_env("OPENROUTER_ENV_FILE")
         .ok()
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty())
@@ -173,7 +172,7 @@ fn configured_env_file_name() -> String {
         raw
     } else {
         crate::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_ENV_FILE '{}'; using {}",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_ENV_FILE '{}'; using {}",
             raw, DEFAULT_ENV_FILE
         ));
         DEFAULT_ENV_FILE.to_string()
@@ -189,12 +188,12 @@ fn parse_env_bool(value: &str) -> Option<bool> {
 }
 
 fn provider_features_enabled(api_base: &str) -> bool {
-    if let Ok(raw) = std::env::var("JCODE_OPENROUTER_PROVIDER_FEATURES") {
+    if let Ok(raw) = product_env("OPENROUTER_PROVIDER_FEATURES") {
         if let Some(value) = parse_env_bool(&raw) {
             return value;
         }
         crate::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_PROVIDER_FEATURES '{}'; expected true/false",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_PROVIDER_FEATURES '{}'; expected true/false",
             raw
         ));
     }
@@ -202,14 +201,14 @@ fn provider_features_enabled(api_base: &str) -> bool {
 }
 
 fn configured_dynamic_bearer_provider() -> Option<String> {
-    std::env::var("JCODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER")
+    product_env("OPENROUTER_DYNAMIC_BEARER_PROVIDER")
         .ok()
         .map(|v| v.trim().to_ascii_lowercase())
         .filter(|v| !v.is_empty())
 }
 
 fn configured_allow_no_auth() -> bool {
-    std::env::var("JCODE_OPENROUTER_ALLOW_NO_AUTH")
+    product_env("OPENROUTER_ALLOW_NO_AUTH")
         .ok()
         .and_then(|raw| parse_env_bool(&raw))
         .or_else(|| {
@@ -229,7 +228,7 @@ pub enum OpenRouterTransportState {
     /// Real OpenRouter BYOK. The provider implementation is both the runtime identity
     /// and the HTTP transport.
     OpenRouterApiKey,
-    /// Jcode subscription access currently reuses the OpenRouter HTTP slot, but is
+    /// Next Code subscription access currently reuses the OpenRouter HTTP slot, but is
     /// not user BYOK/OpenRouter billing.
     JcodeSubscription,
     /// A direct OpenAI-compatible endpoint that needs a user key, Azure credential,
@@ -265,7 +264,7 @@ impl OpenRouterTransportState {
         }
 
         if Self::runtime_provider_is_direct_compatible(runtime_provider.as_deref())
-            || std::env::var_os("JCODE_NAMED_PROVIDER_PROFILE").is_some()
+            || product_env_os("NAMED_PROVIDER_PROFILE").is_some()
         {
             return Self::DirectApiKey;
         }
@@ -279,7 +278,7 @@ impl OpenRouterTransportState {
     }
 
     fn from_env_marker() -> Option<Self> {
-        let raw = std::env::var(OPENROUTER_TRANSPORT_STATE_ENV).ok()?;
+        let raw = crate::env::product_env("OPENROUTER_TRANSPORT_STATE").ok()?;
         let value = raw.trim().to_ascii_lowercase();
         if value.is_empty() {
             return None;
@@ -289,10 +288,10 @@ impl OpenRouterTransportState {
             "openrouter" | "openrouter-api-key" | "openrouter_byok" | "openrouter-byok" => {
                 Some(Self::OpenRouterApiKey)
             }
-            "jcode"
+            "next-code"
+            | "jcode"
             | "jcode-subscription"
             | "subscription"
-            | "next-code"
             | "next-code-subscription" => Some(Self::JcodeSubscription),
             "direct" | "direct-api-key" | "openai-compatible" | "compatible-api-key" => {
                 Some(Self::DirectApiKey)
@@ -300,8 +299,8 @@ impl OpenRouterTransportState {
             "direct-no-auth" | "no-auth" | "local" => Some(Self::DirectNoAuth),
             other => {
                 crate::logging::warn(&format!(
-                    "Ignoring invalid {} '{}'; expected openrouter-api-key, next-code-subscription, direct-api-key, or direct-no-auth",
-                    OPENROUTER_TRANSPORT_STATE_ENV, other
+                    "Ignoring invalid NEXT_CODE_OPENROUTER_TRANSPORT_STATE (or legacy JCODE_*) '{}'; expected openrouter-api-key, next-code-subscription, direct-api-key, or direct-no-auth",
+                    other
                 ));
                 None
             }

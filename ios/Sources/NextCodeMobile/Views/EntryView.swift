@@ -1,4 +1,4 @@
-import JCodeKit
+import NextCodeKit
 import SwiftUI
 
 /// Friendly placeholder for a fresh session, centered in the canvas.

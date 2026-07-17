@@ -186,8 +186,8 @@ fn test_remote_runtime_activity_notification_renders_as_system_message() {
 
     app.handle_server_event(
         crate::protocol::ServerEvent::Notification {
-            from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_session: "next-code".to_string(),
+            from_name: Some("Next Code".to_string()),
             notification_type: crate::protocol::NotificationType::Message {
                 scope: Some("auth_activity".to_string()),
                 channel: None,
@@ -220,8 +220,8 @@ fn test_remote_auth_activity_notification_is_status_only_during_onboarding() {
 
     app.handle_server_event(
         crate::protocol::ServerEvent::Notification {
-            from_session: "jcode".to_string(),
-            from_name: Some("Jcode".to_string()),
+            from_session: "next-code".to_string(),
+            from_name: Some("Next Code".to_string()),
             notification_type: crate::protocol::NotificationType::Message {
                 scope: Some("auth_activity".to_string()),
                 channel: None,
@@ -262,8 +262,8 @@ fn test_remote_catalog_activity_notification_upserts_progress_card() {
     ] {
         app.handle_server_event(
             crate::protocol::ServerEvent::Notification {
-                from_session: "jcode".to_string(),
-                from_name: Some("Jcode".to_string()),
+                from_session: "next-code".to_string(),
+                from_name: Some("Next Code".to_string()),
                 notification_type: crate::protocol::NotificationType::Message {
                     scope: Some("catalog_activity".to_string()),
                     channel: None,
@@ -362,11 +362,11 @@ fn test_model_picker_remote_comtegra_model_uses_comtegra_route_not_copilot() {
 #[test]
 fn test_model_picker_remote_bedrock_model_has_bedrock_route_when_configured() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var("JCODE_HOME").ok();
+    let prev_home = std::env::var("NEXT_CODE_HOME").ok();
     let prev_key = std::env::var(crate::provider::bedrock::API_KEY_ENV).ok();
     let prev_region = std::env::var(crate::provider::bedrock::REGION_ENV).ok();
     let temp = tempfile::tempdir().expect("tempdir");
-    crate::env::set_var("JCODE_HOME", temp.path().display().to_string());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path().display().to_string());
     crate::env::set_var(crate::provider::bedrock::API_KEY_ENV, "test-bedrock-key");
     crate::env::set_var(crate::provider::bedrock::REGION_ENV, "us-east-2");
     crate::auth::AuthStatus::invalidate_cache();
@@ -378,8 +378,8 @@ fn test_model_picker_remote_bedrock_model_has_bedrock_route_when_configured() {
     app.open_model_picker();
 
     match prev_home {
-        Some(value) => crate::env::set_var("JCODE_HOME", value),
-        None => crate::env::remove_var("JCODE_HOME"),
+        Some(value) => crate::env::set_var("NEXT_CODE_HOME", value),
+        None => crate::env::remove_var("NEXT_CODE_HOME"),
     }
     match prev_key {
         Some(value) => crate::env::set_var(crate::provider::bedrock::API_KEY_ENV, value),

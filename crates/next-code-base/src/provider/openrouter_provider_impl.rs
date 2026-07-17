@@ -199,7 +199,7 @@ impl Provider for OpenRouterProvider {
         // Merge user-configured extra request-body fields last so they can
         // satisfy non-standard backend requirements (e.g. NVIDIA NIM
         // DeepSeek-V4 `chat_template_kwargs`) and intentionally override any
-        // jcode-generated field with the same key (issue #341).
+        // next-code-generated field with the same key (issue #341).
         #[allow(clippy::collapsible_if)]
         if let Some(extra) = self.extra_body.as_ref() {
             if let Some(request_obj) = request.as_object_mut() {

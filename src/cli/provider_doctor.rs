@@ -1,5 +1,6 @@
 //! `next-code provider-doctor` command: a user-facing strict provider/model diagnostic.
 
+use crate::env::product_env_os;
 use std::io::IsTerminal;
 
 use anyhow::{Context, Result, anyhow};
@@ -96,7 +97,7 @@ fn emit_report(report: &DoctorReport, emit_json: bool, emit_toon: bool) {
     } else {
         let colorize = std::io::stdout().is_terminal()
             && std::env::var_os("NO_COLOR").is_none()
-            && std::env::var_os("JCODE_NO_COLOR").is_none();
+            && product_env_os("NO_COLOR").is_none();
         print!("{}", format_report(report, colorize));
     }
 }

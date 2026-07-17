@@ -445,7 +445,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_auth_success() {
-        let var_name = "JCODE_TEST_AUTH_KEY_UNIQUE_001";
+        let var_name = "NEXT_CODE_TEST_AUTH_KEY_UNIQUE_001";
         // SAFETY: test-only env var mutation in a single-threaded test context.
         unsafe { env::set_var(var_name, "from-env") };
         let auth = config(var_name.into());
@@ -466,7 +466,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_config_auth_missing_env() {
-        let var_name = "JCODE_TEST_AUTH_KEY_DOES_NOT_EXIST";
+        let var_name = "NEXT_CODE_TEST_AUTH_KEY_DOES_NOT_EXIST";
         // SAFETY: test-only env var mutation in a single-threaded test context.
         unsafe { env::remove_var(var_name) };
         let auth = config(var_name.into());

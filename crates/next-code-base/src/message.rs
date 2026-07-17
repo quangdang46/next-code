@@ -32,7 +32,7 @@ fn compile_static_regex(pattern: &str) -> Option<Regex> {
         Ok(regex) => Some(regex),
         Err(err) => {
             logging::error(&format!("failed to compile static message regex: {err}"));
-            eprintln!("jcode: failed to compile static regex: {err}");
+            eprintln!("next-code: failed to compile static regex: {err}");
             None
         }
     }
@@ -175,8 +175,8 @@ pub fn redact_secrets(text: &str) -> String {
 
     // Also redact custom API key variable names configured at runtime.
     for source in [
-        "JCODE_OPENROUTER_API_KEY_NAME",
-        "JCODE_OPENAI_COMPAT_API_KEY_NAME",
+        "NEXT_CODE_OPENROUTER_API_KEY_NAME",
+        "NEXT_CODE_OPENAI_COMPAT_API_KEY_NAME",
     ] {
         let Some(key_name) = std::env::var(source)
             .ok()
@@ -324,7 +324,7 @@ pub fn generated_image_visual_context_blocks(
     ));
     let (media_type, data_b64) = generated_image_payload(path, output_format)?;
     let mut reminder = format!(
-        "<system-reminder>\nA provider-native image generation call created `{}`. Jcode attached the image pixels as visual context for future turns because the active provider supports image input and the file is under the safe {} MB limit.\nFormat: {}",
+        "<system-reminder>\nA provider-native image generation call created `{}`. Next Code attached the image pixels as visual context for future turns because the active provider supports image input and the file is under the safe {} MB limit.\nFormat: {}",
         path,
         GENERATED_IMAGE_MAX_AUTO_VISION_BYTES / 1024 / 1024,
         output_format,

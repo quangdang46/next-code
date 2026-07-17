@@ -1,9 +1,9 @@
 //! Provider usage policy -- deny-list based filtering.
 //!
 //! Mirrors opencode's `PolicyService` which evaluates `"provider.use"`
-//! actions to `"allow"` / `"deny"`.  jcode simplifies this to a deny
+//! actions to `"allow"` / `"deny"`.  next-code simplifies this to a deny
 //! list: a set of [`ProviderId`]s the user has explicitly blocked,
-//! sourced from `config.toml` or the `JCODE_DENIED_PROVIDERS` env var.
+//! sourced from `config.toml` or the `NEXT_CODE_DENIED_PROVIDERS` env var.
 //!
 //! The [`CatalogService`](crate::catalog::CatalogService) calls
 //! [`PolicyService::is_allowed`] from both its `finalize` step (removes
@@ -25,6 +25,7 @@
 //! assert!(policy.is_allowed(&"anthropic".into()));
 //! ```
 
+use next_code_core::env::{product_env};
 use crate::types::ProviderId;
 use std::collections::HashSet;
 
@@ -64,7 +65,7 @@ pub trait PolicyService: Send + Sync {
 /// assert!(!policy.is_allowed(&"antigravity".into()));
 /// ```
 ///
-/// Or from the `JCODE_DENIED_PROVIDERS` env var (comma-separated):
+/// Or from the `NEXT_CODE_DENIED_PROVIDERS` env var (comma-separated):
 ///
 /// ```no_run
 /// use next_code_provider_service::policy::DenyListPolicy;
@@ -89,11 +90,11 @@ impl DenyListPolicy {
         Self { denied }
     }
 
-    /// Create a deny list from the `JCODE_DENIED_PROVIDERS` environment
+    /// Create a deny list from the `NEXT_CODE_DENIED_PROVIDERS` environment
     /// variable.  The value is split on commas, trimmed, and lowercased.
     /// Returns an empty policy when the variable is unset or empty.
     pub fn from_env() -> Self {
-        match std::env::var("JCODE_DENIED_PROVIDERS") {
+        match product_env("DENIED_PROVIDERS") {
             Ok(val) => Self::parse(val.as_str()),
             Err(_) => Self {
                 denied: HashSet::new(),

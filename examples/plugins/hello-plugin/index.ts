@@ -1,16 +1,16 @@
-// Hello Plugin — real working example for jcode's plugin system.
+// Hello Plugin — real working example for next-code's plugin system.
 //
 // This file is:
-//   1. Discovered by jcode-plugin-runtime::PluginLoader::scan_directory
-//      (looks for *.ts files in ~/.jcode/plugins/ or configured plugin_dirs)
-//   2. Transpiled by jcode-plugin-runtime::Transpiler (SWC, TypeScript -> JS)
-//   3. Evaluated by jcode-plugin-runtime::SandboxContext (QuickJS)
-//   4. The `jcode` object is injected by jcode-plugin-runtime::api::PluginApiBindings
+//   1. Discovered by next-code-plugin-runtime::PluginLoader::scan_directory
+//      (looks for *.ts files in ~/.next-code/plugins/ (or legacy ~/.jcode/plugins/) or configured plugin_dirs)
+//   2. Transpiled by next-code-plugin-runtime::Transpiler (SWC, TypeScript -> JS)
+//   3. Evaluated by next-code-plugin-runtime::SandboxContext (QuickJS)
+//   4. The `jcode` object is injected by next-code-plugin-runtime::api::PluginApiBindings
 //
-// Available APIs on `jcode` (as of jcode v0.29):
+// Available APIs on `jcode` (plugin global; next-code v0.29+):
 //   jcode.on(event, handler)              — register event handler
 //   jcode.registerTool(toolDef)           — register a tool the LLM can call
-//   jcode.logger.{info,warn,error,debug}  — log to jcode's tracing system
+//   jcode.logger.{info,warn,error,debug}  — log to next-code's tracing system
 //   jcode.kv.{get,set}                    — per-plugin key/value store
 //   jcode.sleep(ms)                       — sleep (capped at 5s)
 //   jcode.uuid()                          — generate a UUID

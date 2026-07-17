@@ -11,7 +11,7 @@ pub fn print_json(report: &DoctorReport) -> anyhow::Result<()> {
 
 /// Render the report as grouped human-readable text.
 pub fn print_text(report: &DoctorReport) {
-    println!("# jcode doctor\n");
+    println!("# next-code doctor\n");
     for category in CheckCategory::ALL {
         let group: Vec<_> = report
             .findings
@@ -47,7 +47,7 @@ pub fn print_text(report: &DoctorReport) {
         c.ok, c.warn, c.fail, c.fixed
     );
     if report.has_unfixed_fail() {
-        println!("Run `jcode doctor --fix` to repair auto-fixable issues.");
+        println!("Run `next-code doctor --fix` to repair auto-fixable issues.");
     }
 }
 

@@ -7,6 +7,7 @@
 //! `provider_catalog`), so it lives in the core layer and can be driven by
 //! both the CLI login flow and the TUI auth UI.
 
+use crate::env::{product_env};
 use anyhow::Result;
 use std::io::{self, IsTerminal, Write};
 
@@ -15,7 +16,7 @@ use crate::auth;
 pub fn can_prompt_for_external_auth() -> bool {
     std::io::stdin().is_terminal()
         && std::io::stderr().is_terminal()
-        && std::env::var("JCODE_NON_INTERACTIVE").is_err()
+        && product_env("NON_INTERACTIVE").is_err()
 }
 
 pub fn external_auth_blocked_message(
@@ -25,7 +26,7 @@ pub fn external_auth_blocked_message(
     login_hint: &str,
 ) -> String {
     format!(
-        "Found existing {} credentials from {} at {} but jcode will not read them without confirmation. Re-run in an interactive terminal to approve this auth source for future jcode sessions, or run `{}`.",
+        "Found existing {} credentials from {} at {} but next-code will not read them without confirmation. Re-run in an interactive terminal to approve this auth source for future next-code sessions, or run `{}`.",
         provider_name,
         source_name,
         path.display(),
@@ -45,9 +46,9 @@ pub fn prompt_to_trust_external_auth(
         source_name,
         path.display()
     );
-    eprintln!("jcode will only read that source in place after you approve it.");
+    eprintln!("next-code will only read that source in place after you approve it.");
     eprintln!("It will not move, delete, or rewrite the original auth there.");
-    eprint!("Trust this auth source for future jcode sessions? [y/N]: ");
+    eprint!("Trust this auth source for future next-code sessions? [y/N]: ");
     io::stdout().flush()?;
 
     let mut input = String::new();
@@ -162,7 +163,7 @@ pub struct ExternalAuthAutoImportOutcome {
 
 impl ExternalAuthAutoImportOutcome {
     /// Provider to activate after a successful multi-source import. This mirrors
-    /// jcode's global provider preference: Anthropic first, then OpenAI, followed
+    /// next-code's global provider preference: Anthropic first, then OpenAI, followed
     /// by the remaining supported providers. The precise OAuth/API-key variant
     /// is resolved from `AuthStatus` by the caller when possible.
     pub fn preferred_activation_provider(&self) -> Option<&'static str> {
@@ -365,10 +366,10 @@ fn prompt_to_review_external_auth_sources(
     }
 
     eprintln!();
-    eprintln!("Found existing logins that jcode can reuse.");
+    eprintln!("Found existing logins that next-code can reuse.");
     eprintln!("Nothing has been imported yet.");
     eprintln!(
-        "Approve the sources you want jcode to read in place; rejected sources stay untouched."
+        "Approve the sources you want next-code to read in place; rejected sources stay untouched."
     );
     eprintln!();
 
@@ -401,14 +402,14 @@ fn approve_external_auth_review_candidate(candidate: &ExternalAuthReviewCandidat
             auth::claude::ExternalClaudeAuthSource::ClaudeCode,
         )?,
         ExternalAuthReviewAction::ClaudeCodeNative => {
-            // Trust, then snapshot the Keychain/env credentials into jcode's own
+            // Trust, then snapshot the Keychain/env credentials into next-code's own
             // auth.json so future loads and refreshes do not depend on the
             // (possibly prompting) Keychain. A successful trust with a failed
             // copy still leaves the env-token path usable.
             auth::claude::trust_native_source()?;
             if let Err(err) = auth::claude::import_native_credentials_into_account() {
                 crate::logging::warn(&format!(
-                    "Trusted Claude Code native credentials but could not snapshot them into jcode: {err}"
+                    "Trusted Claude Code native credentials but could not snapshot them into next-code: {err}"
                 ));
             }
         }
@@ -476,7 +477,7 @@ fn revoke_external_auth_review_candidate(candidate: &ExternalAuthReviewCandidate
 fn token_freshness_note(expires_at_ms: i64) -> String {
     let now_ms = chrono::Utc::now().timestamp_millis();
     if expires_at_ms <= now_ms {
-        " The access token is expired; jcode will refresh it on first use, or run /login if that fails.".to_string()
+        " The access token is expired; next-code will refresh it on first use, or run /login if that fails.".to_string()
     } else {
         String::new()
     }
@@ -486,7 +487,7 @@ fn token_freshness_note(expires_at_ms: i64) -> String {
 // reusable credentials are present after trusting the source. It must NOT
 // perform a live OAuth refresh, because OAuth refresh tokens are single-use --
 // refreshing here would rotate (and thus burn) the source's refresh token and
-// then discard the rotated result, breaking both jcode and the original tool.
+// then discard the rotated result, breaking both next-code and the original tool.
 // Expired tokens are still imported: they get refreshed lazily (and persisted)
 // at request time, or the user is prompted to /login.
 
@@ -624,7 +625,7 @@ pub fn format_external_auth_review_candidates_markdown(
     candidates: &[ExternalAuthReviewCandidate],
 ) -> String {
     let mut message = String::from(
-        "**Auto Import Existing Logins**\n\nFound existing logins that jcode can reuse. Nothing has been imported yet.\n\nReply with `a` to approve all, `1,3` to approve specific sources, or `/cancel` to abort.\n",
+        "**Auto Import Existing Logins**\n\nFound existing logins that next-code can reuse. Nothing has been imported yet.\n\nReply with `a` to approve all, `1,3` to approve specific sources, or `/cancel` to abort.\n",
     );
     for (index, candidate) in candidates.iter().enumerate() {
         message.push_str(&format!(

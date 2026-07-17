@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use crate::auth::{AuthState, AuthStatus};
 
 use super::pricing::cheapness_for_route;
@@ -243,7 +244,7 @@ pub(super) fn multiprovider_model_routes(provider: &MultiProvider) -> Vec<ModelR
     }
 
     let total_ms = routes_started.elapsed().as_millis();
-    if total_ms >= 250 || std::env::var("JCODE_LOG_MODEL_PICKER_TIMING").is_ok() {
+    if total_ms >= 250 || product_env("LOG_MODEL_PICKER_TIMING").is_ok() {
         crate::logging::info(&format!(
             "[TIMING] model_routes: routes={}, openrouter_configured={}, openrouter_models={}, openrouter_endpoint_cache_hits={}, openrouter_endpoint_routes={}, openrouter_scheduled_endpoint_refreshes={}, total={}ms",
             routes.len(),
@@ -1165,10 +1166,10 @@ mod tests {
             let lock = crate::storage::lock_test_env();
             let temp = tempfile::tempdir().expect("tempdir");
             let vars = vec![
-                ("JCODE_HOME", std::env::var_os("JCODE_HOME")),
+                ("NEXT_CODE_HOME", std::env::var_os("NEXT_CODE_HOME")),
                 ("OPENCODE_API_KEY", std::env::var_os("OPENCODE_API_KEY")),
             ];
-            crate::env::set_var("JCODE_HOME", temp.path());
+            crate::env::set_var("NEXT_CODE_HOME", temp.path());
             crate::env::set_var("OPENCODE_API_KEY", "sk-test-opencode");
             Self {
                 vars,
@@ -1178,7 +1179,7 @@ mod tests {
         }
 
         fn save_opencode_cache(&self, source_api_base: &str, model_ids: &[&str]) {
-            let next_code_home = std::env::var_os("JCODE_HOME").expect("JCODE_HOME set");
+            let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("JCODE_HOME set");
             let cache_dir = std::path::PathBuf::from(next_code_home).join("cache");
             std::fs::create_dir_all(&cache_dir).expect("create cache dir");
             let cache = next_code_provider_openrouter::DiskCache {
@@ -1303,7 +1304,7 @@ mod tests {
     }
 
     fn save_openrouter_catalog_cache(model_ids: &[&str]) {
-        let next_code_home = std::env::var_os("JCODE_HOME").expect("JCODE_HOME set");
+        let next_code_home = std::env::var_os("NEXT_CODE_HOME").expect("JCODE_HOME set");
         let cache_dir = std::path::PathBuf::from(next_code_home).join("cache");
         std::fs::create_dir_all(&cache_dir).expect("create cache dir");
         let cache = next_code_provider_openrouter::DiskCache {

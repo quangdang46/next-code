@@ -6,7 +6,7 @@ use super::env_bool;
 
 pub fn check_mcp(opts: &DoctorOptions, out: &mut Vec<Finding>) {
     let global = crate::storage::next_code_dir().ok().map(|h| h.join("mcp.json"));
-    let project = opts.cwd.join(".jcode").join("mcp.json");
+    let project = opts.cwd.join(".next-code").join("mcp.json");
 
     for (label, path) in [("global", global), ("project", Some(project.clone()))] {
         let Some(path) = path else { continue };
@@ -30,13 +30,13 @@ pub fn check_mcp(opts: &DoctorOptions, out: &mut Vec<Finding>) {
     }
 
     // Trust posture for project-local servers (mirrors the MVP hint).
-    if project.is_file() && !env_bool("JCODE_REQUIRE_MCP_TRUST") {
+    if project.is_file() && !env_bool("NEXT_CODE_REQUIRE_MCP_TRUST") {
         out.push(
             Finding::warn(
                 CheckCategory::Mcp,
-                "project-local .jcode/mcp.json loads without trust gating",
+                "project-local .next-code/mcp.json loads without trust gating",
             )
-            .with_remediation("set JCODE_REQUIRE_MCP_TRUST=1 to require explicit trust"),
+            .with_remediation("set NEXT_CODE_REQUIRE_MCP_TRUST=1 to require explicit trust"),
         );
     }
 

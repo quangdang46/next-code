@@ -4,7 +4,7 @@
 //! agent through the `discover_tools` tool, backed by a hosted manifest. All
 //! agent-facing guidance lives in that tool's schema rather than the system
 //! prompt.
-//! Some providers may share revenue with Jcode when users choose their tools.
+//! Some providers may share revenue with Next Code when users choose their tools.
 //! Partnership status never influences recommendations. The relationship is
 //! disclosed in the UI with a link to <https://jcode.sh/discovery-tools>.
 //!
@@ -22,7 +22,7 @@
 //! - Requests carry only discovery fields (category, query, tool, and reason),
 //!   never session content.
 
-/// Public URL explaining Jcode's tool-provider partnerships.
+/// Public URL explaining Next Code's tool-provider partnerships.
 pub const DISCOVERY_PARTNERS_URL: &str = "https://jcode.sh/discovery-tools";
 
 /// Provenance tagging and coarse usage metering for MCP servers connected
@@ -33,7 +33,7 @@ pub mod provenance;
 pub const DISCOVERY_DISCLOSURE_TAG: &str = "(partner discovery disclosure)";
 
 /// First-use-per-session disclosure detail rendered inline with discovery.
-pub const DISCOVERY_DISCLOSURE_NOTICE: &str = "Jcode partners with tool providers to make their \
+pub const DISCOVERY_DISCLOSURE_NOTICE: &str = "Next Code partners with tool providers to make their \
      tools discoverable. Learn more: https://jcode.sh/discovery-tools";
 
 /// Categories in which discoverable tools exist. Shipped as a constant so the

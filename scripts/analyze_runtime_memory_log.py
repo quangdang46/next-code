@@ -154,11 +154,11 @@ def parse_args() -> argparse.Namespace:
 
 
 def default_log_dir() -> Path:
-    next_code_home = os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME")
+    next_code_home = (os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME")) or (os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME"))
     if next_code_home:
         return Path(next_code_home).expanduser() / "logs" / "memory"
     home = Path.home()
-    for candidate in (home / ".next-code" / "logs" / "memory", home / ".jcode" / "logs" / "memory"):
+    for candidate in (home / ".next-code" / "logs" / "memory", home / ".next-code" / "logs" / "memory"):
         if candidate.exists():
             return candidate
     return home / ".next-code" / "logs" / "memory"
@@ -785,7 +785,7 @@ def build_incident_assessment(
                 "action": "Use a jemalloc-prof build and heap dump if coverage remains below 50%.",
                 "commands": [
                     "next-code debug 'allocator:profile:on'",
-                    "next-code debug 'allocator:profile:dump /tmp/jcode-server.heap'",
+                    "next-code debug 'allocator:profile:dump /tmp/next-code-server.heap'",
                 ],
             },
         ]

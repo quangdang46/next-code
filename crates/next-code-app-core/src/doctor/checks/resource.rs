@@ -1,5 +1,5 @@
 //! Resource preflight (re-interpretation of pi's "resource governor"): free
-//! disk for `~/.jcode`, and session count vs the picker cap. Read-only.
+//! disk for `~/.next-code`, and session count vs the picker cap. Read-only.
 
 use super::super::types::{CheckCategory, Finding};
 use super::env_string;
@@ -18,7 +18,7 @@ pub fn check_resource(out: &mut Vec<Finding>) {
                     CheckCategory::Resource,
                     format!("low disk: {free_mb} MB free for {}", home.display()),
                 )
-                .with_remediation("free up disk space before running jcode")
+                .with_remediation("free up disk space before running next-code")
             } else if free_mb < 500 {
                 Finding::warn(
                     CheckCategory::Resource,
@@ -54,13 +54,13 @@ pub fn check_resource(out: &mut Vec<Finding>) {
                     .count()
             })
             .unwrap_or(0);
-        match env_string("JCODE_SESSION_PICKER_MAX_SESSIONS").and_then(|v| v.parse::<usize>().ok())
+        match env_string("NEXT_CODE_SESSION_PICKER_MAX_SESSIONS").and_then(|v| v.parse::<usize>().ok())
         {
             Some(cap) if count > cap => out.push(
                 Finding::warn(
                     CheckCategory::Resource,
                     format!(
-                        "{count} session file(s) exceed JCODE_SESSION_PICKER_MAX_SESSIONS={cap}"
+                        "{count} session file(s) exceed NEXT_CODE_SESSION_PICKER_MAX_SESSIONS={cap}"
                     ),
                 )
                 .with_remediation("raise the cap or archive old sessions"),

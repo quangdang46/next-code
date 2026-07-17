@@ -104,10 +104,10 @@ impl NotificationDispatcher {
 
     /// Send a permission request notification (high priority).
     pub fn dispatch_permission_request(&self, action: &str, description: &str, request_id: &str) {
-        let title = format!("jcode: permission needed ({})", action);
-        let safe_body = "An ambient action needs your approval. Open jcode to review.".to_string();
+        let title = format!("next-code: permission needed ({})", action);
+        let safe_body = "An ambient action needs your approval. Open next-code to review.".to_string();
         let detailed_body = format!(
-            "Action: {}\n{}\n\nRequest ID: {}\nReview in jcode to approve or deny.",
+            "Action: {}\n{}\n\nRequest ID: {}\nReview in next-code to approve or deny.",
             action, description, request_id
         );
 
@@ -116,7 +116,7 @@ impl NotificationDispatcher {
             .config
             .email_from
             .as_deref()
-            .unwrap_or("jcode@localhost");
+            .unwrap_or("next-code@localhost");
         let email_html = build_permission_email_html(action, description, request_id, reply_to);
 
         self.send_all_with_email_override(
@@ -333,7 +333,7 @@ pub fn send_desktop_notification_rich(
     {
         let _ = (subtitle, sound);
         let _ = std::process::Command::new("notify-send")
-            .arg("--app-name=jcode")
+            .arg("--app-name=next-code")
             .arg(title)
             .arg(body)
             .stdin(std::process::Stdio::null())
@@ -361,7 +361,7 @@ fn send_desktop(title: &str, body: &str, urgency: &str) {
     #[cfg(not(target_os = "macos"))]
     {
         let result = std::process::Command::new("notify-send")
-            .arg("--app-name=jcode")
+            .arg("--app-name=next-code")
             .arg(format!("--urgency={}", urgency))
             .arg("--icon=dialog-information")
             .arg(title)
@@ -505,7 +505,7 @@ fn format_cycle_body_safe(transcript: &AmbientTranscript) -> String {
         ));
     }
 
-    lines.push("Check jcode for full details.".to_string());
+    lines.push("Check next-code for full details.".to_string());
     lines.join("\n")
 }
 
@@ -536,7 +536,7 @@ fn format_cycle_body_detailed(transcript: &AmbientTranscript) -> String {
     if transcript.pending_permissions > 0 {
         lines.push(String::new());
         lines.push(format!(
-            "**⚠ {} permission request(s) pending** — review in jcode",
+            "**⚠ {} permission request(s) pending** — review in next-code",
             transcript.pending_permissions
         ));
     }
@@ -578,7 +578,7 @@ mod tests {
         let body = format_cycle_body_safe(&transcript);
         assert!(body.contains("Memories modified: 3"));
         assert!(body.contains("Compactions: 1"));
-        assert!(body.contains("Check jcode for full details"));
+        assert!(body.contains("Check next-code for full details"));
         // Safe body must NOT include model-generated summary
         assert!(!body.contains("Cleaned up"));
         assert!(!body.contains("permission"));
@@ -631,7 +631,7 @@ mod tests {
 
         let safe = format_cycle_body_safe(&transcript);
         assert!(safe.contains("2 permission request(s) pending"));
-        assert!(safe.contains("Check jcode for full details"));
+        assert!(safe.contains("Check next-code for full details"));
 
         let detailed = format_cycle_body_detailed(&transcript);
         assert!(detailed.contains("2 permission request(s) pending"));

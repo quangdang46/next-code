@@ -1,13 +1,13 @@
 # Release artifact signing & SmartScreen / Gatekeeper warnings
 
-Issue [#56](https://github.com/quangdang46/jcode/issues/56) reported that
+Issue [#56](https://github.com/quangdang46/next-code/issues/56) reported that
 the release package shows a "risk warning" when launched on Windows
 (SmartScreen) or macOS (Gatekeeper). This document explains why and how
 to verify the artifacts are legitimate.
 
 ## Why the warning?
 
-jcode release binaries are **not yet code-signed** with an Authenticode
+next-code release binaries are **not yet code-signed** with an Authenticode
 (Windows) or Apple Developer ID (macOS) certificate. Both Windows
 SmartScreen and macOS Gatekeeper flag any unsigned executable on first
 run, regardless of where it came from.
@@ -30,16 +30,16 @@ release containing checksums of every artifact:
 
 ```bash
 VERSION=v0.12.4
-ARTIFACT=jcode-linux-x86_64.tar.gz   # adjust for your platform
+ARTIFACT=next-code-linux-x86_64.tar.gz   # adjust for your platform
 
-curl -LO "https://github.com/quangdang46/jcode/releases/download/${VERSION}/${ARTIFACT}"
-curl -LO "https://github.com/quangdang46/jcode/releases/download/${VERSION}/SHA256SUMS"
+curl -LO "https://github.com/quangdang46/next-code/releases/download/${VERSION}/${ARTIFACT}"
+curl -LO "https://github.com/quangdang46/next-code/releases/download/${VERSION}/SHA256SUMS"
 
 # Linux / macOS / WSL:
 sha256sum --check --ignore-missing SHA256SUMS
 
 # Windows PowerShell:
-Get-FileHash -Algorithm SHA256 .\jcode-windows-x86_64.tar.gz | Format-List
+Get-FileHash -Algorithm SHA256 .\next-code-windows-x86_64.tar.gz | Format-List
 # Compare against the line in SHA256SUMS for that artifact.
 ```
 
@@ -60,14 +60,14 @@ If SmartScreen blocks the binary:
 
 Alternatively, unblock the file via PowerShell:
 ```powershell
-Unblock-File -Path .\jcode.exe
+Unblock-File -Path .\next-code.exe
 ```
 
 ### macOS Gatekeeper
 
 If Gatekeeper blocks the binary:
 ```bash
-xattr -d com.apple.quarantine /path/to/jcode
+xattr -d com.apple.quarantine /path/to/next-code
 ```
 
 Or right-click the binary in Finder → **Open** → confirm in the dialog.
@@ -76,7 +76,7 @@ Or right-click the binary in Finder → **Open** → confirm in the dialog.
 
 Code signing is funded only when there's clear demand or sponsorship
 covering the certificate cost + workflow integration time. Track / +1
-issue [#56](https://github.com/quangdang46/jcode/issues/56) if this
+issue [#56](https://github.com/quangdang46/next-code/issues/56) if this
 matters for your team's deployment.
 
 ## See also

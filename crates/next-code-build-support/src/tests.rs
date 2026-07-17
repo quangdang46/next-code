@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env_os};
 use super::*;
 
 fn test_env_lock() -> std::sync::MutexGuard<'static, ()> {
@@ -11,13 +12,13 @@ fn test_env_lock() -> std::sync::MutexGuard<'static, ()> {
 fn with_temp_jcode_home<T>(f: impl FnOnce() -> T) -> T {
     let _guard = test_env_lock();
     let temp_home = tempfile::tempdir().expect("tempdir");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    next_code_core::env::set_var("JCODE_HOME", temp_home.path());
+    let prev_home = product_env_os("HOME");
+    next_code_core::env::set_var("NEXT_CODE_HOME", temp_home.path());
     let result = f();
     if let Some(prev_home) = prev_home {
-        next_code_core::env::set_var("JCODE_HOME", prev_home);
+        next_code_core::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_core::env::remove_var("JCODE_HOME");
+        next_code_core::env::remove_var("NEXT_CODE_HOME");
     }
     result
 }
@@ -192,8 +193,8 @@ fn test_find_repo_in_ancestors_walks_upward() {
 fn test_client_update_candidate_prefers_dev_binary_for_selfdev() {
     let _guard = test_env_lock();
     let temp_home = tempfile::tempdir().expect("tempdir");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    next_code_core::env::set_var("JCODE_HOME", temp_home.path());
+    let prev_home = product_env_os("HOME");
+    next_code_core::env::set_var("NEXT_CODE_HOME", temp_home.path());
 
     let version = "test-current";
     let version_binary =
@@ -209,9 +210,9 @@ fn test_client_update_candidate_prefers_dev_binary_for_selfdev() {
     );
 
     if let Some(prev_home) = prev_home {
-        next_code_core::env::set_var("JCODE_HOME", prev_home);
+        next_code_core::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_core::env::remove_var("JCODE_HOME");
+        next_code_core::env::remove_var("NEXT_CODE_HOME");
     }
 }
 

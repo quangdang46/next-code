@@ -72,7 +72,7 @@ fn test_remote_done_shows_footer_after_final_tool_result_without_trailing_text()
 
 #[test]
 fn test_remote_auto_poke_followup_preserves_visible_timer_and_stays_hidden() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
@@ -128,7 +128,7 @@ fn test_remote_auto_poke_followup_preserves_visible_timer_and_stays_hidden() {
 
 #[test]
 fn test_remote_auto_poke_completion_ignores_precompletion_confidence() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
@@ -168,7 +168,7 @@ fn test_remote_auto_poke_completion_ignores_precompletion_confidence() {
 
 #[test]
 fn test_remote_auto_poke_completion_below_threshold_tells_model_to_keep_working() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
@@ -212,7 +212,7 @@ fn test_remote_auto_poke_completion_below_threshold_tells_model_to_keep_working(
 
 #[test]
 fn test_remote_poke_status_and_off_update_state() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();

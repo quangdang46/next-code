@@ -1,4 +1,4 @@
--- Schema for jcode telemetry D1 database
+-- Schema for next-code telemetry (D1 database_name remains jcode-telemetry historically) D1 database
 
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -2,7 +2,7 @@
 name = "next-code-provider-service"
 version = "0.1.0"
 edition = "2024"
-description = "Catalog / Integration / Credential service traits and shared types for jcode provider resolution"
+description = "Catalog / Integration / Credential service traits and shared types for next-code provider resolution"
 
 [lib]
 name = "next_code_provider_service"
@@ -22,6 +22,7 @@ metadata = ["dep:next-code-provider-metadata"]
 inventory = ["dep:inventory"]
 
 [dependencies]
+next-code-core = { path = "../next-code-core" }
 anyhow = "1"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }

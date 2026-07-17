@@ -2,10 +2,10 @@
 //!
 //! Mirrors opencode's `Fff.available() ? fffLayer : ripgrepLayer` — prefer ffs
 //! **crate APIs** (`ffs-search`, `ffs-symbol`, `ffs-engine`); fall back to `rg`
-//! only when ffs path fails or `JCODE_DISABLE_FFS` is set.
+//! only when ffs path fails or `NEXT_CODE_DISABLE_FFS` is set.
 //!
 //! Do **not** shell out to the `ffs` CLI — that pattern is for ffs-mcp only
-//! (MCP server runs inside the ffs binary). jcode links the crates directly.
+//! (MCP server runs inside the ffs binary). next-code links the crates directly.
 
 mod backend;
 mod engine_nav;

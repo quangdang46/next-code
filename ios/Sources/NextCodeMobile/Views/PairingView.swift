@@ -1,4 +1,4 @@
-import JCodeKit
+import NextCodeKit
 import SwiftUI
 
 /// First-run pairing: scan QR or type host/port/code.

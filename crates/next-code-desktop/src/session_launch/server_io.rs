@@ -36,11 +36,11 @@ pub(super) fn ensure_server_running() -> Result<()> {
         return Ok(());
     }
 
-    spawn_jcode_server_with_diagnostics()?;
+    spawn_next_code_server_with_diagnostics()?;
     connect_server_with_retry_path(&path, SERVER_START_TIMEOUT).map(|_| ())
 }
 
-fn spawn_jcode_server_with_diagnostics() -> Result<()> {
+fn spawn_next_code_server_with_diagnostics() -> Result<()> {
     let mut command = Command::new(next_code_bin());
     command
         .arg("serve")
@@ -51,7 +51,7 @@ fn spawn_jcode_server_with_diagnostics() -> Result<()> {
         command.current_dir(working_dir);
     }
 
-    let mut child = command.spawn().context("failed to spawn jcode serve")?;
+    let mut child = command.spawn().context("failed to spawn next-code serve")?;
 
     let pid = child.id();
     if let Some(stdout) = child.stdout.take() {
@@ -62,19 +62,19 @@ fn spawn_jcode_server_with_diagnostics() -> Result<()> {
     }
 
     std::thread::Builder::new()
-        .name("jcode-desktop-serve-wait".to_string())
+        .name("next-code-desktop-serve-wait".to_string())
         .spawn(move || match child.wait() {
             Ok(status) if status.success() => crate::desktop_log::info(format_args!(
-                "jcode-desktop: jcode serve child pid={pid} exited with {status}"
+                "next-code-desktop: next-code serve child pid={pid} exited with {status}"
             )),
             Ok(status) => crate::desktop_log::error(format_args!(
-                "jcode-desktop: jcode serve child pid={pid} exited with {status}"
+                "next-code-desktop: next-code serve child pid={pid} exited with {status}"
             )),
             Err(error) => crate::desktop_log::warn(format_args!(
-                "jcode-desktop: failed to wait for jcode serve child pid={pid}: {error}"
+                "next-code-desktop: failed to wait for next-code serve child pid={pid}: {error}"
             )),
         })
-        .context("failed to spawn jcode serve wait logger")?;
+        .context("failed to spawn next-code serve wait logger")?;
 
     Ok(())
 }
@@ -84,18 +84,18 @@ where
     R: Read + Send + 'static,
 {
     if let Err(error) = std::thread::Builder::new()
-        .name(format!("jcode-desktop-serve-{stream_name}"))
+        .name(format!("next-code-desktop-serve-{stream_name}"))
         .spawn(move || {
             let reader = BufReader::new(pipe);
             for line in reader.lines() {
                 match line {
                     Ok(line) => crate::desktop_log::info(format_args!(
-                        "jcode-desktop: jcode serve pid={pid} {stream_name}: {}",
+                        "next-code-desktop: next-code serve pid={pid} {stream_name}: {}",
                         crate::desktop_log::truncate_for_log(&line, 4096)
                     )),
                     Err(error) => {
                         crate::desktop_log::warn(format_args!(
-                            "jcode-desktop: failed reading jcode serve pid={pid} {stream_name}: {error}"
+                            "next-code-desktop: failed reading next-code serve pid={pid} {stream_name}: {error}"
                         ));
                         break;
                     }
@@ -104,7 +104,7 @@ where
         })
     {
         crate::desktop_log::warn(format_args!(
-            "jcode-desktop: failed to spawn jcode serve {stream_name} logger: {error}"
+            "next-code-desktop: failed to spawn next-code serve {stream_name} logger: {error}"
         ));
     }
 }
@@ -132,11 +132,11 @@ pub(super) fn connect_server_with_retry_path(
     match last_error {
         Some(error) => Err(error).with_context(|| {
             format!(
-                "timed out connecting to jcode server at {}",
+                "timed out connecting to next-code server at {}",
                 socket_path.display()
             )
         }),
-        None => anyhow::bail!("timed out connecting to jcode server"),
+        None => anyhow::bail!("timed out connecting to next-code server"),
     }
 }
 
@@ -147,13 +147,13 @@ pub(super) fn validate_reload_socket_path(
 ) -> Result<PathBuf> {
     let trimmed = raw_new_socket.trim();
     if trimmed.is_empty() {
-        anyhow::bail!("jcode server advertised an empty reload socket path");
+        anyhow::bail!("next-code server advertised an empty reload socket path");
     }
 
     let new_socket_path = PathBuf::from(trimmed);
     if !new_socket_path.is_absolute() {
         anyhow::bail!(
-            "jcode server advertised non-absolute reload socket path {}",
+            "next-code server advertised non-absolute reload socket path {}",
             new_socket_path.display()
         );
     }
@@ -166,7 +166,7 @@ pub(super) fn validate_reload_socket_path(
     })?;
     if !metadata.file_type().is_socket() {
         anyhow::bail!(
-            "jcode server advertised reload path that is not a socket: {}",
+            "next-code server advertised reload path that is not a socket: {}",
             new_socket_path.display()
         );
     }
@@ -174,7 +174,7 @@ pub(super) fn validate_reload_socket_path(
     let effective_uid = unsafe { libc::geteuid() };
     if metadata.uid() != effective_uid {
         anyhow::bail!(
-            "jcode server advertised reload socket owned by uid {}, expected uid {}: {}",
+            "next-code server advertised reload socket owned by uid {}, expected uid {}: {}",
             metadata.uid(),
             effective_uid,
             new_socket_path.display()
@@ -183,7 +183,7 @@ pub(super) fn validate_reload_socket_path(
 
     let current_parent = current_socket_path.parent().with_context(|| {
         format!(
-            "current jcode socket path has no parent: {}",
+            "current next-code socket path has no parent: {}",
             current_socket_path.display()
         )
     })?;
@@ -195,7 +195,7 @@ pub(super) fn validate_reload_socket_path(
     })?;
     let current_parent = current_parent.canonicalize().with_context(|| {
         format!(
-            "failed to canonicalize current jcode socket directory {}",
+            "failed to canonicalize current next-code socket directory {}",
             current_parent.display()
         )
     })?;
@@ -207,7 +207,7 @@ pub(super) fn validate_reload_socket_path(
     })?;
     if current_parent != new_parent {
         anyhow::bail!(
-            "jcode server advertised reload socket outside current socket directory: {} (current directory {})",
+            "next-code server advertised reload socket outside current socket directory: {} (current directory {})",
             new_socket_path.display(),
             current_parent.display()
         );
@@ -225,7 +225,7 @@ pub(super) fn subscribe_to_server(
     let working_dir = default_desktop_working_dir().map(|path| path.display().to_string());
     let selfdev = working_dir
         .as_deref()
-        .and_then(|path| path_contains_jcode_repo(path).then_some(true));
+        .and_then(|path| path_contains_next_code_repo(path).then_some(true));
     write_json_line(
         writer,
         json!({
@@ -254,10 +254,10 @@ fn desktop_client_instance_id() -> &'static str {
 }
 
 #[cfg(unix)]
-fn path_contains_jcode_repo(path: &str) -> bool {
+fn path_contains_next_code_repo(path: &str) -> bool {
     let mut current = Some(Path::new(path));
     while let Some(path) = current {
-        if path.join("crates/jcode-desktop").is_dir() && path.join("Cargo.toml").is_file() {
+        if path.join("crates/next-code-desktop").is_dir() && path.join("Cargo.toml").is_file() {
             return true;
         }
         current = path.parent();
@@ -330,12 +330,12 @@ pub(super) fn read_session_id_from_events(
     while started.elapsed() < timeout {
         line.clear();
         match reader.read_line(&mut line) {
-            Ok(0) => anyhow::bail!("jcode server disconnected before assigning a session"),
+            Ok(0) => anyhow::bail!("next-code server disconnected before assigning a session"),
             Ok(_) => {
                 let value = parse_server_event_line(&line, "waiting for session id")?;
                 if value.get("type").and_then(Value::as_str) == Some("session") {
                     let Some(session_id) = value.get("session_id").and_then(Value::as_str) else {
-                        anyhow::bail!("jcode server sent malformed session event");
+                        anyhow::bail!("next-code server sent malformed session event");
                     };
                     return Ok(Some(session_id.to_string()));
                 }
@@ -346,10 +346,10 @@ pub(super) fn read_session_id_from_events(
                         .and_then(Value::as_str)
                         .unwrap_or("unknown server error");
                     crate::desktop_log::error(format_args!(
-                        "jcode-desktop: jcode server rejected fresh session: {}",
+                        "next-code-desktop: next-code server rejected fresh session: {}",
                         crate::desktop_log::truncate_for_log(message, 2048)
                     ));
-                    anyhow::bail!("jcode server rejected fresh session: {message}");
+                    anyhow::bail!("next-code server rejected fresh session: {message}");
                 }
                 if value.get("type").and_then(Value::as_str) == Some("done")
                     && complete_request_id
@@ -363,11 +363,11 @@ pub(super) fn read_session_id_from_events(
                     error.kind(),
                     io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
                 ) => {}
-            Err(error) => return Err(error).context("failed to read jcode server event"),
+            Err(error) => return Err(error).context("failed to read next-code server event"),
         }
     }
 
-    anyhow::bail!("timed out waiting for jcode server session id")
+    anyhow::bail!("timed out waiting for next-code server session id")
 }
 
 #[cfg(unix)]
@@ -386,14 +386,14 @@ pub(super) fn read_session_id_from_state(
     while started.elapsed() < timeout {
         line.clear();
         match reader.read_line(&mut line) {
-            Ok(0) => anyhow::bail!("jcode server disconnected before returning state"),
+            Ok(0) => anyhow::bail!("next-code server disconnected before returning state"),
             Ok(_) => {
                 let value = parse_server_event_line(&line, "waiting for server state")?;
                 if value.get("type").and_then(Value::as_str) == Some("state")
                     && value.get("id").and_then(Value::as_u64) == Some(state_request_id)
                 {
                     let Some(session_id) = value.get("session_id").and_then(Value::as_str) else {
-                        anyhow::bail!("jcode server sent malformed state event");
+                        anyhow::bail!("next-code server sent malformed state event");
                     };
                     return Ok(session_id.to_string());
                 }
@@ -406,10 +406,10 @@ pub(super) fn read_session_id_from_state(
                         .and_then(Value::as_str)
                         .unwrap_or("unknown server error");
                     crate::desktop_log::error(format_args!(
-                        "jcode-desktop: jcode server rejected state request id={state_request_id}: {}",
+                        "next-code-desktop: next-code server rejected state request id={state_request_id}: {}",
                         crate::desktop_log::truncate_for_log(message, 2048)
                     ));
-                    anyhow::bail!("jcode server rejected state request: {message}");
+                    anyhow::bail!("next-code server rejected state request: {message}");
                 }
             }
             Err(error)
@@ -417,11 +417,11 @@ pub(super) fn read_session_id_from_state(
                     error.kind(),
                     io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
                 ) => {}
-            Err(error) => return Err(error).context("failed to read jcode server event"),
+            Err(error) => return Err(error).context("failed to read next-code server event"),
         }
     }
 
-    anyhow::bail!("timed out waiting for jcode server state")
+    anyhow::bail!("timed out waiting for next-code server state")
 }
 
 #[cfg(unix)]
@@ -440,7 +440,7 @@ pub(super) fn read_model_changed(
     while started.elapsed() < timeout {
         line.clear();
         match reader.read_line(&mut line) {
-            Ok(0) => anyhow::bail!("jcode server disconnected before switching model"),
+            Ok(0) => anyhow::bail!("next-code server disconnected before switching model"),
             Ok(_) => {
                 let value = parse_server_event_line(&line, "waiting for model switch")?;
                 if value.get("type").and_then(Value::as_str) == Some("model_changed")
@@ -460,10 +460,10 @@ pub(super) fn read_model_changed(
                         .and_then(Value::as_str)
                         .unwrap_or("unknown server error");
                     crate::desktop_log::error(format_args!(
-                        "jcode-desktop: jcode server rejected model switch id={request_id}: {}",
+                        "next-code-desktop: next-code server rejected model switch id={request_id}: {}",
                         crate::desktop_log::truncate_for_log(message, 2048)
                     ));
-                    anyhow::bail!("jcode server rejected model switch: {message}");
+                    anyhow::bail!("next-code server rejected model switch: {message}");
                 }
             }
             Err(error)
@@ -471,11 +471,11 @@ pub(super) fn read_model_changed(
                     error.kind(),
                     io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
                 ) => {}
-            Err(error) => return Err(error).context("failed to read jcode server event"),
+            Err(error) => return Err(error).context("failed to read next-code server event"),
         }
     }
 
-    anyhow::bail!("timed out waiting for jcode server model switch")
+    anyhow::bail!("timed out waiting for next-code server model switch")
 }
 
 #[cfg(unix)]
@@ -494,7 +494,7 @@ pub(super) fn read_model_catalog(
     while started.elapsed() < timeout {
         line.clear();
         match reader.read_line(&mut line) {
-            Ok(0) => anyhow::bail!("jcode server disconnected before loading model catalog"),
+            Ok(0) => anyhow::bail!("next-code server disconnected before loading model catalog"),
             Ok(_) => {
                 let value = parse_server_event_line(&line, "waiting for model catalog")?;
                 if value.get("type").and_then(Value::as_str) == Some("history")
@@ -504,7 +504,7 @@ pub(super) fn read_model_catalog(
                         send_desktop_event_ref(event_tx, event);
                         return Ok(());
                     }
-                    anyhow::bail!("jcode server returned malformed model catalog");
+                    anyhow::bail!("next-code server returned malformed model catalog");
                 }
                 forward_non_done_server_event(event_tx, &value);
                 if value.get("type").and_then(Value::as_str) == Some("error")
@@ -515,10 +515,10 @@ pub(super) fn read_model_catalog(
                         .and_then(Value::as_str)
                         .unwrap_or("unknown server error");
                     crate::desktop_log::error(format_args!(
-                        "jcode-desktop: jcode server rejected model catalog request id={request_id}: {}",
+                        "next-code-desktop: next-code server rejected model catalog request id={request_id}: {}",
                         crate::desktop_log::truncate_for_log(message, 2048)
                     ));
-                    anyhow::bail!("jcode server rejected model catalog request: {message}");
+                    anyhow::bail!("next-code server rejected model catalog request: {message}");
                 }
             }
             Err(error)
@@ -526,11 +526,11 @@ pub(super) fn read_model_catalog(
                     error.kind(),
                     io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
                 ) => {}
-            Err(error) => return Err(error).context("failed to read jcode server event"),
+            Err(error) => return Err(error).context("failed to read next-code server event"),
         }
     }
 
-    anyhow::bail!("timed out waiting for jcode server model catalog")
+    anyhow::bail!("timed out waiting for next-code server model catalog")
 }
 
 #[cfg(unix)]
@@ -551,7 +551,7 @@ pub(super) fn read_control_response(
     while started.elapsed() < timeout {
         line.clear();
         match reader.read_line(&mut line) {
-            Ok(0) => anyhow::bail!("jcode server disconnected while {action_label}"),
+            Ok(0) => anyhow::bail!("next-code server disconnected while {action_label}"),
             Ok(_) => {
                 let value = parse_server_event_line(&line, action_label)?;
                 let event_type = value
@@ -576,10 +576,10 @@ pub(super) fn read_control_response(
                         .and_then(Value::as_str)
                         .unwrap_or("unknown server error");
                     crate::desktop_log::error(format_args!(
-                        "jcode-desktop: jcode server rejected {action_label} id={request_id}: {}",
+                        "next-code-desktop: next-code server rejected {action_label} id={request_id}: {}",
                         crate::desktop_log::truncate_for_log(message, 2048)
                     ));
-                    anyhow::bail!("jcode server rejected {action_label}: {message}");
+                    anyhow::bail!("next-code server rejected {action_label}: {message}");
                 }
             }
             Err(error)
@@ -587,11 +587,11 @@ pub(super) fn read_control_response(
                     error.kind(),
                     io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
                 ) => {}
-            Err(error) => return Err(error).context("failed to read jcode server event"),
+            Err(error) => return Err(error).context("failed to read next-code server event"),
         }
     }
 
-    anyhow::bail!("timed out waiting for jcode server while {action_label}")
+    anyhow::bail!("timed out waiting for next-code server while {action_label}")
 }
 
 #[cfg(unix)]
@@ -655,7 +655,7 @@ pub(super) fn drain_session_events(
             {
                 continue;
             }
-            Err(error) => return Err(error).context("failed to read jcode server event"),
+            Err(error) => return Err(error).context("failed to read next-code server event"),
             Ok(_) => {
                 let value = parse_server_event_line(&line, "draining session events")?;
                 if value.get("type").and_then(Value::as_str) == Some("reloading") {
@@ -694,7 +694,7 @@ pub(super) fn drain_session_events(
                                 .and_then(Value::as_str)
                                 .unwrap_or("unknown server error");
                             anyhow::bail!(
-                                "jcode server rejected cancel request {cancel_request_id}: {message}"
+                                "next-code server rejected cancel request {cancel_request_id}: {message}"
                             );
                         }
                         _ => {}
@@ -732,20 +732,20 @@ fn parse_server_event_line(line: &str, context: &str) -> Result<Value> {
         }
         Err(error) => {
             crate::desktop_log::error(format_args!(
-                "jcode-desktop: failed to parse jcode server event while {context}: {error}; line={}",
+                "next-code-desktop: failed to parse next-code server event while {context}: {error}; line={}",
                 crate::desktop_log::truncate_for_log(line.trim(), 512)
             ));
-            Err(error).context("failed to parse jcode server event")
+            Err(error).context("failed to parse next-code server event")
         }
     }
 }
 
 fn validate_server_event_value(value: &Value, context: &str) -> Result<()> {
     let Some(object) = value.as_object() else {
-        anyhow::bail!("jcode server sent non-object event while {context}");
+        anyhow::bail!("next-code server sent non-object event while {context}");
     };
     let Some(event_type) = object.get("type").and_then(Value::as_str) else {
-        anyhow::bail!("jcode server sent event without string type while {context}");
+        anyhow::bail!("next-code server sent event without string type while {context}");
     };
 
     match event_type {
@@ -757,7 +757,7 @@ fn validate_server_event_value(value: &Value, context: &str) -> Result<()> {
                 .is_some_and(|prompt| !prompt.is_string())
             {
                 anyhow::bail!(
-                    "jcode server sent stdin_request with non-string prompt while {context}"
+                    "next-code server sent stdin_request with non-string prompt while {context}"
                 );
             }
             if value
@@ -765,7 +765,7 @@ fn validate_server_event_value(value: &Value, context: &str) -> Result<()> {
                 .is_some_and(|is_password| !is_password.is_boolean())
             {
                 anyhow::bail!(
-                    "jcode server sent stdin_request with non-boolean is_password while {context}"
+                    "next-code server sent stdin_request with non-boolean is_password while {context}"
                 );
             }
         }
@@ -775,7 +775,7 @@ fn validate_server_event_value(value: &Value, context: &str) -> Result<()> {
                 .is_some_and(|new_socket| !new_socket.is_string()) =>
         {
             anyhow::bail!(
-                "jcode server sent reloading event with non-string new_socket while {context}"
+                "next-code server sent reloading event with non-string new_socket while {context}"
             );
         }
         _ => {}
@@ -798,7 +798,7 @@ fn require_non_empty_event_string(
         Ok(())
     } else {
         anyhow::bail!(
-            "jcode server sent {event_type} event without non-empty string {field} while {context}"
+            "next-code server sent {event_type} event without non-empty string {field} while {context}"
         );
     }
 }

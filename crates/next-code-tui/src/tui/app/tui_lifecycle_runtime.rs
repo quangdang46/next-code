@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::*;
 use crate::tui::connection_type_icon;
 
@@ -91,15 +92,15 @@ impl App {
         } else {
             self.session.is_canary
         };
-        let server_name = self.remote_server_short_name.as_deref().unwrap_or("jcode");
+        let server_name = self.remote_server_short_name.as_deref().unwrap_or("next-code");
         let icon = connection_type_icon(self.connection_type.as_deref()).unwrap_or(session_icon);
         let session_label = crate::process_title::terminal_session_label(&session_name, None);
-        let fallback_label = if server_name.eq_ignore_ascii_case("jcode") {
-            format!("jcode {session_label}")
+        let fallback_label = if server_name.eq_ignore_ascii_case("next-code") {
+            format!("next-code {session_label}")
         } else {
-            format!("jcode/{} {session_label}", server_name.to_lowercase())
+            format!("next-code/{} {session_label}", server_name.to_lowercase())
         };
-        if server_name.eq_ignore_ascii_case("jcode") {
+        if server_name.eq_ignore_ascii_case("next-code") {
             crate::process_title::set_client_display_title(&session_name, is_canary);
         } else {
             crate::process_title::set_client_remote_display_title(
@@ -133,7 +134,7 @@ impl App {
     /// (`pending_reload_session_id`), then the resume target the client was
     /// launched with. Only when none of those is known do we fabricate a fresh
     /// `ses_*` id. Fabricating eagerly is what caused issue #328: the re-exec
-    /// would `jcode --resume <bogus-id>` and crash with "No session found
+    /// would `next-code --resume <bogus-id>` and crash with "No session found
     /// matching ..." after an auto-update, because the version-mismatch defer
     /// path returns before `remote_session_id` is ever assigned.
     pub(super) fn reload_handoff_session_id(&self) -> String {
@@ -638,7 +639,7 @@ pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
     if trimmed == "/restart" {
         app.push_display_message(DisplayMessage {
             role: "system".to_string(),
-            content: "Restarting jcode (same binary, session preserved)...".to_string(),
+            content: "Restarting next-code (same binary, session preserved)...".to_string(),
             tool_calls: vec![],
             duration_secs: None,
             title: None,
@@ -674,14 +675,14 @@ pub(super) fn handle_dev_command(app: &mut App, trimmed: &str) -> bool {
                 PremiumMode::OnePerSession => "one premium per session",
                 PremiumMode::Zero => "zero premium requests",
             };
-            let env = std::env::var("JCODE_COPILOT_PREMIUM").ok();
+            let env = product_env("COPILOT_PREMIUM").ok();
             let env_label = match env.as_deref() {
                 Some("0") => "0 (zero)",
                 Some("1") => "1 (one per session)",
                 _ => "unset (normal)",
             };
             app.push_display_message(DisplayMessage::system(format!(
-                "Premium mode: {}\nEnv JCODE_COPILOT_PREMIUM: {}",
+                "Premium mode: {}\nEnv NEXT_CODE_COPILOT_PREMIUM: {}",
                 label, env_label,
             )));
             return true;

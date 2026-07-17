@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Default system prompt for jcode (embedded at compile time)
+/// Default system prompt for next-code (embedded at compile time)
 pub const DEFAULT_SYSTEM_PROMPT: &str = include_str!("prompt/system_prompt.md");
 
 /// Prompt guidance for the optional Mermaid rendering capability.
@@ -59,17 +59,17 @@ fn base_system_prompt_parts(capabilities: PromptCapabilities) -> Vec<String> {
 
 /// Built-in default swarm prompt: model-routing guidance for spawned swarm
 /// agents (which model/effort to pick per task kind). Users can override it by
-/// creating `~/.jcode/swarm-prompt.md` (global) or `./.jcode/swarm-prompt.md`
+/// creating `~/.next-code/swarm-prompt.md` (global) or `./.next-code/swarm-prompt.md`
 /// (project). See [`load_swarm_prompt`].
 pub const DEFAULT_SWARM_PROMPT: &str = include_str!("prompt/swarm_prompt.md");
 
 /// Load the swarm prompt used to steer swarm model routing. Precedence:
-/// project `./.jcode/swarm-prompt.md`, then global `~/.jcode/swarm-prompt.md`,
+/// project `./.next-code/swarm-prompt.md`, then global `~/.next-code/swarm-prompt.md`,
 /// then the built-in [`DEFAULT_SWARM_PROMPT`].
 pub fn load_swarm_prompt(working_dir: Option<&Path>) -> String {
     let project_dir = working_dir.unwrap_or(Path::new("."));
     let candidates = [
-        Some(project_dir.join(".jcode").join("swarm-prompt.md")),
+        Some(project_dir.join(".next-code").join("swarm-prompt.md")),
         crate::storage::next_code_dir()
             .ok()
             .map(|dir| dir.join("swarm-prompt.md")),
@@ -180,7 +180,7 @@ pub fn append_swarm_effort_directive(split: &mut SplitSystemPrompt, effort: Opti
     split.dynamic_part.push_str(directive);
 }
 /// Mission-continuation template (embedded at compile time). Consumed by the
-/// `mission` module in the upper `jcode-app-core` layer; the asset lives here
+/// `mission` module in the upper `next-code-app-core` layer; the asset lives here
 /// alongside the other prompt templates.
 pub const MISSION_CONTINUATION_TEMPLATE: &str = include_str!("prompt/mission_continuation.md");
 const SELFDEV_MODE_PROMPT: &str = include_str!("prompt/selfdev_mode.txt");
@@ -442,14 +442,14 @@ pub fn build_system_prompt_full_with_capabilities(
     info.has_global_agents_md = md_info.has_global_agents_md;
     info.global_agents_md_chars = md_info.global_agents_md_chars;
 
-    // Add optional prompt overlays from ~/.jcode/ and ./.jcode/
+    // Add optional prompt overlays from ~/.next-code/ and ./.next-code/
     let (overlay_content, overlay_chars) = load_prompt_overlay_files_from_dir(working_dir);
     if let Some(content) = overlay_content {
         info.prompt_overlay_chars = overlay_chars;
         parts.push(content);
     }
 
-    // Add optional preferred-tool guidance from ~/.jcode/ and ./.jcode/
+    // Add optional preferred-tool guidance from ~/.next-code/ and ./.next-code/
     let (preferred_tools_content, preferred_tools_chars) =
         load_preferred_tools_files_from_dir(working_dir);
     if let Some(content) = preferred_tools_content {
@@ -561,7 +561,7 @@ pub fn build_system_prompt_split_with_capabilities(
     info.has_global_agents_md = md_info.has_global_agents_md;
     info.global_agents_md_chars = md_info.global_agents_md_chars;
 
-    // Add optional prompt overlays from ~/.jcode/ and ./.jcode/
+    // Add optional prompt overlays from ~/.next-code/ and ./.next-code/
     let (overlay_content, overlay_chars) = load_prompt_overlay_files_from_dir(working_dir);
     if let Some(content) = overlay_content {
         info.prompt_overlay_chars = overlay_chars;
@@ -655,7 +655,7 @@ impl SelfDevProductContext {
         };
 
         let path = working_dir.to_string_lossy().replace('\\', "/");
-        if path.contains("/crates/jcode-desktop") || path.ends_with("crates/jcode-desktop") {
+        if path.contains("/crates/next-code-desktop") || path.ends_with("crates/next-code-desktop") {
             Self::Desktop
         } else {
             Self::Tui
@@ -697,7 +697,7 @@ pub fn build_session_context(working_dir: Option<&Path>) -> String {
     lines.push(format!("OS: {}", std::env::consts::OS));
     lines.push(format!("Architecture: {}", std::env::consts::ARCH));
     lines.push(format!(
-        "Jcode version: {} ({})",
+        "Next Code version: {} ({})",
         next_code_build_meta::VERSION,
         next_code_build_meta::GIT_HASH
     ));
@@ -932,7 +932,7 @@ pub fn load_agents_md_files_from_dir(working_dir: Option<&Path>) -> (Option<Stri
     }
 }
 
-/// Load optional prompt overlay markdown from ~/.jcode/ and ./.jcode/
+/// Load optional prompt overlay markdown from ~/.next-code/ and ./.next-code/
 fn load_prompt_overlay_files_from_dir(working_dir: Option<&Path>) -> (Option<String>, usize) {
     let mut contents = vec![];
     let mut total_chars = 0usize;
@@ -951,8 +951,8 @@ fn load_prompt_overlay_files_from_dir(working_dir: Option<&Path>) -> (Option<Str
 
     let project_dir = working_dir.unwrap_or(Path::new("."));
     if let Some((content, size)) = load_file(
-        &project_dir.join(".jcode").join("prompt-overlay.md"),
-        "Project Prompt Overlay (.jcode/prompt-overlay.md)",
+        &project_dir.join(".next-code").join("prompt-overlay.md"),
+        "Project Prompt Overlay (.next-code/prompt-overlay.md)",
     ) {
         total_chars += size;
         contents.push(content);
@@ -961,7 +961,7 @@ fn load_prompt_overlay_files_from_dir(working_dir: Option<&Path>) -> (Option<Str
     if let Ok(global_overlay) = crate::storage::next_code_dir().map(|dir| dir.join("prompt-overlay.md"))
         && let Some((content, size)) = load_file(
             &global_overlay,
-            "Global Prompt Overlay (~/.jcode/prompt-overlay.md)",
+            "Global Prompt Overlay (~/.next-code/prompt-overlay.md)",
         )
     {
         total_chars += size;
@@ -975,7 +975,7 @@ fn load_prompt_overlay_files_from_dir(working_dir: Option<&Path>) -> (Option<Str
     }
 }
 
-/// Load optional preferred-tool guidance from ~/.jcode/ and ./.jcode/
+/// Load optional preferred-tool guidance from ~/.next-code/ and ./.next-code/
 fn load_preferred_tools_files_from_dir(working_dir: Option<&Path>) -> (Option<String>, usize) {
     let mut contents = vec![];
     let mut total_chars = 0usize;
@@ -994,8 +994,8 @@ fn load_preferred_tools_files_from_dir(working_dir: Option<&Path>) -> (Option<St
 
     let project_dir = working_dir.unwrap_or(Path::new("."));
     if let Some((content, size)) = load_file(
-        &project_dir.join(".jcode").join("preferred-tools.md"),
-        "Project Preferred Tools (.jcode/preferred-tools.md)",
+        &project_dir.join(".next-code").join("preferred-tools.md"),
+        "Project Preferred Tools (.next-code/preferred-tools.md)",
     ) {
         total_chars += size;
         contents.push(content);
@@ -1005,7 +1005,7 @@ fn load_preferred_tools_files_from_dir(working_dir: Option<&Path>) -> (Option<St
         crate::storage::next_code_dir().map(|dir| dir.join("preferred-tools.md"))
         && let Some((content, size)) = load_file(
             &global_preferred_tools,
-            "Global Preferred Tools (~/.jcode/preferred-tools.md)",
+            "Global Preferred Tools (~/.next-code/preferred-tools.md)",
         )
     {
         total_chars += size;

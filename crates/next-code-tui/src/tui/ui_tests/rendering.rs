@@ -272,7 +272,7 @@ fn test_render_swarm_message_centered_mode_keeps_file_activity_preview_centered_
 
     let msg = DisplayMessage::swarm(
         "File activity · rose",
-        "`…/jcode/src/server/comm_sync.rs`
+        "`…/next-code/src/server/comm_sync.rs`
 
 Modified via apply_patch
 
@@ -368,7 +368,7 @@ fn test_render_memory_tiles_allows_boxes_below_other_boxes() {
         ),
         (
             "preference".to_string(),
-            "User prefers quick verification that jcode is up-to-date.".to_string(),
+            "User prefers quick verification that next-code is up-to-date.".to_string(),
         ),
         ("fact".to_string(), "Jeremy".to_string()),
         (

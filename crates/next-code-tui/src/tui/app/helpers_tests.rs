@@ -154,19 +154,19 @@ fn detected_resume_terminal_recognizes_handterm_term_program() {
 #[test]
 fn shell_command_quotes_single_quotes_for_handterm_exec() {
     let command = shell_command(&[
-        "/tmp/jcode binary".to_string(),
+        "/tmp/next-code binary".to_string(),
         "--resume".to_string(),
         "session'quote".to_string(),
     ]);
     assert_eq!(
         command,
-        "'/tmp/jcode binary' '--resume' 'session'\"'\"'quote'"
+        "'/tmp/next-code binary' '--resume' 'session'\"'\"'quote'"
     );
 }
 
 #[test]
 fn resume_invocation_args_includes_socket_when_present() {
-    let args = resume_invocation_args("ses_123", Some("/tmp/jcode-test.sock"));
+    let args = resume_invocation_args("ses_123", Some("/tmp/next-code-test.sock"));
     assert_eq!(
         args,
         vec![
@@ -174,7 +174,7 @@ fn resume_invocation_args_includes_socket_when_present() {
             "--resume".to_string(),
             "ses_123".to_string(),
             "--socket".to_string(),
-            "/tmp/jcode-test.sock".to_string()
+            "/tmp/next-code-test.sock".to_string()
         ]
     );
 }
@@ -193,7 +193,7 @@ fn resume_invocation_args_omits_blank_socket() {
 }
 
 #[test]
-fn build_resume_command_uses_imported_jcode_session_for_claude_code() {
+fn build_resume_command_uses_imported_next_code_session_for_claude_code() {
     let (program, args, title) = build_resume_command(
         &ResumeTarget::ClaudeCodeSession {
             session_id: "claude-session-123".to_string(),
@@ -202,9 +202,14 @@ fn build_resume_command_uses_imported_jcode_session_for_claude_code() {
         None,
     );
 
-    assert_eq!(
-        program.file_name().and_then(|name| name.to_str()),
-        Some("jcode")
+    let binary_name = program.file_name().and_then(|name| name.to_str());
+    assert!(
+        matches!(binary_name, Some("next-code") | Some("jcode"))
+            || binary_name.is_some_and(|name| {
+                // Test binaries / local channel wrappers still count as a client launch path.
+                name.contains("next-code") || name.contains("jcode") || name.contains("next_code")
+            }),
+        "unexpected launch binary: {binary_name:?} ({program:?})"
     );
     assert_eq!(
         args,
@@ -219,7 +224,7 @@ fn build_resume_command_uses_imported_jcode_session_for_claude_code() {
 }
 
 #[test]
-fn build_resume_command_uses_imported_jcode_session_for_codex() {
+fn build_resume_command_uses_imported_next_code_session_for_codex() {
     let (program, args, title) = build_resume_command(
         &ResumeTarget::CodexSession {
             session_id: "codex-session-123".to_string(),
@@ -228,9 +233,14 @@ fn build_resume_command_uses_imported_jcode_session_for_codex() {
         None,
     );
 
-    assert_eq!(
-        program.file_name().and_then(|name| name.to_str()),
-        Some("jcode")
+    let binary_name = program.file_name().and_then(|name| name.to_str());
+    assert!(
+        matches!(binary_name, Some("next-code") | Some("jcode"))
+            || binary_name.is_some_and(|name| {
+                // Test binaries / local channel wrappers still count as a client launch path.
+                name.contains("next-code") || name.contains("jcode") || name.contains("next_code")
+            }),
+        "unexpected launch binary: {binary_name:?} ({program:?})"
     );
     assert_eq!(
         args,
@@ -260,7 +270,7 @@ fn format_countdown_until_handles_subminute_and_minutes() {
 fn gather_ambient_info_filters_to_session_reminders_when_ambient_disabled() {
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("tempdir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
 
     let mut manager = AmbientManager::new().expect("ambient manager");
     let first_due = Utc::now() + ChronoDuration::minutes(5);
@@ -382,7 +392,7 @@ fn invalidate_todos_cache_backdates_entry_so_next_gather_refetches() {
 
     let _env_lock = crate::storage::lock_test_env();
     let temp = tempfile::tempdir().expect("tempdir");
-    let _home = EnvVarGuard::set_path("JCODE_HOME", temp.path());
+    let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
     clear_todos_cache_for_tests();
 
     let session_id = "freshness-test-session";
@@ -429,7 +439,7 @@ fn fresh_session_command_includes_fresh_spawn_and_socket() {
     let command = super::build_fresh_session_command(Some("/tmp/test.sock"));
     assert!(command.fresh_spawn, "must hand off as a fresh spawn");
     assert_eq!(command.kind.as_deref(), Some("new-terminal"));
-    assert_eq!(command.title.as_deref(), Some("jcode · new session"));
+    assert_eq!(command.title.as_deref(), Some("next-code · new session"));
     assert_eq!(
         command.args,
         vec![

@@ -13,8 +13,8 @@ echo "==> Installing..."
 mkdir -p ~/.next-code/builds/current
 if [[ -x target/release/next-code ]]; then
   cp target/release/next-code ~/.next-code/builds/current/next-code
-elif [[ -x target/release/jcode ]]; then
-  cp target/release/jcode ~/.next-code/builds/current/next-code
+elif [[ -x target/release/next-code ]]; then
+  cp target/release/next-code ~/.next-code/builds/current/next-code
 else
   echo "error: release binary not found (expected target/release/next-code)" >&2
   exit 1
@@ -24,12 +24,12 @@ strip ~/.next-code/builds/current/next-code
 # Keep launcher + one-release compat symlink in sync when present.
 if [[ -d "$HOME/.local/bin" ]]; then
   ln -sfn "$HOME/.next-code/builds/current/next-code" "$HOME/.local/bin/next-code"
-  ln -sfn "next-code" "$HOME/.local/bin/jcode"
+  ln -sfn "next-code" "$HOME/.local/bin/next-code"
 fi
 
 echo "==> Killing old server daemon..."
 pkill -f "next-code.*serve" 2>/dev/null || true
-pkill -f "jcode.*serve" 2>/dev/null || true
+pkill -f "next-code.*serve" 2>/dev/null || true
 sleep 0.5
 
 echo "==> Done. Binary: $(ls -lh ~/.next-code/builds/current/next-code | awk '{print $5}')"

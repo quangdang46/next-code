@@ -2,7 +2,7 @@ use crate::test_support::*;
 
 // ============================================================================
 // Binary Integration Tests
-// These tests run the actual jcode binary and require real credentials.
+// These tests run the actual next-code binary and require real credentials.
 // Run with: cargo test --test e2e binary_integration -- --ignored
 // ============================================================================
 
@@ -159,8 +159,8 @@ async fn binary_integration_reload_handoff() -> Result<()> {
     std::fs::create_dir_all(&home_dir)?;
     std::fs::create_dir_all(&install_dir)?;
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let stderr_file = std::fs::File::create(&stderr_path)?;
     let mut child = Command::new(env!("CARGO_BIN_EXE_next-code"))
@@ -171,19 +171,19 @@ async fn binary_integration_reload_handoff() -> Result<()> {
         // This test must exercise the real exec-based reload handoff, not the
         // in-process test shortcut used by other e2e cases.
         .env_remove("NEXT_CODE_TEST_SESSION")
-        .env_remove("JCODE_TEST_SESSION")
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env("NEXT_CODE_HOME", &home_dir)
-        .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
-        .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("NEXT_CODE_INSTALL_DIR", &install_dir)
-        .env("JCODE_INSTALL_DIR", &install_dir)
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir)
         .env("NEXT_CODE_DEBUG_CONTROL", "1")
-        .env("JCODE_DEBUG_CONTROL", "1")
+        .env("NEXT_CODE_DEBUG_CONTROL", "1")
         .env("NEXT_CODE_TEMP_SERVER", "1")
-        .env("JCODE_TEMP_SERVER", "1")
+        .env("NEXT_CODE_TEMP_SERVER", "1")
         .env("NEXT_CODE_SERVER_OWNER_PID", std::process::id().to_string())
-        .env("JCODE_SERVER_OWNER_PID", std::process::id().to_string())
+        .env("NEXT_CODE_SERVER_OWNER_PID", std::process::id().to_string())
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::from(stderr_file))
@@ -294,14 +294,14 @@ async fn binary_integration_selfdev_reload_reconnects_quickly() -> Result<()> {
     std::fs::create_dir_all(&install_dir)?;
 
     let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
-    let _home_legacy = EnvVarGuard::set("JCODE_HOME", &home_dir);
+    let _home_legacy = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
     let _runtime_guard = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
-    let _runtime_legacy = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
+    let _runtime_legacy = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
     let _install_guard = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
-    let _install_legacy = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
+    let _install_legacy = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
     let mut command = Command::new(&release_binary);
     command
         .arg("--no-update")
@@ -310,13 +310,13 @@ async fn binary_integration_selfdev_reload_reconnects_quickly() -> Result<()> {
         .arg("self-dev")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .env_remove("NEXT_CODE_TEST_SESSION")
-        .env_remove("JCODE_TEST_SESSION")
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env("NEXT_CODE_HOME", &home_dir)
-        .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
-        .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("NEXT_CODE_INSTALL_DIR", &install_dir)
-        .env("JCODE_INSTALL_DIR", &install_dir);
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir);
 
     let mut child = spawn_pty_child(command)?;
 
@@ -407,14 +407,14 @@ async fn binary_integration_selfdev_client_reload_resumes_session() -> Result<()
     std::fs::create_dir_all(&install_dir)?;
 
     let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
-    let _home_legacy = EnvVarGuard::set("JCODE_HOME", &home_dir);
+    let _home_legacy = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
     let _runtime_guard = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
-    let _runtime_legacy = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
+    let _runtime_legacy = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
     let _install_guard = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
-    let _install_legacy = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
+    let _install_legacy = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
     let starter_binary = temp_root.path().join("next-code-selfdev-client-starter");
     std::fs::copy(env!("CARGO_BIN_EXE_next-code"), &starter_binary)?;
     let starter_mtime = std::fs::metadata(&release_binary)?
@@ -431,13 +431,13 @@ async fn binary_integration_selfdev_client_reload_resumes_session() -> Result<()
         .arg("self-dev")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .env_remove("NEXT_CODE_TEST_SESSION")
-        .env_remove("JCODE_TEST_SESSION")
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env("NEXT_CODE_HOME", &home_dir)
-        .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
-        .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("NEXT_CODE_INSTALL_DIR", &install_dir)
-        .env("JCODE_INSTALL_DIR", &install_dir);
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir);
 
     let mut child = spawn_pty_child(command)?;
 
@@ -576,14 +576,14 @@ async fn binary_integration_selfdev_full_reload_resumes_session_quickly() -> Res
     std::fs::create_dir_all(&install_dir)?;
 
     let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
-    let _home_legacy = EnvVarGuard::set("JCODE_HOME", &home_dir);
+    let _home_legacy = EnvVarGuard::set("NEXT_CODE_HOME", &home_dir);
     let _runtime_guard = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
-    let _runtime_legacy = EnvVarGuard::set("JCODE_RUNTIME_DIR", &runtime_dir);
+    let _runtime_legacy = EnvVarGuard::set("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
     let _install_guard = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
-    let _install_legacy = EnvVarGuard::set("JCODE_INSTALL_DIR", &install_dir);
+    let _install_legacy = EnvVarGuard::set("NEXT_CODE_INSTALL_DIR", &install_dir);
 
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
     let starter_binary = temp_root.path().join("next-code-selfdev-full-reload-starter");
     std::fs::copy(env!("CARGO_BIN_EXE_next-code"), &starter_binary)?;
     let starter_mtime = std::fs::metadata(&release_binary)?
@@ -600,13 +600,13 @@ async fn binary_integration_selfdev_full_reload_resumes_session_quickly() -> Res
         .arg("self-dev")
         .current_dir(env!("CARGO_MANIFEST_DIR"))
         .env_remove("NEXT_CODE_TEST_SESSION")
-        .env_remove("JCODE_TEST_SESSION")
+        .env_remove("NEXT_CODE_TEST_SESSION")
         .env("NEXT_CODE_HOME", &home_dir)
-        .env("JCODE_HOME", &home_dir)
+        .env("NEXT_CODE_HOME", &home_dir)
         .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
-        .env("JCODE_RUNTIME_DIR", &runtime_dir)
+        .env("NEXT_CODE_RUNTIME_DIR", &runtime_dir)
         .env("NEXT_CODE_INSTALL_DIR", &install_dir)
-        .env("JCODE_INSTALL_DIR", &install_dir);
+        .env("NEXT_CODE_INSTALL_DIR", &install_dir);
 
     let mut child = spawn_pty_child(command)?;
 

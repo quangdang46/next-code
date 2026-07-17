@@ -655,7 +655,7 @@ done
     async fn discovery_provenance_end_to_end_with_real_mcp_server() {
         let env_guard = crate::storage::lock_test_env();
         let temp = tempfile::tempdir().unwrap();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         std::fs::write(
             temp.path().join("config.toml"),
             "[sponsors]\nenabled = true\n",

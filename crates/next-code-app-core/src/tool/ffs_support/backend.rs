@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -17,7 +18,7 @@ pub const DEFAULT_ENGINE_TOKEN_BUDGET: u64 = 25_000;
 /// Prefer ffs when not explicitly disabled (opencode: `Fff.available()`).
 pub fn ffs_preferred() -> bool {
     !matches!(
-        std::env::var("JCODE_DISABLE_FFS").as_deref(),
+        product_env("DISABLE_FFS").as_deref(),
         Ok("1") | Ok("true") | Ok("TRUE")
     )
 }

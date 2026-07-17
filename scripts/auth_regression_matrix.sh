@@ -7,7 +7,7 @@ cd "$repo_root"
 bin=${NEXT_CODE_AUTH_MATRIX_BIN:-${JCODE_AUTH_MATRIX_BIN:-}}
 out_dir=${NEXT_CODE_AUTH_MATRIX_OUT:-${JCODE_AUTH_MATRIX_OUT:-"$repo_root/target/auth-test-reports"}}
 prompt=${NEXT_CODE_AUTH_MATRIX_PROMPT:-${JCODE_AUTH_MATRIX_PROMPT:-"Reply with exactly AUTH_TEST_OK and nothing else. Do not call tools."}}
-providers=${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-${JCODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}}
+providers=${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-${JCODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}}}
 mode=${NEXT_CODE_AUTH_MATRIX_MODE:-${JCODE_AUTH_MATRIX_MODE:-configured}}
 keep_going=${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-${JCODE_AUTH_MATRIX_KEEP_GOING:-1}}
 per_command_timeout=${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-${JCODE_AUTH_MATRIX_TIMEOUT:-90}}
@@ -35,14 +35,14 @@ Options:
 
 Environment equivalents:
   NEXT_CODE_AUTH_MATRIX_BIN=/path/to/next-code
-  JCODE_AUTH_MATRIX_OUT=target/auth-test-reports
-  JCODE_AUTH_MATRIX_PROVIDERS="claude deepseek zai"
-  JCODE_AUTH_MATRIX_MODE=configured|all
-  JCODE_AUTH_MATRIX_LOGIN=1
-  JCODE_AUTH_MATRIX_NO_SMOKE=1
-  JCODE_AUTH_MATRIX_NO_TOOL_SMOKE=1
-  JCODE_AUTH_MATRIX_KEEP_GOING=0
-  JCODE_AUTH_MATRIX_TIMEOUT=90
+  NEXT_CODE_AUTH_MATRIX_OUT=target/auth-test-reports
+  NEXT_CODE_AUTH_MATRIX_PROVIDERS="claude deepseek zai"
+  NEXT_CODE_AUTH_MATRIX_MODE=configured|all
+  NEXT_CODE_AUTH_MATRIX_LOGIN=1
+  NEXT_CODE_AUTH_MATRIX_NO_SMOKE=1
+  NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE=1
+  NEXT_CODE_AUTH_MATRIX_KEEP_GOING=0
+  NEXT_CODE_AUTH_MATRIX_TIMEOUT=90
 
 Examples:
   scripts/auth_regression_matrix.sh --configured --no-smoke
@@ -116,13 +116,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${JCODE_AUTH_MATRIX_LOGIN:-0}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_LOGIN:-${JCODE_AUTH_MATRIX_LOGIN:-0}}" == "1" ]]; then
   extra_args+=(--login)
 fi
-if [[ "${JCODE_AUTH_MATRIX_NO_SMOKE:-0}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_NO_SMOKE:-${JCODE_AUTH_MATRIX_NO_SMOKE:-0}}" == "1" ]]; then
   extra_args+=(--no-smoke)
 fi
-if [[ "${JCODE_AUTH_MATRIX_NO_TOOL_SMOKE:-0}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE:-${JCODE_AUTH_MATRIX_NO_TOOL_SMOKE:-0}}" == "1" ]]; then
   extra_args+=(--no-tool-smoke)
 fi
 
@@ -145,11 +145,11 @@ configured_json="$out_dir/configured-providers.json"
 if [[ "$mode" == "configured" ]]; then
   echo "Discovering configured providers..."
   rm -f "$configured_json"
-  if ! run_jcode auth-test --all-configured --no-smoke --no-tool-smoke --json --output "$configured_json" >/tmp/jcode-auth-matrix-discovery.out 2>/tmp/jcode-auth-matrix-discovery.err; then
+  if ! run_jcode auth-test --all-configured --no-smoke --no-tool-smoke --json --output "$configured_json" >/tmp/next-code-auth-matrix-discovery.out 2>/tmp/next-code-auth-matrix-discovery.err; then
     if [[ -s "$configured_json" ]]; then
       echo "note: configured-provider discovery reported non-ready providers; continuing with per-provider classification" >&2
     else
-      cat /tmp/jcode-auth-matrix-discovery.err >&2 || true
+      cat /tmp/next-code-auth-matrix-discovery.err >&2 || true
       echo "warning: configured-provider discovery failed; continuing with explicit matrix and skipping only obvious unconfigured failures" >&2
     fi
   fi

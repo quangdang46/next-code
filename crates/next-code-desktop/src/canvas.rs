@@ -315,7 +315,7 @@ impl Canvas {
         let (device, queue) = adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    label: Some("jcode-desktop-device"),
+                    label: Some("next-code-desktop-device"),
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
                 },
@@ -453,7 +453,7 @@ impl Canvas {
     pub(crate) fn suspend_for_zero_size(&mut self, size: PhysicalSize<u32>) {
         if !self.surface_zero_sized {
             desktop_log::info(format_args!(
-                "jcode-desktop: suspending surface rendering while window is zero-sized ({}x{})",
+                "next-code-desktop: suspending surface rendering while window is zero-sized ({}x{})",
                 size.width, size.height
             ));
         }
@@ -470,7 +470,7 @@ impl Canvas {
         self.surface_zero_sized = false;
         if was_zero_sized {
             desktop_log::info(format_args!(
-                "jcode-desktop: resuming surface rendering at {}x{}",
+                "next-code-desktop: resuming surface rendering at {}x{}",
                 size.width, size.height
             ));
         }
@@ -908,7 +908,7 @@ impl Canvas {
                     Ok(font_system) => Some(font_system),
                     Err(_) => {
                         desktop_log::error(format_args!(
-                            "jcode-desktop: font system loader thread panicked"
+                            "next-code-desktop: font system loader thread panicked"
                         ));
                         None
                     }
@@ -924,19 +924,19 @@ impl Canvas {
         let shader = self
             .device
             .create_shader_module(wgpu::ShaderModuleDescriptor {
-                label: Some("jcode-desktop-primitive-shader"),
+                label: Some("next-code-desktop-primitive-shader"),
                 source: wgpu::ShaderSource::Wgsl(SHADER.into()),
             });
         let pipeline_layout = self
             .device
             .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("jcode-desktop-primitive-pipeline-layout"),
+                label: Some("next-code-desktop-primitive-pipeline-layout"),
                 bind_group_layouts: &[],
                 push_constant_ranges: &[],
             });
         self.render_pipeline = Some(self.device.create_render_pipeline(
             &wgpu::RenderPipelineDescriptor {
-                label: Some("jcode-desktop-primitive-pipeline"),
+                label: Some("next-code-desktop-primitive-pipeline"),
                 layout: Some(&pipeline_layout),
                 vertex: wgpu::VertexState {
                     module: &shader,
@@ -1135,12 +1135,12 @@ impl Canvas {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("jcode-desktop-boot-frame"),
+                label: Some("next-code-desktop-boot-frame"),
             });
         frame_profile.checkpoint("frame_setup");
         {
             let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("jcode-desktop-boot-clear-pass"),
+                label: Some("next-code-desktop-boot-clear-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -1206,7 +1206,7 @@ impl Canvas {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("jcode-desktop-scene-render"),
+                label: Some("next-code-desktop-scene-render"),
             });
         frame_profile.checkpoint("frame_setup");
 
@@ -1228,7 +1228,7 @@ impl Canvas {
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("jcode-desktop-scene-pass"),
+                label: Some("next-code-desktop-scene-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -1306,7 +1306,7 @@ impl Canvas {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("jcode-desktop-render-workspace"),
+                label: Some("next-code-desktop-render-workspace"),
             });
         let now = Instant::now();
         let spinner_tick = desktop_spinner_tick(now);
@@ -1579,7 +1579,7 @@ impl Canvas {
                     }
                 } else {
                     desktop_log::error(format_args!(
-                        "jcode-desktop: missing single-session viewport while preparing text"
+                        "next-code-desktop: missing single-session viewport while preparing text"
                     ));
                     Vec::new()
                 }
@@ -1612,7 +1612,7 @@ impl Canvas {
                             &mut self.swash_cache,
                         ) {
                             desktop_log::error(format_args!(
-                                "jcode-desktop: failed to prepare text, recreating renderer: {error:?}"
+                                "next-code-desktop: failed to prepare text, recreating renderer: {error:?}"
                             ));
                             self.text_renderer = None;
                             self.text_atlas = None;
@@ -1624,7 +1624,7 @@ impl Canvas {
                     }
                     _ => {
                         desktop_log::error(format_args!(
-                            "jcode-desktop: text renderer state was incomplete before prepare, recreating renderer"
+                            "next-code-desktop: text renderer state was incomplete before prepare, recreating renderer"
                         ));
                         self.text_renderer = None;
                         self.text_atlas = None;
@@ -1699,7 +1699,7 @@ impl Canvas {
                             &mut self.swash_cache,
                         ) {
                             desktop_log::error(format_args!(
-                                "jcode-desktop: failed to prepare streaming text, recreating renderer: {error:?}"
+                                "next-code-desktop: failed to prepare streaming text, recreating renderer: {error:?}"
                             ));
                             self.streaming_text_renderer = None;
                             self.streaming_text_atlas = None;
@@ -1711,7 +1711,7 @@ impl Canvas {
                     }
                     _ => {
                         desktop_log::error(format_args!(
-                            "jcode-desktop: streaming text renderer state was incomplete before prepare, recreating renderer"
+                            "next-code-desktop: streaming text renderer state was incomplete before prepare, recreating renderer"
                         ));
                         self.streaming_text_renderer = None;
                         self.streaming_text_atlas = None;
@@ -2119,7 +2119,7 @@ impl Canvas {
         let mut streaming_text_render_failed = false;
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("jcode-desktop-workspace-pass"),
+                label: Some("next-code-desktop-workspace-pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: &view,
                     resolve_target: None,
@@ -2149,7 +2149,7 @@ impl Canvas {
                 && let Err(error) = text_renderer.render(text_atlas, &mut render_pass)
             {
                 desktop_log::error(format_args!(
-                    "jcode-desktop: failed to render text, recreating renderer: {error:?}"
+                    "next-code-desktop: failed to render text, recreating renderer: {error:?}"
                 ));
                 text_render_failed = true;
             }
@@ -2161,7 +2161,7 @@ impl Canvas {
                 && let Err(error) = text_renderer.render(text_atlas, &mut render_pass)
             {
                 desktop_log::error(format_args!(
-                    "jcode-desktop: failed to render streaming text, recreating renderer: {error:?}"
+                    "next-code-desktop: failed to render streaming text, recreating renderer: {error:?}"
                 ));
                 streaming_text_render_failed = true;
             }
@@ -2240,7 +2240,7 @@ pub(crate) fn upload_primitive_vertices(
         let size =
             (*primitive_vertex_capacity * std::mem::size_of::<Vertex>()) as wgpu::BufferAddress;
         *primitive_vertex_buffer = Some(device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("jcode-desktop-workspace-vertices"),
+            label: Some("next-code-desktop-workspace-vertices"),
             size,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,

@@ -9,7 +9,7 @@ use tokio::task::JoinHandle;
 
 /// Directory for background task output files
 pub(super) fn task_dir() -> PathBuf {
-    std::env::temp_dir().join("jcode-bg-tasks")
+    std::env::temp_dir().join("next-code-bg-tasks")
 }
 
 pub(super) const EXIT_MARKER_PREFIX: &str = "--- Command finished with exit code: ";
@@ -161,7 +161,7 @@ pub(super) fn progress_wait_reason(
     }
 }
 
-// Progress-display formatting now lives in `jcode-background-types` (pure
+// Progress-display formatting now lives in `next-code-background-types` (pure
 // functions over BackgroundTaskProgress); re-export for existing callers.
 pub use next_code_background_types::{
     format_progress_display, format_progress_summary, render_progress_bar,

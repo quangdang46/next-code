@@ -384,12 +384,12 @@ pub trait Provider: Send + Sync {
         String::new()
     }
 
-    /// Returns true if jcode should use its own compaction for this provider.
+    /// Returns true if next-code should use its own compaction for this provider.
     fn supports_compaction(&self) -> bool {
         false
     }
 
-    /// Returns true if jcode should proactively run its own summary-based compaction.
+    /// Returns true if next-code should proactively run its own summary-based compaction.
     fn uses_jcode_compaction(&self) -> bool {
         self.supports_compaction()
     }
@@ -526,7 +526,7 @@ impl CredentialMode {
 /// Channel for sending provider-native tool results back to a provider bridge.
 pub type NativeToolResultSender = tokio::sync::mpsc::Sender<NativeToolResult>;
 
-/// Native tool result to send back to provider bridges that delegate tool execution to jcode.
+/// Native tool result to send back to provider bridges that delegate tool execution to next-code.
 #[derive(Debug, Clone, Serialize)]
 pub struct NativeToolResult {
     #[serde(rename = "type")]

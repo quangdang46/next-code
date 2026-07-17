@@ -6,13 +6,14 @@
 //! [`HooksConfig`] with a 3-layer TOML loader ([`load_hooks_config`]).
 //!
 //! Configuration is loaded from three layers (lowest to highest priority):
-//!   1. `~/.jcode/hooks.toml`          (user-level)
-//!   2. `.jcode/hooks.toml`            (project-level, relative to cwd)
-//!   3. `$JCODE_HOOKS_CONFIG`          (env-level, path to TOML file)
+//!   1. `~/.next-code/hooks.toml`          (user-level)
+//!   2. `.next-code/hooks.toml` (project-level; dual-read: `.jcode/hooks.toml`)
+//!   3. `$NEXT_CODE_HOOKS_CONFIG`          (env-level, path to TOML file)
 //!
 //! Settings from higher-priority layers override lower ones; event handlers
 //! are **appended** across layers.
 
+use next_code_core::env::{product_env, product_var_full};
 use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
@@ -216,7 +217,7 @@ impl HookEvent {
     }
 
     /// Uppercase form suitable for env-var keys
-    /// (e.g. `"PRETOOLUSE"` for `JCODE_SKIP_EVENT_PRETOOLUSE`).
+    /// (e.g. `"PRETOOLUSE"` for `NEXT_CODE_SKIP_EVENT_PRETOOLUSE`).
     pub fn name_uppercase(&self) -> String {
         self.display_name().to_ascii_uppercase()
     }
@@ -431,7 +432,7 @@ impl Default for HttpHandlerConfig {
 
 /// Inline agent handler.
 ///
-/// Dispatches the hook to a jcode sub-agent identified by `agent_id`.
+/// Dispatches the hook to a next-code sub-agent identified by `agent_id`.
 /// The agent receives the hook input as context and its response is parsed
 /// as [`HookOutput`](super::types::HookOutput).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -439,7 +440,7 @@ impl Default for HttpHandlerConfig {
 pub struct AgentHandlerConfig {
     /// Whether this handler is active.
     pub enabled: bool,
-    /// Agent ID or name registered in jcode's agent registry.
+    /// Agent ID or name registered in next-code's agent registry.
     pub agent_id: String,
     /// Optional system-prompt override for the hook agent.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -686,39 +687,39 @@ impl HooksConfig {
 // ---------------------------------------------------------------------------
 
 /// Load hooks configuration from the 3-layer TOML hierarchy, respecting the
-/// `DISABLE_JCODE_HOOKS` kill-switch.
+/// `DISABLE_NEXT_CODE_HOOKS` kill-switch (dual-read: `DISABLE_JCODE_HOOKS`).
 ///
 /// Layers (lowest to highest priority):
-///   1. `~/.jcode/hooks.toml`
-///   2. `<cwd>/.jcode/hooks.toml`
-///   3. Path in `$JCODE_HOOKS_CONFIG`
+///   1. `~/.next-code/hooks.toml`
+///   2. `<cwd>/.next-code/hooks.toml` (dual-read: `.jcode/hooks.toml`)
+///   3. Path in `$NEXT_CODE_HOOKS_CONFIG`
 ///
 /// Returns a default (empty) config when the kill-switch env var is set or
 /// when no config files are found.
 pub fn load_hooks_config() -> HooksConfig {
-    // Kill-switch: honour DISABLE_JCODE_HOOKS.
-    if std::env::var("DISABLE_JCODE_HOOKS").is_ok() {
-        eprintln!("[hooks] disabled via DISABLE_JCODE_HOOKS env var");
+    // Kill-switch: honour DISABLE_NEXT_CODE_HOOKS (dual-read: DISABLE_JCODE_HOOKS).
+    if product_var_full("DISABLE_NEXT_CODE_HOOKS", "DISABLE_JCODE_HOOKS").is_ok() { // dual-read: legacy
+        eprintln!("[hooks] disabled via DISABLE_NEXT_CODE_HOOKS env var");
         return HooksConfig::default();
     }
 
     let mut merged = HooksConfig::default();
 
-    // Layer 1 -- user-level (~/.jcode/hooks.toml)
+    // Layer 1 -- user-level (~/.next-code/hooks.toml)
     if let Some(path) = user_hooks_config_path() {
         if let Some(config) = load_hooks_config_from_path(&path) {
             merged.merge(config);
         }
     }
 
-    // Layer 2 -- project-level (<cwd>/.jcode/hooks.toml)
+    // Layer 2 -- project-level (<cwd>/.next-code/hooks.toml)
     if let Some(path) = project_hooks_config_path() {
         if let Some(config) = load_hooks_config_from_path(&path) {
             merged.merge(config);
         }
     }
 
-    // Layer 3 -- env-level ($JCODE_HOOKS_CONFIG)
+    // Layer 3 -- env-level ($NEXT_CODE_HOOKS_CONFIG)
     if let Some(path) = env_hooks_config_path() {
         if let Some(config) = load_hooks_config_from_path(&path) {
             merged.merge(config);
@@ -728,21 +729,39 @@ pub fn load_hooks_config() -> HooksConfig {
     merged
 }
 
-/// `$HOME/.jcode/hooks.toml`
+/// `$HOME/.next-code/hooks.toml` (dual-read: `$HOME/.jcode/hooks.toml`).
 fn user_hooks_config_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| home.join(".jcode").join("hooks.toml"))
+    let home = dirs::home_dir()?;
+    let primary = home.join(".next-code").join("hooks.toml");
+    if primary.exists() {
+        return Some(primary);
+    }
+    // dual-read: legacy home dir
+    let legacy = home.join(".jcode").join("hooks.toml"); // dual-read: legacy
+    if legacy.exists() {
+        return Some(legacy);
+    }
+    Some(primary)
 }
 
-/// `<cwd>/.jcode/hooks.toml`
+/// `<cwd>/.next-code/hooks.toml` (dual-read: `<cwd>/.jcode/hooks.toml`).
 fn project_hooks_config_path() -> Option<PathBuf> {
-    std::env::current_dir()
-        .ok()
-        .map(|cwd| cwd.join(".jcode").join("hooks.toml"))
+    let cwd = std::env::current_dir().ok()?;
+    let primary = cwd.join(".next-code").join("hooks.toml");
+    if primary.exists() {
+        return Some(primary);
+    }
+    // dual-read: legacy project dir
+    let legacy = cwd.join(".jcode").join("hooks.toml"); // dual-read: legacy
+    if legacy.exists() {
+        return Some(legacy);
+    }
+    Some(primary)
 }
 
-/// Path from the `JCODE_HOOKS_CONFIG` environment variable.
+/// Path from the `NEXT_CODE_HOOKS_CONFIG` environment variable.
 fn env_hooks_config_path() -> Option<PathBuf> {
-    std::env::var("JCODE_HOOKS_CONFIG")
+    product_env("HOOKS_CONFIG")
         .ok()
         .filter(|s| !s.is_empty())
         .map(PathBuf::from)

@@ -87,7 +87,7 @@ impl DesktopReloadStartup {
             let placement = DesktopReloadWindowPlacement::from_env_value(raw);
             if placement.is_none() {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: ignoring invalid reload window placement {raw:?}"
+                    "next-code-desktop: ignoring invalid reload window placement {raw:?}"
                 ));
             }
             placement
@@ -100,7 +100,7 @@ impl DesktopReloadStartup {
             (None, None) => None,
             _ => {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: ignoring incomplete reload handoff environment"
+                    "next-code-desktop: ignoring incomplete reload handoff environment"
                 ));
                 None
             }
@@ -127,13 +127,13 @@ impl DesktopReloadStartupHandoff {
     pub(crate) fn signal_ready_and_wait_for_release(&self) {
         if let Err(error) = write_desktop_reload_marker(&self.ready_file) {
             desktop_log::warn(format_args!(
-                "jcode-desktop: failed to signal reload readiness: {error:#}"
+                "next-code-desktop: failed to signal reload readiness: {error:#}"
             ));
             return;
         }
 
         desktop_log::info(format_args!(
-            "jcode-desktop: reload child ready, waiting for parent release"
+            "next-code-desktop: reload child ready, waiting for parent release"
         ));
         let deadline = Instant::now() + DESKTOP_RELOAD_STARTUP_RELEASE_TIMEOUT;
         while Instant::now() < deadline {
@@ -145,7 +145,7 @@ impl DesktopReloadStartupHandoff {
         }
 
         desktop_log::warn(format_args!(
-            "jcode-desktop: reload parent did not release handoff within {}ms; showing replacement window anyway",
+            "next-code-desktop: reload parent did not release handoff within {}ms; showing replacement window anyway",
             DESKTOP_RELOAD_STARTUP_RELEASE_TIMEOUT.as_millis()
         ));
         cleanup_desktop_reload_handoff_files(&self.ready_file, &self.release_file);
@@ -233,7 +233,7 @@ pub(crate) fn desktop_reload_handoff_temp_dir() -> PathBuf {
         .map(|duration| duration.as_nanos())
         .unwrap_or_default();
     std::env::temp_dir().join(format!(
-        "jcode-desktop-reload-{}-{nonce}",
+        "next-code-desktop-reload-{}-{nonce}",
         std::process::id()
     ))
 }
@@ -251,7 +251,7 @@ pub(crate) fn cleanup_desktop_reload_handoff_files(ready_file: &Path, release_fi
         && parent
             .file_name()
             .and_then(|name| name.to_str())
-            .is_some_and(|name| name.starts_with("jcode-desktop-reload-"))
+            .is_some_and(|name| name.starts_with("next-code-desktop-reload-"))
     {
         let _ = fs::remove_dir(parent);
     }
@@ -311,7 +311,7 @@ impl DesktopHotReloader {
             match message {
                 Ok(DesktopWorkerToHostMessage::Ready(ready)) => {
                     desktop_log::info(format_args!(
-                        "jcode-desktop: app worker ready; pid={} mode={:?}",
+                        "next-code-desktop: app worker ready; pid={} mode={:?}",
                         ready.worker_pid, ready.mode
                     ));
                 }
@@ -323,31 +323,31 @@ impl DesktopHotReloader {
                 }
                 Ok(DesktopWorkerToHostMessage::Snapshot(snapshot)) => {
                     desktop_log::info(format_args!(
-                        "jcode-desktop: app worker snapshot response {}; mode={}",
+                        "next-code-desktop: app worker snapshot response {}; mode={}",
                         snapshot.request_id, snapshot.snapshot.mode
                     ));
                 }
                 Ok(DesktopWorkerToHostMessage::Metrics(metrics)) => {
                     desktop_log::info(format_args!(
-                        "jcode-desktop: app worker reported {} metric(s)",
+                        "next-code-desktop: app worker reported {} metric(s)",
                         metrics.metrics.len()
                     ));
                 }
                 Ok(DesktopWorkerToHostMessage::Log(log)) => {
                     desktop_log::info(format_args!(
-                        "jcode-desktop: app worker log {:?}: {}",
+                        "next-code-desktop: app worker log {:?}: {}",
                         log.level, log.message
                     ));
                 }
                 Ok(DesktopWorkerToHostMessage::Exited(exit)) => {
                     desktop_log::warn(format_args!(
-                        "jcode-desktop: app worker exited code={:?} reason={:?}",
+                        "next-code-desktop: app worker exited code={:?} reason={:?}",
                         exit.code, exit.reason
                     ));
                 }
                 Err(error) => {
                     desktop_log::error(format_args!(
-                        "jcode-desktop: failed to read app worker message: {error:#}"
+                        "next-code-desktop: failed to read app worker message: {error:#}"
                     ));
                     should_drop_worker = true;
                     break;
@@ -358,14 +358,14 @@ impl DesktopHotReloader {
             match worker.try_wait() {
                 Ok(Some(status)) => {
                     desktop_log::warn(format_args!(
-                        "jcode-desktop: app worker process exited unexpectedly: {status}"
+                        "next-code-desktop: app worker process exited unexpectedly: {status}"
                     ));
                     should_drop_worker = true;
                 }
                 Ok(None) => {}
                 Err(error) => {
                     desktop_log::warn(format_args!(
-                        "jcode-desktop: failed to poll app worker process: {error:#}"
+                        "next-code-desktop: failed to poll app worker process: {error:#}"
                     ));
                     should_drop_worker = true;
                 }
@@ -376,7 +376,7 @@ impl DesktopHotReloader {
             && let Err(error) = worker.kill()
         {
             desktop_log::warn(format_args!(
-                "jcode-desktop: failed to clean up stopped app worker: {error:#}"
+                "next-code-desktop: failed to clean up stopped app worker: {error:#}"
             ));
         }
         drained
@@ -408,7 +408,7 @@ impl DesktopHotReloader {
     ) {
         let Some(relaunch) = self.relaunch.clone() else {
             desktop_log::warn(format_args!(
-                "jcode-desktop: cannot start app worker for {reason}; current process cannot be relaunched"
+                "next-code-desktop: cannot start app worker for {reason}; current process cannot be relaunched"
             ));
             return;
         };
@@ -449,13 +449,13 @@ impl DesktopHotReloader {
         }
         if self.pending_handoff.is_some() {
             desktop_log::warn(format_args!(
-                "jcode-desktop: force reload requested while another reload handoff is pending"
+                "next-code-desktop: force reload requested while another reload handoff is pending"
             ));
             return false;
         }
         let Some(relaunch) = self.relaunch.clone() else {
             desktop_log::warn(format_args!(
-                "jcode-desktop: force reload requested but current process cannot be relaunched"
+                "next-code-desktop: force reload requested but current process cannot be relaunched"
             ));
             return false;
         };
@@ -477,7 +477,7 @@ impl DesktopHotReloader {
             }
             DesktopReloadStrategy::AppWorkerRestart => {
                 desktop_log::info(format_args!(
-                    "jcode-desktop: {reason} requested app-worker restart; keeping stable host window alive"
+                    "next-code-desktop: {reason} requested app-worker restart; keeping stable host window alive"
                 ));
                 self.restart_app_worker(app, window, relaunch, binary, reason);
                 false
@@ -497,7 +497,7 @@ impl DesktopHotReloader {
             && let Err(error) = worker.kill()
         {
             desktop_log::warn(format_args!(
-                "jcode-desktop: failed to stop previous app worker before {reason}: {error:#}"
+                "next-code-desktop: failed to stop previous app worker before {reason}: {error:#}"
             ));
         }
 
@@ -512,23 +512,23 @@ impl DesktopHotReloader {
                     }))
                 {
                     desktop_log::error(format_args!(
-                        "jcode-desktop: failed to initialize app worker for {reason}: {error:#}"
+                        "next-code-desktop: failed to initialize app worker for {reason}: {error:#}"
                     ));
                     if let Err(kill_error) = worker.kill() {
                         desktop_log::warn(format_args!(
-                            "jcode-desktop: failed to kill uninitialized app worker: {kill_error:#}"
+                            "next-code-desktop: failed to kill uninitialized app worker: {kill_error:#}"
                         ));
                     }
                     return;
                 }
                 desktop_log::info(format_args!(
-                    "jcode-desktop: app worker restarted for {reason}; pid={}",
+                    "next-code-desktop: app worker restarted for {reason}; pid={}",
                     worker.child_id()
                 ));
                 self.app_worker = Some(worker);
             }
             Err(error) => desktop_log::error(format_args!(
-                "jcode-desktop: failed to restart app worker for {reason}: {error:#}"
+                "next-code-desktop: failed to restart app worker for {reason}: {error:#}"
             )),
         }
     }
@@ -550,7 +550,7 @@ impl DesktopHotReloader {
             Ok(None) => true,
             Err(error) => {
                 desktop_log::error(format_args!(
-                    "jcode-desktop: failed to {reason} desktop: {error:#}"
+                    "next-code-desktop: failed to {reason} desktop: {error:#}"
                 ));
                 false
             }
@@ -565,13 +565,13 @@ impl DesktopHotReloader {
             Ok(DesktopReloadHandoffPoll::Waiting) => false,
             Ok(DesktopReloadHandoffPoll::Ready) => {
                 desktop_log::info(format_args!(
-                    "jcode-desktop: reload replacement is ready; exiting old process"
+                    "next-code-desktop: reload replacement is ready; exiting old process"
                 ));
                 true
             }
             Ok(DesktopReloadHandoffPoll::TimedOut) => {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: reload replacement did not become ready within {}ms; keeping old process alive",
+                    "next-code-desktop: reload replacement did not become ready within {}ms; keeping old process alive",
                     DESKTOP_RELOAD_HANDOFF_TIMEOUT.as_millis()
                 ));
                 if let Some(pending_handoff) = self.pending_handoff.take() {
@@ -581,7 +581,7 @@ impl DesktopHotReloader {
             }
             Err(error) => {
                 desktop_log::error(format_args!(
-                    "jcode-desktop: failed to release reload replacement: {error:#}"
+                    "next-code-desktop: failed to release reload replacement: {error:#}"
                 ));
                 true
             }
@@ -637,13 +637,13 @@ impl DesktopRelaunch {
             Ok(handoff) => Some(handoff),
             Err(error) => {
                 desktop_log::warn(format_args!(
-                    "jcode-desktop: reload handoff unavailable, falling back to immediate relaunch: {error:#}"
+                    "next-code-desktop: reload handoff unavailable, falling back to immediate relaunch: {error:#}"
                 ));
                 None
             }
         };
         desktop_log::info(format_args!(
-            "jcode-desktop: hot reloading into {} with args {:?}{}",
+            "next-code-desktop: hot reloading into {} with args {:?}{}",
             self.binary.display(),
             self.args,
             if handoff.is_some() {
@@ -675,7 +675,7 @@ impl DesktopRelaunch {
             && let Err(error) = desktop_prefs::save_preferences(&workspace.preferences())
         {
             desktop_log::error(format_args!(
-                "jcode-desktop: failed to persist workspace state before hot reload: {error:#}"
+                "next-code-desktop: failed to persist workspace state before hot reload: {error:#}"
             ));
         }
 
@@ -704,7 +704,7 @@ impl DesktopRelaunch {
 
     fn spawn_app_worker(&self) -> Result<DesktopWorkerConnection> {
         desktop_log::info(format_args!(
-            "jcode-desktop: spawning app worker {} with args {:?}",
+            "next-code-desktop: spawning app worker {} with args {:?}",
             self.binary.display(),
             self.args
         ));
@@ -724,7 +724,7 @@ pub(crate) fn ensure_desktop_workspace_arg(args: &mut Vec<OsString>) {
             || arg == "--new"
             || arg == "--resume"
             || arg.to_str().is_some_and(|value| {
-                value.starts_with("--resume=") || value.starts_with("jcode://") || value.starts_with("nextcode://")
+                value.starts_with("--resume=") || value.starts_with("next-code://") || value.starts_with("nextcode://")
             })
     });
     if !has_mode_arg {
@@ -811,9 +811,9 @@ pub(crate) fn desktop_selfdev_binary_path(repo_dir: &Path) -> PathBuf {
 
 pub(crate) fn desktop_binary_name() -> &'static str {
     if cfg!(windows) {
-        "jcode-desktop.exe"
+        "next-code-desktop.exe"
     } else {
-        "jcode-desktop"
+        "next-code-desktop"
     }
 }
 
@@ -855,16 +855,16 @@ pub(crate) fn find_desktop_repo_dir() -> Option<PathBuf> {
 pub(crate) fn find_desktop_repo_in_ancestors(start: &Path) -> Option<PathBuf> {
     start
         .ancestors()
-        .find(|candidate| is_jcode_desktop_repo(candidate))
+        .find(|candidate| is_next_code_desktop_repo(candidate))
         .map(Path::to_path_buf)
 }
 
-pub(crate) fn is_jcode_desktop_repo(candidate: &Path) -> bool {
-    if !candidate.join("crates/jcode-desktop/Cargo.toml").is_file() {
+pub(crate) fn is_next_code_desktop_repo(candidate: &Path) -> bool {
+    if !candidate.join("crates/next-code-desktop/Cargo.toml").is_file() {
         return false;
     }
     std::fs::read_to_string(candidate.join("Cargo.toml"))
-        .map(|cargo_toml| cargo_toml.contains("name = \"jcode\""))
+        .map(|cargo_toml| cargo_toml.contains("name = \"next-code\""))
         .unwrap_or(false)
 }
 

@@ -9,7 +9,7 @@
 //!
 //! ```bash
 //! # Comma-separated chain of (provider:model) fallbacks, tried in order.
-//! JCODE_FAILOVER_CHAIN=anthropic:claude-sonnet-4,openai:gpt-5.5,openrouter:google/gemini-2.5-pro
+//! NEXT_CODE_FAILOVER_CHAIN=anthropic:claude-sonnet-4,openai:gpt-5.5,openrouter:google/gemini-2.5-pro
 //! ```
 //!
 //! ## API
@@ -36,6 +36,7 @@
 //! - Per-model cooldown windows (don't immediately retry a model
 //!   that just rate-limited).
 
+use crate::env::{product_env};
 use std::time::Duration;
 
 /// A single failover destination.
@@ -49,7 +50,7 @@ pub struct FailoverEntry {
     pub model: String,
 }
 
-/// Parse the active failover chain from `JCODE_FAILOVER_CHAIN`.
+/// Parse the active failover chain from `NEXT_CODE_FAILOVER_CHAIN`.
 /// Empty/unset env returns `Vec::new()`.
 ///
 /// Format: `provider:model,provider:model,...`. Whitespace is
@@ -57,7 +58,7 @@ pub struct FailoverEntry {
 /// model ids (provider field empty — caller falls back to the
 /// active provider).
 pub fn current_chain() -> Vec<FailoverEntry> {
-    let Ok(raw) = std::env::var("JCODE_FAILOVER_CHAIN") else {
+    let Ok(raw) = product_env("FAILOVER_CHAIN") else {
         return Vec::new();
     };
     parse_chain(&raw)
@@ -86,7 +87,7 @@ pub fn parse_chain(raw: &str) -> Vec<FailoverEntry> {
 /// chain. Defaults to 30s; tunable via env so corporate users with
 /// stricter quotas can extend.
 pub fn rate_limit_cooldown() -> Duration {
-    let secs = std::env::var("JCODE_FAILOVER_COOLDOWN_SECS")
+    let secs = product_env("FAILOVER_COOLDOWN_SECS")
         .ok()
         .and_then(|s| s.trim().parse::<u64>().ok())
         .unwrap_or(30);
@@ -144,8 +145,8 @@ mod tests {
     #[test]
     fn empty_when_unset() {
         let _lock = crate::storage::lock_test_env();
-        let saved = save_keys(&["JCODE_FAILOVER_CHAIN"]);
-        crate::env::remove_var("JCODE_FAILOVER_CHAIN");
+        let saved = save_keys(&["NEXT_CODE_FAILOVER_CHAIN"]);
+        crate::env::remove_var("NEXT_CODE_FAILOVER_CHAIN");
         assert!(current_chain().is_empty());
         restore(saved);
     }
@@ -178,9 +179,9 @@ mod tests {
     #[test]
     fn current_chain_reads_env() {
         let _lock = crate::storage::lock_test_env();
-        let saved = save_keys(&["JCODE_FAILOVER_CHAIN"]);
+        let saved = save_keys(&["NEXT_CODE_FAILOVER_CHAIN"]);
         crate::env::set_var(
-            "JCODE_FAILOVER_CHAIN",
+            "NEXT_CODE_FAILOVER_CHAIN",
             "anthropic:claude-sonnet-4,openai:gpt-5.5",
         );
         let chain = current_chain();
@@ -191,8 +192,8 @@ mod tests {
     #[test]
     fn cooldown_default_30s() {
         let _lock = crate::storage::lock_test_env();
-        let saved = save_keys(&["JCODE_FAILOVER_COOLDOWN_SECS"]);
-        crate::env::remove_var("JCODE_FAILOVER_COOLDOWN_SECS");
+        let saved = save_keys(&["NEXT_CODE_FAILOVER_COOLDOWN_SECS"]);
+        crate::env::remove_var("NEXT_CODE_FAILOVER_COOLDOWN_SECS");
         assert_eq!(rate_limit_cooldown(), Duration::from_secs(30));
         restore(saved);
     }
@@ -200,8 +201,8 @@ mod tests {
     #[test]
     fn cooldown_respects_override() {
         let _lock = crate::storage::lock_test_env();
-        let saved = save_keys(&["JCODE_FAILOVER_COOLDOWN_SECS"]);
-        crate::env::set_var("JCODE_FAILOVER_COOLDOWN_SECS", "120");
+        let saved = save_keys(&["NEXT_CODE_FAILOVER_COOLDOWN_SECS"]);
+        crate::env::set_var("NEXT_CODE_FAILOVER_COOLDOWN_SECS", "120");
         assert_eq!(rate_limit_cooldown(), Duration::from_secs(120));
         restore(saved);
     }

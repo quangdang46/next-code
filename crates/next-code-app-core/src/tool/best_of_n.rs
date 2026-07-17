@@ -70,7 +70,7 @@ impl Tool for BestOfNEditTool {
         if !cfg.enabled() {
             return Err(anyhow::anyhow!(
                 "Best-of-N is disabled. Set [best_of_n] mode = \"auto\" in config.toml \
-                 (or JCODE_BEST_OF_N_MODE=auto)."
+                 (or NEXT_CODE_BEST_OF_N_MODE=auto)."
             ));
         }
 

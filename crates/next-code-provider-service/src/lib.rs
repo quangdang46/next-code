@@ -1,9 +1,9 @@
-//! jcode-provider-service
+//! next-code-provider-service
 //!
 //! Catalog → Integration → Credential service traits and shared types for
-//! jcode's provider resolution layer.
+//! next-code's provider resolution layer.
 //!
-//! This crate defines the *interfaces* that the rest of jcode (CLI, TUI,
+//! This crate defines the *interfaces* that the rest of next-code (CLI, TUI,
 //! session runner) talks to. Concrete implementations live in their own
 //! crates:
 //!
@@ -17,7 +17,7 @@
 //!   three layers and the [`RouteResolver`] that turns a `provider + model`
 //!   request into a fully-prepared [`Route`].
 //!
-//! The old `Provider` trait in `jcode-provider-core` keeps working — this
+//! The old `Provider` trait in `next-code-provider-core` keeps working — this
 //! crate sits *alongside* it, and Phase 6 of the master plan is when we
 //! rewire consumers to flow through here.
 

@@ -108,7 +108,7 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/context", "Show the full session context snapshot"),
     RegisteredCommand::public(
         "/skills",
-        "Show loaded skills and jcode-endorsed recommendations",
+        "Show loaded skills and next-code-endorsed recommendations",
     ),
     RegisteredCommand::public("/version", "Show current version"),
     RegisteredCommand::public("/changelog", "Show recent changes in this build"),
@@ -119,9 +119,9 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
         "Generate a shareable usage report + dashboard image",
     ),
     RegisteredCommand::public("/wrapped", "Alias for /productivity"),
-    RegisteredCommand::public("/feedback", "Send feedback about jcode"),
+    RegisteredCommand::public("/feedback", "Send feedback about next-code"),
     RegisteredCommand::public("/config", "Show or edit configuration"),
-    RegisteredCommand::public("/log", "Mark the current location in the jcode logs"),
+    RegisteredCommand::public("/log", "Mark the current location in the next-code logs"),
     RegisteredCommand::public(
         "/keys",
         "Show keybinding conflicts with your terminal and OS (/keys refresh to rescan)",
@@ -141,7 +141,7 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/reload", "Reload into newest available binary"),
     RegisteredCommand::public("/restart", "Restart with current binary"),
     RegisteredCommand::public("/rebuild", "Background rebuild and auto reload"),
-    RegisteredCommand::public("/selfdev", "Open a new self-dev jcode session"),
+    RegisteredCommand::public("/selfdev", "Open a new self-dev next-code session"),
     RegisteredCommand::public("/update", "Background update and auto reload"),
     RegisteredCommand::public("/resume", "Open session picker"),
     RegisteredCommand::public("/sessions", "Alias for /resume"),
@@ -156,7 +156,7 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/fork", "Arm next prompt to launch in a new forked session"),
     RegisteredCommand::public("/transfer", "Compact context into a fresh handoff session"),
     RegisteredCommand::public("/workspace", "Niri-style session workspace"),
-    RegisteredCommand::public("/exit", "Exit jcode (opencode TUI slash)"),
+    RegisteredCommand::public("/exit", "Exit next-code (opencode TUI slash)"),
     RegisteredCommand::public("/quit", "Alias for /exit"),
     RegisteredCommand::public(
         "/experiment",
@@ -2038,7 +2038,7 @@ mod external_cli_suggestion_tests {
     /// Faithful, real-home measurement of the per-frame onboarding cost.
     /// Ignored by default (depends on local ~/.codex and ~/.claude contents).
     /// Run with:
-    ///   cargo test -p jcode-tui --lib onboarding_suggestion_scan_cost -- --ignored --nocapture
+    ///   cargo test -p next-code-tui --lib onboarding_suggestion_scan_cost -- --ignored --nocapture
     #[test]
     #[ignore]
     fn onboarding_suggestion_scan_cost() {
@@ -2101,8 +2101,8 @@ mod external_cli_suggestion_tests {
         let path = temp.path().join("codex.jsonl");
         std::fs::write(
             &path,
-            r#"{"type":"session_meta","payload":{"id":"sid","cwd":"/home/jeremy/jcode"}}
-{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"check in on jcode"}]}}
+            r#"{"type":"session_meta","payload":{"id":"sid","cwd":"/home/jeremy/next-code"}}
+{"type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"check in on next-code"}]}}
 "#,
         )
         .expect("write fixture");
@@ -2110,8 +2110,8 @@ mod external_cli_suggestion_tests {
         let candidate = suggestion_candidate_from_jsonl(&path, "Codex", SystemTime::UNIX_EPOCH)
             .expect("candidate");
         assert_eq!(candidate.session_id.as_deref(), Some("sid"));
-        assert_eq!(candidate.working_dir.as_deref(), Some("/home/jeremy/jcode"));
-        assert_eq!(candidate.context.as_deref(), Some("check in on jcode"));
+        assert_eq!(candidate.working_dir.as_deref(), Some("/home/jeremy/next-code"));
+        assert_eq!(candidate.context.as_deref(), Some("check in on next-code"));
     }
 
     #[test]

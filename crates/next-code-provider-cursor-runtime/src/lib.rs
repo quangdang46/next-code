@@ -224,7 +224,7 @@ impl CursorCliProvider {
     }
 
     pub fn new() -> Self {
-        let model = std::env::var("JCODE_CURSOR_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.into());
+        let model = std::env::var("NEXT_CODE_CURSOR_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.into());
         let provider = Self {
             client: next_code_provider_core::shared_http_client(),
             model: Arc::new(RwLock::new(model)),

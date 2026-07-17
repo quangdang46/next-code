@@ -59,8 +59,8 @@ impl ModelTier {
     /// shape as `model_routing.rs` (#100) so the two systems stay aligned.
     pub fn env_var(&self) -> &'static str {
         match self {
-            ModelTier::Routine => "JCODE_ROUTING_ROUTINE",
-            ModelTier::Thinking => "JCODE_ROUTING_THINKING",
+            ModelTier::Routine => "NEXT_CODE_ROUTING_ROUTINE",
+            ModelTier::Thinking => "NEXT_CODE_ROUTING_THINKING",
         }
     }
 
@@ -198,21 +198,21 @@ mod tests {
     fn with_env_lock<F: FnOnce()>(f: F) {
         let guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         // Snapshot + restore env vars we mutate so test order is irrelevant.
-        let saved_routine = std::env::var_os("JCODE_ROUTING_ROUTINE");
-        let saved_thinking = std::env::var_os("JCODE_ROUTING_THINKING");
+        let saved_routine = std::env::var_os("NEXT_CODE_ROUTING_ROUTINE");
+        let saved_thinking = std::env::var_os("NEXT_CODE_ROUTING_THINKING");
         unsafe {
-            std::env::remove_var("JCODE_ROUTING_ROUTINE");
-            std::env::remove_var("JCODE_ROUTING_THINKING");
+            std::env::remove_var("NEXT_CODE_ROUTING_ROUTINE");
+            std::env::remove_var("NEXT_CODE_ROUTING_THINKING");
         }
         f();
         unsafe {
             match saved_routine {
-                Some(v) => std::env::set_var("JCODE_ROUTING_ROUTINE", v),
-                None => std::env::remove_var("JCODE_ROUTING_ROUTINE"),
+                Some(v) => std::env::set_var("NEXT_CODE_ROUTING_ROUTINE", v),
+                None => std::env::remove_var("NEXT_CODE_ROUTING_ROUTINE"),
             }
             match saved_thinking {
-                Some(v) => std::env::set_var("JCODE_ROUTING_THINKING", v),
-                None => std::env::remove_var("JCODE_ROUTING_THINKING"),
+                Some(v) => std::env::set_var("NEXT_CODE_ROUTING_THINKING", v),
+                None => std::env::remove_var("NEXT_CODE_ROUTING_THINKING"),
             }
         }
         drop(guard);
@@ -234,7 +234,7 @@ mod tests {
     fn override_wins_over_tier_and_session_default() {
         with_env_lock(|| {
             unsafe {
-                std::env::set_var("JCODE_ROUTING_THINKING", "should-be-ignored");
+                std::env::set_var("NEXT_CODE_ROUTING_THINKING", "should-be-ignored");
             }
             let got = resolve_model(
                 Some("explicit-model"),
@@ -249,7 +249,7 @@ mod tests {
     fn tier_uses_env_var_when_set() {
         with_env_lock(|| {
             unsafe {
-                std::env::set_var("JCODE_ROUTING_ROUTINE", "haiku-4-5");
+                std::env::set_var("NEXT_CODE_ROUTING_ROUTINE", "haiku-4-5");
             }
             let got = resolve_model(None, Some(ModelTier::Routine), "session-default");
             assert_eq!(got, "haiku-4-5");
@@ -294,7 +294,7 @@ mod tests {
     fn resolution_source_reports_tier_hit() {
         with_env_lock(|| {
             unsafe {
-                std::env::set_var("JCODE_ROUTING_THINKING", "opus-4-7");
+                std::env::set_var("NEXT_CODE_ROUTING_THINKING", "opus-4-7");
             }
             let src = resolve_model_with_source(None, Some(ModelTier::Thinking), "fallback");
             match src {

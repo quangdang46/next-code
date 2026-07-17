@@ -66,7 +66,7 @@ segments = ["mode", "model", "provider", "context", "tokens", "git"]
 Advanced users set a shell command in config:
 ```toml
 [status_line]
-command = "~/.jcode/statusline.sh"
+command = "~/.next-code/statusline.sh"
 ```
 
 jcode runs the command every 5s, passes this JSON via stdin:

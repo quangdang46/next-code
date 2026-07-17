@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env_os};
 use crate::workspace::SessionCard;
 pub use crate::workspace::SessionTranscriptMessage;
 use anyhow::{Context, Result};
@@ -77,7 +78,7 @@ pub fn load_session_transcript_by_id(
             Ok(session) => session,
             Err(error) => {
                 crate::desktop_log::warn(format_args!(
-                    "jcode-desktop: skipped transcript {}: {error:#}",
+                    "next-code-desktop: skipped transcript {}: {error:#}",
                     candidate.path.display()
                 ));
                 continue;
@@ -183,7 +184,7 @@ fn load_recent_session_cards_with_limit(limit: usize) -> Result<Vec<SessionCard>
             Ok(entry) => Some(entry),
             Err(error) => {
                 crate::desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to read entry in {}: {error}",
+                    "next-code-desktop: failed to read entry in {}: {error}",
                     sessions_dir.display()
                 ));
                 None
@@ -199,7 +200,7 @@ fn load_recent_session_cards_with_limit(limit: usize) -> Result<Vec<SessionCard>
             Ok(Some(card)) => cards.push(card),
             Ok(None) => {}
             Err(error) => crate::desktop_log::warn(format_args!(
-                "jcode-desktop: skipped session {}: {error:#}",
+                "next-code-desktop: skipped session {}: {error:#}",
                 candidate.path.display()
             )),
         }
@@ -232,7 +233,7 @@ fn session_file_modified(path: &Path) -> SystemTime {
         Ok(modified) => modified,
         Err(error) => {
             crate::desktop_log::warn(format_args!(
-                "jcode-desktop: failed to read session file timestamp for {}: {error}",
+                "next-code-desktop: failed to read session file timestamp for {}: {error}",
                 path.display()
             ));
             SystemTime::UNIX_EPOCH
@@ -400,12 +401,12 @@ fn load_stored_session(path: &Path) -> Result<StoredSession> {
 }
 
 fn next_code_sessions_dir() -> Result<PathBuf> {
-    let next_code_home = match std::env::var_os("JCODE_HOME") {
+    let next_code_home = match product_env_os("HOME") {
         Some(path) => PathBuf::from(path),
         None => std::env::var_os("HOME")
             .map(PathBuf::from)
             .context("HOME is not set")?
-            .join(".jcode"),
+            .join(".next-code"),
     };
     Ok(next_code_home.join("sessions"))
 }
@@ -660,7 +661,7 @@ mod tests {
     #[test]
     fn load_session_card_filters_startup_reminder_from_preview_and_transcript() -> Result<()> {
         let dir = std::env::temp_dir().join(format!(
-            "jcode-desktop-session-card-reminder-test-{}",
+            "next-code-desktop-session-card-reminder-test-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&dir);
@@ -711,7 +712,7 @@ mod tests {
     #[test]
     fn session_card_transcript_messages_are_bounded_to_recent_visible_text() -> Result<()> {
         let dir = std::env::temp_dir().join(format!(
-            "jcode-desktop-session-card-bound-test-{}",
+            "next-code-desktop-session-card-bound-test-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&dir);
@@ -769,7 +770,7 @@ mod tests {
     #[test]
     fn typed_session_parser_accepts_legacy_string_content() -> Result<()> {
         let dir = std::env::temp_dir().join(format!(
-            "jcode-desktop-session-data-test-{}",
+            "next-code-desktop-session-data-test-{}",
             std::process::id()
         ));
         let _ = fs::remove_dir_all(&dir);
@@ -810,7 +811,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         let temp_home = std::env::temp_dir().join(format!(
-            "jcode-desktop-session-loader-test-{}-{unique}",
+            "next-code-desktop-session-loader-test-{}-{unique}",
             std::process::id()
         ));
         let sessions_dir = temp_home.join("sessions");
@@ -830,12 +831,12 @@ mod tests {
             .unwrap();
         }
 
-        let previous_home = std::env::var_os("JCODE_HOME");
-        unsafe { std::env::set_var("JCODE_HOME", &temp_home) };
+        let previous_home = product_env_os("HOME");
+        unsafe { std::env::set_var("NEXT_CODE_HOME", &temp_home) };
         let cards = load_recent_session_cards().unwrap();
         match previous_home {
-            Some(value) => unsafe { std::env::set_var("JCODE_HOME", value) },
-            None => unsafe { std::env::remove_var("JCODE_HOME") },
+            Some(value) => unsafe { std::env::set_var("NEXT_CODE_HOME", value) },
+            None => unsafe { std::env::remove_var("NEXT_CODE_HOME") },
         }
         let _ = fs::remove_dir_all(&temp_home);
 

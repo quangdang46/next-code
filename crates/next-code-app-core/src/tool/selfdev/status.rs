@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::*;
 
 pub fn selfdev_status_output() -> Result<ToolOutput> {
@@ -7,7 +8,7 @@ pub fn selfdev_status_output() -> Result<ToolOutput> {
 
     status.push_str("## Current Version\n\n");
     status.push_str(&format!(
-        "**Running:** jcode {}\n",
+        "**Running:** next-code {}\n",
         next_code_build_meta::VERSION
     ));
 
@@ -225,7 +226,7 @@ impl SelfDevTool {
             "debug_socket": debug_socket.to_string_lossy(),
             "main_socket": main_socket.to_string_lossy(),
             "debug_enabled": crate::config::config().display.debug_socket ||
-                             std::env::var("JCODE_DEBUG_CONTROL").is_ok() ||
+                             product_env("DEBUG_CONTROL").is_ok() ||
                              crate::storage::next_code_dir().map(|d| d.join("debug_control").exists()).unwrap_or(false),
             "connect_example": format!(
                 "echo '{{\"type\":\"debug_command\",\"id\":1,\"command\":\"help\"}}' | nc -U {}",

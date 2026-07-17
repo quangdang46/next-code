@@ -9,6 +9,7 @@
 //! exercises the exact code path a real subscription session uses rather than a
 //! re-implementation of the Messages API.
 
+use next_code_core::env::{product_env};
 use anyhow::{Context, anyhow, ensure};
 use serde::Deserialize;
 
@@ -26,7 +27,7 @@ use next_code_provider_antigravity_runtime::AntigravityProvider;
 /// well over a minute to return a single completion). The override applies a floor
 /// so it can only extend, never shorten, the built-in deadline.
 fn smoke_timeout(default_secs: u64) -> std::time::Duration {
-    let secs = std::env::var("JCODE_LIVE_SMOKE_TIMEOUT_SECS")
+    let secs = product_env("LIVE_SMOKE_TIMEOUT_SECS")
         .ok()
         .and_then(|raw| raw.trim().parse::<u64>().ok())
         .map(|override_secs| override_secs.max(default_secs))

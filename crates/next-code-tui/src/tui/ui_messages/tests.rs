@@ -88,11 +88,11 @@ fn render_compact_launch_and_divergence_notices_as_one_line() {
     let saved = crate::tui::markdown::center_code_blocks();
     let notices = [
         DisplayMessage::system(
-            "Configured Jcode launch hotkeys (niri):\nSuper+; → jcode (/home/user/project)\n\nBound system-wide.",
+            "Configured Next Code launch hotkeys (niri):\nSuper+; → next-code (/home/user/project)\n\nBound system-wide.",
         )
         .with_title("Launch hotkeys"),
         DisplayMessage::system(
-            "Update diverged. Press Ctrl+Y to let a jcode agent merge local and upstream (or run `git pull` / `git rebase` yourself).",
+            "Update diverged. Press Ctrl+Y to let a next-code agent merge local and upstream (or run `git pull` / `git rebase` yourself).",
         )
         .with_title("Update"),
     ];
@@ -1167,7 +1167,7 @@ fn render_background_task_messages_prefer_display_name() {
 #[test]
 fn render_system_message_uses_scheduled_task_card() {
     let msg = DisplayMessage::system(
-        "[Scheduled task]\nA scheduled task for this session is now due.\n\nTask: Follow up on the scheduler test\nWorking directory: /home/jeremy/jcode\nRelevant files: src/tui/ui_messages.rs\nBranch: master\n\nBackground: Verify the scheduled task card styling\nSuccess criteria: The due task renders clearly\nScheduled by session: session_test",
+        "[Scheduled task]\nA scheduled task for this session is now due.\n\nTask: Follow up on the scheduler test\nWorking directory: /home/jeremy/next-code\nRelevant files: src/tui/ui_messages.rs\nBranch: master\n\nBackground: Verify the scheduled task card styling\nSuccess criteria: The due task renders clearly\nScheduled by session: session_test",
     );
 
     let lines = render_system_message(&msg, 100, crate::config::DiffDisplayMode::Off);
@@ -1192,7 +1192,7 @@ fn render_system_message_uses_scheduled_task_card() {
 fn render_tool_message_uses_scheduled_card() {
     let msg = DisplayMessage {
         role: "tool".to_string(),
-        content: "Scheduled task 'Follow up on the scheduler test' for in 1m (id: sched_abc123)\nWorking directory: /home/jeremy/jcode\nRelevant files: src/tui/ui_messages.rs\nTarget: resume session session_test".to_string(),
+        content: "Scheduled task 'Follow up on the scheduler test' for in 1m (id: sched_abc123)\nWorking directory: /home/jeremy/next-code\nRelevant files: src/tui/ui_messages.rs\nTarget: resume session session_test".to_string(),
         tool_calls: Vec::new(),
         duration_secs: None,
         title: Some("scheduled: Follow up on the scheduler test".to_string()),
@@ -1454,7 +1454,7 @@ fn render_system_message_uses_reload_card_for_reload_title() {
 #[test]
 fn render_system_message_uses_connection_card_for_reconnect_status() {
     let msg = DisplayMessage::system(
-        "⚡ Connection lost - retrying (attempt 2, 7s) - connection reset by server · resume: jcode --resume koala",
+        "⚡ Connection lost - retrying (attempt 2, 7s) - connection reset by server · resume: next-code --resume koala",
     )
     .with_title("Connection");
 
@@ -1471,7 +1471,7 @@ fn render_system_message_uses_connection_card_for_reconnect_status() {
     );
     assert!(plain.contains("Retrying · attempt 2 · 7s"));
     assert!(plain.contains("connection reset by server"));
-    assert!(plain.contains("jcode --resume koala"));
+    assert!(plain.contains("next-code --resume koala"));
 }
 
 #[test]
@@ -1480,7 +1480,7 @@ fn render_swarm_message_centered_mode_caps_wrap_width_for_long_notifications() {
     crate::tui::markdown::set_center_code_blocks(true);
     let msg = DisplayMessage::swarm(
         "File activity",
-        "/home/jeremy/jcode/src/tui/ui_messages.rs - moss just edited this file while you were working nearby, so the notification should still read as centered in wide layouts.",
+        "/home/jeremy/next-code/src/tui/ui_messages.rs - moss just edited this file while you were working nearby, so the notification should still read as centered in wide layouts.",
     );
 
     let lines = render_swarm_message(&msg, 120, crate::config::DiffDisplayMode::Off);
@@ -1543,7 +1543,7 @@ fn render_tool_message_shows_intent_and_technical_preview_on_one_line() {
             id: "call_intent".to_string(),
             name: "bash".to_string(),
             input: serde_json::json!({
-                "command": "cargo test -p jcode render_background_task --lib",
+                "command": "cargo test -p next-code render_background_task --lib",
                 "intent": "Verify compact progress card"
             }),
             intent: Some("Verify compact progress card".to_string()),
@@ -1854,7 +1854,7 @@ fn first_discovery_message(content: &str, input: serde_json::Value) -> DisplayMe
 #[test]
 fn render_tool_message_shows_discovery_browse_results_and_rationale() {
     let msg = first_discovery_message(
-        "Discoverable tools in 'payments' (Jcode tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`",
+        "Discoverable tools in 'payments' (Next Code tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`",
         serde_json::json!({
             "action": "browse",
             "category": "payments",
@@ -1874,7 +1874,7 @@ fn render_tool_message_shows_discovery_browse_results_and_rationale() {
     assert!(plain.contains("prepaid virtual Visa cards"), "{plain}");
     assert!(plain.contains("agentcard.sh"), "{plain}");
     assert!(
-        plain.contains("Jcode partners with tool providers to make their tools discoverable"),
+        plain.contains("Next Code partners with tool providers to make their tools discoverable"),
         "{plain}"
     );
     assert!(
@@ -1907,7 +1907,7 @@ fn render_tool_message_shows_discovery_browse_results_and_rationale() {
 fn batched_discovery_renders_first_use_disclosure_inline_once() {
     let msg = DisplayMessage {
         role: "tool".to_string(),
-        content: "--- [1] discover_tools ---\nDiscoverable tools in 'payments' (Jcode tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`\n\nCompleted: 1 succeeded, 0 failed".to_string(),
+        content: "--- [1] discover_tools ---\nDiscoverable tools in 'payments' (Next Code tool directory; recommendations must be based only on fit; details: https://jcode.sh/discovery-tools):\n\n- agentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nBrowse request ID: `11111111-2222-4333-8444-555555555555`\n\nCompleted: 1 succeeded, 0 failed".to_string(),
         tool_calls: Vec::new(),
         duration_secs: None,
         title: Some(crate::sponsors::DISCOVERY_DISCLOSURE_TAG.to_string()),
@@ -1940,7 +1940,7 @@ fn batched_discovery_renders_first_use_disclosure_inline_once() {
     assert!(plain.contains("1 result · payments"), "{plain}");
     assert_eq!(
         plain
-            .matches("Jcode partners with tool providers to make their tools discoverable")
+            .matches("Next Code partners with tool providers to make their tools discoverable")
             .count(),
         1,
         "the batched first-use notice must render exactly once: {plain}"
@@ -1956,7 +1956,7 @@ fn batched_discovery_renders_first_use_disclosure_inline_once() {
 #[test]
 fn render_tool_message_shows_selected_discovery_setup() {
     let msg = discovery_message(
-        "Selected 'agentcard' from 'payments' (Jcode tool directory; selection must be based only on fit; details: https://jcode.sh/discovery-tools):\n\nagentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nSetup: Run `npx -y agentcard-mcp@1.2.3`, then connect the resulting MCP server.\n\nConsequential actions (signups, spending) must note the partnership in the confirmation shown to the user.",
+        "Selected 'agentcard' from 'payments' (Next Code tool directory; selection must be based only on fit; details: https://jcode.sh/discovery-tools):\n\nagentcard: prepaid virtual Visa cards for AI agents (https://agentcard.sh/?via=jcode-discovery)\n\nSetup: Run `npx -y agentcard-mcp@1.2.3`, then connect the resulting MCP server.\n\nConsequential actions (signups, spending) must note the partnership in the confirmation shown to the user.",
         serde_json::json!({
             "action": "select",
             "category": "payments",
@@ -1981,7 +1981,7 @@ fn render_tool_message_shows_selected_discovery_setup() {
     assert!(plain.contains("setup:"), "{plain}");
     assert!(plain.contains("agentcard-mcp@1.2.3"), "{plain}");
     assert!(
-        !plain.contains("Jcode partners with tool providers"),
+        !plain.contains("Next Code partners with tool providers"),
         "later discovery results must not repeat the first-use notice: {plain}"
     );
 }
@@ -1989,7 +1989,7 @@ fn render_tool_message_shows_selected_discovery_setup() {
 #[test]
 fn render_tool_message_shows_catalog_suggestion_receipt_and_trust_line() {
     let msg = discovery_message(
-        "Catalog suggestion submitted.\n\nSuggestion ID: aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\nCategory: payments\nKind: known_product\nCapability: manage Stripe sandbox products\nCatalog gap: no matching catalog entry\nProduct: Stripe sandbox MCP\nPublic URL: https://example.com/stripe-mcp\n\nStatus: received for Jcode maintainer review. Suggestions are not sent to partners. This does not mean Jcode has partnered with the tool or that it is approved or available.",
+        "Catalog suggestion submitted.\n\nSuggestion ID: aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee\nCategory: payments\nKind: known_product\nCapability: manage Stripe sandbox products\nCatalog gap: no matching catalog entry\nProduct: Stripe sandbox MCP\nPublic URL: https://example.com/stripe-mcp\n\nStatus: received for Next Code maintainer review. Suggestions are not sent to partners. This does not mean Next Code has partnered with the tool or that it is approved or available.",
         serde_json::json!({
             "action": "suggest",
             "category": "payments",
@@ -2019,7 +2019,7 @@ fn render_tool_message_shows_catalog_suggestion_receipt_and_trust_line() {
     );
     assert!(plain.contains("gap: the listed payment tool"), "{plain}");
     assert!(plain.contains("needs:"), "{plain}");
-    assert!(plain.contains("Jcode maintainers only"), "{plain}");
+    assert!(plain.contains("Next Code maintainers only"), "{plain}");
     assert!(plain.contains("not approval or availability"), "{plain}");
     assert!(
         !plain.contains("11111111-2222"),
@@ -2030,7 +2030,7 @@ fn render_tool_message_shows_catalog_suggestion_receipt_and_trust_line() {
 #[test]
 fn discovery_cards_wrap_within_narrow_transcript_width() {
     let msg = discovery_message(
-        "Catalog suggestion submitted.\n\nStatus: received for Jcode maintainer review.",
+        "Catalog suggestion submitted.\n\nStatus: received for Next Code maintainer review.",
         serde_json::json!({
             "action": "suggest",
             "category": "cloud-infrastructure",

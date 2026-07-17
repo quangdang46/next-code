@@ -275,7 +275,7 @@ fn openai_catalog_and_chat_endpoints_agree_on_credential_shape() {
 #[test]
 fn responses_url_honors_api_base_override_in_api_key_mode() {
     let _guard = next_code_base::storage::lock_test_env();
-    let _b = EnvVarGuard::remove("JCODE_OPENAI_API_BASE");
+    let _b = EnvVarGuard::remove("NEXT_CODE_OPENAI_API_BASE");
     let _c = EnvVarGuard::remove("OPENAI_BASE_URL");
     let _d = EnvVarGuard::remove("OPENAI_API_BASE");
 
@@ -294,7 +294,7 @@ fn responses_url_honors_api_base_override_in_api_key_mode() {
     );
 
     // Override is applied (and a trailing slash is tolerated).
-    let _override = EnvVarGuard::set("JCODE_OPENAI_API_BASE", "http://127.0.0.1:8317/v1/");
+    let _override = EnvVarGuard::set("NEXT_CODE_OPENAI_API_BASE", "http://127.0.0.1:8317/v1/");
     assert_eq!(
         OpenAIProvider::responses_url(&api_key_creds),
         "http://127.0.0.1:8317/v1/responses",
@@ -314,7 +314,7 @@ fn responses_url_honors_api_base_override_in_api_key_mode() {
 #[test]
 fn responses_url_ignores_override_in_chatgpt_mode() {
     let _guard = next_code_base::storage::lock_test_env();
-    let _override = EnvVarGuard::set("JCODE_OPENAI_API_BASE", "http://127.0.0.1:8317/v1");
+    let _override = EnvVarGuard::set("NEXT_CODE_OPENAI_API_BASE", "http://127.0.0.1:8317/v1");
 
     let oauth_creds = CodexCredentials {
         access_token: "oauth-access".to_string(),
@@ -333,7 +333,7 @@ fn responses_url_ignores_override_in_chatgpt_mode() {
 #[test]
 fn resolve_api_base_precedence_and_validation() {
     let _guard = next_code_base::storage::lock_test_env();
-    let _a = EnvVarGuard::remove("JCODE_OPENAI_API_BASE");
+    let _a = EnvVarGuard::remove("NEXT_CODE_OPENAI_API_BASE");
     let _b = EnvVarGuard::remove("OPENAI_BASE_URL");
     let _c = EnvVarGuard::remove("OPENAI_API_BASE");
 
@@ -343,14 +343,14 @@ fn resolve_api_base_precedence_and_validation() {
     // JCODE_OPENAI_API_BASE wins over OPENAI_BASE_URL / OPENAI_API_BASE.
     let _p1 = EnvVarGuard::set("OPENAI_API_BASE", "https://c.example/v1");
     let _p2 = EnvVarGuard::set("OPENAI_BASE_URL", "https://b.example/v1");
-    let _p3 = EnvVarGuard::set("JCODE_OPENAI_API_BASE", "https://a.example/v1");
+    let _p3 = EnvVarGuard::set("NEXT_CODE_OPENAI_API_BASE", "https://a.example/v1");
     assert_eq!(OpenAIProvider::resolve_api_base(), "https://a.example/v1");
 
     // A trailing /responses is trimmed so callers don't double it.
-    let _p4 = EnvVarGuard::set("JCODE_OPENAI_API_BASE", "https://a.example/v1/responses");
+    let _p4 = EnvVarGuard::set("NEXT_CODE_OPENAI_API_BASE", "https://a.example/v1/responses");
     assert_eq!(OpenAIProvider::resolve_api_base(), "https://a.example/v1");
 
     // Non-URL values are ignored, falling through to the next candidate.
-    let _p5 = EnvVarGuard::set("JCODE_OPENAI_API_BASE", "not-a-url");
+    let _p5 = EnvVarGuard::set("NEXT_CODE_OPENAI_API_BASE", "not-a-url");
     assert_eq!(OpenAIProvider::resolve_api_base(), "https://b.example/v1");
 }

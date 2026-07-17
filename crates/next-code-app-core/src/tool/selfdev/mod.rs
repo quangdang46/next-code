@@ -1,7 +1,8 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
-//! Self-development tool - manage canary builds when working on jcode itself
+//! Self-development tool - manage canary builds when working on next-code itself
 
+use crate::env::{product_env};
 use crate::background::{self, TaskResult};
 use crate::build;
 use crate::bus::BackgroundTaskStatus;
@@ -32,8 +33,8 @@ pub use launch::{enter_selfdev_session, schedule_selfdev_prompt_delivery};
 pub use reload::{ReloadRecoveryDirective, persisted_background_tasks_note};
 pub use status::selfdev_status_output;
 
-/// Public GitHub source used when cloning the jcode repository for self-dev.
-pub const JCODE_REPO_URL: &str = "https://github.com/1jehuang/jcode.git";
+/// Public GitHub source used when cloning the next-code repository for self-dev.
+pub const NEXT_CODE_REPO_URL: &str = "https://github.com/quangdang46/next-code.git";
 
 #[derive(Debug, Deserialize)]
 struct SelfDevInput {
@@ -265,7 +266,7 @@ impl BuildRequest {
         self.status_file.as_ref().map(PathBuf::from).or_else(|| {
             self.background_task_id.as_ref().map(|task_id| {
                 std::env::temp_dir()
-                    .join("jcode-bg-tasks")
+                    .join("next-code-bg-tasks")
                     .join(format!("{}.status.json", task_id))
             })
         })
@@ -411,10 +412,10 @@ impl SelfDevTool {
     /// reload/find-config); inside self-dev it manages builds and reloads.
     pub fn description_for(is_selfdev: bool) -> &'static str {
         if is_selfdev {
-            "Manage self-dev builds, tests, and reloads while working on jcode itself."
+            "Manage self-dev builds, tests, and reloads while working on next-code itself."
         } else {
-            "Enter self-dev mode to work on jcode itself. Also sets up the dev \
-             environment, reloads jcode to a newer build, and locates jcode config/paths."
+            "Enter self-dev mode to work on next-code itself. Also sets up the dev \
+             environment, reloads next-code to a newer build, and locates next-code config/paths."
         }
     }
 
@@ -452,7 +453,7 @@ impl SelfDevTool {
                     "target": {
                         "type": "string",
                         "enum": ["auto", "tui", "desktop", "all"],
-                        "description": "Build target for action=build. auto chooses from changed paths; tui builds jcode; desktop builds jcode-desktop; all builds both."
+                        "description": "Build target for action=build. auto chooses from changed paths; tui builds next-code; desktop builds next-code-desktop; all builds both."
                     },
                     "command": {
                         "type": "string",
@@ -477,7 +478,7 @@ impl SelfDevTool {
                             "status",
                             "find-config"
                         ],
-                        "description": "Action. `enter` spawns a self-dev session (optionally seeded with `prompt`); `setup` checks/installs the dev prerequisites (rust toolchain, git, repo clone); `reload` restarts jcode into a newer installed build; `status` shows build/version state; `find-config` locates jcode config and key paths."
+                        "description": "Action. `enter` spawns a self-dev session (optionally seeded with `prompt`); `setup` checks/installs the dev prerequisites (rust toolchain, git, repo clone); `reload` restarts next-code into a newer installed build; `status` shows build/version state; `find-config` locates next-code config and key paths."
                     },
                     "prompt": {
                         "type": "string",
@@ -538,7 +539,7 @@ impl Tool for SelfDevTool {
             }
 
             // Self-dev-only actions: building, testing, and low-level socket
-            // access only make sense once you are working on jcode itself.
+            // access only make sense once you are working on next-code itself.
             "build" => {
                 self.do_build(
                     params.reason,
@@ -606,7 +607,7 @@ impl Tool for SelfDevTool {
 
 impl SelfDevTool {
     fn is_test_session() -> bool {
-        std::env::var("JCODE_TEST_SESSION")
+        product_env("TEST_SESSION")
             .map(|value| {
                 let trimmed = value.trim();
                 !trimmed.is_empty() && trimmed != "0" && !trimmed.eq_ignore_ascii_case("false")
@@ -615,7 +616,7 @@ impl SelfDevTool {
     }
 
     fn reload_timeout_secs() -> u64 {
-        std::env::var("JCODE_SELFDEV_RELOAD_TIMEOUT_SECS")
+        product_env("SELFDEV_RELOAD_TIMEOUT_SECS")
             .ok()
             .and_then(|raw| raw.trim().parse::<u64>().ok())
             .filter(|secs| *secs > 0)
@@ -626,7 +627,7 @@ impl SelfDevTool {
     /// builds ahead of it in the queue) to finish before giving up and telling
     /// the agent to reload manually.
     fn build_reload_wait_secs() -> u64 {
-        std::env::var("JCODE_SELFDEV_BUILD_WAIT_SECS")
+        product_env("SELFDEV_BUILD_WAIT_SECS")
             .ok()
             .and_then(|raw| raw.trim().parse::<u64>().ok())
             .filter(|secs| *secs > 0)
@@ -653,7 +654,7 @@ impl SelfDevTool {
     fn resolve_repo_dir(working_dir: Option<&std::path::Path>) -> Option<std::path::PathBuf> {
         if let Some(dir) = working_dir {
             for ancestor in dir.ancestors() {
-                if build::is_jcode_repo(ancestor) {
+                if build::is_next_code_repo(ancestor) {
                     return Some(ancestor.to_path_buf());
                 }
             }
@@ -666,7 +667,7 @@ impl SelfDevTool {
         build::client_update_candidate(true)
             .map(|(path, _label)| path)
             .or_else(|| std::env::current_exe().ok())
-            .ok_or_else(|| anyhow::anyhow!("Could not resolve jcode executable to launch"))
+            .ok_or_else(|| anyhow::anyhow!("Could not resolve next-code executable to launch"))
     }
 
     fn build_command(repo_dir: &Path, target: build::SelfDevBuildTarget) -> SelfDevBuildCommand {

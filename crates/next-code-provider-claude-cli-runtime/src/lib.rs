@@ -4,6 +4,7 @@
 //! binary's composition root registers [`ClaudeProvider`] with
 //! `next_code_base::provider::external` at startup.
 
+use next_code_core::env::{product_env};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use next_code_base::auth::{claude as claude_auth, oauth};
@@ -128,12 +129,12 @@ struct ClaudeCliConfig {
 
 impl ClaudeCliConfig {
     fn from_env() -> Self {
-        let cli_path = std::env::var("JCODE_CLAUDE_CLI_PATH")
+        let cli_path = product_env("CLAUDE_CLI_PATH")
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| "claude".to_string());
 
-        let mut model = std::env::var("JCODE_CLAUDE_CLI_MODEL")
+        let mut model = product_env("CLAUDE_CLI_MODEL")
             .ok()
             .filter(|value| !value.trim().is_empty())
             .unwrap_or_else(|| DEFAULT_MODEL.to_string());
@@ -145,19 +146,19 @@ impl ClaudeCliConfig {
             model = DEFAULT_MODEL.to_string();
         }
 
-        let permission_mode = std::env::var("JCODE_CLAUDE_CLI_PERMISSION_MODE")
+        let permission_mode = product_env("CLAUDE_CLI_PERMISSION_MODE")
             .ok()
             .filter(|value| !value.trim().is_empty())
             .or_else(|| {
-                std::env::var("JCODE_CLAUDE_SDK_PERMISSION_MODE")
+                product_env("CLAUDE_SDK_PERMISSION_MODE")
                     .ok()
                     .filter(|value| !value.trim().is_empty())
             })
             .or_else(|| Some(DEFAULT_PERMISSION_MODE.to_string()));
 
-        let include_partial_messages = std::env::var("JCODE_CLAUDE_CLI_PARTIAL")
+        let include_partial_messages = product_env("CLAUDE_CLI_PARTIAL")
             .ok()
-            .or_else(|| std::env::var("JCODE_CLAUDE_SDK_PARTIAL").ok())
+            .or_else(|| std::env::var("NEXT_CODE_CLAUDE_SDK_PARTIAL").ok())
             .map(|value| {
                 let value = value.to_lowercase();
                 !(value == "0" || value == "false" || value == "no")

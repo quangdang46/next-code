@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct JCodeMobileApp: App {
+struct NextCodeMobileApp: App {
     @State private var model = AppModel()
 
     var body: some Scene {

@@ -1,4 +1,4 @@
-name: JCodeMobile
+name: NextCodeMobile
 options:
   bundleIdPrefix: com.jcode
   deploymentTarget:
@@ -11,20 +11,20 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: NO
 
 packages:
-  JCodeKit:
+  NextCodeKit:
     path: .
 
 targets:
-  JCodeMobile:
+  NextCodeMobile:
     type: application
     platform: iOS
     sources:
-      - path: Sources/JCodeMobile
+      - path: Sources/NextCodeMobile
         excludes:
           - "**/.DS_Store"
     settings:
       base:
-        INFOPLIST_FILE: Sources/JCodeMobile/Info.plist
+        INFOPLIST_FILE: Sources/NextCodeMobile/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.jcode.mobile
         MARKETING_VERSION: "2.0.0"
         CURRENT_PROJECT_VERSION: 1
@@ -33,5 +33,5 @@ targets:
         DEVELOPMENT_TEAM: TAS6ARKDN7
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
-      - package: JCodeKit
-        product: JCodeKit
+      - package: NextCodeKit
+        product: NextCodeKit

@@ -1,8 +1,8 @@
 #!/bin/bash
-# Replay a jcode recording as video
+# Replay a next-code recording as video
 #
 # This script:
-# 1. Starts a fresh jcode instance in a new terminal
+# 1. Starts a fresh next-code instance in a new terminal
 # 2. Records the screen with wf-recorder
 # 3. Replays the recorded keystrokes with proper timing
 # 4. Outputs a video file
@@ -21,7 +21,7 @@ if [ ! -f "$RECORDING_FILE" ]; then
     exit 1
 fi
 
-echo "🎬 jcode Recording Replay"
+echo "🎬 next-code Recording Replay"
 echo "   Input:  $RECORDING_FILE"
 echo "   Output: $OUTPUT_FILE"
 echo ""
@@ -133,11 +133,11 @@ wf-recorder -g "0,0 $GEOMETRY" -f "$OUTPUT_FILE" &
 RECORDER_PID=$!
 sleep 1  # Let recorder initialize
 
-# Start jcode in a new kitty window
-echo "🚀 Starting jcode..."
+# Start next-code in a new kitty window
+echo "🚀 Starting next-code..."
 kitty --title "next-code-replay" -e bash -c "cd $(pwd) && ${NEXT_CODE_BIN:-${JCODE_BIN:-~/.cargo/bin/next-code}}; read -p 'Press Enter to close...'" &
 KITTY_PID=$!
-sleep 2  # Wait for jcode to start
+sleep 2  # Wait for next-code to start
 
 # Focus the new window
 sleep 0.5

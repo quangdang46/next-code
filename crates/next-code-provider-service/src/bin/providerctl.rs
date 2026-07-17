@@ -1,9 +1,9 @@
 //! `providerctl` — a small standalone CLI that exercises the
-//! `jcode-provider-service` facade end-to-end.
+//! `next-code-provider-service` facade end-to-end.
 //!
 //! This binary is the Phase 4 "Quick Win" deliverable: it shows that the
 //! Catalog → Integration → Credential pipeline works for users without
-//! requiring the rest of jcode to rewire (which lands in Phase 6).
+//! requiring the rest of next-code to rewire (which lands in Phase 6).
 //!
 //! Usage:
 //!   providerctl list                       — show all registered providers
@@ -17,7 +17,7 @@
 //!   providerctl resolve <provider> [model] — print the resolved Route JSON
 //!
 //! All commands work against the real OS keychain via
-//! `jcode-keyring-store` and the in-memory catalog. Phase 4b will plug
+//! `next-code-keyring-store` and the in-memory catalog. Phase 4b will plug
 //! in a static catalog of all seven real providers.
 
 use anyhow::{Context, Result};
@@ -149,8 +149,8 @@ async fn main() -> Result<()> {
             }
         }
         "secrets" => {
-            // Phase 1 integration: `jcode secrets set provider.<id>.api_key`
-            // and `jcode secrets list`.
+            // Phase 1 integration: `next-code secrets set provider.<id>.api_key`
+            // and `next-code secrets list`.
             match args.get(2).map(String::as_str).unwrap_or("list") {
                 "list" => cmd_secrets_list(&svc).await,
                 "set" => {
@@ -220,7 +220,7 @@ async fn main() -> Result<()> {
 
 fn usage() {
     eprintln!(
-        "providerctl — jcode-provider-service test CLI
+        "providerctl — next-code-provider-service test CLI
 \n         
 \n         USAGE:
   \n             providerctl <command> [args...]
@@ -272,7 +272,7 @@ async fn build_service() -> Result<DefaultProviderService> {
 }
 
 async fn cmd_list(svc: &DefaultProviderService) -> Result<()> {
-    // Per the plan: `jcode provider list` shows real-time
+    // Per the plan: `next-code provider list` shows real-time
     // available providers **with credentials** and **auth method
     // hints**. We list every registered provider, mark whether
     // the integration layer detects a connection, and show the

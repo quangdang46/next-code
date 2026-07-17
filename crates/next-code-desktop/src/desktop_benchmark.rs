@@ -1,10 +1,11 @@
+use next_code_core::env::{product_env_os};
 use crate::desktop_config::env_flag_enabled;
 use std::time::Instant;
 use winit::dpi::PhysicalSize;
 
 pub(super) fn startup_log_requested(args: &[String]) -> bool {
     args.iter().any(|arg| arg == "--startup-log")
-        || std::env::var_os("JCODE_DESKTOP_STARTUP_LOG").is_some_and(env_flag_enabled)
+        || product_env_os("DESKTOP_STARTUP_LOG").is_some_and(env_flag_enabled)
 }
 
 pub(super) fn startup_benchmark_requested(args: &[String]) -> bool {

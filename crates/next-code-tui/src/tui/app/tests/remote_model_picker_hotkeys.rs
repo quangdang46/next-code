@@ -46,7 +46,7 @@ fn remote_model_picker_preview_state() -> crate::tui::InlineInteractiveState {
 
 #[test]
 fn test_remote_model_picker_preview_ctrl_n_toggles_favorite() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();
@@ -96,7 +96,7 @@ fn test_remote_model_picker_preview_ctrl_n_toggles_favorite() {
 
 #[test]
 fn test_remote_model_picker_preview_ctrl_o_sets_default() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         let rt = tokio::runtime::Runtime::new().unwrap();
         let _guard = rt.enter();

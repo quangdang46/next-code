@@ -222,9 +222,9 @@ async fn readiness_does_not_trust_a_stale_setup_marker() {
     use std::os::unix::fs::PermissionsExt;
 
     let _guard = next_code_base::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    next_code_base::env::set_var("JCODE_HOME", temp.path());
+    next_code_base::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let browser_dir = temp.path().join("browser");
     std::fs::create_dir_all(&browser_dir).expect("create browser dir");
@@ -250,8 +250,8 @@ async fn readiness_does_not_trust_a_stale_setup_marker() {
     assert!(message.contains("capability discovery"), "{message}");
 
     if let Some(prev_home) = prev_home {
-        next_code_base::env::set_var("JCODE_HOME", prev_home);
+        next_code_base::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_base::env::remove_var("JCODE_HOME");
+        next_code_base::env::remove_var("NEXT_CODE_HOME");
     }
 }

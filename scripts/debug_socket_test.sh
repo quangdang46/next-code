@@ -2,7 +2,7 @@
 # Test script to capture and analyze debug socket events
 # Usage: ./scripts/debug_socket_test.sh [capture|compare]
 
-DEBUG_SOCKET="${XDG_RUNTIME_DIR:-/tmp}/jcode-debug.sock"  # product still uses jcode-debug.sock basename
+DEBUG_SOCKET="${XDG_RUNTIME_DIR:-/tmp}/next-code-debug.sock"  # product still uses next-code-debug.sock basename
 CAPTURE_FILE="/tmp/next-code_debug_capture.jsonl"
 
 case "${1:-capture}" in

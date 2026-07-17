@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::client_lifecycle::process_message_streaming_mpsc;
 use super::state::{
     SessionControlHandle, SessionInterruptQueues, queue_soft_interrupt_for_session,
@@ -78,7 +79,7 @@ impl RelayListenerConfig {
         Some(Self {
             api,
             session_id: session_id.to_string(),
-            process_existing_prompts: env_flag("JCODE_JADE_RELAY_PROCESS_EXISTING_PROMPTS"),
+            process_existing_prompts: env_flag("NEXT_CODE_JADE_RELAY_PROCESS_EXISTING_PROMPTS"),
         })
     }
 }
@@ -130,7 +131,7 @@ fn session_command_event_types_param() -> String {
 }
 
 fn default_device_id() -> String {
-    if let Ok(value) = std::env::var("JCODE_JADE_RELAY_DEVICE_ID")
+    if let Ok(value) = product_env("JADE_RELAY_DEVICE_ID")
         && !value.trim().is_empty()
     {
         return value.trim().to_string();
@@ -138,7 +139,7 @@ fn default_device_id() -> String {
     let host = std::env::var("HOSTNAME")
         .or_else(|_| std::env::var("COMPUTERNAME"))
         .unwrap_or_else(|_| "device".to_string());
-    format!("jcode-{host}")
+    format!("next-code-{host}")
 }
 
 pub(super) fn spawn_if_configured(
@@ -314,7 +315,7 @@ impl RelayClient {
             "label": &self.config.api.device_id,
             "platform": std::env::consts::OS,
             "session_id": &self.config.session_id,
-            "app": "jcode",
+            "app": "next-code",
             "capabilities": ["session"],
         });
         add_user_id(&mut body, self.config.api.user_id.as_deref());
@@ -665,7 +666,7 @@ impl RelayLauncherClient {
             "device_id": &self.config.api.device_id,
             "label": &self.config.api.device_id,
             "platform": std::env::consts::OS,
-            "app": "jcode",
+            "app": "next-code",
             "capabilities": ["launch"],
         });
         add_user_id(&mut body, self.config.api.user_id.as_deref());
@@ -806,7 +807,7 @@ impl RelayLauncherClient {
             request.provider_key.as_deref(),
         )?;
         if !launched {
-            anyhow::bail!("no supported terminal found for headed Jcode launch")
+            anyhow::bail!("no supported terminal found for headed Next Code launch")
         }
 
         let launched_data = serde_json::json!({
@@ -817,7 +818,7 @@ impl RelayLauncherClient {
         let _ = self
             .post_device_event(
                 "launch_status",
-                &format!("Launched headed Jcode session {session_id}"),
+                &format!("Launched headed Next Code session {session_id}"),
                 event.seq,
                 Some(launched_data),
             )
@@ -1141,7 +1142,7 @@ fn spawn_launch_window(
     let exe = crate::build::client_update_candidate(selfdev_requested)
         .map(|(path, _label)| path)
         .or_else(|| std::env::current_exe().ok())
-        .unwrap_or_else(|| PathBuf::from("jcode"));
+        .unwrap_or_else(|| PathBuf::from("next-code"));
     let context = crate::session_launch::SessionSpawnContext::kind("jade-relay");
     if selfdev_requested {
         crate::session_launch::spawn_selfdev_in_new_terminal_with_context(
@@ -1194,7 +1195,7 @@ async fn deliver_to_session(
         guard.get(session_id).cloned()
     };
     let Some(agent) = agent else {
-        anyhow::bail!("session '{session_id}' is not live in this Jcode server")
+        anyhow::bail!("session '{session_id}' is not live in this Next Code server")
     };
 
     if agent.try_lock().is_err() {
@@ -1237,7 +1238,7 @@ async fn deliver_to_launched_session(
         guard.get(session_id).cloned()
     };
     let Some(agent) = agent else {
-        anyhow::bail!("session '{session_id}' is not live in this Jcode server")
+        anyhow::bail!("session '{session_id}' is not live in this Next Code server")
     };
 
     // A just-spawned headed TUI briefly owns the agent lock while it subscribes

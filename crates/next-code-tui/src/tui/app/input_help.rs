@@ -29,7 +29,7 @@ impl App {
             | "provider test coverage"
             | "model-status"
             | "model status" => {
-                "/provider-test-coverage\nShow jcode live verification evidence for the current provider/model.\n\n/provider-test-coverage <provider> <model>\nLook up a specific provider/model pair in the live-test coverage ledger.\n\nThe report shows last-tested time, jcode build, passed/missing checkpoints, readiness gaps, and a caveat that missing evidence is not a provider failure."
+                "/provider-test-coverage\nShow next-code live verification evidence for the current provider/model.\n\n/provider-test-coverage <provider> <model>\nLook up a specific provider/model pair in the live-test coverage ledger.\n\nThe report shows last-tested time, next-code build, passed/missing checkpoints, readiness gaps, and a caveat that missing evidence is not a provider failure."
             }
             "refresh-model-list" => {
                 "/refresh-model-list\nForce-refresh provider model catalogs, update /model, and persist the refreshed cache."
@@ -38,7 +38,7 @@ impl App {
                 "/agents\nOpen the agent-model config picker.\n\n/agents <swarm|review|judge|memory|ambient>\nJump straight to that agent role's saved model override."
             }
             "swarm-prompt" => {
-                "/swarm-prompt\nOpen the active swarm routing prompt in $VISUAL or $EDITOR.\n\nJcode uses a nonblank project override at ./.jcode/swarm-prompt.md when present, then ~/.jcode/swarm-prompt.md, then the built-in default. If no editable override exists, this command creates the global file from the built-in default. Restart or reload Jcode after editing because running agent tool registries cache the prompt."
+                "/swarm-prompt\nOpen the active swarm routing prompt in $VISUAL or $EDITOR.\n\nNext Code uses a nonblank project override at ./.next-code/swarm-prompt.md when present, then ~/.next-code/swarm-prompt.md, then the built-in default. If no editable override exists, this command creates the global file from the built-in default. Restart or reload Next Code after editing because running agent tool registries cache the prompt."
             }
             "subagent" => {
                 "/subagent <prompt>\nLaunch a subagent immediately.\n\nOptional flags:\n  --type <kind>         sets the subagent type (default general)\n  --model <name>        overrides the subagent model for this run\n  --continue <id>       resumes an existing subagent session"
@@ -93,7 +93,7 @@ impl App {
             }
             "memory" => "/memory [on|off|status]\nToggle memory features for this session.",
             "log" => {
-                "/log mark [note]\nWrite a distinctive JCODE_LOG_MARK line to ~/.jcode/logs/jcode-YYYY-MM-DD.log with the current session, provider, model, working directory, and optional note. Use this to mark a spot for agents to inspect later."
+                "/log mark [note]\nWrite a distinctive NEXT_CODE_LOG_MARK line to ~/.next-code/logs/next-code-YYYY-MM-DD.log with the current session, provider, model, working directory, and optional note. Use this to mark a spot for agents to inspect later."
             }
             "goals" => {
                 "/goals\nOpen the goals overview in the side panel.\n\n/goals resume\nResume the most relevant active goal for this session/project.\n\n/goals show <id>\nOpen a specific goal in the side panel."
@@ -103,7 +103,7 @@ impl App {
                 "/overnight <hours>[h|m] [mission]\nStart one overnight coordinator with a target wake/report time. The coordinator prioritizes verifiable, low-risk work, maintains structured logs, updates review notes, and generates a review HTML page.\n\n/overnight status\nShow the latest overnight run status.\n\n/overnight log\nShow recent overnight events.\n\n/overnight review\nOpen the generated review page.\n\n/overnight cancel\nRequest cancellation after the current coordinator turn reaches a safe boundary."
             }
             "dictate" | "dictation" => {
-                "/dictate\nRun the configured external speech-to-text command and inject the transcript into jcode.\n\nConfigure [dictation] in ~/.jcode/config.toml:\n  command       shell command that prints transcript to stdout,\n                for example ~/.local/bin/my-whisper-script --grammar-target code\n  mode          insert|append|replace|send\n  key           optional hotkey (for example alt+;)\n  timeout_secs  max wait time"
+                "/dictate\nRun the configured external speech-to-text command and inject the transcript into next-code.\n\nConfigure [dictation] in ~/.next-code/config.toml:\n  command       shell command that prints transcript to stdout,\n                for example ~/.local/bin/my-whisper-script --grammar-target code\n  mode          insert|append|replace|send\n  key           optional hotkey (for example alt+;)\n  timeout_secs  max wait time"
             }
             "poke" => {
                 "/poke [on|off|status]\nPoke the model to resume when it has stopped with incomplete todos.\n\n\
@@ -116,7 +116,7 @@ impl App {
                 finish the work, update the todo list to reflect what is done, or ask for user input if genuinely blocked."
             }
             "transfer" => {
-                "/transfer\nCompact the current session into a summary-only handoff, copy the current todo list to a fresh session, and open that transferred session in a new window.\n\nIf a turn is currently running, jcode first soft-pauses the current session at the next safe point, then performs the transfer."
+                "/transfer\nCompact the current session into a summary-only handoff, copy the current todo list to a fresh session, and open that transferred session in a new window.\n\nIf a turn is currently running, next-code first soft-pauses the current session at the next safe point, then performs the transfer."
             }
             "plan" => {
                 "/plan [goal]\nDraft a plan without implementing anything. The model inspects the repo, then writes a structured plan (Goal, Scope, Approach, Validation, Open questions) to the side panel for review.\n\nNothing is edited: it stops after writing the plan. Once you approve, it converts the plan into a todo list and starts the work.\n\n/plan with no goal plans the task currently in focus."
@@ -131,13 +131,13 @@ impl App {
                 "/reload\nReload into the newest available binary if one is ready. This is fast and does not rebuild."
             }
             "restart" => {
-                "/restart\nRestart jcode with the current binary. Session is preserved.\nUseful after config changes, MCP server updates, or env var changes."
+                "/restart\nRestart next-code with the current binary. Session is preserved.\nUseful after config changes, MCP server updates, or env var changes."
             }
             "rebuild" => {
-                "/rebuild\nRun git pull --ff-only, cargo build --release, and release tests in the background. jcode stays usable and reloads automatically when the build is ready."
+                "/rebuild\nRun git pull --ff-only, cargo build --release, and release tests in the background. next-code stays usable and reloads automatically when the build is ready."
             }
             "selfdev" => {
-                "/selfdev\nSpawn a new self-dev jcode session in a separate terminal.\n\n/selfdev <prompt>\nSpawn a new self-dev session and auto-deliver the prompt to it.\n\n/selfdev status\nShow current self-dev/build status."
+                "/selfdev\nSpawn a new self-dev next-code session in a separate terminal.\n\n/selfdev <prompt>\nSpawn a new self-dev session and auto-deliver the prompt to it.\n\n/selfdev status\nShow current self-dev/build status."
             }
             "split" => {
                 "/split\nSplit the current session into a new window. Clones the full conversation history so both sessions continue from the same point."
@@ -153,7 +153,7 @@ impl App {
                 "/usage\nFetch and display usage limits for connected providers. This command only reports real connected-provider usage windows and reset times."
             }
             "changelog" => "/changelog\nShow recent changes embedded in this build.",
-            "quit" => "/quit\nExit jcode.",
+            "quit" => "/quit\nExit next-code.",
             "config" => {
                 "/config\nShow active configuration.\n\n/config init\nCreate default config file.\n\n/config edit\nOpen config in $EDITOR."
             }

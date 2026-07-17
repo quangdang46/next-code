@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env_os};
 use super::*;
 use std::sync::{Mutex, OnceLock};
 
@@ -70,9 +71,9 @@ fn lock_telemetry_test_state() -> std::sync::MutexGuard<'static, ()> {
 #[test]
 fn test_opt_out_env_var() {
     let _guard = lock_test_env();
-    next_code_core::env::set_var("JCODE_NO_TELEMETRY", "1");
+    next_code_core::env::set_var("NEXT_CODE_NO_TELEMETRY", "1");
     assert!(!is_enabled());
-    next_code_core::env::remove_var("JCODE_NO_TELEMETRY");
+    next_code_core::env::remove_var("NEXT_CODE_NO_TELEMETRY");
 }
 
 #[test]
@@ -539,9 +540,9 @@ fn test_onboarding_step_milestone_key_includes_provider_and_method() {
 #[test]
 fn test_install_marker_tracks_current_telemetry_id() {
     let _guard = lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    next_code_core::env::set_var("JCODE_HOME", temp.path());
+    next_code_core::env::set_var("NEXT_CODE_HOME", temp.path());
 
     assert!(!install_recorded_for_id("id-a"));
     mark_install_recorded("id-a");
@@ -549,18 +550,18 @@ fn test_install_marker_tracks_current_telemetry_id() {
     assert!(!install_recorded_for_id("id-b"));
 
     if let Some(prev_home) = prev_home {
-        next_code_core::env::set_var("JCODE_HOME", prev_home);
+        next_code_core::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_core::env::remove_var("JCODE_HOME");
+        next_code_core::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[test]
 fn test_install_conversion_id_is_validated_and_consumed() {
     let _guard = lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    next_code_core::env::set_var("JCODE_HOME", temp.path());
+    next_code_core::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let path = install_conversion_id_path().expect("conversion path");
     write_private_file(&path, "11111111-2222-4333-8444-555555555555\n");
@@ -581,18 +582,18 @@ fn test_install_conversion_id_is_validated_and_consumed() {
     ));
 
     if let Some(prev_home) = prev_home {
-        next_code_core::env::set_var("JCODE_HOME", prev_home);
+        next_code_core::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_core::env::remove_var("JCODE_HOME");
+        next_code_core::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[test]
 fn test_attributed_install_bypasses_existing_install_marker() {
     let _guard = lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    next_code_core::env::set_var("JCODE_HOME", temp.path());
+    next_code_core::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let id = get_or_create_id().expect("telemetry id");
     mark_install_recorded(&id);
@@ -608,29 +609,29 @@ fn test_attributed_install_bypasses_existing_install_marker() {
     assert!(should_record_install_for_id(&id, conversion_id.as_deref()));
 
     if let Some(prev_home) = prev_home {
-        next_code_core::env::set_var("JCODE_HOME", prev_home);
+        next_code_core::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_core::env::remove_var("JCODE_HOME");
+        next_code_core::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[test]
 fn test_install_conversion_id_is_removed_when_telemetry_is_disabled() {
     let _guard = lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = product_env_os("HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    next_code_core::env::set_var("JCODE_HOME", temp.path());
+    next_code_core::env::set_var("NEXT_CODE_HOME", temp.path());
     let path = install_conversion_id_path().expect("conversion path");
     write_private_file(&path, "11111111-2222-4333-8444-555555555555\n");
 
-    next_code_core::env::set_var("JCODE_NO_TELEMETRY", "1");
+    next_code_core::env::set_var("NEXT_CODE_NO_TELEMETRY", "1");
     record_install_if_first_run();
-    next_code_core::env::remove_var("JCODE_NO_TELEMETRY");
+    next_code_core::env::remove_var("NEXT_CODE_NO_TELEMETRY");
     assert!(!path.exists());
 
     if let Some(prev_home) = prev_home {
-        next_code_core::env::set_var("JCODE_HOME", prev_home);
+        next_code_core::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_core::env::remove_var("JCODE_HOME");
+        next_code_core::env::remove_var("NEXT_CODE_HOME");
     }
 }

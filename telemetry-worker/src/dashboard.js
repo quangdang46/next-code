@@ -1,6 +1,6 @@
-// jcode telemetry console — "Terminal Observatory" aesthetic.
+// next-code telemetry console — "Terminal Observatory" aesthetic.
 //
-// Design intent (frontend-design skill): jcode is a terminal coding agent, so
+// Design intent (frontend-design skill): next-code is a terminal coding agent, so
 // the dashboard is built as a precision instrument readout, not generic SaaS.
 // - Type: JetBrains Mono (display + data) paired with a quiet grotesk for prose.
 // - Palette: near-black graphite, warm phosphor amber as the dominant signal,
@@ -17,7 +17,7 @@ export const DASHBOARD_HTML = `<!DOCTYPE html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>jcode · telemetry console</title>
+<title>next-code · telemetry console</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&family=Sora:wght@400;500;600&display=swap" rel="stylesheet">
@@ -182,7 +182,7 @@ export const DASHBOARD_HTML = `<!DOCTYPE html>
 <div class="wrap">
   <div id="gate" class="gate hidden">
     <div class="box">
-      <div class="glyph">jc</div>
+      <div class="glyph">nc</div>
       <h2>TELEMETRY CONSOLE</h2>
       <p>access token required</p>
       <input id="token" type="password" placeholder="•••••••••••" autocomplete="off" />
@@ -194,9 +194,9 @@ export const DASHBOARD_HTML = `<!DOCTYPE html>
   <div id="app" class="hidden">
     <header class="bar">
       <div class="mark">
-        <div class="glyph">jc</div>
+        <div class="glyph">nc</div>
         <div>
-          <h1>jcode telemetry</h1>
+          <h1>next-code telemetry</h1>
           <div class="tag" id="generated">— · — · —</div>
         </div>
       </div>
@@ -220,7 +220,7 @@ const pct = (x) => (x==null?"—":(x*100).toFixed(1)+"%");
 const ms  = (x) => (x==null?"—":x>=1000?(x/1000).toFixed(1)+"s":Math.round(x)+"ms");
 const dec = (x,d=1) => (x==null?"—":Number(x).toFixed(d));
 const esc = (s) => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-let TOKEN = localStorage.getItem("jcode_dash_token") || "";
+let TOKEN = localStorage.getItem("next_code_dash_token") || localStorage.getItem("jcode_dash_token") || "";  // dual-read: jcode_dash_token one release
 
 function showGate(m){ document.getElementById("app").classList.add("hidden"); document.getElementById("gate").classList.remove("hidden"); document.getElementById("gate-err").textContent = m||""; }
 function showApp(){ document.getElementById("gate").classList.add("hidden"); document.getElementById("app").classList.remove("hidden"); }
@@ -232,7 +232,7 @@ async function load(){
   let res;
   try { res = await fetch("/v1/stats", { headers:{ "Authorization":"Bearer "+TOKEN } }); }
   catch(e){ showGate("network error"); return; }
-  if(res.status===401){ localStorage.removeItem("jcode_dash_token"); TOKEN=""; showGate("invalid token"); return; }
+  if(res.status===401){ localStorage.removeItem("next_code_dash_token"); localStorage.removeItem("jcode_dash_token"); TOKEN=""; showGate("invalid token"); return; }
   if(!res.ok){ document.getElementById("content").innerHTML='<div class="err">failed to load ('+res.status+')</div>'; return; }
   render(await res.json());
 }
@@ -313,7 +313,7 @@ function render(d){
     + '<div class="hero-main">'
       + '<div class="label">total users · headline</div>'
       + '<div class="big">'+fmt(u.total_users)+'<span class="unit">people</span></div>'
-      + '<div class="hero-desc">Distinct real people who installed jcode or did meaningful work in it. CI runners excluded; each anonymous machine id counts once.</div>'
+      + '<div class="hero-desc">Distinct real people who installed next-code or did meaningful work in it. CI runners excluded; each anonymous machine id counts once.</div>'
       + '<div class="ladder">'
         + '<div class="rung"><span class="lk"><b>Reached</b> · launched it at least once</span><span class="lv dim">'+fmt(u.reached_users)+'</span></div>'
         + '<div class="rung"><span class="lk"><b>Total users</b> · installed OR did work</span><span class="lv amber">'+fmt(u.total_users)+'</span></div>'
@@ -335,7 +335,7 @@ function render(d){
   // 01 USER COMPOSITION
   H+=sec("01","user composition","each tier broader than the one below · nothing dropped");
   H+='<div class="grid g4">'
-    + stat("Reached", fmt(u.reached_users), "ran jcode ≥1 time (non-CI)")
+    + stat("Reached", fmt(u.reached_users), "ran next-code ≥1 time (non-CI)")
     + stat("Total users", fmt(u.total_users), "installed OR did work", {key:true})
     + stat("Core users", fmt(u.core_users), "did meaningful work")
     + stat("Installed", fmt(u.installed_users), "distinct install events")
@@ -484,10 +484,10 @@ function render(d){
   c.innerHTML=H;
 }
 
-document.getElementById("unlock").addEventListener("click",()=>{const v=document.getElementById("token").value.trim();if(!v){document.getElementById("gate-err").textContent="enter a token";return;}TOKEN=v;localStorage.setItem("jcode_dash_token",v);load();});
+document.getElementById("unlock").addEventListener("click",()=>{const v=document.getElementById("token").value.trim();if(!v){document.getElementById("gate-err").textContent="enter a token";return;}TOKEN=v;localStorage.setItem("next_code_dash_token",v); localStorage.removeItem("jcode_dash_token");load();});
 document.getElementById("token").addEventListener("keydown",e=>{if(e.key==="Enter")document.getElementById("unlock").click();});
 document.getElementById("refresh").addEventListener("click",load);
-document.getElementById("logout").addEventListener("click",()=>{localStorage.removeItem("jcode_dash_token");TOKEN="";showGate("");});
+document.getElementById("logout").addEventListener("click",()=>{localStorage.removeItem("next_code_dash_token"); localStorage.removeItem("jcode_dash_token");TOKEN="";showGate("");});
 load();
 </script>
 </body>

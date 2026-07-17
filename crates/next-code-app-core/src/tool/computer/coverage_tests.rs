@@ -1,7 +1,7 @@
 //! Exhaustive live coverage of EVERY computer action. These mutate the desktop
 //! (open TextEdit, move windows, clipboard, etc.) so they are `#[ignore]`d and
 //! run explicitly:
-//!   cargo test -p jcode-app-core tool::computer::coverage -- --ignored --nocapture --test-threads=1
+//!   cargo test -p next-code-app-core tool::computer::coverage -- --ignored --nocapture --test-threads=1
 //!
 //! Each test asserts the action returns Ok and (where checkable) the expected
 //! effect. The goal is to prove no action panics or silently misbehaves.
@@ -154,7 +154,7 @@ async fn coverage_clipboard_scripting_system() {
     assert!(c.output.contains("cov-clip"));
     ok(json!({"action":"run_applescript","script":"return 7 * 6"})).await;
     ok(json!({"action":"run_jxa","script":"2 + 3"})).await;
-    ok(json!({"action":"notify","text":"jcode coverage test","title":"jcode"})).await;
+    ok(json!({"action":"notify","text":"next-code coverage test","title":"next-code"})).await;
     // wait_for against a known app/text with short timeout (Finder always has a menu)
     textedit_new().await;
     let _ =

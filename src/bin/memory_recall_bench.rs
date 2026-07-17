@@ -1,13 +1,13 @@
 //! Memory recall benchmark (Mode 1 / no-LLM).
 //!
 //! Faithful offline harness for measuring memory retrieval accuracy. Reuses the
-//! REAL jcode retrieval primitives:
+//! REAL next-code retrieval primitives:
 //!   - `next_code::memory_graph::MemoryGraph` deserialization (real on-disk graphs)
 //!   - `next_code::embedding::embed` (real all-MiniLM-L6-v2 ONNX model)
 //!   - `next_code::memory::format_context_for_relevance` (real live query window)
 //!   - a faithful re-implementation of `score_and_filter` (cosine + gap filter)
 //!
-//! Privacy: all data lives OUTSIDE the repo (default `~/jcode-memory-bench`).
+//! Privacy: all data lives OUTSIDE the repo (default `~/next-code-memory-bench`).
 //! Nothing here writes into the repo tree.
 //!
 //! Subcommands:
@@ -44,7 +44,7 @@ static LLM_OUTPUT_TOK: std::sync::atomic::AtomicUsize = std::sync::atomic::Atomi
 fn bench_root() -> PathBuf {
     std::env::var("MEMORY_BENCH_DIR")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| dirs_home().join("jcode-memory-bench"))
+        .unwrap_or_else(|_| dirs_home().join("next-code-memory-bench"))
 }
 
 fn dirs_home() -> PathBuf {
@@ -447,7 +447,7 @@ fn cmd_queries(args: &[String]) -> Result<()> {
     let sessions_dir = opts
         .get("sessions")
         .cloned()
-        .unwrap_or_else(|| format!("{}/.jcode/sessions", dirs_home().display()));
+        .unwrap_or_else(|| format!("{}/.next-code/sessions", dirs_home().display()));
     let max_sessions: usize = opts
         .get("max_sessions")
         .and_then(|s| s.parse().ok())
@@ -672,7 +672,7 @@ fn cmd_pool(args: &[String]) -> Result<()> {
     Ok(())
 }
 
-// ---------------- LLM judge (direct Anthropic via jcode Sidecar) ----------------
+// ---------------- LLM judge (direct Anthropic via next-code Sidecar) ----------------
 
 #[derive(Deserialize)]
 struct JudgeInput {
@@ -1029,13 +1029,13 @@ fn cmd_metrics(args: &[String]) -> Result<()> {
     let queries = read_queries()?;
     let gold = read_gold()?;
 
-    // For `prod_hybrid`: seed a temp JCODE_HOME project graph with the corpus and
+    // For `prod_hybrid`: seed a temp NEXT_CODE_HOME project graph with the corpus and
     // exercise the REAL shipped MemoryManager::find_similar_hybrid end-to-end.
     let prod_mgr = if config == "prod_hybrid" {
         let tmp = std::env::temp_dir().join(format!("memrecall-prod-{}", std::process::id()));
         std::fs::create_dir_all(&tmp)?;
         // SAFETY: single-threaded setup before any embedding work.
-        unsafe { std::env::set_var("JCODE_HOME", &tmp) };
+        unsafe { std::env::set_var("NEXT_CODE_HOME", &tmp) };
         let project_dir = "/bench/prod-validate";
         let mgr = next_code::memory::MemoryManager::new().with_project_dir(project_dir);
         let graph = load_graph(Path::new(&graph_file))?;
@@ -2191,7 +2191,7 @@ fn cmd_gate(args: &[String]) -> Result<()> {
     let sessions_dir = opts
         .get("sessions")
         .cloned()
-        .unwrap_or_else(|| format!("{}/.jcode/sessions", dirs_home().display()));
+        .unwrap_or_else(|| format!("{}/.next-code/sessions", dirs_home().display()));
     let max_sessions: usize = opts
         .get("max_sessions")
         .and_then(|s| s.parse().ok())

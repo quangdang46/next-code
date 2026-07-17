@@ -1,14 +1,14 @@
 //! Self-dev customization records (#42).
 //!
-//! When the self-dev agent (or a user manually) modifies jcode source,
-//! capture a structured record of the change in `~/.jcode/customizations/`.
+//! When the self-dev agent (or a user manually) modifies next-code source,
+//! capture a structured record of the change in `~/.next-code/customizations/`.
 //! Foundation for #43 (intent + provenance + rationale) and #44 (update
 //! flow integration).
 //!
 //! ## Schema
 //!
 //! Each record is one JSON file at
-//! `~/.jcode/customizations/<id>.json`:
+//! `~/.next-code/customizations/<id>.json`:
 //!
 //! ```json
 //! {
@@ -65,11 +65,11 @@ pub struct CustomizationRecord {
     /// Human-readable reason. May be agent-generated or user-typed.
     pub intent: String,
 
-    /// jcode session id this customization originated from, when known.
+    /// next-code session id this customization originated from, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
 
-    /// jcode version at record time (e.g. `v0.12.97-dev`).
+    /// next-code version at record time (e.g. `v0.12.97-dev`).
     pub version_at_record: String,
 
     /// Git hash at record time.
@@ -87,7 +87,7 @@ pub struct CustomizationRecord {
     pub rationale: Option<String>,
 
     /// Validation evidence captured before the customization was applied.
-    /// Used by `jcode update` (#44) to decide whether a customization
+    /// Used by `next-code update` (#44) to decide whether a customization
     /// still passes against a new release.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation: Option<Validation>,
@@ -114,7 +114,7 @@ pub enum Provenance {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validation {
     /// Free-form description of what was checked
-    /// (e.g. "cargo test -p jcode --lib customization::tests").
+    /// (e.g. "cargo test -p next-code --lib customization::tests").
     pub description: String,
     /// True if validation passed at record time.
     pub passed: bool,
@@ -160,7 +160,7 @@ pub fn hash_diff(diff: &str) -> String {
 }
 
 /// Record a new customization. Writes the JSON file under
-/// `~/.jcode/customizations/<id>.json` and returns the assigned id.
+/// `~/.next-code/customizations/<id>.json` and returns the assigned id.
 pub fn record(
     intent: impl Into<String>,
     files: Vec<String>,
@@ -296,7 +296,7 @@ pub enum UpdateStatus {
     MissingFiles { missing: Vec<String> },
 
     /// The version recorded against this customization predates the
-    /// current jcode release. The customization itself may or may not
+    /// current next-code release. The customization itself may or may not
     /// still apply — surface a "needs review" so the user can replay
     /// validation.
     StaleVersion {
@@ -314,7 +314,7 @@ pub struct CustomizationStatus {
 }
 
 /// Scan all stored customizations and report their health relative to
-/// the current repo state + jcode version. Used after `jcode update`
+/// the current repo state + next-code version. Used after `next-code update`
 /// to surface customizations that may need review.
 ///
 /// `repo_root` is the directory to resolve customization `files`
@@ -373,14 +373,14 @@ mod tests {
 
     fn with_temp_home<F: FnOnce()>(f: F) {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::TempDir::new().unwrap();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         f();
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -485,7 +485,7 @@ mod tests {
                 Some(prov.clone()),
                 Some("racing borrow on shared state".to_string()),
                 Some(Validation {
-                    description: "cargo test -p jcode --lib provider::dispatch".to_string(),
+                    description: "cargo test -p next-code --lib provider::dispatch".to_string(),
                     passed: true,
                     detail: Some("12 passed".to_string()),
                 }),
@@ -501,7 +501,7 @@ mod tests {
             let v = loaded.validation.unwrap();
             assert_eq!(
                 v.description,
-                "cargo test -p jcode --lib provider::dispatch"
+                "cargo test -p next-code --lib provider::dispatch"
             );
             assert!(v.passed);
             assert_eq!(v.detail.as_deref(), Some("12 passed"));
@@ -627,7 +627,7 @@ mod tests {
     }
 
     #[test]
-    fn scan_status_flags_stale_version_when_recorded_under_older_jcode() {
+    fn scan_status_flags_stale_version_when_recorded_under_older_next_code() {
         with_temp_home(|| {
             // Write a record manually with an older version_at_record.
             let dir = customizations_dir().unwrap();

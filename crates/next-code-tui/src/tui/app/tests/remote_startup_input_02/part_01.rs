@@ -212,7 +212,7 @@ fn test_remote_fallback_bedrock_arn_does_not_create_openrouter_route() {
 
 #[test]
 fn test_remote_current_fpt_live_model_uses_fpt_route_not_copilot_without_cache() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         crate::env::set_var("FPT_API_KEY", "test-fpt-key");
 
         let mut app = create_test_app();
@@ -248,7 +248,7 @@ fn test_remote_fallback_claude_model_gets_api_key_route_without_oauth() {
     // catalog fallback (oversized route frames are downgraded to model names).
     // With only ANTHROPIC_API_KEY configured, the fallback must synthesize a
     // claude-api route; previously it only ever emitted claude-oauth routes.
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         crate::env::set_var("ANTHROPIC_API_KEY", "sk-ant-test-key");
         crate::auth::AuthStatus::invalidate_cache();
 
@@ -280,7 +280,7 @@ fn test_remote_cached_oauth_only_claude_route_gains_api_key_route_in_picker() {
     // released Claude model. When an Anthropic API key is configured, opening
     // the picker must add the claude-api route instead of trusting the stale
     // single-route cache forever.
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         crate::env::set_var("ANTHROPIC_API_KEY", "sk-ant-test-key");
         crate::auth::AuthStatus::invalidate_cache();
 
@@ -323,7 +323,7 @@ fn test_remote_cached_oauth_only_claude_route_gains_api_key_route_in_picker() {
 
 #[test]
 fn test_model_picker_ctrl_b_bedrock_selection_saves_bedrock_default() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.is_remote = true;
         app.remote_available_entries = vec!["amazon.nova-pro-v1:0".to_string()];
@@ -825,7 +825,7 @@ fn test_transfer_command_queues_pause_while_processing_locally() {
 
 #[test]
 fn test_create_transfer_session_from_parent_copies_todos_and_uses_compacted_context_only() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.session.working_dir = Some("/tmp".to_string());
         app.session.model = Some("test-model".to_string());

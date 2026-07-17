@@ -15,7 +15,7 @@ pub(crate) mod color_support;
 mod core;
 pub(crate) mod fuzzy;
 // Terminal image display + metadata helpers now live in the dependency-free
-// `jcode-terminal-image` crate (shared with the `read` tool). Re-exported here
+// `next-code-terminal-image` crate (shared with the `read` tool). Re-exported here
 // so existing `crate::tui::image` / `crate::tui::image_metadata` paths keep working.
 pub use next_code_terminal_image::display as image;
 use next_code_terminal_image::metadata as image_metadata;
@@ -300,7 +300,7 @@ pub trait TuiState {
     }
     /// Total session token usage (input, output) - used for high usage warnings
     fn total_session_tokens(&self) -> Option<(u64, u64)>;
-    /// Number of jcode compactions already applied to this session, when known.
+    /// Number of next-code compactions already applied to this session, when known.
     fn session_compaction_count(&self) -> usize {
         0
     }
@@ -805,7 +805,7 @@ fn supports_reliable_zero_cache_read_warning(
         return true;
     }
 
-    // OpenRouter/Jcode-subscription routes can only be treated as reliable for zero-read
+    // OpenRouter/Next Code-subscription routes can only be treated as reliable for zero-read
     // warnings once the upstream provider identifies a known cache-reporting family.
     // A bare OpenRouter route with cached_tokens=0 is not enough: some upstreams simply
     // do not implement prompt caching, and warning on those would make the UI untrustworthy.

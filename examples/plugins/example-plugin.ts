@@ -1,16 +1,16 @@
 /**
- * Example Plugin for jcode
+ * Example Plugin for next-code
  *
  * This demonstrates the full plugin API including lifecycle hooks,
  * event handlers, tool registration, state management, configuration,
  * persistence, and capability declarations.
  *
  * Plugins run in QuickJS sandboxes with no DOM, no Node.js built-ins,
- * and limited global objects. The runtime injects a `jcode` global
+ * and limited global objects. The runtime injects a `jcode` global (plugin API name)
  * that provides all plugin APIs.
  *
  * Plugin lifecycle:
- *   1. Discovery  ─ jcode scans plugin directories / npm cache / config
+ *   1. Discovery  ─ next-code scans plugin directories / npm cache / config
  *   2. Preflight  ─ static analysis for capability enforcement
  *   3. Load       ─ eval (transpile TS→JS, then QuickJS eval)
  *   4. Activate   ─ handlers are registered into the dispatcher
@@ -21,7 +21,7 @@
 // ─── Plugin Identity & Manifest ────────────────────────────────────────────
 //
 // Every plugin MUST export a default object with identity metadata.
-// jcode reads this at load time to register the plugin and wire up
+// next-code reads this at load time to register the plugin and wire up
 // lifecycle hooks.
 
 type HandlerResult = { action: string; output?: unknown; error?: string };
@@ -48,13 +48,13 @@ interface PluginManifest {
 const manifest: PluginManifest = {
   name: 'example-plugin',
   version: '1.0.0',
-  description: 'Demo plugin showing all jcode plugin API capabilities',
-  author: 'jcode team',
+  description: 'Demo plugin showing all next-code plugin API capabilities',
+  author: 'next-code team',
 
   // Declare required capabilities. The runtime checks these against
   // the plugin's static analysis and the user's security policy.
   capabilities: {
-    fs_read: ['$HOME/.jcode/data'],
+    fs_read: ['$HOME/.next-code/data'],
     network: ['api.github.com'],
     register_tools: true,
     read_config: true,
@@ -273,7 +273,7 @@ jcode.on('SessionEnd', () => {
 
 // ─── Default Export ────────────────────────────────────────────────────────
 //
-// jcode loads the module and reads the default export for plugin metadata.
+// next-code loads the module and reads the default export for plugin metadata.
 // The actual work (handlers, tools, config) happens at module scope above,
 // but the export ensures the runtime can identify the plugin.
 

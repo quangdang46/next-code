@@ -26,7 +26,7 @@ fn test_rewrite_command_with_full_path() {
     // If binary exists, it rewrites; if not, returns unchanged
     if browser_binary_path().exists() {
         assert!(result.contains("ping"));
-        assert!(result.contains(".jcode/browser"));
+        assert!(result.contains(".next-code/browser"));
     } else {
         assert_eq!(result, cmd);
     }
@@ -37,7 +37,7 @@ fn test_paths() {
     let _guard = crate::storage::lock_test_env();
 
     let bdir = browser_dir();
-    assert!(bdir.to_string_lossy().contains(".jcode"));
+    assert!(bdir.to_string_lossy().contains(".next-code"));
     assert!(bdir.to_string_lossy().ends_with("browser"));
 
     let bin = browser_binary_path();
@@ -78,9 +78,9 @@ fn test_should_prompt_extension_install_only_before_setup_complete() {
 #[test]
 fn setup_complete_requires_native_host_binary() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     std::fs::create_dir_all(browser_dir()).expect("create browser dir");
     std::fs::write(setup_marker_path(), "test").expect("write setup marker");
@@ -94,18 +94,18 @@ fn setup_complete_requires_native_host_binary() {
     assert!(is_setup_complete());
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
 #[tokio::test]
 async fn test_inspect_browser_status_without_binary() {
-    // Hold the test-env lock: this reads JCODE_HOME-derived paths, and other
-    // tests mutate JCODE_HOME (and write browser fixture files) under the
+    // Hold the test-env lock: this reads NEXT_CODE_HOME-derived paths, and other
+    // tests mutate NEXT_CODE_HOME (and write browser fixture files) under the
     // lock. Without it, the status snapshot and the exists() check below can
-    // observe different JCODE_HOME values mid-test.
+    // observe different NEXT_CODE_HOME values mid-test.
     let _guard = crate::storage::lock_test_env();
     let status = inspect_browser_status().await.unwrap();
     assert_eq!(status.backend, "firefox_agent_bridge");
@@ -119,7 +119,7 @@ async fn test_inspect_browser_status_without_binary() {
 #[tokio::test]
 async fn test_ensure_browser_ready_noninteractive_without_binary() {
     // See test_inspect_browser_status_without_binary: serialize against tests
-    // that mutate JCODE_HOME under the test-env lock.
+    // that mutate NEXT_CODE_HOME under the test-env lock.
     let _guard = crate::storage::lock_test_env();
     let status = ensure_browser_ready_noninteractive().await.unwrap();
     assert_eq!(status.backend, "firefox_agent_bridge");
@@ -138,9 +138,9 @@ fn ensure_browser_session_fails_fast_when_session_process_exits_immediately() {
     use std::time::{Duration, Instant};
 
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let browser_dir = temp.path().join("browser");
     std::fs::create_dir_all(&browser_dir).expect("create browser dir");
@@ -164,9 +164,9 @@ fn ensure_browser_session_fails_fast_when_session_process_exits_immediately() {
     );
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 
@@ -176,9 +176,9 @@ fn ensure_browser_session_does_not_pass_unsupported_bind_window_flag() {
     use std::os::unix::fs::PermissionsExt;
 
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
     let temp = tempfile::TempDir::new().expect("create temp dir");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let browser_dir = temp.path().join("browser");
     std::fs::create_dir_all(&browser_dir).expect("create browser dir");
@@ -205,8 +205,8 @@ fn ensure_browser_session_does_not_pass_unsupported_bind_window_flag() {
     assert!(!calls.contains("--bind-window"), "{calls}");
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }

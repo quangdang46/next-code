@@ -1,6 +1,6 @@
-# jcode Plugin Author Guide
+# next-code Plugin Author Guide
 
-jcode plugins are TypeScript or JavaScript modules that run inside a QuickJS sandbox. They can listen to lifecycle events, register custom tools for the LLM to invoke, and interact with jcode through a constrained API surface -- all without access to the host process or filesystem except through declared capabilities.
+next-code plugins are TypeScript or JavaScript modules that run inside a QuickJS sandbox. They can listen to lifecycle events, register custom tools for the LLM to invoke, and interact with next-code through a constrained API surface -- all without access to the host process or filesystem except through declared capabilities.
 
 The canonical reference implementation is at `examples/plugins/hello-plugin/`.
 
@@ -27,22 +27,22 @@ The canonical reference implementation is at `examples/plugins/hello-plugin/`.
 ### 1. Copy the hello-plugin scaffold
 
 ```bash
-cp -r <jcode-repo>/examples/plugins/hello-plugin/ ~/my-plugin/
+cp -r <next-code-repo>/examples/plugins/hello-plugin/ ~/my-plugin/
 cd ~/my-plugin
 ```
 
-### 2. Load the plugin into jcode
+### 2. Load the plugin into next-code
 
 ```bash
-jcode plugin load ./my-plugin
+next-code plugin load ./my-plugin
 ```
 
-On next start, jcode discovers the plugin, transpiles `index.ts` to JavaScript via SWC, evaluates it in a QuickJS sandbox, and injects the `jcode` global object.
+On next start, next-code discovers the plugin, transpiles `index.ts` to JavaScript via SWC, evaluates it in a QuickJS sandbox, and injects the `jcode` global object.
 
 ### 3. Verify it loaded
 
 ```bash
-jcode plugin list
+next-code plugin list
 ```
 
 You should see `file:hello-plugin` in the output.
@@ -70,7 +70,7 @@ A minimal plugin is a directory with two files:
 
 ```
 my-plugin/
-  package.json          # Manifest (jcode metadata under "jcode" key)
+  package.json          # Manifest (next-code metadata under "next-code" key)
   index.ts              # Entry point, gets transpiled by SWC
 ```
 
@@ -86,7 +86,7 @@ Plugins declare identity, capabilities, and entry points in `package.json` under
 {
   "name": "hello-plugin",
   "version": "0.1.0",
-  "description": "An example jcode plugin",
+  "description": "An example next-code plugin",
   "jcode": {
     "name": "Hello Plugin",
     "package_name": "hello-plugin",
@@ -112,7 +112,7 @@ Plugins declare identity, capabilities, and entry points in `package.json` under
 | `license` | `string` | No | SPDX license identifier |
 | `tier` | `"read" \| "write" \| "exec"` | No | Default ToolTier for all tools in this plugin |
 | `capabilities` | `object` | No | Declared capabilities (see [Capability Model](#capability-model)) |
-| `engines` | `{ jcode?: string }` | No | Required jcode version range |
+| `engines` | `{ jcode?: string }` | No | Required next-code version range |
 | `tags` | `string[]` | No | Categorization tags |
 
 The `package_name` field serves as a unique identity check: no two loaded plugins may share the same `package_name`. This prevents spoofing where a malicious plugin claims the identity of a trusted one.
@@ -168,7 +168,7 @@ jcode.logger.error(message: string): void
 jcode.logger.debug(message: string): void
 ```
 
-Structured logger backed by jcode's `tracing` crate. Messages appear in the jcode debug log at their respective levels. Enable with `RUST_LOG=jcode_plugin_runtime=debug` to see plugin log output.
+Structured logger backed by next-code's `tracing` crate. Messages appear in the next-code debug log at their respective levels. Enable with `RUST_LOG=next_code_plugin_runtime=debug` to see plugin log output.
 
 ```typescript
 jcode.logger.info("[my-plugin] Starting up");
@@ -222,7 +222,7 @@ jcode.sleep(100); // wait 100 ms
 jcode.cwd: string
 ```
 
-Read-only string containing the current working directory of the jcode process at the time the plugin was loaded.
+Read-only string containing the current working directory of the next-code process at the time the plugin was loaded.
 
 ```typescript
 jcode.logger.info("Working directory: " + jcode.cwd);
@@ -234,7 +234,7 @@ jcode.logger.info("Working directory: " + jcode.cwd);
 jcode.getConfig(key: string): string
 ```
 
-Read a plugin configuration value from jcode's config system. Returns an empty string if the key is not set.
+Read a plugin configuration value from next-code's config system. Returns an empty string if the key is not set.
 
 ```typescript
 var apiKey = jcode.getConfig("my-plugin.apiKey");
@@ -268,7 +268,7 @@ The plugin's version string, derived from its manifest `version` field.
 
 ## Lifecycle Events
 
-Events are dispatched to handlers registered via `jcode.on()`. The full set of supported event names, matched against the Rust `PluginEvent` enum in `jcode-plugin-core`:
+Events are dispatched to handlers registered via `jcode.on()`. The full set of supported event names, matched against the Rust `PluginEvent` enum in `next-code-plugin-core`:
 
 | Category | Events | Description |
 |----------|--------|-------------|
@@ -440,8 +440,8 @@ Example capability declaration in `package.json`:
 {
   "jcode": {
     "capabilities": {
-      "fs_read": ["$HOME/.jcode/data"],
-      "fs_write": ["$HOME/.jcode/data/my-plugin"],
+      "fs_read": ["$HOME/.next-code/data"],
+      "fs_write": ["$HOME/.next-code/data/my-plugin"],
       "http_hosts": ["api.github.com"],
       "env_read": ["HOME", "USER"],
       "shell_commands": ["git *"],
@@ -498,15 +498,15 @@ The default tier for an undeclared tool is `Exec` (fail-closed). Plugin authors 
 
 ## Distribution
 
-jcode has exactly **three** distribution paths. There is no npm registry, no marketplace, and no publish step.
+next-code has exactly **three** distribution paths. There is no npm registry, no marketplace, and no publish step.
 
 ### 1. Local Path
 
 Load a plugin from a local directory:
 
 ```bash
-jcode plugin load ./my-plugin
-jcode plugin load /absolute/path/to/my-plugin
+next-code plugin load ./my-plugin
+next-code plugin load /absolute/path/to/my-plugin
 ```
 
 The directory must contain `package.json` and an entry file referenced by the manifest.
@@ -516,10 +516,10 @@ The directory must contain `package.json` and an entry file referenced by the ma
 Clone a plugin from a git repository and load it:
 
 ```bash
-jcode plugin load https://github.com/user/my-plugin.git
+next-code plugin load https://github.com/user/my-plugin.git
 ```
 
-jcode clones the repository into its plugin cache and loads the plugin from there. Updates are manual (`jcode plugin update`).
+next-code clones the repository into its plugin cache and loads the plugin from there. Updates are manual (`next-code plugin update`).
 
 ### 3. Rust Workspace Crate
 
@@ -529,12 +529,12 @@ For Rust plugin authors, see the [Rust Workspace Crate Path](#rust-workspace-cra
 
 ## Rust Workspace Crate Path
 
-Rust developers can write plugins as workspace crates that are compiled directly into jcode. This is the **preferred** distribution path for Rust developers because it avoids the QuickJS sandbox overhead and gives full access to Rust's ecosystem.
+Rust developers can write plugins as workspace crates that are compiled directly into next-code. This is the **preferred** distribution path for Rust developers because it avoids the QuickJS sandbox overhead and gives full access to Rust's ecosystem.
 
 ### Structure
 
 ```
-crates/jcode-ext-my-plugin/
+crates/next-code-ext-my-plugin/
   Cargo.toml
   src/
     lib.rs
@@ -544,14 +544,14 @@ crates/jcode-ext-my-plugin/
 
 ```toml
 [package]
-name = "jcode-ext-my-plugin"
+name = "next-code-ext-my-plugin"
 version = "0.1.0"
 
 [lib]
 crate-type = ["lib"]
 
 [dependencies]
-jcode-plugin-core = { path = "../jcode-plugin-core" }
+next-code-plugin-core = { path = "../next-code-plugin-core" }
 inventory = "0.3"
 ```
 
@@ -560,10 +560,10 @@ inventory = "0.3"
 Use `inventory::submit!` to register the plugin at compile time:
 
 ```rust
-use jcode_plugin_core::manifest::PluginManifest;
-use jcode_plugin_core::PluginEvent;
-use jcode_plugin_core::events::{EventInput, HandlerResult};
-use jcode_plugin_core::types::PluginId;
+use next_code_plugin_core::manifest::PluginManifest;
+use next_code_plugin_core::PluginEvent;
+use next_code_plugin_core::events::{EventInput, HandlerResult};
+use next_code_plugin_core::types::PluginId;
 use std::sync::Arc;
 
 inventory::submit! {
@@ -587,8 +587,8 @@ impl MyPlugin {
     }
 }
 
-// jcode-plugin-core defines traits that plugin crates implement.
-// At build time, jcode discovers all inventory::submit! entries
+// next-code-plugin-core defines traits that plugin crates implement.
+// At build time, next-code discovers all inventory::submit! entries
 // and registers them in the plugin system.
 ```
 
@@ -598,16 +598,16 @@ Add the crate to the root `Cargo.toml`:
 
 ```toml
 [dependencies]
-jcode-ext-my-plugin = { path = "crates/jcode-ext-my-plugin" }
+next-code-ext-my-plugin = { path = "crates/next-code-ext-my-plugin" }
 ```
 
-Build jcode and the plugin is compiled in:
+Build next-code and the plugin is compiled in:
 
 ```bash
-cargo build --bin jcode
+cargo build --bin next-code
 ```
 
-The plugin appears in `jcode plugin list` alongside file-based plugins.
+The plugin appears in `next-code plugin list` alongside file-based plugins.
 
 ---
 
@@ -615,7 +615,7 @@ The plugin appears in `jcode plugin list` alongside file-based plugins.
 
 ### Integration Test Pattern
 
-The canonical integration test pattern lives in `crates/jcode-plugin-runtime/src/integration_tests.rs`. It loads the real hello-plugin example and verifies the full pipeline:
+The canonical integration test pattern lives in `crates/next-code-plugin-runtime/src/integration_tests.rs`. It loads the real hello-plugin example and verifies the full pipeline:
 
 1. `PluginLoader::scan_directory` discovers the plugin directory.
 2. `PreflightAnalyzer::analyze` runs static analysis.
@@ -630,7 +630,7 @@ The canonical integration test pattern lives in `crates/jcode-plugin-runtime/src
 ### Debug Logging
 
 ```bash
-RUST_LOG=jcode_plugin_runtime=debug jcode
+RUST_LOG=next_code_plugin_runtime=debug next-code
 ```
 
 This enables tracing for:
@@ -645,8 +645,8 @@ This enables tracing for:
 View the plugin audit trail:
 
 ```bash
-jcode plugin audit
-jcode plugin audit --recent 50 --json
+next-code plugin audit
+next-code plugin audit --recent 50 --json
 ```
 
 The audit trail is a ring buffer (default capacity configurable) that logs every capability access with plugin ID, resource, action, and decision.
@@ -671,13 +671,13 @@ Before distributing a plugin, verify each item:
 
 1. **Unique package_name**: The `package_name` must be unique across all plugins. This is enforced at load time and prevents identity spoofing.
 
-2. **Minimum capabilities**: Declare only the capabilities the plugin needs. Prefer specific paths over broad patterns (e.g., `$HOME/.jcode/data/my-plugin` over `$HOME`).
+2. **Minimum capabilities**: Declare only the capabilities the plugin needs. Prefer specific paths over broad patterns (e.g., `$HOME/.next-code/data/my-plugin` over `$HOME`).
 
 3. **Explicit ToolTier**: Set a `tier` in the manifest. Defaulting to `Exec` is safe but will trigger approval prompts for tools that could be `Read` or `Write`.
 
 4. **Audit trail compatibility**: Every capability access is logged. The plugin should not produce excessive log entries that fill the audit ring buffer.
 
-5. **No shell access without reason**: `shell_commands` capability is powerful. Prefer registering a tool that jcode's built-in `Bash` tool can handle.
+5. **No shell access without reason**: `shell_commands` capability is powerful. Prefer registering a tool that next-code's built-in `Bash` tool can handle.
 
 6. **Timeout awareness**: Handler execution is subject to timeouts (default 5000 ms for actionable events, 500 ms for informational events). Long-running operations should complete within these limits.
 
@@ -691,4 +691,4 @@ Before distributing a plugin, verify each item:
 
 11. **Cross-plugin isolation**: Each plugin runs in its own QuickJS context. Plugins cannot access each other's globals or `jcode.kv` namespaces.
 
-12. **Test the full pipeline**: Run `jcode plugin load ./my-plugin` and verify the plugin loads without warnings. Check `jcode plugin audit` after exercising the plugin's functionality.
+12. **Test the full pipeline**: Run `next-code plugin load ./my-plugin` and verify the plugin loads without warnings. Check `next-code plugin audit` after exercising the plugin's functionality.

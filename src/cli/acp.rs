@@ -1078,10 +1078,10 @@ pub(crate) async fn run_acp_command(
     provider_profile: Option<String>,
     explicit_tool_profile: bool,
 ) -> Result<()> {
-    crate::env::set_var("JCODE_NON_INTERACTIVE", "1");
+    crate::env::set_var("NEXT_CODE_NON_INTERACTIVE", "1");
     let acp_config = crate::config::config().acp.clone();
     if !explicit_tool_profile {
-        crate::env::set_var("JCODE_TOOL_PROFILE", acp_config.tool_profile.trim());
+        crate::env::set_var("NEXT_CODE_TOOL_PROFILE", acp_config.tool_profile.trim());
         crate::config::invalidate_config_cache();
     }
     let profile = AcpProfile::parse(&acp_config.profile);

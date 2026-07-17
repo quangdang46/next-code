@@ -1,4 +1,4 @@
-# jcode Feature Registry
+# Next Code Feature Registry
 
 > Feature inventory tracking implementation status and source references across reference repos (Claude Code, opencode, codebuff, pi-agent-rust, oh-my-openagent, codex, oh-my-pi, oh-my-claudecode, oh-my-codex).  
 > Organized by feature domain. New features should be added to the appropriate section.
@@ -28,7 +28,7 @@
 
 *Interactive list below status bar showing live agents, tools, and tasks.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Running items list** | Interactive list below status bar. Shows subagents, shell commands, background tasks. ↓/↑ navigate, Enter detail, Esc close. Toggle via Ctrl+O. | CCB (running items), opencode (task list) | `ui_running_items.rs`, `ui.rs` chunks[8], `input.rs` Ctrl+O | ✅ | — |
 | **Status icons** | Running ◯, Completed ✓, Failed ✗, Stopped ■. Colored by status. | CCB (status icons) | `item_icon_and_color()` in `ui_running_items.rs` | ✅ | — |
@@ -42,7 +42,7 @@
 
 *Popup showing live agent/tool information.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Detail popup** | Rounded border overlay showing item info. | CCB (AgentDetail), opencode (detail view) | `draw_running_item_detail()` in `ui_running_items.rs` | ✅ | — |
 | **Real-time update** | Content rebuilt every frame. Status/elapsed update live. | CCB (live update) | Called from `draw_inner()` each frame | ✅ | — |
@@ -56,7 +56,7 @@
 
 *Switching to a running agent's session to view transcript.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Attach to session** | Enter on subagent item → switch to that agent's session via `queue_resume_session(sid)`. | CCB (session switch) | `input.rs`, `key_handling.rs` | ✅ | — |
 | **View transcript** | See agent's conversation history after attaching. | CCB (transcript view) | Session resume → full transcript render | ✅ | — |
@@ -69,11 +69,11 @@
 
 *File format, storage, loading, validation.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **File format** | TOML-based definition. Fields: id, display_name, model_override, tool_names, system_prompt, instructions_prompt, step_prompt, spawner_prompt, inherit_parent_system_prompt, include_message_history, permission_mode, max_turns, output_mode, output_schema, color, reasoning. | CCB (YAML frontmatter), pi-agent-rust (config format) | `definition.rs`: `AgentDefinition` struct | ✅ | — |
 | **Registry** | 3-tier priority: Builtin < UserGlobal < ProjectLocal. load_directory, register_builtin, iter_sorted, conflict resolution. | CCB (4 scopes), pi-agent-rust (registry) | `registry.rs`: `AgentRegistry` | ✅ | — |
-| **Storage scopes** | Agent file directories. | CCB (managed/project/user/plugin) | `~/.jcode/agents/`, `.jcode/agents/` | ✅ | Plugin scope pending (managed done). |
+| **Storage scopes** | Agent file directories. | CCB (managed/project/user/plugin) | `~/.next-code/agents/`, `.next-code/agents/` | ✅ | Plugin scope pending (managed done). |
 | **Validation** | Validate agent file on load. Error/warning reporting. | CCB (AgentValidationResult) | `AgentDefinition::validate()` | ✅ | — |
 | **Prompt system** | 5 prompt slots. Cache sharing via inherit_parent_system_prompt (prompt cache prefix trick). | CCB (AgentTool prompts), oh-my-openagent (per-model prompts) | `definition.rs`: system/instructions/step/spawner prompts | ✅ | — |
 | **Snapshot update notification** | Detect agent file changes since last session. Show notification on startup. | CCB (SnapshotUpdateDialog) | `check_agent_snapshots()` in `openers.rs`. Runs at startup, compares mtime. | ✅ | — |
@@ -84,7 +84,7 @@
 
 *Spawning, execution, completion, background.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Spawning** | Spawn subagent from parent session. Context inheritance, tool/config pass-through. | CCB (spawnInProcess), oh-my-openagent (delegate-task), codebuff (4-agent pipeline) | Agent runtime via AgentTarget + model resolution | ✅ | — |
 | **Lifecycle states** | Start → running → completed/failed/stopped. Visible in UI. | CCB (LocalAgentTask) | `running_items.rs` status icons. `SwarmMemberStatus` from server events. | ✅ | — |
@@ -99,7 +99,7 @@
 
 *Per-agent tool restrictions and permission modes.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Tool whitelist** | `tool_names`: only these tools available to agent. | CCB (tools field), codex (sandbox) | `definition.rs`: `tool_names: Vec<String>` | ✅ | — |
 | **Tool denylist** | `disallowed_tools`: block specific tools. | CCB (tool deny), oh-my-pi (tool gating) | `definition.rs`: `disallowed_tools: Vec<String>` | ✅ | — |
@@ -113,7 +113,7 @@
 
 *Visual agent identity via named colors.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Color field** | 8 named colors: red/blue/green/yellow/purple/orange/pink/cyan. Stored in agent definition. | CCB (AgentColorName, agentColorManager.ts) | `definition.rs`: `color: Option<String>` | ✅ | — |
 | **Color badge** | Colored badge displayed in agent list. | CCB (color badge in AgentsList) | `agent_color_icon()` → emoji per color: ❤💙💚💛💜🧡 | ✅ | — |
@@ -125,7 +125,7 @@
 
 *Tabbed agent management interface.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Command entry** | `/agents` opens agent management UI. | CCB (agents/index.ts) | `/agents` → `open_agents_picker()` | ✅ | — |
 | **Tab switching** | Tab/BackTab/→/← switch Running ↔ Library. | CCB (tab interface) | `inline_interactive.rs`: column switch | ✅ | — |
@@ -141,7 +141,7 @@
 
 *Creating new agent definitions.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **AI generation** | Open $EDITOR with prompt template. User describes agent. Queue to current model. | CCB (generateAgent.ts — Claude API) | `PickerAction::GenerateAgent` → `queued_messages.push()` | ⚠️ | Response in chat. Must manually save. AI auto-save handles this. |
 | **`/agents save`** | Save generated agent TOML from last model response. | CCB (auto-save after AI gen) | `save_last_assistant_as_agent()` in `openers.rs` | ✅ | — |
@@ -155,7 +155,7 @@
 
 *Standalone background task management.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Command entry** | `/tasks` lists running/completed background tasks. | CCB (tasks/index.ts, tasks.tsx) | `/tasks` → opens running items list (Ctrl+O) | ✅ | — |
 | **Attach to task** | Enter on task → view output/attach to session. | CCB (task attach) | Enter on task in running items → detail → session attach | ✅ | — |
@@ -166,7 +166,7 @@
 
 *Multi-agent coordination.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Swarm members** | Remote swarm member lifecycle. Status via ServerEvent::SwarmStatus. | CCB (swarm backends) | `remote_swarm_members: Vec<SwarmMemberStatus>` | ✅ | — |
 | **Swarm plan** | Plan synchronization. Plan proposals, coordinator mode. | CCB (coordinatorMode) | `swarm_plan_core.rs`, `ServerEvent::SwarmPlan` | ✅ | — |
@@ -177,20 +177,20 @@
 
 *Pre-shipped agent definitions.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
-| **basher** | Run terminal commands. One-shot bash executor. prefer_tier=routine, max_turns=10, permission_mode=accept-edits. | codebuff (bash agent), CCB (shell tools) | `.jcode/agents/basher.toml`. color=green. | ✅ | — |
-| **code-reviewer** | Review code changes for bugs and regressions. prefer_tier=thinking, inherit_parent_system_prompt=true, permission_mode=plan. | codebuff (reviewer agent) | `.jcode/agents/code-reviewer.toml`. color=purple. | ✅ | — |
-| **editor** | Precise code edits with hashline_edit. prefer_tier=thinking, inherit_parent_system_prompt=true, permission_mode=accept-edits. | oh-my-pi (hashline_edit), CCB (editor) | `.jcode/agents/editor.toml`. color=blue. | ✅ | — |
-| **planner** | Create step-by-step plans for complex tasks. Read-only, uses beads/tasks. Analysis-first approach. prefer_tier=thinking, reasoning=high, permission_mode=plan. | codebuff (planner agent) | `.jcode/agents/planner.toml`. color=orange. | ✅ | — |
-| **file-picker** | Find relevant files in codebase. prefer_tier=routine, permission_mode=plan, max_turns=5. | codebuff (file-picker agent) | `.jcode/agents/file-picker.toml`. color=cyan. | ✅ | — |
+| **basher** | Run terminal commands. One-shot bash executor. prefer_tier=routine, max_turns=10, permission_mode=accept-edits. | codebuff (bash agent), CCB (shell tools) | `.next-code/agents/basher.toml`. color=green. | ✅ | — |
+| **code-reviewer** | Review code changes for bugs and regressions. prefer_tier=thinking, inherit_parent_system_prompt=true, permission_mode=plan. | codebuff (reviewer agent) | `.next-code/agents/code-reviewer.toml`. color=purple. | ✅ | — |
+| **editor** | Precise code edits with hashline_edit. prefer_tier=thinking, inherit_parent_system_prompt=true, permission_mode=accept-edits. | oh-my-pi (hashline_edit), CCB (editor) | `.next-code/agents/editor.toml`. color=blue. | ✅ | — |
+| **planner** | Create step-by-step plans for complex tasks. Read-only, uses beads/tasks. Analysis-first approach. prefer_tier=thinking, reasoning=high, permission_mode=plan. | codebuff (planner agent) | `.next-code/agents/planner.toml`. color=orange. | ✅ | — |
+| **file-picker** | Find relevant files in codebase. prefer_tier=routine, permission_mode=plan, max_turns=5. | codebuff (file-picker agent) | `.next-code/agents/file-picker.toml`. color=cyan. | ✅ | — |
 ---
 
 ### 13. Model Override (Built-in Agent Types)
 
 *Hardcoded agent types for model routing.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Swarm override** | Model override for swarm subagents. | CCB (agent model config) | `AgentModelTarget::Swarm` via `model_prefs.json` | ✅ | — |
 | **Review override** | Model override for review agent. | CCB | `AgentModelTarget::Review` | ✅ | — |
@@ -202,7 +202,7 @@
 
 *Tool-level permission classification, mode management, dialog UI, and rule CRUD.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **6 permission modes** | Default/AcceptEdits/Plan/Auto/DontAsk/BypassPermissions. Mode cycling via Alt+P, Shift+Tab, `/permissions`. | CCB (PermissionMode union) | `permission.rs`: `PermissionMode` enum. `input.rs`: Alt+P, BackTab. `dcg_bridge.rs`: `cycle_mode()`, `set_mode()`. | ✅ | — |
 | **Tool execution pause** | When permission needed, dialog shows + tool execution pauses via `await_permission_response()`. User approves → tool continues. Model never sees error. | CCB (interactiveHandler flow) | `turn_execution.rs`: `validate_tool_allowed` async. `dcg_bridge.rs`: `await_permission_response()`, `signal_permission_response()`. | ✅ | — |
@@ -225,9 +225,9 @@
 
 *Lifecycle hooks for tool execution, session management, permission events, agent lifecycle, compaction, and setup.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
-| **PreToolUse** | Blocking gate: runs before every tool call. Exit 0=allow, 2=block. Timeout configurable. | CCB (preToolUse), jcode HOOKS.md | `tool/mod.rs`: dispatch via `HookEvent::PreToolUse`. | ✅ | — |
+| **PreToolUse** | Blocking gate: runs before every tool call. Exit 0=allow, 2=block. Timeout configurable. | CCB (preToolUse), next-code HOOKS.md | `tool/mod.rs`: dispatch via `HookEvent::PreToolUse`. | ✅ | — |
 | **PostToolUse** | Fire-and-forget observer after successful tool call. | CCB (postToolUse) | `tool/mod.rs`: dispatch via `HookEvent::PostToolUse`. | ✅ | — |
 | **PostToolUseFailure** | Fire-and-forget observer after tool call failure. | CCB (postToolUseFailure) | `tool/mod.rs`: dispatch via `HookEvent::PostToolUseFailure`. | ✅ | — |
 | **ToolError** | Fire-and-forget diagnostic on tool execution error. | CCB (ToolError) | `tool/mod.rs`: dispatch via `HookEvent::ToolError`. | ✅ | — |
@@ -256,22 +256,22 @@
 | **TaskCompleted** | Fire-and-forget observer on task completion. | CCB (TaskCompleted) | `tool/todo.rs`: dispatch via `HookEvent::TaskCompleted`. | ✅ | — |
 | **Setup** | Fire-and-forget observer on agent creation (initial setup). | CCB (Setup) | `agent.rs`: dispatch via `HookEvent::Setup`. | ✅ | — |
 | **Custom events** | User-defined hook events via TOML config. | CCB (Custom) | `config.rs`: `HookEvent::Custom(String)`. | ✅ | — |
-| **Legacy v1 bridge** | `turn_end`→TurnEnd, `session_start/end`→SessionStart/End, `pre_tool`→PreToolUse, `post_tool`→PostToolUse+Failure. Config via `[hooks]` TOML. | jcode HOOKS.md | `config.rs`: `legacy_v1_to_v2_handlers()`. | ✅ | — |
-| **Spawn hook** | Custom terminal spawn (`JCODE_SPAWN_HOOK`). Route headed sessions to tmux/kitty/zellij. | CCB (spawn hook) | `terminal_launch.rs`: spawn hook with `JCODE_SPAWN_*` env metadata. | ✅ | — |
-| **Focus hook** | Custom window focus (`JCODE_FOCUS_HOOK`). Bring session window to front. | CCB (focus hook) | `terminal_launch.rs`: focus hook with `JCODE_FOCUS_*` env metadata. | ✅ | — |
-| **Recursion guard** | `JCODE_HOOKS_DISABLED=1` suppresses hooks in nested jcode calls. | jcode HOOKS.md | `execute.rs`: recursion guard set in hook env. | ✅ | — |
+| **Legacy v1 bridge** | `turn_end`→TurnEnd, `session_start/end`→SessionStart/End, `pre_tool`→PreToolUse, `post_tool`→PostToolUse+Failure. Config via `[hooks]` TOML. | next-code HOOKS.md | `config.rs`: `legacy_v1_to_v2_handlers()`. | ✅ | — |
+| **Spawn hook** | Custom terminal spawn (`NEXT_CODE_SPAWN_HOOK`). Route headed sessions to tmux/kitty/zellij. | CCB (spawn hook) | `terminal_launch.rs`: spawn hook with `NEXT_CODE_SPAWN_*` env metadata. | ✅ | — |
+| **Focus hook** | Custom window focus (`NEXT_CODE_FOCUS_HOOK`). Bring session window to front. | CCB (focus hook) | `terminal_launch.rs`: focus hook with `NEXT_CODE_FOCUS_*` env metadata. | ✅ | — |
+| **Recursion guard** | `NEXT_CODE_HOOKS_DISABLED=1` suppresses hooks in nested next-code calls. | next-code HOOKS.md | `execute.rs`: recursion guard set in hook env. | ✅ | — |
 
 ## IV. Keyword System
 
 *Natural language keyword triggers that activate persistent workflow modes, inject system prompts, and manage mode lifecycle across turns.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
 | **Keyword detection** | Scan user input for predefined keyword triggers (`$ultrawork`, `$ralplan`, etc.) with exact + fuzzy matching. Levenshtein distance ≤ 2 for aliases. | CCB (keyword detection) | `detector.rs`: `detect_keywords()`, `find_fuzzy()`, `levenshtein_distance()`. Sanitizer strips ANSI, normalizes whitespace. | ✅ | — |
 | **Keyword registry** | 14 keywords + aliases, priority-sorted, deduplicated by workflow. Keywords: `$ultrawork`, `$ralplan`, `$ultragoal`, `$ultraqa`, `$deep-interview`, `$ultrathink`, `$deepsearch`, `$tdd`, `$code-review`, `$security-review`, `$analyze`, `$wiki`, `canceljcode`, `ai-slop-cleaner`. | CCB (keyword registry) | `registry.rs`: `KeywordEntry` struct, `build_registry()` with OnceLock. 14 WorkflowKind variants. | ✅ | — |
-| **Mode state persistence** | Active modes persisted to `.jcode/state/modes.toml`. Turn counting, auto-expiry after 10 turns, cancel all. | CCB (mode state) | `state.rs`: `ModeState`, `ActiveMode`, `update_modes()`, `load_state()`, `save_state()`, `clear_modes()`. | ✅ | — |
+| **Mode state persistence** | Active modes persisted to `.next-code/state/modes.toml`. Turn counting, auto-expiry after 10 turns, cancel all. | CCB (mode state) | `state.rs`: `ModeState`, `ActiveMode`, `update_modes()`, `load_state()`, `save_state()`, `clear_modes()`. | ✅ | — |
 | **Workflow execution** | Execute active workflows each turn. Get handler → build prompt → apply actions (deferred spawns for subagent). Heavy workflows suppressed for Simple tasks (< 50 chars). | CCB (workflow executor) | `workflow/executor.rs`: `process_turn()`, `execute_active_workflows()`, `apply_actions()`, `build_workflow_prompt()`. | ✅ | — |
-| **System prompt injection** | Keyword prompt injected into system prompt's dynamic part. Both TUI and agent-runtime paths run `process_turn()` independently. | CCB (system prompt injection) | `turn_memory.rs` (TUI path), `prompting.rs` (agent-runtime path): both call `jcode_keywords::process_turn()`. | ✅ | — |
+| **System prompt injection** | Keyword prompt injected into system prompt's dynamic part. Both TUI and agent-runtime paths run `process_turn()` independently. | CCB (system prompt injection) | `turn_memory.rs` (TUI path), `prompting.rs` (agent-runtime path): both call `next_code_keywords::process_turn()`. | ✅ | — |
 | **User feedback** | Status notice when keyword activates a mode. Shows "🧠 Ultrawork mode activated" in status bar. | CCB (mode feedback) | `turn_memory.rs`: post-`process_turn()` check → `self.set_status_notice()`. | ✅ | — |
 | **Task size classification** | Simple (< 50 chars) / Medium (50-200 chars) / Heavy (> 200 chars). Heavy workflows suppressed for Simple tasks. | CCB (task size) | `task_size.rs`: `classify()`, `should_suppress()`. | ✅ | — |
 | **Conflict detection** | Detect conflicting active modes (e.g., TDD + Ultrawork). Log warnings. | CCB (conflict detection) | `conflict.rs`: `check_conflicts()`, `format_warning()`. | ✅ | — |
@@ -282,13 +282,13 @@
 
 *Multi-repo goal management: set objectives, track progress, auto-continuation, and success criteria across turns.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
-| **Hierarchical goals** | Epics → Goals → Milestones → Steps → Beads. Full nesting with status per level. | CCB (flat), codex (goals+criteria), oh-my-openagent (team tasklist), jcode (beads_rust) | `jcode-beads-bridge`: `Goal`, `GoalMilestone`, `GoalStep`. `GoalCreateInput` with success_criteria. | ✅ | — |
+| **Hierarchical goals** | Epics → Goals → Milestones → Steps → Beads. Full nesting with status per level. | CCB (flat), codex (goals+criteria), oh-my-openagent (team tasklist), next-code (beads_rust) | `next-code-beads-bridge`: `Goal`, `GoalMilestone`, `GoalStep`. `GoalCreateInput` with success_criteria. | ✅ | — |
 | **`/goal` CLI command** | `/goal` — show active goals. `/goal <objective>` — set new. `/goal clear` — clear all. `/goal resume` — resume session goal. | CCB (`/goal` set/status/clear/pause/resume/continue/complete) | `commands.rs`: `handle_goal_or_mission_command()` with set/status/clear/resume. | ✅ | — |
 | **Auto-continuation** | After each turn, if goal is active and not complete, auto-queue continuation message. `goal_continuation_disabled` flag. | CCB (auto-continuation) | `local.rs`: `finish_turn()` checks active goals → queues "Continue working toward goal". `app.goal_continuation_disabled`. | ✅ | — |
 | **Success criteria** | Per-goal success criteria list. Checked for completion status. | codex (UlwLoopItem.successCriteria with pass/fail status per criterion) | `GoalCreateInput.success_criteria: Vec<String>`. Passed through beads_rust. | ✅ | — |
-| **Side panel display** | Goals overview in side panel. Detail page per goal. Attach to session. | jcode (beads_rust side panel) | `open_goals_overview_for_session()`, `open_goal_for_session()`, `write_goal_page()`. | ✅ | — |
+| **Side panel display** | Goals overview in side panel. Detail page per goal. Attach to session. | next-code (beads_rust side panel) | `open_goals_overview_for_session()`, `open_goal_for_session()`, `write_goal_page()`. | ✅ | — |
 | **Dependencies** | Goal-blocking relationships via `blockers` + `beads_dep`. | oh-my-openagent (team tasklist dependencies) | `Goal.blockers: Vec<String>`, `beads_dep` tool for dependency graph. | ✅ | — |
 | **Progress tracking** | Progress percentage per goal. Updated via `update_goal()`. | CCB (token budget, turns) | `Goal.progress_percent: Option<u8>`. Updated through beads lifecycle. | ✅ | — |
 | **Goal lifecycle** | Status: active / done / cancelled / blocked. Create → update → complete. | CCB (set/clear/pause/resume/complete) | `GoalStatus` enum with full lifecycle. `create_goal()`, `update_goal()`, `load_goal()`. | ✅ | — |
@@ -297,16 +297,16 @@
 
 *Session persistence, resume, cross-agent conversion, export, and compact.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
-| **JSONL snapshot + journal** | Session stored as JSON snapshot + append-only journal. Incremental save, atomic writes, backup files. | pi-agent-rust (SQLite), jcode (JSONL) | `persistence.rs`: `load_from_path()`, snapshot + journal merge. `load()`, `save()` with backup rotation. | ✅ | — |
-| **Session resume** | `jcode --resume <id>` to resume any session. Session picker with preview. | CCB (`claude --resume`), pi-agent-rust (`pi --session`) | `session_picker.rs`: full resume UI with preview. `workspace_client::queue_resume_session()`. | ✅ | — |
-| **Cross-agent session resume** | Convert sessions between 12 providers (jcode, CC, aider, opencode, codex, cursor, cline, pi, gemini, vibe, openclaw, chatgpt). `casr convert` pipeline. | CASR (cross_agent_session_resumer) | CASR v0.1.4 with 12 providers. `ConversionPipeline::convert()` with detection→read→validate→write→verify. Atomic write with backup. | ✅ | — |
-| **Session graph / memory topology** | Build graph topology from memory entries. Compute graph node scores for relevance ranking. | jcode (info_widget_graph) | `info_widget_graph.rs`: `build_graph_topology()`, `graph_node_score()`, `GraphEdge`, `GraphNode`. | ✅ | — |
+| **JSONL snapshot + journal** | Session stored as JSON snapshot + append-only journal. Incremental save, atomic writes, backup files. | pi-agent-rust (SQLite), next-code (JSONL) | `persistence.rs`: `load_from_path()`, snapshot + journal merge. `load()`, `save()` with backup rotation. | ✅ | — |
+| **Session resume** | `next-code --resume <id>` to resume any session. Session picker with preview. | CCB (`claude --resume`), pi-agent-rust (`pi --session`) | `session_picker.rs`: full resume UI with preview. `workspace_client::queue_resume_session()`. | ✅ | — |
+| **Cross-agent session resume** | Convert sessions between 12 providers (next-code, CC, aider, opencode, codex, cursor, cline, pi, gemini, vibe, openclaw, chatgpt). `casr convert` pipeline. | CASR (cross_agent_session_resumer) | CASR v0.1.4 with 12 providers. `ConversionPipeline::convert()` with detection→read→validate→write→verify. Atomic write with backup. | ✅ | — |
+| **Session graph / memory topology** | Build graph topology from memory entries. Compute graph node scores for relevance ranking. | next-code (info_widget_graph) | `info_widget_graph.rs`: `build_graph_topology()`, `graph_node_score()`, `GraphEdge`, `GraphNode`. | ✅ | — |
 | **`/session` command** | View/manage current session. session info, history, resume. | CCB (`/session`) | `/session` command with session details. | ✅ | — |
 | **`/compact` command** | Compact session to reduce context window pressure. Micro-compact options. | CCB (`/compact`) | `/compact` command with mode selection. PreCompact/PostCompact hooks. | ✅ | — |
 | **`/export` command** | Export current conversation to `.txt` file. Format: Markdown with role headers. | CCB (`/export <filename>`) | `commands.rs`: `handle_export_command()` → writes to filename, shows message count + KB. | ✅ | — |
-| **`/transfer` command** | Transfer session to another jcode instance (remote). | CCB (session transfer) | `/transfer` command. | ✅ | — |
+| **`/transfer` command** | Transfer session to another next-code instance (remote). | CCB (session transfer) | `/transfer` command. | ✅ | — |
 | **Teammate view** | View subagent's stream inline without switching sessions. Panel with live status + output_tail + session load. | CCB (teammateView) | `viewing_teammate_session_id` field. Teammate view panel + output_tail + session file loading via snapshot. | ✅ | — |
 | **Session allow-list** | Per-session approved-tool cache for permission mode. `approve_session_action()`, `session_allows_action()`. | CCB (session permissions) | `dcg_bridge.rs`: `SESSION_ALLOWED_ACTIONS`. `approve_session_action()`, `clear_session_allowed_action()`. | ✅ | — |
 | **Session idle / error** | Session idle timeout handling. Session error reporting. | CCB (SessionIdle, SessionError) | `client_lifecycle.rs`: SessionIdle + SessionError hook dispatches. | ✅ | — |
@@ -343,9 +343,9 @@
 
 ### Missing / Partial Features
 
-| Priority | Feature | Section | Effort | Reference | jcode Impl |
+| Priority | Feature | Section | Effort | Reference | Next Code Impl |
 |----------|---------|---------|--------|-----------|------------|
-| — | Agent scopes (managed) | I-4 | Low | CCB: 4 scopes | ✅ `SourceKind::Managed` added. Managed dir: `~/.jcode/managed-agents/` |
+| — | Agent scopes (managed) | I-4 | Low | CCB: 4 scopes | ✅ `SourceKind::Managed` added. Managed dir: `~/.next-code/managed-agents/` |
 | — | Agent teams interactive | I-11 | Low | CCB: teammate view | ⚠️ `/agents` Running tab + running items list provide navigation. TeamViewInteraction struct added. |
 | — | Deferred spawns | IV | Low | CCB: subagent spawn | ⚠️ DeferredSpawn queued, keyword prompt injected. Model spawns via subagent tool. |
 | — | Sandbox integration | II | High | CCB: sandbox | ❌ Skipped per request |
@@ -355,30 +355,30 @@
 *Edit quality benchmarks, eval framework, and performance measurement scripts.*
 
 > **⚠️ PRELIMINARY:** This section was added during a brief codebase scan. Features listed here
-> are **not fully verified**. Some may require external dependencies (API keys, jcode binary in
+> are **not fully verified**. Some may require external dependencies (API keys, next-code binary in
 > PATH, ONNX models, rustfmt, etc.) to actually run end-to-end. Treat status indicators as
 > tentative until each feature is independently validated.
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|-----------|
-| **Edit benchmark** | Mutation-based edit benchmark harness. Generates tasks via tree-sitter AST mutations (25 mutation types), runs agents in parallel (best-of-N), verifies with rustfmt normalization. | oh-my-pi (typescript-edit-benchmark) | `evals/jcode-edit-bench/`: `generate.rs`, `runner.rs`, `verify.rs`, `mutation.rs`, `difficulty.rs`, `report.rs`, `formatter.rs`, `fixtures.rs` | ✅ | — |
+| **Edit benchmark** | Mutation-based edit benchmark harness. Generates tasks via tree-sitter AST mutations (25 mutation types), runs agents in parallel (best-of-N), verifies with rustfmt normalization. | oh-my-pi (typescript-edit-benchmark) | `evals/next-code-edit-bench/`: `generate.rs`, `runner.rs`, `verify.rs`, `mutation.rs`, `difficulty.rs`, `report.rs`, `formatter.rs`, `fixtures.rs` | ✅ | — |
 | **Difficulty scoring** | Scores each mutation (0-20) based on file length, code density, nesting depth, repeated lines, function count. | oh-my-pi (scoreDifficulty) | `difficulty.rs`: `score_difficulty()`, `analyze_file()`, `file_matches_difficulty()`, `min_score_for_difficulty()` | ✅ | — |
-| **Edit benchmark CLI** | 4 subcommands: `generate` (create fixtures), `run` (execute benchmark), `list` (list tasks), `check` (validate fixtures). | oh-my-pi (CLI) | `bin/jcode-edit-bench.rs`: CLI with `GenerateConfig`, `BenchmarkConfig`. | ✅ | — |
-| **Parallel agent runner** | Semaphore-limited concurrent agent subprocesses via `jcode agent run`. Timeout + retry per attempt. | oh-my-pi (runner.ts) | `runner.rs`: `run_benchmark()`, `run_single_attempt()` with tokio semaphore (max 8 concurrent). | ✅ | — |
+| **Edit benchmark CLI** | 4 subcommands: `generate` (create fixtures), `run` (execute benchmark), `list` (list tasks), `check` (validate fixtures). | oh-my-pi (CLI) | `bin/next-code-edit-bench.rs`: CLI with `GenerateConfig`, `BenchmarkConfig`. | ✅ | — |
+| **Parallel agent runner** | Semaphore-limited concurrent agent subprocesses via `next-code agent run`. Timeout + retry per attempt. | oh-my-pi (runner.ts) | `runner.rs`: `run_benchmark()`, `run_single_attempt()` with tokio semaphore (max 8 concurrent). | ✅ | — |
 | **Report generation** | JSON + Markdown report output. Task-level summarization, best-of-N selection, pass rates, token/tool-call stats. | oh-my-pi (report.ts) | `report.rs`: `generate_json_report()`, `generate_markdown_report()`, `pick_best_run_index()`, `summarize_task()`. | ✅ | — |
 | **Fixture management** | Load tasks from fixture directories (input/expected/prompt/metadata). Validate fixture integrity. | oh-my-pi (fixtures) | `fixtures.rs`: `load_tasks_from_dir()`, `validate_fixtures()`, `list_files()`, `save_task()`. | ✅ | — |
 | **JBench eval framework** | Git-commit-reconstruction eval framework. Reconstruct commits from parent, compare agent diff vs ground truth. | codebuff (BuffBench) | `evals/jbench/`: `types.rs`, `agent_runner.rs`, `judge.rs`, `lessons.rs`. CLI via `bin/jbench.rs`. | ⚠️ | Library crate says `unimplemented!()` stubs. Real API calls (reqwest) exist in judge/lessons. Needs end-to-end validation. |
-| **Agent runner** | Spawn jcode agent in prepared repo clone, capture diff + trace. Resolves agent from AgentRegistry. | codebuff (agent-runner.ts) | `agent_runner.rs`: `run_agent_in_repo()`, `extract_diff_from_repo()`. | ⚠️ | Code spawns `jcode` subprocess. Needs jcode binary in PATH + registered agent. Not tested. |
+| **Agent runner** | Spawn next-code agent in prepared repo clone, capture diff + trace. Resolves agent from AgentRegistry. | codebuff (agent-runner.ts) | `agent_runner.rs`: `run_agent_in_repo()`, `extract_diff_from_repo()`. | ⚠️ | Code spawns `next-code` subprocess. Needs next-code binary in PATH + registered agent. Not tested. |
 | **Three-judge pipeline** | Grade agent diffs with 3 frontier models in parallel (gpt-5, gemini-pro, claude-sonnet). Median overall_score. | codebuff (judge.ts) | `judge.rs`: `JudgeProviderKind` (OpenAI, Anthropic), `judge_commit_result()`, `median_score()`. | ⚠️ | Code exists with real reqwest calls. Requires API keys (`JBENCH_API_KEY`). Not tested end-to-end. |
 | **Lessons extractor** | Compare agent diff vs ground truth → distilled lessons for system prompt improvement. | codebuff (lessons-extractor.ts) | `lessons.rs`: `Lesson` struct, `RunLessonsConfig`, `extract_lessons()`. | ⚠️ | Code exists with API calls. Requires API keys. Not tested. |
-| **TUI rendering benchmark** | Measure TUI frame rendering performance with synthetic session data. | jcode | `src/bin/tui_bench.rs`: ratatui TestBackend, configurable message count. | ✅ | — |
-| **Memory recall benchmark** | Offline memory retrieval accuracy harness. Uses real MemoryGraph, all-MiniLM-L6-v2 ONNX embedding. | jcode | `src/bin/memory_recall_bench.rs`: `score_and_filter` with cosine + gap filter. Data outside repo. | ⚠️ | Binary exists. Requires ONNX model + external data. Needs end-to-end test. |
-| **Startup time benchmark** | Measure cold client startup time in isolated JCODE_HOME/JCODE_RUNTIME_DIR. | jcode | `scripts/bench_startup.py`: PTY-based startup profiling with regression check. | ✅ | — |
-| **Tool call benchmark** | Measure execution time for each tool with representative inputs. | jcode | `scripts/benchmark_tools.sh`: CSV results, configurable iterations. | ✅ | — |
-| **Swarm benchmark** | Compare single agent vs swarm on Anthropic Performance Take-Home (VLIW SIMD kernel). | jcode | `scripts/benchmark_swarm.py`, `scripts/benchmark_takehome.py`: timed trials, configurable timeout. | ✅ | — |
-| **Compile benchmark** | Measure cargo check/build/release compilation times. | jcode | `scripts/bench_compile.sh`: targets for check, build, release-jcode. | ✅ | — |
-| **Self-dev checkpoint bench** | Benchmark self-development checkpoint operations. | jcode | `scripts/bench_selfdev_checkpoints.sh`: timing for dev loop steps. | ✅ | — |
-| **Terminal bench campaign** | Run terminal-based benchmark campaigns with harbor deployment. | jcode | `scripts/run_terminal_bench_campaign.py`, `scripts/run_terminal_bench_harbor.sh`: parallel campaign orchestration. | ✅ | — |
+| **TUI rendering benchmark** | Measure TUI frame rendering performance with synthetic session data. | next-code | `src/bin/tui_bench.rs`: ratatui TestBackend, configurable message count. | ✅ | — |
+| **Memory recall benchmark** | Offline memory retrieval accuracy harness. Uses real MemoryGraph, all-MiniLM-L6-v2 ONNX embedding. | next-code | `src/bin/memory_recall_bench.rs`: `score_and_filter` with cosine + gap filter. Data outside repo. | ⚠️ | Binary exists. Requires ONNX model + external data. Needs end-to-end test. |
+| **Startup time benchmark** | Measure cold client startup time in isolated NEXT_CODE_HOME/NEXT_CODE_RUNTIME_DIR. | next-code | `scripts/bench_startup.py`: PTY-based startup profiling with regression check. | ✅ | — |
+| **Tool call benchmark** | Measure execution time for each tool with representative inputs. | next-code | `scripts/benchmark_tools.sh`: CSV results, configurable iterations. | ✅ | — |
+| **Swarm benchmark** | Compare single agent vs swarm on Anthropic Performance Take-Home (VLIW SIMD kernel). | next-code | `scripts/benchmark_swarm.py`, `scripts/benchmark_takehome.py`: timed trials, configurable timeout. | ✅ | — |
+| **Compile benchmark** | Measure cargo check/build/release compilation times. | next-code | `scripts/bench_compile.sh`: targets for check, build, release-next-code. | ✅ | — |
+| **Self-dev checkpoint bench** | Benchmark self-development checkpoint operations. | next-code | `scripts/bench_selfdev_checkpoints.sh`: timing for dev loop steps. | ✅ | — |
+| **Terminal bench campaign** | Run terminal-based benchmark campaigns with harbor deployment. | next-code | `scripts/run_terminal_bench_campaign.py`, `scripts/run_terminal_bench_harbor.sh`: parallel campaign orchestration. | ✅ | — |
 
 ---
 
@@ -393,7 +393,7 @@
 
 ### 1. File Operations
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **read** | Read file contents from workspace. Supports line ranges, syntax highlighting. | CCB (read), codebuff (read) | `tool/read.rs`: `ReadTool` | ✅ |
 | **write** | Write content to a new or existing file. | CCB (write), codex (write) | `tool/write.rs`: `WriteTool` | ✅ |
@@ -408,7 +408,7 @@
 
 ### 2. Search & Code Understanding
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **codesearch** | Semantic code search across workspace. | oh-my-openagent (ripgrep-cli) | `tool/codesearch.rs`: `CodeSearchTool` | ✅ |
 | **agentgrep** | *(removed)* Replaced by FFS (`ffs_grep` / `ffs_glob` / …). | — | deleted | 🗑️ |
@@ -427,7 +427,7 @@
 
 ### 3. Shell & Execution
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **bash** | Execute shell commands with interactive terminal support. | CCB (bash), codex (shell) | `tool/bash.rs`: `BashTool` | ✅ |
 | **bg** | Manage background tasks: list, wait, inspect output. | CCB (background tasks) | `tool/bg.rs`: `BgTool` | ✅ |
@@ -436,7 +436,7 @@
 
 ### 4. Web & Communication
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **websearch** | Search the web via configured search engine. | CCB (Web Search) | `tool/websearch.rs`: `WebSearchTool` | ✅ |
 | **webfetch** | Fetch content from URLs with proper headers and parsing. | CCB (webfetch) | `tool/webfetch.rs`: `WebFetchTool` | ✅ |
@@ -444,7 +444,7 @@
 
 ### 5. Agent Coordination
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **swarm** | Multi-agent swarm coordination via shared plan + status. | CCB (SwarmPlan), codebuff (4-agent) | `tool/swarm.rs` | ✅ |
 | **team_create** | Create a new team with members and roles. | oh-my-openagent (Atlas) | `tool/team.rs`: `TeamCreateTool` | ✅ |
@@ -458,33 +458,33 @@
 
 ### 6. Issue Tracking (Beads)
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
-| **beads_list** | List issues with filtering and status display. | jcode (beads-rs) | `tool/beads.rs`: `BeadsListTool` | ✅ |
-| **beads_create** | Create a new issue with title, body, and metadata. | jcode (beads-rs) | `tool/beads.rs`: `BeadsCreateTool` | ✅ |
-| **beads_ready** | Mark issue as ready for work. | jcode (beads-rs) | `tool/beads.rs`: `BeadsReadyTool` | ✅ |
-| **beads_claim** | Claim an issue for the current agent. | jcode (beads-rs) | `tool/beads.rs`: `BeadsClaimTool` | ✅ |
-| **beads_close** | Close an issue with resolution status. | jcode (beads-rs) | `tool/beads.rs`: `BeadsCloseTool` | ✅ |
-| **beads_dep** | Manage issue dependencies (blocked-by, blocks). | jcode (beads-rs) | `tool/beads.rs`: `BeadsDepTool` | ✅ |
+| **beads_list** | List issues with filtering and status display. | next-code (beads-rs) | `tool/beads.rs`: `BeadsListTool` | ✅ |
+| **beads_create** | Create a new issue with title, body, and metadata. | next-code (beads-rs) | `tool/beads.rs`: `BeadsCreateTool` | ✅ |
+| **beads_ready** | Mark issue as ready for work. | next-code (beads-rs) | `tool/beads.rs`: `BeadsReadyTool` | ✅ |
+| **beads_claim** | Claim an issue for the current agent. | next-code (beads-rs) | `tool/beads.rs`: `BeadsClaimTool` | ✅ |
+| **beads_close** | Close an issue with resolution status. | next-code (beads-rs) | `tool/beads.rs`: `BeadsCloseTool` | ✅ |
+| **beads_dep** | Manage issue dependencies (blocked-by, blocks). | next-code (beads-rs) | `tool/beads.rs`: `BeadsDepTool` | ✅ |
 
 ### 7. Memory & Knowledge
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **memory** | Store, recall, and search across-session memories. | CCB (claude.md), pi-agent-rust | `tool/memory.rs`: `MemoryTool` | ✅ |
 | **session_search** | RAG search across all past session transcripts. | CCB (session search) | `tool/session_search.rs`: `SessionSearchTool` | ✅ |
-| **notepad_read_priority** | Read priority (auto-injected) notes. | jcode (notepad) | `tool/notepad.rs` | ✅ |
-| **notepad_write_priority** | Write priority notes (requires confirmation). | jcode (notepad) | `tool/notepad.rs` | ✅ |
-| **notepad_read_working** | Read working (scratchpad) notes. | jcode (notepad) | `tool/notepad.rs` | ✅ |
-| **notepad_write_working** | Write working notes. | jcode (notepad) | `tool/notepad.rs` | ✅ |
-| **notepad_read_manual** | Read user-authored notes. | jcode (notepad) | `tool/notepad.rs` | ✅ |
-| **notepad_write_manual** | Write manual notes. | jcode (notepad) | `tool/notepad.rs` | ✅ |
-| **notepad_stats** | Show per-tier notepad sizes. | jcode (notepad) | `tool/notepad.rs` | ✅ |
-| **notepad_prune** | Clear working notes only. | jcode (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_read_priority** | Read priority (auto-injected) notes. | next-code (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_write_priority** | Write priority notes (requires confirmation). | next-code (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_read_working** | Read working (scratchpad) notes. | next-code (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_write_working** | Write working notes. | next-code (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_read_manual** | Read user-authored notes. | next-code (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_write_manual** | Write manual notes. | next-code (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_stats** | Show per-tier notepad sizes. | next-code (notepad) | `tool/notepad.rs` | ✅ |
+| **notepad_prune** | Clear working notes only. | next-code (notepad) | `tool/notepad.rs` | ✅ |
 
 ### 8. Goal & Initiative
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **initiative** | Set, track, and complete goals with milestones. | CCB (goal/goals) | `tool/goal.rs`: `InitiativeTool` | ✅ |
 | **todo** | Task management for the current session (todo add/list/done). | CCB (todo) | `tool/todo.rs`: `TodoTool` | ✅ |
@@ -493,7 +493,7 @@
 
 ### 9. Utility
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **ls** | List directory contents with file metadata. | CCB (ls) | `tool/ls.rs`: `LsTool` | ✅ |
 | **open** | Open a file or URL in the default system handler. | CCB (open) | `tool/open.rs`: `OpenTool` | ✅ |
@@ -505,59 +505,59 @@
 
 *(Included for completeness — these are not agent tools but project scaffold templates.)*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **Template: basic** | Minimal `main.rs` + `Cargo.toml` Rust project. | — | Embedded template | ✅ |
-| **Template: agent** | Agent project with jcode agent-runtime dependency. | — | Embedded template | ✅ |
+| **Template: agent** | Agent project with next-code agent-runtime dependency. | — | Embedded template | ✅ |
 | **Template: tool** | Custom tool scaffold with Tool trait impl. | — | Embedded template | ✅ |
 | **Template: provider** | Custom provider scaffold with Provider trait impl. | — | Embedded template | ✅ |
-| **Template: desktop-app** | Desktop app scaffold with jcode-desktop. | — | Embedded template | ✅ |
+| **Template: desktop-app** | Desktop app scaffold with next-code-desktop. | — | Embedded template | ✅ |
 | **Template: plugin** | Plugin scaffold with manifest, capabilities, security config. | — | Embedded template | ✅ |
 ## IX. Provider System
 
 *Multi-provider abstraction layer refactored to opencode-style 4-axis route + Catalog/Integration/Credential architecture (Phase 1–8, 86 beads).*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status | Remaining |
+| Name | Description | Source Repo(s) | Next Code Impl | Status | Remaining |
 |------|-------------|----------------|------------|--------|----------|
-| **Provider abstraction** | `Provider` trait + new 4-axis route (`Route = Protocol × Endpoint × Auth × Framing`). Adding a provider = 3 lines (metadata + registry + facade). 21+ providers planned. | opencode (`packages/llm/src/route/client.ts:36-53`), oh-my-pi (40+ providers), pi-agent-rust (`src/provider.rs:28-48`) | `provider-core/src/lib.rs` (old, 1.5K LOC) — to be replaced by `jcode-llm-core/{route,protocol,auth,endpoint,framing,transport}.rs` (new 4-axis) | 🔜 | Phase 1 skeleton created. Auth trait, Route/Framing, schema types pending in ultracode workflow |
-| **Auth modes (4-axis)** | `Auth` trait with 7 combinators: Bearer, Header, Remove, Custom, Optional, Config, OrElse. Chainable: `Auth.optional(key).orElse(Auth.config(env)).pipe(Auth.header("x-api-key"))`. | opencode (`packages/llm/src/route/auth.ts:25-38`) | `auth_mode.rs` (old) → `jcode-llm-core/src/auth.rs` (new Auth trait) | 🔜 | New Auth trait pending in workflow (agent a7f..4a4) |
-| **Route composition** | 4-axis: Protocol (wire format) + Endpoint (baseURL+path) + Auth + Framing/Transport (SSE/AWS-EventStream/WS). Provider = 1 Route.make(...) call. | opencode (`packages/llm/src/route/client.ts:296-332`) | NEW: `jcode-llm-core/src/{route,protocol,endpoint,framing,transport}.rs` | 🔜 | New Route/Framing pending in workflow |
-| **Canonical schema** | `LlmRequest`, `LlmEvent` (15 variants), `Usage` (inclusive + non-overlapping breakdown), `LlmError` (9 tagged reasons with HttpContext). All Schema-plugged. | opencode (`packages/llm/src/schema/{messages,events,errors}.ts`) | NEW: `jcode-llm-core/src/schema.rs` | 🔜 | New schema types pending in workflow (agent a7f..a4a) |
+| **Provider abstraction** | `Provider` trait + new 4-axis route (`Route = Protocol × Endpoint × Auth × Framing`). Adding a provider = 3 lines (metadata + registry + facade). 21+ providers planned. | opencode (`packages/llm/src/route/client.ts:36-53`), oh-my-pi (40+ providers), pi-agent-rust (`src/provider.rs:28-48`) | `provider-core/src/lib.rs` (old, 1.5K LOC) — to be replaced by `next-code-llm-core/{route,protocol,auth,endpoint,framing,transport}.rs` (new 4-axis) | 🔜 | Phase 1 skeleton created. Auth trait, Route/Framing, schema types pending in ultracode workflow |
+| **Auth modes (4-axis)** | `Auth` trait with 7 combinators: Bearer, Header, Remove, Custom, Optional, Config, OrElse. Chainable: `Auth.optional(key).orElse(Auth.config(env)).pipe(Auth.header("x-api-key"))`. | opencode (`packages/llm/src/route/auth.ts:25-38`) | `auth_mode.rs` (old) → `next-code-llm-core/src/auth.rs` (new Auth trait) | 🔜 | New Auth trait pending in workflow (agent a7f..4a4) |
+| **Route composition** | 4-axis: Protocol (wire format) + Endpoint (baseURL+path) + Auth + Framing/Transport (SSE/AWS-EventStream/WS). Provider = 1 Route.make(...) call. | opencode (`packages/llm/src/route/client.ts:296-332`) | NEW: `next-code-llm-core/src/{route,protocol,endpoint,framing,transport}.rs` | 🔜 | New Route/Framing pending in workflow |
+| **Canonical schema** | `LlmRequest`, `LlmEvent` (15 variants), `Usage` (inclusive + non-overlapping breakdown), `LlmError` (9 tagged reasons with HttpContext). All Schema-plugged. | opencode (`packages/llm/src/schema/{messages,events,errors}.ts`) | NEW: `next-code-llm-core/src/schema.rs` | 🔜 | New schema types pending in workflow (agent a7f..a4a) |
 | **Provider failover** | Reactive failover: detect RateLimit/503/529 → walk configurable `FailoverChain` → switch model + inject explanation prompt. | oh-my-openagent (`model-error-classifier.ts:9-35`), oh-my-pi (`rate-limit-utils.ts:30-93`) | `failover.rs`: `FailoverDecision`, `ErrorCode` (existing); bead 7.3 new reactive walker pending | ⚠️ | Existing failover.rs classifies error only. New reactive walker in Phase 7 (bead pjm.3) |
 | **Model selection** | Resolve `ModelRef` from user config → Catalog lookup → credential resolution → route construction. Per-agent model override. Single global default. | opencode (`packages/core/src/session/runner/model.ts:141-166`) | `selection.rs` (old 8 ActiveProvider) → Phase 6 Catalog + Integration service (new) | 🔜 | New Catalog/Integration in Phase 6 (bead gqw.1-6.3) |
-| **Model catalog** | Auto-bootstrap from `models.dev` JSON. 5-min disk cache, 7-day fingerprint, Flock file lock. 21+ providers with model list + cost + capabilities. | opencode (`packages/core/src/models-dev.ts`), oh-my-openagent (`models.dev`) | `catalog_refresh.rs` (old) → `jcode-models-dev` crate (new) | 🔜 | New models-dev crate in Phase 6 (bead gqw.3) |
+| **Model catalog** | Auto-bootstrap from `models.dev` JSON. 5-min disk cache, 7-day fingerprint, Flock file lock. 21+ providers with model list + cost + capabilities. | opencode (`packages/core/src/models-dev.ts`), oh-my-openagent (`models.dev`) | `catalog_refresh.rs` (old) → `next-code-models-dev` crate (new) | 🔜 | New models-dev crate in Phase 6 (bead gqw.3) |
 | **Pricing** | Token-based pricing calculator with per-model rates, cache read pricing, cost estimation. — Unchanged from existing. | pi-agent-rust (cost tracking) | `pricing.rs` (unchanged) | ✅ | — |
 | **Request fingerprinting** | Stable hash of provider inputs for dedup, logging, caching, and auditing. — Unchanged from existing. | — | `fingerprint.rs` (unchanged) | ✅ | — |
-| **OpenAI schema** | OpenAI Responses protocol (jcode-llm-protocols). HTTP + WebSocket transport. Provider-executed tools (web_search, etc.) with `provider_executed: true`. | opencode (`packages/llm/src/protocols/openai-responses.ts:33-160`) | NEW: `jcode-llm-protocols/src/openai_responses.rs` + `openai_chat.rs` | 🔜 | Protocol pending in workflow (agent a...2c9) |
-| **Anthropic schema** | Anthropic Messages protocol (jcode-llm-protocols). 4-breakpoint cache cap, OAuth beta headers, extended thinking, server tools. | opencode (`packages/llm/src/protocols/anthropic-messages.ts:822-844`) | NEW: `jcode-llm-protocols/src/anthropic_messages.rs` | 🔜 | Protocol pending in workflow (agent a...db9) |
-| **Inband dialect layer** | 13 dialects for non-JSON tool-call providers: anthropic, deepseek, gemini, gemma, glm, harmony, hermes, kimi, minimax, pi, qwen3, xml (fallback), jcode. Each has InbandScanner that parses proprietary XML/DSML tags from streaming text. | oh-my-pi (`packages/ai/src/dialect/factory.ts:15-28`) | NEW: `jcode-llm-dialects/src/dialects/` (13 dialect implementations) | 🔜 | Phase 5 (bead dpd.1-5.8). Foundation pending. |
-| **VCR test infrastructure** | Recorded-replay HTTP test infra. Cassette JSON format. 3 modes: Record (live API → save), Replay (no network), Disabled. 50+ cassettes for 21 providers. | pi-agent-rust (`src/vcr.rs`), opencode (`packages/llm/test/fixtures/recordings/`) | NEW: `jcode-llm-vcr/src/lib.rs`: `VcrRecorder`, `Cassette`, `VcrMode` | 🔜 | VCR pending in workflow (agent a...b9) |
-| **Provider: Anthropic** | Claude Opus 4.8, Sonnet 4.6, Haiku 4.5 via Anthropic API. — Will be migrated to AnthropicMessagesProtocol Phase 2. | opencode (`packages/llm/src/providers/anthropic.ts`) | `jcode-provider-anthropic/` (820 lines, old) → Phase 2 migrate | ✅ | Migrate to new architecture Phase 2 (bead 6it.1-6it.2) |
-| **Provider: OpenAI** | GPT 5.5→5.1 via OpenAI Responses API. — Will be migrated to OpenAiResponsesProtocol Phase 2. | opencode (`packages/llm/src/providers/openai.ts`) | `jcode-provider-openai/` (request+stream+websocket_health) → Phase 2 migrate | ✅ | Migrate to new architecture Phase 2 (bead 6it.3-6it.5) |
-| **Provider: Gemini** | Google Gemini models. Streaming currently ⚠️ (PARITY.md L534). Plan: implement GeminiProtocol Phase 3 + fix streaming. | opencode (`packages/llm/src/protocols/gemini.ts`) | `jcode-provider-gemini/` (748 lines) | ⚠️ | Phase 3 migrate + fix streaming (bead tfn.3-tfn.4) |
-| **Provider: Bedrock** | AWS Bedrock Converse stream. SigV4 auth. — Will be migrated to BedrockConverseProtocol Phase 3. | opencode (`packages/llm/src/protocols/bedrock-converse.ts`), pi-agent-rust (`src/providers/bedrock.rs`) | `jcode-provider-bedrock/` (1757 lines) | ✅ | Phase 3 migrate (bead tfn.1-tfn.2) |
-| **Provider: Copilot** | GitHub Copilot. Streaming currently ⚠️ (PARITY.md L536). Plan: implement via OpenAiChatProtocol + device flow Phase 3. | pi-agent-rust (`src/providers/copilot.rs:565 lines`), oh-my-pi (`github-copilot-headers.ts`) | `jcode-provider-copilot/` (236 lines) | ⚠️ | Phase 3 migrate + fix streaming (bead tfn.5) |
-| **Provider: OpenRouter** | OpenRouter unified API. Will be migrated to OpenAiChatProtocol with custom routing headers Phase 3. | oh-my-pi (`docs/adding-a-provider.md:25-46`) | `jcode-provider-openrouter/` (932 lines, 79 pub items) | ✅ | Phase 3 migrate (bead tfn.6) |
-| **Provider: Azure** | Azure OpenAI Responses. Uses `Auth.remove("Authorization").orElse(Auth.header("api-key", key))`. | codex (`codex-rs/codex-api/src/provider.rs:106-127`) | NEW: `jcode-provider-azure/` (Phase 4) | 🔜 | Bead 9ot.1 |
-| **Provider: Vertex** | Google Vertex AI (Claude + Gemini models). Application Default Credentials. | opencode (`packages/llm/src/providers/google.ts`), pi-agent-rust (`src/providers/vertex.rs`) | NEW: `jcode-provider-vertex/` (Phase 4) | 🔜 | Bead 9ot.2 |
-| **Provider: Groq + Mistral** | OpenAI-compatible gateways. 50 LOC each via OpenAiChatProtocol reuse. | opencode (`packages/llm/src/providers/openai-compatible-profile.ts:6-16`) | NEW: `jcode-provider-groq/` + `jcode-provider-mistral/` (Phase 4) | 🔜 | Bead 9ot.3-9ot.4 |
-| **Provider: Cohere** | Cohere v2 chat (tool.parameter_definitions format). | pi-agent-rust (`src/providers/cohere.rs:1962 lines`) | NEW: `jcode-provider-cohere/` (Phase 4) | 🔜 | Bead 9ot.5 |
+| **OpenAI schema** | OpenAI Responses protocol (next-code-llm-protocols). HTTP + WebSocket transport. Provider-executed tools (web_search, etc.) with `provider_executed: true`. | opencode (`packages/llm/src/protocols/openai-responses.ts:33-160`) | NEW: `next-code-llm-protocols/src/openai_responses.rs` + `openai_chat.rs` | 🔜 | Protocol pending in workflow (agent a...2c9) |
+| **Anthropic schema** | Anthropic Messages protocol (next-code-llm-protocols). 4-breakpoint cache cap, OAuth beta headers, extended thinking, server tools. | opencode (`packages/llm/src/protocols/anthropic-messages.ts:822-844`) | NEW: `next-code-llm-protocols/src/anthropic_messages.rs` | 🔜 | Protocol pending in workflow (agent a...db9) |
+| **Inband dialect layer** | 13 dialects for non-JSON tool-call providers: anthropic, deepseek, gemini, gemma, glm, harmony, hermes, kimi, minimax, pi, qwen3, xml (fallback), next-code. Each has InbandScanner that parses proprietary XML/DSML tags from streaming text. | oh-my-pi (`packages/ai/src/dialect/factory.ts:15-28`) | NEW: `next-code-llm-dialects/src/dialects/` (13 dialect implementations) | 🔜 | Phase 5 (bead dpd.1-5.8). Foundation pending. |
+| **VCR test infrastructure** | Recorded-replay HTTP test infra. Cassette JSON format. 3 modes: Record (live API → save), Replay (no network), Disabled. 50+ cassettes for 21 providers. | pi-agent-rust (`src/vcr.rs`), opencode (`packages/llm/test/fixtures/recordings/`) | NEW: `next-code-llm-vcr/src/lib.rs`: `VcrRecorder`, `Cassette`, `VcrMode` | 🔜 | VCR pending in workflow (agent a...b9) |
+| **Provider: Anthropic** | Claude Opus 4.8, Sonnet 4.6, Haiku 4.5 via Anthropic API. — Will be migrated to AnthropicMessagesProtocol Phase 2. | opencode (`packages/llm/src/providers/anthropic.ts`) | `next-code-provider-anthropic/` (820 lines, old) → Phase 2 migrate | ✅ | Migrate to new architecture Phase 2 (bead 6it.1-6it.2) |
+| **Provider: OpenAI** | GPT 5.5→5.1 via OpenAI Responses API. — Will be migrated to OpenAiResponsesProtocol Phase 2. | opencode (`packages/llm/src/providers/openai.ts`) | `next-code-provider-openai/` (request+stream+websocket_health) → Phase 2 migrate | ✅ | Migrate to new architecture Phase 2 (bead 6it.3-6it.5) |
+| **Provider: Gemini** | Google Gemini models. Streaming currently ⚠️ (PARITY.md L534). Plan: implement GeminiProtocol Phase 3 + fix streaming. | opencode (`packages/llm/src/protocols/gemini.ts`) | `next-code-provider-gemini/` (748 lines) | ⚠️ | Phase 3 migrate + fix streaming (bead tfn.3-tfn.4) |
+| **Provider: Bedrock** | AWS Bedrock Converse stream. SigV4 auth. — Will be migrated to BedrockConverseProtocol Phase 3. | opencode (`packages/llm/src/protocols/bedrock-converse.ts`), pi-agent-rust (`src/providers/bedrock.rs`) | `next-code-provider-bedrock/` (1757 lines) | ✅ | Phase 3 migrate (bead tfn.1-tfn.2) |
+| **Provider: Copilot** | GitHub Copilot. Streaming currently ⚠️ (PARITY.md L536). Plan: implement via OpenAiChatProtocol + device flow Phase 3. | pi-agent-rust (`src/providers/copilot.rs:565 lines`), oh-my-pi (`github-copilot-headers.ts`) | `next-code-provider-copilot/` (236 lines) | ⚠️ | Phase 3 migrate + fix streaming (bead tfn.5) |
+| **Provider: OpenRouter** | OpenRouter unified API. Will be migrated to OpenAiChatProtocol with custom routing headers Phase 3. | oh-my-pi (`docs/adding-a-provider.md:25-46`) | `next-code-provider-openrouter/` (932 lines, 79 pub items) | ✅ | Phase 3 migrate (bead tfn.6) |
+| **Provider: Azure** | Azure OpenAI Responses. Uses `Auth.remove("Authorization").orElse(Auth.header("api-key", key))`. | codex (`codex-rs/codex-api/src/provider.rs:106-127`) | NEW: `next-code-provider-azure/` (Phase 4) | 🔜 | Bead 9ot.1 |
+| **Provider: Vertex** | Google Vertex AI (Claude + Gemini models). Application Default Credentials. | opencode (`packages/llm/src/providers/google.ts`), pi-agent-rust (`src/providers/vertex.rs`) | NEW: `next-code-provider-vertex/` (Phase 4) | 🔜 | Bead 9ot.2 |
+| **Provider: Groq + Mistral** | OpenAI-compatible gateways. 50 LOC each via OpenAiChatProtocol reuse. | opencode (`packages/llm/src/providers/openai-compatible-profile.ts:6-16`) | NEW: `next-code-provider-groq/` + `next-code-provider-mistral/` (Phase 4) | 🔜 | Bead 9ot.3-9ot.4 |
+| **Provider: Cohere** | Cohere v2 chat (tool.parameter_definitions format). | pi-agent-rust (`src/providers/cohere.rs:1962 lines`) | NEW: `next-code-provider-cohere/` (Phase 4) | 🔜 | Bead 9ot.5 |
 | **Provider: MiniMax/Kimi/ZAI/Zhipu/Alibaba/Qwen/DeepSeek** | 7 Chinese-ecosystem providers with inband tool-call dialect support (MiniMax dialect, Kimi dialect, Qwen3 dialect, GLM dialect, DeepSeek dialect). | oh-my-pi (`packages/ai/src/registry/{minimax,kimi,zai,...}.ts`) | NEW: 7 providers + 13 dialects (Phase 5) | 🔜 | Bead dpd.1-5.19 |
-| **Catalog service** | In-memory `Catalog` (Map&lt;ProviderId, ProviderEntry&gt;). Loaded from ALL_PROVIDERS metadata + models.dev snapshot + user config overrides. | opencode (`packages/core/src/catalog.ts:86-332`) | NEW: `jcode-provider-app/src/catalog.rs` (Phase 6) | 🔜 | Bead gqw.1-gqw.2 |
-| **Integration/Credential** | OAuth (PKCE loopback + device code) + API key + env var auth methods. 10-min attempt TTL. SQLite-backed credential store. | opencode (`packages/core/src/integration.ts:435-567`, `credential.ts`) | NEW: `jcode-provider-app/src/{integration,credential}.rs` (Phase 6) | 🔜 | Bead gqw.2 |
-| **TUI /provider** | `/provider` command: list 21 providers with status, login (OAuth/API key), logout, set default. Browser auto-opens for OAuth. | opencode TUI, oh-my-pi (`api-key-login.ts:51-109`, `oauth/callback-server.ts:33-90`) | NEW: `jcode-tui-provider/` (Phase 6) | ❌ | Bead gqw.4 |
-| **TUI /model** | `/model` command: list 50+ models with cost + capabilities, filter by provider, set default. Persists to config.toml. | opencode TUI | NEW: `jcode-tui-model/` (Phase 6) | ❌ | Bead gqw.5 |
+| **Catalog service** | In-memory `Catalog` (Map&lt;ProviderId, ProviderEntry&gt;). Loaded from ALL_PROVIDERS metadata + models.dev snapshot + user config overrides. | opencode (`packages/core/src/catalog.ts:86-332`) | NEW: `next-code-provider-app/src/catalog.rs` (Phase 6) | 🔜 | Bead gqw.1-gqw.2 |
+| **Integration/Credential** | OAuth (PKCE loopback + device code) + API key + env var auth methods. 10-min attempt TTL. SQLite-backed credential store. | opencode (`packages/core/src/integration.ts:435-567`, `credential.ts`) | NEW: `next-code-provider-app/src/{integration,credential}.rs` (Phase 6) | 🔜 | Bead gqw.2 |
+| **TUI /provider** | `/provider` command: list 21 providers with status, login (OAuth/API key), logout, set default. Browser auto-opens for OAuth. | opencode TUI, oh-my-pi (`api-key-login.ts:51-109`, `oauth/callback-server.ts:33-90`) | NEW: `next-code-tui-provider/` (Phase 6) | ❌ | Bead gqw.4 |
+| **TUI /model** | `/model` command: list 50+ models with cost + capabilities, filter by provider, set default. Persists to config.toml. | opencode TUI | NEW: `next-code-tui-model/` (Phase 6) | ❌ | Bead gqw.5 |
 | **Model persistence** | Default model survives restarts. Config `default_model` is read on `Agent::new()` and `new_with_session()` before any hardcoded env var. Works for both client and server restart. | opencode (config persistence) | `agent.rs:370-385`: `config().provider.default_model` applied to provider before `build_base()` | ✅ | Fixed 2026-06-18, both constructors patched |
-| **VCR cassettes** | 50+ recorded-replay cassettes. 3 common use cases (basic text, tool_use, streaming) per provider. Cassette ≤ 200KB, total ≤ 10MB. | opencode (`packages/llm/test/fixtures/recordings/`) | NEW: `crates/jcode-llm-vcr/tests/fixtures/<provider>/<use_case>.json` | 🔜 | Phase 7 (bead 7.4) |
-| **Reactive failover walker** | On first retryable error per request, walk `FailoverChain` to next entry. Cooldown 300s. Prompt injection explaining the switch. | oh-my-openagent (`event-model-fallback.ts:96-116`) | NEW: `jcode-app-core/src/stream_completion.rs` (Phase 7) | 🔜 | Bead pjm.3 |
-| **Observability** | Per-provider Prometheus metrics: `provider_request_total{provider,model,status}` counter, `provider_request_duration_seconds` histogram, `provider_cost_micros` counter. Exported at /metrics. | — | NEW: extend `jcode-telemetry-core/` (Phase 7) | 🔜 | Bead pjm.8 |
+| **VCR cassettes** | 50+ recorded-replay cassettes. 3 common use cases (basic text, tool_use, streaming) per provider. Cassette ≤ 200KB, total ≤ 10MB. | opencode (`packages/llm/test/fixtures/recordings/`) | NEW: `crates/next-code-llm-vcr/tests/fixtures/<provider>/<use_case>.json` | 🔜 | Phase 7 (bead 7.4) |
+| **Reactive failover walker** | On first retryable error per request, walk `FailoverChain` to next entry. Cooldown 300s. Prompt injection explaining the switch. | oh-my-openagent (`event-model-fallback.ts:96-116`) | NEW: `next-code-app-core/src/stream_completion.rs` (Phase 7) | 🔜 | Bead pjm.3 |
+| **Observability** | Per-provider Prometheus metrics: `provider_request_total{provider,model,status}` counter, `provider_request_duration_seconds` histogram, `provider_cost_micros` counter. Exported at /metrics. | — | NEW: extend `next-code-telemetry-core/` (Phase 7) | 🔜 | Bead pjm.8 |
 ## X. Plugin System
 
 *Full plugin runtime with manifest, security capabilities, dispatcher, TUI host, native plugins, transpiler, loader, server, and v2 hardenings.*
 
 ### v1 — Existing (shipped)
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **Plugin manifest** | TOML/JSON manifest with name, version, entry point, capabilities, features, settings, engines, tags. | opencode (extension system), oh-my-openagent (plugin) | `manifest.rs`: `PluginManifest`, `PluginKind`, `PluginEntry`, `PluginCapabilities`, `SettingSchema` | ✅ |
 | **Security capabilities** | Capability chain with deny-list, allow-list, global defaults, access mode. `Deny` by default. | pi-agent-rust (WASM capability gates) | `security.rs`: `CapabilityChain`, `AccessDecision`, `AccessMode`, `CapabilityAction` | ✅ |
@@ -567,33 +567,33 @@
 | **Plugin loader** | Load plugins from disk, validate manifest, instantiate runtime. | opencode (loader) | `loader.rs`: async plugin loading with validation | ✅ |
 | **Plugin registry** | Global plugin registry: install, list, get, uninstall. Version tracking. | — | `registry.rs`: `PluginRegistry` | ✅ |
 | **Plugin dispatcher** | Dispatch events/tools/capabilities to the correct plugin handler. | oh-my-openagent (delegate) | `dispatcher.rs`: event routing to plugin handlers, RCU snapshot | ✅ |
-| **Native plugins** | Rust-native plugin support (compiled alongside jcode). | — | `native.rs`: native plugin ABI | ✅ |
+| **Native plugins** | Rust-native plugin support (compiled alongside next-code). | — | `native.rs`: native plugin ABI | ✅ |
 | **Plugin transpiler** | Transpile plugin source to compatible JS/TS for the sandbox (SWC). | — | `transpiler.rs`: SWC-based TS→JS transpilation | ✅ |
 | **TUI plugin host** | Render plugin-provided UI in the terminal. Plugin panels, status widgets. | opencode (TUI extensions) | `tui_api.rs`, `tui_system.rs`: TUI integration for plugins | ✅ |
 | **Plugin server** | Serve plugin capabilities to remote clients over HTTP/WS. | — | `server.rs`: plugin server endpoint | ✅ |
 | **Timer/scheduler** | Time-based plugin execution scheduling. | — | `timer.rs`: scheduled plugin tasks | ✅ |
 | **Plugin audit** | Audit trail for plugin operations and security decisions. | — | `audit.rs`: capability check logging | ✅ |
 | **Error handling** | Structured plugin error types with context. | — | `errors.rs`: `PluginError` with typed variants | ✅ |
-| **Bridge API** | Bridge between plugin runtime and jcode core. Tool registration, event hooks. | oh-my-claudecode (hooks) | `bridge.rs`: async PromiseBridge (stub) + `api.rs`: PluginApiBindings with jcode.on, registerTool, logger, kv, uuid, sleep, cwd | ✅ |
+| **Bridge API** | Bridge between plugin runtime and next-code core. Tool registration, event hooks. | oh-my-claudecode (hooks) | `bridge.rs`: async PromiseBridge (stub) + `api.rs`: PluginApiBindings with next-code.on, registerTool, logger, kv, uuid, sleep, cwd | ✅ |
 | **Preflight checks** | Validate plugin before installation: manifest, permissions, dependencies. | — | `preflight.rs`: pre-install validation, blocks exec() patterns | ✅ |
 | **Serde helpers** | Serialization helpers for plugin data interchange. | — | `serde.rs`: plugin-specific serialization | ✅ |
 
 ### v2 — Harden & Custom Plugin Authoring (in flight via ultracode workflow)
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
-| **ToolTier enum** | `ToolTier::Read | Write | Exec`. Fail-closed default (Exec). Declared per-tool or auto-fallback to manifest default. Used by ApprovalGate for mode interaction. | oh-my-pi (ToolTier in agent/src/types.ts:477) | `jcode-plugin-core/manifest.rs`: `ToolTier`. `jcode-tool-types`: re-export + `declared_tier()` on Tool trait | 🔜 |
-| **CapabilityChainV2 (5-layer)** | Plugin deny → Global deny → Plugin allow → Global allow → Mode fallback (Strict/Permissive/Prompt/Disabled). Structured `AccessDecisionV2` with layer + reason. | pi-agent-rust (5-layer policy in extensions.rs:2146), oh-my-pi (policy merge) | `jcode-plugin-core/security.rs`: `CapabilityChainV2`, `PolicyMode`, `AccessDecisionV2` | 🔜 |
-| **ApprovalGate (single chokepoint)** | Wraps every tool call: user override (allow/deny/prompt) → capability chain → permission mode interaction (Plan→prompt all, AcceptEdits→prompt Exec only, BypassPermissions→allow all, DontAsk→allow Read only). Per-tool `ToolTier` drives the prompt decision. | oh-my-pi (ExtensionToolWrapper in extensibility/extensions/wrapper.ts:113) | `jcode-plugin-runtime/gate.rs`: `ApprovalGate`, `GateDecision`, `ApprovalPrompt`. Wired into `RcuDispatcher::dispatch` | 🔜 |
-| **PluginManager** | Load/unload/list/enable/disable for plugins. Supports 3 source types: `Local { path }`, `Git { url, rev }`, `WorkspaceCrate { crate_name }`. State persisted to `installed.json`. Rollback on failure. NO npm, NO marketplace, NO registry. | oh-my-pi (PluginManager in extensibility/plugins/manager.ts:113) | `jcode-plugin-core/manager.rs`: `PluginManager`, `PluginSource`, `InstalledPlugin`, `PluginState` | 🔜 |
-| **Workspace crate plugin path** | Plugin is a Rust crate in the jcode workspace. Compiled into the binary, registered via `inventory::submit!` at link time. Toggle via `[plugins.workspace]` config. Plugin author writes Rust, not TS. | oh-my-pi (pi-natives NAPI addon pattern), pi-agent-rust (native descriptor files) | `crates/jcode-ext-hello/`: example workspace crate. `server.rs`: inventory scan at startup | 🔜 |
-| **js API inject (eval_with_pi)** | QuickJS context creates `jcode` global + `__jcode_api` before plugin eval. Plugin code uses `jcode.on(...)`, `jcode.logger.info(...)`, `jcode.registerTool(...)`. Fix: previously no API was injected → ReferenceError. | oh-my-pi (pi object in sdk.ts), opencode (__opencode_api) | `sandbox.rs`: `eval_with_pi()`. `api.rs`: global `jcode` + `__jcode_api` objects. Tested: `test_hello_plugin_e2e` (26/26 passed) | 🔜 |
+| **ToolTier enum** | `ToolTier::Read | Write | Exec`. Fail-closed default (Exec). Declared per-tool or auto-fallback to manifest default. Used by ApprovalGate for mode interaction. | oh-my-pi (ToolTier in agent/src/types.ts:477) | `next-code-plugin-core/manifest.rs`: `ToolTier`. `next-code-tool-types`: re-export + `declared_tier()` on Tool trait | 🔜 |
+| **CapabilityChainV2 (5-layer)** | Plugin deny → Global deny → Plugin allow → Global allow → Mode fallback (Strict/Permissive/Prompt/Disabled). Structured `AccessDecisionV2` with layer + reason. | pi-agent-rust (5-layer policy in extensions.rs:2146), oh-my-pi (policy merge) | `next-code-plugin-core/security.rs`: `CapabilityChainV2`, `PolicyMode`, `AccessDecisionV2` | 🔜 |
+| **ApprovalGate (single chokepoint)** | Wraps every tool call: user override (allow/deny/prompt) → capability chain → permission mode interaction (Plan→prompt all, AcceptEdits→prompt Exec only, BypassPermissions→allow all, DontAsk→allow Read only). Per-tool `ToolTier` drives the prompt decision. | oh-my-pi (ExtensionToolWrapper in extensibility/extensions/wrapper.ts:113) | `next-code-plugin-runtime/gate.rs`: `ApprovalGate`, `GateDecision`, `ApprovalPrompt`. Wired into `RcuDispatcher::dispatch` | 🔜 |
+| **PluginManager** | Load/unload/list/enable/disable for plugins. Supports 3 source types: `Local { path }`, `Git { url, rev }`, `WorkspaceCrate { crate_name }`. State persisted to `installed.json`. Rollback on failure. NO npm, NO marketplace, NO registry. | oh-my-pi (PluginManager in extensibility/plugins/manager.ts:113) | `next-code-plugin-core/manager.rs`: `PluginManager`, `PluginSource`, `InstalledPlugin`, `PluginState` | 🔜 |
+| **Workspace crate plugin path** | Plugin is a Rust crate in the next-code workspace. Compiled into the binary, registered via `inventory::submit!` at link time. Toggle via `[plugins.workspace]` config. Plugin author writes Rust, not TS. | oh-my-pi (pi-natives NAPI addon pattern), pi-agent-rust (native descriptor files) | `crates/next-code-ext-hello/`: example workspace crate. `server.rs`: inventory scan at startup | 🔜 |
+| **js API inject (eval_with_pi)** | QuickJS context creates `next-code` global + `__next_code_api` before plugin eval. Plugin code uses `next-code.on(...)`, `next-code.logger.info(...)`, `next-code.registerTool(...)`. Fix: previously no API was injected → ReferenceError. | oh-my-pi (pi object in sdk.ts), opencode (__opencode_api) | `sandbox.rs`: `eval_with_pi()`. `api.rs`: global `next-code` + `__next_code_api` objects. Tested: `test_hello_plugin_e2e` (26/26 passed) | 🔜 |
 | **Hot-reload** | Compare SHA-256 fingerprint (seahash + mtime + size). If unchanged → no-op. If changed → re-transpile, re-prefight, re-eval, atomic swap in RCU dispatcher. | opencode (PluginMeta.fingerprint in plugin/meta.ts) | `loader.rs`: `reload(plugin_id)`, `PluginFingerprint`, `fingerprints` cache | 🔜 |
-| **Per-extension kill switch** | Environment variable `JCODE_PLUGIN_KILL_<UPPERCASE_NAME>=1`. If set at startup, plugin is skipped. In addition to existing global `JCODE_PLUGIN_KILL_ALL`. | pi-agent-rust (`forced_compat_extension_kill_switch`) | `server.rs`: `is_killed(plugin_name)` check | 🔜 |
-| **Example plugin (TS)** | `examples/plugins/hello-plugin/index.ts` — real file, exercises `jcode.on`, `jcode.registerTool`, `jcode.logger.info`, `jcode.kv.set`, `jcode.uuid`. Used by e2e test. | oh-my-pi (examples/extensions/hello.ts) | `examples/plugins/hello-plugin/`: `index.ts` + `package.json` | 🔜 |
-| **Example plugin (Rust)** | `crates/jcode-ext-hello/` — workspace crate plugin compiled into binary, registers via `inventory::submit!`. | pi-agent-rust (native descriptors) | `crates/jcode-ext-hello/Cargo.toml` + `src/lib.rs` | 🔜 |
-| **CLI plugin subcommands** | `jcode plugin load <path>` / `clone <url>` / `list` / `unload` / `enable` / `disable` / `reload` / `info`. No npm, no marketplace, no registry. | opencode (`packages/opencode/src/cli/cmd/plug.ts:70`) | `src/*.rs`: clap subcommand for plugin management | 🔜 |
-| **Plugin author guide** | `docs/plugins.md` — quick start, jcode API reference, lifecycle events, capability model, ToolTier model, Rust workspace crate path, testing, security checklist. Modeled on oh-my-pi's docs/extensions.md. | oh-my-pi (docs/extensions.md) | `docs/plugins.md` (≥200 lines) | 🔜 |
+| **Per-extension kill switch** | Environment variable `NEXT_CODE_PLUGIN_KILL_<UPPERCASE_NAME>=1`. If set at startup, plugin is skipped. In addition to existing global `NEXT_CODE_PLUGIN_KILL_ALL`. | pi-agent-rust (`forced_compat_extension_kill_switch`) | `server.rs`: `is_killed(plugin_name)` check | 🔜 |
+| **Example plugin (TS)** | `examples/plugins/hello-plugin/index.ts` — real file, exercises `next-code.on`, `next-code.registerTool`, `next-code.logger.info`, `next-code.kv.set`, `next-code.uuid`. Used by e2e test. | oh-my-pi (examples/extensions/hello.ts) | `examples/plugins/hello-plugin/`: `index.ts` + `package.json` | 🔜 |
+| **Example plugin (Rust)** | `crates/next-code-ext-hello/` — workspace crate plugin compiled into binary, registers via `inventory::submit!`. | pi-agent-rust (native descriptors) | `crates/next-code-ext-hello/Cargo.toml` + `src/lib.rs` | 🔜 |
+| **CLI plugin subcommands** | `next-code plugin load <path>` / `clone <url>` / `list` / `unload` / `enable` / `disable` / `reload` / `info`. No npm, no marketplace, no registry. | opencode (`packages/opencode/src/cli/cmd/plug.ts:70`) | `src/*.rs`: clap subcommand for plugin management | 🔜 |
+| **Plugin author guide** | `docs/plugins.md` — quick start, next-code API reference, lifecycle events, capability model, ToolTier model, Rust workspace crate path, testing, security checklist. Modeled on oh-my-pi's docs/extensions.md. | oh-my-pi (docs/extensions.md) | `docs/plugins.md` (≥200 lines) | 🔜 |
 | **STRIDE threat model** | `docs/plugin-threat-model.md` — Spoofing/Tampering/Repudiation/Info-disclosure/DoS/Elevation. Each with attack scenario, mitigation, test reference. Modeled on pi-agent-rust's extension-runtime-threat-model.md. | pi-agent-rust (docs/extension-runtime-threat-model.md) | `docs/plugin-threat-model.md` (≥150 lines) | 🔜 |
 | **Distribution policy** | 3 paths only: local path, git clone, workspace crate. Explicitly NO npm, NO marketplace, NO registry. All plugin source originates from local files or explicit user-requested git clone. | (user constraint 2026-06-18) | Enforced by `PluginSource` enum (no Npm variant), CLI help text, docs | 🔜 |
 
@@ -601,7 +601,7 @@
 
 *Native desktop application with rich text rendering, IPC, animations, gallery, issue browser, and workspace management.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **Desktop protocol** | Host-worker message protocol with compatibility negotiation. | opencode (desktop) | `desktop_protocol.rs`: `DesktopHostToWorkerMessage`, `DesktopWorkerToHostMessage`, compatibility versioning | ✅ |
 | **Desktop IPC** | Stdio-based IPC between host and worker processes. JSON envelope framing. | opencode (desktop IPC) | `desktop_ipc.rs`: `DesktopIpcFrame`, `send_frame()`, `recv_frame()` | ✅ |
@@ -623,7 +623,7 @@
 
 *ONNX-based embedding model for semantic search, memory palace adapter, and cross-session memory types.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **ONNX embedding model** | all-MiniLM-L6-v2 sentence embedding via tract + tokenizers. | pi-agent-rust (embeddings) | `embedding/lib.rs`: `RunnableEmbeddingModel`, `TopKItem`, batch inference | ✅ |
 | **Tokenization** | HuggingFace tokenizers for embedding model input. | — | `tokenizers::Tokenizer`: sub-word tokenization | ✅ |
@@ -637,7 +637,7 @@
 
 *Authentication providers, OAuth flows, credential storage, and secret management.*
 
-| Name | Description | Source Repo(s) | jcode Impl | Status |
+| Name | Description | Source Repo(s) | Next Code Impl | Status |
 |------|-------------|----------------|------------|--------|
 | **Auth types** | Auth state machine: Available, Expired, NotConfigured. Provider-level auth status. | CCB (auth) | `auth-types/`: `AuthState`, `AuthProvider` | ✅ |
 | **OS keyring** | Platform-native credential manager: macOS Keychain, Linux Secret Service, Windows Credential Manager. | — | `keyring-store/`: `KeyringStore` trait, `DefaultKeyringStore`, `MockKeyringStore` | ✅ |
@@ -647,27 +647,27 @@
 
 ## XIV. Reference Repo Gaps (from feature-planning skill)
 
-*Features present in reference repos that jcode does not yet have or only partially implements.*
+*Features present in reference repos that next-code does not yet have or only partially implements.*
 
-| Feature | Source Repo | jcode Status | Notes |
+| Feature | Source Repo | next-code Status | Notes |
 |---------|-------------|-------------|-------|
-| **WASM extension security** | pi-agent-rust | ❌ Not implemented | pi-agent-rust has WASM-based extension sandboxing. jcode has native plugin system but no WASM sandbox. |
+| **WASM extension security** | pi-agent-rust | ❌ Not implemented | pi-agent-rust has WASM-based extension sandboxing. next-code has native plugin system but no WASM sandbox. |
 | **SSE streaming** | pi-agent-rust | ❌ Not found | Server-Sent Events for real-time streaming. May exist in protocol layer. |
-| **ACP / Remote control** | claude-code (CCB) | ⚠️ Partial | jcode has remote protocol but ACP-style remote agent control not verified. |
+| **ACP / Remote control** | claude-code (CCB) | ⚠️ Partial | next-code has remote protocol but ACP-style remote agent control not verified. |
 | **Sandbox execution** | codex | ❌ Skipped | Container/firewall-based sandbox. Marked as skipped by design decision. |
-| **40+ providers** | oh-my-pi | ⚠️ Partial | jcode has 10 provider crates. oh-my-pi claims 40+. |
-| **IDE wiring** (VS Code) | oh-my-pi | ❌ Not found | IDE integration. jcode is terminal-first. |
-| **DAP operations** (27 ops) | oh-my-pi | ⚠️ Partial | jcode has LSP (9 ops) but no DAP (Debug Adapter Protocol). |
-| **Computer Use** | CCB | ⚠️ Partial | jcode has `macos_computer_use` tool (macOS-only). Full cross-platform Computer Use not implemented. |
-| **Chrome Use** | CCB | ❌ Not found | Chrome browser automation. jcode has `browser` tool with Firefox bridge. |
+| **40+ providers** | oh-my-pi | ⚠️ Partial | next-code has 10 provider crates. oh-my-pi claims 40+. |
+| **IDE wiring** (VS Code) | oh-my-pi | ❌ Not found | IDE integration. next-code is terminal-first. |
+| **DAP operations** (27 ops) | oh-my-pi | ⚠️ Partial | next-code has LSP (9 ops) but no DAP (Debug Adapter Protocol). |
+| **Computer Use** | CCB | ⚠️ Partial | next-code has `macos_computer_use` tool (macOS-only). Full cross-platform Computer Use not implemented. |
+| **Chrome Use** | CCB | ❌ Not found | Chrome browser automation. next-code has `browser` tool with Firefox bridge. |
 | **Voice Mode** | CCB | ❌ Not found | Speech-to-text / text-to-speech. Whisper transcript type exists in protocol tests only. |
 | **Pipe IPC multi-instance** | CCB | ❌ Not found | Cross-instance Pipe IPC with auto-orchestration. |
-| **Langfuse monitoring** | CCB | ❌ Not found | Langfuse observability integration. jcode has `telemetry-core` but no Langfuse adapter. |
+| **Langfuse monitoring** | CCB | ❌ Not found | Langfuse observability integration. next-code has `telemetry-core` but no Langfuse adapter. |
 | **Remote Control Docker UI** | CCB | ❌ Not found | Docker self-hosted remote UI for phone access. |
 | **Tmux integration** | oh-my-openagent | ⚠️ Partial | `team.rs` mentions tmux layout. Dedicated tmux session management not verified. |
 | **Prompt variants per model** | oh-my-openagent | ❌ Not found | Same agent, different prompt per provider (Claude vs GPT vs Gemini). |
-| **Tree-sitter code map** | codebuff (10+ languages) | ⚠️ Partial | tree-sitter used only in `jcode-edit-bench`. No general code-map tool. |
-| **io_uring fast lane** | pi-agent-rust | ❌ Not attempted | Linux-specific. jcode uses tokio. |
+| **Tree-sitter code map** | codebuff (10+ languages) | ⚠️ Partial | tree-sitter used only in `next-code-edit-bench`. No general code-map tool. |
+| **io_uring fast lane** | pi-agent-rust | ❌ Not attempted | Linux-specific. next-code uses tokio. |
 | **Shadow dual execution** | pi-agent-rust | ❌ Not attempted | Runs two models and compares. Complex infrastructure. |
 
 ## XV. Known Gaps — Features Not Yet Tracked
@@ -683,18 +683,18 @@
 
 ### Reference Repo Feature Gaps (from feature-planning skill)
 
-| Feature | Source Repo | jcode Status | Notes |
+| Feature | Source Repo | next-code Status | Notes |
 |---------|-------------|-------------|-------|
-| **WASM extension security** | pi-agent-rust | ❌ Not implemented | pi-agent-rust has WASM-based extension sandboxing. jcode has plugin system but no WASM sandbox. |
-| **SSE streaming** | pi-agent-rust | ❌ Not found | Server-Sent Events for real-time streaming. May exist in jcode protocol layer. |
-| **ACP / Remote control** | claude-code (CCB) | ⚠️ Partial | jcode has remote protocol (`jcode-protocol`) but ACP-style remote agent control not verified. |
+| **WASM extension security** | pi-agent-rust | ❌ Not implemented | pi-agent-rust has WASM-based extension sandboxing. next-code has plugin system but no WASM sandbox. |
+| **SSE streaming** | pi-agent-rust | ❌ Not found | Server-Sent Events for real-time streaming. May exist in next-code protocol layer. |
+| **ACP / Remote control** | claude-code (CCB) | ⚠️ Partial | next-code has remote protocol (`next-code-protocol`) but ACP-style remote agent control not verified. |
 | **Sandbox execution** | codex | ❌ Skipped | Marked as skipped in PARITY.md. Requires container infrastructure. |
-| **40+ providers** | oh-my-pi | ⚠️ Partial | jcode has 10 provider crates + core abstraction. oh-my-pi claims 40+. |
-| **IDE wiring** | oh-my-pi | ❌ Not found | VS Code / editor integration. jcode is terminal-first. |
-| **DAP operations** | oh-my-pi | ⚠️ Not verified | jcode has LSP tool but DAP (Debug Adapter Protocol) not confirmed. |
+| **40+ providers** | oh-my-pi | ⚠️ Partial | next-code has 10 provider crates + core abstraction. oh-my-pi claims 40+. |
+| **IDE wiring** | oh-my-pi | ❌ Not found | VS Code / editor integration. next-code is terminal-first. |
+| **DAP operations** | oh-my-pi | ⚠️ Not verified | next-code has LSP tool but DAP (Debug Adapter Protocol) not confirmed. |
 
 ### Adding New Features
 
 1. Pick the matching section (I-IX). If none matches, add a new top-level section.
-2. Add a row: Name, Description, Source Repo(s), jcode Impl, Status, Remaining.
+2. Add a row: Name, Description, Source Repo(s), Next Code Impl, Status, Remaining.
 3. Update the summary table at the bottom.

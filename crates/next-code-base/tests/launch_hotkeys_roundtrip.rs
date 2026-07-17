@@ -13,8 +13,8 @@ fn launch_hotkeys_config_round_trips_toml() {
             entries: vec![
                 LaunchHotkeyEntry {
                     chord: "cmd+;".into(),
-                    dir: "/Users/jeremy/jcode-github".into(),
-                    label: "jcode-github".into(),
+                    dir: "/Users/jeremy/next-code-github".into(),
+                    label: "next-code-github".into(),
                     self_dev: false,
                 },
                 LaunchHotkeyEntry {

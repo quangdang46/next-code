@@ -94,7 +94,7 @@ fn load_session_todos(session_id: &str) -> Vec<TodoItem> {
 /// Build the compact notification. Kept free of `App` for testability.
 ///
 /// Layout (macOS):
-///   title:    jcode · <session> · done in <dur>
+///   title:    next-code · <session> · done in <dur>
 ///   subtitle: <todo progress, e.g. "3/5 todos · 1 blocked">
 ///   body:     names the work — "✓ <just done> · → <in progress>" or a
 ///             blocker ("⊘ <todo> needs <dep>"), falling back to the
@@ -105,7 +105,7 @@ pub(super) fn build_turn_notification(
     todos: &[TodoItem],
     last_assistant_text: Option<&str>,
 ) -> TurnNotification {
-    let mut title = String::from("jcode");
+    let mut title = String::from("next-code");
     if let Some(name) = session_name {
         title.push_str(" · ");
         title.push_str(name);
@@ -321,7 +321,7 @@ mod tests {
     #[test]
     fn title_includes_session_and_compact_duration() {
         let n = build_turn_notification(Some("fox"), 754.0, &[], Some("All done."));
-        assert_eq!(n.title, "jcode · fox · done in 12m 34s");
+        assert_eq!(n.title, "next-code · fox · done in 12m 34s");
         assert_eq!(n.subtitle, None);
         assert_eq!(n.body, "All done.");
     }
@@ -333,7 +333,7 @@ mod tests {
             todo_named("handle reconnect", "in_progress", &[]),
         ];
         let n = build_turn_notification(None, 200.0, &todos, Some("Fixed the parser bug."));
-        assert_eq!(n.title, "jcode · done in 3m 20s");
+        assert_eq!(n.title, "next-code · done in 3m 20s");
         assert_eq!(n.subtitle.as_deref(), Some("1/2 todos"));
         // Names actual todo work, not the prose snippet.
         assert_eq!(n.body, "✓ wire up parser · → handle reconnect");
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn empty_inputs_fall_back_to_minimal_body() {
         let n = build_turn_notification(None, 65.0, &[], None);
-        assert_eq!(n.title, "jcode · done in 1m 5s");
+        assert_eq!(n.title, "next-code · done in 1m 5s");
         assert_eq!(n.subtitle, None);
         assert_eq!(n.body, "Turn finished");
     }

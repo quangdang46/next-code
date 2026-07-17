@@ -1,7 +1,7 @@
 //! Anthropic provider shared helpers (compatibility shim).
 //!
 //! The direct Anthropic Messages API *runtime* (`AnthropicProvider`) now lives
-//! in the downstream `jcode-provider-anthropic-runtime` crate so provider
+//! in the downstream `next-code-provider-anthropic-runtime` crate so provider
 //! edits do not rebuild the base -> app-core -> tui spine. The binary's
 //! composition root registers it via [`crate::provider::external`].
 //!
@@ -13,6 +13,7 @@
 //! - the process-wide cache-TTL toggle, and
 //! - the static model list.
 
+use crate::env::{product_env};
 use anyhow::{Context, Result};
 use std::sync::atomic::{AtomicBool, Ordering};
 use uuid::Uuid;
@@ -90,7 +91,7 @@ pub fn load_anthropic_api_key() -> Result<String> {
         "anthropic.env",
     )
     .context("No Anthropic API key found")?;
-    if std::env::var("JCODE_LOG_SERVICE_TIER").is_ok() {
+    if product_env("LOG_SERVICE_TIER").is_ok() {
         let prefix: String = key.chars().take(14).collect();
         eprintln!(
             "[anthropic] resolved API key prefix={prefix}... (len={})",

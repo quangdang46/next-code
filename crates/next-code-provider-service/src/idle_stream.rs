@@ -16,7 +16,7 @@
 //! on whether the first event has been received yet.
 //!
 //! The actual stream wrapping is left to the consumer
-//! (`jcode-llm-core`); this module is the policy side.
+//! (`next-code-llm-core`); this module is the policy side.
 
 use std::time::Duration;
 

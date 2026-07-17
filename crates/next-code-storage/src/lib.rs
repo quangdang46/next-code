@@ -98,7 +98,7 @@ fn ensure_private_runtime_dir(path: &Path) {
 /// Resolution order:
 /// 1. `$NEXT_CODE_HOME` (canonical)
 /// 2. `$JCODE_HOME` (legacy dual-read)
-/// 3. `~/.next-code`, migrating from `~/.jcode` when the new dir is missing
+/// 3. `~/.next-code`, migrating from `~/.next-code` when the new dir is missing
 ///    and the legacy dir exists.
 ///
 /// On a successful one-shot migrate, a `.migrated-from-jcode` marker is written

@@ -8,7 +8,7 @@
 //! pruning) layer. The flow is:
 //!
 //! ```text
-//! Tool execute → RTCO pre-filter → filtered output → JCode context → DCP prunes
+//! Tool execute → RTCO pre-filter → filtered output → Next Code context → DCP prunes
 //! ```
 //!
 //! RTCO is opt-in via the `rtco` feature flag (off by default).

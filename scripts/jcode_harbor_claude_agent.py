@@ -21,7 +21,7 @@ DEFAULT_CLAUDE_AUTH_PATH = "~/.next-code/auth.json"
 DEFAULT_OPENROUTER_ENV_PATH = "~/.config/next-code/openrouter.env"
 DEFAULT_ANTHROPIC_ENV_PATH = "~/.config/next-code/anthropic.env"
 CA_BUNDLE_CANDIDATES = (
-    os.environ.get("JCODE_HARBOR_CA_BUNDLE"),
+    os.environ.get("NEXT_CODE_HARBOR_CA_BUNDLE"),
     "/etc/ca-certificates/extracted/tls-ca-bundle.pem",
     "/etc/ssl/certs/ca-certificates.crt",
 )
@@ -80,19 +80,19 @@ def _load_key_from_env_file(env_path: str, env_var: str, *direct_env: str) -> st
 
 def _load_anthropic_key() -> str | None:
     return _load_key_from_env_file(
-        os.environ.get("JCODE_HARBOR_ANTHROPIC_ENV", DEFAULT_ANTHROPIC_ENV_PATH),
+        os.environ.get("NEXT_CODE_HARBOR_ANTHROPIC_ENV", DEFAULT_ANTHROPIC_ENV_PATH),
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_API_KEY",
-        "JCODE_HARBOR_ANTHROPIC_KEY",
+        "NEXT_CODE_HARBOR_ANTHROPIC_KEY",
     )
 
 
 def _load_openrouter_key() -> str | None:
-    # Priority: explicit env, then the jcode openrouter.env file (raw key per line).
-    direct = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("JCODE_HARBOR_OPENROUTER_KEY")
+    # Priority: explicit env, then the next-code openrouter.env file (raw key per line).
+    direct = os.environ.get("OPENROUTER_API_KEY") or os.environ.get("NEXT_CODE_HARBOR_OPENROUTER_KEY")
     if direct and direct.strip():
         return direct.strip()
-    path = Path(os.environ.get("JCODE_HARBOR_OPENROUTER_ENV", DEFAULT_OPENROUTER_ENV_PATH)).expanduser()
+    path = Path(os.environ.get("NEXT_CODE_HARBOR_OPENROUTER_ENV", DEFAULT_OPENROUTER_ENV_PATH)).expanduser()
     if path.exists() and path.is_file():
         for line in path.read_text().splitlines():
             line = line.strip()
@@ -110,11 +110,11 @@ def _load_openrouter_key() -> str | None:
 
 
 JCODE_BINARY = _resolve_existing_file(
-    env_name="JCODE_HARBOR_BINARY",
+    env_name="NEXT_CODE_HARBOR_BINARY" if os.environ.get("NEXT_CODE_HARBOR_BINARY") else "NEXT_CODE_HARBOR_BINARY",
     default_path=DEFAULT_BINARY_PATH,
 )
 CA_BUNDLE = _resolve_existing_file(
-    env_name="JCODE_HARBOR_CA_BUNDLE",
+    env_name="NEXT_CODE_HARBOR_CA_BUNDLE",
     candidates=CA_BUNDLE_CANDIDATES,
 )
 OPENSSL_RUNTIME_LIBS = tuple(
@@ -122,7 +122,7 @@ OPENSSL_RUNTIME_LIBS = tuple(
     for lib in (
         _resolve_optional_existing_file(
             candidates=(
-                os.environ.get("JCODE_HARBOR_LIBSSL"),
+                os.environ.get("NEXT_CODE_HARBOR_LIBSSL"),
                 *_sibling_runtime_lib_candidates(JCODE_BINARY, "libssl"),
                 "/usr/lib/libssl.so.3",
                 "/usr/lib/x86_64-linux-gnu/libssl.so.3",
@@ -131,7 +131,7 @@ OPENSSL_RUNTIME_LIBS = tuple(
         ),
         _resolve_optional_existing_file(
             candidates=(
-                os.environ.get("JCODE_HARBOR_LIBCRYPTO"),
+                os.environ.get("NEXT_CODE_HARBOR_LIBCRYPTO"),
                 *_sibling_runtime_lib_candidates(JCODE_BINARY, "libcrypto"),
                 "/usr/lib/libcrypto.so.3",
                 "/usr/lib/x86_64-linux-gnu/libcrypto.so.3",
@@ -144,7 +144,7 @@ OPENSSL_RUNTIME_LIBS = tuple(
 
 
 def _benchmark_instruction_preamble() -> str:
-    return os.environ.get("JCODE_HARBOR_EXTRA_PREAMBLE", "")
+    return os.environ.get("NEXT_CODE_HARBOR_EXTRA_PREAMBLE", "")
 
 
 def _load_final_payload(output_dir: Path) -> dict[str, Any] | None:
@@ -185,12 +185,12 @@ def _load_final_payload(output_dir: Path) -> dict[str, Any] | None:
 
 
 class JcodeClaudeHarborAgent(BaseAgent):
-    """Harbor adapter that runs jcode with Opus 4.8.
+    """Harbor adapter that runs next-code with Opus 4.8.
 
     Default route is the native Anthropic API (provider=anthropic-api,
     model=claude-opus-4-8) using ANTHROPIC_API_KEY. OpenRouter
     (provider=openrouter, model=anthropic/claude-opus-4.8) and native Claude
-    OAuth (provider=claude via ~/.jcode/auth.json) are also supported.
+    OAuth (provider=claude via ~/.next-code/auth.json) are also supported.
     """
 
     def __init__(self, logs_dir: Path, model_name: str | None = None, *args, **kwargs):
@@ -205,13 +205,13 @@ class JcodeClaudeHarborAgent(BaseAgent):
         self._claude_auth: Path | None = None
         if self._provider_arg == "claude":
             self._claude_auth = _resolve_existing_file(
-                env_name="JCODE_HARBOR_CLAUDE_AUTH",
+                env_name="NEXT_CODE_HARBOR_CLAUDE_AUTH",
                 default_path=DEFAULT_CLAUDE_AUTH_PATH,
             )
 
     @staticmethod
     def name() -> str:
-        return "jcode-harbor-claude"
+        return "next-code-harbor-claude"
 
     def version(self) -> str | None:
         return "compat-opus-4-8"
@@ -222,7 +222,7 @@ class JcodeClaudeHarborAgent(BaseAgent):
         # ubuntu:24.04 with no /etc/ssl/certs, and the per-task verifier runs
         # `apt-get install ca-certificates curl` then bootstraps uv over https.
         # Hijacking the system cert dir breaks the verifier's curl (error 77,
-        # "error setting certificate file") so tests never run. jcode itself
+        # "error setting certificate file") so tests never run. next-code itself
         # gets its CA bundle via SSL_CERT_FILE/OPENSSL_CERT_FILE below, so no
         # global cert override is needed.
         await environment.exec(
@@ -245,9 +245,9 @@ class JcodeClaudeHarborAgent(BaseAgent):
             f"{IN_CONTAINER_BINARY} --quiet --no-update --no-selfdev version --json",
             env={
                 "HOME": IN_CONTAINER_HOME,
-                "JCODE_HOME": IN_CONTAINER_HOME,
-                "JCODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
-                "JCODE_NO_TELEMETRY": "1",
+                "NEXT_CODE_HOME": IN_CONTAINER_HOME, "NEXT_CODE_HOME": IN_CONTAINER_HOME,
+                "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME, "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
+                "NEXT_CODE_NO_TELEMETRY": "1", "NEXT_CODE_NO_TELEMETRY": "1",
                 "LD_LIBRARY_PATH": IN_CONTAINER_LIB_DIR,
             },
             timeout_sec=60,
@@ -265,12 +265,12 @@ class JcodeClaudeHarborAgent(BaseAgent):
 
         env = {
             "HOME": IN_CONTAINER_HOME,
-            "JCODE_HOME": IN_CONTAINER_HOME,
-            "JCODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
-            "JCODE_NO_TELEMETRY": "1",
-            "JCODE_PROVIDER": self._provider_arg,
-            "JCODE_MODEL": self._jcode_model,
-            "JCODE_ANTHROPIC_REASONING_EFFORT": os.environ.get("JCODE_ANTHROPIC_REASONING_EFFORT", "high"),
+            "NEXT_CODE_HOME": IN_CONTAINER_HOME, "NEXT_CODE_HOME": IN_CONTAINER_HOME,
+            "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME, "NEXT_CODE_RUNTIME_DIR": IN_CONTAINER_RUNTIME,
+            "NEXT_CODE_NO_TELEMETRY": "1", "NEXT_CODE_NO_TELEMETRY": "1",
+            "NEXT_CODE_PROVIDER": self._provider_arg,
+            "NEXT_CODE_MODEL": self._jcode_model,
+            "NEXT_CODE_ANTHROPIC_REASONING_EFFORT": os.environ.get("NEXT_CODE_ANTHROPIC_REASONING_EFFORT", "high"),
             "SSL_CERT_FILE": IN_CONTAINER_CA_BUNDLE,
             "OPENSSL_CERT_FILE": IN_CONTAINER_CA_BUNDLE,
             "LD_LIBRARY_PATH": IN_CONTAINER_LIB_DIR,
@@ -301,7 +301,7 @@ class JcodeClaudeHarborAgent(BaseAgent):
         (self.logs_dir / "exec_return_code.txt").write_text(str(result.return_code))
 
         try:
-            await environment.download_dir(IN_CONTAINER_OUTPUT, self.logs_dir / "jcode-output")
+            await environment.download_dir(IN_CONTAINER_OUTPUT, self.logs_dir / "next-code-output")
         except Exception as e:  # noqa: BLE001
             (self.logs_dir / "download_error.txt").write_text(str(e))
 
@@ -309,10 +309,10 @@ class JcodeClaudeHarborAgent(BaseAgent):
             "return_code": result.return_code,
             "provider": self._provider_arg,
             "model": self._jcode_model,
-            "jcode_binary": str(JCODE_BINARY),
+            "next_code_binary": str(JCODE_BINARY),
         }
 
-        output_dir = self.logs_dir / "jcode-output"
+        output_dir = self.logs_dir / "next-code-output"
         payload = _load_final_payload(output_dir)
         if payload is not None:
             usage = payload.get("usage") or {}
@@ -324,6 +324,6 @@ class JcodeClaudeHarborAgent(BaseAgent):
                 context.n_cache_tokens = cache_read + cache_create
             elif isinstance(cache_read, int):
                 context.n_cache_tokens = cache_read
-            metadata["jcode_result"] = payload
+            metadata["next_code_result"] = payload
 
         context.metadata = metadata

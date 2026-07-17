@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use next_code_logging as logging;
 use next_code_storage as storage;
 mod lifecycle;
@@ -286,7 +287,7 @@ enum DeliveryMode {
 }
 
 pub fn is_enabled() -> bool {
-    if std::env::var("JCODE_NO_TELEMETRY").is_ok() || std::env::var("DO_NOT_TRACK").is_ok() {
+    if product_env("NO_TELEMETRY").is_ok() || std::env::var("DO_NOT_TRACK").is_ok() {
         logging::debug("telemetry disabled by environment");
         return false;
     }
@@ -316,7 +317,7 @@ pub fn content_sharing_enabled() -> bool {
     if !is_enabled() {
         return false;
     }
-    if std::env::var("JCODE_NO_TELEMETRY").is_ok() || std::env::var("DO_NOT_TRACK").is_ok() {
+    if product_env("NO_TELEMETRY").is_ok() || std::env::var("DO_NOT_TRACK").is_ok() {
         return false;
     }
     share_content_marker_path()
@@ -1323,7 +1324,7 @@ pub fn record_install_if_first_run() {
         return;
     }
     // Skip install/onboarding emission under CI. Ephemeral runners start with a
-    // fresh ~/.jcode (so a new telemetry_id) on every job, which would otherwise
+    // fresh ~/.next-code (so a new telemetry_id) on every job, which would otherwise
     // look like a brand-new install and user, inflating install/active counts,
     // the onboarding funnel, and depressing retention. Session/turn/lifecycle
     // events are still emitted (tagged is_ci) so CI crash/error signal stays

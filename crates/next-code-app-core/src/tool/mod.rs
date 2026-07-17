@@ -706,7 +706,7 @@ impl Registry {
         let compaction = Arc::new(RwLock::new(CompactionManager::new()));
         let compaction_ms = compaction_start.elapsed().as_millis();
         let registry_struct_start = std::time::Instant::now();
-        // Load v2 hooks config (.jcode/hooks.toml, $JCODE_HOOKS_CONFIG, etc.)
+        // Load v2 hooks config (.next-code/hooks.toml, $NEXT_CODE_HOOKS_CONFIG, etc.)
         let mut hook_config = next_code_hooks::load_hooks_config();
         // Merge v1 legacy config.toml [hooks] entries into the v2 config so
         // existing single-line hooks (`pre_tool = "check.sh"`) continue working
@@ -838,7 +838,7 @@ impl Registry {
     /// names (`grep`, `bash`). This mapping ensures both forms resolve
     /// correctly.
     ///
-    /// The canonical mapping lives in `jcode-tool-types::resolve_tool_name` so
+    /// The canonical mapping lives in `next-code-tool-types::resolve_tool_name` so
     /// lower-level crates (e.g. config) can normalize tool names without
     /// depending on the tool subsystem; this method delegates to it.
     pub(crate) fn resolve_tool_name(name: &str) -> &str {

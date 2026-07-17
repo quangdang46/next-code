@@ -54,7 +54,7 @@ impl DesktopMode {
 
 pub(crate) fn run_desktop_app_worker_process(desktop_mode: DesktopMode) -> Result<()> {
     desktop_log::info(format_args!(
-        "jcode-desktop: app worker process started; pid={}",
+        "next-code-desktop: app worker process started; pid={}",
         std::process::id()
     ));
 
@@ -96,7 +96,7 @@ pub(crate) fn run_desktop_app_worker_process(desktop_mode: DesktopMode) -> Resul
                     && let Err(error) = app.restore_snapshot(snapshot)
                 {
                     desktop_log::error(format_args!(
-                        "jcode-desktop: app worker failed to restore host snapshot: {error:#}"
+                        "next-code-desktop: app worker failed to restore host snapshot: {error:#}"
                     ));
                 }
                 let app_runtime = DesktopAppRuntime::new(app);
@@ -127,7 +127,7 @@ pub(crate) fn run_desktop_app_worker_process(desktop_mode: DesktopMode) -> Resul
                         .context("failed to write worker snapshot response")?;
                 } else {
                     desktop_log::info(format_args!(
-                        "jcode-desktop: app worker received snapshot request {request_id} before initialization"
+                        "next-code-desktop: app worker received snapshot request {request_id} before initialization"
                     ));
                 }
             }

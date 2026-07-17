@@ -22,7 +22,7 @@ pub(crate) fn log_desktop_session_event_batch_profile(
         return;
     }
     emit_desktop_profile_event(
-        "jcode-desktop-session-event-profile",
+        "next-code-desktop-session-event-profile",
         serde_json::json!({
             "raw_events": raw_event_count,
             "coalesced_events": apply_stats.event_count,
@@ -50,7 +50,7 @@ pub(crate) fn log_desktop_session_card_refresh_profile(
         return;
     }
     emit_desktop_profile_event(
-        "jcode-desktop-session-card-refresh-profile",
+        "next-code-desktop-session-card-refresh-profile",
         serde_json::json!({
             "session_id": session_id,
             "loaded_in_ms": duration_ms(loaded_in),
@@ -71,7 +71,7 @@ pub(crate) fn log_desktop_session_cards_load_profile(
         return;
     }
     emit_desktop_profile_event(
-        "jcode-desktop-session-cards-load-profile",
+        "next-code-desktop-session-cards-load-profile",
         serde_json::json!({
             "purpose": format!("{purpose:?}"),
             "loaded_in_ms": duration_ms(loaded_in),
@@ -92,7 +92,7 @@ pub(crate) fn log_desktop_preferences_save_profile(
         return;
     }
     emit_desktop_profile_event(
-        "jcode-desktop-preferences-save-profile",
+        "next-code-desktop-preferences-save-profile",
         serde_json::json!({
             "saved_in_ms": duration_ms(saved_in),
             "queued_for_ms": duration_ms(queued_for),
@@ -112,7 +112,7 @@ pub(crate) fn log_desktop_crashed_sessions_restore_profile(
         return;
     }
     emit_desktop_profile_event(
-        "jcode-desktop-crashed-sessions-restore-profile",
+        "next-code-desktop-crashed-sessions-restore-profile",
         serde_json::json!({
             "restored": restored,
             "errors": errors,
@@ -229,7 +229,7 @@ impl DesktopFrameProfiler {
         let enabled = desktop_frame_profile_enabled(mode.as_deref());
         let log_all = desktop_frame_profile_log_all(mode.as_deref());
         let budget =
-            duration_millis_env("JCODE_DESKTOP_FRAME_BUDGET_MS", DESKTOP_120FPS_FRAME_BUDGET);
+            duration_millis_env("NEXT_CODE_DESKTOP_FRAME_BUDGET_MS", DESKTOP_120FPS_FRAME_BUDGET);
         Self {
             enabled,
             log_all,
@@ -297,7 +297,7 @@ impl DesktopFrameProfiler {
     pub(crate) fn report(&mut self, now: Instant) {
         if let Some(worst) = self.worst.as_ref() {
             emit_desktop_profile_event(
-                "jcode-desktop-frame-profile",
+                "next-code-desktop-frame-profile",
                 serde_json::json!({
                     "cpu_budget_ms": duration_ms(self.budget),
                     "present_stall_budget_ms": duration_ms(DESKTOP_PRESENT_STALL_BUDGET),
@@ -359,7 +359,7 @@ impl DesktopInteractionLatencyProfiler {
         let enabled = desktop_frame_profile_enabled(mode.as_deref());
         let log_all = desktop_frame_profile_log_all(mode.as_deref());
         let budget = duration_millis_env(
-            "JCODE_DESKTOP_INPUT_LATENCY_BUDGET_MS",
+            "NEXT_CODE_DESKTOP_INPUT_LATENCY_BUDGET_MS",
             DESKTOP_INPUT_LATENCY_BUDGET,
         );
         Self {
@@ -410,7 +410,7 @@ impl DesktopInteractionLatencyProfiler {
             return;
         }
         eprintln!(
-            "jcode-desktop-latency-profile {}",
+            "next-code-desktop-latency-profile {}",
             serde_json::json!({
                 "kind": pending.kind,
                 "interaction_count": pending.count,
@@ -472,7 +472,7 @@ impl DesktopNoPaintWatchdog {
         let enabled = desktop_frame_profile_enabled(mode);
         let log_all = desktop_frame_profile_log_all(mode);
         let budget =
-            duration_millis_env("JCODE_DESKTOP_NO_PAINT_BUDGET_MS", DESKTOP_NO_PAINT_BUDGET);
+            duration_millis_env("NEXT_CODE_DESKTOP_NO_PAINT_BUDGET_MS", DESKTOP_NO_PAINT_BUDGET);
         Self {
             enabled,
             log_all,
@@ -513,7 +513,7 @@ impl DesktopNoPaintWatchdog {
         if report_due {
             self.last_reported_at = Some(now);
             emit_desktop_profile_event(
-                "jcode-desktop-no-paint-profile",
+                "next-code-desktop-no-paint-profile",
                 serde_json::json!({
                     "budget_ms": duration_ms(self.budget),
                     "gap_ms": duration_ms(gap),
@@ -622,10 +622,10 @@ pub(crate) struct DesktopProfileLogLine {
 }
 
 pub(crate) fn desktop_profile_log_path() -> Option<PathBuf> {
-    if std::env::var_os("JCODE_DESKTOP_PROFILE_LOG").is_some_and(|value| !env_flag_enabled(value)) {
+    if std::env::var_os("NEXT_CODE_DESKTOP_PROFILE_LOG").is_some_and(|value| !env_flag_enabled(value)) {
         return None;
     }
-    if let Some(path) = std::env::var_os("JCODE_DESKTOP_PROFILE_LOG_PATH") {
+    if let Some(path) = std::env::var_os("NEXT_CODE_DESKTOP_PROFILE_LOG_PATH") {
         if path.is_empty() {
             return None;
         }
@@ -636,14 +636,14 @@ pub(crate) fn desktop_profile_log_path() -> Option<PathBuf> {
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")))?;
     Some(
         cache_root
-            .join("jcode")
+            .join("next-code")
             .join("desktop")
             .join("performance.log"),
     )
 }
 
 pub(crate) fn desktop_profile_stderr_enabled() -> bool {
-    std::env::var_os("JCODE_DESKTOP_PROFILE_STDERR").is_none_or(env_flag_enabled)
+    std::env::var_os("NEXT_CODE_DESKTOP_PROFILE_STDERR").is_none_or(env_flag_enabled)
 }
 
 pub(crate) fn desktop_profile_launch_id() -> &'static str {
@@ -668,14 +668,14 @@ pub(crate) fn desktop_profile_log_sender() -> Option<&'static mpsc::Sender<Deskt
             }
             let (tx, rx) = mpsc::channel::<DesktopProfileLogLine>();
             match std::thread::Builder::new()
-                .name("jcode-desktop-profile-log".to_string())
+                .name("next-code-desktop-profile-log".to_string())
                 .spawn(move || {
                     let mut file = path.and_then(|path| {
                         if let Some(parent) = path.parent()
                             && let Err(error) = std::fs::create_dir_all(parent)
                         {
                             desktop_log::error(format_args!(
-                                "jcode-desktop: failed to create profile log directory {}: {error}",
+                                "next-code-desktop: failed to create profile log directory {}: {error}",
                                 parent.display()
                             ));
                             return None;
@@ -684,7 +684,7 @@ pub(crate) fn desktop_profile_log_sender() -> Option<&'static mpsc::Sender<Deskt
                             Ok(file) => Some(file),
                             Err(error) => {
                                 desktop_log::error(format_args!(
-                                    "jcode-desktop: failed to open profile log {}: {error}",
+                                    "next-code-desktop: failed to open profile log {}: {error}",
                                     path.display()
                                 ));
                                 None
@@ -699,7 +699,7 @@ pub(crate) fn desktop_profile_log_sender() -> Option<&'static mpsc::Sender<Deskt
                             && let Err(error) = writeln!(profile_file, "{}", line.jsonl_line)
                         {
                             desktop_log::error(format_args!(
-                                "jcode-desktop: failed to write profile log: {error}"
+                                "next-code-desktop: failed to write profile log: {error}"
                             ));
                             file = None;
                         }
@@ -708,7 +708,7 @@ pub(crate) fn desktop_profile_log_sender() -> Option<&'static mpsc::Sender<Deskt
                 Ok(_) => Some(tx),
                 Err(error) => {
                     desktop_log::error(format_args!(
-                        "jcode-desktop: failed to start profile logger: {error:#}"
+                        "next-code-desktop: failed to start profile logger: {error:#}"
                     ));
                     None
                 }
@@ -741,7 +741,7 @@ pub(crate) fn emit_desktop_profile_event(event: &'static str, payload: serde_jso
             .is_err()
         {
             desktop_log::warn(format_args!(
-                "jcode-desktop: failed to queue profile event {event}, logger is closed"
+                "next-code-desktop: failed to queue profile event {event}, logger is closed"
             ));
         }
     }
@@ -760,7 +760,7 @@ pub(crate) fn log_desktop_slow_interaction(
         return;
     }
     emit_desktop_profile_event(
-        "jcode-desktop-interaction-profile",
+        "next-code-desktop-interaction-profile",
         serde_json::json!({
             "kind": kind,
             "budget_ms": duration_ms(DESKTOP_120FPS_FRAME_BUDGET),

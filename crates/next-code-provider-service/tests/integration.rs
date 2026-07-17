@@ -1,4 +1,4 @@
-//! End-to-end integration test for the jcode-provider-service facade.
+//! End-to-end integration test for the next-code-provider-service facade.
 //!
 //! Exercises the full flow the plan calls for in §3 Phase 6:
 //!   1. boot the service (real keychain + built-in providers)
@@ -305,11 +305,11 @@ fn dummy_store() -> impl next_code_provider_service::credential::CredentialServi
 #[tokio::test]
 async fn end_to_end_recents_persist_across_sessions() {
     // The runtime's record_recent() writes to
-    // ~/.jcode/model_prefs.json via model_prefs::default_path().
+    // ~/.next-code/model_prefs.json via model_prefs::default_path().
     // For test isolation we set a custom HOME so we don't pollute
     // the user's real prefs file. (HOME override is read at the
     // time default_path() is called, which is inside the test.)
-    let tmp_home = std::env::temp_dir().join(format!("jcode-runtime-home-{}", std::process::id()));
+    let tmp_home = std::env::temp_dir().join(format!("next-code-runtime-home-{}", std::process::id()));
     std::fs::create_dir_all(&tmp_home).ok();
     // Note: model_prefs::default_path() reads HOME at call time, so
     // we need to set the env var before calling into the runtime.
@@ -334,7 +334,7 @@ async fn end_to_end_recents_persist_across_sessions() {
 
     // Start a session. The runtime's record_recent() should push
     // the selection into the recents list at the real path
-    // (~/.jcode/model_prefs.json). We can't redirect that path
+    // (~/.next-code/model_prefs.json). We can't redirect that path
     // from this integration test without changing the
     // default_path() implementation, so we just verify the
     // in-memory Session was constructed correctly.
@@ -403,7 +403,7 @@ async fn end_to_end_classify_with_body_classifier() {
 async fn end_to_end_runtime_resolves_with_cli_override() {
     // The runtime picks a session based on the precedence chain:
     //   1. Explicit CLI override (provider + model)
-    //   2. Per-provider default in ~/.jcode/provider-defaults.json
+    //   2. Per-provider default in ~/.next-code/provider-defaults.json
     //   3. Global default in the same file
     //   4. Catalog::default() heuristic
     // This test exercises path 1: an explicit ById + model.

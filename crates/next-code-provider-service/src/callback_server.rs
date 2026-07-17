@@ -5,7 +5,7 @@
 //!   > 2. Auto mode: open browser → callback server listens → on
 //!   >    success → credential stored
 //!
-//! When the user runs `jcode provider connect <id>` in auto mode, the
+//! When the user runs `next-code provider connect <id>` in auto mode, the
 //! CLI:
 //!  1. Starts this server on a random local port.
 //!  2. Opens the authorization URL in the user's browser.

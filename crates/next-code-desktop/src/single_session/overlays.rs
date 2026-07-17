@@ -924,7 +924,7 @@ impl SingleSessionApp {
             Ok(_) => false,
             Err(error) => {
                 crate::desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to hydrate resumed transcript for {session_id}: {error}"
+                    "next-code-desktop: failed to hydrate resumed transcript for {session_id}: {error}"
                 ));
                 self.error = Some(format!("failed to load transcript: {error}"));
                 false

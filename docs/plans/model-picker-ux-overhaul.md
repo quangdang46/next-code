@@ -40,7 +40,7 @@ pub struct ModelKey {
 }
 ```
 
-**Persist path**: `~/.jcode/state/model_prefs.json` — atomic JSON write, same pattern as `session.json`.
+**Persist path**: `~/.next-code/state/model_prefs.json` — atomic JSON write, same pattern as `session.json`.
 
 **grep targets**:
 - `crates/jcode-base/src/session.rs` — session.json read/write pattern (JSON, atomic write)
@@ -326,7 +326,7 @@ cycle(direction: 1 | -1) {
 3. Arrow keys wrap around at list boundaries
 4. Search filters all sections with fuzzy matching (name + provider + id)
 5. `f` key toggles favorite on current selection
-6. Favorite/recent selections persist across `~/.jcode/state/model_prefs.json`
+6. Favorite/recent selections persist across `~/.next-code/state/model_prefs.json`
 7. Tab/Shift+Tab cycle through recent models
 8. Model info shown: name, provider, cost tag (Free/paid), freshness (Latest), context window, latency
 9. Highlighted model shows tooltip/info panel with details

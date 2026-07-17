@@ -93,16 +93,16 @@ struct SearchInput {
     /// Restrict to sessions updated/messages at or before this RFC3339 timestamp or YYYY-MM-DD date.
     #[serde(default)]
     before: Option<String>,
-    /// Restrict Jcode sessions by saved/bookmarked flag.
+    /// Restrict Next Code sessions by saved/bookmarked flag.
     #[serde(default)]
     saved: Option<bool>,
-    /// Restrict Jcode sessions by debug flag.
+    /// Restrict Next Code sessions by debug flag.
     #[serde(default)]
     debug: Option<bool>,
-    /// Restrict Jcode sessions by canary flag.
+    /// Restrict Next Code sessions by canary flag.
     #[serde(default)]
     canary: Option<bool>,
-    /// Restrict source: jcode, claude, codex, pi, opencode, cursor, or all.
+    /// Restrict source: next-code, claude, codex, pi, opencode, cursor, or all.
     #[serde(default)]
     source: Option<String>,
     /// Include external session sources discovered by the session picker. Defaults to true.
@@ -117,7 +117,7 @@ struct SearchInput {
     /// Bound the number of recent sessions scanned per source.
     #[serde(default)]
     max_scan_sessions: Option<i64>,
-    /// Scan every available Jcode session instead of the recent indexed subset.
+    /// Scan every available Next Code session instead of the recent indexed subset.
     #[serde(default)]
     exhaustive: Option<bool>,
 }
@@ -138,12 +138,12 @@ impl Default for SessionSearchTool {
 
 /// Warm the recent-session search indexes in the background so the first
 /// interactive `session_search` call does not pay the cold indexing cost.
-/// Covers the jcode store plus the external stores (claude/codex/pi/cursor).
+/// Covers the next-code store plus the external stores (claude/codex/pi/cursor).
 pub fn spawn_recent_index_warmup() {
     tokio::task::spawn_blocking(|| {
         let start = std::time::Instant::now();
         remove_legacy_index();
-        let empty_query = QueryProfile::new("__jcode_index_warmup__");
+        let empty_query = QueryProfile::new("__next_code_index_warmup__");
 
         let next_code_count = (|| -> Result<usize> {
             let sessions_dir = storage::next_code_dir()?.join("sessions");
@@ -155,7 +155,7 @@ pub fn spawn_recent_index_warmup() {
             Ok(collection.files.len())
         })()
         .unwrap_or_else(|err| {
-            crate::logging::info(&format!("jcode session index warmup skipped: {err}"));
+            crate::logging::info(&format!("next-code session index warmup skipped: {err}"));
             0
         });
 
@@ -183,7 +183,7 @@ pub fn spawn_recent_index_warmup() {
         }
 
         crate::logging::info(&format!(
-            "Session search index warmup completed for {next_code_count} jcode + {external_count} external session(s) in {}ms",
+            "Session search index warmup completed for {next_code_count} next-code + {external_count} external session(s) in {}ms",
             start.elapsed().as_millis()
         ));
     });
@@ -357,19 +357,19 @@ impl Tool for SessionSearchTool {
                 },
                 "saved": {
                     "type": "boolean",
-                    "description": "Restrict Jcode sessions by saved/bookmarked flag."
+                    "description": "Restrict Next Code sessions by saved/bookmarked flag."
                 },
                 "debug": {
                     "type": "boolean",
-                    "description": "Restrict Jcode sessions by debug/test flag."
+                    "description": "Restrict Next Code sessions by debug/test flag."
                 },
                 "canary": {
                     "type": "boolean",
-                    "description": "Restrict Jcode sessions by canary flag."
+                    "description": "Restrict Next Code sessions by canary flag."
                 },
                 "source": {
                     "type": "string",
-                    "enum": ["all", "jcode", "claude", "codex", "pi", "opencode", "cursor"],
+                    "enum": ["all", "next-code", "claude", "codex", "pi", "opencode", "cursor"],
                     "description": "Restrict session source. Defaults to all available sources."
                 },
                 "include_external": {
@@ -396,7 +396,7 @@ impl Tool for SessionSearchTool {
                 },
                 "exhaustive": {
                     "type": "boolean",
-                    "description": "Search every available Jcode session instead of the recent indexed subset. Slower, but useful for deep recall."
+                    "description": "Search every available Next Code session instead of the recent indexed subset. Slower, but useful for deep recall."
                 }
             },
             "required": ["query"]
@@ -574,11 +574,11 @@ fn normalize_source_filter(raw: Option<&str>) -> std::result::Result<Option<Stri
     let normalized = source.to_ascii_lowercase();
     match normalized.as_str() {
         "all" => Ok(None),
-        "jcode" | "claude" | "claude-code" | "codex" | "pi" | "opencode" | "cursor" => {
+        "next-code" | "claude" | "claude-code" | "codex" | "pi" | "opencode" | "cursor" => {
             Ok(Some(normalized.replace("claude-code", "claude")))
         }
         _ => Err(format!(
-            "source must be one of all, jcode, claude, codex, pi, opencode, or cursor; received {source}."
+            "source must be one of all, next-code, claude, codex, pi, opencode, or cursor; received {source}."
         )),
     }
 }
@@ -617,7 +617,7 @@ fn search_sessions_blocking(
         return Ok(report);
     }
 
-    if source_matches_filter("jcode", options) {
+    if source_matches_filter("next-code", options) {
         let collection = collect_session_files(sessions_dir, options.max_scan_sessions)?;
         report.truncated |= collection.truncated;
         let mut files = collection.files;
@@ -812,13 +812,13 @@ fn remove_legacy_index() {
     }
 }
 
-/// Build/update the incremental jcode session index and return the candidate
+/// Build/update the incremental next-code session index and return the candidate
 /// subset of `files` that plausibly match `query`.
 fn next_code_index_candidates(
     files: &[SessionFileCandidate],
     query: &QueryProfile,
 ) -> Result<Vec<SessionFileCandidate>> {
-    let index_path = index_dir()?.join("session_search_jcode_index_v2.bin");
+    let index_path = index_dir()?.join("session_search_next_code_index_v2.bin");
     let specs: Vec<IndexFileSpec> = files
         .iter()
         .map(|file| {
@@ -1061,7 +1061,7 @@ fn collect_external_jsonl_source(
     report.external_sources.push(source);
     let paths = collect_recent_files_recursive(&root, "jsonl", options.max_scan_sessions);
     let mut candidates = external_index_candidate_paths(source, &paths, query);
-    // Like the jcode path, cap how many candidate files get fully parsed.
+    // Like the next-code path, cap how many candidate files get fully parsed.
     // Candidates arrive most-recent-first; exhaustive mode skips the cap.
     if !options.exhaustive {
         let budget = indexed_candidate_budget(options);
@@ -1525,7 +1525,7 @@ fn append_session_results(
         && let Some(match_score) = score_message_match(&metadata_text(session), query)
     {
         results.push(SearchResult {
-            source: "jcode".to_string(),
+            source: "next-code".to_string(),
             session_id: session.id.clone(),
             short_name: session.short_name.clone(),
             title: session.display_title().map(ToOwned::to_owned),
@@ -1579,7 +1579,7 @@ fn append_session_results(
         }
 
         results.push(SearchResult {
-            source: "jcode".to_string(),
+            source: "next-code".to_string(),
             session_id: session.id.clone(),
             short_name: session.short_name.clone(),
             title: session.display_title().map(ToOwned::to_owned),
@@ -1596,7 +1596,7 @@ fn append_session_results(
             score,
             matched_terms: match_score.matched_terms,
             exact_match: match_score.exact_match,
-            context: build_jcode_context(&session.messages, message_index, options),
+            context: build_next_code_context(&session.messages, message_index, options),
         });
     }
 }
@@ -1645,10 +1645,10 @@ fn source_matches_filter(source: &str, options: &SearchOptions) -> bool {
 }
 
 fn next_code_session_matches_filters(session: &Session, options: &SearchOptions) -> bool {
-    if !source_matches_filter("jcode", options) {
+    if !source_matches_filter("next-code", options) {
         return false;
     }
-    if !provider_matches(session.provider_key.as_deref(), "jcode", options) {
+    if !provider_matches(session.provider_key.as_deref(), "next-code", options) {
         return false;
     }
     if !field_filter_matches(session.model.as_deref(), options.model_filter.as_deref()) {
@@ -1733,7 +1733,7 @@ fn role_filter_allows_external_message(role: &str, options: &SearchOptions) -> b
     }
 }
 
-fn build_jcode_context(
+fn build_next_code_context(
     messages: &[StoredMessage],
     hit_index: usize,
     options: &SearchOptions,

@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::{StdinInputRequest, Tool, ToolContext, ToolExecutionMode, ToolOutput};
 use crate::background::TaskResult;
 use crate::bus::{
@@ -27,11 +28,13 @@ const MAX_OUTPUT_LEN: usize = 30000;
 const DEFAULT_TIMEOUT_MS: u64 = 120000;
 const STDIN_POLL_INTERVAL_MS: u64 = 500;
 const STDIN_INITIAL_DELAY_MS: u64 = 300;
-const PROGRESS_MARKER_PREFIX: &str = "JCODE_PROGRESS ";
-const CHECKPOINT_MARKER_PREFIX: &str = "JCODE_CHECKPOINT ";
-const BACKGROUND_PROGRESS_GUIDANCE: &str = "For long-running background commands, prefer scripts or commands that periodically print progress updates. Best format: print lines starting with `JCODE_PROGRESS ` followed by JSON like {\"percent\":42,\"message\":\"Running\"} or {\"current\":120,\"total\":1000,\"unit\":\"batches\",\"message\":\"Epoch 2/5\",\"eta_seconds\":30}. Supported JSON fields are `percent`, `message`, `current`, `total`, `unit`, `eta_seconds`, and optional `kind`=`indeterminate` or `kind`=`checkpoint`. For milestone-style wakeups, print `JCODE_CHECKPOINT {\"message\":\"Unit tests passed\"}`. Generic fallback output that can be parsed includes `42%`, `3/10 tests`, `3 of 10 steps`, `1.5/3.0 GiB`, or phase lines like `Compiling ...`, `Downloading ...`, `Running ...`, and `Building ...`. If you are writing the script yourself, add these progress/checkpoint lines explicitly.";
-const BASH_TOOL_DESCRIPTION: &str = "Run a bash command. For long-running background commands, prefer scripts that emit progress/checkpoint lines. Print `JCODE_PROGRESS {json}` or `JCODE_CHECKPOINT {json}` lines for reliable reporting, or at least output parseable progress like `42%`, `3/10 tests`, `3 of 10 steps`, `1.5/3.0 GiB`, or `Running ...`.";
-const WINDOWS_SHELL_TOOL_DESCRIPTION: &str = "Run a shell command. For long-running background commands, prefer scripts that emit progress/checkpoint lines. Print `JCODE_PROGRESS {json}` or `JCODE_CHECKPOINT {json}` lines for reliable reporting, or at least output parseable progress like `42%`, `3/10 tests`, `3 of 10 steps`, `1.5/3.0 GiB`, or `Running ...`.";
+const PROGRESS_MARKER_PREFIX: &str = "NEXT_CODE_PROGRESS ";
+const LEGACY_PROGRESS_MARKER_PREFIX: &str = "JCODE_PROGRESS ";
+const CHECKPOINT_MARKER_PREFIX: &str = "NEXT_CODE_CHECKPOINT ";
+const LEGACY_CHECKPOINT_MARKER_PREFIX: &str = "JCODE_CHECKPOINT ";
+const BACKGROUND_PROGRESS_GUIDANCE: &str = "For long-running background commands, prefer scripts or commands that periodically print progress updates. Best format: print lines starting with `NEXT_CODE_PROGRESS ` followed by JSON like {\"percent\":42,\"message\":\"Running\"} or {\"current\":120,\"total\":1000,\"unit\":\"batches\",\"message\":\"Epoch 2/5\",\"eta_seconds\":30}. Supported JSON fields are `percent`, `message`, `current`, `total`, `unit`, `eta_seconds`, and optional `kind`=`indeterminate` or `kind`=`checkpoint`. For milestone-style wakeups, print `NEXT_CODE_CHECKPOINT {\"message\":\"Unit tests passed\"}`. Generic fallback output that can be parsed includes `42%`, `3/10 tests`, `3 of 10 steps`, `1.5/3.0 GiB`, or phase lines like `Compiling ...`, `Downloading ...`, `Running ...`, and `Building ...`. If you are writing the script yourself, add these progress/checkpoint lines explicitly. Legacy `JCODE_PROGRESS` / `JCODE_CHECKPOINT` markers are still accepted.";
+const BASH_TOOL_DESCRIPTION: &str = "Run a bash command. For long-running background commands, prefer scripts that emit progress/checkpoint lines. Print `NEXT_CODE_PROGRESS {json}` or `NEXT_CODE_CHECKPOINT {json}` lines for reliable reporting, or at least output parseable progress like `42%`, `3/10 tests`, `3 of 10 steps`, `1.5/3.0 GiB`, or `Running ...`.";
+const WINDOWS_SHELL_TOOL_DESCRIPTION: &str = "Run a shell command. For long-running background commands, prefer scripts that emit progress/checkpoint lines. Print `NEXT_CODE_PROGRESS {json}` or `NEXT_CODE_CHECKPOINT {json}` lines for reliable reporting, or at least output parseable progress like `42%`, `3/10 tests`, `3 of 10 steps`, `1.5/3.0 GiB`, or `Running ...`.";
 
 /// Build a clear timeout message. The `timeout` param is in milliseconds, which
 /// agents frequently mistake for seconds (e.g. passing 1000 thinking it means
@@ -163,8 +166,24 @@ fn summarize_background_command(description: Option<&str>, command: &str) -> Str
     truncate_str(&label, 28).to_string()
 }
 
+fn strip_progress_marker_prefix(line: &str) -> Option<&str> {
+    let trimmed = line.trim();
+    trimmed
+        .strip_prefix(PROGRESS_MARKER_PREFIX)
+        .or_else(|| trimmed.strip_prefix(LEGACY_PROGRESS_MARKER_PREFIX))
+        .map(str::trim)
+}
+
+fn strip_checkpoint_marker_prefix(line: &str) -> Option<&str> {
+    let trimmed = line.trim();
+    trimmed
+        .strip_prefix(CHECKPOINT_MARKER_PREFIX)
+        .or_else(|| trimmed.strip_prefix(LEGACY_CHECKPOINT_MARKER_PREFIX))
+        .map(str::trim)
+}
+
 fn parse_progress_marker_with_checkpoint(line: &str) -> Option<(BackgroundTaskProgress, bool)> {
-    let payload = line.trim().strip_prefix(PROGRESS_MARKER_PREFIX)?.trim();
+    let payload = strip_progress_marker_prefix(line)?;
     let marker: ProgressMarker = serde_json::from_str(payload).ok()?;
     let is_checkpoint =
         marker.checkpoint.unwrap_or(false) || matches!(marker.kind.as_deref(), Some("checkpoint"));
@@ -199,7 +218,7 @@ fn parse_progress_marker(line: &str) -> Option<BackgroundTaskProgress> {
 }
 
 fn parse_checkpoint_marker(line: &str) -> Option<BackgroundTaskProgress> {
-    let payload = line.trim().strip_prefix(CHECKPOINT_MARKER_PREFIX)?.trim();
+    let payload = strip_checkpoint_marker_prefix(line)?;
     let marker: ProgressMarker = serde_json::from_str(payload).unwrap_or_else(|_| ProgressMarker {
         percent: None,
         message: Some(payload.to_string()),
@@ -434,7 +453,7 @@ async fn handle_background_output_line(
         }
         Ok(None) => {}
         Err(err) => {
-            let warning = format!("[jcode warning] failed to parse background progress: {err}\n");
+            let warning = format!("[next-code warning] failed to parse background progress: {err}\n");
             file.write_all(warning.as_bytes()).await.ok();
             file.flush().await.ok();
         }
@@ -469,9 +488,9 @@ fn build_detached_shell_wrapper(command: &str) -> StdCommand {
     let mut cmd = StdCommand::new("bash");
     cmd.arg("-lc")
         .arg(
-            r#"eval "$JCODE_RELOAD_DETACH_COMMAND"; status=$?; printf '\n--- Command finished with exit code: %s ---\n' "$status"; exit "$status""#,
+            r#"eval "$NEXT_CODE_RELOAD_DETACH_COMMAND"; status=$?; printf '\n--- Command finished with exit code: %s ---\n' "$status"; exit "$status""#,
         )
-        .env("JCODE_RELOAD_DETACH_COMMAND", command);
+        .env("NEXT_CODE_RELOAD_DETACH_COMMAND", command);
     cmd
 }
 
@@ -566,9 +585,9 @@ impl Tool for BashTool {
 
     fn parameters_schema(&self) -> Value {
         let cmd_desc = if cfg!(windows) {
-            "The shell command to execute (via cmd.exe). If you write a long-running script or loop for run_in_background=true, make it print progress lines. Preferred format: `JCODE_PROGRESS {json}`."
+            "The shell command to execute (via cmd.exe). If you write a long-running script or loop for run_in_background=true, make it print progress lines. Preferred format: `NEXT_CODE_PROGRESS {json}`."
         } else {
-            "The bash command to execute. If you write a long-running script or loop for run_in_background=true, make it print progress lines. Preferred format: `JCODE_PROGRESS {json}`."
+            "The bash command to execute. If you write a long-running script or loop for run_in_background=true, make it print progress lines. Preferred format: `NEXT_CODE_PROGRESS {json}`."
         };
         json!({
             "type": "object",
@@ -614,7 +633,7 @@ impl Tool for BashTool {
         if crate::browser::is_browser_command(&params.command) {
             params.command = crate::browser::rewrite_command_with_full_path(&params.command);
 
-            // Start/attach a browser session for this jcode session.
+            // Start/attach a browser session for this next-code session.
             // This gives each agent its own browser tab, preventing
             // multi-agent conflicts when using the browser bridge.
             if !cfg!(windows)
@@ -653,7 +672,7 @@ impl BashTool {
         // - DANGEROUSLY_SKIP_PERMISSIONS env is set
         // - Permission mode is BypassPermissions
         if ctx.execution_mode == ToolExecutionMode::AgentTurn
-            && std::env::var("JCODE_DANGEROUSLY_SKIP_PERMISSIONS").is_err()
+            && std::env::var("NEXT_CODE_DANGEROUSLY_SKIP_PERMISSIONS").is_err()
         {
             // Check the current permission mode — skip if bypassed
             let mode = crate::dcg_bridge::current_mode();
@@ -935,7 +954,7 @@ Alternatives: {}",
         // - DANGEROUSLY_SKIP_PERMISSIONS env is set
         // - Permission mode is BypassPermissions
         if ctx.execution_mode == ToolExecutionMode::AgentTurn
-            && std::env::var("JCODE_DANGEROUSLY_SKIP_PERMISSIONS").is_err()
+            && product_env("DANGEROUSLY_SKIP_PERMISSIONS").is_err()
         {
             // Check the current permission mode — skip if bypassed
             let mode = crate::dcg_bridge::current_mode();

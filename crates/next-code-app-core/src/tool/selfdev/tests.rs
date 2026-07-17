@@ -58,7 +58,7 @@ fn create_repo_fixture() -> tempfile::TempDir {
     std::fs::create_dir_all(temp.path().join(".git")).expect("git dir");
     std::fs::write(
         temp.path().join("Cargo.toml"),
-        "[package]\nname = \"jcode\"\nversion = \"0.1.0\"\n",
+        "[package]\nname = \"next-code\"\nversion = \"0.1.0\"\n",
     )
     .expect("cargo toml");
     temp
@@ -81,8 +81,8 @@ fn test_source_state(repo_dir: &std::path::Path) -> build::SourceState {
 #[test]
 fn build_lock_is_removed_on_drop_and_can_be_reacquired() {
     let _env_lock = lock_env();
-    let temp = tempfile::tempdir().expect("temp jcode home");
-    let _home = EnvVarGuard::set("JCODE_HOME", temp.path());
+    let temp = tempfile::tempdir().expect("temp next-code home");
+    let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());
     let scope = format!("lock-drop-{}", std::process::id());
     let path = SelfDevTool::build_lock_path(&scope).expect("lock path");
 
@@ -156,7 +156,7 @@ fn test_reload_context_save_and_load_for_session_uses_session_scoped_file() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
 
     let ctx = ReloadContext {
         task_context: Some("Testing scoped reload context".to_string()),
@@ -246,7 +246,7 @@ fn test_recovery_directive_returns_none_when_no_reload_recovery_needed() {
 fn reload_timeout_secs_defaults_to_15() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
-    let _guard = EnvVarGuard::remove("JCODE_SELFDEV_RELOAD_TIMEOUT_SECS");
+    let _guard = EnvVarGuard::remove("NEXT_CODE_SELFDEV_RELOAD_TIMEOUT_SECS");
     assert_eq!(SelfDevTool::reload_timeout_secs(), 15);
 }
 
@@ -254,7 +254,7 @@ fn reload_timeout_secs_defaults_to_15() {
 fn reload_timeout_secs_honors_valid_env_override() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
-    let _guard = EnvVarGuard::set("JCODE_SELFDEV_RELOAD_TIMEOUT_SECS", "27");
+    let _guard = EnvVarGuard::set("NEXT_CODE_SELFDEV_RELOAD_TIMEOUT_SECS", "27");
     assert_eq!(SelfDevTool::reload_timeout_secs(), 27);
 }
 
@@ -262,15 +262,15 @@ fn reload_timeout_secs_honors_valid_env_override() {
 fn reload_timeout_secs_ignores_empty_invalid_and_zero_values() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
-    let _guard = EnvVarGuard::set("JCODE_SELFDEV_RELOAD_TIMEOUT_SECS", "   ");
+    let _guard = EnvVarGuard::set("NEXT_CODE_SELFDEV_RELOAD_TIMEOUT_SECS", "   ");
     assert_eq!(SelfDevTool::reload_timeout_secs(), 15);
     drop(_guard);
 
-    let _guard = EnvVarGuard::set("JCODE_SELFDEV_RELOAD_TIMEOUT_SECS", "abc");
+    let _guard = EnvVarGuard::set("NEXT_CODE_SELFDEV_RELOAD_TIMEOUT_SECS", "abc");
     assert_eq!(SelfDevTool::reload_timeout_secs(), 15);
     drop(_guard);
 
-    let _guard = EnvVarGuard::set("JCODE_SELFDEV_RELOAD_TIMEOUT_SECS", "0");
+    let _guard = EnvVarGuard::set("NEXT_CODE_SELFDEV_RELOAD_TIMEOUT_SECS", "0");
     assert_eq!(SelfDevTool::reload_timeout_secs(), 15);
 }
 
@@ -369,8 +369,8 @@ async fn test_action_queues_command_in_test_mode() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let tool = SelfDevTool::new();
@@ -382,7 +382,7 @@ async fn test_action_queues_command_in_test_mode() {
         .execute(
             json!({
                 "action": "test",
-                "command": "cargo test -p jcode selfdev_build_command",
+                "command": "cargo test -p next-code selfdev_build_command",
                 "reason": "verify selfdev test queue"
             }),
             ctx,
@@ -394,7 +394,7 @@ async fn test_action_queues_command_in_test_mode() {
     assert!(
         output
             .output
-            .contains("cargo test -p jcode selfdev_build_command")
+            .contains("cargo test -p next-code selfdev_build_command")
     );
 }
 
@@ -432,7 +432,7 @@ async fn do_reload_returns_after_ack_in_direct_mode() {
 #[test]
 fn reload_repo_resolver_uses_working_dir_when_primary_detection_fails() {
     let repo = create_repo_fixture();
-    let nested = repo.path().join("crates").join("jcode-build-support");
+    let nested = repo.path().join("crates").join("next-code-build-support");
     std::fs::create_dir_all(&nested).expect("nested dir");
 
     let resolved = reload::resolve_selfdev_reload_repo_dir_from(None, Some(&nested));
@@ -444,8 +444,8 @@ async fn enter_creates_selfdev_session_in_test_mode() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let mut parent = session::Session::create(None, Some("Origin Session".to_string()));
@@ -474,7 +474,7 @@ async fn enter_creates_selfdev_session_in_test_mode() {
     let ctx = create_test_context(&parent.id, Some(repo.path().to_path_buf()));
     let output = tool
         .execute(
-            json!({"action": "enter", "prompt": "Work on jcode itself"}),
+            json!({"action": "enter", "prompt": "Work on next-code itself"}),
             ctx,
         )
         .await
@@ -521,8 +521,8 @@ async fn enter_falls_back_to_fresh_session_when_parent_missing() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let tool = SelfDevTool::new();
@@ -552,9 +552,9 @@ async fn reload_in_non_selfdev_session_is_upgrade_in_place() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
     // Test mode short-circuits the actual server reload signal.
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
 
     let mut session = session::Session::create(None, Some("Normal Session".to_string()));
     session.save().expect("save session");
@@ -581,7 +581,7 @@ async fn socket_actions_require_selfdev_session() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
 
     let mut session = session::Session::create(None, Some("Normal Session".to_string()));
     session.save().expect("save session");
@@ -608,7 +608,7 @@ async fn find_config_reports_key_paths() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
 
     let mut session = session::Session::create(None, Some("Normal Session".to_string()));
     session.save().expect("save session");
@@ -632,9 +632,9 @@ async fn setup_reports_dependency_checks() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
     // Test mode avoids attempting a real git clone when no repo is detected.
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let mut session = session::Session::create(None, Some("Normal Session".to_string()));
@@ -664,8 +664,8 @@ async fn build_requires_reason() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let tool = SelfDevTool::new();
@@ -683,8 +683,8 @@ async fn build_queues_background_tasks_and_reports_queue_status() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let mut session_one = session::Session::create(None, Some("First build session".to_string()));
@@ -759,8 +759,8 @@ async fn build_reload_waits_for_build_then_reloads() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let mut session = session::Session::create(None, Some("Build+reload session".to_string()));
@@ -819,8 +819,8 @@ async fn build_dedupes_identical_reason_and_version_with_attached_watcher() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let mut session_one = session::Session::create(None, Some("Build A".to_string()));
@@ -880,8 +880,8 @@ async fn cancel_build_marks_request_cancelled_and_removes_it_from_queue() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let mut session_one = session::Session::create(None, Some("Build A".to_string()));
@@ -944,14 +944,14 @@ fn status_output_prunes_stale_pending_requests() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
 
     let mut session = session::Session::create(None, Some("Stale Build".to_string()));
     session.short_name = Some("ghost".to_string());
     session.save().expect("save session");
 
     let stale_status_path = temp_home.path().join("missing-selfdev.status.json");
-    let source = test_source_state(std::path::Path::new("/tmp/jcode"));
+    let source = test_source_state(std::path::Path::new("/tmp/next-code"));
     let request = BuildRequest {
         request_id: "stale-request".to_string(),
         background_task_id: Some("missing-task".to_string()),
@@ -959,10 +959,10 @@ fn status_output_prunes_stale_pending_requests() {
         session_short_name: session.short_name.clone(),
         session_title: Some("Stale Build".to_string()),
         reason: "stale reason".to_string(),
-        repo_dir: "/tmp/jcode".to_string(),
+        repo_dir: "/tmp/next-code".to_string(),
         repo_scope: source.repo_scope.clone(),
         worktree_scope: source.worktree_scope.clone(),
-        command: "scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode".to_string(),
+        command: "scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code".to_string(),
         // Outside the bootstrap grace window: a request with a missing status
         // file is only pruned once it is old enough that the queue handler
         // cannot still be mid-spawn.
@@ -1014,12 +1014,12 @@ fn freshly_queued_request_survives_reconcile_before_task_metadata_exists() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
 
     let mut session = session::Session::create(None, Some("Fresh Build".to_string()));
     session.save().expect("save session");
 
-    let source = test_source_state(std::path::Path::new("/tmp/jcode"));
+    let source = test_source_state(std::path::Path::new("/tmp/next-code"));
     let request = BuildRequest {
         request_id: "fresh-request".to_string(),
         // No background task metadata yet: mid-bootstrap.
@@ -1028,10 +1028,10 @@ fn freshly_queued_request_survives_reconcile_before_task_metadata_exists() {
         session_short_name: session.short_name.clone(),
         session_title: Some("Fresh Build".to_string()),
         reason: "fresh reason".to_string(),
-        repo_dir: "/tmp/jcode".to_string(),
+        repo_dir: "/tmp/next-code".to_string(),
         repo_scope: source.repo_scope.clone(),
         worktree_scope: source.worktree_scope.clone(),
-        command: "scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode".to_string(),
+        command: "scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code".to_string(),
         requested_at: Utc::now().to_rfc3339(),
         started_at: None,
         completed_at: None,
@@ -1071,8 +1071,8 @@ async fn build_ignores_stale_pending_requests_when_computing_queue_position() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
-    let _test_guard = EnvVarGuard::set("JCODE_TEST_SESSION", "1");
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
+    let _test_guard = EnvVarGuard::set("NEXT_CODE_TEST_SESSION", "1");
     let repo = create_repo_fixture();
 
     let mut stale_session = session::Session::create(None, Some("Stale Build".to_string()));
@@ -1116,7 +1116,7 @@ async fn build_ignores_stale_pending_requests_when_computing_queue_position() {
         repo_dir: repo.path().display().to_string(),
         repo_scope: source.repo_scope.clone(),
         worktree_scope: source.worktree_scope.clone(),
-        command: "scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode".to_string(),
+        command: "scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code".to_string(),
         // Backdated beyond the 30s bootstrap grace so reconciliation treats the
         // dead-task request as genuinely stale (a fresh timestamp would keep it
         // alive and Queued, which is the bootstrap-race protection, not the
@@ -1174,7 +1174,7 @@ fn reconcile_pending_state_maps_superseded_background_status() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
 
     let mut session = session::Session::create(None, Some("Superseded Build".to_string()));
     session.short_name = Some("alpha".to_string());
@@ -1206,7 +1206,7 @@ fn reconcile_pending_state_maps_superseded_background_status() {
     )
     .expect("write superseded status file");
 
-    let source = test_source_state(std::path::Path::new("/tmp/jcode"));
+    let source = test_source_state(std::path::Path::new("/tmp/next-code"));
     let request = BuildRequest {
         request_id: "superseded-request".to_string(),
         background_task_id: Some("superseded-task".to_string()),
@@ -1214,10 +1214,10 @@ fn reconcile_pending_state_maps_superseded_background_status() {
         session_short_name: session.short_name.clone(),
         session_title: Some("Superseded Build".to_string()),
         reason: "superseded reason".to_string(),
-        repo_dir: "/tmp/jcode".to_string(),
+        repo_dir: "/tmp/next-code".to_string(),
         repo_scope: source.repo_scope.clone(),
         worktree_scope: source.worktree_scope.clone(),
-        command: "scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode".to_string(),
+        command: "scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code".to_string(),
         requested_at: Utc::now().to_rfc3339(),
         started_at: Some(Utc::now().to_rfc3339()),
         completed_at: None,
@@ -1265,7 +1265,7 @@ fn reconcile_keeps_running_request_not_yet_registered_in_live_task_map() {
     let _storage_guard = crate::storage::lock_test_env();
     let _lock = lock_env();
     let temp_home = tempfile::TempDir::new().expect("temp home");
-    let _home_guard = EnvVarGuard::set("JCODE_HOME", temp_home.path());
+    let _home_guard = EnvVarGuard::set("NEXT_CODE_HOME", temp_home.path());
 
     let mut session = session::Session::create(None, Some("Racing Build".to_string()));
     session.save().expect("save session");
@@ -1296,7 +1296,7 @@ fn reconcile_keeps_running_request_not_yet_registered_in_live_task_map() {
     )
     .expect("write running status file");
 
-    let source = test_source_state(std::path::Path::new("/tmp/jcode"));
+    let source = test_source_state(std::path::Path::new("/tmp/next-code"));
     let request = BuildRequest {
         request_id: "racing-request".to_string(),
         background_task_id: Some("racing-task-not-in-live-map".to_string()),
@@ -1304,10 +1304,10 @@ fn reconcile_keeps_running_request_not_yet_registered_in_live_task_map() {
         session_short_name: session.short_name.clone(),
         session_title: Some("Racing Build".to_string()),
         reason: "racing reason".to_string(),
-        repo_dir: "/tmp/jcode".to_string(),
+        repo_dir: "/tmp/next-code".to_string(),
         repo_scope: source.repo_scope.clone(),
         worktree_scope: source.worktree_scope.clone(),
-        command: "scripts/dev_cargo.sh build --profile selfdev -p jcode --bin jcode".to_string(),
+        command: "scripts/dev_cargo.sh build --profile selfdev -p next-code --bin next-code".to_string(),
         requested_at: Utc::now().to_rfc3339(),
         started_at: None,
         completed_at: None,

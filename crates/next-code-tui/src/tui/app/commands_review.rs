@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::commands::{REVIEW_PREFERRED_MODEL, active_session_id, active_working_dir};
 use super::{App, DisplayMessage};
 use crate::id;
@@ -699,7 +700,7 @@ pub(super) fn launch_prompt_in_new_session_local(
         .filter(|path| path.is_dir())
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let socket = std::env::var("JCODE_SOCKET").ok();
+    let socket = product_env("SOCKET").ok();
     let opened = super::spawn_in_new_terminal(&exe, &session_id, &cwd, socket.as_deref())?;
     if opened {
         app.push_display_message(DisplayMessage::system(format!(
@@ -709,7 +710,7 @@ pub(super) fn launch_prompt_in_new_session_local(
         app.set_status_notice("Prompt launched in new session");
     } else {
         app.push_display_message(DisplayMessage::system(format!(
-            "↗ New session {} created for the next prompt.\n\nNo terminal was opened automatically. Resume manually:\n\n  jcode --resume {}",
+            "↗ New session {} created for the next prompt.\n\nNo terminal was opened automatically. Resume manually:\n\n  next-code --resume {}",
             session_name, session_id
         )));
         app.set_status_notice("Prompt session created");
@@ -747,7 +748,7 @@ fn launch_review_window_local(
         .filter(|path| path.is_dir())
         .or_else(|| std::env::current_dir().ok())
         .unwrap_or_else(|| std::path::PathBuf::from("."));
-    let socket = std::env::var("JCODE_SOCKET").ok();
+    let socket = product_env("SOCKET").ok();
     let opened = super::spawn_in_new_terminal(&exe, &session_id, &cwd, socket.as_deref())?;
     if opened {
         app.push_display_message(DisplayMessage::system(format!(
@@ -757,7 +758,7 @@ fn launch_review_window_local(
         app.set_status_notice(format!("{} launched", label));
     } else {
         app.push_display_message(DisplayMessage::system(format!(
-            "🔍 {} session {} created.\n\nNo terminal was opened automatically. Resume manually:\n\n  jcode --resume {}",
+            "🔍 {} session {} created.\n\nNo terminal was opened automatically. Resume manually:\n\n  next-code --resume {}",
             label, session_name, session_id
         )));
         app.set_status_notice(format!("{} session created", label));

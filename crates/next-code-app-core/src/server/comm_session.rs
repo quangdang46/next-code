@@ -121,7 +121,7 @@ async fn resolve_spawn_working_dir(
 }
 
 /// Launch a headed window for `session_id`, exporting the given spawn context
-/// (`JCODE_SPAWN_KIND`, swarm/coordinator ids, ...) to spawn hooks and
+/// (`NEXT_CODE_SPAWN_KIND`, swarm/coordinator ids, ...) to spawn hooks and
 /// spawned terminals so external programs can reroute the window.
 fn spawn_visible_session_window_with_context(
     session_id: &str,
@@ -133,7 +133,7 @@ fn spawn_visible_session_window_with_context(
     let exe = crate::build::client_update_candidate(selfdev_requested)
         .map(|(path, _label)| path)
         .or_else(|| std::env::current_exe().ok())
-        .unwrap_or_else(|| PathBuf::from("jcode"));
+        .unwrap_or_else(|| PathBuf::from("next-code"));
     if selfdev_requested {
         crate::session_launch::spawn_selfdev_in_new_terminal_with_context(
             &exe,
@@ -615,10 +615,10 @@ pub(super) async fn spawn_swarm_agent(
             startup_message.as_deref(),
             |session_id, cwd, selfdev_requested, provider_key| {
                 // Tag the headed window as a swarm-agent spawn so spawn hooks
-                // and terminals can identify and reroute it (JCODE_SPAWN_*).
+                // and terminals can identify and reroute it (NEXT_CODE_SPAWN_*).
                 let context = crate::session_launch::SessionSpawnContext::kind("swarm-agent")
-                    .env("JCODE_SPAWN_SWARM_ID", swarm_id)
-                    .env("JCODE_SPAWN_COORDINATOR_SESSION_ID", req_session_id)
+                    .env("NEXT_CODE_SPAWN_SWARM_ID", swarm_id)
+                    .env("NEXT_CODE_SPAWN_COORDINATOR_SESSION_ID", req_session_id)
                     .with_client_terminal_env(client_terminal_env.clone());
                 spawn_visible_session_window_with_context(
                     session_id,

@@ -18,7 +18,7 @@
 //! 4. **Terminal members are evicted** — never sticky `@name: cancelled`.
 //! 5. Live chrome with spinner (not a sticky transcript section).
 //! 6. Alternative CC surface: footer **pills** when tree mode is off
-//!    (`PromptInputFooterLeftSide` + `BackgroundTaskStatus`) — jcode maps this
+//!    (`PromptInputFooterLeftSide` + `BackgroundTaskStatus`) — next-code maps this
 //!    partially via swarm strip / running_items; tree is the spinner-tree mode.
 
 use crate::tui::color_support::rgb as rgb_color;
@@ -230,7 +230,7 @@ pub struct AgentTreeViewState {
 /// Selection hints — match CC TeammateSpinnerLine (short, only when relevant).
 ///
 /// CC (`teammateSelectHint.ts`): `"shift + ↑/↓ to select"`.
-/// jcode also accepts bare ↓ at chat bottom, but we keep the CC wording in-tree
+/// next-code also accepts bare ↓ at chat bottom, but we keep the CC wording in-tree
 /// so the chrome stays clean (long multi-path hints live only in docs).
 pub const TEAMMATE_SELECT_HINT: &str = "shift + ↑/↓ to select";
 /// CC: `enter to view` when a child is selected and not foregrounded.

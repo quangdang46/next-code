@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+use crate::env::{product_env_os};
 use super::*;
 use crate::message::{Message, ToolDefinition};
 use crate::provider::{EventStream, Provider};
@@ -346,9 +347,9 @@ async fn registry_execute_pre_tool_hook_blocks_and_allows() {
         .expect("chmod policy");
 
     // Pre-tool gate is now handled via the v1→v2 bridge, which reads the
-    // JCODE_HOOK_PRE_TOOL env var at Registry construction time.
-    let prev = std::env::var_os("JCODE_HOOK_PRE_TOOL");
-    crate::env::set_var("JCODE_HOOK_PRE_TOOL", policy.to_string_lossy().to_string());
+    // NEXT_CODE_HOOK_PRE_TOOL env var at Registry construction time.
+    let prev = product_env_os("HOOK_PRE_TOOL");
+    crate::env::set_var("NEXT_CODE_HOOK_PRE_TOOL", policy.to_string_lossy().to_string());
     crate::config::invalidate_config_cache();
 
     let provider: Arc<dyn Provider> = Arc::new(MockProvider);
@@ -388,8 +389,8 @@ async fn registry_execute_pre_tool_hook_blocks_and_allows() {
         .await;
 
     match prev {
-        Some(value) => crate::env::set_var("JCODE_HOOK_PRE_TOOL", value),
-        None => crate::env::remove_var("JCODE_HOOK_PRE_TOOL"),
+        Some(value) => crate::env::set_var("NEXT_CODE_HOOK_PRE_TOOL", value),
+        None => crate::env::remove_var("NEXT_CODE_HOOK_PRE_TOOL"),
     }
     crate::config::invalidate_config_cache();
 

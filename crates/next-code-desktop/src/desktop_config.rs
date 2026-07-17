@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use crate::{desktop_log, desktop_session_events::BACKEND_EVENT_FORWARD_MAX_RAW_EVENTS};
 use std::ffi::OsString;
 use std::time::{Duration, Instant};
@@ -29,7 +30,7 @@ fn env_flag_text_enabled(value: &str) -> bool {
 }
 
 pub(crate) fn desktop_frame_profile_mode() -> Option<String> {
-    std::env::var("JCODE_DESKTOP_FRAME_PROFILE").ok()
+    product_env("DESKTOP_FRAME_PROFILE").ok()
 }
 
 pub(crate) fn parse_positive_duration_millis(value: &str) -> Option<Duration> {
@@ -83,14 +84,14 @@ pub(crate) fn desktop_platform_support_warning(platform: DesktopPlatform) -> Opt
             "Windows desktop support is experimental; terminal spawning, power inhibit, and GPU backend behavior may differ from Linux/macOS",
         ),
         DesktopPlatform::Other => Some(
-            "this platform is not officially supported by jcode-desktop; startup will continue on a best-effort GPU backend",
+            "this platform is not officially supported by next-code-desktop; startup will continue on a best-effort GPU backend",
         ),
     }
 }
 
 pub(crate) fn log_desktop_platform_support_warning() {
     if let Some(warning) = desktop_platform_support_warning(current_desktop_platform()) {
-        desktop_log::warn(format_args!("jcode-desktop: {warning}"));
+        desktop_log::warn(format_args!("next-code-desktop: {warning}"));
     }
 }
 
@@ -111,11 +112,11 @@ impl DesktopStartupTrace {
     pub(crate) fn mark(&self, milestone: &str) {
         if self.enabled {
             eprintln!(
-                "jcode-desktop startup +{:>7.2} ms  {milestone}",
+                "next-code-desktop startup +{:>7.2} ms  {milestone}",
                 self.started_at.elapsed().as_secs_f64() * 1000.0
             );
             desktop_log::info(format_args!(
-                "jcode-desktop: startup +{:>7.2} ms {milestone}",
+                "next-code-desktop: startup +{:>7.2} ms {milestone}",
                 self.started_at.elapsed().as_secs_f64() * 1000.0
             ));
         }

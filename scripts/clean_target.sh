@@ -24,7 +24,7 @@ cd "$repo_root"
 target_dir="${CARGO_TARGET_DIR:-$repo_root/target}"
 apply="false"
 aggressive="false"
-activity_window_min="${JCODE_CLEAN_ACTIVE_WINDOW_MIN:-20}"
+activity_window_min="${NEXT_CODE_CLEAN_ACTIVE_WINDOW_MIN:-${JCODE_CLEAN_ACTIVE_WINDOW_MIN:-20}}"
 
 for arg in "$@"; do
   case "$arg" in

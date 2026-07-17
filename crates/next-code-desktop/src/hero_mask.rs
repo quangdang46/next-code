@@ -123,7 +123,7 @@ pub(crate) async fn render_hero_frame_to_image(
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
-                label: Some("jcode-desktop-hero-capture-device"),
+                label: Some("next-code-desktop-hero-capture-device"),
                 required_features: wgpu::Features::empty(),
                 required_limits: wgpu::Limits::default(),
             },
@@ -134,16 +134,16 @@ pub(crate) async fn render_hero_frame_to_image(
 
     let format = wgpu::TextureFormat::Rgba8UnormSrgb;
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-        label: Some("jcode-desktop-hero-capture-primitive-shader"),
+        label: Some("next-code-desktop-hero-capture-primitive-shader"),
         source: wgpu::ShaderSource::Wgsl(SHADER.into()),
     });
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("jcode-desktop-hero-capture-pipeline-layout"),
+        label: Some("next-code-desktop-hero-capture-pipeline-layout"),
         bind_group_layouts: &[],
         push_constant_ranges: &[],
     });
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some("jcode-desktop-hero-capture-primitive-pipeline"),
+        label: Some("next-code-desktop-hero-capture-primitive-pipeline"),
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
             module: &shader,
@@ -174,7 +174,7 @@ pub(crate) async fn render_hero_frame_to_image(
     });
 
     let texture = device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("jcode-desktop-hero-capture-texture"),
+        label: Some("next-code-desktop-hero-capture-texture"),
         size: wgpu::Extent3d {
             width: size.width,
             height: size.height,
@@ -295,7 +295,7 @@ pub(crate) async fn render_hero_frame_to_image(
         welcome_hero_reveal_progress,
     );
     let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("jcode-desktop-hero-capture-vertices"),
+        label: Some("next-code-desktop-hero-capture-vertices"),
         size: (vertices.len() * std::mem::size_of::<Vertex>()) as wgpu::BufferAddress,
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
@@ -308,18 +308,18 @@ pub(crate) async fn render_hero_frame_to_image(
         * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     let output_buffer_size = padded_bytes_per_row as u64 * size.height as u64;
     let output_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("jcode-desktop-hero-capture-readback"),
+        label: Some("next-code-desktop-hero-capture-readback"),
         size: output_buffer_size,
         usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
         mapped_at_creation: false,
     });
 
     let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("jcode-desktop-hero-capture-encoder"),
+        label: Some("next-code-desktop-hero-capture-encoder"),
     });
     {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("jcode-desktop-hero-capture-pass"),
+            label: Some("next-code-desktop-hero-capture-pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 resolve_target: None,
@@ -372,7 +372,7 @@ pub(crate) async fn render_hero_frame_to_image(
     buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
         if tx.send(result).is_err() {
             desktop_log::warn(format_args!(
-                "jcode-desktop: failed to deliver hero capture readback result"
+                "next-code-desktop: failed to deliver hero capture readback result"
             ));
         }
     });
@@ -474,7 +474,7 @@ pub(crate) struct HeroMaskRenderer {
 impl HeroMaskRenderer {
     pub(crate) fn new(device: &wgpu::Device, target_format: wgpu::TextureFormat) -> Self {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("jcode-desktop-hero-mask-bind-group-layout"),
+            label: Some("next-code-desktop-hero-mask-bind-group-layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -515,16 +515,16 @@ impl HeroMaskRenderer {
             ],
         });
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("jcode-desktop-hero-mask-pipeline-layout"),
+            label: Some("next-code-desktop-hero-mask-pipeline-layout"),
             bind_group_layouts: &[&bind_group_layout],
             push_constant_ranges: &[],
         });
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("jcode-desktop-hero-mask-shader"),
+            label: Some("next-code-desktop-hero-mask-shader"),
             source: wgpu::ShaderSource::Wgsl(HERO_MASK_SHADER.into()),
         });
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("jcode-desktop-hero-mask-pipeline"),
+            label: Some("next-code-desktop-hero-mask-pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -554,7 +554,7 @@ impl HeroMaskRenderer {
             multiview: None,
         });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("jcode-desktop-hero-mask-sampler"),
+            label: Some("next-code-desktop-hero-mask-sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -564,13 +564,13 @@ impl HeroMaskRenderer {
             ..Default::default()
         });
         let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("jcode-desktop-hero-mask-vertices"),
+            label: Some("next-code-desktop-hero-mask-vertices"),
             size: (6 * std::mem::size_of::<HeroMaskVertex>()) as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
         let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("jcode-desktop-hero-mask-uniform"),
+            label: Some("next-code-desktop-hero-mask-uniform"),
             size: std::mem::size_of::<HeroRevealUniform>() as wgpu::BufferAddress,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
@@ -643,7 +643,7 @@ impl HeroMaskRenderer {
         let glyph_texture = create_hero_mask_texture(
             device,
             queue,
-            "jcode-desktop-hero-alpha-texture",
+            "next-code-desktop-hero-alpha-texture",
             mask.width,
             mask.height,
             &mask.glyph_rgba,
@@ -651,7 +651,7 @@ impl HeroMaskRenderer {
         let reveal_texture = create_hero_mask_texture(
             device,
             queue,
-            "jcode-desktop-hero-reveal-texture",
+            "next-code-desktop-hero-reveal-texture",
             mask.width,
             mask.height,
             &mask.reveal_rgba,
@@ -659,7 +659,7 @@ impl HeroMaskRenderer {
         let glyph_view = glyph_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let reveal_view = reveal_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("jcode-desktop-hero-mask-bind-group"),
+            label: Some("next-code-desktop-hero-mask-bind-group"),
             layout: &self.bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {

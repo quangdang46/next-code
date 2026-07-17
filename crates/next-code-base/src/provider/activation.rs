@@ -1,3 +1,4 @@
+use crate::env::{product_env_os};
 use anyhow::Result;
 use next_code_provider_core::{ActiveProvider, provider_key};
 
@@ -133,7 +134,7 @@ impl ProviderActivation {
     pub fn azure_openai(model: Option<String>) -> Self {
         let activation = Self::locked(RuntimeProviderId::AzureOpenAi, ActiveProvider::OpenRouter);
         if let Some(model) = model.filter(|value| !value.trim().is_empty()) {
-            activation.with_model_hint("JCODE_OPENROUTER_MODEL", model)
+            activation.with_model_hint("NEXT_CODE_OPENROUTER_MODEL", model)
         } else {
             activation
         }
@@ -145,7 +146,7 @@ impl ProviderActivation {
             ActiveProvider::OpenRouter,
         );
         if let Some(model) = model.filter(|value| !value.trim().is_empty()) {
-            activation.with_model_hint("JCODE_OPENROUTER_MODEL", model)
+            activation.with_model_hint("NEXT_CODE_OPENROUTER_MODEL", model)
         } else {
             activation
         }
@@ -153,31 +154,31 @@ impl ProviderActivation {
 
     pub fn next_code_subscription(model: impl Into<String>) -> Self {
         Self::locked(RuntimeProviderId::Jcode, ActiveProvider::OpenRouter)
-            .with_model_hint("JCODE_OPENROUTER_MODEL", model)
+            .with_model_hint("NEXT_CODE_OPENROUTER_MODEL", model)
     }
 
     pub fn apply_env(&self) -> Result<()> {
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", self.runtime_id.key());
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", self.runtime_id.key());
         match self.runtime_id {
             RuntimeProviderId::Jcode => {
                 crate::env::set_var(
-                    "JCODE_OPENROUTER_TRANSPORT_STATE",
+                    "NEXT_CODE_OPENROUTER_TRANSPORT_STATE",
                     "next-code-subscription",
                 )
             }
             RuntimeProviderId::OpenRouter => {
-                crate::env::set_var("JCODE_OPENROUTER_TRANSPORT_STATE", "openrouter-api-key")
+                crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "openrouter-api-key")
             }
             RuntimeProviderId::AzureOpenAi => {
-                crate::env::set_var("JCODE_OPENROUTER_TRANSPORT_STATE", "direct-api-key")
+                crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "direct-api-key")
             }
             RuntimeProviderId::OpenAiCompatible => {
-                if std::env::var_os("JCODE_OPENROUTER_TRANSPORT_STATE").is_none() {
-                    crate::env::set_var("JCODE_OPENROUTER_TRANSPORT_STATE", "direct-api-key");
+                if product_env_os("OPENROUTER_TRANSPORT_STATE").is_none() {
+                    crate::env::set_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE", "direct-api-key");
                 }
             }
             _ => {
-                crate::env::remove_var("JCODE_OPENROUTER_TRANSPORT_STATE");
+                crate::env::remove_var("NEXT_CODE_OPENROUTER_TRANSPORT_STATE");
             }
         }
 
@@ -185,14 +186,14 @@ impl ProviderActivation {
         match self.selection {
             RuntimeSelection::Locked(active_provider) => {
                 active_key_for_log = provider_key(active_provider);
-                crate::env::set_var("JCODE_ACTIVE_PROVIDER", active_key_for_log);
-                crate::env::set_var("JCODE_FORCE_PROVIDER", "1");
+                crate::env::set_var("NEXT_CODE_ACTIVE_PROVIDER", active_key_for_log);
+                crate::env::set_var("NEXT_CODE_FORCE_PROVIDER", "1");
             }
             RuntimeSelection::Unlocked { active_hint } => {
-                crate::env::remove_var("JCODE_FORCE_PROVIDER");
+                crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
                 if let Some(active_provider) = active_hint {
                     active_key_for_log = provider_key(active_provider);
-                    crate::env::set_var("JCODE_ACTIVE_PROVIDER", active_key_for_log);
+                    crate::env::set_var("NEXT_CODE_ACTIVE_PROVIDER", active_key_for_log);
                 }
             }
             RuntimeSelection::Unchanged => {}
@@ -223,8 +224,8 @@ impl ProviderActivation {
 
 /// Backwards-compatible adapter for existing string-based call sites.
 pub fn lock_runtime_provider_key(provider_key_raw: &str) {
-    crate::env::set_var("JCODE_ACTIVE_PROVIDER", provider_key_raw);
-    crate::env::set_var("JCODE_FORCE_PROVIDER", "1");
+    crate::env::set_var("NEXT_CODE_ACTIVE_PROVIDER", provider_key_raw);
+    crate::env::set_var("NEXT_CODE_FORCE_PROVIDER", "1");
     crate::logging::auth_event(
         "runtime_activation_legacy_lock",
         provider_key_raw,
@@ -233,7 +234,7 @@ pub fn lock_runtime_provider_key(provider_key_raw: &str) {
 }
 
 pub fn unlock_runtime_provider() {
-    crate::env::remove_var("JCODE_FORCE_PROVIDER");
+    crate::env::remove_var("NEXT_CODE_FORCE_PROVIDER");
     crate::logging::auth_event(
         "runtime_activation_unlock",
         "runtime",
@@ -288,14 +289,14 @@ mod tests {
     #[test]
     fn azure_activation_preserves_identity_while_using_openrouter_slot() {
         // Serialize with every other test that mutates provider env vars
-        // (e.g. anthropic_tests sets JCODE_RUNTIME_PROVIDER=claude); without
+        // (e.g. anthropic_tests sets NEXT_CODE_RUNTIME_PROVIDER=claude); without
         // this lock the assertions below race parallel tests.
         let _lock = crate::storage::lock_test_env();
         let _guard = EnvGuard::new(&[
-            "JCODE_RUNTIME_PROVIDER",
-            "JCODE_ACTIVE_PROVIDER",
-            "JCODE_FORCE_PROVIDER",
-            "JCODE_OPENROUTER_MODEL",
+            "NEXT_CODE_RUNTIME_PROVIDER",
+            "NEXT_CODE_ACTIVE_PROVIDER",
+            "NEXT_CODE_FORCE_PROVIDER",
+            "NEXT_CODE_OPENROUTER_MODEL",
         ]);
 
         ProviderActivation::azure_openai(Some("gpt-4.1-mini".to_string()))
@@ -303,16 +304,16 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            std::env::var("JCODE_RUNTIME_PROVIDER").as_deref(),
+            std::env::var("NEXT_CODE_RUNTIME_PROVIDER").as_deref(),
             Ok("azure-openai")
         );
         assert_eq!(
-            std::env::var("JCODE_ACTIVE_PROVIDER").as_deref(),
+            std::env::var("NEXT_CODE_ACTIVE_PROVIDER").as_deref(),
             Ok("openrouter")
         );
-        assert_eq!(std::env::var("JCODE_FORCE_PROVIDER").as_deref(), Ok("1"));
+        assert_eq!(std::env::var("NEXT_CODE_FORCE_PROVIDER").as_deref(), Ok("1"));
         assert_eq!(
-            std::env::var("JCODE_OPENROUTER_MODEL").as_deref(),
+            std::env::var("NEXT_CODE_OPENROUTER_MODEL").as_deref(),
             Ok("gpt-4.1-mini")
         );
     }

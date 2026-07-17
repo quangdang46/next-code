@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env, product_env_os};
 use super::*;
 
 /// Selection knobs for the real-transcript benchmarks.
@@ -7,15 +8,15 @@ use super::*;
 /// qualify. Both are overridable via environment variables so a run can target
 /// more (or fewer) of the biggest transcripts without a rebuild:
 ///
-/// - `JCODE_DESKTOP_BENCHMARK_SESSIONS` (default 8)
-/// - `JCODE_DESKTOP_BENCHMARK_MIN_MESSAGES` (default 24)
+/// - `NEXT_CODE_DESKTOP_BENCHMARK_SESSIONS` (default 8)
+/// - `NEXT_CODE_DESKTOP_BENCHMARK_MIN_MESSAGES` (default 24)
 pub(crate) fn real_transcript_benchmark_selection() -> (usize, usize) {
-    let max_sessions = std::env::var("JCODE_DESKTOP_BENCHMARK_SESSIONS")
+    let max_sessions = product_env("DESKTOP_BENCHMARK_SESSIONS")
         .ok()
         .and_then(|value| value.trim().parse::<usize>().ok())
         .filter(|value| *value > 0)
         .unwrap_or(8);
-    let min_messages = std::env::var("JCODE_DESKTOP_BENCHMARK_MIN_MESSAGES")
+    let min_messages = product_env("DESKTOP_BENCHMARK_MIN_MESSAGES")
         .ok()
         .and_then(|value| value.trim().parse::<usize>().ok())
         .unwrap_or(24);
@@ -43,7 +44,7 @@ pub(crate) fn run_real_transcript_scroll_benchmark(frames: usize) -> Result<()> 
             serde_json::to_string_pretty(&serde_json::json!({
                 "frames": frames,
                 "sessions": [],
-                "note": "no real transcripts with >=24 messages found under ~/.jcode/sessions",
+                "note": "no real transcripts with >=24 messages found under ~/.next-code/sessions",
             }))?
         );
         return Ok(());
@@ -233,7 +234,7 @@ pub(crate) fn benchmark_real_transcript_scroll(
     // Optional diagnostic: capture the single slowest window rebuild and describe
     // the window content so we can attribute the cost (line count, advanced
     // shaping triggers, longest line) rather than guessing.
-    let diagnose = std::env::var_os("JCODE_DESKTOP_SCROLL_DIAG").is_some();
+    let diagnose = product_env_os("DESKTOP_SCROLL_DIAG").is_some();
     let mut worst_rebuild_us = 0.0_f64;
     let mut worst_rebuild_window_lines = 0usize;
     let mut worst_rebuild_max_line_chars = 0usize;
@@ -281,7 +282,7 @@ pub(crate) fn benchmark_real_transcript_scroll(
                     worst_rebuild_advanced_lines =
                         window.iter().filter(|l| !l.text.is_ascii()).count();
                     worst_rebuild_segments = window.iter().map(|l| l.inline_spans.len() + 1).sum();
-                    if let Ok(path) = std::env::var("JCODE_DESKTOP_SCROLL_DIAG_DUMP") {
+                    if let Ok(path) = product_env("DESKTOP_SCROLL_DIAG_DUMP") {
                         let text = window
                             .iter()
                             .map(|l| l.text.as_str())
@@ -398,7 +399,7 @@ pub(crate) fn run_real_transcript_action_benchmark(frames: usize) -> Result<()> 
             serde_json::to_string_pretty(&serde_json::json!({
                 "frames": frames,
                 "sessions": [],
-                "note": "no real transcripts with >=24 messages found under ~/.jcode/sessions",
+                "note": "no real transcripts with >=24 messages found under ~/.next-code/sessions",
             }))?
         );
         return Ok(());

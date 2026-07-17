@@ -590,7 +590,7 @@ impl JadeRelayChannel {
             "type": "response",
             "text": text,
             "request_seq": request_seq,
-            "origin": "jcode",
+            "origin": "next-code",
         });
         let resp = self
             .auth(
@@ -652,7 +652,7 @@ impl MessageChannel for JadeRelayChannel {
     fn is_reply_enabled(&self) -> bool {
         // Inbound Jade relay prompts are delivered by server::jade_relay so they
         // work even when ambient mode is disabled and target the configured live
-        // Jcode session directly. Keep this channel for outbound notifications
+        // Next Code session directly. Keep this channel for outbound notifications
         // only; otherwise ambient mode would start a second poller.
         let _configured_for_server_listener = self.reply_enabled;
         false
@@ -668,7 +668,7 @@ impl MessageChannel for JadeRelayChannel {
         let host = std::env::var("HOSTNAME")
             .or_else(|_| std::env::var("COMPUTERNAME"))
             .unwrap_or_else(|_| "laptop".to_string());
-        let device_id = format!("jcode-{}", host);
+        let device_id = format!("next-code-{}", host);
         logging::info(&format!(
             "jade relay reply loop started channel={}/{}",
             self.user_id, self.session_id
@@ -850,7 +850,7 @@ mod tests {
     /// run with the relay env vars set:
     ///   JADE_RELAY_API_BASE, JADE_RELAY_TOKEN, JADE_RELAY_TOKEN_ID,
     ///   JADE_RELAY_USER_ID, JADE_RELAY_SESSION_ID
-    ///   cargo test -p jcode-app-core relay_live -- --ignored --nocapture
+    ///   cargo test -p next-code-app-core relay_live -- --ignored --nocapture
     #[tokio::test]
     #[ignore = "requires live Jade relay credentials"]
     async fn test_relay_live_roundtrip() {
@@ -877,7 +877,7 @@ mod tests {
         );
 
         // 1) heartbeat (device register)
-        ch.heartbeat("jcode-test-device").await;
+        ch.heartbeat("next-code-test-device").await;
 
         // 2) baseline cursor: no prompts yet
         let (events, after) = ch.poll_prompts(0, 0).await.expect("baseline poll");

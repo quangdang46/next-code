@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 const IDLE_VARIANTS: &[&str] = &["donut", "orbit_rings"];
 
 // Pure math kernels (3D samplers, glyph chooser, HSV->RGB) live in the
-// dependency-free `jcode-tui-anim` crate, which is pinned to opt-level = 3 in
+// dependency-free `next-code-tui-anim` crate, which is pinned to opt-level = 3 in
 // all profiles so these trig-heavy loops stay optimized even in debug/selfdev
 // builds. They are imported under their original names so the call sites and
 // tests below are unchanged.

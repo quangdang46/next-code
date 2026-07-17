@@ -74,44 +74,44 @@ impl TestEnvGuard {
         // Prefer NEXT_CODE_*; dual-write JCODE_* so product dual-read and
         // still-legacy-only call sites both see the sandbox home.
         let prev_home = std::env::var_os("NEXT_CODE_HOME")
-            .or_else(|| std::env::var_os("JCODE_HOME"));
+            .or_else(|| std::env::var_os("NEXT_CODE_HOME"));
         let prev_runtime_dir = std::env::var_os("NEXT_CODE_RUNTIME_DIR")
-            .or_else(|| std::env::var_os("JCODE_RUNTIME_DIR"));
+            .or_else(|| std::env::var_os("NEXT_CODE_RUNTIME_DIR"));
         let prev_test_session = std::env::var_os("NEXT_CODE_TEST_SESSION")
-            .or_else(|| std::env::var_os("JCODE_TEST_SESSION"));
+            .or_else(|| std::env::var_os("NEXT_CODE_TEST_SESSION"));
         let prev_debug_control = std::env::var_os("NEXT_CODE_DEBUG_CONTROL")
-            .or_else(|| std::env::var_os("JCODE_DEBUG_CONTROL"));
+            .or_else(|| std::env::var_os("NEXT_CODE_DEBUG_CONTROL"));
         let prev_runtime_provider = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER")
-            .or_else(|| std::env::var_os("JCODE_RUNTIME_PROVIDER"));
+            .or_else(|| std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER"));
         let prev_active_provider = std::env::var_os("NEXT_CODE_ACTIVE_PROVIDER")
-            .or_else(|| std::env::var_os("JCODE_ACTIVE_PROVIDER"));
+            .or_else(|| std::env::var_os("NEXT_CODE_ACTIVE_PROVIDER"));
         let prev_openrouter_cache_namespace = std::env::var_os("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE")
-            .or_else(|| std::env::var_os("JCODE_OPENROUTER_CACHE_NAMESPACE"));
+            .or_else(|| std::env::var_os("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE"));
         let runtime_dir = temp_home.path().join("runtime");
         std::fs::create_dir_all(&runtime_dir)?;
 
         next_code::env::set_var("NEXT_CODE_HOME", temp_home.path());
-        next_code::env::set_var("JCODE_HOME", temp_home.path());
+        next_code::env::set_var("NEXT_CODE_HOME", temp_home.path());
         next_code::env::set_var("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
-        next_code::env::set_var("JCODE_RUNTIME_DIR", &runtime_dir);
+        next_code::env::set_var("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
         next_code::env::set_var("NEXT_CODE_TEST_SESSION", "1");
-        next_code::env::set_var("JCODE_TEST_SESSION", "1");
+        next_code::env::set_var("NEXT_CODE_TEST_SESSION", "1");
         next_code::env::set_var("NEXT_CODE_DEBUG_CONTROL", "1");
-        next_code::env::set_var("JCODE_DEBUG_CONTROL", "1");
+        next_code::env::set_var("NEXT_CODE_DEBUG_CONTROL", "1");
         next_code::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
-        next_code::env::remove_var("JCODE_RUNTIME_PROVIDER");
+        next_code::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
         next_code::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
-        next_code::env::remove_var("JCODE_ACTIVE_PROVIDER");
+        next_code::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
         next_code::env::remove_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
-        next_code::env::remove_var("JCODE_OPENROUTER_CACHE_NAMESPACE");
+        next_code::env::remove_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
         // Disable the memory sidecar/extraction in e2e runs. Its background
         // extraction makes its own provider `complete()` call, which would steal
         // a queued mock response from the scenario under test and make turn
         // outcomes nondeterministic across transports.
         next_code::env::set_var("NEXT_CODE_MEMORY_ENABLED", "0");
-        next_code::env::set_var("JCODE_MEMORY_ENABLED", "0");
+        next_code::env::set_var("NEXT_CODE_MEMORY_ENABLED", "0");
         next_code::env::set_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED", "0");
-        next_code::env::set_var("JCODE_MEMORY_SIDECAR_ENABLED", "0");
+        next_code::env::set_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED", "0");
 
         Ok(Self {
             _lock: lock,
@@ -141,42 +141,42 @@ impl Drop for TestEnvGuard {
                 }
             }
         }
-        restore("NEXT_CODE_HOME", "JCODE_HOME", &self.prev_home);
+        restore("NEXT_CODE_HOME", "NEXT_CODE_HOME", &self.prev_home);
         restore(
             "NEXT_CODE_RUNTIME_DIR",
-            "JCODE_RUNTIME_DIR",
+            "NEXT_CODE_RUNTIME_DIR",
             &self.prev_runtime_dir,
         );
         restore(
             "NEXT_CODE_TEST_SESSION",
-            "JCODE_TEST_SESSION",
+            "NEXT_CODE_TEST_SESSION",
             &self.prev_test_session,
         );
         restore(
             "NEXT_CODE_DEBUG_CONTROL",
-            "JCODE_DEBUG_CONTROL",
+            "NEXT_CODE_DEBUG_CONTROL",
             &self.prev_debug_control,
         );
         restore(
             "NEXT_CODE_RUNTIME_PROVIDER",
-            "JCODE_RUNTIME_PROVIDER",
+            "NEXT_CODE_RUNTIME_PROVIDER",
             &self.prev_runtime_provider,
         );
         restore(
             "NEXT_CODE_ACTIVE_PROVIDER",
-            "JCODE_ACTIVE_PROVIDER",
+            "NEXT_CODE_ACTIVE_PROVIDER",
             &self.prev_active_provider,
         );
         restore(
             "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
-            "JCODE_OPENROUTER_CACHE_NAMESPACE",
+            "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
             &self.prev_openrouter_cache_namespace,
         );
         // Clear test-only memory overrides we always set.
         next_code::env::remove_var("NEXT_CODE_MEMORY_ENABLED");
-        next_code::env::remove_var("JCODE_MEMORY_ENABLED");
+        next_code::env::remove_var("NEXT_CODE_MEMORY_ENABLED");
         next_code::env::remove_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED");
-        next_code::env::remove_var("JCODE_MEMORY_SIDECAR_ENABLED");
+        next_code::env::remove_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED");
     }
 }
 
@@ -561,15 +561,15 @@ pub(crate) struct TransportScenarioResult {
 
 pub(crate) async fn run_unix_transport_scenario() -> Result<TransportScenarioResult> {
     let runtime_dir = short_runtime_dir(format!(
-        "jcode-ws-e2e-unix-{}",
+        "next-code-ws-e2e-unix-{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let provider = MockProvider::new();
     provider.queue_response(vec![
@@ -629,7 +629,7 @@ pub(crate) async fn run_unix_transport_scenario() -> Result<TransportScenarioRes
                     .await
                     .unwrap_or_else(|e| format!("<state error: {e}>"));
                 let logs = std::env::var_os("NEXT_CODE_HOME")
-                    .or_else(|| std::env::var_os("JCODE_HOME"))
+                    .or_else(|| std::env::var_os("NEXT_CODE_HOME"))
                     .and_then(|home| latest_log_excerpt(std::path::Path::new(&home)));
                 let seen = message_events
                     .iter()
@@ -679,15 +679,15 @@ pub(crate) async fn run_unix_transport_scenario() -> Result<TransportScenarioRes
 
 pub(crate) async fn run_websocket_transport_scenario() -> Result<TransportScenarioResult> {
     let runtime_dir = short_runtime_dir(format!(
-        "jcode-ws-e2e-websocket-{}",
+        "next-code-ws-e2e-websocket-{}",
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
     let gateway_port = reserve_tcp_port()?;
     let ws_token = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     pair_test_device(ws_token)?;

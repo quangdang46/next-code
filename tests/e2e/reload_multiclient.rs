@@ -28,8 +28,8 @@ async fn start_inprocess_server(
             .as_nanos()
     ));
     std::fs::create_dir_all(&runtime_dir)?;
-    let socket_path = runtime_dir.join("jcode.sock");
-    let debug_socket_path = runtime_dir.join("jcode-debug.sock");
+    let socket_path = runtime_dir.join("next-code.sock");
+    let debug_socket_path = runtime_dir.join("next-code-debug.sock");
 
     let server_instance =
         server::Server::new_with_paths(provider, socket_path.clone(), debug_socket_path.clone());

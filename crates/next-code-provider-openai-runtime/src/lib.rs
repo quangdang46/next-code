@@ -8,6 +8,7 @@
 //! (it is shared vocabulary for routing), as does the pure request shaping in
 //! `next_code_base::provider::openai_request`.
 
+use next_code_core::env::{product_env};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use futures::{FutureExt, SinkExt, StreamExt as FuturesStreamExt};
@@ -82,7 +83,7 @@ const WEBSOCKET_PERSISTENT_HEALTHCHECK_IDLE_SECS: u64 = 15;
 /// `Some(secs)` means reconnect after that idle duration; `None` means never
 /// force a reconnect on idle alone (healthcheck + max-age still apply).
 static WEBSOCKET_PERSISTENT_IDLE_RECONNECT_SECS: LazyLock<Option<u64>> = LazyLock::new(|| {
-    match std::env::var("JCODE_OPENAI_WS_IDLE_RECONNECT_SECS") {
+    match std::env::var("NEXT_CODE_OPENAI_WS_IDLE_RECONNECT_SECS") {
         Ok(raw) => match raw.trim().parse::<u64>() {
             Ok(0) => {
                 next_code_base::logging::info(
@@ -552,7 +553,7 @@ impl OpenAIProvider {
 
         // Check for model override from environment
         let mut model =
-            std::env::var("JCODE_OPENAI_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
+            std::env::var("NEXT_CODE_OPENAI_MODEL").unwrap_or_else(|_| DEFAULT_MODEL.to_string());
         if !next_code_base::provider::known_openai_model_ids()
             .iter()
             .any(|known| known == &model)
@@ -564,11 +565,11 @@ impl OpenAIProvider {
             model = DEFAULT_MODEL.to_string();
         }
 
-        let prompt_cache_key = std::env::var("JCODE_OPENAI_PROMPT_CACHE_KEY")
+        let prompt_cache_key = product_env("OPENAI_PROMPT_CACHE_KEY")
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty());
-        let prompt_cache_retention = std::env::var("JCODE_OPENAI_PROMPT_CACHE_RETENTION")
+        let prompt_cache_retention = product_env("OPENAI_PROMPT_CACHE_RETENTION")
             .ok()
             .map(|v| v.trim().to_string())
             .filter(|v| !v.is_empty());
@@ -679,7 +680,7 @@ impl OpenAIProvider {
         // choice so UI surfaces report the auth method requests will actually use.
         // `Auto` leaves the existing identity untouched.
         if let Some(route) = mode.auth_route(next_code_provider_core::DualAuthProvider::OpenAI) {
-            next_code_base::env::set_var("JCODE_RUNTIME_PROVIDER", route.runtime_provider_key());
+            next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", route.runtime_provider_key());
         }
         // Drop any cached auth snapshot so surfaces that still consult the cheap
         // cached probe (auto-mode resolution, usage availability, account labels)
@@ -821,7 +822,7 @@ impl OpenAIProvider {
     }
 
     fn load_max_output_tokens() -> Option<u32> {
-        let raw = std::env::var("JCODE_OPENAI_MAX_OUTPUT_TOKENS").ok();
+        let raw = product_env("OPENAI_MAX_OUTPUT_TOKENS").ok();
         let parsed = Self::parse_max_output_tokens(raw.as_deref());
         if raw.is_some() {
             match parsed {

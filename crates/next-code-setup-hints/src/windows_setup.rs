@@ -74,7 +74,7 @@ fn resolve_windows_hotkeys() -> Vec<WindowsHotkey> {
     let config = super::load_launch_hotkeys_config();
     let exe_path = std::env::current_exe()
         .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_else(|_| "jcode".to_string());
+        .unwrap_or_else(|_| "next-code".to_string());
     let last_dir = super::mac_hotkey_last_dir_file()
         .map(|p| p.to_string_lossy().into_owned())
         .unwrap_or_default();
@@ -168,13 +168,13 @@ fn create_hotkey_shortcut(use_alacritty: bool) -> Result<()> {
         .args([
             "-NoProfile",
             "-Command",
-            "Get-Process powershell, pwsh -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*jcode-hotkey*' } | Stop-Process -Force -ErrorAction SilentlyContinue",
+            "Get-Process powershell, pwsh -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*next-code-hotkey*' } | Stop-Process -Force -ErrorAction SilentlyContinue",
         ])
         .output();
 
-    let ps1_path = hotkey_dir.join("jcode-hotkey.ps1");
+    let ps1_path = hotkey_dir.join("next-code-hotkey.ps1");
     std::fs::write(&ps1_path, &ps1_content)?;
-    let _ = std::fs::remove_file(hotkey_dir.join("jcode-hotkey-launcher.vbs"));
+    let _ = std::fs::remove_file(hotkey_dir.join("next-code-hotkey-launcher.vbs"));
 
     let startup_dir = format!(
         "{}\\Microsoft\\Windows\\Start Menu\\Programs\\Startup",
@@ -191,10 +191,10 @@ fn create_hotkey_shortcut(use_alacritty: bool) -> Result<()> {
         r#"
 $ErrorActionPreference = "Stop"
 $shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut("{startup_dir}\jcode-hotkey.lnk")
+$shortcut = $shell.CreateShortcut("{startup_dir}\next-code-hotkey.lnk")
 $shortcut.TargetPath = "powershell.exe"
 $shortcut.Arguments = '-NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File "{ps1_path}"'
-$shortcut.Description = "jcode Alt+; hotkey listener"
+$shortcut.Description = "next-code Alt+; hotkey listener"
 $shortcut.WindowStyle = 7
 $shortcut.Save()
 Write-Output "OK"
@@ -249,7 +249,7 @@ Write-Output "OK"
 /// Build the TUI startup notice for the Windows launch hotkeys (or `None` when
 /// there is nothing to show). Mirrors the macOS/Linux notices with Alt-style
 /// chords. Only shown once the listener is configured, since Windows needs the
-/// interactive `jcode setup-hotkey` flow to install it.
+/// interactive `next-code setup-hotkey` flow to install it.
 pub(super) fn windows_launch_hotkeys_notice(state: &SetupHintsState) -> Option<StartupHints> {
     if !state.hotkey_configured {
         return None;
@@ -288,7 +288,7 @@ pub(super) fn windows_launch_hotkeys_notice(state: &SetupHintsState) -> Option<S
         "Launch hotkeys available".to_string(),
         "Launch hotkeys",
         format!(
-            "Configured Jcode launch hotkeys:\n{}\n\nThese fire system-wide.",
+            "Configured Next Code launch hotkeys:\n{}\n\nThese fire system-wide.",
             lines.join("\n")
         ),
     ))
@@ -348,7 +348,7 @@ fn nudge_hotkey(state: &mut SetupHintsState) -> bool {
 
     eprintln!("\x1b[36m┌─────────────────────────────────────────────────────────────┐\x1b[0m");
     eprintln!(
-        "\x1b[36m│\x1b[0m \x1b[1m💡 Set up Alt+; to launch jcode from anywhere?\x1b[0m              \x1b[36m│\x1b[0m"
+        "\x1b[36m│\x1b[0m \x1b[1m💡 Set up Alt+; to launch next-code from anywhere?\x1b[0m              \x1b[36m│\x1b[0m"
     );
     eprintln!(
         "\x1b[36m│\x1b[0m                                                             \x1b[36m│\x1b[0m"
@@ -357,7 +357,7 @@ fn nudge_hotkey(state: &mut SetupHintsState) -> bool {
         "\x1b[36m│\x1b[0m    Creates a global hotkey - no extra software needed.       \x1b[36m│\x1b[0m"
     );
     eprintln!(
-        "\x1b[36m│\x1b[0m    Opens jcode in {:<39}    \x1b[36m│\x1b[0m",
+        "\x1b[36m│\x1b[0m    Opens next-code in {:<39}    \x1b[36m│\x1b[0m",
         format!("{}.", terminal_name)
     );
     eprintln!(
@@ -381,7 +381,7 @@ fn nudge_hotkey(state: &mut SetupHintsState) -> bool {
                     state.launch_hotkey_tracking_version = super::LAUNCH_HOTKEY_TRACKING_VERSION;
                     let _ = state.save();
                     eprintln!(
-                        "  \x1b[32m✓\x1b[0m Created hotkey (\x1b[1mAlt+;\x1b[0m) → {} + jcode",
+                        "  \x1b[32m✓\x1b[0m Created hotkey (\x1b[1mAlt+;\x1b[0m) → {} + next-code",
                         terminal_name
                     );
                     eprintln!();
@@ -390,7 +390,7 @@ fn nudge_hotkey(state: &mut SetupHintsState) -> bool {
                 Err(e) => {
                     eprintln!("  \x1b[31m✗\x1b[0m Failed to create hotkey: {}", e);
                     eprintln!(
-                        "    You can set it up manually later with: \x1b[1mjcode setup-hotkey\x1b[0m"
+                        "    You can set it up manually later with: \x1b[1mnext-code setup-hotkey\x1b[0m"
                     );
                     eprintln!();
                     false
@@ -417,7 +417,7 @@ fn nudge_alacritty(state: &mut SetupHintsState) -> bool {
 
     eprintln!("\x1b[36m┌─────────────────────────────────────────────────────────────┐\x1b[0m");
     eprintln!(
-        "\x1b[36m│\x1b[0m \x1b[1m💡 Alacritty: the fastest terminal for jcode\x1b[0m               \x1b[36m│\x1b[0m"
+        "\x1b[36m│\x1b[0m \x1b[1m💡 Alacritty: the fastest terminal for next-code\x1b[0m               \x1b[36m│\x1b[0m"
     );
     eprintln!(
         "\x1b[36m│\x1b[0m                                                             \x1b[36m│\x1b[0m"
@@ -464,7 +464,7 @@ fn nudge_alacritty(state: &mut SetupHintsState) -> bool {
                         match create_hotkey_shortcut(true) {
                             Ok(()) => {
                                 eprintln!(
-                                    "  \x1b[32m✓\x1b[0m Hotkey updated: \x1b[1mAlt+;\x1b[0m → Alacritty + jcode"
+                                    "  \x1b[32m✓\x1b[0m Hotkey updated: \x1b[1mAlt+;\x1b[0m → Alacritty + next-code"
                                 );
                             }
                             Err(e) => {
@@ -501,10 +501,10 @@ fn prompt_try_it_out(installed_alacritty: bool) {
         "\x1b[32m│\x1b[0m                                                             \x1b[32m│\x1b[0m"
     );
     eprintln!(
-        "\x1b[32m│\x1b[0m    Press \x1b[1mAlt+;\x1b[0m from anywhere to launch jcode.                \x1b[32m│\x1b[0m"
+        "\x1b[32m│\x1b[0m    Press \x1b[1mAlt+;\x1b[0m from anywhere to launch next-code.                \x1b[32m│\x1b[0m"
     );
     eprintln!(
-        "\x1b[32m│\x1b[0m    Inside jcode, \x1b[1mAlt+Shift+;\x1b[0m opens a new session here.      \x1b[32m│\x1b[0m"
+        "\x1b[32m│\x1b[0m    Inside next-code, \x1b[1mAlt+Shift+;\x1b[0m opens a new session here.      \x1b[32m│\x1b[0m"
     );
     if installed_alacritty {
         eprintln!(
@@ -515,7 +515,7 @@ fn prompt_try_it_out(installed_alacritty: bool) {
         "\x1b[32m│\x1b[0m                                                             \x1b[32m│\x1b[0m"
     );
     eprintln!(
-        "\x1b[32m│\x1b[0m    \x1b[90m(Starting jcode normally in 3 seconds...)\x1b[0m                 \x1b[32m│\x1b[0m"
+        "\x1b[32m│\x1b[0m    \x1b[90m(Starting next-code normally in 3 seconds...)\x1b[0m                 \x1b[32m│\x1b[0m"
     );
     eprintln!("\x1b[32m└─────────────────────────────────────────────────────────────┘\x1b[0m");
     eprintln!();
@@ -575,7 +575,7 @@ pub(super) fn run_setup_hotkey_windows() -> Result<()> {
     let terminal = detect_terminal();
     let already_using_alacritty = terminal == "alacritty";
 
-    eprintln!("\x1b[1mjcode setup-hotkey\x1b[0m");
+    eprintln!("\x1b[1mnext-code setup-hotkey\x1b[0m");
     eprintln!();
 
     eprintln!(
@@ -633,7 +633,7 @@ pub(super) fn run_setup_hotkey_windows() -> Result<()> {
     };
 
     eprintln!(
-        "  Setting up global launch hotkeys → {} + jcode...",
+        "  Setting up global launch hotkeys → {} + next-code...",
         terminal_name
     );
 
@@ -680,7 +680,7 @@ pub(super) fn create_windows_desktop_shortcut(state: &mut SetupHintsState) -> Re
     };
 
     let desktop_dir = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\Users\\Default".into());
-    let shortcut_path = format!("{}\\Desktop\\jcode.lnk", desktop_dir);
+    let shortcut_path = format!("{}\\Desktop\\next-code.lnk", desktop_dir);
 
     let ps_script = format!(
         r#"
@@ -688,7 +688,7 @@ $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut("{shortcut_path}")
 $shortcut.TargetPath = "{target}"
 $shortcut.Arguments = '{args}'
-$shortcut.Description = "jcode - AI coding agent"
+$shortcut.Description = "next-code - AI coding agent"
 $shortcut.Save()
 Write-Output "OK"
 "#,

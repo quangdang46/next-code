@@ -1,6 +1,6 @@
 //! YOLO Classifier — 2-stage LLM-based auto-approval for Mode::Auto
 //!
-//! In Mode::Auto, jcode uses this classifier to make fast auto-approval
+//! In Mode::Auto, next-code uses this classifier to make fast auto-approval
 //! decisions using the active LLM provider (Claude/Gemini/OpenAI/etc).
 //!
 //! ## Two-stage approach

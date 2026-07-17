@@ -1,4 +1,4 @@
-//! Typed client for the Jcode account and subscription API.
+//! Typed client for the Next Code account and subscription API.
 //!
 //! All bearer credentials are sent in authorization headers or JSON response
 //! bodies. They are never placed in URLs, redirects, or diagnostic messages.
@@ -116,20 +116,20 @@ impl fmt::Display for AccountApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Offline(reason) => write!(f, "temporarily offline: {reason}"),
-            Self::Unauthorized => write!(f, "the Jcode account key is revoked or expired"),
-            Self::Forbidden => write!(f, "the Jcode account request was denied"),
+            Self::Unauthorized => write!(f, "the Next Code account key is revoked or expired"),
+            Self::Forbidden => write!(f, "the Next Code account request was denied"),
             Self::LegacyBackend => write!(
                 f,
-                "the configured Jcode API uses the legacy email-based login contract; update the backend or use the current https://api.jcode.sh/v1 endpoint"
+                "the configured Next Code API uses the legacy email-based login contract; update the backend or use the current https://api.jcode.sh/v1 endpoint"
             ),
             Self::Http { status, code } => match code {
-                Some(code) => write!(f, "Jcode account API returned HTTP {status} ({code})"),
-                None => write!(f, "Jcode account API returned HTTP {status}"),
+                Some(code) => write!(f, "Next Code account API returned HTTP {status} ({code})"),
+                None => write!(f, "Next Code account API returned HTTP {status}"),
             },
             Self::InvalidResponse(detail) => {
                 write!(
                     f,
-                    "Jcode account API returned an invalid response: {detail}"
+                    "Next Code account API returned an invalid response: {detail}"
                 )
             }
         }
@@ -230,7 +230,7 @@ pub async fn request_device_authorization(
     requested_tier: Option<JcodeTier>,
 ) -> std::result::Result<DeviceAuthorization, AccountApiError> {
     let url = endpoint_url(api_base, "auth/device");
-    let mut payload = serde_json::json!({ "client_name": "jcode-cli" });
+    let mut payload = serde_json::json!({ "client_name": "next-code-cli" });
     if let Some(tier) = requested_tier {
         payload["requested_tier"] = serde_json::Value::String(tier.as_str().to_string());
     }
@@ -378,7 +378,7 @@ pub async fn fetch_subscription_me_with(
 /// Fetch account status using the configured local credential.
 pub async fn fetch_subscription_me() -> Result<SubscriptionMe> {
     let api_key = subscription_catalog::configured_api_key()
-        .context("no Jcode account credential configured (run `jcode account login`)")?;
+        .context("no Next Code account credential configured (run `next-code account login`)")?;
     fetch_subscription_me_with(
         &crate::provider::shared_http_client(),
         &configured_api_base(),

@@ -70,7 +70,7 @@ pub(super) fn edit_input_in_external_editor(app: &mut App) {
 
 pub(super) fn edit_text_in_external_editor(initial_text: &str) -> Result<String> {
     let mut file = tempfile::Builder::new()
-        .prefix("jcode-prompt-")
+        .prefix("next-code-prompt-")
         .suffix(".md")
         .tempfile()?;
     file.write_all(initial_text.as_bytes())?;
@@ -90,7 +90,7 @@ pub(super) fn edit_text_in_external_editor(initial_text: &str) -> Result<String>
     let status_result = std::process::Command::new("sh")
         .arg("-c")
         .arg("exec ${VISUAL:-${EDITOR:-vi}} \"$@\"")
-        .arg("jcode-editor")
+        .arg("next-code-editor")
         .arg(&path)
         .status();
 
@@ -1438,7 +1438,7 @@ impl App {
             .unwrap_or(false)
     }
 
-    /// Spawn a brand-new jcode session in a new terminal window.
+    /// Spawn a brand-new next-code session in a new terminal window.
     pub(crate) fn handle_new_terminal_hotkey(&mut self) {
         let cwd = commands::active_working_dir(self)
             .filter(|path| path.is_dir())
@@ -1447,7 +1447,7 @@ impl App {
         match super::spawn_fresh_session_in_new_terminal(&cwd) {
             Ok(true) => self.set_status_notice("↗ New terminal opened"),
             Ok(false) => {
-                self.set_status_notice("No supported terminal found; run `jcode` manually")
+                self.set_status_notice("No supported terminal found; run `next-code` manually")
             }
             Err(error) => self.set_status_notice(format!("New terminal failed: {}", error)),
         }
@@ -3601,7 +3601,7 @@ impl App {
 
             if self.is_remote {
                 self.push_display_message(DisplayMessage::system(
-                    "Input-line ! shell commands are only available in a local jcode TUI session.",
+                    "Input-line ! shell commands are only available in a local next-code TUI session.",
                 ));
                 self.set_status_notice("Local shell unavailable in remote mode");
                 return;
@@ -3637,7 +3637,7 @@ impl App {
             // daemon-side `skill_manage reload_all` can update a different process.
             // On a slash miss, synchronously refresh from the active session working
             // directory before reporting Unknown skill so project-local skills such
-            // as .jcode/skills/optimization work immediately after reload/build.
+            // as .next-code/skills/optimization work immediately after reload/build.
             if skill.is_none() {
                 let working_dir = self
                     .session
@@ -3682,7 +3682,7 @@ impl App {
                             skill_name, install
                         ),
                         None => format!(
-                            "Skill /{} is endorsed but not installed (source: {}). Install it into ~/.jcode/skills/{}/SKILL.md.",
+                            "Skill /{} is endorsed but not installed (source: {}). Install it into ~/.next-code/skills/{}/SKILL.md.",
                             skill_name, endorsed.source, skill_name
                         ),
                     });

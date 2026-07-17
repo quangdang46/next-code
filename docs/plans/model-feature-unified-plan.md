@@ -22,7 +22,7 @@ jcode's model feature is 60% there — has model picker, switching, provider cat
 
 ### Chosen Approach: OpenCode's 3-layer + Codex's persistence
 
-- **Layer 1 — Persistence** (Codex): `/model` + picker write to `~/.jcode/config.toml` (DONE, but buggy). Add `model_prefs.json` for favorites/recents/variant.
+- **Layer 1 — Persistence** (Codex): `/model` + picker write to `~/.next-code/config.toml` (DONE, but buggy). Add `model_prefs.json` for favorites/recents/variant.
 - **Layer 2 — Store/Sync**: Sync config on model change for daemon mode. `SetModel`/`SetRoute` both save to config server-side. Client-side cycle_model should go through server protocol, not local provider.
 - **Layer 3 — Picker UI** (OpenCode): Sectioned: Favorites → Recent → Provider. fuzzysort multi-key. Variant sub-dialog. Provider selector.
 

@@ -158,7 +158,7 @@ mod tests {
 
     #[test]
     fn record_returns_consistent_tag() {
-        let path = Path::new("/tmp/jcode-snap-test-a.txt");
+        let path = Path::new("/tmp/next-code-snap-test-a.txt");
         let tag1 = record(path, "hello\nworld\n", None);
         assert_eq!(tag1.len(), 4);
         let tag2 = record(path, "hello\nworld\n", None);
@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn head_returns_most_recent() {
-        let path = Path::new("/tmp/jcode-snap-test-b.txt");
+        let path = Path::new("/tmp/next-code-snap-test-b.txt");
         let t1 = record(path, "v1", None);
         let t2 = record(path, "v2", None);
         assert_ne!(t1, t2);
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn by_hash_finds_historical_version() {
-        let path = Path::new("/tmp/jcode-snap-test-c.txt");
+        let path = Path::new("/tmp/next-code-snap-test-c.txt");
         let t1 = record(path, "alpha", None);
         let _t2 = record(path, "beta", None);
         let snap = by_hash(path, &t1).expect("old version should be retained");
@@ -186,7 +186,7 @@ mod tests {
 
     #[test]
     fn seen_lines_propagate() {
-        let path = Path::new("/tmp/jcode-snap-test-d.txt");
+        let path = Path::new("/tmp/next-code-snap-test-d.txt");
         let tag = record(path, "l1\nl2\nl3\n", Some(&[1, 2]));
         record_seen_lines(path, &tag, &[3]);
         let snap = head(path).expect("head");

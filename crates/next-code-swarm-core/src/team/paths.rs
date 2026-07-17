@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use crate::team::spec::{TeamError, TeamResult};
 
 /// Env var that overrides the team base directory (used by tests/benchmarks).
-pub const TEAMS_BASE_OVERRIDE_ENV: &str = "JCODE_TEAMS_BASE_OVERRIDE";
+pub const TEAMS_BASE_OVERRIDE_ENV: &str = "NEXT_CODE_TEAMS_BASE_OVERRIDE";
 
-/// `~/.jcode/teams` — the team base directory (or the override dir in tests).
+/// `~/.next-code/teams` — the team base directory (or the override dir in tests).
 pub fn teams_base_dir() -> PathBuf {
     if let Some(over) = std::env::var_os(TEAMS_BASE_OVERRIDE_ENV) {
         return PathBuf::from(over);

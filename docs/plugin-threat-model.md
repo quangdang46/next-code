@@ -1,6 +1,6 @@
 # Plugin System Threat Model
 
-This document applies the STRIDE framework to jcode's plugin runtime. Each threat category identifies a class of attack, evaluates how jcode's architecture mitigates it, and documents any residual risk.
+This document applies the STRIDE framework to next-code's plugin runtime. Each threat category identifies a class of attack, evaluates how next-code's architecture mitigates it, and documents any residual risk.
 
 ## Scope
 
@@ -12,9 +12,9 @@ This document applies the STRIDE framework to jcode's plugin runtime. Each threa
 - Distribution paths (local path, git clone, Rust workspace crate)
 
 **Out of scope:**
-- Build-time supply chain attacks on jcode's own dependencies
+- Build-time supply chain attacks on next-code's own dependencies
 - Physical attacks on the host machine
-- OS-level sandbox escapes (jcode's plugin sandbox is a userspace sandbox, not an OS sandbox)
+- OS-level sandbox escapes (next-code's plugin sandbox is a userspace sandbox, not an OS sandbox)
 
 ---
 
@@ -35,7 +35,7 @@ This prevents a local-path plugin from spoofing a git-cloned plugin, or a git-cl
 ### Residual risk
 
 - The `package_name` uniqueness check relies on the manifest being parsed before code execution. If a manifest parser bug allows two different `package_name` values to hash/collide to the same internal identifier, a plugin could bypass the check by using a visually identical but byte-different string (Unicode confusability). The runtime should normalize `package_name` to NFC Unicode form before comparison.
-- Rust workspace crates registered via `inventory::submit!` are compiled into the binary and cannot be spoofed by runtime-loaded plugins, but two workspace crates with the same `package_name` would silently conflict at link time. A workspace-level CI check should enforce `package_name` uniqueness across all jcode-ext-* crates.
+- Rust workspace crates registered via `inventory::submit!` are compiled into the binary and cannot be spoofed by runtime-loaded plugins, but two workspace crates with the same `package_name` would silently conflict at link time. A workspace-level CI check should enforce `package_name` uniqueness across all next-code-ext-* crates.
 
 ---
 
@@ -49,7 +49,7 @@ Every capability access goes through the `CapabilityChain` before reaching the r
 
 1. The plugin declares `fs_read` and `fs_write` path patterns in its manifest.
 2. The `CapabilityChain` evaluates each access: deny list -> global deny -> allow list -> global default.
-3. The `FsConnector` matches paths by prefix: a request to read `/home/user/.jcode/data/my-plugin/stats.json` is allowed if `fs_read` contains `/home/user/.jcode/data/my-plugin`.
+3. The `FsConnector` matches paths by prefix: a request to read `/home/user/.next-code/data/my-plugin/stats.json` is allowed if `fs_read` contains `/home/user/.next-code/data/my-plugin`.
 
 For other resource types:
 - **HTTP hosts**: `http_hosts` is matched by exact host or `*.suffix` suffix glob.
@@ -67,7 +67,7 @@ Every capability access decision is logged to the `AuditTrail`, a thread-safe ri
 - `decision` -- allowed, denied, or needs_approval
 - `reason` -- explanation from the capability chain
 
-Logs are accessible via `jcode plugin audit` and can be exported as JSON. This provides tamper evidence: if a plugin accesses data outside its declared capabilities, the access attempt (and its denial) is recorded.
+Logs are accessible via `next-code plugin audit` and can be exported as JSON. This provides tamper evidence: if a plugin accesses data outside its declared capabilities, the access attempt (and its denial) is recorded.
 
 ### Residual risk
 
@@ -90,13 +90,13 @@ Every call from plugin code to a host resource passes through the `CapabilityCha
 - **Action type**: what operation was attempted (`Read`, `Write`, `Exec`, `Config`, etc.).
 - **Decision**: whether access was `allowed`, `denied`, or `needs_approval`, plus the reason.
 
-Because the audit trail is populated by the host (`jcode-plugin-runtime` code), the plugin itself cannot suppress or modify these entries. A plugin that tries to access a resource outside its capabilities will find both the attempt and the denial logged.
+Because the audit trail is populated by the host (`next-code-plugin-runtime` code), the plugin itself cannot suppress or modify these entries. A plugin that tries to access a resource outside its capabilities will find both the attempt and the denial logged.
 
 ### Residual risk
 
-- The audit trail is not authenticated or signed. If an attacker gains write access to the jcode process's memory, they could inject bogus entries or clear the trail.
+- The audit trail is not authenticated or signed. If an attacker gains write access to the next-code process's memory, they could inject bogus entries or clear the trail.
 - The audit trail is not currently persisted to disk. Process crash or restart loses all entries. Work is tracked under a future requirement for persistent audit logging.
-- For workspace crate plugins (Rust, compiled-in), the audit trail entries are the same, but the plugin's code runs natively rather than in the QuickJS sandbox. A native Rust plugin has more avenues to avoid audit logging by calling jcode internals directly instead of going through the capability chain.
+- For workspace crate plugins (Rust, compiled-in), the audit trail entries are the same, but the plugin's code runs natively rather than in the QuickJS sandbox. A native Rust plugin has more avenues to avoid audit logging by calling next-code internals directly instead of going through the capability chain.
 
 ---
 
@@ -110,9 +110,9 @@ Environment variables are gated by the `env_read` capability. A plugin must expl
 
 ```json
 {
-  "jcode": {
+  "next-code": {
     "capabilities": {
-      "env_read": ["HOME", "JCODE_API_KEY"]
+      "env_read": ["HOME", "NEXT_CODE_API_KEY"]
     }
   }
 }
@@ -126,7 +126,7 @@ Configuration values declared with `"secret": true` in the plugin's `SettingSche
 - Log output (replaced with `****`)
 - Audit trail entries (replaced with `[REDACTED]`)
 - Plugin debug output
-- `jcode plugin info` display
+- `next-code plugin info` display
 
 The runtime's `SecretRedactor` runs on all logged strings before they enter the tracing system or audit trail. This happens in `PluginApiBindings` before values are passed to plugin code, and again before values are written to the audit log.
 
@@ -148,7 +148,7 @@ The `http_hosts` capability defines which remote hosts a plugin may contact. A p
 
 ## Denial of Service
 
-**Threat:** A plugin makes excessive calls to host resources, consumes excessive CPU time or memory in the QuickJS sandbox, or holds onto resources indefinitely, degrading or denying service for other plugins or the main jcode process.
+**Threat:** A plugin makes excessive calls to host resources, consumes excessive CPU time or memory in the QuickJS sandbox, or holds onto resources indefinitely, degrading or denying service for other plugins or the main next-code process.
 
 ### Mitigation: max_hostcalls_per_sec quota
 
@@ -156,7 +156,7 @@ Each plugin declares a `max_hostcalls_per_sec` quota in its capabilities. The ru
 
 ```json
 {
-  "jcode": {
+  "next-code": {
     "capabilities": {
       "max_hostcalls_per_sec": 100
     }
@@ -218,7 +218,7 @@ pub enum ToolTier {
 
 The tool manifest's `tier` field is set in `package.json` and parsed once at load time. Once a tool's tier is assigned, it cannot be changed at runtime. The `ApprovalGate` reads the tier from the immutable tool record:
 
-1. Tool is registered via `jcode.registerTool()` -> `PluginRegistry::register_js_tool()`.
+1. Tool is registered via `next-code.registerTool()` -> `PluginRegistry::register_js_tool()`.
 2. Tool tier defaults to the plugin's manifest `tier` field (or `Exec` if unset).
 3. `ApprovalGate` consults `ToolTier` + `CapabilityChain` before every invocation.
 4. If the current permission mode forbids the tool's tier, the call is denied before any handler code runs.
@@ -263,18 +263,18 @@ A tool with `ToolTier::Read` in `Permissive` mode:
 
 - **QuickJS sandbox escape**: If an attacker achieves arbitrary code execution within the QuickJS runtime (via a vulnerability in `rquickjs` or the QuickJS C engine), they would control the sandbox thread. From there they could:
   - Call the injected Rust functions (`make_sleep_fn`, `make_uuid_fn`, `make_kv_get_fn`) with arbitrary arguments.
-  - Access the `__jcode_api` global (aliased as `jcode`) which exposes all `PluginApiBindings`.
+  - Access the `__jcode_api` global (also bound as `jcode`) which exposes all `PluginApiBindings`.
   - Attempt to find memory corruption bugs in the FFI boundary between QuickJS and Rust.
   
   Mitigation: the API surface is intentionally small (on, registerTool, logger, kv, sleep, uuid, getConfig, cwd). Each function validates its arguments at the QuickJS-to-Rust boundary. There is no `require()`, no `fetch()`, no `process` access.
 
-- **Capability confusion between distribution paths**: A Rust workspace crate plugin bypasses the QuickJS sandbox entirely -- it runs native Rust code linked into the jcode binary. It must still go through the `CapabilityChain` for resource access, but a malicious Rust plugin could:
-  - Directly call jcode internal functions if they are public.
+- **Capability confusion between distribution paths**: A Rust workspace crate plugin bypasses the QuickJS sandbox entirely -- it runs native Rust code linked into the next-code binary. It must still go through the `CapabilityChain` for resource access, but a malicious Rust plugin could:
+  - Directly call next-code internal functions if they are public.
   - Access plugin resource registries directly instead of through the audit-trailed path.
   
-  Mitigation: workspace crate plugins are compiled into the binary and reviewed as part of the build. They are not loadable at runtime, so the trust model is different from dynamic plugins. The `jcode-ext-*` convention assumes first-party trust.
+  Mitigation: workspace crate plugins are compiled into the binary and reviewed as part of the build. They are not loadable at runtime, so the trust model is different from dynamic plugins. The `next-code-ext-*` convention assumes first-party trust.
 
-- **`inventory::submit!` trust**: The `inventory` crate collects registrations at link time. Any `jcode-ext-*` crate in the workspace has its `inventory::submit!` entry unconditionally registered. There is no capability check at registration time -- the check only happens at invocation time.
+- **`inventory::submit!` trust**: The `inventory` crate collects registrations at link time. Any `next-code-ext-*` crate in the workspace has its `inventory::submit!` entry unconditionally registered. There is no capability check at registration time -- the check only happens at invocation time.
 
 ---
 
@@ -294,7 +294,7 @@ A tool with `ToolTier::Read` in `Permissive` mode:
 - [Plugin Author Guide](./plugins.md) -- how to write plugins
 - [Plugin API Reference](./plugins/api-reference.md) -- complete API surface
 - [Plugin System v2 Hardening Plan](./plugin-hardening-v2.md) -- implementation plan for the security model
-- [Safety System](./SAFETY_SYSTEM.md) -- jcode's wider safety architecture
-- [Audit Trail implementation](../crates/jcode-plugin-runtime/src/audit.rs) -- ring-buffer audit source
-- [CapabilityChain implementation](../crates/jcode-plugin-core/src/security.rs) -- capability evaluation source
-- [PluginApiBindings implementation](../crates/jcode-plugin-runtime/src/api.rs) -- JS-to-Rust bridge source
+- [Safety System](./SAFETY_SYSTEM.md) -- next-code's wider safety architecture
+- [Audit Trail implementation](../crates/next-code-plugin-runtime/src/audit.rs) -- ring-buffer audit source
+- [CapabilityChain implementation](../crates/next-code-plugin-core/src/security.rs) -- capability evaluation source
+- [PluginApiBindings implementation](../crates/next-code-plugin-runtime/src/api.rs) -- JS-to-Rust bridge source

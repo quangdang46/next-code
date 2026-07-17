@@ -10,7 +10,7 @@
 //!
 //! ## Storage
 //!
-//! Drafts live at `<JCODE_HOME>/skill_drafts.jsonl` — newline-
+//! Drafts live at `<NEXT_CODE_HOME>/skill_drafts.jsonl` — newline-
 //! delimited JSON. Each line:
 //!
 //! ```json
@@ -46,7 +46,7 @@
 //!   warrant skillification)
 //! - SKILL.md synthesis (LLM call to draft a skill from a cluster)
 //! - Drift detection vs existing skills
-//! - User-facing review UI (`jcode skills propose`)
+//! - User-facing review UI (`next-code skills propose`)
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -120,7 +120,7 @@ pub fn record_workflow(mut draft: WorkflowDraft) -> Result<()> {
 }
 
 /// Read all stored drafts. Used by the future distiller; for now
-/// also useful for tests + a `jcode skills drafts` debug subcommand.
+/// also useful for tests + a `next-code skills drafts` debug subcommand.
 pub fn load_workflows() -> Result<Vec<WorkflowDraft>> {
     let path = drafts_path()?;
     if !path.exists() {
@@ -135,7 +135,7 @@ pub fn load_workflows() -> Result<Vec<WorkflowDraft>> {
         match serde_json::from_str::<StoredWorkflow>(line) {
             Ok(stored) => out.push(stored.draft),
             Err(err) => {
-                eprintln!("jcode skill_distillation: skip malformed line: {err}");
+                eprintln!("next-code skill_distillation: skip malformed line: {err}");
             }
         }
     }
@@ -167,13 +167,13 @@ mod tests {
     {
         let _lock = crate::storage::lock_test_env();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         let result = f();
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
         result
     }

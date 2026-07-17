@@ -8,7 +8,7 @@
 //! Layout, top to bottom, vertically centered in the chat area:
 //!   1. Grayed telemetry notice header.
 //!   2. The animated donut (attention grab).
-//!   3. "Welcome to jcode onboarding" title.
+//!   3. "Welcome to next-code onboarding" title.
 //!   4. The login / getting-started prompt with suggestions.
 //!
 //! The donut is drawn as a live widget (not part of the cached transcript) so
@@ -239,9 +239,9 @@ fn telemetry_header_lines(width: u16) -> Vec<Line<'static>> {
     let align = Alignment::Center;
     let dim = Style::default().fg(dim_color());
     let lines = vec![
-        "jcode collects anonymous usage statistics (version, OS, session",
+        "next-code collects anonymous usage statistics (version, OS, session",
         "activity, and crash reasons). No code, prompts, or personal data.",
-        "Opt out anytime: export JCODE_NO_TELEMETRY=1",
+        "Opt out anytime: export NEXT_CODE_NO_TELEMETRY=1",
     ];
     lines
         .into_iter()
@@ -263,7 +263,7 @@ fn telemetry_header_lines(width: u16) -> Vec<Line<'static>> {
 /// Welcome title line, rendered just above the donut.
 fn welcome_title_line() -> Line<'static> {
     Line::from(Span::styled(
-        "Welcome to jcode onboarding",
+        "Welcome to next-code onboarding",
         Style::default()
             .fg(welcome_accent())
             .add_modifier(Modifier::BOLD),
@@ -356,7 +356,7 @@ fn welcome_body_lines(app: &dyn TuiState) -> Vec<Line<'static>> {
                         .alignment(align),
                     );
                     // If we detected a coding agent the user recently used, offer
-                    // to hand the fix to it (it can run jcode's auth-test and add
+                    // to hand the fix to it (it can run next-code's auth-test and add
                     // the key non-interactively).
                     if let Some(agent) = repair_agent_label {
                         lines.push(

@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+use crate::env::{product_env, product_env_os};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -36,28 +37,28 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
         .filter(|value| !value.is_empty())
     {
         provider_catalog::apply_named_provider_profile_env(profile_name)?;
-        crate::env::set_var("JCODE_PROVIDER_PROFILE_NAME", profile_name);
-        crate::env::set_var("JCODE_PROVIDER_PROFILE_ACTIVE", "1");
+        crate::env::set_var("NEXT_CODE_PROVIDER_PROFILE_NAME", profile_name);
+        crate::env::set_var("NEXT_CODE_PROVIDER_PROFILE_ACTIVE", "1");
         let _ = provider_choice; // keep alive; named profiles override the provider flag
     }
 
     if let Some(tool_profile) = args.tool_profile.as_deref() {
-        crate::env::set_var("JCODE_TOOL_PROFILE", tool_profile);
+        crate::env::set_var("NEXT_CODE_TOOL_PROFILE", tool_profile);
     }
     if let Some(permission_mode) = args.permission_mode.as_deref() {
-        crate::env::set_var("JCODE_PERMISSION_MODE", permission_mode);
+        crate::env::set_var("NEXT_CODE_PERMISSION_MODE", permission_mode);
     }
     if args.dangerously_skip_permissions {
-        crate::env::set_var("JCODE_DANGEROUSLY_SKIP_PERMISSIONS", "1");
+        crate::env::set_var("NEXT_CODE_DANGEROUSLY_SKIP_PERMISSIONS", "1");
     }
     if let Some(tools) = args.tools.as_deref() {
-        crate::env::set_var("JCODE_TOOLS", tools);
+        crate::env::set_var("NEXT_CODE_TOOLS", tools);
     }
     if let Some(disabled_tools) = args.disabled_tools.as_deref() {
-        crate::env::set_var("JCODE_DISABLED_TOOLS", disabled_tools);
+        crate::env::set_var("NEXT_CODE_DISABLED_TOOLS", disabled_tools);
     }
     if args.disable_base_tools {
-        crate::env::set_var("JCODE_DISABLE_BASE_TOOLS", "1");
+        crate::env::set_var("NEXT_CODE_DISABLE_BASE_TOOLS", "1");
     }
     if args.tool_profile.is_some()
         || args.tools.is_some()
@@ -68,7 +69,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
     }
 
     // Initialize permission mode from config (TOML + env override)
-    // This reads from Config which merges JCODE_PERMISSION_MODE env var
+    // This reads from Config which merges NEXT_CODE_PERMISSION_MODE env var
     // and the [permission_mode] TOML field.
     {
         let config = crate::config::config();
@@ -76,14 +77,14 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             && !crate::dcg_bridge::set_mode_from_str(mode_str)
         {
             eprintln!(
-                "Warning: JCODE_PERMISSION_MODE='{mode_str}' is not a valid mode; using Default"
+                "Warning: NEXT_CODE_PERMISSION_MODE='{mode_str}' is not a valid mode; using Default"
             );
         }
         // --dangerously-skip-permissions CLI flag overrides everything
         if args.dangerously_skip_permissions {
             crate::dcg_bridge::set_mode_from_str("bypass-permissions");
         }
-        // JCODE_DANGEROUSLY_SKIP_PERMISSIONS env var (non-CLI consumers)
+        // NEXT_CODE_DANGEROUSLY_SKIP_PERMISSIONS env var (non-CLI consumers)
         if config.dangerously_skip_permissions && !args.dangerously_skip_permissions {
             crate::dcg_bridge::set_mode_from_str("bypass-permissions");
         }
@@ -100,7 +101,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             server_name,
         }) => {
             let serve_start = Instant::now();
-            crate::env::set_var("JCODE_NON_INTERACTIVE", "1");
+            crate::env::set_var("NEXT_CODE_NON_INTERACTIVE", "1");
             if temporary_server {
                 server::configure_temporary_server(owner_pid, temp_idle_timeout_secs);
             }
@@ -493,7 +494,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             let coverage_path = coverage_file.as_deref().map(std::path::Path::new);
             let colorize = std::io::stdout().is_terminal()
                 && std::env::var_os("NO_COLOR").is_none()
-                && std::env::var_os("JCODE_NO_COLOR").is_none();
+                && product_env_os("NO_COLOR").is_none();
             if let Some(provider) = provider_query {
                 let model = model_query
                     .or_else(|| args.model.clone())
@@ -649,7 +650,7 @@ fn resolve_resume_arg(args: &mut Args) -> Result<()> {
             Err(e) => {
                 match resume_resolution_failure_action(&resume_id, |key| std::env::var_os(key)) {
                     // During a reload/update/restart handoff the client re-execs
-                    // itself with `--resume <id>` and `JCODE_RESUMING=1`. In the
+                    // itself with `--resume <id>` and `NEXT_CODE_RESUMING=1`. In the
                     // client/server architecture the shared server is the authority
                     // for session lifecycle, so an id that is not in the local store
                     // can still be valid server-side. Hard-exiting here dumped the
@@ -699,7 +700,7 @@ fn resume_resolution_failure_action<F, V>(
 where
     F: Fn(&str) -> Option<V>,
 {
-    if var_os("JCODE_RESUMING").is_some() {
+    if var_os("NEXT_CODE_RESUMING").is_some() {
         ResumeResolutionFailureAction::DeferToServer
     } else {
         ResumeResolutionFailureAction::Exit
@@ -1075,7 +1076,7 @@ async fn run_default_command(args: Args) -> Result<()> {
         server_running = wait_for_existing_reload_server("client startup").await;
     }
 
-    if !server_running && std::env::var("JCODE_RESUMING").is_ok() {
+    if !server_running && product_env("RESUMING").is_ok() {
         server_running = wait_for_resuming_server(
             "client startup without reload marker",
             std::time::Duration::from_secs(5),
@@ -1124,7 +1125,7 @@ async fn run_default_command(args: Args) -> Result<()> {
     }
 
     startup_profile::mark("pre_tui_client");
-    if std::env::var("JCODE_RESUMING").is_err() && server_running {
+    if product_env("RESUMING").is_err() && server_running {
         output::stderr_info("Connecting to server...");
     }
     tui_launch::run_tui_client(
@@ -1326,11 +1327,11 @@ pub(crate) async fn maybe_prompt_server_bootstrap_login(
     //
     // The only thing left to honor at the CLI layer is an explicit headless
     // bootstrap (e.g. CI / non-interactive provisioning), which opts in via the
-    // `JCODE_CLI_BOOTSTRAP_LOGIN` env var.
+    // `NEXT_CODE_CLI_BOOTSTRAP_LOGIN` env var.
     if cred_state.has_any || *provider_choice != ProviderChoice::Auto {
         return Ok(());
     }
-    if std::env::var_os("JCODE_CLI_BOOTSTRAP_LOGIN").is_none() {
+    if product_env_os("CLI_BOOTSTRAP_LOGIN").is_none() {
         return Ok(());
     }
 
@@ -1411,14 +1412,14 @@ pub(crate) async fn spawn_server(
     let mut cmd = ProcessCommand::new(&exe);
     cmd.env_remove(selfdev::CLIENT_SELFDEV_ENV);
     if client_requested_selfdev {
-        cmd.env("JCODE_DEBUG_CONTROL", "1");
+        cmd.env("NEXT_CODE_DEBUG_CONTROL", "1");
     }
     cmd.arg("--provider").arg(provider_choice.as_arg_value());
     // The interactive TUI owns first-run onboarding/login. Let the spawned
     // server boot with a deferred (credential-less) provider when nothing is
     // configured yet, instead of bailing; the TUI activates a provider via the
     // in-TUI `/login` flow. See init_provider_with_options.
-    cmd.env("JCODE_DEFERRED_AUTH_BOOTSTRAP", "1");
+    cmd.env("NEXT_CODE_DEFERRED_AUTH_BOOTSTRAP", "1");
     if let Some(provider_profile) = provider_profile {
         cmd.arg("--provider-profile").arg(provider_profile);
     }

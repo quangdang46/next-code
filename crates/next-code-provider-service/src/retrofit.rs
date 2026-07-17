@@ -6,7 +6,7 @@
 //!   > [ ] Retrofit layer keeps `--provider` CLI flag working for
 //!   >     existing users
 //!
-//! The old `jcode-provider-core::auth_mode` module accepted a long
+//! The old `next-code-provider-core::auth_mode` module accepted a long
 //! list of aliases — `claude`, `claude-oauth`, `claude-api-key`,
 //! `anthropic-api`, `openai`, `openai-oauth`, `openai-api`,
 //! `openai-api-key` — and quietly normalized them into a

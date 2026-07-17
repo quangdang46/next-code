@@ -1,6 +1,6 @@
 //! DCP integration test — 100-message session, verify token reduction.
 //!
-//! Validates J11 from JCODE_DCP_PLAN.md:
+//! Validates J11 from NEXT_CODE_DCP_PLAN.md:
 //! - 100-message session with realistic coding conversation content
 //!   (tool calls, tool results, text messages)
 //! - DCP transform reduces tokens (verifies strategies fire)
@@ -307,7 +307,7 @@ fn dcp_empty_messages_returns_empty() {
 fn dcp_bridge_roundtrip_preserves_content() {
     let messages = build_100_message_session();
 
-    // Forward: jcode -> DCP -> jcode
+    // Forward: next-code -> DCP -> next-code
     let dcp_msgs = dcp_bridge::next_code_to_dcp(&messages);
     assert_eq!(dcp_msgs.len(), messages.len());
 

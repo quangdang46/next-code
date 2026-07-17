@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::*;
 use crate::tui::TuiState as _;
 use std::cell::RefCell;
@@ -59,7 +60,7 @@ impl App {
     }
 
     fn configured_remote_provider_hint(&self) -> Option<String> {
-        std::env::var("JCODE_PROVIDER")
+        product_env("PROVIDER")
             .ok()
             .or_else(|| crate::config::config().provider.default_provider.clone())
             .map(|provider| provider.trim().to_string())
@@ -68,7 +69,7 @@ impl App {
 
     fn configured_remote_model_hint(&self) -> Option<String> {
         Self::sanitize_remote_model_hint(
-            std::env::var("JCODE_MODEL")
+            product_env("MODEL")
                 .ok()
                 .or_else(|| crate::config::config().provider.default_model.clone()),
         )
@@ -168,7 +169,7 @@ impl App {
     ///   credential the next request will actually use the instant the user
     ///   switches OAuth<->API (model picker, `/account`, header toggle). That
     ///   read is in-memory and cache-free, so it never lingers on a stale
-    ///   [`AuthStatus`] snapshot (cached up to 60s) or a `JCODE_RUNTIME_PROVIDER`
+    ///   [`AuthStatus`] snapshot (cached up to 60s) or a `NEXT_CODE_RUNTIME_PROVIDER`
     ///   pin that drifted out of sync with the provider. When the provider is in
     ///   auto mode (no explicit pin) it falls back to
     ///   [`resolve_dual_credential_auth`] -- shared with the header tag and
@@ -2480,7 +2481,7 @@ impl App {
             .and_then(|m| m.friendly_name.clone())
             .unwrap_or_else(|| session_id.chars().take(8).collect());
 
-        let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("jcode"));
+        let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("next-code"));
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
         match next_code_app_core::session_launch::spawn_resume_in_new_terminal(&exe, &session_id, &cwd)
         {
@@ -2765,7 +2766,7 @@ impl App {
     /// Begin hard-attach into a swarm agent session (true transcript switch).
     ///
     /// Claude Code does not resume sockets — it swaps `task.messages` in-process
-    /// and keeps `viewingAgentTaskId` until Esc. jcode must hard-resume the agent
+    /// and keeps `viewingAgentTaskId` until Esc. next-code must hard-resume the agent
     /// session, so we **must** remember the leader session for Esc return, and
     /// keep durable chrome (`hard_attached` + agent name) until resume-home.
     /// Returns `true` when hard-attach state was armed (caller should resume).
@@ -2945,7 +2946,7 @@ impl App {
         // 2) Footer tasks/bg_agent pills: bare ↑/↓ once the footer is focused
         //    (`footer:down` / `footer:up` in defaultBindings.ts).
         //
-        // jcode merges the useful bits: Shift+↑/↓ always (CC tree), AND bare
+        // next-code merges the useful bits: Shift+↑/↓ always (CC tree), AND bare
         // ↑/↓ when already selecting/viewing, AND bare ↓ when the transcript is
         // already pinned to the bottom (scroll would no-op / overscroll) — so
         // "no more messages → ↓ through agents" works without forcing Shift.
@@ -3020,7 +3021,7 @@ impl App {
 
         // Enter / 'f' while selecting — CC: one "enter to view" = real transcript.
         //
-        // jcode multi-session mapping:
+        // next-code multi-session mapping:
         //   Enter / f     → hard `resume_session` (full child history) by default
         //                   OR soft buffer-swap when Message-level stream already
         //                   exists AND not forcing hard (stays on lead socket)

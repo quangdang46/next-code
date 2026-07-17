@@ -20,8 +20,8 @@ impl PromiseBridge {
 
     /// TODO(WIP): Install promise bridge functions into the QuickJS context.
     /// Currently a no-op — the bridge between async Rust futures and JS Promises
-    /// is not yet implemented. Requires injecting `__jcode_resolve(id, data)` and
-    /// `__jcode_reject(id, error)` globals and wiring them to the oneshot channels.
+    /// is not yet implemented. Requires injecting `__nextcode_resolve` / dual-read `__jcode_resolve` and
+    /// `__nextcode_reject` / dual-read `__jcode_reject` globals and wiring them to the oneshot channels.
     pub fn install(&self, _ctx: &rquickjs::Ctx<'_>) -> Result<(), rquickjs::Error> {
         Ok(())
     }

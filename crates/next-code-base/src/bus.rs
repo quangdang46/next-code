@@ -279,7 +279,7 @@ pub struct GitStatusCompleted {
 ///
 /// Carries the already-rendered notification/wake payloads so the server's bus
 /// monitor can deliver completion through the same notify/wake path as
-/// background tasks, without re-coupling `jcode-base` to swarm internals.
+/// background tasks, without re-coupling `next-code-base` to swarm internals.
 #[derive(Clone, Debug)]
 pub struct SwarmAwaitCompleted {
     /// Session that requested the await (delivery target).
@@ -300,7 +300,7 @@ pub struct SwarmAwaitCompleted {
 ///
 /// Carries already-rendered outputs (markdown + PNG bytes) so the TUI layer can
 /// display/copy them without depending on the productivity crate's types here in
-/// `jcode-base`.
+/// `next-code-base`.
 #[derive(Clone, Debug)]
 pub struct ProductivityReportReady {
     pub session_id: String,

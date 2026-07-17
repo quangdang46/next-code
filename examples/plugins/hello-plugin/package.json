@@ -1,7 +1,7 @@
 {
   "name": "hello-plugin",
   "version": "0.1.0",
-  "description": "A real working example plugin for jcode — exercises pi.on, pi.registerTool, pi.logger, pi.kv, pi.uuid",
+  "description": "A real working example plugin for next-code — exercises pi.on, pi.registerTool, pi.logger, pi.kv, pi.uuid",
   "jcode": {
     "name": "Hello Plugin",
     "package_name": "hello-plugin",

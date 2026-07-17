@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use next_code::env::product_env;
 use clap::{Parser, ValueEnum};
 use next_code::message::{ContentBlock, Role, ToolCall};
 use next_code::perf::{SyntheticSystemProfile, TuiPerfPolicy, tui_policy_for};
@@ -1213,7 +1214,7 @@ fn make_text(len: usize) -> String {
 }
 
 fn main() -> Result<()> {
-    if std::env::var("JCODE_TUI_PROFILE").is_ok() {
+    if product_env("TUI_PROFILE").is_ok() {
         next_code::logging::init();
         if let Some(path) = next_code::logging::log_path() {
             println!("profile_log: {}", path.display());

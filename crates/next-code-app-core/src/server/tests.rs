@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+use crate::env::{product_env_os};
 use super::{
     FileAccess, Server, SessionInterruptQueues, SwarmMember, dispatch_background_task_completion,
     file_activity_scope_label, persist_swarm_state_snapshot,
@@ -93,8 +94,8 @@ fn configured_server_name_normalizes_operator_labels() {
 #[test]
 fn server_identity_uses_configured_name() {
     let _guard = crate::storage::lock_test_env();
-    let _server_name_guard = ScopedEnvVar::set("JCODE_SERVER_NAME", "env-name");
-    let _server_display_name_guard = ScopedEnvVar::set("JCODE_SERVER_DISPLAY_NAME", "display-name");
+    let _server_name_guard = ScopedEnvVar::set("NEXT_CODE_SERVER_NAME", "env-name");
+    let _server_display_name_guard = ScopedEnvVar::set("NEXT_CODE_SERVER_DISPLAY_NAME", "display-name");
 
     let server = Server::new_with_name(
         Arc::new(StreamingMockProvider::default()),
@@ -113,8 +114,8 @@ fn server_identity_uses_configured_name() {
 #[test]
 fn server_identity_reads_name_from_env() {
     let _guard = crate::storage::lock_test_env();
-    let _server_name_guard = ScopedEnvVar::set("JCODE_SERVER_NAME", "mount-cloud/john");
-    let _server_display_name_guard = ScopedEnvVar::set("JCODE_SERVER_DISPLAY_NAME", "ignored");
+    let _server_name_guard = ScopedEnvVar::set("NEXT_CODE_SERVER_NAME", "mount-cloud/john");
+    let _server_display_name_guard = ScopedEnvVar::set("NEXT_CODE_SERVER_DISPLAY_NAME", "ignored");
 
     let server = Server::new_with_name(Arc::new(StreamingMockProvider::default()), None);
 
@@ -124,19 +125,19 @@ fn server_identity_reads_name_from_env() {
 impl Drop for EnvGuard {
     fn drop(&mut self) {
         if let Some(value) = &self.prev_home {
-            crate::env::set_var("JCODE_HOME", value);
+            crate::env::set_var("NEXT_CODE_HOME", value);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
         if let Some(value) = &self.prev_runtime_dir {
-            crate::env::set_var("JCODE_RUNTIME_DIR", value);
+            crate::env::set_var("NEXT_CODE_RUNTIME_DIR", value);
         } else {
-            crate::env::remove_var("JCODE_RUNTIME_DIR");
+            crate::env::remove_var("NEXT_CODE_RUNTIME_DIR");
         }
         if let Some(value) = &self.prev_socket {
-            crate::env::set_var("JCODE_SOCKET", value);
+            crate::env::set_var("NEXT_CODE_SOCKET", value);
         } else {
-            crate::env::remove_var("JCODE_SOCKET");
+            crate::env::remove_var("NEXT_CODE_SOCKET");
         }
     }
 }
@@ -160,16 +161,16 @@ impl Drop for ScopedEnvVar {
 }
 
 fn configure_test_env(root: &tempfile::TempDir) -> EnvGuard {
-    let prev_home = std::env::var_os("JCODE_HOME");
-    let prev_runtime_dir = std::env::var_os("JCODE_RUNTIME_DIR");
-    let prev_socket = std::env::var_os("JCODE_SOCKET");
+    let prev_home = product_env_os("HOME");
+    let prev_runtime_dir = product_env_os("RUNTIME_DIR");
+    let prev_socket = product_env_os("SOCKET");
     let home_dir = root.path().join("home");
     let runtime_dir = root.path().join("runtime");
     std::fs::create_dir_all(&home_dir).expect("create home dir");
     std::fs::create_dir_all(&runtime_dir).expect("create runtime dir");
-    crate::env::set_var("JCODE_HOME", &home_dir);
-    crate::env::set_var("JCODE_RUNTIME_DIR", &runtime_dir);
-    crate::env::remove_var("JCODE_SOCKET");
+    crate::env::set_var("NEXT_CODE_HOME", &home_dir);
+    crate::env::set_var("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
+    crate::env::remove_var("NEXT_CODE_SOCKET");
     EnvGuard {
         prev_home,
         prev_runtime_dir,
@@ -621,7 +622,7 @@ async fn background_task_progress_notifies_attached_clients() {
 #[tokio::test]
 #[allow(
     clippy::await_holding_lock,
-    reason = "test intentionally serializes process-wide JCODE_HOME/env state across async recovery assertions"
+    reason = "test intentionally serializes process-wide NEXT_CODE_HOME/env state across async recovery assertions"
 )]
 async fn startup_recovery_resumes_interrupted_headless_sessions_after_reload() -> Result<()> {
     let _storage_guard = crate::storage::lock_test_env();
@@ -756,7 +757,7 @@ async fn startup_recovery_resumes_interrupted_headless_sessions_after_reload() -
 #[tokio::test]
 #[allow(
     clippy::await_holding_lock,
-    reason = "test intentionally serializes process-wide JCODE_HOME/env state across async recovery assertions"
+    reason = "test intentionally serializes process-wide NEXT_CODE_HOME/env state across async recovery assertions"
 )]
 async fn startup_recovery_preserves_headed_session_reload_context_for_later_reconnect() -> Result<()>
 {
@@ -859,7 +860,7 @@ async fn startup_recovery_preserves_headed_session_reload_context_for_later_reco
 #[tokio::test]
 #[allow(
     clippy::await_holding_lock,
-    reason = "test intentionally serializes process-wide JCODE_HOME/env state across async startup assertions"
+    reason = "test intentionally serializes process-wide NEXT_CODE_HOME/env state across async startup assertions"
 )]
 async fn startup_ready_signal_is_not_blocked_by_headless_recovery_delay() -> Result<()> {
     use std::os::unix::io::FromRawFd;
@@ -868,7 +869,7 @@ async fn startup_ready_signal_is_not_blocked_by_headless_recovery_delay() -> Res
     let _storage_guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new()?;
     let _env = configure_test_env(&temp);
-    let _delay_guard = ScopedEnvVar::set("JCODE_TEST_HEADLESS_STARTUP_RECOVERY_DELAY_MS", "500");
+    let _delay_guard = ScopedEnvVar::set("NEXT_CODE_TEST_HEADLESS_STARTUP_RECOVERY_DELAY_MS", "500");
 
     let mut headless =
         crate::session::Session::create(None, Some("headless-ready-delay".to_string()));
@@ -896,7 +897,7 @@ async fn startup_ready_signal_is_not_blocked_by_headless_recovery_delay() -> Res
     assert_eq!(pipe_rc, 0, "pipe() should succeed");
     let read_fd = ready_fds[0];
     let write_fd = ready_fds[1];
-    let _ready_fd_guard = ScopedEnvVar::set("JCODE_READY_FD", write_fd.to_string());
+    let _ready_fd_guard = ScopedEnvVar::set("NEXT_CODE_READY_FD", write_fd.to_string());
 
     let main_listener = crate::transport::Listener::bind(&server.socket_path)?;
     let debug_listener = crate::transport::Listener::bind(&server.debug_socket_path)?;

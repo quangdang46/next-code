@@ -4,11 +4,11 @@ use next_code_provider_openrouter::stream::OpenRouterStream;
 fn local_endpoint_troubleshooting_hint(api_base: &str, model: &str) -> &'static str {
     let lower = api_base.to_ascii_lowercase();
     if lower.contains("localhost:11434") || lower.contains("127.0.0.1:11434") {
-        return "Ollama hint: make sure `ollama serve` is running, the model is installed with `ollama pull <model>`, and run jcode with an installed model, for example `jcode --provider ollama --model llama3.2 run 'hello'`.";
+        return "Ollama hint: make sure `ollama serve` is running, the model is installed with `ollama pull <model>`, and run next-code with an installed model, for example `next-code --provider ollama --model llama3.2 run 'hello'`.";
     }
 
     if lower.contains("localhost:1234") || lower.contains("127.0.0.1:1234") {
-        return "LM Studio hint: start the Local Server in LM Studio, load a chat model, and run jcode with the exact model id shown by LM Studio's /v1/models endpoint.";
+        return "LM Studio hint: start the Local Server in LM Studio, load a chat model, and run next-code with the exact model id shown by LM Studio's /v1/models endpoint.";
     }
 
     if lower.contains("localhost") || lower.contains("127.0.0.1") || lower.contains("[::1]") {
@@ -175,7 +175,7 @@ async fn stream_response(
 
     if send_openrouter_headers {
         req = req
-            .header("HTTP-Referer", "https://github.com/jcode")
+            .header("HTTP-Referer", "https://github.com/quangdang46/next-code")
             .header("X-Title", "next-code");
     }
 
@@ -227,7 +227,7 @@ async fn stream_response(
     // Idle timeout between streamed chunks. Configurable so slow reasoning
     // models (e.g. DeepSeek) that think silently for minutes before emitting
     // tokens don't trip a premature timeout (issue #196). Resolved from
-    // `[provider] stream_idle_timeout_secs` / `JCODE_STREAM_IDLE_TIMEOUT_SECS`,
+    // `[provider] stream_idle_timeout_secs` / `NEXT_CODE_STREAM_IDLE_TIMEOUT_SECS`,
     // defaulting to 180s. Shared with the native provider paths (issue #434).
     let sse_chunk_timeout = crate::provider::stream_idle_timeout();
     let idle_timeout_secs = sse_chunk_timeout.as_secs();

@@ -95,12 +95,12 @@ mod tests {
 
     #[test]
     fn test_run_experiment_enable_disable_roundtrip() {
-        // Use a temp JCODE_HOME to isolate from user config.
+        // Use a temp NEXT_CODE_HOME to isolate from user config.
         let tmp = tempfile::tempdir().unwrap();
-        // JCODE_HOME points directly to the next-code data directory.
+        // NEXT_CODE_HOME points directly to the next-code data directory.
         // SAFETY: test-only env mutation, single-threaded test harness.
         unsafe {
-            std::env::set_var("JCODE_HOME", tmp.path().to_str().unwrap());
+            std::env::set_var("NEXT_CODE_HOME", tmp.path().to_str().unwrap());
         }
         // Initially hooks_v2 should be disabled by default.
         let config = crate::config::Config::load();
@@ -124,7 +124,7 @@ mod tests {
         assert_eq!(config3.experiments.entries.get("hooks_v2"), Some(&false));
         // SAFETY: test-only env mutation, single-threaded test harness.
         unsafe {
-            std::env::remove_var("JCODE_HOME");
+            std::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }

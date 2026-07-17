@@ -208,7 +208,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_and_list_plugin() {
-        let tmp = std::env::temp_dir().join(format!("jcode-manager-test-{}", uuid::Uuid::new_v4()));
+        let tmp = std::env::temp_dir().join(format!("next-code-manager-test-{}", uuid::Uuid::new_v4()));
         let mgr = PluginManager::new(tmp.clone()).await;
         let p = mgr
             .load(
@@ -227,7 +227,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_enable_disable_roundtrip() {
-        let tmp = std::env::temp_dir().join(format!("jcode-manager-test-{}", uuid::Uuid::new_v4()));
+        let tmp = std::env::temp_dir().join(format!("next-code-manager-test-{}", uuid::Uuid::new_v4()));
         let mgr = PluginManager::new(tmp.clone()).await;
         mgr.load(
             "test",
@@ -248,7 +248,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_unload_is_idempotent() {
-        let tmp = std::env::temp_dir().join(format!("jcode-manager-test-{}", uuid::Uuid::new_v4()));
+        let tmp = std::env::temp_dir().join(format!("next-code-manager-test-{}", uuid::Uuid::new_v4()));
         let mgr = PluginManager::new(tmp.clone()).await;
         // unload non-existent — should not error
         mgr.unload("nonexistent").await.unwrap();

@@ -13,7 +13,7 @@
 //! - per-transition latency budget (soft finding, reported not fatal)
 //!
 //! Run with:
-//!   cargo test -p jcode-desktop state_space -- --nocapture
+//!   cargo test -p next-code-desktop state_space -- --nocapture
 
 use super::desktop_app_driver::{DesktopAppDriver, DesktopSurfaceSnapshot};
 use super::desktop_gallery;
@@ -57,10 +57,10 @@ struct WalkBudget {
 
 fn walk_budget() -> WalkBudget {
     WalkBudget {
-        max_depth: env_usize("JCODE_WALK_DEPTH", MAX_DEPTH),
-        max_unique_states: env_usize("JCODE_WALK_STATES", MAX_UNIQUE_STATES_PER_SEED),
+        max_depth: env_usize("NEXT_CODE_WALK_DEPTH", MAX_DEPTH),
+        max_unique_states: env_usize("NEXT_CODE_WALK_STATES", MAX_UNIQUE_STATES_PER_SEED),
         seed_time_budget: Duration::from_secs(env_usize(
-            "JCODE_WALK_SECONDS",
+            "NEXT_CODE_WALK_SECONDS",
             SEED_TIME_BUDGET.as_secs() as usize,
         ) as u64),
     }

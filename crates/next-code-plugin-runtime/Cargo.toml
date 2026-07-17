@@ -2,9 +2,10 @@
 name = "next-code-plugin-runtime"
 version = "0.1.0"
 edition = "2024"
-description = "QuickJS plugin runtime: sandbox, transpiler, dispatcher, and bridge for the jcode plugin system"
+description = "QuickJS plugin runtime: sandbox, transpiler, dispatcher, and bridge for the next-code plugin system"
 
 [dependencies]
+next-code-core = { path = "../next-code-core" }
 next-code-agent-runtime = { path = "../next-code-agent-runtime" }
 next-code-plugin-core = { path = "../next-code-plugin-core" }
 rquickjs = { version = "0.7", features = ["parallel", "futures", "classes"] }

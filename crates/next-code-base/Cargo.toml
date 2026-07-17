@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
-# Foundational layer of the jcode application core: the downward-closed set of
+# Foundational layer of the next-code application core: the downward-closed set of
 # modules (provider, auth, config, session, message, memory, telemetry, ...)
 # that the server/tool/agent layer depends on. Split out of `next-code-app-core` so
 # the two halves compile as separate rustc units, halving peak compile memory.
@@ -133,7 +133,7 @@ default = ["embeddings"]
 # Compiles the in-crate test helpers (storage::lock_test_env,
 # auth::test_sandbox, bus::reset_models_updated_publish_state_for_tests, ...) as
 # `pub` so downstream crates' test targets can reach them. Enabled as a
-# dev-dependency feature by next-code-app-core / jcode / etc.; never in normal
+# dev-dependency feature by next-code-app-core / next-code / etc.; never in normal
 # (non-test) builds.
 test-support = []
 jemalloc = [

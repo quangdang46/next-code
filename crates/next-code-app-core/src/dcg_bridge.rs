@@ -1,11 +1,11 @@
-//! Bridge between jcode's permission system and `dcg-core`'s
+//! Bridge between next-code's permission system and `dcg-core`'s
 //! permission-modes API.
 //!
-//! jcode classifies *high-level intent strings* (e.g. `"read"`, `"memory"`,
+//! next-code classifies *high-level intent strings* (e.g. `"read"`, `"memory"`,
 //! `"todowrite"`). `dcg-core` evaluates *low-level tool calls*
 //! (`ToolCall::Bash`, `ToolCall::Read`, …). This module is the adapter that
-//! lets jcode delegate the "auto-allow vs requires-permission" decision to
-//! `dcg-core::Engine` while preserving jcode's own queue / TUI / notification
+//! lets next-code delegate the "auto-allow vs requires-permission" decision to
+//! `dcg-core::Engine` while preserving next-code's own queue / TUI / notification
 //! plumbing.
 //!
 //! # Wiring
@@ -52,7 +52,7 @@ pub use crate::yolo_classifier::YoloClassifier;
 static GLOBAL_MODE: LazyLock<Mutex<Mode>> = LazyLock::new(|| Mutex::new(Mode::Default));
 
 /// Per-process [`dcg_core::Engine`]. Built lazily on first `classify` call.
-/// jcode runs with a single engine because protected paths and the working
+/// next-code runs with a single engine because protected paths and the working
 /// dir are stable for the lifetime of the process.
 static ENGINE: LazyLock<Engine> = LazyLock::new(|| {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
@@ -65,9 +65,9 @@ static ENGINE: LazyLock<Engine> = LazyLock::new(|| {
 });
 
 /// Per-process [`dcg_core::Session`]. Used by `Engine::evaluate` for
-/// allow-once cache and deny counters. jcode's existing
+/// allow-once cache and deny counters. next-code's existing
 /// `PermissionRequest` queue handles the human-prompt flow, so the
-/// `Session` stays jcode-internal: it never crosses out to the user.
+/// `Session` stays next-code-internal: it never crosses out to the user.
 static SESSION: LazyLock<Mutex<Session>> = LazyLock::new(|| {
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/"));
     Mutex::new(Session::with_working_dir(cwd))
@@ -85,7 +85,7 @@ fn default_protected_paths() -> Vec<String> {
     ]
 }
 
-/// Convert a [`PermissionMode`] (from `jcode-agent-runtime`) into the
+/// Convert a [`PermissionMode`] (from `next-code-agent-runtime`) into the
 /// corresponding [`dcg_core::Mode`]. The two enums mirror each other
 /// exactly; this function is the canonical bridge.
 ///
@@ -400,7 +400,7 @@ pub fn set_mode_from_str(s: &str) -> bool {
 /// `Decision::Prompt` is returned, and consumed here after user approval.
 ///
 /// Length and shape are validated **before** any hash work to prevent
-/// pathological inputs (e.g. multi-megabyte argv from `jcode permission allow`)
+/// pathological inputs (e.g. multi-megabyte argv from `next-code permission allow`)
 /// from blocking the global `SESSION` mutex.
 pub fn consume_allow_once(code: &str) -> bool {
     if !is_valid_allow_once_code(code) {
@@ -614,7 +614,7 @@ pub fn classify_for_session(action: &str, session_id: &str) -> BridgeDecision {
     classify_with_mode(action, mode)
 }
 
-/// Three-state outcome from the bridge. jcode's `SafetySystem` collapses
+/// Three-state outcome from the bridge. next-code's `SafetySystem` collapses
 /// `Allow` to `ActionTier::AutoAllowed` and `Prompt`/`Deny` to
 /// `ActionTier::RequiresPermission` — but exposing the full set here
 /// lets future call sites (e.g. CLI hooks, MCP servers) react to a hard
@@ -624,7 +624,7 @@ pub fn classify_for_session(action: &str, session_id: &str) -> BridgeDecision {
 pub enum BridgeDecision {
     /// dcg-core allowed the action under the current mode.
     Allow,
-    /// dcg-core wants a human prompt; jcode should queue a
+    /// dcg-core wants a human prompt; next-code should queue a
     /// `PermissionRequest` with the given reason and allow-once code.
     Prompt {
         /// Short human-readable explanation of why the prompt was raised.
@@ -644,7 +644,7 @@ pub enum BridgeDecision {
     },
 }
 
-/// Classify a jcode action via dcg-core. The caller is responsible for
+/// Classify a next-code action via dcg-core. The caller is responsible for
 /// translating the result into its own `ActionTier` / `PermissionResult`
 /// vocabulary.
 #[must_use]
@@ -662,7 +662,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
     //
     // `dcg-core` Phase A does not yet expose a rule layer, so
     // `Mode::Default::fallthrough_allows()` returns `true` — meaning every
-    // unmatched call would auto-allow. That regresses jcode's legacy
+    // unmatched call would auto-allow. That regresses next-code's legacy
     // AUTO_ALLOWED-based classify, which only auto-allows a fixed set of
     // read-only / stateful-safe intents. Until dcg-core Phase 2 wires
     // pack-rule evaluation in, we keep the legacy gate inline for the
@@ -729,7 +729,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
     let decision = match SESSION.lock() {
         Ok(mut session) => ENGINE.evaluate(&mut session, &tool, mode, &effects),
         // If the session mutex is poisoned we fall back to "needs prompt"
-        // which is the safest choice for jcode's queue/TUI flow.
+        // which is the safest choice for next-code's queue/TUI flow.
         Err(_) => {
             return BridgeDecision::Prompt {
                 reason: "Session poisoned".into(),
@@ -763,7 +763,7 @@ pub fn classify_with_mode(action: &str, mode: Mode) -> BridgeDecision {
 /// Dispatch permission-related hooks after a bridge classification.
 ///
 /// This is the integration point between dcg-core's permission decision and
-/// the jcode hooks v2 system. It fires the appropriate hook event based on the
+/// the next-code hooks v2 system. It fires the appropriate hook event based on the
 /// [`BridgeDecision`] so that user-configured hooks can observe or override
 /// permission outcomes.
 ///
@@ -937,7 +937,7 @@ pub async fn dispatch_permission_replied_hooks(
     let _ = next_code_hooks::dispatch_hooks(&event, &input, &handlers, &dispatch_config).await;
 }
 
-/// Centralized list of action names that auto-allowed under jcode's
+/// Centralized list of action names that auto-allowed under next-code's
 /// legacy `AUTO_ALLOWED` table. Used by the `Default` / `Auto` mode path.
 /// Kept in lockstep with [`action_to_tool_call`] so the two views never
 /// drift.
@@ -967,14 +967,14 @@ const READ_ONLY_ACTIONS: &[&str] = &[
     "ffs symbol",
 ];
 
-/// Stateful but non-destructive intents — write to jcode-managed scratch
+/// Stateful but non-destructive intents — write to next-code-managed scratch
 /// state, never to user files.
 const STATEFUL_SAFE_ACTIONS: &[&str] = &["memory", "todo", "todowrite"];
 
-/// Map a lowercased jcode action name to a `(ToolCall, Effects)` pair.
+/// Map a lowercased next-code action name to a `(ToolCall, Effects)` pair.
 ///
 /// `dcg-core::ToolCall` only has `Bash | Edit | Write | Read | Network`
-/// variants, so we approximate jcode's higher-level action vocabulary:
+/// variants, so we approximate next-code's higher-level action vocabulary:
 ///
 /// - **Read-only** intents (`read`, `glob`, `grep`, `ls`, `codesearch`,
 ///   `*_search`, `todoread`) → `ToolCall::Read` with `[Read, Fs]`.
@@ -1048,7 +1048,7 @@ mod tests {
     use super::*;
 
     /// In `Default` mode, the legacy AUTO_ALLOWED tools must still
-    /// auto-allow so existing jcode workflows are not regressed.
+    /// auto-allow so existing next-code workflows are not regressed.
     #[test]
     fn default_mode_auto_allows_legacy_read_tools() {
         for action in [

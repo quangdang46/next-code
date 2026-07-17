@@ -143,17 +143,17 @@ jobs:
           fi
           cargo build --release --target ${{ matrix.target }}
         env:
-          JCODE_RELEASE_BUILD: "1"
-          JCODE_BUILD_SEMVER: ${{ github.ref_name }}
+          NEXT_CODE_RELEASE_BUILD: "1"
+          NEXT_CODE_BUILD_SEMVER: ${{ github.ref_name }}
 
       - name: Build portable Linux x86_64 release binary
         if: matrix.compat_container == true
         shell: bash
         run: scripts/build_linux_compat.sh dist
         env:
-          JCODE_RELEASE_BUILD: "1"
-          JCODE_BUILD_SEMVER: ${{ github.ref_name }}
-          JCODE_COMPAT_ARTIFACT: ${{ matrix.artifact }}
+          NEXT_CODE_RELEASE_BUILD: "1"
+          NEXT_CODE_BUILD_SEMVER: ${{ github.ref_name }}
+          NEXT_CODE_COMPAT_ARTIFACT: ${{ matrix.artifact }}
 
       - name: Package binary
         if: matrix.compat_container != true
@@ -249,8 +249,8 @@ jobs:
 
           & cargo @cargoArgs
         env:
-          JCODE_RELEASE_BUILD: "1"
-          JCODE_BUILD_SEMVER: ${{ github.ref_name }}
+          NEXT_CODE_RELEASE_BUILD: "1"
+          NEXT_CODE_BUILD_SEMVER: ${{ github.ref_name }}
 
       - name: Verify built Windows binary launches
         shell: pwsh
@@ -454,8 +454,8 @@ jobs:
             export CARGO_TERM_COLOR=always
             # CARGO_BUILD_JOBS keeps memory in check; aws-lc-sys is memory hungry.
             export CARGO_BUILD_JOBS=3
-            export JCODE_RELEASE_BUILD=1
-            export JCODE_BUILD_SEMVER="${{ github.ref_name }}"
+            export NEXT_CODE_RELEASE_BUILD=1
+            export NEXT_CODE_BUILD_SEMVER="${{ github.ref_name }}"
 
             echo "::group::cargo build (next-code binary)"
             cargo build --locked --release -p next-code --bin next-code
@@ -570,72 +570,77 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
 
-          git clone git@github.com:1jehuang/homebrew-jcode.git /tmp/homebrew-jcode
+          git clone git@github.com:quangdang46/homebrew-next-code.git /tmp/homebrew-next-code
 
-          cat > /tmp/homebrew-jcode/Formula/jcode.rb << FORMULA
-          class Jcode < Formula
+          cat > /tmp/homebrew-next-code/Formula/next-code.rb << FORMULA
+          class NextCode < Formula
             desc "AI coding agent powered by Claude and ChatGPT"
-            homepage "https://github.com/1jehuang/jcode"
+            homepage "https://github.com/quangdang46/next-code"
             version "${VERSION_NUM}"
             license "MIT"
 
             on_macos do
               on_arm do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-macos-aarch64.tar.gz"
+                url "https://github.com/quangdang46/next-code/releases/download/${VERSION}/next-code-macos-aarch64.tar.gz"
                 sha256 "${MACOS_ARM_SHA}"
 
                 def install
-                  bin.install "next-code-macos-aarch64" => "jcode"
+                  bin.install "next-code-macos-aarch64" => "next-code"
+                  # Compat symlink for one release so existing `jcode` muscle memory keeps working.
+                  bin.install_symlink "next-code" => "jcode"
                 end
               end
 
               on_intel do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-macos-x86_64.tar.gz"
+                url "https://github.com/quangdang46/next-code/releases/download/${VERSION}/next-code-macos-x86_64.tar.gz"
                 sha256 "${MACOS_INTEL_SHA}"
 
                 def install
-                  bin.install "next-code-macos-x86_64" => "jcode"
+                  bin.install "next-code-macos-x86_64" => "next-code"
+                  bin.install_symlink "next-code" => "jcode"
                 end
               end
             end
 
             on_linux do
               on_intel do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-linux-x86_64.tar.gz"
+                url "https://github.com/quangdang46/next-code/releases/download/${VERSION}/next-code-linux-x86_64.tar.gz"
                 sha256 "${LINUX_SHA}"
 
                 def install
                   libexec.install "next-code-linux-x86_64", "next-code-linux-x86_64.bin"
                   libexec.install Dir["libssl.so*"], Dir["libcrypto.so*"] unless Dir["libssl.so*", "libcrypto.so*"].empty?
-                  (bin/"jcode").write <<~SH
+                  (bin/"next-code").write <<~SH
                     #!/bin/sh
                     exec "#{libexec}/next-code-linux-x86_64" "$@"
                   SH
+                  bin.install_symlink "next-code" => "jcode"
                 end
               end
 
               on_arm do
-                url "https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-linux-aarch64.tar.gz"
+                url "https://github.com/quangdang46/next-code/releases/download/${VERSION}/next-code-linux-aarch64.tar.gz"
                 sha256 "${LINUX_ARM_SHA}"
 
                 def install
-                  bin.install "next-code-linux-aarch64" => "jcode"
+                  bin.install "next-code-linux-aarch64" => "next-code"
+                  bin.install_symlink "next-code" => "jcode"
                 end
               end
             end
 
             test do
-              assert_match "jcode", shell_output("#{bin}/jcode --version")
+              assert_match "next-code", shell_output("#{bin}/next-code --version")
             end
           end
           FORMULA
 
-          sed -i 's/^          //' /tmp/homebrew-jcode/Formula/jcode.rb
+          sed -i 's/^          //' /tmp/homebrew-next-code/Formula/next-code.rb
 
-          cd /tmp/homebrew-jcode
-          git config user.name "jcode-release-bot"
-          git config user.email "release@jcode.dev"
-          git add Formula/jcode.rb
+          cd /tmp/homebrew-next-code
+          git config user.name "next-code-release-bot"
+          git config user.email "release@next-code.dev"
+          git add Formula/next-code.rb
           git commit -m "Update to ${VERSION}" || echo "No changes"
           git push
 
@@ -667,7 +672,7 @@ jobs:
           VERSION_NUM="${VERSION#v}"
 
           LINUX_SHA=$(sha256sum artifacts/next-code-linux-x86_64/next-code-linux-x86_64.tar.gz | cut -d' ' -f1)
-          LINUX_URL="https://github.com/1jehuang/jcode/releases/download/${VERSION}/next-code-linux-x86_64.tar.gz"
+          LINUX_URL="https://github.com/quangdang46/next-code/releases/download/${VERSION}/next-code-linux-x86_64.tar.gz"
 
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
@@ -679,35 +684,37 @@ jobs:
 
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_key -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=10 -o ConnectionAttempts=3"
 
-          retry 3 5 bash -lc 'rm -rf /tmp/jcode-aur && git clone --depth 1 ssh://aur@aur.archlinux.org/jcode-bin.git /tmp/jcode-aur'
-          cd /tmp/jcode-aur
-          git remote set-url origin ssh://aur@aur.archlinux.org/jcode-bin.git
+          retry 3 5 bash -lc 'rm -rf /tmp/next-code-aur && git clone --depth 1 ssh://aur@aur.archlinux.org/next-code-bin.git /tmp/next-code-aur'
+          cd /tmp/next-code-aur
+          git remote set-url origin ssh://aur@aur.archlinux.org/next-code-bin.git
 
           cat > PKGBUILD << 'PKGBUILD_END'
-          # Maintainer: Jeremy Huang <jeremyhuang55555@gmail.com>
-          pkgname=jcode-bin
+
+          pkgname=next-code-bin
           pkgver=VERSION_PLACEHOLDER
           pkgrel=1
           pkgdesc="AI coding agent powered by Claude and ChatGPT"
           arch=('x86_64')
-          url="https://github.com/1jehuang/jcode"
+          url="https://github.com/quangdang46/next-code"
           license=('MIT')
-          provides=('jcode')
-          conflicts=('jcode')
+          provides=('next-code' 'jcode')
+          conflicts=('next-code' 'jcode' 'jcode-bin')
           source=("URL_PLACEHOLDER")
           sha256sums=('SHA_PLACEHOLDER')
 
           package() {
-              install -Dm755 "${srcdir}/next-code-linux-x86_64" "${pkgdir}/usr/lib/jcode/next-code-linux-x86_64"
-              install -Dm755 "${srcdir}/next-code-linux-x86_64.bin" "${pkgdir}/usr/lib/jcode/next-code-linux-x86_64.bin"
+              install -Dm755 "${srcdir}/next-code-linux-x86_64" "${pkgdir}/usr/lib/next-code/next-code-linux-x86_64"
+              install -Dm755 "${srcdir}/next-code-linux-x86_64.bin" "${pkgdir}/usr/lib/next-code/next-code-linux-x86_64.bin"
               if compgen -G "${srcdir}/libssl.so*" >/dev/null; then
-                  install -Dm644 "${srcdir}"/libssl.so* "${pkgdir}/usr/lib/jcode/"
+                  install -Dm644 "${srcdir}"/libssl.so* "${pkgdir}/usr/lib/next-code/"
               fi
               if compgen -G "${srcdir}/libcrypto.so*" >/dev/null; then
-                  install -Dm644 "${srcdir}"/libcrypto.so* "${pkgdir}/usr/lib/jcode/"
+                  install -Dm644 "${srcdir}"/libcrypto.so* "${pkgdir}/usr/lib/next-code/"
               fi
               mkdir -p "${pkgdir}/usr/bin"
-              ln -s /usr/lib/jcode/next-code-linux-x86_64 "${pkgdir}/usr/bin/jcode"
+              ln -s /usr/lib/next-code/next-code-linux-x86_64 "${pkgdir}/usr/bin/next-code"
+              # Compat symlink for one release.
+              ln -s next-code "${pkgdir}/usr/bin/jcode"
           }
           PKGBUILD_END
 
@@ -717,21 +724,24 @@ jobs:
           sed -i 's/^          //' PKGBUILD
 
           # Generate .SRCINFO without makepkg (AUR uses tab indentation)
-          printf 'pkgbase = jcode-bin\n' > .SRCINFO
+          printf 'pkgbase = next-code-bin\n' > .SRCINFO
           printf '\tpkgdesc = AI coding agent powered by Claude and ChatGPT\n' >> .SRCINFO
           printf '\tpkgver = %s\n' "${VERSION_NUM}" >> .SRCINFO
           printf '\tpkgrel = 1\n' >> .SRCINFO
-          printf '\turl = https://github.com/1jehuang/jcode\n' >> .SRCINFO
+          printf '\turl = https://github.com/quangdang46/next-code\n' >> .SRCINFO
           printf '\tarch = x86_64\n' >> .SRCINFO
           printf '\tlicense = MIT\n' >> .SRCINFO
+          printf '\tprovides = next-code\n' >> .SRCINFO
           printf '\tprovides = jcode\n' >> .SRCINFO
+          printf '\tconflicts = next-code\n' >> .SRCINFO
           printf '\tconflicts = jcode\n' >> .SRCINFO
+          printf '\tconflicts = jcode-bin\n' >> .SRCINFO
           printf '\tsource = %s\n' "${LINUX_URL}" >> .SRCINFO
           printf '\tsha256sums = %s\n' "${LINUX_SHA}" >> .SRCINFO
-          printf '\npkgname = jcode-bin\n' >> .SRCINFO
+          printf '\npkgname = next-code-bin\n' >> .SRCINFO
 
-          git config user.name "Jeremy Huang"
-          git config user.email "jeremyhuang55555@gmail.com"
+          git config user.name "next-code-release-bot"
+          git config user.email "release@next-code.dev"
           git add PKGBUILD .SRCINFO
           git commit -m "Update to ${VERSION}" || echo "No changes"
           retry 3 5 git push origin master

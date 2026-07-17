@@ -72,7 +72,7 @@ pub fn newly_completed_groups_have_sufficient_ownership(
 
 /// Build the synthetic auto-poke continuation prompt sent when the model
 /// stops with incomplete todos. Kept here so every producer (TUI auto-poke,
-/// `jcode run` auto-poke) and the transcript renderer agree on the exact text.
+/// `next-code run` auto-poke) and the transcript renderer agree on the exact text.
 pub fn build_auto_poke_message(incomplete_count: usize) -> String {
     format!(
         "You have {} incomplete todo{}. Continue working, or update the todo tool.",
@@ -418,9 +418,9 @@ mod tests {
     #[test]
     fn goal_intention_fields_round_trip_through_storage() {
         let _guard = crate::storage::lock_test_env();
-        let previous_home = std::env::var_os("JCODE_HOME");
+        let previous_home = std::env::var_os("NEXT_CODE_HOME");
         let dir = tempfile::TempDir::new().expect("tempdir");
-        crate::env::set_var("JCODE_HOME", dir.path());
+        crate::env::set_var("NEXT_CODE_HOME", dir.path());
 
         let goals = vec![TodoGoal {
             group: Some("todo user intention".to_string()),
@@ -440,8 +440,8 @@ mod tests {
         );
 
         match previous_home {
-            Some(value) => crate::env::set_var("JCODE_HOME", value),
-            None => crate::env::remove_var("JCODE_HOME"),
+            Some(value) => crate::env::set_var("NEXT_CODE_HOME", value),
+            None => crate::env::remove_var("NEXT_CODE_HOME"),
         }
     }
 }

@@ -12,7 +12,7 @@ inject *synthetic* `crossterm::KeyEvent`s. They never exercise:
   * the kitty keyboard protocol bytes a real terminal actually sends.
 
 So a unit test can be green while the live shortcut does nothing. This harness
-closes that gap by driving the **real jcode binary** under a pseudo-terminal and
+closes that gap by driving the **real next-code binary** under a pseudo-terminal and
 feeding it the **exact bytes** a terminal emits for Alt+Shift+E, then reading the
 resulting diff state back over the debug socket.
 
@@ -73,7 +73,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # The exact bytes a terminal sends for Alt+Shift+E.
 #
 # Captured live from kitty 0.46 with the kitty keyboard protocol enabled (the
-# protocol jcode turns on at startup):
+# protocol next-code turns on at startup):
 #     press   = ESC [ 101 ; 4 u      -> b"\x1b[101;4u"
 #     release = ESC [ 101 ; 4 : 3 u  -> b"\x1b[101;4:3u"
 # (101 = 'e' codepoint, modifier mask 4 = (4-1)=3 = SHIFT|ALT.)
@@ -157,7 +157,7 @@ def wait_for_socket(path: Path, timeout_s: float = 25.0) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# A PTY-driven jcode client. This is the real live-render input path; bytes
+# A PTY-driven next-code client. This is the real live-render input path; bytes
 # written to master_fd are decoded by crossterm exactly as a terminal would.
 # ──────────────────────────────────────────────────────────────────────────────
 _TERM_REPLIES = [
@@ -259,14 +259,14 @@ def launch_client(binary: str, env: dict, session_id: str, name: str,
     # Route this client's file-based debug channel to per-client paths so we can
     # talk to *this* live TUI directly (fixture setup + state readback + the
     # synthetic-key positive control).
-    cenv["JCODE_DEBUG_CMD_PATH"] = str(debug_cmd)
-    cenv["JCODE_DEBUG_RESPONSE_PATH"] = str(debug_resp)
+    cenv["NEXT_CODE_DEBUG_CMD_PATH"] = str(debug_cmd)
+    cenv["NEXT_CODE_DEBUG_RESPONSE_PATH"] = str(debug_resp)
     proc = subprocess.Popen(
         [
             binary,
             "--no-update",
             "--no-selfdev",
-            "--socket", env["JCODE_SOCKET"],
+            "--socket", env["NEXT_CODE_SOCKET"],
             "--resume", session_id,
         ],
         stdin=slave_fd, stdout=slave_fd, stderr=slave_fd,
@@ -429,7 +429,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    default_bin = Path.home() / ".jcode" / "builds" / "current" / "jcode"
+    default_bin = Path.home() / ".next-code" / "builds" / "current" / "next-code"
     ap.add_argument("--binary", default=str(default_bin))
     ap.add_argument("--keep", action="store_true", help="keep temp home on exit")
     ap.add_argument("-v", "--verbose", action="store_true")
@@ -440,21 +440,21 @@ def main() -> int:
         print(f"❌ binary not found: {binary}")
         return 3
 
-    root = Path(tempfile.mkdtemp(prefix="jcode-expand-edit-"))
+    root = Path(tempfile.mkdtemp(prefix="next-code-expand-edit-"))
     home = root / "home"
     run = root / "run"
     home.mkdir(parents=True, exist_ok=True)
     run.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
-    env["JCODE_HOME"] = str(home)
-    env["JCODE_RUNTIME_DIR"] = str(run)
-    env["JCODE_SOCKET"] = str(run / "jcode.sock")
-    env["JCODE_NO_TELEMETRY"] = "1"
-    env["JCODE_DEBUG_CONTROL"] = "1"
-    env["JCODE_TEMP_SERVER"] = "1"
-    env["JCODE_SERVER_OWNER_PID"] = str(os.getpid())
-    debug_sock = run / "jcode-debug.sock"
+    env["NEXT_CODE_HOME"] = str(home)
+    env["NEXT_CODE_RUNTIME_DIR"] = str(run)
+    env["NEXT_CODE_SOCKET"] = str(run / "next-code.sock")
+    env["NEXT_CODE_NO_TELEMETRY"] = "1"
+    env["NEXT_CODE_DEBUG_CONTROL"] = "1"
+    env["NEXT_CODE_TEMP_SERVER"] = "1"
+    env["NEXT_CODE_SERVER_OWNER_PID"] = str(os.getpid())
+    debug_sock = run / "next-code-debug.sock"
     client_cmd_path = run / "client_debug_cmd"
     client_resp_path = run / "client_debug_resp"
 
@@ -465,7 +465,7 @@ def main() -> int:
     print(f"  home   : {home}")
 
     server = subprocess.Popen(
-        [binary, "serve", "--socket", env["JCODE_SOCKET"], "--debug-socket",
+        [binary, "serve", "--socket", env["NEXT_CODE_SOCKET"], "--debug-socket",
          "--no-update", "--no-selfdev"],
         env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         preexec_fn=os.setsid,
@@ -474,7 +474,7 @@ def main() -> int:
     client: LiveClient | None = None
     rc = 3
     try:
-        wait_for_socket(Path(env["JCODE_SOCKET"]))
+        wait_for_socket(Path(env["NEXT_CODE_SOCKET"]))
         wait_for_socket(debug_sock)
         print("  server : up")
 

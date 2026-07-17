@@ -1,6 +1,6 @@
 //! Migration helpers for adopting the new service facade.
 //!
-//! Phase 6 (continued): when the rest of jcode eventually rewires
+//! Phase 6 (continued): when the rest of next-code eventually rewires
 //! through [`crate::service::ProviderService`], the existing
 //! `next_code_provider_core::AuthMode` / `DualAuthProvider` data needs to
 //! be imported into the new credential store. This module is the
@@ -29,7 +29,7 @@ use std::collections::HashMap;
 /// Snapshot of an existing dual-auth credential selection in the old
 /// vocabulary. This mirrors `next_code_provider_core::auth_mode::AuthMode`
 /// but is decoupled from the old crate so the new code can compile
-/// without dragging the rest of jcode in.
+/// without dragging the rest of next-code in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LegacyAuthMode {
     /// OAuth / subscription login (e.g. Claude subscription, ChatGPT).
@@ -176,27 +176,27 @@ mod tests {
     fn detect_legacy_auth_picks_anthropic_when_key_set() {
         // SAFETY: test-only env mutation in a single-threaded test context.
         unsafe {
-            std::env::set_var("JCODE_TEST_MIG_ANTH", "sk-test");
-            std::env::remove_var("JCODE_TEST_MIG_OAI");
+            std::env::set_var("NEXT_CODE_TEST_MIG_ANTH", "sk-test");
+            std::env::remove_var("NEXT_CODE_TEST_MIG_OAI");
         }
-        let got = detect_legacy_auth("JCODE_TEST_MIG_ANTH", "JCODE_TEST_MIG_OAI");
+        let got = detect_legacy_auth("NEXT_CODE_TEST_MIG_ANTH", "NEXT_CODE_TEST_MIG_OAI");
         assert!(got.is_some());
         let (p, mode, key) = got.unwrap();
         assert_eq!(p.as_str(), "anthropic");
         assert_eq!(mode, LegacyAuthMode::ApiKey);
         assert_eq!(key, "sk-test");
         unsafe {
-            std::env::remove_var("JCODE_TEST_MIG_ANTH");
+            std::env::remove_var("NEXT_CODE_TEST_MIG_ANTH");
         }
     }
 
     #[test]
     fn detect_legacy_auth_returns_none_when_neither_set() {
         unsafe {
-            std::env::remove_var("JCODE_TEST_MIG_NONE_A");
-            std::env::remove_var("JCODE_TEST_MIG_NONE_B");
+            std::env::remove_var("NEXT_CODE_TEST_MIG_NONE_A");
+            std::env::remove_var("NEXT_CODE_TEST_MIG_NONE_B");
         }
-        let got = detect_legacy_auth("JCODE_TEST_MIG_NONE_A", "JCODE_TEST_MIG_NONE_B");
+        let got = detect_legacy_auth("NEXT_CODE_TEST_MIG_NONE_A", "NEXT_CODE_TEST_MIG_NONE_B");
         assert!(got.is_none());
     }
 
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn from_env_to_credentials_round_trip() {
         unsafe {
-            std::env::set_var("JCODE_TEST_MIG_RT", "sk-rt");
+            std::env::set_var("NEXT_CODE_TEST_MIG_RT", "sk-rt");
         }
         let snap = LegacyProviderSelection::from_env();
         // We don't know which keys are set globally, so just check that
@@ -236,7 +236,7 @@ mod tests {
             assert_eq!(c.label, "default");
         }
         unsafe {
-            std::env::remove_var("JCODE_TEST_MIG_RT");
+            std::env::remove_var("NEXT_CODE_TEST_MIG_RT");
         }
     }
 }

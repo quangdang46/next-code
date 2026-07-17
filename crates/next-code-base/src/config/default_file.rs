@@ -10,11 +10,11 @@ impl Config {
             std::fs::create_dir_all(parent)?;
         }
 
-        let default_content = r#"# jcode configuration file
-# Location: ~/.jcode/config.toml
+        let default_content = r#"# next-code configuration file
+# Location: ~/.next-code/config.toml
 #
 # Environment variables override these settings.
-# Run `/config` in jcode to see current settings.
+# Run `/config` in next-code to see current settings.
 
 [keybindings]
 # Scroll keys (vim-style by default)
@@ -71,12 +71,12 @@ info_widget_toggle = "alt+i"
 # exits. Active only with agents.swarm_spawn_mode = "inline".
 swarm_panel_focus = "alt+w"
 
-# Spawn a fresh jcode session in a new terminal window, reusing the current
+# Spawn a fresh next-code session in a new terminal window, reusing the current
 # session's working directory. Companion to the system-wide launch hotkeys.
-# On macOS, `jcode setup-hotkey` installs three global launch hotkeys:
-#   Cmd+;        new jcode in your home directory
-#   Cmd+'        new jcode in your last project directory
-#   Cmd+Shift+'  new jcode self-dev session (last jcode repo)
+# On macOS, `next-code setup-hotkey` installs three global launch hotkeys:
+#   Cmd+;        new next-code in your home directory
+#   Cmd+'        new next-code in your last project directory
+#   Cmd+Shift+'  new next-code self-dev session (last next-code repo)
 # Default: Cmd+Shift+; on macOS, Alt+Shift+; elsewhere. Set "" to disable.
 # Note: some macOS terminals intercept Cmd combos; if so, pick another binding.
 # new_terminal = "cmd+shift+;"
@@ -98,7 +98,7 @@ session_picker_enter = "current-terminal"
 # command = "~/.local/bin/my-whisper-script --grammar-target code"
 command = ""
 
-# How to apply the transcript inside jcode: insert|append|replace|send
+# How to apply the transcript inside next-code: insert|append|replace|send
 mode = "send"
 
 # Optional in-app hotkey to trigger dictation. Set to "off" to disable.
@@ -212,7 +212,7 @@ engine = "duckduckgo"
 fallback_engines = ["bing"]
 # Bring your own Bing Search API key for primary Bing searches. Prefer using an env var.
 # Fallback Bing searches intentionally use keyless HTML search.
-# bing_api_key_env = "JCODE_BING_API_KEY"
+# bing_api_key_env = "NEXT_CODE_BING_API_KEY"
 # bing_api_key = ""
 # Bing market/region, for example "en-US" or "zh-CN".
 bing_market = "en-US"
@@ -220,13 +220,13 @@ bing_market = "en-US"
 # DuckDuckGo and Bing block scraped requests via TLS fingerprinting / IP
 # reputation and return an anti-bot page with no results. Pointing at a SearXNG
 # instance (self-hosted or trusted public) with the JSON format enabled avoids
-# this. Configure here or via the JCODE_SEARXNG_URL environment variable, then
+# this. Configure here or via the NEXT_CODE_SEARXNG_URL environment variable, then
 # set engine = "searxng" or add it to fallback_engines.
 # searxng_url = "https://searx.example.org"
 
 [tools]
 # Backend for the single `edit` tool: hashline (default), apply_patch, replace, multiedit.
-# Override with env JCODE_EDIT_MODE or PI_EDIT_VARIANT.
+# Override with env NEXT_CODE_EDIT_MODE or PI_EDIT_VARIANT.
 # edit_mode = "hashline"
 
 # Controls which built-in tools are sent to the model.
@@ -248,7 +248,7 @@ disable_base_tools = false
 # Magic keyword / sticky mode workflows ($ultrawork, $ultraqa, canceljcode, …).
 # match_mode = "strict"  # default: only $keyword + single-token aliases (ulw, uw)
 # match_mode = "loose"   # also multi-word phrases ("work on", "think hard", …)
-# Override with env: JCODE_KEYWORDS_MATCH_MODE, JCODE_KEYWORDS_ENABLED
+# Override with env: NEXT_CODE_KEYWORDS_MATCH_MODE, NEXT_CODE_KEYWORDS_ENABLED
 enabled = true
 match_mode = "strict"
 sticky_turns = 10
@@ -262,7 +262,7 @@ allow_fuzzy = false
 # mode = "auto"  # run N candidates on $bestofn / edit-like prompts, auto-apply best
 # mode = "show"  # same as auto for now (interactive picker not implemented yet)
 # count = 3      # number of parallel candidates (min 2)
-# Override with env: JCODE_BEST_OF_N_MODE, JCODE_BEST_OF_N_COUNT
+# Override with env: NEXT_CODE_BEST_OF_N_MODE, NEXT_CODE_BEST_OF_N_COUNT
 # Manual tool path: best_of_n_edit → propose_* drafts → best_of_n_apply
 
 [acp]
@@ -270,7 +270,7 @@ allow_fuzzy = false
 # standard emits only spec-compatible ACP messages.
 # extended/full additionally emit ignorable _jcode/* extension notifications.
 profile = "standard"
-# Tool profile requested when `jcode acp` starts the daemon itself.
+# Tool profile requested when `next-code acp` starts the daemon itself.
 # Existing daemons keep their current server-wide tool config.
 tool_profile = "acp"
 
@@ -280,9 +280,9 @@ tool_profile = "acp"
 # default_model = "claude-fable-5"
 # Default provider (optional: claude|anthropic-api|openai|openai-api|copilot|openrouter|...)
 # When set, this provider is preferred on startup if available.
-#   claude        = Claude via OAuth/subscription (token in ~/.jcode/auth.json)
+#   claude        = Claude via OAuth/subscription (token in ~/.next-code/auth.json)
 #   anthropic-api = Claude via direct Anthropic API key (ANTHROPIC_API_KEY env
-#                   or ~/.config/jcode/anthropic.env). API-key mode does NOT fall
+#                   or ~/.config/next-code/anthropic.env). API-key mode does NOT fall
 #                   back to OAuth; configure the key first.
 # `claude` and `anthropic-api` are distinct providers with distinct credentials.
 # See docs/AUTH_CREDENTIAL_SOURCES.md for where each credential lives.
@@ -314,7 +314,7 @@ cross_provider_failover = "countdown"
 # Max seconds to wait for streaming data before timing out a request with no
 # data received. Raise this for slow reasoning models (e.g. DeepSeek) that think
 # silently for minutes before emitting tokens. Default: 180.
-# Also overridable per-launch via JCODE_STREAM_IDLE_TIMEOUT_SECS.
+# Also overridable per-launch via NEXT_CODE_STREAM_IDLE_TIMEOUT_SECS.
 # stream_idle_timeout_secs = 600
 
 [execution-policy]
@@ -347,7 +347,7 @@ ask = []
 # Default model for spawned swarm/subagent sessions.
 # Leave unset (or "inherit"/"coordinator") so workers inherit the model of the
 # session that spawned them. Set a concrete model only to pin every worker to it.
-# Env override: JCODE_SWARM_MODEL
+# Env override: NEXT_CODE_SWARM_MODEL
 # swarm_model = "inherit"
 #
 # How swarm-created agents are spawned:
@@ -356,7 +356,7 @@ ask = []
 #   "inline"   - in-process (no window), shown as a live gallery viewport in the coordinator
 #   "auto"     - try visible first, fall back to headless if no window can open
 # The swarm tool's per-call `spawn_mode` overrides this when set.
-# Env override: JCODE_SWARM_SPAWN_MODE
+# Env override: NEXT_CODE_SWARM_SPAWN_MODE
 swarm_spawn_mode = "visible"
 #
 # Max percentage (1-90) of the chat height the inline swarm gallery band may use.
@@ -365,14 +365,14 @@ swarm_spawn_mode = "visible"
 # swarm_gallery_max_pct = 40
 #
 # Model for the memory sidecar (relevance/extraction). Unset = sidecar auto-select.
-# Env override: JCODE_MEMORY_MODEL
+# Env override: NEXT_CODE_MEMORY_MODEL
 # memory_model = "claude-haiku-4"
 #
 # Whether the memory sidecar (LLM precision judge) handles relevance/extraction.
 # Default true: the LLM precision-judge path is the only reliably productive
 # memory mode. Set false only to opt into the lower-precision no-LLM hybrid path.
 # When this is true but no LLM backend is reachable (logged out), memory goes
-# dormant instead of degrading to the no-LLM path. Env: JCODE_MEMORY_SIDECAR_ENABLED
+# dormant instead of degrading to the no-LLM path. Env: NEXT_CODE_MEMORY_SIDECAR_ENABLED
 # memory_sidecar_enabled = true
 #
 # Minimum turns between Mode-2 memory reranks (cadence floor). The expensive
@@ -394,7 +394,7 @@ swarm_spawn_mode = "visible"
 # OpenAI / OpenAI-compatible /v1/embeddings endpoint (requires OPENAI_API_KEY;
 # silently falls back to local when no key is found). Vectors from different
 # models live in separate spaces and are never compared, so switching is safe.
-# Env override: JCODE_MEMORY_EMBEDDING_BACKEND
+# Env override: NEXT_CODE_MEMORY_EMBEDDING_BACKEND
 # memory_embedding_backend = "local"
 # memory_embedding_model = "text-embedding-3-small"
 # memory_embedding_base_url = "https://api.openai.com/v1"
@@ -404,40 +404,40 @@ swarm_spawn_mode = "visible"
 # External command that takes over headed session spawns (swarm agents,
 # resume-in-new-terminal, self-dev windows, restart restores).
 #
-# When set, jcode runs `<spawn_hook> <jcode-binary> <args...>` instead of
-# opening a terminal emulator itself. The hook receives JCODE_SPAWN_* env vars
+# When set, next-code runs `<spawn_hook> <next-code-binary> <args...>` instead of
+# opening a terminal emulator itself. The hook receives NEXT_CODE_SPAWN_* env vars
 # describing the spawn so multiplexers/wrappers can decide where it appears:
-#   JCODE_SPAWN_KIND        - "swarm-agent", "resume", "selfdev", "restart", ...
-#   JCODE_SPAWN_SESSION_ID  - session the window will run
-#   JCODE_SPAWN_TITLE       - suggested window/tab title
-#   JCODE_SPAWN_CWD         - session working directory (also the hook's cwd)
-#   JCODE_SPAWN_PROGRAM     - jcode binary path
-#   JCODE_SPAWN_COMMAND     - full shell-escaped command line
-#   JCODE_SPAWN_SWARM_ID / JCODE_SPAWN_COORDINATOR_SESSION_ID (swarm spawns)
-# If the hook fails to start, jcode falls back to built-in terminal detection.
-# Env override: JCODE_SPAWN_HOOK (set empty to disable a config hook).
+#   NEXT_CODE_SPAWN_KIND        - "swarm-agent", "resume", "selfdev", "restart", ...
+#   NEXT_CODE_SPAWN_SESSION_ID  - session the window will run
+#   NEXT_CODE_SPAWN_TITLE       - suggested window/tab title
+#   NEXT_CODE_SPAWN_CWD         - session working directory (also the hook's cwd)
+#   NEXT_CODE_SPAWN_PROGRAM     - next-code binary path
+#   NEXT_CODE_SPAWN_COMMAND     - full shell-escaped command line
+#   NEXT_CODE_SPAWN_SWARM_ID / NEXT_CODE_SPAWN_COORDINATOR_SESSION_ID (swarm spawns)
+# If the hook fails to start, next-code falls back to built-in terminal detection.
+# Env override: NEXT_CODE_SPAWN_HOOK (set empty to disable a config hook).
 #
 # Examples:
 #   spawn_hook = "tmux new-window"                # tmux window per agent
 #   spawn_hook = "kitty @ launch --type=tab --"   # kitty tab per agent
-#   spawn_hook = "~/bin/jcode-spawn-router"       # custom placement script
+#   spawn_hook = "~/bin/next-code-spawn-router"       # custom placement script
 # spawn_hook = ""
 #
 # External command used to focus/raise an existing session window, replacing
-# the built-in wmctrl/xdotool title search. Receives JCODE_FOCUS_SESSION_ID
-# and JCODE_FOCUS_TITLE env vars. Pair with spawn_hook so the program that
+# the built-in wmctrl/xdotool title search. Receives NEXT_CODE_FOCUS_SESSION_ID
+# and NEXT_CODE_FOCUS_TITLE env vars. Pair with spawn_hook so the program that
 # placed the window also brings it to the front.
-# Env override: JCODE_FOCUS_HOOK (set empty to disable a config hook).
+# Env override: NEXT_CODE_FOCUS_HOOK (set empty to disable a config hook).
 #
 # Example:
-#   focus_hook = "~/bin/jcode-focus-router"
+#   focus_hook = "~/bin/next-code-focus-router"
 # focus_hook = ""
 #
 # macOS only: terminal that the Cmd+; launch hotkey and in-app session spawns
-# open jcode into. One of: ghostty, iterm2, wezterm, warp, alacritty, vscode,
+# open next-code into. One of: ghostty, iterm2, wezterm, warp, alacritty, vscode,
 # terminal (Apple Terminal). Preferred over the legacy
-# ~/.jcode/preferred_terminal.json file. After changing this, re-run
-# `jcode setup-hotkey` so the generated launcher script (Cmd+;) picks it up.
+# ~/.next-code/preferred_terminal.json file. After changing this, re-run
+# `next-code setup-hotkey` so the generated launcher script (Cmd+;) picks it up.
 # preferred = "ghostty"
 
 [notifications]
@@ -462,52 +462,52 @@ swarm_spawn_mode = "visible"
 # turn_complete_sound = "Glass"
 
 [hooks]
-# Lifecycle hooks: external commands jcode runs at well-defined points so other
+# Lifecycle hooks: external commands next-code runs at well-defined points so other
 # programs can observe or gate agent behavior. Commands are parsed shell-style
-# (quotes work) but executed directly, with JCODE_HOOK_* env vars describing
+# (quotes work) but executed directly, with NEXT_CODE_HOOK_* env vars describing
 # the event:
-#   JCODE_HOOK_EVENT       - "turn_start", "turn_end", "session_start",
+#   NEXT_CODE_HOOK_EVENT       - "turn_start", "turn_end", "session_start",
 #                            "session_end", "pre_tool", "post_tool"
-#   JCODE_HOOK_SESSION_ID  - the session the event belongs to
-#   JCODE_HOOK_CWD         - session working directory (also the hook's cwd)
-#   JCODE_HOOK_PAYLOAD     - JSON mirror of all fields
-# Hook processes get JCODE_HOOKS_DISABLED=1 so nested jcode calls don't recurse.
+#   NEXT_CODE_HOOK_SESSION_ID  - the session the event belongs to
+#   NEXT_CODE_HOOK_CWD         - session working directory (also the hook's cwd)
+#   NEXT_CODE_HOOK_PAYLOAD     - JSON mirror of all fields
+# Hook processes get NEXT_CODE_HOOKS_DISABLED=1 so nested next-code calls don't recurse.
 #
 # All hooks except pre_tool are observers: detached, fire-and-forget, failures
-# only logged. Env overrides: JCODE_HOOK_TURN_START, JCODE_HOOK_TURN_END,
-# JCODE_HOOK_SESSION_START, JCODE_HOOK_SESSION_END, JCODE_HOOK_PRE_TOOL,
-# JCODE_HOOK_POST_TOOL (set empty to disable a config hook).
+# only logged. Env overrides: NEXT_CODE_HOOK_TURN_START, NEXT_CODE_HOOK_TURN_END,
+# NEXT_CODE_HOOK_SESSION_START, NEXT_CODE_HOOK_SESSION_END, NEXT_CODE_HOOK_PRE_TOOL,
+# NEXT_CODE_HOOK_POST_TOOL (set empty to disable a config hook).
 #
 # Runs when an agent turn begins, before the model starts generating and before
 # the first pre_tool. Lets integrations detect the agent is working during the
-# think/stream window before any tool call. Extra fields: JCODE_HOOK_MODEL,
-# JCODE_HOOK_SOURCE ("chat"/"resume"/"ambient").
-# turn_start = "~/bin/jcode-turn-start"
+# think/stream window before any tool call. Extra fields: NEXT_CODE_HOOK_MODEL,
+# NEXT_CODE_HOOK_SOURCE ("chat"/"resume"/"ambient").
+# turn_start = "~/bin/next-code-turn-start"
 #
-# Runs when an agent turn completes. Extra fields: JCODE_HOOK_STATUS
-# ("ok"/"error"), JCODE_HOOK_DURATION_MS, JCODE_HOOK_MODEL,
-# JCODE_HOOK_LAST_ASSISTANT_TEXT (first 4000 chars), JCODE_HOOK_ERROR.
-# turn_end = "~/bin/jcode-turn-notify"
+# Runs when an agent turn completes. Extra fields: NEXT_CODE_HOOK_STATUS
+# ("ok"/"error"), NEXT_CODE_HOOK_DURATION_MS, NEXT_CODE_HOOK_MODEL,
+# NEXT_CODE_HOOK_LAST_ASSISTANT_TEXT (first 4000 chars), NEXT_CODE_HOOK_ERROR.
+# turn_end = "~/bin/next-code-turn-notify"
 #
-# Runs when a session becomes active. Extra: JCODE_HOOK_SOURCE
+# Runs when a session becomes active. Extra: NEXT_CODE_HOOK_SOURCE
 # ("create"/"attach"/"resume").
 # session_start = ""
 #
-# Runs when a session closes normally. Extra: JCODE_HOOK_SOURCE ("close").
+# Runs when a session closes normally. Extra: NEXT_CODE_HOOK_SOURCE ("close").
 # session_end = ""
 #
-# Gate hook before every tool call. Receives JCODE_HOOK_TOOL_NAME and the tool
-# input JSON on stdin (truncated copy in JCODE_HOOK_TOOL_INPUT). Exit 0 allows
+# Gate hook before every tool call. Receives NEXT_CODE_HOOK_TOOL_NAME and the tool
+# input JSON on stdin (truncated copy in NEXT_CODE_HOOK_TOOL_INPUT). Exit 0 allows
 # the call; exit 2 blocks it and stderr is shown to the model as the error;
 # any other outcome (other exits, timeout, missing binary) fails open.
-# pre_tool = "~/bin/jcode-tool-policy"
+# pre_tool = "~/bin/next-code-tool-policy"
 #
 # Max milliseconds to wait for pre_tool before failing open (default: 5000).
 # pre_tool_timeout_ms = 5000
 #
-# Runs after each tool call. Extra fields: JCODE_HOOK_TOOL_NAME,
-# JCODE_HOOK_STATUS, JCODE_HOOK_DURATION_MS, JCODE_HOOK_OUTPUT_BYTES,
-# JCODE_HOOK_ERROR.
+# Runs after each tool call. Extra fields: NEXT_CODE_HOOK_TOOL_NAME,
+# NEXT_CODE_HOOK_STATUS, NEXT_CODE_HOOK_DURATION_MS, NEXT_CODE_HOOK_OUTPUT_BYTES,
+# NEXT_CODE_HOOK_ERROR.
 # post_tool = ""
 
 [ambient]
@@ -544,17 +544,17 @@ port = 7643
 bind_addr = "0.0.0.0"
 
 [power]
-# Prevent the machine from suspending (idle/lid sleep) while any jcode session
+# Prevent the machine from suspending (idle/lid sleep) while any next-code session
 # is actively streaming/processing. The display can still sleep; only system
 # suspend is inhibited, and only for as long as work is in flight. (default: true)
-# Set JCODE_DISABLE_POWER_INHIBIT=1 to force-disable regardless of this setting.
+# Set NEXT_CODE_DISABLE_POWER_INHIBIT=1 to force-disable regardless of this setting.
 prevent_sleep_while_streaming = true
 
 [safety]
 # Notification settings for ambient mode events
 
 # ntfy.sh push notifications (free, phone app: https://ntfy.sh)
-# ntfy_topic = "jcode-ambient-your-secret-topic"
+# ntfy_topic = "next-code-ambient-your-secret-topic"
 # ntfy_server = "https://ntfy.sh"
 
 # Desktop notifications via notify-send (default: true)
@@ -563,10 +563,10 @@ desktop_notifications = true
 # Email notifications via SMTP
 # email_enabled = false
 # email_to = "you@example.com"
-# email_from = "jcode@example.com"
+# email_from = "next-code@example.com"
 # email_smtp_host = "smtp.gmail.com"
 # email_smtp_port = 587
-# Password via env: JCODE_SMTP_PASSWORD (preferred) or config below
+# Password via env: NEXT_CODE_SMTP_PASSWORD (preferred) or config below
 # email_password = ""
 
 # IMAP for email replies (reply to ambient emails to send directives)
@@ -576,21 +576,21 @@ desktop_notifications = true
 
 # Telegram notifications via Bot API (free, https://telegram.org)
 # telegram_enabled = false
-# telegram_bot_token = ""  # From @BotFather (prefer JCODE_TELEGRAM_BOT_TOKEN env var)
+# telegram_bot_token = ""  # From @BotFather (prefer NEXT_CODE_TELEGRAM_BOT_TOKEN env var)
 # telegram_chat_id = ""    # Your user/chat ID
 # telegram_reply_enabled = false  # Reply to bot messages to send directives
 
 # Discord notifications via Bot API (https://discord.com/developers)
 # discord_enabled = false
-# discord_bot_token = ""     # From Discord Developer Portal (prefer JCODE_DISCORD_BOT_TOKEN env var)
+# discord_bot_token = ""     # From Discord Developer Portal (prefer NEXT_CODE_DISCORD_BOT_TOKEN env var)
 # discord_channel_id = ""    # Channel ID to post in
 # discord_bot_user_id = ""   # Bot's user ID (for filtering own messages)
 # discord_reply_enabled = false  # Messages in channel become agent directives
 
 # Jade cloud relay (outbound-only long polling, disabled by default).
 # Prefer environment variables for secrets:
-# JCODE_JADE_RELAY_API_BASE, JCODE_JADE_RELAY_TOKEN, JCODE_JADE_RELAY_TOKEN_ID,
-# JCODE_JADE_RELAY_USER_ID, JCODE_JADE_RELAY_SESSION_ID.
+# NEXT_CODE_JADE_RELAY_API_BASE, NEXT_CODE_JADE_RELAY_TOKEN, NEXT_CODE_JADE_RELAY_TOKEN_ID,
+# NEXT_CODE_JADE_RELAY_USER_ID, NEXT_CODE_JADE_RELAY_SESSION_ID.
 # jade_relay_enabled = false
 # jade_relay_reply_enabled = false   # Deliver cloud prompts to one configured live session.
 # jade_relay_launch_enabled = false  # Allow cloud device commands to open headed local sessions.
@@ -599,8 +599,8 @@ desktop_notifications = true
 # [sponsors] # Legacy config section name retained for compatibility.
 # Tool partner discovery (enabled by default; set enabled = false to opt out).
 # When enabled, the agent gains a `discover_tools` tool listing third-party
-# developer tools from Jcode's hosted partner directory. Some partners may
-# share revenue with Jcode when a referred user becomes a customer, but
+# developer tools from Next Code's hosted partner directory. Some partners may
+# share revenue with Next Code when a referred user becomes a customer, but
 # partnership status never influences recommendations. Each session's first
 # use of discover_tools shows a concise disclosure with a learn-more link.
 # See https://jcode.sh/discovery-tools

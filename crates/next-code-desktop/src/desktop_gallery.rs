@@ -90,7 +90,7 @@ pub(super) fn temporary_app(state: &str) -> DesktopApp {
             });
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolInput {
                 id: Some("gallery-running".to_string()),
-                delta: r#"{"command":"cargo check -p jcode-desktop","run_in_background":true}"#
+                delta: r#"{"command":"cargo check -p next-code-desktop","run_in_background":true}"#
                     .to_string(),
             });
         }
@@ -107,7 +107,7 @@ pub(super) fn temporary_app(state: &str) -> DesktopApp {
             });
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolInput {
                 id: Some("gallery-success".to_string()),
-                delta: r#"{"query":"DesktopSessionEvent","path":"crates/jcode-desktop/src"}"#
+                delta: r#"{"query":"DesktopSessionEvent","path":"crates/next-code-desktop/src"}"#
                     .to_string(),
             });
             app.apply_session_event(session_launch::DesktopSessionEvent::ToolFinished {
@@ -250,7 +250,7 @@ fn temporary_gallery_sessions() -> Vec<workspace::SessionCard> {
             detail_lines: vec![
                 format!("Prompt {index}  inspect inline widget geometry"),
                 "Assistant  preview pane content should wrap cleanly".to_string(),
-                "Tool  cargo check -p jcode-desktop completed".to_string(),
+                "Tool  cargo check -p next-code-desktop completed".to_string(),
             ],
             transcript_messages: Vec::new(),
         })

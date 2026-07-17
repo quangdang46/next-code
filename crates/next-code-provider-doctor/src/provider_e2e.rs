@@ -1404,7 +1404,7 @@ impl NativeProviderKind {
                     switch_prefix: "openrouter:".to_string(),
                 },
                 auth_source: "Next Code subscription API key (JCODE_API_KEY)",
-                auth_env_key: Some("JCODE_API_KEY"),
+                auth_env_key: Some("NEXT_CODE_API_KEY"),
                 login_hint: "next-code login --provider next-code",
             },
             Self::Azure => NativeProviderSpec {
@@ -1467,7 +1467,7 @@ impl NativeProviderKind {
                 // `detect_tier_and_set_default` (run from `prefetch_models`). With
                 // the default grace window the doctor's immediate prefetch returns
                 // early without marking init done, so the live probes would hang.
-                next_code_base::env::set_var("JCODE_COPILOT_PREFETCH_STARTUP_GRACE_MS", "0");
+                next_code_base::env::set_var("NEXT_CODE_COPILOT_PREFETCH_STARTUP_GRACE_MS", "0");
                 let runtime = match next_code_provider_copilot_runtime::CopilotApiProvider::new() {
                     Ok(runtime) => runtime,
                     Err(_) => next_code_provider_copilot_runtime::CopilotApiProvider::new_with_token(

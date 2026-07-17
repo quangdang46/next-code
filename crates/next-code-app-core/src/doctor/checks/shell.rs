@@ -1,4 +1,4 @@
-//! Shell-tool detection: verify the external binaries jcode shells out to are
+//! Shell-tool detection: verify the external binaries next-code shells out to are
 //! present on `PATH`.
 
 use super::super::types::{CheckCategory, Finding};

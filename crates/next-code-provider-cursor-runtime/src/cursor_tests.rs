@@ -59,8 +59,8 @@ fn merge_cursor_models_deduplicates_dynamic_entries() {
 fn available_models_display_seeds_from_persisted_catalog() {
     let _guard = next_code_base::storage::lock_test_env();
     let temp = tempfile::TempDir::new().expect("tempdir");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    next_code_base::env::set_var("JCODE_HOME", temp.path());
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    next_code_base::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let path = CursorCliProvider::persisted_catalog_path().expect("catalog path");
     next_code_base::storage::write_json(
@@ -80,9 +80,9 @@ fn available_models_display_seeds_from_persisted_catalog() {
     );
 
     if let Some(prev_home) = prev_home {
-        next_code_base::env::set_var("JCODE_HOME", prev_home);
+        next_code_base::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        next_code_base::env::remove_var("JCODE_HOME");
+        next_code_base::env::remove_var("NEXT_CODE_HOME");
     }
 }
 

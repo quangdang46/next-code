@@ -9,6 +9,7 @@ name = "next_code_setup_hints"
 path = "src/lib.rs"
 
 [dependencies]
+next-code-core = { path = "../next-code-core" }
 anyhow = "1"
 dirs = "5"
 global-hotkey = "0.7"

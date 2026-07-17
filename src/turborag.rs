@@ -12,7 +12,7 @@
 //! ## Storage layout
 //!
 //! ```text
-//! <JCODE_HOME>/turborag/
+//! <NEXT_CODE_HOME>/turborag/
 //!   manifest.toml                    # index of cached chunks
 //!   blobs/
 //!     <model_id>/<chunk_id>.bin      # provider-opaque cache fragment
@@ -100,7 +100,7 @@ pub struct Cache {
 }
 
 impl Cache {
-    /// Open the user-level TurboRAG cache (under `JCODE_HOME`).
+    /// Open the user-level TurboRAG cache (under `NEXT_CODE_HOME`).
     /// Creates the directory layout if it doesn't exist yet.
     pub fn open() -> Result<Self> {
         let root = next_code_storage::next_code_dir()?.join("turborag");

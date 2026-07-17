@@ -22,7 +22,7 @@ use std::path::Path;
 /// recovery copy.
 const BACKUP_RETENTION_DAYS: i64 = 30;
 
-/// Minimum interval between prune passes across all jcode processes.
+/// Minimum interval between prune passes across all next-code processes.
 ///
 /// The prune walks the entire sessions directory (easily 100k+ entries on a
 /// long-lived install), which profiles as the single largest CPU cost of TUI
@@ -35,7 +35,7 @@ const PRUNE_INTERVAL_SECS: u64 = 24 * 60 * 60;
 ///
 /// Best-effort: any I/O error is ignored so this can run on a background thread
 /// at startup without ever affecting launch. Skips cheaply (one stat) unless
-/// the machine-wide prune interval has elapsed, so spawning many jcode
+/// the machine-wide prune interval has elapsed, so spawning many next-code
 /// processes at once does not trigger many full directory walks.
 pub fn prune_old_session_backups() {
     if let Ok(base) = storage::next_code_dir() {
@@ -100,7 +100,7 @@ mod tests {
     #[test]
     fn claim_prune_slot_rate_limits_within_interval_and_reclaims_after() {
         let dir = std::env::temp_dir().join(format!(
-            "jcode-bak-claim-test-{}-{}",
+            "next-code-bak-claim-test-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -138,7 +138,7 @@ mod tests {
     #[test]
     fn prunes_only_old_bak_files() {
         let dir = std::env::temp_dir().join(format!(
-            "jcode-bak-prune-test-{}-{}",
+            "next-code-bak-prune-test-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)

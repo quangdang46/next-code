@@ -28,7 +28,7 @@ pub(crate) fn spawn_session_event_forwarder(
     event_loop_proxy: EventLoopProxy<DesktopUserEvent>,
 ) {
     if let Err(error) = std::thread::Builder::new()
-        .name("jcode-desktop-session-event-forwarder".to_string())
+        .name("next-code-desktop-session-event-forwarder".to_string())
         .spawn(move || {
             let mut next_forward_at = Instant::now();
             while let Ok(first_event) = session_event_rx.recv() {
@@ -46,7 +46,7 @@ pub(crate) fn spawn_session_event_forwarder(
                     .is_err()
                 {
                     desktop_log::warn(format_args!(
-                        "jcode-desktop: failed to forward session events, event loop is closed"
+                        "next-code-desktop: failed to forward session events, event loop is closed"
                     ));
                     break;
                 }
@@ -54,7 +54,7 @@ pub(crate) fn spawn_session_event_forwarder(
         })
     {
         desktop_log::error(format_args!(
-            "jcode-desktop: failed to start session event forwarder: {error:#}"
+            "next-code-desktop: failed to start session event forwarder: {error:#}"
         ));
     }
 }

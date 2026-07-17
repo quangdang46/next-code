@@ -161,7 +161,7 @@ fn test_show_accounts_includes_masked_email_column() {
 
 #[test]
 fn test_account_openai_command_opens_account_picker() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let now_ms = chrono::Utc::now().timestamp_millis();
 
         crate::auth::codex::upsert_account(crate::auth::codex::OpenAiAccount {
@@ -217,7 +217,7 @@ fn test_account_openai_command_opens_account_picker() {
 
 #[test]
 fn test_account_command_opens_account_picker() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let now_ms = chrono::Utc::now().timestamp_millis();
 
         crate::auth::claude::upsert_account(crate::auth::claude::AnthropicAccount {
@@ -292,7 +292,7 @@ fn test_account_command_opens_account_picker() {
 
 #[test]
 fn test_account_picker_supports_arrow_and_vim_navigation() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let now_ms = chrono::Utc::now().timestamp_millis();
 
         crate::auth::codex::upsert_account(crate::auth::codex::OpenAiAccount {
@@ -347,7 +347,7 @@ fn test_account_picker_supports_arrow_and_vim_navigation() {
 
 #[test]
 fn test_account_picker_preview_from_input_filters_accounts() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let now_ms = chrono::Utc::now().timestamp_millis();
 
         crate::auth::codex::upsert_account(crate::auth::codex::OpenAiAccount {
@@ -404,7 +404,7 @@ fn test_account_picker_preview_stays_closed_for_explicit_subcommands() {
 
 #[test]
 fn test_account_command_combines_claude_and_openai_accounts() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let now_ms = chrono::Utc::now().timestamp_millis();
 
         crate::auth::claude::upsert_account(crate::auth::claude::AnthropicAccount {
@@ -468,8 +468,8 @@ fn test_account_command_combines_claude_and_openai_accounts() {
 fn test_account_command_uses_fast_auth_snapshot_without_running_cursor_status() {
     use std::os::unix::fs::PermissionsExt;
 
-    with_temp_jcode_home(|| {
-        let prev_cursor_cli_path = std::env::var_os("JCODE_CURSOR_CLI_PATH");
+    with_temp_next_code_home(|| {
+        let prev_cursor_cli_path = std::env::var_os("NEXT_CODE_CURSOR_CLI_PATH");
         let temp = tempfile::TempDir::new().expect("create temp dir");
         let marker = temp.path().join("cursor-status-ran");
         let script = temp.path().join("cursor-agent-mock");
@@ -487,7 +487,7 @@ fn test_account_command_uses_fast_auth_snapshot_without_running_cursor_status() 
 
         let mut app = create_test_app();
 
-        crate::env::set_var("JCODE_CURSOR_CLI_PATH", &script);
+        crate::env::set_var("NEXT_CODE_CURSOR_CLI_PATH", &script);
         crate::auth::AuthStatus::invalidate_cache();
         let _ = std::fs::remove_file(&marker);
 
@@ -501,8 +501,8 @@ fn test_account_command_uses_fast_auth_snapshot_without_running_cursor_status() 
         );
 
         match prev_cursor_cli_path {
-            Some(value) => crate::env::set_var("JCODE_CURSOR_CLI_PATH", value),
-            None => crate::env::remove_var("JCODE_CURSOR_CLI_PATH"),
+            Some(value) => crate::env::set_var("NEXT_CODE_CURSOR_CLI_PATH", value),
+            None => crate::env::remove_var("NEXT_CODE_CURSOR_CLI_PATH"),
         }
         crate::auth::AuthStatus::invalidate_cache();
     });
@@ -510,7 +510,7 @@ fn test_account_command_uses_fast_auth_snapshot_without_running_cursor_status() 
 
 #[test]
 fn test_account_switch_shorthand_switches_openai_account_by_label() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let now_ms = chrono::Utc::now().timestamp_millis();
 
         crate::auth::codex::upsert_account(crate::auth::codex::OpenAiAccount {
@@ -665,7 +665,7 @@ fn test_improve_plan_command_is_plan_only_and_accepts_focus() {
 
 #[test]
 fn test_improve_status_summarizes_current_todos() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         crate::todo::save_todos(
             &app.session.id,
@@ -771,7 +771,7 @@ fn test_improve_resume_requires_saved_mode() {
 
 #[test]
 fn test_improve_resume_uses_saved_mode_and_current_todos() {
-    with_temp_jcode_home(|| {
+    with_temp_next_code_home(|| {
         let mut app = create_test_app();
         app.session.improve_mode = Some(crate::session::SessionImproveMode::ImproveRun);
         app.session.save().expect("save session");

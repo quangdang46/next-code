@@ -18,7 +18,7 @@
 //!    resolutions inside one turn don't re-read disk.
 //!
 //! Frecency state lives at `<cache_root>/<repo_hash>/{frecency,queries}` so
-//! multiple jcode sessions on the same repo share rankings.
+//! multiple next-code sessions on the same repo share rankings.
 //!
 //! ## Concurrency
 //!
@@ -58,7 +58,7 @@ const DEFAULT_RESOLVE_BUDGET_TOKENS: u32 = 50_000;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AtSuggestion {
     /// Path relative to the picker's base directory, e.g. `src/main.rs`
-    /// or `crates/jcode-core` (no trailing `/` even for dirs — caller
+    /// or `crates/next-code-core` (no trailing `/` even for dirs — caller
     /// decides whether to append it for display).
     pub display_path: String,
     pub is_directory: bool,
@@ -101,7 +101,7 @@ struct AtPickerInner {
 
 impl AtPicker {
     /// Create a new picker for a given base path. `cache_root` is typically
-    /// `~/.jcode/cache/ffs/`; a per-repo subdirectory will be created inside.
+    /// `~/.next-code/cache/ffs/`; a per-repo subdirectory will be created inside.
     ///
     /// This call is cheap — no filesystem scan happens until `warm_up()`.
     pub fn new(base_path: impl Into<PathBuf>, cache_root: impl Into<PathBuf>) -> Self {
@@ -238,7 +238,7 @@ impl AtPicker {
         };
 
         // Build a MentionResolver that delegates to the same ffs pipeline
-        // the rest of jcode uses, with frecency already wired via
+        // the rest of next-code uses, with frecency already wired via
         // SharedFrecency. The resolver reuses the live picker's lifetime.
         let resolver = MentionResolver::new(picker)
             .with_shared_frecency(self.inner.shared_frecency.clone())
@@ -440,7 +440,7 @@ fn next_code_ffs_cache_root() -> PathBuf {
     let base = crate::storage::next_code_dir().unwrap_or_else(|_| {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
-            .join(".jcode")
+            .join(".next-code")
     });
     base.join("cache").join("ffs")
 }

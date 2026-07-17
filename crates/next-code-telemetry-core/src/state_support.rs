@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use super::{SESSION_STATE, sanitize_telemetry_label};
 use chrono::{DateTime, Datelike, Timelike, Utc};
 use next_code_storage as storage;
@@ -324,7 +325,7 @@ fn find_jcode_repo_in_ancestors(start: &Path) -> Option<PathBuf> {
 }
 
 fn telemetry_jcode_repo_dir() -> Option<PathBuf> {
-    if let Ok(path) = std::env::var("JCODE_REPO_DIR") {
+    if let Ok(path) = product_env("REPO_DIR") {
         let path = PathBuf::from(path);
         if is_jcode_repo_dir(&path) {
             return Some(path);

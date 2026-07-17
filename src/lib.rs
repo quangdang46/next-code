@@ -6,12 +6,12 @@
     clippy::useless_conversion
 )]
 
-//! Root `jcode` crate: the entrypoint + cli layer on top of the `jcode-tui`
-//! presentation crate (which in turn re-exports `jcode-app-core` and
-//! `jcode-base`).
+//! Root `next-code` crate: the entrypoint + cli layer on top of the `next-code-tui`
+//! presentation crate (which in turn re-exports `next-code-app-core` and
+//! `next-code-base`).
 //!
-//! The presentation modules (`tui`, `video_export`) live in `jcode-tui` and the
-//! non-presentation modules live in `jcode-app-core`; both are re-exported here
+//! The presentation modules (`tui`, `video_export`) live in `next-code-tui` and the
+//! non-presentation modules live in `next-code-app-core`; both are re-exported here
 //! via `pub use next_code_tui::*`, so existing `crate::<module>` paths (e.g.
 //! `crate::config`, `crate::server`, `crate::tui`) keep resolving unchanged
 //! across the cli code that was not moved.

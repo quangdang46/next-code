@@ -751,8 +751,8 @@ pub(super) async fn handle_refresh_models(
 
 fn send_catalog_activity(client_event_tx: &mpsc::UnboundedSender<ServerEvent>, message: &str) {
     let _ = client_event_tx.send(ServerEvent::Notification {
-        from_session: "jcode".to_string(),
-        from_name: Some("Jcode".to_string()),
+        from_session: "next-code".to_string(),
+        from_name: Some("Next Code".to_string()),
         notification_type: NotificationType::Message {
             scope: Some("catalog_activity".to_string()),
             channel: None,
@@ -1020,7 +1020,7 @@ pub(super) async fn handle_notify_auth_changed(
     let agent_clone = agent.clone();
     tokio::spawn(async move {
         let activation = crate::auth::lifecycle::activate_auth_change(&activation_request);
-        // Snapshot which providers jcode now believes are configured right after
+        // Snapshot which providers next-code now believes are configured right after
         // an auth change activates. This is the cornerstone for diagnosing
         // "logged in but model picker still empty / only OpenAI+Anthropic" and
         // "paste key silently returns to menu" reports (#312, #292, #304): if a
@@ -1054,7 +1054,7 @@ pub(super) async fn handle_notify_auth_changed(
         crate::bus::Bus::global().publish(crate::bus::BusEvent::UiActivity(
             crate::bus::UiActivity::catalog(
                 Some(session_id.clone()),
-                "**Auth Model Routes Updating**\n\nCredentials are reloaded. Jcode is pushing an updated model catalog snapshot to connected clients.",
+                "**Auth Model Routes Updating**\n\nCredentials are reloaded. Next Code is pushing an updated model catalog snapshot to connected clients.",
                 Some("Auth: model routes updating..."),
             ),
         ));
@@ -1301,8 +1301,8 @@ mod tests {
     impl IsolatedRuntimeDir {
         fn new() -> Self {
             let temp = tempfile::TempDir::new().expect("runtime dir");
-            let prev_runtime = std::env::var_os("JCODE_RUNTIME_DIR");
-            crate::env::set_var("JCODE_RUNTIME_DIR", temp.path());
+            let prev_runtime = std::env::var_os("NEXT_CODE_RUNTIME_DIR");
+            crate::env::set_var("NEXT_CODE_RUNTIME_DIR", temp.path());
             Self {
                 _prev_runtime: prev_runtime,
                 _temp: temp,
@@ -1313,9 +1313,9 @@ mod tests {
     impl Drop for IsolatedRuntimeDir {
         fn drop(&mut self) {
             if let Some(prev_runtime) = self._prev_runtime.take() {
-                crate::env::set_var("JCODE_RUNTIME_DIR", prev_runtime);
+                crate::env::set_var("NEXT_CODE_RUNTIME_DIR", prev_runtime);
             } else {
-                crate::env::remove_var("JCODE_RUNTIME_DIR");
+                crate::env::remove_var("NEXT_CODE_RUNTIME_DIR");
             }
         }
     }

@@ -46,7 +46,7 @@ fn remote_working_dir_option_parses() {
     let args = Args::try_parse_from([
         "next-code",
         "--socket",
-        "/tmp/jcode.sock",
+        "/tmp/next-code.sock",
         "--remote-working-dir",
         "/home/agent/project",
     ])

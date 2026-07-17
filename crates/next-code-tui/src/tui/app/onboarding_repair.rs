@@ -9,8 +9,8 @@
 //!   2. Builds an agent-friendly *repair brief* ([`build_repair_brief`]) that
 //!      states the failure, points at the log file, and lists the exact
 //!      non-interactive commands the agent can run to diagnose and fix the
-//!      login (`jcode auth-test --json`, `jcode provider add --api-key-stdin`,
-//!      `jcode login`). The agent can add the key/login for the user itself.
+//!      login (`next-code auth-test --json`, `next-code provider add --api-key-stdin`,
+//!      `next-code login`). The agent can add the key/login for the user itself.
 //!
 //! The brief is plain text so it works whether we copy it to the clipboard,
 //! show it on screen, or seed an agent's prompt.
@@ -18,7 +18,7 @@
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-/// An external coding agent jcode can hand a repair task to. These map to the
+/// An external coding agent next-code can hand a repair task to. These map to the
 /// real CLI binaries users run, so the brief can name the exact command.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RepairAgent {
@@ -92,7 +92,7 @@ impl RepairAgent {
 }
 
 /// Resolve a path under the (sandbox-aware) external home so detection honors
-/// `JCODE_HOME`/external isolation, matching the onboarding import detectors.
+/// `NEXT_CODE_HOME`/external isolation, matching the onboarding import detectors.
 fn external_home_path(rel: &str) -> PathBuf {
     crate::storage::user_home_path(rel)
         .ok()
@@ -144,11 +144,11 @@ pub(crate) fn build_repair_brief(
     let provider = provider_hint.unwrap_or("<provider>");
     let log_line = next_code_logging::log_path()
         .map(|p| format!("Logs:    {}", p.display()))
-        .unwrap_or_else(|| "Logs:    ~/.jcode/logs/jcode-<date>.log".to_string());
+        .unwrap_or_else(|| "Logs:    ~/.next-code/logs/next-code-<date>.log".to_string());
 
     let mut brief = String::new();
     brief.push_str(
-        "jcode (a terminal coding agent) could not import or validate a login \
+        "next-code (a terminal coding agent) could not import or validate a login \
 during first-run onboarding. Please fix the login for the user.\n\n",
     );
     brief.push_str(&format!("Failure: {}\n", failure.trim()));
@@ -156,32 +156,32 @@ during first-run onboarding. Please fix the login for the user.\n\n",
 
     brief.push_str("Diagnose (machine-readable, exit/JSON tells you what's wrong):\n");
     if provider_hint.is_some() {
-        brief.push_str(&format!("  jcode auth-test --provider {provider} --json\n",));
+        brief.push_str(&format!("  next-code auth-test --provider {provider} --json\n",));
     } else {
-        brief.push_str("  jcode auth-test --all-configured --json   # which provider is broken?\n");
+        brief.push_str("  next-code auth-test --all-configured --json   # which provider is broken?\n");
     }
-    brief.push_str("  jcode auth doctor   # human-readable, structured recovery steps\n\n");
+    brief.push_str("  next-code auth doctor   # human-readable, structured recovery steps\n\n");
 
     brief.push_str("Fix - pick the one that matches the provider:\n");
     brief.push_str(
         "  # OAuth providers (OpenAI/ChatGPT, Anthropic/Claude, Gemini, Copilot, Cursor):\n",
     );
-    brief.push_str(&format!("  jcode login --provider {provider}\n\n"));
+    brief.push_str(&format!("  next-code login --provider {provider}\n\n"));
     brief.push_str("  # API-key providers (pass the key directly):\n");
     brief.push_str(&format!(
-        "  jcode login --provider {provider} --api-key \"$THE_API_KEY\"\n\n",
+        "  next-code login --provider {provider} --api-key \"$THE_API_KEY\"\n\n",
     ));
     brief.push_str(
         "  # Custom OpenAI-compatible endpoint (adds a named profile + stores the key on stdin, no echo):\n",
     );
     brief.push_str(
-        "  printf '%s' \"$THE_API_KEY\" | jcode provider add my-endpoint \\\n\
+        "  printf '%s' \"$THE_API_KEY\" | next-code provider add my-endpoint \\\n\
 \u{20}     --base-url https://api.example.com/v1 --model <model> --api-key-stdin\n\n",
     );
 
     brief.push_str("Re-validate (success means done):\n");
     brief.push_str(&format!(
-        "  jcode auth-test --provider {provider} --json   # success:true in the JSON = fixed\n\n",
+        "  next-code auth-test --provider {provider} --json   # success:true in the JSON = fixed\n\n",
     ));
 
     if let Some(agent) = agent {
@@ -191,7 +191,7 @@ during first-run onboarding. Please fix the login for the user.\n\n",
         ));
     }
     brief.push_str(
-        "When auth-test reports success, tell the user to restart jcode (or press Enter on \
+        "When auth-test reports success, tell the user to restart next-code (or press Enter on \
 the onboarding screen to choose the provider you just fixed).\n",
     );
     brief
@@ -199,7 +199,7 @@ the onboarding screen to choose the provider you just fixed).\n",
 
 /// Stable path where the latest onboarding repair brief is written, so a helper
 /// agent launched in this directory can simply `cat` it without the user having
-/// to paste anything. Lives under the jcode home so it honors `JCODE_HOME`.
+/// to paste anything. Lives under the next-code home so it honors `NEXT_CODE_HOME`.
 pub(crate) fn repair_brief_path() -> Option<PathBuf> {
     crate::storage::next_code_dir()
         .ok()
@@ -253,12 +253,12 @@ mod tests {
         );
         // The exact agent-runnable commands.
         assert!(
-            brief.contains("jcode auth-test --provider openai --json"),
+            brief.contains("next-code auth-test --provider openai --json"),
             "{brief}"
         );
-        assert!(brief.contains("jcode login --provider openai"), "{brief}");
+        assert!(brief.contains("next-code login --provider openai"), "{brief}");
         assert!(brief.contains("--api-key-stdin"), "{brief}");
-        assert!(brief.contains("jcode provider add"), "{brief}");
+        assert!(brief.contains("next-code provider add"), "{brief}");
         // Points at the logs.
         assert!(brief.contains("Logs:"), "{brief}");
         // Names the detected agent so it knows it can act directly.
@@ -270,12 +270,12 @@ mod tests {
         let brief = build_repair_brief(None, "unknown failure", None);
         // With no provider hint we point the agent at --all-configured.
         assert!(
-            brief.contains("jcode auth-test --all-configured --json"),
+            brief.contains("next-code auth-test --all-configured --json"),
             "{brief}"
         );
-        assert!(brief.contains("jcode auth doctor"), "{brief}");
+        assert!(brief.contains("next-code auth doctor"), "{brief}");
         // No agent label, but still tells the user what to do.
-        assert!(brief.contains("restart jcode"), "{brief}");
+        assert!(brief.contains("restart next-code"), "{brief}");
     }
 
     #[test]

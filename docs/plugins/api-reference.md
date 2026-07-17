@@ -1,6 +1,6 @@
-# jcode Plugin API Reference
+# next-code Plugin API Reference
 
-Complete TypeScript type definitions for the jcode plugin system. All types are derived from the actual Rust implementation in `jcode-plugin-core` and `jcode-plugin-runtime`.
+Complete TypeScript type definitions for the next-code plugin system. All types are derived from the actual Rust implementation in `next-code-plugin-core` and `next-code-plugin-runtime`.
 
 ---
 
@@ -33,7 +33,7 @@ interface PluginApi {
   /** Plugin version string */
   readonly version: string;
 
-  /** Current working directory of the jcode process */
+  /** Current working directory of the next-code process */
   readonly cwd: string;
 
   /** Structured logger */
@@ -193,8 +193,8 @@ interface PluginFeature {
 
 ```typescript
 interface PluginEngines {
-  /** Required jcode version range (e.g., ">=0.9.0") */
-  jcode?: string;
+  /** Required next-code version range (e.g., ">=0.9.0") */
+  next-code?: string;
 }
 ```
 
@@ -250,11 +250,11 @@ interface PluginVersion {
   /** Plugin version */
   semver: string;
 
-  /** Minimum required jcode version */
-  jcode_min_version?: string;
+  /** Minimum required next-code version */
+  next_code_min_version?: string;
 
-  /** Maximum supported jcode version */
-  jcode_max_version?: string;
+  /** Maximum supported next-code version */
+  next_code_max_version?: string;
 }
 ```
 
@@ -662,7 +662,7 @@ interface JSONSchemaProperty {
 
 ```typescript
 interface PluginCapabilities {
-  /** Allowed read paths (e.g., ["$HOME/.jcode/data"]) */
+  /** Allowed read paths (e.g., ["$HOME/.next-code/data"]) */
   fs_read?: string[];
 
   /** Allowed write paths */
@@ -683,10 +683,10 @@ interface PluginCapabilities {
   /** Allow registering LLM providers */
   register_providers?: boolean;
 
-  /** Allow reading jcode config */
+  /** Allow reading next-code config */
   read_config?: boolean;
 
-  /** Allow writing jcode config */
+  /** Allow writing next-code config */
   write_config?: boolean;
 
   /** Allowed environment variables */
@@ -948,9 +948,9 @@ interface DiscoveryPaths {
 }
 
 // Default paths:
-// plugin_dirs: ["~/.jcode/plugins"]
-// npm_cache:   "~/.jcode/cache/packages"
-// tool_dirs:   ["~/.jcode/tools"]
+// plugin_dirs: ["~/.next-code/plugins"]
+// npm_cache:   "~/.next-code/cache/packages"
+// tool_dirs:   ["~/.next-code/tools"]
 ```
 
 ---

@@ -1,9 +1,9 @@
-# jcode Feature PR Backlog — From 13 Reference Repos
+# next-code Feature PR Backlog — From 13 Reference Repos
 
 > Goal-driven implementation backlog. Each row = 1 PR against `master`.
 > For each missing feature, the implementation subagent must:
 > 1. Spawn a research subagent to verify the actual code in `/tmp/feature-research/<repo>`
-> 2. Compare against jcode implementation
+> 2. Compare against next-code implementation
 > 3. Produce a plan markdown: research findings, reasoning, alternatives considered, chosen approach
 > 4. Implement, test, and open the PR
 > 5. Attach the plan markdown to the PR description
@@ -44,7 +44,7 @@
 | A16 | TUI /provider command (list/login/logout/set default) | opencode, oh-my-pi | 🔜 Pending | P1 | M | docs/pr-plans/A16-tui-provider.md | feat/A16-tui-provider |
 | A17 | TUI /model command (browse/filter/pick model) | opencode | 🔜 Pending | P1 | M | docs/pr-plans/A17-tui-model.md | feat/A17-tui-model |
 | A18 | Models.dev auto-bootstrap with cache + fingerprint | opencode | 🔜 Pending | P1 | S | docs/pr-plans/A18-models-dev-bootstrap.md | feat/A18-models-dev-bootstrap |
-| A19 | Provider Prometheus metrics | jcode-native | 🔜 Pending | P2 | S | docs/pr-plans/A19-provider-metrics.md | feat/A19-provider-metrics |
+| A19 | Provider Prometheus metrics | next-code-native | 🔜 Pending | P2 | S | docs/pr-plans/A19-provider-metrics.md | feat/A19-provider-metrics |
 
 ## Section B — Plugin System (from oh-my-pi, pi-agent-rust, opencode, crush, qwen-code)
 
@@ -55,7 +55,7 @@
 | B3 | PluginManager (load/unload/list/enable/disable with 3 source types) | oh-my-pi | 🔜 Pending | P1 | M | docs/pr-plans/B3-plugin-manager.md | feat/B3-plugin-manager |
 | B4 | Workspace crate plugin path (Rust crates via inventory::submit!) | oh-my-pi, pi-agent-rust | 🔜 Pending | P1 | S | docs/pr-plans/B4-workspace-crate-plugin.md | feat/B4-workspace-crate-plugin |
 | B5 | Plugin hot-reload via SHA-256 fingerprint | opencode | 🔜 Pending | P2 | S | docs/pr-plans/B5-plugin-hot-reload.md | feat/B5-plugin-hot-reload |
-| B6 | Per-extension kill switch (JCODE_PLUGIN_KILL_<NAME>) | pi-agent-rust | 🔜 Pending | P2 | S | docs/pr-plans/B6-plugin-kill-switch.md | feat/B6-plugin-kill-switch |
+| B6 | Per-extension kill switch (NEXT_CODE_PLUGIN_KILL_<NAME>) | pi-agent-rust | 🔜 Pending | P2 | S | docs/pr-plans/B6-plugin-kill-switch.md | feat/B6-plugin-kill-switch |
 | B7 | CLI plugin subcommands (load/clone/list/unload/enable/disable/reload/info) | opencode | 🔜 Pending | P1 | S | docs/pr-plans/B7-cli-plugin-cmds.md | feat/B7-cli-plugin-cmds |
 | B8 | Plugin author guide (docs/plugins.md) | oh-my-pi | 🔜 Pending | P1 | S | docs/pr-plans/B8-plugin-author-guide.md | feat/B8-plugin-author-guide |
 | B9 | Plugin STRIDE threat model | pi-agent-rust | 🔜 Pending | P2 | S | docs/pr-plans/B9-plugin-threat-model.md | feat/B9-plugin-threat-model |
@@ -104,7 +104,7 @@
 | E2 | SSE streaming parser with UTF-8 tail handling | pi-agent-rust | ❌ Missing | P1 | M | docs/pr-plans/E2-sse-parser.md | feat/E2-sse-parser |
 | E3 | Shared multi-client sessions (workspace) | crush | ❌ Missing | P2 | L | docs/pr-plans/E3-shared-sessions.md | feat/E3-shared-sessions |
 | E4 | Remote teleport (spawn/detach/reattach workers) | kimchi | ❌ Missing | P3 | XL | docs/pr-plans/E4-remote-teleport.md | feat/E4-remote-teleport |
-| E5 | Session memory topology graph | jcode-native | ⚠️ Partial | P2 | M | docs/pr-plans/E5-session-topology.md | feat/E5-session-topology |
+| E5 | Session memory topology graph | next-code-native | ⚠️ Partial | P2 | M | docs/pr-plans/E5-session-topology.md | feat/E5-session-topology |
 
 ## Section F — Workflow Pipeline (from gajae-code, kimchi)
 
@@ -153,7 +153,7 @@
 | J2 | Auto-provider updates (Catwalk registry) | crush | ❌ Missing | P3 | M | docs/pr-plans/J2-auto-provider.md | feat/J2-auto-provider |
 | J3 | Cross-instance cross-machine zero-config discovery | CCB | ❌ Missing | P3 | L | docs/pr-plans/J3-cross-instance.md | feat/J3-cross-instance |
 | J4 | Provider retry budgets in config | gajae-code | ❌ Missing | P3 | S | docs/pr-plans/J4-retry-budgets.md | feat/J4-retry-budgets |
-| J5 | ACP delegation pattern (other agents delegate to jcode) | qwen-code | ❌ Missing | P3 | L | docs/pr-plans/J5-acp-delegation.md | feat/J5-acp-delegation |
+| J5 | ACP delegation pattern (other agents delegate to next-code) | qwen-code | ❌ Missing | P3 | L | docs/pr-plans/J5-acp-delegation.md | feat/J5-acp-delegation |
 
 ---
 
@@ -193,7 +193,7 @@ Each `docs/pr-plans/<ID>-<name>.md` must contain:
 - Key files inspected: <paths in /tmp/feature-research/...>
 - Direct code links: <URLs to source repo files>
 
-## Why This Feature Is Missing in jcode
+## Why This Feature Is Missing in next-code
 - Gap analysis from PARITY.md §XIV
 - Code path that should exist but doesn't
 
@@ -204,7 +204,7 @@ Each `docs/pr-plans/<ID>-<name>.md` must contain:
 
 ## Chosen Approach
 - Rationale
-- Architectural alignment with jcode
+- Architectural alignment with next-code
 
 ## Implementation Plan
 - File-by-file changes

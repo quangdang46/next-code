@@ -20,17 +20,17 @@
 // recursion limit (128) is exceeded once more properties are added.
 #![recursion_limit = "256"]
 
-//! Application core for jcode (upper layer).
+//! Application core for next-code (upper layer).
 //!
 //! This crate holds the server/tool/agent layer and its presentation-adjacent
 //! leaves. The foundational layer it builds on (provider, auth, config, session,
-//! message, memory, telemetry, ...) lives in the `jcode-base` crate and is
+//! message, memory, telemetry, ...) lives in the `next-code-base` crate and is
 //! re-exported here via `pub use next_code_base::*`, so every existing
 //! `crate::<module>` path (e.g. `crate::config`, `crate::provider`) keeps
-//! resolving unchanged across this crate and the root `jcode` crate, which in
+//! resolving unchanged across this crate and the root `next-code` crate, which in
 //! turn re-exports this crate via `pub use next_code_app_core::*`.
 
-// Foundational layer: re-export every `jcode-base` module so `crate::<module>`
+// Foundational layer: re-export every `next-code-base` module so `crate::<module>`
 // paths resolve here exactly as they did before the split.
 pub use next_code_base::*;
 

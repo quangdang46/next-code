@@ -1,7 +1,7 @@
 //! TUI provider/model picker — data model only.
 //!
 //! Phase 5 of the master plan. The actual TUI rendering will be
-//! integrated into `jcode-tui` (which has unrelated pre-existing build
+//! integrated into `next-code-tui` (which has unrelated pre-existing build
 //! failures); this module provides the *headless* data model that the
 //! eventual TUI binds against, plus a `next()` / `prev()` / `filter()`
 //! API for the keyboard navigation. Tests verify the selection logic

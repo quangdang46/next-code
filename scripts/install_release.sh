@@ -9,7 +9,7 @@
 # - ~/.local/bin/next-code -> ~/.next-code/builds/current/next-code (launcher)
 # - ~/.local/bin/jcode -> next-code (compat symlink for one release)
 #
-# Legacy ~/.jcode is dual-read by the binary and migrates automatically when
+# Legacy ~/.next-code is dual-read by the binary and migrates automatically when
 # ~/.next-code is missing. Installers write to ~/.next-code going forward.
 set -euo pipefail
 
@@ -44,8 +44,8 @@ bin="$repo_root/target/$profile/next-code"
 
 if [[ ! -x "$bin" ]]; then
   # Fall back to a still-present legacy binary name during the rebrand window.
-  if [[ -x "$repo_root/target/$profile/jcode" ]]; then
-    bin="$repo_root/target/$profile/jcode"
+  if [[ -x "$repo_root/target/$profile/next-code" ]]; then
+    bin="$repo_root/target/$profile/next-code"
   else
     echo "Release binary not found: $bin" >&2
     exit 1
@@ -67,16 +67,16 @@ if [[ -z "$hash" ]]; then
 fi
 
 # Prefer NEXT_CODE_HOME, then legacy JCODE_HOME, then ~/.next-code (with legacy
-# ~/.jcode builds dir as a last-resort fallback when it already exists alone).
+# ~/.next-code builds dir as a last-resort fallback when it already exists alone).
 if [ -n "${NEXT_CODE_HOME:-}" ]; then
   next_code_home="$NEXT_CODE_HOME"
-elif [ -n "${JCODE_HOME:-}" ]; then
-  next_code_home="$JCODE_HOME"
-elif [ -d "$HOME/.next-code" ] || [ ! -d "$HOME/.jcode" ]; then
+elif [ -n "${NEXT_CODE_HOME:-${JCODE_HOME:-}}" ]; then
+  next_code_home="${NEXT_CODE_HOME:-${JCODE_HOME:-}}"
+elif [ -d "$HOME/.next-code" ] || [ ! -d "$HOME/.next-code" ]; then
   next_code_home="$HOME/.next-code"
 else
   # Legacy install still present; keep writing builds there until migration runs.
-  next_code_home="$HOME/.jcode"
+  next_code_home="$HOME/.next-code"
 fi
 
 # Install versioned binary into <home>/builds/versions/<hash>/
@@ -104,7 +104,7 @@ install_dir="${NEXT_CODE_INSTALL_DIR:-${JCODE_INSTALL_DIR:-$HOME/.local/bin}}"
 mkdir -p "$install_dir"
 ln -sfn "$current_dir/next-code" "$install_dir/next-code"
 # Compat symlink for one release so existing `jcode` muscle memory keeps working.
-ln -sfn "next-code" "$install_dir/jcode"
+ln -sfn "next-code" "$install_dir/next-code"
 
 echo "Installed: $version_dir/next-code"
 echo "Updated stable symlink: $stable_dir/next-code -> $version_dir/next-code"

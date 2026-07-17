@@ -836,7 +836,7 @@ impl App {
 
     /// Get the debug socket path
     pub fn debug_socket_path() -> std::path::PathBuf {
-        crate::storage::runtime_dir().join("jcode-debug.sock")
+        crate::storage::runtime_dir().join("next-code-debug.sock")
     }
 }
 
@@ -1540,7 +1540,7 @@ fn format_cache_stats(app: &App) -> String {
 }
 
 /// Build the `/skills` report: currently loaded skills (marking the active one)
-/// plus the curated list of jcode-endorsed skills (marking which are installed).
+/// plus the curated list of next-code-endorsed skills (marking which are installed).
 fn build_skills_report(app: &App) -> String {
     let mut out = String::new();
 
@@ -1566,7 +1566,7 @@ fn build_skills_report(app: &App) -> String {
         skills.sort_by(|a, b| a.name.cmp(&b.name));
         if skills.is_empty() {
             out.push_str(
-                "- none loaded\n  Add skills under ~/.jcode/skills/<name>/SKILL.md or ./.jcode/skills/<name>/SKILL.md\n",
+                "- none loaded\n  Add skills under ~/.next-code/skills/<name>/SKILL.md or ./.next-code/skills/<name>/SKILL.md\n",
             );
         } else {
             for skill in skills {
@@ -1594,7 +1594,7 @@ fn build_skills_report(app: &App) -> String {
                 .map(|s| s.name.clone())
                 .collect()
         };
-    out.push_str("\nEndorsed skills (recommended by jcode)\n");
+    out.push_str("\nEndorsed skills (recommended by next-code)\n");
     // Group by category, preserving first-seen category order.
     let mut category_order: Vec<&str> = Vec::new();
     for endorsed in crate::skill::endorsed_skills() {
@@ -1775,7 +1775,7 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
         } else {
             ""
         };
-        let mut content = format!("jcode client: {}{}", version, is_canary);
+        let mut content = format!("next-code client: {}{}", version, is_canary);
         if app.is_remote {
             content.push_str("\nmode: remote/shared-server");
             let server_label = match (&app.remote_server_icon, &app.remote_server_short_name) {
@@ -2015,7 +2015,7 @@ pub(super) fn handle_info_command(app: &mut App, trimmed: &str) -> bool {
                     None => "none",
                 };
                 format!(
-                    "- supported: yes\n- mode: {}\n- jcode-managed: {}\n- active summary: {} ({})\n- compacted messages: {}\n- active messages: {}\n- summary chars: {}\n- estimated tokens: {}\n- effective tokens: {}\n- observed tokens: {}\n- usage: {:.1}%\n- compacting now: {}\n- budget: {}",
+                    "- supported: yes\n- mode: {}\n- next-code-managed: {}\n- active summary: {} ({})\n- compacted messages: {}\n- active messages: {}\n- summary chars: {}\n- estimated tokens: {}\n- effective tokens: {}\n- observed tokens: {}\n- usage: {:.1}%\n- compacting now: {}\n- budget: {}",
                     mode,
                     if app.provider.uses_jcode_compaction() {
                         "yes"

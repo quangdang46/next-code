@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use anyhow::{Context, Result};
 use serde_json::json;
 use std::io::BufReader;
@@ -77,13 +78,13 @@ use terminal::{compact_title, launch_first_available_terminal, terminal_candidat
 pub use terminal::{launch_validated_resume_session, validate_resume_session_id};
 
 pub(super) fn default_desktop_working_dir() -> Option<PathBuf> {
-    if let Ok(raw) = std::env::var("JCODE_DESKTOP_WORKING_DIR") {
+    if let Ok(raw) = product_env("DESKTOP_WORKING_DIR") {
         let path = PathBuf::from(raw);
         if is_usable_directory(&path) {
             return Some(path);
         }
         crate::desktop_log::warn(format_args!(
-            "jcode-desktop: ignoring JCODE_DESKTOP_WORKING_DIR because it is not a directory: {}",
+            "next-code-desktop: ignoring NEXT_CODE_DESKTOP_WORKING_DIR because it is not a directory: {}",
             path.display()
         ));
     }
@@ -356,19 +357,19 @@ enum DesktopSessionCommand {
 }
 
 pub fn launch_resume_session(session_id: &str, title: &str) -> Result<()> {
-    let title = format!("jcode · {}", compact_title(title));
+    let title = format!("next-code · {}", compact_title(title));
     let candidates = terminal_candidates(&title, &["--resume", session_id]);
-    launch_first_available_terminal(candidates, &format!("jcode --resume {session_id}"))
+    launch_first_available_terminal(candidates, &format!("next-code --resume {session_id}"))
 }
 
 pub fn launch_new_session() -> Result<()> {
-    let candidates = terminal_candidates("jcode · new session", &["--fresh-spawn"]);
-    launch_first_available_terminal(candidates, "jcode")
+    let candidates = terminal_candidates("next-code · new session", &["--fresh-spawn"]);
+    launch_first_available_terminal(candidates, "next-code")
 }
 
 pub fn launch_selfdev_session() -> Result<()> {
-    let candidates = terminal_candidates("jcode · self-dev", &["self-dev"]);
-    launch_first_available_terminal(candidates, "jcode self-dev")
+    let candidates = terminal_candidates("next-code · self-dev", &["self-dev"]);
+    launch_first_available_terminal(candidates, "next-code self-dev")
 }
 
 pub fn launch_home_session() -> Result<()> {
@@ -376,8 +377,8 @@ pub fn launch_home_session() -> Result<()> {
         .map(PathBuf::from)
         .ok_or_else(|| anyhow::anyhow!("HOME is not set"))?;
     let candidates =
-        terminal::terminal_candidates_in_dir("jcode · home", &["--fresh-spawn"], home.as_path());
-    launch_first_available_terminal(candidates, "jcode in home directory")
+        terminal::terminal_candidates_in_dir("next-code · home", &["--fresh-spawn"], home.as_path());
+    launch_first_available_terminal(candidates, "next-code in home directory")
 }
 
 pub fn send_message_to_session(session_id: &str, _title: &str, message: &str) -> Result<()> {
@@ -388,13 +389,13 @@ pub fn send_message_to_session(session_id: &str, _title: &str, message: &str) ->
 
     let session_id = session_id.to_string();
     let message = message.to_string();
-    spawn_bounded_desktop_session_worker("jcode-desktop-workspace-message", move || {
+    spawn_bounded_desktop_session_worker("next-code-desktop-workspace-message", move || {
         let (_command_tx, command_rx) = mpsc::channel();
         if let Err(error) =
             run_server_session(Some(&session_id), &message, Vec::new(), None, command_rx)
         {
             crate::desktop_log::error(format_args!(
-                "jcode-desktop: workspace server message failed session_id={session_id}: {error:#}"
+                "next-code-desktop: workspace server message failed session_id={session_id}: {error:#}"
             ));
         }
     })
@@ -414,12 +415,12 @@ pub fn spawn_fresh_server_session(
 
     let (command_tx, command_rx) = mpsc::channel();
     let handle = DesktopSessionHandle { command_tx };
-    spawn_bounded_desktop_session_worker("jcode-desktop-fresh-session", move || {
+    spawn_bounded_desktop_session_worker("next-code-desktop-fresh-session", move || {
         if let Err(error) =
             run_server_session(None, &message, images, Some(event_tx.clone()), command_rx)
         {
             crate::desktop_log::error(format_args!(
-                "jcode-desktop: fresh server session failed: {error:#}"
+                "next-code-desktop: fresh server session failed: {error:#}"
             ));
             send_desktop_event_ref(
                 Some(&event_tx),
@@ -444,7 +445,7 @@ pub fn spawn_message_to_session(
 
     let (command_tx, command_rx) = mpsc::channel();
     let handle = DesktopSessionHandle { command_tx };
-    spawn_bounded_desktop_session_worker("jcode-desktop-session-message", move || {
+    spawn_bounded_desktop_session_worker("next-code-desktop-session-message", move || {
         if let Err(error) = run_server_session(
             Some(&session_id),
             &message,
@@ -453,7 +454,7 @@ pub fn spawn_message_to_session(
             command_rx,
         ) {
             crate::desktop_log::error(format_args!(
-                "jcode-desktop: server session message failed session_id={session_id}: {error:#}"
+                "next-code-desktop: server session message failed session_id={session_id}: {error:#}"
             ));
             send_desktop_event_ref(
                 Some(&event_tx),
@@ -471,14 +472,14 @@ pub fn spawn_cycle_model(
     target_session_id: Option<String>,
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
-    spawn_bounded_desktop_session_worker("jcode-desktop-cycle-model", move || {
+    spawn_bounded_desktop_session_worker("next-code-desktop-cycle-model", move || {
             if let Err(error) = cycle_model(
                 direction,
                 target_session_id.as_deref(),
                 Some(event_tx.clone()),
             ) {
                 crate::desktop_log::error(format_args!(
-                    "jcode-desktop: model cycle failed direction={direction} target_session={}: {error:#}",
+                    "next-code-desktop: model cycle failed direction={direction} target_session={}: {error:#}",
                     target_session_id.as_deref().unwrap_or("<current>")
                 ));
                 send_desktop_event_ref(
@@ -513,11 +514,11 @@ pub fn spawn_load_model_catalog(
     target_session_id: Option<String>,
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
-    spawn_bounded_desktop_session_worker("jcode-desktop-load-model-catalog", move || {
+    spawn_bounded_desktop_session_worker("next-code-desktop-load-model-catalog", move || {
         if let Err(error) = load_model_catalog(target_session_id.as_deref(), Some(event_tx.clone()))
         {
             crate::desktop_log::error(format_args!(
-                "jcode-desktop: model catalog load failed target_session={}: {error:#}",
+                "next-code-desktop: model catalog load failed target_session={}: {error:#}",
                 target_session_id.as_deref().unwrap_or("<current>")
             ));
             send_desktop_event_ref(
@@ -553,11 +554,11 @@ pub fn spawn_set_model(
     target_session_id: Option<String>,
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
-    spawn_bounded_desktop_session_worker("jcode-desktop-set-model", move || {
+    spawn_bounded_desktop_session_worker("next-code-desktop-set-model", move || {
         if let Err(error) = set_model(&model, target_session_id.as_deref(), Some(event_tx.clone()))
         {
             crate::desktop_log::error(format_args!(
-                "jcode-desktop: set model failed model={} target_session={}: {error:#}",
+                "next-code-desktop: set model failed model={} target_session={}: {error:#}",
                 crate::desktop_log::truncate_for_log(&model, 256),
                 target_session_id.as_deref().unwrap_or("<current>")
             ));
@@ -594,7 +595,7 @@ pub fn spawn_refresh_models(
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
     spawn_control_request(
-        "jcode-desktop-refresh-models",
+        "next-code-desktop-refresh-models",
         target_session_id,
         event_tx,
         DesktopSessionStatus::external("refreshing model list"),
@@ -625,7 +626,7 @@ pub fn spawn_set_service_tier(
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
     spawn_control_request(
-        "jcode-desktop-set-fast-mode",
+        "next-code-desktop-set-fast-mode",
         target_session_id,
         event_tx,
         DesktopSessionStatus::external("setting fast mode"),
@@ -657,7 +658,7 @@ pub fn spawn_set_transport(
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
     spawn_control_request(
-        "jcode-desktop-set-transport",
+        "next-code-desktop-set-transport",
         target_session_id,
         event_tx,
         DesktopSessionStatus::external("setting transport"),
@@ -689,7 +690,7 @@ pub fn spawn_set_compaction_mode(
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
     spawn_control_request(
-        "jcode-desktop-set-compaction-mode",
+        "next-code-desktop-set-compaction-mode",
         target_session_id,
         event_tx,
         DesktopSessionStatus::external("setting compaction mode"),
@@ -720,7 +721,7 @@ pub fn spawn_compact_session(
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
     spawn_control_request(
-        "jcode-desktop-compact-session",
+        "next-code-desktop-compact-session",
         target_session_id,
         event_tx,
         DesktopSessionStatus::external("requesting compaction"),
@@ -752,7 +753,7 @@ pub fn spawn_rename_session(
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
     spawn_control_request(
-        "jcode-desktop-rename-session",
+        "next-code-desktop-rename-session",
         target_session_id,
         event_tx,
         DesktopSessionStatus::external("renaming session"),
@@ -783,7 +784,7 @@ pub fn spawn_clear_server_session(
     event_tx: DesktopSessionEventSender,
 ) -> Result<()> {
     spawn_control_request(
-        "jcode-desktop-clear-session",
+        "next-code-desktop-clear-session",
         target_session_id,
         event_tx,
         DesktopSessionStatus::external("clearing session"),
@@ -830,7 +831,7 @@ where
             action_label,
         ) {
             crate::desktop_log::error(format_args!(
-                "jcode-desktop: {action_label} failed target_session={}: {error:#}",
+                "next-code-desktop: {action_label} failed target_session={}: {error:#}",
                 target_session_id.as_deref().unwrap_or("<current>")
             ));
             send_desktop_event_ref(
@@ -1135,7 +1136,7 @@ fn run_server_session(
         )?;
         if reconnected_session_id != session_id {
             anyhow::bail!(
-                "jcode server reconnected to unexpected session id: expected {session_id}, got {reconnected_session_id}"
+                "next-code server reconnected to unexpected session id: expected {session_id}, got {reconnected_session_id}"
             );
         }
         send_desktop_event(
@@ -1176,7 +1177,7 @@ pub(super) fn send_desktop_event_ref(
         let event_kind = desktop_session_event_kind(&event);
         if event_tx.send(event).is_err() {
             crate::desktop_log::warn(format_args!(
-                "jcode-desktop: failed to deliver backend event {event_kind}, receiver is closed"
+                "next-code-desktop: failed to deliver backend event {event_kind}, receiver is closed"
             ));
         }
     }
@@ -1210,18 +1211,18 @@ fn desktop_session_event_kind(event: &DesktopSessionEvent) -> &'static str {
 }
 
 pub(super) fn socket_path() -> PathBuf {
-    if let Ok(custom) = std::env::var("JCODE_SOCKET") {
+    if let Ok(custom) = product_env("SOCKET") {
         return PathBuf::from(custom);
     }
-    if let Ok(dir) = std::env::var("JCODE_RUNTIME_DIR") {
-        return PathBuf::from(dir).join("jcode.sock");
+    if let Ok(dir) = product_env("RUNTIME_DIR") {
+        return PathBuf::from(dir).join("next-code.sock");
     }
     if let Ok(dir) = std::env::var("XDG_RUNTIME_DIR") {
-        return PathBuf::from(dir).join("jcode.sock");
+        return PathBuf::from(dir).join("next-code.sock");
     }
     std::env::temp_dir()
-        .join(format!("jcode-{}", runtime_user_discriminator()))
-        .join("jcode.sock")
+        .join(format!("next-code-{}", runtime_user_discriminator()))
+        .join("next-code.sock")
 }
 
 #[cfg(unix)]

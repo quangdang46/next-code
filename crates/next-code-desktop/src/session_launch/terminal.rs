@@ -1,3 +1,4 @@
+use next_code_core::env::{product_env};
 use super::launch_resume_session;
 use anyhow::{Context, Result};
 use std::io;
@@ -57,14 +58,14 @@ fn terminal_candidates_with_working_dir(
 ) -> Vec<Command> {
     let mut candidates = Vec::new();
 
-    if let Ok(raw_terminal) = std::env::var("JCODE_DESKTOP_TERMINAL") {
+    if let Ok(raw_terminal) = product_env("DESKTOP_TERMINAL") {
         match terminal_env_command(&raw_terminal, next_code_args) {
             Ok(mut command) => {
                 apply_working_dir(&mut command, working_dir);
                 candidates.push(command);
             }
             Err(error) => crate::desktop_log::warn(format_args!(
-                "jcode-desktop: ignoring invalid JCODE_DESKTOP_TERMINAL={raw_terminal:?}: {error:#}"
+                "next-code-desktop: ignoring invalid NEXT_CODE_DESKTOP_TERMINAL={raw_terminal:?}: {error:#}"
             )),
         }
     }
@@ -215,7 +216,7 @@ fn apply_working_dir(command: &mut Command, working_dir: Option<&Path>) {
 }
 
 pub(super) fn next_code_bin() -> String {
-    std::env::var("JCODE_BIN").unwrap_or_else(|_| "jcode".to_string())
+    std::env::var("NEXT_CODE_BIN").unwrap_or_else(|_| "next-code".to_string())
 }
 
 pub(super) fn compact_title(title: &str) -> String {
@@ -258,16 +259,16 @@ mod tests {
     #[test]
     fn parses_terminal_env_command_with_quotes_and_escapes() -> Result<()> {
         assert_eq!(
-            parse_terminal_env_command("kitty --title 'Jcode Desktop' --")?,
-            vec!["kitty", "--title", "Jcode Desktop", "--"]
+            parse_terminal_env_command("kitty --title 'Next Code Desktop' --")?,
+            vec!["kitty", "--title", "Next Code Desktop", "--"]
         );
         assert_eq!(
-            parse_terminal_env_command(r#"footclient -T jcode\ desktop --"#)?,
-            vec!["footclient", "-T", "jcode desktop", "--"]
+            parse_terminal_env_command(r#"footclient -T next-code\ desktop --"#)?,
+            vec!["footclient", "-T", "next-code desktop", "--"]
         );
         assert_eq!(
-            parse_terminal_env_command(r#"terminal --class "jcode desktop""#)?,
-            vec!["terminal", "--class", "jcode desktop"]
+            parse_terminal_env_command(r#"terminal --class "next-code desktop""#)?,
+            vec!["terminal", "--class", "next-code desktop"]
         );
         Ok(())
     }
@@ -280,8 +281,8 @@ mod tests {
     }
 
     #[test]
-    fn terminal_env_command_appends_jcode_invocation_without_shell() -> Result<()> {
-        let command = terminal_env_command("kitty --title 'Jcode Desktop'", &["--resume", "abc"])?;
+    fn terminal_env_command_appends_next_code_invocation_without_shell() -> Result<()> {
+        let command = terminal_env_command("kitty --title 'Next Code Desktop'", &["--resume", "abc"])?;
         let args = command
             .get_args()
             .map(|arg| arg.to_string_lossy().into_owned())
@@ -290,7 +291,7 @@ mod tests {
         assert_eq!(command.get_program().to_string_lossy(), "kitty");
         assert_eq!(
             args,
-            vec!["--title", "Jcode Desktop", "jcode", "--resume", "abc"]
+            vec!["--title", "Next Code Desktop", "next-code", "--resume", "abc"]
         );
         Ok(())
     }

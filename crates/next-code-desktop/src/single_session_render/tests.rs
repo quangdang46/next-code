@@ -114,7 +114,7 @@ fn test_session_card(session_id: &str, title: &str) -> SessionCard {
         session_id: session_id.to_string(),
         title: title.to_string(),
         subtitle: "active · test-model".to_string(),
-        detail: "3 msgs · just now · jcode".to_string(),
+        detail: "3 msgs · just now · next-code".to_string(),
         preview_lines: vec![
             "Prompt 1  inspect compact desktop geometry".to_string(),
             "Assistant  layout lanes should stay separated".to_string(),
@@ -352,7 +352,7 @@ fn wrapped_tool_lines_keep_hanging_indent_inside_card_inset() {
     // "  ● bash · running · <long command>" wraps; continuation rows must
     // inherit the 4-column hang so they stay inside the tool card inset
     // instead of colliding with the timeline rail at column zero.
-    let text = "  ● bash · running · cargo check -p jcode-desktop --all-targets --all-features";
+    let text = "  ● bash · running · cargo check -p next-code-desktop --all-targets --all-features";
     let line = SingleSessionStyledLine::new(text, SingleSessionLineStyle::Tool);
     let mut wrapped = Vec::new();
     push_wrapped_body_line_ref(&mut wrapped, &line, 34);
@@ -2123,7 +2123,7 @@ fn session_switcher_text_buffer_shapes_loaded_session_rows() {
         session_id: "session_visible".to_string(),
         title: "visible resume row".to_string(),
         subtitle: "active · test-model".to_string(),
-        detail: "3 msgs · just now · jcode".to_string(),
+        detail: "3 msgs · just now · next-code".to_string(),
         preview_lines: vec!["user hello from resume picker".to_string()],
         detail_lines: vec!["user hello from resume picker".to_string()],
         transcript_messages: Vec::new(),

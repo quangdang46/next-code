@@ -51,7 +51,7 @@ impl AnthropicContextMode {
         !matches!(self, AnthropicContextMode::Standard)
     }
 
-    /// Whether jcode should surface a distinct `[1m]` picker alias for this model.
+    /// Whether next-code should surface a distinct `[1m]` picker alias for this model.
     /// Only opt-in models benefit, native-1M models already use 1M by default so
     /// a `[1m]` alias would be a redundant duplicate.
     pub fn exposes_1m_alias(self) -> bool {

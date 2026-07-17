@@ -9,7 +9,7 @@
 //!   - HTML output with inline CSS / SVG mermaid / base64 images
 //!   - Redaction (`--redact`) of API keys, bearer tokens, well-known env vars
 //!   - The `/export` slash command (this PR is CLI-only via
-//!     `jcode export <session> [output]`)
+//!     `next-code export <session> [output]`)
 
 use anyhow::{Context, Result};
 use std::path::PathBuf;
@@ -255,7 +255,7 @@ pub fn render_html(session: &crate::session::Session) -> String {
     out.push_str("<!doctype html>\n<html lang=\"en\"><head>\n");
     out.push_str("<meta charset=\"utf-8\">\n");
     out.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
-    out.push_str(&format!("<title>{title_esc} — jcode session</title>\n"));
+    out.push_str(&format!("<title>{title_esc} — next-code session</title>\n"));
     out.push_str("<style>");
     out.push_str(HTML_STYLE);
     out.push_str("</style>\n</head><body>\n");
@@ -504,7 +504,7 @@ mod tests {
             id: "m1".to_string(),
             role: Role::User,
             content: vec![ContentBlock::Text {
-                text: "hello jcode".to_string(),
+                text: "hello next-code".to_string(),
                 cache_control: None,
             }],
             display_role: None,
@@ -551,7 +551,7 @@ mod tests {
         assert!(md.contains("- **Model**: `gpt-5.5`"));
         assert!(md.contains("- **Messages**: 2"));
         assert!(md.contains("## #0 User"));
-        assert!(md.contains("hello jcode"));
+        assert!(md.contains("hello next-code"));
         assert!(md.contains("## #1 Assistant"));
         assert!(md.contains("Done."));
     }
@@ -595,7 +595,7 @@ mod tests {
         let s = fake_session();
         let html = render_html(&s);
         assert!(html.starts_with("<!doctype html>"));
-        assert!(html.contains("<title>Test Export — jcode session</title>"));
+        assert!(html.contains("<title>Test Export — next-code session</title>"));
         assert!(html.contains("<style>"));
         // Inline CSS, no external refs.
         assert!(!html.contains("<link "));

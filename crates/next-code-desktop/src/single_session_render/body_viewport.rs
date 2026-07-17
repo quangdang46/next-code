@@ -1,5 +1,6 @@
 //! Body viewport and rendered-line pipeline: visible body selection, viewport windows, rendered/wrapped body line production, streaming append, hit-testing, and vertical body geometry.
 
+use next_code_core::env::{product_env_os};
 use super::*;
 
 #[derive(Clone, Debug)]
@@ -93,7 +94,7 @@ pub(crate) fn single_session_rendered_body_lines_for_tick_shared(
     // Allow disabling the memo for A/B perf measurement in debug builds only;
     // the production memo can never be turned off by an env var.
     let memo_disabled =
-        cfg!(debug_assertions) && std::env::var_os("JCODE_DESKTOP_DISABLE_BODY_MEMO").is_some();
+        cfg!(debug_assertions) && product_env_os("DESKTOP_DISABLE_BODY_MEMO").is_some();
     if !memo_disabled
         && let Some(cached) = RENDERED_BODY_LINES_MEMO.with(|cell| {
             cell.borrow()

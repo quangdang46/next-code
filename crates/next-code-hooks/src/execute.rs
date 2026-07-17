@@ -7,7 +7,7 @@
 //!   reads `HookOutput` from stdout, and interprets the exit code.
 //! - **HTTP** -- sends `HookInput` as a JSON POST (or other method) to a URL
 //!   and expects a `HookOutput` JSON response body.
-//! - **Agent** -- placeholder for dispatching to an inline jcode sub-agent.
+//! - **Agent** -- placeholder for dispatching to an inline next-code sub-agent.
 //! - **Plugin** -- runs an external executable with the same stdin/stdout
 //!   protocol as command hooks.
 //!
@@ -170,9 +170,9 @@ fn is_handler_enabled(handler: &HookHandlerConfig) -> bool {
 ///
 /// The child process inherits the current process environment, plus:
 /// - Any variables from the handler's `env` field (after `${VAR}` expansion).
-/// - `JCODE_HOOK_EVENT` set to the event name.
-/// - `JCODE_HOOK_SESSION_ID` set to the session id.
-/// - `JCODE_HOOK_CWD` set to the working directory.
+/// - `NEXT_CODE_HOOK_EVENT` set to the event name.
+/// - `NEXT_CODE_HOOK_SESSION_ID` set to the session id.
+/// - `NEXT_CODE_HOOK_CWD` set to the working directory.
 ///
 /// # Working directory
 ///
@@ -283,16 +283,16 @@ pub async fn execute_command_hook(
 /// Build the full environment for a command hook child process.
 ///
 /// Starts with the current process environment, overlays the handler's `env`
-/// (with `${VAR}` expansion), and adds the standard `JCODE_HOOK_*` vars.
+/// (with `${VAR}` expansion), and adds the standard `NEXT_CODE_HOOK_*` vars.
 ///
 /// # Backward-compat env vars (v1→v2 migration)
 ///
 /// In addition to the three v2-standard vars, we set several env vars that
 /// v1 hooks relied on, so existing scripts continue to work without changes:
 ///
-/// - `JCODE_HOOKS_DISABLED=1` — recursion guard (v1 also set this).
-/// - `JCODE_HOOK_TOOL_NAME` — name of the tool being executed (if applicable).
-/// - `JCODE_HOOK_TOOL_INPUT` — JSON tool input (truncated to 16 KB).
+/// - `NEXT_CODE_HOOKS_DISABLED=1` — recursion guard (v1 also set this).
+/// - `NEXT_CODE_HOOK_TOOL_NAME` — name of the tool being executed (if applicable).
+/// - `NEXT_CODE_HOOK_TOOL_INPUT` — JSON tool input (truncated to 16 KB).
 fn build_command_env(
     handler_env: &HashMap<String, String>,
     input: &HookInput,
@@ -305,31 +305,31 @@ fn build_command_env(
     }
 
     // Recursion guard — prevents hook commands from re-entering the hook
-    // system (v1 compat). A hook that spawns jcode will see this env var
+    // system (v1 compat). A hook that spawns next-code will see this env var
     // and skip hook dispatch.
-    env.insert("JCODE_HOOKS_DISABLED".to_string(), "1".to_string());
+    env.insert("NEXT_CODE_HOOKS_DISABLED".to_string(), "1".to_string());
 
     // Standard hook env vars.
     env.insert(
-        "JCODE_HOOK_EVENT".to_string(),
+        "NEXT_CODE_HOOK_EVENT".to_string(),
         input.hook_event_name.clone(),
     );
     env.insert(
-        "JCODE_HOOK_SESSION_ID".to_string(),
+        "NEXT_CODE_HOOK_SESSION_ID".to_string(),
         input.session_id.clone(),
     );
-    env.insert("JCODE_HOOK_CWD".to_string(), input.cwd.clone());
+    env.insert("NEXT_CODE_HOOK_CWD".to_string(), input.cwd.clone());
 
     // Backward-compat env vars — v1 hooks used these for decision-making.
     if let Some(tool_name) = &input.tool_name {
-        env.insert("JCODE_HOOK_TOOL_NAME".to_string(), tool_name.clone());
+        env.insert("NEXT_CODE_HOOK_TOOL_NAME".to_string(), tool_name.clone());
     }
     if let Some(tool_input) = &input.tool_input {
         // Truncate to 16 KB to match v1's TOOL_INPUT_ENV_LIMIT.
         let json_str = serde_json::to_string(tool_input).unwrap_or_default();
         const TOOL_INPUT_LIMIT: usize = 16 * 1024;
         let truncated: String = json_str.chars().take(TOOL_INPUT_LIMIT).collect();
-        env.insert("JCODE_HOOK_TOOL_INPUT".to_string(), truncated);
+        env.insert("NEXT_CODE_HOOK_TOOL_INPUT".to_string(), truncated);
     }
 
     env
@@ -524,11 +524,11 @@ pub async fn execute_http_hook(
 /// Execute an agent-type hook handler.
 ///
 /// **Not yet implemented.** This is a placeholder for future support of
-/// inline jcode sub-agent dispatch.  Currently returns
+/// inline next-code sub-agent dispatch.  Currently returns
 /// [`ExecuteError::AgentNotImplemented`].
 ///
 /// When implemented, this function will:
-/// 1. Resolve the agent by `agent_id` from jcode's agent registry.
+/// 1. Resolve the agent by `agent_id` from next-code's agent registry.
 /// 2. Construct a sub-agent invocation with the `HookInput` as context.
 /// 3. Optionally override the system prompt if `config.system_prompt` is set.
 /// 4. Wait for completion (if `config.wait_for_completion` is `true`).
@@ -563,9 +563,9 @@ pub async fn execute_agent_hook(
 /// # Environment
 ///
 /// The plugin inherits the current process environment plus:
-/// - `JCODE_HOOK_EVENT`
-/// - `JCODE_HOOK_SESSION_ID`
-/// - `JCODE_HOOK_CWD`
+/// - `NEXT_CODE_HOOK_EVENT`
+/// - `NEXT_CODE_HOOK_SESSION_ID`
+/// - `NEXT_CODE_HOOK_CWD`
 ///
 /// # Arguments
 ///
@@ -583,14 +583,14 @@ pub async fn execute_plugin_hook(
     // Build environment.
     let mut env_vars: HashMap<String, String> = std::env::vars().collect();
     env_vars.insert(
-        "JCODE_HOOK_EVENT".to_string(),
+        "NEXT_CODE_HOOK_EVENT".to_string(),
         input.hook_event_name.clone(),
     );
     env_vars.insert(
-        "JCODE_HOOK_SESSION_ID".to_string(),
+        "NEXT_CODE_HOOK_SESSION_ID".to_string(),
         input.session_id.clone(),
     );
-    env_vars.insert("JCODE_HOOK_CWD".to_string(), input.cwd.clone());
+    env_vars.insert("NEXT_CODE_HOOK_CWD".to_string(), input.cwd.clone());
 
     // Spawn the plugin process.
     let mut child = Command::new(&plugin_path)
@@ -760,13 +760,13 @@ mod tests {
     #[test]
     fn expand_missing_var_no_default() {
         // A variable that is extremely unlikely to exist.
-        let result = expand_env_var("${JCODE_HOOKS_TEST_VAR_987654321}");
-        assert_eq!(result, "${JCODE_HOOKS_TEST_VAR_987654321}");
+        let result = expand_env_var("${NEXT_CODE_HOOKS_TEST_VAR_987654321}");
+        assert_eq!(result, "${NEXT_CODE_HOOKS_TEST_VAR_987654321}");
     }
 
     #[test]
     fn expand_missing_var_with_default() {
-        let result = expand_env_var("${JCODE_HOOKS_TEST_MISSING:-fallback_value}");
+        let result = expand_env_var("${NEXT_CODE_HOOKS_TEST_MISSING:-fallback_value}");
         assert_eq!(result, "fallback_value");
     }
 
@@ -780,25 +780,25 @@ mod tests {
 
     #[test]
     fn expand_mixed_text() {
-        std::env::set_var("_JCODE_TEST_EXPAND", "REPLACED");
-        let result = expand_env_var("before_${_JCODE_TEST_EXPAND}_after");
+        std::env::set_var("_NEXT_CODE_TEST_EXPAND", "REPLACED");
+        let result = expand_env_var("before_${_NEXT_CODE_TEST_EXPAND}_after");
         assert_eq!(result, "before_REPLACED_after");
-        std::env::remove_var("_JCODE_TEST_EXPAND");
+        std::env::remove_var("_NEXT_CODE_TEST_EXPAND");
     }
 
     #[test]
     fn expand_multiple_vars() {
-        std::env::set_var("_JCODE_TEST_A", "AAA");
-        std::env::set_var("_JCODE_TEST_B", "BBB");
-        let result = expand_env_var("${_JCODE_TEST_A}/${_JCODE_TEST_B}");
+        std::env::set_var("_NEXT_CODE_TEST_A", "AAA");
+        std::env::set_var("_NEXT_CODE_TEST_B", "BBB");
+        let result = expand_env_var("${_NEXT_CODE_TEST_A}/${_NEXT_CODE_TEST_B}");
         assert_eq!(result, "AAA/BBB");
-        std::env::remove_var("_JCODE_TEST_A");
-        std::env::remove_var("_JCODE_TEST_B");
+        std::env::remove_var("_NEXT_CODE_TEST_A");
+        std::env::remove_var("_NEXT_CODE_TEST_B");
     }
 
     #[test]
     fn expand_dollar_brace_in_default() {
-        let result = expand_env_var("${_JCODE_TEST_UNDEF:-${ALSO_UNDEF}}");
+        let result = expand_env_var("${_NEXT_CODE_TEST_UNDEF:-${ALSO_UNDEF}}");
         // When the var is not set, the default is "${ALSO_UNDEF}" (literal).
         assert_eq!(result, "${ALSO_UNDEF}");
     }
@@ -811,7 +811,7 @@ mod tests {
 
     #[test]
     fn expand_default_empty() {
-        let result = expand_env_var("${_JCODE_TEST_UNDEF:-}");
+        let result = expand_env_var("${_NEXT_CODE_TEST_UNDEF:-}");
         assert_eq!(result, "");
     }
 
@@ -881,9 +881,9 @@ mod tests {
             .build();
         let handler_env = HashMap::new();
         let env = build_command_env(&handler_env, &input);
-        assert_eq!(env.get("JCODE_HOOK_EVENT").unwrap(), "PreToolUse");
-        assert_eq!(env.get("JCODE_HOOK_SESSION_ID").unwrap(), "ses_1");
-        assert_eq!(env.get("JCODE_HOOK_CWD").unwrap(), "/project");
+        assert_eq!(env.get("NEXT_CODE_HOOK_EVENT").unwrap(), "PreToolUse");
+        assert_eq!(env.get("NEXT_CODE_HOOK_SESSION_ID").unwrap(), "ses_1");
+        assert_eq!(env.get("NEXT_CODE_HOOK_CWD").unwrap(), "/project");
     }
 
     #[test]
@@ -1009,8 +1009,8 @@ mod tests {
     async fn command_hook_receives_env_vars() {
         let config = CommandHandlerConfig {
             enabled: true,
-            // The command checks that JCODE_HOOK_EVENT is set.
-            command: "test \"$JCODE_HOOK_EVENT\" = \"SessionStart\"".to_string(),
+            // The command checks that NEXT_CODE_HOOK_EVENT is set.
+            command: "test \"$NEXT_CODE_HOOK_EVENT\" = \"SessionStart\"".to_string(),
             ..Default::default()
         };
         let input = HookInputBuilder::new()

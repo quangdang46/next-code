@@ -12,8 +12,8 @@
 //! it, and returns a `Session` handle that the rest of the runtime
 //! (transport, agent loop) can drive.
 //!
-//! The actual `Agent::new()` in `jcode-app-core` cannot be rewired
-//! until the broken `jcode-tui` crate is repaired; this module gives
+//! The actual `Agent::new()` in `next-code-app-core` cannot be rewired
+//! until the broken `next-code-tui` crate is repaired; this module gives
 //! downstream consumers the *exact* shape of the new resolution so
 //! the swap is a one-line change once the dependency is healthy.
 
@@ -26,7 +26,7 @@ use crate::service::{ProviderService, ResolvedRoute};
 use crate::types::{ModelId, ProviderId, ProviderProfile};
 
 /// The new-shape session handle. The full `Agent` struct (in
-/// `jcode-app-core`) has many more fields; this is the *minimum*
+/// `next-code-app-core`) has many more fields; this is the *minimum*
 /// the new resolution path needs to return so downstream code can
 /// be rewired incrementally.
 #[derive(Debug, Clone)]
@@ -61,7 +61,7 @@ pub enum SessionError {
 /// The selection precedence is:
 ///  1. Explicit `--provider <flag> --model <flag>` (the most
 ///     specific override).
-///  2. Per-provider default in `~/.jcode/provider-defaults.json`.
+///  2. Per-provider default in `~/.next-code/provider-defaults.json`.
 ///  3. Global default in the same file.
 ///  4. `Catalog::default()` heuristic (flagship model of the first
 ///     available provider).
@@ -91,7 +91,7 @@ pub async fn start_session(
         return finish(svc, provider, resolved).await;
     }
 
-    // 3. User-set global default (from model_prefs.json / `jcode model default`).
+    // 3. User-set global default (from model_prefs.json / `next-code model default`).
     //    Opencode checks this FIRST before falling through to catalog heuristic.
     if let Some(ref d) = defaults
         && let Some((ref global_provider, ref global_model)) = d.global
@@ -134,7 +134,7 @@ async fn finish(
     })
 }
 
-/// Push the (provider, model) selection into ~/.jcode/model_prefs.json
+/// Push the (provider, model) selection into ~/.next-code/model_prefs.json
 /// under 'recents'. LIFO + dedup + 10-entry cap, matching the
 /// tui_picker::PickerState::push_recent semantics.
 fn record_recent(provider: &ProviderId, model: &ModelId) {

@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use super::*;
 use crate::provider_catalog::{LoginProviderDescriptor, LoginProviderTarget};
 pub(super) use next_code_provider_core::{ActiveProvider, ProviderAvailability};
@@ -52,7 +53,7 @@ impl MultiProvider {
     }
 
     pub(super) fn forced_provider_from_env() -> Option<ActiveProvider> {
-        let force = std::env::var("JCODE_FORCE_PROVIDER")
+        let force = product_env("FORCE_PROVIDER")
             .ok()
             .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
             .unwrap_or(false);
@@ -60,13 +61,13 @@ impl MultiProvider {
             return None;
         }
 
-        let active = std::env::var("JCODE_ACTIVE_PROVIDER")
+        let active = product_env("ACTIVE_PROVIDER")
             .ok()
             .and_then(|value| Self::parse_provider_hint(&value))?;
 
         // CLI init for Gemini/Cursor/Antigravity uses a standalone runtime and
         // explicitly unlocks the multi-provider router. A previous auth-change
-        // bug locked these via JCODE_FORCE_PROVIDER, which then blocked every
+        // bug locked these via NEXT_CODE_FORCE_PROVIDER, which then blocked every
         // switch to named OpenAI-compatible profiles (e.g. `9router:xxx`).
         // Ignore force pins for these providers so stale process env cannot
         // keep MultiProvider locked after login.

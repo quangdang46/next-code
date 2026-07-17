@@ -269,7 +269,7 @@ impl McpClient {
             protocol_version: "2024-11-05".to_string(),
             capabilities: ClientCapabilities::default(),
             client_info: ClientInfo {
-                name: "jcode".to_string(),
+                name: "next-code".to_string(),
                 version: next_code_build_meta::PKG_VERSION.to_string(),
             },
         };

@@ -1,4 +1,4 @@
-//! # JCode Edit Benchmark
+//! # Next Code Edit Benchmark
 //!
 //! Mutation-based edit benchmark harness for measuring edit-tool quality
 //! across different models. Generates benchmark tasks by applying AST-level

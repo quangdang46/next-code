@@ -202,7 +202,7 @@ pub trait CatalogService: Send + Sync {
     async fn list_providers(&self) -> Result<Vec<ProviderInfo>, CatalogError>;
 
     /// All providers that are enabled *and* have credentials. The list the
-    /// `jcode provider list` CLI shows by default.
+    /// `next-code provider list` CLI shows by default.
     async fn available(&self) -> Result<Vec<ProviderInfo>, CatalogError>;
 
     /// Set the cached connection state for one provider. The new
@@ -287,7 +287,7 @@ pub trait CatalogService: Send + Sync {
 
     /// The cheapest "small" model available. When `provider_id` is `Some`,
     /// scoped to that provider (opencode-style). When `None`, searches all
-    /// available providers (jcode default).
+    /// available providers (next-code default).
     /// Heuristic: model id contains
     /// `nano` / `flash` / `lite` / `mini` / `haiku`. If none match, returns
     /// the cheapest model with a non-zero cost.

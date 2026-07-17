@@ -138,7 +138,7 @@ pub fn set_client_display_title(session_name: &str, is_selfdev: bool) {
 }
 
 pub fn set_client_remote_display_title(server_name: &str, session_name: &str, is_selfdev: bool) {
-    if server_name.is_empty() || server_name.eq_ignore_ascii_case("next-code") || server_name.eq_ignore_ascii_case("jcode") {
+    if server_name.is_empty() || server_name.eq_ignore_ascii_case("next-code") || server_name.eq_ignore_ascii_case("next-code") {
         set_client_display_title(session_name, is_selfdev);
         return;
     }
@@ -190,9 +190,9 @@ mod tests {
     #[test]
     fn terminal_session_label_for_id_reads_custom_title_from_session() {
         let _guard = lock_test_env();
-        let previous_home = std::env::var_os("JCODE_HOME");
+        let previous_home = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::tempdir().expect("temp dir");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let mut session = crate::session::Session::create_with_id(
             "session_fox_123".to_string(),
@@ -208,18 +208,18 @@ mod tests {
         );
 
         if let Some(previous_home) = previous_home {
-            crate::env::set_var("JCODE_HOME", previous_home);
+            crate::env::set_var("NEXT_CODE_HOME", previous_home);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
     #[test]
     fn terminal_session_label_for_id_prefers_todo_title_over_generated_title() {
         let _guard = lock_test_env();
-        let previous_home = std::env::var_os("JCODE_HOME");
+        let previous_home = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::tempdir().expect("temp dir");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let session_id = "session_fox_456";
         let mut session = crate::session::Session::create_with_id(
@@ -252,9 +252,9 @@ mod tests {
         );
 
         if let Some(previous_home) = previous_home {
-            crate::env::set_var("JCODE_HOME", previous_home);
+            crate::env::set_var("NEXT_CODE_HOME", previous_home);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }

@@ -137,9 +137,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 const DEFAULT_WINDOW_WIDTH: f64 = 1280.0;
 const DEFAULT_WINDOW_HEIGHT: f64 = 800.0;
-const DESKTOP_RELOAD_WINDOW_ENV: &str = "JCODE_DESKTOP_RELOAD_WINDOW";
-const DESKTOP_RELOAD_HANDOFF_READY_ENV: &str = "JCODE_DESKTOP_RELOAD_READY_FILE";
-const DESKTOP_RELOAD_HANDOFF_RELEASE_ENV: &str = "JCODE_DESKTOP_RELOAD_RELEASE_FILE";
+const DESKTOP_RELOAD_WINDOW_ENV: &str = "NEXT_CODE_DESKTOP_RELOAD_WINDOW";
+const DESKTOP_RELOAD_HANDOFF_READY_ENV: &str = "NEXT_CODE_DESKTOP_RELOAD_READY_FILE";
+const DESKTOP_RELOAD_HANDOFF_RELEASE_ENV: &str = "NEXT_CODE_DESKTOP_RELOAD_RELEASE_FILE";
 const DESKTOP_RELOAD_HANDOFF_POLL_INTERVAL: Duration = Duration::from_millis(25);
 const DESKTOP_RELOAD_HANDOFF_TIMEOUT: Duration = Duration::from_secs(8);
 const DESKTOP_RELOAD_STARTUP_RELEASE_TIMEOUT: Duration = Duration::from_secs(3);
@@ -273,14 +273,14 @@ fn main() {
     desktop_log::init();
     install_desktop_diagnostic_hooks();
     desktop_log::info(format_args!(
-        "jcode-desktop: starting pid={} version={} build_hash={}",
+        "next-code-desktop: starting pid={} version={} build_hash={}",
         std::process::id(),
         desktop_header_version_label(),
         desktop_build_hash_label()
     ));
 
     if let Err(error) = pollster::block_on(run()) {
-        desktop_log::error(format_args!("jcode-desktop: fatal error: {error:#}"));
+        desktop_log::error(format_args!("next-code-desktop: fatal error: {error:#}"));
         std::process::exit(1);
     }
 }
@@ -288,9 +288,9 @@ fn main() {
 fn install_desktop_diagnostic_hooks() {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |panic_info| {
-        desktop_log::error(format_args!("jcode-desktop: panic: {panic_info}"));
+        desktop_log::error(format_args!("next-code-desktop: panic: {panic_info}"));
         desktop_log::error(format_args!(
-            "jcode-desktop: panic backtrace: {}",
+            "next-code-desktop: panic backtrace: {}",
             std::backtrace::Backtrace::force_capture()
         ));
         default_hook(panic_info);
@@ -357,7 +357,7 @@ async fn run() -> Result<()> {
     let resume_session_id = desktop_resume_session_id_from_args(args.iter().map(String::as_str));
     let desktop_reload_startup = DesktopReloadStartup::from_env();
     emit_desktop_profile_event(
-        "jcode-desktop-launch-profile",
+        "next-code-desktop-launch-profile",
         serde_json::json!({
             "mode": desktop_mode.as_str(),
             "process_role": process_role.as_str(),
@@ -827,7 +827,7 @@ async fn run() -> Result<()> {
                                 session_launch::launch_validated_resume_session(&session_id, &title)
                             {
                                 desktop_log::error(format_args!(
-                                    "jcode-desktop: failed to open session {session_id}: {error:#}"
+                                    "next-code-desktop: failed to open session {session_id}: {error:#}"
                                 ));
                             }
                         }
@@ -841,7 +841,7 @@ async fn run() -> Result<()> {
 
                             if let Err(error) = session_launch::launch_new_session() {
                                 desktop_log::error(format_args!(
-                                    "jcode-desktop: failed to spawn session: {error:#}"
+                                    "next-code-desktop: failed to spawn session: {error:#}"
                                 ));
                             } else {
                                 spawn_session_cards_load(
@@ -855,14 +855,14 @@ async fn run() -> Result<()> {
                         KeyOutcome::SpawnSelfDevSession => {
                             if let Err(error) = session_launch::launch_selfdev_session() {
                                 desktop_log::error(format_args!(
-                                    "jcode-desktop: failed to spawn self-dev session: {error:#}"
+                                    "next-code-desktop: failed to spawn self-dev session: {error:#}"
                                 ));
                             }
                         }
                         KeyOutcome::SpawnHomeSession => {
                             if let Err(error) = session_launch::launch_home_session() {
                                 desktop_log::error(format_args!(
-                                    "jcode-desktop: failed to spawn home session: {error:#}"
+                                    "next-code-desktop: failed to spawn home session: {error:#}"
                                 ));
                             }
                         }
@@ -900,7 +900,7 @@ async fn run() -> Result<()> {
                                         window.request_redraw();
                                     }
                                     Err(error) => desktop_log::error(format_args!(
-                                        "jcode-desktop: failed to send image draft to {session_id}: {error:#}"
+                                        "next-code-desktop: failed to send image draft to {session_id}: {error:#}"
                                     )),
                                 }
                             } else if let Err(error) = session_launch::send_message_to_session(
@@ -909,7 +909,7 @@ async fn run() -> Result<()> {
                                 &message,
                             ) {
                                 desktop_log::error(format_args!(
-                                    "jcode-desktop: failed to send draft to {session_id}: {error:#}"
+                                    "next-code-desktop: failed to send draft to {session_id}: {error:#}"
                                 ));
                             } else {
                                 spawn_session_cards_load(
@@ -1304,7 +1304,7 @@ async fn run() -> Result<()> {
                         surface_timeout_redraw_at = Some(redraw_at);
                         if consecutive_timeouts == 1 || delay == SURFACE_TIMEOUT_BACKOFF_MAX {
                             desktop_log::warn(format_args!(
-                                "jcode-desktop: surface acquire timed out, retrying in {}ms after {} consecutive timeout(s)",
+                                "next-code-desktop: surface acquire timed out, retrying in {}ms after {} consecutive timeout(s)",
                                 delay.as_millis(),
                                 consecutive_timeouts
                             ));
@@ -1343,7 +1343,7 @@ async fn run() -> Result<()> {
                     }
                     Err(message) => {
                         desktop_log::error(format_args!(
-                            "jcode-desktop: failed to initialize desktop renderer: {message}"
+                            "next-code-desktop: failed to initialize desktop renderer: {message}"
                         ));
                         renderer = DesktopHostRendererState::GpuFailed { _message: message };
                         target.exit();
@@ -1449,7 +1449,7 @@ async fn run() -> Result<()> {
             }) => {
                 if app.apply_hydrated_transcript(&session_id, result) {
                     desktop_log::info(format_args!(
-                        "jcode-desktop: hydrated resumed transcript for {session_id} in {}ms",
+                        "next-code-desktop: hydrated resumed transcript for {session_id} in {}ms",
                         loaded_in.as_millis()
                     ));
                     window.set_title(&app.status_title());
@@ -1686,7 +1686,7 @@ impl DesktopHostRendererState {
 
         let started_at = Instant::now();
         std::thread::Builder::new()
-            .name("jcode-desktop-gpu-init".to_string())
+            .name("next-code-desktop-gpu-init".to_string())
             .spawn(move || {
                 startup_trace.mark("canvas init started");
                 let canvas = pollster::block_on(Canvas::new(window, startup_trace))
@@ -1700,7 +1700,7 @@ impl DesktopHostRendererState {
                     .is_err()
                 {
                     desktop_log::warn(format_args!(
-                        "jcode-desktop: failed to deliver async canvas initialization result"
+                        "next-code-desktop: failed to deliver async canvas initialization result"
                     ));
                 }
             })
@@ -1828,7 +1828,7 @@ fn load_desktop_preferences() -> Option<workspace::DesktopPreferences> {
         Ok(preferences) => preferences,
         Err(error) => {
             desktop_log::error(format_args!(
-                "jcode-desktop: failed to load desktop preferences: {error:#}"
+                "next-code-desktop: failed to load desktop preferences: {error:#}"
             ));
             None
         }
@@ -1864,7 +1864,7 @@ fn initial_single_session_app(resume_session_id: Option<&str>) -> DesktopApp {
         }
         Err(error) => {
             desktop_log::error(format_args!(
-                "jcode-desktop: failed to load resumed session metadata for {session_id}: {error:#}"
+                "next-code-desktop: failed to load resumed session metadata for {session_id}: {error:#}"
             ));
             app.set_status_label(format!("resumed session {session_id}"));
             app.error = Some(format!("failed to load session metadata: {error:#}"));
@@ -2371,14 +2371,14 @@ fn desktop_surface_snapshot(app: &DesktopApp) -> DesktopSurfaceSnapshot {
 }
 
 fn apply_single_session_error(app: &mut DesktopApp, error: anyhow::Error) {
-    desktop_log::error(format_args!("jcode-desktop: UI action failed: {error:#}"));
+    desktop_log::error(format_args!("next-code-desktop: UI action failed: {error:#}"));
     app.apply_session_event(session_launch::DesktopSessionEvent::Error(format!(
         "{error:#}"
     )));
 }
 
 fn desktop_build_hash_label() -> &'static str {
-    option_env!("JCODE_DESKTOP_GIT_HASH").unwrap_or("unknown")
+    option_env!("NEXT_CODE_DESKTOP_GIT_HASH").unwrap_or("unknown")
 }
 
 #[cfg(test)]

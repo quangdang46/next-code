@@ -92,7 +92,7 @@ fn latest_external_cli_suggestion_uses_newest_candidate_context() {
     let new = ExternalCliSessionCandidate {
         source: "Codex",
         modified: SystemTime::UNIX_EPOCH + Duration::from_secs(10),
-        working_dir: Some("/home/user/jcode".to_string()),
+        working_dir: Some("/home/user/next-code".to_string()),
         context: Some("implement startup continuation suggestions".to_string()),
     };
 
@@ -101,14 +101,14 @@ fn latest_external_cli_suggestion_uses_newest_candidate_context() {
 
     assert_eq!(
         suggestion,
-        "continue the latest Codex session in jcode: implement startup continuation suggestions"
+        "continue the latest Codex session in next-code: implement startup continuation suggestions"
     );
 }
 
 #[test]
 fn latest_external_cli_suggestion_missing_roots_returns_none() {
     let home =
-        std::env::temp_dir().join(format!("jcode-missing-external-cli-{}", std::process::id()));
+        std::env::temp_dir().join(format!("next-code-missing-external-cli-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&home);
 
     assert_eq!(
@@ -120,7 +120,7 @@ fn latest_external_cli_suggestion_missing_roots_returns_none() {
 #[test]
 fn latest_external_cli_suggestion_ignores_malformed_jsonl() {
     let home = std::env::temp_dir().join(format!(
-        "jcode-malformed-external-cli-{}-{:?}",
+        "next-code-malformed-external-cli-{}-{:?}",
         std::process::id(),
         SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -192,13 +192,13 @@ fn tool_header_uses_status_icons_and_compact_summary() {
 #[test]
 fn bash_tool_rendering_shows_intent_command_and_background_flag() {
     let lines = rendered_tool_text(
-        "▾ bash running\n  input: {\"intent\":\"run the desktop tests\",\"command\":\"cargo test -p jcode-desktop\",\"run_in_background\":true}",
+        "▾ bash running\n  input: {\"intent\":\"run the desktop tests\",\"command\":\"cargo test -p next-code-desktop\",\"run_in_background\":true}",
         true,
     );
     assert_eq!(
         lines,
         vec![
-            "  ● bash · running · $ cargo test -p jcode-desktop · background: yes",
+            "  ● bash · running · $ cargo test -p next-code-desktop · background: yes",
             "    waiting for tool output…",
         ]
     );
@@ -207,7 +207,7 @@ fn bash_tool_rendering_shows_intent_command_and_background_flag() {
 #[test]
 fn active_tool_lines_carry_visual_metadata_for_native_cards() {
     let lines = rendered_tool_lines(
-        "▾ bash running\n  input: {\"command\":\"cargo test -p jcode-desktop\"}",
+        "▾ bash running\n  input: {\"command\":\"cargo test -p next-code-desktop\"}",
         true,
     );
 
@@ -258,13 +258,13 @@ fn desktop_tool_metadata_prioritizes_tui_like_summary_over_intent() {
 #[test]
 fn tool_result_content_renders_inside_inline_widget() {
     let lines = rendered_tool_text(
-        "▾ bash failed: tests failed\n  input: {\"command\":\"cargo test -p jcode-desktop\"}\n  error[E0425]: cannot find value `foo` in this scope\n  test result: FAILED",
+        "▾ bash failed: tests failed\n  input: {\"command\":\"cargo test -p next-code-desktop\"}\n  error[E0425]: cannot find value `foo` in this scope\n  test result: FAILED",
         true,
     );
 
     assert_eq!(
         lines[0],
-        "  ✕ bash · failed · tests failed · $ cargo test -p jcode-desktop"
+        "  ✕ bash · failed · tests failed · $ cargo test -p next-code-desktop"
     );
     assert_eq!(
         lines[1],
@@ -276,13 +276,13 @@ fn tool_result_content_renders_inside_inline_widget() {
 #[test]
 fn inactive_tool_result_compacts_to_metadata_only() {
     let lines = rendered_tool_text(
-        "▸ bash done: tests passed\n  input: {\"command\":\"cargo test -p jcode-desktop\"}\n  test result: ok",
+        "▸ bash done: tests passed\n  input: {\"command\":\"cargo test -p next-code-desktop\"}\n  test result: ok",
         false,
     );
 
     assert_eq!(
         lines,
-        vec!["  ✓ bash · done · tests passed · $ cargo test -p jcode-desktop"]
+        vec!["  ✓ bash · done · tests passed · $ cargo test -p next-code-desktop"]
     );
 }
 

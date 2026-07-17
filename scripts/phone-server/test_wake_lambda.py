@@ -8,7 +8,8 @@ import unittest
 from unittest.mock import patch
 
 os.environ["WAKE_TOKEN"] = "test-token"
-os.environ["JCODE_GATEWAY_HOST"] = "100.64.0.10"
+os.environ["NEXT_CODE_GATEWAY_HOST"] = "100.64.0.10"
+os.environ["NEXT_CODE_GATEWAY_HOST"] = "100.64.0.10"  # dual-read
 sys.modules.setdefault("boto3", types.ModuleType("boto3"))
 sys.modules["boto3"].client = lambda *_args, **_kwargs: None
 

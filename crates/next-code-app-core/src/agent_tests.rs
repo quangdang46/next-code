@@ -571,18 +571,18 @@ async fn new_agent_registers_active_pid_and_clear_swaps_it() {
 #[tokio::test]
 async fn gmail_is_exposed_by_default_and_can_be_explicitly_disabled() {
     let _guard = crate::storage::lock_test_env();
-    let prev_home = std::env::var_os("JCODE_HOME");
-    let prev_tools = std::env::var_os("JCODE_TOOLS");
-    let prev_disabled_tools = std::env::var_os("JCODE_DISABLED_TOOLS");
-    let prev_tool_profile = std::env::var_os("JCODE_TOOL_PROFILE");
-    let prev_disable_base_tools = std::env::var_os("JCODE_DISABLE_BASE_TOOLS");
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    let prev_tools = std::env::var_os("NEXT_CODE_TOOLS");
+    let prev_disabled_tools = std::env::var_os("NEXT_CODE_DISABLED_TOOLS");
+    let prev_tool_profile = std::env::var_os("NEXT_CODE_TOOL_PROFILE");
+    let prev_disable_base_tools = std::env::var_os("NEXT_CODE_DISABLE_BASE_TOOLS");
     let temp_home = tempfile::TempDir::new().expect("temp home");
 
-    crate::env::set_var("JCODE_HOME", temp_home.path());
-    crate::env::remove_var("JCODE_TOOLS");
-    crate::env::remove_var("JCODE_DISABLED_TOOLS");
-    crate::env::remove_var("JCODE_TOOL_PROFILE");
-    crate::env::remove_var("JCODE_DISABLE_BASE_TOOLS");
+    crate::env::set_var("NEXT_CODE_HOME", temp_home.path());
+    crate::env::remove_var("NEXT_CODE_TOOLS");
+    crate::env::remove_var("NEXT_CODE_DISABLED_TOOLS");
+    crate::env::remove_var("NEXT_CODE_TOOL_PROFILE");
+    crate::env::remove_var("NEXT_CODE_DISABLE_BASE_TOOLS");
     crate::config::Config::invalidate_cache();
 
     let provider: Arc<dyn Provider> = Arc::new(NativeAutoCompactionProvider);
@@ -606,7 +606,7 @@ async fn gmail_is_exposed_by_default_and_can_be_explicitly_disabled() {
         .validate_tool_allowed(tool_name)
         .expect("gmail must be executable by default");
 
-    crate::env::set_var("JCODE_DISABLED_TOOLS", tool_name);
+    crate::env::set_var("NEXT_CODE_DISABLED_TOOLS", tool_name);
     crate::config::Config::invalidate_cache();
 
     let provider: Arc<dyn Provider> = Arc::new(NativeAutoCompactionProvider);
@@ -631,29 +631,29 @@ async fn gmail_is_exposed_by_default_and_can_be_explicitly_disabled() {
     assert!(err.to_string().contains("disabled"));
 
     if let Some(previous) = prev_home {
-        crate::env::set_var("JCODE_HOME", previous);
+        crate::env::set_var("NEXT_CODE_HOME", previous);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
     if let Some(previous) = prev_tools {
-        crate::env::set_var("JCODE_TOOLS", previous);
+        crate::env::set_var("NEXT_CODE_TOOLS", previous);
     } else {
-        crate::env::remove_var("JCODE_TOOLS");
+        crate::env::remove_var("NEXT_CODE_TOOLS");
     }
     if let Some(previous) = prev_disabled_tools {
-        crate::env::set_var("JCODE_DISABLED_TOOLS", previous);
+        crate::env::set_var("NEXT_CODE_DISABLED_TOOLS", previous);
     } else {
-        crate::env::remove_var("JCODE_DISABLED_TOOLS");
+        crate::env::remove_var("NEXT_CODE_DISABLED_TOOLS");
     }
     if let Some(previous) = prev_tool_profile {
-        crate::env::set_var("JCODE_TOOL_PROFILE", previous);
+        crate::env::set_var("NEXT_CODE_TOOL_PROFILE", previous);
     } else {
-        crate::env::remove_var("JCODE_TOOL_PROFILE");
+        crate::env::remove_var("NEXT_CODE_TOOL_PROFILE");
     }
     if let Some(previous) = prev_disable_base_tools {
-        crate::env::set_var("JCODE_DISABLE_BASE_TOOLS", previous);
+        crate::env::set_var("NEXT_CODE_DISABLE_BASE_TOOLS", previous);
     } else {
-        crate::env::remove_var("JCODE_DISABLE_BASE_TOOLS");
+        crate::env::remove_var("NEXT_CODE_DISABLE_BASE_TOOLS");
     }
     crate::config::Config::invalidate_cache();
 }
@@ -847,8 +847,8 @@ async fn build_memory_prompt_nonblocking_defers_pending_memory_during_tool_loop(
 #[tokio::test]
 async fn memory_injection_message_defaults_to_ephemeral_history() {
     let _guard = crate::storage::lock_test_env();
-    let previous = std::env::var_os("JCODE_PERSIST_MEMORY_INJECTIONS");
-    crate::env::set_var("JCODE_PERSIST_MEMORY_INJECTIONS", "false");
+    let previous = std::env::var_os("NEXT_CODE_PERSIST_MEMORY_INJECTIONS");
+    crate::env::set_var("NEXT_CODE_PERSIST_MEMORY_INJECTIONS", "false");
     crate::config::invalidate_config_cache();
 
     let provider: Arc<dyn Provider> = Arc::new(NativeAutoCompactionProvider);
@@ -871,8 +871,8 @@ async fn memory_injection_message_defaults_to_ephemeral_history() {
     assert!(message_text(&message).contains("Use ephemeral mode"));
 
     match previous {
-        Some(value) => crate::env::set_var("JCODE_PERSIST_MEMORY_INJECTIONS", value),
-        None => crate::env::remove_var("JCODE_PERSIST_MEMORY_INJECTIONS"),
+        Some(value) => crate::env::set_var("NEXT_CODE_PERSIST_MEMORY_INJECTIONS", value),
+        None => crate::env::remove_var("NEXT_CODE_PERSIST_MEMORY_INJECTIONS"),
     }
     crate::config::invalidate_config_cache();
 }
@@ -880,8 +880,8 @@ async fn memory_injection_message_defaults_to_ephemeral_history() {
 #[tokio::test]
 async fn memory_injection_message_can_persist_to_history() {
     let _guard = crate::storage::lock_test_env();
-    let previous = std::env::var_os("JCODE_PERSIST_MEMORY_INJECTIONS");
-    crate::env::set_var("JCODE_PERSIST_MEMORY_INJECTIONS", "true");
+    let previous = std::env::var_os("NEXT_CODE_PERSIST_MEMORY_INJECTIONS");
+    crate::env::set_var("NEXT_CODE_PERSIST_MEMORY_INJECTIONS", "true");
     crate::config::invalidate_config_cache();
 
     let provider: Arc<dyn Provider> = Arc::new(NativeAutoCompactionProvider);
@@ -909,8 +909,8 @@ async fn memory_injection_message_can_persist_to_history() {
     );
 
     match previous {
-        Some(value) => crate::env::set_var("JCODE_PERSIST_MEMORY_INJECTIONS", value),
-        None => crate::env::remove_var("JCODE_PERSIST_MEMORY_INJECTIONS"),
+        Some(value) => crate::env::set_var("NEXT_CODE_PERSIST_MEMORY_INJECTIONS", value),
+        None => crate::env::remove_var("NEXT_CODE_PERSIST_MEMORY_INJECTIONS"),
     }
     crate::config::invalidate_config_cache();
 }
@@ -919,8 +919,8 @@ async fn memory_injection_message_can_persist_to_history() {
 async fn mark_closed_persists_soft_interrupts_for_restore_after_reload() {
     let _guard = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().expect("temp dir");
-    let prev_home = std::env::var_os("JCODE_HOME");
-    crate::env::set_var("JCODE_HOME", temp.path());
+    let prev_home = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
     let provider: Arc<dyn Provider> = Arc::new(NativeAutoCompactionProvider);
     let registry = Registry::new(provider.clone()).await;
@@ -949,9 +949,9 @@ async fn mark_closed_persists_soft_interrupts_for_restore_after_reload() {
     );
 
     if let Some(prev_home) = prev_home {
-        crate::env::set_var("JCODE_HOME", prev_home);
+        crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 }
 

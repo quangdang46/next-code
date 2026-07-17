@@ -4,12 +4,12 @@
 //! hostile plan data, then render through the real pipeline
 //! (`render_mermaid_untracked`).
 //!
-//!   scripts/dev_cargo.sh run -p jcode-tui-mermaid --features renderer \
+//!   scripts/dev_cargo.sh run -p next-code-tui-mermaid --features renderer \
 //!       --example swarm_plan_stress
 //!
 //! Cases:
 //!   (a) real deep-mode plan fixture (examples/swarm_plan_fixture.json,
-//!       snapshot of ~/.jcode/state/swarm/_home_jeremy_jcode__git.json)
+//!       snapshot of ~/.next-code/state/swarm/_home_jeremy_next_code__git.json)
 //!   (a23) first 23 items of the fixture (the original task shape)
 //!   (b) 40-node plan -> truncation with the linked 'more' summary node
 //!   (c) labels at exactly the label cap with unicode glyphs

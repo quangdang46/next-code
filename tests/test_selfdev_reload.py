@@ -18,8 +18,8 @@ import sys
 import glob
 
 RUNTIME_DIR = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
-SOCKET_PATH = os.path.join(RUNTIME_DIR, "jcode-debug.sock")
-JCODE_DIR = os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME") or os.path.expanduser("~/.next-code")
+SOCKET_PATH = os.path.join(RUNTIME_DIR, "next-code-debug.sock")
+NEXT_CODE_DIR = (os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME")) or (os.environ.get("NEXT_CODE_HOME") or os.environ.get("JCODE_HOME")) or os.path.expanduser("~/.next-code")
 
 def send_cmd(sock, cmd, session_id=None, timeout=60):
     """Send a debug command and get the response."""
@@ -58,7 +58,7 @@ def test_selfdev_status():
 
     try:
         # Create a test session
-        result = send_cmd(sock, "create_session:selfdev:/home/jeremy/jcode")
+        result = send_cmd(sock, "create_session:selfdev:/home/jeremy/next-code")
         if not result or not result.get('ok'):
             print(f"Failed to create session: {result}")
             return False
@@ -121,7 +121,7 @@ def test_selfdev_socket_info():
         return False
 
     try:
-        result = send_cmd(sock, "create_session:selfdev:/home/jeremy/jcode")
+        result = send_cmd(sock, "create_session:selfdev:/home/jeremy/next-code")
         if not result or not result.get('ok'):
             return False
         session_id = json.loads(result['output'])['session_id']
@@ -171,9 +171,9 @@ def test_reload_context():
     print("=" * 60)
 
     context_candidates = sorted(
-        glob.glob(os.path.join(JCODE_DIR, "reload-context-*.json"))
+        glob.glob(os.path.join(NEXT_CODE_DIR, "reload-context-*.json"))
     )
-    legacy_context_path = os.path.join(JCODE_DIR, "reload-context.json")
+    legacy_context_path = os.path.join(NEXT_CODE_DIR, "reload-context.json")
     if os.path.exists(legacy_context_path):
         context_candidates.append(legacy_context_path)
 

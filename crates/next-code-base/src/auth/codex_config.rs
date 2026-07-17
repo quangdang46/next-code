@@ -12,7 +12,7 @@
 //! base_url               = "https://gateway.example.com/v1"
 //! ```
 //!
-//! ...jcode could trust the Codex auth.json (refresh token, ID token) but
+//! ...next-code could trust the Codex auth.json (refresh token, ID token) but
 //! still send requests to the hard-coded `https://api.openai.com/v1`. The
 //! result was a confusing 401 "invalid API key" against the real OpenAI
 //! endpoint while the gateway never saw the call.
@@ -25,7 +25,7 @@
 //!   3. `[model_providers.<name>]` has `wire_api = "responses"` AND
 //!      `requires_openai_auth = true` AND a non-empty `base_url`.
 //!
-//! The helper returns `None` (silently) for any other shape so jcode falls
+//! The helper returns `None` (silently) for any other shape so next-code falls
 //! back to the existing `OPENAI_API_BASE` default. We do not treat
 //! arbitrary chat-completions endpoints as Responses endpoints — that would
 //! produce mismatched wire protocol errors.
@@ -51,7 +51,7 @@ pub fn active_responses_base_url() -> Option<String> {
 
 /// Resolve the on-disk path to the user's Codex config (`~/.codex/config.toml`).
 ///
-/// Honours `JCODE_HOME`-sandboxed test runs via `crate::storage::user_home_path`.
+/// Honours `NEXT_CODE_HOME`-sandboxed test runs via `crate::storage::user_home_path`.
 pub fn codex_config_path() -> Result<PathBuf> {
     crate::storage::user_home_path(".codex/config.toml")
 }

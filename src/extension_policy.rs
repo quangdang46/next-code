@@ -5,10 +5,11 @@
 //!
 //! Configured via:
 //!   - `--extension-policy <all|trusted|none>` CLI flag, OR
-//!   - `JCODE_EXTENSION_POLICY=<value>` env var (CLI flag sets this).
+//!   - `NEXT_CODE_EXTENSION_POLICY=<value>` env var (CLI flag sets this).
 //!
 //! Default is [`Policy::All`] (preserves existing behavior).
 
+use crate::env::{product_env};
 /// Extension-load policy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Policy {
@@ -17,8 +18,8 @@ pub enum Policy {
     #[default]
     All,
     /// Only load extensions whose source path / spec has been
-    /// explicitly trusted via `jcode mcp trust` (or future
-    /// `jcode extension trust`).
+    /// explicitly trusted via `next-code mcp trust` (or future
+    /// `next-code extension trust`).
     Trusted,
     /// Block all extension loading. Built-in tools still work.
     None,
@@ -60,11 +61,11 @@ impl Policy {
     }
 }
 
-/// Read the active policy from `JCODE_EXTENSION_POLICY`.
+/// Read the active policy from `NEXT_CODE_EXTENSION_POLICY`.
 ///
 /// Returns [`Policy::All`] when the env var is unset or unparseable.
 pub fn current() -> Policy {
-    std::env::var("JCODE_EXTENSION_POLICY")
+    product_env("EXTENSION_POLICY")
         .ok()
         .and_then(|v| Policy::parse(&v))
         .unwrap_or_default()
@@ -124,24 +125,24 @@ mod tests {
     #[test]
     fn current_reads_env() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_EXTENSION_POLICY");
+        let prev = std::env::var_os("NEXT_CODE_EXTENSION_POLICY");
 
-        crate::env::remove_var("JCODE_EXTENSION_POLICY");
+        crate::env::remove_var("NEXT_CODE_EXTENSION_POLICY");
         assert_eq!(current(), Policy::All);
 
-        crate::env::set_var("JCODE_EXTENSION_POLICY", "trusted");
+        crate::env::set_var("NEXT_CODE_EXTENSION_POLICY", "trusted");
         assert_eq!(current(), Policy::Trusted);
 
-        crate::env::set_var("JCODE_EXTENSION_POLICY", "none");
+        crate::env::set_var("NEXT_CODE_EXTENSION_POLICY", "none");
         assert_eq!(current(), Policy::None);
 
-        crate::env::set_var("JCODE_EXTENSION_POLICY", "garbage");
+        crate::env::set_var("NEXT_CODE_EXTENSION_POLICY", "garbage");
         assert_eq!(current(), Policy::All, "fallback to default on bad value");
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_EXTENSION_POLICY", p);
+            crate::env::set_var("NEXT_CODE_EXTENSION_POLICY", p);
         } else {
-            crate::env::remove_var("JCODE_EXTENSION_POLICY");
+            crate::env::remove_var("NEXT_CODE_EXTENSION_POLICY");
         }
     }
 }

@@ -497,13 +497,13 @@ mod tests {
         let presentation = present_swarm_notification(
             "moss",
             &NotificationType::FileConflict {
-                path: "/home/jeremy/jcode/src/tool/communicate.rs".to_string(),
+                path: "/home/jeremy/next-code/src/tool/communicate.rs".to_string(),
                 operation: "edited".to_string(),
                 intent: Some("wire swarm intent display".to_string()),
                 summary: Some("edited lines 323-348 (1 occurrence)".to_string()),
                 detail: Some("323- old line\n323+ new line".to_string()),
             },
-            "⚠ File activity: /home/jeremy/jcode/src/tool/communicate.rs - moss just edited this file you previously worked with: edited lines 323-348 (1 occurrence)",
+            "⚠ File activity: /home/jeremy/next-code/src/tool/communicate.rs - moss just edited this file you previously worked with: edited lines 323-348 (1 occurrence)",
             false,
         );
 
@@ -512,7 +512,7 @@ mod tests {
             .expect("file activity with details should be collapsible");
         assert_eq!(
             parsed.tldr,
-            "…/jcode/src/tool/communicate.rs · Edited lines 323-348 (1 occurrence)"
+            "…/next-code/src/tool/communicate.rs · Edited lines 323-348 (1 occurrence)"
         );
         assert!(parsed.body.contains("Intent: wire swarm intent display"));
         assert!(
@@ -522,7 +522,7 @@ mod tests {
         );
         assert_eq!(
             presentation.status_notice,
-            "File activity · …/jcode/src/tool/communicate.rs"
+            "File activity · …/next-code/src/tool/communicate.rs"
         );
     }
 
@@ -531,13 +531,13 @@ mod tests {
         let presentation = present_swarm_notification(
             "moss",
             &NotificationType::FileConflict {
-                path: "/home/jeremy/jcode/src/tool/communicate.rs".to_string(),
+                path: "/home/jeremy/next-code/src/tool/communicate.rs".to_string(),
                 operation: "edited".to_string(),
                 intent: Some("wire swarm intent display".to_string()),
                 summary: Some("edited lines 323-348 (1 occurrence)".to_string()),
                 detail: Some("323- old line\n323+ new line".to_string()),
             },
-            "⚠ File activity: /home/jeremy/jcode/src/tool/communicate.rs - moss just edited this file you previously worked with: edited lines 323-348 (1 occurrence)",
+            "⚠ File activity: /home/jeremy/next-code/src/tool/communicate.rs - moss just edited this file you previously worked with: edited lines 323-348 (1 occurrence)",
             true,
         );
 
@@ -546,13 +546,13 @@ mod tests {
             .expect("compact mode should retain collapsible details");
         assert_eq!(
             parsed.tldr,
-            "…/jcode/src/tool/communicate.rs · Edited lines 323-348 (1 occurrence)"
+            "…/next-code/src/tool/communicate.rs · Edited lines 323-348 (1 occurrence)"
         );
         assert!(parsed.body.contains("Intent: wire swarm intent display"));
         assert!(parsed.body.contains("323- old line"));
         assert_eq!(
             presentation.status_notice,
-            "File activity · …/jcode/src/tool/communicate.rs"
+            "File activity · …/next-code/src/tool/communicate.rs"
         );
     }
 }

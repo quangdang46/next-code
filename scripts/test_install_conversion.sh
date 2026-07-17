@@ -51,14 +51,14 @@ while [ "$#" -gt 0 ]; do
     *) shift ;;
   esac
 done
-cat > "$dest/jcode-linux-x86_64" <<'BIN'
+cat > "$dest/next-code-linux-x86_64" <<'BIN'
 #!/usr/bin/env bash
-if [ "${1:-}" = "--version" ]; then printf 'jcode 1.2.3\n'; fi
+if [ "${1:-}" = "--version" ]; then printf 'next-code 1.2.3\n'; fi
 if [ "${1:-}" = "setup-hotkey" ] && [ -n "${HOTKEY_SETUP_LOG:-}" ]; then
   printf '%s\n' "$*" >> "$HOTKEY_SETUP_LOG"
 fi
 BIN
-chmod +x "$dest/jcode-linux-x86_64"
+chmod +x "$dest/next-code-linux-x86_64"
 EOF
 chmod +x "$tmp/bin/uname" "$tmp/bin/curl" "$tmp/bin/tar"
 
@@ -67,15 +67,15 @@ telemetry_log="$tmp/telemetry.jsonl"
 hotkey_setup_log="$tmp/hotkey-setup.log"
 PATH="$tmp/bin:$PATH" \
 HOME="$tmp/home" \
-JCODE_HOME="$tmp/home/.jcode" \
-JCODE_INSTALL_DIR="$tmp/install" \
-JCODE_INSTALL_CONVERSION_ID="$conversion_id" \
-JCODE_SKIP_SERVER_RELOAD=1 \
+NEXT_CODE_HOME="$tmp/home/.next-code" \
+NEXT_CODE_INSTALL_DIR="$tmp/install" \
+NEXT_CODE_INSTALL_CONVERSION_ID="$conversion_id" \
+NEXT_CODE_SKIP_SERVER_RELOAD=1 \
 INSTALL_TELEMETRY_LOG="$telemetry_log" \
 HOTKEY_SETUP_LOG="$hotkey_setup_log" \
 bash "$repo_dir/scripts/install.sh" >/dev/null
 
-test "$(cat "$tmp/home/.jcode/install_conversion_id")" = "$conversion_id"
+test "$(cat "$tmp/home/.next-code/install_conversion_id")" = "$conversion_id"
 grep -q '"stage":"installer_start".*"outcome":"success"' "$telemetry_log"
 grep -q '"stage":"installer_finish".*"outcome":"success"' "$telemetry_log"
 test "$(cat "$hotkey_setup_log")" = "setup-hotkey"
@@ -83,10 +83,10 @@ test "$(cat "$hotkey_setup_log")" = "setup-hotkey"
 failure_log="$tmp/failure.jsonl"
 if PATH="$tmp/bin:$PATH" \
   HOME="$tmp/home-failure" \
-  JCODE_HOME="$tmp/home-failure/.jcode" \
-  JCODE_INSTALL_DIR="$tmp/install-failure" \
-  JCODE_INSTALL_CONVERSION_ID="$conversion_id" \
-  JCODE_SKIP_SERVER_RELOAD=1 \
+  NEXT_CODE_HOME="$tmp/home-failure/.next-code" \
+  NEXT_CODE_INSTALL_DIR="$tmp/install-failure" \
+  NEXT_CODE_INSTALL_CONVERSION_ID="$conversion_id" \
+  NEXT_CODE_SKIP_SERVER_RELOAD=1 \
   INSTALL_TELEMETRY_LOG="$failure_log" \
   FAIL_RELEASE=1 \
   bash "$repo_dir/scripts/install.sh" >/dev/null 2>&1; then
@@ -98,14 +98,14 @@ grep -q '"stage":"installer_finish".*"outcome":"failure".*"failure_stage":"relea
 privacy_log="$tmp/privacy.jsonl"
 PATH="$tmp/bin:$PATH" \
 HOME="$tmp/home-private" \
-JCODE_HOME="$tmp/home-private/.jcode" \
-JCODE_INSTALL_DIR="$tmp/install-private" \
-JCODE_INSTALL_CONVERSION_ID="$conversion_id" \
-JCODE_SKIP_SERVER_RELOAD=1 \
-JCODE_NO_TELEMETRY=1 \
+NEXT_CODE_HOME="$tmp/home-private/.next-code" \
+NEXT_CODE_INSTALL_DIR="$tmp/install-private" \
+NEXT_CODE_INSTALL_CONVERSION_ID="$conversion_id" \
+NEXT_CODE_SKIP_SERVER_RELOAD=1 \
+NEXT_CODE_NO_TELEMETRY=1 \
 INSTALL_TELEMETRY_LOG="$privacy_log" \
 bash "$repo_dir/scripts/install.sh" >/dev/null
 test ! -e "$privacy_log"
-test ! -e "$tmp/home-private/.jcode/install_conversion_id"
+test ! -e "$tmp/home-private/.next-code/install_conversion_id"
 
 echo "installer conversion telemetry tests passed"

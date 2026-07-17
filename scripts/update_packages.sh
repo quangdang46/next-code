@@ -53,7 +53,7 @@ class NextCode < Formula
 
       def install
         bin.install "next-code-macos-aarch64" => "next-code"
-        bin.install_symlink "next-code" => "jcode"
+        bin.install_symlink "next-code" => "next-code"
       end
     end
 
@@ -63,7 +63,7 @@ class NextCode < Formula
 
       def install
         bin.install "next-code-macos-x86_64" => "next-code"
-        bin.install_symlink "next-code" => "jcode"
+        bin.install_symlink "next-code" => "next-code"
       end
     end
   end
@@ -80,7 +80,7 @@ class NextCode < Formula
           #!/bin/sh
           exec "#{libexec}/next-code-linux-x86_64" "\$@"
         SH
-        bin.install_symlink "next-code" => "jcode"
+        bin.install_symlink "next-code" => "next-code"
       end
     end
 
@@ -90,7 +90,7 @@ class NextCode < Formula
 
       def install
         bin.install "next-code-linux-aarch64" => "next-code"
-        bin.install_symlink "next-code" => "jcode"
+        bin.install_symlink "next-code" => "next-code"
       end
     end
   end
@@ -119,8 +119,8 @@ pkgdesc="AI coding agent powered by Claude and ChatGPT"
 arch=('x86_64')
 url="https://github.com/${REPO}"
 license=('MIT')
-provides=('next-code' 'jcode')
-conflicts=('next-code' 'jcode' 'jcode-bin')
+provides=('next-code' 'next-code')
+conflicts=('next-code' 'next-code' 'next-code-bin')
 source=("$LINUX_URL")
 sha256sums=('$LINUX_SHA')
 
@@ -131,7 +131,7 @@ package() {
     install -Dm644 "\${srcdir}"/libcrypto.so* "\${pkgdir}/usr/lib/next-code/"
     mkdir -p "\${pkgdir}/usr/bin"
     ln -s /usr/lib/next-code/next-code-linux-x86_64 "\${pkgdir}/usr/bin/next-code"
-    ln -s next-code "\${pkgdir}/usr/bin/jcode"
+    ln -s next-code "\${pkgdir}/usr/bin/next-code"
 }
 EOF
 

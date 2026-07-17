@@ -89,7 +89,7 @@ CI handles Homebrew and AUR updates automatically:
 
 Both are triggered by the final `release` job after all platform builds complete.
 
-Release asset names use the `next-code-<os>-<arch>` prefix (for example `next-code-linux-x86_64.tar.gz`). Installers also create a one-release `jcode` → `next-code` compat symlink.
+Release asset names use the `next-code-<os>-<arch>` prefix (for example `next-code-linux-x86_64.tar.gz`). Installers also create a one-release compat symlink: `jcode` → `next-code`.
 
 ### Windows signing prerequisites
 

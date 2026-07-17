@@ -784,7 +784,7 @@ fn persist_auth_test_live_verification_event(
     let (coverage_provider_id, coverage_provider_label) =
         auth_test_coverage_provider_identity(report);
     let mut event = crate::live_tests::LiveVerificationEvent::new(
-        "auth_test_real_jcode_runtime",
+        "auth_test_real_next_code_runtime",
         coverage_provider_id,
         coverage_provider_label,
         crate::live_tests::LiveVerificationAuth::non_secret("auth-test", None::<String>),
@@ -807,7 +807,7 @@ fn persist_auth_test_live_verification_event(
 
 fn auth_test_coverage_provider_identity(report: &AuthTestProviderReport) -> (String, String) {
     if report.provider == "openai-compatible"
-        && let Ok(profile_name) = std::env::var("JCODE_NAMED_PROVIDER_PROFILE")
+        && let Ok(profile_name) = product_env("NAMED_PROVIDER_PROFILE")
     {
         let profile_name = profile_name.trim();
         if !profile_name.is_empty() {

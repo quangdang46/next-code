@@ -23,7 +23,7 @@ This repo (`quangdang46/next-code`) is a rebranded fork of `1jehuang/jcode`. Sev
 
 ## Install Notes
 - `~/.local/bin/next-code` is the launcher symlink used from `PATH`.
-- `~/.local/bin/jcode` is a one-release compat symlink to `next-code`.
+- one-release compat: `jcode` → `next-code` symlink at `~/.local/bin/jcode`.
 - `~/.next-code/builds/current/next-code` is the active local/source-build channel; self-dev builds and `scripts/install_release.sh` point the launcher here.
 - `~/.next-code/builds/stable/next-code` is the stable release channel; `scripts/install.sh` installs this and points the launcher here.
 - `~/.next-code/builds/versions/<version>/next-code` stores immutable binaries.

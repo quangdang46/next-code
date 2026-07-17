@@ -44,7 +44,7 @@ pub(crate) fn session_switcher_styled_lines(
 
     if switcher.loading {
         lines.push(styled_line(
-            "loading recent sessions from ~/.jcode/sessions...",
+            "loading recent sessions from ~/.next-code/sessions...",
             SingleSessionLineStyle::Status,
         ));
     }
@@ -1054,8 +1054,8 @@ pub(crate) const SINGLE_SESSION_HELP_SECTIONS: &[HelpSection] = &[
         title: "window",
         shortcuts: &[
             ("Ctrl+;", "reset/spawn fresh desktop session"),
-            ("Super+;", "spawn a self-dev jcode session"),
-            ("Super+'", "spawn a jcode session in home"),
+            ("Super+;", "spawn a self-dev next-code session"),
+            ("Super+'", "spawn a next-code session in home"),
             ("Ctrl+R", "reload sessions/models while a picker is open"),
             ("Ctrl+?", "toggle this help"),
             ("q", "close help or session info"),

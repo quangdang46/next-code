@@ -1,5 +1,5 @@
 //! Config validation: locate global + project `config.toml` and validate TOML
-//! syntax. (Strict unknown-key detection can follow once `jcode-config-types`
+//! syntax. (Strict unknown-key detection can follow once `next-code-config-types`
 //! derives `serde(deny_unknown_fields)`.)
 
 use super::super::types::{CheckCategory, DoctorOptions, Finding};
@@ -8,7 +8,7 @@ pub fn check_config(opts: &DoctorOptions, out: &mut Vec<Finding>) {
     let global = crate::storage::next_code_dir()
         .ok()
         .map(|h| h.join("config.toml"));
-    let project = opts.cwd.join(".jcode").join("config.toml");
+    let project = opts.cwd.join(".next-code").join("config.toml");
 
     let mut found_any = false;
     for (label, path) in [("global", global), ("project", Some(project))] {

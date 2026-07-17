@@ -9,7 +9,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
 
-DEFAULT_SOCKET = f"/run/user/{os.getuid()}/jcode.sock"
+DEFAULT_SOCKET = f"/run/user/{os.getuid()}/next-code.sock"
 
 
 @dataclass
@@ -112,10 +112,10 @@ def first_non_option(argv: list[str]) -> str | None:
 
 def classify_process(argv: list[str], cmd: str, main_socket: str) -> tuple[str | None, bool]:
     argv0 = Path(argv[0]).name if argv else ""
-    if not (argv0.startswith("jcode") or argv0.startswith("next-code")):
+    if not (argv0.startswith("next-code") or argv0.startswith("next-code")):
         return None, False
 
-    if "jcode serve" in cmd or "next-code serve" in cmd:
+    if "next-code serve" in cmd or "next-code serve" in cmd:
         socket_path = parse_socket_path(cmd) or main_socket
         if socket_path == main_socket:
             return "server", True
@@ -124,7 +124,7 @@ def classify_process(argv: list[str], cmd: str, main_socket: str) -> tuple[str |
     socket_path = parse_socket_path(cmd) or main_socket
     is_main = socket_path == main_socket
 
-    if "cargo build" in cmd or "rustc --crate-name jcode" in cmd or "rustc --crate-name next_code" in cmd or "handle_resume_session" in cmd:
+    if "cargo build" in cmd or "rustc --crate-name next-code" in cmd or "rustc --crate-name next_code" in cmd or "handle_resume_session" in cmd:
         return None, False
 
     subcommand = first_non_option(argv)
@@ -164,7 +164,7 @@ def iter_next_code_processes(main_socket: str, include_aux: bool) -> Iterable[Pr
         if not argv:
             continue
         cmd = " ".join(argv)
-        if "jcode" not in cmd:
+        if "next-code" not in cmd:
             continue
         role, is_main = classify_process(argv, cmd, main_socket)
         if role is None:

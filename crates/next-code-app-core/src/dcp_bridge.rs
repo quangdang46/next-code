@@ -1,8 +1,8 @@
-//! Bridge between jcode's internal message format and DCP's canonical IR.
+//! Bridge between next-code's internal message format and DCP's canonical IR.
 //!
 //! This module provides converters:
-//! - `next_code_to_dcp`: Convert jcode messages to DCP format
-//! - `dcp_to_jcode`: Convert DCP messages back to jcode format
+//! - `next_code_to_dcp`: Convert next-code messages to DCP format
+//! - `dcp_to_next_code`: Convert DCP messages back to next-code format
 //!
 //! Wiring into Agent::messages_for_provider is deferred to a later PR
 //! (see PLAN.md §9.1).
@@ -10,12 +10,12 @@
 use crate::message::{ContentBlock, Message as JMsg, Role as JRole};
 use dynamic_context_pruning::{Message as DcpMessage, Part, Role as DcpRole, ToolStatus};
 
-/// Convert jcode messages to DCP canonical IR.
+/// Convert next-code messages to DCP canonical IR.
 pub fn next_code_to_dcp(msgs: &[JMsg]) -> Vec<DcpMessage> {
     msgs.iter().map(jmsg_to_dcp).collect()
 }
 
-/// Convert a single jcode message to DCP format.
+/// Convert a single next-code message to DCP format.
 fn jmsg_to_dcp(m: &JMsg) -> DcpMessage {
     let role = match m.role {
         JRole::User => DcpRole::User,
@@ -39,7 +39,7 @@ fn jmsg_to_dcp(m: &JMsg) -> DcpMessage {
     }
 }
 
-/// Map jcode ContentBlock to DCP Part.
+/// Map next-code ContentBlock to DCP Part.
 fn content_to_part(b: &ContentBlock) -> Option<Part> {
     Some(match b {
         ContentBlock::Text { text, .. } => Part::Text(text.clone()),
@@ -78,13 +78,13 @@ fn content_to_part(b: &ContentBlock) -> Option<Part> {
     })
 }
 
-/// Convert DCP messages back to jcode format.
-pub fn dcp_to_jcode(msgs: Vec<DcpMessage>) -> Vec<JMsg> {
-    msgs.into_iter().map(dcp_msg_to_jcode).collect()
+/// Convert DCP messages back to next-code format.
+pub fn dcp_to_next_code(msgs: Vec<DcpMessage>) -> Vec<JMsg> {
+    msgs.into_iter().map(dcp_msg_to_next_code).collect()
 }
 
-/// Convert a single DCP message to jcode format.
-fn dcp_msg_to_jcode(m: DcpMessage) -> JMsg {
+/// Convert a single DCP message to next-code format.
+fn dcp_msg_to_next_code(m: DcpMessage) -> JMsg {
     let role = match m.role {
         DcpRole::User => JRole::User,
         DcpRole::Assistant => JRole::Assistant,
@@ -108,7 +108,7 @@ fn dcp_msg_to_jcode(m: DcpMessage) -> JMsg {
     }
 }
 
-/// Map DCP Part back to jcode ContentBlock.
+/// Map DCP Part back to next-code ContentBlock.
 fn part_to_content(p: Part) -> Option<ContentBlock> {
     Some(match p {
         Part::Text(text) => ContentBlock::Text {
@@ -147,7 +147,7 @@ mod tests {
     use crate::message::ContentBlock;
 
     #[test]
-    fn test_jcode_to_dcp_roundtrip() {
+    fn test_next_code_to_dcp_roundtrip() {
         let jmsg = JMsg {
             role: JRole::User,
             content: vec![ContentBlock::Text {
@@ -163,7 +163,7 @@ mod tests {
         assert_eq!(dcp.role, DcpRole::User);
         assert_eq!(dcp.parts.len(), 1);
 
-        let back = dcp_msg_to_jcode(dcp);
+        let back = dcp_msg_to_next_code(dcp);
         assert_eq!(back.role, JRole::User);
     }
 
@@ -186,7 +186,7 @@ mod tests {
             ignored: false,
         };
 
-        let jmsg = dcp_msg_to_jcode(dcp_msg);
+        let jmsg = dcp_msg_to_next_code(dcp_msg);
         assert_eq!(jmsg.role, JRole::Assistant);
         assert!(
             jmsg.content

@@ -1,9 +1,9 @@
 use std::process::{Child, Command, Stdio};
 
-const DISABLE_ENV: &str = "JCODE_DISABLE_POWER_INHIBIT";
-const MODE_ENV: &str = "JCODE_DESKTOP_POWER_INHIBIT";
+const DISABLE_ENV: &str = "NEXT_CODE_DISABLE_POWER_INHIBIT";
+const MODE_ENV: &str = "NEXT_CODE_DESKTOP_POWER_INHIBIT";
 
-/// Best-effort inhibitor that keeps laptops awake while Jcode is actively
+/// Best-effort inhibitor that keeps laptops awake while Next Code is actively
 /// streaming/processing. The helper process is kept alive only while active work
 /// exists, then killed immediately so normal power management resumes.
 pub(crate) struct PowerInhibitor {
@@ -57,7 +57,7 @@ impl PowerInhibitor {
             }
             Err(error) => {
                 crate::desktop_log::error(format_args!(
-                    "jcode-desktop: failed to acquire power inhibitor: {error}"
+                    "next-code-desktop: failed to acquire power inhibitor: {error}"
                 ));
                 self.available = false;
             }
@@ -68,12 +68,12 @@ impl PowerInhibitor {
         if let Some(mut child) = self.child.take() {
             if let Err(error) = child.kill() {
                 crate::desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to stop power inhibitor process: {error}"
+                    "next-code-desktop: failed to stop power inhibitor process: {error}"
                 ));
             }
             if let Err(error) = child.wait() {
                 crate::desktop_log::warn(format_args!(
-                    "jcode-desktop: failed to reap power inhibitor process: {error}"
+                    "next-code-desktop: failed to reap power inhibitor process: {error}"
                 ));
             }
         }
@@ -140,8 +140,8 @@ fn build_linux_systemd_inhibit_command() -> Command {
     let mut command = Command::new("systemd-inhibit");
     command
         .arg("--what=sleep:handle-lid-switch")
-        .arg("--who=jcode")
-        .arg("--why=Jcode is streaming or processing active work")
+        .arg("--who=next-code")
+        .arg("--why=Next Code is streaming or processing active work")
         .arg("sleep")
         .arg("infinity")
         .stdin(Stdio::null())
@@ -239,7 +239,7 @@ mod tests {
 
         assert_eq!(command_name(&command), "systemd-inhibit");
         assert!(args.contains(&"--what=sleep:handle-lid-switch".to_string()));
-        assert!(args.contains(&"--who=jcode".to_string()));
+        assert!(args.contains(&"--who=next-code".to_string()));
         assert!(args.contains(&"sleep".to_string()));
         assert!(args.contains(&"infinity".to_string()));
     }

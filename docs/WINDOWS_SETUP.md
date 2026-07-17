@@ -1,33 +1,33 @@
 # Windows Setup and Troubleshooting Guide
 
-This guide provides Windows-specific setup instructions and troubleshooting for jcode users on Windows 10/11.
+This guide provides Windows-specific setup instructions and troubleshooting for next-code users on Windows 10/11.
 
 ## Installation
 
 ### Quick Install (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/quangdang46/jcode/master/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/quangdang46/next-code/master/scripts/install.ps1 | iex
 ```
 
 ### Installation Details
 
 The PowerShell installer:
-- Downloads the latest jcode release for your architecture (x86_64 or ARM64)
-- Installs to `%LOCALAPPDATA%\jcode\bin\jcode.exe` (launcher)
-- Stores versioned binaries in `%LOCALAPPDATA%\jcode\builds\versions\<version>\jcode.exe`
+- Downloads the latest next-code release for your architecture (x86_64 or ARM64)
+- Installs to `%LOCALAPPDATA%\next-code\bin\next-code.exe` (launcher)
+- Stores versioned binaries in `%LOCALAPPDATA%\next-code\builds\versions\<version>\next-code.exe`
 - Adds the installation directory to your user PATH
 - Optionally installs Alacritty terminal emulator
-- Optionally sets up Alt+; global hotkey to launch jcode
+- Optionally sets up Alt+; global hotkey to launch next-code
 
 ### Manual Installation
 
 If the automated installer fails:
 
-1. Download the appropriate release from [GitHub Releases](https://github.com/quangdang46/jcode/releases)
-2. Extract `jcode.exe` to a directory of your choice
+1. Download the appropriate release from [GitHub Releases](https://github.com/quangdang46/next-code/releases)
+2. Extract `next-code.exe` to a directory of your choice
 3. Add that directory to your system PATH
-4. Verify installation: `jcode --version`
+4. Verify installation: `next-code --version`
 
 ## Configuration Locations
 
@@ -35,12 +35,12 @@ Windows-specific configuration paths:
 
 | File/Directory | Windows Path |
 |----------------|--------------|
-| Main config | `%USERPROFILE%\.jcode\config.toml` |
-| Auth credentials | `%USERPROFILE%\.jcode\auth.json` |
-| Provider env files | `%APPDATA%\jcode\` |
-| Build artifacts | `%LOCALAPPDATA%\jcode\builds\` |
-| Browser components | `%LOCALAPPDATA%\jcode\browser\` |
-| Logs | `%USERPROFILE%\.jcode\logs\` |
+| Main config | `%USERPROFILE%\.next-code\config.toml` |
+| Auth credentials | `%USERPROFILE%\.next-code\auth.json` |
+| Provider env files | `%APPDATA%\next-code\` |
+| Build artifacts | `%LOCALAPPDATA%\next-code\builds\` |
+| Browser components | `%LOCALAPPDATA%\next-code\browser\` |
+| Logs | `%USERPROFILE%\.next-code\logs\` |
 
 ## Login and Authentication
 
@@ -50,10 +50,10 @@ The CLI provides flags to avoid interactive TUI issues:
 
 ```powershell
 # OpenAI-compatible provider with all options
-jcode login --provider openai-compatible --api-base https://api.deepseek.com --model deepseek-v4-flash --api-key YOUR_API_KEY
+next-code login --provider openai-compatible --api-base https://api.deepseek.com --model deepseek-v4-flash --api-key YOUR_API_KEY
 
 # Skip API key prompt (will prompt securely)
-jcode login --provider openai-compatible --api-base https://api.deepseek.com --model deepseek-v4-flash
+next-code login --provider openai-compatible --api-base https://api.deepseek.com --model deepseek-v4-flash
 ```
 
 Available login flags:
@@ -67,12 +67,12 @@ Available login flags:
 
 ### Handling Credential Conflicts
 
-jcode may detect credentials from other tools (OpenCode, Codex, etc.):
+next-code may detect credentials from other tools (OpenCode, Codex, etc.):
 
 ```
 Found existing OpenRouter credentials from OpenCode auth.json at C:\Users\...\auth.json.
-jcode will only read that source in place after you approve it.
-Trust this auth source for future jcode sessions? [y/N]:
+next-code will only read that source in place after you approve it.
+Trust this auth source for future next-code sessions? [y/N]:
 ```
 
 Type `y` to approve, or manage credentials manually in the config locations listed above.
@@ -118,7 +118,7 @@ If you experience:
 
 ### Issue #140: Browser Setup Missing Binary
 
-**Symptoms**: `jcode browser setup` fails with "Host binary not found"
+**Symptoms**: `next-code browser setup` fails with "Host binary not found"
 
 **Status**: Firefox Agent Bridge native messaging host not included in Windows releases
 
@@ -128,9 +128,9 @@ If you experience:
 
 ### Installation Issues
 
-**Problem**: `jcode` command not found after installation
+**Problem**: `next-code` command not found after installation
 - **Solution**: Open a new terminal window (PATH changes require new session)
-- **Alternative**: Add `%LOCALAPPDATA%\jcode\bin` to PATH manually
+- **Alternative**: Add `%LOCALAPPDATA%\next-code\bin` to PATH manually
 
 **Problem**: Installation fails with "PowerShell 5.1 or later required"
 - **Solution**: Update PowerShell or use Windows Terminal with PowerShell 7
@@ -142,7 +142,7 @@ If you experience:
 
 **Problem**: "No models are available" after login
 - **Solution**: Check that your API key is valid and the model name is correct
-- **Solution**: Run `jcode auth-test` to verify credentials
+- **Solution**: Run `next-code auth-test` to verify credentials
 
 **Problem**: Credential conflicts with other tools
 - **Solution**: Approve the credential source when prompted, or manage credentials manually
@@ -152,8 +152,8 @@ If you experience:
 
 ### Runtime Issues
 
-**Problem**: jcode won't start or crashes immediately
-- **Solution**: Check logs in `%USERPROFILE%\.jcode\logs\`
+**Problem**: next-code won't start or crashes immediately
+- **Solution**: Check logs in `%USERPROFILE%\.next-code\logs\`
 - **Solution**: Ensure Windows Defender isn't blocking the executable
 - **Solution**: Try running as administrator (not recommended for regular use)
 
@@ -168,17 +168,17 @@ If you experience:
 
 If you encounter issues not covered here:
 
-1. Check existing [GitHub Issues](https://github.com/quangdang46/jcode/issues) for similar problems
+1. Check existing [GitHub Issues](https://github.com/quangdang46/next-code/issues) for similar problems
 2. Search for your error message in the issue tracker
 3. File a new issue with:
    - Your Windows version and architecture
-   - jcode version (`jcode --version`)
+   - next-code version (`next-code --version`)
    - Terminal type (PowerShell, Windows Terminal, etc.)
    - Full error message and reproduction steps
-   - Relevant logs from `%USERPROFILE%\.jcode\logs\`
+   - Relevant logs from `%USERPROFILE%\.next-code\logs\`
 
 ## Additional Resources
 
 - [Windows Architecture Notes](WINDOWS.md) - Technical implementation details
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
-- [GitHub Issues](https://github.com/quangdang46/jcode/issues) - Bug reports and feature requests
+- [GitHub Issues](https://github.com/quangdang46/next-code/issues) - Bug reports and feature requests

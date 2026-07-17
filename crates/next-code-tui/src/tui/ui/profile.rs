@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -18,7 +19,7 @@ fn profile_state() -> &'static Mutex<RenderProfile> {
 
 pub(super) fn profile_enabled() -> bool {
     static ENABLED: OnceLock<bool> = OnceLock::new();
-    *ENABLED.get_or_init(|| std::env::var("JCODE_TUI_PROFILE").is_ok())
+    *ENABLED.get_or_init(|| product_env("TUI_PROFILE").is_ok())
 }
 
 pub(super) fn record_profile(prepare: Duration, draw: Duration, total: Duration) {

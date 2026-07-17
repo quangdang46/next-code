@@ -73,9 +73,9 @@ impl SandboxContext {
     ///
     /// Previously, the loader called `eval()` without setting up the `pi` object,
     /// causing ReferenceErrors on `pi.xxx` calls. The `pi` global is set via
-    /// PluginApiBindings::install, which creates the `__jcode_pi` global and
+    /// PluginApiBindings::install, which creates the `__nextcode_api` / dual-read `__jcode_api` global and
     /// injects all the JS-accessible functions (on, registerTool, logger, kv, etc.).
-    /// See crates/jcode-plugin-runtime/src/api.rs for the full API surface.
+    /// See crates/next-code-plugin-runtime/src/api.rs for the full API surface.
     ///
     /// This method replaces the pattern of manually creating PluginApiBindings
     /// in the loader: the loader now passes a `registry` ref and the bindings

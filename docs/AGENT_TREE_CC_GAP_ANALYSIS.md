@@ -1,4 +1,4 @@
-# Agent Tree / Subagent View: Claude Code vs jcode — Gap Analysis
+# Agent Tree / Subagent View: Claude Code vs next-code — Gap Analysis
 
 **Date:** 2026-07-13  
 **Branch:** `feat/agent-tree`  
@@ -123,7 +123,7 @@ In-process: same Node process, AsyncLocalStorage isolation — no socket session
 
 ---
 
-## 2. What jcode does today
+## 2. What next-code does today
 
 ### 2.1 Data model
 
@@ -172,13 +172,13 @@ if viewing_teammate_session_id.is_some() {
 | Live stream of subagent tools | **No** in view mode |
 | Esc | Clears viewing flag |
 
-**Conclusion:** User is correct — jcode has **not** implemented real “jump into session”. Only a flag + stub panel.
+**Conclusion:** User is correct — next-code has **not** implemented real “jump into session”. Only a flag + stub panel.
 
 ---
 
 ## 3. Gap matrix (priority)
 
-| # | Gap | Claude Code | jcode now | Severity | Effort |
+| # | Gap | Claude Code | next-code now | Severity | Effort |
 |---|-----|-------------|-----------|----------|--------|
 | **G1** | **Transcript takeover** | Main `Messages` shows `task.messages` | Leader transcript unchanged | **P0** | L |
 | **G2** | **Live message mirror** | Stream → `task.messages` every tool/assistant chunk | Only `output_tail` string on SwarmStatus | **P0** | L (server+protocol) |
@@ -202,7 +202,7 @@ if viewing_teammate_session_id.is_some() {
 
 ## 4. Architecture fork (decide before coding)
 
-Claude Code teammates are **in-process**. jcode swarm members are usually **separate remote sessions** (`session_id` on server). Two valid product modes:
+Claude Code teammates are **in-process**. next-code swarm members are usually **separate remote sessions** (`session_id` on server). Two valid product modes:
 
 ### Option A — Soft view (closest CC UX, keep coordinator session)
 
@@ -277,7 +277,7 @@ Aligns with existing notice: swarm panel `o pop out`.
 
 ---
 
-## 6. Concrete jcode code map (implement here)
+## 6. Concrete next-code code map (implement here)
 
 | Change | File(s) |
 |--------|---------|
@@ -312,7 +312,7 @@ Existing assets to reuse:
 
 ## 8. One-paragraph summary for implementers
 
-Claude Code “enter subagent” is a **full transcript + input context switch** onto an in-process task’s `messages` array (`enterTeammateView` → `displayedMessages = task.messages` + `injectUserMessageToTeammate`). jcode only sets `viewing_teammate_session_id` and draws a **stub corner panel** from `running_items`, without swapping the main transcript, without a per-agent message buffer, and without routing input — so users correctly feel they never “jumped in.” Closing the gap requires either soft-view (swap display + stream tails + inject) or hard-attach (`resume_session`), ideally hybrid: soft view on Enter, hard pop-out on existing swarm `o` path.
+Claude Code “enter subagent” is a **full transcript + input context switch** onto an in-process task’s `messages` array (`enterTeammateView` → `displayedMessages = task.messages` + `injectUserMessageToTeammate`). next-code only sets `viewing_teammate_session_id` and draws a **stub corner panel** from `running_items`, without swapping the main transcript, without a per-agent message buffer, and without routing input — so users correctly feel they never “jumped in.” Closing the gap requires either soft-view (swap display + stream tails + inject) or hard-attach (`resume_session`), ideally hybrid: soft view on Enter, hard pop-out on existing swarm `o` path.
 
 ---
 

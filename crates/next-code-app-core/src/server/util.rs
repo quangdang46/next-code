@@ -1,3 +1,4 @@
+use crate::env::{product_env};
 use crate::build;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -12,7 +13,7 @@ pub(crate) fn debug_control_allowed() -> bool {
     if crate::config::config().display.debug_socket {
         return true;
     }
-    if std::env::var("JCODE_DEBUG_CONTROL")
+    if product_env("DEBUG_CONTROL")
         .ok()
         .map(|v| matches!(v.as_str(), "1" | "true" | "yes" | "on"))
         .unwrap_or(false)
@@ -29,7 +30,7 @@ pub(crate) fn debug_control_allowed() -> bool {
 }
 
 pub(crate) fn embedding_idle_unload_secs() -> u64 {
-    std::env::var("JCODE_EMBEDDING_IDLE_UNLOAD_SECS")
+    product_env("EMBEDDING_IDLE_UNLOAD_SECS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
         .filter(|v| *v > 0)
@@ -304,7 +305,7 @@ pub(crate) fn git_common_dir_for(path: &Path) -> Option<PathBuf> {
 }
 
 pub(crate) fn swarm_id_for_dir(dir: Option<PathBuf>) -> Option<String> {
-    if let Ok(sw_id) = std::env::var("JCODE_SWARM_ID") {
+    if let Ok(sw_id) = product_env("SWARM_ID") {
         let trimmed = sw_id.trim();
         if !trimmed.is_empty() {
             return Some(trimmed.to_string());
@@ -445,7 +446,7 @@ impl ServerIdentity {
 }
 
 pub(crate) fn startup_headless_recovery_test_delay() -> Option<std::time::Duration> {
-    let raw = std::env::var("JCODE_TEST_HEADLESS_STARTUP_RECOVERY_DELAY_MS").ok()?;
+    let raw = product_env("TEST_HEADLESS_STARTUP_RECOVERY_DELAY_MS").ok()?;
     let delay_ms = raw.trim().parse::<u64>().ok()?;
     (delay_ms > 0).then(|| std::time::Duration::from_millis(delay_ms))
 }
@@ -462,20 +463,20 @@ mod newer_binary_tests {
 
     #[test]
     fn reports_update_when_candidate_is_strictly_newer() {
-        let candidates = vec![(PathBuf::from("/x/stable/jcode"), Some(t(200)))];
+        let candidates = vec![(PathBuf::from("/x/stable/next-code"), Some(t(200)))];
         assert!(newer_binary_available(
             Some(t(100)),
-            Some(std::path::Path::new("/x/current/jcode")),
+            Some(std::path::Path::new("/x/current/next-code")),
             candidates,
         ));
     }
 
     #[test]
     fn ignores_candidate_that_is_not_newer() {
-        let candidates = vec![(PathBuf::from("/x/stable/jcode"), Some(t(100)))];
+        let candidates = vec![(PathBuf::from("/x/stable/next-code"), Some(t(100)))];
         assert!(!newer_binary_available(
             Some(t(100)),
-            Some(std::path::Path::new("/x/current/jcode")),
+            Some(std::path::Path::new("/x/current/next-code")),
             candidates,
         ));
     }
@@ -483,10 +484,10 @@ mod newer_binary_tests {
     #[test]
     fn never_reloads_into_self_even_if_paths_were_equal() {
         // Same canonical path must never count as an update, regardless of mtime.
-        let candidates = vec![(PathBuf::from("/x/current/jcode"), Some(t(999)))];
+        let candidates = vec![(PathBuf::from("/x/current/next-code"), Some(t(999)))];
         assert!(!newer_binary_available(
             Some(t(100)),
-            Some(std::path::Path::new("/x/current/jcode")),
+            Some(std::path::Path::new("/x/current/next-code")),
             candidates,
         ));
     }
@@ -495,10 +496,10 @@ mod newer_binary_tests {
     fn suppresses_update_when_current_mtime_unavailable() {
         // Regression for issue #277: an unreadable current mtime previously fell
         // through to a path-difference heuristic that could loop forever.
-        let candidates = vec![(PathBuf::from("/x/stable/jcode"), Some(t(200)))];
+        let candidates = vec![(PathBuf::from("/x/stable/next-code"), Some(t(200)))];
         assert!(!newer_binary_available(
             None,
-            Some(std::path::Path::new("/x/current/jcode")),
+            Some(std::path::Path::new("/x/current/next-code")),
             candidates,
         ));
     }
@@ -507,10 +508,10 @@ mod newer_binary_tests {
     fn suppresses_update_when_candidate_mtime_unavailable() {
         // The dangerous case from issue #277: candidate path differs but its
         // mtime cannot be read. Must NOT report an update.
-        let candidates = vec![(PathBuf::from("/x/stable/jcode"), None)];
+        let candidates = vec![(PathBuf::from("/x/stable/next-code"), None)];
         assert!(!newer_binary_available(
             Some(t(100)),
-            Some(std::path::Path::new("/x/current/jcode")),
+            Some(std::path::Path::new("/x/current/next-code")),
             candidates,
         ));
     }
@@ -518,12 +519,12 @@ mod newer_binary_tests {
     #[test]
     fn reports_update_if_any_candidate_is_newer() {
         let candidates = vec![
-            (PathBuf::from("/x/stable/jcode"), None),
-            (PathBuf::from("/x/shared/jcode"), Some(t(300))),
+            (PathBuf::from("/x/stable/next-code"), None),
+            (PathBuf::from("/x/shared/next-code"), Some(t(300))),
         ];
         assert!(newer_binary_available(
             Some(t(100)),
-            Some(std::path::Path::new("/x/current/jcode")),
+            Some(std::path::Path::new("/x/current/next-code")),
             candidates,
         ));
     }
@@ -535,10 +536,10 @@ mod newer_binary_tests {
         // server (t=300) is newer than the only candidate (stable at t=100), so
         // there is no update. Previously a channel-version *mismatch* short-circuit
         // reported `true` here and told the newer server to downgrade itself.
-        let candidates = vec![(PathBuf::from("/x/stable/jcode"), Some(t(100)))];
+        let candidates = vec![(PathBuf::from("/x/stable/next-code"), Some(t(100)))];
         assert!(!newer_binary_available(
             Some(t(300)),
-            Some(std::path::Path::new("/x/builds/versions/dev/jcode")),
+            Some(std::path::Path::new("/x/builds/versions/dev/next-code")),
             candidates,
         ));
     }
@@ -547,10 +548,10 @@ mod newer_binary_tests {
     fn equal_mtime_channel_binary_is_not_an_update() {
         // A candidate with the same mtime is not strictly newer, so it must not
         // trigger a reload (avoids the differ-but-not-newer reload loop, #277).
-        let candidates = vec![(PathBuf::from("/x/stable/jcode"), Some(t(100)))];
+        let candidates = vec![(PathBuf::from("/x/stable/next-code"), Some(t(100)))];
         assert!(!newer_binary_available(
             Some(t(100)),
-            Some(std::path::Path::new("/x/builds/versions/dev/jcode")),
+            Some(std::path::Path::new("/x/builds/versions/dev/next-code")),
             candidates,
         ));
     }
@@ -575,10 +576,10 @@ mod reload_target_tests {
         // Reloading into ourselves never raises a version question, even with an
         // older mtime reading.
         let decision = guarded_reload_target(
-            candidate("/x/current/jcode"),
-            Path::new("/x/current/jcode"),
-            Some(Path::new("/x/current/jcode")),
-            Some(Path::new("/x/current/jcode")),
+            candidate("/x/current/next-code"),
+            Path::new("/x/current/next-code"),
+            Some(Path::new("/x/current/next-code")),
+            Some(Path::new("/x/current/next-code")),
             Some(t(200)),
             Some(t(100)),
         );
@@ -589,16 +590,16 @@ mod reload_target_tests {
     fn newer_candidate_is_used() {
         // The self-dev case: a freshly written candidate is newer, so apply it.
         let decision = guarded_reload_target(
-            candidate("/x/shared-server/jcode"),
-            Path::new("/x/builds/versions/new/jcode"),
-            Some(Path::new("/x/builds/versions/old/jcode")),
-            Some(Path::new("/x/builds/versions/old/jcode")),
+            candidate("/x/shared-server/next-code"),
+            Path::new("/x/builds/versions/new/next-code"),
+            Some(Path::new("/x/builds/versions/old/next-code")),
+            Some(Path::new("/x/builds/versions/old/next-code")),
             Some(t(100)),
             Some(t(200)),
         );
         match decision {
             ReloadTargetDecision::UseCandidate((path, _)) => {
-                assert_eq!(path, PathBuf::from("/x/shared-server/jcode"));
+                assert_eq!(path, PathBuf::from("/x/shared-server/next-code"));
             }
             other => panic!("expected candidate to be used, got {other:?}"),
         }
@@ -608,10 +609,10 @@ mod reload_target_tests {
     fn equal_mtime_candidate_is_used() {
         // Same mtime is not a downgrade.
         let decision = guarded_reload_target(
-            candidate("/x/shared-server/jcode"),
-            Path::new("/x/builds/versions/same/jcode"),
-            Some(Path::new("/x/builds/versions/current/jcode")),
-            Some(Path::new("/x/builds/versions/current/jcode")),
+            candidate("/x/shared-server/next-code"),
+            Path::new("/x/builds/versions/same/next-code"),
+            Some(Path::new("/x/builds/versions/current/next-code")),
+            Some(Path::new("/x/builds/versions/current/next-code")),
             Some(t(100)),
             Some(t(100)),
         );
@@ -624,16 +625,16 @@ mod reload_target_tests {
         // the running client. Force reload must NOT downgrade; it re-execs the
         // current binary instead.
         let decision = guarded_reload_target(
-            candidate("/x/shared-server/jcode"),
-            Path::new("/x/builds/versions/old-0.14.3/jcode"),
-            Some(Path::new("/x/builds/versions/new/jcode")),
-            Some(Path::new("/x/builds/versions/new/jcode")),
+            candidate("/x/shared-server/next-code"),
+            Path::new("/x/builds/versions/old-0.14.3/next-code"),
+            Some(Path::new("/x/builds/versions/new/next-code")),
+            Some(Path::new("/x/builds/versions/new/next-code")),
             Some(t(300)),
             Some(t(100)),
         );
         match decision {
             ReloadTargetDecision::DowngradeBlockedUseCurrent((path, _)) => {
-                assert_eq!(path, PathBuf::from("/x/builds/versions/new/jcode"));
+                assert_eq!(path, PathBuf::from("/x/builds/versions/new/next-code"));
             }
             other => panic!("expected downgrade to be blocked, got {other:?}"),
         }
@@ -642,10 +643,10 @@ mod reload_target_tests {
     #[test]
     fn unreadable_candidate_mtime_is_treated_as_downgrade() {
         let decision = guarded_reload_target(
-            candidate("/x/shared-server/jcode"),
-            Path::new("/x/builds/versions/unknown/jcode"),
-            Some(Path::new("/x/builds/versions/new/jcode")),
-            Some(Path::new("/x/builds/versions/new/jcode")),
+            candidate("/x/shared-server/next-code"),
+            Path::new("/x/builds/versions/unknown/next-code"),
+            Some(Path::new("/x/builds/versions/new/next-code")),
+            Some(Path::new("/x/builds/versions/new/next-code")),
             Some(t(300)),
             None,
         );
@@ -660,8 +661,8 @@ mod reload_target_tests {
         // If we cannot identify the running exe we cannot re-exec it, so we have
         // to proceed with the candidate rather than refuse to reload entirely.
         let decision = guarded_reload_target(
-            candidate("/x/shared-server/jcode"),
-            Path::new("/x/builds/versions/old/jcode"),
+            candidate("/x/shared-server/next-code"),
+            Path::new("/x/builds/versions/old/next-code"),
             None,
             None,
             None,
@@ -701,14 +702,14 @@ mod pick_newest_candidate_tests {
         // can actually apply the update it advertises.
         let chosen = pick_newest_candidate([
             entry(
-                "/x/versions/old-selfdev/jcode",
+                "/x/versions/old-selfdev/next-code",
                 "shared-server",
                 Some(t(100)),
             ),
-            entry("/x/versions/new-release/jcode", "stable", Some(t(200))),
+            entry("/x/versions/new-release/next-code", "stable", Some(t(200))),
         ])
         .expect("a candidate");
-        assert_eq!(chosen.0, PathBuf::from("/x/versions/new-release/jcode"));
+        assert_eq!(chosen.0, PathBuf::from("/x/versions/new-release/next-code"));
     }
 
     #[test]
@@ -716,25 +717,25 @@ mod pick_newest_candidate_tests {
         // A deliberately-pinned self-dev build that is at least as fresh as the
         // other flavor must be preserved (self-dev pin protection).
         let chosen = pick_newest_candidate([
-            entry("/x/versions/selfdev/jcode", "shared-server", Some(t(200))),
-            entry("/x/versions/release/jcode", "stable", Some(t(200))),
+            entry("/x/versions/selfdev/next-code", "shared-server", Some(t(200))),
+            entry("/x/versions/release/next-code", "stable", Some(t(200))),
         ])
         .expect("a candidate");
-        assert_eq!(chosen.0, PathBuf::from("/x/versions/selfdev/jcode"));
+        assert_eq!(chosen.0, PathBuf::from("/x/versions/selfdev/next-code"));
     }
 
     #[test]
     fn own_flavor_wins_when_strictly_newer() {
         let chosen = pick_newest_candidate([
             entry(
-                "/x/versions/fresh-selfdev/jcode",
+                "/x/versions/fresh-selfdev/next-code",
                 "shared-server",
                 Some(t(300)),
             ),
-            entry("/x/versions/release/jcode", "stable", Some(t(200))),
+            entry("/x/versions/release/next-code", "stable", Some(t(200))),
         ])
         .expect("a candidate");
-        assert_eq!(chosen.0, PathBuf::from("/x/versions/fresh-selfdev/jcode"));
+        assert_eq!(chosen.0, PathBuf::from("/x/versions/fresh-selfdev/next-code"));
     }
 
     #[test]
@@ -742,11 +743,11 @@ mod pick_newest_candidate_tests {
         // An unreadable mtime on the other flavor must not let it win, so we
         // never swap to an unverifiable binary.
         let chosen = pick_newest_candidate([
-            entry("/x/versions/selfdev/jcode", "shared-server", Some(t(100))),
-            entry("/x/versions/release/jcode", "stable", None),
+            entry("/x/versions/selfdev/next-code", "shared-server", Some(t(100))),
+            entry("/x/versions/release/next-code", "stable", None),
         ])
         .expect("a candidate");
-        assert_eq!(chosen.0, PathBuf::from("/x/versions/selfdev/jcode"));
+        assert_eq!(chosen.0, PathBuf::from("/x/versions/selfdev/next-code"));
     }
 
     #[test]
@@ -754,8 +755,8 @@ mod pick_newest_candidate_tests {
         // Both flavors resolving to the same binary must not double-count; the
         // first (preferred) occurrence wins.
         let chosen = pick_newest_candidate([
-            entry("/x/versions/same/jcode", "shared-server", Some(t(100))),
-            entry("/x/versions/same/jcode", "stable", Some(t(999))),
+            entry("/x/versions/same/next-code", "shared-server", Some(t(100))),
+            entry("/x/versions/same/next-code", "stable", Some(t(999))),
         ])
         .expect("a candidate");
         assert_eq!(chosen.1, "shared-server");
@@ -771,7 +772,7 @@ mod pick_newest_candidate_tests {
 mod newest_reload_candidate_integration_tests {
     //! End-to-end-ish coverage that drives `newest_reload_candidate` through the
     //! REAL channel resolution (`build::shared_server_update_candidate`) against
-    //! a temp `JCODE_HOME`. This reproduces the field "/update -> new client,
+    //! a temp `NEXT_CODE_HOME`. This reproduces the field "/update -> new client,
     //! stale server" state and proves the fix: a self-dev daemon now reloads into
     //! the freshly installed release instead of its old pinned binary.
     use super::{newer_binary_available, newest_reload_candidate};
@@ -809,8 +810,8 @@ mod newest_reload_candidate_integration_tests {
     fn selfdev_daemon_reloads_into_fresh_release_after_update() {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::TempDir::new().expect("temp dir");
-        let prev_home = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let base = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
         // Field state: shared-server pinned to an OLD self-dev build; stable
@@ -840,9 +841,9 @@ mod newest_reload_candidate_integration_tests {
         );
 
         if let Some(prev_home) = prev_home {
-            crate::env::set_var("JCODE_HOME", prev_home);
+            crate::env::set_var("NEXT_CODE_HOME", prev_home);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -850,8 +851,8 @@ mod newest_reload_candidate_integration_tests {
     fn selfdev_pin_is_preserved_when_it_is_the_freshest_build() {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::TempDir::new().expect("temp dir");
-        let prev_home = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let base = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
         // A deliberately-promoted self-dev build that is NEWER than stable must
@@ -871,9 +872,9 @@ mod newest_reload_candidate_integration_tests {
         );
 
         if let Some(prev_home) = prev_home {
-            crate::env::set_var("JCODE_HOME", prev_home);
+            crate::env::set_var("NEXT_CODE_HOME", prev_home);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
@@ -918,8 +919,8 @@ mod newest_reload_candidate_integration_tests {
     fn normal_user_daemon_detects_and_targets_update_after_update() {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::TempDir::new().expect("temp dir");
-        let prev_home = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let base = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
         let old_release = "0.14.3";
@@ -954,12 +955,12 @@ mod newest_reload_candidate_integration_tests {
         );
 
         if let Some(prev_home) = prev_home {
-            crate::env::set_var("JCODE_HOME", prev_home);
+            crate::env::set_var("NEXT_CODE_HOME", prev_home);
         }
     }
 
-    /// Install a release-archive-style version dir: a tiny `jcode` wrapper
-    /// script plus the real `jcode-linux-x86_64.bin` payload, with independently
+    /// Install a release-archive-style version dir: a tiny `next-code` wrapper
+    /// script plus the real `next-code-linux-x86_64.bin` payload, with independently
     /// settable mtimes. This is exactly what `/update`'s tar.gz install path
     /// produces on disk.
     fn install_release_style_binary(
@@ -972,7 +973,7 @@ mod newest_reload_candidate_integration_tests {
             .join("versions")
             .join(version);
         std::fs::create_dir_all(&dir).expect("create version dir");
-        let payload = dir.join("jcode-linux-x86_64.bin");
+        let payload = dir.join("next-code-linux-x86_64.bin");
         std::fs::write(&payload, format!("payload for {version}")).expect("write payload");
         std::fs::File::open(&payload)
             .expect("open payload")
@@ -981,7 +982,7 @@ mod newest_reload_candidate_integration_tests {
         let wrapper = dir.join(build::binary_name());
         std::fs::write(
             &wrapper,
-            "#!/usr/bin/env sh\nexec ./jcode-linux-x86_64.bin \"$@\"\n",
+            "#!/usr/bin/env sh\nexec ./next-code-linux-x86_64.bin \"$@\"\n",
         )
         .expect("write wrapper");
         std::fs::File::open(&wrapper)
@@ -1003,8 +1004,8 @@ mod newest_reload_candidate_integration_tests {
     fn freshly_updated_release_daemon_reports_no_phantom_update() {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::TempDir::new().expect("temp dir");
-        let prev_home = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let base = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
         // Wrapper written strictly AFTER the payload (the bad copy order).
@@ -1034,9 +1035,9 @@ mod newest_reload_candidate_integration_tests {
         assert!(wrapper_mtime > payload_mtime);
 
         if let Some(prev_home) = prev_home {
-            crate::env::set_var("JCODE_HOME", prev_home);
+            crate::env::set_var("NEXT_CODE_HOME", prev_home);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }
@@ -1048,23 +1049,23 @@ mod deleted_suffix_tests {
 
     #[test]
     fn strips_linux_deleted_marker() {
-        let p = PathBuf::from("/home/u/.jcode/builds/versions/abc/jcode (deleted)");
+        let p = PathBuf::from("/home/u/.next-code/builds/versions/abc/next-code (deleted)");
         assert_eq!(
             strip_deleted_suffix(p),
-            PathBuf::from("/home/u/.jcode/builds/versions/abc/jcode")
+            PathBuf::from("/home/u/.next-code/builds/versions/abc/next-code")
         );
     }
 
     #[test]
     fn leaves_normal_paths_untouched() {
-        let p = PathBuf::from("/home/u/.jcode/builds/versions/abc/jcode");
+        let p = PathBuf::from("/home/u/.next-code/builds/versions/abc/next-code");
         assert_eq!(strip_deleted_suffix(p.clone()), p);
     }
 
     #[test]
     fn only_strips_trailing_marker() {
         // A path that merely contains the substring must not be altered.
-        let p = PathBuf::from("/home/u/jcode (deleted)/jcode");
+        let p = PathBuf::from("/home/u/next-code (deleted)/next-code");
         assert_eq!(strip_deleted_suffix(p.clone()), p);
     }
 }

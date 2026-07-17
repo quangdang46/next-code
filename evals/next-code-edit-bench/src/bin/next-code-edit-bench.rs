@@ -13,7 +13,7 @@ use next_code_edit_bench::{
     types::{BenchmarkConfig, GenerateConfig},
 };
 
-/// JCode Edit Benchmark — mutation-based edit-tool quality measurement.
+/// Next Code Edit Benchmark — mutation-based edit-tool quality measurement.
 #[derive(Debug, Parser)]
 #[command(
     name = "next-code-edit-bench",

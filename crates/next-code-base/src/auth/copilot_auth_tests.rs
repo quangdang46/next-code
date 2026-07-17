@@ -156,7 +156,7 @@ fn normalize_candidate_token_rejects_empty_and_unknown_values() {
 
 #[test]
 fn gh_cli_fallback_requires_explicit_opt_in() {
-    let key = "JCODE_COPILOT_ALLOW_GH_AUTH_TOKEN";
+    let key = "NEXT_CODE_COPILOT_ALLOW_GH_AUTH_TOKEN";
     let previous = std::env::var_os(key);
 
     crate::env::remove_var(key);
@@ -202,10 +202,10 @@ fn save_github_token_creates_config_dir() -> Result<()> {
     let _guard = crate::storage::lock_test_env();
     let dir = TempDir::new().map_err(|e| anyhow!(e))?;
     let config_dir = dir.path().join("github-copilot");
-    let prev_jcode_home = std::env::var_os("JCODE_HOME");
+    let prev_jcode_home = std::env::var_os("NEXT_CODE_HOME");
     let prev_xdg_config_home = std::env::var_os("XDG_CONFIG_HOME");
 
-    crate::env::remove_var("JCODE_HOME");
+    crate::env::remove_var("NEXT_CODE_HOME");
     crate::env::set_var(
         "XDG_CONFIG_HOME",
         dir.path()
@@ -223,9 +223,9 @@ fn save_github_token_creates_config_dir() -> Result<()> {
     assert_eq!(loaded, "gho_newtoken");
 
     if let Some(prev) = prev_jcode_home {
-        crate::env::set_var("JCODE_HOME", prev);
+        crate::env::set_var("NEXT_CODE_HOME", prev);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 
     if let Some(prev) = prev_xdg_config_home {
@@ -240,8 +240,8 @@ fn save_github_token_creates_config_dir() -> Result<()> {
 fn legacy_copilot_config_dir_uses_jcode_home_external_dir() -> Result<()> {
     let _guard = crate::storage::lock_test_env();
     let dir = TempDir::new().map_err(|e| anyhow!(e))?;
-    let prev = std::env::var_os("JCODE_HOME");
-    crate::env::set_var("JCODE_HOME", dir.path());
+    let prev = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", dir.path());
 
     let path = legacy_copilot_config_dir();
     assert_eq!(
@@ -253,9 +253,9 @@ fn legacy_copilot_config_dir_uses_jcode_home_external_dir() -> Result<()> {
     );
 
     if let Some(prev) = prev {
-        crate::env::set_var("JCODE_HOME", prev);
+        crate::env::set_var("NEXT_CODE_HOME", prev);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
     Ok(())
 }
@@ -264,10 +264,10 @@ fn legacy_copilot_config_dir_uses_jcode_home_external_dir() -> Result<()> {
 fn save_github_token_makes_future_loads_available() -> Result<()> {
     let _guard = crate::storage::lock_test_env();
     let dir = TempDir::new().map_err(|e| anyhow!(e))?;
-    let prev_jcode_home = std::env::var_os("JCODE_HOME");
+    let prev_jcode_home = std::env::var_os("NEXT_CODE_HOME");
     let prev_xdg_config_home = std::env::var_os("XDG_CONFIG_HOME");
 
-    crate::env::set_var("JCODE_HOME", dir.path());
+    crate::env::set_var("NEXT_CODE_HOME", dir.path());
     crate::env::remove_var("XDG_CONFIG_HOME");
 
     save_github_token("gho_persisted_token", "testuser")?;
@@ -282,9 +282,9 @@ fn save_github_token_makes_future_loads_available() -> Result<()> {
     assert_eq!(load_github_token()?, "gho_persisted_token");
 
     if let Some(prev) = prev_jcode_home {
-        crate::env::set_var("JCODE_HOME", prev);
+        crate::env::set_var("NEXT_CODE_HOME", prev);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
 
     if let Some(prev) = prev_xdg_config_home {
@@ -538,12 +538,12 @@ fn normalize_github_host_key_rejects_non_github_hosts() {
 
 #[test]
 fn live_verify_failure_record_blocks_auto_use() -> Result<()> {
-    // Lock the test env and isolate JCODE_HOME so the validation record we write
+    // Lock the test env and isolate NEXT_CODE_HOME so the validation record we write
     // does not touch the developer's real auth-validation.json.
     let _guard = crate::storage::lock_test_env();
     let dir = TempDir::new().map_err(|e| anyhow!(e))?;
-    let prev_jcode_home = std::env::var_os("JCODE_HOME");
-    crate::env::set_var("JCODE_HOME", dir.path());
+    let prev_jcode_home = std::env::var_os("NEXT_CODE_HOME");
+    crate::env::set_var("NEXT_CODE_HOME", dir.path());
 
     // Ensure no env token is present, otherwise the gate short-circuits to
     // "allowed" regardless of the saved record.
@@ -593,9 +593,9 @@ fn live_verify_failure_record_blocks_auto_use() -> Result<()> {
         }
     }
     if let Some(prev) = prev_jcode_home {
-        crate::env::set_var("JCODE_HOME", prev);
+        crate::env::set_var("NEXT_CODE_HOME", prev);
     } else {
-        crate::env::remove_var("JCODE_HOME");
+        crate::env::remove_var("NEXT_CODE_HOME");
     }
     Ok(())
 }

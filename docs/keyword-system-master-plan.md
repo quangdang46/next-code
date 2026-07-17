@@ -4,7 +4,7 @@
 
 ## Context
 
-jcode has `$<name>` skill invocation but no natural language keyword detection or workflow orchestration. This plan adds:
+next-code has `$<name>` skill invocation but no natural language keyword detection or workflow orchestration. This plan adds:
 1. **Keyword detection** — NL triggers with sanitization, intent disambiguation, multilingual
 2. **Workflow handlers** — full execution logic for each keyword (spawn agents, enforce rules, aggregate results)
 3. **Mode state** — persistent across turns and session restarts
@@ -18,10 +18,10 @@ jcode has `$<name>` skill invocation but no natural language keyword detection o
 
 ## Architecture
 
-### Crate: `jcode-keywords`
+### Crate: `next-code-keywords`
 
 ```
-crates/jcode-keywords/
+crates/next-code-keywords/
 ├── Cargo.toml
 └── src/
     ├── lib.rs                  # public API
@@ -61,7 +61,7 @@ User types message
   → prompting.rs: build_system_prompt_split()
       → keyword detector runs on latest user message
       → for each matched keyword:
-          → activate mode (persist to .jcode/state/modes.toml)
+          → activate mode (persist to .next-code/state/modes.toml)
           → build mode-specific prompt injection
           → if workflow handler needed → spawn workflow
       → append to dynamic_part
@@ -776,7 +776,7 @@ fn handle_cancel(state: &mut ModeStateStore, session_id: &str) {
 
 ## Part 3: Mode State Persistence
 
-### File: `.jcode/state/modes.toml`
+### File: `.next-code/state/modes.toml`
 
 ```toml
 [active_modes.ultrawork]
@@ -802,8 +802,8 @@ workflow_state = '{ "round": 1, "ambiguity_score": 45 }'
 pub struct ModeStateStore { ... }
 
 impl ModeStateStore {
-    pub fn load() -> Result<Self>;           // Load from .jcode/state/modes.toml
-    pub fn save(&self) -> Result<()>;        // Save to .jcode/state/modes.toml
+    pub fn load() -> Result<Self>;           // Load from .next-code/state/modes.toml
+    pub fn save(&self) -> Result<()>;        // Save to .next-code/state/modes.toml
     pub fn activate(&mut self, skill: &str, ctx: &WorkflowContext);
     pub fn deactivate(&mut self, skill: &str);
     pub fn clear_all(&mut self);
@@ -881,7 +881,7 @@ Show active modes in the TUI info widget:
 
 ## Part 5: Config
 
-### `.jcode/config.json`
+### `.next-code/config.json`
 
 ```json
 {
@@ -907,7 +907,7 @@ Show active modes in the TUI info widget:
 ## Part 6: Implementation Order
 
 ### Phase 1: Detection Engine
-1. Create `jcode-keywords` crate
+1. Create `next-code-keywords` crate
 2. `registry.rs` — all 50+ keyword entries
 3. `sanitizer.rs` — code blocks, URLs, quotes, system echoes
 4. `detector.rs` — matching engine
@@ -958,21 +958,21 @@ Show active modes in the TUI info widget:
 
 | File | Change |
 |------|--------|
-| `Cargo.toml` | Add `jcode-keywords` workspace member |
-| `crates/jcode-keywords/` | **NEW** — 20+ files |
-| `crates/jcode-app-core/src/agent/prompting.rs` | Keyword detection + prompt injection |
-| `crates/jcode-app-core/src/agent/turn_loops.rs` | Pass user message to detector |
-| `crates/jcode-tui/src/tui/app/input.rs` | Rainbow + shimmer effects |
-| `crates/jcode-tui/src/tui/app/state_ui_input_helpers.rs` | Cancel command |
-| `crates/jcode-tui/src/tui/info_widget.rs` | Active modes display |
-| `crates/jcode-config-types/src/lib.rs` | KeywordsConfig |
-| `crates/jcode-base/src/config.rs` | Load keywords config |
+| `Cargo.toml` | Add `next-code-keywords` workspace member |
+| `crates/next-code-keywords/` | **NEW** — 20+ files |
+| `crates/next-code-app-core/src/agent/prompting.rs` | Keyword detection + prompt injection |
+| `crates/next-code-app-core/src/agent/turn_loops.rs` | Pass user message to detector |
+| `crates/next-code-tui/src/tui/app/input.rs` | Rainbow + shimmer effects |
+| `crates/next-code-tui/src/tui/app/state_ui_input_helpers.rs` | Cancel command |
+| `crates/next-code-tui/src/tui/info_widget.rs` | Active modes display |
+| `crates/next-code-config-types/src/lib.rs` | KeywordsConfig |
+| `crates/next-code-base/src/config.rs` | Load keywords config |
 
 ## Verification
 
-1. `cargo check -p jcode-keywords` — compiles
-2. `cargo test -p jcode-keywords` — unit tests pass
-3. `cargo test -p jcode-app-core` — integration tests pass
+1. `cargo check -p next-code-keywords` — compiles
+2. `cargo test -p next-code-keywords` — unit tests pass
+3. `cargo test -p next-code-app-core` — integration tests pass
 4. Manual: "run ultrawork" → mode activates, parallel agents spawn
 5. Manual: "what is ultrawork?" → no activation (informational)
 6. Manual: "fix typo" → heavy modes suppressed (small task)
@@ -1121,8 +1121,8 @@ fn match_ai_slop_cleaner(text: &str) -> bool {
 // System echo stripping — prevent self-reinforcing loops
 fn strip_system_echoes(text: &str) -> String {
     // Remove previously injected mode banners
-    // Pattern: [SYSTEM DIRECTIVE: JCODE - MODE_NAME ...]
-    let re = Regex::new(r"\[SYSTEM DIRECTIVE: JCODE[^\]]*\]").unwrap();
+    // Pattern: [SYSTEM DIRECTIVE: NEXT_CODE - MODE_NAME ...]
+    let re = Regex::new(r"\[SYSTEM DIRECTIVE: NEXT_CODE[^\]]*\]").unwrap();
     re.replace_all(text, "").to_string()
 }
 
@@ -1654,7 +1654,7 @@ Report: patterns found, fixes applied, lines saved.
 ### 8.14 Cancel — No Prompt Injection
 
 Cancel does NOT inject a prompt. It:
-1. Clears all active mode states in `.jcode/state/modes.toml`
+1. Clears all active mode states in `.next-code/state/modes.toml`
 2. Cancels running background tasks for the session
 3. Shows toast: "All modes cancelled"
 4. Returns to normal mode
@@ -2007,7 +2007,7 @@ enum RalplanStatus {
 
 ---
 
-## Part 10: Integration with Existing jcode Tools
+## Part 10: Integration with Existing next-code Tools
 
 ### 10.1 Tool Usage Per Workflow
 
@@ -2144,7 +2144,7 @@ Mode active for > 2 hours without activity
 ### 12.9 Session Restart with Active Modes
 
 ```
-Mode persisted in .jcode/state/modes.toml, session restarted
+Mode persisted in .next-code/state/modes.toml, session restarted
 ```
 **Resolution:** Load state on startup. If stale (>2h), deactivate. If fresh, continue.
 
@@ -2159,7 +2159,7 @@ User: "run ultrawork" then "run deep-interview"
 
 ## Part 13: Full File List
 
-### New Files (crates/jcode-keywords/)
+### New Files (crates/next-code-keywords/)
 
 | File | Lines (est.) | Purpose |
 |------|-------------|---------|
@@ -2197,13 +2197,13 @@ User: "run ultrawork" then "run deep-interview"
 | File | Change | Lines (est.) |
 |------|--------|-------------|
 | `Cargo.toml` | Add workspace member | 2 |
-| `crates/jcode-app-core/src/agent/prompting.rs` | Keyword detection + injection | 80 |
-| `crates/jcode-app-core/src/agent/turn_loops.rs` | Pass message to detector | 20 |
-| `crates/jcode-tui/src/tui/app/input.rs` | Rainbow + shimmer | 150 |
-| `crates/jcode-tui/src/tui/app/state_ui_input_helpers.rs` | Cancel command | 30 |
-| `crates/jcode-tui/src/tui/info_widget.rs` | Mode indicator | 50 |
-| `crates/jcode-config-types/src/lib.rs` | KeywordsConfig | 30 |
-| `crates/jcode-base/src/config.rs` | Load config | 20 |
+| `crates/next-code-app-core/src/agent/prompting.rs` | Keyword detection + injection | 80 |
+| `crates/next-code-app-core/src/agent/turn_loops.rs` | Pass message to detector | 20 |
+| `crates/next-code-tui/src/tui/app/input.rs` | Rainbow + shimmer | 150 |
+| `crates/next-code-tui/src/tui/app/state_ui_input_helpers.rs` | Cancel command | 30 |
+| `crates/next-code-tui/src/tui/info_widget.rs` | Mode indicator | 50 |
+| `crates/next-code-config-types/src/lib.rs` | KeywordsConfig | 30 |
+| `crates/next-code-base/src/config.rs` | Load config | 20 |
 | **Total** | | **~380** |
 
 ### Grand Total: ~6,080 lines of new/modified code

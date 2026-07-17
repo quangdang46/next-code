@@ -6,7 +6,7 @@ pub(super) enum PickerInitMode {
     Probe,
 }
 
-/// Terminal multiplexers / agent-multiplexers that sit between jcode and the
+/// Terminal multiplexers / agent-multiplexers that sit between Next Code and the
 /// real outer terminal. Inside any of these the outer terminal's identity env
 /// vars (TERM_PROGRAM, KITTY_WINDOW_ID, ...) are masked or rewritten, so
 /// env-based protocol detection cannot see whether the outer terminal supports
@@ -40,7 +40,7 @@ fn env_is_set(value: Option<&str>) -> bool {
     value.map(|v| !v.trim().is_empty()).unwrap_or(false)
 }
 
-/// Detect whether jcode is running inside a known multiplexer, using the same
+/// Detect whether Next Code is running inside a known multiplexer, using the same
 /// signals the multiplexers themselves expose to child processes.
 pub(super) fn detect_multiplexer(
     term: Option<&str>,
@@ -90,7 +90,7 @@ fn parse_env_bool(raw: &str) -> Option<bool> {
 
 /// Decide how to initialize the picker.
 ///
-/// * `probe_override` is the parsed value of `JCODE_MERMAID_PICKER_PROBE`
+/// * `probe_override` is the parsed value of `NEXT_CODE_MERMAID_PICKER_PROBE` (legacy `JCODE_MERMAID_PICKER_PROBE`)
 ///   (`Some(true)`/`Some(false)` when set explicitly, `None` otherwise) and
 ///   always wins so users can force either behavior.
 /// * When the override is absent, startup stays on the environment-based fast
@@ -98,7 +98,7 @@ fn parse_env_bool(raw: &str) -> Option<bool> {
 ///   does not answer, which made an optional image capability dominate the TUI
 ///   critical path. Users behind multiplexers that hide the outer terminal can
 ///   still opt into the authoritative probe with
-///   `JCODE_MERMAID_PICKER_PROBE=1`.
+///   `NEXT_CODE_MERMAID_PICKER_PROBE=1` (legacy `JCODE_MERMAID_PICKER_PROBE=1`).
 pub(super) fn decide_picker_init_mode(
     probe_override: Option<bool>,
     _env_protocol: Option<ProtocolType>,
@@ -111,7 +111,7 @@ pub(super) fn decide_picker_init_mode(
     }
 }
 
-/// Parse only the explicit `JCODE_MERMAID_PICKER_PROBE` override into a mode,
+/// Parse only the explicit `NEXT_CODE_MERMAID_PICKER_PROBE` (or legacy `JCODE_…`) override into a mode,
 /// ignoring env/multiplexer detection. `Some(true)` probes; unset or any other
 /// value keeps the historical fast default. Used for the force-on/off path and
 /// as a focused unit-test seam.
@@ -244,7 +244,7 @@ fn probe_picker() -> Picker {
 pub(crate) fn prewarm_svg_font_db_async() {
     SVG_FONT_DB_PREWARM_STARTED.get_or_init(|| {
         let _ = std::thread::Builder::new()
-            .name("jcode-mermaid-fontdb-prewarm".to_string())
+            .name("next-code-mermaid-fontdb-prewarm".to_string())
             .spawn(|| {
                 let _ = &*SVG_FONT_DB;
             });
@@ -252,8 +252,8 @@ pub(crate) fn prewarm_svg_font_db_async() {
 }
 
 /// Initialize the global picker.
-/// By default jcode uses environment-based detection and never blocks startup
-/// on terminal capability responses. Set JCODE_MERMAID_PICKER_PROBE=1 to run an
+/// By default Next Code uses environment-based detection and never blocks startup
+/// on terminal capability responses. Set NEXT_CODE_MERMAID_PICKER_PROBE=1 (or legacy JCODE_MERMAID_PICKER_PROBE=1) to run an
 /// authoritative stdio probe when a multiplexer masks the outer terminal, or
 /// =0 to explicitly retain the fast path. Also triggers cache eviction on first
 /// call.
@@ -266,7 +266,8 @@ pub fn init_picker() {
             std::env::var("KITTY_WINDOW_ID").ok().as_deref(),
         );
         let multiplexer = detect_multiplexer_from_env();
-        let probe_override = std::env::var("JCODE_MERMAID_PICKER_PROBE")
+        let probe_override = std::env::var("NEXT_CODE_MERMAID_PICKER_PROBE")
+            .or_else(|_| std::env::var("JCODE_MERMAID_PICKER_PROBE"))
             .ok()
             .as_deref()
             .and_then(parse_env_bool);

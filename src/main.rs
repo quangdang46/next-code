@@ -36,7 +36,7 @@ fn configure_system_allocator() {
     const M_ARENA_MAX: i32 = -8;
     const M_MMAP_THRESHOLD: i32 = -3;
 
-    let arena_max = parse_alloc_tuning_env("JCODE_GLIBC_ARENA_MAX", 4);
+    let arena_max = parse_alloc_tuning_env("NEXT_CODE_GLIBC_ARENA_MAX", 4);
     let _ = unsafe { mallopt(M_ARENA_MAX, arena_max) };
 
     // Pin the mmap threshold so large transient allocations (history JSON,
@@ -51,7 +51,7 @@ fn configure_system_allocator() {
     // alloc/free cycles (mmap/munmap syscalls + page faults each time) for
     // predictable, immediate memory return. For a long-running interactive
     // agent, lower steady-state RSS wins.
-    let mmap_threshold = parse_alloc_tuning_env("JCODE_GLIBC_MMAP_THRESHOLD", 256 * 1024);
+    let mmap_threshold = parse_alloc_tuning_env("NEXT_CODE_GLIBC_MMAP_THRESHOLD", 256 * 1024);
     let _ = unsafe { mallopt(M_MMAP_THRESHOLD, mmap_threshold) };
 }
 
@@ -80,11 +80,11 @@ fn main() -> Result<()> {
     // Unix environments where most development happens. The CLI/provider setup
     // path can exceed that reserve before Tokio takes over, producing an
     // unrecoverable STATUS_STACK_OVERFLOW. Keep the linker defaults unchanged
-    // for every auxiliary binary and run the Jcode entry point on a deliberately
+    // for every auxiliary binary and run the Next Code entry point on a deliberately
     // sized stack instead.
     const WINDOWS_MAIN_STACK_SIZE: usize = 8 * 1024 * 1024;
     match std::thread::Builder::new()
-        .name("jcode-main".to_string())
+        .name("next-code-main".to_string())
         .stack_size(WINDOWS_MAIN_STACK_SIZE)
         .spawn(run_main)?
         .join()
@@ -103,7 +103,7 @@ fn run_main() -> Result<()> {
     // Log panics before abort so we can diagnose OOM / SIGKILL causes.
     let orig_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        eprintln!("\n\x1b[31m*** jcode PANIC ***\x1b[0m {}", info);
+        eprintln!("\n\x1b[31m*** next-code PANIC ***\x1b[0m {}", info);
         if let Ok(next_code_dir) = next_code::storage::next_code_dir() {
             let panic_log = next_code_dir.join("panic.log");
             let msg = format!("{}: {}\n", chrono::Utc::now().to_rfc3339(), info);
@@ -118,7 +118,7 @@ fn run_main() -> Result<()> {
     }
 
     // SessionStart hooks should be effectively invisible to Claude Code and
-    // Codex. Handle this tiny callback before the Tokio runtime and normal Jcode
+    // Codex. Handle this tiny callback before the Tokio runtime and normal Next Code
     // startup path so it does not initialize providers, start cleanup threads,
     // check for updates, or emit first-run telemetry disclosure text into the
     // parent CLI's hook output.
@@ -142,7 +142,7 @@ fn run_main() -> Result<()> {
     runtime.block_on(async { next_code::run().await })
 }
 
-/// True when invoked as `jcode setup-hotkey --listen-macos-hotkey`.
+/// True when invoked as `next-code setup-hotkey --listen-macos-hotkey`.
 fn is_macos_hotkey_listener_invocation() -> bool {
     args_are_macos_hotkey_listener(std::env::args().skip(1))
 }
