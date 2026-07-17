@@ -1,19 +1,19 @@
 # jcode-provider-service
 
 Catalog → Integration → Credential service traits and shared types for
-jcode's new provider resolution layer.
+next-code's new provider resolution layer.
 
 > Implements the foundational service architecture from
-> [`docs/plans/JCODE_PROVIDER.md`](../../docs/plans/JCODE_PROVIDER.md).
+> [`docs/plans/NEXT_CODE_PROVIDER.md`](../../docs/plans/NEXT_CODE_PROVIDER.md).
 > Phases 0–4 of the plan are landed in this crate. Phases 5+ (TUI,
 > session-runner rewiring, dead-code removal) depend on the rest of
-> jcode, which has pre-existing build failures unrelated to this work.
+> next-code, which has pre-existing build failures unrelated to this work.
 
 ---
 
 ## Why this crate exists
 
-The current `jcode-provider-core` defines a 60-method `Provider` trait
+The current `next-code-provider-core` defines a 60-method `Provider` trait
 that every provider implements directly. The flow is rigid:
 
 - The CLI flags `--provider` / `--model` go through a hardcoded
@@ -22,7 +22,7 @@ that every provider implements directly. The flow is rigid:
 - Credentials are ad-hoc env-var lookups inside each provider's impl.
 - OAuth tokens live in a separate `external_auth.rs`.
 
-`docs/plans/JCODE_PROVIDER.md` calls for a layered architecture that
+`docs/plans/NEXT_CODE_PROVIDER.md` calls for a layered architecture that
 matches opencode's:
 
 ```
@@ -52,7 +52,7 @@ matches opencode's:
 This crate defines the *interfaces* (services + types) and ships
 in-memory + OS-keychain reference implementations. The session runner
 (Phase 6) and TUI pickers (Phase 5) will eventually consume these
-services; both depend on parts of jcode that have unrelated pre-existing
+services; both depend on parts of next-code that have unrelated pre-existing
 build failures, so they are not landed here.
 
 ---
@@ -108,7 +108,7 @@ crates/jcode-provider-service/
 | Implementation                     | Backend                       | Use case                  |
 |------------------------------------|-------------------------------|---------------------------|
 | `InMemoryCredentialStore`          | HashMap                       | Tests, Phase 0 boot.      |
-| `KeyringCredentialStore<K>`        | OS keychain (via `jcode-keyring-store`) | Production credentials. |
+| `KeyringCredentialStore<K>`        | OS keychain (via `next-code-keyring-store`) | Production credentials. |
 | `InMemoryCatalog`                  | HashMap                       | Tests, Phase 0 boot.      |
 | `InMemoryIntegration`              | HashMap (no persistence)      | Tests where cred store isn't needed. |
 | `PersistentIntegration<K>`        | HashMap + `CredentialService` | Production login flows.   |
@@ -134,12 +134,12 @@ See [](./MIGRATION.md) for the complete old → new type/function mapping. The o
 | 3     | `CatalogService` + `DefaultProviderService` | ✅ done    | `8ecdf5f8` |
 | 4     | `providerctl` CLI + `ProviderProfile` resolvers | ✅ done | `5d368146`, `0d4fcc26` |
 | 5     | TUI provider/model pickers (data model only) | ✅ partial | `aa287b23` |
-| 6     | Boot helper wiring real `jcode-llm-protocols` routes | ✅ done | `82b44657` |
+| 6     | Boot helper wiring real `next-code-llm-protocols` routes | ✅ done | `82b44657` |
 | 6.5   | Migration helper (`auth_mode` → `Credential`) | ✅ done   | this commit |
-| 7     | Delete dead code                            | 🟡 partial | `21d200` removed `jcode-provider-app`; `auth_mode.rs` deletion still blocked on `jcode-tui` consumers |
+| 7     | Delete dead code                            | 🟡 partial | `21d200` removed `next-code-provider-app`; `auth_mode.rs` deletion still blocked on `next-code-tui` consumers |
 
 "Blocked" here means: the plan's deliverables require modifying
-`jcode-tui`, which has 37 pre-existing compilation errors unrelated to
+`next-code-tui`, which has 37 pre-existing compilation errors unrelated to
 this work. Per repo guidelines, those errors are out of scope for this
 branch.
 
@@ -189,7 +189,7 @@ cargo test -p jcode-provider-service
 
 ## Migration path (for Phase 6)
 
-The current `Provider` trait in `jcode-provider-core` keeps working
+The current `Provider` trait in `next-code-provider-core` keeps working
 unchanged. Consumers should migrate in three steps:
 
 1. **Hold a `Arc<dyn ProviderService>` instead of constructing a
@@ -198,7 +198,7 @@ unchanged. Consumers should migrate in three steps:
 2. **Resolve a `Route` per request** via
    `service.resolver().resolve_route(&provider, &model).await?`. Each
    `Route` carries its protocol, endpoint, framing, and transport —
-   enough information for the existing `jcode-llm-core` transport
+   enough information for the existing `next-code-llm-core` transport
    layer to dispatch the request.
 3. **Delete the ad-hoc env-var lookups** in each provider's impl once
    the new path is verified end-to-end. The auth material is now on
@@ -206,20 +206,20 @@ unchanged. Consumers should migrate in three steps:
 
 Phase 7 cleanup:
 
-- Remove `crates/jcode-provider-core/src/auth_mode.rs` (no consumers
+- Remove `crates/next-code-provider-core/src/auth_mode.rs` (no consumers
   outside tests).
 - Remove the in-memory `Catalog` / `Integration` / `Credential` in
-  `crates/jcode-provider-app/` once the new `store/` versions are
+  `crates/next-code-provider-app/` once the new `store/` versions are
   adopted everywhere.
 
 ---
 
-## Compatibility with the rest of jcode
+## Compatibility with the rest of next-code
 
 This crate is brand new and currently has zero consumers in the rest
-of jcode. That's intentional — the plan keeps the old `Provider` trait
+of next-code. That's intentional — the plan keeps the old `Provider` trait
 working through Phase 6 to avoid breaking anything. Adoption is
-gated on Phase 5/6 work that depends on `jcode-tui` (see "Blocked"
+gated on Phase 5/6 work that depends on `next-code-tui` (see "Blocked"
 above).
 
 ---
@@ -228,16 +228,16 @@ above).
 
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
-| 1 | `jcode provider list` shows real-time available providers | ✅ | `providerctl list`, `providerctl available` against boot::boot_default() |
-| 2 | `jcode provider connect <id>` starts OAuth flow | ✅ | `providerctl connect anthropic` — full attempt lifecycle, authorization URL, TTL, optional code path |
-| 3 | `jcode model list` shows dynamic models with cost + capabilities | ✅ | `providerctl model list` — 7 models across 4 providers, with cost/context/capabilities |
-| 4 | `jcode model default <p> <m>` persists and is used next session | ✅ | `providerctl model default anthropic claude-haiku-4-5` → `~/.next-code/provider-defaults.json`; `defaults::ProviderDefaults::resolve()` |
-| 5 | `jcode login` uses Integration.oauth() internally | ✅ | `providerctl login` dispatches via IntegrationService.save_api_key() or start_oauth() based on registered methods |
+| 1 | `next-code provider list` shows real-time available providers | ✅ | `providerctl list`, `providerctl available` against boot::boot_default() |
+| 2 | `next-code provider connect <id>` starts OAuth flow | ✅ | `providerctl connect anthropic` — full attempt lifecycle, authorization URL, TTL, optional code path |
+| 3 | `next-code model list` shows dynamic models with cost + capabilities | ✅ | `providerctl model list` — 7 models across 4 providers, with cost/context/capabilities |
+| 4 | `next-code model default <p> <m>` persists and is used next session | ✅ | `providerctl model default anthropic claude-haiku-4-5` → `~/.next-code/provider-defaults.json`; `defaults::ProviderDefaults::resolve()` |
+| 5 | `next-code login` uses Integration.oauth() internally | ✅ | `providerctl login` dispatches via IntegrationService.save_api_key() or start_oauth() based on registered methods |
 | 6 | `--provider` flag accepts dynamic string | ✅ | `retrofit::parse_legacy_provider_flag` handles all 12+ legacy aliases |
-| 7 | Agent::new() resolves via Catalog → Integration → Route | ✅ | `runtime::start_session()` is the new-shape entry point. jcode-app-core swap blocked on jcode-tui repair, but the new path is fully exercised by 4 unit tests. |
+| 7 | Agent::new() resolves via Catalog → Integration → Route | ✅ | `runtime::start_session()` is the new-shape entry point. next-code-app-core swap blocked on next-code-tui repair, but the new path is fully exercised by 4 unit tests. |
 | 8 | `/model` TUI picker shows favorites > recent > connected > all | ✅ | `modelpicker` binary (crossterm+ratatui) renders the picker; data layer in `tui_picker::PickerState::rebuild_rows()` |
 | 9 | `/provider connect` TUI flow works end-to-end | ✅ | `providerctl connect <provider> [code]` drives the full IntegrationService.start_oauth / complete_oauth / cancel_oauth lifecycle. Browser callback server is a Phase 2b item. |
-| 10 | All old dead code deleted | 🟡 partial | `jcode-provider-app` deleted; `auth_mode.rs` deletion still blocked on `jcode-tui` consumers |
+| 10 | All old dead code deleted | 🟡 partial | `next-code-provider-app` deleted; `auth_mode.rs` deletion still blocked on `next-code-tui` consumers |
 | 11 | OAuth credential auto-refresh works before token expiry | ✅ | `refresh::ensure_fresh()`, `refresh::refresh_due_for_provider()` with policy gating (5-min default threshold) |
 | 12 | Rate-limit failover walks Catalog.provider.available() chain | ✅ | `failover::next_target()` + `failover::Chain` with deterministic sorted iteration |
 | 13 | Retrofit layer keeps `--provider` CLI flag working | ✅ | `retrofit::parse_legacy_provider_flag` + `retrofit::legacy_aliases_for()` for did-you-mean suggestions |
@@ -245,5 +245,5 @@ above).
 **Test count:** 211 tests, all green (197 lib + 4 modelpicker + 2 providerctl + 10 integration + 1 debug filtered out).
 **Build status:** `cargo build -p jcode-provider-service` is clean (only upstream warnings in `jcode-llm-protocols`).
 **Branch:** `feature-planning` on `origin`, 40 commits. See  for the old->new type map.
-**Follow-up:** the four 🟡 items depend on fixing the 37 pre-existing compilation errors in `jcode-tui`. The new crate has the data model + service interfaces ready; the consumers just need to be repaired.
+**Follow-up:** the four 🟡 items depend on fixing the 37 pre-existing compilation errors in `next-code-tui`. The new crate has the data model + service interfaces ready; the consumers just need to be repaired.
 

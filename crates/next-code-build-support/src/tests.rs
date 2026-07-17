@@ -28,7 +28,7 @@ fn create_git_repo_fixture() -> tempfile::TempDir {
     std::fs::create_dir_all(temp.path().join(".git")).expect("create .git dir");
     std::fs::write(
         temp.path().join("Cargo.toml"),
-        "[package]\nname = \"jcode\"\nversion = \"0.0.0\"\n",
+        "[package]\nname = \"next-code\"\nversion = \"0.0.0\"\n",
     )
     .expect("write Cargo.toml");
     std::process::Command::new("git")
@@ -88,7 +88,7 @@ fn test_binary_version_hash_mismatch_rejects_publish_candidate() {
         git_hash: Some("oldhash".to_string()),
     };
 
-    let error = validate_binary_version_matches_source_report(&report, Path::new("jcode"), &source)
+    let error = validate_binary_version_matches_source_report(&report, Path::new("next-code"), &source)
         .expect_err("mismatched git hash should be rejected");
 
     assert!(
@@ -174,13 +174,13 @@ fn test_binary_choice_for_canary_session() {
 #[test]
 fn test_find_repo_in_ancestors_walks_upward() {
     let temp = tempfile::tempdir().expect("tempdir");
-    let repo = temp.path().join("jcode-repo");
+    let repo = temp.path().join("next-code-repo");
     let nested = repo.join("a").join("b").join("c");
 
     std::fs::create_dir_all(repo.join(".git")).expect("create .git");
     std::fs::write(
         repo.join("Cargo.toml"),
-        "[package]\nname = \"jcode\"\nversion = \"0.0.0\"\n",
+        "[package]\nname = \"next-code\"\nversion = \"0.0.0\"\n",
     )
     .expect("write Cargo.toml");
     std::fs::create_dir_all(&nested).expect("create nested dirs");
@@ -220,7 +220,7 @@ fn test_client_update_candidate_prefers_dev_binary_for_selfdev() {
 fn launcher_dir_uses_sandbox_bin_when_jcode_home_is_set() {
     with_temp_jcode_home(|| {
         let launcher_dir = launcher_dir().expect("launcher dir");
-        let expected = storage::next_code_dir().expect("jcode dir").join("bin");
+        let expected = storage::next_code_dir().expect("next-code dir").join("bin");
         assert_eq!(launcher_dir, expected);
     });
 }
@@ -236,7 +236,7 @@ fn update_launcher_symlink_stays_inside_sandbox_home() {
 
         let launcher = update_launcher_symlink_to_current().expect("update launcher");
         let expected_launcher = storage::next_code_dir()
-            .expect("jcode dir")
+            .expect("next-code dir")
             .join("bin")
             .join(binary_name());
         assert_eq!(launcher, expected_launcher);
@@ -558,7 +558,7 @@ fn simulate_stable_update_channel_swap(new_version: &str) {
 fn daemon_reload_target_version() -> Option<String> {
     let (candidate, _label) = shared_server_update_candidate(false)?;
     let canonical = std::fs::canonicalize(&candidate).unwrap_or(candidate);
-    // versions/<version>/jcode -> <version>
+    // versions/<version>/next-code -> <version>
     canonical
         .parent()
         .and_then(|p| p.file_name())
@@ -718,7 +718,7 @@ fn selfdev_reload_target_diverges_from_update_probe_when_shared_server_pinned() 
     });
 }
 
-/// Write a distinct, real binary into `versions/<version>/jcode` with an
+/// Write a distinct, real binary into `versions/<version>/next-code` with an
 /// explicit mtime so channel-repair mtime comparisons are deterministic
 /// (install_binary_at_version hard-links and would share an mtime).
 fn write_versioned_binary(version: &str, mtime: std::time::SystemTime) -> PathBuf {

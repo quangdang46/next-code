@@ -415,7 +415,7 @@ impl AuthLifecycleDriver {
             .clone()
             .or_else(|| activation.activated_model.clone());
         // Mirror the server's post-auth re-selection
-        // (`handle_notify_auth_changed`): once the live catalog lands, jcode
+        // (`handle_notify_auth_changed`): once the live catalog lands, next-code
         // switches to an accessible model returned by the live catalog when
         // the current model has no matching provider route (e.g. a static
         // profile default the live catalog no longer serves).
@@ -593,7 +593,7 @@ mod tests {
             .filter(|value| !value.is_empty())
             .map(|secret| LiveTestApiKey {
                 auth: next_code_base::live_tests::LiveVerificationAuth::from_secret(
-                    "env:JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY",
+                    "env:NEXT_CODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY",
                     Some("NEXT_CODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY"),
                     &secret,
                 ),
@@ -609,7 +609,7 @@ mod tests {
         {
             return Some(LiveTestApiKey {
                 auth: next_code_base::live_tests::LiveVerificationAuth::from_secret(
-                    "env:JCODE_AUTH_LIFECYCLE_OPENCODE_API_KEY",
+                    "env:NEXT_CODE_AUTH_LIFECYCLE_OPENCODE_API_KEY",
                     Some("NEXT_CODE_AUTH_LIFECYCLE_OPENCODE_API_KEY"),
                     &secret,
                 ),
@@ -1265,12 +1265,12 @@ mod tests {
     async fn cerebras_live_opt_in_catalog_lifecycle_uses_isolated_sandbox() {
         if !env_truthy("NEXT_CODE_AUTH_LIFECYCLE_LIVE") {
             eprintln!(
-                "skipping live Cerebras auth lifecycle test; set JCODE_AUTH_LIFECYCLE_LIVE=1 and JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY"
+                "skipping live Cerebras auth lifecycle test; set NEXT_CODE_AUTH_LIFECYCLE_LIVE=1 and NEXT_CODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY"
             );
             return;
         }
         let api_key = live_cerebras_api_key()
-            .expect("JCODE_AUTH_LIFECYCLE_LIVE=1 requires JCODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY");
+            .expect("NEXT_CODE_AUTH_LIFECYCLE_LIVE=1 requires NEXT_CODE_AUTH_LIFECYCLE_CEREBRAS_API_KEY");
 
         let spend_smoke = env_truthy("NEXT_CODE_AUTH_LIFECYCLE_SMOKE");
         let stream_smoke = env_truthy("NEXT_CODE_AUTH_LIFECYCLE_STREAM_SMOKE");
@@ -1486,12 +1486,12 @@ mod tests {
     async fn opencode_zen_live_opt_in_tool_call_smoke() {
         if !env_truthy("NEXT_CODE_OPENCODE_ZEN_LIVE_TOOL_TEST") {
             eprintln!(
-                "skipping live OpenCode Zen tool-call smoke; set JCODE_OPENCODE_ZEN_LIVE_TOOL_TEST=1 and provide OPENCODE_API_KEY"
+                "skipping live OpenCode Zen tool-call smoke; set NEXT_CODE_OPENCODE_ZEN_LIVE_TOOL_TEST=1 and provide OPENCODE_API_KEY"
             );
             return;
         }
         let api_key = live_opencode_zen_api_key().expect(
-            "JCODE_OPENCODE_ZEN_LIVE_TOOL_TEST=1 requires OPENCODE_API_KEY or JCODE_AUTH_LIFECYCLE_OPENCODE_API_KEY",
+            "NEXT_CODE_OPENCODE_ZEN_LIVE_TOOL_TEST=1 requires OPENCODE_API_KEY or NEXT_CODE_AUTH_LIFECYCLE_OPENCODE_API_KEY",
         );
         let model = product_env("OPENCODE_ZEN_LIVE_TOOL_MODEL")
             .ok()
@@ -1710,7 +1710,7 @@ mod tests {
             .filter(|value| !value.is_empty())
         else {
             eprintln!(
-                "skipping issue-driven live provider test; set JCODE_ISSUE_DRIVEN_LIVE_PROVIDER to an OpenAI-compatible profile id"
+                "skipping issue-driven live provider test; set NEXT_CODE_ISSUE_DRIVEN_LIVE_PROVIDER to an OpenAI-compatible profile id"
             );
             return;
         };
@@ -1719,7 +1719,7 @@ mod tests {
         let resolved = next_code_base::provider_catalog::resolve_openai_compatible_profile(profile);
         let api_key = live_openai_compatible_api_key(profile).unwrap_or_else(|| {
             panic!(
-                "JCODE_ISSUE_DRIVEN_LIVE_PROVIDER={} requires {} or {}",
+                "NEXT_CODE_ISSUE_DRIVEN_LIVE_PROVIDER={} requires {} or {}",
                 provider_id, resolved.api_key_env, resolved.env_file
             )
         });

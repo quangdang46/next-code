@@ -3,11 +3,11 @@ set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
-# Prefer next-code; fall back to legacy jcode during the rebrand window.
+# Prefer next-code; fall back to legacy next-code during the rebrand window.
 if [ -n "${NEXT_CODE_BIN:-}" ]; then
   NEXT_CODE_BIN="$NEXT_CODE_BIN"
 elif [ -n "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]; then
-  NEXT_CODE_BIN="$JCODE_BIN"
+  NEXT_CODE_BIN="$NEXT_CODE_BIN"
 elif [ -x "$HOME/.local/bin/next-code" ]; then
   NEXT_CODE_BIN="$HOME/.local/bin/next-code"
 elif [ -x "$HOME/.local/bin/next-code" ]; then
@@ -114,8 +114,8 @@ rpc_probe="$(curl -fsS --max-time 10 -X POST https://etc.rivet.link/ \
   --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}')"
 python -c 'import json,sys; assert json.loads(sys.argv[1]).get("result") == "0x3d"' "$rpc_probe"
 
-printf 'JCODE_PROGRESS {"percent":10,"message":"Local Discovery fixture ready"}\n'
-printf 'JCODE_PROGRESS {"percent":20,"message":"OpenRelay public RPC verified"}\n'
+printf 'NEXT_CODE_PROGRESS {"percent":10,"message":"Local Discovery fixture ready"}\n'
+printf 'NEXT_CODE_PROGRESS {"percent":20,"message":"OpenRelay public RPC verified"}\n'
 
 set +e
 NEXT_CODE_HOME="$test_home" \
@@ -134,7 +134,7 @@ NEXT_CODE_NO_TELEMETRY=1 \
 status=${PIPESTATUS[0]}
 set -e
 
-printf 'JCODE_PROGRESS {"percent":90,"message":"Validating agent trace"}\n'
+printf 'NEXT_CODE_PROGRESS {"percent":90,"message":"Validating agent trace"}\n'
 set +e
 python - "$OUTPUT" "$SERVER_LOG" <<'PY'
 import json
@@ -210,4 +210,4 @@ if [[ $validation_status -ne 0 ]]; then
   printf 'OpenRelay Discovery trace validation failed\n' >&2
   exit "$validation_status"
 fi
-printf 'JCODE_CHECKPOINT {"message":"OpenRelay Discovery test passed"}\n'
+printf 'NEXT_CODE_CHECKPOINT {"message":"OpenRelay Discovery test passed"}\n'

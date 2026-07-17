@@ -3,10 +3,10 @@ use next_code_message_types::{ContentBlock, Message, Role, ToolCall};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-/// Identifies a session to resume, across the agent backends jcode can import
+/// Identifies a session to resume, across the agent backends next-code can import
 /// from. This is pure data (only ids/paths) with no UI dependency; it lives in
-/// `jcode-session-types` so the foundation/import layer can match on it without
-/// depending on any `jcode-tui-*` crate. The session-picker UI re-exports it.
+/// `next-code-session-types` so the foundation/import layer can match on it without
+/// depending on any `next-code-tui-*` crate. The session-picker UI re-exports it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResumeTarget {
     JcodeSession {
@@ -966,11 +966,11 @@ mod session_search_tests {
             "/TMP/project"
         ));
         assert!(session_search_working_dir_matches(
-            "/workspace/jcode",
-            "jcode"
+            "/workspace/next-code",
+            "next-code"
         ));
         assert!(!session_search_working_dir_matches(
-            "/workspace/jcode",
+            "/workspace/next-code",
             "/workspace/other"
         ));
     }

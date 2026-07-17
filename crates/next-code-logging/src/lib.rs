@@ -1,4 +1,4 @@
-//! Logging infrastructure for jcode
+//! Logging infrastructure for next-code
 //!
 //! Logs to ~/.next-code/logs/ with automatic rotation
 //!
@@ -191,7 +191,7 @@ impl Logger {
 
         // Use date-based log file
         let date = Local::now().format("%Y-%m-%d");
-        let path = log_dir.join(format!("jcode-{}.log", date));
+        let path = log_dir.join(format!("next-code-{}.log", date));
 
         let file = OpenOptions::new()
             .create(true)
@@ -211,11 +211,11 @@ impl Logger {
         let message = next_code_redact::redact_secrets(message);
         let line = format!("[{}] [{}] {}{}\n", timestamp, level, ctx, message);
         if let Err(err) = self.file.write_all(line.as_bytes()) {
-            eprintln!("jcode logger write failed: {err}");
+            eprintln!("next-code logger write failed: {err}");
             return;
         }
         if let Err(err) = self.file.flush() {
-            eprintln!("jcode logger flush failed: {err}");
+            eprintln!("next-code logger flush failed: {err}");
         }
     }
 }
@@ -233,10 +233,10 @@ pub fn init() {
 
     // Prune stale daily log files once per process, off the startup path so
     // disk I/O never blocks launch. cleanup_old_logs is scoped to our own
-    // `jcode-*.log` files, so it is safe to run unconditionally.
+    // `next-code-*.log` files, so it is safe to run unconditionally.
     if !CLEANUP_STARTED.swap(true, Ordering::SeqCst) {
         std::thread::Builder::new()
-            .name("jcode-log-cleanup".to_string())
+            .name("next-code-log-cleanup".to_string())
             .spawn(cleanup_old_logs)
             .ok();
     }
@@ -293,7 +293,7 @@ pub fn truncate_for_log(value: &str, max_chars: usize) -> String {
     format!("{}… [{} chars total]", truncated, value.chars().count())
 }
 
-/// Log a debug message (only if JCODE_TRACE is set)
+/// Log a debug message (only if NEXT_CODE_TRACE is set)
 #[expect(
     clippy::collapsible_if,
     reason = "Debug logging keeps env gating and logger access explicit"
@@ -563,10 +563,10 @@ pub fn current_session() -> Option<String> {
 pub fn log_path() -> Option<PathBuf> {
     let log_dir = log_dir()?;
     let date = Local::now().format("%Y-%m-%d");
-    Some(log_dir.join(format!("jcode-{}.log", date)))
+    Some(log_dir.join(format!("next-code-{}.log", date)))
 }
 
-/// Remove daily `jcode-*.log` / `jcode-desktop-*.log` files older than 7 days.
+/// Remove daily `next-code-*.log` / `next-code-desktop-*.log` files older than 7 days.
 ///
 /// Scoped deliberately to the date-stamped log files this logger produces. The
 /// log directory also holds non-log data (e.g. `memory/`, `memory-events-*.jsonl`)
@@ -588,7 +588,7 @@ fn cleanup_old_logs_in(log_dir: &std::path::Path, now: chrono::DateTime<Local>) 
         // Only consider our own date-stamped log files.
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
-        let is_jcode_log = (name.starts_with("jcode-") || name.starts_with("jcode-desktop-"))
+        let is_jcode_log = (name.starts_with("next-code-") || name.starts_with("next-code-desktop-"))
             && name.ends_with(".log");
         if !is_jcode_log {
             continue;
@@ -602,7 +602,7 @@ fn cleanup_old_logs_in(log_dir: &std::path::Path, now: chrono::DateTime<Local>) 
             if modified < cutoff
                 && let Err(err) = fs::remove_file(entry.path())
             {
-                eprintln!("jcode logger cleanup failed: {err}");
+                eprintln!("next-code logger cleanup failed: {err}");
             }
         }
     }
@@ -744,7 +744,7 @@ mod tests {
         use std::time::{Duration, SystemTime};
 
         let dir = std::env::temp_dir().join(format!(
-            "jcode-log-cleanup-test-{}-{}",
+            "next-code-log-cleanup-test-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
@@ -766,10 +766,10 @@ mod tests {
         };
 
         // Old log files that SHOULD be deleted.
-        let old_log = write("jcode-2000-01-01.log", true);
-        let old_desktop = write("jcode-desktop-2000-01-01.log", true);
+        let old_log = write("next-code-2000-01-01.log", true);
+        let old_desktop = write("next-code-desktop-2000-01-01.log", true);
         // Recent log file that SHOULD survive.
-        let new_log = write("jcode-2099-01-01.log", false);
+        let new_log = write("next-code-2099-01-01.log", false);
         // Non-log data that SHOULD survive even though it is old.
         let old_memory = write("memory-events-2000-01-01.jsonl", true);
         let old_other = write("notes-2000-01-01.txt", true);
@@ -779,9 +779,9 @@ mod tests {
 
         cleanup_old_logs_in(&dir, Local::now());
 
-        assert!(!old_log.exists(), "old jcode log should be deleted");
+        assert!(!old_log.exists(), "old next-code log should be deleted");
         assert!(!old_desktop.exists(), "old desktop log should be deleted");
-        assert!(new_log.exists(), "recent jcode log must survive");
+        assert!(new_log.exists(), "recent next-code log must survive");
         assert!(old_memory.exists(), "memory-events jsonl must survive");
         assert!(old_other.exists(), "unrelated files must survive");
         assert!(subdir.is_dir(), "subdirectories must survive");

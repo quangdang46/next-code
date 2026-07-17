@@ -11,7 +11,7 @@ The canonical reference implementation is at `examples/plugins/hello-plugin/`.
 - [Quick Start](#quick-start)
 - [Package Structure](#package-structure)
 - [Manifest Format](#manifest-format)
-- [jcode API Reference](#jcode-api-reference)
+- [nextcode API Reference](#nextcode-api-reference)
 - [Lifecycle Events](#lifecycle-events)
 - [Capability Model](#capability-model)
 - [ToolTier Model](#tooltier-model)
@@ -37,7 +37,7 @@ cd ~/my-plugin
 next-code plugin load ./my-plugin
 ```
 
-On next start, next-code discovers the plugin, transpiles `index.ts` to JavaScript via SWC, evaluates it in a QuickJS sandbox, and injects the `jcode` global object.
+On next start, next-code discovers the plugin, transpiles `index.ts` to JavaScript via SWC, evaluates it in a QuickJS sandbox, and injects the `nextcode` global object (dual-read: also `jcode`).
 
 ### 3. Verify it loaded
 
@@ -52,11 +52,11 @@ You should see `file:hello-plugin` in the output.
 Edit `index.ts`:
 
 ```typescript
-jcode.on("SessionStart", function(event) {
-    jcode.logger.info("my-plugin: session started, id=" + event.sessionId);
+nextcode.on("SessionStart", function(event) {
+    nextcode.logger.info("my-plugin: session started, id=" + event.sessionId);
 });
 
-jcode.registerTool({
+nextcode.registerTool({
     name: "greet",
     description: "Return a friendly greeting",
 });
@@ -80,14 +80,14 @@ The entry file can also be `index.js` (plain JavaScript, no transpilation). Type
 
 ## Manifest Format
 
-Plugins declare identity, capabilities, and entry points in `package.json` under the `"jcode"` key.
+Plugins declare identity, capabilities, and entry points in `package.json` under the `"nextcode"` key (dual-read: legacy `"jcode"`).
 
 ```json
 {
   "name": "hello-plugin",
   "version": "0.1.0",
   "description": "An example next-code plugin",
-  "jcode": {
+  "next-code": {
     "name": "Hello Plugin",
     "package_name": "hello-plugin",
     "version": "0.1.0",
@@ -112,35 +112,35 @@ Plugins declare identity, capabilities, and entry points in `package.json` under
 | `license` | `string` | No | SPDX license identifier |
 | `tier` | `"read" \| "write" \| "exec"` | No | Default ToolTier for all tools in this plugin |
 | `capabilities` | `object` | No | Declared capabilities (see [Capability Model](#capability-model)) |
-| `engines` | `{ jcode?: string }` | No | Required next-code version range |
+| `engines` | `{ nextcode?: string }` | No | Required next-code version range |
 | `tags` | `string[]` | No | Categorization tags |
 
 The `package_name` field serves as a unique identity check: no two loaded plugins may share the same `package_name`. This prevents spoofing where a malicious plugin claims the identity of a trusted one.
 
 ---
 
-## jcode API Reference
+## nextcode API Reference
 
-All plugin APIs are available through the global `jcode` object, injected into the QuickJS sandbox by the runtime's `PluginApiBindings`. The object is also aliased as `__jcode_api` for internal use.
+All plugin APIs are available through the global `nextcode` object, injected into the QuickJS sandbox by the runtime's `PluginApiBindings`. The object is also aliased as `__nextcode_api` (dual-read: also `__jcode_api`).
 
-### `jcode.on(event, handler)`
+### `nextcode.on(event, handler)`
 
 ```typescript
-jcode.on(event: string, handler: (event: any) => void | HandlerResult): void
+nextcode.on(event: string, handler: (event: any) => void | HandlerResult): void
 ```
 
 Register an event handler. The handler receives an event object whose shape depends on the event type. See [Lifecycle Events](#lifecycle-events) for all events.
 
 ```typescript
-jcode.on("SessionStart", function(event) {
-    jcode.logger.info("session " + event.sessionId + " started");
+nextcode.on("SessionStart", function(event) {
+    nextcode.logger.info("session " + event.sessionId + " started");
 });
 ```
 
-### `jcode.registerTool(toolDef)`
+### `nextcode.registerTool(toolDef)`
 
 ```typescript
-jcode.registerTool(toolDef: {
+nextcode.registerTool(toolDef: {
     name: string;
     description: string;
     parameters?: JSONSchema;
@@ -151,7 +151,7 @@ jcode.registerTool(toolDef: {
 Register a custom tool that the LLM can invoke. The tool definition must have at minimum a `name` and `description`. Parameters follow JSON Schema format when provided.
 
 ```typescript
-jcode.registerTool({
+nextcode.registerTool({
     name: "hello",
     description: "Say hello and return a greeting",
 });
@@ -159,107 +159,107 @@ jcode.registerTool({
 
 Tool names should be prefixed with the plugin name to avoid collisions (e.g., `analytics_report`, not `report`).
 
-### `jcode.logger.*`
+### `nextcode.logger.*`
 
 ```typescript
-jcode.logger.info(message: string): void
-jcode.logger.warn(message: string): void
-jcode.logger.error(message: string): void
-jcode.logger.debug(message: string): void
+nextcode.logger.info(message: string): void
+nextcode.logger.warn(message: string): void
+nextcode.logger.error(message: string): void
+nextcode.logger.debug(message: string): void
 ```
 
 Structured logger backed by next-code's `tracing` crate. Messages appear in the next-code debug log at their respective levels. Enable with `RUST_LOG=next_code_plugin_runtime=debug` to see plugin log output.
 
 ```typescript
-jcode.logger.info("[my-plugin] Starting up");
-jcode.logger.warn("[my-plugin] Deprecated config key used");
-jcode.logger.error("[my-plugin] Failed to parse input");
-jcode.logger.debug("[my-plugin] Internal state: " + JSON.stringify(state));
+nextcode.logger.info("[my-plugin] Starting up");
+nextcode.logger.warn("[my-plugin] Deprecated config key used");
+nextcode.logger.error("[my-plugin] Failed to parse input");
+nextcode.logger.debug("[my-plugin] Internal state: " + JSON.stringify(state));
 ```
 
-### `jcode.kv.*`
+### `nextcode.kv.*`
 
 ```typescript
-jcode.kv.get(key: string): string
-jcode.kv.set(key: string, value: string): void
+next-code.kv.get(key: string): string
+next-code.kv.set(key: string, value: string): void
 ```
 
 Per-plugin durable key-value storage that persists across sessions. Values are strings; serialize objects with `JSON.stringify` / `JSON.parse`.
 
 ```typescript
-jcode.kv.set("hello-plugin:loaded-at", "test");
-var stored = jcode.kv.get("hello-plugin:loaded-at");
+next-code.kv.set("hello-plugin:loaded-at", "test");
+var stored = next-code.kv.get("hello-plugin:loaded-at");
 ```
 
-### `jcode.uuid()`
+### `nextcode.uuid()`
 
 ```typescript
-jcode.uuid(): string
+nextcode.uuid(): string
 ```
 
 Generate a UUID v4 string. Backed by the `uuid` crate.
 
 ```typescript
-var instanceUuid = jcode.uuid();
-jcode.logger.info("instance uuid = " + instanceUuid);
+var instanceUuid = nextcode.uuid();
+nextcode.logger.info("instance uuid = " + instanceUuid);
 ```
 
-### `jcode.sleep(ms)`
+### `nextcode.sleep(ms)`
 
 ```typescript
-jcode.sleep(ms: number): void
+nextcode.sleep(ms: number): void
 ```
 
 Block the sandbox thread for the given number of milliseconds. Hard-capped at 5000 ms (5 seconds) to prevent plugins from blocking the QuickJS thread indefinitely.
 
 ```typescript
-jcode.sleep(100); // wait 100 ms
+nextcode.sleep(100); // wait 100 ms
 ```
 
-### `jcode.cwd`
+### `nextcode.cwd`
 
 ```typescript
-jcode.cwd: string
+nextcode.cwd: string
 ```
 
 Read-only string containing the current working directory of the next-code process at the time the plugin was loaded.
 
 ```typescript
-jcode.logger.info("Working directory: " + jcode.cwd);
+nextcode.logger.info("Working directory: " + nextcode.cwd);
 ```
 
-### `jcode.getConfig(key)`
+### `nextcode.getConfig(key)`
 
 ```typescript
-jcode.getConfig(key: string): string
+next-code.getConfig(key: string): string
 ```
 
 Read a plugin configuration value from next-code's config system. Returns an empty string if the key is not set.
 
 ```typescript
-var apiKey = jcode.getConfig("my-plugin.apiKey");
+var apiKey = next-code.getConfig("my-plugin.apiKey");
 ```
 
-### `jcode.id`
+### `nextcode.id`
 
 ```typescript
-jcode.id: string
+next-code.id: string
 ```
 
 The plugin's unique identifier, derived from its `package_name`.
 
-### `jcode.name`
+### `nextcode.name`
 
 ```typescript
-jcode.name: string
+next-code.name: string
 ```
 
 The plugin's display name, derived from its manifest `name` field.
 
-### `jcode.version`
+### `nextcode.version`
 
 ```typescript
-jcode.version: string
+next-code.version: string
 ```
 
 The plugin's version string, derived from its manifest `version` field.
@@ -268,7 +268,7 @@ The plugin's version string, derived from its manifest `version` field.
 
 ## Lifecycle Events
 
-Events are dispatched to handlers registered via `jcode.on()`. The full set of supported event names, matched against the Rust `PluginEvent` enum in `next-code-plugin-core`:
+Events are dispatched to handlers registered via `nextcode.on()`. The full set of supported event names, matched against the Rust `PluginEvent` enum in `next-code-plugin-core`:
 
 | Category | Events | Description |
 |----------|--------|-------------|
@@ -438,7 +438,7 @@ Example capability declaration in `package.json`:
 
 ```json
 {
-  "jcode": {
+  "next-code": {
     "capabilities": {
       "fs_read": ["$HOME/.next-code/data"],
       "fs_write": ["$HOME/.next-code/data/my-plugin"],
@@ -481,7 +481,7 @@ The default tier for an undeclared tool is `Exec` (fail-closed). Plugin authors 
 
 ```json
 {
-  "jcode": {
+  "next-code": {
     "tier": "read",
     "approval": {
       "kind": "per_tool",
@@ -621,9 +621,9 @@ The canonical integration test pattern lives in `crates/next-code-plugin-runtime
 2. `PreflightAnalyzer::analyze` runs static analysis.
 3. `Transpiler::transpile` converts TypeScript to JavaScript via SWC.
 4. `RuntimeManager::create_sandbox` creates a QuickJS runtime.
-5. `PluginApiBindings::install` injects the `jcode` object.
+5. `PluginApiBindings::install` injects the `next-code` object.
 6. `SandboxContext::eval` runs the JavaScript.
-7. Plugin code calls `jcode.on(...)`, `jcode.registerTool(...)`, etc.
+7. Plugin code calls `nextcode.on(...)`, `nextcode.registerTool(...)`, etc.
 8. `RcuDispatcher::commit` finalizes handler registration.
 9. Assertions verify handlers and tools are registered.
 
@@ -681,14 +681,14 @@ Before distributing a plugin, verify each item:
 
 6. **Timeout awareness**: Handler execution is subject to timeouts (default 5000 ms for actionable events, 500 ms for informational events). Long-running operations should complete within these limits.
 
-7. **UUID uniqueness**: Use `jcode.uuid()` for identifier generation instead of rolling your own.
+7. **UUID uniqueness**: Use `nextcode.uuid()` for identifier generation instead of rolling your own.
 
-8. **Sleep cap**: `jcode.sleep()` is capped at 5000 ms. Do not rely on longer sleeps for timing logic.
+8. **Sleep cap**: `nextcode.sleep()` is capped at 5000 ms. Do not rely on longer sleeps for timing logic.
 
 9. **No eval**: The preflight analyzer catches `eval()` usage. Use regular function calls instead.
 
 10. **No require / import**: The QuickJS sandbox does not support CommonJS `require()` or dynamic `import()`. All code must be self-contained in the entry file.
 
-11. **Cross-plugin isolation**: Each plugin runs in its own QuickJS context. Plugins cannot access each other's globals or `jcode.kv` namespaces.
+11. **Cross-plugin isolation**: Each plugin runs in its own QuickJS context. Plugins cannot access each other's globals or `next-code.kv` namespaces.
 
 12. **Test the full pipeline**: Run `next-code plugin load ./my-plugin` and verify the plugin loads without warnings. Check `next-code plugin audit` after exercising the plugin's functionality.

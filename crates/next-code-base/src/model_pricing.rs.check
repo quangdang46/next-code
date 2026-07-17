@@ -182,10 +182,10 @@ pub fn schedule_refresh() {
     // JCODE_FORCE_PRICING_REFRESH=1 re-enables the fetch for manual e2e checks
     // (e.g. `cargo run --example pricing_e2e_check`, which builds with
     // test-support unified in).
-    let forced = std::env::var_os("JCODE_FORCE_PRICING_REFRESH").is_some();
+    let forced = std::env::var_os("NEXT_CODE_FORCE_PRICING_REFRESH").is_some();
     if !forced
         && (cfg!(any(test, feature = "test-support"))
-            || std::env::var_os("JCODE_DISABLE_PRICING_REFRESH").is_some())
+            || std::env::var_os("NEXT_CODE_DISABLE_PRICING_REFRESH").is_some())
     {
         return;
     }
@@ -371,8 +371,8 @@ mod tests {
     fn lookup_normalizes_model_ids() {
         let _guard = crate::storage::lock_test_env();
         let temp = tempfile::tempdir().expect("tempdir");
-        let prev_home = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         clear_memory_cache_for_tests();
 
         save_test_cache(&[
@@ -410,9 +410,9 @@ mod tests {
 
         clear_memory_cache_for_tests();
         if let Some(prev) = prev_home {
-            crate::env::set_var("JCODE_HOME", prev);
+            crate::env::set_var("NEXT_CODE_HOME", prev);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }

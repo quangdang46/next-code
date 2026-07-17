@@ -437,11 +437,11 @@ pub struct NamedProviderConfig {
     /// body sent to this provider. Lets users inject non-standard parameters
     /// some OpenAI-compatible backends require (e.g. NVIDIA NIM DeepSeek-V4
     /// needs `chat_template_kwargs = { thinking = true, reasoning_effort = "high" }`).
-    /// Must be a JSON object; keys here override jcode-generated body fields.
+    /// Must be a JSON object; keys here override next-code-generated body fields.
     #[serde(default, alias = "extra-body", skip_serializing_if = "Option::is_none")]
     pub extra_body: Option<serde_json::Value>,
     /// Whether this endpoint accepts the DeepSeek-style top-level
-    /// `reasoning_effort` request field (`/effort` support). When unset, jcode
+    /// `reasoning_effort` request field (`/effort` support). When unset, next-code
     /// auto-detects it from the active model id (DeepSeek-family models
     /// support it regardless of which gateway serves them). Set `false` to
     /// suppress auto-detection for strict-schema endpoints.
@@ -481,7 +481,7 @@ impl Default for NamedProviderConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct AuthConfig {
-    /// External auth source ids that the user has approved jcode to read/use.
+    /// External auth source ids that the user has approved next-code to read/use.
     pub trusted_external_sources: Vec<String>,
     /// Path-bound approvals for external auth sources managed by other tools.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -546,16 +546,16 @@ pub struct AgentsConfig {
     /// all-MiniLM-L6-v2 ONNX, default, no network) or `"openai"` (remote
     /// OpenAI/openai-compatible `/v1/embeddings`, opt-in, requires an
     /// `OPENAI_API_KEY`). A keyless `"openai"` setting silently degrades to
-    /// local. Env override: `JCODE_MEMORY_EMBEDDING_BACKEND`.
+    /// local. Env override: `NEXT_CODE_MEMORY_EMBEDDING_BACKEND`.
     #[serde(default = "default_memory_embedding_backend")]
     pub memory_embedding_backend: String,
     /// OpenAI embedding model name when `memory_embedding_backend = "openai"`.
-    /// Unset = `text-embedding-3-small`. Env: `JCODE_MEMORY_EMBEDDING_MODEL`.
+    /// Unset = `text-embedding-3-small`. Env: `NEXT_CODE_MEMORY_EMBEDDING_MODEL`.
     #[serde(default)]
     pub memory_embedding_model: Option<String>,
     /// Optional override for the embeddings API base URL (no trailing slash),
     /// for OpenAI-compatible gateways. Unset = `https://api.openai.com/v1`.
-    /// Env: `JCODE_MEMORY_EMBEDDING_BASE_URL`.
+    /// Env: `NEXT_CODE_MEMORY_EMBEDDING_BASE_URL`.
     #[serde(default)]
     pub memory_embedding_base_url: Option<String>,
     /// Optional override for the remote embedding dimensionality (vector-space
@@ -569,7 +569,7 @@ pub struct AgentsConfig {
     /// ceiling is still the per-swarm member cap. Light mode uses a small fixed
     /// fan-out instead. `0` means "no extra cap": run_plan dispatches the entire
     /// ready set every loop, bounded only by the member cap.
-    /// Env override: `JCODE_SWARM_MAX_CONCURRENT_AGENTS`.
+    /// Env override: `NEXT_CODE_SWARM_MAX_CONCURRENT_AGENTS`.
     #[serde(default = "default_swarm_max_concurrent_agents")]
     pub swarm_max_concurrent_agents: usize,
 }
@@ -694,51 +694,51 @@ pub struct TerminalConfig {
     /// External command that takes over headed session spawns (new terminal
     /// windows for swarm agents, resume-in-new-terminal, self-dev, restarts).
     ///
-    /// When set, jcode runs `<spawn_hook> <jcode-binary> <args...>` instead of
-    /// opening a terminal emulator itself, with `JCODE_SPAWN_*` metadata env
+    /// When set, next-code runs `<spawn_hook> <next-code-binary> <args...>` instead of
+    /// opening a terminal emulator itself, with `NEXT_CODE_SPAWN_*` metadata env
     /// vars describing the spawn (kind, session id, title, cwd, full command).
     /// This lets multiplexers and wrappers (tmux, kitty remote, zellij, herd
     /// runners, window managers) decide where and how the session appears.
     ///
     /// Example: `spawn_hook = "tmux new-window"` opens each headed spawn as a
-    /// tmux window in the current server. If the hook fails to launch, jcode
+    /// tmux window in the current server. If the hook fails to launch, next-code
     /// falls back to its built-in terminal detection.
     ///
-    /// Env override: `JCODE_SPAWN_HOOK` (set empty to disable a config hook).
+    /// Env override: `NEXT_CODE_SPAWN_HOOK` (set empty to disable a config hook).
     pub spawn_hook: Option<String>,
     /// External command used to focus/raise an existing session window.
     ///
-    /// When set, jcode runs the hook (instead of wmctrl/xdotool) whenever it
+    /// When set, next-code runs the hook (instead of wmctrl/xdotool) whenever it
     /// wants to bring a session's window to the foreground, with
-    /// `JCODE_FOCUS_SESSION_ID` and `JCODE_FOCUS_TITLE` env vars. Pair this
+    /// `NEXT_CODE_FOCUS_SESSION_ID` and `NEXT_CODE_FOCUS_TITLE` env vars. Pair this
     /// with `spawn_hook` so wrappers that own placement (tmux, kitty remote,
     /// herd) also own focus (e.g. `tmux select-window`, Wayland compositor
     /// IPC like `niri msg`).
     ///
-    /// Env override: `JCODE_FOCUS_HOOK` (set empty to disable a config hook).
+    /// Env override: `NEXT_CODE_FOCUS_HOOK` (set empty to disable a config hook).
     pub focus_hook: Option<String>,
     /// Terminal used by the macOS Cmd+; launch hotkey and in-app session spawns.
     ///
     /// One of: `ghostty`, `iterm2`, `wezterm`, `warp`, `alacritty`, `vscode`,
     /// `terminal` (Apple Terminal). When set, this is the source of truth for
-    /// which terminal jcode launches into and is preferred over the legacy
-    /// `~/.next-code/preferred_terminal.json` file. Re-run `jcode setup-hotkey`
+    /// which terminal next-code launches into and is preferred over the legacy
+    /// `~/.next-code/preferred_terminal.json` file. Re-run `next-code setup-hotkey`
     /// after changing it so the generated launcher script picks up the change.
     ///
     /// macOS only; ignored on other platforms.
     pub preferred: Option<String>,
 }
 
-/// Lifecycle hooks: external commands jcode runs at well-defined points.
+/// Lifecycle hooks: external commands next-code runs at well-defined points.
 ///
 /// Hook commands are parsed shell-style (quotes work) but executed directly,
-/// with `JCODE_HOOK_*` env vars describing the event (`JCODE_HOOK_EVENT`,
-/// `JCODE_HOOK_SESSION_ID`, `JCODE_HOOK_CWD`, event-specific fields, and a
-/// `JCODE_HOOK_PAYLOAD` JSON mirror). Hook processes get
-/// `JCODE_HOOKS_DISABLED=1` so nested jcode invocations don't recurse.
+/// with `NEXT_CODE_HOOK_*` env vars describing the event (`NEXT_CODE_HOOK_EVENT`,
+/// `NEXT_CODE_HOOK_SESSION_ID`, `NEXT_CODE_HOOK_CWD`, event-specific fields, and a
+/// `NEXT_CODE_HOOK_PAYLOAD` JSON mirror). Hook processes get
+/// `NEXT_CODE_HOOKS_DISABLED=1` so nested next-code invocations don't recurse.
 ///
 /// All hooks except `pre_tool` are observers: detached, fire-and-forget,
-/// failures only logged. `pre_tool` is a gate: jcode waits for it and exit
+/// failures only logged. `pre_tool` is a gate: next-code waits for it and exit
 /// code 2 blocks the tool call (stderr becomes the error shown to the model);
 /// exit 0 allows; anything else fails open.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -748,30 +748,30 @@ pub struct HooksConfig {
     /// before the model starts generating). Fires before the first `pre_tool`,
     /// so integrations can detect that the agent is actively working even while
     /// it is only thinking/streaming text. Fields: MODEL, SOURCE
-    /// ("chat"/"resume"/"ambient"). Env override: JCODE_HOOK_TURN_START.
+    /// ("chat"/"resume"/"ambient"). Env override: NEXT_CODE_HOOK_TURN_START.
     pub turn_start: Option<String>,
     /// Runs when an agent turn completes.
     /// Fields: STATUS ("ok"/"error"), DURATION_MS, MODEL, LAST_ASSISTANT_TEXT.
-    /// Env override: JCODE_HOOK_TURN_END.
+    /// Env override: NEXT_CODE_HOOK_TURN_END.
     pub turn_end: Option<String>,
     /// Runs when a session becomes active (created or resumed).
     /// Fields: SOURCE ("create"/"resume").
-    /// Env override: JCODE_HOOK_SESSION_START.
+    /// Env override: NEXT_CODE_HOOK_SESSION_START.
     pub session_start: Option<String>,
     /// Runs when a session closes normally.
-    /// Env override: JCODE_HOOK_SESSION_END.
+    /// Env override: NEXT_CODE_HOOK_SESSION_END.
     pub session_end: Option<String>,
     /// Gate hook before each tool call. Receives TOOL_NAME and the tool input
     /// JSON on stdin (also truncated in TOOL_INPUT). Exit 0 allows, exit 2
     /// blocks (stderr is fed back to the model), anything else fails open.
-    /// Env override: JCODE_HOOK_PRE_TOOL.
+    /// Env override: NEXT_CODE_HOOK_PRE_TOOL.
     pub pre_tool: Option<String>,
     /// Runs after each tool call completes.
     /// Fields: TOOL_NAME, STATUS ("ok"/"error"), DURATION_MS, OUTPUT_BYTES.
-    /// Env override: JCODE_HOOK_POST_TOOL.
+    /// Env override: NEXT_CODE_HOOK_POST_TOOL.
     pub post_tool: Option<String>,
     /// Max milliseconds to wait for the pre_tool gate before failing open
-    /// (default: 5000). Env override: JCODE_HOOK_PRE_TOOL_TIMEOUT_MS.
+    /// (default: 5000). Env override: NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS.
     pub pre_tool_timeout_ms: u64,
 }
 
@@ -813,7 +813,7 @@ pub struct AutoReviewConfig {
 pub struct SponsorsConfig {
     /// Enable tool partner discovery. Enabled by default; set to false to opt
     /// out. When false, no discovery categories are added to the prompt, the
-    /// `discover_tools` tool is not registered, and jcode never contacts the
+    /// `discover_tools` tool is not registered, and next-code never contacts the
     /// discovery endpoint.
     pub enabled: bool,
     /// Base URL of the discovery endpoint.
@@ -902,7 +902,7 @@ pub struct KeybindingsConfig {
     /// prompt, esc exits). Active only when `agents.swarm_spawn_mode = "inline"`
     /// and the session manages swarm agents.
     pub swarm_panel_focus: String,
-    /// Spawn a fresh jcode session in a new terminal window (default: unbound).
+    /// Spawn a fresh next-code session in a new terminal window (default: unbound).
     /// Example: "alt+enter".
     pub new_terminal: String,
     /// Open the `/resume` session picker (default: "cmd+b" on macOS, "alt+r"
@@ -1053,7 +1053,7 @@ pub struct DisplayConfig {
     pub keybinding_hints: bool,
     /// Color theme: "auto" (detect terminal background), "dark", or "light".
     /// Auto queries the terminal's background color (OSC 11) at startup and
-    /// adapts jcode's palette for light backgrounds. Default: auto.
+    /// adapts next-code's palette for light backgrounds. Default: auto.
     #[serde(default)]
     pub theme: String,
     /// Opt-in active sessions manager: pressing Left arrow on an empty input
@@ -1184,7 +1184,7 @@ pub enum WebSearchEngine {
     /// Bing search. Uses the Bing API when configured, otherwise Bing HTML search.
     Bing,
     /// SearXNG metasearch instance (JSON API). Requires `searxng_url` (or the
-    /// `JCODE_SEARXNG_URL` env var) to point at a SearXNG instance. Useful on
+    /// `NEXT_CODE_SEARXNG_URL` env var) to point at a SearXNG instance. Useful on
     /// hosts where DuckDuckGo/Bing block the request via TLS fingerprinting.
     Searxng,
 }
@@ -1267,7 +1267,7 @@ pub struct ProviderConfig {
     pub preserve_reasoning_context: bool,
     /// How to handle cross-provider failover when the same input would be resent elsewhere.
     pub cross_provider_failover: CrossProviderFailoverMode,
-    /// Whether jcode should automatically try another account on the same provider
+    /// Whether next-code should automatically try another account on the same provider
     /// before falling back to a different provider.
     pub same_provider_account_failover: bool,
     /// Copilot premium request mode: "normal", "one", or "zero"
@@ -1282,7 +1282,7 @@ pub struct ProviderConfig {
     /// Max seconds to wait for streaming data before timing out a request with
     /// no data received. Raise this for slow reasoning models (e.g. DeepSeek)
     /// that think silently for minutes before emitting tokens. Default: 180.
-    /// Overridable per-launch via `JCODE_STREAM_IDLE_TIMEOUT_SECS`.
+    /// Overridable per-launch via `NEXT_CODE_STREAM_IDLE_TIMEOUT_SECS`.
     pub stream_idle_timeout_secs: u64,
 }
 
@@ -1412,7 +1412,7 @@ pub struct SafetyConfig {
     pub email_smtp_port: u16,
     /// Email sender address
     pub email_from: Option<String>,
-    /// SMTP password (prefer JCODE_SMTP_PASSWORD env var)
+    /// SMTP password (prefer NEXT_CODE_SMTP_PASSWORD env var)
     pub email_password: Option<String>,
     /// IMAP host for receiving email replies (e.g. imap.gmail.com)
     pub email_imap_host: Option<String>,
@@ -1442,7 +1442,7 @@ pub struct SafetyConfig {
     pub jade_relay_enabled: bool,
     /// Jade relay API base URL (e.g. https://...lambda-url.us-east-1.on.aws/)
     pub jade_relay_api_base: Option<String>,
-    /// Jade relay bearer token (prefer JCODE_JADE_RELAY_TOKEN env var)
+    /// Jade relay bearer token (prefer NEXT_CODE_JADE_RELAY_TOKEN env var)
     pub jade_relay_token: Option<String>,
     /// Jade relay token id header (x-jade-token-id), used for fast token lookup
     pub jade_relay_token_id: Option<String>,
@@ -1522,10 +1522,10 @@ impl Default for GatewayConfig {
 #[serde(default)]
 pub struct PowerConfig {
     /// Prevent the machine from going to sleep (idle/lid suspend) while any
-    /// jcode session is actively streaming/processing. The display is still
+    /// next-code session is actively streaming/processing. The display is still
     /// allowed to sleep; only system suspend is inhibited. Default: true.
     ///
-    /// Honored by the shared `jcode serve` daemon. The `JCODE_DISABLE_POWER_INHIBIT`
+    /// Honored by the shared `next-code serve` daemon. The `NEXT_CODE_DISABLE_POWER_INHIBIT`
     /// environment variable forces this off regardless of the config value.
     pub prevent_sleep_while_streaming: bool,
 }
@@ -1538,19 +1538,19 @@ impl Default for PowerConfig {
     }
 }
 
-/// A single global launch hotkey: a chord plus the directory it opens jcode in.
+/// A single global launch hotkey: a chord plus the directory it opens next-code in.
 ///
 /// `dir` is usually an absolute path, but a few sentinels keep dynamic targets
 /// working without rewriting config on every launch:
 /// - `$HOME` -> the user's home directory.
-/// - `$LAST_DIR` -> the most recent non-home project directory jcode ran in.
-/// - `$LAST_REPO` -> the most recent jcode repo (for self-dev).
+/// - `$LAST_DIR` -> the most recent non-home project directory next-code ran in.
+/// - `$LAST_REPO` -> the most recent next-code repo (for self-dev).
 ///
 /// `self_dev = true` opens the directory as a self-dev session (passes the
 /// `self-dev` subcommand). `label` is an optional human name used in notices.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LaunchHotkeyEntry {
-    /// jcode-style chord string, e.g. `cmd+;`, `cmd+[`, `cmd+shift+'`.
+    /// next-code-style chord string, e.g. `cmd+;`, `cmd+[`, `cmd+shift+'`.
     pub chord: String,
     /// Directory to open (absolute path or a `$HOME`/`$LAST_DIR`/`$LAST_REPO`
     /// sentinel).
@@ -1563,9 +1563,9 @@ pub struct LaunchHotkeyEntry {
     pub self_dev: bool,
 }
 
-/// Configuration for the global "launch a new jcode" hotkeys (macOS).
+/// Configuration for the global "launch a new next-code" hotkeys (macOS).
 ///
-/// When `entries` is empty, jcode uses its built-in defaults (`Cmd+;` -> home,
+/// When `entries` is empty, next-code uses its built-in defaults (`Cmd+;` -> home,
 /// `Cmd+'` -> last project, `Cmd+Shift+'` -> self-dev). Auto-import can bake a
 /// richer, per-repo mapping here once: the top repo on `Cmd+;`, home on
 /// `Cmd+'`, and the next repos on `Cmd+[` / `Cmd+]` / `Cmd+\`. Once baked the

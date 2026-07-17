@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Run Terminal-Bench through Harbor with next-code using Opus 4.8.
 # Default route is OpenRouter (anthropic/claude-opus-4.8) since native Claude
-# OAuth may be unavailable. Override with JCODE_TB_MODEL / env vars.
+# OAuth may be unavailable. Override with NEXT_CODE_TB_MODEL / env vars.
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)

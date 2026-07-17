@@ -1,11 +1,11 @@
 //! Provider strict end-to-end diagnostic runner.
 //!
-//! This powers `jcode provider-doctor`: it walks the same strict provider/model
+//! This powers `next-code provider-doctor`: it walks the same strict provider/model
 //! checkpoints that the coverage ledger tracks, but as a user-facing diagnostic
 //! so anyone can answer "why is my provider/model or model picker broken?".
 //!
 //! Three tiers trade off safety vs. coverage:
-//! - [`DoctorTier::Offline`]: no API key, no network, no spend. Validates jcode's
+//! - [`DoctorTier::Offline`]: no API key, no network, no spend. Validates next-code's
 //!   own wiring (catalog reload, picker rendering, fallback labeling, model-switch
 //!   routing, auth-lifecycle transcript) against a synthetic catalog.
 //! - [`DoctorTier::Catalog`]: needs a key, ~no spend. Everything in offline plus the
@@ -42,7 +42,7 @@ use next_code_base::provider_catalog::OpenAiCompatibleProfile;
 /// How much of the strict pipeline to exercise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DoctorTier {
-    /// No key, no network, no spend. Validates jcode-side wiring only.
+    /// No key, no network, no spend. Validates next-code-side wiring only.
     Offline,
     /// Needs a key, negligible spend. Adds the live model catalog fetch.
     Catalog,
@@ -618,7 +618,7 @@ pub async fn run_claude_native_e2e(
     //
     // The `claude` login provider is specifically the OAuth/subscription path,
     // so pin OAuth mode before resolving: otherwise a self-dev session with
-    // `JCODE_RUNTIME_PROVIDER=claude-api` would silently test the API-key path
+    // `NEXT_CODE_RUNTIME_PROVIDER=claude-api` would silently test the API-key path
     // and mislabel the credential. Pinning also points any provider instances
     // the probes build afterwards at the same OAuth path.
     let provider_runtime = AnthropicProvider::new();
@@ -631,7 +631,7 @@ pub async fn run_claude_native_e2e(
             label_for(checkpoints::AUTH_CREDENTIAL_LOADED),
             format!(
                 "could not select the Claude OAuth credential path: {error}. \
-                 Run `jcode login --provider claude` to mint a fresh OAuth token."
+                 Run `next-code login --provider claude` to mint a fresh OAuth token."
             ),
         ));
         return Ok(finish_report(
@@ -681,7 +681,7 @@ pub async fn run_claude_native_e2e(
                     label_for(checkpoints::AUTH_CREDENTIAL_LOADED),
                     format!(
                         "could not resolve a Claude credential: {error}. \
-                         Run `jcode login --provider claude` to mint a fresh OAuth token."
+                         Run `next-code login --provider claude` to mint a fresh OAuth token."
                     ),
                 ));
                 return Ok(finish_report(
@@ -951,7 +951,7 @@ fn native_antigravity_wiring_contract() -> WiringContract {
 }
 
 /// Credential descriptor for the native Antigravity doctor. Antigravity uses
-/// Google OAuth tokens minted by `jcode login --provider antigravity`; the
+/// Google OAuth tokens minted by `next-code login --provider antigravity`; the
 /// tokens rotate and are never persisted here, so we record only the source
 /// (and the resolved Google account email when available) without a secret.
 fn native_antigravity_auth(account: &str) -> LiveVerificationAuth {
@@ -966,7 +966,7 @@ fn native_antigravity_auth(account: &str) -> LiveVerificationAuth {
 /// Pick the cheapest sensible Antigravity model from a catalog for a smoke run.
 ///
 /// Prefers a Gemini Flash tier (cheapest, and the backend's native path that
-/// accepts every schema construct jcode emits), then any Gemini model, then any
+/// accepts every schema construct next-code emits), then any Gemini model, then any
 /// available catalog model. Returns `None` when the catalog is empty, letting
 /// the caller fall back to the runtime default.
 fn cheapest_antigravity_model(catalog_models: &[String]) -> Option<String> {
@@ -1039,7 +1039,7 @@ pub async fn run_antigravity_native_e2e(
                     label_for(checkpoints::AUTH_CREDENTIAL_LOADED),
                     format!(
                         "could not resolve an Antigravity credential: {error}. \
-                         Run `jcode login --provider antigravity` to sign in."
+                         Run `next-code login --provider antigravity` to sign in."
                     ),
                 ));
                 return Ok(finish_report(
@@ -1331,7 +1331,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "OpenAI ChatGPT OAuth / API key via auth.json",
                 auth_env_key: None,
-                login_hint: "jcode login --provider openai",
+                login_hint: "next-code login --provider openai",
             },
             Self::Gemini => NativeProviderSpec {
                 provider_id: "gemini",
@@ -1345,7 +1345,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "Gemini Code Assist Google OAuth via gemini_oauth.json",
                 auth_env_key: None,
-                login_hint: "jcode login --provider gemini",
+                login_hint: "next-code login --provider gemini",
             },
             Self::Cursor => NativeProviderSpec {
                 provider_id: "cursor",
@@ -1359,7 +1359,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "Cursor API key / CLI session via auth.json",
                 auth_env_key: Some("CURSOR_API_KEY"),
-                login_hint: "jcode login --provider cursor",
+                login_hint: "next-code login --provider cursor",
             },
             Self::Copilot => NativeProviderSpec {
                 provider_id: "copilot",
@@ -1373,7 +1373,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "GitHub Copilot device-flow token via hosts.json",
                 auth_env_key: None,
-                login_hint: "jcode login --provider copilot",
+                login_hint: "next-code login --provider copilot",
             },
             Self::Bedrock => NativeProviderSpec {
                 provider_id: "bedrock",
@@ -1387,7 +1387,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "AWS Bedrock API key / AWS credentials",
                 auth_env_key: Some("AWS_BEARER_TOKEN_BEDROCK"),
-                login_hint: "jcode login --provider bedrock",
+                login_hint: "next-code login --provider bedrock",
             },
             Self::Jcode => NativeProviderSpec {
                 provider_id: "next-code",
@@ -1403,7 +1403,7 @@ impl NativeProviderKind {
                     expected_namespace: None,
                     switch_prefix: "openrouter:".to_string(),
                 },
-                auth_source: "Next Code subscription API key (JCODE_API_KEY)",
+                auth_source: "Next Code subscription API key (NEXT_CODE_API_KEY)",
                 auth_env_key: Some("NEXT_CODE_API_KEY"),
                 login_hint: "next-code login --provider next-code",
             },
@@ -1423,7 +1423,7 @@ impl NativeProviderKind {
                 },
                 auth_source: "Azure OpenAI API key / Entra ID (AZURE_OPENAI_*)",
                 auth_env_key: Some("AZURE_OPENAI_API_KEY"),
-                login_hint: "jcode login --provider azure",
+                login_hint: "next-code login --provider azure",
             },
         }
     }
@@ -1508,7 +1508,7 @@ impl NativeProviderKind {
         match self {
             Self::OpenAi => {
                 let credentials = next_code_base::auth::codex::load_credentials()
-                    .context("load OpenAI credentials (run `jcode login --provider openai`)")?;
+                    .context("load OpenAI credentials (run `next-code login --provider openai`)")?;
                 if credentials.access_token.trim().is_empty() {
                     anyhow::bail!("resolved an empty OpenAI access token");
                 }
@@ -1525,7 +1525,7 @@ impl NativeProviderKind {
             }
             Self::Cursor => {
                 let key = next_code_base::auth::cursor::load_api_key()
-                    .context("load Cursor credential (run `jcode login --provider cursor`)")?;
+                    .context("load Cursor credential (run `next-code login --provider cursor`)")?;
                 if key.trim().is_empty() {
                     anyhow::bail!("resolved an empty Cursor credential");
                 }
@@ -1533,7 +1533,7 @@ impl NativeProviderKind {
             }
             Self::Copilot => {
                 let token = next_code_base::auth::copilot::load_github_token()
-                    .context("load GitHub Copilot token (run `jcode login --provider copilot`)")?;
+                    .context("load GitHub Copilot token (run `next-code login --provider copilot`)")?;
                 if token.trim().is_empty() {
                     anyhow::bail!("resolved an empty GitHub Copilot token");
                 }
@@ -1551,7 +1551,7 @@ impl NativeProviderKind {
             Self::Jcode => {
                 if !next_code_base::subscription_catalog::has_credentials() {
                     anyhow::bail!(
-                        "no Next Code subscription credential found (set JCODE_API_KEY or run \
+                        "no Next Code subscription credential found (set NEXT_CODE_API_KEY or run \
                          `next-code login --provider next-code`)"
                     );
                 }
@@ -1561,7 +1561,7 @@ impl NativeProviderKind {
                 if !next_code_base::auth::azure::has_configuration() {
                     anyhow::bail!(
                         "Azure OpenAI is not fully configured (need AZURE_OPENAI_ENDPOINT plus an \
-                         API key or Entra ID); run `jcode login --provider azure`"
+                         API key or Entra ID); run `next-code login --provider azure`"
                     );
                 }
                 Ok(format!(
@@ -1609,13 +1609,13 @@ struct NativeProviderSpec {
     provider_id: &'static str,
     /// Human display label for messages and the report.
     label: &'static str,
-    /// jcode-side routing/activation contract for the wiring checkpoints.
+    /// next-code-side routing/activation contract for the wiring checkpoints.
     contract: WiringContract,
     /// Non-secret description of the credential source for the ledger.
     auth_source: &'static str,
     /// Env var to associate with the credential (for `non_secret`), if any.
     auth_env_key: Option<&'static str>,
-    /// `jcode login` hint surfaced when the credential cannot be resolved.
+    /// `next-code login` hint surfaced when the credential cannot be resolved.
     login_hint: &'static str,
 }
 
@@ -1928,13 +1928,13 @@ async fn run_generic_native_api_checks(
     );
 }
 
-/// The jcode-side wiring a given compat profile is expected to activate.
+/// The next-code-side wiring a given compat profile is expected to activate.
 ///
 /// Most OpenAI-compatible profiles route through the generic
 /// `openai-compatible` runtime with a per-profile catalog namespace and an
 /// `openai-compatible:<id>` api_method. A few profile ids deliberately collide
 /// with native login providers (`anthropic-api`→Anthropic, `openai-api`→OpenAI)
-/// and jcode remaps them to their native runtimes. The doctor must assert the
+/// and next-code remaps them to their native runtimes. The doctor must assert the
 /// *native* wiring for those, not the generic compat contract, or the routing
 /// checkpoints fail even though the live API works.
 struct WiringContract {
@@ -2420,7 +2420,7 @@ mod tests {
             ("cursor", NativeProviderKind::Cursor),
             ("copilot", NativeProviderKind::Copilot),
             ("bedrock", NativeProviderKind::Bedrock),
-            ("jcode", NativeProviderKind::Jcode),
+            ("next-code", NativeProviderKind::Jcode),
             ("next-code", NativeProviderKind::Jcode),
             ("azure-openai", NativeProviderKind::Azure),
         ] {

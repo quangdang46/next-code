@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::SystemTime;
 
-/// Get the jcode repository directory
+/// Get the next-code repository directory
 pub fn get_repo_dir() -> Option<PathBuf> {
     if let Ok(path) = product_env("REPO_DIR") {
         let path = PathBuf::from(path);
@@ -256,7 +256,7 @@ fn infer_selfdev_build_target(repo_dir: &Path) -> SelfDevBuildTarget {
             desktop = true;
             other = true;
         } else if path.starts_with("crates/next-code-desktop/")
-            || path.starts_with("crates/jcode-desktop/")
+            || path.starts_with("crates/next-code-desktop/")
         {
             desktop = true;
         } else if !path.is_empty() {
@@ -336,7 +336,7 @@ fn non_empty_env_path(name: &str) -> Option<PathBuf> {
 /// Overridable with `NEXT_CODE_INSTALL_DIR` (canonical) or legacy `JCODE_INSTALL_DIR`.
 pub fn launcher_dir() -> Result<PathBuf> {
     if let Some(custom) = non_empty_env_path("NEXT_CODE_INSTALL_DIR")
-        .or_else(|| non_empty_env_path("NEXT_CODE_INSTALL_DIR"))
+        .or_else(|| non_empty_env_path("JCODE_INSTALL_DIR"))
     {
         return Ok(custom);
     }
@@ -643,19 +643,20 @@ mod tests {
 
     #[test]
     fn is_next_code_repo_accepts_legacy_jcode_package_name() {
+        // dual-read: legacy package name still accepted
         let repo = repo_fixture(false, "jcode");
         assert!(is_next_code_repo(repo.path()));
         assert!(is_jcode_repo(repo.path()));
     }
 
-    /// Build a release-style install dir: `jcode` wrapper script + payload.
+    /// Build a release-style install dir: `next-code` wrapper script + payload.
     fn release_install_fixture() -> (tempfile::TempDir, PathBuf, PathBuf) {
         let temp = tempfile::TempDir::new().expect("temp install");
-        let wrapper = temp.path().join("jcode");
-        let payload = temp.path().join("jcode-linux-x86_64.bin");
+        let wrapper = temp.path().join("next-code");
+        let payload = temp.path().join("next-code-linux-x86_64.bin");
         std::fs::write(
             &wrapper,
-            "#!/usr/bin/env sh\nexec ./jcode-linux-x86_64.bin \"$@\"\n",
+            "#!/usr/bin/env sh\nexec ./next-code-linux-x86_64.bin \"$@\"\n",
         )
         .expect("wrapper");
         std::fs::write(&payload, vec![0x7fu8; 64]).expect("payload");
@@ -673,11 +674,11 @@ mod tests {
 
     #[test]
     fn resolve_binary_payload_follows_channel_symlink_to_wrapper() {
-        // The real layout: builds/<channel>/jcode -> versions/<v>/jcode (wrapper).
+        // The real layout: builds/<channel>/next-code -> versions/<v>/next-code (wrapper).
         let (temp, wrapper, payload) = release_install_fixture();
         let channel_dir = temp.path().join("channel");
         std::fs::create_dir_all(&channel_dir).expect("channel dir");
-        let link = channel_dir.join("jcode");
+        let link = channel_dir.join("next-code");
         #[cfg(unix)]
         std::os::unix::fs::symlink(&wrapper, &link).expect("symlink");
         #[cfg(not(unix))]
@@ -693,9 +694,9 @@ mod tests {
         // A normal (non-wrapper) binary resolves to itself even with a sibling
         // `.bin` file present: it is too large / not a script.
         let temp = tempfile::TempDir::new().expect("temp install");
-        let binary = temp.path().join("jcode");
+        let binary = temp.path().join("next-code");
         std::fs::write(&binary, vec![0x7fu8; 8192]).expect("binary");
-        std::fs::write(temp.path().join("jcode-linux-x86_64.bin"), [0u8; 8]).expect("bin");
+        std::fs::write(temp.path().join("next-code-linux-x86_64.bin"), [0u8; 8]).expect("bin");
         assert_eq!(
             resolve_binary_payload(&binary),
             std::fs::canonicalize(&binary).expect("canonical binary")
@@ -705,7 +706,7 @@ mod tests {
     #[test]
     fn resolve_binary_payload_keeps_small_script_without_payload() {
         let temp = tempfile::TempDir::new().expect("temp install");
-        let script = temp.path().join("jcode");
+        let script = temp.path().join("next-code");
         std::fs::write(&script, "#!/usr/bin/env sh\nexec true\n").expect("script");
         assert_eq!(
             resolve_binary_payload(&script),
@@ -716,7 +717,7 @@ mod tests {
     #[test]
     fn resolve_binary_payload_refuses_ambiguous_payloads() {
         let (temp, wrapper, _payload) = release_install_fixture();
-        std::fs::write(temp.path().join("jcode-macos-aarch64.bin"), [0u8; 8]).expect("second bin");
+        std::fs::write(temp.path().join("next-code-macos-aarch64.bin"), [0u8; 8]).expect("second bin");
         assert_eq!(
             resolve_binary_payload(&wrapper),
             std::fs::canonicalize(&wrapper).expect("canonical wrapper")

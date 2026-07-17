@@ -1,5 +1,5 @@
 //! OpenAI provider runtime (Codex OAuth + API key, Responses API over SSE and
-//! persistent WebSocket), moved out of `jcode-base` so provider edits compile
+//! persistent WebSocket), moved out of `next-code-base` so provider edits compile
 //! only this crate plus a binary relink instead of rebuilding the
 //! base -> app-core -> tui spine. The binary's composition root registers
 //! [`OpenAIProvider`] with `next_code_base::provider::external` at startup.
@@ -72,7 +72,7 @@ const WEBSOCKET_PERSISTENT_MAX_AGE_SECS: u64 = 3000; // 50 min (server limit is 
 /// and keep the warm cache. Dead/half-closed sockets are still detected by the
 /// ping and reconnect gracefully, and `WEBSOCKET_PERSISTENT_MAX_AGE_SECS` still
 /// caps total connection lifetime. Tunable via
-/// `JCODE_OPENAI_WS_IDLE_RECONNECT_SECS` (0 disables the idle reconnect entirely,
+/// `NEXT_CODE_OPENAI_WS_IDLE_RECONNECT_SECS` (0 disables the idle reconnect entirely,
 /// relying solely on the healthcheck + max-age cap).
 const WEBSOCKET_PERSISTENT_IDLE_RECONNECT_SECS_DEFAULT: u64 = 600; // 10 min
 /// If a persistent socket has been idle for a while, send a lightweight ping
@@ -87,20 +87,20 @@ static WEBSOCKET_PERSISTENT_IDLE_RECONNECT_SECS: LazyLock<Option<u64>> = LazyLoc
         Ok(raw) => match raw.trim().parse::<u64>() {
             Ok(0) => {
                 next_code_base::logging::info(
-                    "OpenAI persistent WS idle reconnect disabled (JCODE_OPENAI_WS_IDLE_RECONNECT_SECS=0); relying on healthcheck + max-age",
+                    "OpenAI persistent WS idle reconnect disabled (NEXT_CODE_OPENAI_WS_IDLE_RECONNECT_SECS=0); relying on healthcheck + max-age",
                 );
                 None
             }
             Ok(secs) => {
                 next_code_base::logging::info(&format!(
-                    "OpenAI persistent WS idle reconnect threshold set to {}s (JCODE_OPENAI_WS_IDLE_RECONNECT_SECS)",
+                    "OpenAI persistent WS idle reconnect threshold set to {}s (NEXT_CODE_OPENAI_WS_IDLE_RECONNECT_SECS)",
                     secs
                 ));
                 Some(secs)
             }
             Err(_) => {
                 next_code_base::logging::info(&format!(
-                    "Warning: invalid JCODE_OPENAI_WS_IDLE_RECONNECT_SECS '{}'; using default {}s",
+                    "Warning: invalid NEXT_CODE_OPENAI_WS_IDLE_RECONNECT_SECS '{}'; using default {}s",
                     raw, WEBSOCKET_PERSISTENT_IDLE_RECONNECT_SECS_DEFAULT
                 ));
                 Some(WEBSOCKET_PERSISTENT_IDLE_RECONNECT_SECS_DEFAULT)
@@ -138,7 +138,7 @@ impl OpenAITransportMode {
             "https" | "http" | "sse" => Self::HTTPS,
             other => {
                 next_code_base::logging::warn(&format!(
-                    "Unknown JCODE_OPENAI_TRANSPORT '{}'; using auto. Use: auto, websocket, or https.",
+                    "Unknown NEXT_CODE_OPENAI_TRANSPORT '{}'; using auto. Use: auto, websocket, or https.",
                     other
                 ));
                 Self::Auto
@@ -577,7 +577,7 @@ impl OpenAIProvider {
             Some("in_memory") | Some("24h") => prompt_cache_retention,
             Some(other) => {
                 next_code_base::logging::info(&format!(
-                    "Warning: Unsupported JCODE_OPENAI_PROMPT_CACHE_RETENTION '{}'; expected 'in_memory' or '24h'",
+                    "Warning: Unsupported NEXT_CODE_OPENAI_PROMPT_CACHE_RETENTION '{}'; expected 'in_memory' or '24h'",
                     other
                 ));
                 None
@@ -782,7 +782,7 @@ impl OpenAIProvider {
             Ok(value) => Some(value),
             Err(_) => {
                 next_code_base::logging::warn(&format!(
-                    "Invalid JCODE_OPENAI_MAX_OUTPUT_TOKENS='{}'; using default {}",
+                    "Invalid NEXT_CODE_OPENAI_MAX_OUTPUT_TOKENS='{}'; using default {}",
                     raw, DEFAULT_MAX_OUTPUT_TOKENS
                 ));
                 Some(DEFAULT_MAX_OUTPUT_TOKENS)
@@ -831,7 +831,7 @@ impl OpenAIProvider {
                     value
                 )),
                 None => next_code_base::logging::info(
-                    "OpenAI max_output_tokens disabled (JCODE_OPENAI_MAX_OUTPUT_TOKENS=0)",
+                    "OpenAI max_output_tokens disabled (NEXT_CODE_OPENAI_MAX_OUTPUT_TOKENS=0)",
                 ),
             }
         }
@@ -854,7 +854,7 @@ impl OpenAIProvider {
     /// Defaults to `https://api.openai.com/v1`, but honors a user override so
     /// the native `openai-api` provider can target a local/proxied Responses
     /// API endpoint (issue #343). Checked in order:
-    /// `JCODE_OPENAI_API_BASE`, `OPENAI_BASE_URL`, `OPENAI_API_BASE`.
+    /// `NEXT_CODE_OPENAI_API_BASE`, `OPENAI_BASE_URL`, `OPENAI_API_BASE`.
     ///
     /// The override must be an absolute `http(s)://` URL; anything else is
     /// logged and ignored so a malformed value never silently breaks requests.

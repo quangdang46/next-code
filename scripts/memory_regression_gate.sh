@@ -19,14 +19,14 @@
 #   scripts/memory_regression_gate.sh [--session <id>] [--idle-secs <n>]
 #
 # Env overrides:
-#   JCODE_MEMGATE_SESSION               probe session id
-#   JCODE_MEMGATE_MAX_RSS_ANON_KB       idle rss_anon bound (default 56320 = 55 MiB)
-#   JCODE_MEMGATE_MAX_LIVE_HEAP_BYTES   idle allocated_bytes bound (default 47185920 = 45 MiB)
+#   NEXT_CODE_MEMGATE_SESSION               probe session id
+#   NEXT_CODE_MEMGATE_MAX_RSS_ANON_KB       idle rss_anon bound (default 56320 = 55 MiB)
+#   NEXT_CODE_MEMGATE_MAX_LIVE_HEAP_BYTES   idle allocated_bytes bound (default 47185920 = 45 MiB)
 #
 # Exit codes: 0 pass, 1 threshold exceeded, 2 could not measure, 3 skipped
 # (probe session missing on this machine).
 #
-# Emits one machine-parseable line: `JCODE_MEMGATE_RESULT {json}`.
+# Emits one machine-parseable line: `NEXT_CODE_MEMGATE_RESULT {json}`.
 
 set -euo pipefail
 
@@ -50,19 +50,19 @@ command -v jq >/dev/null || { echo "jq required" >&2; exit 2; }
 # Skip (not fail) when the pinned probe session does not exist on this
 # machine: thresholds are only meaningful against a fixed workload.
 if ! ls "$HOME/.next-code/sessions/${SESSION_ID}"* >/dev/null 2>&1; then
-    echo "JCODE_MEMGATE_RESULT {\"status\":\"skipped\",\"reason\":\"probe session ${SESSION_ID} not found\"}"
+    echo "NEXT_CODE_MEMGATE_RESULT {\"status\":\"skipped\",\"reason\":\"probe session ${SESSION_ID} not found\"}"
     exit 3
 fi
 
 echo "[memgate] probing session ${SESSION_ID} (idle ${IDLE_SECS}s)..." >&2
 PROBE_OUT="$("$SCRIPT_DIR/memory_probe.sh" --session "$SESSION_ID" --idle-secs "$IDLE_SECS" --skip-trim)" || {
-    echo "JCODE_MEMGATE_RESULT {\"status\":\"error\",\"reason\":\"memory_probe failed\"}"
+    echo "NEXT_CODE_MEMGATE_RESULT {\"status\":\"error\",\"reason\":\"memory_probe failed\"}"
     exit 2
 }
 
 IDLE_LINE="$(printf '%s\n' "$PROBE_OUT" | jq -c 'select(.phase=="idle")' | head -1)"
 [[ -n "$IDLE_LINE" ]] || {
-    echo "JCODE_MEMGATE_RESULT {\"status\":\"error\",\"reason\":\"no idle phase in probe output\"}"
+    echo "NEXT_CODE_MEMGATE_RESULT {\"status\":\"error\",\"reason\":\"no idle phase in probe output\"}"
     exit 2
 }
 
@@ -97,7 +97,7 @@ jq -cn \
              idle_live_heap_bytes:$live_heap_bytes,
              thresholds:{rss_anon_kb:$max_rss_anon_kb, live_heap_bytes:$max_live_heap_bytes},
              server:$server, failures:$ARGS.positional}' -- "${FAILURES[@]+"${FAILURES[@]}"}" \
-    | sed 's/^/JCODE_MEMGATE_RESULT /'
+    | sed 's/^/NEXT_CODE_MEMGATE_RESULT /'
 
 if [[ "$STATUS" == "fail" ]]; then
     printf '[memgate] FAIL: %s\n' "${FAILURES[@]}" >&2

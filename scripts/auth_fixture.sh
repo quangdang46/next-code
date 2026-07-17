@@ -143,7 +143,7 @@ load_fixture() {
   copy_dir_contents "$src" "$next_code_home"
   chmod -R go-rwx "$next_code_home" 2>/dev/null || true
   echo "Loaded auth fixture '$name' into sandbox '$sandbox_name'"
-  echo "JCODE_HOME=$next_code_home"
+  echo "NEXT_CODE_HOME=$next_code_home"
 }
 
 delete_fixture() {

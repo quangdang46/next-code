@@ -260,7 +260,7 @@ class JcodeHarborAgent(BaseAgent):
                 'fi; '
                 f'instruction="$(cat {IN_CONTAINER_INPUT}/instruction.txt)"; '
                 f'{IN_CONTAINER_BINARY} --quiet --no-update --no-selfdev '
-                '--provider "${NEXT_CODE_PROVIDER:-$JCODE_PROVIDER}" --model "${NEXT_CODE_MODEL:-$JCODE_MODEL}" '
+                '--provider "${NEXT_CODE_PROVIDER:-$NEXT_CODE_PROVIDER}" --model "${NEXT_CODE_MODEL:-$NEXT_CODE_MODEL}" '
                 '-C "$workdir" run --ndjson "$instruction" '
                 f'> {IN_CONTAINER_OUTPUT}/events.ndjson 2> {IN_CONTAINER_OUTPUT}/stderr.txt'
             ),

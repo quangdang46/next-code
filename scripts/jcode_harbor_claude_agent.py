@@ -283,13 +283,13 @@ class JcodeClaudeHarborAgent(BaseAgent):
         result = await environment.exec(
             command=(
                 'set -e; '
-                'workdir="${JCODE_TASK_WORKDIR:-}"; '
+                'workdir="${NEXT_CODE_TASK_WORKDIR:-}"; '
                 'if [ -z "$workdir" ]; then '
                 '  if [ -d /app ]; then workdir=/app; else workdir="$(pwd)"; fi; '
                 'fi; '
                 f'instruction="$(cat {IN_CONTAINER_INPUT}/instruction.txt)"; '
                 f'{IN_CONTAINER_BINARY} --quiet --no-update --no-selfdev '
-                '--provider "$JCODE_PROVIDER" --model "$JCODE_MODEL" '
+                '--provider "$NEXT_CODE_PROVIDER" --model "$NEXT_CODE_MODEL" '
                 '-C "$workdir" run --ndjson "$instruction" '
                 f'> {IN_CONTAINER_OUTPUT}/events.ndjson 2> {IN_CONTAINER_OUTPUT}/stderr.txt'
             ),

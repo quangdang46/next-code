@@ -72,7 +72,7 @@ fn test_config_dir(temp: &TempDir) -> std::path::PathBuf {
 }
 
 fn write_test_api_key(temp: &TempDir, env_file: &str, env_key: &str, value: &str) {
-    let config_dir = test_config_dir(temp).join("jcode");
+    let config_dir = test_config_dir(temp).join("next-code");
     std::fs::create_dir_all(&config_dir).expect("create test config dir");
     std::fs::write(config_dir.join(env_file), format!("{env_key}={value}\n"))
         .expect("write test api key");
@@ -897,7 +897,7 @@ fn autodetects_single_saved_local_openai_compatible_profile() {
     let lmstudio = next_code_base::provider_catalog::resolve_openai_compatible_profile(
         next_code_base::provider_catalog::LMSTUDIO_PROFILE,
     );
-    let config_dir = test_config_dir(&temp).join("jcode");
+    let config_dir = test_config_dir(&temp).join("next-code");
     std::fs::create_dir_all(&config_dir).expect("create test config dir");
     std::fs::write(
         config_dir.join(&lmstudio.env_file),
@@ -949,12 +949,12 @@ fn openrouter_transport_state_distinguishes_runtime_identities() {
     assert!(OpenRouterTransportState::from_current_env(Some("openrouter")).is_real_openrouter());
     next_code_base::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
 
-    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "jcode");
+    next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "next-code");
     assert_eq!(
-        OpenRouterTransportState::from_current_env(Some("jcode")),
+        OpenRouterTransportState::from_current_env(Some("next-code")),
         OpenRouterTransportState::JcodeSubscription
     );
-    assert!(!OpenRouterTransportState::from_current_env(Some("jcode")).accrues_user_api_key_cost());
+    assert!(!OpenRouterTransportState::from_current_env(Some("next-code")).accrues_user_api_key_cost());
 
     next_code_base::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "next-code");
     assert_eq!(
@@ -2219,7 +2219,7 @@ fn runtime_display_name_for_profile_runtime_instance() {
     // `Provider::display_name`.
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
-    let next_code_home = temp.path().join("jcode-home");
+    let next_code_home = temp.path().join("next-code-home");
     let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
@@ -2312,7 +2312,7 @@ fn resolve_extra_body_ignores_non_object_config() {
 fn named_profile_extra_body_threads_into_provider() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
-    let next_code_home = temp.path().join("jcode-home");
+    let next_code_home = temp.path().join("next-code-home");
     let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
@@ -2689,12 +2689,12 @@ fn named_profile_construction_reads_openai_reasoning_effort_config() {
 /// stripped before the model id reaches the upstream API. Without this, a
 /// resumed/new TUI session sends e.g. `cline:cline-pass/qwen3.7-max` verbatim
 /// and the gateway rejects it with 404 model_not_found, even though headless
-/// `jcode run` (which binds profile_id in-process) works fine.
+/// `next-code run` (which binds profile_id in-process) works fine.
 #[test]
 fn user_named_profile_prefix_is_stripped_even_without_profile_id() {
     let _lock = ENV_LOCK.lock();
     let temp = TempDir::new().expect("create temp home");
-    let next_code_home = temp.path().join("jcode-home");
+    let next_code_home = temp.path().join("next-code-home");
     let _jcode_home = EnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
     let _home = EnvVarGuard::set("HOME", temp.path());
     let _appdata = EnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));

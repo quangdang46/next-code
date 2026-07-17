@@ -1,12 +1,12 @@
 //! Model tier abstraction.
 //!
 //! A "tier" is a **user-defined named slot** that maps to a concrete model id.
-//! It is intentionally NOT an opinionated catalog — jcode does not maintain
+//! It is intentionally NOT an opinionated catalog — next-code does not maintain
 //! per-provider tier defaults like Codebuff/OpenRouter does.
 //!
 //! ## Why slots, not catalog?
 //!
-//! jcode users connect a single provider via OAuth (Claude Pro, ChatGPT Plus,
+//! next-code users connect a single provider via OAuth (Claude Pro, ChatGPT Plus,
 //! Gemini Advanced, etc.) and pay through that subscription. Auto-downgrading
 //! to a "cheaper tier" without their consent is wrong — they already chose
 //! the model they want. So the default is: agents inherit the session's
@@ -16,8 +16,8 @@
 //! setting two env vars, exactly mirroring `model_routing.rs` (#100):
 //!
 //! ```bash
-//! JCODE_ROUTING_ROUTINE=claude-haiku-4-5
-//! JCODE_ROUTING_THINKING=claude-opus-4-7
+//! NEXT_CODE_ROUTING_ROUTINE=claude-haiku-4-5
+//! NEXT_CODE_ROUTING_THINKING=claude-opus-4-7
 //! ```
 //!
 //! Agent definitions reference tiers by name:
@@ -25,7 +25,7 @@
 //! ```toml
 //! [agent]
 //! id = "file-picker"
-//! prefer_tier = "routine"   # uses JCODE_ROUTING_ROUTINE if set
+//! prefer_tier = "routine"   # uses NEXT_CODE_ROUTING_ROUTINE if set
 //! ```
 //!
 //! ## Resolution order
@@ -42,15 +42,15 @@ use std::fmt;
 
 /// A user-defined tier slot. Currently only two are supported because that
 /// matches `model_routing.rs` (#100). Adding tiers later is additive — the
-/// env var name pattern is `JCODE_ROUTING_<UPPER_TIER>`.
+/// env var name pattern is `NEXT_CODE_ROUTING_<UPPER_TIER>`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ModelTier {
     /// Cheap / fast / lower-effort work: file pickers, basher,
-    /// summarizers. Reads `JCODE_ROUTING_ROUTINE`.
+    /// summarizers. Reads `NEXT_CODE_ROUTING_ROUTINE`.
     Routine,
     /// Premium / reasoning work: editor, reviewer, planner.
-    /// Reads `JCODE_ROUTING_THINKING`.
+    /// Reads `NEXT_CODE_ROUTING_THINKING`.
     Thinking,
 }
 
@@ -128,7 +128,7 @@ pub fn resolve_model(
 }
 
 /// Diagnostic-friendly explanation of which slot was used. Useful for
-/// `jcode doctor` output so users can see exactly why a given agent picked
+/// `next-code doctor` output so users can see exactly why a given agent picked
 /// the model it did.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolutionSource {
@@ -192,7 +192,7 @@ mod tests {
 
     /// Mutex to serialize env-var manipulation across tests in this module.
     /// Without this, `cargo test` runs tests in parallel and they trample
-    /// each other's `JCODE_ROUTING_*` state.
+    /// each other's `NEXT_CODE_ROUTING_*` state.
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     fn with_env_lock<F: FnOnce()>(f: F) {

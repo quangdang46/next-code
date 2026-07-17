@@ -15,14 +15,14 @@ fn product_env(suffix: &str) -> Result<String, std::env::VarError> {
 
 
 
-// Build metadata generator for the jcode workspace.
+// Build metadata generator for the next-code workspace.
 //
-// This is the single source of truth for the JCODE_* compile-time values that
-// previously lived in the root `jcode` crate's build.rs. It is hosted in the
-// leaf `jcode-build-meta` crate so every workspace crate can read identical
+// This is the single source of truth for the NEXT_CODE_* compile-time values that
+// previously lived in the root `next-code` crate's build.rs. It is hosted in the
+// leaf `next-code-build-meta` crate so every workspace crate can read identical
 // values (via `next_code_build_meta::*`) without duplicating this script.
 //
-// NOTE: because this crate's own package version is unrelated to jcode's, we
+// NOTE: because this crate's own package version is unrelated to next-code's, we
 // parse the root `Cargo.toml` `[package].version` for the base semver instead
 // of `CARGO_PKG_VERSION`.
 
@@ -147,7 +147,7 @@ fn main() {
     println!("cargo:rustc-env=NEXT_CODE_CHANGELOG={}", changelog);
     println!("cargo:rustc-env=NEXT_CODE_PKG_VERSION={}", pkg_version);
 
-    // Forward JCODE_RELEASE_BUILD env var if set (CI sets this for release binaries)
+    // Forward NEXT_CODE_RELEASE_BUILD env var if set (CI sets this for release binaries)
     if product_env("RELEASE_BUILD").is_ok() {
         println!("cargo:rustc-env=NEXT_CODE_RELEASE_BUILD=1");
     }
@@ -160,14 +160,14 @@ fn main() {
     // script as dirty whenever any declared input is newer than the script's
     // output file, reruns it, and then force-recompiles every dependent crate
     // via StaleDepFingerprint -- even when the emitted output is byte-identical.
-    // Since `jcode-build-meta` sits at the bottom of the crate graph
+    // Since `next-code-build-meta` sits at the bottom of the crate graph
     // (base -> app-core -> tui -> cli all depend on it), watching the git files
     // turned routine git activity into a full-tree recompile (~18s) on every
     // incremental build. See the deterministic-semver note in
     // `resolve_build_semver` for the companion fix.
     //
     // Correctness is preserved where it matters:
-    //   * Release/dist builds set JCODE_RELEASE_BUILD=1 and JCODE_BUILD_SEMVER,
+    //   * Release/dist builds set NEXT_CODE_RELEASE_BUILD=1 and NEXT_CODE_BUILD_SEMVER,
     //     both of which DO force a rerun (declared below), so released binaries
     //     always embed the exact version/hash.
     //   * A `[package].version` bump touches Cargo.toml (declared below), which
@@ -196,12 +196,12 @@ fn main() {
     println!("cargo:rerun-if-env-changed=JCODE_BUILD_GIT_TAG");
 }
 
-/// Workspace root, derived from this crate's manifest dir (`crates/jcode-build-meta`).
+/// Workspace root, derived from this crate's manifest dir (`crates/next-code-build-meta`).
 fn repo_root() -> PathBuf {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|_| PathBuf::from("."));
-    // crates/jcode-build-meta -> crates -> <repo root>
+    // crates/next-code-build-meta -> crates -> <repo root>
     manifest_dir
         .parent()
         .and_then(|p| p.parent())
@@ -255,14 +255,14 @@ fn resolve_build_semver(base_version: (u32, u32, u32)) -> Result<String, String>
 
     // Dev builds derive the patch number deterministically from committed git
     // state: `base.patch + <commits since the base-version tag>`. This is a pure
-    // function of HEAD, so the emitted JCODE_SEMVER/JCODE_VERSION only change when
+    // function of HEAD, so the emitted NEXT_CODE_SEMVER/NEXT_CODE_VERSION only change when
     // an actual commit lands, NOT on every build-script rerun.
     //
     // The previous implementation incremented a persistent counter on every
     // rerun. Because the build script reruns whenever `.git/index`/`.git/HEAD`
     // change (any `git add`, commit, or concurrent agent git op), that side
     // effect churned the version string on essentially every build, which in
-    // turn invalidated `jcode-build-meta` and force-recompiled the entire crate
+    // turn invalidated `next-code-build-meta` and force-recompiled the entire crate
     // graph (base -> app-core -> tui -> cli). Deriving the value deterministically
     // keeps incremental rebuilds incremental.
     let offset = commits_since_base_tag(base_version).unwrap_or(0);

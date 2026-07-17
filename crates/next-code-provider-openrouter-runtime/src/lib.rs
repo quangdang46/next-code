@@ -1,6 +1,6 @@
 //! OpenRouter / OpenAI-compatible provider runtime (aggregator with
 //! provider-routing features, plus direct profile endpoints like DeepSeek and
-//! NVIDIA NIM), moved out of `jcode-base` so provider edits compile only this
+//! NVIDIA NIM), moved out of `next-code-base` so provider edits compile only this
 //! crate plus a binary relink instead of rebuilding the base -> app-core ->
 //! tui spine. The binary's composition root registers a parameterized factory
 //! with `next_code_base::provider::external::register_openrouter_factory`.
@@ -14,7 +14,7 @@
 //! - Provider routing: Ranks providers using OpenRouter's endpoint API data (throughput, uptime, cost, cache support)
 //! - Provider pinning: Pins to a provider per-session for cache locality; refreshes pin on cache hits
 //! - Cache support: Automatically injects cache breakpoints when provider supports caching
-//! - Manual pinning: Set JCODE_OPENROUTER_PROVIDER or use model@Provider syntax
+//! - Manual pinning: Set NEXT_CODE_OPENROUTER_PROVIDER or use model@Provider syntax
 
 use next_code_core::env::{product_env, product_env_os};
 use anyhow::{Context, Result};
@@ -137,7 +137,7 @@ fn configured_api_base() -> String {
         .unwrap_or_else(|| DEFAULT_API_BASE.to_string());
     normalize_api_base(&raw).unwrap_or_else(|| {
         next_code_base::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_API_BASE '{}'; using {}",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_API_BASE '{}'; using {}",
             raw, DEFAULT_API_BASE
         ));
         DEFAULT_API_BASE.to_string()
@@ -155,7 +155,7 @@ fn configured_api_key_name() -> String {
         raw
     } else {
         next_code_base::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_API_KEY_NAME '{}'; using {}",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_API_KEY_NAME '{}'; using {}",
             raw, DEFAULT_API_KEY_NAME
         ));
         DEFAULT_API_KEY_NAME.to_string()
@@ -173,7 +173,7 @@ fn configured_env_file_name() -> String {
         raw
     } else {
         next_code_base::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_ENV_FILE '{}'; using {}",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_ENV_FILE '{}'; using {}",
             raw, DEFAULT_ENV_FILE
         ));
         DEFAULT_ENV_FILE.to_string()
@@ -213,7 +213,7 @@ fn provider_features_enabled(api_base: &str) -> bool {
             return value;
         }
         next_code_base::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_PROVIDER_FEATURES '{}'; expected true/false",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_PROVIDER_FEATURES '{}'; expected true/false",
             raw
         ));
     }
@@ -226,7 +226,7 @@ fn model_catalog_enabled() -> bool {
             return value;
         }
         next_code_base::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_MODEL_CATALOG '{}'; expected true/false",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_MODEL_CATALOG '{}'; expected true/false",
             raw
         ));
     }
@@ -253,7 +253,7 @@ fn configured_auth_header_mode() -> AuthHeaderMode {
         "api-key" | "apikey" => AuthHeaderMode::ApiKey,
         other => {
             next_code_base::logging::warn(&format!(
-                "Ignoring invalid JCODE_OPENROUTER_AUTH_HEADER '{}'; expected authorization-bearer or api-key",
+                "Ignoring invalid NEXT_CODE_OPENROUTER_AUTH_HEADER '{}'; expected authorization-bearer or api-key",
                 other
             ));
             AuthHeaderMode::AuthorizationBearer
@@ -269,7 +269,7 @@ fn configured_auth_header_name() -> HeaderName {
         .unwrap_or_else(|| "api-key".to_string());
     HeaderName::from_bytes(raw.as_bytes()).unwrap_or_else(|_| {
         next_code_base::logging::warn(&format!(
-            "Ignoring invalid JCODE_OPENROUTER_AUTH_HEADER_NAME '{}'; using api-key",
+            "Ignoring invalid NEXT_CODE_OPENROUTER_AUTH_HEADER_NAME '{}'; using api-key",
             raw
         ));
         HeaderName::from_static("api-key")
@@ -326,7 +326,7 @@ impl OpenRouterTransportState {
 
         if matches!(
             runtime_provider.as_deref(),
-            Some("jcode" | "next-code")
+            Some("next-code" | "next-code")
         ) {
             return Self::JcodeSubscription;
         }
@@ -364,7 +364,7 @@ impl OpenRouterTransportState {
             "openrouter" | "openrouter-api-key" | "openrouter_byok" | "openrouter-byok" => {
                 Some(Self::OpenRouterApiKey)
             }
-            "jcode"
+            "next-code"
             | "jcode-subscription"
             | "subscription"
             | "next-code"
@@ -861,9 +861,9 @@ pub fn maybe_schedule_openai_compatible_profile_catalog_refresh(
 pub fn maybe_schedule_standard_openrouter_catalog_refresh(context: &'static str) -> bool {
     // This always targets canonical openrouter.ai with OPENROUTER_API_KEY and
     // writes to the dedicated `openrouter` cache namespace. It must run even
-    // when JCODE_OPENROUTER_* env vars are set by an active named profile
+    // when NEXT_CODE_OPENROUTER_* env vars are set by an active named profile
     // (e.g. NVIDIA NIM via `[providers.mynvidia]`, which sets
-    // JCODE_OPENROUTER_API_BASE to the NVIDIA endpoint): that profile owns the
+    // NEXT_CODE_OPENROUTER_API_BASE to the NVIDIA endpoint): that profile owns the
     // shared slot and points the live runtime elsewhere, but standard
     // OpenRouter's catalog still needs its own refresh so `/model` can list it
     // (issue #292). Hence we deliberately ignore the shared-slot runtime env.
@@ -968,7 +968,7 @@ pub struct OpenRouterProvider {
     /// Extra top-level JSON object fields merged into every chat/completions
     /// request body (e.g. NVIDIA NIM DeepSeek-V4 `chat_template_kwargs`).
     /// Resolved once at construction from named-profile config or the
-    /// `JCODE_OPENAI_EXTRA_BODY` env/env-file value.
+    /// `NEXT_CODE_OPENAI_EXTRA_BODY` env/env-file value.
     extra_body: Option<serde_json::Map<String, Value>>,
     static_models: Vec<String>,
     static_context_limits: HashMap<String, usize>,
@@ -1145,7 +1145,7 @@ impl OpenRouterProvider {
                 Ok(0) => return None,
                 Ok(value) => return Some(value),
                 Err(_) => next_code_base::logging::warn(&format!(
-                    "Ignoring invalid JCODE_OPENROUTER_MAX_TOKENS '{}'; expected a positive integer or auto",
+                    "Ignoring invalid NEXT_CODE_OPENROUTER_MAX_TOKENS '{}'; expected a positive integer or auto",
                     raw
                 )),
             }
@@ -1160,7 +1160,7 @@ impl OpenRouterProvider {
     ///
     /// Sources, in precedence order (later overrides earlier):
     /// 1. An optional named-profile `extra_body` config object.
-    /// 2. The `JCODE_OPENAI_EXTRA_BODY` env var (or the same key inside the
+    /// 2. The `NEXT_CODE_OPENAI_EXTRA_BODY` env var (or the same key inside the
     ///    profile's `.env` file), parsed as a JSON object string.
     ///
     /// This lets users inject non-standard parameters that some backends
@@ -1197,10 +1197,10 @@ impl OpenRouterProvider {
                     }
                 }
                 Ok(_) => next_code_base::logging::warn(
-                    "Ignoring JCODE_OPENAI_EXTRA_BODY: expected a JSON object string, e.g. {\"chat_template_kwargs\":{\"thinking\":true}}",
+                    "Ignoring NEXT_CODE_OPENAI_EXTRA_BODY: expected a JSON object string, e.g. {\"chat_template_kwargs\":{\"thinking\":true}}",
                 ),
                 Err(err) => next_code_base::logging::warn(&format!(
-                    "Ignoring invalid JCODE_OPENAI_EXTRA_BODY JSON: {err}"
+                    "Ignoring invalid NEXT_CODE_OPENAI_EXTRA_BODY JSON: {err}"
                 )),
             }
         }
@@ -1482,7 +1482,7 @@ impl OpenRouterProvider {
             "auto" | "" => None,
             other => {
                 next_code_base::logging::info(&format!(
-                    "Warning: Unsupported JCODE_OPENROUTER_THINKING '{}'; expected enabled/disabled/auto",
+                    "Warning: Unsupported NEXT_CODE_OPENROUTER_THINKING '{}'; expected enabled/disabled/auto",
                     other
                 ));
                 None
@@ -1666,7 +1666,7 @@ impl OpenRouterProvider {
                     .map(|dir| dir.join(&resolved.env_file).display().to_string())
                     .unwrap_or_else(|_| resolved.env_file.clone());
                 anyhow::bail!(
-                    "{} credentials not available. {} not found in environment or {}. Run `jcode login --provider {}` first.",
+                    "{} credentials not available. {} not found in environment or {}. Run `next-code login --provider {}` first.",
                     resolved.display_name,
                     resolved.api_key_env,
                     path,
@@ -2370,12 +2370,12 @@ impl OpenRouterProvider {
                         })
                     } else {
                         anyhow::bail!(
-                            "Azure OpenAI is configured for Entra ID, but Azure settings are incomplete. Run `jcode login --provider azure`."
+                            "Azure OpenAI is configured for Entra ID, but Azure settings are incomplete. Run `next-code login --provider azure`."
                         )
                     }
                 }
                 other => anyhow::bail!(
-                    "Unsupported JCODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER '{}'.",
+                    "Unsupported NEXT_CODE_OPENROUTER_DYNAMIC_BEARER_PROVIDER '{}'.",
                     other
                 ),
             };

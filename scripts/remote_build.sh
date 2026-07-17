@@ -2,9 +2,9 @@
 # Remote cargo runner (build/test/check/clippy) via SSH + rsync.
 #
 # Defaults:
-# - Config file: ~/.config/next-code/remote-build.env (override with JCODE_REMOTE_CONFIG)
-# - Host: JCODE_REMOTE_HOST from env/config, or --host
-# - Remote dir: .cache/remote-builds/next-code/<repo-name> (override with JCODE_REMOTE_DIR or --remote-dir)
+# - Config file: ~/.config/next-code/remote-build.env (override with NEXT_CODE_REMOTE_CONFIG)
+# - Host: NEXT_CODE_REMOTE_HOST from env/config, or --host
+# - Remote dir: .cache/remote-builds/next-code/<repo-name> (override with NEXT_CODE_REMOTE_DIR or --remote-dir)
 #
 # Examples:
 #   scripts/remote_build.sh --release
@@ -118,7 +118,7 @@ if [[ "$REMOTE_DIR" == *" "* ]]; then
 fi
 
 if [[ -z "$REMOTE" ]]; then
-    echo "error: remote host not configured; set JCODE_REMOTE_HOST or pass --host HOST" >&2
+    echo "error: remote host not configured; set NEXT_CODE_REMOTE_HOST or pass --host HOST" >&2
     exit 2
 fi
 
@@ -224,7 +224,7 @@ echo "[0/3] Checking remote SSH..."
 if ! preflight_output="$(remote_ssh "printf 'next-code-remote-ok\\n'" 2>&1)"; then
     echo "error: remote host '$REMOTE' is not reachable within ${SSH_CONNECT_TIMEOUT}s" >&2
     echo "$preflight_output" >&2
-    echo "hint: set JCODE_REMOTE_CARGO=0 to force local cargo, or fix JCODE_REMOTE_HOST/JCODE_REMOTE_CONNECT_TIMEOUT." >&2
+    echo "hint: set NEXT_CODE_REMOTE_CARGO=0 to force local cargo, or fix NEXT_CODE_REMOTE_HOST/NEXT_CODE_REMOTE_CONNECT_TIMEOUT." >&2
     exit 75
 fi
 
@@ -255,7 +255,7 @@ if [[ "$SYNC_SOURCE" -eq 1 ]]; then
         printf 'git_date=%s\n' "$local_git_date"
         printf 'git_tag=%s\n' "$local_git_tag"
         printf 'git_dirty=%s\n' "$local_git_dirty"
-        printf 'changelog_raw<<JCODE_CHANGELOG_EOF\n%s\nJCODE_CHANGELOG_EOF\n' "$local_changelog_raw"
+        printf 'changelog_raw<<NEXT_CODE_CHANGELOG_EOF\n%s\nJCODE_CHANGELOG_EOF\n' "$local_changelog_raw"
     } > "$metadata_file"
     "$RSYNC_BIN" -avz -e "$RSYNC_SSH_COMMAND" "$metadata_file" "$REMOTE:$REMOTE_DIR/.next-code-build-meta"
 else
@@ -264,7 +264,7 @@ else
 fi
 
 printf -v REMOTE_CARGO_CMD '%q ' "${CARGO_CMD[@]}"
-printf -v REMOTE_INNER_CMD 'cd %q && env JCODE_BUILD_METADATA_FILE=.next-code-build-meta %s' "$REMOTE_DIR" "$REMOTE_CARGO_CMD"
+printf -v REMOTE_INNER_CMD 'cd %q && env NEXT_CODE_BUILD_METADATA_FILE=.next-code-build-meta %s' "$REMOTE_DIR" "$REMOTE_CARGO_CMD"
 printf -v REMOTE_RUN_CMD 'sh -lc %q' "$REMOTE_INNER_CMD"
 echo ""
 echo "[2/3] Running on remote..."

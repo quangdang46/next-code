@@ -7,10 +7,10 @@ set -euo pipefail
 # (deterministic grading). Captures full provenance for publication.
 #
 # Env knobs:
-#   JCODE_TB_JOBS_DIR   output dir (default /tmp/next-code-tb21-pub)
-#   JCODE_TB_K          attempts per task (default 1)
-#   JCODE_TB_NCONC      concurrent containers (default 3)
-#   JCODE_TB_AGENT_MULT agent-timeout multiplier (default 1000 ~ uncapped)
+#   NEXT_CODE_TB_JOBS_DIR   output dir (default /tmp/next-code-tb21-pub)
+#   NEXT_CODE_TB_K          attempts per task (default 1)
+#   NEXT_CODE_TB_NCONC      concurrent containers (default 3)
+#   NEXT_CODE_TB_AGENT_MULT agent-timeout multiplier (default 1000 ~ uncapped)
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)

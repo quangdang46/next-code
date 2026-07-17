@@ -3,11 +3,11 @@ set -euo pipefail
 
 SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$SCRIPT_PATH")/.." && pwd)"
-# Prefer next-code; fall back to legacy jcode during the rebrand window.
+# Prefer next-code; fall back to legacy next-code during the rebrand window.
 if [ -n "${NEXT_CODE_BIN:-}" ]; then
   NEXT_CODE_BIN="$NEXT_CODE_BIN"
 elif [ -n "${NEXT_CODE_BIN:-${JCODE_BIN:-}}" ]; then
-  NEXT_CODE_BIN="$JCODE_BIN"
+  NEXT_CODE_BIN="$NEXT_CODE_BIN"
 elif [ -x "$HOME/.local/bin/next-code" ]; then
   NEXT_CODE_BIN="$HOME/.local/bin/next-code"
 elif [ -x "$HOME/.local/bin/next-code" ]; then

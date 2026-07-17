@@ -18,7 +18,7 @@ case "$ref_profile" in
   debug) default_bin="$repo_root/target/debug/next-code" ;;
   release) default_bin="$repo_root/target/release/next-code" ;;
   *)
-    printf 'error: unsupported JCODE_REF_PROFILE: %s (expected debug or release)\n' "$ref_profile" >&2
+    printf 'error: unsupported NEXT_CODE_REF_PROFILE: %s (expected debug or release)\n' "$ref_profile" >&2
     exit 1
     ;;
 esac
@@ -54,14 +54,14 @@ die() {
 }
 
 assert_safe_paths() {
-  [[ -n "$ref_home" ]] || die "JCODE_REF_HOME resolved to empty path"
-  [[ -n "$ref_socket" ]] || die "JCODE_REF_SOCKET resolved to empty path"
-  [[ "$ref_home" = /* ]] || die "JCODE_REF_HOME must be an absolute path: $ref_home"
-  [[ "$ref_socket" = /* ]] || die "JCODE_REF_SOCKET must be an absolute path: $ref_socket"
+  [[ -n "$ref_home" ]] || die "NEXT_CODE_REF_HOME resolved to empty path"
+  [[ -n "$ref_socket" ]] || die "NEXT_CODE_REF_SOCKET resolved to empty path"
+  [[ "$ref_home" = /* ]] || die "NEXT_CODE_REF_HOME must be an absolute path: $ref_home"
+  [[ "$ref_socket" = /* ]] || die "NEXT_CODE_REF_SOCKET must be an absolute path: $ref_socket"
 
   local prod_home="${HOME}/.next-code"
   if [[ "$ref_home" == "$prod_home" ]]; then
-    die "refusing to run with production home ($prod_home); set JCODE_REF_HOME to an isolated path"
+    die "refusing to run with production home ($prod_home); set NEXT_CODE_REF_HOME to an isolated path"
   fi
 }
 

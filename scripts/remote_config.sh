@@ -2,13 +2,13 @@
 # Shared loader for Jcode remote build defaults.
 #
 # The config file is intentionally a shell fragment so users can write either:
-#   JCODE_REMOTE_HOST=builder
+#   NEXT_CODE_REMOTE_HOST=builder
 # or:
-#   export JCODE_REMOTE_HOST=builder
+#   export NEXT_CODE_REMOTE_HOST=builder
 #
 # Explicit environment variables take precedence over values loaded from the
 # config file. This lets callers temporarily disable remote builds with, for
-# example, `JCODE_REMOTE_CARGO=0 scripts/dev_cargo.sh check`.
+# example, `NEXT_CODE_REMOTE_CARGO=0 scripts/dev_cargo.sh check`.
 
 next_code_remote_config_path() {
   if [[ -n "${NEXT_CODE_REMOTE_CONFIG:-${JCODE_REMOTE_CONFIG:-}}" ]]; then

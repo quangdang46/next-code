@@ -7,7 +7,7 @@
 //! 3. **Builtins** registered programmatically via [`AgentRegistry::register_builtin`]
 //!
 //! When the same id appears in multiple sources, the higher-priority one
-//! wins. The registry tracks where each agent came from so `jcode doctor`
+//! wins. The registry tracks where each agent came from so `next-code doctor`
 //! can show provenance.
 //!
 //! ## What this module does NOT do
@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-/// Where an agent definition was loaded from. Surfaced in `jcode doctor`
+/// Where an agent definition was loaded from. Surfaced in `next-code doctor`
 /// and conflict warnings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentSource {
@@ -48,7 +48,7 @@ impl AgentSource {
         }
     }
 
-    /// Short human-readable label for `jcode doctor` output.
+    /// Short human-readable label for `next-code doctor` output.
     pub fn short_label(&self) -> String {
         match self {
             AgentSource::Builtin => "builtin".to_string(),
@@ -102,7 +102,7 @@ pub enum LoadError {
 pub struct AgentRegistry {
     by_id: HashMap<String, LoadedAgent>,
     /// Non-fatal load errors collected during discovery. Surfaced by
-    /// `jcode doctor` so users can see why a malformed file was skipped.
+    /// `next-code doctor` so users can see why a malformed file was skipped.
     load_errors: Vec<LoadError>,
 }
 
@@ -322,10 +322,10 @@ impl AgentRegistry {
 }
 
 /// Tag for `load_directory` so the caller decides how loaded entries are
-/// labeled. The function itself doesn't care about jcode's path convention.
+/// labeled. The function itself doesn't care about next-code's path convention.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SourceKind {
-    /// Read-only agents shipped with jcode or installed by admin.
+    /// Read-only agents shipped with next-code or installed by admin.
     Managed,
     /// User-global agents at ~/.next-code/agents/.
     UserGlobal,
@@ -346,7 +346,7 @@ mod tests {
 
     fn temp_dir(name: &str) -> PathBuf {
         let base = std::env::temp_dir().join(format!(
-            "jcode-agent-registry-test-{}-{}-{}",
+            "next-code-agent-registry-test-{}-{}-{}",
             name,
             std::process::id(),
             // Use atomics for a per-process counter so concurrent tests don't collide.
@@ -364,7 +364,7 @@ mod tests {
         let mut reg = AgentRegistry::new();
         let n = reg
             .load_directory(
-                Path::new("/nonexistent/jcode-test-dir"),
+                Path::new("/nonexistent/next-code-test-dir"),
                 SourceKind::UserGlobal,
             )
             .unwrap();

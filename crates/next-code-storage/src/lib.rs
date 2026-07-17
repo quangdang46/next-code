@@ -39,7 +39,7 @@ static MIGRATE_LOG_ONCE: Once = Once::new();
 /// - Fallback: `std::env::temp_dir()`
 ///
 /// Can be overridden with `$NEXT_CODE_RUNTIME_DIR` (canonical) or legacy
-/// `$JCODE_RUNTIME_DIR`.
+/// `$NEXT_CODE_RUNTIME_DIR`.
 pub fn runtime_dir() -> PathBuf {
     if let Ok(dir) = next_code_core::env::product_env("RUNTIME_DIR") {
         return PathBuf::from(dir);
@@ -134,7 +134,7 @@ pub const PROJECT_DIR_CANDIDATES: &[&str] = &[".next-code", ".jcode"];
 
 /// Resolve a path under the project-local product directory.
 ///
-/// Tries `<root>/.next-code/<relative>` first, then `<root>/.jcode/<relative>`.
+/// Tries `<root>/.next-code/<relative>` first, then `<root>/.next-code/<relative>`.
 /// Returns the first candidate that exists. When neither exists, returns the
 /// canonical `.next-code` path so callers that create the path write to the
 /// new name.
@@ -717,7 +717,7 @@ mod tests {
         let prev_home = std::env::var_os("HOME");
         next_code_core::env::set_var("HOME", sandbox.path());
 
-        // No .jcode, no .next-code yet — resolve to the new path without creating it.
+        // No .next-code, no .next-code yet — resolve to the new path without creating it.
         let got = next_code_dir().unwrap();
         assert_eq!(got, sandbox.path().join(".next-code"));
         assert!(

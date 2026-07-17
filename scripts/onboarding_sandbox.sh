@@ -23,7 +23,7 @@ run_in_sandbox() {
     cd "$repo_root"
     # Strip any inherited self-dev markers so the sandbox behaves like a real
     # first-run install. `--no-selfdev` only prevents *setting*
-    # JCODE_CLIENT_SELFDEV_MODE; it cannot unset one inherited from a parent
+    # NEXT_CODE_CLIENT_SELFDEV_MODE; it cannot unset one inherited from a parent
     # self-dev shell, which would otherwise force every sandbox session canary
     # (suppressing the new-session suggestion cards we are trying to verify).
     env -u JCODE_CLIENT_SELFDEV_MODE -u JCODE_SELFDEV -u JCODE_CANARY \
@@ -89,7 +89,7 @@ status() {
   ensure_dirs
   echo "Sandbox name: $sandbox_name"
   echo "Sandbox root: $sandbox_root"
-  echo "JCODE_HOME:   $next_code_home"
+  echo "NEXT_CODE_HOME:   $next_code_home"
   echo "RUNTIME_DIR:  $runtime_dir"
   echo
 
@@ -107,8 +107,8 @@ reset() {
 open_shell() {
   ensure_dirs
   echo "Opening sandbox shell"
-  echo "  JCODE_HOME=$next_code_home"
-  echo "  JCODE_RUNTIME_DIR=$runtime_dir"
+  echo "  NEXT_CODE_HOME=$next_code_home"
+  echo "  NEXT_CODE_RUNTIME_DIR=$runtime_dir"
   env JCODE_HOME="$next_code_home" JCODE_RUNTIME_DIR="$runtime_dir" bash --noprofile --norc
 }
 
@@ -118,8 +118,8 @@ run_jcode() {
   # auto-detect the repository and join the shared self-dev server (remote
   # mode), which both breaks isolation and skips local-only first-run behavior
   # like the new-session model validation. `--no-selfdev` keeps it standalone,
-  # spawning its own server under the sandbox's JCODE_RUNTIME_DIR. Set
-  # JCODE_SANDBOX_SELFDEV=1 to opt back into the shared-server behavior.
+  # spawning its own server under the sandbox's NEXT_CODE_RUNTIME_DIR. Set
+  # NEXT_CODE_SANDBOX_SELFDEV=1 to opt back into the shared-server behavior.
   local prefix=()
   if [[ "${NEXT_CODE_SANDBOX_SELFDEV:-${JCODE_SANDBOX_SELFDEV:-0}}" != "1" ]]; then
     prefix=(--no-selfdev)

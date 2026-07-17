@@ -87,20 +87,20 @@ maybe_enable_sccache() {
   # sccache cannot cache incremental compilations, so for our default
   # incremental profiles it produces 0% hits while adding wrapper overhead and
   # misleading "enabled" status. Skip it for incremental builds unless the
-  # caller explicitly forces it via JCODE_SCCACHE=1/on/force.
+  # caller explicitly forces it via NEXT_CODE_SCCACHE=1/on/force.
   local force_sccache="${NEXT_CODE_SCCACHE:-${JCODE_SCCACHE:-auto}}"
   case "$force_sccache" in
     1|true|yes|on|force) force_sccache="1" ;;
     0|false|no|off|never)
       sccache_status="disabled-by-next-code-sccache"
-      log "sccache disabled by JCODE_SCCACHE"
+      log "sccache disabled by NEXT_CODE_SCCACHE"
       return
       ;;
     *) force_sccache="auto" ;;
   esac
   if [[ "$force_sccache" != "1" ]] && build_is_incremental "$@"; then
     sccache_status="skipped-incremental"
-    log "sccache skipped for incremental build (it cannot cache incremental units; set JCODE_SCCACHE=on to force, or use a non-incremental profile)"
+    log "sccache skipped for incremental build (it cannot cache incremental units; set NEXT_CODE_SCCACHE=on to force, or use a non-incremental profile)"
     return
   fi
 
@@ -188,7 +188,7 @@ validate_feature_profile() {
     ""|default|minimal|none|pdf|embeddings|full)
       ;;
     *)
-      printf 'error: unsupported JCODE_DEV_FEATURE_PROFILE=%s (expected default|minimal|pdf|embeddings|full)\n' "$profile" >&2
+      printf 'error: unsupported NEXT_CODE_DEV_FEATURE_PROFILE=%s (expected default|minimal|pdf|embeddings|full)\n' "$profile" >&2
       exit 1
       ;;
   esac
@@ -272,7 +272,7 @@ cpu_count() {
 # coarse sample, and next-code-base keeps growing) so a fresh build under load backs
 # off before earlyoom SIGTERMs it. Clamp into [1, cpus]. On an idle 15 GiB
 # machine this still uses ~7 of 8 cores; under memory pressure a fresh build
-# backs off further. An explicit CARGO_BUILD_JOBS / JCODE_BUILD_JOBS always
+# backs off further. An explicit CARGO_BUILD_JOBS / NEXT_CODE_BUILD_JOBS always
 # wins, and non-Linux hosts fall back to the cargo/.cargo default.
 select_build_jobs() {
   # Respect an explicit override from either env var.
@@ -303,7 +303,7 @@ select_build_jobs() {
   # Per-job memory budget (MiB). Sized with a cushion above the largest measured
   # rustc unit (next-code-base, ~1.6 GiB RSS sampled) so an idle machine uses nearly
   # every core while a memory-pressured one backs off before earlyoom kills a
-  # build. Tunable per host via JCODE_BUILD_MIB_PER_JOB.
+  # build. Tunable per host via NEXT_CODE_BUILD_MIB_PER_JOB.
   mib_per_job_default=1792
   mib_per_job="${NEXT_CODE_BUILD_MIB_PER_JOB:-${JCODE_BUILD_MIB_PER_JOB:-$mib_per_job_default}}"
   [[ "$mib_per_job" =~ ^[0-9]+$ && "$mib_per_job" -ge 256 ]] || mib_per_job="$mib_per_job_default"
@@ -321,7 +321,7 @@ select_build_jobs() {
   export CARGO_BUILD_JOBS="$jobs"
   build_jobs_status="adaptive:${jobs} (cpus=${cpus}, mem_avail=${mem_available_mib}MiB, budget=${mib_per_job}MiB/job)"
   if (( jobs < cpus )); then
-    log "limiting cargo to ${jobs} job(s) under memory pressure (${mem_available_mib}MiB available, ~${mib_per_job}MiB/job); override with JCODE_BUILD_JOBS"
+    log "limiting cargo to ${jobs} job(s) under memory pressure (${mem_available_mib}MiB available, ~${mib_per_job}MiB/job); override with NEXT_CODE_BUILD_JOBS"
   fi
 }
 
@@ -338,12 +338,12 @@ select_build_jobs() {
 # manually touched Cargo.toml.
 #
 # Instead, export the *value* of the current git hash/date. build.rs declares
-# `cargo:rerun-if-env-changed=JCODE_BUILD_GIT_HASH` (and _DATE), so cargo reruns
+# `cargo:rerun-if-env-changed=NEXT_CODE_BUILD_GIT_HASH` (and _DATE), so cargo reruns
 # the build script ONLY when these values change -- i.e. exactly when HEAD moves
 # -- and never on a bare `git add`/`status` or repeated builds on the same
 # commit. This keeps the embedded hash correct after every commit while keeping
 # same-commit incremental builds fully incremental. We intentionally do NOT
-# export JCODE_BUILD_GIT_DIRTY here: the dirty flag flips on every edit and would
+# export NEXT_CODE_BUILD_GIT_DIRTY here: the dirty flag flips on every edit and would
 # reintroduce per-build churn; the publish guard validates dirty builds via the
 # source fingerprint / mtime path instead of the embedded flag.
 export_git_build_metadata() {
@@ -391,7 +391,7 @@ maybe_configure_low_memory_selfdev() {
       fi
       ;;
     *)
-      printf 'error: unsupported JCODE_SELFDEV_LOW_MEMORY=%s (expected auto|on|off)\n' "$mode" >&2
+      printf 'error: unsupported NEXT_CODE_SELFDEV_LOW_MEMORY=%s (expected auto|on|off)\n' "$mode" >&2
       exit 1
       ;;
   esac
@@ -422,9 +422,9 @@ maybe_configure_low_memory_selfdev() {
 # the front-end, not codegen, so we deliberately do not enable it.
 #
 # Controls:
-#   JCODE_PARALLEL_FRONTEND=auto|0|1   (default auto)
-#   JCODE_FRONTEND_THREADS=<n>         (default 4; diminishing returns past 4)
-#   JCODE_DEV_TOOLCHAIN=<name>         (default: nightly when present)
+#   NEXT_CODE_PARALLEL_FRONTEND=auto|0|1   (default auto)
+#   NEXT_CODE_FRONTEND_THREADS=<n>         (default 4; diminishing returns past 4)
+#   NEXT_CODE_DEV_TOOLCHAIN=<name>         (default: nightly when present)
 parallel_frontend_status="disabled"
 parallel_frontend_toolchain=""
 
@@ -465,7 +465,7 @@ configure_parallel_frontend() {
   # isolated `target/selfdev` dir that only this script + `selfdev build` use, so
   # adding `-Zthreads` to RUSTFLAGS (which changes cargo's unit fingerprint)
   # cannot thrash rust-analyzer's `target/debug` cache. Forcing the flag on
-  # (`JCODE_PARALLEL_FRONTEND=1`) opts dev/test in too, accepting that potential
+  # (`NEXT_CODE_PARALLEL_FRONTEND=1`) opts dev/test in too, accepting that potential
   # cache contention.
   local profile
   profile=$(selected_profile "$@")
@@ -540,7 +540,7 @@ configure_linux_linker() {
     lld|mold|system)
       ;;
     *)
-      printf 'error: unsupported JCODE_FAST_LINKER=%s (expected auto|lld|mold|system)\n' "$mode" >&2
+      printf 'error: unsupported NEXT_CODE_FAST_LINKER=%s (expected auto|lld|mold|system)\n' "$mode" >&2
       exit 1
       ;;
   esac
@@ -711,7 +711,7 @@ remote_tcp_reachable() {
 remote_cargo_preflight() {
   local remote="${NEXT_CODE_REMOTE_HOST:-${JCODE_REMOTE_HOST:-}}"
   if [[ -z "$remote" ]]; then
-    log "remote cargo requested but JCODE_REMOTE_HOST is not configured"
+    log "remote cargo requested but NEXT_CODE_REMOTE_HOST is not configured"
     return 1
   fi
 
@@ -733,7 +733,7 @@ remote_cargo_preflight() {
 
   # Fast TCP pre-probe to fail fast when the host is offline, unless the
   # connection is proxied (where a direct probe would be wrong) or explicitly
-  # disabled via JCODE_REMOTE_TCP_PROBE=0.
+  # disabled via NEXT_CODE_REMOTE_TCP_PROBE=0.
   local tcp_probe="${NEXT_CODE_REMOTE_TCP_PROBE:-${JCODE_REMOTE_TCP_PROBE:-1}}"
   case "$tcp_probe" in
     0|false|no|off) tcp_probe="0" ;;
@@ -781,7 +781,7 @@ remote_cargo_fallback_mode() {
       printf 'error\n'
       ;;
     *)
-      printf 'error: unsupported JCODE_REMOTE_CARGO_FALLBACK=%s (expected local|error)\n' "$mode" >&2
+      printf 'error: unsupported NEXT_CODE_REMOTE_CARGO_FALLBACK=%s (expected local|error)\n' "$mode" >&2
       exit 2
       ;;
   esac
@@ -828,7 +828,7 @@ run_local_cargo() {
     if [[ "$status" -eq 0 ]] \
       && grep -qE '^running 0 tests$' "$output_file" \
       && ! grep -qE '^running [1-9][0-9]* tests$' "$output_file"; then
-      printf 'dev_cargo: explicit cargo test filter matched zero tests; check the test path/name or set JCODE_DEV_CARGO_ALLOW_ZERO_TESTS=1 to allow this intentionally\n' >&2
+      printf 'dev_cargo: explicit cargo test filter matched zero tests; check the test path/name or set NEXT_CODE_DEV_CARGO_ALLOW_ZERO_TESTS=1 to allow this intentionally\n' >&2
       rm -f "$output_file"
       return 97
     fi
@@ -866,7 +866,7 @@ if [[ "${NEXT_CODE_REMOTE_CARGO:-${JCODE_REMOTE_CARGO:-0}}" == "1" ]]; then
     exec "$repo_root/scripts/remote_build.sh" "${cargo_argv[@]}"
   fi
   if [[ "$(remote_cargo_fallback_mode)" == "local" ]]; then
-    log "remote cargo unavailable; falling back to local cargo (set JCODE_REMOTE_CARGO_FALLBACK=error to fail instead)"
+    log "remote cargo unavailable; falling back to local cargo (set NEXT_CODE_REMOTE_CARGO_FALLBACK=error to fail instead)"
   else
     log "remote cargo unavailable and fallback disabled"
     exit 75
