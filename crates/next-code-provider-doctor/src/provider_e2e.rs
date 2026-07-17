@@ -2507,7 +2507,7 @@ mod tests {
             NativeProviderKind::Cursor,
             NativeProviderKind::Copilot,
             NativeProviderKind::Bedrock,
-            NativeProviderKind::            NativeProviderKind::Azure,
+            NativeProviderKind::Azure,
         ] {
             let id = kind.spec().provider_id;
             assert!(

@@ -10,7 +10,6 @@ fn with_clean_provider_test_env<T>(f: impl FnOnce() -> T) -> T {
     register_test_external_runtimes();
     let temp = tempfile::tempdir().expect("tempdir");
     let prev_home = product_env_os("HOME");
-    let prev_subscription =
     let mut profile_env_keys = vec![
         "OPENROUTER_API_KEY",
         "DEEPSEEK_API_KEY",
@@ -71,12 +70,6 @@ fn with_clean_provider_test_env<T>(f: impl FnOnce() -> T) -> T {
         crate::env::set_var("NEXT_CODE_HOME", prev_home);
     } else {
         crate::env::remove_var("NEXT_CODE_HOME");
-    }
-    if let Some(prev_subscription) = prev_subscription {
-        crate::env::set_var(
-            prev_subscription,
-        );
-    } else {
     }
     for (key, value) in saved_profile_env {
         if let Some(value) = value {

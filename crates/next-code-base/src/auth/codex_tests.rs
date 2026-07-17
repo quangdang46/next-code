@@ -311,7 +311,7 @@ fn load_credentials_reads_legacy_oauth_when_allowed() {
     let _lock = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
-    let _allow = EnvVarGuard::set(ALLOW_LEGACY_AUTH_ENV, "1");
+    let _allow = EnvVarGuard::set("NEXT_CODE_ALLOW_CODEX_LEGACY_AUTH", "1");
     set_active_account_override(None);
 
     let legacy_path = temp
@@ -350,7 +350,7 @@ fn load_credentials_reads_legacy_oauth_without_changing_external_permissions() {
     let _lock = crate::storage::lock_test_env();
     let temp = tempfile::TempDir::new().unwrap();
     let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
-    let _allow = EnvVarGuard::set(ALLOW_LEGACY_AUTH_ENV, "1");
+    let _allow = EnvVarGuard::set("NEXT_CODE_ALLOW_CODEX_LEGACY_AUTH", "1");
     set_active_account_override(None);
 
     let legacy_path = temp

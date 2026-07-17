@@ -603,7 +603,8 @@ async fn gmail_is_exposed_by_default_and_can_be_explicitly_disabled() {
         "{tool_name} must be listed as model-visible by default"
     );
     agent
-        .validate_tool_allowed(tool_name)
+        .validate_tool_allowed(tool_name, None)
+        .await
         .expect("gmail must be executable by default");
 
     crate::env::set_var("NEXT_CODE_DISABLED_TOOLS", tool_name);
@@ -626,7 +627,8 @@ async fn gmail_is_exposed_by_default_and_can_be_explicitly_disabled() {
         "explicitly disabled {tool_name} must not be listed as model-visible"
     );
     let err = agent
-        .validate_tool_allowed(tool_name)
+        .validate_tool_allowed(tool_name, None)
+        .await
         .expect_err("explicitly disabled gmail must not be executable");
     assert!(err.to_string().contains("disabled"));
 

@@ -210,6 +210,8 @@ async fn test_batch_resolves_function_namespaced_tools() {
         stdin_request_tx: None,
         graceful_shutdown_signal: None,
         execution_mode: ToolExecutionMode::Direct,
+        best_of_n_run_id: None,
+        best_of_n_candidate_id: None,
     };
 
     let result = registry
@@ -245,6 +247,8 @@ async fn test_batch_rejects_function_namespaced_batch_recursion() {
         stdin_request_tx: None,
         graceful_shutdown_signal: None,
         execution_mode: ToolExecutionMode::Direct,
+        best_of_n_run_id: None,
+        best_of_n_candidate_id: None,
     };
 
     let error = registry

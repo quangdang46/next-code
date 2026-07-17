@@ -598,13 +598,13 @@ mod tests {
     fn blank_env_vars_fall_back_to_built_in_credentials() {
         let _guard = lock_test_env();
         crate::env::set_var("NEXT_CODE_ANTIGRAVITY_CLIENT_ID", "   ");
-        crate::env::set_var(CLIENT_SECRET_ENV, "   ");
+        crate::env::set_var("NEXT_CODE_ANTIGRAVITY_CLIENT_SECRET", "   ");
 
         assert_eq!(antigravity_client_id(), ANTIGRAVITY_CLIENT_ID);
         assert_eq!(antigravity_client_secret(), ANTIGRAVITY_CLIENT_SECRET);
 
         crate::env::remove_var("NEXT_CODE_ANTIGRAVITY_CLIENT_ID");
-        crate::env::remove_var(CLIENT_SECRET_ENV);
+        crate::env::remove_var("NEXT_CODE_ANTIGRAVITY_CLIENT_SECRET");
     }
 
     #[test]

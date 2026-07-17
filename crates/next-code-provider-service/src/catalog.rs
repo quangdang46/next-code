@@ -732,6 +732,7 @@ mod tests {
             enabled: true,
             is_connected: true,
             has_integration: false,
+            body_defaults: None,
             models: vec![
                 ModelInfo {
                     id: "claude-opus-4-8".into(),
@@ -749,6 +750,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
                 ModelInfo {
                     id: "claude-haiku-4-5".into(),
@@ -766,6 +768,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
             ],
         }
@@ -844,6 +847,7 @@ mod tests {
             enabled: true,
             is_connected: true,
             has_integration: false,
+            body_defaults: None,
             models: vec![
                 ModelInfo {
                     id: "claude-haiku-old".into(),
@@ -860,6 +864,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
                 ModelInfo {
                     id: "claude-haiku-new".into(),
@@ -876,6 +881,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
             ],
         };
@@ -899,6 +905,7 @@ mod tests {
             enabled: true,
             is_connected: true,
             has_integration: false,
+            body_defaults: None,
             models: vec![
                 ModelInfo {
                     id: "claude-haiku-ancient".into(),
@@ -915,6 +922,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
                 ModelInfo {
                     id: "claude-haiku-fresh".into(),
@@ -931,6 +939,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
             ],
         };
@@ -953,6 +962,7 @@ mod tests {
             enabled: true,
             is_connected: true,
             has_integration: false,
+            body_defaults: None,
             models: vec![
                 ModelInfo {
                     id: "gpt-flagship".into(),
@@ -969,6 +979,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
                 ModelInfo {
                     id: "gpt-standard".into(),
@@ -985,6 +996,7 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 },
             ],
         };

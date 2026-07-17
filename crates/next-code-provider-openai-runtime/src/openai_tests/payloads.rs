@@ -12,7 +12,6 @@ fn test_build_response_request_includes_stream_for_http() {
         None,
         None,
         None,
-        None,
     );
     assert_eq!(request["stream"], serde_json::json!(true));
     assert_eq!(request["store"], serde_json::json!(false));
@@ -27,7 +26,6 @@ fn test_websocket_payload_strips_stream_and_background() {
         &[],
         false,
         Some(DEFAULT_MAX_OUTPUT_TOKENS),
-        None,
         None,
         None,
         None,
@@ -72,7 +70,6 @@ fn test_websocket_payload_preserves_required_fields() {
         None,
         None,
         None,
-        None,
     );
 
     let obj = request.as_object_mut().expect("request is object");
@@ -106,7 +103,6 @@ fn test_websocket_continuation_request_excludes_transport_fields() {
         None,
         Some("flex"),
         Some("next-code-test-cache"),
-        Some("24h"),
         Some(160_000),
     );
 

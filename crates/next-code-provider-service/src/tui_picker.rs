@@ -269,6 +269,7 @@ mod tests {
                         base_url: None,
                         path: None,
                         protocol: None,
+                        body_overrides: None,
                     },
                     ModelInfo {
                         id: "claude-haiku-4-5".into(),
@@ -286,12 +287,14 @@ mod tests {
                         base_url: None,
                         path: None,
                         protocol: None,
+                        body_overrides: None,
                     },
                 ],
                 api_key: None,
                 protocol: "anthropic-messages-2023-01-01".into(),
                 path: "/v1/messages".into(),
                 base_url: "https://api.anthropic.com".into(),
+                body_defaults: None,
             },
             ProviderInfo {
                 id: "openai".into(),
@@ -315,11 +318,13 @@ mod tests {
                     base_url: None,
                     path: None,
                     protocol: None,
+                    body_overrides: None,
                 }],
                 api_key: None,
                 protocol: "anthropic-messages-2023-01-01".into(),
                 path: "/v1/messages".into(),
                 base_url: "https://api.anthropic.com".into(),
+                body_defaults: None,
             },
         ] {
             c.register_provider(p.clone()).await.unwrap();
