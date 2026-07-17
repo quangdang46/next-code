@@ -91,16 +91,33 @@ pub enum Stream {
 impl Stream {
     pub async fn connect(path: impl AsRef<Path>) -> io::Result<Self> {
         let pipe_name = path_to_pipe_name(path.as_ref());
+        // Named-pipe CreateFile can block while a server instance exists but has
+        // not yet accepted. Bound the wait so readiness probes cannot hang the
+        // process (e.g. Listener::bind without an accept loop).
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_millis(250);
         loop {
-            match ClientOptions::new().open(&pipe_name) {
+            let name = pipe_name.clone();
+            let open_result = tokio::task::spawn_blocking(move || ClientOptions::new().open(&name))
+                .await
+                .map_err(|err| io::Error::other(format!("named pipe open join error: {err}")))?;
+            match open_result {
                 Ok(client) => return Ok(Stream::Client(client)),
                 Err(e)
                     if e.raw_os_error()
                         == Some(windows_sys::Win32::Foundation::ERROR_PIPE_BUSY as i32) =>
                 {
-                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                    if tokio::time::Instant::now() >= deadline {
+                        return Err(e);
+                    }
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
                 }
                 Err(e) => return Err(e),
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    format!("timed out connecting to named pipe {pipe_name}"),
+                ));
             }
         }
     }
@@ -333,8 +350,18 @@ impl io::Write for SyncStream {
 }
 
 pub fn is_socket_path(path: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+
     let pipe_name = path_to_pipe_name(path);
-    ClientOptions::new().open(&pipe_name).is_ok()
+    // Probe without opening a client. Opening would consume the waiting server
+    // instance and can leave subsequent connects stuck on ERROR_PIPE_BUSY.
+    let wide: Vec<u16> = std::ffi::OsStr::new(&pipe_name)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
+    // Use a short wait instead of NMPWAIT_NOWAIT — some Windows builds report a
+    // waiting CreateNamedPipe instance only after a non-zero timeout.
+    unsafe { windows_sys::Win32::System::Pipes::WaitNamedPipeW(wide.as_ptr(), 50) != 0 }
 }
 
 pub fn remove_socket(path: &Path) {

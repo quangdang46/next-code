@@ -70,6 +70,12 @@ async fn pending_restore_returns_false_for_unarmed_snapshot() {
 async fn pending_restore_does_not_auto_restore_recent_crash_without_snapshot() {
     let _guard = TestEnvGuard::new().expect("setup test env");
 
+    #[cfg(windows)]
+    let mut child = std::process::Command::new("cmd")
+        .args(["/C", "exit 0"])
+        .spawn()
+        .expect("spawn child");
+    #[cfg(not(windows))]
     let mut child = std::process::Command::new("sh")
         .arg("-c")
         .arg("exit 0")

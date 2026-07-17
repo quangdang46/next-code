@@ -1233,7 +1233,10 @@ pub(crate) async fn wait_for_reloading_server() -> bool {
 }
 
 async fn server_is_running_at(path: &std::path::Path) -> bool {
-    server::is_server_ready(path).await || server::has_live_listener(path).await
+    // Prefer the cheap listener probe first. On Windows named pipes, a ping-based
+    // readiness connect can consume the only waiting server instance (or block)
+    // when nothing is accepting yet.
+    server::has_live_listener(path).await || server::is_server_ready(path).await
 }
 
 #[cfg(unix)]

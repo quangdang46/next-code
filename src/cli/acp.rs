@@ -1187,7 +1187,11 @@ mod tests {
     fn cwd_must_be_absolute() {
         let params = json!({"cwd": "relative"});
         assert!(cwd_from_params(&params).is_err());
-        let params = json!({"cwd": "/tmp"});
-        assert_eq!(cwd_from_params(&params).unwrap(), Path::new("/tmp"));
+        #[cfg(windows)]
+        let absolute = r"C:\tmp";
+        #[cfg(not(windows))]
+        let absolute = "/tmp";
+        let params = json!({"cwd": absolute});
+        assert_eq!(cwd_from_params(&params).unwrap(), Path::new(absolute));
     }
 }

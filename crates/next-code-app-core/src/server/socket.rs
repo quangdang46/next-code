@@ -71,7 +71,22 @@ pub async fn connect_socket(path: &std::path::Path) -> Result<Stream> {
 }
 
 pub(super) async fn socket_has_live_listener(path: &std::path::Path) -> bool {
-    crate::transport::is_socket_path(path) && Stream::connect(path).await.is_ok()
+    #[cfg(windows)]
+    {
+        // Prefer WaitNamedPipe (does not consume a server instance). Fall back to a
+        // short timed connect for servers that are already accepting.
+        if crate::transport::is_socket_path(path) {
+            return true;
+        }
+        matches!(
+            tokio::time::timeout(Duration::from_millis(150), Stream::connect(path)).await,
+            Ok(Ok(_))
+        )
+    }
+    #[cfg(not(windows))]
+    {
+        crate::transport::is_socket_path(path) && Stream::connect(path).await.is_ok()
+    }
 }
 
 /// Reap a provably-stale socket left behind by a dead daemon.

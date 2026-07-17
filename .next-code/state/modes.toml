@@ -1,11 +1,2 @@
-updated_at = "2026-07-09T14:35:25.947193+00:00"
-
-[[active_modes]]
-workflow = "ultraqa"
-activated_at = "2026-06-21T16:51:36.546100+00:00"
-turn_count = 5
-turn_limit = 10
-
-[active_modes.metadata]
-qa_phase = "implement"
-qa_iteration = "0"
+active_modes = []
+updated_at = "2026-07-17T04:29:54.428686500+00:00"

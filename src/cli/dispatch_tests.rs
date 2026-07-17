@@ -210,9 +210,16 @@ async fn wait_for_resuming_server_detects_delayed_listener_without_marker() {
     let (release_tx, release_rx) = tokio::sync::oneshot::channel();
     let bind_task = tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let listener = Listener::bind(&bind_path).expect("bind delayed listener");
-        let _listener = listener;
+        let mut listener = Listener::bind(&bind_path).expect("bind delayed listener");
+        let accept_task = tokio::spawn(async move {
+            loop {
+                if listener.accept().await.is_err() {
+                    break;
+                }
+            }
+        });
         let _ = release_rx.await;
+        accept_task.abort();
     });
 
     let result = tokio::time::timeout(
@@ -255,9 +262,19 @@ async fn wait_for_reloading_server_returns_false_when_reload_failed() {
 async fn wait_for_reloading_server_returns_true_for_live_listener() {
     let _guard = crate::storage::lock_test_env();
     let env = ReloadTestEnv::new();
-    let _listener = Listener::bind(&env.socket_path).expect("bind listener");
+    let mut listener = Listener::bind(&env.socket_path).expect("bind listener");
+    // Windows named pipes require Accept/ConnectNamedPipe before clients complete;
+    // keep accepting so the live-listener probe can observe the server.
+    let accept_task = tokio::spawn(async move {
+        loop {
+            if listener.accept().await.is_err() {
+                break;
+            }
+        }
+    });
 
     assert!(wait_for_reloading_server().await);
+    accept_task.abort();
 }
 
 #[tokio::test]

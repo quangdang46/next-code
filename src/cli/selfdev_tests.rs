@@ -233,9 +233,17 @@ async fn test_wait_for_reloading_server_returns_true_for_live_listener() {
     let temp = tempfile::tempdir().expect("tempdir");
     let socket_path = temp.path().join("next-code.sock");
     let _env = set_socket_test_env(&socket_path, temp.path());
-    let _listener = crate::transport::Listener::bind(&socket_path).expect("bind listener");
+    let mut listener = crate::transport::Listener::bind(&socket_path).expect("bind listener");
+    let accept_task = tokio::spawn(async move {
+        loop {
+            if listener.accept().await.is_err() {
+                break;
+            }
+        }
+    });
 
     assert!(wait_for_reloading_server().await);
+    accept_task.abort();
 }
 
 fn isolated_launcher_env() -> (
@@ -245,9 +253,19 @@ fn isolated_launcher_env() -> (
 ) {
     let lock = lock_env();
     let temp = tempfile::tempdir().expect("tempdir");
-    let env = EnvVarGuard::capture(&["NEXT_CODE_INSTALL_DIR", "NEXT_CODE_HOME", "HOME", "USERPROFILE"]);
+    let env = EnvVarGuard::capture(&[
+        "NEXT_CODE_INSTALL_DIR",
+        "NEXT_CODE_HOME",
+        "HOME",
+        "USERPROFILE",
+        "LOCALAPPDATA",
+    ]);
     crate::env::set_var("HOME", temp.path());
     crate::env::set_var("USERPROFILE", temp.path());
+    crate::env::set_var(
+        "LOCALAPPDATA",
+        temp.path().join("AppData").join("Local"),
+    );
     crate::env::remove_var("NEXT_CODE_INSTALL_DIR");
     crate::env::remove_var("NEXT_CODE_HOME");
     (lock, env, temp)
