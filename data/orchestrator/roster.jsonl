@@ -1,0 +1,6 @@
+{"ts": "2026-07-18T03:41:36.432683+00:00", "event": "spawn", "pane_id": "w3R:p2", "role": "implementer", "name": "impl-appcore", "model": "default"}
+{"ts": "2026-07-18T03:41:36.432683+00:00", "event": "spawn", "pane_id": "w3S:p2", "role": "implementer", "name": "impl-tui", "model": "default"}
+{"ts": "2026-07-18T03:41:36.432683+00:00", "event": "spawn", "pane_id": "w3T:p2", "role": "implementer", "name": "impl-cli-base", "model": "default"}
+{"ts": "2026-07-18T04:59:37.222606+00:00", "event": "spawn", "pane_id": "w3V:p2", "role": "reviewer", "name": "check-base", "plan": "pre-merge-check"}
+{"ts": "2026-07-18T04:59:37.222606+00:00", "event": "spawn", "pane_id": "w3W:p2", "role": "reviewer", "name": "check-residual", "plan": "pre-merge-check"}
+{"ts": "2026-07-18T04:59:37.222606+00:00", "event": "spawn", "pane_id": "w3X:p2", "role": "reviewer", "name": "check-tui", "plan": "pre-merge-check"}

@@ -39,29 +39,14 @@ report_install_funnel() {
   stage="$1"
   outcome="$2"
   failure_stage="${3:-}"
-  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY)" != "1" ] || return 0
   [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
   valid_conversion_id || return 0
 
-  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-}"
-  payload=$(printf '{"id":"%s","event":"install_funnel","version":"%s","os":"%s","arch":"%s","conversion_id":"%s","stage":"%s","outcome":"%s","source":"installer","install_method":"shell","failure_stage":"%s"}' \
-    "$conversion_id" \
-    "$(telemetry_value "$INSTALL_VERSION")" \
-    "$(telemetry_value "$INSTALL_OS")" \
-    "$(telemetry_value "$INSTALL_ARCH")" \
-    "$conversion_id" \
-    "$(telemetry_value "$stage")" \
-    "$(telemetry_value "$outcome")" \
-    "$(telemetry_value "$failure_stage")")
-  curl -fsS --max-time 2 -H 'Content-Type: application/json' \
-    --data "$payload" https://telemetry.next-code.sh/v1/event >/dev/null 2>&1 || true
 }
 
 persist_install_conversion_id() {
-  [ "$(next_code_env NEXT_CODE_NO_TELEMETRY)" != "1" ] || return 0
   [ "${DO_NOT_TRACK:-}" != "1" ] || return 0
   valid_conversion_id || return 0
-  conversion_id="${NEXT_CODE_INSTALL_CONVERSION_ID:-}"
   # Prefer NEXT_CODE_HOME, then ~/.next-code.
   next_code_home="$(next_code_env NEXT_CODE_HOME "$HOME/.next-code")"
   mkdir -p "$next_code_home" 2>/dev/null || return 0
@@ -76,9 +61,7 @@ install_exit() {
   set +e
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
   if [ "$INSTALL_SUCCEEDED" = "1" ] && [ "$status" = "0" ]; then
-    report_install_funnel "installer_finish" "success" ""
   else
-    report_install_funnel "installer_finish" "failure" "$INSTALL_STAGE"
   fi
   exit "$status"
 }
@@ -122,7 +105,6 @@ case "$OS" in
     ;;
 esac
 
-report_install_funnel "installer_start" "success" ""
 
 if [ "$IS_WINDOWS" = true ]; then
   INSTALL_DIR="$(next_code_env NEXT_CODE_INSTALL_DIR "$LOCALAPPDATA/next-code/bin")"
@@ -408,6 +390,5 @@ else
   fi
 fi
 
-persist_install_conversion_id
 INSTALL_STAGE="complete"
 INSTALL_SUCCEEDED=1

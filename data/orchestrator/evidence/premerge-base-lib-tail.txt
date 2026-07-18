@@ -1,0 +1,80 @@
+failures:
+
+---- config::tests::test_generated_default_config_uses_low_openai_reasoning_effort stdout ----
+
+thread 'config::tests::test_generated_default_config_uses_low_openai_reasoning_effort' (84120776) panicked at crates/next-code-base/src/config_tests.rs:489:5:
+generated default config should document the Luna memory sidecar default
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- config::tests::tool_config_acp_profile_allows_core_coding_plus_batch stdout ----
+
+thread 'config::tests::tool_config_acp_profile_allows_core_coding_plus_batch' (84120784) panicked at crates/next-code-base/src/config_tests.rs:374:5:
+assertion failed: allowed.contains("apply_patch")
+
+---- config::tests::tool_config_minimal_profile_allows_core_coding_tools stdout ----
+
+thread 'config::tests::tool_config_minimal_profile_allows_core_coding_tools' (84120791) panicked at crates/next-code-base/src/config_tests.rs:402:5:
+assertion failed: allowed.contains("apply_patch")
+
+---- memory::tests::hybrid_fuse_returns_dense_hits_without_lexical_overlap stdout ----
+
+thread 'memory::tests::hybrid_fuse_returns_dense_hits_without_lexical_overlap' (84133863) panicked at crates/next-code-base/src/memory_tests.rs:777:5:
+assertion failed: !ranked.is_empty()
+
+---- memory::tests::score_and_filter_prioritizes_matching_skill_memories stdout ----
+
+thread 'memory::tests::score_and_filter_prioritizes_matching_skill_memories' (84133945) panicked at crates/next-code-base/src/memory_tests.rs:715:5:
+assertion `left == right` failed
+  left: 0
+ right: 2
+
+---- platform::platform_tests::spawn_detached_creates_new_session stdout ----
+
+thread 'platform::platform_tests::spawn_detached_creates_new_session' (84138208) panicked at crates/next-code-base/src/platform_tests.rs:28:5:
+child should exit successfully
+
+---- provider::tests::test_should_failover_on_access_denied stdout ----
+
+thread 'provider::tests::test_should_failover_on_access_denied' (84141031) panicked at crates/next-code-base/src/provider/tests/fallback_failover.rs:256:5:
+assertion failed: MultiProvider::classify_failover_error(&err).should_failover()
+
+---- session::tests::cases::initial_session_context_can_refresh_before_real_conversation stdout ----
+
+thread 'session::tests::cases::initial_session_context_can_refresh_before_real_conversation' (84141156) panicked at crates/next-code-base/src/session_tests/cases.rs:319:9:
+assertion failed: session.messages[0].content_preview().contains(&format!("Working directory: {}",
+            first_dir.path().display()))
+
+---- session::tests::cases::initial_session_context_does_not_refresh_after_real_conversation stdout ----
+Error: No such file or directory (os error 2)
+
+---- session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted stdout ----
+Error: No such file or directory (os error 2)
+
+---- session::tests::cases::test_render_messages_shows_auto_poke_continuations_as_system_not_user stdout ----
+
+thread 'session::tests::cases::test_render_messages_shows_auto_poke_continuations_as_system_not_user' (84141347) panicked at crates/next-code-base/src/session_tests/cases.rs:1321:5:
+quality continuation should render as system: [RenderedMessage { role: "user", content: "please fix the login bug", tool_calls: [], tool_data: None, stored_index: Some(0) }, RenderedMessage { role: "assistant", content: "Working on it.", tool_calls: [], tool_data: None, stored_index: Some(1) }, RenderedMessage { role: "system", content: "You have 2 incomplete todos. Continue working, or update the todo tool.", tool_calls: [], tool_data: None, stored_index: Some(2) }, RenderedMessage { role: "system", content: "Your completion confidence is missing or not high enough. Validate the completed result more thoroughly, address any remaining issues, and then reassess whether the work is ready to finalize.", tool_calls: [], tool_data: None, stored_index: Some(3) }]
+
+---- skill::tests::reload_global_excludes_project_local_skills stdout ----
+
+thread 'skill::tests::reload_global_excludes_project_local_skills' (84141723) panicked at crates/next-code-base/src/skill.rs:1142:48:
+cwd: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    config::tests::test_generated_default_config_uses_low_openai_reasoning_effort
+    config::tests::tool_config_acp_profile_allows_core_coding_plus_batch
+    config::tests::tool_config_minimal_profile_allows_core_coding_tools
+    memory::tests::hybrid_fuse_returns_dense_hits_without_lexical_overlap
+    memory::tests::score_and_filter_prioritizes_matching_skill_memories
+    platform::platform_tests::spawn_detached_creates_new_session
+    provider::tests::test_should_failover_on_access_denied
+    session::tests::cases::initial_session_context_can_refresh_before_real_conversation
+    session::tests::cases::initial_session_context_does_not_refresh_after_real_conversation
+    session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted
+    session::tests::cases::test_render_messages_shows_auto_poke_continuations_as_system_not_user
+    skill::tests::reload_global_excludes_project_local_skills
+
+test result: FAILED. 1072 passed; 12 failed; 1 ignored; 0 measured; 0 filtered out; finished in 55.58s
+
+error: test failed, to rerun pass `-p next-code-base --lib`

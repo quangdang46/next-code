@@ -1,3 +1,5 @@
+> **Historical reference — hosted billing/accounting system was removed.**
+
 # Account Contract Conformance Tests and Test Vectors
 
 Executable conformance design for the next-code subscription account contract:

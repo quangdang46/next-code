@@ -1,0 +1,57 @@
+_account_usage_probe_detects_all_accounts_exhausted ... ok
+test usage::tests::test_account_usage_probe_prefers_best_available_alternative ... ok
+test usage::tests::test_active_anthropic_usage_report_prefers_marked_account ... ok
+test usage::tests::test_activity_sweeper_skips_sources_with_dedicated_reports ... ok
+test usage::tests::test_classify_openai_limits_recognizes_five_weekly_and_spark ... ok
+test usage::tests::test_classify_openai_limits_treats_usage_limit_values_as_percent ... ok
+test usage::tests::test_format_reset_time_past ... ok
+test usage::tests::test_format_reset_time_under_one_minute_rounds_up ... ok
+test usage::tests::test_format_reset_time_uses_days_for_long_windows ... ok
+test usage::tests::test_format_usage_bar ... ok
+test usage::tests::test_get_openai_usage_sync_without_runtime_does_not_panic ... ok
+test usage::tests::test_get_sync_without_runtime_does_not_panic ... ok
+test usage::tests::test_humanize_key ... ok
+test usage::tests::test_mask_email_censors_local_part ... ok
+test usage::tests::test_openai_snapshot_treats_hard_limit_flag_as_exhausted ... ok
+test usage::tests::test_openai_usage_data_becomes_stale_when_reset_time_has_passed ... ok
+test usage::tests::test_openai_usage_data_display_snapshot_clears_passed_reset_window ... ok
+test usage::tests::test_openai_usage_data_from_provider_report_preserves_error ... ok
+test usage::tests::test_openai_usage_data_from_provider_report_preserves_hard_limit_flag ... ok
+test usage::tests::test_parse_openai_hard_limit_reached_detects_rate_limit_denials ... ok
+test usage::tests::test_parse_openai_hard_limit_reached_ignores_unrelated_allowed_flags ... ok
+test usage::tests::test_parse_openai_usage_payload_falls_back_to_nested_rate_limits ... ok
+test usage::tests::test_parse_openai_usage_payload_labels_monthly_primary_window ... ok
+test usage::tests::test_parse_openai_usage_payload_prefers_wham_windows_and_additional_limits ... ok
+test usage::tests::test_parse_openai_wham_windows_preserve_low_percent_values ... ok
+test usage::tests::test_parse_usage_percent_preserves_low_percent_values ... ok
+test usage::tests::test_parse_usage_percent_supports_remaining_limit_shape ... ok
+test usage::tests::test_parse_usage_percent_supports_used_limit_shape ... ok
+test usage::tests::test_provider_usage_cache_is_not_fresh_after_reset_boundary ... ok
+test usage::tests::test_provider_usage_percent_helpers_clamp_invalid_low_values ... ok
+test usage::tests::test_reports_sort_most_recently_used_first ... ok
+test usage::tests::test_usage_data_becomes_stale_when_reset_time_has_passed ... ok
+test usage::tests::test_usage_data_default ... ok
+test usage::tests::test_usage_data_display_snapshot_clears_passed_reset_window ... ok
+test usage::tests::test_usage_data_from_provider_report_maps_limits_and_extra_usage ... ok
+test usage::tests::test_usage_data_from_provider_report_treats_usage_limit_values_as_percent ... ok
+test usage::tests::test_usage_percent_format ... ok
+test util::tests::test_format_error_chain_deduplicates_repeated_messages ... ok
+test util::tests::test_format_error_chain_includes_nested_causes ... ok
+
+failures:
+
+---- session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted stdout ----
+
+thread 'session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted' (84519596) panicked at crates/next-code-base/src/session_tests/cases.rs:270:5:
+assertion `left == right` failed
+  left: Some("/private/var/folders/dd/qv4ltr9158116jk2739rp61c0000gn/T/next-code-session-context-first-gFaSt6")
+ right: Some("/var/folders/dd/qv4ltr9158116jk2739rp61c0000gn/T/next-code-session-context-first-gFaSt6")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted
+
+test result: FAILED. 1083 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 55.65s
+
+error: test failed, to rerun pass `-p next-code-base --lib`

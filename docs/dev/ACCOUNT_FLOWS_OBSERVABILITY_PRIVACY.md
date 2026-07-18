@@ -1,3 +1,5 @@
+> **Historical reference — hosted billing/accounting system was removed.**
+
 # Account Flows: Observability, Privacy, and Support Diagnostics
 
 Security logging, audit events, metrics, traces, alerting, redaction,

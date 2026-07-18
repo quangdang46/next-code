@@ -1,0 +1,736 @@
+   Compiling rustls-webpki v0.103.13
+   Compiling hyper v0.14.32
+   Compiling rustls v0.21.12
+   Compiling aws-smithy-schema v0.2.0
+   Compiling tinyvec_macros v0.1.1
+   Compiling ratatui-widgets v0.3.2
+   Compiling aws-smithy-eventstream v0.61.1
+   Compiling signature v2.2.0
+   Compiling float-cmp v0.9.0
+   Compiling hstr v3.0.6
+   Compiling tinyvec v1.12.0
+   Compiling strict-num v0.1.1
+   Compiling ecdsa v0.16.9
+   Compiling next-code-logging v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-logging)
+   Compiling aws-smithy-http v0.64.0
+   Compiling primeorder v0.13.6
+   Compiling ratatui-crossterm v0.1.2
+   Compiling rustls v0.23.42
+   Compiling aws-credential-types v1.3.0
+   Compiling p256 v0.13.2
+   Compiling swc_atoms v9.0.3
+   Compiling aws-smithy-observability v0.3.0
+   Compiling tempfile v3.27.0
+   Compiling core_maths v0.1.1
+   Compiling slotmap v1.1.1
+   Compiling swc_common v23.0.2
+   Compiling ttf-parser v0.25.1
+   Compiling aws-sigv4 v1.5.1
+   Compiling aws-types v1.4.0
+   Compiling ratatui-macros v0.7.2
+   Compiling ratatui v0.30.2
+   Compiling polycool v0.4.0
+   Compiling string-interner v0.15.0
+   Compiling tract-data v0.21.10
+   Compiling kurbo v0.13.1
+   Compiling image v0.25.10
+   Compiling aws-smithy-json v0.63.0
+   Compiling tokio-rustls v0.24.1
+   Compiling sha1 v0.10.7
+   Compiling tokio-stream v0.1.18
+   Compiling unicode-ccc v0.4.0
+   Compiling swc_ecma_ast v25.0.0
+   Compiling unicode-bidi-mirroring v0.4.0
+   Compiling hyper-rustls v0.24.2
+   Compiling unicode-properties v0.1.4
+   Compiling unicode-script v0.5.8
+   Compiling svgtypes v0.16.1
+   Compiling simplecss v0.2.2
+   Compiling roxmltree v0.21.1
+   Compiling tract-linalg v0.21.10
+   Compiling unicode-vo v0.1.0
+   Compiling unicode-bidi v0.3.18
+   Compiling fontdb v0.23.0
+   Compiling rustybuzz v0.20.1
+   Compiling imagesize v0.14.0
+   Compiling xmlwriter v0.1.0
+   Compiling data-url v0.3.2
+   Compiling pico-args v0.5.0
+   Compiling xattr v1.6.1
+   Compiling filetime v0.2.29
+   Compiling tap v1.0.1
+   Compiling color_quant v1.1.0
+   Compiling palette_derive v0.7.6
+   Compiling gif v0.14.2
+   Compiling tokio-rustls v0.26.4
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling hyper-rustls v0.27.9
+   Compiling wyz v0.5.1
+   Compiling reqwest v0.12.28
+   Compiling aws-smithy-http-client v1.2.0
+   Compiling reqwest v0.13.4
+   Compiling tract-core v0.21.10
+   Compiling swc_ecma_visit v25.0.0
+   Compiling tar v0.4.46
+   Compiling rand v0.10.2
+   Compiling aws-smithy-runtime v1.12.0
+   Compiling next-code-provider-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-core)
+   Compiling next-code-llm-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-llm-core)
+   Compiling rustix v0.38.44
+   Compiling radium v0.7.0
+   Compiling libz-sys v1.1.29
+   Compiling tiny-skia-path v0.12.0
+   Compiling aws-runtime v1.8.1
+   Compiling tiny-skia-path v0.11.4
+   Compiling objc2-core-services v0.3.2
+   Compiling image-webp v0.2.4
+   Compiling rgb v0.8.53
+   Compiling safe_arch v0.9.3
+   Compiling ref-cast-impl v1.0.25
+   Compiling fast-srgb8 v1.0.0
+   Compiling funty v2.0.0
+   Compiling aws-smithy-xml v0.61.1
+   Compiling ref-cast v1.0.25
+   Compiling palette v0.7.6
+   Compiling bitvec v1.1.1
+   Compiling next-code-plugin-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-plugin-core)
+   Compiling notify v9.0.0-rc.4
+   Compiling typespec_client_core v1.1.0
+   Compiling wide v0.8.3
+   Compiling next-code-llm-protocols v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-llm-protocols)
+   Compiling libgit2-sys v0.18.5+1.9.4
+   Compiling stacker v0.1.24
+   Compiling lmdb-master-sys v0.2.6
+   Compiling aws-smithy-query v0.61.1
+   Compiling png v0.17.16
+   Compiling rand_distr v0.4.3
+   Compiling dashmap v6.2.1
+   Compiling rand_xoshiro v0.7.0
+   Compiling ordered-float v5.3.0
+   Compiling num_cpus v1.17.0
+   Compiling page_size v0.6.0
+   Compiling tracing-appender v0.2.5
+   Compiling swc_ecma_parser v41.1.2
+   Compiling fff-notify-debouncer-full v0.9.4
+   Compiling heed v0.22.1
+   Compiling swc_ecma_utils v31.0.2
+   Compiling tiny-skia v0.11.4
+   Compiling azure_core v1.1.0
+   Compiling aws-sdk-sts v1.108.0
+   Compiling git2 v0.20.4
+   Compiling aws-sdk-ssooidc v1.105.0
+   Compiling aws-sdk-sso v1.103.0
+   Compiling native-tls v0.2.18
+   Compiling usvg v0.46.0
+   Compiling usvg v0.47.0
+   Compiling quantette v0.5.1
+   Compiling tiny-skia v0.12.0
+   Compiling next-code-agent-runtime v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-agent-runtime)
+   Compiling rust-embed-utils v8.12.0
+   Compiling tract-nnef v0.21.10
+   Compiling tract-hir v0.21.10
+   Compiling next-code-provider-metadata v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-metadata)
+   Compiling security-framework v2.11.1
+   Compiling rustls-webpki v0.102.8
+   Compiling pom v1.1.0
+   Compiling ucd-trie v0.1.7
+   Compiling ffs-search v0.1.15 (https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d)
+   Compiling resvg v0.47.0
+   Compiling tokenizers v0.21.4
+   Compiling rustls-native-certs v0.7.3
+   Compiling tungstenite v0.24.0
+   Compiling json5 v1.3.1
+   Compiling rustls v0.22.4
+   Compiling next-code-provider-env v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-env)
+   Compiling swc_ecma_transforms_base v44.0.4
+   Compiling rust-embed v8.12.0
+   Compiling icy_sixel v0.5.0
+   Compiling resvg v0.46.0
+   Compiling aws-config v1.9.0
+   Compiling tract-onnx-opl v0.21.10
+   Compiling tract-onnx v0.21.10
+   Compiling tokio-native-tls v0.3.1
+   Compiling azure_identity v1.0.0
+   Compiling ffs-symbol v0.1.15 (https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d)
+   Compiling system-configuration-sys v0.5.0
+   Compiling next-code-tool-types v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tool-types)
+   Compiling aws-sdk-bedrock v1.148.0
+   Compiling aws-sdk-bedrockruntime v1.136.0
+   Compiling swc_ecma_hooks v0.9.0
+   Compiling next-code-memory-types v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-memory-types)
+   Compiling next-code-terminal-launch v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-terminal-launch)
+   Compiling dirs-sys v0.5.0
+   Compiling keyring v3.6.3
+   Compiling md-5 v0.10.6
+   Compiling rangemap v1.7.1
+   Compiling foldhash v0.1.5
+   Compiling age-core v0.11.0
+   Compiling next-code-best-of-n v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-best-of-n)
+   Compiling lopdf v0.34.0
+   Compiling hashbrown v0.15.5
+   Compiling next-code-embedding v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-embedding)
+   Compiling swc_allocator v4.0.1
+   Compiling next-code-protocol v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-protocol)
+   Compiling ffs-engine v0.1.15 (https://github.com/quangdang46/fast_file_search?rev=a0bda22d16cff8637d162a700dc8f1cbd41d957b#a0bda22d)
+   Compiling swc_ecma_transforms_react v49.0.0
+   Compiling next-code-keyring-store v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-keyring-store)
+   Compiling dirs v6.0.0
+   Compiling scrypt v0.11.0
+   Compiling next-code-azure-auth v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-azure-auth)
+   Compiling next-code-tool-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tool-core)
+   Compiling i18n-embed v0.15.4
+   Compiling system-configuration v0.5.1
+   Compiling x25519-dalek v2.0.1
+   Compiling hyper-tls v0.5.0
+   Compiling rustls-connector v0.19.2
+   Compiling ratatui-image v10.0.8
+   Compiling tokio-tungstenite v0.24.0
+   Compiling mermaid-rs-renderer v0.3.1 (https://github.com/1jehuang/mermaid-rs-renderer.git?tag=v0.3.1#2f993bd7)
+   Compiling adobe-cmap-parser v0.4.1
+   Compiling type1-encoding-parser v0.1.1
+   Compiling next-code-provider-anthropic v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-anthropic)
+   Compiling next-code-provider-openai v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-openai)
+   Compiling next-code-provider-openrouter v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-openrouter)
+   Compiling next-code-tui-workspace v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-workspace)
+   Compiling next-code-import-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-import-core)
+   Compiling unicode-normalization v0.1.25
+   Compiling next-code-terminal-image v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-terminal-image)
+   Compiling itertools v0.13.0
+   Compiling euclid v0.20.14
+   Compiling open v5.4.0
+   Compiling postscript v0.14.1
+   Compiling unicode-width v0.1.14
+   Compiling cff-parser v0.1.0
+   Compiling reqwest v0.11.27
+   Compiling lettre v0.11.22
+   Compiling pdf-extract v0.8.2
+   Compiling unicode-truncate v1.1.0
+   Compiling imap v3.0.0-alpha.15
+   Compiling age v0.11.5
+   Compiling swc_ecma_codegen v28.0.2
+   Compiling swc_ecma_transforms_typescript v49.0.0
+   Compiling lru v0.12.5
+   Compiling crossterm v0.28.1
+   Compiling syntect v5.3.0
+   Compiling next-code-tui-style v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-style)
+   Compiling core-graphics-types v0.1.3
+   Compiling compact_str v0.8.2
+   Compiling wait-timeout v0.2.1
+   Compiling cassowary v0.3.0
+   Compiling dcg-core v0.1.0 (https://github.com/quangdang46/destructive_command_guard?branch=main#b57f1d28)
+   Compiling next-code-notify-email v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-notify-email)
+   Compiling next-code-plugin-runtime v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-plugin-runtime)
+   Compiling core-graphics v0.23.2
+   Compiling ratatui v0.28.1
+   Compiling next-code-secrets v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-secrets)
+   Compiling next-code-hooks v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-hooks)
+   Compiling next-code-pdf v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-pdf)
+   Compiling next-code-keywords v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-keywords)
+   Compiling next-code-setup-hints v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-setup-hints)
+   Compiling next-code-swarm-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-swarm-core)
+   Compiling next-code-build-support v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-build-support)
+   Compiling arboard v3.6.1
+   Compiling hashline v0.8.5 (https://github.com/quangdang46/hashline.git?rev=d0f836789#d0f83678)
+   Compiling next-code-tui-mermaid v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-mermaid)
+   Compiling next-code-update-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-update-core)
+   Compiling terminal-trx v0.2.6
+   Compiling xterm-color v1.0.2
+   Compiling terminal-colorsaurus v1.0.3
+   Compiling next-code-provider-service v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-service)
+   Compiling next-code-tui-render v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-render)
+   Compiling next-code-tui-usage-overlay v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-usage-overlay)
+   Compiling next-code-tui-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-core)
+   Compiling next-code-productivity-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-productivity-core)
+   Compiling next-code-tui-session-picker v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-session-picker)
+   Compiling next-code-tui-visual-debug v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-visual-debug)
+   Compiling next-code-tui-account-picker v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-account-picker)
+   Compiling next-code-tui-tool-display v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-tool-display)
+   Compiling basic-toml v0.1.10
+   Compiling next-code-tui-anim v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-anim)
+   Compiling next-code-tui-markdown v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-markdown)
+   Compiling next-code-fuzzy v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-fuzzy)
+warning: function `set_diagram_mode_raw` is never used
+  --> crates/next-code-tui-markdown/src/markdown_context.rs:46:4
+   |
+46 | fn set_diagram_mode_raw(mode: Option<DiagramDisplayMode>) -> Option<DiagramDisplayMode> {
+   |    ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling next-code-tui-messages v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-messages)
+warning: `next-code-tui-markdown` (lib) generated 1 warning
+   Compiling next-code-provider-bedrock v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-bedrock)
+   Compiling next-code-base v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-base)
+warning: unused import: `ModelRoute`
+  --> crates/next-code-base/src/provider/models.rs:19:62
+   |
+19 |     ALL_CLAUDE_MODELS, ALL_OPENAI_MODELS, ModelCapabilities, ModelRoute,
+   |                                                              ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling next-code-app-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-app-core)
+   Compiling next-code-tui-permissions v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui-permissions)
+warning: use of deprecated function `next_code_base::hooks::hook_configured`: Use v2 hooks system via next-code-hooks crate
+   --> crates/next-code-app-core/src/agent/turn_execution.rs:381:27
+    |
+381 |         if !crate::hooks::hook_configured("turn_start") {
+    |                           ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `next_code_base::hooks::dispatch_observer`: Use v2 hooks system via next-code-hooks crate
+   --> crates/next-code-app-core/src/agent/turn_execution.rs:391:23
+    |
+391 |         crate::hooks::dispatch_observer(event);
+    |                       ^^^^^^^^^^^^^^^^^
+
+warning: `next-code-base` (lib) generated 1 warning (run `cargo fix --lib -p next-code-base` to apply 1 suggestion)
+warning: `next-code-app-core` (lib) generated 2 warnings
+   Compiling next-code-tui v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-tui)
+warning: unused import: `get_tool_activity_detail`
+ --> crates/next-code-tui/src/tui/ui_input.rs:2:23
+  |
+2 | use super::tools_ui::{get_tool_activity_detail, summarize_batch_running_tools_compact};
+  |                       ^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `next_code_tui_style::theme::animated_tool_color as theme_animated_tool_color`
+  --> crates/next-code-tui/src/tui/ui_input.rs:14:5
+   |
+14 | use next_code_tui_style::theme::animated_tool_color as theme_animated_tool_color;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `MessageBoundary`
+   --> crates/next-code-tui/src/tui/ui.rs:468:45
+    |
+468 |     CopyTarget, EditToolRange, ImageRegion, MessageBoundary, PreparedChatFrame, PreparedMessages,
+    |                                             ^^^^^^^^^^^^^^^
+
+warning: unused import: `crate::tui::TuiState`
+ --> crates/next-code-tui/src/tui/app/run_shell.rs:3:5
+  |
+3 | use crate::tui::TuiState;
+  |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `query`
+    --> crates/next-code-tui/src/tui/app/inline_interactive.rs:3607:17
+     |
+3607 |             let query = picker.filter.trim();
+     |                 ^^^^^ help: if this is intentional, prefix it with an underscore: `_query`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `spinner_frame`
+   --> crates/next-code-tui/src/tui/ui_prepare.rs:498:9
+    |
+498 |     let spinner_frame =
+    |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spinner_frame`
+
+warning: unused variable: `spinner_frame`
+    --> crates/next-code-tui/src/tui/ui_prepare.rs:1158:21
+     |
+1158 |                 let spinner_frame = (app.animation_elapsed()
+     |                     ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_spinner_frame`
+
+warning: enum `SwarmPanelAction` is never used
+  --> crates/next-code-tui/src/tui/mod.rs:89:17
+   |
+89 | pub(crate) enum SwarmPanelAction {
+   |                 ^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: variant `IdleExpiry` is never constructed
+   --> crates/next-code-tui/src/tui/app.rs:392:5
+    |
+390 | pub(super) enum ColdCacheWarningTrigger {
+    |                 ----------------------- variant in this enum
+391 |     /// The idle tick detected a cold cache; warn on the next user turn.
+392 |     IdleExpiry,
+    |     ^^^^^^^^^^
+    |
+    = note: `ColdCacheWarningTrigger` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: multiple fields are never read
+    --> crates/next-code-tui/src/tui/app.rs:1457:5
+     |
+ 719 | pub struct App {
+     |            --- fields in this struct
+...
+1457 |     cold_cache_warned_baseline_completed_at: Option<Instant>,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+1458 |     // Per-session count of consecutive credential failures (reset on success).
+1459 |     consecutive_credential_failures: u32,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1470 |     hotkey_usage: Option<hotkey_feedback::HotkeyUsageState>,
+     |     ^^^^^^^^^^^^
+...
+1476 |     learn_hint_shown_this_session: bool,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1480 |     pending_fallback_resend: Option<FallbackResendPayload>,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^
+...
+1489 |     pending_reasoning_effort: Option<String>,
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1494 |     pending_startup_notice: Option<(String, String)>,
+     |     ^^^^^^^^^^^^^^^^^^^^^^
+...
+1497 |     remote_resend: Option<FallbackResendPayload>,
+     |     ^^^^^^^^^^^^^
+...
+1500 |     repo_dir: Option<std::path::PathBuf>,
+     |     ^^^^^^^^
+
+warning: fields `content`, `images`, `is_system`, `auto_retry`, `system_reminder`, and `raw_input` are never read
+    --> crates/next-code-tui/src/tui/app.rs:1506:5
+     |
+1504 | struct FallbackResendPayload {
+     |        --------------------- fields in this struct
+1505 |     /// Expanded message content that was sent to the server.
+1506 |     content: String,
+     |     ^^^^^^^
+1507 |     /// Inline image attachments that accompanied the message.
+1508 |     images: Vec<(String, String)>,
+     |     ^^^^^^
+1509 |     /// Whether the failed send was a system continuation (poke/reminder).
+1510 |     is_system: bool,
+     |     ^^^^^^^^^
+1511 |     /// Whether the failed send was flagged for automatic retries.
+1512 |     auto_retry: bool,
+     |     ^^^^^^^^^^
+1513 |     /// Hidden system reminder that accompanied the message, if any.
+1514 |     system_reminder: Option<String>,
+     |     ^^^^^^^^^^^^^^^
+...
+1517 |     raw_input: Option<String>,
+     |     ^^^^^^^^^
+     |
+     = note: `FallbackResendPayload` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: fields `repo_dir` and `detail` are never read
+    --> crates/next-code-tui/src/tui/app.rs:1524:5
+     |
+1521 | struct PendingMergeOffer {
+     |        ----------------- fields in this struct
+...
+1524 |     repo_dir: Option<std::path::PathBuf>,
+     |     ^^^^^^^^
+1525 |     /// The raw update-failure detail, shown to the user and the merge agent.
+1526 |     detail: String,
+     |     ^^^^^^
+     |
+     = note: `PendingMergeOffer` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: method `load_todos_from_disk` is never used
+    --> crates/next-code-tui/src/tui/app.rs:1600:19
+     |
+1578 | impl App {
+     | -------- method in this implementation
+...
+1600 |     pub(super) fn load_todos_from_disk(&mut self) {
+     |                   ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `repeat_char` is never used
+  --> crates/next-code-tui/src/tui/app/auth.rs:19:4
+   |
+19 | fn repeat_char(c: char, n: usize) -> String {
+   |    ^^^^^^^^^^^
+
+warning: methods `show_auth_status` and `show_interactive_logout` are never used
+   --> crates/next-code-tui/src/tui/app/auth.rs:65:19
+    |
+ 23 | impl App {
+    | -------- methods in this implementation
+...
+ 65 |     pub(super) fn show_auth_status(&mut self) {
+    |                   ^^^^^^^^^^^^^^^^
+...
+147 |     pub(super) fn show_interactive_logout(&mut self) {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `UNKNOWN_NOTICE_MIN_GAP_MS` is never used
+  --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:35:7
+   |
+35 | const UNKNOWN_NOTICE_MIN_GAP_MS: u128 = 1200;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `UNKNOWN_NOTICE_MAX_PER_CHORD` is never used
+  --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:37:7
+   |
+37 | const UNKNOWN_NOTICE_MAX_PER_CHORD: u32 = 3;
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `STATE_FILE` is never used
+  --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:39:7
+   |
+39 | const STATE_FILE: &str = "hotkey_usage.json";
+   |       ^^^^^^^^^^
+
+warning: field `quiet` is never read
+  --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:50:9
+   |
+43 | pub(super) struct KnownHotkey {
+   |                   ----------- field in this struct
+...
+50 |     pub quiet: bool,
+   |         ^^^^^
+   |
+   = note: `KnownHotkey` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: function `state_path` is never used
+   --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:581:4
+    |
+581 | fn state_path() -> Option<std::path::PathBuf> {
+    |    ^^^^^^^^^^
+
+warning: function `load_state` is never used
+   --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:587:4
+    |
+587 | fn load_state() -> HotkeyUsageState {
+    |    ^^^^^^^^^^
+
+warning: function `save_state` is never used
+   --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:594:4
+    |
+594 | fn save_state(state: &HotkeyUsageState) {
+    |    ^^^^^^^^^^
+
+warning: function `now_unix` is never used
+   --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:610:4
+    |
+610 | fn now_unix() -> u64 {
+    |    ^^^^^^^^
+
+warning: methods `handle_hotkeys_command`, `hotkey_registry`, `observe_known_hotkey`, and `note_unrecognized_hotkey` are never used
+   --> crates/next-code-tui/src/tui/app/hotkey_feedback.rs:686:19
+    |
+683 | impl App {
+    | -------- methods in this implementation
+...
+686 |     pub(super) fn handle_hotkeys_command(&mut self, trimmed: &str) -> bool {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^
+...
+697 |     fn hotkey_registry(&self, remote: bool) -> Vec<KnownHotkey> {
+    |        ^^^^^^^^^^^^^^^
+...
+716 |     pub(crate) fn observe_known_hotkey(
+    |                   ^^^^^^^^^^^^^^^^^^^^
+...
+774 |     pub(crate) fn note_unrecognized_hotkey(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: method `open_logout_picker_inline` is never used
+   --> crates/next-code-tui/src/tui/app/inline_interactive/openers.rs:358:19
+    |
+ 11 | impl App {
+    | -------- method in this implementation
+...
+358 |     pub(crate) fn open_logout_picker_inline(&mut self) {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variant `Cursor` is never constructed
+  --> crates/next-code-tui/src/tui/app/onboarding_flow.rs:38:5
+   |
+33 | pub(crate) enum ExternalCli {
+   |                 ----------- variant in this enum
+...
+38 |     Cursor,
+   |     ^^^^^^
+   |
+   = note: `ExternalCli` has derived impls for the traits `Debug` and `Clone`, but these are intentionally ignored during dead code analysis
+
+warning: function `should_disclose` is never used
+  --> crates/next-code-tui/src/tui/app/sponsor_disclosure.rs:16:4
+   |
+16 | fn should_disclose(_shown: bool, _tool: &ToolCall) -> bool {
+   |    ^^^^^^^^^^^^^^^
+
+warning: methods `offer_update_merge`, `clear_update_merge_offer`, `merge_offer_key_matches`, `accept_update_merge_offer`, `launch_update_merge_agent`, and `spawn_merge_session_terminal` are never used
+   --> crates/next-code-tui/src/tui/app/state_ui_maintenance.rs:353:19
+    |
+  4 | impl App {
+    | -------- methods in this implementation
+...
+353 |     pub(super) fn offer_update_merge(
+    |                   ^^^^^^^^^^^^^^^^^^
+...
+379 |     pub(super) fn clear_update_merge_offer(&mut self) {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+385 |     pub(super) fn merge_offer_key_matches(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^
+...
+396 |     pub(super) fn accept_update_merge_offer(&mut self) -> bool {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+449 |     fn launch_update_merge_agent(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+466 |     fn spawn_merge_session_terminal(
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: methods `toggle_swarm_panel_focus`, `cycle_swarm_panel_selection`, `remote_effort_identity`, `remote_reasoning_effort_hint`, and `swarm_panel_action_for_key` are never used
+    --> crates/next-code-tui/src/tui/app/tui_state.rs:2383:19
+     |
+2346 | impl App {
+     | -------- methods in this implementation
+...
+2383 |     pub(crate) fn toggle_swarm_panel_focus(&mut self) -> bool {
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+2496 |     pub(crate) fn cycle_swarm_panel_selection(&mut self) {
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+2510 |     pub(super) fn remote_effort_identity(&self) -> (Option<String>, Option<String>) {
+     |                   ^^^^^^^^^^^^^^^^^^^^^^
+...
+2527 |     pub(super) fn remote_reasoning_effort_hint(&self) -> Option<String> {
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+2549 |     pub(crate) fn swarm_panel_action_for_key(
+     |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: variant `MessageAgent` is never constructed
+    --> crates/next-code-tui/src/tui/app/tui_state.rs:3099:5
+     |
+3093 | pub(crate) enum TeammateNavAction {
+     |                 ----------------- variant in this enum
+...
+3099 |     MessageAgent {
+     |     ^^^^^^^^^^^^
+     |
+     = note: `TeammateNavAction` has derived impls for the traits `Clone` and `Debug`, but these are intentionally ignored during dead code analysis
+
+warning: function `hard_attach_status_line` is never used
+   --> crates/next-code-tui/src/tui/teammate_view.rs:313:8
+    |
+313 | pub fn hard_attach_status_line(_agent_name: &str) -> Line<'static> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `marker_for_status` is never used
+  --> crates/next-code-tui/src/tui/todo_panel.rs:66:8
+   |
+66 | pub fn marker_for_status(status: &str) -> &'static str {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: function `label_for_status` is never used
+  --> crates/next-code-tui/src/tui/todo_panel.rs:77:8
+   |
+77 | pub fn label_for_status(status: &str) -> &'static str {
+   |        ^^^^^^^^^^^^^^^^
+
+warning: function `render_panel` is never used
+   --> crates/next-code-tui/src/tui/todo_panel.rs:185:8
+    |
+185 | pub fn render_panel(data: &TodoPanelData, width: usize) -> Vec<ratatui::text::Line<'static>> {
+    |        ^^^^^^^^^^^^
+
+warning: function `load_cursor_preview_from_path` is never used
+    --> crates/next-code-tui/src/tui/session_picker/loading.rs:2681:15
+     |
+2681 | pub(super) fn load_cursor_preview_from_path(path: &Path) -> Option<Vec<PreviewMessage>> {
+     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `transport_context_labels` is never used
+   --> crates/next-code-tui/src/tui/ui_input.rs:549:4
+    |
+549 | fn transport_context_labels(app: &dyn TuiState) -> Vec<String> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `append_transport_context` is never used
+   --> crates/next-code-tui/src/tui/ui_input.rs:560:4
+    |
+560 | fn append_transport_context(status_text: &mut String, app: &dyn TuiState) {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `idle_input_hint` is never used
+    --> crates/next-code-tui/src/tui/ui_input.rs:2450:4
+     |
+2450 | fn idle_input_hint(app: &dyn TuiState) -> Option<String> {
+     |    ^^^^^^^^^^^^^^^
+
+warning: function `draw_send_mode_indicator` is never used
+    --> crates/next-code-tui/src/tui/ui_input.rs:2553:4
+     |
+2553 | fn draw_send_mode_indicator(frame: &mut Frame, app: &dyn TuiState, area: Rect) {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `encode_swarm_agent_snapshot` is never used
+    --> crates/next-code-tui/src/tui/ui_messages.rs:2638:15
+     |
+2638 | pub(crate) fn encode_swarm_agent_snapshot(
+     |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `draw_teammate_view_panel` is never used
+    --> crates/next-code-tui/src/tui/ui_overlays.rs:1199:15
+     |
+1199 | pub(super) fn draw_teammate_view_panel(
+     |               ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: struct `BodyRenderCtx` is never constructed
+   --> crates/next-code-tui/src/tui/ui_prepare.rs:911:8
+    |
+911 | struct BodyRenderCtx<'a> {
+    |        ^^^^^^^^^^^^^
+
+warning: struct `BodyAcc` is never constructed
+   --> crates/next-code-tui/src/tui/ui_prepare.rs:931:8
+    |
+931 | struct BodyAcc {
+    |        ^^^^^^^
+
+warning: methods `push_auto` and `push_blank` are never used
+   --> crates/next-code-tui/src/tui/ui_prepare.rs:966:8
+    |
+958 | impl BodyAcc {
+    | ------------ methods in this implementation
+...
+966 |     fn push_auto(&mut self, line: Line<'static>) {
+    |        ^^^^^^^^^
+...
+982 |     fn push_blank(&mut self) {
+    |        ^^^^^^^^^^
+
+warning: function `todo_change_lines` is never used
+   --> crates/next-code-tui/src/tui/ui_prepare.rs:989:4
+    |
+989 | fn todo_change_lines(
+    |    ^^^^^^^^^^^^^^^^^
+
+warning: function `render_message_into` is never used
+    --> crates/next-code-tui/src/tui/ui_prepare.rs:1015:4
+     |
+1015 | fn render_message_into(
+     |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `suffix_reuse_compatible` is never used
+    --> crates/next-code-tui/src/tui/ui_prepare.rs:2674:15
+     |
+2674 | pub(super) fn suffix_reuse_compatible(
+     |               ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `transcript_swarm_members` and `swarm_panel_full_page` are never read
+   --> crates/next-code-tui/src/tui/ui_tests/mod.rs:146:5
+    |
+114 | struct TestState {
+    |        --------- fields in this struct
+...
+146 |     transcript_swarm_members: Option<Vec<crate::protocol::SwarmMemberStatus>>,
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+149 |     swarm_panel_full_page: bool,
+    |     ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `TestState` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: function `draw_running_item_detail` is never used
+   --> crates/next-code-tui/src/tui/ui_running_items.rs:110:15
+    |
+110 | pub(super) fn draw_running_item_detail(frame: &mut Frame, app: &dyn super::TuiState, area: Rect) {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^
+

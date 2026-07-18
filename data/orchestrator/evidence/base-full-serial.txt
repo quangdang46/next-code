@@ -1,0 +1,1257 @@
+   Compiling next-code-provider-env v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-env)
+   Compiling next-code-provider-bedrock v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-bedrock)
+   Compiling next-code-base v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-base)
+warning: unused import: `ModelRoute`
+  --> crates/next-code-base/src/provider/models.rs:19:62
+   |
+19 |     ALL_CLAUDE_MODELS, ALL_OPENAI_MODELS, ModelCapabilities, ModelRoute,
+   |                                                              ^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling next-code-app-core v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-app-core)
+   Compiling next-code-provider-openrouter-runtime v0.1.0 (/Users/tranquangdang21/Projects/next-code/crates/next-code-provider-openrouter-runtime)
+warning: `next-code-base` (lib) generated 1 warning (run `cargo fix --lib -p next-code-base` to apply 1 suggestion)
+warning: use of deprecated function `next_code_base::hooks::hook_configured`: Use v2 hooks system via next-code-hooks crate
+   --> crates/next-code-app-core/src/agent/turn_execution.rs:381:27
+    |
+381 |         if !crate::hooks::hook_configured("turn_start") {
+    |                           ^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated function `next_code_base::hooks::dispatch_observer`: Use v2 hooks system via next-code-hooks crate
+   --> crates/next-code-app-core/src/agent/turn_execution.rs:391:23
+    |
+391 |         crate::hooks::dispatch_observer(event);
+    |                       ^^^^^^^^^^^^^^^^^
+
+warning: `next-code-app-core` (lib) generated 2 warnings
+warning: unused import: `super::*`
+   --> crates/next-code-base/src/mcp/manager.rs:615:9
+    |
+615 |     use super::*;
+    |         ^^^^^^^^
+    |
+    = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `ModelRoute`
+  --> crates/next-code-base/src/provider/models.rs:19:62
+   |
+19 |     ALL_CLAUDE_MODELS, ALL_OPENAI_MODELS, ModelCapabilities, ModelRoute,
+   |                                                              ^^^^^^^^^^
+
+warning: function `write_fake_mcp_server` is never used
+   --> crates/next-code-base/src/mcp/manager.rs:620:8
+    |
+620 |     fn write_fake_mcp_server(dir: &std::path::Path) -> std::path::PathBuf {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: associated function `same_provider_account_candidates` is never used
+   --> crates/next-code-base/src/provider/mod.rs:575:8
+    |
+423 | impl MultiProvider {
+    | ------------------ associated function in this implementation
+...
+575 |     fn same_provider_account_candidates(provider: ActiveProvider) -> Vec<String> {
+    |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `next-code-base` (lib test) generated 4 warnings (run `cargo fix --lib -p next-code-base --tests` to apply 2 suggestions)
+    Finished `test` profile [unoptimized] target(s) in 17.78s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/debug/deps/next_code_base-0c6e26124a3821c2)
+
+running 1085 tests
+test auth::account_store::tests::relabel_accounts_canonicalizes_labels_and_active_label ... ok
+test auth::account_store::tests::upsert_account_assigns_next_label_and_sets_initial_active ... ok
+test auth::active_method::tests::anthropic_auto_falls_back_to_api_key ... ok
+test auth::active_method::tests::anthropic_auto_prefers_oauth_when_both_present ... ok
+test auth::active_method::tests::anthropic_explicit_selection_wins_over_auto ... ok
+test auth::active_method::tests::anthropic_none_when_unconfigured ... ok
+test auth::active_method::tests::auto_resolution_is_not_marked_explicit ... ok
+test auth::active_method::tests::non_dual_providers_return_none ... ok
+test auth::active_method::tests::openai_auto_reports_both_and_prefers_oauth ... ok
+test auth::antigravity::tests::blank_env_vars_fall_back_to_built_in_credentials ... ok
+test auth::antigravity::tests::build_auth_url_includes_antigravity_scope_and_redirect ... ok
+test auth::antigravity::tests::build_auth_url_uses_default_client_id_when_env_missing ... ok
+test auth::antigravity::tests::client_metadata_uses_backend_accepted_platform ... ok
+test auth::antigravity::tests::extract_project_id_supports_string_or_object ... ok
+test auth::antigravity::tests::redirect_uri_uses_ipv4_loopback ... ok
+test auth::azure::tests::normalize_endpoint_appends_openai_v1 ... ok
+test auth::azure::tests::normalize_endpoint_preserves_existing_openai_v1 ... ok
+test auth::azure::tests::normalize_endpoint_rejects_insecure_remote_http ... ok
+test auth::claude::tests::active_account_override_roundtrip ... ok
+test auth::claude::tests::anthropic_account_email_omitted_when_none ... ok
+test auth::claude::tests::anthropic_account_email_serialized_when_present ... ok
+test auth::claude::tests::anthropic_account_no_subscription_type ... ok
+test auth::claude::tests::anthropic_account_subscription_type_omitted_when_none ... ok
+test auth::claude::tests::anthropic_account_subscription_type_serialized_when_present ... ok
+test auth::claude::tests::claude_code_credentials_format ... ok
+test auth::claude::tests::claude_code_credentials_missing_oauth ... ok
+test auth::claude::tests::claude_code_credentials_no_subscription ... ok
+test auth::claude::tests::env_token_absent_yields_none ... ok
+test auth::claude::tests::env_token_credentials_parse_bare_token ... ok
+test auth::claude::tests::env_token_credentials_parse_json_blob ... ok
+test auth::claude::tests::is_max_subscription_max_is_true ... ok
+test auth::claude::tests::is_max_subscription_pro_is_false ... ok
+test auth::claude::tests::is_max_subscription_unknown_is_true ... ok
+test auth::claude::tests::live_keychain_native_credentials_detected_and_parsed ... ignored, live: reads the real macOS Keychain
+test auth::claude::tests::load_auth_file_renames_existing_labels_to_numbered_scheme ... ok
+test auth::claude::tests::load_claude_code_credentials_does_not_change_external_permissions ... ok
+test auth::claude::tests::next_code_auth_file_default_is_empty ... ok
+test auth::claude::tests::next_code_auth_file_legacy_migration_format ... ok
+test auth::claude::tests::next_code_auth_file_multi_account ... ok
+test auth::claude::tests::next_code_auth_file_roundtrip ... ok
+test auth::claude::tests::next_code_path_respects_next_code_home ... ok
+test auth::claude::tests::opencode_credentials_format ... ok
+test auth::claude::tests::opencode_credentials_no_anthropic ... ok
+test auth::claude::tests::parse_blob_accepts_bare_keychain_form_with_numeric_expiry ... ok
+test auth::claude::tests::parse_blob_accepts_rfc3339_string_expiry ... ok
+test auth::claude::tests::parse_blob_accepts_space_delimited_scope_string ... ok
+test auth::claude::tests::parse_blob_accepts_wrapped_file_form ... ok
+test auth::claude::tests::parse_blob_missing_expiry_defaults_to_zero ... ok
+test auth::claude::tests::parse_blob_rejects_empty_input ... ok
+test auth::claude::tests::parse_blob_rejects_empty_token ... ok
+test auth::claude::tests::update_account_profile_sets_email ... ok
+test auth::codex::tests::auth_file_minimal_tokens ... ok
+test auth::codex::tests::auth_file_with_api_key_only ... ok
+test auth::codex::tests::auth_file_with_oauth_tokens ... ok
+test auth::codex::tests::decode_jwt_payload_valid ... ok
+test auth::codex::tests::expires_at_from_access_token_handles_missing_exp_and_garbage ... ok
+test auth::codex::tests::expires_at_from_access_token_reads_exp_claim_as_millis ... ok
+test auth::codex::tests::explicit_expires_at_takes_precedence_over_jwt ... ok
+test auth::codex::tests::extract_account_id_from_jwt ... ok
+test auth::codex::tests::extract_email_from_jwt ... ok
+test auth::codex::tests::legacy_tokens_without_expiry_recover_expires_at_from_jwt ... ok
+test auth::codex::tests::load_auth_file_migrates_legacy_codex_tokens ... ok
+test auth::codex::tests::load_auth_file_renames_existing_labels_to_numbered_scheme ... ok
+test auth::codex::tests::load_credentials_falls_back_to_env_api_key ... ok
+test auth::codex::tests::load_credentials_ignores_legacy_oauth_without_consent ... ok
+test auth::codex::tests::load_credentials_reads_legacy_oauth_when_allowed ... ok
+test auth::codex::tests::load_credentials_reads_legacy_oauth_without_changing_external_permissions ... ok
+test auth::codex::tests::multi_account_active_switch_works ... ok
+test auth::copilot::tests::access_token_response_expired ... ok
+test auth::copilot::tests::access_token_response_pending ... ok
+test auth::copilot::tests::access_token_response_success ... ok
+test auth::copilot::tests::choose_default_model_empty_list ... ok
+test auth::copilot::tests::choose_default_model_with_opus ... ok
+test auth::copilot::tests::choose_default_model_with_sonnet_4_only ... ok
+test auth::copilot::tests::choose_default_model_without_opus ... ok
+test auth::copilot::tests::copilot_account_type_display ... ok
+test auth::copilot::tests::copilot_api_token_expired ... ok
+test auth::copilot::tests::copilot_api_token_expiring_within_buffer ... ok
+test auth::copilot::tests::copilot_api_token_not_expired ... ok
+test auth::copilot::tests::copilot_model_info_deserialize ... ok
+test auth::copilot::tests::copilot_model_info_minimal ... ok
+test auth::copilot::tests::copilot_token_response_roundtrip ... ok
+test auth::copilot::tests::device_code_response_deserialize ... ok
+test auth::copilot::tests::gh_cli_fallback_requires_explicit_opt_in ... ok
+test auth::copilot::tests::legacy_copilot_config_dir_uses_next_code_home_external_dir ... ok
+test auth::copilot::tests::live_verify_failure_record_blocks_auto_use ... ok
+test auth::copilot::tests::load_token_empty_oauth_token ... ok
+test auth::copilot::tests::load_token_from_apps_json ... ok
+test auth::copilot::tests::load_token_from_copilot_config_json ... ok
+test auth::copilot::tests::load_token_from_hosts_json ... ok
+test auth::copilot::tests::load_token_from_json_does_not_change_external_permissions ... ok
+test auth::copilot::tests::load_token_invalid_json ... ok
+test auth::copilot::tests::load_token_missing_oauth_token_field ... ok
+test auth::copilot::tests::load_token_multiple_hosts ... ok
+test auth::copilot::tests::load_token_nonexistent_file ... ok
+test auth::copilot::tests::normalize_candidate_token_rejects_empty_and_unknown_values ... ok
+test auth::copilot::tests::normalize_github_host_key_accepts_common_forms ... ok
+test auth::copilot::tests::normalize_github_host_key_rejects_non_github_hosts ... ok
+test auth::copilot::tests::save_and_load_github_token ... ok
+test auth::copilot::tests::save_github_token_creates_config_dir ... ok
+test auth::copilot::tests::save_github_token_makes_future_loads_available ... ok
+test auth::cursor::tests::config_file_path_under_next_code ... ok
+test auth::cursor::tests::cursor_auth_file_path_respects_next_code_home ... ok
+test auth::cursor::tests::cursor_vscdb_paths_respect_next_code_home ... ok
+test auth::cursor::tests::external_auth_command_timeout_returns_none ... ok
+test auth::cursor::tests::find_vscdb_missing_returns_error ... ok
+test auth::cursor::tests::has_cursor_api_key_from_env ... ok
+test auth::cursor::tests::load_access_token_from_auth_file_does_not_change_external_permissions ... ok
+test auth::cursor::tests::load_api_key_empty_env_falls_through ... ok
+test auth::cursor::tests::load_key_empty_value ... ok
+test auth::cursor::tests::load_key_missing_file ... ok
+test auth::cursor::tests::load_key_multiple_lines ... ok
+test auth::cursor::tests::load_key_no_cursor_line ... ok
+test auth::cursor::tests::load_key_quoted ... ok
+test auth::cursor::tests::load_key_single_quoted ... ok
+test auth::cursor::tests::load_key_with_whitespace ... ok
+test auth::cursor::tests::save_and_load_api_key ... ok
+test auth::cursor::tests::status_output_detects_authenticated_session ... ok
+test auth::cursor::tests::status_output_detects_missing_authentication ... ok
+test auth::cursor::tests::status_output_requires_successful_exit_for_authentication_keywords ... ok
+test auth::cursor::tests::vscdb_empty_value_returns_error ... ok
+test auth::cursor::tests::vscdb_missing_file_returns_error ... ok
+test auth::cursor::tests::vscdb_missing_key_returns_error ... ok
+test auth::cursor::tests::vscdb_multiple_keys ... ok
+test auth::cursor::tests::vscdb_paths_not_empty ... ok
+test auth::cursor::tests::vscdb_read_access_token ... ok
+test auth::cursor::tests::vscdb_read_machine_id ... ok
+test auth::cursor::tests::vscdb_wrong_table_name ... ok
+test auth::doctor::tests::refresh_failure_marks_available_provider_as_needing_attention ... ok
+test auth::doctor::tests::stale_validation_marks_provider_as_needing_attention ... ok
+test auth::external::external_tests::hermes_api_key_imports_from_credential_pool ... ok
+test auth::external::external_tests::hermes_oauth_tokens_import_from_credential_pool ... ok
+test auth::external::external_tests::hermes_oauth_tokens_parse_rfc3339_expiry ... ok
+test auth::external::external_tests::load_copilot_oauth_token_from_pi_auth ... ok
+test auth::external::external_tests::openclaw_api_key_imports_from_trusted_file ... ok
+test auth::external::external_tests::openclaw_auth_profiles_store_resolves_and_flattens ... ok
+test auth::external::external_tests::openclaw_legacy_flat_auth_json_still_wins_when_present ... ok
+test auth::external::external_tests::openclaw_oauth_tokens_import_like_pi ... ok
+test auth::external::external_tests::opencode_api_key_imports_from_trusted_file ... ok
+test auth::external::external_tests::pi_api_key_env_reference_uses_named_env_var ... ok
+test auth::external::external_tests::pi_shell_command_api_keys_are_not_executed ... ok
+test auth::external::external_tests::source_provider_labels_reports_supported_oauth_and_api_key_imports ... ok
+test auth::external::external_tests::unconsented_source_detects_supported_api_key_files ... ok
+test auth::gemini::tests::build_manual_auth_url_contains_expected_redirect_uri ... ok
+test auth::gemini::tests::build_web_auth_url_includes_pkce_parameters ... ok
+test auth::gemini::tests::display_includes_args_when_present ... ok
+test auth::gemini::tests::falls_back_to_gemini_binary_when_available ... ok
+test auth::gemini::tests::falls_back_to_npx_when_gemini_binary_missing ... ok
+test auth::gemini::tests::imports_cli_oauth_tokens_when_native_tokens_missing ... ok
+test auth::gemini::tests::imports_cli_oauth_tokens_without_changing_external_permissions ... ok
+test auth::gemini::tests::parses_env_command_with_args ... ok
+test auth::gemini::tests::resolve_callback_or_manual_code_accepts_manual_code_with_expected_state ... ok
+test auth::gemini::tests::resolve_callback_or_manual_code_validates_state_for_callback_input ... ok
+test auth::gemini::tests::uses_hardcoded_credentials_when_env_missing ... ok
+test auth::integration::tests::integration_registry_covers_login_catalog_once ... ok
+test auth::integration::tests::integration_registry_preserves_runtime_identity ... ok
+test auth::integration::tests::integration_surface_support_matches_catalog_order ... ok
+test auth::integration::tests::model_auth_status_providers_have_runtime_identity ... ok
+test auth::lifecycle::tests::api_key_login_replaces_stale_process_env_with_saved_file_key ... ok
+test auth::lifecycle::tests::catalog_invariants_pass_when_selected_model_matches_provider_route ... ok
+test auth::lifecycle::tests::catalog_invariants_reject_generic_openai_compatible_route_for_namespaced_auth ... ok
+test auth::lifecycle::tests::catalog_invariants_warn_when_selected_model_is_from_stale_provider ... ok
+test auth::lifecycle::tests::direct_auth_catalog_matching_preserves_oauth_vs_api_key_route_identity ... ok
+test auth::lifecycle::tests::direct_login_provider_activation_sets_runtime_identity_and_active_provider ... ok
+test auth::lifecycle::tests::direct_login_provider_descriptor_matrix_has_full_lifecycle_parity ... ok
+test auth::lifecycle::tests::direct_login_provider_ids_are_normalized_with_display_labels ... ok
+test auth::lifecycle::tests::every_model_login_provider_has_explicit_lifecycle_normalization ... ok
+test auth::lifecycle::tests::frontier_version_parsing_and_compare ... ok
+test auth::lifecycle::tests::gemini_auth_change_does_not_lock_router_against_openai_compatible_profiles ... ok
+test auth::lifecycle::tests::global_default_route_ignores_unavailable_routes_and_preserves_unknown_order ... ok
+test auth::lifecycle::tests::global_default_route_prefers_gpt_5_6_over_fable_and_preserves_route ... ok
+test auth::lifecycle::tests::global_default_route_uses_clean_gpt_5_6_then_fable_before_weaker_models ... ok
+test auth::lifecycle::tests::legacy_hint_only_auth_change_still_syncs_saved_file_key ... ok
+test auth::lifecycle::tests::model_switch_request_is_provider_explicit_for_all_auth_providers ... ok
+test auth::lifecycle::tests::model_switch_request_prefixes_openai_compatible_profiles_with_profile_id ... ok
+test auth::lifecycle::tests::normalize_model_for_preference_strips_hosted_prefixes_and_suffixes ... ok
+test auth::lifecycle::tests::oauth_auth_change_does_not_touch_api_key_process_env ... ok
+test auth::lifecycle::tests::onboarding_frontier_provider_preference_matrix ... ok
+test auth::lifecycle::tests::post_auth_auto_promotes_newer_frontier_release_not_yet_in_curated_list ... ok
+test auth::lifecycle::tests::post_auth_frontier_promotion_covers_bedrock_and_gemini ... ok
+test auth::lifecycle::tests::post_auth_frontier_promotion_ignores_cheaper_and_specialized_variants ... ok
+test auth::lifecycle::tests::post_auth_frontier_promotion_no_op_when_curated_is_still_newest ... ok
+test auth::lifecycle::tests::post_auth_model_selection_classifies_every_login_provider ... ok
+test auth::lifecycle::tests::post_auth_model_selection_copilot_prefers_claude_family_over_openai ... ok
+test auth::lifecycle::tests::post_auth_model_selection_falls_back_when_quality_first_model_is_unavailable ... ok
+test auth::lifecycle::tests::post_auth_model_selection_keeps_catalog_order_for_unranked_providers ... ok
+test auth::lifecycle::tests::post_auth_model_selection_picks_flagship_for_every_ranked_provider ... ok
+test auth::lifecycle::tests::post_auth_model_selection_prefers_anthropic_flagship_over_catalog_order ... ok
+test auth::lifecycle::tests::post_auth_model_selection_prefers_claude_oauth_flagship ... ok
+test auth::lifecycle::tests::post_auth_model_selection_prefers_matching_provider_route_over_stale_model ... ok
+test auth::lifecycle::tests::post_auth_model_selection_prefers_newest_live_release_for_unranked_provider ... ok
+test auth::lifecycle::tests::post_auth_model_selection_prefers_openai_flagship_over_catalog_order ... ok
+test auth::lifecycle::tests::post_auth_model_selection_reselects_duplicate_model_name_from_matching_provider_route ... ok
+test auth::lifecycle::tests::quality_first_defaults_are_not_displaced_by_lower_family_or_equal_release ... ok
+test auth::lifecycle::tests::typed_auth_request_provider_id_wins_over_legacy_hint ... ok
+test auth::login_diagnostics::tests::augments_message_with_next_step ... ok
+test auth::login_diagnostics::tests::classifies_callback_timeout ... ok
+test auth::login_diagnostics::tests::classifies_oauth_rate_limit ... ok
+test auth::login_diagnostics::tests::classifies_validation_failure ... ok
+test auth::oauth::tests::basic::claude_oauth_constants ... ok
+test auth::oauth::tests::basic::fetch_claude_profile_email_handles_missing_email ... ok
+test auth::oauth::tests::basic::fetch_claude_profile_email_propagates_http_error ... ok
+test auth::oauth::tests::basic::fetch_claude_profile_email_reads_account_email ... ok
+test auth::oauth::tests::basic::oauth_tokens_serialization_roundtrip ... ok
+test auth::oauth::tests::basic::oauth_tokens_without_id_token ... ok
+test auth::oauth::tests::basic::openai_oauth_constants ... ok
+test auth::oauth::tests::basic::pkce_challenge_is_base64url ... ok
+test auth::oauth::tests::basic::pkce_challenge_is_sha256_of_verifier ... ok
+test auth::oauth::tests::basic::pkce_generates_unique_values ... ok
+test auth::oauth::tests::basic::pkce_verifier_and_challenge_are_different ... ok
+test auth::oauth::tests::basic::save_claude_tokens_preserves_existing_account_metadata ... ok
+test auth::oauth::tests::basic::save_openai_tokens_uses_next_code_home_sandbox ... ok
+test auth::oauth::tests::basic::state_generates_unique_values ... ok
+test auth::oauth::tests::basic::state_is_random_hex ... ok
+test auth::oauth::tests::basic::wait_for_callback_async_ignores_missing_code_until_valid_callback ... ok
+test auth::oauth::tests::basic::wait_for_callback_async_ignores_wrong_state_until_valid_callback ... ok
+test auth::oauth::tests::basic::wait_for_callback_async_on_prebound_listener_parses_code ... ok
+test auth::oauth::tests::basic::wait_for_callback_async_parses_code ... ok
+test auth::oauth::tests::basic::wait_for_callback_async_surfaces_provider_error ... ok
+test auth::oauth::tests::flow::claude_auth_url_contains_required_params ... ok
+test auth::oauth::tests::flow::claude_auth_url_with_dynamic_redirect_uri ... ok
+test auth::oauth::tests::flow::claude_exchange_cloudflare_403_is_actionable ... ok
+test auth::oauth::tests::flow::claude_exchange_falls_back_to_verifier_when_input_has_no_state ... ok
+test auth::oauth::tests::flow::claude_exchange_handles_special_chars_in_code ... ok
+test auth::oauth::tests::flow::claude_exchange_mock_server_error_propagates ... ok
+test auth::oauth::tests::flow::claude_exchange_mock_server_receives_json ... ok
+test auth::oauth::tests::flow::claude_exchange_mock_server_with_state ... ok
+test auth::oauth::tests::flow::claude_exchange_preserves_returned_scopes ... ok
+test auth::oauth::tests::flow::claude_exchange_rejects_state_mismatch ... ok
+test auth::oauth::tests::flow::claude_exchange_rejects_token_without_inference_scope ... ok
+test auth::oauth::tests::flow::claude_exchange_request_body_is_json ... ok
+test auth::oauth::tests::flow::claude_exchange_request_contains_required_fields ... ok
+test auth::oauth::tests::flow::claude_exchange_request_includes_state_when_present ... ok
+test auth::oauth::tests::flow::claude_exchange_request_targets_correct_url ... ok
+test auth::oauth::tests::flow::claude_exchange_request_uses_json_like_claude_code ... ok
+test auth::oauth::tests::flow::claude_exchange_uses_claude_code_token_headers ... ok
+test auth::oauth::tests::flow::claude_exchange_uses_state_from_url_query_when_present ... ok
+test auth::oauth::tests::flow::claude_exchange_uses_verifier_when_input_state_is_empty ... ok
+test auth::oauth::tests::flow::claude_json_body_accepted_by_strict_server ... ok
+test auth::oauth::tests::flow::claude_redirect_uri_accepts_legacy_console_callback_url ... ok
+test auth::oauth::tests::flow::claude_redirect_uri_keeps_localhost_fallback_for_raw_code ... ok
+test auth::oauth::tests::flow::claude_redirect_uri_uses_manual_callback_for_platform_url ... ok
+test auth::oauth::tests::flow::claude_refresh_invalid_scope_detection_matches_anthropic_error ... ok
+test auth::oauth::tests::flow::claude_refresh_mock_server_error_propagates ... ok
+test auth::oauth::tests::flow::claude_refresh_mock_server_receives_json ... ok
+test auth::oauth::tests::flow::claude_refresh_request_body_is_json ... ok
+test auth::oauth::tests::flow::claude_refresh_request_can_omit_scope_for_legacy_fallback ... ok
+test auth::oauth::tests::flow::claude_refresh_request_contains_required_fields ... ok
+test auth::oauth::tests::flow::claude_refresh_request_targets_correct_url ... ok
+test auth::oauth::tests::flow::claude_refresh_request_uses_json_like_claude_code ... ok
+test auth::oauth::tests::flow::claude_scope_validation_requires_inference_when_scope_is_reported ... ok
+test auth::oauth::tests::flow::exchange_handles_missing_id_token ... ok
+test auth::oauth::tests::flow::exchange_parses_optional_id_token ... ok
+test auth::oauth::tests::flow::exchange_sets_expires_at_in_future ... ok
+test auth::oauth::tests::flow::openai_auth_url_contains_required_params ... ok
+test auth::oauth::tests::flow::openai_callback_input_rejects_state_mismatch ... ok
+test auth::oauth::tests::flow::openai_docs_reference_current_callback_uri ... ok
+test auth::oauth::tests::flow::openai_exchange_request_contains_required_fields ... ok
+test auth::oauth::tests::flow::openai_exchange_request_targets_correct_url ... ok
+test auth::oauth::tests::flow::openai_exchange_request_uses_form_urlencoded ... ok
+test auth::oauth::tests::flow::openai_redirect_uri_format ... ok
+test auth::oauth::tests::flow::openai_refresh_request_contains_required_fields ... ok
+test auth::oauth::tests::flow::openai_refresh_request_targets_correct_url ... ok
+test auth::oauth::tests::flow::openai_refresh_request_uses_form_urlencoded ... ok
+test auth::oauth::tests::flow::parse_callback_input_extracts_code_and_state ... ok
+test auth::oauth::tests::flow::parse_callback_input_requires_state ... ok
+test auth::oauth::tests::flow::parse_code_from_query_string ... ok
+test auth::oauth::tests::flow::parse_code_from_url ... ok
+test auth::oauth::tests::flow::parse_code_hash_state_format ... ok
+test auth::oauth::tests::flow::parse_code_rejects_empty_code_query_param ... ok
+test auth::oauth::tests::flow::parse_code_rejects_empty_input ... ok
+test auth::oauth::tests::flow::parse_code_trims_input_whitespace ... ok
+test auth::oauth::tests::flow::parse_code_url_with_whitespace_extracts_state ... ok
+test auth::oauth::tests::flow::parse_code_without_hash ... ok
+test auth::oauth::tests::flow::parse_plain_auth_code ... ok
+test auth::oauth::tests::flow::token_requests_use_expected_content_types ... ok
+test auth::refresh_coordinator::tests::concurrent_refreshes_for_same_key_run_once ... ok
+test auth::refresh_coordinator::tests::distinct_keys_do_not_serialize ... ok
+test auth::refresh_coordinator::tests::refresh_uses_newest_stored_state ... ok
+test auth::refresh_state::tests::format_record_label_prefers_failure_details ... ok
+test auth::refresh_state::tests::format_record_label_reports_success ... ok
+test auth::test_sandbox::tests::sandbox_isolates_next_code_home_and_config_dir ... ok
+test auth::test_sandbox::tests::sandbox_openai_compatible_key_file_is_read_from_temp_config ... ok
+test auth::tests::anthropic_api_provider_reports_api_key_independently_of_oauth ... ok
+test auth::tests::auth_state_default_is_not_configured ... ok
+test auth::tests::auth_state_equality ... ok
+test auth::tests::auth_status_check_fast_ignores_expired_full_cache ... ok
+test auth::tests::auth_status_check_fast_includes_bedrock_probe ... ok
+test auth::tests::auth_status_check_returns_valid_struct ... ok
+test auth::tests::auth_status_default_all_not_configured ... ok
+test auth::tests::azure_readiness_distinguishes_credentials_from_deployment_validation ... ok
+test auth::tests::browser_suppressed_inside_test_harness_without_env_overrides ... ok
+test auth::tests::claude_oauth_provider_reports_oauth_independently_of_api_key ... ok
+test auth::tests::command_candidates_adds_extension_on_windows ... ok
+test auth::tests::command_exists_absolute_nonexistent ... ok
+test auth::tests::command_exists_absolute_path ... ok
+test auth::tests::command_exists_cached_on_second_call ... ok
+test auth::tests::command_exists_empty_string ... ok
+test auth::tests::command_exists_for_known_binary ... ok
+test auth::tests::command_exists_nonexistent ... ok
+test auth::tests::configured_api_key_source_rejects_invalid_values ... ok
+test auth::tests::configured_api_key_source_uses_valid_overrides ... ok
+test auth::tests::contains_path_separator_detection ... ok
+test auth::tests::copilot_recent_token_exchange_failure_is_not_auto_usable ... ok
+test auth::tests::cursor_status_is_available_for_authenticated_cli_session ... ok
+test auth::tests::cursor_status_is_available_for_native_auth_without_cli ... ok
+test auth::tests::cursor_status_is_available_when_api_key_exists_without_cli ... ok
+test auth::tests::dedup_preserves_order ... ok
+test auth::tests::full_and_fast_auth_status_document_cursor_cli_exception ... ok
+test auth::tests::full_and_fast_auth_status_match_for_shared_probe_fields ... ok
+test auth::tests::has_extension_detection ... ok
+test auth::tests::is_wsl2_windows_path_matches_drive_mounts ... ok
+test auth::tests::is_wsl2_windows_path_rejects_non_drives ... ok
+test auth::tests::openrouter_like_status_is_provider_specific ... ok
+test auth::tests::provider_auth_assessment_predicates_reflect_state ... ok
+test auth::tests::provider_auth_default ... ok
+test auth::validation::tests::format_record_label_marks_stale_records ... ok
+test auth::validation::tests::format_record_label_prefers_tool_validated_wording ... ok
+test auth::validation::tests::format_record_label_reports_failures ... ok
+test background::tests::reconcile_leaves_non_orphans_alone ... ok
+test background::tests::reconcile_marks_orphan_from_dead_process_failed ... ok
+test background::tests::reconcile_marks_orphan_from_reloaded_process_failed ... ok
+test background::tests::spawn_with_notify_emits_started_ui_activity ... ok
+test background::tests::status_read_self_heals_orphaned_task ... ok
+test background::tests::tasks_map_prunes_entry_after_natural_completion ... ok
+test background::tests::update_delivery_applies_to_running_task_completion ... ok
+test background::tests::update_progress_persists_status_and_emits_bus_event ... ok
+test background::tests::wait_returns_on_progress_checkpoint ... ok
+test background::tests::wait_returns_on_timeout ... ok
+test background::tests::wait_returns_when_task_finishes ... ok
+test browser::browser_tests::ensure_browser_session_does_not_pass_unsupported_bind_window_flag ... ok
+test browser::browser_tests::ensure_browser_session_fails_fast_when_session_process_exits_immediately ... ok
+test browser::browser_tests::setup_complete_requires_native_host_binary ... ok
+test browser::browser_tests::test_ensure_browser_ready_noninteractive_without_binary ... ok
+test browser::browser_tests::test_inspect_browser_status_without_binary ... ok
+test browser::browser_tests::test_is_browser_command ... ok
+test browser::browser_tests::test_paths ... ok
+test browser::browser_tests::test_platform_asset_name ... ok
+test browser::browser_tests::test_rewrite_command_with_full_path ... ok
+test browser::browser_tests::test_should_prompt_extension_install_only_before_setup_complete ... ok
+test bus::tests::models_updated_publishes_are_coalesced ... ok
+test cache_invalidation::tests::most_recent_since_filters_older_entries ... ok
+test cache_tracker::tests::test_append_only_no_violation ... ok
+test cache_tracker::tests::test_message_removal_violation ... ok
+test cache_tracker::tests::test_no_false_positive_on_normal_growth ... ok
+test cache_tracker::tests::test_no_false_positive_when_memory_excluded ... ok
+test cache_tracker::tests::test_prefix_modification_violation ... ok
+test cache_tracker::tests::test_reset ... ok
+test compaction::tests::test_context_usage_after_compaction_resets_observed ... ok
+test compaction::tests::test_context_usage_prefers_observed_tokens ... ok
+test compaction::tests::test_context_usage_with_both_estimate_and_observed ... ok
+test compaction::tests::test_emergency_truncate_large_tool_results ... ok
+test compaction::tests::test_emergency_truncate_skips_small_results ... ok
+test compaction::tests::test_force_compact_applies_summary ... ok
+test compaction::tests::test_guard_at_100_percent_drops_messages ... ok
+test compaction::tests::test_guard_at_95_triggers_hard_compact ... ok
+test compaction::tests::test_guard_below_80_does_nothing ... ok
+test compaction::tests::test_guard_between_80_and_95_starts_background_only ... ok
+test compaction::tests::test_hard_compact_aborts_inflight_background_compaction ... ok
+test compaction::tests::test_hard_compact_clamps_pathological_compacted_count ... ok
+test compaction::tests::test_hard_compact_preserves_recent_turns ... ok
+test compaction::tests::test_hard_compact_reduces_api_payload_and_reports_saved_tokens ... ok
+test compaction::tests::test_hard_compact_too_few_messages ... ok
+test compaction::tests::test_hard_compact_twice ... ok
+test compaction::tests::test_invalid_compacted_count_does_not_resurrect_full_transcript_after_new_turn ... ok
+test compaction::tests::test_messages_for_api_no_summary ... ok
+test compaction::tests::test_messages_for_api_with_summary_prepended ... ok
+test compaction::tests::test_new_manager ... ok
+test compaction::tests::test_new_message_after_restore_reenables_compaction ... ok
+test compaction::tests::test_notify_message_added ... ok
+test compaction::tests::test_persisted_state_round_trip_preserves_compacted_view ... ok
+test compaction::tests::test_recover_within_budget_drops_messages_without_truncation ... ok
+test compaction::tests::test_recover_within_budget_summary_line_variants ... ok
+test compaction::tests::test_recover_within_budget_truncates_when_tail_still_too_large ... ok
+test compaction::tests::test_restored_messages_do_not_trigger_compaction_immediately ... ok
+test compaction::tests::test_safe_cutoff_handles_chained_tool_dependencies_without_rescan ... ok
+test compaction::tests::test_safe_cutoff_no_tool_pairs ... ok
+test compaction::tests::test_safe_cutoff_preserves_tool_pairs ... ok
+test compaction::tests::test_should_compact ... ok
+test compaction::tests::test_should_compact_uses_observed_tokens ... ok
+test compaction::tests::test_stale_background_result_discarded_when_context_shrinks ... ok
+test compaction::tests::test_token_estimate ... ok
+test config::tests::acp_config_defaults_to_standard_profile_and_acp_tools ... ok
+test config::tests::cached_external_auth_trust_observes_manual_revocation ... ok
+test config::tests::config_env_fingerprint_ignores_runtime_only_next_code_vars ... ok
+test config::tests::config_env_fingerprint_tracks_every_apply_env_override_var ... ok
+test config::tests::config_save_invalidates_global_config_cache ... ok
+test config::tests::global_config_cache_reloads_after_manual_file_edit ... ok
+test config::tests::hooks_config_defaults_and_parses_from_toml ... ok
+test config::tests::known_update_channel_values_still_parse ... ok
+test config::tests::latex_rendering_defaults_to_image_and_parses_all_modes ... ok
+test config::tests::latex_rendering_environment_override_accepts_aliases ... ok
+test config::tests::mermaid_environment_override_uses_standard_boolean_values ... ok
+test config::tests::mermaid_feature_defaults_on_and_parses_false ... ok
+test config::tests::populate_context_limits_from_config_ref_seeds_global_cache ... ok
+test config::tests::populate_context_limits_from_config_seeds_qualified_runtime_model_shapes ... ok
+test config::tests::preserve_reasoning_context_defaults_to_enabled ... ok
+test config::tests::spawn_hook_defaults_to_none_and_parses_from_toml ... ok
+test config::tests::swarm_max_concurrent_agents_defaults_high_for_deep_fanout ... ok
+test config::tests::swarm_max_concurrent_agents_parses_and_allows_zero_for_unbounded ... ok
+test config::tests::swarm_spawn_mode_as_str_round_trips ... ok
+test config::tests::swarm_spawn_mode_defaults_to_inline ... ok
+test config::tests::swarm_spawn_mode_parses_supported_values ... ok
+test config::tests::swarm_spawn_mode_rejects_invalid_values ... ok
+test config::tests::terminal_preferred_defaults_to_none_and_parses_from_toml ... ok
+test config::tests::test_ambient_visible_defaults_to_true ... ok
+test config::tests::test_copy_badge_alt_label_defaults_to_auto_and_deserializes ... ok
+test config::tests::test_display_alignment_defaults_to_left ... ok
+test config::tests::test_display_auto_server_reload_defaults_to_true ... ok
+test config::tests::test_env_override_auto_server_reload ... ok
+test config::tests::test_env_override_diff_mode_full_inline ... ok
+test config::tests::test_env_override_focus_hook ... ok
+test config::tests::test_env_override_lifecycle_hooks ... ok
+test config::tests::test_env_override_memory_sidecar ... ok
+test config::tests::test_env_override_native_scrollbars ... ok
+test config::tests::test_env_override_spawn_hook ... ok
+test config::tests::test_env_override_swarm_model ... ok
+test config::tests::test_env_override_swarm_spawn_mode ... ok
+test config::tests::test_env_override_trusted_external_auth_splits_source_and_path_entries ... ok
+test config::tests::test_external_auth_source_allowed_for_path_ignores_broad_legacy_entry ... ok
+test config::tests::test_external_auth_source_allowed_for_path_matches_saved_entry ... ok
+test config::tests::test_generated_default_config_uses_low_openai_reasoning_effort ... FAILED
+test config::tests::test_memory_sidecar_enabled_defaults_true ... ok
+test config::tests::test_native_scrollbars_default_to_enabled ... ok
+test config::tests::test_openai_fast_mode_defaults_to_priority ... ok
+test config::tests::test_openai_reasoning_effort_defaults_to_low ... ok
+test config::tests::test_provider_failover_defaults_match_new_behavior ... ok
+test config::tests::test_session_picker_resume_action_defaults_to_current_terminal ... ok
+test config::tests::test_session_picker_resume_action_deserializes_kebab_case ... ok
+test config::tests::tool_config_acp_profile_allows_core_coding_plus_batch ... FAILED
+test config::tests::tool_config_all_enabled_sentinel_keeps_unrestricted_toolset ... ok
+test config::tests::tool_config_defaults_to_full_toolset ... ok
+test config::tests::tool_config_disabled_only_keeps_full_profile_with_deny_list ... ok
+test config::tests::tool_config_explicit_disabled_overrides_all_enabled_sentinel ... ok
+test config::tests::tool_config_explicit_enabled_and_disabled_lists_compose ... ok
+test config::tests::tool_config_explicit_enabled_uses_allow_list ... ok
+test config::tests::tool_config_minimal_profile_allows_core_coding_tools ... FAILED
+test config::tests::tool_config_none_profile_disables_all_tools ... ok
+test config::tests::unknown_update_channel_value_falls_back_to_stable_instead_of_failing_parse ... ok
+test config::tests::update_channel_parse_accepts_known_aliases_and_rejects_unknown ... ok
+test copilot_usage::tests::save_and_load_roundtrip_under_next_code_home ... ok
+test copilot_usage::tests::usage_path_respects_next_code_home ... ok
+test dictation::dictation_tests::extract_session_short_name_from_next_code_window_title ... ok
+test dictation::dictation_tests::normalize_session_short_name_strips_wrapping_punctuation ... ok
+test dictation::dictation_tests::parse_ppid_from_proc_status ... ok
+test dictation::dictation_tests::read_resumed_session_id_from_cmdline_for_current_process ... ok
+test dictation::dictation_tests::remember_and_read_last_focused_session ... ok
+test dictation::dictation_tests::run_command_trims_trailing_newlines ... ok
+test dictation::dictation_tests::select_candidate_prefers_title_match ... ok
+test embedding::tests::test_cosine_similarity ... ok
+test embedding::tests::test_find_similar ... ok
+test embedding::tests::test_idle_unload_noop_when_not_loaded ... ok
+test embedding_backend::tests::default_formatting_is_identity ... ok
+test embedding_backend::tests::local_backend_model_id_matches_legacy_tag ... ok
+test embedding_backend::tests::openai_backend_namespaces_model_id_and_infers_dim ... ok
+test gateway::gateway_tests::test_authorize_ws_device_rejects_unknown_and_revoked_with_401 ... ok
+test gateway::gateway_tests::test_authorize_ws_device_valid_token ... ok
+test gateway::gateway_tests::test_device_re_pairing ... ok
+test gateway::gateway_tests::test_device_registry_pairing ... ok
+test gateway::gateway_tests::test_device_registry_token_auth ... ok
+test gateway::gateway_tests::test_extract_ws_auth_prefers_header_and_falls_back_to_query ... ok
+test gateway::gateway_tests::test_extract_ws_auth_rejects_conflicting_sources ... ok
+test gateway::gateway_tests::test_find_header_end ... ok
+test gateway::gateway_tests::test_hex_token_validation ... ok
+test gateway::gateway_tests::test_parse_bearer_token ... ok
+test gateway::gateway_tests::test_parse_query_token ... ok
+test generated_image::tests::generated_image_side_panel_markdown_prefers_compact_useful_metadata ... ok
+test generated_image::tests::generated_image_side_panel_title_includes_filename_and_dimensions ... ok
+test gmail::tests::composio_backend_is_configured_and_can_send ... ok
+test gmail::tests::composio_proxy_payload_get_has_no_body ... ok
+test gmail::tests::composio_proxy_payload_omits_optional_account_fields ... ok
+test gmail::tests::composio_proxy_payload_post_includes_body ... ok
+test gmail::tests::direct_backend_label_and_default ... ok
+test gmail::tests::effective_user_id_defaults_to_default ... ok
+test gmail::tests::message_attachments_flatten_nested_parts ... ok
+test gmail::tests::message_without_attachments_formats_clean ... ok
+test gmail::tests::needs_connection_reflects_connected_account_presence ... ok
+test gmail::tests::truncate_error_caps_length ... ok
+test hooks::tests::observer_dispatch_runs_hook_with_event_env ... ok
+test hooks::tests::payload_json_includes_event_and_lowercased_fields ... ok
+test hooks::tests::pre_tool_gate_allows_on_exit_zero_and_blocks_on_exit_two ... ok
+test hooks::tests::pre_tool_gate_fails_open_on_timeout_and_odd_exits ... ok
+test hooks::tests::pre_tool_gate_receives_input_on_stdin ... ok
+test hooks::tests::truncate_bytes_respects_char_boundaries ... ok
+test import::tests::cached_imported_session_preserves_existing_history_verbatim ... ok
+test import::tests::imported_history_is_bounded_for_fast_initial_render ... ok
+test import::tests::imported_tool_history_is_provider_neutral ... ok
+test import::tests::message_role_prefilter_accepts_json_whitespace ... ok
+test import::tests::repeated_external_resume_reuses_the_imported_snapshot ... ok
+test import::tests::test_convert_blocks_content ... ok
+test import::tests::test_convert_empty_content ... ok
+test import::tests::test_convert_text_content ... ok
+test import::tests::test_discover_projects_uses_sandboxed_external_home ... ok
+test import::tests::test_import_claude_session_uses_recovered_live_transcript ... ok
+test import::tests::test_import_cursor_session_creates_next_code_snapshot ... ok
+test import::tests::test_import_opencode_session_creates_next_code_snapshot ... ok
+test import::tests::test_import_pi_session_creates_next_code_snapshot ... ok
+test import::tests::test_list_claude_code_sessions_skips_empty_index_entries_without_messages ... ok
+test import::tests::test_list_claude_code_sessions_uses_index_metadata_without_parsing_transcript ... ok
+test import::tests::test_list_claude_code_sessions_uses_live_transcripts_when_index_is_stale ... ok
+test import::tests::test_reimporting_claude_session_preserves_next_code_continuation ... ok
+test import::tests::test_resolve_resume_target_to_next_code_imports_claude_code_session ... ok
+test import::tests::test_resolve_resume_target_to_next_code_imports_codex_session ... ok
+test import::tests::test_truncate_title ... ok
+test live_tests::tests::auth_fingerprint_is_stable_and_non_reversible ... ok
+test live_tests::tests::coverage_line_classifier_assigns_expected_styles ... ok
+test live_tests::tests::coverage_summary_lists_one_line_per_pair_without_glyph_bars ... ok
+test live_tests::tests::end_to_end_checkpoint_taxonomy_covers_user_ready_ladder ... ok
+test live_tests::tests::humanize_time_ago_buckets_and_labels_actor ... ok
+test live_tests::tests::issue_driven_live_provider_targets_report_covered_partial_and_missing_evidence ... ok
+test live_tests::tests::live_verification_ledger_writes_events_and_coverage_without_secret ... ok
+test live_tests::tests::readiness_gaps_track_expected_checkpoints_not_yet_exercised ... ok
+test live_tests::tests::strict_coverage_keeps_passing_run_when_newer_run_skips_same_checkpoints ... ok
+test live_tests::tests::strict_live_provider_model_coverage_counts_only_exact_pairs_with_all_required_passed ... ok
+test live_tests::tests::strict_live_provider_model_coverage_report_names_required_e2e_checkpoints ... ok
+test login_qr::tests::indented_section_prefixes_each_line ... ok
+test login_qr::tests::markdown_section_wraps_qr_in_code_block ... ok
+test login_qr::tests::qr_sections_are_disabled_by_default ... ok
+test login_qr::tests::render_unicode_qr_uses_block_glyphs_without_ansi ... ok
+test login_qr::tests::tui_markdown_section_is_opt_in_even_when_general_qr_is_enabled ... ok
+test login_qr::tests::tui_markdown_section_uses_dedicated_env_flag ... ok
+test mcp::manager::tests::call_tool_unconfigured_server_bails_cleanly ... ok
+test mcp::manager::tests::connect_all_skips_disabled_servers ... ok
+test mcp::manager::tests::connect_on_first_call_fails_cleanly_for_broken_server ... ok
+test mcp::manager::tests::ensure_server_connected_unconfigured_errors ... ok
+test mcp::pool::tests::begin_connect_deduplicates_concurrent_attempts ... ok
+test mcp::protocol::protocol_tests::load_for_dir_without_project_does_not_load_process_cwd_config ... ok
+test mcp::protocol::protocol_tests::test_disabled_server_survives_save_roundtrip ... ok
+test mcp::protocol::protocol_tests::test_initialize_result ... ok
+test mcp::protocol::protocol_tests::test_json_rpc_error_response ... ok
+test mcp::protocol::protocol_tests::test_json_rpc_request_serialization ... ok
+test mcp::protocol::protocol_tests::test_json_rpc_response_deserialization ... ok
+test mcp::protocol::protocol_tests::test_load_claude_json_global_and_project_servers ... ok
+test mcp::protocol::protocol_tests::test_load_project_locals_merge_order ... ok
+test mcp::protocol::protocol_tests::test_load_project_locals_resolves_against_given_dir_not_cwd ... ok
+test mcp::protocol::protocol_tests::test_mcp_config_accepts_claude_mcp_servers_key ... ok
+test mcp::protocol::protocol_tests::test_mcp_config_deserialization ... ok
+test mcp::protocol::protocol_tests::test_mcp_config_empty ... ok
+test mcp::protocol::protocol_tests::test_mcp_http_server_is_not_stdio ... ok
+test mcp::protocol::protocol_tests::test_server_disabled_true_claude_style ... ok
+test mcp::protocol::protocol_tests::test_server_disabled_wins_over_enabled ... ok
+test mcp::protocol::protocol_tests::test_server_enabled_defaults_true ... ok
+test mcp::protocol::protocol_tests::test_server_enabled_false_opencode_style ... ok
+test mcp::protocol::protocol_tests::test_tool_call_result_error ... ok
+test mcp::protocol::protocol_tests::test_tool_call_result_text ... ok
+test mcp::protocol::protocol_tests::test_tool_def_deserialization ... ok
+test mcp::schema_cache::schema_cache_tests::fingerprint_env_order_independent ... ok
+test mcp::schema_cache::schema_cache_tests::fingerprint_is_stable_and_sensitive ... ok
+test mcp::schema_cache::schema_cache_tests::load_save_roundtrip_via_temp_home ... ok
+test mcp::schema_cache::schema_cache_tests::retain_prunes_removed_servers ... ok
+test mcp::schema_cache::schema_cache_tests::tools_for_respects_fingerprint ... ok
+test mcp::schema_cache::schema_cache_tests::update_reports_change_only_on_diff ... ok
+test memory::tests::collect_skill_query_terms_keeps_relevant_words_and_drops_generic_words ... ok
+test memory::tests::extraction_context_keeps_tool_io_details ... ok
+test memory::tests::focus_query_text_falls_back_when_all_stripped ... ok
+test memory::tests::focus_query_text_strips_noise_and_leads_with_user_intent ... ok
+test memory::tests::format_context_includes_roles_and_tools ... ok
+test memory::tests::goal_memory_upsert_skips_embedding_generation ... ok
+test memory::tests::graph_based_memory_operations ... ok
+test memory::tests::hybrid_excludes_superseded_memories ... ok
+test memory::tests::hybrid_fuse_rescues_lexical_match_dense_would_miss ... ok
+test memory::tests::hybrid_fuse_returns_dense_hits_without_lexical_overlap ... FAILED
+test memory::tests::injected_memory_dedup_expires_after_ttl ... ok
+test memory::tests::manager_persists_and_forgets_memories ... ok
+test memory::tests::manager_search_scoped_normalizes_whitespace_and_separators ... ok
+test memory::tests::manager_without_project_dir_does_not_use_process_cwd ... ok
+test memory::tests::mark_memories_known_blocks_reinjection_like_injection ... ok
+test memory::tests::memory_search_normalizes_whitespace_and_separators ... ok
+test memory::tests::memory_store_format_groups_by_category ... ok
+test memory::tests::memory_store_search_matches_content_and_tags ... ok
+test memory::tests::pending_memory_freshness_and_clear ... ok
+test memory::tests::pending_memory_keeps_existing_similar_payload_instead_of_replacing_it ... ok
+test memory::tests::pending_memory_per_session_isolation ... ok
+test memory::tests::pending_memory_suppresses_immediate_duplicate_payloads ... ok
+test memory::tests::pending_memory_suppresses_overlapping_memory_sets ... ok
+test memory::tests::pending_memory_suppresses_payload_when_all_ids_already_known ... ok
+test memory::tests::project_memories_are_isolated_by_explicit_project_dir ... ok
+test memory::tests::prompt_memories_scoped_keeps_only_most_recent_entries ... ok
+test memory::tests::retrieval_candidates_include_local_skills ... ok
+test memory::tests::scoped_retrieval_respects_project_vs_global ... ok
+test memory::tests::score_and_filter_prioritizes_matching_skill_memories ... FAILED
+test memory_agent::tests::apply_cluster_assignment_links_members ... ok
+test memory_agent::tests::apply_confidence_updates_batches_boost_and_decay ... ok
+test memory_agent::tests::dynamic_gate_cuts_tail_at_score_gap ... ok
+test memory_agent::tests::dynamic_gate_empty_input_returns_empty ... ok
+test memory_agent::tests::dynamic_gate_keeps_top1_even_when_isolated ... ok
+test memory_agent::tests::dynamic_gate_respects_max_k_on_flat_scores ... ok
+test memory_agent::tests::infer_candidate_tag_uses_repeated_non_stopword ... ok
+test memory_agent::tests::should_run_rerank_cadence_and_overrides ... ok
+test memory_judge_metrics::tests::all_array_matches_enum_and_indices ... ok
+test memory_judge_metrics::tests::classification_is_consistent ... ok
+test memory_judge_metrics::tests::snapshot_computes_rates ... ok
+test memory_log::tests::memory_log_cleanup_respects_14_day_window ... ok
+test memory_rerank::tests::build_prompt_numbers_candidates_one_based ... ok
+test memory_rerank::tests::compose_precision_keeps_only_ranked ... ok
+test memory_rerank::tests::compose_recall_appends_omitted_in_hybrid_order ... ok
+test memory_rerank::tests::extract_ranking_distinguishes_empty_array_from_no_array ... ok
+test memory_rerank::tests::judge_failure_backoff_arms_and_auth_invalidation_clears_it ... ok
+test memory_rerank::tests::parse_rerank_response_basic ... ok
+test memory_rerank::tests::parse_rerank_response_dedups_and_bounds ... ok
+test memory_rerank::tests::parse_rerank_response_empty_on_garbage ... ok
+test memory_rerank::tests::parse_rerank_response_tolerates_prose ... ok
+test memory_rerank::tests::tally_consensus_empty_when_no_votes ... ok
+test memory_rerank::tests::tally_consensus_ignores_failed_ballots ... ok
+test memory_rerank::tests::tally_consensus_orders_by_votes_then_rank ... ok
+test memory_rerank::tests::tally_consensus_requires_agreement ... ok
+test message::tests::background_task_notifications_include_display_name_when_available ... ok
+test message::tests::background_task_progress_notifications_include_display_name_when_available ... ok
+test message::tests::description_token_estimate_uses_chars_per_token_heuristic ... ok
+test message::tests::ends_with_fresh_user_turn_accepts_plain_user_text ... ok
+test message::tests::ends_with_fresh_user_turn_rejects_assistant_tail ... ok
+test message::tests::ends_with_fresh_user_turn_rejects_trailing_tool_result ... ok
+test message::tests::ends_with_fresh_user_turn_skips_internal_system_reminders ... ok
+test message::tests::format_background_task_notification_markdown_handles_empty_preview ... ok
+test message::tests::format_background_task_notification_markdown_highlights_failure_reason ... ok
+test message::tests::format_background_task_notification_markdown_renders_superseded_status ... ok
+test message::tests::format_background_task_notification_markdown_strips_ansi_from_preview ... ok
+test message::tests::format_background_task_notification_markdown_uses_code_block_preview ... ok
+test message::tests::format_background_task_progress_markdown_uses_compact_multiline_layout ... ok
+test message::tests::format_input_shell_result_markdown_strips_ansi_from_output ... ok
+test message::tests::format_timestamp_is_stable_utc_rfc3339 ... ok
+test message::tests::generated_image_rendered_image_uses_inline_tool_anchor ... ok
+test message::tests::generated_image_visual_context_blocks_attach_safe_image ... ok
+test message::tests::parse_background_task_notification_markdown_extracts_fields ... ok
+test message::tests::parse_background_task_progress_notification_extracts_card_fields ... ok
+test message::tests::parse_background_task_progress_notification_supports_legacy_inline_layout ... ok
+test message::tests::push_reasoning_blocks_always_captures_history ... ok
+test message::tests::push_reasoning_blocks_anthropic_signed_replay ... ok
+test message::tests::push_reasoning_blocks_anthropic_unsigned_falls_back_to_trace ... ok
+test message::tests::push_reasoning_blocks_openai_keeps_readable_trace ... ok
+test message::tests::push_reasoning_blocks_openrouter_replay_is_readable ... ok
+test message::tests::push_reasoning_blocks_skips_empty ... ok
+test message::tests::reasoning_trace_serde_round_trip ... ok
+test message::tests::redact_secrets_also_covers_shared_sanitizer_formats ... ok
+test message::tests::redact_secrets_leaves_normal_output_unchanged ... ok
+test message::tests::redact_secrets_redacts_env_style_assignments ... ok
+test message::tests::redact_secrets_redacts_known_direct_token_formats ... ok
+test message::tests::redact_secrets_redacts_mixed_case_token_assignments ... ok
+test message::tests::redact_secrets_redacts_runtime_key_assignment ... ok
+test message::tests::sanitize_tool_id_alphanumeric_passthrough ... ok
+test message::tests::sanitize_tool_id_already_valid_unchanged ... ok
+test message::tests::sanitize_tool_id_copilot_to_anthropic ... ok
+test message::tests::sanitize_tool_id_empty_returns_unknown ... ok
+test message::tests::sanitize_tool_id_hyphens_passthrough ... ok
+test message::tests::sanitize_tool_id_replaces_colons ... ok
+test message::tests::sanitize_tool_id_replaces_dots ... ok
+test message::tests::sanitize_tool_id_replaces_special_chars ... ok
+test message::tests::strip_ansi_escape_sequences_removes_terminal_controls ... ok
+test message::tests::tool_call_intent_from_input_trims_optional_intent ... ok
+test message::tests::tool_call_normalizes_non_object_input_to_empty_object ... ok
+test message::tests::tool_call_parses_empty_or_null_streamed_input_as_empty_object ... ok
+test message::tests::tool_call_preserves_invalid_streamed_json_as_validation_error ... ok
+test message::tests::tool_call_validation_rejects_empty_name_and_non_object_input ... ok
+test message::tests::with_timestamps_adds_tool_timing_header_with_duration ... ok
+test message::tests::with_timestamps_prepends_utc_prefix_to_user_text ... ok
+test message::tests::with_timestamps_skips_internal_system_reminders ... ok
+test model_pricing::tests::lookup_normalizes_model_ids ... ok
+test model_pricing::tests::parses_models_dev_shape ... ok
+test model_pricing::tests::provider_key_mapping_covers_next_code_providers ... ok
+test model_pricing::tests::rejects_empty_response ... ok
+test notepad::tests::test_absolute_config_dir_rejected ... ok
+test notepad::tests::test_all_tiers ... ok
+test notepad::tests::test_clear ... ok
+test notepad::tests::test_disabled_notepad_returns_none ... ok
+test notepad::tests::test_lock_timeout_surfaces_error ... ok
+test notepad::tests::test_new_does_not_create_dir_unless_write ... ok
+test notepad::tests::test_parent_dir_config_dir_rejected ... ok
+test notepad::tests::test_priority_cache_serves_fresh_content ... ok
+test notepad::tests::test_priority_prompt_block_escapes_embedded_instructions ... ok
+test notepad::tests::test_priority_prompt_block_formats_content ... ok
+test notepad::tests::test_priority_prompt_block_returns_none_when_empty ... ok
+test notepad::tests::test_prune_clears_working ... ok
+test notepad::tests::test_read_nonexistent_returns_empty ... ok
+test notepad::tests::test_read_write_roundtrip ... ok
+test notepad::tests::test_stale_lock_is_recovered ... ok
+test notepad::tests::test_stats_after_write ... ok
+test notepad::tests::test_stats_empty ... ok
+test notepad::tests::test_tier_as_str ... ok
+test notepad::tests::test_tier_filename ... ok
+test notepad::tests::test_truncation ... ok
+test platform::platform_tests::desired_nofile_soft_limit_only_raises_when_possible ... ok
+test platform::platform_tests::spawn_detached_creates_new_session ... FAILED
+test power_inhibit::tests::availability_requires_no_legacy_disable_and_supported_platform ... ok
+test power_inhibit::tests::linux_inhibitor_blocks_sleep_and_lid_switch_with_bounded_ttl ... ok
+test power_inhibit::tests::macos_inhibitor_prevents_system_sleep_without_display_assertion ... ok
+test power_inhibit::tests::refresh_is_due_only_after_the_threshold_elapses ... ok
+test process_memory::tests::allocator_info_matches_enabled_allocator_features ... ok
+test process_memory::tests::parse_retention_trim_threshold_handles_default_disable_and_values ... ok
+test process_memory::tests::release_retained_heap_debounced_skips_within_interval ... ok
+test process_memory::tests::release_retained_heap_if_excessive_skips_below_threshold ... ok
+test process_memory::tests::release_retained_heap_is_safe_to_call ... ok
+test process_memory::tests::retention_growth_trigger_measures_growth_above_baseline ... ok
+test process_title::tests::terminal_session_label_for_id_prefers_todo_title_over_generated_title ... ok
+test process_title::tests::terminal_session_label_for_id_reads_custom_title_from_session ... ok
+test process_title::tests::terminal_session_label_includes_custom_title_and_short_name ... ok
+test process_title::tests::terminal_window_title_omits_product_and_animal_names ... ok
+test prompt::prompt_tests::build_system_prompt_full_uses_next_code_system_md_root ... ok
+test prompt::prompt_tests::classify_effort_distinguishes_reasoning_from_swarm_modes ... ok
+test prompt::prompt_tests::mermaid_prompt_module_follows_capability ... ok
+test prompt::prompt_tests::split_prompt_estimated_tokens_is_positive_when_populated ... ok
+test prompt::prompt_tests::sponsored_discovery_is_not_injected_into_the_system_prompt ... ok
+test prompt::prompt_tests::swarm_deep_effort_injects_task_graph_directive ... ok
+test prompt::prompt_tests::swarm_effort_directive_is_appended_only_for_swarm_sentinel ... ok
+test prompt::prompt_tests::test_context_files_disabled_returns_false_by_default ... ok
+test prompt::prompt_tests::test_context_files_disabled_returns_true_when_env_set ... ok
+test prompt::prompt_tests::test_default_swarm_prompt_mentions_model_and_list_models ... ok
+test prompt::prompt_tests::test_default_system_prompt_no_claude_code_identity ... ok
+test prompt::prompt_tests::test_full_prompt_includes_notepad_block_when_provided ... ok
+test prompt::prompt_tests::test_full_prompt_omits_notepad_block_when_none ... ok
+test prompt::prompt_tests::test_load_agents_md_files_uses_sandboxed_global_files ... ok
+test prompt::prompt_tests::test_load_agents_md_from_dir_loads_files_when_not_disabled ... ok
+test prompt::prompt_tests::test_load_agents_md_from_dir_returns_none_when_disabled ... ok
+test prompt::prompt_tests::test_non_selfdev_prompt_leaves_selfdev_guidance_to_the_tool_schema ... ok
+test prompt::prompt_tests::test_preferred_tools_files_are_loaded_from_project_and_global_next_code_dirs ... ok
+test prompt::prompt_tests::test_prompt_overlay_files_are_loaded_from_project_and_global_next_code_dirs ... ok
+test prompt::prompt_tests::test_selfdev_prompt_prefers_publish_flow_for_active_builds ... ok
+test prompt::prompt_tests::test_selfdev_prompt_template_placeholders_are_resolved ... ok
+test prompt::prompt_tests::test_selfdev_prompt_uses_full_selfdev_instructions ... ok
+test prompt::prompt_tests::test_session_context_includes_time_timezone_and_system_info ... ok
+test prompt::prompt_tests::test_skill_prompt_integration ... ok
+test prompt::prompt_tests::test_split_prompt_does_not_inject_session_context_per_turn ... ok
+test prompt::prompt_tests::test_split_prompt_omits_notepad_when_none ... ok
+test prompt::prompt_tests::test_split_prompt_puts_notepad_in_dynamic_part ... ok
+test prompt::prompt_tests::test_split_selfdev_prompt_defaults_to_tui_focus_for_repo_root ... ok
+test prompt::prompt_tests::test_swarm_prompt_prefers_project_then_global_then_default ... ok
+test provider::activation::tests::azure_activation_preserves_identity_while_using_openrouter_slot ... ok
+test provider::catalog_routes::tests::openrouter_alternative_routes_skip_models_absent_from_catalog ... ok
+test provider::catalog_routes::tests::remote_compatible_route_ignores_live_cache_from_wrong_api_base ... ok
+test provider::catalog_routes::tests::remote_compatible_route_marks_static_model_list_fallback ... ok
+test provider::catalog_routes::tests::remote_compatible_route_uses_live_cache_and_does_not_mark_fallback ... ok
+test provider::catalog_routes::tests::simplified_anthropic_routes_preserve_oauth_vs_api_key_state_space ... ok
+test provider::image_clamp::tests::correctly_labeled_image_is_not_touched ... ok
+test provider::image_clamp::tests::few_images_clamp_to_8000 ... ok
+test provider::image_clamp::tests::jpeg_bytes_mislabeled_as_png_are_relabeled ... ok
+test provider::image_clamp::tests::many_images_clamp_to_2000 ... ok
+test provider::image_clamp::tests::media_type_match_is_case_insensitive ... ok
+test provider::image_clamp::tests::no_images_returns_none ... ok
+test provider::image_clamp::tests::oversized_base64_image_is_reencoded_under_byte_cap ... ok
+test provider::image_clamp::tests::png_bytes_mislabeled_as_jpeg_are_relabeled ... ok
+test provider::image_clamp::tests::single_large_image_uses_few_image_limit ... ok
+test provider::image_clamp::tests::sniff_detects_common_formats ... ok
+test provider::image_clamp::tests::within_limits_returns_none ... ok
+test provider::models::catalog::status_error_tests::catalog_status_error_round_trips_through_anyhow_downcast ... ok
+test provider::models::catalog_service::tests::abandoned_in_flight_refresh_expires_and_is_reclaimed ... ok
+test provider::models::catalog_service::tests::begin_refresh_blocks_duplicate_until_finished_then_retry_throttles ... ok
+test provider::models::catalog_service::tests::empty_model_sets_do_not_replace_existing_catalog ... ok
+test provider::models::catalog_service::tests::hydrating_recent_disk_snapshot_keeps_scope_fresh ... ok
+test provider::models::catalog_service::tests::hydrating_stale_disk_snapshot_does_not_mark_scope_fresh ... ok
+test provider::models::catalog_service::tests::replace_scope_models_updates_catalog_and_revision ... ok
+test provider::models::catalog_service::tests::runtime_unavailability_is_account_scoped_and_clearable ... ok
+test provider::models::catalog_service::tests::runtime_unavailability_scope_clear_drops_all_models_for_account ... ok
+test provider::pricing::tests::anthropic_api_pricing_long_context_uses_standard_rates ... ok
+test provider::pricing::tests::cheapness_for_openai_route_falls_back_to_subscription_for_unpriced_api_key_models ... ok
+test provider::pricing::tests::cheapness_for_openai_route_prefers_metered_api_prices_when_available ... ok
+test provider::pricing::tests::copilot_zero_mode_marks_estimate_high_confidence_and_zero_reference_cost ... ok
+test provider::pricing::tests::openrouter_pricing_from_model_pricing_parses_token_prices ... ok
+test provider::pricing::tests::unified_resolver_prefers_static_tables_then_models_dev_catalog ... ok
+test provider::route_builders::listable_tests::drops_non_chat_models ... ok
+test provider::route_builders::listable_tests::empty_and_sentinels_filtered ... ok
+test provider::route_builders::listable_tests::keeps_real_chat_models ... ok
+test provider::selection::tests::config_provider_resolution_handles_all_config_namespaces ... ok
+test provider::selection::tests::default_model_selection_preserves_route_identity_state_space ... ok
+test provider::selection::tests::login_provider_defaults_are_canonical_config_keys ... ok
+test provider::selection::tests::route_defaults_are_derived_consistently ... ok
+test provider::selection::tests::session_model_route_identity_helpers_preserve_auth_mode_and_profiles ... ok
+test provider::selection::tests::session_provider_key_picker_vocabulary_preserves_auth_mode_without_route ... ok
+test provider::state::tests::provider_state_resolves_default_provider_through_canonical_selection ... ok
+test provider::state::tests::runtime_state_tracks_user_selection_after_auth_generation ... ok
+test provider::tests::active_explicit_credential_reflects_openai_switch_immediately_and_none_for_auto ... ok
+test provider::tests::configured_openai_compatible_profile_routes_use_live_cache_when_not_active_provider ... ok
+test provider::tests::default_named_openai_compatible_provider_uses_direct_compatible_request_path ... ok
+test provider::tests::default_named_openai_compatible_with_catalog_uses_direct_compatible_request_path ... ok
+test provider::tests::model_routes_memo_serves_repeats_and_invalidates_on_auth_and_model_changes ... ok
+test provider::tests::new_session_fork_reloads_changed_config_provider_and_model ... ok
+test provider::tests::openai_compatible_api_key_setup_makes_configured_model_route_available ... ok
+test provider::tests::openai_compatible_api_key_setup_survives_process_restart_without_relogin ... ok
+test provider::tests::openai_model_route_roundtrip_preserves_auth_method_for_model_switches ... ok
+test provider::tests::openai_model_routes_cover_oauth_api_and_no_auth_state_space ... ok
+test provider::tests::openai_model_switch_prefixes_preserve_oauth_vs_api_state_space ... ok
+test provider::tests::runtime_display_name_tracks_active_openai_compatible_profile ... ok
+test provider::tests::standard_openrouter_catalog_refresh_fires_when_named_profile_owns_slot ... ok
+test provider::tests::standard_openrouter_catalog_refresh_is_noop_when_cache_fresh ... ok
+test provider::tests::standard_openrouter_catalog_refresh_skips_without_key ... ok
+test provider::tests::test_active_compat_profile_counts_as_configured_openrouter_slot ... ok
+test provider::tests::test_anthropic_auth_mode_prefixed_model_switch_changes_credentials ... ok
+test provider::tests::test_anthropic_model_routes_keep_plain_4_6_available_without_extra_usage ... ok
+test provider::tests::test_auth_changed_preserves_existing_direct_profile_session ... ok
+test provider::tests::test_auth_changed_replaces_template_direct_profile_for_new_logins ... ok
+test provider::tests::test_auto_default_prefers_claude_over_openai_when_both_available ... ok
+test provider::tests::test_auto_default_prefers_copilot_when_zero_premium_mode_enabled ... ok
+test provider::tests::test_available_models_display_uses_route_models_and_filters_placeholder_rows ... ok
+test provider::tests::test_cerebras_model_routes_are_profile_scoped_and_unique ... ok
+test provider::tests::test_config_default_model_with_credential_prefix_applies_model_and_pin ... ok
+test provider::tests::test_config_default_provider_anthropic_api_pins_api_credential ... ok
+test provider::tests::test_config_default_provider_deepseek_applies_without_openrouter_key ... ok
+test provider::tests::test_config_default_provider_openai_compatible_keeps_gpt_model_provider_local ... ok
+test provider::tests::test_configured_direct_compatible_profiles_are_listed_without_openrouter_key ... ok
+test provider::tests::test_context_limit_claude ... ok
+test provider::tests::test_context_limit_dynamic_cache ... ok
+test provider::tests::test_context_limit_error_fails_over_without_marking_provider_unavailable ... ok
+test provider::tests::test_context_limit_gpt_5_4 ... ok
+test provider::tests::test_context_limit_respects_provider_hint ... ok
+test provider::tests::test_context_limit_spark_vs_codex ... ok
+test provider::tests::test_cursor_models_are_included_in_available_models_display_when_configured ... ok
+test provider::tests::test_cursor_models_are_included_in_model_routes_when_configured ... ok
+test provider::tests::test_custom_compatible_model_routes_do_not_request_openrouter_rewrite ... ok
+test provider::tests::test_deepseek_direct_profile_supports_reasoning_effort_via_multi_provider ... ok
+test provider::tests::test_direct_chutes_ignores_legacy_openrouter_catalog_cache ... ok
+test provider::tests::test_fallback_sequence_includes_all_providers ... ok
+test provider::tests::test_forced_copilot_treats_claude_like_model_as_provider_local ... ok
+test provider::tests::test_forced_openrouter_preserves_custom_at_sign_model_ids ... ok
+test provider::tests::test_forced_openrouter_treats_claude_like_model_as_provider_local ... ok
+test provider::tests::test_forced_provider_disables_cross_provider_fallback_sequence ... ok
+test provider::tests::test_merge_anthropic_model_ids_appends_dynamic_models ... ok
+test provider::tests::test_merge_openai_model_ids_appends_dynamic_oauth_models ... ok
+test provider::tests::test_multi_provider_antigravity_routes_do_not_include_legacy_duplicate_entries ... ok
+test provider::tests::test_multi_provider_fork_switch_request_preserves_route_identity_state_space ... ok
+test provider::tests::test_named_config_provider_models_appear_in_picker_and_are_selectable ... ok
+test provider::tests::test_no_provider_error_mentions_tokens_and_details ... ok
+test provider::tests::test_normalize_model_id_strips_1m_suffix ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_anthropic_and_marks_routes_available ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_anthropic_from_api_key_and_marks_routes_available ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_antigravity_when_tokens_exist_but_are_expired ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_copilot_and_marks_routes_available ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_cursor_and_marks_routes_available ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_gemini_and_marks_routes_available ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_openai_and_marks_routes_available ... ok
+test provider::tests::test_on_auth_changed_hot_initializes_openrouter_and_marks_routes_available ... ok
+test provider::tests::test_on_auth_changed_refreshes_existing_openai_provider_credentials ... ok
+test provider::tests::test_openai_auth_mode_prefixed_model_switch_changes_credentials ... ok
+test provider::tests::test_openrouter_and_compatible_profile_transition_invariants ... ok
+test provider::tests::test_openrouter_catalog_model_id_normalizes_bare_openai_and_claude_models ... ok
+test provider::tests::test_parse_anthropic_model_catalog_reads_context_limits ... ok
+test provider::tests::test_parse_provider_hint_supports_known_values ... ok
+test provider::tests::test_profile_prefixed_model_switch_reinitializes_direct_compatible_runtime ... ok
+test provider::tests::test_provider_for_model_bedrock ... ok
+test provider::tests::test_provider_for_model_claude ... ok
+test provider::tests::test_provider_for_model_cursor ... ok
+test provider::tests::test_provider_for_model_gemini ... ok
+test provider::tests::test_provider_for_model_openai ... ok
+test provider::tests::test_provider_for_model_openrouter ... ok
+test provider::tests::test_provider_for_model_unknown ... ok
+test provider::tests::test_provider_specific_model_prefix_cannot_bypass_provider_lock ... ok
+test provider::tests::test_resolve_model_capabilities_uses_provider_hint ... ok
+test provider::tests::test_session_route_restore_request_matrix_preserves_runtime_identity ... ok
+test provider::tests::test_set_model_accepts_bare_openai_openrouter_pin_when_openrouter_available ... ok
+test provider::tests::test_set_model_rejects_cross_provider_without_creds ... ok
+test provider::tests::test_set_model_supports_explicit_cursor_prefix ... ok
+test provider::tests::test_set_model_switches_to_cursor_for_cursor_models ... ok
+test provider::tests::test_set_model_with_auth_refresh_reloads_auth_and_retries_once ... ok
+test provider::tests::test_should_failover_on_403_forbidden ... ok
+test provider::tests::test_should_failover_on_access_denied ... FAILED
+test provider::tests::test_should_failover_on_token_exchange_failed ... ok
+test provider::tests::test_should_failover_when_status_code_starts_message ... ok
+test provider::tests::test_should_not_failover_on_generic_error ... ok
+test provider::tests::test_should_not_failover_on_non_independent_status_digits ... ok
+test provider::tests::test_startup_initializes_anthropic_from_saved_api_key_and_marks_routes_available ... ok
+test provider::tests::test_startup_initializes_antigravity_when_cached_tokens_are_expired ... ok
+test provider::tests::test_state_space_openrouter_default_survives_switch_to_nvidia_nim ... ok
+test provider::tests::test_summarize_model_catalog_refresh_ignores_display_only_age_suffix_changes ... ok
+test provider::tests::test_summarize_model_catalog_refresh_still_counts_meaningful_detail_changes ... ok
+test provider_activity::tests::record_spend_ignores_invalid_amounts ... ok
+test provider_activity::tests::record_use_and_spend_roundtrip_under_next_code_home ... ok
+test provider_activity::tests::relative_age_formatting ... ok
+test provider_activity::tests::source_key_mapping_covers_known_providers ... ok
+test provider_catalog::provider_catalog_tests::auth_issue_lan_openai_compatible_bases_are_valid_for_local_model_servers ... ok
+test provider_catalog::provider_catalog_tests::auth_issue_profile_metadata_matches_direct_provider_endpoints ... ok
+test provider_catalog::provider_catalog_tests::auth_issue_runtime_display_name_tracks_direct_compatible_profiles ... ok
+test provider_catalog::provider_catalog_tests::auth_profile_env_application_flushes_stale_openrouter_catalog_state ... ok
+test provider_catalog::provider_catalog_tests::every_static_profile_model_has_a_known_context_limit ... ok
+test provider_catalog::provider_catalog_tests::load_api_key_accepts_legacy_zai_key_name ... ok
+test provider_catalog::provider_catalog_tests::matrix_cli_login_selection_preserves_existing_order ... FAILED
+test provider_catalog::provider_catalog_tests::matrix_load_api_key_from_env_or_config_prefers_env ... ok
+test provider_catalog::provider_catalog_tests::matrix_load_api_key_from_env_or_config_reads_config_file ... ok
+test provider_catalog::provider_catalog_tests::matrix_login_provider_aliases_resolve_to_canonical_ids ... FAILED
+test provider_catalog::provider_catalog_tests::matrix_login_provider_ids_and_aliases_are_unique ... ok
+test provider_catalog::provider_catalog_tests::matrix_openai_compatible_localhost_override_allows_no_auth ... ok
+test provider_catalog::provider_catalog_tests::matrix_openai_compatible_profile_overrides_apply_when_valid ... ok
+test provider_catalog::provider_catalog_tests::matrix_openai_compatible_profile_overrides_read_from_env_file ... ok
+test provider_catalog::provider_catalog_tests::matrix_openai_compatible_profile_overrides_reject_invalid_values ... ok
+test provider_catalog::provider_catalog_tests::matrix_openrouter_like_sources_accept_valid_overrides ... ok
+test provider_catalog::provider_catalog_tests::matrix_openrouter_like_sources_include_all_static_profiles ... ok
+test provider_catalog::provider_catalog_tests::matrix_openrouter_like_sources_reject_invalid_overrides ... ok
+test provider_catalog::provider_catalog_tests::matrix_profiles_have_unique_ids_and_safe_metadata ... ok
+test provider_catalog::provider_catalog_tests::matrix_tui_login_selection_supports_numbers_and_names ... FAILED
+test provider_catalog::provider_catalog_tests::minimax_default_provider_applies_openai_api_key_env_not_openrouter ... ok
+test provider_catalog::provider_catalog_tests::minimax_token_plan_keys_resolve_to_china_endpoint_without_changing_international_default ... ok
+test provider_catalog::provider_catalog_tests::named_provider_config_accepts_openai_compatible_spelling ... ok
+test provider_catalog::provider_catalog_tests::named_provider_inline_api_key_is_private_runtime_fallback ... ok
+test provider_catalog::provider_catalog_tests::named_provider_profile_maps_to_openai_compatible_runtime_env ... ok
+test provider_catalog::provider_catalog_tests::named_provider_profile_reports_malformed_config_instead_of_unknown_profile ... ok
+test provider_catalog::provider_catalog_tests::newest_release_picker_prefers_strongest_tier_over_newest_cheap ... ok
+test provider_catalog::provider_catalog_tests::newest_release_picker_uses_recency_within_a_tier ... ok
+test provider_catalog::provider_catalog_tests::open_weight_family_context_limits_match_published_windows ... ok
+test provider_catalog::provider_catalog_tests::quality_tier_ranks_flagship_above_bare_above_cheap ... ok
+test provider_catalog::provider_catalog_tests::resolved_named_profile_skips_non_chat_models_when_picking_newest_default ... ok
+test provider_catalog::provider_catalog_tests::resolved_named_profile_suggests_newest_cached_live_release ... ok
+test registry::registry_tests::cleanup_stale_preserves_live_socket_paths ... ok
+test registry::registry_tests::find_server_by_socket_sync_returns_matching_server ... ok
+test registry::registry_tests::test_registry_find_by_name ... ok
+test registry::registry_tests::test_server_info_display_name ... ok
+test runtime_memory_log::runtime_memory_log_tests::allocator_retained_resident_estimate_caps_by_anon_pss_minus_live ... ok
+test runtime_memory_log::runtime_memory_log_tests::append_client_sample_writes_jsonl_under_memory_logs_dir ... ok
+test runtime_memory_log::runtime_memory_log_tests::append_server_sample_writes_jsonl_under_memory_logs_dir ... ok
+test runtime_memory_log::runtime_memory_log_tests::build_process_diagnostics_populates_coverage_estimates ... ok
+test runtime_memory_log::runtime_memory_log_tests::controller_defers_attribution_until_min_spacing ... ok
+test runtime_memory_log::runtime_memory_log_tests::server_logging_enabled_defaults_on_and_respects_falsey_env ... ok
+test runtime_memory_log::runtime_memory_log_tests::thread_stack_estimate_adds_fixed_cost_per_aux_thread ... ok
+test safety::tests::test_classify_auto_allowed ... ok
+test safety::tests::test_classify_case_insensitive ... ok
+test safety::tests::test_classify_requires_permission ... ok
+test safety::tests::test_empty_summary ... ok
+test safety::tests::test_log_action_and_summary ... ok
+test safety::tests::test_new_request_id_format ... ok
+test safety::tests::test_record_decision_removes_from_queue ... ok
+test safety::tests::test_record_permission_via_file ... ok
+test safety::tests::test_request_permission_returns_queued ... ok
+test session::crash::batch_crash_tests::find_session_by_name_or_id_accepts_imported_session_ids ... ok
+test session::crash::batch_crash_tests::find_session_by_name_or_id_bare_id_without_snapshot_still_errors ... ok
+test session::crash::batch_crash_tests::find_session_by_name_or_id_matches_custom_title ... ok
+test session::crash::batch_crash_tests::find_session_by_name_or_id_resolves_bare_opencode_id_to_imported_snapshot ... ok
+test session::crash::batch_crash_tests::test_crashed_sessions_info_struct ... ok
+test session::maintenance::tests::claim_prune_slot_rate_limits_within_interval_and_reclaims_after ... ok
+test session::maintenance::tests::prunes_only_old_bak_files ... ok
+test session::tests::cases::derive_session_provider_key_falls_back_to_openrouter_namespace ... ok
+test session::tests::cases::derive_session_provider_key_keeps_openai_compatible_profile_namespace ... ok
+test session::tests::cases::derive_session_provider_key_prefers_runtime_identity_over_transport ... ok
+test session::tests::cases::existing_non_empty_session_does_not_get_retroactive_session_context ... ok
+test session::tests::cases::fork_notice_is_model_visible_but_hidden_from_transcript ... ok
+test session::tests::cases::initial_session_context_can_refresh_before_real_conversation ... FAILED
+test session::tests::cases::initial_session_context_does_not_refresh_after_real_conversation ... FAILED
+test session::tests::cases::initial_session_context_is_persisted_once_and_not_overwritten ... ok
+test session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted ... FAILED
+test session::tests::cases::load_for_remote_startup_preserves_messages_and_replay_but_skips_heavy_vectors ... ok
+test session::tests::cases::load_startup_stub_preserves_metadata_but_skips_heavy_vectors ... ok
+test session::tests::cases::reasoning_trace_survives_session_save_and_load ... ok
+test session::tests::cases::rename_title_preserves_generated_title_for_clear ... ok
+test session::tests::cases::streaming_guard_creates_visible_macos_sleep_assertion ... ok
+test session::tests::cases::test_compacted_history_never_truncates_single_long_turn ... ok
+test session::tests::cases::test_compacted_history_truncates_only_when_long_and_many_turns ... ok
+test session::tests::cases::test_compacted_history_window_counts_renderable_messages_not_hidden_reminders ... ok
+test session::tests::cases::test_corrupt_journal_heals_via_checkpoint_on_next_save ... ok
+test session::tests::cases::test_create_marks_debug_when_test_session_env_enabled ... ok
+test session::tests::cases::test_create_not_debug_when_test_session_env_disabled ... ok
+test session::tests::cases::test_debug_memory_profile_reports_messages_and_provider_cache ... ok
+test session::tests::cases::test_journal_replay_salvages_glued_entries_on_torn_line ... ok
+test session::tests::cases::test_journal_replay_skips_corrupt_line_and_keeps_tail ... ok
+test session::tests::cases::test_recover_crashed_sessions_by_ids_restores_only_selected_group ... ok
+test session::tests::cases::test_recover_crashed_sessions_preserves_debug_flag ... ok
+test session::tests::cases::test_redacted_for_export_redacts_replay_events ... ok
+test session::tests::cases::test_redacted_for_export_redacts_tool_result_and_tool_input ... ok
+test session::tests::cases::test_render_images_anchors_tool_and_user_images ... ok
+test session::tests::cases::test_render_images_attached_label_message_does_not_shift_prompt_ordinals ... ok
+test session::tests::cases::test_render_messages_and_images_share_tool_resolution_and_labels ... ok
+test session::tests::cases::test_render_messages_can_expand_compacted_history_window ... ok
+test session::tests::cases::test_render_messages_hides_internal_system_reminders ... ok
+test session::tests::cases::test_render_messages_hides_persisted_reasoning_in_current_mode ... ok
+test session::tests::cases::test_render_messages_hides_persisted_reasoning_in_off_mode ... ok
+test session::tests::cases::test_render_messages_honors_background_task_display_role_override ... ok
+test session::tests::cases::test_render_messages_honors_system_display_role_override ... ok
+test session::tests::cases::test_render_messages_renders_legacy_reasoning_variant ... ok
+test session::tests::cases::test_render_messages_renders_persisted_reasoning ... ok
+test session::tests::cases::test_render_messages_renders_reasoning_before_answer_in_stored_order ... ok
+test session::tests::cases::test_render_messages_shows_auto_poke_continuations_as_system_not_user ... FAILED
+test session::tests::cases::test_render_messages_shows_recent_compacted_history_by_default ... ok
+test session::tests::cases::test_rewind_targets_match_rendered_transcript_numbering ... ok
+test session::tests::cases::test_save_appends_journal_and_load_replays_it ... ok
+test session::tests::cases::test_save_checkpoints_after_full_mutation_and_clears_journal ... ok
+test session::tests::cases::test_save_persists_compaction_state ... ok
+test session::tests::cases::test_save_persists_full_session_content ... ok
+test session::tests::cases::test_save_persists_provider_key ... ok
+test session::tests::cases::test_save_persists_reasoning_effort ... ok
+test session::tests::cases::test_session_exists_roundtrip ... ok
+test session::tests::cases::test_summarize_tool_calls_includes_tool_only_assistant_messages ... ok
+test session::tests::cases::token_usage_totals_counts_cache_reported_inputs_only_when_cache_fields_exist ... ok
+test session_metrics::tests::counts_turns ... ok
+test session_metrics::tests::forget_clears_state ... ok
+test session_metrics::tests::ignores_empty_and_zero ... ok
+test session_metrics::tests::record_activity_ignores_empty_session ... ok
+test session_metrics::tests::records_and_snapshots_token_usage ... ok
+test session_metrics::tests::records_last_activity_age ... ok
+test session_metrics::tests::token_usage_and_turns_mark_activity ... ok
+test side_panel::side_panel_tests::load_markdown_file_rejects_non_markdown_extensions ... ok
+test side_panel::side_panel_tests::load_markdown_file_uses_source_path_content ... ok
+test side_panel::side_panel_tests::refresh_linked_page_content_updates_snapshot_in_memory ... ok
+test side_panel::side_panel_tests::side_panel_delete_falls_back_to_most_recent_page ... ok
+test side_panel::side_panel_tests::side_panel_pages_persist_and_focus_latest ... ok
+test side_panel::side_panel_tests::status_output_marks_linked_and_managed_pages ... ok
+test sidecar::tests::sidecar_provider_path_works_for_all_providers ... ok
+test sidecar::tests::sidecar_uses_active_provider_when_no_oauth_creds ... ok
+test sidecar::tests::test_anthropic_sidecar_prefers_api_key_respects_pinned_mode ... ok
+test sidecar::tests::test_backend_selection_prefers_openai ... ok
+test sidecar::tests::test_build_claude_api_key_system_param_omits_identity_spoof ... ok
+test sidecar::tests::test_build_openai_request_uses_configured_default_and_fallback_reasoning ... ok
+test sidecar::tests::test_chatgpt_oauth_falls_back_to_gpt_5_4_low_when_luna_unavailable ... ok
+test sidecar::tests::test_chatgpt_oauth_uses_luna_with_no_reasoning_when_available ... ok
+test sidecar::tests::test_is_anthropic_oauth_forbidden ... ok
+test sidecar::tests::test_openai_api_key_mode_uses_luna_with_no_reasoning ... ok
+test sidecar::tests::test_sidecar_fast_model ... ok
+test skill::invocation_parse_tests::parse_invocation_accepts_dollar_prefix ... ok
+test skill::invocation_parse_tests::parse_invocation_keeps_trailing_prompt_on_dollar_namespace ... ok
+test skill::invocation_parse_tests::parse_invocation_rejects_bare_dollar ... ok
+test skill::invocation_parse_tests::parse_invocation_rejects_other_prefixes ... ok
+test skill::invocation_parse_tests::parse_invocation_rejects_slash_prefix ... ok
+test skill::tests::endorsed_skills_have_unique_nonempty_metadata ... ok
+test skill::tests::endorsed_skills_include_anthropic_frontend_design ... ok
+test skill::tests::endorsed_skills_include_nvidia_cuda_x_catalog ... ok
+test skill::tests::explicit_next_code_skill_wins_over_plugin_skill_with_same_name ... ok
+test skill::tests::list_is_sorted_by_name_regardless_of_insertion_order ... ok
+test skill::tests::load_for_working_dir_reads_project_local_agents_skills ... ok
+test skill::tests::load_for_working_dir_reads_project_local_next_code_skills ... ok
+test skill::tests::parse_invocation_handles_bare_and_incomplete_quoted_prompts_without_blocking ... ok
+test skill::tests::parse_invocation_rejects_terminal_file_drop_paths ... ok
+test skill::tests::parse_invocation_supports_a_trailing_prompt ... ok
+test skill::tests::plugin_scan_respects_depth_bound ... ok
+test skill::tests::plugin_scan_skips_marketplace_catalog_when_manifest_exists ... ok
+test skill::tests::plugin_skill_dirs_empty_for_missing_root ... ok
+test skill::tests::plugin_skills_fall_back_to_cache_scan_without_manifest ... ok
+test skill::tests::plugin_skills_load_from_installed_plugins_manifest ... ok
+test skill::tests::plugin_skills_load_from_repos_layout ... ok
+test skill::tests::project_overlay_is_session_scoped_and_composes_over_globals ... ok
+test skill::tests::registry_contains_reports_loaded_skills ... ok
+test skill::tests::reload_global_excludes_project_local_skills ... FAILED
+test skill::tests::skill_as_memory_entry_formats_invocation_and_prompt ... ok
+test soft_interrupt_store::soft_interrupt_store_tests::append_take_and_clear_round_trip ... ok
+test storage::tests::app_config_dir_uses_next_code_home_when_set ... ok
+test storage::tests::harden_secret_file_permissions_sets_owner_only_modes ... ok
+test storage::tests::upsert_env_file_value_writes_replaces_and_removes_entries ... ok
+test storage::tests::user_home_path_uses_external_dir_under_next_code_home ... ok
+test storage::tests::validate_external_auth_file_rejects_symlink ... ok
+test storage::tests::write_text_secret_sets_owner_only_modes ... ok
+test telegram::tests::test_parse_response ... ok
+test telegram::tests::test_parse_update ... ok
+test terminal_launch::tests::spawn_via_hook_runs_hook_with_metadata_env ... ok
+test todo::tests::built_auto_poke_messages_are_detected ... ok
+test todo::tests::goal_intention_fields_round_trip_through_storage ... ok
+test todo::tests::newly_completed_group_requires_sufficient_end_to_end_ownership ... ok
+test todo::tests::ownership_gate_grandfathers_preexisting_completed_groups ... ok
+test todo::tests::ownership_gate_normalizes_groups_and_supports_ungrouped_work ... ok
+test todo::tests::ownership_is_not_required_before_group_completion ... ok
+test todo::tests::quality_continuations_are_actionable_without_private_calibration ... ok
+test todo::tests::real_user_prompts_are_not_detected_as_pokes ... ok
+test todo::tests::session_title_prefers_in_progress_todo_group ... ok
+test todo::tests::session_title_uses_latest_incomplete_group_when_nothing_is_active ... ok
+test todo::tests::ungrouped_session_title_prefers_goal_objective_then_item_content ... ok
+test todo::tests::ungrouped_session_title_uses_user_intention_without_objective ... ok
+test usage::tests::test_account_usage_probe_detects_all_accounts_exhausted ... ok
+test usage::tests::test_account_usage_probe_prefers_best_available_alternative ... ok
+test usage::tests::test_active_anthropic_usage_report_prefers_marked_account ... ok
+test usage::tests::test_activity_sweeper_skips_sources_with_dedicated_reports ... ok
+test usage::tests::test_classify_openai_limits_recognizes_five_weekly_and_spark ... ok
+test usage::tests::test_classify_openai_limits_treats_usage_limit_values_as_percent ... ok
+test usage::tests::test_format_reset_time_past ... ok
+test usage::tests::test_format_reset_time_under_one_minute_rounds_up ... ok
+test usage::tests::test_format_reset_time_uses_days_for_long_windows ... ok
+test usage::tests::test_format_usage_bar ... ok
+test usage::tests::test_get_openai_usage_sync_without_runtime_does_not_panic ... ok
+test usage::tests::test_get_sync_without_runtime_does_not_panic ... ok
+test usage::tests::test_humanize_key ... ok
+test usage::tests::test_mask_email_censors_local_part ... ok
+test usage::tests::test_openai_snapshot_treats_hard_limit_flag_as_exhausted ... ok
+test usage::tests::test_openai_usage_data_becomes_stale_when_reset_time_has_passed ... ok
+test usage::tests::test_openai_usage_data_display_snapshot_clears_passed_reset_window ... ok
+test usage::tests::test_openai_usage_data_from_provider_report_preserves_error ... ok
+test usage::tests::test_openai_usage_data_from_provider_report_preserves_hard_limit_flag ... ok
+test usage::tests::test_parse_openai_hard_limit_reached_detects_rate_limit_denials ... ok
+test usage::tests::test_parse_openai_hard_limit_reached_ignores_unrelated_allowed_flags ... ok
+test usage::tests::test_parse_openai_usage_payload_falls_back_to_nested_rate_limits ... ok
+test usage::tests::test_parse_openai_usage_payload_labels_monthly_primary_window ... ok
+test usage::tests::test_parse_openai_usage_payload_prefers_wham_windows_and_additional_limits ... ok
+test usage::tests::test_parse_openai_wham_windows_preserve_low_percent_values ... ok
+test usage::tests::test_parse_usage_percent_preserves_low_percent_values ... ok
+test usage::tests::test_parse_usage_percent_supports_remaining_limit_shape ... ok
+test usage::tests::test_parse_usage_percent_supports_used_limit_shape ... ok
+test usage::tests::test_provider_usage_cache_is_not_fresh_after_reset_boundary ... ok
+test usage::tests::test_provider_usage_percent_helpers_clamp_invalid_low_values ... ok
+test usage::tests::test_reports_sort_most_recently_used_first ... ok
+test usage::tests::test_usage_data_becomes_stale_when_reset_time_has_passed ... ok
+test usage::tests::test_usage_data_default ... ok
+test usage::tests::test_usage_data_display_snapshot_clears_passed_reset_window ... ok
+test usage::tests::test_usage_data_from_provider_report_maps_limits_and_extra_usage ... ok
+test usage::tests::test_usage_data_from_provider_report_treats_usage_limit_values_as_percent ... ok
+test usage::tests::test_usage_percent_format ... ok
+test util::tests::test_format_error_chain_deduplicates_repeated_messages ... ok
+test util::tests::test_format_error_chain_includes_nested_causes ... ok
+
+failures:
+
+---- config::tests::test_generated_default_config_uses_low_openai_reasoning_effort stdout ----
+
+thread 'config::tests::test_generated_default_config_uses_low_openai_reasoning_effort' (83320824) panicked at crates/next-code-base/src/config_tests.rs:489:5:
+generated default config should document the Luna memory sidecar default
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- config::tests::tool_config_acp_profile_allows_core_coding_plus_batch stdout ----
+
+thread 'config::tests::tool_config_acp_profile_allows_core_coding_plus_batch' (83320832) panicked at crates/next-code-base/src/config_tests.rs:374:5:
+assertion failed: allowed.contains("apply_patch")
+
+---- config::tests::tool_config_minimal_profile_allows_core_coding_tools stdout ----
+
+thread 'config::tests::tool_config_minimal_profile_allows_core_coding_tools' (83320839) panicked at crates/next-code-base/src/config_tests.rs:402:5:
+assertion failed: allowed.contains("apply_patch")
+
+---- memory::tests::hybrid_fuse_returns_dense_hits_without_lexical_overlap stdout ----
+
+thread 'memory::tests::hybrid_fuse_returns_dense_hits_without_lexical_overlap' (83330242) panicked at crates/next-code-base/src/memory_tests.rs:777:5:
+assertion failed: !ranked.is_empty()
+
+---- memory::tests::score_and_filter_prioritizes_matching_skill_memories stdout ----
+
+thread 'memory::tests::score_and_filter_prioritizes_matching_skill_memories' (83330300) panicked at crates/next-code-base/src/memory_tests.rs:715:5:
+assertion `left == right` failed
+  left: 0
+ right: 2
+
+---- platform::platform_tests::spawn_detached_creates_new_session stdout ----
+
+thread 'platform::platform_tests::spawn_detached_creates_new_session' (83333027) panicked at crates/next-code-base/src/platform_tests.rs:28:5:
+child should exit successfully
+
+---- provider::tests::test_should_failover_on_access_denied stdout ----
+
+thread 'provider::tests::test_should_failover_on_access_denied' (83334995) panicked at crates/next-code-base/src/provider/tests/fallback_failover.rs:256:5:
+assertion failed: MultiProvider::classify_failover_error(&err).should_failover()
+
+---- provider_catalog::provider_catalog_tests::matrix_cli_login_selection_preserves_existing_order stdout ----
+
+thread 'provider_catalog::provider_catalog_tests::matrix_cli_login_selection_preserves_existing_order' (83335027) panicked at crates/next-code-base/src/provider_catalog_tests.rs:428:5:
+assertion `left == right` failed
+  left: Some("copilot")
+ right: Some("next-code")
+
+---- provider_catalog::provider_catalog_tests::matrix_login_provider_aliases_resolve_to_canonical_ids stdout ----
+
+thread 'provider_catalog::provider_catalog_tests::matrix_login_provider_aliases_resolve_to_canonical_ids' (83335030) panicked at crates/next-code-base/src/provider_catalog_tests.rs:49:5:
+assertion `left == right` failed
+  left: None
+ right: Some("next-code")
+
+---- provider_catalog::provider_catalog_tests::matrix_tui_login_selection_supports_numbers_and_names stdout ----
+
+thread 'provider_catalog::provider_catalog_tests::matrix_tui_login_selection_supports_numbers_and_names' (83335040) panicked at crates/next-code-base/src/provider_catalog_tests.rs:391:5:
+assertion `left == right` failed
+  left: Some("opencode")
+ right: Some("bedrock")
+
+---- session::tests::cases::initial_session_context_can_refresh_before_real_conversation stdout ----
+
+thread 'session::tests::cases::initial_session_context_can_refresh_before_real_conversation' (83335125) panicked at crates/next-code-base/src/session_tests/cases.rs:319:9:
+assertion failed: session.messages[0].content_preview().contains(&format!("Working directory: {}",
+            first_dir.path().display()))
+
+---- session::tests::cases::initial_session_context_does_not_refresh_after_real_conversation stdout ----
+Error: No such file or directory (os error 2)
+
+---- session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted stdout ----
+Error: No such file or directory (os error 2)
+
+---- session::tests::cases::test_render_messages_shows_auto_poke_continuations_as_system_not_user stdout ----
+
+thread 'session::tests::cases::test_render_messages_shows_auto_poke_continuations_as_system_not_user' (83335262) panicked at crates/next-code-base/src/session_tests/cases.rs:1321:5:
+quality continuation should render as system: [RenderedMessage { role: "user", content: "please fix the login bug", tool_calls: [], tool_data: None, stored_index: Some(0) }, RenderedMessage { role: "assistant", content: "Working on it.", tool_calls: [], tool_data: None, stored_index: Some(1) }, RenderedMessage { role: "system", content: "You have 2 incomplete todos. Continue working, or update the todo tool.", tool_calls: [], tool_data: None, stored_index: Some(2) }, RenderedMessage { role: "system", content: "Your completion confidence is missing or not high enough. Validate the completed result more thoroughly, address any remaining issues, and then reassess whether the work is ready to finalize.", tool_calls: [], tool_data: None, stored_index: Some(3) }]
+
+---- skill::tests::reload_global_excludes_project_local_skills stdout ----
+
+thread 'skill::tests::reload_global_excludes_project_local_skills' (83335533) panicked at crates/next-code-base/src/skill.rs:1142:48:
+cwd: Os { code: 2, kind: NotFound, message: "No such file or directory" }
+
+
+failures:
+    config::tests::test_generated_default_config_uses_low_openai_reasoning_effort
+    config::tests::tool_config_acp_profile_allows_core_coding_plus_batch
+    config::tests::tool_config_minimal_profile_allows_core_coding_tools
+    memory::tests::hybrid_fuse_returns_dense_hits_without_lexical_overlap
+    memory::tests::score_and_filter_prioritizes_matching_skill_memories
+    platform::platform_tests::spawn_detached_creates_new_session
+    provider::tests::test_should_failover_on_access_denied
+    provider_catalog::provider_catalog_tests::matrix_cli_login_selection_preserves_existing_order
+    provider_catalog::provider_catalog_tests::matrix_login_provider_aliases_resolve_to_canonical_ids
+    provider_catalog::provider_catalog_tests::matrix_tui_login_selection_supports_numbers_and_names
+    session::tests::cases::initial_session_context_can_refresh_before_real_conversation
+    session::tests::cases::initial_session_context_does_not_refresh_after_real_conversation
+    session::tests::cases::initial_session_context_preserves_explicitly_bound_cwd_when_inserted
+    session::tests::cases::test_render_messages_shows_auto_poke_continuations_as_system_not_user
+    skill::tests::reload_global_excludes_project_local_skills
+
+test result: FAILED. 1069 passed; 15 failed; 1 ignored; 0 measured; 0 filtered out; finished in 54.56s
+
+error: test failed, to rerun pass `-p next-code-base --lib`

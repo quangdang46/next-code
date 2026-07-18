@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running unittests src/lib.rs (target/debug/deps/next_code_provider_metadata-4ad1760f22da9e50)
+
+running 1 test
+test tests::matrix_cli_login_selection_preserves_existing_order ... FAILED
+
+failures:
+
+---- tests::matrix_cli_login_selection_preserves_existing_order stdout ----
+
+thread 'tests::matrix_cli_login_selection_preserves_existing_order' (83195682) panicked at crates/next-code-provider-metadata/src/lib.rs:670:9:
+assertion `left == right` failed
+  left: Some("opencode")
+ right: Some("azure")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tests::matrix_cli_login_selection_preserves_existing_order
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p next-code-provider-metadata --lib`
