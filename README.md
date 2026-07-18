@@ -287,7 +287,7 @@ Memories are automatically consolidated every so often via the ambient mode. Thi
 
 </div>
 
-<!-- Memory demo media is hosted in the readme-assets release. -->
+<!-- Memory demo media is in assets/ -->
 
 ---
 
