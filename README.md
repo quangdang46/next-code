@@ -14,8 +14,8 @@ Built for multi-session workflows, infinite customizability, and performance.
 
 <br>
 
-<a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.mp4">
-  <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.webp" alt="next-code memory demonstration" width="800">
+<a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code_demo.mp4">
+  <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/readme/next-code-vs-claude-code.png" alt="next-code memory demonstration" width="800">
 </a>
 
 <br>
@@ -256,8 +256,8 @@ versions tested for this corrected memory rerun:
 
 <div align="center">
 
-  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-performance-demo.mp4">
-    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-performance-demo.webp" alt="next-code performance demonstration" width="900">
+  <a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code_replay_duck_fast-on-mid-stream_autoedit_2x.mp4">
+    <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code-vs-claude-code.png" alt="next-code performance demonstration" width="900">
   </a>
 
   <p><em>next-code performance demonstration</em></p>
@@ -279,8 +279,8 @@ Memories are automatically consolidated every so often via the ambient mode. Thi
 
 <div align="center">
 
-  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.mp4">
-    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-memory-demo.webp" alt="next-code memory demonstration" width="900">
+  <a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code_demo.mp4">
+    <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/readme/100-sessions-spawn-demo.gif" alt="next-code memory demonstration" width="900">
   </a>
 
   <p><em>next-code memory demonstration</em></p>
@@ -314,8 +314,8 @@ Spawn two or more agents in the same repo, and they will automatically be manage
 
 <div align="center">
 
-  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/swarm-demo.mp4">
-    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-swarm-demonstration.webp" alt="next-code swarm demonstration" width="900">
+  <a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code_wolf_demo_final.mp4">
+    <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code-vs-claude-code.png" alt="next-code swarm demonstration" width="900">
   </a>
 
   <p><em>next-code swarm demonstration</em></p>
@@ -661,8 +661,8 @@ This is useful when you want to test with a clean context or run sessions withou
 
 <div align="center">
 
-  <a href="https://github.com/quangdang46/next-code/releases/download/readme-assets/workflow.mp4">
-    <img src="https://github.com/quangdang46/next-code/releases/download/readme-assets/next-code-workflow-demonstration.webp" alt="next-code workflow demonstration" width="900">
+  <a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code_claudeai_demo.mp4">
+    <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/readme/next-code-workflow-demonstration.webp" alt="next-code workflow demonstration" width="900">
   </a>
 
   <p><em>next-code workflow demonstration</em></p>
