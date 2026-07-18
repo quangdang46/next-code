@@ -689,17 +689,18 @@ fn collect_skill_query_terms_keeps_relevant_words_and_drops_generic_words() {
 
 #[test]
 fn score_and_filter_prioritizes_matching_skill_memories() {
+    let model = crate::embedding_backend::active_model_id();
     let generic = MemoryEntry::new(
         MemoryCategory::Fact,
         "General planning note that is not about structured todo skills.",
     )
-    .with_embedding(vec![1.0, 0.0]);
+    .with_embedding_for_model(vec![1.0, 0.0], model.clone());
 
     let mut skill = MemoryEntry::new(
         MemoryCategory::Custom("Skills".to_string()),
         "Use skill `/todo-planning-skill` for todo list planning, debugging, reflection, and validation on long tasks.",
     )
-    .with_embedding(vec![1.0, 0.0])
+    .with_embedding_for_model(vec![1.0, 0.0], model)
     .with_source("skill_registry");
     skill.id = "skill:todo-planning-skill".to_string();
 
@@ -722,22 +723,23 @@ fn hybrid_fuse_rescues_lexical_match_dense_would_miss() {
     // A memory that is the obvious lexical answer (shares the rare identifier
     // `find_similar_hybrid`) but is given a deliberately ORTHOGONAL embedding so
     // pure dense cosine ranks it last. BM25 must rescue it into the top result.
+    let model = crate::embedding_backend::active_model_id();
     let target = MemoryEntry::new(
         MemoryCategory::Fact,
         "The function find_similar_hybrid fuses dense and bm25 with RRF.",
     )
-    .with_embedding(vec![0.0, 1.0]);
+    .with_embedding_for_model(vec![0.0, 1.0], model.clone());
 
     let distractor_a = MemoryEntry::new(
         MemoryCategory::Fact,
         "Unrelated note about coffee brewing temperatures.",
     )
-    .with_embedding(vec![1.0, 0.0]);
+    .with_embedding_for_model(vec![1.0, 0.0], model.clone());
     let distractor_b = MemoryEntry::new(
         MemoryCategory::Fact,
         "Another unrelated note about bicycle maintenance.",
     )
-    .with_embedding(vec![0.95, 0.05]);
+    .with_embedding_for_model(vec![0.95, 0.05], model);
 
     // Query embedding points along the distractors' axis, so dense alone would
     // rank the target dead last; the query TEXT contains the rare identifier.
@@ -762,10 +764,11 @@ fn hybrid_fuse_rescues_lexical_match_dense_would_miss() {
 fn hybrid_fuse_returns_dense_hits_without_lexical_overlap() {
     // When the query shares NO tokens with any memory, hybrid must still return
     // the dense-nearest memory (fusion falls back to the dense ranking).
+    let model = crate::embedding_backend::active_model_id();
     let near = MemoryEntry::new(MemoryCategory::Fact, "alpha bravo charlie")
-        .with_embedding(vec![1.0, 0.0]);
-    let far =
-        MemoryEntry::new(MemoryCategory::Fact, "delta echo foxtrot").with_embedding(vec![0.0, 1.0]);
+        .with_embedding_for_model(vec![1.0, 0.0], model.clone());
+    let far = MemoryEntry::new(MemoryCategory::Fact, "delta echo foxtrot")
+        .with_embedding_for_model(vec![0.0, 1.0], model);
 
     let ranked = MemoryManager::hybrid_fuse(
         vec![near.clone(), far],

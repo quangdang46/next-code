@@ -231,12 +231,12 @@ bing_market = "en-US"
 
 # Controls which built-in tools are sent to the model.
 # Profiles: "full" (default), "acp", "minimal"/"lite", or "none".
-# acp keeps core coding tools plus batch for generic ACP clients.
-# minimal keeps core coding tools only: bash, read, write, edit, multiedit,
-# apply_patch, patch, glob, grep, and ls.
+# acp keeps core coding tools plus batch for generic ACP clients:
+# bash, read, write, edit, ffs_grep, ffs_glob, ls, batch.
+# minimal keeps core coding tools only: bash, read, write, edit, ffs_grep, ffs_glob, ls.
 profile = "full"
 # Explicit allow-list. When non-empty, only these tools are exposed.
-# enabled = ["bash", "read", "write", "apply_patch", "ls"]
+# enabled = ["bash", "read", "write", "edit", "ls"]
 # Privacy-sensitive or stub tools such as gmail and lsp are disabled by default.
 # To expose every tool including default-disabled tools, use: enabled = ["*"]
 # Hide selected tools after applying the profile/allow-list.

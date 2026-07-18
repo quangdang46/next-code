@@ -1139,13 +1139,18 @@ mod tests {
         let temp = tempfile::tempdir().expect("tempdir");
         write_test_skill(temp.path(), ".next-code", "session-skill");
 
-        let prev_cwd = std::env::current_dir().expect("cwd");
+        let prev_cwd = std::env::current_dir().ok();
         // reload_global must not pick up project-local skills even when the
         // process cwd contains them (daemon startup cwd independence).
         std::env::set_current_dir(temp.path()).expect("chdir");
         let mut registry = SkillRegistry::default();
         let result = registry.reload_global();
-        std::env::set_current_dir(prev_cwd).expect("restore cwd");
+        if let Some(prev) = prev_cwd.as_ref().filter(|p| p.exists()) {
+            let _ = std::env::set_current_dir(prev);
+        } else {
+            // Previous cwd may have been a deleted temp dir from another test.
+            let _ = std::env::set_current_dir(std::env::temp_dir());
+        }
 
         result.expect("reload skills");
         assert!(

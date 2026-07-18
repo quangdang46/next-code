@@ -251,9 +251,11 @@ fn test_should_failover_on_token_exchange_failed() {
 }
 
 #[test]
-fn test_should_failover_on_access_denied() {
+fn test_should_not_failover_on_access_denied() {
+    // Permission/access denials are terminal for the request path; hopping to
+    // another provider would not recover a suspended account.
     let err = anyhow::anyhow!("Access denied: account suspended");
-    assert!(MultiProvider::classify_failover_error(&err).should_failover());
+    assert!(!MultiProvider::classify_failover_error(&err).should_failover());
 }
 
 #[test]

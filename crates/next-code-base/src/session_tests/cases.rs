@@ -1,5 +1,6 @@
 use super::*;
 use anyhow::{Result, anyhow};
+use std::path::Path;
 
 #[test]
 fn test_session_exists_roundtrip() -> Result<()> {
@@ -266,25 +267,50 @@ fn initial_session_context_preserves_explicitly_bound_cwd_when_inserted() -> Res
         None,
         Some("Session context cwd refresh".to_string()),
     );
-    assert_eq!(
-        session.working_dir.as_deref(),
-        Some(first_dir.path().to_str().unwrap())
+    // macOS temp paths often appear as /var/... vs /private/var/... depending on
+    // whether they were captured via Path::display or current_dir canonicalize.
+    let wd = session.working_dir.as_deref().unwrap_or("");
+    let first_raw = first_dir.path().to_str().unwrap();
+    let first_canon = first_dir
+        .path()
+        .canonicalize()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| first_raw.to_string());
+    assert!(
+        wd == first_raw
+            || wd == first_canon
+            || Path::new(wd)
+                .canonicalize()
+                .ok()
+                .and_then(|w| first_dir.path().canonicalize().ok().map(|f| w == f))
+                .unwrap_or(false),
+        "session.working_dir should bind to first_dir (got {wd:?}, first={first_raw:?}, canon={first_canon:?})"
     );
 
     std::env::set_current_dir(second_dir.path()).map_err(|e| anyhow!(e))?;
     let result: std::result::Result<(), anyhow::Error> = (|| {
         assert!(session.ensure_initial_session_context_message());
         let first = session.messages[0].content_preview();
+        let first_disp = first_dir.path().display().to_string();
+        let first_canon = first_dir
+            .path()
+            .canonicalize()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| first_disp.clone());
         assert!(
-            first.contains(&format!(
-                "Working directory: {}",
-                first_dir.path().display()
-            )),
+            first.contains(&format!("Working directory: {first_disp}"))
+                || first.contains(&format!("Working directory: {first_canon}")),
             "session context should preserve the bound cwd, got: {first}"
         );
-        assert_eq!(
-            session.working_dir.as_deref(),
-            Some(first_dir.path().to_str().unwrap())
+        let wd = session.working_dir.as_deref().unwrap_or("");
+        assert!(
+            wd == first_dir.path().to_str().unwrap()
+                || Path::new(wd)
+                    .canonicalize()
+                    .ok()
+                    .map(|p| p == first_dir.path().canonicalize().unwrap())
+                    .unwrap_or(false),
+            "working_dir should stay bound to first_dir, got {wd:?}"
         );
         Ok(())
     })();
@@ -316,25 +342,38 @@ fn initial_session_context_can_refresh_before_real_conversation() -> Result<()> 
             Some("Remote cwd refresh".to_string()),
         );
         assert!(session.ensure_initial_session_context_message());
-        assert!(session.messages[0].content_preview().contains(&format!(
-            "Working directory: {}",
-            first_dir.path().display()
-        )));
+        let first_disp = first_dir.path().display().to_string();
+        let first_canon = first_dir
+            .path()
+            .canonicalize()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| first_disp.clone());
+        let preview = session.messages[0].content_preview();
+        assert!(
+            preview.contains(&format!("Working directory: {first_disp}"))
+                || preview.contains(&format!("Working directory: {first_canon}")),
+            "session context missing first cwd, got: {preview}"
+        );
 
-        session.working_dir = Some(second_dir.path().display().to_string());
+        let second_disp = second_dir.path().display().to_string();
+        let second_canon = second_dir
+            .path()
+            .canonicalize()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| second_disp.clone());
+        session.working_dir = Some(second_disp.clone());
         assert!(session.refresh_initial_session_context_message());
         let refreshed = session.messages[0].content_preview();
         assert!(
-            refreshed.contains(&format!(
-                "Working directory: {}",
-                second_dir.path().display()
-            )),
+            refreshed.contains(&format!("Working directory: {second_disp}"))
+                || refreshed.contains(&format!("Working directory: {second_canon}")),
             "session context should refresh to subscribed cwd, got: {refreshed}"
         );
-        assert!(!refreshed.contains(&format!(
-            "Working directory: {}",
-            first_dir.path().display()
-        )));
+        assert!(
+            !refreshed.contains(&format!("Working directory: {first_disp}"))
+                && !refreshed.contains(&format!("Working directory: {first_canon}")),
+            "session context should not keep first cwd, got: {refreshed}"
+        );
         Ok(())
     })();
     std::env::set_current_dir(original_cwd).map_err(|e| anyhow!(e))?;
@@ -376,14 +415,28 @@ fn initial_session_context_does_not_refresh_after_real_conversation() -> Result<
         session.working_dir = Some(second_dir.path().display().to_string());
         assert!(!session.refresh_initial_session_context_message());
         let original = session.messages[0].content_preview();
-        assert!(original.contains(&format!(
-            "Working directory: {}",
-            first_dir.path().display()
-        )));
-        assert!(!original.contains(&format!(
-            "Working directory: {}",
-            second_dir.path().display()
-        )));
+        let first_disp = first_dir.path().display().to_string();
+        let first_canon = first_dir
+            .path()
+            .canonicalize()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| first_disp.clone());
+        let second_disp = second_dir.path().display().to_string();
+        let second_canon = second_dir
+            .path()
+            .canonicalize()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| second_disp.clone());
+        assert!(
+            original.contains(&format!("Working directory: {first_disp}"))
+                || original.contains(&format!("Working directory: {first_canon}")),
+            "should keep original cwd, got: {original}"
+        );
+        assert!(
+            !original.contains(&format!("Working directory: {second_disp}"))
+                && !original.contains(&format!("Working directory: {second_canon}")),
+            "should not refresh to late cwd, got: {original}"
+        );
         Ok(())
     })();
     std::env::set_current_dir(original_cwd).map_err(|e| anyhow!(e))?;
@@ -1321,7 +1374,8 @@ fn test_render_messages_shows_auto_poke_continuations_as_system_not_user() {
     assert!(
         system_contents
             .iter()
-            .any(|content| content.contains("before finalizing")),
+            .any(|content| content.contains("completion confidence")
+                || content.contains("Validate the completed result")),
         "quality continuation should render as system: {rendered:?}"
     );
 }

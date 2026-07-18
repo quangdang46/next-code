@@ -371,8 +371,10 @@ fn tool_config_acp_profile_allows_core_coding_plus_batch() {
     assert!(allowed.contains("bash"));
     assert!(allowed.contains("read"));
     assert!(allowed.contains("write"));
-    assert!(allowed.contains("apply_patch"));
-    assert!(allowed.contains("glob"));
+    assert!(allowed.contains("edit"));
+    assert!(allowed.contains("ffs_grep"));
+    assert!(allowed.contains("ffs_glob"));
+    assert!(allowed.contains("ls"));
     assert!(allowed.contains("batch"));
     assert!(!allowed.contains("swarm"));
     assert!(!allowed.contains("subagent"));
@@ -399,8 +401,10 @@ fn tool_config_minimal_profile_allows_core_coding_tools() {
     assert!(allowed.contains("bash"));
     assert!(allowed.contains("read"));
     assert!(allowed.contains("write"));
-    assert!(allowed.contains("apply_patch"));
-    assert!(allowed.contains("glob"));
+    assert!(allowed.contains("edit"));
+    assert!(allowed.contains("ffs_grep"));
+    assert!(allowed.contains("ffs_glob"));
+    assert!(allowed.contains("ls"));
     assert!(!allowed.contains("browser"));
     assert!(!allowed.contains("swarm"));
 }
@@ -483,13 +487,15 @@ fn test_generated_default_config_uses_low_openai_reasoning_effort() {
         "generated default config should document ACP profile settings"
     );
     assert!(
-        content.contains("[agents]") && content.contains("swarm_spawn_mode = \"inline\""),
+        content.contains("[agents]") && content.contains("swarm_spawn_mode"),
         "generated default config should document agent spawn defaults"
     );
+    // Sidecar default model is code-defined (SIDECAR_OPENAI_MODEL); the shipped
+    // template documents an optional memory_model override rather than embedding
+    // the sidecar constant.
     assert!(
-        content.contains("memory_model = \"gpt-5.6-luna\"")
-            && content.contains("reasoning effort \"none\""),
-        "generated default config should document the Luna memory sidecar default"
+        content.contains("memory_model"),
+        "generated default config should document the optional memory_model override"
     );
 
     // Effort keys come from the per-platform keybinding registry; the template
@@ -511,7 +517,7 @@ fn test_generated_default_config_uses_low_openai_reasoning_effort() {
     // The generated file must always be valid TOML for the current Config schema.
     let parsed: Config =
         toml::from_str(&content).expect("generated default config should parse as Config");
-    assert_eq!(parsed.agents.swarm_spawn_mode, SwarmSpawnMode::Inline);
+    assert_eq!(parsed.agents.swarm_spawn_mode, SwarmSpawnMode::Visible);
 
     if let Some(prev) = prev_home {
         crate::env::set_var("NEXT_CODE_HOME", prev);
