@@ -513,12 +513,6 @@ impl Agent {
 
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("create");
-        crate::telemetry::begin_session_with_parent(
-            agent.provider.name(),
-            &agent.provider.model(),
-            agent.session.parent_id.clone(),
-            false,
-        );
         agent
     }
 
@@ -613,12 +607,6 @@ impl Agent {
 
         agent.seed_compaction_from_session();
         agent.log_env_snapshot("attach");
-        crate::telemetry::begin_session_with_parent(
-            agent.provider.name(),
-            &agent.provider.model(),
-            agent.session.parent_id.clone(),
-            false,
-        );
         agent
     }
 
@@ -1076,12 +1064,6 @@ impl Agent {
 
     /// Mark this agent session as closed and persist it.
     pub fn mark_closed(&mut self) {
-        crate::telemetry::end_session_with_reason(
-            self.provider.name(),
-            &self.provider.model(),
-            crate::telemetry::SessionEndReason::NormalExit,
-        );
-
         // Dispatch SessionEnd hooks (fire-and-forget, observational only)
         {
             let registry = self.hook_registry.clone();
@@ -1155,11 +1137,6 @@ impl Agent {
     }
 
     pub fn mark_crashed(&mut self, message: Option<String>) {
-        crate::telemetry::record_crash(
-            self.provider.name(),
-            &self.provider.model(),
-            crate::telemetry::SessionEndReason::Unknown,
-        );
         let crash_msg = message
             .clone()
             .unwrap_or_else(|| "unknown crash".to_string());

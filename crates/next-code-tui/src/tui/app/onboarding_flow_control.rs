@@ -243,7 +243,6 @@ impl App {
     /// provider picker, since that is the most common first login. The provider
     /// picker is still reachable via `/login`.
     pub(super) fn onboarding_start_default_login(&mut self) {
-        crate::telemetry::record_setup_step_once("login_picker_opened");
         self.start_login_provider(crate::provider_catalog::OPENAI_LOGIN_PROVIDER);
         self.set_status_notice("Login: opening OpenAI sign-in (or type /login for others)");
     }
@@ -265,7 +264,6 @@ impl App {
         self.onboarding_import_error = None;
         // Prompt/transcript content sharing is opt-in and off by default; we
         // intentionally don't prompt for it during onboarding.
-        crate::telemetry::set_content_sharing_enabled(false);
         if let Some(flow) = self.onboarding_flow.as_mut() {
             flow.phase = OnboardingPhase::ModelSelect;
         }
@@ -782,13 +780,6 @@ impl App {
                     return;
                 }
             };
-            // Auto-import bypasses the manual `pending_login` path, so record
-            // `auth_success` here for each imported provider. Without this the
-            // onboarding activation funnel undercounts every imported login
-            // (the happy path of the guided first-run flow).
-            for (provider, method) in &outcome.imported_auth_labels {
-                crate::telemetry::record_auth_success(provider, method);
-            }
             // Preserve which runtime should become the first-run default. The old
             // synthetic `auto-import` provider discarded this information, so the
             // auth-refresh path kept the stale pre-import provider and validation

@@ -10,8 +10,8 @@ surfaces live in this repo; backend surfaces live in `solosystems-backend`.
 
 ## Existing surfaces (grounding)
 
-- Client telemetry pipeline: `crates/next-code-telemetry-core/src/lib.rs`
-  (`record_auth_success` @1409, `sanitize_telemetry_label` applied to all
+- Client telemetry pipeline: *(removed — no client telemetry pipeline)*
+  (legacy references removed with telemetry-core;
   auth labels @398-400; `AuthEvent` schema in
   `crates/next-code-usage-types/src/lib.rs:270-284` has NO account_id/email slot,
   by design — see the TODO at `src/cli/login/next_code_device.rs:370-374`).

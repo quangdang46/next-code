@@ -12,7 +12,6 @@
     "crates/next-code-provider-doctor/src/lifecycle_driver.rs": 2,
     "crates/next-code-render-core/src/math.rs": 4,
     "crates/next-code-render-core/src/preprocess.rs": 2,
-    "crates/next-code-telemetry-core/src/lib.rs": 1,
     "crates/next-code-terminal-launch/src/lib.rs": 1,
     "crates/next-code-tui-core/src/stream_buffer.rs": 3,
     "crates/next-code-tui/src/tui/app/helpers.rs": 1,

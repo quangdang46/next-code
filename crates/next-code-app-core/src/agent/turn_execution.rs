@@ -353,7 +353,6 @@ impl Agent {
                     cache_control: None,
                 }],
             );
-            crate::telemetry::record_turn();
             self.session.save()?;
             let _ = event_tx.send(ServerEvent::TextDelta { text: partial });
             let _ = event_tx.send(ServerEvent::MessageEnd);
@@ -362,7 +361,6 @@ impl Agent {
         }
 
         self.add_message(Role::User, blocks);
-        crate::telemetry::record_turn();
         self.session.save()?;
         let turn_started_at = Instant::now();
         let start_message_index = self.message_count();

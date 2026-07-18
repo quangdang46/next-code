@@ -43,7 +43,6 @@
     "crates/next-code-provider-openrouter-runtime/src/lib.rs": 2701,
     "crates/next-code-render-core/src/math.rs": 1250,
     "crates/next-code-setup-hints/src/lib.rs": 2411,
-    "crates/next-code-telemetry-core/src/lib.rs": 1953,
     "crates/next-code-tui-mermaid/src/mermaid_cache_render.rs": 1333,
     "crates/next-code-tui-mermaid/src/mermaid_viewport.rs": 1351,
     "crates/next-code-tui-render/src/swarm_gallery.rs": 3044,

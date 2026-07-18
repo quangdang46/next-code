@@ -285,13 +285,12 @@ fn login_phase_advances_to_model_select_without_telemetry_prompt() {
             Some(OnboardingPhase::Login { .. })
         ));
         // After login we no longer ask a telemetry-consent question; we advance
-        // straight to model selection and leave content sharing off.
+        // straight to model selection.
         app.onboarding_after_login();
         assert!(matches!(
             app.onboarding_phase(),
             Some(OnboardingPhase::ModelSelect) | Some(OnboardingPhase::Suggestions)
         ));
-        assert!(!crate::telemetry::content_sharing_enabled());
     });
 }
 

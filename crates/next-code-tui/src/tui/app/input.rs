@@ -3582,9 +3582,6 @@ impl App {
             || super::auth::handle_auth_command(self, trimmed)
             || super::tui_lifecycle_runtime::handle_dev_command(self, trimmed);
         if handled {
-            if trimmed.starts_with('/') {
-                crate::telemetry::record_command_family(trimmed);
-            }
             return;
         }
 
@@ -3756,7 +3753,6 @@ impl App {
             });
             self.session.add_message(Role::User, blocks);
         }
-        crate::telemetry::record_turn();
         self.session_save_pending = true;
 
         // A fresh user turn supersedes any post-error fallback offer from the

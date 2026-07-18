@@ -37,19 +37,9 @@ impl App {
     ) -> String {
         let mut notices = Vec::new();
         if !browser_opened {
-            crate::telemetry::record_auth_surface_blocked_reason(
-                provider_id,
-                "oauth",
-                crate::auth::login_diagnostics::AuthFailureReason::BrowserOpenFailed.label(),
-            );
             notices.push("This machine could not open a browser automatically.".to_string());
         }
         if matches!(callback_available, Some(false)) {
-            crate::telemetry::record_auth_surface_blocked_reason(
-                provider_id,
-                "oauth",
-                crate::auth::login_diagnostics::AuthFailureReason::CallbackPortUnavailable.label(),
-            );
             if let Some(target) = callback_target {
                 notices.push(format!(
                     "Local callback target {} is unavailable, so next-code is using manual-safe paste completion instead.",
@@ -150,7 +140,6 @@ impl App {
     }
 
     pub(super) fn show_interactive_login(&mut self) {
-        crate::telemetry::record_setup_step_once("login_picker_opened");
         self.open_login_picker_inline();
         self.set_status_notice("Login: choose a provider");
     }
@@ -387,7 +376,6 @@ impl App {
         &mut self,
         provider: crate::provider_catalog::LoginProviderDescriptor,
     ) {
-        crate::telemetry::record_provider_selected(provider.id);
         crate::logging::event_info(
             "login_started",
             vec![
@@ -445,10 +433,6 @@ impl App {
                 self.start_antigravity_login()
             }
             crate::provider_catalog::LoginProviderTarget::Google => {
-                crate::telemetry::record_auth_surface_blocked(
-                    provider.id,
-                    provider.auth_kind.label(),
-                );
                 self.push_display_message(DisplayMessage::error(
                     "Google/Gmail login is only available from the CLI right now. Run next-code login --provider google."
                         .to_string(),
@@ -458,9 +442,6 @@ impl App {
     }
 
     fn begin_pending_login(&mut self, pending: PendingLogin) {
-        if let Some((provider, method)) = pending.telemetry_context() {
-            crate::telemetry::record_auth_started(&provider, &method);
-        }
         self.pending_login = Some(pending);
     }
 
@@ -1280,8 +1261,6 @@ impl App {
     }
 
     fn start_cursor_login(&mut self) {
-        crate::telemetry::record_auth_started("cursor", "api_key");
-
         self.push_display_message(DisplayMessage::system(
             "Cursor API Key\n\n\
              Get your API key from: https://cursor.com/settings\n\
@@ -1570,9 +1549,6 @@ impl App {
     pub(super) fn handle_login_input(&mut self, pending: PendingLogin, input: String) {
         let trimmed = input.trim();
         if trimmed == "/cancel" {
-            if let Some((provider, method)) = pending.telemetry_context() {
-                crate::telemetry::record_auth_cancelled(&provider, &method);
-            }
             self.push_display_message(DisplayMessage::system("Login cancelled.".to_string()));
             return;
         }
@@ -1964,11 +1940,6 @@ impl App {
                                 ("error", e.to_string()),
                             ],
                         );
-                        crate::telemetry::record_auth_failed_reason(
-                            &provider_id,
-                            &auth_method,
-                            reason.label(),
-                        );
                         self.push_display_message(DisplayMessage::error(format!(
                             "Failed to save {} key: {}",
                             provider, e
@@ -2145,14 +2116,6 @@ impl App {
                         }));
                     }
                     Err(e) => {
-                        let reason = crate::auth::login_diagnostics::classify_auth_failure_message(
-                            &e.to_string(),
-                        );
-                        crate::telemetry::record_auth_failed_reason(
-                            "cursor",
-                            "api_key",
-                            reason.label(),
-                        );
                         self.push_display_message(DisplayMessage::error(format!(
                             "Failed to save Cursor API key: {}",
                             e
@@ -2191,13 +2154,6 @@ impl App {
                     .await
                     {
                         Ok(outcome) => {
-                            // Auto-import bypasses the manual `pending_login`
-                            // telemetry path, so record `auth_success` for each
-                            // imported provider to keep the activation funnel
-                            // accurate.
-                            for (provider, method) in &outcome.imported_auth_labels {
-                                crate::telemetry::record_auth_success(provider, method);
-                            }
                             Bus::global().publish(BusEvent::LoginCompleted(LoginCompleted {
                                 provider: "auto-import".to_string(),
                                 success: outcome.imported > 0,
@@ -2694,19 +2650,6 @@ impl App {
                 ("success", login.success.to_string()),
             ],
         );
-        if let Some((provider, method)) = self
-            .pending_login
-            .as_ref()
-            .and_then(PendingLogin::telemetry_context)
-        {
-            if login.success {
-                crate::telemetry::record_auth_success(&provider, &method);
-            } else {
-                let reason =
-                    crate::auth::login_diagnostics::classify_auth_failure_message(&login.message);
-                crate::telemetry::record_auth_failed_reason(&provider, &method, reason.label());
-            }
-        }
         if login.success {
             self.recent_authenticated_provider = Some((login.provider.clone(), Instant::now()));
             // A fresh login is exactly what the credential-failure breaker is
@@ -2853,10 +2796,6 @@ impl App {
             )));
             return;
         }
-        crate::telemetry::record_auth_success(
-            "azure",
-            if use_entra { "entra_id" } else { "api_key" },
-        );
         let auth_note = if use_entra {
             "Using Microsoft Entra ID through Azure DefaultAzureCredential. If you use Azure CLI auth, run az login and make sure the identity has the Cognitive Services OpenAI User role."
         } else {

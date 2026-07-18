@@ -418,7 +418,6 @@ impl Agent {
                         if trace {
                             eprintln!("[trace] connection_type={}", connection);
                         }
-                        crate::telemetry::record_connection_type(&connection);
                         self.last_connection_type = Some(connection);
                     }
                     StreamEvent::ConnectionPhase { phase } => {
@@ -544,14 +543,10 @@ impl Agent {
                             best_of_n_run_id: self.best_of_n_run_id.clone(),
                             best_of_n_candidate_id: self.best_of_n_candidate_id.clone(),
                         };
-                        crate::telemetry::record_tool_call();
                         let tool_result = self
                             .registry
                             .execute(&tool_name, ToolCall::normalize_input_to_object(input), ctx)
                             .await;
-                        if tool_result.is_err() {
-                            crate::telemetry::record_tool_failure();
-                        }
                         let native_result = match tool_result {
                             Ok(output) => NativeToolResult::success(request_id, output.output),
                             Err(e) => NativeToolResult::error(request_id, e.to_string()),
@@ -652,19 +647,6 @@ impl Agent {
                 ],
             );
 
-            if usage_input.is_some()
-                || usage_output.is_some()
-                || usage_cache_read.is_some()
-                || usage_cache_creation.is_some()
-            {
-                crate::telemetry::record_token_usage(
-                    usage_input.unwrap_or(0),
-                    usage_output.unwrap_or(0),
-                    usage_cache_read,
-                    usage_cache_creation,
-                );
-            }
-
             if print_output
                 && (usage_input.is_some()
                     || usage_output.is_some()
@@ -733,7 +715,6 @@ impl Agent {
             }
 
             let assistant_message_id = if !content_blocks.is_empty() {
-                crate::telemetry::record_assistant_response();
                 let token_usage = Some(crate::session::StoredTokenUsage {
                     input_tokens: self.last_usage.input_tokens,
                     output_tokens: self.last_usage.output_tokens,
@@ -1025,7 +1006,6 @@ impl Agent {
                 }));
 
                 let result = self.registry.execute(&tc.name, tc.input.clone(), ctx).await;
-                crate::telemetry::record_tool_call();
                 self.unlock_tools_if_needed(&tc.name);
                 let tool_elapsed = tool_start.elapsed();
                 logging::info(&format!(
@@ -1112,7 +1092,6 @@ impl Agent {
                         tool_results_dirty = true;
                     }
                     Err(e) => {
-                        crate::telemetry::record_tool_failure();
                         Bus::global().publish(BusEvent::ToolUpdated(ToolEvent {
                             session_id: self.session.id.clone(),
                             message_id: message_id.clone(),

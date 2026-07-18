@@ -1479,9 +1479,6 @@ fn handle_disconnected_local_command(app: &mut App, trimmed: &str) -> bool {
         || super::commands::handle_dev_command(app, trimmed);
 
     if handled {
-        if trimmed.starts_with('/') {
-            crate::telemetry::record_command_family(trimmed);
-        }
         app.input.clear();
         app.cursor_pos = 0;
         app.reset_tab_completion();

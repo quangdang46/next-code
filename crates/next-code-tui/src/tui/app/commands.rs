@@ -765,14 +765,8 @@ fn launch_manual_subagent(app: &mut App, spec: ManualSubagentSpec) {
         let duration_ms = start.elapsed().as_millis() as u64;
 
         let (output, is_error, title, status) = match result {
-            Ok(output) => {
-                crate::telemetry::record_tool_call();
-                (output.output, false, output.title, ToolStatus::Completed)
-            }
-            Err(error) => {
-                crate::telemetry::record_tool_failure();
-                (format!("Error: {}", error), true, None, ToolStatus::Error)
-            }
+            Ok(output) => (output.output, false, output.title, ToolStatus::Completed),
+            Err(error) => (format!("Error: {}", error), true, None, ToolStatus::Error),
         };
 
         Bus::global().publish(BusEvent::ToolUpdated(ToolEvent {
@@ -3433,15 +3427,13 @@ pub(super) fn handle_feedback_command(app: &mut App, trimmed: &str) -> bool {
         return false;
     };
 
-    let feedback = rest.trim();
-    if feedback.is_empty() {
+    if rest.trim().is_empty() {
         app.push_display_message(DisplayMessage::error(
             "Usage: /feedback <your feedback>".to_string(),
         ));
         return true;
     }
 
-    crate::telemetry::record_feedback(feedback);
     app.push_display_message(DisplayMessage::system(
         "Thanks, recorded your feedback.".to_string(),
     ));

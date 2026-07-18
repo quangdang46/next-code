@@ -166,7 +166,7 @@ Features from reference repos that next-code doesn't have yet. Decision needed: 
 | **WASM extension runtime** | pi-agent-rust | next-code has native plugin system already. WASM adds security isolation but may not be needed. |
 | **io_uring fast lane** | pi-agent-rust | Linux-specific. Not portable. |
 | **Shadow dual execution** | pi-agent-rust | Complex. Runs two models and compares. |
-| **Langfuse monitoring** | CCB | next-code has telemetry-core. Langfuse is a specific external platform. |
+| **Langfuse monitoring** | CCB | next-code has no product telemetry pipeline. Langfuse is a specific external platform. |
 | **Sandbox execution** | codex | Already marked ❌ by design decision. |
 | **IDE wiring** (VS Code) | oh-my-pi | next-code is terminal-first. Different philosophy. |
 | **Remote Control** (Docker UI) | CCB | Docker self-hosted remote UI. Niche. |

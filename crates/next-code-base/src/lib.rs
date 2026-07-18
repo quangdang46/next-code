@@ -2,7 +2,7 @@
 //!
 //! This crate holds the downward-closed set of modules that the upper
 //! server/tool/agent layer (`next-code-app-core`) depends on: provider, auth,
-//! config, session, message, memory, telemetry, and their supporting leaves.
+//! config, session, message, memory, and their supporting leaves.
 //! Splitting it out lets the two halves compile as separate rustc units so the
 //! largest compilation unit (and its peak memory) is roughly halved.
 //!
@@ -80,10 +80,6 @@ pub mod sponsors;
 pub mod stdin_detect;
 pub mod storage;
 pub mod telegram;
-pub mod telemetry {
-    pub use crate::telemetry_stub::*;
-}
-mod telemetry_stub;
 pub mod terminal_launch;
 pub mod todo;
 pub mod transport;

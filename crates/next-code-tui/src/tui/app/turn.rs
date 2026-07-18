@@ -1003,11 +1003,7 @@ impl App {
                                                 ctx,
                                             )
                                             .await;
-                                        crate::telemetry::record_tool_call();
                                         self.todo_reminder_state.record_tool_call();
-                                        if tool_result.is_err() {
-                                            crate::telemetry::record_tool_failure();
-                                        }
                                         let native_result = match tool_result {
                                             Ok(output) => crate::provider::NativeToolResult::success(request_id, output.output),
                                             Err(e) => crate::provider::NativeToolResult::error(request_id, e.to_string()),
@@ -1106,7 +1102,6 @@ impl App {
             }
 
             let assistant_message_id = if !content_blocks.is_empty() {
-                crate::telemetry::record_assistant_response();
                 let content_clone = content_blocks.clone();
                 self.add_provider_message(Message {
                     role: Role::Assistant,
