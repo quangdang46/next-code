@@ -15,7 +15,7 @@ Built for multi-session workflows, infinite customizability, and performance.
 <br>
 
 <a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code_demo.mp4">
-  <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/readme/next-code-vs-claude-code.png" alt="next-code memory demonstration" width="800">
+  <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code-vs-claude-code.png" alt="next-code memory demonstration" width="800">
 </a>
 
 <br>
@@ -661,8 +661,8 @@ This is useful when you want to test with a clean context or run sessions withou
 
 <div align="center">
 
-  <a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code_claudeai_demo.mp4">
-    <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/readme/next-code-workflow-demonstration.webp" alt="next-code workflow demonstration" width="900">
+  <a href="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/workflow.mp4">
+    <img src="https://raw.githubusercontent.com/quangdang46/next-code/main/assets/demos/next-code-vs-claude-code.png" alt="next-code workflow demonstration" width="900">
   </a>
 
   <p><em>next-code workflow demonstration</em></p>
