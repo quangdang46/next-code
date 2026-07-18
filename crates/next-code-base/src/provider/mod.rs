@@ -815,8 +815,8 @@ impl MultiProvider {
                 }
             }
             ActiveProvider::OpenRouter => {
-                // The OpenRouter slot multiplexes the public aggregator, the
-                // next-code subscription, and direct OpenAI-compatible profiles.
+                // The OpenRouter slot multiplexes the public aggregator and
+                // direct OpenAI-compatible profiles.
                 let label = self
                     .active_openrouter_execution_provider()
                     .map(|execution| execution.runtime_display_name())
@@ -2757,7 +2757,6 @@ pub fn cache_ttl_for_provider_model(provider: &str, model: Option<&str>) -> Opti
             }
         }
         "openrouter" => Some(300),
-        "next-code subscription" | "next code subscription" => Some(300),
         "gemini" => Some(300),
         "copilot" => None,
         "cursor" => None,

@@ -310,7 +310,6 @@ impl MultiProvider {
     fn session_provider_key_from_provider_name(provider_name: &str) -> Option<String> {
         let normalized = provider_name.trim().to_ascii_lowercase();
         let key = match normalized.as_str() {
-            "next-code" | "next code subscription" | "next-code subscription" => "next-code",
             "anthropic" | "claude" | "claude cli" => "claude",
             "openai" => "openai",
             "github copilot" | "copilot" => "copilot",

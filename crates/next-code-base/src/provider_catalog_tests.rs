@@ -48,11 +48,11 @@ fn matrix_profiles_have_unique_ids_and_safe_metadata() {
 fn matrix_login_provider_aliases_resolve_to_canonical_ids() {
     assert_eq!(
         resolve_login_provider("subscription").map(|provider| provider.id),
-        Some("next-code")
+        None
     );
     assert_eq!(
         resolve_login_provider("next-code").map(|provider| provider.id),
-        Some("next-code")
+        None
     );
     assert_eq!(
         resolve_login_provider("anthropic").map(|provider| provider.id),
@@ -388,10 +388,14 @@ fn matrix_tui_login_selection_supports_numbers_and_names() {
         resolve_login_selection("3", &providers).map(|provider| provider.id),
         Some("anthropic-api")
     );
-    assert_eq!(
-        resolve_login_selection("7", &providers).map(|provider| provider.id),
-        Some("bedrock")
-    );
+    {
+        let ids: Vec<&str> = providers.iter().map(|p| p.id).collect();
+        let pos = ids.iter().position(|id| *id == "bedrock").expect("bedrock in tui providers") + 1;
+        assert_eq!(
+            resolve_login_selection(&pos.to_string(), &providers).map(|provider| provider.id),
+            Some("bedrock")
+        );
+    }
     assert_eq!(
         resolve_login_selection("compat", &providers).map(|provider| provider.id),
         Some("openai-compatible")
@@ -407,7 +411,6 @@ fn matrix_tui_login_selection_supports_numbers_and_names() {
     assert!(
         providers
             .iter()
-            .take(7)
             .any(|provider| provider.id == "bedrock")
     );
     assert!(resolve_login_selection("google", &providers).is_none());
@@ -425,26 +428,24 @@ fn matrix_cli_login_selection_preserves_existing_order() {
         resolve_login_selection("3", &providers).map(|provider| provider.id),
         Some("anthropic-api")
     );
-    assert_eq!(
-        resolve_login_selection("5", &providers).map(|provider| provider.id),
-        Some("next-code")
+    // Hosted next-code/subscription login was removed; resolve remaining core
+    // providers by current list position rather than hard-coded slots.
+    let ids: Vec<&str> = providers.iter().map(|p| p.id).collect();
+    assert!(
+        !ids.contains(&"next-code"),
+        "hosted next-code login provider must stay removed: {ids:?}"
     );
-    assert_eq!(
-        resolve_login_selection("6", &providers).map(|provider| provider.id),
-        Some("copilot")
-    );
-    assert_eq!(
-        resolve_login_selection("7", &providers).map(|provider| provider.id),
-        Some("openrouter")
-    );
-    assert_eq!(
-        resolve_login_selection("8", &providers).map(|provider| provider.id),
-        Some("bedrock")
-    );
-    assert_eq!(
-        resolve_login_selection("9", &providers).map(|provider| provider.id),
-        Some("azure")
-    );
+    for expected in ["copilot", "openrouter", "bedrock", "azure"] {
+        assert!(
+            ids.contains(&expected),
+            "expected {expected} in CLI login providers: {ids:?}"
+        );
+        let pos = ids.iter().position(|id| *id == expected).unwrap() + 1;
+        assert_eq!(
+            resolve_login_selection(&pos.to_string(), &providers).map(|provider| provider.id),
+            Some(expected)
+        );
+    }
     assert_eq!(
         resolve_login_selection("bedrock", &providers).map(|provider| provider.id),
         Some("bedrock")

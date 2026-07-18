@@ -497,11 +497,11 @@ mod tests {
     fn matrix_login_provider_aliases_resolve_to_canonical_ids() {
         assert_eq!(
             resolve_login_provider("subscription").map(|provider| provider.id),
-            Some("next-code")
+            None
         );
         assert_eq!(
             resolve_login_provider("next-code").map(|provider| provider.id),
-            Some("next-code")
+            None
         );
         assert_eq!(
             resolve_login_provider("anthropic").map(|provider| provider.id),
@@ -623,14 +623,26 @@ mod tests {
             resolve_login_selection("2", &providers).map(|provider| provider.id),
             Some("claude")
         );
-        // `anthropic-api` sits at 3 (between claude and openai), shifting the
-        // rest of the list down one slot relative to the pre-May-2026 order.
+        // `anthropic-api` sits at 3 (between claude and openai).
         assert_eq!(
             resolve_login_selection("3", &providers).map(|provider| provider.id),
             Some("anthropic-api")
         );
+        // Resolve bedrock by current list position; hosted next-code login was
+        // removed and shifted later slots.
+        let ids: Vec<&str> = providers.iter().map(|p| p.id).collect();
+        assert!(
+            !ids.contains(&"next-code"),
+            "hosted next-code login provider must stay removed: {ids:?}"
+        );
+        let bedrock_pos = ids
+            .iter()
+            .position(|id| *id == "bedrock")
+            .expect("bedrock in tui providers")
+            + 1;
         assert_eq!(
-            resolve_login_selection("7", &providers).map(|provider| provider.id),
+            resolve_login_selection(&bedrock_pos.to_string(), &providers)
+                .map(|provider| provider.id),
             Some("bedrock")
         );
         assert_eq!(
@@ -647,31 +659,26 @@ mod tests {
             resolve_login_selection("1", &providers).map(|provider| provider.id),
             Some("auto-import")
         );
-        // `anthropic-api` at 3 shifted everything after it down one slot.
+        // `anthropic-api` remains early in the CLI list after auto-import + claude.
         assert_eq!(
             resolve_login_selection("3", &providers).map(|provider| provider.id),
             Some("anthropic-api")
         );
-        assert_eq!(
-            resolve_login_selection("5", &providers).map(|provider| provider.id),
-            Some("next-code")
-        );
-        assert_eq!(
-            resolve_login_selection("6", &providers).map(|provider| provider.id),
-            Some("copilot")
-        );
-        assert_eq!(
-            resolve_login_selection("7", &providers).map(|provider| provider.id),
-            Some("openrouter")
-        );
-        assert_eq!(
-            resolve_login_selection("8", &providers).map(|provider| provider.id),
-            Some("bedrock")
-        );
-        assert_eq!(
-            resolve_login_selection("9", &providers).map(|provider| provider.id),
-            Some("azure")
-        );
+        // Hosted next-code/subscription login was removed; ensure remaining
+        // core providers are still reachable by number without a dead slot.
+        let ids: Vec<&str> = providers.iter().map(|p| p.id).collect();
+        assert!(!ids.contains(&"next-code"), "hosted next-code login provider must stay removed: {ids:?}");
+        for expected in ["copilot", "openrouter", "bedrock", "azure"] {
+            assert!(
+                ids.contains(&expected),
+                "expected {expected} in CLI login providers: {ids:?}"
+            );
+            let pos = ids.iter().position(|id| *id == expected).unwrap() + 1;
+            assert_eq!(
+                resolve_login_selection(&pos.to_string(), &providers).map(|provider| provider.id),
+                Some(expected)
+            );
+        }
         assert_eq!(
             resolve_login_selection("bedrock", &providers).map(|provider| provider.id),
             Some("bedrock")

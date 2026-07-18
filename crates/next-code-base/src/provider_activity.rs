@@ -15,7 +15,7 @@
 //!   - `claude:oauth:<label>` / `claude:api-key`
 //!   - `openai:oauth:<label>` / `openai:api-key`
 //!   - `openai-compatible:<profile-id>` (DeepSeek, Moonshot, NVIDIA NIM, ...)
-//!   - `openrouter`, `next-code`, `copilot`, `gemini`, `cursor`, `bedrock`,
+//!   - `openrouter`, `copilot`, `gemini`, `cursor`, `bedrock`,
 //!     `antigravity`, `azure-openai`
 
 use chrono::{Datelike, Utc};
@@ -251,7 +251,6 @@ pub fn display_name_for_source_key(source_key: &str) -> String {
         "claude:api-key" => "Anthropic API key".to_string(),
         "openai:api-key" => "OpenAI API key".to_string(),
         "openrouter" => "OpenRouter".to_string(),
-        "next-code" => "Next Code subscription".to_string(),
         "copilot" => "GitHub Copilot".to_string(),
         "gemini" => "Google Gemini".to_string(),
         "cursor" => "Cursor".to_string(),

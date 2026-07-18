@@ -454,10 +454,6 @@ pub(super) fn draw_help_overlay(frame: &mut Frame, area: Rect, scroll: usize, ap
         "/account",
         "Open combined Claude/OpenAI account picker",
     ));
-    lines.push(help_entry(
-        "/subscription",
-        "Inspect next-code subscription scaffold",
-    ));
 
     lines.push(Line::from(""));
     lines.push(separator());

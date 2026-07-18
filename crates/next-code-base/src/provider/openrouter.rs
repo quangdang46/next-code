@@ -228,8 +228,7 @@ pub enum OpenRouterTransportState {
     /// Real OpenRouter BYOK. The provider implementation is both the runtime identity
     /// and the HTTP transport.
     OpenRouterApiKey,
-    /// Next Code subscription access currently reuses the OpenRouter HTTP slot, but is
-    /// not user BYOK/OpenRouter billing.
+    /// Reserved historical variant for non-BYOK OpenRouter-compatible transports.
     /// A direct OpenAI-compatible endpoint that needs a user key, Azure credential,
     /// or provider-profile secret while reusing the OpenRouter-compatible transport.
     DirectApiKey,

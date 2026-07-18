@@ -766,12 +766,6 @@ fn route_matches_activation(route: &ModelRoute, activation: &AuthActivationResul
                 crate::provider::ModelRouteApiMethod::CodeAssistOAuth
             );
         }
-        "next-code" => {
-            // The Next Code subscription runtime is the OpenRouter transport with a
-            // curated catalog, so its routes carry the `openrouter` api_method
-            // even though the runtime identity is `next-code`.
-            return matches!(api_method, crate::provider::ModelRouteApiMethod::OpenRouter);
-        }
         "azure-openai" => {
             // Azure OpenAI reuses the OpenRouter transport (configured via Azure
             // env), so its routes carry the `openrouter` api_method while keeping
@@ -1380,9 +1374,6 @@ mod tests {
             ("openai", "openai", "OpenAI"),
             ("openai-key", "openai-api", "OpenAI API"),
             ("openrouter", "openrouter", "OpenRouter"),
-            ("subscription", "next-code", "Next Code"),
-            ("next-code", "next-code", "Next Code"),
-            ("next-code", "next-code", "Next Code"),
             ("bedrock", "bedrock", "AWS Bedrock"),
             ("cursor", "cursor", "Cursor"),
             ("copilot", "copilot", "GitHub Copilot"),
@@ -1440,8 +1431,6 @@ mod tests {
             ("openai", "openai", "openai", "openai", true),
             ("openai-api", "openai-api", "openai-api", "openai", true),
             ("openrouter", "openrouter", "openrouter", "openrouter", true),
-            ("next-code", "next-code", "next-code", "openrouter", true),
-            ("next-code", "next-code", "next-code", "openrouter", true),
             ("bedrock", "bedrock", "bedrock", "bedrock", true),
             ("cursor", "cursor", "cursor", "cursor", false),
             ("copilot", "copilot", "copilot", "copilot", true),
@@ -1630,7 +1619,6 @@ mod tests {
             "openai",
             "openai-api",
             "openrouter",
-            "next-code",
             "bedrock",
             "cursor",
             "copilot",
@@ -1665,9 +1653,6 @@ mod tests {
             ("openai", "openai-oauth:shared-model"),
             ("openai-api", "openai-api:shared-model"),
             ("openrouter", "openrouter:shared-model"),
-            ("next-code", "openrouter:shared-model"),
-            ("next-code", "openrouter:shared-model"),
-            ("subscription", "openrouter:shared-model"),
             ("azure-openai", "openrouter:shared-model"),
             ("bedrock", "bedrock:shared-model"),
             ("cursor", "cursor:shared-model"),
