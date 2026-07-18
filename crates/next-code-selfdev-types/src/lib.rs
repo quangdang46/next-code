@@ -41,7 +41,7 @@ impl SelfDevBuildTarget {
     pub fn parse(value: Option<&str>) -> Result<Self> {
         match value.unwrap_or("auto").trim().to_ascii_lowercase().as_str() {
             "" | "auto" => Ok(Self::Auto),
-            "tui" | "next-code" => Ok(Self::Tui),
+            "tui" | "next-code" | "nextcode" => Ok(Self::Tui),
             "all" | "both" => Ok(Self::All),
             other => anyhow::bail!(
                 "invalid selfdev build target `{}`; expected auto, tui, or all",

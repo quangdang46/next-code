@@ -633,7 +633,7 @@ fn provider_style(provider_id: &str) -> Style {
         | "cerebras"
         | "alibaba-coding-plan"
         | "antigravity"
-        _ => Color::Rgb(180, 190, 220),
+        | _ => Color::Rgb(180, 190, 220),
     };
     Style::default().fg(color).bold()
 }
