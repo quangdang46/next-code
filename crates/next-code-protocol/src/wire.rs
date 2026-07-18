@@ -216,8 +216,8 @@ pub enum Request {
 
     /// Set the active model by name.
     ///
-    /// A legacy/desktop compatibility shape (`{"type":"set_route","model":...}`)
-    /// is also accepted, but it is normalized into this variant inside
+    /// A legacy wire shape (`{"type":"set_route","model":...}`) is also
+    /// accepted, but it is normalized into this variant inside
     /// [`crate::decode_request`] rather than via a serde `alias`. A serde alias
     /// would make this variant *also* answer to the `set_route` tag, and serde's
     /// internally-tagged enums pick the first matching variant by tag (not by

@@ -17,10 +17,10 @@ if [[ "$out_dir" != /* ]]; then
   out_dir="$repo_root/$out_dir"
 fi
 
-artifact="${NEXT_CODE_COMPAT_ARTIFACT:-${NEXT_CODE_COMPAT_ARTIFACT:-${NEXT_CODE_COMPAT_ARTIFACT:-next-code-linux-x86_64}}}"
-profile="${NEXT_CODE_COMPAT_PROFILE:-${NEXT_CODE_COMPAT_PROFILE:-release}}"
-image="${NEXT_CODE_COMPAT_IMAGE:-${NEXT_CODE_COMPAT_IMAGE:-quay.io/pypa/manylinux2014_x86_64}}"
-cache_root="${NEXT_CODE_COMPAT_CACHE_DIR:-${NEXT_CODE_COMPAT_CACHE_DIR:-$HOME/.cache/next-code-linux-compat}}"
+artifact="${NEXT_CODE_COMPAT_ARTIFACT:-${NEXT_CODE_COMPAT_ARTIFACT:-next-code-linux-x86_64}}"
+profile="${NEXT_CODE_COMPAT_PROFILE:-release}"
+image="${NEXT_CODE_COMPAT_IMAGE:-quay.io/pypa/manylinux2014_x86_64}"
+cache_root="${NEXT_CODE_COMPAT_CACHE_DIR:-$HOME/.cache/next-code-linux-compat}"
 target="x86_64-unknown-linux-gnu"
 
 mkdir -p "$out_dir" \
@@ -74,10 +74,10 @@ echo "Embedding git metadata: hash=${git_hash:-<none>} tag=${git_tag:-<none>} di
 
 docker run --rm \
   -e CARGO_TERM_COLOR=always \
-  -e NEXT_CODE_RELEASE_BUILD="${NEXT_CODE_RELEASE_BUILD:-${NEXT_CODE_RELEASE_BUILD:-1}}" \
-  -e NEXT_CODE_RELEASE_BUILD="${NEXT_CODE_RELEASE_BUILD:-${NEXT_CODE_RELEASE_BUILD:-1}}" \
-  -e NEXT_CODE_BUILD_SEMVER="${NEXT_CODE_BUILD_SEMVER:-${NEXT_CODE_BUILD_SEMVER:-}}" \
-  -e NEXT_CODE_BUILD_SEMVER="${NEXT_CODE_BUILD_SEMVER:-${NEXT_CODE_BUILD_SEMVER:-}}" \
+  -e NEXT_CODE_RELEASE_BUILD="${NEXT_CODE_RELEASE_BUILD:-1}" \
+  -e NEXT_CODE_RELEASE_BUILD="${NEXT_CODE_RELEASE_BUILD:-1}" \
+  -e NEXT_CODE_BUILD_SEMVER="${NEXT_CODE_BUILD_SEMVER:-}" \
+  -e NEXT_CODE_BUILD_SEMVER="${NEXT_CODE_BUILD_SEMVER:-}" \
   -e NEXT_CODE_BUILD_METADATA_FILE=/next-code-build-meta \
   -e NEXT_CODE_BUILD_METADATA_FILE=/next-code-build-meta \
   -e NEXT_CODE_COMPAT_PROFILE="$profile" \
@@ -139,9 +139,9 @@ docker run --rm \
 	    export CARGO_TARGET_DIR=/work/target/linux-compat
 	    export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}"
 	    export CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS="${CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS:--C link-arg=-static-libgcc}"
-	    cargo build --profile "${NEXT_CODE_COMPAT_PROFILE:-${NEXT_CODE_COMPAT_PROFILE:-}}" --target "${NEXT_CODE_COMPAT_TARGET:-${NEXT_CODE_COMPAT_TARGET:-}}" -p next-code --bin next-code
+	    cargo build --profile "${NEXT_CODE_COMPAT_PROFILE:-}" --target "${NEXT_CODE_COMPAT_TARGET:-}" -p next-code --bin next-code
 
-	    cp "$CARGO_TARGET_DIR/${NEXT_CODE_COMPAT_TARGET:-${NEXT_CODE_COMPAT_TARGET:-}}/${NEXT_CODE_COMPAT_PROFILE:-${NEXT_CODE_COMPAT_PROFILE:-}}/next-code" "/out/'"$artifact"'.bin"
+	    cp "$CARGO_TARGET_DIR/${NEXT_CODE_COMPAT_TARGET:-}/${NEXT_CODE_COMPAT_PROFILE:-}/next-code" "/out/'"$artifact"'.bin"
 	    chmod +x "/out/'"$artifact"'.bin"
 	    cat > "/out/'"$artifact"'" <<WRAPPER
 #!/usr/bin/env sh

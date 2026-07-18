@@ -7,13 +7,13 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 
-sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-${NEXT_CODE_ONBOARDING_SANDBOX:-default}}
+sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-default}
 sandbox_root_default="$repo_root/.tmp/onboarding/$sandbox_name"
-sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-${NEXT_CODE_ONBOARDING_DIR:-$sandbox_root_default}}
+sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-$sandbox_root_default}
 next_code_home="$sandbox_root/home"
 runtime_dir="$sandbox_root/runtime"
 fixture_root_default="$repo_root/.tmp/auth-fixtures"
-fixture_root=${NEXT_CODE_AUTH_FIXTURE_DIR:-${NEXT_CODE_AUTH_FIXTURE_DIR:-$fixture_root_default}}
+fixture_root=${NEXT_CODE_AUTH_FIXTURE_DIR:-$fixture_root_default}
 
 usage() {
   cat <<EOF

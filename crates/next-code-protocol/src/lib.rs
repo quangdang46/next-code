@@ -708,7 +708,7 @@ pub fn encode_event(event: &ServerEvent) -> String {
 
 /// Decode a request from a JSON string.
 ///
-/// Handles a legacy/desktop compatibility shape where a model switch was sent as
+/// Handles a legacy wire shape where a model switch was sent as
 /// `{"type":"set_route","model":"..."}` (a bare model string under the
 /// `set_route` tag). The current protocol reserves the `set_route` tag for the
 /// structured [`Request::SetRoute`] variant (which carries a `selection`

@@ -1,6 +1,5 @@
 //! Integration test: load the bundled sample agents in
-//! `<project>/.next-code/agents/` (legacy sample path; dual-read with
-//! `.next-code/agents/`) and assert the registry behaves as documented.
+//! `<project>/.next-code/agents/` and assert the registry behaves as documented.
 //!
 //! Lives in `tests/` so it exercises the public API the way real callers
 //! will (the `next-code` binary, the future `cli/agents` module, etc.).

@@ -55,7 +55,7 @@ impl LocalSecretsBackend {
             return Ok(BTreeMap::new());
         }
 
-        // Load passphrase from OS keychain (new service, then legacy dual-read).
+        // Load passphrase from OS keychain.
         let passphrase = load_passphrase(self.keyring_store.as_ref())?.ok_or_else(|| {
             anyhow::anyhow!(
                 "No passphrase found in OS keychain for next-code-secrets.\n\
@@ -94,14 +94,11 @@ impl LocalSecretsBackend {
             next_code_storage::ensure_dir(parent)?;
         }
 
-        // Get or create passphrase (dual-read so a pre-rebrand keychain entry
-        // is reused rather than minting a second passphrase that cannot decrypt
-        // the existing age file).
+        // Get or create passphrase.
         let passphrase = match load_passphrase(self.keyring_store.as_ref())? {
             Some(p) => p,
             None => {
                 let new_pass = super::generate_passphrase();
-                // Saves write the new service name only.
                 self.keyring_store
                     .save(SERVICE_NAME, PASS_ACCOUNT, &new_pass)?;
                 new_pass

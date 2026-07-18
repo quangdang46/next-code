@@ -44,9 +44,9 @@ export NEXT_CODE_RUNTIME_DIR="$SANDBOX/runtime"
 export NEXT_CODE_SOCKET="$SANDBOX/runtime/next-code.sock"
 # Make the new client's clean release version comparable (debug build is dirty).
 export NEXT_CODE_TEST_CLIENT_VERSION_OVERRIDE="v0.22.0 (sandbox)"
-mkdir -p "${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}" "${NEXT_CODE_RUNTIME_DIR:-${NEXT_CODE_RUNTIME_DIR:-}}"
+mkdir -p "${NEXT_CODE_HOME:-}" "${NEXT_CODE_RUNTIME_DIR:-}"
 
-BUILDS="${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}/builds"
+BUILDS="${NEXT_CODE_HOME:-}/builds"
 mkdir -p "$BUILDS/versions/0.14.6" "$BUILDS/versions/0.22.0" \
          "$BUILDS/shared-server" "$BUILDS/stable" "$BUILDS/current"
 
@@ -108,7 +108,7 @@ log "Starting OLD v0.14.6 daemon"
 SERVER_PID=$!
 # Wait for the socket to appear.
 for _ in $(seq 1 40); do
-  [ -S "${NEXT_CODE_SOCKET:-${NEXT_CODE_SOCKET:-}}" ] && break
+  [ -S "${NEXT_CODE_SOCKET:-}" ] && break
   sleep 0.25
 done
 sleep 1
@@ -124,7 +124,7 @@ echo "shared-server-version after repair: $(cat "$BUILDS/shared-server-version")
 
 # Give the handoff a moment.
 for _ in $(seq 1 40); do
-  [ -S "${NEXT_CODE_SOCKET:-${NEXT_CODE_SOCKET:-}}" ] && break
+  [ -S "${NEXT_CODE_SOCKET:-}" ] && break
   sleep 0.25
 done
 sleep 2

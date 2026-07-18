@@ -21,7 +21,6 @@ pre_tool_timeout_ms = 5000
 Env overrides (always win; empty value disables a config hook):
 `NEXT_CODE_HOOK_TURN_END`, `NEXT_CODE_HOOK_SESSION_START`, `NEXT_CODE_HOOK_SESSION_END`,
 `NEXT_CODE_HOOK_PRE_TOOL`, `NEXT_CODE_HOOK_POST_TOOL`, `NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS`.
-Legacy `NEXT_CODE_HOOK_*` env names are dual-read for one release.
 
 ## Common contract
 

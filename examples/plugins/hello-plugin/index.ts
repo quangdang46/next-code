@@ -1,9 +1,8 @@
-/** dual-read: legacy plugins may use `next-code` instead of `nextcode`. */
 // Hello Plugin — real working example for next-code's plugin system.
 //
 // This file is:
 //   1. Discovered by next-code-plugin-runtime::PluginLoader::scan_directory
-//      (looks for *.ts files in ~/.next-code/plugins/ (or legacy ~/.next-code/plugins/) or configured plugin_dirs)
+//      (looks for *.ts files in ~/.next-code/plugins/ or configured plugin_dirs)
 //   2. Transpiled by next-code-plugin-runtime::Transpiler (SWC, TypeScript -> JS)
 //   3. Evaluated by next-code-plugin-runtime::SandboxContext (QuickJS)
 //   4. The `nextcode` object is injected by next-code-plugin-runtime::api::PluginApiBindings

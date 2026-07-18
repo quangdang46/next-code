@@ -354,15 +354,7 @@ fn product_cache_file(file_name: &str) -> PathBuf {
     }
 
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    let primary = home.join(".next-code").join("cache").join(file_name);
-    if primary.exists() {
-        return primary;
-    }
-    let legacy = home.join(".next-code").join("cache").join(file_name);
-    if legacy.exists() {
-        return legacy;
-    }
-    primary
+    home.join(".next-code").join("cache").join(file_name)
 }
 
 fn cache_path_for_namespace(namespace: &str) -> PathBuf {

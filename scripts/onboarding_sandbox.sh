@@ -7,9 +7,9 @@ if [[ $# -gt 0 ]]; then
   shift
 fi
 
-sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-${NEXT_CODE_ONBOARDING_SANDBOX:-default}}
+sandbox_name=${NEXT_CODE_ONBOARDING_SANDBOX:-default}
 sandbox_root_default="$repo_root/.tmp/onboarding/$sandbox_name"
-sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-${NEXT_CODE_ONBOARDING_DIR:-$sandbox_root_default}}
+sandbox_root=${NEXT_CODE_ONBOARDING_DIR:-$sandbox_root_default}
 next_code_home="$sandbox_root/home"
 runtime_dir="$sandbox_root/runtime"
 
@@ -121,18 +121,18 @@ run_next_code() {
   # spawning its own server under the sandbox's NEXT_CODE_RUNTIME_DIR. Set
   # NEXT_CODE_SANDBOX_SELFDEV=1 to opt back into the shared-server behavior.
   local prefix=()
-  if [[ "${NEXT_CODE_SANDBOX_SELFDEV:-${NEXT_CODE_SANDBOX_SELFDEV:-0}}" != "1" ]]; then
+  if [[ "${NEXT_CODE_SANDBOX_SELFDEV:-0}" != "1" ]]; then
     prefix=(--no-selfdev)
   fi
   # Allow pointing the sandbox at an already-built binary (e.g. the selfdev
   # profile output) without rebuilding the debug binary. Falls back to the
   # debug binary, then to `cargo run`.
-  if [[ -n "${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}}" ]]; then
-    if [[ -x "${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}}" ]]; then
-      run_in_sandbox "${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}}" "${prefix[@]}" "$@"
+  if [[ -n "${NEXT_CODE_SANDBOX_BIN:-}" ]]; then
+    if [[ -x "${NEXT_CODE_SANDBOX_BIN:-}" ]]; then
+      run_in_sandbox "${NEXT_CODE_SANDBOX_BIN:-}" "${prefix[@]}" "$@"
       return
     fi
-    echo "NEXT_CODE_SANDBOX_BIN=${NEXT_CODE_SANDBOX_BIN:-${NEXT_CODE_SANDBOX_BIN:-}} is not executable" >&2
+    echo "NEXT_CODE_SANDBOX_BIN=${NEXT_CODE_SANDBOX_BIN:-} is not executable" >&2
     return 1
   fi
   local binary_path="$repo_root/target/debug/next-code"
@@ -151,7 +151,7 @@ run_auth_fixture() {
 
 # Copy one real file from $HOME into the sandbox's external/ tree, preserving its
 # relative path. next-code resolves every external credential/transcript lookup to
-# ${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}/external/<same-relative-path-as-$HOME> when NEXT_CODE_HOME is set, so
+# ${NEXT_CODE_HOME:-}/external/<same-relative-path-as-$HOME> when NEXT_CODE_HOME is set, so
 # seeding here makes your real logins/transcripts visible to the onboarding
 # import + continue steps. Copies (never symlinks: next-code rejects symlinked auth
 # files) and never touches the originals.

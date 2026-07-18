@@ -568,8 +568,6 @@ pub fn log_path() -> Option<PathBuf> {
 
 /// Remove daily `next-code-*.log` files older than 7 days.
 ///
-/// Also cleans legacy `next-code-desktop-*.log` files from older installs.
-///
 /// Scoped deliberately to the date-stamped log files this logger produces. The
 /// log directory also holds non-log data (e.g. `memory/`, `memory-events-*.jsonl`)
 /// that must NOT be touched here, so we never blanket-delete by mtime.
@@ -590,8 +588,7 @@ fn cleanup_old_logs_in(log_dir: &std::path::Path, now: chrono::DateTime<Local>) 
         // Only consider our own date-stamped log files.
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
-        let is_next_code_log = (name.starts_with("next-code-") || name.starts_with("next-code-desktop-"))
-            && name.ends_with(".log");
+        let is_next_code_log = name.starts_with("next-code-") && name.ends_with(".log");
         if !is_next_code_log {
             continue;
         }
@@ -769,7 +766,6 @@ mod tests {
 
         // Old log files that SHOULD be deleted.
         let old_log = write("next-code-2000-01-01.log", true);
-        let old_desktop = write("next-code-desktop-2000-01-01.log", true);
         // Recent log file that SHOULD survive.
         let new_log = write("next-code-2099-01-01.log", false);
         // Non-log data that SHOULD survive even though it is old.
@@ -782,7 +778,6 @@ mod tests {
         cleanup_old_logs_in(&dir, Local::now());
 
         assert!(!old_log.exists(), "old next-code log should be deleted");
-        assert!(!old_desktop.exists(), "old desktop log should be deleted");
         assert!(new_log.exists(), "recent next-code log must survive");
         assert!(old_memory.exists(), "memory-events jsonl must survive");
         assert!(old_other.exists(), "unrelated files must survive");

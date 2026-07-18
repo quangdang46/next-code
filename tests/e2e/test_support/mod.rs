@@ -71,46 +71,28 @@ impl TestEnvGuard {
         let temp_home = tempfile::Builder::new()
             .prefix("next-code-e2e-home-")
             .tempdir()?;
-        // Prefer NEXT_CODE_*; dual-write NEXT_CODE_* so product dual-read and
-        // still-legacy-only call sites both see the sandbox home.
-        let prev_home = std::env::var_os("NEXT_CODE_HOME")
-            .or_else(|| std::env::var_os("NEXT_CODE_HOME"));
-        let prev_runtime_dir = std::env::var_os("NEXT_CODE_RUNTIME_DIR")
-            .or_else(|| std::env::var_os("NEXT_CODE_RUNTIME_DIR"));
-        let prev_test_session = std::env::var_os("NEXT_CODE_TEST_SESSION")
-            .or_else(|| std::env::var_os("NEXT_CODE_TEST_SESSION"));
-        let prev_debug_control = std::env::var_os("NEXT_CODE_DEBUG_CONTROL")
-            .or_else(|| std::env::var_os("NEXT_CODE_DEBUG_CONTROL"));
-        let prev_runtime_provider = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER")
-            .or_else(|| std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER"));
-        let prev_active_provider = std::env::var_os("NEXT_CODE_ACTIVE_PROVIDER")
-            .or_else(|| std::env::var_os("NEXT_CODE_ACTIVE_PROVIDER"));
-        let prev_openrouter_cache_namespace = std::env::var_os("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE")
-            .or_else(|| std::env::var_os("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE"));
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        let prev_runtime_dir = std::env::var_os("NEXT_CODE_RUNTIME_DIR");
+        let prev_test_session = std::env::var_os("NEXT_CODE_TEST_SESSION");
+        let prev_debug_control = std::env::var_os("NEXT_CODE_DEBUG_CONTROL");
+        let prev_runtime_provider = std::env::var_os("NEXT_CODE_RUNTIME_PROVIDER");
+        let prev_active_provider = std::env::var_os("NEXT_CODE_ACTIVE_PROVIDER");
+        let prev_openrouter_cache_namespace = std::env::var_os("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
         let runtime_dir = temp_home.path().join("runtime");
         std::fs::create_dir_all(&runtime_dir)?;
 
         next_code::env::set_var("NEXT_CODE_HOME", temp_home.path());
-        next_code::env::set_var("NEXT_CODE_HOME", temp_home.path());
-        next_code::env::set_var("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
         next_code::env::set_var("NEXT_CODE_RUNTIME_DIR", &runtime_dir);
         next_code::env::set_var("NEXT_CODE_TEST_SESSION", "1");
-        next_code::env::set_var("NEXT_CODE_TEST_SESSION", "1");
-        next_code::env::set_var("NEXT_CODE_DEBUG_CONTROL", "1");
         next_code::env::set_var("NEXT_CODE_DEBUG_CONTROL", "1");
         next_code::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
-        next_code::env::remove_var("NEXT_CODE_RUNTIME_PROVIDER");
         next_code::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
-        next_code::env::remove_var("NEXT_CODE_ACTIVE_PROVIDER");
-        next_code::env::remove_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
         next_code::env::remove_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
         // Disable the memory sidecar/extraction in e2e runs. Its background
         // extraction makes its own provider `complete()` call, which would steal
         // a queued mock response from the scenario under test and make turn
         // outcomes nondeterministic across transports.
         next_code::env::set_var("NEXT_CODE_MEMORY_ENABLED", "0");
-        next_code::env::set_var("NEXT_CODE_MEMORY_ENABLED", "0");
-        next_code::env::set_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED", "0");
         next_code::env::set_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED", "0");
 
         Ok(Self {
@@ -174,8 +156,6 @@ impl Drop for TestEnvGuard {
         );
         // Clear test-only memory overrides we always set.
         next_code::env::remove_var("NEXT_CODE_MEMORY_ENABLED");
-        next_code::env::remove_var("NEXT_CODE_MEMORY_ENABLED");
-        next_code::env::remove_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED");
         next_code::env::remove_var("NEXT_CODE_MEMORY_SIDECAR_ENABLED");
     }
 }
@@ -629,7 +609,6 @@ pub(crate) async fn run_unix_transport_scenario() -> Result<TransportScenarioRes
                     .await
                     .unwrap_or_else(|e| format!("<state error: {e}>"));
                 let logs = std::env::var_os("NEXT_CODE_HOME")
-                    .or_else(|| std::env::var_os("NEXT_CODE_HOME"))
                     .and_then(|home| latest_log_excerpt(std::path::Path::new(&home)));
                 let seen = message_events
                     .iter()

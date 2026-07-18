@@ -11,8 +11,8 @@
 # example, `NEXT_CODE_REMOTE_CARGO=0 scripts/dev_cargo.sh check`.
 
 next_code_remote_config_path() {
-  if [[ -n "${NEXT_CODE_REMOTE_CONFIG:-${NEXT_CODE_REMOTE_CONFIG:-}}" ]]; then
-    printf '%s\n' "${NEXT_CODE_REMOTE_CONFIG:-${NEXT_CODE_REMOTE_CONFIG:-}}"
+  if [[ -n "${NEXT_CODE_REMOTE_CONFIG:-}" ]]; then
+    printf '%s\n' "${NEXT_CODE_REMOTE_CONFIG:-}"
   elif [[ -n "${XDG_CONFIG_HOME:-}" ]]; then
     printf '%s\n' "$XDG_CONFIG_HOME/next-code/remote-build.env"
   elif [[ -n "${HOME:-}" ]]; then
@@ -31,25 +31,25 @@ next_code_load_remote_config() {
   local had_remote_ssh_bin=0 remote_ssh_bin=""
   local had_remote_rsync_bin=0 remote_rsync_bin=""
 
-  if [[ ${NEXT_CODE_REMOTE_CARGO:-${NEXT_CODE_REMOTE_CARGO:-}}+x} ]]; then
+  if [[ ${NEXT_CODE_REMOTE_CARGO:-}+x} ]]; then
     had_remote_cargo=1
-    remote_cargo="${NEXT_CODE_REMOTE_CARGO:-${NEXT_CODE_REMOTE_CARGO:-}}"
+    remote_cargo="${NEXT_CODE_REMOTE_CARGO:-}"
   fi
-  if [[ ${NEXT_CODE_REMOTE_HOST:-${NEXT_CODE_REMOTE_HOST:-}}+x} ]]; then
+  if [[ ${NEXT_CODE_REMOTE_HOST:-}+x} ]]; then
     had_remote_host=1
-    remote_host="${NEXT_CODE_REMOTE_HOST:-${NEXT_CODE_REMOTE_HOST:-}}"
+    remote_host="${NEXT_CODE_REMOTE_HOST:-}"
   fi
-  if [[ ${NEXT_CODE_REMOTE_DIR:-${NEXT_CODE_REMOTE_DIR:-}}+x} ]]; then
+  if [[ ${NEXT_CODE_REMOTE_DIR:-}+x} ]]; then
     had_remote_dir=1
-    remote_dir="${NEXT_CODE_REMOTE_DIR:-${NEXT_CODE_REMOTE_DIR:-}}"
+    remote_dir="${NEXT_CODE_REMOTE_DIR:-}"
   fi
-  if [[ ${NEXT_CODE_REMOTE_SSH_BIN:-${NEXT_CODE_REMOTE_SSH_BIN:-}}+x} ]]; then
+  if [[ ${NEXT_CODE_REMOTE_SSH_BIN:-}+x} ]]; then
     had_remote_ssh_bin=1
-    remote_ssh_bin="${NEXT_CODE_REMOTE_SSH_BIN:-${NEXT_CODE_REMOTE_SSH_BIN:-}}"
+    remote_ssh_bin="${NEXT_CODE_REMOTE_SSH_BIN:-}"
   fi
-  if [[ ${NEXT_CODE_REMOTE_RSYNC_BIN:-${NEXT_CODE_REMOTE_RSYNC_BIN:-}}+x} ]]; then
+  if [[ ${NEXT_CODE_REMOTE_RSYNC_BIN:-}+x} ]]; then
     had_remote_rsync_bin=1
-    remote_rsync_bin="${NEXT_CODE_REMOTE_RSYNC_BIN:-${NEXT_CODE_REMOTE_RSYNC_BIN:-}}"
+    remote_rsync_bin="${NEXT_CODE_REMOTE_RSYNC_BIN:-}"
   fi
 
   # shellcheck source=/dev/null

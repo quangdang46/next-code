@@ -87,7 +87,6 @@ fn project_goals_dir(working_dir: Option<&Path>) -> Result<Option<PathBuf>> {
     let Some(dir) = working_dir else {
         return Ok(None);
     };
-    // Prefer `.next-code/goals`, fall back to legacy `.next-code/goals`.
     Ok(Some(storage::project_product_path(dir, "goals")))
 }
 

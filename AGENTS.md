@@ -47,7 +47,7 @@ Confirm the live binary: `lsof -p $(pgrep -f 'builds/.*/next-code' | head -1) | 
 
 ## Notepad (compaction-resistant notes)
 
-The notepad (`crates/next-code-base/src/notepad.rs`, `crates/next-code-app-core/src/tool/notepad.rs`) is a 3-tier file-based store under `<working_dir>/.next-code/notepad/` (legacy `.next-code/notepad/` is dual-read) that lets the model persist short notes across turns and across compaction.
+The notepad (`crates/next-code-base/src/notepad.rs`, `crates/next-code-app-core/src/tool/notepad.rs`) is a 3-tier file-based store under `<working_dir>/.next-code/notepad/` that lets the model persist short notes across turns and across compaction.
 
 Tiers:
 - **priority** — auto-injected into the system prompt every turn. Survives compaction because the content is re-read from disk each cycle. Rendered as a fenced code block with a trust marker so the model cannot inject instructions through it.
@@ -63,7 +63,7 @@ Tools (namespaced under `notepad_*`):
 
 Config (under `[notepad]` in `config.toml`):
 - `enabled` (default: `true`) — set to `false` to disable entirely.
-- `dir` (default: `.next-code/notepad`; legacy `.next-code/notepad` dual-read) — must be a relative path with no `..` components; absolute paths and `..` are rejected.
+- `dir` (default: `.next-code/notepad`) — must be a relative path with no `..` components; absolute paths and `..` are rejected.
 - `max_bytes_per_tier` (default: 4096) — the field is byte-based (predictable file size, predictable token cost). Truncation always lands on a UTF-8 char boundary.
 - `require_priority_confirm` (default: `true`) — when enabled, `notepad_write_priority` must include `confirm: true` in its input.
 

@@ -430,14 +430,12 @@ impl McpConfig {
     }
 
     /// Load project-local MCP config files from `project_root`, in override
-    /// order: `.next-code/mcp.json`, then legacy `.next-code/mcp.json`, then
-    /// `.mcp.json` (Claude Code project config), then `.claude/mcp.json`
-    /// (legacy compatibility). Later files override same-named servers from
-    /// earlier ones. Competitor `.claude` paths are preserved unchanged.
+    /// order: `.next-code/mcp.json`, then `.mcp.json` (Claude Code project
+    /// config), then `.claude/mcp.json` (Claude Code compatibility). Later
+    /// files override same-named servers from earlier ones.
     fn load_project_locals(project_root: &std::path::Path) -> Self {
         let mut merged = Self::default();
         for relative in [
-            ".next-code/mcp.json",
             ".next-code/mcp.json",
             ".mcp.json",
             ".claude/mcp.json",

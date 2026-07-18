@@ -32,7 +32,7 @@ Built for multi-session workflows, infinite customizability, and performance.
 
 </div>
 
-> **Renamed from next-code.** The binary is `next-code`. Installers also create a one-release `next-code` → `next-code` compat symlink. Home data defaults to `~/.next-code` (legacy `~/.next-code` is dual-read and migrated). Env vars prefer `NEXT_CODE_*` and still dual-read `NEXT_CODE_*`. Project-local dirs prefer `.next-code/` and fall back to `.next-code/`.
+> The binary is `next-code`. Home data defaults to `~/.next-code`. Env vars use `NEXT_CODE_*`. Project-local dirs use `.next-code/`.
 
 ```bash
 # macOS & Linux

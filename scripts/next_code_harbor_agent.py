@@ -254,7 +254,7 @@ class NextCodeHarborAgent(BaseAgent):
         result = await environment.exec(
             command=(
                 'set -e; '
-                'workdir="${NEXT_CODE_TASK_WORKDIR:-${NEXT_CODE_TASK_WORKDIR:-}}"; '
+                'workdir="${NEXT_CODE_TASK_WORKDIR:-}"; '
                 'if [ -z "$workdir" ]; then '
                 '  if [ -d /app ]; then workdir=/app; else workdir="$(pwd)"; fi; '
                 'fi; '

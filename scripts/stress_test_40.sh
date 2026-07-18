@@ -8,7 +8,7 @@ set -euo pipefail
 NUM_INSTANCES=${1:-40}
 if [ -n "${NEXT_CODE_BIN:-}" ]; then
   NEXT_CODE_BIN="$NEXT_CODE_BIN"
-elif [ -n "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}" ]; then
+elif [ -n "${NEXT_CODE_BIN:-}" ]; then
   :
 elif command -v next-code >/dev/null 2>&1; then
   NEXT_CODE_BIN="$(command -v next-code)"
@@ -26,7 +26,7 @@ DEBUG_SOCK="/run/user/$(id -u)/next-code-debug.sock"
 echo "========================================="
 echo " next-code Stress Test: $NUM_INSTANCES instances"
 echo "========================================="
-echo "Binary: ${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}"
+echo "Binary: ${NEXT_CODE_BIN:-}"
 echo "Log dir: $LOG_DIR"
 echo "Main socket: $MAIN_SOCK"
 echo ""
@@ -194,7 +194,7 @@ for i in $(seq 1 $NUM_INSTANCES); do
 
     # Each instance gets its own pseudo-terminal via script(1)
     # We connect to the existing server, which creates sessions
-    script -q -c "${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}} --no-update --no-selfdev" /dev/null \
+    script -q -c "${NEXT_CODE_BIN:-} --no-update --no-selfdev" /dev/null \
         > "$LOG_DIR/instance_${i}_stdout.log" \
         2> "$LOG_DIR/instance_${i}_stderr.log" &
     pid=$!
@@ -321,7 +321,7 @@ echo "========================================="
 echo ""
 echo "Configuration:"
 echo "  Instances spawned: $NUM_INSTANCES"
-echo "  Binary: ${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-}}"
+echo "  Binary: ${NEXT_CODE_BIN:-}"
 echo ""
 
 # Spawn time stats

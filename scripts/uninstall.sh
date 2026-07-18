@@ -6,7 +6,7 @@
 # reinstall picks up where you left off.
 #
 # Flags:
-#   --purge     Also delete ~/.next-code (and legacy ~/.next-code if present).
+#   --purge     Also delete ~/.next-code.
 #   --dry-run   Print what would be removed without deleting anything.
 #   --yes       Skip the confirmation prompt.
 #
@@ -41,64 +41,39 @@ case "$OS" in
   MINGW*|MSYS*|CYGWIN*)
     if [ -n "${NEXT_CODE_HOME:-}" ]; then
       NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
-    elif [ -n "${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}" ]; then
-      NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
     else
       NEXT_CODE_HOME_DIR="${LOCALAPPDATA:?LOCALAPPDATA not set}/next-code"
     fi
-    LEGACY_HOME_DIR="${LOCALAPPDATA}/next-code"
-    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${NEXT_CODE_INSTALL_DIR:-$LOCALAPPDATA/next-code/bin}}"
+    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-$LOCALAPPDATA/next-code/bin}"
     LAUNCHER="$LAUNCHER_DIR/next-code.exe"
-    LEGACY_LAUNCHER="$LAUNCHER_DIR/next-code.exe"
-    # Also check the old default install dir.
-    LEGACY_LAUNCHER_DIR="${LOCALAPPDATA}/next-code/bin"
-    LEGACY_LAUNCHER_ALT="$LEGACY_LAUNCHER_DIR/next-code.exe"
     BUILDS_DIR="$NEXT_CODE_HOME_DIR/builds"
-    LEGACY_BUILDS_DIR="$LEGACY_HOME_DIR/builds"
     USER_DATA_DIR="$NEXT_CODE_HOME_DIR"
-    LEGACY_USER_DATA_DIR="$LEGACY_HOME_DIR"
     ;;
   *)
     if [ -n "${NEXT_CODE_HOME:-}" ]; then
       NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
-    elif [ -n "${NEXT_CODE_HOME:-${NEXT_CODE_HOME:-}}" ]; then
-      NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
     else
       NEXT_CODE_HOME_DIR="$HOME/.next-code"
     fi
-    LEGACY_HOME_DIR="$HOME/.next-code"
-    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-${NEXT_CODE_INSTALL_DIR:-$HOME/.local/bin}}"
+    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-$HOME/.local/bin}"
     LAUNCHER="$LAUNCHER_DIR/next-code"
-    LEGACY_LAUNCHER="$LAUNCHER_DIR/next-code"
-    LEGACY_LAUNCHER_DIR=""
-    LEGACY_LAUNCHER_ALT=""
     BUILDS_DIR="$NEXT_CODE_HOME_DIR/builds"
-    LEGACY_BUILDS_DIR="$LEGACY_HOME_DIR/builds"
     USER_DATA_DIR="$NEXT_CODE_HOME_DIR"
-    LEGACY_USER_DATA_DIR="$LEGACY_HOME_DIR"
     ;;
 esac
 
 # Collect removal targets.
 TARGETS=()
 [ -e "$LAUNCHER" ] || [ -L "$LAUNCHER" ] && TARGETS+=("$LAUNCHER (launcher)")
-[ -e "$LEGACY_LAUNCHER" ] || [ -L "$LEGACY_LAUNCHER" ] && TARGETS+=("$LEGACY_LAUNCHER (legacy next-code launcher)")
-if [ -n "$LEGACY_LAUNCHER_ALT" ] && { [ -e "$LEGACY_LAUNCHER_ALT" ] || [ -L "$LEGACY_LAUNCHER_ALT" ]; }; then
-  TARGETS+=("$LEGACY_LAUNCHER_ALT (legacy Windows launcher)")
-fi
 [ -d "$BUILDS_DIR" ] && TARGETS+=("$BUILDS_DIR (installed binaries: stable/current/canary/versions)")
-[ -d "$LEGACY_BUILDS_DIR" ] && [ "$LEGACY_BUILDS_DIR" != "$BUILDS_DIR" ] && \
-  TARGETS+=("$LEGACY_BUILDS_DIR (legacy installed binaries)")
 if [ "$PURGE" = true ]; then
   [ -d "$USER_DATA_DIR" ] && \
     TARGETS+=("$USER_DATA_DIR (ALL user data: config, auth, sessions, logs, memory)")
-  [ -d "$LEGACY_USER_DATA_DIR" ] && [ "$LEGACY_USER_DATA_DIR" != "$USER_DATA_DIR" ] && \
-    TARGETS+=("$LEGACY_USER_DATA_DIR (legacy ALL user data under ~/.next-code)")
 fi
 
 # Compatibility wrapper installed by some setups.
 SELFDEV_WRAPPER="$HOME/.local/bin/selfdev"
-if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code|next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
+if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
   TARGETS+=("$SELFDEV_WRAPPER (selfdev wrapper)")
 fi
 
@@ -113,9 +88,6 @@ for t in "${TARGETS[@]}"; do
 done
 if [ "$PURGE" = false ]; then
   warn "User data in $USER_DATA_DIR is kept (config, auth, sessions, logs)."
-  if [ -d "$LEGACY_USER_DATA_DIR" ] && [ "$LEGACY_USER_DATA_DIR" != "$USER_DATA_DIR" ]; then
-    warn "Legacy user data in $LEGACY_USER_DATA_DIR is also kept."
-  fi
   warn "Run with --purge for a full wipe."
 fi
 
@@ -138,7 +110,7 @@ if [ "$ASSUME_YES" = false ]; then
   fi
 fi
 
-# Stop any running next-code / legacy next-code server so files are not recreated mid-wipe.
+# Stop any running next-code server so files are not recreated mid-wipe.
 if command -v pkill >/dev/null 2>&1; then
   pkill -f 'next-code( .*)? serve' 2>/dev/null || true
   pkill -f 'next-code( .*)? serve' 2>/dev/null || true
@@ -153,16 +125,12 @@ remove() {
 }
 
 remove "$LAUNCHER"
-remove "$LEGACY_LAUNCHER"
-[ -n "$LEGACY_LAUNCHER_ALT" ] && remove "$LEGACY_LAUNCHER_ALT"
 if [ "$PURGE" = true ]; then
   remove "$USER_DATA_DIR"
-  [ "$LEGACY_USER_DATA_DIR" != "$USER_DATA_DIR" ] && remove "$LEGACY_USER_DATA_DIR"
 else
   remove "$BUILDS_DIR"
-  [ "$LEGACY_BUILDS_DIR" != "$BUILDS_DIR" ] && remove "$LEGACY_BUILDS_DIR"
 fi
-if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code|next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
+if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
   remove "$SELFDEV_WRAPPER"
 fi
 

@@ -135,7 +135,7 @@ sleep 1  # Let recorder initialize
 
 # Start next-code in a new kitty window
 echo "🚀 Starting next-code..."
-kitty --title "next-code-replay" -e bash -c "cd $(pwd) && ${NEXT_CODE_BIN:-${NEXT_CODE_BIN:-~/.cargo/bin/next-code}}; read -p 'Press Enter to close...'" &
+kitty --title "next-code-replay" -e bash -c "cd $(pwd) && ${NEXT_CODE_BIN:-~/.cargo/bin/next-code}; read -p 'Press Enter to close...'" &
 KITTY_PID=$!
 sleep 2  # Wait for next-code to start
 

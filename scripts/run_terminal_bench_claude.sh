@@ -7,10 +7,10 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
-DEFAULT_BINARY_DIR=${NEXT_CODE_HARBOR_BINARY_DIR:-${NEXT_CODE_HARBOR_BINARY_DIR:-/tmp/next-code-compat-dist}}
-DEFAULT_BINARY_PATH=${NEXT_CODE_HARBOR_BINARY:-${NEXT_CODE_HARBOR_BINARY:-$DEFAULT_BINARY_DIR/next-code-linux-x86_64.bin}}
-DEFAULT_MODEL=${NEXT_CODE_TB_MODEL:-${NEXT_CODE_TB_MODEL:-anthropic-api/claude-opus-4-8}}
-DEFAULT_PATH=${NEXT_CODE_TB_PATH:-${NEXT_CODE_TB_PATH:-/tmp/terminal-bench-2.1}}
+DEFAULT_BINARY_DIR=${NEXT_CODE_HARBOR_BINARY_DIR:-/tmp/next-code-compat-dist}
+DEFAULT_BINARY_PATH=${NEXT_CODE_HARBOR_BINARY:-$DEFAULT_BINARY_DIR/next-code-linux-x86_64.bin}
+DEFAULT_MODEL=${NEXT_CODE_TB_MODEL:-anthropic-api/claude-opus-4-8}
+DEFAULT_PATH=${NEXT_CODE_TB_PATH:-/tmp/terminal-bench-2.1}
 
 have_model=0
 have_agent_import=0
@@ -37,13 +37,13 @@ fi
 
 # Resolve provider keys from next-code's env files if not already set.
 if [[ -z "${OPENROUTER_API_KEY:-}" ]]; then
-  OR_ENV=${NEXT_CODE_HARBOR_OPENROUTER_ENV:-${NEXT_CODE_HARBOR_OPENROUTER_ENV:-$HOME/.config/next-code/openrouter.env}}
+  OR_ENV=${NEXT_CODE_HARBOR_OPENROUTER_ENV:-$HOME/.config/next-code/openrouter.env}
   if [[ -f "$OR_ENV" ]]; then
     export NEXT_CODE_HARBOR_OPENROUTER_ENV="$OR_ENV"
   fi
 fi
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-  ANT_ENV=${NEXT_CODE_HARBOR_ANTHROPIC_ENV:-${NEXT_CODE_HARBOR_ANTHROPIC_ENV:-$HOME/.config/next-code/anthropic.env}}
+  ANT_ENV=${NEXT_CODE_HARBOR_ANTHROPIC_ENV:-$HOME/.config/next-code/anthropic.env}
   if [[ -f "$ANT_ENV" ]]; then
     export NEXT_CODE_HARBOR_ANTHROPIC_ENV="$ANT_ENV"
   fi
@@ -54,7 +54,7 @@ export NEXT_CODE_HARBOR_BINARY="$DEFAULT_BINARY_PATH"
 export NEXT_CODE_ANTHROPIC_REASONING_EFFORT=${NEXT_CODE_ANTHROPIC_REASONING_EFFORT:-high}
 export NEXT_CODE_NO_TELEMETRY=${NEXT_CODE_NO_TELEMETRY:-1}
 
-HARBOR_BIN=${NEXT_CODE_HARBOR_BIN:-${NEXT_CODE_HARBOR_BIN:-harbor}}
+HARBOR_BIN=${NEXT_CODE_HARBOR_BIN:-harbor}
 
 cmd=($HARBOR_BIN run)
 if [[ $have_task_source -eq 0 ]]; then
@@ -70,7 +70,7 @@ cmd+=("$@")
 
 {
   echo "Running Harbor with next-code Opus 4.8 adapter"
-  echo "  binary: ${NEXT_CODE_HARBOR_BINARY:-${NEXT_CODE_HARBOR_BINARY:-}}"
+  echo "  binary: ${NEXT_CODE_HARBOR_BINARY:-}"
   echo "  model:  ${DEFAULT_MODEL}"
 } >&2
 

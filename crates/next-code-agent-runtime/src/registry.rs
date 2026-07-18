@@ -2,7 +2,7 @@
 //!
 //! ## Lookup paths (highest priority first)
 //!
-//! 1. **Project-local**: `<cwd>/.next-code/agents/*.toml` (dual-read: `.next-code/agents/`)
+//! 1. **Project-local**: `<cwd>/.next-code/agents/*.toml`
 //! 2. **User-global**: `~/.next-code/agents/*.toml`
 //! 3. **Builtins** registered programmatically via [`AgentRegistry::register_builtin`]
 //!
@@ -35,7 +35,7 @@ pub enum AgentSource {
     Builtin,
     /// Loaded from `~/.next-code/agents/<file>`.
     UserGlobal { path: PathBuf },
-    /// Loaded from `<project>/.next-code/agents/<file>` (dual-read: `.next-code/agents/`). Highest priority.
+    /// Loaded from `<project>/.next-code/agents/<file>`. Highest priority.
     ProjectLocal { path: PathBuf },
 }
 
@@ -272,50 +272,38 @@ impl AgentRegistry {
     /// directories using standard next-code paths. `home` defaults to
     /// `dirs::home_dir()` (omitted here to keep this crate dep-light;
     /// callers pass the resolved home to avoid pulling `dirs`).
-    ///
-    /// Dual-reads `.next-code/` (canonical) then legacy `.next-code/` for both
-    /// the user home and the project root so pre-rebrand installs keep
-    /// working. When both exist, both are loaded (later/legacy wins on name
-    /// collision so unmigrated edits remain visible).
     pub fn discover_standard_paths(
         &mut self,
         home_dir: Option<&Path>,
         project_root: Option<&Path>,
     ) {
-        const PRODUCT_DIRS: &[&str] = &[".next-code", ".jcode"];
         if let Some(home) = home_dir {
-            for segment in PRODUCT_DIRS {
-                let user_dir = home.join(segment).join("agents");
-                if let Err(err) = self.load_directory(&user_dir, SourceKind::UserGlobal) {
-                    self.load_errors.push(LoadError::Io {
-                        path: user_dir,
-                        source: err,
-                    });
-                }
+            let user_dir = home.join(".next-code").join("agents");
+            if let Err(err) = self.load_directory(&user_dir, SourceKind::UserGlobal) {
+                self.load_errors.push(LoadError::Io {
+                    path: user_dir,
+                    source: err,
+                });
             }
         }
-        // Managed agents: ~/.next-code/managed-agents/ (and legacy ~/.next-code/)
-        // — read-only, lower priority than user-global.
+        // Managed agents: ~/.next-code/managed-agents/ — read-only, lower
+        // priority than user-global.
         if let Some(home) = home_dir {
-            for segment in PRODUCT_DIRS {
-                let managed_dir = home.join(segment).join("managed-agents");
-                if let Err(err) = self.load_directory(&managed_dir, SourceKind::Managed) {
-                    self.load_errors.push(LoadError::Io {
-                        path: managed_dir,
-                        source: err,
-                    });
-                }
+            let managed_dir = home.join(".next-code").join("managed-agents");
+            if let Err(err) = self.load_directory(&managed_dir, SourceKind::Managed) {
+                self.load_errors.push(LoadError::Io {
+                    path: managed_dir,
+                    source: err,
+                });
             }
         }
         if let Some(root) = project_root {
-            for segment in PRODUCT_DIRS {
-                let project_dir = root.join(segment).join("agents");
-                if let Err(err) = self.load_directory(&project_dir, SourceKind::ProjectLocal) {
-                    self.load_errors.push(LoadError::Io {
-                        path: project_dir,
-                        source: err,
-                    });
-                }
+            let project_dir = root.join(".next-code").join("agents");
+            if let Err(err) = self.load_directory(&project_dir, SourceKind::ProjectLocal) {
+                self.load_errors.push(LoadError::Io {
+                    path: project_dir,
+                    source: err,
+                });
             }
         }
     }
@@ -329,7 +317,7 @@ pub enum SourceKind {
     Managed,
     /// User-global agents at ~/.next-code/agents/.
     UserGlobal,
-    /// Project-local agents at .next-code/agents/ (dual-read: .next-code/agents/).
+    /// Project-local agents at .next-code/agents/.
     ProjectLocal,
 }
 

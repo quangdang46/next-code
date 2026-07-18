@@ -4,7 +4,7 @@ This document covers the **on-disk configuration files** next-code reads, with a
 focus on **offline** / **air-gapped** / **self-hosted** setups (issue
 [#48](https://github.com/quangdang46/next-code/issues/48)). All paths are
 relative to your next-code home, which is `~/.next-code/` by default (or
-`$NEXT_CODE_HOME` if set; legacy `$NEXT_CODE_HOME` is dual-read; or `$XDG_DATA_HOME/next-code` when
+`$NEXT_CODE_HOME` if set; or `$XDG_DATA_HOME/next-code` when
 [`NEXT_CODE_USE_XDG=1`](#xdg-mode) is enabled). Existing `~/.next-code` data is migrated into `~/.next-code` on first run. Project-local files prefer `.next-code/` and fall back to `.next-code/`.
 
 ## tl;dr
@@ -44,7 +44,7 @@ next-code --offline --provider-profile local-vllm
 | `~/.next-code/openai-auth.json` | OpenAI / Codex OAuth credentials | JSON |
 | `~/.next-code/gemini_oauth.json` | Gemini OAuth credentials | JSON |
 | `~/.next-code/mcp.json` | Global MCP server registry | JSON |
-| `.next-code/mcp.json` (project; dual-read `.next-code/mcp.json`) | Project-local MCP servers | JSON |
+| `.next-code/mcp.json` (project) | Project-local MCP servers | JSON |
 | `~/.next-code/prompts/*.md` | User-level prompt templates | Markdown |
 | `.next-code/prompts/*.md` (project) | Project-level prompt templates | Markdown |
 | `~/.next-code/SYSTEM.md` | Global system-prompt override | Markdown |

@@ -193,10 +193,9 @@ interface PluginFeature {
 
 ```typescript
 interface PluginEngines {
-  /** Required next-code version range (e.g., ">=0.9.0"). Prefer `nextcode`; dual-read also accepts legacy `next-code`. */
+  /** Required next-code version range (e.g., ">=0.9.0"). JSON field: `nextcode`. */
   nextcode?: string;
-  /** @deprecated dual-read legacy key — prefer `nextcode` */
-  next-code?: string;
+    next-code?: string;
 }
 ```
 

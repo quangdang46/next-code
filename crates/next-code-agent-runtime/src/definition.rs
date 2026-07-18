@@ -7,8 +7,7 @@
 //! Definitions are loaded from TOML files in three locations (highest
 //! priority first):
 //!
-//!   1. `.next-code/agents/<id>.toml` (project-local, committed to repo;
-//!      dual-read: legacy `.next-code/agents/`)
+//!   1. `.next-code/agents/<id>.toml` (project-local, committed to repo)
 //!   2. `~/.next-code/agents/<id>.toml` (user-global)
 //!   3. Embedded built-in agents bundled with the binary
 //!

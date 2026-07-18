@@ -358,7 +358,6 @@ impl TuiPluginSystem {
             "__nextcode_kb_{}_",
             plugin_id.short_name().replace(['/', '@'], "_")
         );
-        // dual-read: legacy prefix still accepted by older plugin stubs
         let kb_prefix_for_closure = kb_prefix.clone();
         let register_kb = Function::new(
             ctx.clone(),
@@ -381,14 +380,12 @@ impl TuiPluginSystem {
                 register_kb,
             )
             .map_err(|e| PluginError::Runtime(format!("Failed to set register_keybinding: {e}")))?;
-        // dual-read: legacy plugin global
 
         // -- event handler registration helper --
         let evt_prefix = format!(
             "__nextcode_evt_{}_",
             plugin_id.short_name().replace(['/', '@'], "_")
         );
-        // dual-read: legacy prefix
         let evt_prefix_for_closure = evt_prefix.clone();
         let register_evt = Function::new(
             ctx.clone(),
@@ -406,7 +403,6 @@ impl TuiPluginSystem {
         globals
             .set("__nextcode_register_tui_event", register_evt)
             .map_err(|e| PluginError::Runtime(format!("Failed to set register_tui_event: {e}")))?;
-        // dual-read: legacy plugin global
 
         // -- expose keybinding/event registration on the TUI API object --
         // to also call the helper functions above.
@@ -463,7 +459,6 @@ impl TuiPluginSystem {
     async fn invoke_keybinding(&self, plugin: &TuiPlugin, key: &str) -> bool {
         let safe_id = plugin._id.short_name().replace(['/', '@'], "_");
         let fn_name_primary = format!("__nextcode_kb_{}_{}", safe_id, key.replace('+', "_"));
-        // dual-read: legacy handler name
         let key_owned = key.to_string();
 
         let result = plugin.context.with(|ctx| -> Result<bool, PluginError> {
@@ -474,7 +469,7 @@ impl TuiPluginSystem {
                 Err(_) => return Ok(false), // No handler registered
             };
 
-            // Initialize the result slot (dual-read: write both names).
+            // Initialize the result slot.
             let result_obj = rquickjs::Object::new(ctx.clone())
                 .map_err(|e| PluginError::Runtime(e.to_string()))?;
             result_obj
@@ -519,7 +514,6 @@ impl TuiPluginSystem {
     ) -> Option<HandlerResult> {
         let safe_id = plugin._id.short_name().replace(['/', '@'], "_");
         let fn_name_primary = format!("__nextcode_evt_{}_{}", safe_id, event);
-        // dual-read: legacy handler name
         let data_str = data.to_string();
 
         let result = plugin
@@ -532,7 +526,7 @@ impl TuiPluginSystem {
                     Err(_) => return Ok(HandlerResult::default()), // No handler
                 };
 
-                // Initialize the result slot (dual-read: write both names).
+                // Initialize the result slot.
                 let result_obj = rquickjs::Object::new(ctx.clone())
                     .map_err(|e| PluginError::Runtime(e.to_string()))?;
                 result_obj
@@ -547,7 +541,6 @@ impl TuiPluginSystem {
                 globals
                     .set("__nextcode_result", result_obj)
                     .map_err(|e| PluginError::Runtime(e.to_string()))?;
-                // dual-read: legacy
 
                 // Invoke the handler with the event data as a JSON string.
                 func.call::<(String,), ()>((data_str.clone(),))

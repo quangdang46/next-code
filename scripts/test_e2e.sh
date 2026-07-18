@@ -53,14 +53,14 @@ echo "Test 6: E2E integration tests..."
 run_cargo test --test e2e --quiet
 echo "✓ E2E tests passed"
 
-if [[ "${NEXT_CODE_REAL_PROVIDER:-${NEXT_CODE_REAL_PROVIDER:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_REAL_PROVIDER:-0}" == "1" ]]; then
     echo ""
     echo "Test 7: Real provider smoke (NEXT_CODE_REAL_PROVIDER=1)..."
     scripts/real_provider_smoke.sh
     echo "✓ Real provider smoke passed"
 fi
 
-if [[ "${NEXT_CODE_REAL_AUTH_TEST:-${NEXT_CODE_REAL_AUTH_TEST:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_REAL_AUTH_TEST:-0}" == "1" ]]; then
     echo ""
     echo "Test 8: Auth E2E validation (NEXT_CODE_REAL_AUTH_TEST=1)..."
     scripts/test_auth_e2e.sh

@@ -1,8 +1,7 @@
 //! 3-tier file-based notepad for compaction-resistant context notes.
 //!
 //! The notepad stores short text notes across three tiers, each backed by
-//! a plain markdown file in `<working_dir>/.next-code/notepad/`
-//! (legacy `.next-code/notepad/` dual-read):
+//! a plain markdown file in `<working_dir>/.next-code/notepad/`:
 //!
 //! - **Priority** – critical context that is injected into the system prompt
 //!   every turn, surviving compaction. The model uses it as always-present
@@ -221,8 +220,8 @@ impl Notepad {
                 }
             }
         }
-        // Default path dual-reads `.next-code/notepad` then legacy
-        // `.next-code/notepad`. An explicit non-default `config.dir` is used as-is.
+        // Default path is `.next-code/notepad`. An explicit non-default
+        // `config.dir` is used as-is.
         let base = if configured.is_empty()
             || configured == ".next-code/notepad"
             || configured == ".next-code/notepad"

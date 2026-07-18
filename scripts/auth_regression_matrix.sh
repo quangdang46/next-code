@@ -4,13 +4,13 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$repo_root"
 
-bin=${NEXT_CODE_AUTH_MATRIX_BIN:-${NEXT_CODE_AUTH_MATRIX_BIN:-}}
-out_dir=${NEXT_CODE_AUTH_MATRIX_OUT:-${NEXT_CODE_AUTH_MATRIX_OUT:-"$repo_root/target/auth-test-reports"}}
-prompt=${NEXT_CODE_AUTH_MATRIX_PROMPT:-${NEXT_CODE_AUTH_MATRIX_PROMPT:-"Reply with exactly AUTH_TEST_OK and nothing else. Do not call tools."}}
-providers=${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}}}
-mode=${NEXT_CODE_AUTH_MATRIX_MODE:-${NEXT_CODE_AUTH_MATRIX_MODE:-configured}}
-keep_going=${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-1}}
-per_command_timeout=${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-90}}
+bin=${NEXT_CODE_AUTH_MATRIX_BIN:-}
+out_dir=${NEXT_CODE_AUTH_MATRIX_OUT:-"$repo_root/target/auth-test-reports"}
+prompt=${NEXT_CODE_AUTH_MATRIX_PROMPT:-"Reply with exactly AUTH_TEST_OK and nothing else. Do not call tools."}
+providers=${NEXT_CODE_AUTH_MATRIX_PROVIDERS:-"claude copilot openrouter deepseek zai alibaba-coding-plan openai-compatible"}}
+mode=${NEXT_CODE_AUTH_MATRIX_MODE:-configured}
+keep_going=${NEXT_CODE_AUTH_MATRIX_KEEP_GOING:-1}
+per_command_timeout=${NEXT_CODE_AUTH_MATRIX_TIMEOUT:-90}
 
 usage() {
   cat <<'EOF'
@@ -116,13 +116,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "${NEXT_CODE_AUTH_MATRIX_LOGIN:-${NEXT_CODE_AUTH_MATRIX_LOGIN:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_LOGIN:-0}" == "1" ]]; then
   extra_args+=(--login)
 fi
-if [[ "${NEXT_CODE_AUTH_MATRIX_NO_SMOKE:-${NEXT_CODE_AUTH_MATRIX_NO_SMOKE:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_NO_SMOKE:-0}" == "1" ]]; then
   extra_args+=(--no-smoke)
 fi
-if [[ "${NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE:-${NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE:-0}}" == "1" ]]; then
+if [[ "${NEXT_CODE_AUTH_MATRIX_NO_TOOL_SMOKE:-0}" == "1" ]]; then
   extra_args+=(--no-tool-smoke)
 fi
 

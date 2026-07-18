@@ -2,15 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// Dual-read NEXT_CODE_{suffix} then legacy NEXT_CODE_{suffix} (build-script local;
-/// cannot depend on next_code_core from a build.rs).
+/// Read `NEXT_CODE_{suffix}` (build-script local; cannot depend on
+/// `next_code_core` from a build.rs).
 fn product_env(suffix: &str) -> Result<String, std::env::VarError> {
-    let new_key = format!("NEXT_CODE_{suffix}");
-    match std::env::var(&new_key) {
-        Ok(v) => Ok(v),
-        Err(std::env::VarError::NotPresent) => std::env::var(format!("NEXT_CODE_{suffix}")),
-        Err(e) => Err(e),
-    }
+    std::env::var(format!("NEXT_CODE_{suffix}"))
 }
 
 
@@ -287,14 +282,8 @@ fn env_or_metadata_or_git<const N: usize>(
     metadata_key: &str,
     git_args: [&str; N],
 ) -> Option<String> {
-    // Dual-read: prefer env_name (NEXT_CODE_*), fall back to NEXT_CODE_* twin.
-    let from_env = std::env::var(env_name).ok().or_else(|| {
-        env_name
-            .strip_prefix("NEXT_CODE_")
-            .map(|suf| format!("NEXT_CODE_{suf}"))
-            .and_then(|legacy| std::env::var(legacy).ok())
-    });
-    from_env
+    std::env::var(env_name)
+        .ok()
         .or_else(|| metadata_value(metadata_key))
         .or_else(|| git_output(repo_root, git_args))
         .map(|value| value.trim().to_string())

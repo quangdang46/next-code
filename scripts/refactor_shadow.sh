@@ -10,9 +10,9 @@ runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
 default_home="${HOME}/.next-code-refactor"
 default_socket="${runtime_dir}/next-code-refactor-${user_name}.sock"
 
-ref_home="${NEXT_CODE_REF_HOME:-${NEXT_CODE_REF_HOME:-$default_home}}"
-ref_socket="${NEXT_CODE_REF_SOCKET:-${NEXT_CODE_REF_SOCKET:-$default_socket}}"
-ref_profile="${NEXT_CODE_REF_PROFILE:-${NEXT_CODE_REF_PROFILE:-debug}}"
+ref_home="${NEXT_CODE_REF_HOME:-$default_home}"
+ref_socket="${NEXT_CODE_REF_SOCKET:-$default_socket}"
+ref_profile="${NEXT_CODE_REF_PROFILE:-debug}"
 
 case "$ref_profile" in
   debug) default_bin="$repo_root/target/debug/next-code" ;;
@@ -23,7 +23,7 @@ case "$ref_profile" in
     ;;
 esac
 
-ref_bin="${NEXT_CODE_REF_BIN:-${NEXT_CODE_REF_BIN:-$default_bin}}"
+ref_bin="${NEXT_CODE_REF_BIN:-$default_bin}"
 
 usage() {
   cat <<'USAGE'

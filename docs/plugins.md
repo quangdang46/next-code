@@ -37,7 +37,7 @@ cd ~/my-plugin
 next-code plugin load ./my-plugin
 ```
 
-On next start, next-code discovers the plugin, transpiles `index.ts` to JavaScript via SWC, evaluates it in a QuickJS sandbox, and injects the `nextcode` global object (dual-read: also `next-code`).
+On next start, next-code discovers the plugin, transpiles `index.ts` to JavaScript via SWC, evaluates it in a QuickJS sandbox, and injects the `nextcode` global object.
 
 ### 3. Verify it loaded
 
@@ -80,7 +80,7 @@ The entry file can also be `index.js` (plain JavaScript, no transpilation). Type
 
 ## Manifest Format
 
-Plugins declare identity, capabilities, and entry points in `package.json` under the `"nextcode"` key (dual-read: legacy `"next-code"`).
+Plugins declare identity, capabilities, and entry points in `package.json` under the `"nextcode"` key.
 
 ```json
 {

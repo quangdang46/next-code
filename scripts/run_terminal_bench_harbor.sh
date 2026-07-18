@@ -3,10 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd -- "$SCRIPT_DIR/.." && pwd)
-DEFAULT_BINARY_DIR=${NEXT_CODE_HARBOR_BINARY_DIR:-${NEXT_CODE_HARBOR_BINARY_DIR:-/tmp/next-code-compat-dist}}
-DEFAULT_BINARY_PATH=${NEXT_CODE_HARBOR_BINARY:-${NEXT_CODE_HARBOR_BINARY:-$DEFAULT_BINARY_DIR/next-code-linux-x86_64}}
-DEFAULT_MODEL=${NEXT_CODE_TB_MODEL:-${NEXT_CODE_TB_MODEL:-openai/gpt-5.4}}
-DEFAULT_PATH=${NEXT_CODE_TB_PATH:-${NEXT_CODE_TB_PATH:-/tmp/terminal-bench-2}}
+DEFAULT_BINARY_DIR=${NEXT_CODE_HARBOR_BINARY_DIR:-/tmp/next-code-compat-dist}
+DEFAULT_BINARY_PATH=${NEXT_CODE_HARBOR_BINARY:-$DEFAULT_BINARY_DIR/next-code-linux-x86_64}
+DEFAULT_MODEL=${NEXT_CODE_TB_MODEL:-openai/gpt-5.4}
+DEFAULT_PATH=${NEXT_CODE_TB_PATH:-/tmp/terminal-bench-2}
 
 have_model=0
 have_agent_import=0
@@ -31,7 +31,7 @@ if [[ ! -x "$DEFAULT_BINARY_PATH" ]]; then
   "$REPO_ROOT/scripts/build_linux_compat.sh" "$DEFAULT_BINARY_DIR"
 fi
 
-OPENAI_AUTH=${NEXT_CODE_HARBOR_OPENAI_AUTH:-${NEXT_CODE_HARBOR_OPENAI_AUTH:-$HOME/.next-code/openai-auth.json}}
+OPENAI_AUTH=${NEXT_CODE_HARBOR_OPENAI_AUTH:-$HOME/.next-code/openai-auth.json}
 if [[ ! -f "$OPENAI_AUTH" ]]; then
   echo "OpenAI OAuth file not found at $OPENAI_AUTH" >&2
   exit 1
@@ -44,7 +44,7 @@ export NEXT_CODE_OPENAI_REASONING_EFFORT=${NEXT_CODE_OPENAI_REASONING_EFFORT:-hi
 export NEXT_CODE_OPENAI_SERVICE_TIER=${NEXT_CODE_OPENAI_SERVICE_TIER:-priority}
 export NEXT_CODE_NO_TELEMETRY=${NEXT_CODE_NO_TELEMETRY:-1}
 
-HARBOR_BIN=${NEXT_CODE_HARBOR_BIN:-${NEXT_CODE_HARBOR_BIN:-}}
+HARBOR_BIN=${NEXT_CODE_HARBOR_BIN:-}
 if [[ -z "$HARBOR_BIN" ]]; then
   CACHED_HARBOR="$HOME/.cache/uv/archive-v0/qtLT-I4hA5Q9ne5Zq-5cn/bin/harbor"
   if [[ -x "$CACHED_HARBOR" ]]; then
@@ -68,8 +68,8 @@ cmd+=("$@")
 
 {
   echo "Running Harbor with next-code adapter"
-  echo "  binary: ${NEXT_CODE_HARBOR_BINARY:-${NEXT_CODE_HARBOR_BINARY:-}}"
-  echo "  auth:   ${NEXT_CODE_HARBOR_OPENAI_AUTH:-${NEXT_CODE_HARBOR_OPENAI_AUTH:-}}"
+  echo "  binary: ${NEXT_CODE_HARBOR_BINARY:-}"
+  echo "  auth:   ${NEXT_CODE_HARBOR_OPENAI_AUTH:-}"
   echo "  model:  ${DEFAULT_MODEL}"
 } >&2
 

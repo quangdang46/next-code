@@ -61,7 +61,7 @@ benchmark_tool() {
 }
 
 # Find debug socket
-DEBUG_SOCK="${NEXT_CODE_DEBUG_SOCK:-${NEXT_CODE_DEBUG_SOCK:-/run/user/$(id -u)/next-code-debug.sock}}"
+DEBUG_SOCK="${NEXT_CODE_DEBUG_SOCK:-/run/user/$(id -u)/next-code-debug.sock}"
 
 if [ ! -S "$DEBUG_SOCK" ]; then
     echo "ERROR: Debug socket not found at $DEBUG_SOCK"

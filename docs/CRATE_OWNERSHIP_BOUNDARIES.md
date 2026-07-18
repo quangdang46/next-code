@@ -99,7 +99,7 @@ Run this guard after adding or changing any type crate dependency:
 python3 scripts/check_dependency_boundaries.py
 ```
 
-The guard blocks direct dependencies from `next-code-*-types` crates to root/runtime-heavy internal crates such as `next-code`, `next-code-core`, provider crates, TUI crates, protocol/runtime crates, and desktop/mobile crates. Type crates may depend on external lightweight libraries and other type crates. If a new internal dependency is needed, first decide whether it should itself be a type crate.
+The guard blocks direct dependencies from `next-code-*-types` crates to root/runtime-heavy internal crates such as `next-code`, `next-code-core`, provider crates, TUI crates, and protocol/runtime crates. Type crates may depend on external lightweight libraries and other type crates. If a new internal dependency is needed, first decide whether it should itself be a type crate.
 
 ## Test policy
 
@@ -183,7 +183,6 @@ Completed/high-value domain type splits:
 2. `next-code-gateway-types`
    - `gateway_types`
    - possibly `GatewayConfig` after deciding whether config owns it
-   - mobile gateway protocol-safe DTOs if needed by mobile crates
 
 3. `next-code-ambient-types`
    - `ambient_usage_types`

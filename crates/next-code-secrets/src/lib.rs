@@ -363,36 +363,20 @@ impl SecretsManager {
 
 /// Canonical OS-keychain service name for the encrypted secrets store.
 pub(crate) const SERVICE_NAME: &str = "next-code-secrets";
-/// Pre-rebrand service name; still dual-read so existing passphrases migrate.
-pub(crate) const LEGACY_SERVICE_NAME: &str = "next-code-secrets";
 pub(crate) const PASS_ACCOUNT: &str = "local-secrets-passphrase";
 
-/// Load the secrets passphrase, trying the new service name first and
-/// falling back to the legacy name. On a legacy hit, copy-forward into the
-/// new service so subsequent loads and saves stay on the canonical name.
+/// Load the secrets passphrase from the OS keychain.
 pub(crate) fn load_passphrase(
     keyring: &dyn next_code_keyring_store::KeyringStore,
 ) -> anyhow::Result<Option<String>> {
-    if let Some(value) = keyring.load(SERVICE_NAME, PASS_ACCOUNT)? {
-        return Ok(Some(value));
-    }
-    match keyring.load(LEGACY_SERVICE_NAME, PASS_ACCOUNT)? {
-        Some(value) => {
-            // Best-effort copy-forward; still return the value on save failure.
-            let _ = keyring.save(SERVICE_NAME, PASS_ACCOUNT, &value);
-            Ok(Some(value))
-        }
-        None => Ok(None),
-    }
+    keyring.load(SERVICE_NAME, PASS_ACCOUNT)
 }
 
-/// Delete the passphrase from both service names (idempotent).
+/// Delete the passphrase from the OS keychain (idempotent).
 pub(crate) fn delete_passphrase(
     keyring: &dyn next_code_keyring_store::KeyringStore,
 ) -> anyhow::Result<()> {
-    keyring.delete(SERVICE_NAME, PASS_ACCOUNT)?;
-    let _ = keyring.delete(LEGACY_SERVICE_NAME, PASS_ACCOUNT);
-    Ok(())
+    keyring.delete(SERVICE_NAME, PASS_ACCOUNT)
 }
 
 /// Generate a cryptographically-random 32-byte passphrase, base64-encoded.

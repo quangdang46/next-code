@@ -816,7 +816,7 @@ mod tests {
     }
 
     #[test]
-    fn plugin_manifest_from_package_json_requires_nextcode_or_pi_field() { // dual-read: legacy
+    fn plugin_manifest_from_package_json_requires_nextcode_or_pi_field() {
         let json = serde_json::json!({"name": "test"});
         let result = PluginManifest::from_package_json(&json);
         assert!(result.is_err());

@@ -9,23 +9,12 @@ use crate::team::spec::{TeamError, TeamResult};
 pub const TEAMS_BASE_OVERRIDE_ENV: &str = "NEXT_CODE_TEAMS_BASE_OVERRIDE";
 
 /// `~/.next-code/teams` — the team base directory (or the override dir in tests).
-///
-/// Dual-reads legacy `~/.next-code/teams` when the canonical path is missing so
-/// pre-rebrand team state remains visible; new writes create `.next-code`.
 pub fn teams_base_dir() -> PathBuf {
     if let Some(over) = std::env::var_os(TEAMS_BASE_OVERRIDE_ENV) {
         return PathBuf::from(over);
     }
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-    let primary = home.join(".next-code").join("teams");
-    if primary.exists() {
-        return primary;
-    }
-    let legacy = home.join(".next-code").join("teams");
-    if legacy.exists() {
-        return legacy;
-    }
-    primary
+    home.join(".next-code").join("teams")
 }
 
 pub fn runtime_dir(run_id: &str) -> PathBuf {

@@ -197,8 +197,8 @@ fn test_set_feature_roundtrip() -> Result<()> {
 
 #[test]
 fn test_set_route_deserializes_as_set_model_compat_alias() -> Result<()> {
-    // Legacy/desktop compatibility shape: a bare model string under the
-    // `set_route` tag. `decode_request` (not raw serde) normalizes it.
+    // Legacy wire shape: a bare model string under the `set_route` tag.
+    // `decode_request` (not raw serde) normalizes it.
     let decoded = decode_request(r#"{"type":"set_route","id":42,"model":"claude-opus-4-5"}"#)?;
     let Request::SetModel { id, model } = decoded else {
         return Err(anyhow!(

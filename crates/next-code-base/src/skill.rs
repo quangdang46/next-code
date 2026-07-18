@@ -309,10 +309,7 @@ impl SkillRegistry {
     }
 
     fn load_project_local_dirs(&mut self, working_dir: Option<&Path>) -> Result<()> {
-        // Prefer ./.next-code/skills/, fall back to legacy ./.next-code/skills/.
-        // Load both when both exist so a partial migrate does not drop skills;
-        // later loads (legacy) win on name collision so pre-rebrand edits
-        // remain visible until the user consolidates.
+        // Load from ./.next-code/skills/.
         for segment in crate::storage::PROJECT_DIR_CANDIDATES {
             let local = Self::project_local_dir(working_dir, segment);
             if local.exists() {

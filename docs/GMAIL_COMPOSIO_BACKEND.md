@@ -26,7 +26,6 @@ The backend is resolved from environment at `GmailClient::new()`:
 
 - `NEXT_CODE_GMAIL_BACKEND=direct` (or unset) -> direct Google backend.
 - `NEXT_CODE_GMAIL_BACKEND=composio` -> Composio backend (requires `COMPOSIO_API_KEY`).
-- Legacy dual-read: `NEXT_CODE_GMAIL_BACKEND` is still accepted for one release.
 
 If `composio` is requested but `COMPOSIO_API_KEY` is missing, next-code warns and
 falls back to `direct`.
@@ -70,7 +69,7 @@ a hint telling the agent to run `action: "connect"` first.
    Note the resulting `connected_account_id` if you want to pin it.
 3. Export the variables:
    ```bash
-   export NEXT_CODE_GMAIL_BACKEND=composio  # legacy dual-read: NEXT_CODE_GMAIL_BACKEND
+   export NEXT_CODE_GMAIL_BACKEND=composio
    export COMPOSIO_API_KEY="ck_..."
    # optional:
    export COMPOSIO_GMAIL_CONNECTED_ACCOUNT_ID="ca_..."

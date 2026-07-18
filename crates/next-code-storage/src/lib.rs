@@ -104,38 +104,15 @@ pub fn next_code_dir() -> Result<PathBuf> {
 /// Project-local product directory name.
 pub const PROJECT_DIR_CANDIDATES: &[&str] = &[".next-code"];
 
-/// Resolve a path under the project-local product directory.
-///
-/// Returns `<root>/.next-code/<relative>` when present, otherwise the canonical
-/// `.next-code` path so callers that create the path write there.
+/// Resolve a path under the project-local product directory
+/// (`<root>/.next-code/<relative>`).
 pub fn project_product_path(root: &Path, relative: impl AsRef<Path>) -> PathBuf {
-    let relative = relative.as_ref();
-    let mut first = None;
-    for segment in PROJECT_DIR_CANDIDATES {
-        let candidate = root.join(segment).join(relative);
-        if first.is_none() {
-            first = Some(candidate.clone());
-        }
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    first.expect("PROJECT_DIR_CANDIDATES is non-empty")
+    root.join(".next-code").join(relative)
 }
 
 /// Resolve the project-local product root directory (`.next-code`).
 pub fn project_product_dir(root: &Path) -> PathBuf {
-    let mut first = None;
-    for segment in PROJECT_DIR_CANDIDATES {
-        let candidate = root.join(segment);
-        if first.is_none() {
-            first = Some(candidate.clone());
-        }
-        if candidate.exists() {
-            return candidate;
-        }
-    }
-    first.expect("PROJECT_DIR_CANDIDATES is non-empty")
+    root.join(".next-code")
 }
 
 pub fn logs_dir() -> Result<PathBuf> {

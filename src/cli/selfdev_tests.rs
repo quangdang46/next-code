@@ -320,9 +320,7 @@ fn test_selfdev_build_command_prefers_repo_wrapper_when_present() {
     assert_eq!(build.args.first().map(String::as_str), Some("-lc"));
     let command = build.args.get(1).expect("shell command");
     assert!(command.contains("dev_cargo.sh' build --profile selfdev -p next-code --bin next-code"));
-    assert!(!command.contains("next-code-desktop"));
     assert!(build.display.contains("-p next-code --bin next-code"));
-    assert!(!build.display.contains("next-code-desktop"));
 }
 
 #[test]
@@ -333,7 +331,6 @@ fn test_selfdev_build_command_falls_back_to_cargo_when_wrapper_missing() {
     assert_eq!(build.args.first().map(String::as_str), Some("-lc"));
     let command = build.args.get(1).expect("shell command");
     assert!(command.contains("cargo build --profile selfdev -p next-code --bin next-code"));
-    assert!(!command.contains("next-code-desktop"));
 }
 
 #[test]
@@ -342,7 +339,6 @@ fn test_selfdev_build_command_can_target_all() {
     let build =
         build::selfdev_build_command_for_target(temp.path(), build::SelfDevBuildTarget::All);
     assert!(build.display.contains("-p next-code --bin next-code"));
-    assert!(!build.display.contains("next-code-desktop"));
 }
 
 #[test]
@@ -351,5 +347,4 @@ fn test_selfdev_build_command_can_target_tui_only() {
     let build =
         build::selfdev_build_command_for_target(temp.path(), build::SelfDevBuildTarget::Tui);
     assert!(build.display.contains("-p next-code --bin next-code"));
-    assert!(!build.display.contains("next-code-desktop"));
 }

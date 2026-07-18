@@ -20,8 +20,8 @@ Usage: scripts/remote_build.sh [options] [cargo-subcommand] [cargo-args...]
 
 Options:
   -r, --release        Add --release to cargo invocation
-  --host HOST          Remote SSH host (default: ${NEXT_CODE_REMOTE_HOST:-${NEXT_CODE_REMOTE_HOST:-}} from env/config; required if unset)
-  --remote-dir DIR     Remote project directory (default: ${NEXT_CODE_REMOTE_DIR:-${NEXT_CODE_REMOTE_DIR:-}} or .cache/remote-builds/next-code/<repo-name>)
+  --host HOST          Remote SSH host (default: ${NEXT_CODE_REMOTE_HOST:-} from env/config; required if unset)
+  --remote-dir DIR     Remote project directory (default: ${NEXT_CODE_REMOTE_DIR:-} or .cache/remote-builds/next-code/<repo-name>)
   --no-sync            Skip rsync upload step
   --sync-back          Force sync-back of built binary after command
   --no-sync-back       Disable sync-back of built binary after command
@@ -43,10 +43,10 @@ REPO_NAME="$(basename "$LOCAL_DIR")"
 source "$LOCAL_DIR/scripts/remote_config.sh"
 next_code_load_remote_config
 
-REMOTE="${NEXT_CODE_REMOTE_HOST:-${NEXT_CODE_REMOTE_HOST:-}}"
-REMOTE_DIR="${NEXT_CODE_REMOTE_DIR:-${NEXT_CODE_REMOTE_DIR:-.cache/remote-builds/next-code/${REPO_NAME}}}"
-SSH_BIN="${NEXT_CODE_REMOTE_SSH_BIN:-${NEXT_CODE_REMOTE_SSH_BIN:-ssh}}"
-RSYNC_BIN="${NEXT_CODE_REMOTE_RSYNC_BIN:-${NEXT_CODE_REMOTE_RSYNC_BIN:-rsync}}"
+REMOTE="${NEXT_CODE_REMOTE_HOST:-}"
+REMOTE_DIR="${NEXT_CODE_REMOTE_DIR:-.cache/remote-builds/next-code/${REPO_NAME}}"
+SSH_BIN="${NEXT_CODE_REMOTE_SSH_BIN:-ssh}"
+RSYNC_BIN="${NEXT_CODE_REMOTE_RSYNC_BIN:-rsync}"
 
 SYNC_SOURCE=1
 SYNC_BACK_MODE="auto" # auto|always|never
@@ -56,7 +56,7 @@ SUBCOMMAND_SET=0
 POSITIONAL=()
 
 remote_connect_timeout() {
-    local value="${NEXT_CODE_REMOTE_CONNECT_TIMEOUT:-${NEXT_CODE_REMOTE_CONNECT_TIMEOUT:-5}}"
+    local value="${NEXT_CODE_REMOTE_CONNECT_TIMEOUT:-5}"
     if [[ ! "$value" =~ ^[0-9]+$ || "$value" -lt 1 ]]; then
         value=5
     fi
@@ -130,15 +130,15 @@ for bin in "$SSH_BIN" "$RSYNC_BIN"; do
 done
 
 SSH_CONNECT_TIMEOUT="$(remote_connect_timeout)"
-SSH_SERVER_ALIVE_INTERVAL="${NEXT_CODE_REMOTE_SERVER_ALIVE_INTERVAL:-${NEXT_CODE_REMOTE_SERVER_ALIVE_INTERVAL:-10}}"
-SSH_SERVER_ALIVE_COUNT_MAX="${NEXT_CODE_REMOTE_SERVER_ALIVE_COUNT_MAX:-${NEXT_CODE_REMOTE_SERVER_ALIVE_COUNT_MAX:-1}}"
+SSH_SERVER_ALIVE_INTERVAL="${NEXT_CODE_REMOTE_SERVER_ALIVE_INTERVAL:-10}"
+SSH_SERVER_ALIVE_COUNT_MAX="${NEXT_CODE_REMOTE_SERVER_ALIVE_COUNT_MAX:-1}"
 SSH_OPTS=(
     -o BatchMode=yes
     -o ConnectTimeout="$SSH_CONNECT_TIMEOUT"
     -o ServerAliveInterval="$SSH_SERVER_ALIVE_INTERVAL"
     -o ServerAliveCountMax="$SSH_SERVER_ALIVE_COUNT_MAX"
 )
-RSYNC_SSH_COMMAND="${NEXT_CODE_REMOTE_RSYNC_SSH:-${NEXT_CODE_REMOTE_RSYNC_SSH:-$SSH_BIN -o BatchMode=yes -o ConnectTimeout=$SSH_CONNECT_TIMEOUT -o ServerAliveInterval=$SSH_SERVER_ALIVE_INTERVAL -o ServerAliveCountMax=$SSH_SERVER_ALIVE_COUNT_MAX}}"
+RSYNC_SSH_COMMAND="${NEXT_CODE_REMOTE_RSYNC_SSH:-$SSH_BIN -o BatchMode=yes -o ConnectTimeout=$SSH_CONNECT_TIMEOUT -o ServerAliveInterval=$SSH_SERVER_ALIVE_INTERVAL -o ServerAliveCountMax=$SSH_SERVER_ALIVE_COUNT_MAX}"
 
 remote_ssh() {
     "$SSH_BIN" "${SSH_OPTS[@]}" "$REMOTE" "$@"
