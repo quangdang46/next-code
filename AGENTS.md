@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Origin Sync (fork management)
-This repo (quangdang46/jcode) is a fork of `1jehuang/jcode`. Several modules have been extracted into separate repos. When syncing from upstream, use the `origin-sync` skill: `skill(name="origin-sync")`. It provides a structured workflow for classifying conflicts (extracted-code, local-extension, upstream-only, dep, new-feature) and resolving them correctly.
+This repo (`quangdang46/next-code`) is a rebranded fork of `quangdang46/next-code`. Several modules have been extracted into separate repos. When syncing from upstream, use the `origin-sync` skill: `skill(name="origin-sync")`. It provides a structured workflow for classifying conflicts (extracted-code, local-extension, upstream-only, dep, new-feature) and resolving them correctly.
 
 
 
@@ -16,37 +16,38 @@ This repo (quangdang46/jcode) is a fork of `1jehuang/jcode`. Several modules hav
 - **Remote builds available** - Use `scripts/remote_build.sh` to offload heavy cargo work to another machine. If your build is terminated, likely is because there are not enough resources on this machine to build. use remote build in that case. Try checking the resource avaliablity on the machine before you run a build. 
 
 ## Logs
-- Logs are written to `~/.jcode/logs/` (daily files like `jcode-YYYY-MM-DD.log`).
+- Logs are written to `~/.next-code/logs/` (daily files like `next-code-YYYY-MM-DD.log`).
 
 ## Debug Socket
 - Use the debug socket for runtime level debugging
 
 ## Install Notes
-- `~/.local/bin/jcode` is the launcher symlink used from `PATH`.
-- `~/.jcode/builds/current/jcode` is the active local/source-build channel; self-dev builds and `scripts/install_release.sh` point the launcher here.
-- `~/.jcode/builds/stable/jcode` is the stable release channel; `scripts/install.sh` installs this and points the launcher here.
-- `~/.jcode/builds/versions/<version>/jcode` stores immutable binaries.
-- `~/.jcode/builds/canary/jcode` still exists for canary/testing flows, but it is not the primary self-dev install path.
-- On Windows, the equivalents are `%LOCALAPPDATA%\\jcode\\bin\\jcode.exe` for the launcher, `%LOCALAPPDATA%\\jcode\\builds\\stable\\jcode.exe` for stable, and `%LOCALAPPDATA%\\jcode\\builds\\versions\\<version>\\jcode.exe` for immutable installs; `scripts/install.ps1` currently installs the stable channel.
+- `~/.local/bin/next-code` is the launcher symlink used from `PATH`.
+- one-release compat: `next-code` → `next-code` symlink at `~/.local/bin/next-code`.
+- `~/.next-code/builds/current/next-code` is the active local/source-build channel; self-dev builds and `scripts/install_release.sh` point the launcher here.
+- `~/.next-code/builds/stable/next-code` is the stable release channel; `scripts/install.sh` installs this and points the launcher here.
+- `~/.next-code/builds/versions/<version>/next-code` stores immutable binaries.
+- `~/.next-code/builds/canary/next-code` still exists for canary/testing flows, but it is not the primary self-dev install path.
+- On Windows, the equivalents are `%LOCALAPPDATA%\\next-code\\bin\\next-code.exe` for the launcher (plus a one-release `next-code.exe` compat entry), `%LOCALAPPDATA%\\next-code\\builds\\stable\\next-code.exe` for stable, and `%LOCALAPPDATA%\\next-code\\builds\\versions\\<version>\\next-code.exe` for immutable installs; `scripts/install.ps1` currently installs the stable channel.
 - Ensure `~/.local/bin` is **before** `~/.cargo/bin` in `PATH`.
 
 ### After install (agent-tree / TUI work)
 
-`scripts/install_release.sh` updates symlinks but **running `jcode serve` keeps the old binary mapped**. Always restart serve after install:
+`scripts/install_release.sh` updates symlinks but **running `next-code serve` keeps the old binary mapped**. Always restart serve after install:
 
 ```bash
 # Prefer the helper:
 bash scripts/restart_local_serve.sh
 
 # Or manually: kill the serve PID, then:
-#   jcode serve   # or: jcode --provider auto serve
+#   next-code serve   # or: next-code --provider auto serve
 ```
 
-Confirm the live binary: `lsof -p $(pgrep -f 'builds/.*/jcode' | head -1) | grep txt` should show the same hash as `readlink ~/.jcode/builds/current/jcode`. The TUI shows a short client git hash in teammate-view chrome while viewing an agent.
+Confirm the live binary: `lsof -p $(pgrep -f 'builds/.*/next-code' | head -1) | grep txt` should show the same hash as `readlink ~/.next-code/builds/current/next-code`. The TUI shows a short client git hash in teammate-view chrome while viewing an agent.
 
 ## Notepad (compaction-resistant notes)
 
-The notepad (`crates/jcode-base/src/notepad.rs`, `crates/jcode-app-core/src/tool/notepad.rs`) is a 3-tier file-based store under `<working_dir>/.jcode/notepad/` that lets the model persist short notes across turns and across compaction.
+The notepad (`crates/next-code-base/src/notepad.rs`, `crates/next-code-app-core/src/tool/notepad.rs`) is a 3-tier file-based store under `<working_dir>/.next-code/notepad/` that lets the model persist short notes across turns and across compaction.
 
 Tiers:
 - **priority** — auto-injected into the system prompt every turn. Survives compaction because the content is re-read from disk each cycle. Rendered as a fenced code block with a trust marker so the model cannot inject instructions through it.
@@ -62,7 +63,7 @@ Tools (namespaced under `notepad_*`):
 
 Config (under `[notepad]` in `config.toml`):
 - `enabled` (default: `true`) — set to `false` to disable entirely.
-- `dir` (default: `.jcode/notepad`) — must be a relative path with no `..` components; absolute paths and `..` are rejected.
+- `dir` (default: `.next-code/notepad`) — must be a relative path with no `..` components; absolute paths and `..` are rejected.
 - `max_bytes_per_tier` (default: 4096) — the field is byte-based (predictable file size, predictable token cost). Truncation always lands on a UTF-8 char boundary.
 - `require_priority_confirm` (default: `true`) — when enabled, `notepad_write_priority` must include `confirm: true` in its input.
 

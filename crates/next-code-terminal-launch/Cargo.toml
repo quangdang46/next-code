@@ -1,0 +1,10 @@
+[package]
+name = "next-code-terminal-launch"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+next-code-core = { path = "../next-code-core" }
+anyhow = "1"
+dirs = "5"

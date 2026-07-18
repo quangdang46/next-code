@@ -1,6 +1,6 @@
 # Permission System Implementation Plan
 
-> Gap analysis + implementation roadmap for jcode's permission system vs Claude Code.
+> Gap analysis + implementation roadmap for next-code's permission system vs Claude Code.
 > Based on thorough research of existing code.
 
 ---
@@ -37,10 +37,10 @@ BridgeDecision::Prompt
 
 | Component | File | Role |
 |-----------|------|------|
-| `PermissionMode` enum | `jcode-agent-runtime/src/permission.rs` | 6 modes mirroring dcg_core::Mode |
-| `dcg_bridge.rs` | `jcode-app-core/src/dcg_bridge.rs` (1326 lines) | Bridge between jcode actions and dcg-core engine |
-| `SafetySystem` | `jcode-base/src/safety.rs` | Legacy system for ambient permission requests |
-| `execution_policy.rs` | `jcode-app-core/src/execution_policy.rs` (847 lines) | Configurable per-command rules |
+| `PermissionMode` enum | `next-code-agent-runtime/src/permission.rs` | 6 modes mirroring dcg_core::Mode |
+| `dcg_bridge.rs` | `next-code-app-core/src/dcg_bridge.rs` (1326 lines) | Bridge between next-code actions and dcg-core engine |
+| `SafetySystem` | `next-code-base/src/safety.rs` | Legacy system for ambient permission requests |
+| `execution_policy.rs` | `next-code-app-core/src/execution_policy.rs` (847 lines) | Configurable per-command rules |
 | `permission dialog` | `ui_overlays.rs:650-699` | TUI permission dialog rendering |
 | `dialog keyboard` | `input.rs:1786-1887` | Arrow/Enter/Esc handling |
 | `dialog bus handler` | `local.rs:253-278` | BusEvent → pending_permission_* fields |
@@ -61,7 +61,7 @@ BridgeDecision::Prompt
 
 ## Gap 1: Tool-Specific Permission Dialogs
 
-### Current (jcode)
+### Current (next-code)
 
 1 generic dialog for ALL tools:
 ```
@@ -127,7 +127,7 @@ fn draw_bash_permission_dialog(frame, area, app) {
     // Render:
     // ╭─ Permission: bash ────────────────────╮
     // │  git status                            │
-    // │  Working dir: ~/Projects/jcode         │
+    // │  Working dir: ~/Projects/next-code         │
     // │  OS: darwin                            │
     // │                                       │
     // │  ❯ ✔ Approve  ◯ Approve all  ◯ Always allow  ◯ Deny
@@ -173,7 +173,7 @@ fn draw_webfetch_permission_dialog(frame, area, app) {
 
 ## Gap 2: Worker Badge (Subagent Attribution)
 
-### Current (jcode)
+### Current (next-code)
 
 Dialog shows tool name + reason only — no indication of WHICH agent requested.
 
@@ -188,7 +188,7 @@ WorkerBadge shows `session_id` or friendly name of the requesting agent:
 
 **Step 1:** Add `worker_id` / `worker_name` to `PermissionRequested` bus event
 
-**File:** `jcode-base/src/bus.rs`
+**File:** `next-code-base/src/bus.rs`
 ```rust
 pub struct PermissionRequested {
     pub session_id: String,
@@ -221,7 +221,7 @@ let worker_name = self.session.subagent_name.clone();
 
 ## Gap 3: Denial Tracking
 
-### Current (jcode)
+### Current (next-code)
 
 No tracking. User can deny infinitely without any change in behavior.
 
@@ -286,7 +286,7 @@ pub fn classify_for_session(action, session_id) -> BridgeDecision {
 
 ## Gap 4: Permission Explainer
 
-### Current (jcode)
+### Current (next-code)
 
 Generic reason: `"Tool action 'bash' requires permission in current mode Default"`
 
@@ -317,7 +317,7 @@ generatePermissionExplanation(action, command, input) → {
 
 **Step 1:** Add `generate_permission_explanation` in agent runtime
 
-**File:** New file `jcode-agent-runtime/src/permission_explainer.rs`
+**File:** New file `next-code-agent-runtime/src/permission_explainer.rs`
 
 ```rust
 pub fn explain_action(tool_name: &str, input: &Value) -> PermissionExplanation {
@@ -363,7 +363,7 @@ pub enum BridgeDecision {
 
 ## Gap 5: Mode Transition Safety
 
-### Current (jcode)
+### Current (next-code)
 
 `cycle_mode()` blindly switches to next mode. Switching from BypassPermissions to Auto keeps all dangerous permissions active.
 
@@ -408,7 +408,7 @@ pub fn cycle_mode() -> Mode {
 
 ## Gap 6: Plan Mode Dialog
 
-### Current (jcode)
+### Current (next-code)
 
 No dialog when entering/exiting Plan mode.
 
@@ -450,7 +450,7 @@ KeyCode::Char('p') if modifiers == KeyCode::ALT => {
 
 ## Gap 7: Permission Request Timeout
 
-### Current (jcode)
+### Current (next-code)
 
 Pending permission dialog stays open indefinitely.
 

@@ -1,0 +1,3 @@
+## Product Focus
+
+This self-dev session was launched from the TUI/root next-code context. Prefer TUI targets and commands (`selfdev build target=tui`, package `next-code`, binary `next-code`) for builds, reloads, tests, and code navigation.

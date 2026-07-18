@@ -3,11 +3,11 @@
 
 ## Goal
 
-Rewrite jcode's footer area (currently shows only processing status / occasional tips) into a persistent configuration status bar showing model, provider, permission mode, git branch, context usage, tokens — like Codex, Claude Code, and oh-my-pi.
+Rewrite next-code's footer area (currently shows only processing status / occasional tips) into a persistent configuration status bar showing model, provider, permission mode, git branch, context usage, tokens — like Codex, Claude Code, and oh-my-pi.
 
 ## Current Issue
 
-jcode's footer shows NOTHING when idle (no processing, no rate limit):
+next-code's footer shows NOTHING when idle (no processing, no rate limit):
 
 ```
 # blank line
@@ -82,13 +82,13 @@ When there's an active `status_notice` (e.g., "Model → deepseek-v4-flash"), it
 
 | File | Change |
 |------|--------|
-| `crates/jcode-tui/src/tui/mod.rs` | Add `status_line()`, `git_branch()`, `cwd_label()` to TuiState trait |
-| `crates/jcode-tui/src/tui/app/tui_state.rs` | Implement new trait methods |
-| `crates/jcode-tui/src/tui/ui_input.rs` | Rewrite `draw_status` for persistent status line |
-| `crates/jcode-config-types/src/lib.rs` | Add `StatusLineConfig` with segments, separtator |
-| `crates/jcode-tui/src/tui/app/commands.rs` | Add `/statusline` command |
-| NEW: `crates/jcode-tui/src/tui/status_line.rs` | Status line segments definition and rendering |
-| NEW: `crates/jcode-tui/src/tui/status_line_setup.rs` | Interactive setup popup |
+| `crates/next-code-tui/src/tui/mod.rs` | Add `status_line()`, `git_branch()`, `cwd_label()` to TuiState trait |
+| `crates/next-code-tui/src/tui/app/tui_state.rs` | Implement new trait methods |
+| `crates/next-code-tui/src/tui/ui_input.rs` | Rewrite `draw_status` for persistent status line |
+| `crates/next-code-config-types/src/lib.rs` | Add `StatusLineConfig` with segments, separtator |
+| `crates/next-code-tui/src/tui/app/commands.rs` | Add `/statusline` command |
+| NEW: `crates/next-code-tui/src/tui/status_line.rs` | Status line segments definition and rendering |
+| NEW: `crates/next-code-tui/src/tui/status_line_setup.rs` | Interactive setup popup |
 
 ### Reference Code
 

@@ -12,12 +12,12 @@
 │ same format, but user picks order + which segments to show   │
 ├──────────────────────────────────────────────────────────────┤
 │ Layer 3: Custom shell command (Claude Code style)            │
-│ user writes any shell script → jcode pipes JSON via stdin    │
+│ user writes any shell script → next-code pipes JSON via stdin    │
 │ → output gets rendered below input bar                       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-### Layer 1 — Built-in Default (jcode `draw_status` rewrite)
+### Layer 1 — Built-in Default (next-code `draw_status` rewrite)
 
 Always visible when idle. Segments:
 
@@ -66,10 +66,10 @@ segments = ["mode", "model", "provider", "context", "tokens", "git"]
 Advanced users set a shell command in config:
 ```toml
 [status_line]
-command = "~/.jcode/statusline.sh"
+command = "~/.next-code/statusline.sh"
 ```
 
-jcode runs the command every 5s, passes this JSON via stdin:
+next-code runs the command every 5s, passes this JSON via stdin:
 ```json
 {
   "model": "deepseek-v4-flash",

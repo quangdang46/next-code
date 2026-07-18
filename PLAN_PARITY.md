@@ -1,6 +1,6 @@
 # Plan: Expand PARITY.md Coverage & Close Reference Repo Gaps
 
-> Generated from research across jcode codebase + feature-planning reference repos
+> Generated from research across next-code codebase + feature-planning reference repos
 > Goal: Identify untracked features, prioritize additions to PARITY.md, and flag implementation gaps vs 9 reference repos
 
 ---
@@ -55,7 +55,7 @@
 | 20 | **memory** | `tool/memory.rs` | CCB, pi-agent-rust | P0 |
 | 21 | **conversation_search** | `tool/conversation_search.rs` | — | P1 |
 | 22 | **session_search** | `tool/session_search.rs` | — | P1 |
-| 23 | **notepad** | `tool/notepad.rs` | jcode native | P1 |
+| 23 | **notepad** | `tool/notepad.rs` | next-code native | P1 |
 | 24 | **beads** | `tool/beads.rs` | — | P1 |
 
 ### Agent Lifecycle (5)
@@ -73,7 +73,7 @@
 | # | Tool | File | Known From | Priority |
 |---|------|------|------------|----------|
 | 30 | **mcp** | `tool/mcp.rs` | — | P1 |
-| 31 | **skill** | `tool/skill.rs` | jcode native | P1 |
+| 31 | **skill** | `tool/skill.rs` | next-code native | P1 |
 | 32 | **side_panel** | `tool/side_panel.rs` | CCB | P2 |
 | 33 | **dcp_compress** | `tool/dcp_compress.rs` | — | P2 |
 | 34 | **debug_socket** | `tool/debug_socket.rs` | — | P2 |
@@ -113,41 +113,39 @@ After tools, add the major subsystems as new PARITY.md sections.
 
 | Domain | Crates | Why Now |
 |--------|--------|---------|
-| **VIII — Provider System** | `jcode-provider-*` (10 crates) | Every agent depends on providers. Model override is tracked but provider abstraction, failover, pricing, auth are not. |
-| **IX — Plugin System** | `jcode-plugin-core/`, `jcode-plugin-runtime/` | Full plugin runtime with security sandbox, manifest, dispatcher, TUI host. Unique jcode advantage. |
+| **VIII — Provider System** | `next-code-provider-*` (10 crates) | Every agent depends on providers. Model override is tracked but provider abstraction, failover, pricing, auth are not. |
+| **IX — Plugin System** | `next-code-plugin-core/`, `next-code-plugin-runtime/` | Full plugin runtime with security sandbox, manifest, dispatcher, TUI host. Unique next-code advantage. |
 | **X — Tools Registry** | All 42 tools | Each tool should be a row in a new Tools section, with its tool name, description, source, and status. |
 
 ### P1 — Add as sections
 
 | Domain | Crates | Notes |
 |--------|--------|-------|
-| **XI — Desktop App** | `jcode-desktop/` | Rich text, IPC, animations, gallery, issue browser |
-| **XII — Embedding/Memory Pipeline** | `jcode-embedding/`, `jcode-mempalace-adapter/`, `jcode-memory-types/` | Memory system is partially tracked in VI. Full pipeline includes ONNX model, embedding, memory palace adapter. |
-| **XIII — Auth & Secrets** | `jcode-auth-types/`, `jcode-azure-auth/`, `jcode-keyring-store/`, `jcode-secrets/` | Provider auth, OAuth flows, OS keyring |
-| **XIV — Config System** | `jcode-config-types/` | Schema, keybindings, model prefs, hooks config |
+| **XII — Embedding/Memory Pipeline** | `next-code-embedding/`, `next-code-mempalace-adapter/`, `next-code-memory-types/` | Memory system is partially tracked in VI. Full pipeline includes ONNX model, embedding, memory palace adapter. |
+| **XIII — Auth & Secrets** | `next-code-auth-types/`, `next-code-azure-auth/`, `next-code-keyring-store/`, `next-code-secrets/` | Provider auth, OAuth flows, OS keyring |
+| **XIV — Config System** | `next-code-config-types/` | Schema, keybindings, model prefs, hooks config |
 
 ### P2 — Add as sections when convenient
 
 | Domain | Crates | Notes |
 |--------|--------|-------|
-| **XV — TUI Framework** | 14 `jcode-tui-*` crates | Individual rendering crates. Low user impact if app-level TUI already tracked. |
-| **XVI — Protocol** | `jcode-protocol/` | Wire protocol, message types. Low impact if session system covers it. |
-| **XVII — Overnight** | `jcode-overnight-core/` | Background overnight processing |
-| **XVIII — Mobile** | `jcode-mobile-core/`, `jcode-mobile-sim/` | Mobile agent runtime |
-| **XIX — Build & Release** | `jcode-build-meta/`, `jcode-build-support/`, `jcode-selfdev-types/` | Dev infrastructure |
+| **XV — TUI Framework** | 14 `next-code-tui-*` crates | Individual rendering crates. Low user impact if app-level TUI already tracked. |
+| **XVI — Protocol** | `next-code-protocol/` | Wire protocol, message types. Low impact if session system covers it. |
+| **XVII — Overnight** | `next-code-overnight-core/` | Background overnight processing |
+| **XIX — Build & Release** | `next-code-build-meta/`, `next-code-build-support/`, `next-code-selfdev-types/` | Dev infrastructure |
 
 ---
 
 ## Phase 3 — Reference Repo Feature Gaps
 
-Features from reference repos that jcode doesn't have yet. Decision needed: implement or defer?
+Features from reference repos that next-code doesn't have yet. Decision needed: implement or defer?
 
 ### High Impact
 
-| Feature | Source Repo | Effort | jcode Counterpart |
+| Feature | Source Repo | Effort | next-code Counterpart |
 |---------|-------------|--------|-------------------|
-| **DAP (27 ops)** | oh-my-pi | Medium | jcode has LSP (9 ops). DAP would add debugger integration. |
-| **Tree-sitter code map** | codebuff (10+ languages) | Medium | jcode uses tree-sitter only in edit-bench. A general code-map tool would improve code understanding. |
+| **DAP (27 ops)** | oh-my-pi | Medium | next-code has LSP (9 ops). DAP would add debugger integration. |
+| **Tree-sitter code map** | codebuff (10+ languages) | Medium | next-code uses tree-sitter only in edit-bench. A general code-map tool would improve code understanding. |
 | **Prompt variants per model** | oh-my-openagent | Small | Same agent, different prompt per provider (Claude vs GPT vs Gemini). Could be added to agent definition. |
 
 ### Medium Impact
@@ -165,12 +163,12 @@ Features from reference repos that jcode doesn't have yet. Decision needed: impl
 
 | Feature | Source Repo | Notes |
 |---------|-------------|-------|
-| **WASM extension runtime** | pi-agent-rust | jcode has native plugin system already. WASM adds security isolation but may not be needed. |
+| **WASM extension runtime** | pi-agent-rust | next-code has native plugin system already. WASM adds security isolation but may not be needed. |
 | **io_uring fast lane** | pi-agent-rust | Linux-specific. Not portable. |
 | **Shadow dual execution** | pi-agent-rust | Complex. Runs two models and compares. |
-| **Langfuse monitoring** | CCB | jcode has telemetry-core. Langfuse is a specific external platform. |
+| **Langfuse monitoring** | CCB | next-code has no product telemetry pipeline. Langfuse is a specific external platform. |
 | **Sandbox execution** | codex | Already marked ❌ by design decision. |
-| **IDE wiring** (VS Code) | oh-my-pi | jcode is terminal-first. Different philosophy. |
+| **IDE wiring** (VS Code) | oh-my-pi | next-code is terminal-first. Different philosophy. |
 | **Remote Control** (Docker UI) | CCB | Docker self-hosted remote UI. Niche. |
 
 ---

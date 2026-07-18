@@ -1,0 +1,10 @@
+[package]
+name = "next-code-tui-core"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+crossterm = "0.29"
+serde = { version = "1", features = ["derive"] }
+next-code-memory-types = { path = "../next-code-memory-types" }

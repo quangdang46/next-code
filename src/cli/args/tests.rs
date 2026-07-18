@@ -2,37 +2,37 @@ use super::*;
 
 #[test]
 fn test_provider_choice_aliases_parse() {
-    let args = Args::try_parse_from(["jcode", "--provider", "z.ai", "run", "smoke"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "--provider", "z.ai", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "z.ai");
 
     let args =
-        Args::try_parse_from(["jcode", "--provider", "kimi-for-coding", "run", "smoke"]).unwrap();
+        Args::try_parse_from(["next-code", "--provider", "kimi-for-coding", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "kimi-for-coding");
 
     let args =
-        Args::try_parse_from(["jcode", "--provider", "cerebrascode", "run", "smoke"]).unwrap();
+        Args::try_parse_from(["next-code", "--provider", "cerebrascode", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "cerebrascode");
 
-    let args = Args::try_parse_from(["jcode", "--provider", "compat", "run", "smoke"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "--provider", "compat", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "compat");
 
-    let args = Args::try_parse_from(["jcode", "--provider", "bailian", "run", "smoke"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "--provider", "bailian", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "bailian");
 
-    let args = Args::try_parse_from(["jcode", "--provider", "together", "run", "smoke"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "--provider", "together", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "together");
 
-    let args = Args::try_parse_from(["jcode", "--provider", "grok", "run", "smoke"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "--provider", "grok", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "grok");
 
-    let args = Args::try_parse_from(["jcode", "--provider", "cgc", "run", "smoke"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "--provider", "cgc", "run", "smoke"]).unwrap();
     assert_eq!(args.provider, "cgc");
 }
 
 #[test]
 fn serve_server_name_option_parses() {
     let args =
-        Args::try_parse_from(["jcode", "serve", "--server-name", "mount-cloud/fabian"]).unwrap();
+        Args::try_parse_from(["next-code", "serve", "--server-name", "mount-cloud/fabian"]).unwrap();
     match args.command {
         Some(Command::Serve { server_name, .. }) => {
             assert_eq!(server_name.as_deref(), Some("mount-cloud/fabian"));
@@ -44,9 +44,9 @@ fn serve_server_name_option_parses() {
 #[test]
 fn remote_working_dir_option_parses() {
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "--socket",
-        "/tmp/jcode.sock",
+        "/tmp/next-code.sock",
         "--remote-working-dir",
         "/home/agent/project",
     ])
@@ -60,7 +60,7 @@ fn remote_working_dir_option_parses() {
 
 #[test]
 fn model_list_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "model", "list", "--json", "--verbose"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "model", "list", "--json", "--verbose"]).unwrap();
     match args.command {
         Some(Command::Model(ModelCommand::List { json, verbose, .. })) => {
             assert!(json);
@@ -70,7 +70,7 @@ fn model_list_subcommand_parses() {
     }
 
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "cloud",
         "sessions",
         "dashboard",
@@ -107,7 +107,7 @@ fn model_list_subcommand_parses() {
 #[test]
 fn session_rename_subcommand_parses() {
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "session",
         "rename",
         "fox",
@@ -131,7 +131,7 @@ fn session_rename_subcommand_parses() {
         other => panic!("unexpected command: {:?}", other),
     }
 
-    let args = Args::try_parse_from(["jcode", "session", "rename", "fox", "--clear"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "session", "rename", "fox", "--clear"]).unwrap();
     match args.command {
         Some(Command::Session(SessionCommand::Rename {
             session,
@@ -152,7 +152,7 @@ fn session_rename_subcommand_parses() {
 #[test]
 fn cloud_sessions_subcommands_parse() {
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "cloud",
         "sessions",
         "configure",
@@ -192,7 +192,7 @@ fn cloud_sessions_subcommands_parse() {
         other => panic!("unexpected command: {:?}", other),
     }
 
-    let args = Args::try_parse_from(["jcode", "cloud", "sessions", "status", "--json"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "cloud", "sessions", "status", "--json"]).unwrap();
     match args.command {
         Some(Command::Cloud(CloudCommand::Sessions {
             action: CloudSessionsCommand::Status { json, .. },
@@ -201,7 +201,7 @@ fn cloud_sessions_subcommands_parse() {
     }
 
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "cloud",
         "sessions",
         "upload-latest",
@@ -235,7 +235,7 @@ fn cloud_sessions_subcommands_parse() {
     }
 
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "cloud",
         "sessions",
         "view",
@@ -264,7 +264,7 @@ fn cloud_sessions_subcommands_parse() {
     }
 
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "cloud",
         "sessions",
         "sync",
@@ -312,7 +312,7 @@ fn cloud_sessions_subcommands_parse() {
 
 #[test]
 fn login_no_browser_flag_parses() {
-    let args = Args::try_parse_from(["jcode", "login", "--no-browser"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "login", "--no-browser"]).unwrap();
     match args.command {
         Some(Command::Login {
             provider,
@@ -346,7 +346,7 @@ fn login_no_browser_flag_parses() {
         other => panic!("unexpected command: {:?}", other),
     }
 
-    let args = Args::try_parse_from(["jcode", "login", "--headless"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "login", "--headless"]).unwrap();
     match args.command {
         Some(Command::Login { no_browser, .. }) => assert!(no_browser),
         other => panic!("unexpected command: {:?}", other),
@@ -355,7 +355,7 @@ fn login_no_browser_flag_parses() {
 
 #[test]
 fn login_accepts_provider_positional() {
-    let args = Args::try_parse_from(["jcode", "login", "google"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "login", "google"]).unwrap();
     match args.command {
         Some(Command::Login { provider, .. }) => {
             assert_eq!(provider, Some("google".to_string()));
@@ -367,7 +367,7 @@ fn login_accepts_provider_positional() {
 #[test]
 fn login_openai_compatible_scriptable_flags_parse() {
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "--provider",
         "openai-compatible",
         "--model",
@@ -397,7 +397,7 @@ fn login_openai_compatible_scriptable_flags_parse() {
 #[test]
 fn login_openai_compatible_accepts_global_provider_and_model_after_subcommand() {
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "login",
         "--provider",
         "openai-compatible",
@@ -420,7 +420,7 @@ fn login_openai_compatible_accepts_global_provider_and_model_after_subcommand() 
 
 #[test]
 fn login_scriptable_flags_parse() {
-    let args = Args::try_parse_from(["jcode", "login", "--print-auth-url", "--json"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "login", "--print-auth-url", "--json"]).unwrap();
     match args.command {
         Some(Command::Login {
             print_auth_url,
@@ -442,7 +442,7 @@ fn login_scriptable_flags_parse() {
     }
 
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "login",
         "--callback-url",
         "http://localhost:1455/auth/callback?code=x&state=y",
@@ -458,7 +458,7 @@ fn login_scriptable_flags_parse() {
         other => panic!("unexpected command: {:?}", other),
     }
 
-    let args = Args::try_parse_from(["jcode", "login", "--auth-code", "abc123"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "login", "--auth-code", "abc123"]).unwrap();
     match args.command {
         Some(Command::Login { auth_code, .. }) => {
             assert_eq!(auth_code.as_deref(), Some("abc123"));
@@ -467,7 +467,7 @@ fn login_scriptable_flags_parse() {
     }
 
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "login",
         "--complete",
         "--google-access-tier",
@@ -488,51 +488,14 @@ fn login_scriptable_flags_parse() {
 }
 
 #[test]
-fn account_subcommands_parse() {
-    let login =
-        Args::try_parse_from(["jcode", "account", "login", "--no-browser"]).expect("account login");
-    assert!(matches!(
-        login.command,
-        Some(Command::Account {
-            action: AccountCommand::Login { no_browser: true }
-        })
-    ));
-
-    let status =
-        Args::try_parse_from(["jcode", "account", "status", "--json"]).expect("account status");
-    assert!(matches!(
-        status.command,
-        Some(Command::Account {
-            action: AccountCommand::Status { json: true }
-        })
-    ));
-
-    let manage = Args::try_parse_from(["jcode", "account", "manage"]).expect("account manage");
-    assert!(matches!(
-        manage.command,
-        Some(Command::Account {
-            action: AccountCommand::Manage
-        })
-    ));
-
-    let logout = Args::try_parse_from(["jcode", "account", "logout"]).expect("account logout");
-    assert!(matches!(
-        logout.command,
-        Some(Command::Account {
-            action: AccountCommand::Logout
-        })
-    ));
-}
-
-#[test]
 fn quiet_global_flag_parses() {
-    let args = Args::try_parse_from(["jcode", "--quiet", "model", "list"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "--quiet", "model", "list"]).unwrap();
     assert!(args.quiet);
 }
 
 #[test]
 fn acp_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "acp"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "acp"]).unwrap();
     match args.command {
         Some(Command::Acp) => {}
         other => panic!("unexpected command: {:?}", other),
@@ -541,7 +504,7 @@ fn acp_subcommand_parses() {
 
 #[test]
 fn run_json_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "run", "--json", "hello"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "run", "--json", "hello"]).unwrap();
     match args.command {
         Some(Command::Run {
             json,
@@ -560,7 +523,7 @@ fn run_json_subcommand_parses() {
 
 #[test]
 fn run_ndjson_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "run", "--ndjson", "hello"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "run", "--ndjson", "hello"]).unwrap();
     match args.command {
         Some(Command::Run {
             json,
@@ -579,7 +542,7 @@ fn run_ndjson_subcommand_parses() {
 
 #[test]
 fn run_toon_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "run", "--toon", "hello"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "run", "--toon", "hello"]).unwrap();
     match args.command {
         Some(Command::Run {
             json,
@@ -597,19 +560,19 @@ fn run_toon_subcommand_parses() {
 }
 #[test]
 fn run_toon_conflicts_with_json() {
-    let err = Args::try_parse_from(["jcode", "run", "--json", "--toon", "hello"]).unwrap_err();
+    let err = Args::try_parse_from(["next-code", "run", "--json", "--toon", "hello"]).unwrap_err();
     assert!(err.to_string().contains("cannot be used with"));
 }
 
 #[test]
 fn run_toon_conflicts_with_ndjson() {
-    let err = Args::try_parse_from(["jcode", "run", "--ndjson", "--toon", "hello"]).unwrap_err();
+    let err = Args::try_parse_from(["next-code", "run", "--ndjson", "--toon", "hello"]).unwrap_err();
     assert!(err.to_string().contains("cannot be used with"));
 }
 
 #[test]
 fn version_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "version", "--json"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "version", "--json"]).unwrap();
     match args.command {
         Some(Command::Version { json, .. }) => assert!(json),
         other => panic!("unexpected command: {:?}", other),
@@ -618,7 +581,7 @@ fn version_subcommand_parses() {
 
 #[test]
 fn usage_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "usage", "--json"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "usage", "--json"]).unwrap();
     match args.command {
         Some(Command::Usage { json, .. }) => assert!(json),
         other => panic!("unexpected command: {:?}", other),
@@ -627,7 +590,7 @@ fn usage_subcommand_parses() {
 
 #[test]
 fn auth_status_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "auth", "status", "--json"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "auth", "status", "--json"]).unwrap();
     match args.command {
         Some(Command::Auth(AuthCommand::Status { json, .. })) => assert!(json),
         other => panic!("unexpected command: {:?}", other),
@@ -636,7 +599,7 @@ fn auth_status_subcommand_parses() {
 
 #[test]
 fn auth_doctor_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "auth", "doctor", "openai", "--validate", "--json"])
+    let args = Args::try_parse_from(["next-code", "auth", "doctor", "openai", "--validate", "--json"])
         .unwrap();
     match args.command {
         Some(Command::Auth(AuthCommand::Doctor {
@@ -656,7 +619,7 @@ fn auth_doctor_subcommand_parses() {
 #[test]
 fn doctor_subcommand_parses_flags_and_only() {
     let args = Args::try_parse_from([
-        "jcode", "doctor", "--json", "--fix", "--yes", "--only", "auth", "--only", "config",
+        "next-code", "doctor", "--json", "--fix", "--yes", "--only", "auth", "--only", "config",
     ])
     .unwrap();
     match args.command {
@@ -679,12 +642,12 @@ fn doctor_subcommand_parses_flags_and_only() {
 #[test]
 fn doctor_yes_requires_fix() {
     // `--yes` without `--fix` is rejected by clap (requires = "fix").
-    assert!(Args::try_parse_from(["jcode", "doctor", "--yes"]).is_err());
+    assert!(Args::try_parse_from(["next-code", "doctor", "--yes"]).is_err());
 }
 
 #[test]
 fn doctor_defaults_are_read_only() {
-    let args = Args::try_parse_from(["jcode", "doctor"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "doctor"]).unwrap();
     match args.command {
         Some(Command::Doctor {
             json,
@@ -704,12 +667,12 @@ fn doctor_defaults_are_read_only() {
 
 #[test]
 fn doctor_only_rejects_unknown_category() {
-    assert!(Args::try_parse_from(["jcode", "doctor", "--only", "bogus"]).is_err());
+    assert!(Args::try_parse_from(["next-code", "doctor", "--only", "bogus"]).is_err());
 }
 
 #[test]
 fn provider_list_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "provider", "list", "--json"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "provider", "list", "--json"]).unwrap();
     match args.command {
         Some(Command::Provider(ProviderCommand::List { json, .. })) => assert!(json),
         other => panic!("unexpected command: {:?}", other),
@@ -718,7 +681,7 @@ fn provider_list_subcommand_parses() {
 
 #[test]
 fn provider_current_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "provider", "current", "--json"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "provider", "current", "--json"]).unwrap();
     match args.command {
         Some(Command::Provider(ProviderCommand::Current { json, .. })) => assert!(json),
         other => panic!("unexpected command: {:?}", other),
@@ -728,7 +691,7 @@ fn provider_current_subcommand_parses() {
 #[test]
 fn provider_add_subcommand_parses_agent_friendly_flags() {
     let args = Args::try_parse_from([
-        "jcode",
+        "next-code",
         "provider",
         "add",
         "my-api",
@@ -773,7 +736,7 @@ fn provider_add_subcommand_parses_agent_friendly_flags() {
 
 #[test]
 fn restart_save_subcommand_parses() {
-    let args = Args::try_parse_from(["jcode", "restart", "save"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "restart", "save"]).unwrap();
     match args.command {
         Some(Command::Restart {
             action: RestartCommand::Save {
@@ -786,7 +749,7 @@ fn restart_save_subcommand_parses() {
 
 #[test]
 fn restart_save_auto_restore_flag_parses() {
-    let args = Args::try_parse_from(["jcode", "restart", "save", "--auto-restore"]).unwrap();
+    let args = Args::try_parse_from(["next-code", "restart", "save", "--auto-restore"]).unwrap();
     match args.command {
         Some(Command::Restart {
             action: RestartCommand::Save { auto_restore: true },
@@ -796,28 +759,28 @@ fn restart_save_auto_restore_flag_parses() {
 }
 
 /// Contract test for the onboarding agent-repair brief (see
-/// `jcode-tui::tui::app::onboarding_repair::build_repair_brief`). The brief
+/// `next-code-tui::tui::app::onboarding_repair::build_repair_brief`). The brief
 /// tells a coding agent to run these exact commands to diagnose and fix a
 /// failed login. If any flag here stops parsing, the brief would hand the agent
 /// a broken command, so this guards the agent-facing CLI contract.
 #[test]
 fn onboarding_repair_brief_commands_are_valid_cli() {
     // Diagnose.
-    Args::try_parse_from(["jcode", "auth-test", "--provider", "openai", "--json"])
+    Args::try_parse_from(["next-code", "auth-test", "--provider", "openai", "--json"])
         .expect("auth-test --provider --json must parse");
-    Args::try_parse_from(["jcode", "auth-test", "--all-configured", "--json"])
+    Args::try_parse_from(["next-code", "auth-test", "--all-configured", "--json"])
         .expect("auth-test --all-configured --json must parse");
-    Args::try_parse_from(["jcode", "auth", "doctor"]).expect("auth doctor must parse");
+    Args::try_parse_from(["next-code", "auth", "doctor"]).expect("auth doctor must parse");
 
     // Fix: OAuth and API-key logins.
-    Args::try_parse_from(["jcode", "login", "--provider", "openai"])
+    Args::try_parse_from(["next-code", "login", "--provider", "openai"])
         .expect("login --provider must parse");
-    Args::try_parse_from(["jcode", "login", "--provider", "openai", "--api-key", "k"])
+    Args::try_parse_from(["next-code", "login", "--provider", "openai", "--api-key", "k"])
         .expect("login --provider --api-key must parse");
 
     // Fix: custom OpenAI-compatible endpoint via provider add + key on stdin.
     Args::try_parse_from([
-        "jcode",
+        "next-code",
         "provider",
         "add",
         "my-endpoint",

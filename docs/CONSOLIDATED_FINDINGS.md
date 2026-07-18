@@ -1,4 +1,4 @@
-# Consolidated Research Findings — 13 Reference Repos vs jcode
+# Consolidated Research Findings — 13 Reference Repos vs next-code
 
 > **Generated from**: PARITY.md, MASTER_UI.md, .agents/skills/feature-planning/, and 12 cloned reference repos in /tmp/feature-research/
 > **Date**: 2026-06-30
@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-**jcode is at 91% parity** with reference repos (281/310 features marked ✅), but has 13 ❌ missing + 16 ⚠️ partial features. The biggest gaps are:
+**next-code is at 91% parity** with reference repos (281/310 features marked ✅), but has 13 ❌ missing + 16 ⚠️ partial features. The biggest gaps are:
 1. **Provider System** (Section A) — needs 4-axis Route architecture
 2. **Plugin System hardening** (Section B) — needs V2 capability chain
 3. **Tools** (Section C) — DAP, tree-sitter code-map, prompt variants

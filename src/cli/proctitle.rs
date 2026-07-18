@@ -10,69 +10,67 @@ use crate::process_title::{compact_process_title, session_name, set_title};
 
 pub(crate) fn initial_title(args: &Args) -> String {
     match &args.command {
-        Some(Command::Serve { .. }) => "jcode:server".to_string(),
-        Some(Command::Acp) => "jcode acp".to_string(),
-        Some(Command::Server { .. }) => "jcode server".to_string(),
-        Some(Command::Connect) => "jcode:client".to_string(),
-        Some(Command::Run { .. }) => "jcode run".to_string(),
-        Some(Command::Login { .. }) => "jcode login".to_string(),
-        Some(Command::Account { .. }) => "jcode account".to_string(),
-        Some(Command::Repl) => "jcode repl".to_string(),
-        Some(Command::Update) => "jcode update".to_string(),
-        Some(Command::Version { .. }) => "jcode version".to_string(),
-        Some(Command::Usage { .. }) => "jcode usage".to_string(),
-        Some(Command::Plugin(..)) => "jcode plugin".to_string(),
-        Some(Command::SelfDev { .. }) => "jcode:selfdev".to_string(),
-        Some(Command::Debug { .. }) => "jcode debug".to_string(),
-        Some(Command::Auth(_)) => "jcode auth".to_string(),
-        Some(Command::Provider(_)) => "jcode provider".to_string(),
-        Some(Command::Memory(_)) => "jcode memory".to_string(),
-        Some(Command::Session(_)) => "jcode session".to_string(),
-        Some(Command::Secrets(_)) => "jcode secrets".to_string(),
+        Some(Command::Serve { .. }) => "nc:server".to_string(),
+        Some(Command::Acp) => "next-code acp".to_string(),
+        Some(Command::Server { .. }) => "next-code server".to_string(),
+        Some(Command::Connect) => "nc:client".to_string(),
+        Some(Command::Run { .. }) => "next-code run".to_string(),
+        Some(Command::Login { .. }) => "next-code login".to_string(),
+        Some(Command::Repl) => "next-code repl".to_string(),
+        Some(Command::Update) => "next-code update".to_string(),
+        Some(Command::Version { .. }) => "next-code version".to_string(),
+        Some(Command::Usage { .. }) => "next-code usage".to_string(),
+        Some(Command::Plugin(..)) => "next-code plugin".to_string(),
+        Some(Command::SelfDev { .. }) => "nc:selfdev".to_string(),
+        Some(Command::Debug { .. }) => "next-code debug".to_string(),
+        Some(Command::Auth(_)) => "next-code auth".to_string(),
+        Some(Command::Provider(_)) => "next-code provider".to_string(),
+        Some(Command::Memory(_)) => "next-code memory".to_string(),
+        Some(Command::Session(_)) => "next-code session".to_string(),
+        Some(Command::Secrets(_)) => "next-code secrets".to_string(),
         Some(Command::Ambient(subcommand)) => match subcommand {
-            AmbientCommand::RunVisible => "jcode ambient visible".to_string(),
-            _ => "jcode ambient".to_string(),
+            AmbientCommand::RunVisible => "next-code ambient visible".to_string(),
+            _ => "next-code ambient".to_string(),
         },
-        Some(Command::Cloud(_)) => "jcode cloud".to_string(),
-        Some(Command::Pair { .. }) => "jcode pair".to_string(),
-        Some(Command::Permissions) => "jcode permissions".to_string(),
-        Some(Command::Permission(_)) => "jcode permission".to_string(),
-        Some(Command::Transcript { .. }) => "jcode transcript".to_string(),
-        Some(Command::Dictate { .. }) => "jcode dictate".to_string(),
+        Some(Command::Cloud(_)) => "next-code cloud".to_string(),
+        Some(Command::Permissions) => "next-code permissions".to_string(),
+        Some(Command::Permission(_)) => "next-code permission".to_string(),
+        Some(Command::Transcript { .. }) => "next-code transcript".to_string(),
+        Some(Command::Dictate { .. }) => "next-code dictate".to_string(),
         Some(Command::SetupHotkey {
             listen_macos_hotkey,
             notify_cli_launch,
         }) => {
             if *listen_macos_hotkey {
-                "jcode hotkey listener".to_string()
+                "next-code hotkey listener".to_string()
             } else if notify_cli_launch.is_some() {
-                "jcode shortcut reminder".to_string()
+                "next-code shortcut reminder".to_string()
             } else {
-                "jcode hotkey setup".to_string()
+                "next-code hotkey setup".to_string()
             }
         }
-        Some(Command::Browser { .. }) => "jcode browser".to_string(),
-        Some(Command::Replay { .. }) => "jcode replay".to_string(),
-        Some(Command::Model(_)) => "jcode model".to_string(),
-        Some(Command::ProviderTestCoverage { .. }) => "jcode provider-test-coverage".to_string(),
-        Some(Command::ProviderDoctor { .. }) => "jcode provider-doctor".to_string(),
-        Some(Command::Doctor { .. }) => "jcode doctor".to_string(),
-        Some(Command::AuthTest { .. }) => "jcode auth-test".to_string(),
-        Some(Command::Restart { .. }) => "jcode restart".to_string(),
+        Some(Command::Browser { .. }) => "next-code browser".to_string(),
+        Some(Command::Replay { .. }) => "next-code replay".to_string(),
+        Some(Command::Model(_)) => "next-code model".to_string(),
+        Some(Command::ProviderTestCoverage { .. }) => "next-code provider-test-coverage".to_string(),
+        Some(Command::ProviderDoctor { .. }) => "next-code provider-doctor".to_string(),
+        Some(Command::Doctor { .. }) => "next-code doctor".to_string(),
+        Some(Command::AuthTest { .. }) => "next-code auth-test".to_string(),
+        Some(Command::Restart { .. }) => "next-code restart".to_string(),
         // Menubar is handled via Command::Ambient(AmbientCommand::Menubar)
-        Some(Command::SetupLauncher) => "jcode setup-launcher".to_string(),
+        Some(Command::SetupLauncher) => "next-code setup-launcher".to_string(),
         None => {
             if let Some(resume) = args.resume.as_deref().filter(|resume| !resume.is_empty()) {
                 let prefix = if crate::cli::selfdev::client_selfdev_requested() {
-                    "jcode:d:"
+                    "nc:d:"
                 } else {
-                    "jcode:c:"
+                    "nc:c:"
                 };
                 compact_process_title(prefix, Some(&session_name(resume)))
             } else if crate::cli::selfdev::client_selfdev_requested() {
-                "jcode:selfdev".to_string()
+                "nc:selfdev".to_string()
             } else {
-                "jcode:client".to_string()
+                "nc:client".to_string()
             }
         }
     }
@@ -88,7 +86,7 @@ mod tests {
     use crate::storage::lock_test_env;
     use clap::Parser;
 
-    const SELFDEV_ENV: &str = jcode_selfdev_types::CLIENT_SELFDEV_ENV;
+    const SELFDEV_ENV: &str = next_code_selfdev_types::CLIENT_SELFDEV_ENV;
 
     fn with_selfdev_env_removed<T>(f: impl FnOnce() -> T) -> T {
         let _guard = lock_test_env();
@@ -104,24 +102,24 @@ mod tests {
     #[test]
     fn initial_title_labels_server() {
         with_selfdev_env_removed(|| {
-            let args = Args::parse_from(["jcode", "serve"]);
-            assert_eq!(initial_title(&args), "jcode:server");
+            let args = Args::parse_from(["next-code", "serve"]);
+            assert_eq!(initial_title(&args), "nc:server");
         });
     }
 
     #[test]
     fn initial_title_labels_resume_client_with_short_name() {
         with_selfdev_env_removed(|| {
-            let args = Args::parse_from(["jcode", "--resume", "session_fox_123"]);
-            assert_eq!(initial_title(&args), "jcode:c:fox");
+            let args = Args::parse_from(["next-code", "--resume", "session_fox_123"]);
+            assert_eq!(initial_title(&args), "nc:c:fox");
         });
     }
 
     #[test]
     fn initial_title_labels_selfdev_command() {
         with_selfdev_env_removed(|| {
-            let args = Args::parse_from(["jcode", "self-dev"]);
-            assert_eq!(initial_title(&args), "jcode:selfdev");
+            let args = Args::parse_from(["next-code", "self-dev"]);
+            assert_eq!(initial_title(&args), "nc:selfdev");
         });
     }
 }

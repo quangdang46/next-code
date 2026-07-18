@@ -1,4 +1,4 @@
-# Goal-Driven(jcode Feature Implementation) System
+# Goal-Driven(next-code Feature Implementation) System
 
 ## 🎯 Goal
 
@@ -39,7 +39,7 @@ The master agent is responsible for:
 Each implementation subagent handles ONE feature PR:
 - Reads the plan file template at `docs/pr-plans/<ID>-<name>.md`
 - Clones/checkouts the relevant reference repo at `/tmp/feature-research/<repo>`
-- Compares against jcode's actual implementation
+- Compares against next-code's actual implementation
 - Writes the plan markdown (research, reasoning, alternatives, chosen approach)
 - Implements the feature
 - Runs tests
@@ -87,13 +87,13 @@ For each feature, spawn an implementation subagent with:
 1. Check /tmp/feature-research/<repo>/ for cloned reference code
 2. If not cloned: git clone --depth=1 <repo_url> /tmp/feature-research/<repo>
 3. Read the actual reference implementation code
-4. Read jcode's current implementation
+4. Read next-code's current implementation
 5. Compare and identify gaps
 
 ### Plan Phase
 Write docs/pr-plans/<ID>-<name>.md with:
 - Research summary (source files, direct links)
-- Why this feature is missing in jcode
+- Why this feature is missing in next-code
 - Alternatives considered (table format)
 - Chosen approach with rationale
 - Implementation plan (file-by-file)
@@ -158,7 +158,7 @@ Each `docs/pr-plans/<ID>-<name>.md` follows this template:
   - https://github.com/<org>/<repo>/blob/main/<path>#L<line>
   - ...
 
-## Why This Feature Is Missing in jcode
+## Why This Feature Is Missing in next-code
 - Gap analysis from PARITY.md §XIV
 - Code path that should exist but doesn't
 - Architectural reason for absence
@@ -172,13 +172,13 @@ Each `docs/pr-plans/<ID>-<name>.md` follows this template:
 
 ## Chosen Approach
 - What we're building
-- Why this approach fits jcode's architecture
+- Why this approach fits next-code's architecture
 - Key architectural decisions
 
 ## Implementation Plan
 
 ### Phase 1: Scaffold
-- [ ] Add new types to `crates/jcode-<module>/src/`
+- [ ] Add new types to `crates/next-code-<module>/src/`
 - [ ] Add tests
 
 ### Phase 2: Integrate
@@ -194,8 +194,8 @@ Each `docs/pr-plans/<ID>-<name>.md` follows this template:
 
 | File | Change |
 |------|--------|
-| `crates/jcode-xxx/src/yyy.rs` | New: Z struct, impl Trait |
-| `crates/jcode-app-core/src/agent.rs` | Modified: added trait impl |
+| `crates/next-code-xxx/src/yyy.rs` | New: Z struct, impl Trait |
+| `crates/next-code-app-core/src/agent.rs` | Modified: added trait impl |
 | `PARITY.md` | Updated: feature row → ✅ |
 
 ## Risk Analysis

@@ -1,4 +1,4 @@
-//! `jcode menubar` - a lightweight live indicator of how many jcode sessions
+//! `next-code menubar` - a lightweight live indicator of how many next-code sessions
 //! are running and how many are actively streaming a model response.
 //!
 //! On macOS this renders a native menu bar (`NSStatusItem`) item that updates
@@ -6,6 +6,7 @@
 //! registries (see `crate::session::session_counts`). On other platforms (and
 //! with `--once` / `--json`) it just prints the current counts.
 
+use crate::env::product_env_os;
 use anyhow::Result;
 use serde::Serialize;
 
@@ -92,18 +93,18 @@ pub fn run_menubar_command(once: bool, json: bool) -> Result<()> {
     }
 }
 
-/// Ensure a single background `jcode menubar` helper is running on macOS so the
+/// Ensure a single background `next-code menubar` helper is running on macOS so the
 /// session-count indicator shows up automatically for every macOS user without
-/// them needing to run `jcode menubar` by hand.
+/// them needing to run `next-code menubar` by hand.
 ///
 /// This is a best-effort, fire-and-forget singleton: it records the helper's
-/// PID in the *global* `~/.jcode/menubar.pid` (see [`global_menubar_dir`]) and
+/// PID in the *global* `~/.next-code/menubar.pid` (see [`global_menubar_dir`]) and
 /// only spawns a new detached process when no live helper is already running.
 /// Failures are silently ignored so they never disrupt normal session startup.
 ///
 /// The macOS menu bar is a single per-login-session resource, so this guards
-/// hard against sandboxed jcode processes (tests, self-dev, onboarding) ever
-/// spawning a helper: each such process runs with a throwaway `$JCODE_HOME`,
+/// hard against sandboxed next-code processes (tests, self-dev, onboarding) ever
+/// spawning a helper: each such process runs with a throwaway `$NEXT_CODE_HOME`,
 /// and without this guard every distinct sandbox home spawned its own helper
 /// and drew its own duplicate status item into the one real menu bar.
 #[cfg(target_os = "macos")]
@@ -112,12 +113,12 @@ pub fn ensure_menubar_helper_running() {
     use std::process::{Command, Stdio};
 
     // Allow users to opt out entirely.
-    if std::env::var_os("JCODE_NO_MENUBAR").is_some() {
+    if product_env_os("NO_MENUBAR").is_some() {
         return;
     }
 
-    // Sandboxed jcode (tests / self-dev / onboarding, anything with a throwaway
-    // `$JCODE_HOME`) must never manage the real user's global menu bar.
+    // Sandboxed next-code (tests / self-dev / onboarding, anything with a throwaway
+    // `$NEXT_CODE_HOME`) must never manage the real user's global menu bar.
     if running_in_menubar_sandbox() {
         return;
     }
@@ -143,7 +144,7 @@ pub fn ensure_menubar_helper_running() {
     let mut command = Command::new(exe);
     command
         .arg("menubar")
-        .env("JCODE_NO_MENUBAR", "1")
+        .env("NEXT_CODE_NO_MENUBAR", "1")
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
@@ -167,31 +168,31 @@ pub fn ensure_menubar_helper_running() {}
 /// state - the "only one helper" lock and the helper pid file.
 ///
 /// The macOS menu bar is a single per-login-session resource shared by every
-/// jcode process for this user, so this state must live at a fixed location
-/// that does **not** depend on `$JCODE_HOME`. Sandboxes (tests, self-dev,
-/// onboarding) override `$JCODE_HOME` with throwaway temp dirs; anchoring to
-/// the real home (`$HOME/.jcode`) gives every process the same lock inode so
+/// next-code process for this user, so this state must live at a fixed location
+/// that does **not** depend on `$NEXT_CODE_HOME`. Sandboxes (tests, self-dev,
+/// onboarding) override `$NEXT_CODE_HOME` with throwaway temp dirs; anchoring to
+/// the real home (`$HOME/.next-code`) gives every process the same lock inode so
 /// the singleton actually holds across them. For a normal (non-sandboxed)
-/// launch this is exactly `crate::storage::jcode_dir()`, so behavior for the
+/// launch this is exactly `crate::storage::next_code_dir()`, so behavior for the
 /// real user is unchanged.
 #[cfg(target_os = "macos")]
 fn global_menubar_dir() -> Option<std::path::PathBuf> {
     let home = dirs::home_dir()?;
-    let dir = home.join(".jcode");
+    let dir = home.join(".next-code");
     let _ = std::fs::create_dir_all(&dir);
     Some(dir)
 }
 
-/// True when this process is a sandboxed jcode that must not own the real
-/// user's global menu bar. A throwaway `$JCODE_HOME` (anything other than the
-/// real `~/.jcode`) or an explicit test/temp marker means "sandbox".
+/// True when this process is a sandboxed next-code that must not own the real
+/// user's global menu bar. A throwaway `$NEXT_CODE_HOME` (anything other than the
+/// real `~/.next-code`) or an explicit test/temp marker means "sandbox".
 #[cfg(target_os = "macos")]
 fn running_in_menubar_sandbox() -> bool {
     is_menubar_sandbox(
-        env_truthy("JCODE_TEST_SESSION"),
-        env_truthy("JCODE_TEMP_SERVER"),
-        std::env::var_os("JCODE_HOME").as_deref(),
-        dirs::home_dir().map(|home| home.join(".jcode")).as_deref(),
+        env_truthy("NEXT_CODE_TEST_SESSION"),
+        env_truthy("NEXT_CODE_TEMP_SERVER"),
+        product_env_os("HOME").as_deref(),
+        dirs::home_dir().map(|home| home.join(".next-code")).as_deref(),
     )
 }
 
@@ -210,25 +211,25 @@ fn env_truthy(key: &str) -> bool {
 /// unit-tested without mutating process-global environment state.
 ///
 /// - An explicit test/temp marker forces "sandbox".
-/// - A `$JCODE_HOME` that differs from the real `~/.jcode` is a sandbox home.
+/// - A `$NEXT_CODE_HOME` that differs from the real `~/.next-code` is a sandbox home.
 /// - No override (or an override equal to the real home) is the real user.
 #[cfg(target_os = "macos")]
 fn is_menubar_sandbox(
     test_session: bool,
     temp_server: bool,
     custom_home: Option<&std::ffi::OsStr>,
-    real_jcode_home: Option<&std::path::Path>,
+    real_next_code_home: Option<&std::path::Path>,
 ) -> bool {
     if test_session || temp_server {
         return true;
     }
 
-    // No explicit override: the real user's default `~/.jcode`.
+    // No explicit override: the real user's default `~/.next-code`.
     let Some(custom_home) = custom_home else {
         return false;
     };
     let custom = std::path::Path::new(custom_home);
-    let Some(real) = real_jcode_home else {
+    let Some(real) = real_next_code_home else {
         // No real home to compare against: treat any explicit override as a sandbox.
         return true;
     };
@@ -272,9 +273,9 @@ mod macos {
     /// Acquire the exclusive, system-wide "only one menu bar helper" lock.
     ///
     /// Uses a non-blocking `flock(LOCK_EX | LOCK_NB)` on the *global*
-    /// `~/.jcode/menubar.lock` (see [`super::global_menubar_dir`]) so the lock
-    /// is shared across every jcode process for this OS user, including ones
-    /// running with a sandboxed `$JCODE_HOME`. The menu bar itself is a single
+    /// `~/.next-code/menubar.lock` (see [`super::global_menubar_dir`]) so the lock
+    /// is shared across every next-code process for this OS user, including ones
+    /// running with a sandboxed `$NEXT_CODE_HOME`. The menu bar itself is a single
     /// per-login-session resource, so the guard must be global too.
     ///
     /// Returns `Some(guard)` if we are the sole helper, or `None` if another
@@ -328,7 +329,7 @@ mod macos {
     }
 
     /// Autosave name under which macOS persists the status item's position.
-    const STATUS_ITEM_AUTOSAVE: &str = "jcode-menubar";
+    const STATUS_ITEM_AUTOSAVE: &str = "next-code-menubar";
 
     /// Number of fixed items at the end of the menu (separator, New Window,
     /// separator, Quit). Session rows are inserted between the summary header
@@ -340,12 +341,12 @@ mod macos {
            // does not implement Drop.
            #[unsafe(super(NSObject))]
            #[thread_kind = MainThreadOnly]
-           #[name = "JcodeMenubarHandler"]
+           #[name = "NextCodeMenubarHandler"]
            struct MenuHandler;
 
            impl MenuHandler {
                /// Open the clicked session (stored in the item's representedObject)
-               /// in a new terminal window via `jcode --resume <id>`.
+               /// in a new terminal window via `next-code --resume <id>`.
                #[unsafe(method(openSession:))]
                fn open_session(&self, sender: &NSMenuItem)
     {
@@ -355,13 +356,13 @@ mod macos {
                    let Ok(session_id) = object.downcast::<NSString>() else {
                        return;
                    };
-                   launch_jcode_window(vec!["--resume".to_string(), session_id.to_string()]);
+                   launch_next_code_window(vec!["--resume".to_string(), session_id.to_string()]);
                }
 
-               /// Launch a brand-new jcode session in a new terminal window.
+               /// Launch a brand-new next-code session in a new terminal window.
                #[unsafe(method(newWindow:))]
                fn new_window(&self, _sender: &NSMenuItem) {
-                   launch_jcode_window(Vec::new());
+                   launch_next_code_window(Vec::new());
                }
            }
        );
@@ -373,13 +374,13 @@ mod macos {
         }
     }
 
-    /// Launch a jcode window off the main thread so slow terminal startup
+    /// Launch a next-code window off the main thread so slow terminal startup
     /// (osascript / `open`) never blocks the menu bar UI.
-    fn launch_jcode_window(args: Vec<String>) {
+    fn launch_next_code_window(args: Vec<String>) {
         std::thread::spawn(move || {
-            if let Err(err) = crate::setup_hints::launch_jcode_in_macos_terminal(&args) {
+            if let Err(err) = crate::setup_hints::launch_next_code_in_macos_terminal(&args) {
                 crate::logging::warn(&format!(
-                    "menubar: failed to launch jcode window ({args:?}): {err}"
+                    "menubar: failed to launch next-code window ({args:?}): {err}"
                 ));
             }
         });
@@ -387,22 +388,22 @@ mod macos {
 
     pub(super) fn run_status_item_app() {
         let mtm = MainThreadMarker::new()
-            .expect("jcode menubar must run on the main thread (the process entry point)");
+            .expect("next-code menubar must run on the main thread (the process entry point)");
 
         // Defense in depth: a process running under an explicit test/temp marker
         // must never paint into the real user's menu bar. The real protection
         // against duplicates is `ensure_menubar_helper_running` (which refuses
         // to spawn from sandboxes) plus the global singleton lock below, but a
-        // stray `jcode menubar` invoked directly inside a test harness should
+        // stray `next-code menubar` invoked directly inside a test harness should
         // still never realize a status item.
-        if super::env_truthy("JCODE_TEST_SESSION") || super::env_truthy("JCODE_TEMP_SERVER") {
+        if super::env_truthy("NEXT_CODE_TEST_SESSION") || super::env_truthy("NEXT_CODE_TEMP_SERVER") {
             return;
         }
 
         // Enforce a single live menu bar helper. The pid-file fast path in
         // `ensure_menubar_helper_running` is best-effort and can race or be
-        // bypassed entirely (e.g. a self-dev `target/.../jcode` and the
-        // installed `~/.local/bin/jcode` both spawn helpers, or a reload
+        // bypassed entirely (e.g. a self-dev `target/.../next-code` and the
+        // installed `~/.local/bin/next-code` both spawn helpers, or a reload
         // re-runs startup). Without a hard guard each extra helper creates its
         // own NSStatusItem, so the user ends up with a duplicate menu bar item
         // per spawn. Acquire an exclusive advisory lock here; if another helper
@@ -417,7 +418,7 @@ mod macos {
         // Accessory: no Dock icon, no main menu, just a menu bar item.
         app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
 
-        // Follow the system's Light/Dark setting explicitly. `jcode` runs as a
+        // Follow the system's Light/Dark setting explicitly. `next-code` runs as a
         // bare Mach-O with no Info.plist app bundle, so AppKit defaults the
         // process to the light Aqua appearance and never auto-adopts macOS Dark
         // Mode. That made the status item's template icon and `labelColor` text
@@ -465,7 +466,7 @@ mod macos {
         if let Some(button) = status_item.button(mtm) {
             let icon = NSImage::imageWithSystemSymbolName_accessibilityDescription(
                 ns_string!("terminal.fill"),
-                Some(ns_string!("jcode sessions")),
+                Some(ns_string!("next-code sessions")),
             );
             if let Some(icon) = icon.as_deref() {
                 icon.setTemplate(true);
@@ -491,7 +492,7 @@ mod macos {
         let new_window_item = unsafe {
             NSMenuItem::initWithTitle_action_keyEquivalent(
                 NSMenuItem::alloc(mtm),
-                ns_string!("New jcode Window"),
+                ns_string!("New next-code Window"),
                 Some(sel!(newWindow:)),
                 ns_string!("n"),
             )
@@ -503,7 +504,7 @@ mod macos {
         let quit_item = unsafe {
             NSMenuItem::initWithTitle_action_keyEquivalent(
                 NSMenuItem::alloc(mtm),
-                ns_string!("Quit jcode menu bar"),
+                ns_string!("Quit next-code menu bar"),
                 Some(objc2::sel!(terminate:)),
                 ns_string!("q"),
             )
@@ -561,7 +562,7 @@ mod macos {
 
     /// Pin the application's appearance to the system Light/Dark setting.
     ///
-    /// `jcode` runs as a bare executable without an `Info.plist` app bundle, so
+    /// `next-code` runs as a bare executable without an `Info.plist` app bundle, so
     /// AppKit defaults the process to the light `Aqua` appearance and does not
     /// follow the user's macOS Dark Mode preference. With a light appearance the
     /// status item's template SF Symbol and `labelColor` title both resolve to a
@@ -777,7 +778,7 @@ mod tests {
         use std::ffi::OsStr;
         use std::path::Path;
 
-        let real = Path::new("/Users/me/.jcode");
+        let real = Path::new("/Users/me/.next-code");
 
         // Real user, no override: not a sandbox -> owns the menu bar.
         assert!(!is_menubar_sandbox(false, false, None, Some(real)));
@@ -785,7 +786,7 @@ mod tests {
         assert!(!is_menubar_sandbox(
             false,
             false,
-            Some(OsStr::new("/Users/me/.jcode")),
+            Some(OsStr::new("/Users/me/.next-code")),
             Some(real),
         ));
 
@@ -797,7 +798,7 @@ mod tests {
         assert!(is_menubar_sandbox(
             false,
             false,
-            Some(OsStr::new("/private/tmp/jcode-e2e-home-xyz")),
+            Some(OsStr::new("/private/tmp/next-code-e2e-home-xyz")),
             Some(real),
         ));
 
@@ -805,7 +806,7 @@ mod tests {
         assert!(is_menubar_sandbox(
             false,
             false,
-            Some(OsStr::new("/private/tmp/jcode-e2e-home-xyz")),
+            Some(OsStr::new("/private/tmp/next-code-e2e-home-xyz")),
             None,
         ));
     }

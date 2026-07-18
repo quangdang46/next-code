@@ -17,7 +17,7 @@ appears first in the `select!` so it can fire even when stdin is blocked.
 
 **Fixed in**: `turn.rs:1291` (commit `7d7c2cab6`).
 
-**Check all 3 nested select blocks** in `crates/jcode-tui/src/tui/app/turn.rs`:
+**Check all 3 nested select blocks** in `crates/next-code-tui/src/tui/app/turn.rs`:
 - Line ~122: API-call select ✅ (no biased, redraw before event)
 - Line ~254: streaming select ✅ (no biased, redraw before event)
 - Line ~1291: tool execution select ✅ (no biased)

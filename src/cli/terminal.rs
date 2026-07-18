@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::io::{self, IsTerminal, Write};
 use std::panic;
 
-use crate::{id, session, telemetry, tui};
+use crate::{id, session, tui};
 
 pub struct TuiRuntimeState {
     mouse_capture: bool,
@@ -10,8 +10,8 @@ pub struct TuiRuntimeState {
     focus_change: bool,
 }
 
-const INHERITED_MODES_ENV: &str = "JCODE_TUI_INHERITED_MODES";
-const INHERITED_THEME_ENV: &str = "JCODE_TUI_INHERITED_THEME";
+const INHERITED_MODES_ENV: &str = "NEXT_CODE_TUI_INHERITED_MODES";
+const INHERITED_THEME_ENV: &str = "NEXT_CODE_TUI_INHERITED_THEME";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct InheritedTerminalModes {
@@ -164,10 +164,6 @@ pub fn install_panic_hook() {
         if let Some(session_id) = get_current_session() {
             print_session_resume_hint(&session_id);
 
-            if let Some((provider, model)) = telemetry::current_provider_model() {
-                telemetry::record_crash(&provider, &model, telemetry::SessionEndReason::Panic);
-            }
-
             if let Ok(mut session) = session::Session::load(&session_id) {
                 session.mark_crashed(Some(format!("Panic: {}", info)));
                 let _ = session.save();
@@ -178,9 +174,6 @@ pub fn install_panic_hook() {
 
 pub fn mark_current_session_crashed(message: String) {
     if let Some(session_id) = get_current_session() {
-        if let Some((provider, model)) = telemetry::current_provider_model() {
-            telemetry::record_crash(&provider, &model, telemetry::SessionEndReason::Signal);
-        }
         if let Ok(mut session) = session::Session::load(&session_id)
             && matches!(session.status, session::SessionStatus::Active)
         {
@@ -211,7 +204,7 @@ pub fn show_crash_resume_hint() {
 
     if crashed.len() == 1 {
         eprintln!(
-            "\x1b[33m💥 Session \x1b[1m{}\x1b[0m\x1b[33m crashed. Resume with:\x1b[0m  jcode --resume {}",
+            "\x1b[33m💥 Session \x1b[1m{}\x1b[0m\x1b[33m crashed. Resume with:\x1b[0m  next-code --resume {}",
             session_label, id
         );
     } else {
@@ -220,15 +213,15 @@ pub fn show_crash_resume_hint() {
             crashed.len(),
             session_label
         );
-        eprintln!("\x1b[33m   Resume with:\x1b[0m  jcode --resume {}", id);
-        eprintln!("\x1b[33m   List all:\x1b[0m     jcode --resume");
+        eprintln!("\x1b[33m   Resume with:\x1b[0m  next-code --resume {}", id);
+        eprintln!("\x1b[33m   List all:\x1b[0m     next-code --resume");
     }
     eprintln!();
 }
 
 fn init_tui_terminal(inherited_terminal: bool) -> Result<ratatui::DefaultTerminal> {
     if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
-        anyhow::bail!("jcode TUI requires an interactive terminal (stdin/stdout must be a TTY)");
+        anyhow::bail!("next-code TUI requires an interactive terminal (stdin/stdout must be a TTY)");
     }
     if inherited_terminal {
         init_tui_terminal_resume()
@@ -243,13 +236,13 @@ fn init_tui_terminal(inherited_terminal: bool) -> Result<ratatui::DefaultTermina
 }
 
 pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)> {
-    let is_resuming = std::env::var_os("JCODE_RESUMING").is_some();
+    let is_resuming = std::env::var_os("NEXT_CODE_RESUMING").is_some();
     let inherited_theme = std::env::var(INHERITED_THEME_ENV).ok();
     let inherited_modes_raw = std::env::var(INHERITED_MODES_ENV).ok();
     let inherited_modes = inherited_modes_raw
         .as_deref()
         .and_then(InheritedTerminalModes::decode);
-    // JCODE_RESUMING describes the session lifecycle, but only a valid modes
+    // NEXT_CODE_RESUMING describes the session lifecycle, but only a valid modes
     // handoff proves the previous process deliberately left the terminal live
     // across exec. A restart used to restore the terminal before exec while the
     // new process still took the resume path, leaving it on the primary screen
@@ -264,13 +257,13 @@ pub fn init_tui_runtime() -> Result<(ratatui::DefaultTerminal, TuiRuntimeGuard)>
         crate::tui::theme_detect::init_theme_mode();
     }
     let terminal = init_tui_terminal(inherited_terminal)?;
-    crate::tui::mermaid::install_jcode_mermaid_hooks();
-    crate::tui::markdown::install_jcode_markdown_hooks();
+    crate::tui::mermaid::install_next_code_mermaid_hooks();
+    crate::tui::markdown::install_next_code_markdown_hooks();
     crate::tui::mermaid::init_picker();
 
     let perf_policy = crate::perf::tui_policy();
     // These private handoff values apply only to this exec boundary. Avoid
-    // leaking them into tools or unrelated child jcode processes.
+    // leaking them into tools or unrelated child next-code processes.
     crate::env::remove_var(INHERITED_MODES_ENV);
     crate::env::remove_var(INHERITED_THEME_ENV);
 
@@ -419,7 +412,7 @@ fn write_session_resume_hint(mut writer: impl Write, session_id: &str) -> io::Re
         "\x1b[33mSession \x1b[1m{}\x1b[0m\x1b[33m - to resume:\x1b[0m",
         session_name
     )?;
-    writeln!(writer, "  jcode --resume {}", session_id)?;
+    writeln!(writer, "  next-code --resume {}", session_id)?;
     writeln!(writer)?;
     Ok(())
 }
@@ -658,7 +651,7 @@ mod tests {
             let mut output = Vec::new();
             write_session_resume_hint(&mut output, &session_id).unwrap();
             let output = String::from_utf8(output).unwrap();
-            let expected_cmd = format!("jcode --resume {}", session_id);
+            let expected_cmd = format!("next-code --resume {}", session_id);
             assert!(output.contains(&expected_cmd));
             assert!(output.contains("to resume"));
             assert!(!session_id.is_empty());

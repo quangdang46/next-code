@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Uninstall jcode binaries and (optionally) all user data.
+# Uninstall next-code binaries and (optionally) all user data.
 #
 # Default: removes installed binaries, build channels, and the launcher
 # symlink, but keeps user data (config, auth, sessions, logs) so a clean
 # reinstall picks up where you left off.
 #
 # Flags:
-#   --purge     Also delete ~/.jcode (config, auth, sessions, logs, memory).
+#   --purge     Also delete ~/.next-code.
 #   --dry-run   Print what would be removed without deleting anything.
 #   --yes       Skip the confirmation prompt.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/uninstall.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/quangdang46/next-code/master/scripts/uninstall.sh | bash
 #   bash scripts/uninstall.sh --purge
 set -euo pipefail
 
@@ -29,7 +29,7 @@ for arg in "$@"; do
     --dry-run) DRY_RUN=true ;;
     --yes|-y)  ASSUME_YES=true ;;
     --help|-h)
-      sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
       exit 0
       ;;
     *) err "Unknown flag: $arg (supported: --purge, --dry-run, --yes)" ;;
@@ -39,18 +39,26 @@ done
 OS="$(uname -s)"
 case "$OS" in
   MINGW*|MSYS*|CYGWIN*)
-    JCODE_HOME="${LOCALAPPDATA:?LOCALAPPDATA not set}/jcode"
-    LAUNCHER_DIR="${JCODE_INSTALL_DIR:-$LOCALAPPDATA/jcode/bin}"
-    LAUNCHER="$LAUNCHER_DIR/jcode.exe"
-    BUILDS_DIR="$JCODE_HOME/builds"
-    USER_DATA_DIR="$JCODE_HOME"
+    if [ -n "${NEXT_CODE_HOME:-}" ]; then
+      NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
+    else
+      NEXT_CODE_HOME_DIR="${LOCALAPPDATA:?LOCALAPPDATA not set}/next-code"
+    fi
+    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-$LOCALAPPDATA/next-code/bin}"
+    LAUNCHER="$LAUNCHER_DIR/next-code.exe"
+    BUILDS_DIR="$NEXT_CODE_HOME_DIR/builds"
+    USER_DATA_DIR="$NEXT_CODE_HOME_DIR"
     ;;
   *)
-    JCODE_HOME="$HOME/.jcode"
-    LAUNCHER_DIR="${JCODE_INSTALL_DIR:-$HOME/.local/bin}"
-    LAUNCHER="$LAUNCHER_DIR/jcode"
-    BUILDS_DIR="$JCODE_HOME/builds"
-    USER_DATA_DIR="$JCODE_HOME"
+    if [ -n "${NEXT_CODE_HOME:-}" ]; then
+      NEXT_CODE_HOME_DIR="$NEXT_CODE_HOME"
+    else
+      NEXT_CODE_HOME_DIR="$HOME/.next-code"
+    fi
+    LAUNCHER_DIR="${NEXT_CODE_INSTALL_DIR:-$HOME/.local/bin}"
+    LAUNCHER="$LAUNCHER_DIR/next-code"
+    BUILDS_DIR="$NEXT_CODE_HOME_DIR/builds"
+    USER_DATA_DIR="$NEXT_CODE_HOME_DIR"
     ;;
 esac
 
@@ -58,18 +66,19 @@ esac
 TARGETS=()
 [ -e "$LAUNCHER" ] || [ -L "$LAUNCHER" ] && TARGETS+=("$LAUNCHER (launcher)")
 [ -d "$BUILDS_DIR" ] && TARGETS+=("$BUILDS_DIR (installed binaries: stable/current/canary/versions)")
-if [ "$PURGE" = true ] && [ -d "$USER_DATA_DIR" ]; then
-  TARGETS+=("$USER_DATA_DIR (ALL user data: config, auth, sessions, logs, memory)")
+if [ "$PURGE" = true ]; then
+  [ -d "$USER_DATA_DIR" ] && \
+    TARGETS+=("$USER_DATA_DIR (ALL user data: config, auth, sessions, logs, memory)")
 fi
 
 # Compatibility wrapper installed by some setups.
 SELFDEV_WRAPPER="$HOME/.local/bin/selfdev"
-if [ -f "$SELFDEV_WRAPPER" ] && grep -q "jcode" "$SELFDEV_WRAPPER" 2>/dev/null; then
+if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
   TARGETS+=("$SELFDEV_WRAPPER (selfdev wrapper)")
 fi
 
 if [ ${#TARGETS[@]} -eq 0 ]; then
-  info "Nothing to uninstall: no jcode installation found."
+  info "Nothing to uninstall: no next-code installation found."
   exit 0
 fi
 
@@ -101,9 +110,10 @@ if [ "$ASSUME_YES" = false ]; then
   fi
 fi
 
-# Stop any running jcode server so files are not recreated mid-wipe.
+# Stop any running next-code server so files are not recreated mid-wipe.
 if command -v pkill >/dev/null 2>&1; then
-  pkill -f 'jcode( .*)? serve' 2>/dev/null || true
+  pkill -f 'next-code( .*)? serve' 2>/dev/null || true
+  pkill -f 'next-code( .*)? serve' 2>/dev/null || true
 fi
 
 remove() {
@@ -120,13 +130,13 @@ if [ "$PURGE" = true ]; then
 else
   remove "$BUILDS_DIR"
 fi
-if [ -f "$SELFDEV_WRAPPER" ] && grep -q "jcode" "$SELFDEV_WRAPPER" 2>/dev/null; then
+if [ -f "$SELFDEV_WRAPPER" ] && grep -Eq 'next-code' "$SELFDEV_WRAPPER" 2>/dev/null; then
   remove "$SELFDEV_WRAPPER"
 fi
 
-info "jcode uninstalled."
+info "next-code uninstalled."
 if [ "$PURGE" = false ]; then
-  info "Reinstall with: curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh | bash"
+  info "Reinstall with: curl -fsSL https://raw.githubusercontent.com/quangdang46/next-code/master/scripts/install.sh | bash"
 else
-  info "All jcode data wiped. Reinstall with: curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh | bash"
+  info "All next-code data wiped. Reinstall with: curl -fsSL https://raw.githubusercontent.com/quangdang46/next-code/master/scripts/install.sh | bash"
 fi

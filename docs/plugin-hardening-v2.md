@@ -1,6 +1,6 @@
 # Implementation Plan: Plugin System v2 (Harden + Custom Plugin Authoring, Rust-first)
 > Generated from research across 3 repos (opencode, oh-my-pi, pi-agent-rust) + user interview
-> **Goal:** Extend jcode's existing `jcode-plugin-core` + `jcode-plugin-runtime` + `jcode-hooks` into a full custom-plugin authoring platform — users can create their own plugins and connect them into jcode — using **oh-my-pi as the primary inspiration**, with security hardening from **pi-agent-rust**, TUI richness from **opencode**, and the existing QuickJS + SWC + RCU + preflight + audit infrastructure kept in place.
+> **Goal:** Extend next-code's existing `next-code-plugin-core` + `next-code-plugin-runtime` + `next-code-hooks` into a full custom-plugin authoring platform — users can create their own plugins and connect them into next-code — using **oh-my-pi as the primary inspiration**, with security hardening from **pi-agent-rust**, TUI richness from **opencode**, and the existing QuickJS + SWC + RCU + preflight + audit infrastructure kept in place.
 >
 > **Distribution policy (user-confirmed, 2026-06-18):**
 > 1. **NO** `npm` distribution. **NO** `npm` registry. **NO** publishing anything to npm.
@@ -14,7 +14,7 @@
 
 ## 1. Executive Summary
 
-jcode already has a sophisticated plugin runtime (QuickJS via `rquickjs` + SWC TypeScript transpiler + RCU dispatcher + `CapabilityChain` + `AuditTrail` + TUI slot system + kill switches). What's missing — and what the 3 reference repos teach us to add — is **(a) a per-tool `ToolTier` (read/write/exec) as the load-bearing approval primitive**, **(b) a manifest schema that lets plugin authors declare tier, capabilities, settings, and engines compat in one place**, **(c) a `PluginManager` that handles load/unload/rollback for local path + git clone (no npm, no marketplace)**, **(d) a Rust workspace-crate path so plugin authors can write Rust and register via `inventory::submit!`** — the preferred path for Rust developers, **(e) hot-reload for fast iteration**, **(f) a STRIDE threat model that turns "is this plugin safe?" into a checkable list of properties**, and **(g) real author documentation with two working example plugins (one TS, one Rust)**. The single architectural choice that ties everything together is the **single chokepoint pattern**: every tool call — built-in, extension-registered, workspace-crate, MCP-bridged, or hot-reloaded — must route through `RcuDispatcher::dispatch` so approval, capability check, audit, and event emission happen in one place. We will add 10 new files (incl. 1 example workspace crate), modify 9 existing files, ship two example plugins (TS + Rust), and write one threat model. Expected outcome: a Rust developer can add a new workspace crate `crates/jcode-ext-foo/`, write `registerTool` + `on("before_tool_call")` calls, run `cargo build`, and have their tool appear in the next jcode session — with the right approval prompt, the right capability check, and a clear audit trail. A TS developer can `jcode plugin load ./my-plugin` and have a TS plugin work the same way. **No npm, no marketplace, no registry, no publish step ever.**
+next-code already has a sophisticated plugin runtime (QuickJS via `rquickjs` + SWC TypeScript transpiler + RCU dispatcher + `CapabilityChain` + `AuditTrail` + TUI slot system + kill switches). What's missing — and what the 3 reference repos teach us to add — is **(a) a per-tool `ToolTier` (read/write/exec) as the load-bearing approval primitive**, **(b) a manifest schema that lets plugin authors declare tier, capabilities, settings, and engines compat in one place**, **(c) a `PluginManager` that handles load/unload/rollback for local path + git clone (no npm, no marketplace)**, **(d) a Rust workspace-crate path so plugin authors can write Rust and register via `inventory::submit!`** — the preferred path for Rust developers, **(e) hot-reload for fast iteration**, **(f) a STRIDE threat model that turns "is this plugin safe?" into a checkable list of properties**, and **(g) real author documentation with two working example plugins (one TS, one Rust)**. The single architectural choice that ties everything together is the **single chokepoint pattern**: every tool call — built-in, extension-registered, workspace-crate, MCP-bridged, or hot-reloaded — must route through `RcuDispatcher::dispatch` so approval, capability check, audit, and event emission happen in one place. We will add 10 new files (incl. 1 example workspace crate), modify 9 existing files, ship two example plugins (TS + Rust), and write one threat model. Expected outcome: a Rust developer can add a new workspace crate `crates/next-code-ext-foo/`, write `registerTool` + `on("before_tool_call")` calls, run `cargo build`, and have their tool appear in the next next-code session — with the right approval prompt, the right capability check, and a clear audit trail. A TS developer can `next-code plugin load ./my-plugin` and have a TS plugin work the same way. **No npm, no marketplace, no registry, no publish step ever.**
 
 ---
 
@@ -22,38 +22,38 @@ jcode already has a sophisticated plugin runtime (QuickJS via `rquickjs` + SWC T
 
 ### Chosen Approach
 
-**Adopt oh-my-pi's three-layer model** (capability-driven discovery + unified `Extension` surface + single chokepoint `ExtensionToolWrapper`) **on top of jcode's existing QuickJS+SWC+RCU+preflight+audit infrastructure**, **and borrow pi-agent-rust's 5-layer capability precedence + STRIDE threat model** for the security half.
+**Adopt oh-my-pi's three-layer model** (capability-driven discovery + unified `Extension` surface + single chokepoint `ExtensionToolWrapper`) **on top of next-code's existing QuickJS+SWC+RCU+preflight+audit infrastructure**, **and borrow pi-agent-rust's 5-layer capability precedence + STRIDE threat model** for the security half.
 
-The existing `jcode-plugin-core::CapabilityChain` already has 4 of the 5 layers from pi-agent-rust. We add the 5th (mode fallback) and re-name for clarity. The existing `jcode-plugin-runtime::RcuDispatcher` is exactly the single chokepoint that oh-my-pi implements with `ExtensionToolWrapper`. We keep the dispatcher and add a thin `ApprovalGate` wrapper that consults tier + capability + mode before each call.
+The existing `next-code-plugin-core::CapabilityChain` already has 4 of the 5 layers from pi-agent-rust. We add the 5th (mode fallback) and re-name for clarity. The existing `next-code-plugin-runtime::RcuDispatcher` is exactly the single chokepoint that oh-my-pi implements with `ExtensionToolWrapper`. We keep the dispatcher and add a thin `ApprovalGate` wrapper that consults tier + capability + mode before each call.
 
-The existing `jcode-plugin-core::PluginManifest` is already similar to oh-my-pi's. We extend it (add `tier`, `approval`, structured `capabilities`, `engines.jcode`) and bump the schema to `jcode-plugin.v2`. The existing `jcode-plugin-runtime::PluginLoader` handles file/JS/TS loading; we add npm install + git clone + project override + rollback on top.
+The existing `next-code-plugin-core::PluginManifest` is already similar to oh-my-pi's. We extend it (add `tier`, `approval`, structured `capabilities`, `engines.next-code`) and bump the schema to `next-code-plugin.v2`. The existing `next-code-plugin-runtime::PluginLoader` handles file/JS/TS loading; we add npm install + git clone + project override + rollback on top.
 
 The new pieces (none invented from scratch — all adapted from the 3 repos):
-- **`ToolTier`** in `jcode-tool-types` (from omp `ToolTier = "read" | "write" | "exec"`)
-- **`PluginManager`** in `jcode-plugin-core::manager` (from omp `PluginManager` install/uninstall/list/link with backup/rollback)
-- **`ApprovalGate`** in `jcode-plugin-runtime::gate` (from omp `ExtensionToolWrapper.execute()` + pia `WasmExtensionToolWrapper` with timeout)
-- **`HotReload`** in `jcode-plugin-runtime::loader` (new — neither omp nor pia have it, but opencode's `PluginMeta.fingerprint` is the seed for "did the file change")
+- **`ToolTier`** in `next-code-tool-types` (from omp `ToolTier = "read" | "write" | "exec"`)
+- **`PluginManager`** in `next-code-plugin-core::manager` (from omp `PluginManager` install/uninstall/list/link with backup/rollback)
+- **`ApprovalGate`** in `next-code-plugin-runtime::gate` (from omp `ExtensionToolWrapper.execute()` + pia `WasmExtensionToolWrapper` with timeout)
+- **`HotReload`** in `next-code-plugin-runtime::loader` (new — neither omp nor pia have it, but opencode's `PluginMeta.fingerprint` is the seed for "did the file change")
 - **`PluginThreatModel`** doc (from pia `docs/extension-runtime-threat-model.md`)
 
 ### Alternatives Considered
 
 | Approach | Source Repo | Pros | Cons | Decision |
 |----------|-------------|------|------|----------|
-| **Adopt omp's 3-layer model + harden with pia's security, Rust-first distribution** | omp + pia | Builds on jcode's existing system. omp's authoring surface is closest to jcode's QuickJS+JS. pia gives us STRIDE + 5-layer precedence. Adds Rust workspace-crate path so plugin authors can write Rust without ever touching npm. Risk: small, mostly additive. | Two inspirations means we have to reconcile omp's `tier: read\|write\|exec` with pia's 5-layer `ExtensionPolicy`. | **CHOSEN** |
+| **Adopt omp's 3-layer model + harden with pia's security, Rust-first distribution** | omp + pia | Builds on next-code's existing system. omp's authoring surface is closest to next-code's QuickJS+JS. pia gives us STRIDE + 5-layer precedence. Adds Rust workspace-crate path so plugin authors can write Rust without ever touching npm. Risk: small, mostly additive. | Two inspirations means we have to reconcile omp's `tier: read\|write\|exec` with pia's 5-layer `ExtensionPolicy`. | **CHOSEN** |
 | Adopt pia's full WASM runtime as the only path | pia | Cleanest ABI, true sandbox, formal threat model. | Requires `wasmtime` ~80MB+ dependency, breaks QuickJS path, huge refactor, not the user's stage. | REJECTED — too costly for dev stage. Stretch goal (v3): add WASM as a parallel runtime behind a feature flag. |
 | Adopt opencode's V1+V2 split (V1 in-process, V2 Effect-based) | opencode | Two-layer server+TUI is clean. | Effect-based V2 is TypeScript-specific (Effect library). Rust has no equivalent. Would require designing a new "Effect for Rust" runtime. | REJECTED — wrong language. Borrow opencode's two-layer (server + TUI) split but not the Effect pattern. |
 | Rewrite from scratch on a clean foundation | none | Cleanest design. | Throws away QuickJS+SWC+RCU+preflight+audit investment. High risk, no incremental value. | REJECTED — user already has the foundation. |
-| **Reject all npm/marketplace distribution** | (user constraint) | No registry dependency, no publish step, no version coupling, simpler mental model. Plugin author keeps full control of their code. | Smaller plugin ecosystem (no `npm install jcode-plugin-foo`). | **CHOSEN** — user explicitly opted out. Three distribution paths only: local path, git clone, Rust workspace crate. |
+| **Reject all npm/marketplace distribution** | (user constraint) | No registry dependency, no publish step, no version coupling, simpler mental model. Plugin author keeps full control of their code. | Smaller plugin ecosystem (no `npm install next-code-plugin-foo`). | **CHOSEN** — user explicitly opted out. Three distribution paths only: local path, git clone, Rust workspace crate. |
 | Drop QuickJS entirely, go Rust-only | (hypothetical) | One language, no SWC transpiler dep, type-safe plugin code. | Loses the existing QuickJS+SWC+audit+preflight investment. Plugin author must compile before testing. | REJECTED — keep QuickJS for JS/TS plugins; add Rust workspace-crate path as the preferred option. |
 
 ---
 
 ## 3. Data Structures & Types
 
-All new types go in `jcode-plugin-core`. The plan modifies `manifest.rs` and `security.rs`; the `manager` module is new.
+All new types go in `next-code-plugin-core`. The plan modifies `manifest.rs` and `security.rs`; the `manager` module is new.
 
 ```rust
-// crates/jcode-plugin-core/src/manifest.rs — additions
+// crates/next-code-plugin-core/src/manifest.rs — additions
 
 /// Tier of risk/privilege a tool carries. Adapted from omp's ToolTier
 /// (https://github.com/can1357/oh-my-pi/blob/main/packages/agent/src/types.ts#L477-L489).
@@ -75,12 +75,12 @@ impl Default for ToolTier {
     fn default() -> Self { Self::Exec }
 }
 
-/// v2 manifest. Bumps schema to "jcode-plugin.v2". v1 manifests
-/// (`jcode-plugin.v1` or `pi/omp/opencode` field) are auto-upgraded
+/// v2 manifest. Bumps schema to "next-code-plugin.v2". v1 manifests
+/// (`next-code-plugin.v1` or `pi/omp/opencode` field) are auto-upgraded
 /// via `PluginManifest::migrate_v1_to_v2` at load time.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginManifestV2 {
-    pub schema: PluginSchemaVersion,                // = "jcode-plugin.v2"
+    pub schema: PluginSchemaVersion,                // = "next-code-plugin.v2"
     pub name: String,
     pub package_name: String,                       // npm-style "scope/name"
     pub version: String,                            // semver
@@ -91,7 +91,7 @@ pub struct PluginManifestV2 {
     pub approval: PluginApprovalPolicy,             // default approval policy
     pub features: HashMap<String, PluginFeature>,
     pub settings: HashMap<String, SettingSchema>,
-    pub engines: PluginEngines,                     // { jcode: ">=0.29" }
+    pub engines: PluginEngines,                     // { next-code: ">=0.29" }
     pub description: Option<String>,
     pub author: Option<String>,
     pub license: Option<String>,
@@ -101,7 +101,7 @@ pub struct PluginManifestV2 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum PluginSchemaVersion { #[serde(rename = "jcode-plugin.v2")] V2 }
+pub enum PluginSchemaVersion { #[serde(rename = "next-code-plugin.v2")] V2 }
 
 /// Per-tool tier override and approval declaration.
 /// Borrowed from omp's ToolApproval (function form): either a static tier
@@ -125,7 +125,7 @@ impl Default for PluginApprovalPolicy {
 }
 
 /// Capabilities with explicit types per omp + pia.
-/// Replaces jcode's current free-form `PluginCapabilities { fs_read, fs_write, ... }`
+/// Replaces next-code's current free-form `PluginCapabilities { fs_read, fs_write, ... }`
 /// with a structured form that the preflight static analyzer can verify.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PluginCapabilities {
@@ -153,11 +153,11 @@ pub struct PluginCapabilities {
 ```
 
 ```rust
-// crates/jcode-plugin-core/src/security.rs — additions
+// crates/next-code-plugin-core/src/security.rs — additions
 
 /// 5-layer capability chain. Adapted from pi-agent-rust's ExtensionPolicy
 /// (https://github.com/Dicklesworthstone/pi_agent_rust/blob/main/src/extensions.rs#L2146)
-/// and omp's per-extension + global policy merge. The current jcode
+/// and omp's per-extension + global policy merge. The current next-code
 /// CapabilityChain has 4 layers; we add a "mode fallback" layer that
 /// kicks in when no allow/deny list matches.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -272,7 +272,7 @@ impl CapabilityChainV2 {
 ```
 
 ```rust
-// crates/jcode-plugin-core/src/manager.rs — new file (excerpt)
+// crates/next-code-plugin-core/src/manager.rs — new file (excerpt)
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -284,9 +284,9 @@ use tokio::sync::RwLock;
 pub struct PluginManager {
     state: Arc<RwLock<PluginState>>,
     loader: Arc<PluginLoader>,
-    install_root: PathBuf,         // ~/.jcode/plugins/
-    lock_path: PathBuf,            // ~/.jcode/plugins/installed.json
-    backup_dir: PathBuf,           // ~/.jcode/plugins/.backups/
+    install_root: PathBuf,         // ~/.next-code/plugins/
+    lock_path: PathBuf,            // ~/.next-code/plugins/installed.json
+    backup_dir: PathBuf,           // ~/.next-code/plugins/.backups/
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -348,7 +348,7 @@ impl PluginManager {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum PluginSource {
     /// Load a plugin from a local path (file or directory). The directory
-    /// must contain a `package.json` with a `jcode-plugin.v2` field, or
+    /// must contain a `package.json` with a `next-code-plugin.v2` field, or
     /// (for TS plugins) an `index.ts`/`index.js` entry. Plugin source is
     /// NOT copied to `install_root` — the loader resolves the path at
     /// every startup. This is the simplest distribution and ideal for
@@ -362,7 +362,7 @@ pub enum PluginSource {
     /// plugin author can document build steps in their README.
     Git { url: String, rev: Option<String> },
 
-    /// Reference a Rust crate that is already a member of the jcode
+    /// Reference a Rust crate that is already a member of the next-code
     /// workspace. The crate's `lib.rs` uses `inventory::submit!` to
     /// register itself at link time. This is the **preferred** path for
     /// plugin authors who want full Rust type safety, no JS/TS layer,
@@ -377,10 +377,10 @@ pub enum PluginSource {
 ```
 
 ```rust
-// crates/jcode-plugin-runtime/src/gate.rs — new file (excerpt)
+// crates/next-code-plugin-runtime/src/gate.rs — new file (excerpt)
 
-use jcode_plugin_core::{AccessDecisionV2, CapabilityAction, CapabilityChainV2, ToolTier};
-use jcode_tui_permissions::PermissionMode;
+use next_code_plugin_core::{AccessDecisionV2, CapabilityAction, CapabilityChainV2, ToolTier};
+use next_code_tui_permissions::PermissionMode;
 
 /// ApprovalGate is the single chokepoint that wraps every tool invocation.
 /// It consults: (1) per-tool tier, (2) capability chain, (3) current
@@ -608,7 +608,7 @@ FUNCTION plugin_manager_install(source) -> Result<InstalledPlugin>:
 
     # 3. Read + parse manifest (with v1→v2 migration)
     manifest = read_manifest(resolved)
-    IF error OR schema != "jcode-plugin.v2":
+    IF error OR schema != "next-code-plugin.v2":
         IF can_migrate: manifest = migrate_v1_to_v2(manifest)
         ELSE: ROLLBACK with "unsupported schema"
 
@@ -618,11 +618,11 @@ FUNCTION plugin_manager_install(source) -> Result<InstalledPlugin>:
         ROLLBACK with "preflight failed: " + issues
 
     # 5. Check engines compatibility
-    IF manifest.engines.jcode AND NOT semver_compatible(manifest.engines.jcode, JCODE_VERSION):
-        ROLLBACK with "engines.jcode mismatch"
+    IF manifest.engines.next-code AND NOT semver_compatible(manifest.engines.next-code, NEXT_CODE_VERSION):
+        ROLLBACK with "engines.next-code mismatch"
 
     # 6. Check per-extension kill switch
-    IF env_var("JCODE_PLUGIN_KILL_" + manifest.package_name.uppercase()) == "1":
+    IF env_var("NEXT_CODE_PLUGIN_KILL_" + manifest.package_name.uppercase()) == "1":
         ROLLBACK with "per-extension kill switch set"
 
     # 7. Move resolved to install_root/<package_name>/
@@ -642,7 +642,7 @@ FUNCTION plugin_manager_install(source) -> Result<InstalledPlugin>:
 
 ## 5. Implementation Code
 
-### File: `crates/jcode-plugin-core/src/manifest.rs` (modify)
+### File: `crates/next-code-plugin-core/src/manifest.rs` (modify)
 
 Add `ToolTier`, `PluginSchemaVersion`, `PluginApprovalPolicy`, `PluginCapabilities` (replace the existing free-form version with the structured one). Bump schema to v2. Add `migrate_v1_to_v2` function.
 
@@ -651,17 +651,17 @@ Add `ToolTier`, `PluginSchemaVersion`, `PluginApprovalPolicy`, `PluginCapabiliti
 
 impl PluginManifestV2 {
     /// Parse from package.json value, with v1→v2 migration.
-    /// v1 manifests have the same fields but as `jcode` or `pi` (legacy) keys
+    /// v1 manifests have the same fields but as `next-code` or `pi` (legacy) keys
     /// and use the old free-form PluginCapabilities. We detect by checking
-    /// for `schema: "jcode-plugin.v2"`.
+    /// for `schema: "next-code-plugin.v2"`.
     pub fn from_package_json(value: &serde_json::Value) -> Result<Self, PluginError> {
         // First try v2 explicit schema
-        if let Some(section) = value.get("jcode-plugin").and_then(|v| v.get("v2")) {
+        if let Some(section) = value.get("next-code-plugin").and_then(|v| v.get("v2")) {
             return serde_json::from_value(section.clone())
                 .map_err(|e| PluginError::InvalidManifest(e.to_string()));
         }
-        // Then try v1 keys: "jcode", "pi", "omp", "opencode" (any of these means it's v1)
-        for key in &["jcode", "pi", "omp", "opencode"] {
+        // Then try v1 keys: "next-code", "pi", "omp", "opencode" (any of these means it's v1)
+        for key in &["next-code", "pi", "omp", "opencode"] {
             if let Some(section) = value.get(*key) {
                 let v1: PluginManifestV1 = serde_json::from_value(section.clone())
                     .map_err(|e| PluginError::InvalidManifest(format!("v1 parse: {}", e)))?;
@@ -738,11 +738,11 @@ pub struct PluginCapabilitiesV1 {
 }
 ```
 
-### File: `crates/jcode-plugin-core/src/security.rs` (modify)
+### File: `crates/next-code-plugin-core/src/security.rs` (modify)
 
 Replace the existing `CapabilityChain` with `CapabilityChainV2` (5 layers, structured return). Keep `CapabilityChain` as a deprecated type alias for one release, then remove.
 
-### File: `crates/jcode-plugin-core/src/manager.rs` (new)
+### File: `crates/next-code-plugin-core/src/manager.rs` (new)
 
 Full file content from Section 3 excerpt above, plus:
 - `install_inner` (the actual install steps)
@@ -752,18 +752,18 @@ Full file content from Section 3 excerpt above, plus:
 - `load_state` (read installed.json, missing file → empty state)
 - `get_enabled` (read state, return only `enabled: true` plugins for the loader)
 
-### File: `crates/jcode-plugin-core/src/lib.rs` (modify)
+### File: `crates/next-code-plugin-core/src/lib.rs` (modify)
 
 Add `pub mod manager;` and re-export the new types.
 
-### File: `crates/jcode-plugin-runtime/src/gate.rs` (new)
+### File: `crates/next-code-plugin-runtime/src/gate.rs` (new)
 
 Full file content from Section 3 excerpt above, plus:
 - `with_user_override(user_overrides: HashMap<String, ApprovalOverride>) -> Self` builder
 - `set_mode(mode: PermissionMode)` for live mode changes
 - `format_prompt(prompt: &ApprovalPrompt) -> String` for the UI
 
-### File: `crates/jcode-plugin-runtime/src/dispatcher.rs` (modify)
+### File: `crates/next-code-plugin-runtime/src/dispatcher.rs` (modify)
 
 The current `RcuDispatcher::dispatch` (which is the single chokepoint) needs to be wired to call `ApprovalGate::check` before `tool.execute()`. The change is small:
 
@@ -835,7 +835,7 @@ impl RcuDispatcher {
 }
 ```
 
-### File: `crates/jcode-plugin-runtime/src/loader.rs` (modify)
+### File: `crates/next-code-plugin-runtime/src/loader.rs` (modify)
 
 Add `reload(plugin_id: &PluginId) -> Result<(), LoaderError>` for hot-reload. The implementation:
 
@@ -891,24 +891,24 @@ impl PluginLoader {
 }
 ```
 
-### File: `crates/jcode-plugin-runtime/src/server.rs` (modify)
+### File: `crates/next-code-plugin-runtime/src/server.rs` (modify)
 
 Add per-extension kill switch check in `PluginSystem::load`:
 
 ```rust
 fn is_killed(plugin_name: &str) -> bool {
-    if std::env::var("JCODE_PLUGIN_KILL_ALL").is_ok() { return true; }
-    let key = format!("JCODE_PLUGIN_KILL_{}", plugin_name.to_uppercase().replace('-', "_").replace('/', "_"));
+    if std::env::var("NEXT_CODE_PLUGIN_KILL_ALL").is_ok() { return true; }
+    let key = format!("NEXT_CODE_PLUGIN_KILL_{}", plugin_name.to_uppercase().replace('-', "_").replace('/', "_"));
     std::env::var(&key).map(|v| v == "1").unwrap_or(false)
 }
 ```
 
-### File: `crates/jcode-tui-permissions/src/lib.rs` (modify)
+### File: `crates/next-code-tui-permissions/src/lib.rs` (modify)
 
 Add `PermissionMode` mapping to `ToolTier` so the existing modes work with the new tier system:
 
 ```rust
-use jcode_plugin_core::ToolTier;
+use next_code_plugin_core::ToolTier;
 
 impl PermissionMode {
     /// Map a tier + this mode to whether the tier is auto-approved.
@@ -928,12 +928,12 @@ impl PermissionMode {
 }
 ```
 
-### File: `crates/jcode-tool-types/src/lib.rs` (modify)
+### File: `crates/next-code-tool-types/src/lib.rs` (modify)
 
 Add `ToolTier` re-export and a `Tool::declared_tier()` method (default returns `None`, meaning "use manifest's default tier"):
 
 ```rust
-pub use jcode_plugin_core::ToolTier;
+pub use next_code_plugin_core::ToolTier;
 
 #[async_trait]
 pub trait Tool: Send + Sync {
@@ -954,11 +954,11 @@ pub trait Tool: Send + Sync {
   "name": "hello-plugin",
   "version": "0.1.0",
   "description": "A demo plugin that registers a tool and a hook",
-  "jcode-plugin": {
+  "next-code-plugin": {
     "v2": {
-      "schema": "jcode-plugin.v2",
+      "schema": "next-code-plugin.v2",
       "name": "Hello Plugin",
-      "package_name": "jcode-hello-plugin",
+      "package_name": "next-code-hello-plugin",
       "version": "0.1.0",
       "kind": "server",
       "entry": { "server": "index.ts" },
@@ -967,7 +967,7 @@ pub trait Tool: Send + Sync {
         "fs_write": ["output.txt"]
       },
       "approval": { "kind": "default" },
-      "engines": { "jcode": ">=0.29" }
+      "engines": { "next-code": ">=0.29" }
     }
   }
 }
@@ -976,10 +976,10 @@ pub trait Tool: Send + Sync {
 ### File: `examples/plugins/hello-plugin/index.ts` (new)
 
 ```typescript
-// Authored as TypeScript, transpiled by jcode-plugin-runtime::Transpiler (SWC).
+// Authored as TypeScript, transpiled by next-code-plugin-runtime::Transpiler (SWC).
 // Same authoring surface as omp's `examples/extensions/hello.ts`.
 
-import type { ExtensionAPI } from "@jcode/plugin-api";
+import type { ExtensionAPI } from "@next-code/plugin-api";
 
 export default function (pi: ExtensionAPI): void {
   // Register a tool. Tier declared as "write" (the plugin's default).
@@ -1004,17 +1004,17 @@ export default function (pi: ExtensionAPI): void {
 }
 ```
 
-### File: `crates/jcode-ext-hello/Cargo.toml` (new — Rust workspace-crate example)
+### File: `crates/next-code-ext-hello/Cargo.toml` (new — Rust workspace-crate example)
 
 ```toml
 [package]
-name = "jcode-ext-hello"
+name = "next-code-ext-hello"
 version = "0.1.0"
 edition = "2024"
-description = "Hello-world example plugin written in Rust (workspace crate, compiled into the jcode binary)"
+description = "Hello-world example plugin written in Rust (workspace crate, compiled into the next-code binary)"
 
 [dependencies]
-jcode-plugin-core = { path = "../jcode-plugin-core" }
+next-code-plugin-core = { path = "../next-code-plugin-core" }
 inventory = "0.3"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -1022,16 +1022,16 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["fs", "macros"] }
 ```
 
-### File: `crates/jcode-ext-hello/src/lib.rs` (new — Rust example)
+### File: `crates/next-code-ext-hello/src/lib.rs` (new — Rust example)
 
 ```rust
-//! Hello-world plugin authored in Rust, compiled into the jcode binary.
+//! Hello-world plugin authored in Rust, compiled into the next-code binary.
 //! Registers itself via the `inventory` crate at link time; the host scans
 //! `inventory::iter::<PluginDescriptor>()` at startup and instantiates each
-//! submitted plugin. No `jcode plugin install` step needed — just `cargo build`.
+//! submitted plugin. No `next-code plugin install` step needed — just `cargo build`.
 
 use std::sync::Arc;
-use jcode_plugin_core::prelude::*;  // {PluginDescriptor, register, Tier, ...}
+use next_code_plugin_core::prelude::*;  // {PluginDescriptor, register, Tier, ...}
 
 pub struct HelloPlugin;
 
@@ -1041,7 +1041,7 @@ impl ExtensionHandler for HelloPlugin {
         PluginManifestV2 {
             schema: PluginSchemaVersion::V2,
             name: "Hello Plugin (Rust)".into(),
-            package_name: "jcode-ext-hello".into(),
+            package_name: "next-code-ext-hello".into(),
             version: "0.1.0".into(),
             kind: PluginKind::Server,
             entry: PluginEntry::default(), // not used for workspace crates
@@ -1053,7 +1053,7 @@ impl ExtensionHandler for HelloPlugin {
             approval: PluginApprovalPolicy::Default,
             features: Default::default(),
             settings: Default::default(),
-            engines: PluginEngines { jcode: Some(">=0.29".into()), ..Default::default() },
+            engines: PluginEngines { next-code: Some(">=0.29".into()), ..Default::default() },
             description: Some("Rust example plugin".into()),
             author: None, license: None, homepage: None, repository: None, tags: vec![],
         }
@@ -1097,21 +1097,21 @@ impl ExtensionHandler for HelloPlugin {
 // the binary. Same pattern as `axum`, `metrics`, `tower`.
 inventory::submit! {
     PluginDescriptor::new(
-        "jcode-ext-hello",
+        "next-code-ext-hello",
         HelloPlugin::register_manifest_and_handler,
     )
 }
 ```
 
-To enable/disable this plugin in the host, the user edits `~/.jcode/config.toml`:
+To enable/disable this plugin in the host, the user edits `~/.next-code/config.toml`:
 
 ```toml
 [plugins.workspace]
-"jcode-ext-hello" = { enabled = true }
-# "jcode-ext-other" = { enabled = false }
+"next-code-ext-hello" = { enabled = true }
+# "next-code-ext-other" = { enabled = false }
 ```
 
-No `jcode plugin install` step. The crate is a workspace member, so `cargo build` links it in. The host enables/disables at startup by checking the config flag. This is the **fastest iteration loop** for Rust plugin authors: edit `.rs` → `cargo build` → restart jcode → test.
+No `next-code plugin install` step. The crate is a workspace member, so `cargo build` links it in. The host enables/disables at startup by checking the config flag. This is the **fastest iteration loop** for Rust plugin authors: edit `.rs` → `cargo build` → restart next-code → test.
 
 ### File: `docs/plugins.md` (new)
 
@@ -1123,7 +1123,7 @@ Modeled on omp's `docs/extensions.md` (417 lines). Covers:
 5. Capability model (fs_read, fs_write, http_hosts, env_read, shell_commands, requires_tools)
 6. Approval model (ToolTier, ApprovalOverride, mode interaction)
 7. Examples (one tool, one hook, one command)
-8. Testing (jcode-plugin-runtime's `integration_tests.rs` pattern)
+8. Testing (next-code-plugin-runtime's `integration_tests.rs` pattern)
 9. Distribution (npm, git, local path, link)
 10. Migration from v1
 11. Security checklist (STRIDE threat model)
@@ -1145,7 +1145,7 @@ Each threat has: description, attack scenario, mitigation, test reference (point
 
 ## 6. Configuration & Wiring
 
-### `~/.jcode/config.toml` additions
+### `~/.next-code/config.toml` additions
 
 ```toml
 [plugins]
@@ -1172,41 +1172,41 @@ http_hosts = ["169.254.169.254"]  # AWS metadata service
 
 # Per-plugin allow list. Tool names here are auto-approved for the named plugin.
 [plugins.allow]
-"jcode-hello-plugin" = ["hello"]
-"jcode-grep-plugin" = ["grep"]
+"next-code-hello-plugin" = ["hello"]
+"next-code-grep-plugin" = ["grep"]
 
 # Per-extension kill switch. Setting this disables the plugin at load time.
-# Mirrors JCODE_PLUGIN_KILL_<name>=1 env var.
+# Mirrors NEXT_CODE_PLUGIN_KILL_<name>=1 env var.
 [plugins.kill]
 "some-plugin" = true
 
-# Workspace-crate plugins (compiled into the jcode binary, discovered via
+# Workspace-crate plugins (compiled into the next-code binary, discovered via
 # the `inventory` crate). Keyed by crate name. Enabled by default; toggle
 # off here to exclude from the registry without removing the crate.
 [plugins.workspace]
-"jcode-ext-hello"   = { enabled = true }
-"jcode-ext-grep"    = { enabled = true }
-"jcode-ext-noisy"   = { enabled = false }  # excluded without recompile
+"next-code-ext-hello"   = { enabled = true }
+"next-code-ext-grep"    = { enabled = true }
+"next-code-ext-noisy"   = { enabled = false }  # excluded without recompile
 
 # Per-plugin settings (override defaults declared in the plugin's manifest).
 # Type-checked against the manifest's `settings` schema if present.
-[plugins.settings."jcode-ext-grep"]
+[plugins.settings."next-code-ext-grep"]
 case_insensitive = true
 max_results = 200
 ```
 
-### `~/.jcode/plugins/installed.json` schema
+### `~/.next-code/plugins/installed.json` schema
 
 The on-disk state file for `PluginManager`:
 
 ```json
 {
-  "schema": "jcode-plugin-state.v1",
+  "schema": "next-code-plugin-state.v1",
   "installed": {
-    "jcode-hello-plugin": {
-      "manifest": { "schema": "jcode-plugin.v2", "name": "Hello Plugin", "package_name": "jcode-hello-plugin", "version": "0.1.0", ... },
-      "source": { "kind": "local", "path": "/Users/foo/.jcode/plugins/jcode-hello-plugin" },
-      "install_path": "/Users/foo/.jcode/plugins/jcode-hello-plugin",
+    "next-code-hello-plugin": {
+      "manifest": { "schema": "next-code-plugin.v2", "name": "Hello Plugin", "package_name": "next-code-hello-plugin", "version": "0.1.0", ... },
+      "source": { "kind": "local", "path": "/Users/foo/.next-code/plugins/next-code-hello-plugin" },
+      "install_path": "/Users/foo/.next-code/plugins/next-code-hello-plugin",
       "installed_at": "2026-06-18T10:30:00Z",
       "enabled": true,
       "settings": { "greeting_prefix": "Howdy" }
@@ -1219,54 +1219,54 @@ The on-disk state file for `PluginManager`:
 
 | Var | Effect |
 |-----|--------|
-| `JCODE_PLUGIN_KILL_ALL=1` | Disable all plugins (existing) |
-| `JCODE_PLUGIN_FORCE_DENY=1` | Force-deny all plugin tool calls (existing) |
-| `JCODE_PLUGIN_SKIP_HOOKS=1` | Skip plugin event handlers (existing) |
-| `JCODE_PLUGIN_KILL_<UPPERCASE_NAME>=1` | Kill switch for a specific plugin (new) |
-| `JCODE_PLUGIN_LOG=trace` | Trace-level logging for plugin subsystem (new) |
-| `JCODE_PLUGIN_AUDIT_PATH=/path/audit.log` | Override audit log path (new) |
+| `NEXT_CODE_PLUGIN_KILL_ALL=1` | Disable all plugins (existing) |
+| `NEXT_CODE_PLUGIN_FORCE_DENY=1` | Force-deny all plugin tool calls (existing) |
+| `NEXT_CODE_PLUGIN_SKIP_HOOKS=1` | Skip plugin event handlers (existing) |
+| `NEXT_CODE_PLUGIN_KILL_<UPPERCASE_NAME>=1` | Kill switch for a specific plugin (new) |
+| `NEXT_CODE_PLUGIN_LOG=trace` | Trace-level logging for plugin subsystem (new) |
+| `NEXT_CODE_PLUGIN_AUDIT_PATH=/path/audit.log` | Override audit log path (new) |
 
-### CLI additions (`jcode plugin` subcommand)
+### CLI additions (`next-code plugin` subcommand)
 
 **Three subcommands, one per distribution path. No `npm`, no `npx`, no registry lookup anywhere.**
 
 ```
 # Local path: load a plugin from a directory or .ts/.js file
-jcode plugin load ./plugins/my-plugin           # load a directory (with package.json + index.ts)
-jcode plugin load ./plugins/my-plugin/index.ts  # load a single file
-jcode plugin load ~/code/my-plugin
+next-code plugin load ./plugins/my-plugin           # load a directory (with package.json + index.ts)
+next-code plugin load ./plugins/my-plugin/index.ts  # load a single file
+next-code plugin load ~/code/my-plugin
 
-# Git: clone to ~/.jcode/plugins/<name>/ then load as local
-jcode plugin clone https://github.com/foo/bar.git
-jcode plugin clone https://github.com/foo/bar.git --rev v1.2.3
-jcode plugin clone git@github.com:foo/bar.git
+# Git: clone to ~/.next-code/plugins/<name>/ then load as local
+next-code plugin clone https://github.com/foo/bar.git
+next-code plugin clone https://github.com/foo/bar.git --rev v1.2.3
+next-code plugin clone git@github.com:foo/bar.git
 
 # Workspace crate: nothing to do — already compiled in. Just toggle on/off.
 # (The host scans inventory::iter::<PluginDescriptor>() at startup.)
-jcode plugin list --kind workspace             # show all linked-in workspace crates
-jcode plugin info jcode-ext-hello              # show manifest + capabilities
+next-code plugin list --kind workspace             # show all linked-in workspace crates
+next-code plugin info next-code-ext-hello              # show manifest + capabilities
 
 # Common operations on all installed plugins
-jcode plugin list                              # show all (local + git-cloned + workspace)
-jcode plugin reload <name>                     # hot-reload a single plugin
-jcode plugin unload <name>                     # remove a previously-loaded plugin
-jcode plugin enable <name>                     # re-enable a disabled plugin
-jcode plugin disable <name>                    # disable without unloading
+next-code plugin list                              # show all (local + git-cloned + workspace)
+next-code plugin reload <name>                     # hot-reload a single plugin
+next-code plugin unload <name>                     # remove a previously-loaded plugin
+next-code plugin enable <name>                     # re-enable a disabled plugin
+next-code plugin disable <name>                    # disable without unloading
 ```
 
-The `load` command copies (or symlinks with `--symlink`) the source into `~/.jcode/plugins/<name>/` so subsequent runs are stable. The `clone` command does the same with `git clone`. The `workspace` crates are discovered via `inventory` at link time and gated by `[plugins.workspace]` in config.toml.
+The `load` command copies (or symlinks with `--symlink`) the source into `~/.next-code/plugins/<name>/` so subsequent runs are stable. The `clone` command does the same with `git clone`. The `workspace` crates are discovered via `inventory` at link time and gated by `[plugins.workspace]` in config.toml.
 
-**No `jcode plugin install <npm-spec>`. No `jcode plugin marketplace`. The plugin source always originates from local files or a git clone the user explicitly invokes.**
+**No `next-code plugin install <npm-spec>`. No `next-code plugin marketplace`. The plugin source always originates from local files or a git clone the user explicitly invokes.**
 
-### Integration with `jcode-app-core`
+### Integration with `next-code-app-core`
 
-`jcode-app-core` already wires `RcuDispatcher` into the agent loop. The new wiring:
-1. On startup, `PluginManager::load_state` reads `~/.jcode/plugins/installed.json`.
+`next-code-app-core` already wires `RcuDispatcher` into the agent loop. The new wiring:
+1. On startup, `PluginManager::load_state` reads `~/.next-code/plugins/installed.json`.
 2. The host scans `inventory::iter::<PluginDescriptor>()` to find all workspace-crate plugins compiled into the binary. Enabled ones (per `[plugins.workspace]`) are registered.
 3. For each enabled local/git-cloned plugin, `PluginLoader::load` instantiates the QuickJS context, runs preflight, calls the plugin's default export, captures `registerTool`/`on` calls, and inserts into the registry.
 4. `ApprovalGate` is constructed from the merged `[plugins.approval]` + `[plugins.deny]` + `[plugins.allow]` + `mode` from config.toml.
 5. `RcuDispatcher` holds a reference to `ApprovalGate`; `dispatch` calls `gate.check` first.
-6. The agent loop's tool-call handler uses `RcuDispatcher::dispatch` for every tool (built-in, workspace-crate, or local/git-cloned plugin). The audit of every call goes to `~/.jcode/logs/jcode-YYYY-MM-DD.log` (existing) and optionally to `JCODE_PLUGIN_AUDIT_PATH` if set.
+6. The agent loop's tool-call handler uses `RcuDispatcher::dispatch` for every tool (built-in, workspace-crate, or local/git-cloned plugin). The audit of every call goes to `~/.next-code/logs/next-code-YYYY-MM-DD.log` (existing) and optionally to `NEXT_CODE_PLUGIN_AUDIT_PATH` if set.
 
 ---
 
@@ -1292,22 +1292,22 @@ The `load` command copies (or symlinks with `--symlink`) the source into `~/.jco
 | immer `Draft` for safe hook output mutation | opencode | `packages/core/src/plugin.ts:136-167` | https://github.com/anomalyco/opencode/blob/main/packages/core/src/plugin.ts#L136-L167 |
 | Two-layer server + TUI split | opencode | `packages/opencode/specs/tui-plugins.md` | https://github.com/anomalyco/opencode/blob/main/packages/opencode/specs/tui-plugins.md |
 | TUI plugin API (`keymap`, `slots`, `route`) | opencode | `packages/plugin/src/tui.ts:1` | https://github.com/anomalyco/opencode/blob/main/packages/plugin/src/tui.ts |
-| Existing `CapabilityChain` (4 layers) | jcode | `crates/jcode-plugin-core/src/security.rs` | (current file in this repo) |
-| Existing `RcuDispatcher` | jcode | `crates/jcode-plugin-runtime/src/dispatcher.rs` | (current file in this repo) |
-| Existing `AuditTrail` | jcode | `crates/jcode-plugin-runtime/src/audit.rs` | (current file in this repo) |
-| Existing `TuiPluginApi` + `SlotRegistry` | jcode | `crates/jcode-plugin-runtime/src/tui_api.rs`, `tui_system.rs` | (current files in this repo) |
-| Existing permission modes | jcode | `crates/jcode-tui-permissions/src/lib.rs` | (current file in this repo) |
+| Existing `CapabilityChain` (4 layers) | next-code | `crates/next-code-plugin-core/src/security.rs` | (current file in this repo) |
+| Existing `RcuDispatcher` | next-code | `crates/next-code-plugin-runtime/src/dispatcher.rs` | (current file in this repo) |
+| Existing `AuditTrail` | next-code | `crates/next-code-plugin-runtime/src/audit.rs` | (current file in this repo) |
+| Existing `TuiPluginApi` + `SlotRegistry` | next-code | `crates/next-code-plugin-runtime/src/tui_api.rs`, `tui_system.rs` | (current files in this repo) |
+| Existing permission modes | next-code | `crates/next-code-tui-permissions/src/lib.rs` | (current file in this repo) |
 
 ---
 
 ## 8. Test Cases
 
-Tests go in the existing test modules: `crates/jcode-plugin-core/src/tests.rs`, `crates/jcode-plugin-runtime/src/integration_tests.rs`. Use the existing fixture patterns.
+Tests go in the existing test modules: `crates/next-code-plugin-core/src/tests.rs`, `crates/next-code-plugin-runtime/src/integration_tests.rs`. Use the existing fixture patterns.
 
 ### Happy Path
 
 ```rust
-// crates/jcode-plugin-runtime/src/integration_tests.rs
+// crates/next-code-plugin-runtime/src/integration_tests.rs
 
 #[tokio::test]
 async fn dispatch_allows_read_tier_in_accept_edits_mode() {
@@ -1367,7 +1367,7 @@ async fn user_override_deny_wins_over_mode() {
 ### Capability Chain 5-Layer Tests
 
 ```rust
-// crates/jcode-plugin-core/src/tests.rs
+// crates/next-code-plugin-core/src/tests.rs
 
 #[test]
 fn chain_layer1_plugin_deny_wins() {
@@ -1455,7 +1455,7 @@ fn chain_disabled_mode_denies_everything() {
 ### Plugin Manager Tests
 
 ```rust
-// crates/jcode-plugin-core/src/manager.rs tests
+// crates/next-code-plugin-core/src/manager.rs tests
 
 #[tokio::test]
 async fn install_from_local_path() {
@@ -1463,11 +1463,11 @@ async fn install_from_local_path() {
     let plugin_dir = tmp.path().join("my-plugin");
     std::fs::create_dir(&plugin_dir).unwrap();
     std::fs::write(plugin_dir.join("package.json"), r#"{
-        "jcode-plugin": { "v2": {
-            "schema": "jcode-plugin.v2", "name": "My", "package_name": "my-plugin",
+        "next-code-plugin": { "v2": {
+            "schema": "next-code-plugin.v2", "name": "My", "package_name": "my-plugin",
             "version": "0.1.0", "kind": "server", "entry": { "server": "index.js" },
             "tier": "read", "capabilities": {}, "approval": { "kind": "default" },
-            "engines": { "jcode": ">=0.29" }
+            "engines": { "next-code": ">=0.29" }
         }}
     }"#).unwrap();
     std::fs::write(plugin_dir.join("index.js"), "module.exports = {};").unwrap();
@@ -1515,7 +1515,7 @@ async fn link_creates_symlink() {
 #[tokio::test]
 async fn engines_compat_rejects_mismatch() {
     let mut manifest = minimal_manifest("incompat");
-    manifest.engines.jcode = Some(">=99.0.0".into()); // we are 0.29
+    manifest.engines.next-code = Some(">=99.0.0".into()); // we are 0.29
     let plugin_dir = make_plugin_with_manifest(manifest);
     let mgr = PluginManager::new(tempdir().unwrap().path().join("ir")).await.unwrap();
     let result = mgr.install(PluginSource::Local { path: plugin_dir }).await;
@@ -1526,7 +1526,7 @@ async fn engines_compat_rejects_mismatch() {
 ### Hot Reload Tests
 
 ```rust
-// crates/jcode-plugin-runtime/src/integration_tests.rs
+// crates/next-code-plugin-runtime/src/integration_tests.rs
 
 #[tokio::test]
 async fn reload_no_op_when_unchanged() {
@@ -1620,11 +1620,11 @@ async fn timeout_kills_long_running_tool() {
 
 #[tokio::test]
 async fn per_extension_kill_switch_blocks_load() {
-    std::env::set_var("JCODE_PLUGIN_KILL_MY_PLUGIN", "1");
+    std::env::set_var("NEXT_CODE_PLUGIN_KILL_MY_PLUGIN", "1");
     let loader = setup_test_loader().await;
     let result = loader.load(PluginSource::Local { path: make_minimal_plugin("my-plugin") }).await;
     assert!(matches!(result, Err(LoaderError::Killed("my-plugin"))));
-    std::env::remove_var("JCODE_PLUGIN_KILL_MY_PLUGIN");
+    std::env::remove_var("NEXT_CODE_PLUGIN_KILL_MY_PLUGIN");
 }
 ```
 
@@ -1687,11 +1687,11 @@ async fn end_to_end_install_then_dispatch() {
 ### Benchmark Code
 
 ```rust
-// crates/jcode-plugin-runtime/benches/dispatch.rs
+// crates/next-code-plugin-runtime/benches/dispatch.rs
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use jcode_plugin_core::*;
-use jcode_plugin_runtime::*;
+use next_code_plugin_core::*;
+use next_code_plugin_runtime::*;
 
 fn bench_dispatch_no_gate(c: &mut Criterion) {
     let rt = tokio::runtime::Runtime::new().unwrap();
@@ -1714,7 +1714,7 @@ fn bench_dispatch_with_gate_allow(c: &mut Criterion) {
 }
 
 fn bench_capability_chain_5_layers(c: &mut Criterion) {
-    use jcode_plugin_core::CapabilityChainV2;
+    use next_code_plugin_core::CapabilityChainV2;
     let chain = CapabilityChainV2 {
         plugin_deny: CapabilitySet::default(),
         global_deny: CapabilitySet::default(),
@@ -1760,21 +1760,21 @@ The plan is **additive + opt-in** for v1 plugins, **breaking** for v2 manifest s
 
 ### Step-by-step
 
-1. **Phase 0 (1 day):** Add `ToolTier` enum to `jcode-tool-types`. Add `declared_tier()` default method to `Tool` trait. No existing tools set it; they all get `None` → fall back to manifest tier → fall back to `Exec` (fail-closed).
+1. **Phase 0 (1 day):** Add `ToolTier` enum to `next-code-tool-types`. Add `declared_tier()` default method to `Tool` trait. No existing tools set it; they all get `None` → fall back to manifest tier → fall back to `Exec` (fail-closed).
 
 2. **Phase 1 (2 days):** Add `CapabilityChainV2` alongside existing `CapabilityChain` (deprecate the old one but keep it compiling). All existing tests pass unchanged.
 
 3. **Phase 2 (3 days):** Add `ApprovalGate` + `PluginManager`. Wire into `RcuDispatcher::dispatch`. Existing tools are still in the registry but go through the gate. The default gate config (`mode: Prompt`, no overrides) means: Plan mode prompts for everything, AcceptEdits prompts for Exec only, BypassPermissions allows everything — same as today's behavior. Audit log gets a new structured format.
 
-4. **Phase 3 (2 days):** Bump manifest schema to `jcode-plugin.v2`. `PluginManifest::from_package_json` auto-migrates v1 → v2 with `tier: Exec` (fail-closed for v1). Add `migrate_v1_to_v2` unit test.
+4. **Phase 3 (2 days):** Bump manifest schema to `next-code-plugin.v2`. `PluginManifest::from_package_json` auto-migrates v1 → v2 with `tier: Exec` (fail-closed for v1). Add `migrate_v1_to_v2` unit test.
 
-5. **Phase 4 (2 days):** Add `PluginLoader::reload` for hot-reload. Wire the `JCODE_PLUGIN_LOG=trace` env var. Add per-extension kill switch.
+5. **Phase 4 (2 days):** Add `PluginLoader::reload` for hot-reload. Wire the `NEXT_CODE_PLUGIN_LOG=trace` env var. Add per-extension kill switch.
 
 6. **Phase 5 (2 days):** Build the example plugin (`examples/plugins/hello-plugin/`). Write `docs/plugins.md` (≥200 lines). Write `docs/plugin-threat-model.md` (STRIDE, ~150 lines).
 
-7. **Phase 6 (1 day):** Add CLI subcommand `jcode plugin install/uninstall/list/enable/disable/link/reload/info`. Wire into existing `cli` module.
+7. **Phase 6 (1 day):** Add CLI subcommand `next-code plugin install/uninstall/list/enable/disable/link/reload/info`. Wire into existing `cli` module.
 
-8. **Phase 7 (1 day):** Integration testing — install hello-plugin from a real `~/.jcode/plugins/` path, run jcode, verify the tool appears in the next session.
+8. **Phase 7 (1 day):** Integration testing — install hello-plugin from a real `~/.next-code/plugins/` path, run next-code, verify the tool appears in the next session.
 
 9. **Phase 8 (1 day):** Update `AGENTS.md` to mention the new plugin system, new CLI subcommand, new env vars, new docs files.
 
@@ -1788,7 +1788,7 @@ Total: ~14 dev days for v2.0.0. Each phase ships as a separate PR.
 
 ### Backward Compat for Plugin Authors
 
-- A v1 plugin keeps working, with `tier: Exec` (fail-closed). Plugin authors can opt into a less-restrictive tier by adding `jcode-plugin.v2.tier: read|write|exec` to their manifest.
+- A v1 plugin keeps working, with `tier: Exec` (fail-closed). Plugin authors can opt into a less-restrictive tier by adding `next-code-plugin.v2.tier: read|write|exec` to their manifest.
 - A plugin that used to work in `BypassPermissions` mode will now go through the gate. If the gate denies, the plugin stops working. This is the desired behavior — surfaces misconfigured plugins.
 
 ---
@@ -1802,12 +1802,12 @@ Total: ~14 dev days for v2.0.0. Each phase ships as a separate PR.
 - ✅ `PluginManager` with load/clone/unload/rollback for local path + git clone
 - ✅ Rust workspace-crate path (compile in, register via `inventory`, toggle via `[plugins.workspace]`)
 - ✅ Hot reload for local-path plugins
-- ✅ Per-extension kill switch (`JCODE_PLUGIN_KILL_<NAME>=1` or `[plugins.kill]`)
+- ✅ Per-extension kill switch (`NEXT_CODE_PLUGIN_KILL_<NAME>=1` or `[plugins.kill]`)
 - ✅ STRIDE threat model + author docs + example plugin (TS + Rust)
 
 ### v2.1 (stretch)
 
-- [ ] `cdylib` plugin path via `libloading` — for trusted external Rust plugins that want to be shipped as a `.so`/`.dylib`/`.dll` without being a workspace member. No registry; the user points `jcode plugin load ./my-plugin.so` at a file. Same `ExtensionAPI`, same `ToolTier`, same `CapabilityChainV2`.
+- [ ] `cdylib` plugin path via `libloading` — for trusted external Rust plugins that want to be shipped as a `.so`/`.dylib`/`.dll` without being a workspace member. No registry; the user points `next-code plugin load ./my-plugin.so` at a file. Same `ExtensionAPI`, same `ToolTier`, same `CapabilityChainV2`.
 - [ ] Per-tool `formatApprovalDetails` UI polish (show truncated command for bash, diff preview for edit)
 - [ ] Plugin signing (sha256 of manifest + signature field; load refuses unsigned unless `--allow-unsigned`)
 - [ ] Pluggable `host.call`-style JSON RPC for plugin→host communication (pia pattern), so plugins can be migrated to WASM later without API change
@@ -1822,31 +1822,31 @@ Total: ~14 dev days for v2.0.0. Each phase ships as a separate PR.
 
 ### Not Covered
 
-- **npm distribution** — explicitly rejected per user policy. No `npm install jcode-plugin-foo`, no `npx`, no `package.json` registry lookups, no `npm publish` flow. The plugin source always originates from local files or a git clone the user explicitly invokes.
+- **npm distribution** — explicitly rejected per user policy. No `npm install next-code-plugin-foo`, no `npx`, no `package.json` registry lookups, no `npm publish` flow. The plugin source always originates from local files or a git clone the user explicitly invokes.
 - **Marketplace / plugin registry** — explicitly rejected. The user keeps full control of which plugins exist in their environment. There is no central catalog, no curated list, no install count.
 - Plugin→plugin direct calls (plugins can only interact via the event bus)
 - Sandboxed subprocess execution (QuickJS has no subprocess; bash tool goes through `dcg-core` for safety)
-- Plugin-distributed themes (jcode's TUI has its own theming; not a plugin concern)
-- Plugin-distributed MCP servers (MCP servers are config-only in jcode today; could be a v2.1 stretch)
+- Plugin-distributed themes (next-code's TUI has its own theming; not a plugin concern)
+- Plugin-distributed MCP servers (MCP servers are config-only in next-code today; could be a v2.1 stretch)
 
 ---
 
 ## 12. Success Criteria Checklist
 
-- [ ] `ToolTier` enum exists in `jcode-plugin-core` and is re-exported from `jcode-tool-types`
+- [ ] `ToolTier` enum exists in `next-code-plugin-core` and is re-exported from `next-code-tool-types`
 - [ ] `CapabilityChainV2` has 5 layers and the new `AccessDecisionV2` return type
 - [ ] All 5-layer chain unit tests pass
 - [ ] `ApprovalGate::check` is called for every tool call (audit by grep: no `tool.execute(` call sites outside `RcuDispatcher::dispatch`)
 - [ ] `PluginManager` has `load_local/clone_git/list_unload/enable/disable/persist_state/load_state` (no `install_npm`, no `marketplace_*`)
 - [ ] All `PluginManager` tests pass (local-path happy path, git-clone happy path, rollback on failure, idempotent unload, engines compat)
 - [ ] `PluginLoader::reload` works for unchanged files (no-op) and changed files (re-transpile + swap)
-- [ ] `JCODE_PLUGIN_KILL_<NAME>=1` blocks plugin load (test exists and passes)
-- [ ] Example TS plugin (`examples/plugins/hello-plugin/`) loads via `jcode plugin load ./examples/plugins/hello-plugin` and registers a working tool
-- [ ] Example Rust workspace-crate plugin (`crates/jcode-ext-hello/`) compiles into the jcode binary, registers via `inventory::submit!`, and its tool is invocable after `cargo build && jcode`
+- [ ] `NEXT_CODE_PLUGIN_KILL_<NAME>=1` blocks plugin load (test exists and passes)
+- [ ] Example TS plugin (`examples/plugins/hello-plugin/`) loads via `next-code plugin load ./examples/plugins/hello-plugin` and registers a working tool
+- [ ] Example Rust workspace-crate plugin (`crates/next-code-ext-hello/`) compiles into the next-code binary, registers via `inventory::submit!`, and its tool is invocable after `cargo build && next-code`
 - [ ] `[plugins.workspace]` config section enables/disables workspace-crate plugins without recompile
 - [ ] `docs/plugins.md` exists, is ≥200 lines, modeled on omp's `docs/extensions.md`
 - [ ] `docs/plugin-threat-model.md` exists, covers all 6 STRIDE categories, points at test references
-- [ ] `jcode plugin load/clone/list/unload/enable/disable/reload/info` CLI subcommand works
+- [ ] `next-code plugin load/clone/list/unload/enable/disable/reload/info` CLI subcommand works
 - [ ] **No npm, no marketplace, no registry** in the entire plugin subsystem (verified by grep: no `npm`, no `registry.npmjs`, no `marketplace` strings in any plugin code or config)
 - [ ] p99 tool dispatch overhead (with gate) ≤ 70µs (vs ≤55µs baseline)
 - [ ] p99 capability check overhead ≤ 500ns
@@ -1865,41 +1865,41 @@ Total: ~14 dev days for v2.0.0. Each phase ships as a separate PR.
 
 | File | LOC est | Purpose |
 |------|---------|---------|
-| `crates/jcode-plugin-core/src/manager.rs` | ~600 | `PluginManager` load/clone/unload/rollback for local path + git |
-| `crates/jcode-plugin-runtime/src/gate.rs` | ~250 | `ApprovalGate` (single chokepoint) |
-| `crates/jcode-plugin-core/src/inventory.rs` | ~150 | `PluginDescriptor` + `inventory::submit!` helpers for workspace-crate registration |
+| `crates/next-code-plugin-core/src/manager.rs` | ~600 | `PluginManager` load/clone/unload/rollback for local path + git |
+| `crates/next-code-plugin-runtime/src/gate.rs` | ~250 | `ApprovalGate` (single chokepoint) |
+| `crates/next-code-plugin-core/src/inventory.rs` | ~150 | `PluginDescriptor` + `inventory::submit!` helpers for workspace-crate registration |
 | `docs/plugins.md` | ~400 | Plugin author guide (modeled on omp) |
 | `docs/plugin-threat-model.md` | ~200 | STRIDE threat model (modeled on pia) |
 | `examples/plugins/hello-plugin/package.json` | ~20 | Example TS plugin manifest |
 | `examples/plugins/hello-plugin/index.ts` | ~40 | Example TS plugin source |
-| `crates/jcode-ext-hello/Cargo.toml` | ~15 | Example Rust workspace-crate manifest |
-| `crates/jcode-ext-hello/src/lib.rs` | ~120 | Example Rust workspace-crate plugin source |
-| `crates/jcode-plugin-runtime/benches/dispatch.rs` | ~100 | Criterion bench for dispatch overhead |
+| `crates/next-code-ext-hello/Cargo.toml` | ~15 | Example Rust workspace-crate manifest |
+| `crates/next-code-ext-hello/src/lib.rs` | ~120 | Example Rust workspace-crate plugin source |
+| `crates/next-code-plugin-runtime/benches/dispatch.rs` | ~100 | Criterion bench for dispatch overhead |
 
 ### Modified files (9)
 
 | File | Changes |
 |------|---------|
-| `Cargo.toml` (workspace root) | Add `crates/jcode-ext-hello` as workspace member; add `inventory = "0.3"` to `[workspace.dependencies]` |
-| `crates/jcode-plugin-core/src/manifest.rs` | Add `ToolTier`, `PluginSchemaVersion`, `PluginApprovalPolicy`, v2 manifest, `migrate_v1_to_v2` |
-| `crates/jcode-plugin-core/src/security.rs` | Add `CapabilityChainV2` (5 layers), deprecate `CapabilityChain` |
-| `crates/jcode-plugin-core/src/lib.rs` | Re-export new types, add `pub mod manager`, `pub mod inventory` |
-| `crates/jcode-plugin-runtime/src/dispatcher.rs` | Wire `ApprovalGate` into `dispatch` |
-| `crates/jcode-plugin-runtime/src/loader.rs` | Add `reload`, `fingerprint` |
-| `crates/jcode-plugin-runtime/src/server.rs` | Add per-extension kill switch; scan `inventory::iter::<PluginDescriptor>()` at startup |
-| `crates/jcode-tool-types/src/lib.rs` | Re-export `ToolTier`, add `declared_tier`/`max_duration_secs` to `Tool` trait |
-| `crates/jcode-tui-permissions/src/lib.rs` | Add `auto_approves(tier)` method to `PermissionMode` |
+| `Cargo.toml` (workspace root) | Add `crates/next-code-ext-hello` as workspace member; add `inventory = "0.3"` to `[workspace.dependencies]` |
+| `crates/next-code-plugin-core/src/manifest.rs` | Add `ToolTier`, `PluginSchemaVersion`, `PluginApprovalPolicy`, v2 manifest, `migrate_v1_to_v2` |
+| `crates/next-code-plugin-core/src/security.rs` | Add `CapabilityChainV2` (5 layers), deprecate `CapabilityChain` |
+| `crates/next-code-plugin-core/src/lib.rs` | Re-export new types, add `pub mod manager`, `pub mod inventory` |
+| `crates/next-code-plugin-runtime/src/dispatcher.rs` | Wire `ApprovalGate` into `dispatch` |
+| `crates/next-code-plugin-runtime/src/loader.rs` | Add `reload`, `fingerprint` |
+| `crates/next-code-plugin-runtime/src/server.rs` | Add per-extension kill switch; scan `inventory::iter::<PluginDescriptor>()` at startup |
+| `crates/next-code-tool-types/src/lib.rs` | Re-export `ToolTier`, add `declared_tier`/`max_duration_secs` to `Tool` trait |
+| `crates/next-code-tui-permissions/src/lib.rs` | Add `auto_approves(tier)` method to `PermissionMode` |
 
 ### Unchanged files (reference only)
 
-- `crates/jcode-plugin-core/src/events.rs` — existing event types, used as-is
-- `crates/jcode-plugin-core/src/preflight.rs` — existing static analysis, used as-is
-- `crates/jcode-plugin-core/src/config.rs` — existing config types, used as-is
-- `crates/jcode-plugin-runtime/src/audit.rs` — existing `AuditTrail`, used as-is
-- `crates/jcode-plugin-runtime/src/transpiler.rs` — existing SWC transpiler, used as-is
-- `crates/jcode-plugin-runtime/src/sandbox.rs` — existing QuickJS sandbox, used as-is
-- `crates/jcode-plugin-runtime/src/tui_*.rs` — existing TUI plugin system, used as-is
-- `crates/jcode-hooks/src/*` — existing legacy hook system, kept for v1 plugins, will be deprecated in v3
+- `crates/next-code-plugin-core/src/events.rs` — existing event types, used as-is
+- `crates/next-code-plugin-core/src/preflight.rs` — existing static analysis, used as-is
+- `crates/next-code-plugin-core/src/config.rs` — existing config types, used as-is
+- `crates/next-code-plugin-runtime/src/audit.rs` — existing `AuditTrail`, used as-is
+- `crates/next-code-plugin-runtime/src/transpiler.rs` — existing SWC transpiler, used as-is
+- `crates/next-code-plugin-runtime/src/sandbox.rs` — existing QuickJS sandbox, used as-is
+- `crates/next-code-plugin-runtime/src/tui_*.rs` — existing TUI plugin system, used as-is
+- `crates/next-code-hooks/src/*` — existing legacy hook system, kept for v1 plugins, will be deprecated in v3
 
 ---
 
@@ -1912,9 +1912,9 @@ Total: ~14 dev days for v2.0.0. Each phase ships as a separate PR.
 | Hot reload race with in-flight tool calls | Medium | High | Atomic swap via RCU snapshot; old instance held until new is in place |
 | QuickJS memory leak from reload | Low | Medium | `dhat` profile every release; `seahash`-based fingerprint forces reload on every change |
 | Plugin authors forget to declare `tier` | High | Low | Default to `Exec` (fail-closed), log warning on plugin load |
-| `engines.jcode` semver too strict | Medium | Low | Use `^0.29` style for jcode (caret means "compatible within 0.x"); document in `docs/plugins.md` |
+| `engines.next-code` semver too strict | Medium | Low | Use `^0.29` style for next-code (caret means "compatible within 0.x"); document in `docs/plugins.md` |
 | **`inventory`-based registration causes link-time conflicts** (two plugins claim the same name) | Medium | Medium | `inventory` returns iter in unspecified order; add a name-uniqueness check at host startup, fail-fast on conflict |
-| **Git-cloned plugin has build step the host doesn't run** (e.g. needs `npm install` or `cargo build`) | High | Medium | Document the convention in `docs/plugins.md`: plugins must ship a pre-built `index.js` for JS, or a Rust source tree the workspace can `cargo build` if it's a separate Cargo project. The host's `jcode plugin clone` runs `npm install` (or `cargo build`) if a `package.json`/`Cargo.toml` is present. |
+| **Git-cloned plugin has build step the host doesn't run** (e.g. needs `npm install` or `cargo build`) | High | Medium | Document the convention in `docs/plugins.md`: plugins must ship a pre-built `index.js` for JS, or a Rust source tree the workspace can `cargo build` if it's a separate Cargo project. The host's `next-code plugin clone` runs `npm install` (or `cargo build`) if a `package.json`/`Cargo.toml` is present. |
 | **cdylib stretch goal causes scope creep** | High | High | Marked as v2.1, not v2. Don't ship without explicit user ask. |
 | **WASM runtime stretch goal causes scope creep** | High | High | Marked as v3, not v2. Don't ship without 6-week budget. |
 
@@ -1922,7 +1922,7 @@ Total: ~14 dev days for v2.0.0. Each phase ships as a separate PR.
 
 ## Appendix C: Open Questions for the User
 
-1. Should `jcode plugin clone` support submodules? Default: yes, with `--recursive` flag. Submodules are common in monorepo-style plugins.
+1. Should `next-code plugin clone` support submodules? Default: yes, with `--recursive` flag. Submodules are common in monorepo-style plugins.
 2. Should plugins be allowed to declare `provides_tools: ["my-tool"]` (claim a tool name in their manifest), or only at runtime via `registerTool`? Default: runtime only, ignore `provides_tools` field. The preflight analyzer warns if a plugin's runtime-registered tools don't match the manifest's `provides_tools`.
 3. Should `ToolTier` be exposed in the LLM's system prompt? If yes, the LLM can choose not to call a "high-tier" tool. If no, the LLM only sees the tool list. Default: not exposed; the gate is enforced regardless of what the LLM sees.
 4. Should per-tool user override be per-session or persistent? Default: persistent in `config.toml`, but a `/tools-approval` slash command in the TUI could set it per-session.

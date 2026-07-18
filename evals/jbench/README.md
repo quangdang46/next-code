@@ -1,9 +1,9 @@
 # JBench
 
-JBench is jcode's evaluation framework for measuring AI coding agent
+JBench is next-code's evaluation framework for measuring AI coding agent
 performance through real-world git commit reconstruction tasks. It is the
 Rust port and adaptation of [Codebuff's BuffBench](https://github.com/codebuff/codebuff/tree/main/evals/buffbench)
-to the jcode multi-agent foundation.
+to the next-code multi-agent foundation.
 
 > **Status: scaffolding.** This crate currently provides typed data
 > models, module skeletons, and a CLI shell. The actual eval
@@ -57,19 +57,19 @@ classic "learn from your mistakes" loop.
 
 The lessons module lives in `src/lessons.rs`.
 
-## Reuse of `jcode-agent-runtime`
+## Reuse of `next-code-agent-runtime`
 
 JBench is built on top of the new agent foundation in
-[`crates/jcode-agent-runtime`](../../crates/jcode-agent-runtime/), which
+[`crates/next-code-agent-runtime`](../../crates/next-code-agent-runtime/), which
 provides:
 
-- `AgentRegistry` — discovery and loading of `.jcode/agents/*.toml`
+- `AgentRegistry` — discovery and loading of `.next-code/agents/*.toml`
   agent definitions.
 - `AgentDefinition` — the declarative schema describing an agent's
   model, tools, system prompt, output mode, etc.
 
 The agent runner (`src/agent_runner.rs`) will resolve agent IDs against
-the registry, spawn a `jcode` subprocess in a clean clone of the target
+the registry, spawn a `next-code` subprocess in a clean clone of the target
 repo, capture the trace, and return an `EvalRun` populated with the diff
 and judging result.
 
@@ -96,9 +96,9 @@ meta-analyze   →  aggregate analysis across all tasks for an agent
 ## Running
 
 ```bash
-cargo check -p jcode-jbench
-cargo test  -p jcode-jbench
-cargo run   -p jcode-jbench --bin jbench -- run --help
+cargo check -p next-code-jbench
+cargo test  -p next-code-jbench
+cargo run   -p next-code-jbench --bin jbench -- run --help
 ```
 
 ## References

@@ -8,19 +8,20 @@ Set-StrictMode -Version Latest
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $resolvedArtifact = (Resolve-Path -LiteralPath $ArtifactExePath).Path
-$tempRoot = Join-Path $env:RUNNER_TEMP ("jcode-windows-install-verify-" + [guid]::NewGuid().ToString('N'))
+$tempRoot = Join-Path $env:RUNNER_TEMP ("next-code-windows-install-verify-" + [guid]::NewGuid().ToString('N'))
 $localAppData = Join-Path $tempRoot 'localappdata'
 $appData = Join-Path $tempRoot 'appdata'
 $userProfile = Join-Path $tempRoot 'userprofile'
-$jcodeHome = Join-Path $tempRoot '.jcode'
-$installDir = Join-Path $localAppData 'jcode\bin'
+$nextCodeHome = Join-Path $tempRoot '.next-code'
+$installDir = Join-Path $localAppData 'next-code\bin'
 
-New-Item -ItemType Directory -Force -Path $localAppData, $appData, $userProfile, $jcodeHome | Out-Null
+New-Item -ItemType Directory -Force -Path $localAppData, $appData, $userProfile, $nextCodeHome | Out-Null
 
 $env:LOCALAPPDATA = $localAppData
 $env:APPDATA = $appData
 $env:USERPROFILE = $userProfile
-$env:JCODE_HOME = $jcodeHome
+$env:NEXT_CODE_HOME = $nextCodeHome
+$env:NEXT_CODE_HOME = $nextCodeHome
 
 $installScript = Join-Path $repoRoot 'scripts\install.ps1'
 
@@ -29,18 +30,20 @@ $installScript = Join-Path $repoRoot 'scripts\install.ps1'
     -Version $Version `
     -ArtifactExePath $resolvedArtifact
 
-$launcherPath = Join-Path $installDir 'jcode.exe'
-$versionDir = Join-Path $localAppData ('jcode\builds\versions\' + $Version.TrimStart('v') + '\jcode.exe')
-$stablePath = Join-Path $localAppData 'jcode\builds\stable\jcode.exe'
+$launcherPath = Join-Path $installDir 'next-code.exe'
+$versionDir = Join-Path $localAppData ('next-code\builds\versions\' + $Version.TrimStart('v') + '\next-code.exe')
+$stablePath = Join-Path $localAppData 'next-code\builds\stable\next-code.exe'
+# Compat launcher kept for one release during the rebrand window.
+$compatLauncherPath = Join-Path $installDir 'next-code.exe'
 
-foreach ($path in @($launcherPath, $versionDir, $stablePath)) {
+foreach ($path in @($launcherPath, $versionDir, $stablePath, $compatLauncherPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Expected installed file missing: $path"
     }
 }
 
-$hotkeyDir = Join-Path $jcodeHome 'hotkey'
-$startupShortcut = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs\Startup\jcode-hotkey.lnk'
+$hotkeyDir = Join-Path $nextCodeHome 'hotkey'
+$startupShortcut = Join-Path $appData 'Microsoft\Windows\Start Menu\Programs\Startup\next-code-hotkey.lnk'
 if (Test-Path -LiteralPath $hotkeyDir) {
     throw "Default install unexpectedly created optional hotkey files: $hotkeyDir"
 }
@@ -53,7 +56,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Installed launcher failed to run --version"
 }
 
-if ($versionOutput -notmatch 'jcode') {
+if ($versionOutput -notmatch 'next-code|next-code') {
     throw "Installed launcher returned unexpected version output: $versionOutput"
 }
 
@@ -95,7 +98,7 @@ if ($shortcut.Arguments -match '(?i)\bBypass\b') {
     throw "Hotkey shortcut unexpectedly bypasses PowerShell execution policy"
 }
 
-$legacyVbs = Join-Path $hotkeyDir 'jcode-hotkey-launcher.vbs'
+$legacyVbs = Join-Path $hotkeyDir 'next-code-hotkey-launcher.vbs'
 if (Test-Path -LiteralPath $legacyVbs) {
     throw "Legacy VBScript hotkey launcher still exists: $legacyVbs"
 }

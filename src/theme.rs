@@ -3,9 +3,9 @@
 //! Reads a TOML file containing per-element color overrides. Loaded
 //! from (in order):
 //!
-//!   1. `JCODE_THEME` env var pointing at an absolute path
-//!   2. `~/.jcode/theme.toml` (user-level)
-//!   3. `<repo>/.jcode/theme.toml` (project-level)
+//!   1. `NEXT_CODE_THEME` env var pointing at an absolute path
+//!   2. `~/.next-code/theme.toml` (user-level)
+//!   3. `<repo>/.next-code/theme.toml` (project-level)
 //!
 //! When none of those exist, [`Theme::default()`] is returned and
 //! the existing hard-coded palette continues to render.
@@ -34,8 +34,9 @@
 //! Color values must be a 7-char hex string (`#RRGGBB`). Lower or
 //! upper case both accepted. Any other format causes the loader to
 //! return [`Theme::default()`] and log a warning, matching the
-//! 'graceful fallback' behavior of the rest of jcode.
+//! 'graceful fallback' behavior of the rest of next_code.
 
+use crate::env::product_env;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -52,7 +53,7 @@ use std::time::SystemTime;
 //
 // The cache invalidates when the active theme.toml's mtime advances
 // or when the resolved theme path changes (user moved theme between
-// project + user level, JCODE_THEME env var changed).
+// project + user level, NEXT_CODE_THEME env var changed).
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ThemeCacheToken(SystemTime, Option<PathBuf>);
@@ -83,8 +84,8 @@ static THEME_CACHE: Mutex<Option<ThemeCache>> = Mutex::new(None);
 
 /// Hot-reload aware theme load. Returns the cached theme when the
 /// resolved theme.toml hasn't changed mtime + path since last call.
-pub fn discover_cached(jcode_home: &Path, repo_root: Option<&Path>) -> (Theme, ThemeCacheToken) {
-    let path = resolve_theme_path(jcode_home, repo_root);
+pub fn discover_cached(next_code_home: &Path, repo_root: Option<&Path>) -> (Theme, ThemeCacheToken) {
+    let path = resolve_theme_path(next_code_home, repo_root);
     let mtime = path
         .as_ref()
         .and_then(|p| std::fs::metadata(p).ok())
@@ -96,7 +97,7 @@ pub fn discover_cached(jcode_home: &Path, repo_root: Option<&Path>) -> (Theme, T
 
     let stale = cache.last_mtime != mtime || cache.last_path != path;
     if stale {
-        cache.cached = load_or_default(jcode_home, repo_root);
+        cache.cached = load_or_default(next_code_home, repo_root);
         cache.last_mtime = mtime;
         cache.last_path = path.clone();
     }
@@ -110,10 +111,10 @@ pub fn discover_cached(jcode_home: &Path, repo_root: Option<&Path>) -> (Theme, T
 /// No re-parse, just an mtime + path lookup.
 pub fn theme_changed_since(
     token: &ThemeCacheToken,
-    jcode_home: &Path,
+    next_code_home: &Path,
     repo_root: Option<&Path>,
 ) -> bool {
-    let path = resolve_theme_path(jcode_home, repo_root);
+    let path = resolve_theme_path(next_code_home, repo_root);
     let mtime = path
         .as_ref()
         .and_then(|p| std::fs::metadata(p).ok())
@@ -243,19 +244,19 @@ pub fn parse_toml(toml_str: &str) -> Result<Theme, String> {
 ///
 /// Returns the path of the first found candidate, or `None` if no
 /// theme file is configured.
-pub fn resolve_theme_path(jcode_home: &Path, repo_root: Option<&Path>) -> Option<PathBuf> {
-    if let Ok(p) = std::env::var("JCODE_THEME") {
+pub fn resolve_theme_path(next_code_home: &Path, repo_root: Option<&Path>) -> Option<PathBuf> {
+    if let Ok(p) = product_env("THEME") {
         let p = PathBuf::from(p);
         if p.exists() {
             return Some(p);
         }
     }
-    let user = jcode_home.join("theme.toml");
+    let user = next_code_home.join("theme.toml");
     if user.exists() {
         return Some(user);
     }
     if let Some(repo) = repo_root {
-        let proj = repo.join(".jcode").join("theme.toml");
+        let proj = repo.join(".next-code").join("theme.toml");
         if proj.exists() {
             return Some(proj);
         }
@@ -265,15 +266,15 @@ pub fn resolve_theme_path(jcode_home: &Path, repo_root: Option<&Path>) -> Option
 
 /// Convenience: load the active theme, falling back to default on
 /// any error (with a warning log message).
-pub fn load_or_default(jcode_home: &Path, repo_root: Option<&Path>) -> Theme {
-    let Some(path) = resolve_theme_path(jcode_home, repo_root) else {
+pub fn load_or_default(next_code_home: &Path, repo_root: Option<&Path>) -> Theme {
+    let Some(path) = resolve_theme_path(next_code_home, repo_root) else {
         return Theme::default();
     };
     let raw = match std::fs::read_to_string(&path) {
         Ok(s) => s,
         Err(e) => {
             eprintln!(
-                "jcode theme: failed to read {}: {} (using default)",
+                "next-code theme: failed to read {}: {} (using default)",
                 path.display(),
                 e
             );
@@ -284,7 +285,7 @@ pub fn load_or_default(jcode_home: &Path, repo_root: Option<&Path>) -> Theme {
         Ok(t) => t,
         Err(e) => {
             eprintln!(
-                "jcode theme: {} parse error: {} (using default)",
+                "next-code theme: {} parse error: {} (using default)",
                 path.display(),
                 e
             );
@@ -378,16 +379,16 @@ mod tests {
         let home = temp.path().join("home");
         let repo = temp.path().join("repo");
         std::fs::create_dir_all(&home).unwrap();
-        std::fs::create_dir_all(repo.join(".jcode")).unwrap();
+        std::fs::create_dir_all(repo.join(".next-code")).unwrap();
 
         // Nothing configured.
         assert_eq!(resolve_theme_path(&home, Some(&repo)), None);
 
         // Project-level only.
-        std::fs::write(repo.join(".jcode/theme.toml"), "").unwrap();
+        std::fs::write(repo.join(".next-code/theme.toml"), "").unwrap();
         assert_eq!(
             resolve_theme_path(&home, Some(&repo)),
-            Some(repo.join(".jcode/theme.toml"))
+            Some(repo.join(".next-code/theme.toml"))
         );
 
         // User-level wins over project-level.
@@ -429,15 +430,15 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_theme_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev_env = std::env::var_os("JCODE_THEME");
+        let prev_env = std::env::var_os("NEXT_CODE_THEME");
         unsafe {
-            std::env::remove_var("JCODE_THEME");
+            std::env::remove_var("NEXT_CODE_THEME");
         }
         let (theme, _) = discover_cached(temp.path(), None);
         assert_eq!(theme, Theme::default());
         if let Some(p) = prev_env {
             unsafe {
-                std::env::set_var("JCODE_THEME", p);
+                std::env::set_var("NEXT_CODE_THEME", p);
             }
         }
     }
@@ -447,9 +448,9 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_theme_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev_env = std::env::var_os("JCODE_THEME");
+        let prev_env = std::env::var_os("NEXT_CODE_THEME");
         unsafe {
-            std::env::remove_var("JCODE_THEME");
+            std::env::remove_var("NEXT_CODE_THEME");
         }
 
         let (theme1, token1) = discover_cached(temp.path(), None);
@@ -465,7 +466,7 @@ mod hot_reload_tests {
 
         if let Some(p) = prev_env {
             unsafe {
-                std::env::set_var("JCODE_THEME", p);
+                std::env::set_var("NEXT_CODE_THEME", p);
             }
         }
     }
@@ -475,9 +476,9 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_theme_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev_env = std::env::var_os("JCODE_THEME");
+        let prev_env = std::env::var_os("NEXT_CODE_THEME");
         unsafe {
-            std::env::remove_var("JCODE_THEME");
+            std::env::remove_var("NEXT_CODE_THEME");
         }
 
         std::fs::write(temp.path().join("theme.toml"), "name = \"v1\"\n").unwrap();
@@ -492,7 +493,7 @@ mod hot_reload_tests {
 
         if let Some(p) = prev_env {
             unsafe {
-                std::env::set_var("JCODE_THEME", p);
+                std::env::set_var("NEXT_CODE_THEME", p);
             }
         }
     }
@@ -502,9 +503,9 @@ mod hot_reload_tests {
         let _lock = crate::storage::lock_test_env();
         clear_theme_cache_for_tests();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev_env = std::env::var_os("JCODE_THEME");
+        let prev_env = std::env::var_os("NEXT_CODE_THEME");
         unsafe {
-            std::env::remove_var("JCODE_THEME");
+            std::env::remove_var("NEXT_CODE_THEME");
         }
 
         std::fs::write(temp.path().join("theme.toml"), "name = \"x\"\n").unwrap();
@@ -516,7 +517,7 @@ mod hot_reload_tests {
 
         if let Some(p) = prev_env {
             unsafe {
-                std::env::set_var("JCODE_THEME", p);
+                std::env::set_var("NEXT_CODE_THEME", p);
             }
         }
     }

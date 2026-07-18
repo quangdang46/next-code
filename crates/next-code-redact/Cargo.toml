@@ -1,0 +1,12 @@
+[package]
+name = "next-code-redact"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[lib]
+name = "next_code_redact"
+path = "src/lib.rs"
+
+[dependencies]
+regex = "1"

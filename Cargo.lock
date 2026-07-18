@@ -3,22 +3,6 @@
 version = 4
 
 [[package]]
-name = "ab_glyph"
-version = "0.2.32"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01c0457472c38ea5bd1c3b5ada5e368271cb550be7a4ca4a0b4634e9913f6cc2"
-dependencies = [
- "ab_glyph_rasterizer",
- "owned_ttf_parser",
-]
-
-[[package]]
-name = "ab_glyph_rasterizer"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "366ffbaa4442f4684d91e2cd7c5ea7c4ed8add41959a31447066e279e432b618"
-
-[[package]]
 name = "adler2"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -133,33 +117,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 
 [[package]]
-name = "android-activity"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee91c0c2905bae44f84bfa4e044536541df26b7703fd0888deeb9060fcc44289"
-dependencies = [
- "android-properties",
- "bitflags 2.13.1",
- "cc",
- "cesu8",
- "jni 0.21.1",
- "jni-sys 0.3.1",
- "libc",
- "log",
- "ndk",
- "ndk-context",
- "ndk-sys",
- "num_enum",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "android-properties"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc7eb209b1518d6bb87b283c20095f5228ecda460da70b44f0802523dea6da04"
-
-[[package]]
 name = "android_system_properties"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,7 +226,7 @@ dependencies = [
  "clipboard-win",
  "image",
  "log",
- "objc2 0.6.4",
+ "objc2",
  "objc2-app-kit",
  "objc2-core-foundation",
  "objc2-core-graphics",
@@ -277,7 +234,6 @@ dependencies = [
  "parking_lot",
  "percent-encoding",
  "windows-sys 0.60.2",
- "wl-clipboard-rs",
  "x11rb",
 ]
 
@@ -303,25 +259,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3fb67a6e08acf24fdeccbac2cb6ac4305825bd1f117462e0e6f2f193345ad56"
 
 [[package]]
-name = "as-raw-xcb-connection"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "175571dd1d178ced59193a6fc02dde1b972eb0bc56c892cde9beeceac5bf0f6b"
-
-[[package]]
 name = "ascii"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d92bec98840b8f03a5ff5413de5293bfcd8bf96467cf5452609f939ec6f5de16"
-
-[[package]]
-name = "ash"
-version = "0.37.3+1.3.251"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39e9c3835d686b0a6084ab4234fcd1b07dbf6e4767dce60874b12356a25ecd4a"
-dependencies = [
- "libloading 0.7.4",
-]
 
 [[package]]
 name = "ast_node"
@@ -1210,12 +1151,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "block"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
-
-[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1243,31 +1178,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "block-sys"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae85a0696e7ea3b835a453750bf002770776609115e6d25c6d2ff28a8200f7e7"
-dependencies = [
- "objc-sys",
-]
-
-[[package]]
-name = "block2"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15b55663a85f33501257357e6421bb33e769d5c9ffb5ba0921c975a123e35e68"
-dependencies = [
- "block-sys",
- "objc2 0.4.1",
-]
-
-[[package]]
 name = "block2"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdeb9d870516001442e364c5220d3574d2da8dc765554b4a617230d33fa58ef5"
 dependencies = [
- "objc2 0.6.4",
+ "objc2",
 ]
 
 [[package]]
@@ -1374,32 +1290,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "calloop"
-version = "0.12.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fba7adb4dd5aa98e5553510223000e7148f621165ec5f9acd7113f6ca4995298"
-dependencies = [
- "bitflags 2.13.1",
- "log",
- "polling",
- "rustix 0.38.44",
- "slab",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "calloop-wayland-source"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f0ea9b9476c7fad82841a8dbb380e2eae480c21910feba80725b46931ed8f02"
-dependencies = [
- "calloop",
- "rustix 0.38.44",
- "wayland-backend",
- "wayland-client",
-]
-
-[[package]]
 name = "camino"
 version = "1.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1475,12 +1365,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cesu8"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d43a04d8753f35258c91f8ec639f792891f748a1edbd759cf1dcea3382ad83c"
-
-[[package]]
 name = "cff-parser"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1494,15 +1378,9 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "cfg_aliases"
-version = "0.1.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
-
-[[package]]
-name = "cfg_aliases"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+checksum = "f079e83a288787bcd14a6aea84cee5c87a67c5a3e660c30f557a3d24761b3527"
 
 [[package]]
 name = "chacha20"
@@ -1674,16 +1552,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c9ea0ac24bc397ab3c98583a3c9ba74fa56b09a4449bbe172b9b1ddb016027a"
 
 [[package]]
-name = "codespan-reporting"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
-dependencies = [
- "termcolor",
- "unicode-width 0.1.14",
-]
-
-[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1703,37 +1571,6 @@ checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "com"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e17887fd17353b65b1b2ef1c526c83e26cd72e74f598a8dc1bee13a48f3d9f6"
-dependencies = [
- "com_macros",
-]
-
-[[package]]
-name = "com_macros"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d375883580a668c7481ea6631fc1a8863e33cc335bf56bfad8d7e6d4b04b13a5"
-dependencies = [
- "com_macros_support",
- "proc-macro2",
- "syn 1.0.109",
-]
-
-[[package]]
-name = "com_macros_support"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad899a1087a9296d5644792d7cb72b8e34c1bec8e7d4fbc002230169a6e8710c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -1907,27 +1744,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77745e017f5edba1a9c1d854f6f3a52dac8a12dd5af5d2f54aecf61e43d80d30"
 dependencies = [
  "libm",
-]
-
-[[package]]
-name = "cosmic-text"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75acbfb314aeb4f5210d379af45ed1ec2c98c7f1790bf57b8a4c562ac0c51b71"
-dependencies = [
- "fontdb 0.15.0",
- "libm",
- "log",
- "rangemap",
- "rustc-hash 1.1.0",
- "rustybuzz 0.11.0",
- "self_cell 1.3.0",
- "swash",
- "sys-locale",
- "unicode-bidi",
- "unicode-linebreak",
- "unicode-script",
- "unicode-segmentation",
 ]
 
 [[package]]
@@ -2143,12 +1959,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cursor-icon"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
-
-[[package]]
 name = "curve25519-dalek"
 version = "4.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2172,17 +1982,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "d3d12"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e3d747f100290a1ca24b752186f61f6637e1deffe3bf6320de6fcb29510a307"
-dependencies = [
- "bitflags 2.13.1",
- "libloading 0.8.9",
- "winapi",
 ]
 
 [[package]]
@@ -2723,19 +2522,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "dispatch"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
-
-[[package]]
 name = "dispatch2"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e0e367e4e7da84520dedcac1901e4da967309406d1e51017ae1abfb97adbd38"
 dependencies = [
  "bitflags 2.13.1",
- "objc2 0.6.4",
+ "objc2",
 ]
 
 [[package]]
@@ -2747,15 +2540,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "dlib"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab8ecd87370524b461f8557c119c405552c396ed91fc0a8eec68679eab26f94a"
-dependencies = [
- "libloading 0.8.9",
 ]
 
 [[package]]
@@ -2946,16 +2730,6 @@ name = "esaxx-rs"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d817e038c30374a4bcb22f94d0a8a0e216958d4c3dcde369b1439fec4bdda6e6"
-
-[[package]]
-name = "etagere"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc89bf99e5dc15954a60f707c1e09d7540e5cd9af85fa75caa0b510bc08c5342"
-dependencies = [
- "euclid 0.22.14",
- "svg_fmt",
-]
 
 [[package]]
 name = "euclid"
@@ -3155,7 +2929,7 @@ dependencies = [
  "ignore",
  "libc",
  "memchr",
- "memmap2 0.9.11",
+ "memmap2",
  "neo_frizbee",
  "notify",
  "once_cell",
@@ -3269,12 +3043,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
-name = "fixedbitset"
-version = "0.5.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d674e81391d1e1ab681a28d99df07927c6d4aa5b027d7da16ba32d1d21ecd99"
-
-[[package]]
 name = "flate2"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3353,15 +3121,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
-name = "font-types"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3971f9a5ca983419cdc386941ba3b9e1feba01a0ab888adf78739feb2798492"
-dependencies = [
- "bytemuck",
-]
-
-[[package]]
 name = "fontconfig-parser"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3372,30 +3131,16 @@ dependencies = [
 
 [[package]]
 name = "fontdb"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "020e203f177c0fb250fb19455a252e838d2bbbce1f80f25ecc42402aafa8cd38"
-dependencies = [
- "fontconfig-parser",
- "log",
- "memmap2 0.8.0",
- "slotmap",
- "tinyvec",
- "ttf-parser 0.19.2",
-]
-
-[[package]]
-name = "fontdb"
 version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "457e789b3d1202543297a350643cf459f836cade38934e7a4cf6a39e7cde2905"
 dependencies = [
  "fontconfig-parser",
  "log",
- "memmap2 0.9.11",
+ "memmap2",
  "slotmap",
  "tinyvec",
- "ttf-parser 0.25.1",
+ "ttf-parser",
 ]
 
 [[package]]
@@ -3786,7 +3531,7 @@ dependencies = [
  "bstr",
  "gix-chunk",
  "gix-hash",
- "memmap2 0.9.11",
+ "memmap2",
  "thiserror 2.0.18",
 ]
 
@@ -4019,7 +3764,7 @@ dependencies = [
  "hashbrown 0.16.1",
  "itoa",
  "libc",
- "memmap2 0.9.11",
+ "memmap2",
  "rustix 1.1.4",
  "smallvec",
  "thiserror 2.0.18",
@@ -4091,7 +3836,7 @@ dependencies = [
  "gix-hashtable",
  "gix-object",
  "gix-path",
- "memmap2 0.9.11",
+ "memmap2",
  "smallvec",
  "thiserror 2.0.18",
 ]
@@ -4181,7 +3926,7 @@ dependencies = [
  "gix-tempfile",
  "gix-utils",
  "gix-validate",
- "memmap2 0.9.11",
+ "memmap2",
  "thiserror 2.0.18",
  "winnow 0.7.15",
 ]
@@ -4405,17 +4150,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "gl_generator"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a95dfc23a2b4a9a2f5ab41d194f8bfda3cabec42af4e39f08c339eb2a0c124d"
-dependencies = [
- "khronos_api",
- "log",
- "xml-rs",
-]
-
-[[package]]
 name = "glidesort"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4435,7 +4169,7 @@ checksum = "b9247516746aa8e53411a0db9b62b0e24efbcf6a76e0ba73e5a91b512ddabed7"
 dependencies = [
  "crossbeam-channel",
  "keyboard-types",
- "objc2 0.6.4",
+ "objc2",
  "objc2-app-kit",
  "once_cell",
  "thiserror 2.0.18",
@@ -4455,91 +4189,6 @@ dependencies = [
  "log",
  "regex-automata",
  "regex-syntax",
-]
-
-[[package]]
-name = "glow"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd348e04c43b32574f2de31c8bb397d96c9fcfa1371bd4ca6d8bdc464ab121b1"
-dependencies = [
- "js-sys",
- "slotmap",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
-name = "glutin_wgl_sys"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c8098adac955faa2d31079b65dc48841251f69efd3ac25477903fc424362ead"
-dependencies = [
- "gl_generator",
-]
-
-[[package]]
-name = "glyphon"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a62d0338e4056db6a73221c2fb2e30619452f6ea9651bac4110f51b0f7a7581"
-dependencies = [
- "cosmic-text",
- "etagere",
- "lru 0.12.5",
- "wgpu",
-]
-
-[[package]]
-name = "gpu-alloc"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45cf04b2726f02df5508c6de726acdc90cdf97ac771a9a0ffd8ba10a6e696bf9"
-dependencies = [
- "bitflags 2.13.1",
- "gpu-alloc-types",
-]
-
-[[package]]
-name = "gpu-alloc-types"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2bbed164dd10ed526c2e4fe3e721ca4a71c61730e5aafac6844b417b3227058"
-dependencies = [
- "bitflags 2.13.1",
-]
-
-[[package]]
-name = "gpu-allocator"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f56f6318968d03c18e1bcf4857ff88c61157e9da8e47c5f29055d60e1228884"
-dependencies = [
- "log",
- "presser",
- "thiserror 1.0.69",
- "winapi",
- "windows 0.52.0",
-]
-
-[[package]]
-name = "gpu-descriptor"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc11df1ace8e7e564511f53af41f3e42ddc95b56fd07b3f4445d2a6048bc682c"
-dependencies = [
- "bitflags 2.13.1",
- "gpu-descriptor-types",
- "hashbrown 0.14.5",
-]
-
-[[package]]
-name = "gpu-descriptor-types"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bf0b36e6f090b7e1d8a4b49c0cb81c1f8376f72198c65dd3ad9ff3556b8b78c"
-dependencies = [
- "bitflags 2.13.1",
 ]
 
 [[package]]
@@ -4663,7 +4312,7 @@ dependencies = [
  "clap",
  "libc",
  "memchr",
- "memmap2 0.9.11",
+ "memmap2",
  "once_cell",
  "regex",
  "serde",
@@ -4682,21 +4331,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7382cf6263419f2d8df38c55d7da83da5c18aef87fc7a7fc1fb1e344edfe14c1"
 dependencies = [
  "hashbrown 0.15.5",
-]
-
-[[package]]
-name = "hassle-rs"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af2a7e73e1f34c48da31fb668a907f250794837e08faa144fd24f0b8b741e890"
-dependencies = [
- "bitflags 2.13.1",
- "com",
- "libc",
- "libloading 0.8.9",
- "thiserror 1.0.69",
- "widestring",
- "winapi",
 ]
 
 [[package]]
@@ -4770,12 +4404,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hexf-parse"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dfa686283ad6dd069f105e5ab091b04c62850d3e4cf5d67debad1933f55023df"
 
 [[package]]
 name = "hkdf"
@@ -5113,17 +4741,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f31827a206f56af32e590ba56d5d2d085f558508192593743f16b2306495269f"
 dependencies = [
  "cc",
-]
-
-[[package]]
-name = "icrate"
-version = "0.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99d3aaff8a54577104bafdf686ff18565c3b6903ca5782a2026ef06e2c7aa319"
-dependencies = [
- "block2 0.3.0",
- "dispatch",
- "objc2 0.4.1",
 ]
 
 [[package]]
@@ -5530,1581 +5147,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
-name = "jcode"
-version = "0.32.0"
-dependencies = [
- "anyhow",
- "arboard",
- "async-stream",
- "async-trait",
- "aws-config",
- "aws-credential-types",
- "aws-sdk-bedrock",
- "aws-sdk-bedrockruntime",
- "aws-sdk-sts",
- "aws-smithy-types",
- "aws-types",
- "base64 0.22.1",
- "block2 0.6.2",
- "bytes",
- "chrono",
- "clap",
- "crossterm 0.29.0",
- "dcg-core",
- "dirs 5.0.1",
- "ffs-engine",
- "ffs-search",
- "flate2",
- "futures",
- "glob",
- "global-hotkey",
- "hex",
- "ignore",
- "image",
- "jcode-agent-runtime",
- "jcode-ambient-types",
- "jcode-app-core",
- "jcode-auth-types",
- "jcode-azure-auth",
- "jcode-background-types",
- "jcode-batch-types",
- "jcode-build-meta",
- "jcode-build-support",
- "jcode-compaction-core",
- "jcode-config-types",
- "jcode-core",
- "jcode-embedding",
- "jcode-experiment-flags",
- "jcode-gateway-types",
- "jcode-hooks",
- "jcode-keyring-store",
- "jcode-logging",
- "jcode-memory-types",
- "jcode-message-types",
- "jcode-notify-email",
- "jcode-overnight-core",
- "jcode-pdf",
- "jcode-plan",
- "jcode-plugin-core",
- "jcode-plugin-runtime",
- "jcode-protocol",
- "jcode-provider-anthropic-runtime",
- "jcode-provider-antigravity-runtime",
- "jcode-provider-claude-cli-runtime",
- "jcode-provider-copilot-runtime",
- "jcode-provider-core",
- "jcode-provider-cursor-runtime",
- "jcode-provider-doctor",
- "jcode-provider-gemini",
- "jcode-provider-gemini-runtime",
- "jcode-provider-metadata",
- "jcode-provider-openai",
- "jcode-provider-openai-runtime",
- "jcode-provider-openrouter",
- "jcode-provider-openrouter-runtime",
- "jcode-provider-service",
- "jcode-secrets",
- "jcode-selfdev-types",
- "jcode-session-types",
- "jcode-setup-hints",
- "jcode-side-panel-types",
- "jcode-storage",
- "jcode-swarm-core",
- "jcode-task-types",
- "jcode-terminal-image",
- "jcode-terminal-launch",
- "jcode-tool-core",
- "jcode-tool-types",
- "jcode-tui",
- "jcode-tui-account-picker",
- "jcode-tui-core",
- "jcode-tui-markdown",
- "jcode-tui-mermaid",
- "jcode-tui-messages",
- "jcode-tui-render",
- "jcode-tui-session-picker",
- "jcode-tui-style",
- "jcode-tui-tool-display",
- "jcode-tui-usage-overlay",
- "jcode-tui-workspace",
- "jcode-update-core",
- "jcode-usage-types",
- "libc",
- "objc2 0.6.4",
- "objc2-app-kit",
- "objc2-foundation",
- "open",
- "proctitle",
- "qrcode",
- "rand 0.9.5",
- "ratatui 0.30.2",
- "regex",
- "reqwest 0.12.28",
- "rustls 0.23.42",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.9",
- "similar",
- "strum 0.26.3",
- "tar",
- "tempfile",
- "thiserror 1.0.69",
- "tikv-jemalloc-ctl",
- "tikv-jemalloc-sys",
- "tikv-jemallocator",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "toml 0.8.23",
- "tru",
- "unicode-width 0.2.2",
- "url",
- "urlencoding",
- "uuid",
- "walkdir",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "jcode-agent-runtime"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "toml 0.8.23",
- "tracing",
-]
-
-[[package]]
-name = "jcode-ambient-types"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
-]
-
-[[package]]
-name = "jcode-app-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arboard",
- "async-stream",
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "chrono",
- "clap",
- "core-graphics",
- "crossterm 0.29.0",
- "dcg-core",
- "dirs 5.0.1",
- "dynamic_context_pruning",
- "ffs-engine",
- "ffs-search",
- "ffs-symbol",
- "flate2",
- "futures",
- "glob",
- "global-hotkey",
- "hashline",
- "hex",
- "ignore",
- "image",
- "jcode-agent-runtime",
- "jcode-ambient-types",
- "jcode-auth-types",
- "jcode-background-types",
- "jcode-base",
- "jcode-batch-types",
- "jcode-best-of-n",
- "jcode-build-meta",
- "jcode-build-support",
- "jcode-compaction-core",
- "jcode-config-types",
- "jcode-core",
- "jcode-experiment-flags",
- "jcode-gateway-types",
- "jcode-hooks",
- "jcode-import-core",
- "jcode-keywords",
- "jcode-logging",
- "jcode-memory-types",
- "jcode-message-types",
- "jcode-notify-email",
- "jcode-overnight-core",
- "jcode-pdf",
- "jcode-plan",
- "jcode-plugin-core",
- "jcode-plugin-runtime",
- "jcode-protocol",
- "jcode-provider-core",
- "jcode-provider-metadata",
- "jcode-secrets",
- "jcode-selfdev-types",
- "jcode-session-types",
- "jcode-setup-hints",
- "jcode-side-panel-types",
- "jcode-storage",
- "jcode-swarm-core",
- "jcode-task-types",
- "jcode-terminal-image",
- "jcode-terminal-launch",
- "jcode-tool-core",
- "jcode-tool-types",
- "jcode-update-core",
- "jcode-usage-types",
- "libc",
- "open",
- "proctitle",
- "qrcode",
- "rand 0.9.5",
- "ratatui 0.30.2",
- "regex",
- "reqwest 0.12.28",
- "rtco-core",
- "rustls 0.23.42",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.9",
- "similar",
- "tar",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "tokio-util",
- "toml 0.8.23",
- "unicode-width 0.2.2",
- "url",
- "urlencoding",
- "uuid",
- "walkdir",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "jcode-auth-types"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "jcode-azure-auth"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "azure_core",
- "azure_identity",
-]
-
-[[package]]
-name = "jcode-background-types"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "jcode-base"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "base64 0.22.1",
- "bytes",
- "chrono",
- "criterion",
- "crossterm 0.29.0",
- "dirs 5.0.1",
- "ffs-engine",
- "ffs-search",
- "flate2",
- "futures",
- "glob",
- "global-hotkey",
- "hex",
- "ignore",
- "image",
- "jcode-agent-runtime",
- "jcode-app-core",
- "jcode-auth-types",
- "jcode-azure-auth",
- "jcode-background-types",
- "jcode-batch-types",
- "jcode-best-of-n",
- "jcode-build-meta",
- "jcode-compaction-core",
- "jcode-config-types",
- "jcode-core",
- "jcode-embedding",
- "jcode-gateway-types",
- "jcode-import-core",
- "jcode-logging",
- "jcode-memory-types",
- "jcode-message-types",
- "jcode-plan",
- "jcode-protocol",
- "jcode-provider-anthropic",
- "jcode-provider-antigravity",
- "jcode-provider-bedrock",
- "jcode-provider-copilot",
- "jcode-provider-core",
- "jcode-provider-env",
- "jcode-provider-gemini",
- "jcode-provider-metadata",
- "jcode-provider-openai",
- "jcode-provider-openrouter",
- "jcode-provider-openrouter-runtime",
- "jcode-redact",
- "jcode-render-core",
- "jcode-selfdev-types",
- "jcode-session-types",
- "jcode-side-panel-types",
- "jcode-storage",
- "jcode-task-types",
- "jcode-telemetry-core",
- "jcode-terminal-image",
- "jcode-terminal-launch",
- "jcode-tool-core",
- "jcode-tool-types",
- "jcode-usage-types",
- "libc",
- "open",
- "proctitle",
- "qrcode",
- "rand 0.9.5",
- "regex",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.10.9",
- "similar",
- "tempfile",
- "tikv-jemalloc-ctl",
- "tikv-jemalloc-sys",
- "tikv-jemallocator",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "toml 0.8.23",
- "url",
- "urlencoding",
- "uuid",
- "walkdir",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "jcode-batch-types"
-version = "0.1.0"
-dependencies = [
- "jcode-message-types",
- "serde",
-]
-
-[[package]]
-name = "jcode-best-of-n"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dashmap",
- "serde",
- "serde_json",
- "similar",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "jcode-build-meta"
-version = "0.1.0"
-
-[[package]]
-name = "jcode-build-support"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "jcode-core",
- "jcode-selfdev-types",
- "jcode-storage",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "jcode-compaction-core"
-version = "0.1.0"
-dependencies = [
- "jcode-message-types",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-config-types"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "libc",
- "rand 0.9.5",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "jcode-desktop"
-version = "0.1.0"
-dependencies = [
- "ab_glyph",
- "anyhow",
- "arboard",
- "base64 0.22.1",
- "bytemuck",
- "glyphon",
- "image",
- "jcode-fuzzy",
- "jcode-tui-messages",
- "libc",
- "pollster",
- "pulldown-cmark",
- "serde",
- "serde_json",
- "wgpu",
- "whoami",
- "winit",
-]
-
-[[package]]
-name = "jcode-edit-bench"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "flate2",
- "rand 0.8.7",
- "rand_chacha 0.3.1",
- "regex",
- "serde",
- "serde_json",
- "similar",
- "tar",
- "tempfile",
- "tokio",
- "tree-sitter",
- "tree-sitter-rust",
-]
-
-[[package]]
-name = "jcode-embedding"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "reqwest 0.12.28",
- "tokenizers",
- "tract-hir",
- "tract-onnx",
-]
-
-[[package]]
-name = "jcode-experiment-flags"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
- "strum 0.26.3",
-]
-
-[[package]]
-name = "jcode-fuzzy"
-version = "0.1.0"
-
-[[package]]
-name = "jcode-gateway-types"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "jcode-hooks"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs 5.0.1",
- "futures",
- "regex",
- "reqwest 0.11.27",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "toml 0.8.23",
-]
-
-[[package]]
-name = "jcode-import-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "hex",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
-]
-
-[[package]]
-name = "jcode-jbench"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "jcode-agent-runtime",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
-]
-
-[[package]]
-name = "jcode-keyring-store"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "keyring",
- "secret-service",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "jcode-keywords"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs 6.0.0",
- "serde",
- "strum 0.26.3",
- "tempfile",
- "tokio",
- "toml 0.8.23",
-]
-
-[[package]]
-name = "jcode-llm-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-stream",
- "async-trait",
- "chrono",
- "futures",
- "schemars",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tracing",
-]
-
-[[package]]
-name = "jcode-llm-dialects"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "jcode-llm-core",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "jcode-llm-protocols"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "jcode-llm-core",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "jcode-llm-providers"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "jcode-llm-core",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "jcode-llm-vcr"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "jcode-logging"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "jcode-core",
- "jcode-redact",
- "jcode-storage",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "jcode-memory-types"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "rand 0.9.5",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-message-types"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-notify-email"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "imap",
- "lettre",
- "mail-parser",
- "pulldown-cmark",
- "urlencoding",
-]
-
-[[package]]
-name = "jcode-overnight-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-pdf"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "pdf-extract",
-]
-
-[[package]]
-name = "jcode-plan"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-plugin-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "regex",
- "semver",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "jcode-plugin-runtime"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "futures",
- "jcode-agent-runtime",
- "jcode-plugin-core",
- "regex",
- "reqwest 0.12.28",
- "rquickjs",
- "seahash",
- "serde",
- "serde_json",
- "swc_atoms",
- "swc_common",
- "swc_ecma_ast",
- "swc_ecma_codegen",
- "swc_ecma_parser",
- "swc_ecma_transforms_base",
- "swc_ecma_transforms_typescript",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "jcode-productivity-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "jcode-storage",
- "rayon",
- "resvg 0.46.0",
- "serde",
- "serde_json",
- "tempfile",
- "usvg 0.46.0",
-]
-
-[[package]]
-name = "jcode-protocol"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "jcode-batch-types",
- "jcode-config-types",
- "jcode-message-types",
- "jcode-plan",
- "jcode-provider-core",
- "jcode-selfdev-types",
- "jcode-session-types",
- "jcode-side-panel-types",
- "rand 0.9.5",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-provider-anthropic"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures",
- "jcode-llm-core",
- "jcode-llm-protocols",
- "jcode-logging",
- "jcode-message-types",
- "jcode-provider-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "jcode-provider-anthropic-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "futures",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-anthropic",
- "jcode-provider-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-stream",
- "uuid",
-]
-
-[[package]]
-name = "jcode-provider-antigravity"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "jcode-provider-gemini",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-provider-antigravity-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-antigravity",
- "jcode-provider-core",
- "jcode-provider-gemini",
- "reqwest 0.12.28",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-stream",
- "uuid",
-]
-
-[[package]]
-name = "jcode-provider-bedrock"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "aws-config",
- "aws-credential-types",
- "aws-sdk-bedrock",
- "aws-sdk-bedrockruntime",
- "aws-sdk-sts",
- "aws-smithy-types",
- "aws-types",
- "base64 0.22.1",
- "chrono",
- "futures",
- "jcode-core",
- "jcode-logging",
- "jcode-message-types",
- "jcode-provider-core",
- "jcode-provider-env",
- "jcode-storage",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "jcode-provider-claude-cli-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-core",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "jcode-provider-copilot"
-version = "0.1.0"
-dependencies = [
- "jcode-message-types",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-provider-copilot-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "dirs 5.0.1",
- "futures",
- "hex",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-copilot",
- "jcode-provider-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "tokio",
- "tokio-stream",
- "uuid",
-]
-
-[[package]]
-name = "jcode-provider-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "futures",
- "httpdate",
- "jcode-logging",
- "jcode-message-types",
- "rand 0.9.5",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tokio",
-]
-
-[[package]]
-name = "jcode-provider-cursor-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "chrono",
- "flate2",
- "h2 0.4.15",
- "http 1.4.2",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-rustls 0.26.4",
- "tokio-stream",
- "uuid",
- "webpki-roots 1.0.8",
-]
-
-[[package]]
-name = "jcode-provider-doctor"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "futures",
- "jcode-base",
- "jcode-provider-anthropic-runtime",
- "jcode-provider-antigravity-runtime",
- "jcode-provider-copilot-runtime",
- "jcode-provider-cursor-runtime",
- "jcode-provider-gemini-runtime",
- "jcode-provider-metadata",
- "jcode-provider-openai-runtime",
- "jcode-provider-openrouter-runtime",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "jcode-provider-env"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "jcode-core",
- "jcode-logging",
- "jcode-provider-metadata",
- "jcode-storage",
- "tempfile",
-]
-
-[[package]]
-name = "jcode-provider-gemini"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "jcode-message-types",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-provider-gemini-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-core",
- "jcode-provider-gemini",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-stream",
- "uuid",
-]
-
-[[package]]
-name = "jcode-provider-metadata"
-version = "0.1.0"
-dependencies = [
- "url",
-]
-
-[[package]]
-name = "jcode-provider-openai"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "bytes",
- "futures",
- "jcode-core",
- "jcode-llm-core",
- "jcode-llm-protocols",
- "jcode-logging",
- "jcode-message-types",
- "jcode-provider-core",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "jcode-provider-openai-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "dirs 5.0.1",
- "futures",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-core",
- "jcode-provider-openai",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-stream",
- "tokio-tungstenite",
- "uuid",
-]
-
-[[package]]
-name = "jcode-provider-openrouter"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytes",
- "dirs 5.0.1",
- "futures",
- "jcode-core",
- "jcode-logging",
- "jcode-message-types",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-provider-openrouter-runtime"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "chrono",
- "futures",
- "jcode-base",
- "jcode-message-types",
- "jcode-provider-core",
- "jcode-provider-metadata",
- "jcode-provider-openrouter",
- "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tokio-stream",
- "toml 0.8.23",
- "uuid",
-]
-
-[[package]]
-name = "jcode-provider-service"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "crossterm 0.28.1",
- "inventory",
- "jcode-keyring-store",
- "jcode-llm-core",
- "jcode-llm-protocols",
- "jcode-message-types",
- "jcode-provider-core",
- "jcode-provider-metadata",
- "ratatui 0.28.1",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "jcode-redact"
-version = "0.1.0"
-dependencies = [
- "regex",
-]
-
-[[package]]
-name = "jcode-render-core"
-version = "0.1.0"
-dependencies = [
- "pulldown-cmark",
- "serde",
- "unicode-width 0.2.2",
-]
-
-[[package]]
-name = "jcode-secrets"
-version = "0.1.0"
-dependencies = [
- "age",
- "anyhow",
- "base64 0.22.1",
- "jcode-keyring-store",
- "jcode-redact",
- "jcode-storage",
- "rand 0.9.5",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "tempfile",
- "tracing",
-]
-
-[[package]]
-name = "jcode-selfdev-types"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "serde",
-]
-
-[[package]]
-name = "jcode-session-types"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "jcode-message-types",
- "memchr",
- "serde",
-]
-
-[[package]]
-name = "jcode-setup-hints"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dirs 5.0.1",
- "global-hotkey",
- "jcode-build-meta",
- "jcode-config-types",
- "jcode-logging",
- "jcode-storage",
- "jcode-terminal-launch",
- "serde",
- "serde_json",
- "tempfile",
- "toml 0.8.23",
-]
-
-[[package]]
-name = "jcode-side-panel-types"
-version = "0.1.0"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "jcode-storage"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dirs 5.0.1",
- "jcode-core",
- "libc",
- "rand 0.9.5",
- "serde",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "jcode-swarm-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs 5.0.1",
- "jcode-plan",
- "libc",
- "regex",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
-name = "jcode-task-types"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-telemetry-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "jcode-build-meta",
- "jcode-core",
- "jcode-logging",
- "jcode-provider-core",
- "jcode-selfdev-types",
- "jcode-storage",
- "jcode-usage-types",
- "reqwest 0.12.28",
- "serde_json",
- "tempfile",
- "tokio",
- "uuid",
- "walkdir",
-]
-
-[[package]]
-name = "jcode-terminal-image"
-version = "0.1.0"
-dependencies = [
- "base64 0.22.1",
- "crossterm 0.29.0",
-]
-
-[[package]]
-name = "jcode-terminal-launch"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dirs 5.0.1",
-]
-
-[[package]]
-name = "jcode-tool-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "jcode-agent-runtime",
- "jcode-message-types",
- "jcode-tool-types",
- "serde_json",
- "tokio",
-]
-
-[[package]]
-name = "jcode-tool-types"
-version = "0.1.0"
-dependencies = [
- "jcode-plugin-core",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-tui"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "arboard",
- "async-trait",
- "base64 0.22.1",
- "basic-toml",
- "chrono",
- "crossterm 0.29.0",
- "dirs 5.0.1",
- "ffs-engine",
- "ffs-search",
- "futures",
- "global-hotkey",
- "hex",
- "image",
- "jcode-agent-runtime",
- "jcode-app-core",
- "jcode-build-meta",
- "jcode-config-types",
- "jcode-core",
- "jcode-fuzzy",
- "jcode-keywords",
- "jcode-logging",
- "jcode-memory-types",
- "jcode-productivity-core",
- "jcode-protocol",
- "jcode-provider-core",
- "jcode-provider-service",
- "jcode-redact",
- "jcode-selfdev-types",
- "jcode-session-types",
- "jcode-terminal-image",
- "jcode-tui-account-picker",
- "jcode-tui-anim",
- "jcode-tui-core",
- "jcode-tui-markdown",
- "jcode-tui-mermaid",
- "jcode-tui-messages",
- "jcode-tui-permissions",
- "jcode-tui-render",
- "jcode-tui-session-picker",
- "jcode-tui-style",
- "jcode-tui-tool-display",
- "jcode-tui-usage-overlay",
- "jcode-tui-visual-debug",
- "jcode-tui-workspace",
- "libc",
- "open",
- "rand 0.9.5",
- "ratatui 0.30.2",
- "regex",
- "serde",
- "serde_json",
- "sha2 0.10.9",
- "similar",
- "tempfile",
- "terminal-colorsaurus",
- "tokio",
- "unicode-width 0.2.2",
- "url",
- "urlencoding",
-]
-
-[[package]]
-name = "jcode-tui-account-picker"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "crossterm 0.29.0",
- "ratatui 0.30.2",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-tui-anim"
-version = "0.1.0"
-
-[[package]]
-name = "jcode-tui-core"
-version = "0.1.0"
-dependencies = [
- "crossterm 0.29.0",
- "jcode-memory-types",
- "serde",
-]
-
-[[package]]
-name = "jcode-tui-markdown"
-version = "0.1.0"
-dependencies = [
- "dirs 5.0.1",
- "image",
- "jcode-render-core",
- "jcode-tui-mermaid",
- "jcode-tui-workspace",
- "pulldown-cmark",
- "ratatui 0.30.2",
- "serde",
- "serde_json",
- "syntect",
- "tempfile",
- "unicode-width 0.2.2",
- "wait-timeout",
-]
-
-[[package]]
-name = "jcode-tui-mermaid"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "crossterm 0.29.0",
- "dirs 5.0.1",
- "image",
- "jcode-plan",
- "jcode-tui-workspace",
- "mermaid-rs-renderer",
- "ratatui 0.30.2",
- "ratatui-image",
- "resvg 0.46.0",
- "serde",
- "serde_json",
- "usvg 0.46.0",
-]
-
-[[package]]
-name = "jcode-tui-messages"
-version = "0.1.0"
-dependencies = [
- "jcode-config-types",
- "jcode-message-types",
- "jcode-session-types",
- "jcode-tui-markdown",
- "ratatui 0.30.2",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-tui-permissions"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "crossterm 0.29.0",
- "jcode-base",
- "jcode-core",
- "jcode-tui-style",
- "ratatui 0.30.2",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-tui-render"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "jcode-tui-style",
- "ratatui 0.30.2",
- "unicode-width 0.2.2",
-]
-
-[[package]]
-name = "jcode-tui-session-picker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "jcode-message-types",
- "jcode-session-types",
- "serde",
-]
-
-[[package]]
-name = "jcode-tui-style"
-version = "0.1.0"
-dependencies = [
- "ratatui 0.30.2",
-]
-
-[[package]]
-name = "jcode-tui-tool-display"
-version = "0.1.0"
-dependencies = [
- "unicode-width 0.2.2",
-]
-
-[[package]]
-name = "jcode-tui-usage-overlay"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "crossterm 0.29.0",
- "jcode-usage-types",
- "ratatui 0.30.2",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-tui-visual-debug"
-version = "0.1.0"
-dependencies = [
- "dirs 5.0.1",
- "jcode-logging",
- "ratatui 0.30.2",
- "regex",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "jcode-tui-workspace"
-version = "0.1.0"
-dependencies = [
- "ratatui 0.30.2",
-]
-
-[[package]]
-name = "jcode-update-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "sha2 0.10.9",
-]
-
-[[package]]
-name = "jcode-usage-types"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "jiff"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7148,22 +5190,6 @@ dependencies = [
 
 [[package]]
 name = "jni"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a87aa2bb7d2af34197c04845522473242e1aa17c12f4935d5856491a7fb8c97"
-dependencies = [
- "cesu8",
- "cfg-if",
- "combine",
- "jni-sys 0.3.1",
- "log",
- "thiserror 1.0.69",
- "walkdir",
- "windows-sys 0.45.0",
-]
-
-[[package]]
-name = "jni"
 version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5efd9a482cf3a427f00d6b35f14332adc7902ce91efb778580e180ff90fa3498"
@@ -7171,7 +5197,7 @@ dependencies = [
  "cfg-if",
  "combine",
  "jni-macros",
- "jni-sys 0.4.1",
+ "jni-sys",
  "log",
  "simd_cesu8",
  "thiserror 2.0.18",
@@ -7190,15 +5216,6 @@ dependencies = [
  "rustc_version",
  "simd_cesu8",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "jni-sys"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41a652e1f9b6e0275df1f15b32661cf0d4b78d4d87ddec5e0c3c20f097433258"
-dependencies = [
- "jni-sys 0.4.1",
 ]
 
 [[package]]
@@ -7302,23 +5319,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "khronos-egl"
-version = "6.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6aae1df220ece3c0ada96b8153459b67eebe9ae9212258bb0134ae60416fdf76"
-dependencies = [
- "libc",
- "libloading 0.8.9",
- "pkg-config",
-]
-
-[[package]]
-name = "khronos_api"
-version = "3.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
-
-[[package]]
 name = "kqueue"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7418,26 +5418,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libloading"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f"
-dependencies = [
- "cfg-if",
- "winapi",
-]
-
-[[package]]
-name = "libloading"
-version = "0.8.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7c4b02199fee7c5d21a5ae7d8cfa79a6ef5bb2fc834d6e9058e89c825efdc55"
-dependencies = [
- "cfg-if",
- "windows-link",
-]
-
-[[package]]
 name = "libm"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7449,10 +5429,7 @@ version = "0.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c943259e342f1e06ff2da7a83eabdfe7f92ce10262688dbf1895ff0b3e6e4652"
 dependencies = [
- "bitflags 2.13.1",
  "libc",
- "plain",
- "redox_syscall 0.9.0",
 ]
 
 [[package]]
@@ -7682,15 +5659,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "malloc_buf"
-version = "0.0.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7744,15 +5712,6 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 
 [[package]]
 name = "memmap2"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43a5a03cefb0d953ec0be133036f14e109412fa594edc2f77227249db66cc3ed"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "memmap2"
 version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1219ed1b7f229ee7104d281dd01d6802fe28bb6e95d292942c4daacdeb798c0"
@@ -7782,7 +5741,7 @@ source = "git+https://github.com/1jehuang/mermaid-rs-renderer.git?tag=v0.3.1#2f9
 dependencies = [
  "anyhow",
  "clap",
- "fontdb 0.23.0",
+ "fontdb",
  "json5 1.3.1",
  "once_cell",
  "regex",
@@ -7790,23 +5749,8 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
- "ttf-parser 0.25.1",
+ "ttf-parser",
  "usvg 0.47.0",
-]
-
-[[package]]
-name = "metal"
-version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c43f73953f8cbe511f021b58f18c3ce1c3d1ae13fe953293e13345bf83217f25"
-dependencies = [
- "bitflags 2.13.1",
- "block",
- "core-graphics-types",
- "foreign-types 0.5.0",
- "log",
- "objc",
- "paste",
 ]
 
 [[package]]
@@ -7886,26 +5830,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "naga"
-version = "0.19.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50e3524642f53d9af419ab5e8dd29d3ba155708267667c2f3f06c88c9e130843"
-dependencies = [
- "bit-set 0.5.3",
- "bitflags 2.13.1",
- "codespan-reporting",
- "hexf-parse",
- "indexmap",
- "log",
- "num-traits",
- "rustc-hash 1.1.0",
- "spirv",
- "termcolor",
- "thiserror 1.0.69",
- "unicode-xid",
-]
-
-[[package]]
 name = "native-tls"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7938,36 +5862,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ndk"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2076a31b7010b17a38c01907c45b945e8f11495ee4dd588309718901b1f7a5b7"
-dependencies = [
- "bitflags 2.13.1",
- "jni-sys 0.3.1",
- "log",
- "ndk-sys",
- "num_enum",
- "raw-window-handle",
- "thiserror 1.0.69",
-]
-
-[[package]]
-name = "ndk-context"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27b02d87554356db9e9a873add8782d4ea6e3e58ea071a9adb9a2e8ddb884a8b"
-
-[[package]]
-name = "ndk-sys"
-version = "0.5.0+25.2.9519653"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c196769dd60fd4f363e11d948139556a344e79d451aeb2fa2fd040738ef7691"
-dependencies = [
- "jni-sys 0.3.1",
-]
-
-[[package]]
 name = "neo_frizbee"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7984,6 +5878,1553 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
+name = "next-code"
+version = "0.32.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "async-stream",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-bedrock",
+ "aws-sdk-bedrockruntime",
+ "aws-sdk-sts",
+ "aws-smithy-types",
+ "aws-types",
+ "base64 0.22.1",
+ "block2",
+ "bytes",
+ "chrono",
+ "clap",
+ "crossterm 0.29.0",
+ "dcg-core",
+ "dirs 5.0.1",
+ "ffs-engine",
+ "ffs-search",
+ "flate2",
+ "futures",
+ "glob",
+ "global-hotkey",
+ "hex",
+ "ignore",
+ "image",
+ "libc",
+ "next-code-agent-runtime",
+ "next-code-ambient-types",
+ "next-code-app-core",
+ "next-code-auth-types",
+ "next-code-azure-auth",
+ "next-code-background-types",
+ "next-code-batch-types",
+ "next-code-build-meta",
+ "next-code-build-support",
+ "next-code-compaction-core",
+ "next-code-config-types",
+ "next-code-core",
+ "next-code-embedding",
+ "next-code-experiment-flags",
+ "next-code-gateway-types",
+ "next-code-hooks",
+ "next-code-keyring-store",
+ "next-code-logging",
+ "next-code-memory-types",
+ "next-code-message-types",
+ "next-code-notify-email",
+ "next-code-overnight-core",
+ "next-code-pdf",
+ "next-code-plan",
+ "next-code-plugin-core",
+ "next-code-plugin-runtime",
+ "next-code-protocol",
+ "next-code-provider-anthropic-runtime",
+ "next-code-provider-antigravity-runtime",
+ "next-code-provider-claude-cli-runtime",
+ "next-code-provider-copilot-runtime",
+ "next-code-provider-core",
+ "next-code-provider-cursor-runtime",
+ "next-code-provider-doctor",
+ "next-code-provider-gemini",
+ "next-code-provider-gemini-runtime",
+ "next-code-provider-metadata",
+ "next-code-provider-openai",
+ "next-code-provider-openai-runtime",
+ "next-code-provider-openrouter",
+ "next-code-provider-openrouter-runtime",
+ "next-code-provider-service",
+ "next-code-secrets",
+ "next-code-selfdev-types",
+ "next-code-session-types",
+ "next-code-setup-hints",
+ "next-code-side-panel-types",
+ "next-code-storage",
+ "next-code-swarm-core",
+ "next-code-task-types",
+ "next-code-terminal-image",
+ "next-code-terminal-launch",
+ "next-code-tool-core",
+ "next-code-tool-types",
+ "next-code-tui",
+ "next-code-tui-account-picker",
+ "next-code-tui-core",
+ "next-code-tui-markdown",
+ "next-code-tui-mermaid",
+ "next-code-tui-messages",
+ "next-code-tui-render",
+ "next-code-tui-session-picker",
+ "next-code-tui-style",
+ "next-code-tui-tool-display",
+ "next-code-tui-usage-overlay",
+ "next-code-tui-workspace",
+ "next-code-update-core",
+ "next-code-usage-types",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "open",
+ "proctitle",
+ "qrcode",
+ "rand 0.9.5",
+ "ratatui 0.30.2",
+ "regex",
+ "reqwest 0.12.28",
+ "rustls 0.23.42",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "similar",
+ "strum 0.26.3",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tikv-jemalloc-ctl",
+ "tikv-jemalloc-sys",
+ "tikv-jemallocator",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "toml 0.8.23",
+ "tru",
+ "unicode-width 0.2.2",
+ "url",
+ "urlencoding",
+ "uuid",
+ "walkdir",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "next-code-agent-runtime"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+ "tracing",
+]
+
+[[package]]
+name = "next-code-ambient-types"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+]
+
+[[package]]
+name = "next-code-app-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "async-stream",
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "chrono",
+ "clap",
+ "core-graphics",
+ "crossterm 0.29.0",
+ "dcg-core",
+ "dirs 5.0.1",
+ "dynamic_context_pruning",
+ "ffs-engine",
+ "ffs-search",
+ "ffs-symbol",
+ "flate2",
+ "futures",
+ "glob",
+ "global-hotkey",
+ "hashline",
+ "hex",
+ "ignore",
+ "image",
+ "libc",
+ "next-code-agent-runtime",
+ "next-code-ambient-types",
+ "next-code-auth-types",
+ "next-code-background-types",
+ "next-code-base",
+ "next-code-batch-types",
+ "next-code-best-of-n",
+ "next-code-build-meta",
+ "next-code-build-support",
+ "next-code-compaction-core",
+ "next-code-config-types",
+ "next-code-core",
+ "next-code-experiment-flags",
+ "next-code-gateway-types",
+ "next-code-hooks",
+ "next-code-import-core",
+ "next-code-keywords",
+ "next-code-logging",
+ "next-code-memory-types",
+ "next-code-message-types",
+ "next-code-notify-email",
+ "next-code-overnight-core",
+ "next-code-pdf",
+ "next-code-plan",
+ "next-code-plugin-core",
+ "next-code-plugin-runtime",
+ "next-code-protocol",
+ "next-code-provider-core",
+ "next-code-provider-metadata",
+ "next-code-secrets",
+ "next-code-selfdev-types",
+ "next-code-session-types",
+ "next-code-setup-hints",
+ "next-code-side-panel-types",
+ "next-code-storage",
+ "next-code-swarm-core",
+ "next-code-task-types",
+ "next-code-terminal-image",
+ "next-code-terminal-launch",
+ "next-code-tool-core",
+ "next-code-tool-types",
+ "next-code-update-core",
+ "next-code-usage-types",
+ "open",
+ "proctitle",
+ "qrcode",
+ "rand 0.9.5",
+ "ratatui 0.30.2",
+ "regex",
+ "reqwest 0.12.28",
+ "rtco-core",
+ "rustls 0.23.42",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "similar",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "tokio-util",
+ "toml 0.8.23",
+ "unicode-width 0.2.2",
+ "url",
+ "urlencoding",
+ "uuid",
+ "walkdir",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "next-code-auth-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "next-code-azure-auth"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "azure_core",
+ "azure_identity",
+]
+
+[[package]]
+name = "next-code-background-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "next-code-base"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "bytes",
+ "chrono",
+ "criterion",
+ "crossterm 0.29.0",
+ "dirs 5.0.1",
+ "ffs-engine",
+ "ffs-search",
+ "flate2",
+ "futures",
+ "glob",
+ "global-hotkey",
+ "hex",
+ "ignore",
+ "image",
+ "libc",
+ "next-code-agent-runtime",
+ "next-code-app-core",
+ "next-code-auth-types",
+ "next-code-azure-auth",
+ "next-code-background-types",
+ "next-code-batch-types",
+ "next-code-best-of-n",
+ "next-code-build-meta",
+ "next-code-compaction-core",
+ "next-code-config-types",
+ "next-code-core",
+ "next-code-embedding",
+ "next-code-gateway-types",
+ "next-code-import-core",
+ "next-code-logging",
+ "next-code-memory-types",
+ "next-code-message-types",
+ "next-code-plan",
+ "next-code-protocol",
+ "next-code-provider-anthropic",
+ "next-code-provider-antigravity",
+ "next-code-provider-bedrock",
+ "next-code-provider-copilot",
+ "next-code-provider-core",
+ "next-code-provider-env",
+ "next-code-provider-gemini",
+ "next-code-provider-metadata",
+ "next-code-provider-openai",
+ "next-code-provider-openrouter",
+ "next-code-provider-openrouter-runtime",
+ "next-code-redact",
+ "next-code-render-core",
+ "next-code-selfdev-types",
+ "next-code-session-types",
+ "next-code-side-panel-types",
+ "next-code-storage",
+ "next-code-task-types",
+ "next-code-terminal-image",
+ "next-code-terminal-launch",
+ "next-code-tool-core",
+ "next-code-tool-types",
+ "next-code-usage-types",
+ "open",
+ "proctitle",
+ "qrcode",
+ "rand 0.9.5",
+ "regex",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2 0.10.9",
+ "similar",
+ "tempfile",
+ "tikv-jemalloc-ctl",
+ "tikv-jemalloc-sys",
+ "tikv-jemallocator",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "toml 0.8.23",
+ "url",
+ "urlencoding",
+ "uuid",
+ "walkdir",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "next-code-batch-types"
+version = "0.1.0"
+dependencies = [
+ "next-code-message-types",
+ "serde",
+]
+
+[[package]]
+name = "next-code-best-of-n"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dashmap",
+ "serde",
+ "serde_json",
+ "similar",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-build-meta"
+version = "0.1.0"
+
+[[package]]
+name = "next-code-build-support"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "next-code-core",
+ "next-code-selfdev-types",
+ "next-code-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "next-code-compaction-core"
+version = "0.1.0"
+dependencies = [
+ "next-code-message-types",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-config-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "libc",
+ "rand 0.9.5",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "next-code-edit-bench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "flate2",
+ "rand 0.8.7",
+ "rand_chacha 0.3.1",
+ "regex",
+ "serde",
+ "serde_json",
+ "similar",
+ "tar",
+ "tempfile",
+ "tokio",
+ "tree-sitter",
+ "tree-sitter-rust",
+]
+
+[[package]]
+name = "next-code-embedding"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "reqwest 0.12.28",
+ "tokenizers",
+ "tract-hir",
+ "tract-onnx",
+]
+
+[[package]]
+name = "next-code-experiment-flags"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "strum 0.26.3",
+]
+
+[[package]]
+name = "next-code-fuzzy"
+version = "0.1.0"
+
+[[package]]
+name = "next-code-gateway-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "next-code-hooks"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs 5.0.1",
+ "futures",
+ "next-code-core",
+ "regex",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "next-code-import-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "hex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+]
+
+[[package]]
+name = "next-code-jbench"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "next-code-agent-runtime",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-keyring-store"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "keyring",
+ "secret-service",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "next-code-keywords"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs 6.0.0",
+ "serde",
+ "strum 0.26.3",
+ "tempfile",
+ "tokio",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "next-code-llm-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "async-trait",
+ "chrono",
+ "futures",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
+name = "next-code-llm-dialects"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "next-code-llm-core",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-llm-protocols"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "next-code-llm-core",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-llm-providers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "next-code-llm-core",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-llm-vcr"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "next-code-logging"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "next-code-core",
+ "next-code-redact",
+ "next-code-storage",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-memory-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-message-types"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-notify-email"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "imap",
+ "lettre",
+ "mail-parser",
+ "pulldown-cmark",
+ "urlencoding",
+]
+
+[[package]]
+name = "next-code-overnight-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-pdf"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "pdf-extract",
+]
+
+[[package]]
+name = "next-code-plan"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-plugin-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "next-code-core",
+ "regex",
+ "semver",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-plugin-runtime"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "futures",
+ "next-code-agent-runtime",
+ "next-code-core",
+ "next-code-plugin-core",
+ "regex",
+ "reqwest 0.12.28",
+ "rquickjs",
+ "seahash",
+ "serde",
+ "serde_json",
+ "swc_atoms",
+ "swc_common",
+ "swc_ecma_ast",
+ "swc_ecma_codegen",
+ "swc_ecma_parser",
+ "swc_ecma_transforms_base",
+ "swc_ecma_transforms_typescript",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-productivity-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "next-code-storage",
+ "rayon",
+ "resvg 0.46.0",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "usvg 0.46.0",
+]
+
+[[package]]
+name = "next-code-protocol"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "next-code-batch-types",
+ "next-code-config-types",
+ "next-code-message-types",
+ "next-code-plan",
+ "next-code-provider-core",
+ "next-code-selfdev-types",
+ "next-code-session-types",
+ "next-code-side-panel-types",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-provider-anthropic"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "next-code-llm-core",
+ "next-code-llm-protocols",
+ "next-code-logging",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "next-code-provider-anthropic-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "futures",
+ "next-code-base",
+ "next-code-core",
+ "next-code-message-types",
+ "next-code-provider-anthropic",
+ "next-code-provider-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-provider-antigravity"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "next-code-provider-gemini",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-provider-antigravity-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "next-code-base",
+ "next-code-message-types",
+ "next-code-provider-antigravity",
+ "next-code-provider-core",
+ "next-code-provider-gemini",
+ "reqwest 0.12.28",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-provider-bedrock"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "aws-config",
+ "aws-credential-types",
+ "aws-sdk-bedrock",
+ "aws-sdk-bedrockruntime",
+ "aws-sdk-sts",
+ "aws-smithy-types",
+ "aws-types",
+ "base64 0.22.1",
+ "chrono",
+ "futures",
+ "next-code-core",
+ "next-code-logging",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "next-code-provider-env",
+ "next-code-storage",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "next-code-provider-claude-cli-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "next-code-base",
+ "next-code-core",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "next-code-provider-copilot"
+version = "0.1.0"
+dependencies = [
+ "next-code-message-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-provider-copilot-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dirs 5.0.1",
+ "futures",
+ "hex",
+ "next-code-base",
+ "next-code-message-types",
+ "next-code-provider-copilot",
+ "next-code-provider-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-provider-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "futures",
+ "httpdate",
+ "next-code-core",
+ "next-code-logging",
+ "next-code-message-types",
+ "rand 0.9.5",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-provider-cursor-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "flate2",
+ "h2 0.4.15",
+ "http 1.4.2",
+ "next-code-base",
+ "next-code-core",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-rustls 0.26.4",
+ "tokio-stream",
+ "uuid",
+ "webpki-roots 1.0.8",
+]
+
+[[package]]
+name = "next-code-provider-doctor"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "futures",
+ "next-code-base",
+ "next-code-core",
+ "next-code-provider-anthropic-runtime",
+ "next-code-provider-antigravity-runtime",
+ "next-code-provider-copilot-runtime",
+ "next-code-provider-cursor-runtime",
+ "next-code-provider-gemini-runtime",
+ "next-code-provider-metadata",
+ "next-code-provider-openai-runtime",
+ "next-code-provider-openrouter-runtime",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-provider-env"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "next-code-core",
+ "next-code-logging",
+ "next-code-provider-metadata",
+ "next-code-storage",
+ "tempfile",
+]
+
+[[package]]
+name = "next-code-provider-gemini"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "next-code-message-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-provider-gemini-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "next-code-base",
+ "next-code-core",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "next-code-provider-gemini",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-provider-metadata"
+version = "0.1.0"
+dependencies = [
+ "url",
+]
+
+[[package]]
+name = "next-code-provider-openai"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "bytes",
+ "futures",
+ "next-code-core",
+ "next-code-llm-core",
+ "next-code-llm-protocols",
+ "next-code-logging",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-provider-openai-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dirs 5.0.1",
+ "futures",
+ "next-code-base",
+ "next-code-core",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "next-code-provider-openai",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-provider-openrouter"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "dirs 5.0.1",
+ "futures",
+ "next-code-core",
+ "next-code-logging",
+ "next-code-message-types",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-provider-openrouter-runtime"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "chrono",
+ "futures",
+ "next-code-base",
+ "next-code-core",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "next-code-provider-metadata",
+ "next-code-provider-openrouter",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "toml 0.8.23",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-provider-service"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "crossterm 0.28.1",
+ "inventory",
+ "next-code-core",
+ "next-code-keyring-store",
+ "next-code-llm-core",
+ "next-code-llm-protocols",
+ "next-code-message-types",
+ "next-code-provider-core",
+ "next-code-provider-metadata",
+ "ratatui 0.28.1",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "next-code-redact"
+version = "0.1.0"
+dependencies = [
+ "regex",
+]
+
+[[package]]
+name = "next-code-render-core"
+version = "0.1.0"
+dependencies = [
+ "pulldown-cmark",
+ "serde",
+ "unicode-width 0.2.2",
+]
+
+[[package]]
+name = "next-code-secrets"
+version = "0.1.0"
+dependencies = [
+ "age",
+ "anyhow",
+ "base64 0.22.1",
+ "next-code-keyring-store",
+ "next-code-redact",
+ "next-code-storage",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
+name = "next-code-selfdev-types"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "serde",
+]
+
+[[package]]
+name = "next-code-session-types"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "memchr",
+ "next-code-message-types",
+ "serde",
+]
+
+[[package]]
+name = "next-code-setup-hints"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 5.0.1",
+ "global-hotkey",
+ "next-code-build-meta",
+ "next-code-config-types",
+ "next-code-core",
+ "next-code-logging",
+ "next-code-storage",
+ "next-code-terminal-launch",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.8.23",
+]
+
+[[package]]
+name = "next-code-side-panel-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "next-code-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 5.0.1",
+ "libc",
+ "next-code-core",
+ "rand 0.9.5",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "next-code-swarm-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs 5.0.1",
+ "libc",
+ "next-code-plan",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "next-code-task-types"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-terminal-image"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "crossterm 0.29.0",
+]
+
+[[package]]
+name = "next-code-terminal-launch"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 5.0.1",
+ "next-code-core",
+]
+
+[[package]]
+name = "next-code-tool-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "next-code-agent-runtime",
+ "next-code-message-types",
+ "next-code-tool-types",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "next-code-tool-types"
+version = "0.1.0"
+dependencies = [
+ "next-code-plugin-core",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-tui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "arboard",
+ "async-trait",
+ "base64 0.22.1",
+ "basic-toml",
+ "chrono",
+ "crossterm 0.29.0",
+ "dirs 5.0.1",
+ "ffs-engine",
+ "ffs-search",
+ "futures",
+ "global-hotkey",
+ "hex",
+ "image",
+ "libc",
+ "next-code-agent-runtime",
+ "next-code-app-core",
+ "next-code-build-meta",
+ "next-code-config-types",
+ "next-code-core",
+ "next-code-fuzzy",
+ "next-code-keywords",
+ "next-code-logging",
+ "next-code-memory-types",
+ "next-code-productivity-core",
+ "next-code-protocol",
+ "next-code-provider-core",
+ "next-code-provider-service",
+ "next-code-redact",
+ "next-code-selfdev-types",
+ "next-code-session-types",
+ "next-code-terminal-image",
+ "next-code-tui-account-picker",
+ "next-code-tui-anim",
+ "next-code-tui-core",
+ "next-code-tui-markdown",
+ "next-code-tui-mermaid",
+ "next-code-tui-messages",
+ "next-code-tui-permissions",
+ "next-code-tui-render",
+ "next-code-tui-session-picker",
+ "next-code-tui-style",
+ "next-code-tui-tool-display",
+ "next-code-tui-usage-overlay",
+ "next-code-tui-visual-debug",
+ "next-code-tui-workspace",
+ "open",
+ "rand 0.9.5",
+ "ratatui 0.30.2",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "similar",
+ "tempfile",
+ "terminal-colorsaurus",
+ "tokio",
+ "unicode-width 0.2.2",
+ "url",
+ "urlencoding",
+]
+
+[[package]]
+name = "next-code-tui-account-picker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "crossterm 0.29.0",
+ "ratatui 0.30.2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-tui-anim"
+version = "0.1.0"
+
+[[package]]
+name = "next-code-tui-core"
+version = "0.1.0"
+dependencies = [
+ "crossterm 0.29.0",
+ "next-code-memory-types",
+ "serde",
+]
+
+[[package]]
+name = "next-code-tui-markdown"
+version = "0.1.0"
+dependencies = [
+ "dirs 5.0.1",
+ "image",
+ "next-code-render-core",
+ "next-code-tui-mermaid",
+ "next-code-tui-workspace",
+ "pulldown-cmark",
+ "ratatui 0.30.2",
+ "serde",
+ "serde_json",
+ "syntect",
+ "tempfile",
+ "unicode-width 0.2.2",
+ "wait-timeout",
+]
+
+[[package]]
+name = "next-code-tui-mermaid"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "crossterm 0.29.0",
+ "dirs 5.0.1",
+ "image",
+ "mermaid-rs-renderer",
+ "next-code-plan",
+ "next-code-tui-workspace",
+ "ratatui 0.30.2",
+ "ratatui-image",
+ "resvg 0.46.0",
+ "serde",
+ "serde_json",
+ "usvg 0.46.0",
+]
+
+[[package]]
+name = "next-code-tui-messages"
+version = "0.1.0"
+dependencies = [
+ "next-code-config-types",
+ "next-code-message-types",
+ "next-code-session-types",
+ "next-code-tui-markdown",
+ "ratatui 0.30.2",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-tui-permissions"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "crossterm 0.29.0",
+ "next-code-base",
+ "next-code-core",
+ "next-code-tui-style",
+ "ratatui 0.30.2",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-tui-render"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "next-code-tui-style",
+ "ratatui 0.30.2",
+ "unicode-width 0.2.2",
+]
+
+[[package]]
+name = "next-code-tui-session-picker"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "next-code-message-types",
+ "next-code-session-types",
+ "serde",
+]
+
+[[package]]
+name = "next-code-tui-style"
+version = "0.1.0"
+dependencies = [
+ "next-code-core",
+ "ratatui 0.30.2",
+]
+
+[[package]]
+name = "next-code-tui-tool-display"
+version = "0.1.0"
+dependencies = [
+ "unicode-width 0.2.2",
+]
+
+[[package]]
+name = "next-code-tui-usage-overlay"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "crossterm 0.29.0",
+ "next-code-usage-types",
+ "ratatui 0.30.2",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-tui-visual-debug"
+version = "0.1.0"
+dependencies = [
+ "dirs 5.0.1",
+ "next-code-logging",
+ "ratatui 0.30.2",
+ "regex",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "next-code-tui-workspace"
+version = "0.1.0"
+dependencies = [
+ "next-code-core",
+ "ratatui 0.30.2",
+]
+
+[[package]]
+name = "next-code-update-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "sha2 0.10.9",
+]
+
+[[package]]
+name = "next-code-usage-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nix"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7991,7 +7432,7 @@ checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
 dependencies = [
  "bitflags 2.13.1",
  "cfg-if",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "libc",
  "memoffset",
 ]
@@ -8155,28 +7596,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num_enum"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d0bca838442ec211fa11de3a8b0e0e8f3a4522575b5c4c06ed722e005036f26"
-dependencies = [
- "num_enum_derive",
- "rustversion",
-]
-
-[[package]]
-name = "num_enum_derive"
-version = "0.7.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "680998035259dcfcafe653688bf2aa6d3e2dc05e98be6ab46afb089dc84f1df8"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "num_threads"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8186,38 +7605,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "objc"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "915b1b472bc21c53464d6c8461c9d3af805ba1ef837e1cac254428f4a77177b1"
-dependencies = [
- "malloc_buf",
- "objc_exception",
-]
-
-[[package]]
-name = "objc-sys"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdb91bdd390c7ce1a8607f35f3ca7151b65afc0ff5ff3b34fa350f7d7c7e4310"
-
-[[package]]
-name = "objc2"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "559c5a40fdd30eb5e344fbceacf7595a81e242529fb4e21cf5f43fb4f11ff98d"
-dependencies = [
- "objc-sys",
- "objc2-encode 3.0.0",
-]
-
-[[package]]
 name = "objc2"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a12a8ed07aefc768292f076dc3ac8c48f3781c8f2d5851dd3d98950e8c5a89f"
 dependencies = [
- "objc2-encode 4.1.0",
+ "objc2-encode",
 ]
 
 [[package]]
@@ -8227,9 +7620,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d49e936b501e5c5bf01fda3a9452ff86dc3ea98ad5f283e1455153142d97518c"
 dependencies = [
  "bitflags 2.13.1",
- "block2 0.6.2",
+ "block2",
  "libc",
- "objc2 0.6.4",
+ "objc2",
  "objc2-cloud-kit",
  "objc2-core-data",
  "objc2-core-foundation",
@@ -8248,7 +7641,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "73ad74d880bb43877038da939b7427bba67e9dd42004a18b809ba7d87cee241c"
 dependencies = [
  "bitflags 2.13.1",
- "objc2 0.6.4",
+ "objc2",
  "objc2-foundation",
 ]
 
@@ -8259,7 +7652,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b402a653efbb5e82ce4df10683b6b28027616a2715e90009947d50b8dd298fa"
 dependencies = [
  "bitflags 2.13.1",
- "objc2 0.6.4",
+ "objc2",
  "objc2-foundation",
 ]
 
@@ -8271,7 +7664,7 @@ checksum = "2a180dd8642fa45cdb7dd721cd4c11b1cadd4929ce112ebd8b9f5803cc79d536"
 dependencies = [
  "bitflags 2.13.1",
  "dispatch2",
- "objc2 0.6.4",
+ "objc2",
 ]
 
 [[package]]
@@ -8282,7 +7675,7 @@ checksum = "e022c9d066895efa1345f8e33e584b9f958da2fd4cd116792e15e07e4720a807"
 dependencies = [
  "bitflags 2.13.1",
  "dispatch2",
- "objc2 0.6.4",
+ "objc2",
  "objc2-core-foundation",
  "objc2-io-surface",
 ]
@@ -8293,7 +7686,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5d563b38d2b97209f8e861173de434bd0214cf020e3423a52624cd1d989f006"
 dependencies = [
- "objc2 0.6.4",
+ "objc2",
  "objc2-foundation",
 ]
 
@@ -8314,7 +7707,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cde0dfb48d25d2b4862161a4d5fcc0e3c24367869ad306b0c9ec0073bfed92d"
 dependencies = [
  "bitflags 2.13.1",
- "objc2 0.6.4",
+ "objc2",
  "objc2-core-foundation",
  "objc2-core-graphics",
 ]
@@ -8326,17 +7719,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d425caf1df73233f29fd8a5c3e5edbc30d2d4307870f802d18f00d83dc5141a6"
 dependencies = [
  "bitflags 2.13.1",
- "objc2 0.6.4",
+ "objc2",
  "objc2-core-foundation",
  "objc2-core-graphics",
  "objc2-io-surface",
 ]
-
-[[package]]
-name = "objc2-encode"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d079845b37af429bfe5dfa76e6d087d788031045b25cfc6fd898486fd9847666"
 
 [[package]]
 name = "objc2-encode"
@@ -8351,9 +7738,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3e0adef53c21f888deb4fa59fc59f7eb17404926ee8a6f59f5df0fd7f9f3272"
 dependencies = [
  "bitflags 2.13.1",
- "block2 0.6.2",
+ "block2",
  "libc",
- "objc2 0.6.4",
+ "objc2",
  "objc2-core-foundation",
 ]
 
@@ -8364,7 +7751,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "180788110936d59bab6bd83b6060ffdfffb3b922ba1396b312ae795e1de9d81d"
 dependencies = [
  "bitflags 2.13.1",
- "objc2 0.6.4",
+ "objc2",
  "objc2-core-foundation",
 ]
 
@@ -8375,17 +7762,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96c1358452b371bf9f104e21ec536d37a650eb10f7ee379fff67d2e08d537f1f"
 dependencies = [
  "bitflags 2.13.1",
- "objc2 0.6.4",
+ "objc2",
  "objc2-foundation",
-]
-
-[[package]]
-name = "objc_exception"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad970fb455818ad6cba4c122ad012fae53ae8b4795f86378bce65e4f6bab2ca4"
-dependencies = [
- "cc",
 ]
 
 [[package]]
@@ -8509,16 +7887,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
-name = "orbclient"
-version = "0.3.55"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5df339f526ea9a60e371768d50efc2f2508c7203290731565d1f7a6f71d21747"
-dependencies = [
- "libc",
- "libredox",
-]
-
-[[package]]
 name = "ordered-float"
 version = "4.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8544,16 +7912,6 @@ checksum = "9aa2b01e1d916879f73a53d01d1d6cee68adbb31d6d9177a8cfce093cced1d50"
 dependencies = [
  "futures-core",
  "pin-project-lite",
-]
-
-[[package]]
-name = "os_pipe"
-version = "1.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
-dependencies = [
- "libc",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -8585,15 +7943,6 @@ name = "outref"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a80800c0488c3a21695ea981a54918fbb37abf04f4d0720c453632255e2ff0e"
-
-[[package]]
-name = "owned_ttf_parser"
-version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36820e9051aca1014ddc75770aab4d68bc1e9e632f0f5627c4086bc216fb583b"
-dependencies = [
- "ttf-parser 0.25.1",
-]
 
 [[package]]
 name = "p256"
@@ -8675,7 +8024,7 @@ checksum = "2621685985a2ebf1c516881c026032ac7deafcda1a2c9b7850dc81e3dfcb64c1"
 dependencies = [
  "cfg-if",
  "libc",
- "redox_syscall 0.5.18",
+ "redox_syscall",
  "smallvec",
  "windows-link",
 ]
@@ -8773,17 +8122,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f9744bc48116fee06334924bb5f2bad41eed5e89bd26e29b0b799f9a3f82c210"
 dependencies = [
  "pest",
-]
-
-[[package]]
-name = "petgraph"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8701b58ea97060d5e5b155d383a69952a60943f0e6dfe30b04c287beb0b27455"
-dependencies = [
- "fixedbitset 0.5.7",
- "hashbrown 0.15.5",
- "indexmap",
 ]
 
 [[package]]
@@ -8904,12 +8242,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19f132c84eca552bf34cab8ec81f1c1dcc229b811638f9d283dceabe58c5569e"
 
 [[package]]
-name = "plain"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
-
-[[package]]
 name = "plotters"
 version = "0.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8976,12 +8308,6 @@ dependencies = [
  "rustix 1.1.4",
  "windows-sys 0.61.2",
 ]
-
-[[package]]
-name = "pollster"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22686f4785f02a4fcc856d3b3bb19bf6c8160d103f7a99cc258bddd0251dc7f2"
 
 [[package]]
 name = "poly1305"
@@ -9053,12 +8379,6 @@ checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
 dependencies = [
  "zerocopy",
 ]
-
-[[package]]
-name = "presser"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8cf8e6a8aa66ce33f63993ffc4ea4271eb5b0530a9002db8455ea6050c77bfa"
 
 [[package]]
 name = "primal-check"
@@ -9152,12 +8472,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "profiling"
-version = "1.0.18"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d595e54a326bc53c1c197b32d295e14b169e3cfeaa8dc82b529f947fba6bcf5"
-
-[[package]]
 name = "prost"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9248,22 +8562,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
 
 [[package]]
-name = "quick-xml"
-version = "0.39.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cdcc8dd4e2f670d309a5f0e83fe36dfdc05af317008fea29144da1a2ac858e5e"
-dependencies = [
- "memchr",
-]
-
-[[package]]
 name = "quinn"
 version = "0.11.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c1a41e437b6bbd489372cd4971de128e85c855f56c57f283d20ff016cf7c0a8"
 dependencies = [
  "bytes",
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "pin-project-lite",
  "quinn-proto",
  "quinn-udp",
@@ -9273,7 +8578,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "web-time 1.1.0",
+ "web-time",
 ]
 
 [[package]]
@@ -9296,7 +8601,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tinyvec",
  "tracing",
- "web-time 1.1.0",
+ "web-time",
 ]
 
 [[package]]
@@ -9305,7 +8610,7 @@ version = "0.5.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35a133f956daabe89a61a685c2649f13d82d5aa4bd5d12d1277e1072a21c0694"
 dependencies = [
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "libc",
  "once_cell",
  "socket2 0.6.5",
@@ -9451,12 +8756,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "range-alloc"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca45419789ae5a7899559e9512e58ca889e41f04f1f2445e9f4b290ceccd1d08"
-
-[[package]]
 name = "rangemap"
 version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9546,7 +8845,7 @@ dependencies = [
  "ratatui 0.30.2",
  "rustix 0.38.44",
  "thiserror 1.0.69",
- "windows 0.58.0",
+ "windows",
 ]
 
 [[package]]
@@ -9610,12 +8909,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "raw-window-handle"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20675572f6f24e9e76ef639bc5552774ed45f1c30e2951e1e99c59888861c539"
-
-[[package]]
 name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9653,38 +8946,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "read-fonts"
-version = "0.22.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69aacb76b5c29acfb7f90155d39759a29496aebb49395830e928a9703d2eec2f"
-dependencies = [
- "bytemuck",
- "font-types",
-]
-
-[[package]]
-name = "redox_syscall"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "567664f262709473930a4bf9e51bf2ebf3348f2e748ccc50dea20646858f8f29"
-dependencies = [
- "bitflags 1.3.2",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
-dependencies = [
- "bitflags 2.13.1",
-]
-
-[[package]]
-name = "redox_syscall"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c5102a6aaa05aa011a238e178e6bca86d2cb56fc9f586d37cb80f5bca6e07759"
 dependencies = [
  "bitflags 2.13.1",
 ]
@@ -9765,12 +9030,6 @@ name = "regex-syntax"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
-
-[[package]]
-name = "renderdoc-sys"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
 name = "reqwest"
@@ -10248,7 +9507,7 @@ version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "764899a24af3980067ee14bc143654f297b22eaebfe3c7b6b211920a5a59b046"
 dependencies = [
- "web-time 1.1.0",
+ "web-time",
  "zeroize",
 ]
 
@@ -10260,7 +9519,7 @@ checksum = "26d1e2536ce4f35f4846aa13bff16bd0ff40157cdb14cc056c7b14ba41233ba0"
 dependencies = [
  "core-foundation 0.10.1",
  "core-foundation-sys",
- "jni 0.22.4",
+ "jni",
  "log",
  "once_cell",
  "rustls 0.23.42",
@@ -10320,23 +9579,6 @@ checksum = "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f"
 
 [[package]]
 name = "rustybuzz"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ee8fe2a8461a0854a37101fe7a1b13998d0cfa987e43248e81d2a5f4570f6fa"
-dependencies = [
- "bitflags 1.3.2",
- "bytemuck",
- "libm",
- "smallvec",
- "ttf-parser 0.20.0",
- "unicode-bidi-mirroring 0.1.0",
- "unicode-ccc 0.1.2",
- "unicode-properties",
- "unicode-script",
-]
-
-[[package]]
-name = "rustybuzz"
 version = "0.20.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd3c7c96f8a08ee34eff8857b11b49b07d71d1c3f4e88f8a88d4c9e9f90b1702"
@@ -10346,9 +9588,9 @@ dependencies = [
  "core_maths",
  "log",
  "smallvec",
- "ttf-parser 0.25.1",
- "unicode-bidi-mirroring 0.4.0",
- "unicode-ccc 0.4.0",
+ "ttf-parser",
+ "unicode-bidi-mirroring",
+ "unicode-ccc",
  "unicode-properties",
  "unicode-script",
 ]
@@ -10459,19 +9701,6 @@ checksum = "da046153aa2352493d6cb7da4b6e5c0c057d8a1d0a9aa8560baffdd945acd414"
 dependencies = [
  "ring",
  "untrusted",
-]
-
-[[package]]
-name = "sctk-adwaita"
-version = "0.8.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70b31447ca297092c5a9916fc3b955203157b37c19ca8edde4f52e9843e602c7"
-dependencies = [
- "ab_glyph",
- "log",
- "memmap2 0.9.11",
- "smithay-client-toolkit",
- "tiny-skia 0.11.4",
 ]
 
 [[package]]
@@ -10860,16 +10089,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ee5873ec9cce0195efcb7a4e9507a04cd49aec9c83d0389df45b1ef7ba2e649"
 
 [[package]]
-name = "skrifa"
-version = "0.22.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e1c44ad1f6c5bdd4eefed8326711b7dbda9ea45dfd36068c427d332aa382cbe"
-dependencies = [
- "bytemuck",
- "read-fonts",
-]
-
-[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10903,40 +10122,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smithay-client-toolkit"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "922fd3eeab3bd820d76537ce8f582b1cf951eceb5475c28500c7457d9d17f53a"
-dependencies = [
- "bitflags 2.13.1",
- "calloop",
- "calloop-wayland-source",
- "cursor-icon",
- "libc",
- "log",
- "memmap2 0.9.11",
- "rustix 0.38.44",
- "thiserror 1.0.69",
- "wayland-backend",
- "wayland-client",
- "wayland-csd-frame",
- "wayland-cursor",
- "wayland-protocols 0.31.2",
- "wayland-protocols-wlr 0.2.0",
- "wayland-scanner",
- "xkeysym",
-]
-
-[[package]]
-name = "smol_str"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd538fb6910ac1099850255cf94a94df6551fbdd602454387d0adb2d1ca6dead"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "socket2"
 version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10954,15 +10139,6 @@ checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "spirv"
-version = "0.3.0+sdk-1.3.268.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eda41003dc44290527a59b13432d4a0379379fa074b70174882adfbdfd917844"
-dependencies = [
- "bitflags 2.13.1",
 ]
 
 [[package]]
@@ -11111,12 +10287,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
-name = "svg_fmt"
-version = "0.4.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0193cc4331cfd2f3d2011ef287590868599a2f33c3e69bc22c1a3d3acf9e02fb"
-
-[[package]]
 name = "svgtypes"
 version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11124,17 +10294,6 @@ checksum = "695b5790b3131dafa99b3bbfd25a216edb3d216dad9ca208d4657bfb8f2abc3d"
 dependencies = [
  "kurbo",
  "siphasher 1.0.3",
-]
-
-[[package]]
-name = "swash"
-version = "0.1.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbd59f3f359ddd2c95af4758c18270eddd9c730dde98598023cdabff472c2ca2"
-dependencies = [
- "skrifa",
- "yazi",
- "zeno",
 ]
 
 [[package]]
@@ -11510,15 +10669,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sys-locale"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "system-configuration"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11588,15 +10738,6 @@ dependencies = [
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "termcolor"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
-dependencies = [
- "winapi-util",
 ]
 
 [[package]]
@@ -11671,7 +10812,7 @@ dependencies = [
  "fancy-regex 0.11.0",
  "filedescriptor",
  "finl_unicode",
- "fixedbitset 0.4.2",
+ "fixedbitset",
  "hex",
  "lazy_static",
  "libc",
@@ -12378,7 +11519,7 @@ dependencies = [
  "bytes",
  "derive-new",
  "log",
- "memmap2 0.9.11",
+ "memmap2",
  "num-integer",
  "prost",
  "smallvec",
@@ -12592,17 +11733,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tree_magic_mini"
-version = "3.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8765b90061cba6c22b5831f675da109ae5561588290f9fa2317adab2714d5a6"
-dependencies = [
- "memchr",
- "nom 8.0.0",
- "petgraph",
-]
-
-[[package]]
 name = "triomphe"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12634,18 +11764,6 @@ name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
-
-[[package]]
-name = "ttf-parser"
-version = "0.19.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49d64318d8311fc2668e48b63969f4343e0a85c4a109aa8460d6672e364b8bd1"
-
-[[package]]
-name = "ttf-parser"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17f77d76d837a7830fe1d4f12b7b4ba4192c1888001c7164257e4bc6d21d96b4"
 
 [[package]]
 name = "ttf-parser"
@@ -12801,12 +11919,6 @@ checksum = "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
 
 [[package]]
 name = "unicode-bidi-mirroring"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56d12260fb92d52f9008be7e4bca09f584780eb2266dc8fecc6a192bec561694"
-
-[[package]]
-name = "unicode-bidi-mirroring"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dfa6e8c60bb66d49db113e0125ee8711b7647b5579dc7f5f19c42357ed039fe"
@@ -12816,12 +11928,6 @@ name = "unicode-bom"
 version = "2.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7eec5d1121208364f6793f7d2e222bf75a915c19557537745b195b253dd64217"
-
-[[package]]
-name = "unicode-ccc"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc2520efa644f8268dce4dcd3050eaa7fc044fca03961e9998ac7e2e92b77cf1"
 
 [[package]]
 name = "unicode-ccc"
@@ -12840,12 +11946,6 @@ name = "unicode-ident"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
-
-[[package]]
-name = "unicode-linebreak"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b09c83c3c29d37506a3e260c08c03743a6bb66a9cd432c6934ab501a190571f"
 
 [[package]]
 name = "unicode-normalization"
@@ -12924,12 +12024,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ac048d71ede7ee76d585517add45da530660ef4390e49b098733c6e897f254"
 
 [[package]]
-name = "unicode-xid"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
-
-[[package]]
 name = "unicode_categories"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13000,13 +12094,13 @@ dependencies = [
  "base64 0.22.1",
  "data-url",
  "flate2",
- "fontdb 0.23.0",
+ "fontdb",
  "imagesize",
  "kurbo",
  "log",
  "pico-args",
  "roxmltree 0.21.1",
- "rustybuzz 0.20.1",
+ "rustybuzz",
  "simplecss",
  "siphasher 1.0.3",
  "strict-num",
@@ -13027,19 +12121,19 @@ dependencies = [
  "base64 0.22.1",
  "data-url",
  "flate2",
- "fontdb 0.23.0",
+ "fontdb",
  "imagesize",
  "kurbo",
  "log",
  "pico-args",
  "roxmltree 0.21.1",
- "rustybuzz 0.20.1",
+ "rustybuzz",
  "simplecss",
  "siphasher 1.0.3",
  "strict-num",
  "svgtypes",
  "tiny-skia-path 0.12.0",
- "ttf-parser 0.25.1",
+ "ttf-parser",
  "unicode-bidi",
  "unicode-script",
  "unicode-vo",
@@ -13196,12 +12290,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "wasite"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8dad83b4f25e74f184f64c43b150b91efe7647395b42289f38e50566d82855b"
-
-[[package]]
 name = "wasm-bindgen"
 version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13283,154 +12371,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "wayland-backend"
-version = "0.3.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2857dd20b54e916ec7253b3d6b4d5c4d7d4ca2c33c2e11c6c76a99bd8744755d"
-dependencies = [
- "cc",
- "downcast-rs",
- "rustix 1.1.4",
- "scoped-tls",
- "smallvec",
- "wayland-sys",
-]
-
-[[package]]
-name = "wayland-client"
-version = "0.31.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "645c7c96bb74690c3189b5c9cb4ca1627062bb23693a4fad9d8c3de958260144"
-dependencies = [
- "bitflags 2.13.1",
- "rustix 1.1.4",
- "wayland-backend",
- "wayland-scanner",
-]
-
-[[package]]
-name = "wayland-csd-frame"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "625c5029dbd43d25e6aa9615e88b829a5cad13b2819c4ae129fdbb7c31ab4c7e"
-dependencies = [
- "bitflags 2.13.1",
- "cursor-icon",
- "wayland-backend",
-]
-
-[[package]]
-name = "wayland-cursor"
-version = "0.31.14"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a52d18780be9b1314328a3de5f930b73d2200112e3849ca6cb11822793fb34d"
-dependencies = [
- "rustix 1.1.4",
- "wayland-client",
- "xcursor",
-]
-
-[[package]]
-name = "wayland-protocols"
-version = "0.31.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f81f365b8b4a97f422ac0e8737c438024b5951734506b0e1d775c73030561f4"
-dependencies = [
- "bitflags 2.13.1",
- "wayland-backend",
- "wayland-client",
- "wayland-scanner",
-]
-
-[[package]]
-name = "wayland-protocols"
-version = "0.32.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23d0c813de3daa2ed6520af85a3bd49b0e722a3078506899aa9686fea58dc4b6"
-dependencies = [
- "bitflags 2.13.1",
- "wayland-backend",
- "wayland-client",
- "wayland-scanner",
-]
-
-[[package]]
-name = "wayland-protocols-plasma"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23803551115ff9ea9bce586860c5c5a971e360825a0309264102a9495a5ff479"
-dependencies = [
- "bitflags 2.13.1",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols 0.31.2",
- "wayland-scanner",
-]
-
-[[package]]
-name = "wayland-protocols-wlr"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad1f61b76b6c2d8742e10f9ba5c3737f6530b4c243132c2a2ccc8aa96fe25cd6"
-dependencies = [
- "bitflags 2.13.1",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols 0.31.2",
- "wayland-scanner",
-]
-
-[[package]]
-name = "wayland-protocols-wlr"
-version = "0.3.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb04e52f7836d7c7976c78ca0250d61e33873c34156a2a1fc9474828ec268234"
-dependencies = [
- "bitflags 2.13.1",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols 0.32.13",
- "wayland-scanner",
-]
-
-[[package]]
-name = "wayland-scanner"
-version = "0.31.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c324a910fd86ebdc364a3e61ec1f11737d3b1d6c273c0239ee8ff4bc0d24b4a"
-dependencies = [
- "proc-macro2",
- "quick-xml",
- "quote",
-]
-
-[[package]]
-name = "wayland-sys"
-version = "0.31.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8eab23fefc9e41f8e841df4a9c707e8a8c4ed26e944ef69297184de2785e3be"
-dependencies = [
- "dlib",
- "log",
- "once_cell",
- "pkg-config",
-]
-
-[[package]]
 name = "web-sys"
 version = "0.3.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8622dcb61c0bcc9fffa6938bed81210af2da9a7e4a1a834b2e37a59b6dfb6141"
-dependencies = [
- "js-sys",
- "wasm-bindgen",
-]
-
-[[package]]
-name = "web-time"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa30049b1c872b72c89866d458eae9f20380ab280ffd1b1e18df2d3e2d98cfe0"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
@@ -13552,130 +12496,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "wgpu"
-version = "0.19.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbd7311dbd2abcfebaabf1841a2824ed7c8be443a0f29166e5d3c6a53a762c01"
-dependencies = [
- "arrayvec",
- "cfg-if",
- "cfg_aliases 0.1.1",
- "js-sys",
- "log",
- "naga",
- "parking_lot",
- "profiling",
- "raw-window-handle",
- "smallvec",
- "static_assertions",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "wgpu-core",
- "wgpu-hal",
- "wgpu-types",
-]
-
-[[package]]
-name = "wgpu-core"
-version = "0.19.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b94525fc99ba9e5c9a9e24764f2bc29bad0911a7446c12f446a8277369bf3a"
-dependencies = [
- "arrayvec",
- "bit-vec 0.6.3",
- "bitflags 2.13.1",
- "cfg_aliases 0.1.1",
- "codespan-reporting",
- "indexmap",
- "log",
- "naga",
- "once_cell",
- "parking_lot",
- "profiling",
- "raw-window-handle",
- "rustc-hash 1.1.0",
- "smallvec",
- "thiserror 1.0.69",
- "web-sys",
- "wgpu-hal",
- "wgpu-types",
-]
-
-[[package]]
-name = "wgpu-hal"
-version = "0.19.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bfabcfc55fd86611a855816326b2d54c3b2fd7972c27ce414291562650552703"
-dependencies = [
- "android_system_properties",
- "arrayvec",
- "ash",
- "bit-set 0.5.3",
- "bitflags 2.13.1",
- "block",
- "cfg_aliases 0.1.1",
- "core-graphics-types",
- "d3d12",
- "glow",
- "glutin_wgl_sys",
- "gpu-alloc",
- "gpu-allocator",
- "gpu-descriptor",
- "hassle-rs",
- "js-sys",
- "khronos-egl",
- "libc",
- "libloading 0.8.9",
- "log",
- "metal",
- "naga",
- "ndk-sys",
- "objc",
- "once_cell",
- "parking_lot",
- "profiling",
- "range-alloc",
- "raw-window-handle",
- "renderdoc-sys",
- "rustc-hash 1.1.0",
- "smallvec",
- "thiserror 1.0.69",
- "wasm-bindgen",
- "web-sys",
- "wgpu-types",
- "winapi",
-]
-
-[[package]]
-name = "wgpu-types"
-version = "0.19.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b671ff9fb03f78b46ff176494ee1ebe7d603393f42664be55b64dc8d53969805"
-dependencies = [
- "bitflags 2.13.1",
- "js-sys",
- "web-sys",
-]
-
-[[package]]
 name = "which"
 version = "8.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f3ef584124b911bcc3875c2f1472e80f24361ceb789bd1c62b3e9a3df9ff43c"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "whoami"
-version = "1.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d4a4db5077702ca3015d3d02d74974948aba2ad9e12ab7df718ee64ccd7e97d"
-dependencies = [
- "libredox",
- "wasite",
- "web-sys",
 ]
 
 [[package]]
@@ -13687,12 +12513,6 @@ dependencies = [
  "bytemuck",
  "safe_arch",
 ]
-
-[[package]]
-name = "widestring"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72069c3113ab32ab29e5584db3c6ec55d416895e60715417b5b883a357c3e471"
 
 [[package]]
 name = "winapi"
@@ -13727,30 +12547,11 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
-version = "0.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e48a53791691ab099e5e2ad123536d0fff50652600abaf43bbf952894110d0be"
-dependencies = [
- "windows-core 0.52.0",
- "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows"
 version = "0.58.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd04d41d93c4992d421894c18c8b43496aa748dd4c081bac0dc93eb0489272b6"
 dependencies = [
  "windows-core 0.58.0",
- "windows-targets 0.52.6",
-]
-
-[[package]]
-name = "windows-core"
-version = "0.52.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33ab640c8d7e35bf8ba19b884ba838ceb4fba93a4e8c65a9059d08afcfc683d9"
-dependencies = [
  "windows-targets 0.52.6",
 ]
 
@@ -13880,15 +12681,6 @@ dependencies = [
 
 [[package]]
 name = "windows-sys"
-version = "0.45.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75283be5efb2831d37ea142365f009c02ec203cd29a3ebecbc093d52315b66d0"
-dependencies = [
- "windows-targets 0.42.2",
-]
-
-[[package]]
-name = "windows-sys"
 version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "677d2418bec65e3338edb076e806bc1ec15693c5d0104683f2efe857f61056a9"
@@ -13930,21 +12722,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ae137229bcbd6cdf0f7b80a31df61766145077ddf49416a728b02cb3921ff3fc"
 dependencies = [
  "windows-link",
-]
-
-[[package]]
-name = "windows-targets"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e5180c00cd44c9b1c88adb3693291f1cd93605ded80c250a75d472756b4d071"
-dependencies = [
- "windows_aarch64_gnullvm 0.42.2",
- "windows_aarch64_msvc 0.42.2",
- "windows_i686_gnu 0.42.2",
- "windows_i686_msvc 0.42.2",
- "windows_x86_64_gnu 0.42.2",
- "windows_x86_64_gnullvm 0.42.2",
- "windows_x86_64_msvc 0.42.2",
 ]
 
 [[package]]
@@ -13997,12 +12774,6 @@ dependencies = [
 
 [[package]]
 name = "windows_aarch64_gnullvm"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "597a5118570b68bc08d8d59125332c54f1ba9d9adeedeef5b99b02ba2b0698f8"
-
-[[package]]
-name = "windows_aarch64_gnullvm"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b38e32f0abccf9987a4e3079dfb67dcd799fb61361e53e2882c3cbaf0d905d8"
@@ -14021,12 +12792,6 @@ checksum = "a9d8416fa8b42f5c947f8482c43e7d89e73a173cead56d044f6a56104a6d1b53"
 
 [[package]]
 name = "windows_aarch64_msvc"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e08e8864a60f06ef0d0ff4ba04124db8b0fb3be5776a5cd47641e942e58c4d43"
-
-[[package]]
-name = "windows_aarch64_msvc"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc35310971f3b2dbbf3f0690a219f40e2d9afcf64f9ab7cc1be722937c26b4bc"
@@ -14042,12 +12807,6 @@ name = "windows_aarch64_msvc"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9d782e804c2f632e395708e99a94275910eb9100b2114651e04744e9b125006"
-
-[[package]]
-name = "windows_i686_gnu"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c61d927d8da41da96a81f029489353e68739737d3beca43145c8afec9a31a84f"
 
 [[package]]
 name = "windows_i686_gnu"
@@ -14081,12 +12840,6 @@ checksum = "fa7359d10048f68ab8b09fa71c3daccfb0e9b559aed648a8f95469c27057180c"
 
 [[package]]
 name = "windows_i686_msvc"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44d840b6ec649f480a41c8d80f9c65108b92d89345dd94027bfe06ac444d1060"
-
-[[package]]
-name = "windows_i686_msvc"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f55c233f70c4b27f66c523580f78f1004e8b5a8b659e05a4eb49d4166cca406"
@@ -14102,12 +12855,6 @@ name = "windows_i686_msvc"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e7ac75179f18232fe9c285163565a57ef8d3c89254a30685b57d83a38d326c2"
-
-[[package]]
-name = "windows_x86_64_gnu"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8de912b8b8feb55c064867cf047dda097f92d51efad5b491dfb98f6bbb70cb36"
 
 [[package]]
 name = "windows_x86_64_gnu"
@@ -14129,12 +12876,6 @@ checksum = "9c3842cdd74a865a8066ab39c8a7a473c0778a3f29370b5fd6b4b9aa7df4a499"
 
 [[package]]
 name = "windows_x86_64_gnullvm"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26d41b46a36d453748aedef1486d5c7a85db22e56aff34643984ea85514e94a3"
-
-[[package]]
-name = "windows_x86_64_gnullvm"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b7b52767868a23d5bab768e390dc5f5c55825b6d30b86c844ff2dc7414044cc"
@@ -14153,12 +12894,6 @@ checksum = "0ffa179e2d07eee8ad8f57493436566c7cc30ac536a3379fdf008f47f6bb7ae1"
 
 [[package]]
 name = "windows_x86_64_msvc"
-version = "0.42.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
-
-[[package]]
-name = "windows_x86_64_msvc"
 version = "0.48.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed94fce61571a4006852b7389a063ab983c02eb1bb37b47f8272ce92d06d9538"
@@ -14174,54 +12909,6 @@ name = "windows_x86_64_msvc"
 version = "0.53.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
-
-[[package]]
-name = "winit"
-version = "0.29.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d59ad965a635657faf09c8f062badd885748428933dad8e8bdd64064d92e5ca"
-dependencies = [
- "ahash",
- "android-activity",
- "atomic-waker",
- "bitflags 2.13.1",
- "bytemuck",
- "calloop",
- "cfg_aliases 0.1.1",
- "core-foundation 0.9.4",
- "core-graphics",
- "cursor-icon",
- "icrate",
- "js-sys",
- "libc",
- "log",
- "memmap2 0.9.11",
- "ndk",
- "ndk-sys",
- "objc2 0.4.1",
- "once_cell",
- "orbclient",
- "percent-encoding",
- "raw-window-handle",
- "redox_syscall 0.3.5",
- "rustix 0.38.44",
- "sctk-adwaita",
- "smithay-client-toolkit",
- "smol_str",
- "unicode-segmentation",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols 0.31.2",
- "wayland-protocols-plasma",
- "web-sys",
- "web-time 0.2.4",
- "windows-sys 0.48.0",
- "x11-dl",
- "x11rb",
- "xkbcommon-dl",
-]
 
 [[package]]
 name = "winnow"
@@ -14258,24 +12945,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ebf944e87a7c253233ad6766e082e3cd714b5d03812acc24c318f549614536e"
 
 [[package]]
-name = "wl-clipboard-rs"
-version = "0.9.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9651471a32e87d96ef3a127715382b2d11cc7c8bb9822ded8a7cc94072eb0a3"
-dependencies = [
- "libc",
- "log",
- "os_pipe",
- "rustix 1.1.4",
- "thiserror 2.0.18",
- "tree_magic_mini",
- "wayland-backend",
- "wayland-client",
- "wayland-protocols 0.32.13",
- "wayland-protocols-wlr 0.3.12",
-]
-
-[[package]]
 name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14291,27 +12960,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "x11-dl"
-version = "2.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38735924fedd5314a6e548792904ed8c6de6636285cb9fec04d5b1db85c1516f"
-dependencies = [
- "libc",
- "once_cell",
- "pkg-config",
-]
-
-[[package]]
 name = "x11rb"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9993aa5be5a26815fe2c3eacfc1fde061fc1a1f094bf1ad2a18bf9c495dd7414"
 dependencies = [
- "as-raw-xcb-connection",
  "gethostname",
- "libc",
- "libloading 0.8.9",
- "once_cell",
  "rustix 1.1.4",
  "x11rb-protocol",
 ]
@@ -14345,12 +12999,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "xcursor"
-version = "0.3.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bec9e4a500ca8864c5b47b8b482a73d62e4237670e5b5f1d6b9e3cae50f28f2b"
-
-[[package]]
 name = "xdg-home"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -14361,29 +13009,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "xkbcommon-dl"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d039de8032a9a8856a6be89cea3e5d12fdd82306ab7c94d74e6deab2460651c5"
-dependencies = [
- "bitflags 2.13.1",
- "dlib",
- "log",
- "once_cell",
- "xkeysym",
-]
-
-[[package]]
 name = "xkeysym"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9cc00251562a284751c9973bace760d86c0276c471b4be569fe6b068ee97a56"
-
-[[package]]
-name = "xml-rs"
-version = "0.8.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ae8337f8a065cfc972643663ea4279e04e7256de865aa66fe25cec5fb912d3f"
 
 [[package]]
 name = "xmlparser"
@@ -14414,12 +13043,6 @@ name = "yansi"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfe53a6657fd280eaa890a3bc59152892ffa3e30101319d168b781ed6529b049"
-
-[[package]]
-name = "yazi"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c94451ac9513335b5e23d7a8a2b61a7102398b8cca5160829d313e84c9d98be1"
 
 [[package]]
 name = "yoke"
@@ -14505,12 +13128,6 @@ dependencies = [
  "static_assertions",
  "zvariant",
 ]
-
-[[package]]
-name = "zeno"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd15f8e0dbb966fd9245e7498c7e9e5055d9e5c8b676b95bd67091cd11a1e697"
 
 [[package]]
 name = "zerocopy"

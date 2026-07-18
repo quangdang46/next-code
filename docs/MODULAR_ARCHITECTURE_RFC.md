@@ -2,7 +2,7 @@
 
 Status: Draft
 
-This RFC describes a modular target architecture for jcode that matches the current codebase, preserves the existing product model, and gives us a safe migration path from today's mostly-monolithic root crate to a layered workspace.
+This RFC describes a modular target architecture for next-code that matches the current codebase, preserves the existing product model, and gives us a safe migration path from today's mostly-monolithic root crate to a layered workspace.
 
 It is intentionally aligned with:
 
@@ -28,9 +28,9 @@ It is intentionally aligned with:
 
 ## Executive Summary
 
-Today, jcode is best described as a **modular monolith with a growing workspace shell**:
+Today, next-code is best described as a **modular monolith with a growing workspace shell**:
 
-- The root `jcode` crate still owns most runtime orchestration and product behavior.
+- The root `next-code` crate still owns most runtime orchestration and product behavior.
 - Several heavy or relatively self-contained subsystems have already moved into workspace crates.
 - The codebase has strong module-level separation in some areas, but several broad root modules still act as architectural chokepoints.
 
@@ -39,7 +39,7 @@ The target architecture is a **layered workspace**:
 1. **Foundation layer** for stable shared types and runtime primitives.
 2. **Domain/runtime layer** for session, agent, provider, and server logic.
 3. **Interface layer** for CLI, TUI, self-dev, and optional heavy integrations.
-4. **Composition layer** where the top-level `jcode` package wires the product together.
+4. **Composition layer** where the top-level `next-code` package wires the product together.
 
 The most important design rule is this:
 
@@ -53,7 +53,7 @@ That rule serves both architecture quality and compile-speed goals.
 
 At the product level, the runtime architecture is already clear:
 
-- `jcode` is a **single-server, multi-client** application.
+- `next-code` is a **single-server, multi-client** application.
 - The server owns sessions, swarm state, background tasks, provider state, and shared services.
 - Clients are primarily TUI frontends that attach to server-owned sessions.
 - Self-dev is session-local capability on the shared server, not a separate architecture.
@@ -64,20 +64,20 @@ That model should stay intact.
 
 The current code organization is mixed:
 
-- **Root crate `jcode`** still contains most product logic.
+- **Root crate `next-code`** still contains most product logic.
 - **Workspace crates** already isolate several heavy or stable seams.
 - **Subdirectories under `src/`** increasingly reflect domain boundaries, especially for `agent`, `cli`, `server`, `tool`, and `tui`.
 
 Current workspace members from `Cargo.toml` are grouped roughly as follows:
 
-- root package: `jcode`
-- foundation/runtime support: `jcode-agent-runtime`, `jcode-core`, `jcode-storage`, `jcode-terminal-launch`, `jcode-tool-core`
-- data-contract crates: `jcode-ambient-types`, `jcode-auth-types`, `jcode-background-types`, `jcode-batch-types`, `jcode-config-types`, `jcode-gateway-types`, `jcode-memory-types`, `jcode-message-types`, `jcode-selfdev-types`, `jcode-session-types`, `jcode-side-panel-types`, `jcode-task-types`, `jcode-tool-types`, `jcode-usage-types`
-- protocol and planning: `jcode-protocol`, `jcode-plan`
-- heavy or optional integrations: `jcode-embedding`, `jcode-pdf`, `jcode-notify-email`
-- auth and providers: `jcode-azure-auth`, `jcode-provider-core`, `jcode-provider-metadata`, `jcode-provider-openrouter`, `jcode-provider-gemini`
-- TUI extraction seams: `jcode-tui-core`, `jcode-tui-markdown`, `jcode-tui-mermaid`, `jcode-tui-render`, `jcode-tui-workspace`
-- product surfaces outside the main TUI binary: `jcode-desktop`
+- root package: `next-code`
+- foundation/runtime support: `next-code-agent-runtime`, `next-code-core`, `next-code-storage`, `next-code-terminal-launch`, `next-code-tool-core`
+- data-contract crates: `next-code-ambient-types`, `next-code-auth-types`, `next-code-background-types`, `next-code-batch-types`, `next-code-config-types`, `next-code-gateway-types`, `next-code-memory-types`, `next-code-message-types`, `next-code-selfdev-types`, `next-code-session-types`, `next-code-side-panel-types`, `next-code-task-types`, `next-code-tool-types`, `next-code-usage-types`
+- protocol and planning: `next-code-protocol`, `next-code-plan`
+- heavy or optional integrations: `next-code-embedding`, `next-code-pdf`, `next-code-notify-email`
+- auth and providers: `next-code-azure-auth`, `next-code-provider-core`, `next-code-provider-metadata`, `next-code-provider-openrouter`, `next-code-provider-gemini`
+- TUI extraction seams: `next-code-tui-core`, `next-code-tui-markdown`, `next-code-tui-mermaid`, `next-code-tui-render`, `next-code-tui-workspace`
+- product surfaces outside the main TUI binary (historical; desktop GUI removed)
 
 ### What the root crate still owns
 
@@ -87,7 +87,7 @@ The root crate still directly owns most of the following concerns:
 - server orchestration and socket lifecycle
 - session state and persistence
 - agent turn execution and tool orchestration
-- provider implementation composition and runtime provider wiring; the shared `Provider` trait now lives in `jcode-provider-core`
+- provider implementation composition and runtime provider wiring; the shared `Provider` trait now lives in `next-code-provider-core`
 - protocol/message/config types
 - tool registry and many tool implementations
 - TUI application state and rendering
@@ -101,41 +101,40 @@ These splits already exist and should be treated as real architectural footholds
 
 | Crate | Current role |
 |---|---|
-| `jcode-agent-runtime` | shared interrupt and lightweight runtime primitives for agent execution |
-| `jcode-ambient-types` | usage and rate-limit records shared by ambient/background flows |
-| `jcode-auth-types` | provider-neutral auth state and credential metadata |
-| `jcode-background-types` | background-task status and progress DTOs |
-| `jcode-batch-types` | batch tool progress DTOs, currently depending only on message types internally |
-| `jcode-config-types` | stable configuration data contracts |
-| `jcode-core` | low-level utilities such as IDs, env helpers, fs helpers, stdin detection, and formatting |
-| `jcode-gateway-types` | gateway-facing data contracts |
-| `jcode-memory-types` | memory subsystem data contracts |
-| `jcode-message-types` | message content and transport-adjacent data contracts |
-| `jcode-protocol` | client/server protocol surface built from stable type crates and provider-core values |
-| `jcode-plan` | plan/task graph data model shared across coordination flows |
-| `jcode-selfdev-types` | self-development request/status data contracts |
-| `jcode-session-types` | session DTOs, currently depending only on message types internally |
-| `jcode-side-panel-types` | side-panel page and update data contracts |
-| `jcode-task-types` | task/tool scheduling data contracts |
-| `jcode-tool-core` | runtime tool contracts such as the `Tool` trait and execution context |
-| `jcode-tool-types` | stable tool output/image DTOs |
-| `jcode-usage-types` | usage accounting data contracts |
-| `jcode-storage` | storage helpers layered on `jcode-core` |
-| `jcode-embedding` | ONNX/tokenizer-based embedding implementation and heavy inference deps |
-| `jcode-pdf` | PDF text extraction |
-| `jcode-azure-auth` | Azure bearer token retrieval |
-| `jcode-notify-email` | SMTP/IMAP/mail transport |
-| `jcode-provider-metadata` | provider/login catalog and profile metadata |
-| `jcode-provider-core` | shared provider contract (`Provider`/`EventStream`), value types, route/cost/model helpers, shared HTTP client, schema helpers |
-| `jcode-provider-openrouter` | OpenRouter-specific catalog/cache/support helpers |
-| `jcode-provider-gemini` | Gemini schema/model/support helpers |
-| `jcode-tui-core` | low-level terminal UI primitives that do not need full app state |
-| `jcode-tui-markdown` | markdown wrapping/rendering, layered on mermaid/workspace support |
-| `jcode-tui-mermaid` | mermaid parsing, rendering, caching, viewport, and widget support |
-| `jcode-tui-render` | reusable TUI layout/render helpers |
-| `jcode-tui-workspace` | workspace-map data/model/widget rendering |
-| `jcode-terminal-launch` | terminal process launch helpers |
-| `jcode-desktop` | desktop app surface and session/workspace rendering experiments |
+| `next-code-agent-runtime` | shared interrupt and lightweight runtime primitives for agent execution |
+| `next-code-ambient-types` | usage and rate-limit records shared by ambient/background flows |
+| `next-code-auth-types` | provider-neutral auth state and credential metadata |
+| `next-code-background-types` | background-task status and progress DTOs |
+| `next-code-batch-types` | batch tool progress DTOs, currently depending only on message types internally |
+| `next-code-config-types` | stable configuration data contracts |
+| `next-code-core` | low-level utilities such as IDs, env helpers, fs helpers, stdin detection, and formatting |
+| `next-code-gateway-types` | gateway-facing data contracts |
+| `next-code-memory-types` | memory subsystem data contracts |
+| `next-code-message-types` | message content and transport-adjacent data contracts |
+| `next-code-protocol` | client/server protocol surface built from stable type crates and provider-core values |
+| `next-code-plan` | plan/task graph data model shared across coordination flows |
+| `next-code-selfdev-types` | self-development request/status data contracts |
+| `next-code-session-types` | session DTOs, currently depending only on message types internally |
+| `next-code-side-panel-types` | side-panel page and update data contracts |
+| `next-code-task-types` | task/tool scheduling data contracts |
+| `next-code-tool-core` | runtime tool contracts such as the `Tool` trait and execution context |
+| `next-code-tool-types` | stable tool output/image DTOs |
+| `next-code-usage-types` | usage accounting data contracts |
+| `next-code-storage` | storage helpers layered on `next-code-core` |
+| `next-code-embedding` | ONNX/tokenizer-based embedding implementation and heavy inference deps |
+| `next-code-pdf` | PDF text extraction |
+| `next-code-azure-auth` | Azure bearer token retrieval |
+| `next-code-notify-email` | SMTP/IMAP/mail transport |
+| `next-code-provider-metadata` | provider/login catalog and profile metadata |
+| `next-code-provider-core` | shared provider contract (`Provider`/`EventStream`), value types, route/cost/model helpers, shared HTTP client, schema helpers |
+| `next-code-provider-openrouter` | OpenRouter-specific catalog/cache/support helpers |
+| `next-code-provider-gemini` | Gemini schema/model/support helpers |
+| `next-code-tui-core` | low-level terminal UI primitives that do not need full app state |
+| `next-code-tui-markdown` | markdown wrapping/rendering, layered on mermaid/workspace support |
+| `next-code-tui-mermaid` | mermaid parsing, rendering, caching, viewport, and widget support |
+| `next-code-tui-render` | reusable TUI layout/render helpers |
+| `next-code-tui-workspace` | workspace-map data/model/widget rendering |
+| `next-code-terminal-launch` | terminal process launch helpers |
 
 These are already aligned with the compile-performance plan's strategy: isolate heavy dependencies and stable helper surfaces first.
 
@@ -159,7 +158,7 @@ This supports the current plan direction:
 
 ```mermaid
 flowchart TD
-  J[jcode root crate]
+  J[next-code root crate]
 
   J --> CLI[CLI and startup]
   J --> Server[Server orchestration]
@@ -170,16 +169,16 @@ flowchart TD
   J --> Coreish[Protocol, message, config, ids]
   J --> Product[Auth, memory, safety, ambient, notifications]
 
-  J --> AR[jcode-agent-runtime]
-  J --> Emb[jcode-embedding]
-  J --> PDF[jcode-pdf]
-  J --> Azure[jcode-azure-auth]
-  J --> Mail[jcode-notify-email]
-  J --> PMeta[jcode-provider-metadata]
-  J --> PCore[jcode-provider-core]
-  J --> POR[jcode-provider-openrouter]
-  J --> PGem[jcode-provider-gemini]
-  J --> TW[jcode-tui-workspace]
+  J --> AR[next-code-agent-runtime]
+  J --> Emb[next-code-embedding]
+  J --> PDF[next-code-pdf]
+  J --> Azure[next-code-azure-auth]
+  J --> Mail[next-code-notify-email]
+  J --> PMeta[next-code-provider-metadata]
+  J --> PCore[next-code-provider-core]
+  J --> POR[next-code-provider-openrouter]
+  J --> PGem[next-code-provider-gemini]
+  J --> TW[next-code-tui-workspace]
 ```
 
 ## Architectural Problems To Solve
@@ -224,33 +223,33 @@ The target is a layered workspace with a thin composition root. Arrows below mea
 
 ```mermaid
 flowchart TD
-  App[jcode top-level package]
+  App[next-code top-level package]
 
   subgraph L2[Layer 2: interfaces and product surfaces]
-    TUI[jcode-tui]
-    SelfDev[jcode-selfdev]
-    CLI[jcode-cli or root CLI modules]
+    TUI[next-code-tui]
+    SelfDev[next-code-selfdev]
+    CLI[next-code-cli or root CLI modules]
   end
 
   subgraph L1[Layer 1: domain/runtime]
-    Server[jcode-server]
-    Agent[jcode-agent]
-    Provider[jcode-provider]
-    Session[jcode-session]
+    Server[next-code-server]
+    Agent[next-code-agent]
+    Provider[next-code-provider]
+    Session[next-code-session]
   end
 
   subgraph L0[Layer 0: foundation and support]
-    Core[jcode-core]
-    AR[jcode-agent-runtime]
-    Emb[jcode-embedding]
-    PDF[jcode-pdf]
-    Azure[jcode-azure-auth]
-    Mail[jcode-notify-email]
-    PMeta[jcode-provider-metadata]
-    PCore[jcode-provider-core]
-    POR[jcode-provider-openrouter]
-    PGem[jcode-provider-gemini]
-    TW[jcode-tui-workspace]
+    Core[next-code-core]
+    AR[next-code-agent-runtime]
+    Emb[next-code-embedding]
+    PDF[next-code-pdf]
+    Azure[next-code-azure-auth]
+    Mail[next-code-notify-email]
+    PMeta[next-code-provider-metadata]
+    PCore[next-code-provider-core]
+    POR[next-code-provider-openrouter]
+    PGem[next-code-provider-gemini]
+    TW[next-code-tui-workspace]
   end
 
   App --> Server
@@ -311,14 +310,14 @@ These crates should be small, low-dependency, and slow-changing. They are allowe
 
 Existing examples:
 
-- `jcode-message-types`
-- `jcode-tool-types`
-- `jcode-session-types`
-- `jcode-config-types`
-- `jcode-protocol`
-- `jcode-provider-core`
-- `jcode-plan`
-- `jcode-*-types`
+- `next-code-message-types`
+- `next-code-tool-types`
+- `next-code-session-types`
+- `next-code-config-types`
+- `next-code-protocol`
+- `next-code-provider-core`
+- `next-code-plan`
+- `next-code-*-types`
 
 Target direction:
 
@@ -338,13 +337,13 @@ These own product behavior but should depend only downward on contracts/support 
 
 Target crates:
 
-- `jcode-provider`: provider composition, provider routing, streaming contract adapters, and concrete runtime implementations layered on the `jcode-provider-core` trait.
-- `jcode-agent`: turn loop, compaction orchestration, provider/tool interaction, recovery logic.
-- `jcode-session`: session model, state transitions, persistence-facing session operations.
-- `jcode-server`: daemon lifecycle, client attachment, swarm/background coordination, service registries.
-- `jcode-tools` or narrower `jcode-tool-core` plus `jcode-tool-impl`: tool registry contracts and tool implementations.
-- `jcode-auth`: root auth orchestration after provider-neutral data lives in `jcode-auth-types` and heavy leaf SDKs stay separate.
-- `jcode-memory`: memory graph/log/search orchestration once its contracts are stable enough.
+- `next-code-provider`: provider composition, provider routing, streaming contract adapters, and concrete runtime implementations layered on the `next-code-provider-core` trait.
+- `next-code-agent`: turn loop, compaction orchestration, provider/tool interaction, recovery logic.
+- `next-code-session`: session model, state transitions, persistence-facing session operations.
+- `next-code-server`: daemon lifecycle, client attachment, swarm/background coordination, service registries.
+- `next-code-tools` or narrower `next-code-tool-core` plus `next-code-tool-impl`: tool registry contracts and tool implementations.
+- `next-code-auth`: root auth orchestration after provider-neutral data lives in `next-code-auth-types` and heavy leaf SDKs stay separate.
+- `next-code-memory`: memory graph/log/search orchestration once its contracts are stable enough.
 
 Compile-time reason:
 
@@ -357,10 +356,9 @@ These are high-churn application surfaces and should sit above runtime/domain cr
 
 Target crates:
 
-- `jcode-cli`: parsing and command dispatch if CLI keeps growing.
-- `jcode-tui`: app state, reducers, key handling, command/input handling, UI orchestration.
-- `jcode-desktop`: already a separate surface.
-- `jcode-selfdev`: self-dev build/reload/customization workflows if they remain a substantial product surface.
+- `next-code-cli`: parsing and command dispatch if CLI keeps growing.
+- `next-code-tui`: app state, reducers, key handling, command/input handling, UI orchestration.
+- `next-code-selfdev`: self-dev build/reload/customization workflows if they remain a substantial product surface.
 
 Compile-time reason:
 
@@ -373,12 +371,12 @@ These should remain isolated and often feature-gated.
 
 Existing examples:
 
-- `jcode-embedding`
-- `jcode-pdf`
-- `jcode-azure-auth`
-- `jcode-notify-email`
-- `jcode-tui-mermaid`
-- provider support crates such as `jcode-provider-openrouter` and `jcode-provider-gemini`
+- `next-code-embedding`
+- `next-code-pdf`
+- `next-code-azure-auth`
+- `next-code-notify-email`
+- `next-code-tui-mermaid`
+- provider support crates such as `next-code-provider-openrouter` and `next-code-provider-gemini`
 
 Target direction:
 
@@ -393,7 +391,7 @@ Compile-time reason:
 
 #### 5. Composition package
 
-The top-level `jcode` package should eventually become mostly:
+The top-level `next-code` package should eventually become mostly:
 
 - binary entrypoints
 - feature defaults
@@ -408,23 +406,23 @@ It should not be the long-term home of large implementation modules.
 A healthy final graph should look like this:
 
 ```text
-jcode binary/composition
-  -> jcode-cli, jcode-tui, jcode-server, jcode-selfdev
+next-code binary/composition
+  -> next-code-cli, next-code-tui, next-code-server, next-code-selfdev
 
-jcode-cli / jcode-tui
-  -> jcode-protocol, jcode-*-types, jcode-server-client contracts
+next-code-cli / next-code-tui
+  -> next-code-protocol, next-code-*-types, next-code-server-client contracts
 
-jcode-server
-  -> jcode-agent, jcode-session, jcode-provider, jcode-tools, jcode-storage
+next-code-server
+  -> next-code-agent, next-code-session, next-code-provider, next-code-tools, next-code-storage
 
-jcode-agent
-  -> jcode-provider, jcode-tools, jcode-session, jcode-agent-runtime
+next-code-agent
+  -> next-code-provider, next-code-tools, next-code-session, next-code-agent-runtime
 
-jcode-provider
-  -> jcode-provider-core, jcode-provider-* leaves, jcode-auth-types
+next-code-provider
+  -> next-code-provider-core, next-code-provider-* leaves, next-code-auth-types
 
-jcode-session
-  -> jcode-session-types, jcode-message-types, jcode-storage, optional leaf adapters
+next-code-session
+  -> next-code-session-types, next-code-message-types, next-code-storage, optional leaf adapters
 
 contract/type crates
   -> serde and small support crates only
@@ -455,7 +453,7 @@ If these are not true yet, keep decomposing internally first.
 
 Avoid these tempting but harmful structures:
 
-- **One mega `jcode-common` crate.** It becomes the new root crate and invalidates everything.
+- **One mega `next-code-common` crate.** It becomes the new root crate and invalidates everything.
 - **One crate per source directory.** This creates noisy APIs and dependency cycles without compile wins.
 - **Moving high-churn traits too early.** A poorly stabilized trait crate can become worse than the monolith.
 - **Moving UI-adjacent state into core.** This contaminates lower layers with `ratatui`/terminal concepts.
@@ -466,12 +464,12 @@ Avoid these tempting but harmful structures:
 
 Based on the current root size and existing footholds, the best next work is probably:
 
-1. **Provider contracts:** keep shrinking `src/provider/mod.rs` until a `jcode-provider` trait/runtime crate can depend only on `jcode-message-types`, `jcode-provider-core`, and small runtime primitives.
+1. **Provider contracts:** keep shrinking `src/provider/mod.rs` until a `next-code-provider` trait/runtime crate can depend only on `next-code-message-types`, `next-code-provider-core`, and small runtime primitives.
 2. **Server core:** extract protocol-independent pieces of `src/server/` such as client lifecycle state machines, swarm/background coordination DTOs, and reload/update policies behind server-local contracts.
 3. **TUI reducer/state core:** extract non-rendering app state transitions from `src/tui/app/*` before moving the whole TUI crate.
 4. **Tool contracts and registry shape:** separate tool definitions, schemas, execution context, and registry metadata from individual tool implementations.
 5. **Session domain:** isolate session state transitions and persistence-facing operations from server/TUI/provider orchestration.
-6. **Auth facade:** keep provider-neutral auth data in `jcode-auth-types`, heavy SDKs in leaf crates, and move root auth orchestration only after provider contracts stabilize.
+6. **Auth facade:** keep provider-neutral auth data in `next-code-auth-types`, heavy SDKs in leaf crates, and move root auth orchestration only after provider contracts stabilize.
 
 A useful near-term policy: every time a large root file is touched, ask whether some pure table, DTO, parser, reducer, classifier, or state transition can move downward into an existing support crate without pulling runtime dependencies with it.
 
@@ -481,7 +479,7 @@ Each structural phase should record at least:
 
 - touched-file `cargo check` for the edited hotspot
 - touched-file selfdev build for the edited hotspot
-- `cargo tree -p jcode --edges normal --depth 1` before/after for dependency surprises
+- `cargo tree -p next-code --edges normal --depth 1` before/after for dependency surprises
 - crate-level test coverage for newly extracted crates
 
 A split is successful if it either:
@@ -494,7 +492,7 @@ A split should be reconsidered if it adds public API churn, creates cycles, or r
 
 ## Target crate responsibilities
 
-### `jcode-core`
+### `next-code-core`
 
 Purpose: stable shared types and utilities with minimal dependencies.
 
@@ -519,7 +517,7 @@ Notes:
 - This is the most important future extraction because it enables the rest.
 - `src/protocol.rs`, `src/id.rs`, and carefully selected parts of `config.rs` and `message.rs` are the likely first feeders.
 
-### `jcode-session`
+### `next-code-session`
 
 Purpose: session domain model, persistence, and state transitions.
 
@@ -540,9 +538,9 @@ Should not contain:
 Notes:
 
 - This crate is not explicitly named in the current compile-performance plan, but the current size and fanout of `src/session.rs` make session extraction a natural stabilizing move.
-- If introducing `jcode-session` feels too early, the same boundary should still be established internally first and extracted later.
+- If introducing `next-code-session` feels too early, the same boundary should still be established internally first and extracted later.
 
-### `jcode-provider`
+### `next-code-provider`
 
 Purpose: provider contracts and runtime-facing provider orchestration.
 
@@ -560,10 +558,10 @@ Should not contain:
 
 Notes:
 
-- Existing crates `jcode-provider-core`, `jcode-provider-metadata`, `jcode-provider-openrouter`, and `jcode-provider-gemini` remain useful under this layer.
+- Existing crates `next-code-provider-core`, `next-code-provider-metadata`, `next-code-provider-openrouter`, and `next-code-provider-gemini` remain useful under this layer.
 - The key migration step is shrinking the `Provider` trait's dependency surface so it no longer depends on root-crate-only message/runtime types.
 
-### `jcode-agent`
+### `next-code-agent`
 
 Purpose: agent turn engine and tool orchestration.
 
@@ -584,9 +582,9 @@ Should not contain:
 Notes:
 
 - This aligns directly with the refactoring roadmap's "Agent Turn-Loop Unification" phase.
-- `jcode-agent-runtime` remains the low-level runtime primitive crate below it.
+- `next-code-agent-runtime` remains the low-level runtime primitive crate below it.
 
-### `jcode-server`
+### `next-code-server`
 
 Purpose: daemon lifecycle and multi-client coordination.
 
@@ -602,14 +600,14 @@ Should not contain:
 
 - TUI rendering
 - provider implementation details beyond service interfaces
-- session persistence internals that belong in `jcode-session`
+- session persistence internals that belong in `next-code-session`
 
 Notes:
 
 - The current `src/server/` submodule tree is already the right shape for this extraction.
 - `src/server.rs` should continue shrinking into a facade/composition module.
 
-### `jcode-tui`
+### `next-code-tui`
 
 Purpose: client UI state, reducers, and rendering.
 
@@ -629,9 +627,9 @@ Should not contain:
 Notes:
 
 - This aligns directly with the refactoring roadmap's "TUI State/Reducer Split" phase.
-- `jcode-tui-workspace` can remain a leaf crate or become a child dependency of `jcode-tui`.
+- `next-code-tui-workspace` can remain a leaf crate or become a child dependency of `next-code-tui`.
 
-### `jcode-selfdev`
+### `next-code-selfdev`
 
 Purpose: self-dev workflows, customization records, reload/build productization.
 
@@ -650,7 +648,7 @@ Notes:
 
 - This aligns with the compile-performance plan's issue-#32 direction and with the already-unified shared-server model.
 
-### `jcode` top-level package
+### `next-code` top-level package
 
 Purpose: composition root and shipping product package.
 
@@ -682,16 +680,16 @@ A higher layer may depend on a lower layer. A lower layer may not depend on a hi
 
 ### Rule 3: No server daemon types in core or provider-support crates
 
-- socket/session attachment state, fanout senders, debug socket helpers, and daemon lifecycle code must not appear in `jcode-core`, `jcode-provider-core`, or provider leaf crates
+- socket/session attachment state, fanout senders, debug socket helpers, and daemon lifecycle code must not appear in `next-code-core`, `next-code-provider-core`, or provider leaf crates
 
 ### Rule 4: Provider implementation crates depend on contracts, not on the server or TUI
 
-- provider leaf crates may depend on `jcode-core`, `jcode-provider`, and `jcode-provider-core`
-- they must not depend on `jcode-server` or `jcode-tui`
+- provider leaf crates may depend on `next-code-core`, `next-code-provider`, and `next-code-provider-core`
+- they must not depend on `next-code-server` or `next-code-tui`
 
-### Rule 5: Async/network-heavy dependencies do not belong in `jcode-core`
+### Rule 5: Async/network-heavy dependencies do not belong in `next-code-core`
 
-`jcode-core` should stay cheap to compile and highly reusable.
+`next-code-core` should stay cheap to compile and highly reusable.
 
 Avoid putting these there unless absolutely necessary:
 
@@ -717,14 +715,14 @@ Do not create a dumping-ground crate.
 
 If code has a clear owner, it belongs with that owner:
 
-- protocol/data types -> `jcode-core`
-- session persistence -> `jcode-session`
+- protocol/data types -> `next-code-core`
+- session persistence -> `next-code-session`
 - provider route/schema helpers -> provider crates
-- rendering helpers -> `jcode-tui`
+- rendering helpers -> `next-code-tui`
 
 ### Rule 8: The root package may compose many crates, but peer crates should stay narrow
 
-The top-level `jcode` package can wire multiple domains together. Peer crates should not casually depend on each other sideways when a lower-level contract would do.
+The top-level `next-code` package can wire multiple domains together. Peer crates should not casually depend on each other sideways when a lower-level contract would do.
 
 ### Rule 9: New crate boundaries should follow both ownership and invalidation logic
 
@@ -743,15 +741,15 @@ This is the recommended direction from the current tree, not a one-shot move lis
 
 | Current area | Likely target |
 |---|---|
-| `src/id.rs`, protocol/message/config primitives | `jcode-core` |
-| `src/session.rs`, parts of `storage`, restart snapshot concerns | `jcode-session` |
-| `src/agent/*`, parts of `compaction`, tool orchestration seams | `jcode-agent` |
-| `src/server/` + shrinking `src/server.rs` facade | `jcode-server` |
-| `src/provider/mod.rs` trait/contracts plus provider composition seams | `jcode-provider` |
+| `src/id.rs`, protocol/message/config primitives | `next-code-core` |
+| `src/session.rs`, parts of `storage`, restart snapshot concerns | `next-code-session` |
+| `src/agent/*`, parts of `compaction`, tool orchestration seams | `next-code-agent` |
+| `src/server/` + shrinking `src/server.rs` facade | `next-code-server` |
+| `src/provider/mod.rs` trait/contracts plus provider composition seams | `next-code-provider` |
 | existing provider helper crates | remain leaf/provider support crates |
-| `src/tui/*` + `jcode-tui-workspace` | `jcode-tui` + leaf workspace widget crate |
-| `src/cli/*` | stay in root initially or become `jcode-cli` later if justified |
-| `src/tool/selfdev/*`, self-dev workflow/productization | `jcode-selfdev` |
+| `src/tui/*` + `next-code-tui-workspace` | `next-code-tui` + leaf workspace widget crate |
+| `src/cli/*` | stay in root initially or become `next-code-cli` later if justified |
+| `src/tool/selfdev/*`, self-dev workflow/productization | `next-code-selfdev` |
 
 ## Phased Migration Plan
 
@@ -786,7 +784,7 @@ Exit criteria:
 - root modules are organized by ownership, not by convenience
 - candidate extraction seams are obvious and lower-risk
 
-### Phase 2: Extract `jcode-core`
+### Phase 2: Extract `next-code-core`
 
 This is the highest-leverage shared boundary.
 
@@ -807,10 +805,10 @@ Exit criteria:
 
 Primary targets:
 
-1. `jcode-provider`
-2. `jcode-agent`
-3. `jcode-server`
-4. `jcode-session`
+1. `next-code-provider`
+2. `next-code-agent`
+3. `next-code-server`
+4. `next-code-session`
 
 Recommended order:
 
@@ -822,7 +820,7 @@ Exit criteria:
 
 - the root crate no longer defines the main provider, server, and agent contracts directly
 
-### Phase 4: Extract `jcode-tui`
+### Phase 4: Extract `next-code-tui`
 
 Focus:
 
@@ -835,7 +833,7 @@ Exit criteria:
 
 - TUI can evolve rapidly without dragging broad server/provider recompilation
 
-### Phase 5: Extract `jcode-selfdev`
+### Phase 5: Extract `next-code-selfdev`
 
 Focus:
 
@@ -852,7 +850,7 @@ Exit criteria:
 Desired end state:
 
 - `src/main.rs` remains thin
-- `jcode::run()` is mostly wiring
+- `next-code::run()` is mostly wiring
 - the top-level package primarily assembles runtime services and default product configuration
 
 ### Continuous work across all phases
@@ -908,10 +906,10 @@ Short version:
 
 These do not block the RFC, but they should be revisited as migration proceeds:
 
-- Should `jcode-session` become an explicit crate, or remain an internal boundary until later?
-- Should CLI remain in the top-level package permanently, or eventually become `jcode-cli`?
-- Should `message` and `protocol` remain together in `jcode-core`, or split into separate contract crates if they evolve at different rates?
-- Should `jcode-tui-workspace` remain a separate leaf crate long-term, or fold into `jcode-tui` once the larger TUI extraction lands?
+- Should `next-code-session` become an explicit crate, or remain an internal boundary until later?
+- Should CLI remain in the top-level package permanently, or eventually become `next-code-cli`?
+- Should `message` and `protocol` remain together in `next-code-core`, or split into separate contract crates if they evolve at different rates?
+- Should `next-code-tui-workspace` remain a separate leaf crate long-term, or fold into `next-code-tui` once the larger TUI extraction lands?
 
 ## Recommendation
 

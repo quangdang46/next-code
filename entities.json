@@ -23,7 +23,7 @@
   ],
   "projects": [
     {
-      "name": "jcode",
+      "name": "next-code",
       "confidence": 0.99,
       "context": "Cargo.toml, 281 of your commits"
     }

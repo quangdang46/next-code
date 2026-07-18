@@ -1,8 +1,8 @@
-# Origin Sync: Fork Sync Skill for jcode (quangdang46/jcode)
+# Origin Sync: Fork Sync Skill for next-code (quangdang46/next-code)
 
 ## Problem
 
-This repo is a **fork** of `1jehuang/jcode`. Multiple modules have been extracted into separate repos under `github.com/quangdang46/*`. When syncing from upstream, conflicts inevitably arise where upstream changes collide with code that was replaced by external repo references.
+This repo is a **fork** of `quangdang46/next-code`. Multiple modules have been extracted into separate repos under `github.com/quangdang46/*`. When syncing from upstream, conflicts inevitably arise where upstream changes collide with code that was replaced by external repo references.
 
 The naive approach (`git merge` + resolve everything by hand) breaks because:
 - Upstream may modify code that now lives in an external repo → taking upstream's change **reverts the extraction**
@@ -19,13 +19,13 @@ The naive approach (`git merge` + resolve everything by hand) breaks because:
 
 | # | Cargo Dep Name | External Repo | Local Adapter/Bridge Files | Domain |
 |---|---|---|---|---|
-| 1 | `casr` | `quangdang46/cross_agent_session_resumer` | `crates/jcode-base/src/casr_adapter.rs`, `crates/jcode-base/src/import.rs` | Session import/resume (replaces `jcode-import-core`) |
-| 2 | `ffs-search`, `ffs-engine`, `ffs-symbol` | `quangdang46/fast_file_search` | `crates/jcode-tui/src/tui/app/at_picker.rs` (uses `ffs_engine::mention` and `ffs_search::mention`) | File search, @-mention autocomplete, symbols |
-| 3 | `dcg-core` | `quangdang46/destructive_command_guard` | `crates/jcode-app-core/src/dcg_bridge.rs` | Permission guard, YOLO classifier |
-| 4 | `hashline` | `quangdang46/hashline` | `crates/jcode-app-core/src/tool/hashline_edit.rs` | SHA-256 anchored hashing |
-| 5 | `mempalace-core` | `quangdang46/mempalace_rust` | `crates/jcode-mempalace-adapter/` (entire crate) | Memory palace |
-| 6 | `dynamic_context_pruning` | `quangdang46/dynamic_context_pruning` | `crates/jcode-app-core/src/dcp_bridge.rs`, `dcp_plugin.rs` | Context pruning |
-| 7 | `rtco-core` | `quangdang46/rust_token_cost_optimizer` | `crates/jcode-app-core/src/rtco_filter.rs` | Token cost optimization |
+| 1 | `casr` | `quangdang46/cross_agent_session_resumer` | `crates/next-code-base/src/casr_adapter.rs`, `crates/next-code-base/src/import.rs` | Session import/resume (replaces `next-code-import-core`) |
+| 2 | `ffs-search`, `ffs-engine`, `ffs-symbol` | `quangdang46/fast_file_search` | `crates/next-code-tui/src/tui/app/at_picker.rs` (uses `ffs_engine::mention` and `ffs_search::mention`) | File search, @-mention autocomplete, symbols |
+| 3 | `dcg-core` | `quangdang46/destructive_command_guard` | `crates/next-code-app-core/src/dcg_bridge.rs` | Permission guard, YOLO classifier |
+| 4 | `hashline` | `quangdang46/hashline` | `crates/next-code-app-core/src/tool/hashline_edit.rs` | SHA-256 anchored hashing |
+| 5 | `mempalace-core` | `quangdang46/mempalace_rust` | `crates/next-code-mempalace-adapter/` (entire crate) | Memory palace |
+| 6 | `dynamic_context_pruning` | `quangdang46/dynamic_context_pruning` | `crates/next-code-app-core/src/dcp_bridge.rs`, `dcp_plugin.rs` | Context pruning |
+| 7 | `rtco-core` | `quangdang46/rust_token_cost_optimizer` | `crates/next-code-app-core/src/rtco_filter.rs` | Token cost optimization |
 
 ### Additional git dependencies
 
@@ -36,21 +36,21 @@ The naive approach (`git merge` + resolve everything by hand) breaks because:
 
 ### Not-yet-extracted domains that commonly conflict
 
-- `crates/jcode-tui/src/tui/app/inline_interactive.rs` — session picker, resume logic (uses `casr` through `import.rs`)
-- `crates/jcode-session-types/src/lib.rs` — `ResumeTarget` enum (has `ForeignSession` variant added locally)
+- `crates/next-code-tui/src/tui/app/inline_interactive.rs` — session picker, resume logic (uses `casr` through `import.rs`)
+- `crates/next-code-session-types/src/lib.rs` — `ResumeTarget` enum (has `ForeignSession` variant added locally)
 - `src/cli/tui_launch.rs` — terminal launch (uses `casr_adapter` heavily)
-- `crates/jcode-tui/src/tui/session_picker/` — session picker UI (has `ForeignSession` arms added locally)
-- `crates/jcode-app-core/src/yolo_classifier.rs` — DCG integration
-- `crates/jcode-tui/src/tui/app/state_ui_input_helpers.rs` — slash commands (`/permissions`, `/models`), `$<skill>`, `@<file>` autocomplete, FFS tool rename
-- `crates/jcode-tui/src/tui/app/state_ui.rs` — `/skills` report, `/permissions` handler
-- `crates/jcode-tui/src/tui/ui_overlays.rs` — help overlay entries
-- `crates/jcode-base/src/safety.rs` — AUTO_ALLOWED list with `ffs *` entries
-- `crates/jcode-base/src/skill.rs` — `parse_invocation` with `$<name>` instead of `/<name>`
-- `Cargo.toml` — `mempalace-backend` feature, `jcode-app-core` dep
-- `crates/jcode-app-core/src/tool/mod.rs` — tool registration names + module declarations
-- `crates/jcode-app-core/src/dcg_bridge.rs` — `READ_ONLY_ACTIONS` with FFS tools, `mode_to_str`
-- `crates/jcode-tui/src/tui/app/at_picker.rs` — `@` mention picker
-- `crates/jcode-base/src/prompt.rs` — system prompt with `$skillname`
+- `crates/next-code-tui/src/tui/session_picker/` — session picker UI (has `ForeignSession` arms added locally)
+- `crates/next-code-app-core/src/yolo_classifier.rs` — DCG integration
+- `crates/next-code-tui/src/tui/app/state_ui_input_helpers.rs` — slash commands (`/permissions`, `/models`), `$<skill>`, `@<file>` autocomplete, FFS tool rename
+- `crates/next-code-tui/src/tui/app/state_ui.rs` — `/skills` report, `/permissions` handler
+- `crates/next-code-tui/src/tui/ui_overlays.rs` — help overlay entries
+- `crates/next-code-base/src/safety.rs` — AUTO_ALLOWED list with `ffs *` entries
+- `crates/next-code-base/src/skill.rs` — `parse_invocation` with `$<name>` instead of `/<name>`
+- `Cargo.toml` — `mempalace-backend` feature, `next-code-app-core` dep
+- `crates/next-code-app-core/src/tool/mod.rs` — tool registration names + module declarations
+- `crates/next-code-app-core/src/dcg_bridge.rs` — `READ_ONLY_ACTIONS` with FFS tools, `mode_to_str`
+- `crates/next-code-tui/src/tui/app/at_picker.rs` — `@` mention picker
+- `crates/next-code-base/src/prompt.rs` — system prompt with `$skillname`
 
 ---
 
@@ -60,13 +60,13 @@ The naive approach (`git merge` + resolve everything by hand) breaks because:
 
 ```bash
 # Add upstream remote if missing
-git remote add upstream https://github.com/1jehuang/jcode.git
+git remote add upstream https://github.com/quangdang46/next-code.git
 
 # Verify upstream
 git remote -v
 # Should show:
-#   origin    https://github.com/quangdang46/jcode.git (fetch/push)
-#   upstream  https://github.com/1jehuang/jcode.git (fetch)
+#   origin    https://github.com/quangdang46/next-code.git (fetch/push)
+#   upstream  https://github.com/quangdang46/next-code.git (fetch)
 
 # Ensure master is clean
 git checkout master
@@ -341,28 +341,27 @@ git show origin/master:<file> > <file>  # get our version
 ```
 
 **Common files with silent overwrite risk** (checked 2026-06; freeze lesson 2026-07):
-- `crates/jcode-tui/src/tui/app/turn.rs` — **NO `biased;` before `event_stream`** (freeze on alt-tab; Lesson 2)
-- `crates/jcode-tui/src/tui/app/local.rs`, `run_shell.rs` — event-loop keep-ours (Lesson 1)
-- `crates/jcode-tui/src/tui/app/state_ui_input_helpers.rs` — slash commands, FFS rename, `$`/`@` autocomplete
-- `crates/jcode-tui/src/tui/app/state_ui.rs` — `/permissions`, `/skills` report
-- `crates/jcode-tui/src/tui/ui_overlays.rs` — help entries
-- `crates/jcode-base/src/safety.rs` — AUTO_ALLOWED list (FFS tools)
-- `crates/jcode-base/src/config.rs` — tool-profile allow lists
-- `crates/jcode-base/src/prompt.rs` — system prompt with `$skillname`
-- `crates/jcode-base/src/skill.rs` — `parse_invocation` using `$<name>`
-- `Cargo.toml` — mempalace-backend feature, jcode-app-core dep
-- `crates/jcode-app-core/src/dcg_bridge.rs` — READ_ONLY_ACTIONS, mode helpers
-- `crates/jcode-app-core/src/tool/mod.rs` — tool registrations, module declarations
-- `crates/jcode-tui/src/tui/app/at_picker.rs` — `@` mention picker
-- `crates/jcode-tui/src/tui/app/input.rs` — lazy-init @ picker
-- `crates/jcode-tui/src/tui/ui_tools.rs` — tool summary display arms
-- `crates/jcode-tui/src/tui/app/tui_lifecycle.rs` — App constructor field
-- `crates/jcode-desktop/src/single_session.rs` — tool name match arms
-- `crates/jcode-provider-core/src/anthropic.rs` — tool name mapping
-- `crates/jcode-base/src/provider/Codex.rs` — tool name mapping
-- `crates/jcode-usage-types/src/lib.rs` — telemetry category arms
-- `crates/jcode-tui-tool-display/src/lib.rs` — resolve_display_tool_name
-- `crates/jcode-tool-types/src/lib.rs` — resolve_tool_name
+- `crates/next-code-tui/src/tui/app/turn.rs` — **NO `biased;` before `event_stream`** (freeze on alt-tab; Lesson 2)
+- `crates/next-code-tui/src/tui/app/local.rs`, `run_shell.rs` — event-loop keep-ours (Lesson 1)
+- `crates/next-code-tui/src/tui/app/state_ui_input_helpers.rs` — slash commands, FFS rename, `$`/`@` autocomplete
+- `crates/next-code-tui/src/tui/app/state_ui.rs` — `/permissions`, `/skills` report
+- `crates/next-code-tui/src/tui/ui_overlays.rs` — help entries
+- `crates/next-code-base/src/safety.rs` — AUTO_ALLOWED list (FFS tools)
+- `crates/next-code-base/src/config.rs` — tool-profile allow lists
+- `crates/next-code-base/src/prompt.rs` — system prompt with `$skillname`
+- `crates/next-code-base/src/skill.rs` — `parse_invocation` using `$<name>`
+- `Cargo.toml` — mempalace-backend feature, next-code-app-core dep
+- `crates/next-code-app-core/src/dcg_bridge.rs` — READ_ONLY_ACTIONS, mode helpers
+- `crates/next-code-app-core/src/tool/mod.rs` — tool registrations, module declarations
+- `crates/next-code-tui/src/tui/app/at_picker.rs` — `@` mention picker
+- `crates/next-code-tui/src/tui/app/input.rs` — lazy-init @ picker
+- `crates/next-code-tui/src/tui/ui_tools.rs` — tool summary display arms
+- `crates/next-code-tui/src/tui/app/tui_lifecycle.rs` — App constructor field
+- `crates/next-code-provider-core/src/anthropic.rs` — tool name mapping
+- `crates/next-code-base/src/provider/Codex.rs` — tool name mapping
+- `crates/next-code-usage-types/src/lib.rs` — telemetry category arms
+- `crates/next-code-tui-tool-display/src/lib.rs` — resolve_display_tool_name
+- `crates/next-code-tool-types/src/lib.rs` — resolve_tool_name
 
 ### Step 5: Verification
 
@@ -396,14 +395,14 @@ git push origin master
 
 ## Quick Reference: Common Conflict Patterns
 
-### Pattern 1: `ResumeTarget` enum (jcode-session-types)
+### Pattern 1: `ResumeTarget` enum (next-code-session-types)
 
 **Upstream** has: `CodexSession, PiSession, OpenCodeSession`
 **Our fork** also has: `ForeignSession { provider_slug, session_id }`
 
 **Resolution**: Keep ForeignSession variant. Add any new variants upstream added.
 
-### Pattern 2: `resolve_resume_target_to_jcode` / `imported_session_id_for_target`
+### Pattern 2: `resolve_resume_target_to_next_code` / `imported_session_id_for_target`
 
 **Upstream** uses inline import logic. **Our fork** delegates to `casr_adapter`.
 
@@ -449,7 +448,7 @@ After push, verify:
 - [ ] `cargo check` passes
 - [ ] Local builds work (`cargo build`)
 - [ ] Category F check done: all locally-modified files that upstream touched were audited for silent overwrite
-- [ ] **Lesson 2**: `rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs` is empty (no freeze-on-alt-tab regression; ignore comments)
+- [ ] **Lesson 2**: `rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs` is empty (no freeze-on-alt-tab regression; ignore comments)
 - [ ] `ffs`/`$`/`@`/`/permissions` features still working
 - [ ] `Cargo.toml` has our feature flags (`mempalace-backend`, `dcp`, `rtco`)
 - [ ] Extracted features still functional (session resume, file picker, DCG mode)
@@ -491,8 +490,8 @@ Then run `cargo generate-lockfile` or just `cargo check`.
 
 ## Repo Status Snapshot (as of last update)
 
-- **Fork**: quangdang46/jcode
-- **Upstream**: 1jehuang/jcode
+- **Fork**: quangdang46/next-code
+- **Upstream**: quangdang46/next-code
 - **Status**: diverged (regenerate counts with `git rev-list --left-right --count master...upstream/master`)
 - **Extracted repos**: 7 (casr, ffs, dcg, hashline, mempalace, dcp, rtco)
 - **Adapter code**: ~2687 lines across 4+ bridge files
@@ -570,7 +569,7 @@ grep -rn 'MemoryEntry {' --include='*.rs' | grep -v 'fn\|pub struct'
 | 🔧 Refactor | **Auth lifecycle** | `lifecycle.rs` rewrite (+287 -14) |
 | ✨ Feature | **Swarm Inline Gallery** | `SwarmSpawnMode::Inline`, live viewport tiles |
 | ✨ Feature | **Anthropic 404 Fallback** | Retry/fallback logic |
-| ✨ Feature | **CrossEncoder reranker** | `jcode-embedding` crate, memory refactor |
+| ✨ Feature | **CrossEncoder reranker** | `next-code-embedding` crate, memory refactor |
 | 🐛 Bugfix | **CI** | Pin `RUSTUP_TOOLCHAIN=stable`, pre-install `rust-src` |
 | 🏗️ Build | **Version bump** | v0.27.0 |
 
@@ -614,7 +613,7 @@ Merge **`27731574a`** (`sync-final-merge` ← upstream) auto-merged `provider_co
 
 **Detection**:
 ```bash
-rg -n 'SERVER-SAVE|ROUTE-SAVE|set_default_model' crates/jcode-app-core/src/server/provider_control.rs
+rg -n 'SERVER-SAVE|ROUTE-SAVE|set_default_model' crates/next-code-app-core/src/server/provider_control.rs
 # expect: set_default_model calls after successful set_model / set_route_selection
 ```
 
@@ -630,7 +629,7 @@ rg -n 'SERVER-SAVE|ROUTE-SAVE|set_default_model' crates/jcode-app-core/src/serve
 
 **Recorded**: 2026-07 (sync-nov-commits). **Severity**: user-visible freeze.
 
-**Bug**: In `crates/jcode-tui/src/tui/app/turn.rs`, a `tokio::select!` over the live turn loop had:
+**Bug**: In `crates/next-code-tui/src/tui/app/turn.rs`, a `tokio::select!` over the live turn loop had:
 
 ```rust
 tokio::select! {
@@ -647,11 +646,11 @@ With `biased;`, branches are polled in order. When a tool future or stream is co
 **Upstream still has `biased;`** in `turn.rs` (as of v0.41). Future merges that touch `turn.rs` will try to reintroduce it.
 
 **Resolution on every sync**:
-1. Treat `crates/jcode-tui/src/tui/app/turn.rs` as **Lesson 1 + Lesson 2** keep-ours for the event loop.
+1. Treat `crates/next-code-tui/src/tui/app/turn.rs` as **Lesson 1 + Lesson 2** keep-ours for the event loop.
 2. After merge, run:
    ```bash
    # Match the statement only (comments may mention biased intentionally)
-   rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs
+   rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs
    # expect: no matches
    ```
 3. If a conflict or auto-merge brings `biased;` back before `event_stream.next()`, **delete it again**. Do not "accept upstream" on that hunk.
@@ -667,7 +666,7 @@ With `biased;`, branches are polled in order. When a tool future or stream is co
 **Branch**: `sync-final-merge` → PR #478
 **Upstream commits**: 164 (v0.35.0..v0.36.0). **Files merged**: 261 (+30,369 / -15,264).
 
-**Status**: ✅ Build clean. `cargo check -p jcode-tui` = 0 errors.
+**Status**: ✅ Build clean. `cargo check -p next-code-tui` = 0 errors.
 
 | Category | What |
 |----------|------|
@@ -679,22 +678,22 @@ With `biased;`, branches are polled in order. When a tool future or stream is co
 | 🐛 Bugfixes | Copy badge, auto-poke, History dedup, /login guide |
 
 **Kept OURS** (Lesson 1 — status bar/event loop):
-- `crates/jcode-tui/src/tui/ui_input.rs`, `ui.rs`, `mod.rs`
-- `crates/jcode-tui/src/tui/app/turn.rs`, `local.rs`, `run_shell.rs`, `state_ui.rs`
+- `crates/next-code-tui/src/tui/ui_input.rs`, `ui.rs`, `mod.rs`
+- `crates/next-code-tui/src/tui/app/turn.rs`, `local.rs`, `run_shell.rs`, `state_ui.rs`
 
 **Kept OURS** (Category A — extracted modules):
-- `crates/jcode-base/src/import.rs`, `casr_adapter.rs`
-- `crates/jcode-app-core/src/dcg_bridge.rs`, `hashline_edit.rs`
-- `crates/jcode-app-core/src/tool/mod.rs` (ffs replacement)
+- `crates/next-code-base/src/import.rs`, `casr_adapter.rs`
+- `crates/next-code-app-core/src/dcg_bridge.rs`, `hashline_edit.rs`
+- `crates/next-code-app-core/src/tool/mod.rs` (ffs replacement)
 
 **Kept OURS** (fork-specific crates — user maintains):
-- `jcode-hooks/`, `jcode-plugin-core/`, `jcode-plugin-runtime/`
-- `jcode-best-of-n/`, `jcode-llm-core/`, `jcode-keywords/`
-- `jcode-provider-service/`, `evals/`, `examples/`
-- `.beads/`, `.jcode/agents/`
+- `next-code-hooks/`, `next-code-plugin-core/`, `next-code-plugin-runtime/`
+- `next-code-best-of-n/`, `next-code-llm-core/`, `next-code-keywords/`
+- `next-code-provider-service/`, `evals/`, `examples/`
+- `.beads/`, `.next-code/agents/`
 
 **Category G fixes applied**:
-1. `SetPermissionMode` — added variant to `jcode-protocol/src/wire.rs`
+1. `SetPermissionMode` — added variant to `next-code-protocol/src/wire.rs`
 2. `is_auto_poke_message` — added to `todo.rs`
 3. `DcpCompressTool` / `BestOfNTool` — replaced with `InvalidTool` stubs
 4. `task_label` field — added `task_label: None` to all `SwarmMemberStatus` initializers
@@ -711,7 +710,7 @@ With `biased;`, branches are polled in order. When a tool future or stream is co
 **Branch**: `master` (via `sync-nov-commits` merge).
 **Upstream range**: v0.40.0..v0.41.0 (~39 commits). **~107 files** in the merge (+4k lines).
 
-**Status**: ✅ Binary builds. `cargo check -p jcode` / `jcode-tui` / `jcode-base --tests` / `jcode-tui --tests` clean. Installed local `current` channel as `v0.32.1408-dev (0399554e1)`.
+**Status**: ✅ Binary builds. `cargo check -p next-code` / `next-code-tui` / `next-code-base --tests` / `next-code-tui --tests` clean. Installed local `current` channel as `v0.32.1408-dev (0399554e1)`.
 
 | Category | What |
 |----------|------|
@@ -736,13 +735,13 @@ With `biased;`, branches are polled in order. When a tool future or stream is co
 **Post-merge MUST-check (freeze)**:
 ```bash
 # Must print nothing for turn.rs event-loop select! (statement only)
-rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biased reintroduced" || echo "OK: no biased in turn.rs"
+rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs && echo "FAIL: biased reintroduced" || echo "OK: no biased in turn.rs"
 ```
 
 **Note on other `biased;` (OK to keep)**: intentional priority selects that do **not** starve `event_stream`:
-- `crates/jcode-tui/src/tui/backend.rs` — cancellation-safety test
-- `crates/jcode-app-core/src/agent/turn_streaming_mpsc.rs` — tool completion vs Alt+B
-- `crates/jcode-app-core/src/server/client_lifecycle.rs` — client I/O over bus noise
+- `crates/next-code-tui/src/tui/backend.rs` — cancellation-safety test
+- `crates/next-code-app-core/src/agent/turn_streaming_mpsc.rs` — tool completion vs Alt+B
+- `crates/next-code-app-core/src/server/client_lifecycle.rs` — client I/O over bus noise
 
 ### 2026-07-11 — v0.41.0..v0.42.0 upstream sync (merge upstream/master → master)
 
@@ -750,12 +749,12 @@ rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biase
 **Upstream range**: post-v0.41 tip → v0.42.0 + follow-ups (~34 commits, tip `329c1ebf0`).
 **Files**: ~122 changed in merge (+7k / -1.5k).
 
-**Status**: ✅ `cargo check -p jcode` clean. Lesson 2 (`biased;` absent in `turn.rs`). Lesson 3 (`SERVER-SAVE` / `ROUTE-SAVE` + `PICKER-SAVE` + `apply_config_default_model`) preserved. Fork version stays **0.32.0** (do not take upstream package version).
+**Status**: ✅ `cargo check -p next-code` clean. Lesson 2 (`biased;` absent in `turn.rs`). Lesson 3 (`SERVER-SAVE` / `ROUTE-SAVE` + `PICKER-SAVE` + `apply_config_default_model`) preserved. Fork version stays **0.32.0** (do not take upstream package version).
 
 | Category | What |
 |----------|------|
-| ✨ Feature | **LaTeX / terminal math** (`jcode-render-core` math, markdown render path) |
-| ✨ Feature | **Typo-resistant fuzzy** (`jcode-fuzzy` crate; TUI picker / slash commands) |
+| ✨ Feature | **LaTeX / terminal math** (`next-code-render-core` math, markdown render path) |
+| ✨ Feature | **Typo-resistant fuzzy** (`next-code-fuzzy` crate; TUI picker / slash commands) |
 | ✨ Feature | **Swarm agent cards** under spawn calls; strip `icon`/`task`; dock `managed_members` |
 | 🖥️ Server | Swarm persistence, lock races, lifecycle ownership, reload recovery, Retry-After |
 | 🏎️ Memory | Retained-heap watchdog (`release_retained_heap_if_excessive`, idle TUI trim) |
@@ -767,7 +766,7 @@ rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biase
 - `skill.rs` `$` + trailing prompt (not `/skill`)
 - `turn.rs` event loop without `biased;`
 - `provider_control.rs` SERVER/ROUTE-SAVE
-- Cargo workspace version 0.32.0 + `jcode-fuzzy` member
+- Cargo workspace version 0.32.0 + `next-code-fuzzy` member
 
 **Category G / bad-merge repairs**:
 1. `GalleryMember.icon` / `.task` + `disp_w` / `CHIP_TASK_*` in `swarm_gallery.rs`
@@ -775,15 +774,15 @@ rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo "FAIL: biase
 3. Restored `ui_prepare.rs` from HEAD (duplicate-fn concat), re-applied upstream swarm-card inject + cache signature
 4. `SwarmInfo` fields: `managed_members`, `selected`, `focused`, `plan_progress`, `spinner_frame`
 5. `process_memory.rs` take upstream retention-trim APIs
-6. Deduped `apply_inline_interactive_filter` onto `jcode_fuzzy::fuzzy_score_tokens`
+6. Deduped `apply_inline_interactive_filter` onto `next_code_fuzzy::fuzzy_score_tokens`
 7. Skill invocation tests updated for `SkillInvocation` + trailing prompt
 
 **Post-merge MUST-check**:
 ```bash
-rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
-rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
-rg -n 'parse_invocation|SkillInvocation' crates/jcode-base/src/skill.rs | head
-cargo check -p jcode
+rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/next-code-app-core/src/server/provider_control.rs
+rg -n 'parse_invocation|SkillInvocation' crates/next-code-base/src/skill.rs | head
+cargo check -p next-code
 ```
 
 ### 2026-07-11 — v0.42.0..v0.43.0 upstream sync (2 commits)
@@ -793,7 +792,7 @@ cargo check -p jcode
 - `a07bd3d96` feat(markdown): support common LaTeX containers
 - `649276753` release: v0.43.0
 
-**Status**: ✅ `cargo check -p jcode` clean. Lesson 2/3 OK. Fork package version remains **0.32.0**.
+**Status**: ✅ `cargo check -p next-code` clean. Lesson 2/3 OK. Fork package version remains **0.32.0**.
 
 | Category | What |
 |----------|------|
@@ -807,10 +806,10 @@ cargo check -p jcode
 ### 2026-07-12 — PR #481 / post-v0.43 upstream sync (19 commits)
 
 **Branch**: `master`.
-**Source**: cross-repo PR https://github.com/quangdang46/jcode/pull/481 (`1jehuang/jcode:master` @ `9c66c82f7` → fork `master`).
+**Source**: cross-repo PR https://github.com/quangdang46/next-code/pull/481 (`quangdang46/next-code:master` @ `9c66c82f7` → fork `master`).
 **Upstream range**: `649276753`..`9c66c82f7` (19 commits after v0.43.0).
 
-**Status**: ✅ `cargo check -p jcode` clean. Lesson 2/3 OK. `$skillname` kept. Fork version remains **0.32.0**.
+**Status**: ✅ `cargo check -p next-code` clean. Lesson 2/3 OK. `$skillname` kept. Fork version remains **0.32.0**.
 
 | Category | What |
 |----------|------|
@@ -833,9 +832,9 @@ cargo check -p jcode
 
 **Post-merge MUST-check**:
 ```bash
-rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
-rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
-cargo check -p jcode
+rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/next-code-app-core/src/server/provider_control.rs
+cargo check -p next-code
 ```
 
 ### Lesson 4: Swarm FullPage / soft-repaint / history fingerprint (Category H hybrid UI)
@@ -848,7 +847,7 @@ When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while 
    - **Fix**: `input.rs` + `remote/key_handling.rs` must call `cycle_swarm_panel_view()` (Chat → Controls → FullPage).
    - **Check**:
      ```bash
-     rg -n 'cycle_swarm_panel_view|toggle_swarm_panel_focus' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
+     rg -n 'cycle_swarm_panel_view|toggle_swarm_panel_focus' crates/next-code-tui/src/tui/app/input.rs crates/next-code-tui/src/tui/app/remote/key_handling.rs
      # expect: cycle at hotkey sites; toggle only if unused helper remains
      ```
 
@@ -856,25 +855,25 @@ When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while 
    - **Port**: `FullFrameInvalidation` / `invalidate_previous_terminal_buffer` in `run_shell.rs`; `App::request_full_repaint()`; navigation scroll arms **soft** repaint. Keep fork **HardClear** via `clear_terminal_for_full_redraw` (no DSR `Terminal::clear()`).
    - **Check**:
      ```bash
-     rg -n 'request_full_repaint|SoftRepaint|force_full_repaint' crates/jcode-tui/src/tui/app/run_shell.rs crates/jcode-tui/src/tui/app/navigation.rs
+     rg -n 'request_full_repaint|SoftRepaint|force_full_repaint' crates/next-code-tui/src/tui/app/run_shell.rs crates/next-code-tui/src/tui/app/navigation.rs
      ```
 
 3. **History fingerprint**: Upstream skips re-applying identical remote History payloads (`history_payload_fingerprint` + image length match). Keep-ours on `server_events` drops this → reconnect/watchdog rebuilds multi-MB transcripts for free.
    - **Port** helpers + wire into `ServerEvent::History` apply path; unit module `history_dedup_tests`.
    - **Check**:
      ```bash
-     rg -n 'should_skip_identical_history_payload|history_payload_fingerprint' crates/jcode-tui/src/tui/app/remote/server_events.rs
+     rg -n 'should_skip_identical_history_payload|history_payload_fingerprint' crates/next-code-tui/src/tui/app/remote/server_events.rs
      ```
 
 4. **Do NOT take full upstream** of: `ui_input.rs` (fork status bar + keyword chips), `state_ui_input_helpers.rs` (would drop `$` / `@` FFS / `/permissions`), `turn.rs` with `biased;`.
 
 ### 2026-07-14 — PR #486 / upstream v0.44..v0.47 origin-sync
 
-**Branch**: `sync-pr-483` → https://github.com/quangdang46/jcode/pull/486 (supersedes conflicted cross-repo PR #483).
+**Branch**: `sync-pr-483` → https://github.com/quangdang46/next-code/pull/486 (supersedes conflicted cross-repo PR #483).
 **Worktree**: `.worktrees/sync-pr-483` from `origin/master`.
 **Upstream tip**: `f7f5898cf` (v0.47.0). **~98 commits**. Merge: `5a39725d1`.
 
-**Status**: ✅ `cargo check -p jcode` / `jcode-tui` clean. Package **0.32.0**. Lesson 2/3 OK.
+**Status**: ✅ `cargo check -p next-code` / `next-code-tui` clean. Package **0.32.0**. Lesson 2/3 OK.
 
 | Category | What |
 |----------|------|
@@ -885,11 +884,11 @@ When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while 
 
 **Post-merge MUST-check**:
 ```bash
-rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
-rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
-rg -n 'cycle_swarm_panel_view' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
-rg -n 'should_skip_identical_history_payload|request_full_repaint|SoftRepaint' crates/jcode-tui/src/tui/app
-cargo check -p jcode
+rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/next-code-app-core/src/server/provider_control.rs
+rg -n 'cycle_swarm_panel_view' crates/next-code-tui/src/tui/app/input.rs crates/next-code-tui/src/tui/app/remote/key_handling.rs
+rg -n 'should_skip_identical_history_payload|request_full_repaint|SoftRepaint' crates/next-code-tui/src/tui/app
+cargo check -p next-code
 ```
 
 ### Lesson 4: Swarm FullPage / soft-repaint / history fingerprint (Category H hybrid UI)
@@ -902,7 +901,7 @@ When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while 
    - **Fix**: `input.rs` + `remote/key_handling.rs` must call `cycle_swarm_panel_view()` (Chat → Controls → FullPage).
    - **Check**:
      ```bash
-     rg -n 'cycle_swarm_panel_view|toggle_swarm_panel_focus' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
+     rg -n 'cycle_swarm_panel_view|toggle_swarm_panel_focus' crates/next-code-tui/src/tui/app/input.rs crates/next-code-tui/src/tui/app/remote/key_handling.rs
      # expect: cycle at hotkey sites; toggle only if unused helper remains
      ```
 
@@ -910,25 +909,25 @@ When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while 
    - **Port**: `FullFrameInvalidation` / `invalidate_previous_terminal_buffer` in `run_shell.rs`; `App::request_full_repaint()`; navigation scroll arms **soft** repaint. Keep fork **HardClear** via `clear_terminal_for_full_redraw` (no DSR `Terminal::clear()`).
    - **Check**:
      ```bash
-     rg -n 'request_full_repaint|SoftRepaint|force_full_repaint' crates/jcode-tui/src/tui/app/run_shell.rs crates/jcode-tui/src/tui/app/navigation.rs
+     rg -n 'request_full_repaint|SoftRepaint|force_full_repaint' crates/next-code-tui/src/tui/app/run_shell.rs crates/next-code-tui/src/tui/app/navigation.rs
      ```
 
 3. **History fingerprint**: Upstream skips re-applying identical remote History payloads (`history_payload_fingerprint` + image length match). Keep-ours on `server_events` drops this → reconnect/watchdog rebuilds multi-MB transcripts for free.
    - **Port** helpers + wire into `ServerEvent::History` apply path; unit module `history_dedup_tests`.
    - **Check**:
      ```bash
-     rg -n 'should_skip_identical_history_payload|history_payload_fingerprint' crates/jcode-tui/src/tui/app/remote/server_events.rs
+     rg -n 'should_skip_identical_history_payload|history_payload_fingerprint' crates/next-code-tui/src/tui/app/remote/server_events.rs
      ```
 
 4. **Do NOT take full upstream** of: `ui_input.rs` (fork status bar + keyword chips), `state_ui_input_helpers.rs` (would drop `$` / `@` FFS / `/permissions`), `turn.rs` with `biased;`.
 
 ### 2026-07-14 — PR #486 / upstream v0.44..v0.47 origin-sync
 
-**Branch**: `sync-pr-483` → https://github.com/quangdang46/jcode/pull/486 (supersedes conflicted cross-repo PR #483).
+**Branch**: `sync-pr-483` → https://github.com/quangdang46/next-code/pull/486 (supersedes conflicted cross-repo PR #483).
 **Worktree**: `.worktrees/sync-pr-483` from `origin/master`.
 **Upstream tip**: `f7f5898cf` (v0.47.0). **~98 commits**. Merge: `5a39725d1`.
 
-**Status**: ✅ `cargo check -p jcode` / `jcode-tui` clean. Package **0.32.0**. Lesson 2/3 OK.
+**Status**: ✅ `cargo check -p next-code` / `next-code-tui` clean. Package **0.32.0**. Lesson 2/3 OK.
 
 | Category | What |
 |----------|------|
@@ -939,20 +938,20 @@ When `merge-file --ours` (or keep-ours) is used on **input/key_handling** while 
 
 **Post-merge MUST-check**:
 ```bash
-rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
-rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
-rg -n 'cycle_swarm_panel_view' crates/jcode-tui/src/tui/app/input.rs crates/jcode-tui/src/tui/app/remote/key_handling.rs
-rg -n 'should_skip_identical_history_payload|request_full_repaint|SoftRepaint' crates/jcode-tui/src/tui/app
-cargo check -p jcode
+rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/next-code-app-core/src/server/provider_control.rs
+rg -n 'cycle_swarm_panel_view' crates/next-code-tui/src/tui/app/input.rs crates/next-code-tui/src/tui/app/remote/key_handling.rs
+rg -n 'should_skip_identical_history_payload|request_full_repaint|SoftRepaint' crates/next-code-tui/src/tui/app
+cargo check -p next-code
 ```
 
 ### 2026-07-16 — PR #488 / upstream v0.48.0 origin-sync (supersedes #487)
 
-**Branch**: `sync-pr-487` → https://github.com/quangdang46/jcode/pull/488 (cross-repo #487 CONFLICTING).
+**Branch**: `sync-pr-487` → https://github.com/quangdang46/next-code/pull/488 (cross-repo #487 CONFLICTING).
 **Worktree**: `.worktrees/sync-pr-487` from `master` (`ac1b155a8` post agent-tree).
 **Upstream tip**: `482bd326f` (post v0.48.0 + onboarding/hotkeys). **52 commits**. Merge: `b4f50b4b5` + fix `fff6b5318`.
 
-**Status**: ✅ `cargo check -p jcode` / `jcode-tui` clean. Package **0.32.0**. Lesson 2/3/4 OK. Agent-tree + FFS prompt kept.
+**Status**: ✅ `cargo check -p next-code` / `next-code-tui` clean. Package **0.32.0**. Lesson 2/3/4 OK. Agent-tree + FFS prompt kept.
 
 | Category | What |
 |----------|------|
@@ -962,10 +961,10 @@ cargo check -p jcode
 
 **Post-merge MUST-check**:
 ```bash
-rg -n '^\s*biased\s*;' crates/jcode-tui/src/tui/app/turn.rs && echo FAIL || echo OK
-rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/jcode-app-core/src/server/provider_control.rs
-rg -n 'cycle_swarm_panel_view' crates/jcode-tui/src/tui/app/input.rs
-rg -n 'handle_agent_tree_navigation_key' crates/jcode-tui/src/tui/app/input.rs
-cargo check -p jcode
+rg -n '^\s*biased\s*;' crates/next-code-tui/src/tui/app/turn.rs && echo FAIL || echo OK
+rg -n 'SERVER-SAVE|ROUTE-SAVE' crates/next-code-app-core/src/server/provider_control.rs
+rg -n 'cycle_swarm_panel_view' crates/next-code-tui/src/tui/app/input.rs
+rg -n 'handle_agent_tree_navigation_key' crates/next-code-tui/src/tui/app/input.rs
+cargo check -p next-code
 ```
 

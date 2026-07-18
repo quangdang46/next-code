@@ -65,18 +65,18 @@ OVERALL_START=$(date +%s)
 echo "▸ Building Linux x86_64 + macOS aarch64 in parallel..."
 
 (
-    JCODE_RELEASE_BUILD=1 JCODE_BUILD_SEMVER="$VERSION_NUM" scripts/build_linux_compat.sh "$DIST" >/dev/null
+    NEXT_CODE_RELEASE_BUILD=1 NEXT_CODE_BUILD_SEMVER="$VERSION_NUM" scripts/build_linux_compat.sh "$DIST" >/dev/null
     echo "  ✅ Linux done ($(( $(date +%s) - OVERALL_START ))s)"
 ) &
 LINUX_PID=$!
 
 (
-    JCODE_RELEASE_BUILD=1 JCODE_BUILD_SEMVER="$VERSION_NUM" \
+    NEXT_CODE_RELEASE_BUILD=1 NEXT_CODE_BUILD_SEMVER="$VERSION_NUM" \
         CARGO_INCREMENTAL=0 CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-1}" \
-        cargo build --release --target aarch64-apple-darwin --bin jcode 2>/dev/null
-    cp target/aarch64-apple-darwin/release/jcode "$DIST/jcode-macos-aarch64"
-    chmod +x "$DIST/jcode-macos-aarch64"
-    (cd "$DIST" && tar czf jcode-macos-aarch64.tar.gz jcode-macos-aarch64)
+        cargo build --release --target aarch64-apple-darwin --bin next-code 2>/dev/null
+    cp target/aarch64-apple-darwin/release/next-code "$DIST/next-code-macos-aarch64"
+    chmod +x "$DIST/next-code-macos-aarch64"
+    (cd "$DIST" && tar czf next-code-macos-aarch64.tar.gz next-code-macos-aarch64)
     echo "  ✅ macOS done ($(( $(date +%s) - OVERALL_START ))s)"
 ) &
 MACOS_PID=$!
@@ -90,9 +90,9 @@ echo "Build time: ${BUILD_TIME}s"
 ls -lh "$DIST"/*.tar.gz
 
 # Verify binaries
-file "$DIST/jcode-linux-x86_64.bin" | grep -q 'ELF 64-bit' || { echo "Error: bad Linux binary"; exit 1; }
-head -1 "$DIST/jcode-linux-x86_64" | grep -q '^#!/' || { echo "Error: bad Linux wrapper"; exit 1; }
-file "$DIST/jcode-macos-aarch64" | grep -q 'Mach-O 64-bit' || { echo "Error: bad macOS binary"; exit 1; }
+file "$DIST/next-code-linux-x86_64.bin" | grep -q 'ELF 64-bit' || { echo "Error: bad Linux binary"; exit 1; }
+head -1 "$DIST/next-code-linux-x86_64" | grep -q '^#!/' || { echo "Error: bad Linux wrapper"; exit 1; }
+file "$DIST/next-code-macos-aarch64" | grep -q 'Mach-O 64-bit' || { echo "Error: bad macOS binary"; exit 1; }
 
 if $DRY_RUN; then
     echo ""
@@ -137,8 +137,8 @@ if ! gh release view "$VERSION" >/dev/null 2>&1; then
 fi
 gh release edit "$VERSION" --title "$TITLE" --notes-file "$NOTES_FILE"
 gh release upload "$VERSION" \
-    "$DIST/jcode-linux-x86_64.tar.gz" \
-    "$DIST/jcode-macos-aarch64.tar.gz" \
+    "$DIST/next-code-linux-x86_64.tar.gz" \
+    "$DIST/next-code-macos-aarch64.tar.gz" \
     --clobber
 
 TOTAL_TIME=$(( $(date +%s) - OVERALL_START ))

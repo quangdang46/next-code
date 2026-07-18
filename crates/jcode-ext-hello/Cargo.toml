@@ -1,8 +1,0 @@
-[package]
-name = "jcode-ext-hello"
-version = "0.1.0"
-edition = "2024"
-description = "Example Rust workspace-crate plugin for jcode"
-
-[dependencies]
-jcode-plugin-core = { path = "../jcode-plugin-core" }

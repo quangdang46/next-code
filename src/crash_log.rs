@@ -1,7 +1,7 @@
 //! Crash log writer (#162).
 //!
-//! When jcode panics or receives a fatal signal mid-session, write a
-//! structured crash log to `~/.jcode/logs/crash-<ts>-<session>.log` so the
+//! When next-code panics or receives a fatal signal mid-session, write a
+//! structured crash log to `~/.next-code/logs/crash-<ts>-<session>.log` so the
 //! user has a breadcrumb to share with maintainers, instead of just
 //! dropping back to the shell with no clue what happened.
 //!
@@ -46,15 +46,15 @@ pub fn write_crash_log(
     let path = dir.join(format!("crash-{timestamp}-{session_label}.log"));
 
     let mut content = String::new();
-    content.push_str("===== jcode crash log =====\n");
+    content.push_str("===== next-code crash log =====\n");
     content.push_str(&format!("timestamp_unix: {timestamp}\n"));
     content.push_str(&format!(
         "timestamp_iso:  {}\n",
         chrono::Utc::now().to_rfc3339()
     ));
     content.push_str(&format!("pid:            {}\n", std::process::id()));
-    content.push_str(&format!("version:        {}\n", jcode_build_meta::VERSION));
-    content.push_str(&format!("git_hash:       {}\n", jcode_build_meta::GIT_HASH));
+    content.push_str(&format!("version:        {}\n", next_code_build_meta::VERSION));
+    content.push_str(&format!("git_hash:       {}\n", next_code_build_meta::GIT_HASH));
     content.push_str(&format!("os:             {}\n", std::env::consts::OS));
     content.push_str(&format!("arch:           {}\n", std::env::consts::ARCH));
     if let Some(sid) = session_id {
@@ -68,7 +68,7 @@ pub fn write_crash_log(
     content.push_str(panic_message);
     content.push('\n');
 
-    // Capture a backtrace if RUST_BACKTRACE was set when jcode launched.
+    // Capture a backtrace if RUST_BACKTRACE was set when next-code launched.
     // We don't unconditionally capture because backtrace generation can
     // cost ~50-200ms which doubles the panic-cleanup window. Users who
     // want backtraces should set RUST_BACKTRACE=1 (or =full) at launch.
@@ -84,7 +84,7 @@ pub fn write_crash_log(
 
     content.push_str("\n----- session resume -----\n");
     if let Some(sid) = session_id {
-        content.push_str(&format!("jcode --resume {sid}\n"));
+        content.push_str(&format!("next-code --resume {sid}\n"));
     } else {
         content.push_str("(no session id captured)\n");
     }
@@ -158,33 +158,33 @@ mod tests {
     #[test]
     fn write_crash_log_creates_file_with_panic_message() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::TempDir::new().unwrap();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let path = write_crash_log("test panic", Some("sess_test_xyz"), None)
             .expect("crash log should write");
 
         let body = std::fs::read_to_string(&path).unwrap();
-        assert!(body.contains("===== jcode crash log ====="));
+        assert!(body.contains("===== next-code crash log ====="));
         assert!(body.contains("test panic"));
         assert!(body.contains("sess_test_xyz"));
-        assert!(body.contains("jcode --resume sess_test_xyz"));
-        assert!(body.contains(jcode_build_meta::VERSION));
+        assert!(body.contains("next-code --resume sess_test_xyz"));
+        assert!(body.contains(next_code_build_meta::VERSION));
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
     #[test]
     fn write_crash_log_handles_unknown_session() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::TempDir::new().unwrap();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let path = write_crash_log("oops", None, None).expect("crash log should write");
         assert!(
@@ -198,18 +198,18 @@ mod tests {
         assert!(body.contains("(no session id captured)"));
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
     #[test]
     fn write_crash_log_includes_provider_model_when_present() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::TempDir::new().unwrap();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         let path = write_crash_log(
             "panic",
@@ -222,18 +222,18 @@ mod tests {
         assert!(body.contains("model:          claude-sonnet-4"));
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 
     #[test]
     fn list_recent_crash_logs_returns_newest_first_bounded_to_ten() {
         let _lock = crate::storage::lock_test_env();
-        let prev = std::env::var_os("JCODE_HOME");
+        let prev = std::env::var_os("NEXT_CODE_HOME");
         let temp = tempfile::TempDir::new().unwrap();
-        crate::env::set_var("JCODE_HOME", temp.path());
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
 
         // Write 12 crash logs with sleep so mtime differs.
         for i in 0..12 {
@@ -261,9 +261,9 @@ mod tests {
         );
 
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }

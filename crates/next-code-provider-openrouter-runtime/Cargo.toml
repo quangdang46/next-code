@@ -1,0 +1,34 @@
+[package]
+name = "next-code-provider-openrouter-runtime"
+version = "0.1.0"
+edition = "2024"
+description = "OpenRouter / OpenAI-compatible provider runtime (aggregator + direct profile endpoints) for next-code, kept downstream of next-code-base so provider edits do not rebuild the app spine"
+
+[lib]
+name = "next_code_provider_openrouter_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+next-code-core = { path = "../next-code-core" }
+anyhow = "1"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+next-code-base = { path = "../next-code-base" }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-provider-core = { path = "../next-code-provider-core" }
+next-code-provider-openrouter = { path = "../next-code-provider-openrouter" }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "charset", "http2", "system-proxy", "rustls-tls", "rustls-tls-native-roots"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+bytes = "1"
+tokio = { version = "1", features = ["sync", "time", "rt"] }
+tokio-stream = "0.1"
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+# The migrated openrouter tests use next-code-base's test-env sandbox.
+next-code-base = { path = "../next-code-base", features = ["test-support"] }
+next-code-provider-metadata = { path = "../next-code-provider-metadata" }
+tempfile = "3"
+toml = "0.8"

@@ -15,10 +15,10 @@ impl TestEnvGuard {
     fn new() -> anyhow::Result<Self> {
         let lock = crate::storage::lock_test_env();
         let temp_home = tempfile::Builder::new()
-            .prefix("jcode-cli-restart-test-home-")
+            .prefix("next-code-cli-restart-test-home-")
             .tempdir()?;
-        let prev_home = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp_home.path());
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp_home.path());
         Ok(Self {
             prev_home,
             _temp_home: temp_home,
@@ -30,9 +30,9 @@ impl TestEnvGuard {
 impl Drop for TestEnvGuard {
     fn drop(&mut self) {
         if let Some(prev_home) = &self.prev_home {
-            crate::env::set_var("JCODE_HOME", prev_home);
+            crate::env::set_var("NEXT_CODE_HOME", prev_home);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
     }
 }
@@ -70,6 +70,12 @@ async fn pending_restore_returns_false_for_unarmed_snapshot() {
 async fn pending_restore_does_not_auto_restore_recent_crash_without_snapshot() {
     let _guard = TestEnvGuard::new().expect("setup test env");
 
+    #[cfg(windows)]
+    let mut child = std::process::Command::new("cmd")
+        .args(["/C", "exit 0"])
+        .spawn()
+        .expect("spawn child");
+    #[cfg(not(windows))]
     let mut child = std::process::Command::new("sh")
         .arg("-c")
         .arg("exit 0")

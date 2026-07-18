@@ -1,6 +1,6 @@
 //! Model routing helper (#100 MVP).
 //!
-//! When the user has cheap + premium model access and wants jcode to
+//! When the user has cheap + premium model access and wants next-code to
 //! pick the cheap one for routine turns and the premium one for hard
 //! reasoning, this module provides a thin lookup keyed on the current
 //! reasoning effort.
@@ -8,9 +8,9 @@
 //! ## Configuration (env-var based for MVP)
 //!
 //! ```bash
-//! JCODE_ROUTING_THINKING=claude-opus-4
-//! JCODE_ROUTING_ROUTINE=claude-sonnet-4
-//! JCODE_ROUTING_THRESHOLD=medium    # "low" | "medium" | "high"
+//! NEXT_CODE_ROUTING_THINKING=claude-opus-4
+//! NEXT_CODE_ROUTING_ROUTINE=claude-sonnet-4
+//! NEXT_CODE_ROUTING_THRESHOLD=medium    # "low" | "medium" | "high"
 //! ```
 //!
 //! When all three are set, calls to `model_for_effort(effort)` return:
@@ -40,9 +40,9 @@
 ///
 /// Returns `None` when routing is disabled (env vars unset / blank).
 pub fn model_for_effort(effort: &str) -> Option<String> {
-    let routine = read_env("JCODE_ROUTING_ROUTINE")?;
-    let thinking = read_env("JCODE_ROUTING_THINKING")?;
-    let threshold = read_env("JCODE_ROUTING_THRESHOLD").unwrap_or_else(|| "medium".to_string());
+    let routine = read_env("NEXT_CODE_ROUTING_ROUTINE")?;
+    let thinking = read_env("NEXT_CODE_ROUTING_THINKING")?;
+    let threshold = read_env("NEXT_CODE_ROUTING_THRESHOLD").unwrap_or_else(|| "medium".to_string());
 
     let effort_rank = effort_to_rank(effort);
     let threshold_rank = effort_to_rank(&threshold);
@@ -71,9 +71,9 @@ fn effort_to_rank(effort: &str) -> u8 {
 }
 
 /// Whether routing is currently active (both endpoints configured).
-/// Useful for surfacing in `jcode doctor`.
+/// Useful for surfacing in `next-code doctor`.
 pub fn routing_active() -> bool {
-    read_env("JCODE_ROUTING_ROUTINE").is_some() && read_env("JCODE_ROUTING_THINKING").is_some()
+    read_env("NEXT_CODE_ROUTING_ROUTINE").is_some() && read_env("NEXT_CODE_ROUTING_THINKING").is_some()
 }
 
 #[cfg(test)]
@@ -98,14 +98,14 @@ mod tests {
     fn returns_none_when_routing_unset() {
         let _lock = crate::storage::lock_test_env();
         let saved = save(&[
-            "JCODE_ROUTING_THINKING",
-            "JCODE_ROUTING_ROUTINE",
-            "JCODE_ROUTING_THRESHOLD",
+            "NEXT_CODE_ROUTING_THINKING",
+            "NEXT_CODE_ROUTING_ROUTINE",
+            "NEXT_CODE_ROUTING_THRESHOLD",
         ]);
         for k in [
-            "JCODE_ROUTING_THINKING",
-            "JCODE_ROUTING_ROUTINE",
-            "JCODE_ROUTING_THRESHOLD",
+            "NEXT_CODE_ROUTING_THINKING",
+            "NEXT_CODE_ROUTING_ROUTINE",
+            "NEXT_CODE_ROUTING_THRESHOLD",
         ] {
             crate::env::remove_var(k);
         }
@@ -119,13 +119,13 @@ mod tests {
     fn picks_routine_when_effort_below_threshold() {
         let _lock = crate::storage::lock_test_env();
         let saved = save(&[
-            "JCODE_ROUTING_THINKING",
-            "JCODE_ROUTING_ROUTINE",
-            "JCODE_ROUTING_THRESHOLD",
+            "NEXT_CODE_ROUTING_THINKING",
+            "NEXT_CODE_ROUTING_ROUTINE",
+            "NEXT_CODE_ROUTING_THRESHOLD",
         ]);
-        crate::env::set_var("JCODE_ROUTING_THINKING", "claude-opus-4");
-        crate::env::set_var("JCODE_ROUTING_ROUTINE", "claude-sonnet-4");
-        crate::env::set_var("JCODE_ROUTING_THRESHOLD", "medium");
+        crate::env::set_var("NEXT_CODE_ROUTING_THINKING", "claude-opus-4");
+        crate::env::set_var("NEXT_CODE_ROUTING_ROUTINE", "claude-sonnet-4");
+        crate::env::set_var("NEXT_CODE_ROUTING_THRESHOLD", "medium");
 
         assert_eq!(model_for_effort("low").as_deref(), Some("claude-sonnet-4"));
         assert_eq!(
@@ -140,13 +140,13 @@ mod tests {
     fn picks_thinking_when_effort_at_or_above_threshold() {
         let _lock = crate::storage::lock_test_env();
         let saved = save(&[
-            "JCODE_ROUTING_THINKING",
-            "JCODE_ROUTING_ROUTINE",
-            "JCODE_ROUTING_THRESHOLD",
+            "NEXT_CODE_ROUTING_THINKING",
+            "NEXT_CODE_ROUTING_ROUTINE",
+            "NEXT_CODE_ROUTING_THRESHOLD",
         ]);
-        crate::env::set_var("JCODE_ROUTING_THINKING", "claude-opus-4");
-        crate::env::set_var("JCODE_ROUTING_ROUTINE", "claude-sonnet-4");
-        crate::env::set_var("JCODE_ROUTING_THRESHOLD", "medium");
+        crate::env::set_var("NEXT_CODE_ROUTING_THINKING", "claude-opus-4");
+        crate::env::set_var("NEXT_CODE_ROUTING_ROUTINE", "claude-sonnet-4");
+        crate::env::set_var("NEXT_CODE_ROUTING_THRESHOLD", "medium");
 
         assert_eq!(model_for_effort("medium").as_deref(), Some("claude-opus-4"));
         assert_eq!(model_for_effort("high").as_deref(), Some("claude-opus-4"));
@@ -158,13 +158,13 @@ mod tests {
     fn threshold_high_only_picks_thinking_at_high() {
         let _lock = crate::storage::lock_test_env();
         let saved = save(&[
-            "JCODE_ROUTING_THINKING",
-            "JCODE_ROUTING_ROUTINE",
-            "JCODE_ROUTING_THRESHOLD",
+            "NEXT_CODE_ROUTING_THINKING",
+            "NEXT_CODE_ROUTING_ROUTINE",
+            "NEXT_CODE_ROUTING_THRESHOLD",
         ]);
-        crate::env::set_var("JCODE_ROUTING_THINKING", "opus");
-        crate::env::set_var("JCODE_ROUTING_ROUTINE", "sonnet");
-        crate::env::set_var("JCODE_ROUTING_THRESHOLD", "high");
+        crate::env::set_var("NEXT_CODE_ROUTING_THINKING", "opus");
+        crate::env::set_var("NEXT_CODE_ROUTING_ROUTINE", "sonnet");
+        crate::env::set_var("NEXT_CODE_ROUTING_THRESHOLD", "high");
 
         assert_eq!(model_for_effort("low").as_deref(), Some("sonnet"));
         assert_eq!(model_for_effort("medium").as_deref(), Some("sonnet"));
@@ -177,13 +177,13 @@ mod tests {
     fn default_threshold_is_medium_when_unset() {
         let _lock = crate::storage::lock_test_env();
         let saved = save(&[
-            "JCODE_ROUTING_THINKING",
-            "JCODE_ROUTING_ROUTINE",
-            "JCODE_ROUTING_THRESHOLD",
+            "NEXT_CODE_ROUTING_THINKING",
+            "NEXT_CODE_ROUTING_ROUTINE",
+            "NEXT_CODE_ROUTING_THRESHOLD",
         ]);
-        crate::env::set_var("JCODE_ROUTING_THINKING", "opus");
-        crate::env::set_var("JCODE_ROUTING_ROUTINE", "sonnet");
-        crate::env::remove_var("JCODE_ROUTING_THRESHOLD");
+        crate::env::set_var("NEXT_CODE_ROUTING_THINKING", "opus");
+        crate::env::set_var("NEXT_CODE_ROUTING_ROUTINE", "sonnet");
+        crate::env::remove_var("NEXT_CODE_ROUTING_THRESHOLD");
 
         // default threshold = medium
         assert_eq!(model_for_effort("low").as_deref(), Some("sonnet"));
@@ -196,16 +196,16 @@ mod tests {
     #[test]
     fn routing_active_reflects_both_endpoints_present() {
         let _lock = crate::storage::lock_test_env();
-        let saved = save(&["JCODE_ROUTING_THINKING", "JCODE_ROUTING_ROUTINE"]);
+        let saved = save(&["NEXT_CODE_ROUTING_THINKING", "NEXT_CODE_ROUTING_ROUTINE"]);
 
-        crate::env::remove_var("JCODE_ROUTING_THINKING");
-        crate::env::remove_var("JCODE_ROUTING_ROUTINE");
+        crate::env::remove_var("NEXT_CODE_ROUTING_THINKING");
+        crate::env::remove_var("NEXT_CODE_ROUTING_ROUTINE");
         assert!(!routing_active());
 
-        crate::env::set_var("JCODE_ROUTING_THINKING", "opus");
+        crate::env::set_var("NEXT_CODE_ROUTING_THINKING", "opus");
         assert!(!routing_active(), "thinking only is not active");
 
-        crate::env::set_var("JCODE_ROUTING_ROUTINE", "sonnet");
+        crate::env::set_var("NEXT_CODE_ROUTING_ROUTINE", "sonnet");
         assert!(routing_active(), "both endpoints set should be active");
 
         restore(saved);

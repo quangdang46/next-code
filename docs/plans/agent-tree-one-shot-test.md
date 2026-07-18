@@ -1,15 +1,15 @@
 # Agent tree — one-shot manual test (after install)
 
-**Binary:** `~/.jcode/builds/current/jcode` (expect hash matching latest `feat/agent-tree`)  
+**Binary:** `~/.next-code/builds/current/next-code` (expect hash matching latest `feat/agent-tree`)  
 **Serve:** must map that same binary (`bash scripts/restart_local_serve.sh` if unsure)
 
 ## Prep
 
 ```bash
-cd /path/to/jcode
+cd /path/to/next-code
 bash scripts/install_release.sh --fast   # if not just installed
 bash scripts/restart_local_serve.sh
-# Open a *new* jcode client (quit old TUI fully)
+# Open a *new* next-code client (quit old TUI fully)
 ```
 
 In view chrome you should see a short **git hash** (e.g. `a5c727c25`).

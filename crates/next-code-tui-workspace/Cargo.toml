@@ -1,0 +1,8 @@
+[package]
+name = "next-code-tui-workspace"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+next-code-core = { path = "../next-code-core" }
+ratatui = "0.30"

@@ -26,7 +26,7 @@
 
 ### 2.1 claude-code (CCB) — ⭐⭐⭐ HIGH
 
-**Relevance:** Direct ancestor của jcode. Contains the complete reference implementation for permission modes, command safety classification, sandboxing, user consent flows, dangerous command detection, and tool policy.
+**Relevance:** Direct ancestor của next-code. Contains the complete reference implementation for permission modes, command safety classification, sandboxing, user consent flows, dangerous command detection, and tool policy.
 
 **Modes:** `plan` → `default` → `acceptEdits` → `dontAsk` → `auto` → `bypassPermissions` (6 modes, Shift+Tab cycling)
 
@@ -107,7 +107,7 @@ Decision { Allow, Prompt, Forbidden }
 
 ### 2.3 pi-agent-rust — ⭐⭐⭐ HIGH
 
-**Relevance:** Rust 2024 edition, same language as jcode. Enum-driven policy with O(1) hot path, WASM sandbox, graduated enforcement rollout. Patterns directly transferable.
+**Relevance:** Rust 2024 edition, same language as next-code. Enum-driven policy with O(1) hot path, WASM sandbox, graduated enforcement rollout. Patterns directly transferable.
 
 **Key Enums (Rust):**
 ```rust
@@ -342,7 +342,7 @@ export function translateWorkerLaunchArgsForCli(workerCli, args, prompt, role) {
 
 ### 2.10 dcg-core (current state) — ⭐⭐⭐ BASE LIBRARY
 
-**Relevance:** Core library that jcode depends on. Already provides Engine, Effect, ToolCall, Mode, Decision, Session, ProtectedPaths.
+**Relevance:** Core library that next-code depends on. Already provides Engine, Effect, ToolCall, Mode, Decision, Session, ProtectedPaths.
 
 **Already Available (v0.6.0-rc.1):**
 | Feature | File | Status |
@@ -465,7 +465,7 @@ Universal across all TypeScript-based agents:
 | codex | `--dangerously-bypass-approvals-and-sandbox` (alias `--yolo`) |
 | oh-my-pi | `--yolo` / `--auto-approve` |
 
-**jcode already has this:** `--dangerously-skip-permissions` (added in this branch).
+**next-code already has this:** `--dangerously-skip-permissions` (added in this branch).
 
 ### 4.5 Per-Tool User Overrides
 
@@ -578,7 +578,7 @@ Runtime mode switching via keyboard shortcut:
 | Per-tool user overrides | P2 | TOML config for allow/deny/prompt per tool pattern |
 | Network policy | P3 | Host allowlist/denylist for network calls |
 
-### 🏗️ Needs Building in jcode
+### 🏗️ Needs Building in next-code
 
 | Feature | Priority | Notes |
 |---------|----------|-------|
@@ -623,13 +623,13 @@ dcg-core Engine::evaluate(session, tool_call, mode, effects)
     └─► Decision: Allow / Prompt / Deny
          │
          ▼
-    jcode TUI: Auto-approve (Allow) / Show dialog (Prompt) / Block (Deny)
+    next-code TUI: Auto-approve (Allow) / Show dialog (Prompt) / Block (Deny)
 ```
 
 ### 7.2 Config Hierarchy
 
 ```
-CLI flag > JCODE_PERMISSION_MODE env > .jcode/config.toml > ~/.jcode/config.toml > Mode::Default
+CLI flag > NEXT_CODE_PERMISSION_MODE env > .next-code/config.toml > ~/.next-code/config.toml > Mode::Default
 ```
 
 ### 7.3 TOML Config Schema (proposed)
@@ -659,7 +659,7 @@ max_total = 20
 
 ## 8. Open Questions (need further discussion)
 
-1. **YOLO classifier design** — Trait-based in dcg-core vs all in jcode? What LLM provider? How to keep dcg clean?
+1. **YOLO classifier design** — Trait-based in dcg-core vs all in next-code? What LLM provider? How to keep dcg clean?
 2. **MCP permission pipeline** — Unified with core tools or separate system?
 3. **Sandboxing** — Not in scope for now, but what's the future plan?
 4. **Pack rules priority** — When should Phase 2 pack integration happen relative to other work?

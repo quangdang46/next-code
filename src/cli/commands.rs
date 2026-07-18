@@ -1,14 +1,14 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+use crate::env::product_env;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::io::{Read, Write};
-use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 
-use crate::{browser, gateway, memory, session, storage, tui};
+use crate::{browser, memory, session, storage, tui};
 
 use super::terminal::init_tui_runtime;
 
@@ -254,7 +254,7 @@ fn run_cloud_sessions_helper_command(action: CloudSessionsSubcommand) -> Result<
 }
 
 fn cloud_sessions_config_path() -> Result<PathBuf> {
-    Ok(crate::storage::jcode_dir()?.join("cloud_sessions.json"))
+    Ok(crate::storage::next_code_dir()?.join("cloud_sessions.json"))
 }
 
 fn load_cloud_sessions_config() -> Result<Option<CloudSessionsConfig>> {
@@ -483,7 +483,7 @@ struct SyncCandidate {
 }
 
 fn cloud_sessions_sync_state_path() -> Result<PathBuf> {
-    Ok(crate::storage::jcode_dir()?.join("cloud_sessions_sync.json"))
+    Ok(crate::storage::next_code_dir()?.join("cloud_sessions_sync.json"))
 }
 
 fn load_cloud_sessions_sync_state() -> Result<CloudSessionsSyncState> {
@@ -526,7 +526,7 @@ fn resolve_sync_sessions_dir(override_path: Option<&str>) -> Result<PathBuf> {
     if let Some(path) = override_path.map(str::trim).filter(|path| !path.is_empty()) {
         return Ok(expand_home_path(path));
     }
-    Ok(crate::storage::jcode_dir()?.join("sessions"))
+    Ok(crate::storage::next_code_dir()?.join("sessions"))
 }
 
 fn expand_home_path(path: &str) -> PathBuf {
@@ -1378,7 +1378,7 @@ fn resolve_jade_sessions_helper(override_path: Option<&str>) -> Result<PathBuf> 
         return Ok(PathBuf::from(path));
     }
 
-    if let Some(path) = std::env::var_os("JCODE_JADE_SESSIONS_HELPER")
+    if let Some(path) = std::env::var_os("NEXT_CODE_JADE_SESSIONS_HELPER")
         .filter(|path| !path.is_empty())
         .map(PathBuf::from)
     {
@@ -1401,7 +1401,7 @@ fn resolve_jade_sessions_helper(override_path: Option<&str>) -> Result<PathBuf> 
     }
 
     anyhow::bail!(
-        "Could not find Jade session helper. Set --helper PATH or JCODE_JADE_SESSIONS_HELPER. Expected a private helper like ~/jade/scripts/jade_sessions.py"
+        "Could not find Jade session helper. Set --helper PATH or NEXT_CODE_JADE_SESSIONS_HELPER. Expected a private helper like ~/jade/scripts/jade_sessions.py"
     );
 }
 
@@ -1566,7 +1566,7 @@ async fn run_ambient_visible() -> Result<()> {
 
     let _ = crossterm::execute!(
         std::io::stdout(),
-        crossterm::terminal::SetTitle("🤖 jcode ambient cycle")
+        crossterm::terminal::SetTitle("🤖 next-code ambient cycle")
     );
 
     let result = app.run(terminal).await;
@@ -1606,7 +1606,7 @@ pub enum MemorySubcommand {
 }
 
 pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
-    use jcode_memory_types::{MemoryEntry as MemEntry, MemoryScope};
+    use next_code_memory_types::{MemoryEntry as MemEntry, MemoryScope};
 
     let manager = memory::MemoryManager::new();
 
@@ -1773,7 +1773,7 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
         }
 
         MemorySubcommand::ClearTest => {
-            let test_dir = storage::jcode_dir()?.join("memory").join("test");
+            let test_dir = storage::next_code_dir()?.join("memory").join("test");
             if test_dir.exists() {
                 let count = std::fs::read_dir(&test_dir)?.count();
                 std::fs::remove_dir_all(&test_dir)?;
@@ -1789,10 +1789,10 @@ pub fn run_memory_command(cmd: MemorySubcommand) -> Result<()> {
 
 pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Result<()> {
     let install_root = dirs::home_dir()
-        .map(|h| h.join(".jcode").join("plugins"))
-        .unwrap_or_else(|| PathBuf::from("/tmp/jcode-plugins"));
-    let mgr = jcode_plugin_core::PluginManager::new(install_root).await;
-    use jcode_plugin_core::PluginSource;
+        .map(|h| h.join(".next-code").join("plugins"))
+        .unwrap_or_else(|| PathBuf::from("/tmp/next-code-plugins"));
+    let mgr = next_code_plugin_core::PluginManager::new(install_root).await;
+    use next_code_plugin_core::PluginSource;
 
     match cmd {
         super::args::PluginSubcommand::Load { path } => {
@@ -1869,7 +1869,7 @@ pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Re
                     println!("Plugin '{name}' reloaded");
                 }
                 None => {
-                    eprintln!("Plugin '{name}' not found. Use `jcode plugin load` first.");
+                    eprintln!("Plugin '{name}' not found. Use `next-code plugin load` first.");
                 }
             }
 
@@ -1901,156 +1901,6 @@ pub(crate) async fn run_plugin_command(cmd: super::args::PluginSubcommand) -> Re
         }
     }
     Ok(())
-}
-
-pub fn run_pair_command(list: bool, revoke: Option<String>) -> Result<()> {
-    let mut registry = gateway::DeviceRegistry::load();
-
-    if list {
-        if registry.devices.is_empty() {
-            eprintln!("No paired devices.")
-        } else {
-            eprintln!("\x1b[1mPaired devices:\x1b[0m\n");
-            for device in &registry.devices {
-                let last_seen = &device.last_seen;
-                eprintln!("  \x1b[36m{}\x1b[0m  ({})", device.name, device.id);
-                eprintln!("    Paired: {}  Last seen: {}", device.paired_at, last_seen);
-                if let Some(ref apns) = device.apns_token {
-                    eprintln!("    APNs: {}...", &apns[..apns.len().min(16)]);
-                }
-                eprintln!();
-            }
-        }
-        return Ok(());
-    }
-
-    if let Some(ref target) = revoke {
-        let before = registry.devices.len();
-        registry
-            .devices
-            .retain(|d| d.id != *target && d.name != *target);
-        if registry.devices.len() < before {
-            registry.save()?;
-            eprintln!("\x1b[32m✓\x1b[0m Revoked device: {}", target)
-        } else {
-            eprintln!("\x1b[31m✗\x1b[0m No device found matching: {}", target)
-        }
-        return Ok(());
-    }
-
-    let gw_config = &crate::config::config().gateway;
-
-    if !gw_config.enabled {
-        eprintln!("\x1b[33m⚠\x1b[0m  Gateway is disabled. Enable it in ~/.jcode/config.toml:\n");
-        eprintln!("    \x1b[2m[gateway]\x1b[0m");
-        eprintln!("    \x1b[2menabled = true\x1b[0m");
-        eprintln!("    \x1b[2mport = {}\x1b[0m\n", gw_config.port);
-        eprintln!("  Then restart the jcode server.\n");
-    }
-
-    let code = registry.generate_pairing_code();
-    let connect_host = resolve_connect_host(&gw_config.bind_addr);
-    let pair_uri = format!(
-        "jcode://pair?host={}&port={}&code={}",
-        connect_host, gw_config.port, code
-    );
-
-    eprintln!();
-    eprintln!("  \x1b[1mScan with the jcode iOS app:\x1b[0m\n");
-    match crate::login_qr::render_unicode_qr(&pair_uri) {
-        Ok(qr) => {
-            for line in qr.lines() {
-                eprintln!("  {line}");
-            }
-        }
-        Err(_) => eprintln!("  \x1b[33m(QR code generation failed)\x1b[0m"),
-    }
-    eprintln!();
-    eprintln!(
-        "  Pairing code:  \x1b[1;37m{} {}\x1b[0m   \x1b[2m(expires in 5 minutes)\x1b[0m",
-        &code[..3],
-        &code[3..]
-    );
-    let resolved_hint = format!("{}:{}", connect_host, gw_config.port);
-    let bind_hint = format!("{}:{}", gw_config.bind_addr, gw_config.port);
-    eprintln!("  Connect host:  \x1b[36m{}\x1b[0m", resolved_hint);
-    if connect_host != gw_config.bind_addr {
-        eprintln!("  Bind address:  \x1b[2m{}\x1b[0m", bind_hint);
-    }
-
-    if connect_host == "<your-mac-hostname>" {
-        eprintln!(
-            "\n  \x1b[33mTip:\x1b[0m set JCODE_GATEWAY_HOST to your reachable Tailscale hostname."
-        );
-    }
-
-    if (gw_config.bind_addr.as_str(), gw_config.port)
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut it| it.next())
-        .is_none()
-    {
-        eprintln!(
-            "  \x1b[33mWarning:\x1b[0m gateway bind address appears invalid: {}",
-            bind_hint
-        );
-    }
-    eprintln!();
-
-    Ok(())
-}
-
-pub fn resolve_connect_host(bind_addr: &str) -> String {
-    if bind_addr == "0.0.0.0" || bind_addr == "::" {
-        if let Some(host) = std::env::var("JCODE_GATEWAY_HOST")
-            .ok()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-        {
-            return host;
-        }
-
-        if let Some(host) = detect_tailscale_dns_name() {
-            return host;
-        }
-
-        return std::env::var("HOSTNAME")
-            .ok()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| "<your-mac-hostname>".to_string());
-    }
-    bind_addr.to_string()
-}
-
-pub fn parse_tailscale_dns_name(status_json: &[u8]) -> Option<String> {
-    let value: serde_json::Value = serde_json::from_slice(status_json).ok()?;
-    let dns_name = value
-        .get("Self")?
-        .get("DNSName")?
-        .as_str()?
-        .trim()
-        .trim_end_matches('.')
-        .to_string();
-
-    if dns_name.is_empty() {
-        None
-    } else {
-        Some(dns_name)
-    }
-}
-
-pub fn detect_tailscale_dns_name() -> Option<String> {
-    let output = std::process::Command::new("tailscale")
-        .args(["status", "--json"])
-        .output()
-        .ok()?;
-
-    if !output.status.success() {
-        return None;
-    }
-
-    parse_tailscale_dns_name(&output.stdout)
 }
 
 pub async fn run_browser(action: &str) -> Result<()> {
@@ -2101,10 +1951,10 @@ pub async fn run_browser(action: &str) -> Result<()> {
                 println!("\nBuilt-in browser tool is ready.");
             } else if status.responding && !status.compatible {
                 println!(
-                    "\nThe browser bridge is connected, but the installed Firefox extension is out of date for this jcode build. Run `jcode browser setup` to repair or update it."
+                    "\nThe browser bridge is connected, but the installed Firefox extension is out of date for this next-code build. Run `next-code browser setup` to repair or update it."
                 );
             } else {
-                println!("\nRun `jcode browser setup` to install or repair it.");
+                println!("\nRun `next-code browser setup` to install or repair it.");
             }
         }
         other => {
@@ -2237,15 +2087,15 @@ pub async fn run_server_reload_command(
     };
 
     // No server? Nothing to reload. This is a success so an installer can call
-    // `jcode server reload` unconditionally after swapping the binary.
+    // `next-code server reload` unconditionally after swapping the binary.
     if !crate::server::has_live_listener(&socket).await {
         // Reap a stale socket left by a crashed daemon so the next launch binds
         // cleanly instead of wedging in a connect-retry loop.
         let reaped = crate::server::reap_stale_socket_if_dead(&socket).await;
         let detail = if reaped {
-            "No running jcode server found; cleared a stale socket.".to_string()
+            "No running next-code server found; cleared a stale socket.".to_string()
         } else {
-            "No running jcode server found; nothing to reload.".to_string()
+            "No running next-code server found; nothing to reload.".to_string()
         };
         return emit(ServerReloadReport {
             socket: socket.display().to_string(),
@@ -2325,7 +2175,7 @@ pub async fn run_server_reload_command(
             reloaded: false,
             already_current: true,
             handoff_ready: true,
-            detail: "jcode server is already running the newest binary; no reload needed."
+            detail: "next-code server is already running the newest binary; no reload needed."
                 .to_string(),
         });
     }
@@ -2338,9 +2188,9 @@ pub async fn run_server_reload_command(
     );
 
     let detail = if handoff_ready {
-        "jcode server reloaded onto the newest binary.".to_string()
+        "next-code server reloaded onto the newest binary.".to_string()
     } else {
-        "jcode server reload requested; the new server is still coming up.".to_string()
+        "next-code server reload requested; the new server is still coming up.".to_string()
     };
 
     emit(ServerReloadReport {
@@ -2369,8 +2219,8 @@ pub async fn run_server_stop_command(force: bool, emit_json: bool, emit_toon: bo
     use std::time::{Duration, Instant};
 
     if !force {
-        let msg = "`jcode server stop` terminates the daemon and drops any live headless/swarm sessions. \
-Prefer `jcode server reload` to pick up an upgrade gracefully. \
+        let msg = "`next-code server stop` terminates the daemon and drops any live headless/swarm sessions. \
+Prefer `next-code server reload` to pick up an upgrade gracefully. \
 Re-run with `--force` if you really want to stop the server.";
         if emit_json || emit_toon {
             let fmt = if emit_toon {
@@ -2420,10 +2270,10 @@ Re-run with `--force` if you really want to stop the server.";
                 match crate::platform::signal_detached_process_group(pid, libc::SIGTERM) {
                     Ok(()) => {
                         signaled_pid = Some(pid);
-                        detail = format!("Sent SIGTERM to jcode server (pid {pid}).");
+                        detail = format!("Sent SIGTERM to next-code server (pid {pid}).");
                     }
                     Err(e) => {
-                        detail = format!("Failed to signal jcode server (pid {pid}): {e}");
+                        detail = format!("Failed to signal next-code server (pid {pid}): {e}");
                     }
                 }
             }
@@ -2432,15 +2282,15 @@ Re-run with `--force` if you really want to stop the server.";
                 match crate::platform::signal_detached_process_group(pid, 0) {
                     Ok(()) => {
                         signaled_pid = Some(pid);
-                        detail = format!("Terminated jcode server (pid {pid}).");
+                        detail = format!("Terminated next-code server (pid {pid}).");
                     }
                     Err(e) => {
-                        detail = format!("Failed to terminate jcode server (pid {pid}): {e}");
+                        detail = format!("Failed to terminate next-code server (pid {pid}): {e}");
                     }
                 }
             }
         } else {
-            detail = format!("Registered jcode server (pid {pid}) is not running.")
+            detail = format!("Registered next-code server (pid {pid}) is not running.")
         }
     } else if had_listener {
         // A listener answers but no registry entry maps to it. We deliberately
@@ -2449,7 +2299,7 @@ Re-run with `--force` if you really want to stop the server.";
         // registry entry.)
         detail = "Found a live server socket with no registry entry.".to_string();
     } else {
-        detail = "No running jcode server found.".to_string();
+        detail = "No running next-code server found.".to_string();
     }
 
     // Wait for the listener to disappear after signalling. Escalate to SIGKILL
@@ -2504,16 +2354,16 @@ Re-run with `--force` if you really want to stop the server.";
             println!("{detail}")
         }
         if stopped && signaled_pid.is_some() {
-            println!("jcode server stopped.")
+            println!("next-code server stopped.")
         } else if stopped && !had_listener && signaled_pid.is_none() {
             // Nothing was running; this is still a success for an installer.
         } else if !stopped {
             println!(
-                "jcode server did not exit cleanly; it may still be shutting down. Re-run if needed."
+                "next-code server did not exit cleanly; it may still be shutting down. Re-run if needed."
             )
         }
         if reaped {
-            println!("Cleared a stale jcode socket.")
+            println!("Cleared a stale next-code socket.")
         }
     }
 
@@ -2569,7 +2419,7 @@ pub async fn run_single_message_command(
 }
 
 fn run_command_auto_poke_enabled() -> bool {
-    std::env::var("JCODE_RUN_AUTO_POKE")
+    product_env("RUN_AUTO_POKE")
         .ok()
         .map(|value| {
             let value = value.trim().to_ascii_lowercase();
@@ -2579,7 +2429,7 @@ fn run_command_auto_poke_enabled() -> bool {
 }
 
 fn run_command_auto_poke_max_turns() -> Option<usize> {
-    std::env::var("JCODE_RUN_AUTO_POKE_MAX_TURNS")
+    product_env("RUN_AUTO_POKE_MAX_TURNS")
         .ok()
         .and_then(|value| value.trim().parse::<usize>().ok())
         .filter(|value| *value > 0)
@@ -2683,7 +2533,7 @@ async fn run_single_message_command_plain_with_auto_poke(
                 }
                 next_message = message;
                 eprintln!(
-                    "Auto-poking: todos complete; sending confidence summary follow-up. Set JCODE_RUN_AUTO_POKE=0 to disable."
+                    "Auto-poking: todos complete; sending confidence summary follow-up. Set NEXT_CODE_RUN_AUTO_POKE=0 to disable."
                 );
                 continue;
             }
@@ -2699,7 +2549,7 @@ async fn run_single_message_command_plain_with_auto_poke(
                 }
                 next_message = message;
                 eprintln!(
-                    "Auto-poking: {} incomplete todo(s). Set JCODE_RUN_AUTO_POKE=0 to disable.",
+                    "Auto-poking: {} incomplete todo(s). Set NEXT_CODE_RUN_AUTO_POKE=0 to disable.",
                     count
                 );
             }

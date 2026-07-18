@@ -1,4 +1,4 @@
-# Goal-Driven(jcode Feature Implementation) System — MASTER PROMPT
+# Goal-Driven(next-code Feature Implementation) System — MASTER PROMPT
 
 > 🎯 **Goal**: Implement tất cả features còn thiếu so với 13 reference repos dưới dạng các PR riêng biệt vào branch `master`, mỗi PR kèm theo file planning markdown chi tiết (research, lý do, alternatives, chosen approach).
 
@@ -38,20 +38,20 @@
 
 ---
 
-## jcode Project Structure
+## next-code Project Structure
 
-- **Repo root**: `/Users/tranquangdang21/Projects/jcode`
+- **Repo root**: `/Users/tranquangdang21/Projects/next-code`
 - **Workspace**: 100+ crates in `crates/`
 - **Main crates**:
-  - `jcode-app-core` — agent runtime
-  - `jcode-agent-runtime` — agent definitions/registry
-  - `jcode-plugin-core` + `jcode-plugin-runtime` — plugin system
-  - `jcode-provider-*` — 10 provider crates
-  - `jcode-tui*` — TUI modules
-  - `jcode-llm-*` — LLM layer
+  - `next-code-app-core` — agent runtime
+  - `next-code-agent-runtime` — agent definitions/registry
+  - `next-code-plugin-core` + `next-code-plugin-runtime` — plugin system
+  - `next-code-provider-*` — 10 provider crates
+  - `next-code-tui*` — TUI modules
+  - `next-code-llm-*` — LLM layer
 - **PARITY.md**: 310 features tracked, 91% complete
 - **MASTER_UI.md**: 110 TUI section specs
-- **Source binary**: `~/.local/bin/jcode`
+- **Source binary**: `~/.local/bin/next-code`
 
 ---
 
@@ -77,7 +77,7 @@ For each feature, spawn a subagent with this task:
 ### Step 1: Research
 - Check /tmp/feature-research/<source-repo>/ for the reference code
 - Read the actual implementation
-- Read jcode's current implementation in crates/
+- Read next-code's current implementation in crates/
 - Identify the gap
 
 ### Step 2: Plan
@@ -89,7 +89,7 @@ Write docs/pr-plans/<ID>-<name>.md with this structure:
 - Key files inspected: <paths>
 - Direct code links: <URLs to GitHub>
 
-## Why This Feature Is Missing in jcode
+## Why This Feature Is Missing in next-code
 - Gap analysis from PARITY.md §XIV
 - Code path that should exist but doesn't
 
@@ -100,7 +100,7 @@ Write docs/pr-plans/<ID>-<name>.md with this structure:
 
 ## Chosen Approach
 - What we're building
-- Why this approach fits jcode
+- Why this approach fits next-code
 
 ## Implementation Plan
 - File-by-file changes
@@ -132,7 +132,7 @@ Write docs/pr-plans/<ID>-<name>.md with this structure:
 2. Update docs/PR_BACKLOG.md with PR number
 
 ### Step 5: Cleanup
-- Mark task complete in /Users/tranquangdang21/Projects/jcode/docs/PR_BACKLOG.md
+- Mark task complete in /Users/tranquangdang21/Projects/next-code/docs/PR_BACKLOG.md
 - Move to next feature
 ```
 
@@ -196,7 +196,7 @@ All P2/P3 items
 - **Direct code links**:
   - https://github.com/<org>/<repo>/blob/main/<path>#L<line>
 
-## Why This Feature Is Missing in jcode
+## Why This Feature Is Missing in next-code
 - Gap analysis from PARITY.md §XIV
 - Code path that should exist but doesn't
 
@@ -209,13 +209,13 @@ All P2/P3 items
 
 ## Chosen Approach
 - **What we're building**: <description>
-- **Why this approach fits jcode**: <rationale>
+- **Why this approach fits next-code**: <rationale>
 - **Key architectural decisions**: <list>
 
 ## Implementation Plan
 
 ### Phase 1: Scaffold
-- [ ] New file: `crates/jcode-<module>/src/<file>.rs`
+- [ ] New file: `crates/next-code-<module>/src/<file>.rs`
 - [ ] Add new type: `<TypeName>`
 - [ ] Add trait impl
 
@@ -305,10 +305,10 @@ For each feature, the master agent should use the Agent tool with:
 Agent(
     description=f"Implement feature {feature_id}: {feature_name}",
     prompt=f"""
-You are implementing feature {feature_id} for jcode.
+You are implementing feature {feature_id} for next-code.
 
 ## Context
-- jcode is at: /Users/tranquangdang21/Projects/jcode
+- next-code is at: /Users/tranquangdang21/Projects/next-code
 - Reference repos at: /tmp/feature-research/
 - Feature: {feature_name}
 - Source: {source_repo}

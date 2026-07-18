@@ -35,7 +35,7 @@
 //! }
 //! ```
 //!
-//! Set `JCODE_FIXTURE_FILTER=read_` to run only fixtures whose name
+//! Set `NEXT_CODE_FIXTURE_FILTER=read_` (or legacy `NEXT_CODE_FIXTURE_FILTER`) to run only fixtures whose name
 //! contains the substring. Useful while iterating.
 //!
 //! ### Out of scope (#20 follow-ups)
@@ -93,7 +93,9 @@ fn collect_fixtures() -> Vec<(String, Fixture)> {
     let Ok(entries) = std::fs::read_dir(&dir) else {
         return out;
     };
-    let filter = std::env::var("JCODE_FIXTURE_FILTER").ok();
+    let filter = std::env::var("NEXT_CODE_FIXTURE_FILTER")
+        .or_else(|_| std::env::var("NEXT_CODE_FIXTURE_FILTER"))
+        .ok();
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|s| s.to_str()) != Some("json") {
@@ -232,7 +234,7 @@ fn run_all_fixtures() {
         // pass even when zero fixtures exist, so the runner is
         // exercised.
         eprintln!(
-            "no fixtures under {} (set JCODE_FIXTURE_FILTER=... to filter)",
+            "no fixtures under {} (set NEXT_CODE_FIXTURE_FILTER=... to filter)",
             fixture_dir().display()
         );
         return;

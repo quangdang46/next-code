@@ -1,7 +1,7 @@
 //! Issue #122 follow-up: skill disable list.
 //!
 //! Tracks user-disabled skills in a single TOML file at
-//! `<JCODE_HOME>/disabled_skills.toml`. Persisted across sessions.
+//! `<NEXT_CODE_HOME>/disabled_skills.toml`. Persisted across sessions.
 //!
 //! Format:
 //! ```toml
@@ -9,9 +9,9 @@
 //! ```
 //!
 //! Used by:
-//!   - `jcode skills disable <name>`  → add to list
-//!   - `jcode skills enable <name>`   → remove from list
-//!   - `jcode skills list`            → annotate disabled entries
+//!   - `next-code skills disable <name>`  → add to list
+//!   - `next-code skills enable <name>`   → remove from list
+//!   - `next-code skills list`            → annotate disabled entries
 //!   - `SkillRegistry::is_disabled()` → activation gate
 
 use anyhow::{Context, Result};
@@ -26,7 +26,7 @@ struct DisabledFile {
 }
 
 fn disabled_file_path() -> Result<PathBuf> {
-    Ok(jcode_storage::jcode_dir()?.join("disabled_skills.toml"))
+    Ok(next_code_storage::next_code_dir()?.join("disabled_skills.toml"))
 }
 
 /// Load the disabled-skills set from disk. Empty when the file
@@ -93,13 +93,13 @@ mod tests {
     {
         let _lock = crate::storage::lock_test_env();
         let temp = tempfile::TempDir::new().unwrap();
-        let prev = std::env::var_os("JCODE_HOME");
-        crate::env::set_var("JCODE_HOME", temp.path());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", temp.path());
         let result = f();
         if let Some(p) = prev {
-            crate::env::set_var("JCODE_HOME", p);
+            crate::env::set_var("NEXT_CODE_HOME", p);
         } else {
-            crate::env::remove_var("JCODE_HOME");
+            crate::env::remove_var("NEXT_CODE_HOME");
         }
         result
     }

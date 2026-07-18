@@ -3,7 +3,7 @@
 
 ## 1. Executive Summary
 
-jcode's model feature is 60% there — has model picker, switching, provider catalog. Missing: persistence to config (both `/model` and picker), proper sectioned picker UI (Favorites → Recent → Provider), model/search improvements, and server/client mode sync. We'll copy OpenCode's architecture (proven, open-source) with Codex's persistence pattern.
+next-code's model feature is 60% there — has model picker, switching, provider catalog. Missing: persistence to config (both `/model` and picker), proper sectioned picker UI (Favorites → Recent → Provider), model/search improvements, and server/client mode sync. We'll copy OpenCode's architecture (proven, open-source) with Codex's persistence pattern.
 
 ## 2. Cross-Repo Patterns
 
@@ -22,7 +22,7 @@ jcode's model feature is 60% there — has model picker, switching, provider cat
 
 ### Chosen Approach: OpenCode's 3-layer + Codex's persistence
 
-- **Layer 1 — Persistence** (Codex): `/model` + picker write to `~/.jcode/config.toml` (DONE, but buggy). Add `model_prefs.json` for favorites/recents/variant.
+- **Layer 1 — Persistence** (Codex): `/model` + picker write to `~/.next-code/config.toml` (DONE, but buggy). Add `model_prefs.json` for favorites/recents/variant.
 - **Layer 2 — Store/Sync**: Sync config on model change for daemon mode. `SetModel`/`SetRoute` both save to config server-side. Client-side cycle_model should go through server protocol, not local provider.
 - **Layer 3 — Picker UI** (OpenCode): Sectioned: Favorites → Recent → Provider. fuzzysort multi-key. Variant sub-dialog. Provider selector.
 
@@ -54,7 +54,7 @@ jcode's model feature is 60% there — has model picker, switching, provider cat
 - OR: better, make `cycle_model` use `cycle_recent_model` which uses saved recents
 
 ### Phase B — model_prefs.json (Favorites + Recents + Variant)
-- jcode already has `model_picker_favorites_store` and `model_picker_usage_store`
+- next-code already has `model_picker_favorites_store` and `model_picker_usage_store`
 - Need unified `model_prefs.json` with `recent[]`, `favorite[]`, `variant{}`
 - Write on every model switch (both `/model` and picker)
 - Read on startup → populate model picker sections
@@ -67,12 +67,12 @@ jcode's model feature is 60% there — has model picker, switching, provider cat
 ### Phase D — Variant Sub-Dialog
 - After selecting a model with variants, show a sub-picker for reasoning effort
 - OpenCode pattern: `dialog.replace(() => <DialogVariant />)`
-- jCode's picker infrastructure supports nested pickers
+- next-code's picker infrastructure supports nested pickers
 
 ### Phase E — Provider Selector
 - "Connect provider" action in model picker
 - Opens provider list → login flow
-- jCode already has `login_picker_overlay` and `account_picker_overlay`
+- next-code already has `login_picker_overlay` and `account_picker_overlay`
 
 ### Phase F — Search Improvements
 - Multi-key fuzzy (name ×3 + provider ×2 + method ×1) — DONE

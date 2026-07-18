@@ -1,0 +1,171 @@
+[package]
+name = "next-code-base"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Foundational layer of the next-code application core: the downward-closed set of
+# modules (provider, auth, config, session, message, memory, telemetry, ...)
+# that the server/tool/agent layer depends on. Split out of `next-code-app-core` so
+# the two halves compile as separate rustc units, halving peak compile memory.
+# `next-code-app-core` re-exports this crate (`pub use next_code_base::*`) so that every
+# existing `crate::<module>` path keeps resolving unchanged.
+
+[lib]
+name = "next_code_base"
+path = "src/lib.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1", features = ["fs", "io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "sync", "time"] }
+futures = "0.3"
+async-trait = "0.1"
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "blocking", "charset", "http2", "system-proxy", "rustls-tls", "rustls-tls-native-roots"] }
+tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-native-roots"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+serde_yaml = "0.9"
+toml = "0.8"
+
+# File operations
+glob = "0.3"
+ignore = "0.4"           # gitignore-aware file walking
+walkdir = "2"
+similar = "2"            # diffing for edits
+
+# Utilities
+dirs = "5"               # home directory
+anyhow = "1"
+libc = "0.2"             # Unix system calls (flock)
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1"
+urlencoding = "2"        # URL encoding for web search
+uuid = { version = "1", features = ["v4", "v5"] }
+proctitle = "0.1"
+
+# Embeddings (local inference) - behind feature flag (163 crates, slow to compile)
+next-code-embedding = { path = "../next-code-embedding", optional = true }
+next-code-gateway-types = { path = "../next-code-gateway-types" }
+next-code-import-core = { path = "../next-code-import-core" }
+next-code-logging = { path = "../next-code-logging" }
+
+# OAuth
+base64 = "0.22"
+sha2 = "0.10"
+rand = "0.9.3"
+hex = "0.4"
+url = "2"
+open = "5"               # Open URLs in browser
+next-code-auth-types = { path = "../next-code-auth-types" }
+next-code-azure-auth = { path = "../next-code-azure-auth" }
+next-code-agent-runtime = { path = "../next-code-agent-runtime" }
+next-code-provider-metadata = { path = "../next-code-provider-metadata" }
+next-code-provider-env = { path = "../next-code-provider-env" }
+next-code-provider-core = { path = "../next-code-provider-core" }
+next-code-provider-bedrock = { path = "../next-code-provider-bedrock" }
+next-code-provider-anthropic = { path = "../next-code-provider-anthropic" }
+next-code-provider-antigravity = { path = "../next-code-provider-antigravity" }
+next-code-provider-copilot = { path = "../next-code-provider-copilot" }
+next-code-provider-openai = { path = "../next-code-provider-openai" }
+next-code-provider-openrouter = { path = "../next-code-provider-openrouter" }
+next-code-provider-gemini = { path = "../next-code-provider-gemini" }
+# NOTE: this foundation layer intentionally does NOT depend on any `next-code-tui-*`
+# crate. The two pure-data/string symbols it used to reach for (`ResumeTarget`,
+# `reasoning_line_markup`) were moved to `next-code-session-types` and
+# `next-code-render-core` respectively, so the layering inversion (foundation
+# depending on presentation) is gone.
+next-code-render-core = { path = "../next-code-render-core" }
+next-code-terminal-launch = { path = "../next-code-terminal-launch" }
+next-code-terminal-image = { path = "../next-code-terminal-image" }
+next-code-usage-types = { path = "../next-code-usage-types" }
+
+# Streaming
+tokio-stream = "0.1"
+bytes = "1"
+
+# Terminal I/O (event stream for interactive auth/secret prompts). NOTE: the
+# heavier presentation deps (ratatui widgets, arboard clipboard) were dropped
+# from this foundation layer; they are unused here and live only in `next-code-tui`.
+crossterm = { version = "0.29", features = ["event-stream"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }  # Only PNG/JPEG (skip avif/rav1e, exr, gif, tiff, etc)
+
+# NOTE: PDF text extraction (next-code-pdf) lives in the upper next-code-app-core crate
+# (tool/read.rs), not here.
+next-code-background-types = { path = "../next-code-background-types" }
+next-code-batch-types = { path = "../next-code-batch-types" }
+next-code-build-meta = { path = "../next-code-build-meta" }
+next-code-compaction-core = { path = "../next-code-compaction-core" }
+next-code-config-types = { path = "../next-code-config-types" }
+next-code-core = { path = "../next-code-core" }
+next-code-memory-types = { path = "../next-code-memory-types" }
+next-code-message-types = { path = "../next-code-message-types" }
+next-code-plan = { path = "../next-code-plan" }
+next-code-protocol = { path = "../next-code-protocol" }
+next-code-selfdev-types = { path = "../next-code-selfdev-types" }
+next-code-session-types = { path = "../next-code-session-types" }
+next-code-task-types = { path = "../next-code-task-types" }
+next-code-storage = { path = "../next-code-storage" }
+next-code-redact = { path = "../next-code-redact" }
+next-code-tool-core = { path = "../next-code-tool-core" }
+next-code-tool-types = { path = "../next-code-tool-types" }
+next-code-side-panel-types = { path = "../next-code-side-panel-types" }
+next-code-best-of-n = { path = "../next-code-best-of-n" }
+
+# Gzip decoding (used by provider import/helpers)
+flate2 = "1"
+tempfile = "3"
+ffs-engine = { workspace = true }
+ffs-search = { workspace = true }
+qrcode = { version = "0.14.1", default-features = false }
+
+[features]
+default = ["embeddings"]
+# Compiles the in-crate test helpers (storage::lock_test_env,
+# auth::test_sandbox, bus::reset_models_updated_publish_state_for_tests, ...) as
+# `pub` so downstream crates' test targets can reach them. Enabled as a
+# dev-dependency feature by next-code-app-core / next-code / etc.; never in normal
+# (non-test) builds.
+test-support = []
+jemalloc = [
+    "dep:tikv-jemallocator",
+    "dep:tikv-jemalloc-ctl",
+    "dep:tikv-jemalloc-sys",
+    "tikv-jemallocator/stats",
+    "tikv-jemalloc-ctl/stats",
+]
+jemalloc-prof = [
+    "jemalloc",
+    "tikv-jemallocator/profiling",
+    "tikv-jemalloc-ctl/profiling",
+]
+embeddings = ["dep:next-code-embedding"]
+# AWS SDK stack (bedrock provider)
+bedrock = []
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_System_Pipes"] }
+
+# Memory allocator (reduces fragmentation for long-running server). jemalloc has
+# no supported native Windows/MSVC build, so it's only pulled in on other targets.
+[target.'cfg(not(windows))'.dependencies]
+tikv-jemallocator = { version = "0.6", features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
+tikv-jemalloc-ctl = { version = "0.6", optional = true }
+tikv-jemalloc-sys = { version = "0.6", optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+global-hotkey = "0.7"
+
+# Cross-layer test (provider/gemini_tests.rs builds a tool::Registry, which lives
+# in the upper next-code-app-core layer). Dev-dependency cycles are permitted by
+# Cargo and do not affect the library build.
+[dev-dependencies]
+next-code-app-core = { path = "../next-code-app-core", default-features = false }
+# Test-only: provider/tests registers the real OpenRouter runtime factory.
+# Dev-dependency cycles are permitted and do not affect the library build.
+next-code-provider-openrouter-runtime = { path = "../next-code-provider-openrouter-runtime" }
+criterion = { version = "0.5", features = ["html_reports"] }
+

@@ -3,7 +3,7 @@
 //! When `profile=deepseek`, this module helps keep the message prefix
 //! byte-stable across turns, maximizing DeepSeek's automatic
 //! prefix-cache hit rate. Adapted from upstream PR
-//! [1jehuang/jcode#194](https://github.com/1jehuang/jcode/pull/194).
+//! [quangdang46/next-code#194](https://github.com/quangdang46/next-code/pull/194).
 //!
 //! ## What's shipped here (minimal port)
 //!
@@ -59,16 +59,16 @@ pub const TURN_END_RESULT_CAP_TOKENS: usize = 3000;
 /// current process.
 ///
 /// Checks three env signals (any one is enough):
-///   - `JCODE_OPENROUTER_CACHE_NAMESPACE=deepseek`
-///   - `JCODE_RUNTIME_PROVIDER=deepseek`
-///   - `JCODE_NAMED_PROVIDER_PROFILE=deepseek`
+///   - `NEXT_CODE_OPENROUTER_CACHE_NAMESPACE=deepseek`
+///   - `NEXT_CODE_RUNTIME_PROVIDER=deepseek`
+///   - `NEXT_CODE_NAMED_PROVIDER_PROFILE=deepseek`
 ///
 /// Comparisons are case-insensitive + whitespace-trimmed.
 pub fn is_prefix_cache_stable_mode() -> bool {
     for key in [
-        "JCODE_OPENROUTER_CACHE_NAMESPACE",
-        "JCODE_RUNTIME_PROVIDER",
-        "JCODE_NAMED_PROVIDER_PROFILE",
+        "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
+        "NEXT_CODE_RUNTIME_PROVIDER",
+        "NEXT_CODE_NAMED_PROVIDER_PROFILE",
     ] {
         if let Ok(val) = std::env::var(key)
             && val.trim().eq_ignore_ascii_case("deepseek")
@@ -142,9 +142,9 @@ mod tests {
         }
     }
     const KEYS: &[&str] = &[
-        "JCODE_OPENROUTER_CACHE_NAMESPACE",
-        "JCODE_RUNTIME_PROVIDER",
-        "JCODE_NAMED_PROVIDER_PROFILE",
+        "NEXT_CODE_OPENROUTER_CACHE_NAMESPACE",
+        "NEXT_CODE_RUNTIME_PROVIDER",
+        "NEXT_CODE_NAMED_PROVIDER_PROFILE",
     ];
 
     fn clear_keys() {
@@ -169,7 +169,7 @@ mod tests {
         let _lock = crate::storage::lock_test_env();
         let saved = save(KEYS);
         clear_keys();
-        crate::env::set_var("JCODE_OPENROUTER_CACHE_NAMESPACE", "deepseek");
+        crate::env::set_var("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE", "deepseek");
         assert!(is_prefix_cache_stable_mode());
         restore(saved);
     }
@@ -179,7 +179,7 @@ mod tests {
         let _lock = crate::storage::lock_test_env();
         let saved = save(KEYS);
         clear_keys();
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "DeepSeek");
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "DeepSeek");
         // Case-insensitive.
         assert!(is_prefix_cache_stable_mode());
         restore(saved);
@@ -190,7 +190,7 @@ mod tests {
         let _lock = crate::storage::lock_test_env();
         let saved = save(KEYS);
         clear_keys();
-        crate::env::set_var("JCODE_NAMED_PROVIDER_PROFILE", "  deepseek  ");
+        crate::env::set_var("NEXT_CODE_NAMED_PROVIDER_PROFILE", "  deepseek  ");
         // Whitespace-trimmed.
         assert!(is_prefix_cache_stable_mode());
         restore(saved);
@@ -201,7 +201,7 @@ mod tests {
         let _lock = crate::storage::lock_test_env();
         let saved = save(KEYS);
         clear_keys();
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "anthropic");
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "anthropic");
         assert!(!is_prefix_cache_stable_mode());
         restore(saved);
     }
@@ -265,7 +265,7 @@ mod tests {
         let _lock = crate::storage::lock_test_env();
         let saved = save(KEYS);
         clear_keys();
-        crate::env::set_var("JCODE_RUNTIME_PROVIDER", "deepseek");
+        crate::env::set_var("NEXT_CODE_RUNTIME_PROVIDER", "deepseek");
         assert_eq!(
             recommended_tool_result_cap_tokens(),
             Some(TURN_END_RESULT_CAP_TOKENS)

@@ -1,4 +1,4 @@
-pub const QUIET_ENV: &str = "JCODE_QUIET";
+pub const QUIET_ENV: &str = "NEXT_CODE_QUIET";
 
 /// Output format for structured JSON/TOON output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

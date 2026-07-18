@@ -1,0 +1,21 @@
+[package]
+name = "next-code-secrets"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+age = { version = "0.11", features = ["armor"] }
+anyhow = "1"
+base64 = "0.22"
+next-code-keyring-store = { path = "../next-code-keyring-store" }
+next-code-redact = { path = "../next-code-redact" }
+next-code-storage = { path = "../next-code-storage" }
+rand = "0.9.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tracing = "0.1"
+
+[dev-dependencies]
+tempfile = "3"

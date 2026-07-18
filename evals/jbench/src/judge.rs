@@ -9,7 +9,7 @@
 //!
 //! Judge prompts are rendered from fixed templates (deduced from the TS
 //! original); the judge agent definitions are embedded here so the
-//! pipeline stays self-contained and does not depend on the full jcode
+//! pipeline stays self-contained and does not depend on the full next-code
 //! agent runtime at evaluation time.
 
 use std::collections::HashMap;

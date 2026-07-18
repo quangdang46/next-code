@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Benchmark and optionally regression-check jcode startup time.
+"""Benchmark and optionally regression-check next-code startup time.
 
-This script runs isolated startup measurements under a temporary JCODE_HOME and
-JCODE_RUNTIME_DIR so it does not interfere with the user's real server, logs, or
+This script runs isolated startup measurements under a temporary NEXT_CODE_HOME and
+NEXT_CODE_RUNTIME_DIR so it does not interfere with the user's real server, logs, or
 credentials.
 
 Cold client startup is measured by launching the normal default client path in a
@@ -49,7 +49,7 @@ class Budget:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("binary", nargs="?", default="./target/release/jcode")
+    parser.add_argument("binary", nargs="?", default=((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or ((os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN")) or (os.environ.get("NEXT_CODE_BIN") or os.environ.get("NEXT_CODE_BIN"))) or "./target/release/next-code")
     parser.add_argument("--runs", type=int, default=5, help="number of startup runs")
     parser.add_argument(
         "--check",
@@ -105,12 +105,14 @@ def run_simple_timing(binary: str, *args: str, runs: int) -> list[float]:
 
 def isolated_env(root: str) -> dict[str, str]:
     env = os.environ.copy()
-    env["JCODE_HOME"] = os.path.join(root, "home")
-    env["JCODE_RUNTIME_DIR"] = os.path.join(root, "run")
-    env["JCODE_SOCKET"] = os.path.join(env["JCODE_RUNTIME_DIR"], "jcode.sock")
-    env["JCODE_NO_TELEMETRY"] = "1"
-    os.makedirs(env["JCODE_HOME"], exist_ok=True)
-    os.makedirs(env["JCODE_RUNTIME_DIR"], exist_ok=True)
+    env["NEXT_CODE_HOME"] = os.path.join(root, "home")
+    env["NEXT_CODE_HOME"] = env["NEXT_CODE_HOME"]
+    env["NEXT_CODE_RUNTIME_DIR"] = os.path.join(root, "run")
+    env["NEXT_CODE_RUNTIME_DIR"] = env["NEXT_CODE_RUNTIME_DIR"]
+    env["NEXT_CODE_SOCKET"] = os.path.join(env["NEXT_CODE_RUNTIME_DIR"], "next-code.sock")
+    env["NEXT_CODE_NO_TELEMETRY"] = "1"
+    os.makedirs(env["NEXT_CODE_HOME"], exist_ok=True)
+    os.makedirs(env["NEXT_CODE_RUNTIME_DIR"], exist_ok=True)
     return env
 
 
@@ -132,9 +134,9 @@ def wait_for_socket(path: str, timeout_s: float) -> bool:
 def measure_server_startup(binary: str, runs: int) -> list[float]:
     times: list[float] = []
     for _ in range(runs):
-        root = tempfile.mkdtemp(prefix="jcode-server-bench-")
+        root = tempfile.mkdtemp(prefix="next-code-server-bench-")
         env = isolated_env(root)
-        socket_path = env["JCODE_SOCKET"]
+        socket_path = env["NEXT_CODE_SOCKET"]
         proc = None
         try:
             start = time.perf_counter()
@@ -205,13 +207,13 @@ def measure_cold_client_startup(binary: str, runs: int) -> list[StartupProfile]:
     profiles: list[StartupProfile] = []
 
     for _ in range(runs):
-        root = tempfile.mkdtemp(prefix="jcode-cold-bench-")
+        root = tempfile.mkdtemp(prefix="next-code-cold-bench-")
         env = isolated_env(root)
-        log_path = Path(env["JCODE_HOME"]) / "logs" / f"jcode-{time.strftime('%Y-%m-%d')}.log"
+        log_path = Path(env["NEXT_CODE_HOME"]) / "logs" / f"next-code-{time.strftime('%Y-%m-%d')}.log"
         try:
             command = (
                 f"{binary} --no-update --debug-socket "
-                f"--socket {env['JCODE_SOCKET']}"
+                f"--socket {env['NEXT_CODE_SOCKET']}"
             )
             subprocess.run(
                 ["timeout", "3s", script_bin, "-qefc", command, "/dev/null"],

@@ -1,4 +1,4 @@
-#[cfg(feature = "jemalloc")]
+#[cfg(all(feature = "jemalloc", not(windows)))]
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
@@ -11,14 +11,14 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 // narenas:4            — limit arena count (17 threads don't need 64 arenas)
 // prof:true            — enable profiling support in jemalloc-prof builds
 // prof_active:false    — keep sampling disabled until explicitly enabled at runtime
-#[cfg(all(feature = "jemalloc", not(feature = "jemalloc-prof")))]
+#[cfg(all(feature = "jemalloc", not(windows), not(feature = "jemalloc-prof")))]
 // jemalloc reads this exact exported symbol name at startup.
 #[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
 pub static malloc_conf: Option<&'static [u8; 50]> =
     Some(b"dirty_decay_ms:1000,muzzy_decay_ms:1000,narenas:4\0");
 
-#[cfg(feature = "jemalloc-prof")]
+#[cfg(all(feature = "jemalloc-prof", not(windows)))]
 // jemalloc reads this exact exported symbol name at startup.
 #[allow(non_upper_case_globals)]
 #[unsafe(no_mangle)]
@@ -36,7 +36,7 @@ fn configure_system_allocator() {
     const M_ARENA_MAX: i32 = -8;
     const M_MMAP_THRESHOLD: i32 = -3;
 
-    let arena_max = parse_alloc_tuning_env("JCODE_GLIBC_ARENA_MAX", 4);
+    let arena_max = parse_alloc_tuning_env("NEXT_CODE_GLIBC_ARENA_MAX", 4);
     let _ = unsafe { mallopt(M_ARENA_MAX, arena_max) };
 
     // Pin the mmap threshold so large transient allocations (history JSON,
@@ -51,7 +51,7 @@ fn configure_system_allocator() {
     // alloc/free cycles (mmap/munmap syscalls + page faults each time) for
     // predictable, immediate memory return. For a long-running interactive
     // agent, lower steady-state RSS wins.
-    let mmap_threshold = parse_alloc_tuning_env("JCODE_GLIBC_MMAP_THRESHOLD", 256 * 1024);
+    let mmap_threshold = parse_alloc_tuning_env("NEXT_CODE_GLIBC_MMAP_THRESHOLD", 256 * 1024);
     let _ = unsafe { mallopt(M_MMAP_THRESHOLD, mmap_threshold) };
 }
 
@@ -80,11 +80,11 @@ fn main() -> Result<()> {
     // Unix environments where most development happens. The CLI/provider setup
     // path can exceed that reserve before Tokio takes over, producing an
     // unrecoverable STATUS_STACK_OVERFLOW. Keep the linker defaults unchanged
-    // for every auxiliary binary and run the Jcode entry point on a deliberately
+    // for every auxiliary binary and run the Next Code entry point on a deliberately
     // sized stack instead.
     const WINDOWS_MAIN_STACK_SIZE: usize = 8 * 1024 * 1024;
     match std::thread::Builder::new()
-        .name("jcode-main".to_string())
+        .name("next-code-main".to_string())
         .stack_size(WINDOWS_MAIN_STACK_SIZE)
         .spawn(run_main)?
         .join()
@@ -103,9 +103,9 @@ fn run_main() -> Result<()> {
     // Log panics before abort so we can diagnose OOM / SIGKILL causes.
     let orig_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
-        eprintln!("\n\x1b[31m*** jcode PANIC ***\x1b[0m {}", info);
-        if let Ok(jcode_dir) = jcode::storage::jcode_dir() {
-            let panic_log = jcode_dir.join("panic.log");
+        eprintln!("\n\x1b[31m*** next-code PANIC ***\x1b[0m {}", info);
+        if let Ok(next_code_dir) = next_code::storage::next_code_dir() {
+            let panic_log = next_code_dir.join("panic.log");
             let msg = format!("{}: {}\n", chrono::Utc::now().to_rfc3339(), info);
             let _ = std::fs::write(&panic_log, msg);
         }
@@ -118,12 +118,12 @@ fn run_main() -> Result<()> {
     }
 
     // SessionStart hooks should be effectively invisible to Claude Code and
-    // Codex. Handle this tiny callback before the Tokio runtime and normal Jcode
+    // Codex. Handle this tiny callback before the Tokio runtime and normal Next Code
     // startup path so it does not initialize providers, start cleanup threads,
     // check for updates, or emit first-run telemetry disclosure text into the
     // parent CLI's hook output.
     if let Some(source) = cli_launch_hint_source_invocation() {
-        return jcode::setup_hints::run_setup_hotkey(false, Some(&source));
+        return next_code::setup_hints::run_setup_hotkey(false, Some(&source));
     }
 
     // The macOS global-hotkey listener must run on the real main thread with a
@@ -132,17 +132,17 @@ fn run_main() -> Result<()> {
     // otherwise move execution onto a worker thread with no run loop and leave
     // the Cmd+; hotkey silently dead.
     if is_macos_hotkey_listener_invocation() {
-        return jcode::setup_hints::run_macos_hotkey_listener_main_thread();
+        return next_code::setup_hints::run_macos_hotkey_listener_main_thread();
     }
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
 
-    runtime.block_on(async { jcode::run().await })
+    runtime.block_on(async { next_code::run().await })
 }
 
-/// True when invoked as `jcode setup-hotkey --listen-macos-hotkey`.
+/// True when invoked as `next-code setup-hotkey --listen-macos-hotkey`.
 fn is_macos_hotkey_listener_invocation() -> bool {
     args_are_macos_hotkey_listener(std::env::args().skip(1))
 }

@@ -14,29 +14,29 @@ The workspace already has many crates, but the critical path is dominated by a s
 
 ```mermaid
 graph LR
-    base["jcode-base\n~100k+ LOC"] --> appcore["jcode-app-core\n~100k LOC"]
-    appcore --> tui["jcode-tui\n~100k+ LOC"]
-    tui --> rootlib["jcode lib"]
-    rootlib --> bin["jcode bin"]
+    base["next-code-base\n~100k+ LOC"] --> appcore["next-code-app-core\n~100k LOC"]
+    appcore --> tui["next-code-tui\n~100k+ LOC"]
+    tui --> rootlib["next-code lib"]
+    rootlib --> bin["next-code bin"]
     small["50+ smaller crates"] -. mostly parallel .-> base
 ```
 
 From the last available Cargo timing report parsed with `scripts/compile_time_probe.sh --skip-build`:
 
 - Cargo timing wall: **16.00s**
-- Known jcode serial stack span: **14.72s**
-- Known jcode serial stack summed unit time: **17.36s**
-- Known jcode serial stack frontend time: **11.99s**
+- Known next-code serial stack span: **14.72s**
+- Known next-code serial stack summed unit time: **17.36s**
+- Known next-code serial stack frontend time: **11.99s**
 
 Slowest units from that timing report:
 
 | Unit | Total | Frontend | Codegen |
 |---|---:|---:|---:|
-| `jcode-app-core` | 4.73s | 3.82s | 0.91s |
-| `jcode-base` | 4.34s | 3.63s | 0.71s |
-| `jcode-tui` | 4.18s | 3.14s | 1.04s |
-| `jcode` bin | 2.34s | n/a | n/a |
-| `jcode` lib | 1.77s | 1.40s | 0.37s |
+| `next-code-app-core` | 4.73s | 3.82s | 0.91s |
+| `next-code-base` | 4.34s | 3.63s | 0.71s |
+| `next-code-tui` | 4.18s | 3.14s | 1.04s |
+| `next-code` bin | 2.34s | n/a | n/a |
+| `next-code` lib | 1.77s | 1.40s | 0.37s |
 
 This means the main bottleneck is rustc front-end serialization in a few mega-crates, not linker choice or third-party cold compile.
 
@@ -46,15 +46,15 @@ Use the focused timing probe for each phase:
 
 ```bash
 scripts/compile_time_probe.sh --json target/compile-time-probe.json
-scripts/compile_time_probe.sh --touch crates/jcode-tui/src/tui/app/input.rs
-scripts/compile_time_probe.sh --touch crates/jcode-app-core/src/server.rs
-scripts/compile_time_probe.sh --touch crates/jcode-base/src/provider/mod.rs
+scripts/compile_time_probe.sh --touch crates/next-code-tui/src/tui/app/input.rs
+scripts/compile_time_probe.sh --touch crates/next-code-app-core/src/server.rs
+scripts/compile_time_probe.sh --touch crates/next-code-base/src/provider/mod.rs
 ```
 
 For broader repeated measurements, continue using:
 
 ```bash
-scripts/bench_compile.sh selfdev-jcode --runs 3 --touch <path> --json
+scripts/bench_compile.sh selfdev-next-code --runs 3 --touch <path> --json
 scripts/bench_selfdev_checkpoints.sh --skip-cold --touch <path> --runs 1
 ```
 
@@ -62,7 +62,7 @@ Track at least:
 
 1. Full-feature selfdev build wall time.
 2. Cargo timing wall time.
-3. `jcode-base -> jcode-app-core -> jcode-tui -> jcode lib -> jcode bin` stack span.
+3. `next-code-base -> next-code-app-core -> next-code-tui -> next-code lib -> next-code bin` stack span.
 4. Sum of frontend time in the serial stack.
 5. Incremental rebuild after touching representative high-churn files.
 6. Static report drift from `scripts/compile_isolation_report.py`: LOC, inline tests, `async_trait`, and target-state dependency advisories.
@@ -71,27 +71,27 @@ Track at least:
 
 ```mermaid
 graph TD
-    bin["jcode binary\ntiny composition root"] --> cli["jcode-cli"]
-    bin --> tui["jcode-tui"]
-    bin --> server["jcode-server"]
+    bin["next-code binary\ntiny composition root"] --> cli["next-code-cli"]
+    bin --> tui["next-code-tui"]
+    bin --> server["next-code-server"]
     bin --> providers["provider leaf crates"]
     bin --> tools["tool leaf crates"]
 
-    cli --> api["jcode-client-api / app-api"]
+    cli --> api["next-code-client-api / app-api"]
     tui --> api
     server --> api
 
     api --> protocol["protocol + view models"]
     protocol --> types["small stable type crates"]
 
-    server --> agent["jcode-agent"]
-    server --> registry["jcode-tool-registry"]
-    server --> auth["jcode-auth-core"]
-    server --> session["jcode-session-core"]
-    server --> memory["jcode-memory-core"]
+    server --> agent["next-code-agent"]
+    server --> registry["next-code-tool-registry"]
+    server --> auth["next-code-auth-core"]
+    server --> session["next-code-session-core"]
+    server --> memory["next-code-memory-core"]
 
-    providers --> provider_core["jcode-provider-core"]
-    tools --> tool_core["jcode-tool-core"]
+    providers --> provider_core["next-code-provider-core"]
+    tools --> tool_core["next-code-tool-core"]
 ```
 
 Rules:
@@ -126,34 +126,34 @@ Split the three long-pole crates into sibling domain crates. Priority is widenin
 
 Likely first splits:
 
-- From `jcode-base`:
-  - `jcode-auth-core`
-  - `jcode-session-core`
-  - `jcode-memory-core`
+- From `next-code-base`:
+  - `next-code-auth-core`
+  - `next-code-session-core`
+  - `next-code-memory-core`
   - provider implementation crates, especially Bedrock/AWS as a leaf
-- From `jcode-app-core`:
-  - `jcode-server`
-  - `jcode-agent`
-  - `jcode-tool-registry`
+- From `next-code-app-core`:
+  - `next-code-server`
+  - `next-code-agent`
+  - `next-code-tool-registry`
   - service crates for background/swarm/update/selfdev as needed
-- From `jcode-tui`:
-  - `jcode-client-api` / view-model boundary first
+- From `next-code-tui`:
+  - `next-code-client-api` / view-model boundary first
   - then move reusable client-side state logic out of the terminal rendering crate only when it creates a real parallel unit
 
 Success criteria:
 
 - Touching common TUI code no longer recompiles app-core/provider/server implementation crates.
 - Touching a provider implementation no longer recompiles TUI or broad base code.
-- Cargo timing shows multiple medium-sized Jcode crates running in parallel instead of one 4-deep mega-crate ladder.
+- Cargo timing shows multiple medium-sized NextCode crates running in parallel instead of one 4-deep mega-crate ladder.
 
 ### Phase 2: kill glob re-export ladders
 
 Current compatibility layering preserves the old monolith shape:
 
 ```rust
-pub use jcode_base::*;
-pub use jcode_app_core::*;
-pub use jcode_tui::*;
+pub use next_code_base::*;
+pub use next_code_app_core::*;
+pub use next_code_tui::*;
 ```
 
 Migration approach:
@@ -210,7 +210,7 @@ Before committing a phase:
 scripts/compile_time_probe.sh --skip-build
 scripts/compile_isolation_report.py
 scripts/check_dependency_boundaries.py
-cargo check --profile selfdev -p jcode --bin jcode
+cargo check --profile selfdev -p next-code --bin next-code
 ```
 
 For code-moving phases, also run the relevant targeted tests for the moved domain, plus one full selfdev build through the coordinated selfdev path when practical:

@@ -1,16 +1,16 @@
 /**
- * Example Plugin for jcode
+ * Example Plugin for next-code
  *
  * This demonstrates the full plugin API including lifecycle hooks,
  * event handlers, tool registration, state management, configuration,
  * persistence, and capability declarations.
  *
  * Plugins run in QuickJS sandboxes with no DOM, no Node.js built-ins,
- * and limited global objects. The runtime injects a `jcode` global
+ * and limited global objects. The runtime injects a `nextcode` global
  * that provides all plugin APIs.
  *
  * Plugin lifecycle:
- *   1. Discovery  ─ jcode scans plugin directories / npm cache / config
+ *   1. Discovery  ─ next-code scans plugin directories / npm cache / config
  *   2. Preflight  ─ static analysis for capability enforcement
  *   3. Load       ─ eval (transpile TS→JS, then QuickJS eval)
  *   4. Activate   ─ handlers are registered into the dispatcher
@@ -21,7 +21,7 @@
 // ─── Plugin Identity & Manifest ────────────────────────────────────────────
 //
 // Every plugin MUST export a default object with identity metadata.
-// jcode reads this at load time to register the plugin and wire up
+// next-code reads this at load time to register the plugin and wire up
 // lifecycle hooks.
 
 type HandlerResult = { action: string; output?: unknown; error?: string };
@@ -48,13 +48,13 @@ interface PluginManifest {
 const manifest: PluginManifest = {
   name: 'example-plugin',
   version: '1.0.0',
-  description: 'Demo plugin showing all jcode plugin API capabilities',
-  author: 'jcode team',
+  description: 'Demo plugin showing all next-code plugin API capabilities',
+  author: 'next-code team',
 
   // Declare required capabilities. The runtime checks these against
   // the plugin's static analysis and the user's security policy.
   capabilities: {
-    fs_read: ['$HOME/.jcode/data'],
+    fs_read: ['$HOME/.next-code/data'],
     network: ['api.github.com'],
     register_tools: true,
     read_config: true,
@@ -65,7 +65,7 @@ const manifest: PluginManifest = {
 // ─── State Management ──────────────────────────────────────────────────────
 //
 // Module-level variables persist for the plugin's lifetime (from load
-// to unload). Use `jcode.kv` for durable cross-session persistence.
+// to unload). Use `next-code.kv` for durable cross-session persistence.
 
 let turnCount = 0;
 let totalToolDuration = 0;
@@ -73,19 +73,19 @@ const toolCallHistory: Array<{ name: string; startedAt: number }> = [];
 
 // ─── Event Handlers ────────────────────────────────────────────────────────
 //
-// Handlers are registered via jcode.on(eventName, callback).
+// Handlers are registered via nextcode.on(eventName, callback).
 // The callback receives an event object with fields specific to the event type.
 // Return value (optional) can modify the event's outcome for events that
 // support it (e.g. PreToolUse can block or modify input).
 
 function setupHandlers(): void {
-  const logger = jcode.logger;
+  const logger = nextcode.logger;
 
   /**
    * TurnStart — fired when a conversation turn begins.
    * Event fields: { session_id, turn_number, messages }
    */
-  jcode.on('TurnStart', (event: { session_id: string; turn_number: number; messages: unknown }) => {
+  nextcode.on('TurnStart', (event: { session_id: string; turn_number: number; messages: unknown }) => {
     turnCount++;
     logger.info(`[example-plugin] Turn #${event.turn_number} started (session: ${event.session_id})`);
   });
@@ -94,7 +94,7 @@ function setupHandlers(): void {
    * TurnEnd — fired when a turn completes.
    * Event fields: { session_id, turn_number, duration_ms }
    */
-  jcode.on('TurnEnd', (event: { session_id: string; turn_number: number; duration_ms: number }) => {
+  nextcode.on('TurnEnd', (event: { session_id: string; turn_number: number; duration_ms: number }) => {
     logger.info(`[example-plugin] Turn #${event.turn_number} ended (${event.duration_ms}ms)`);
     logger.info(`[example-plugin] Total tools duration this session: ${totalToolDuration}ms`);
   });
@@ -103,7 +103,7 @@ function setupHandlers(): void {
    * MessageStart — fired when the model or user starts a new message.
    * Event fields: { session_id, role }  (role = "user" | "assistant" | "system")
    */
-  jcode.on('MessageStart', (event: { session_id: string; role: string }) => {
+  nextcode.on('MessageStart', (event: { session_id: string; role: string }) => {
     logger.debug(`[example-plugin] ${event.role} message starting`);
   });
 
@@ -111,7 +111,7 @@ function setupHandlers(): void {
    * MessageEnd — fired when a message is fully produced.
    * Event fields: { session_id, role, content }
    */
-  jcode.on('MessageEnd', (event: { session_id: string; role: string; content: string }) => {
+  nextcode.on('MessageEnd', (event: { session_id: string; role: string; content: string }) => {
     logger.debug(`[example-plugin] ${event.role} message ended (${event.content.length} chars)`);
   });
 
@@ -123,7 +123,7 @@ function setupHandlers(): void {
    * Return { action: 'block', output: 'reason' } to prevent execution.
    * Return { action: 'continue', output: { modified_input } } to modify args.
    */
-  jcode.on('PreToolUse', (event: { tool_name: string; tool_input: Record<string, unknown>; session_id: string }) => {
+  nextcode.on('PreToolUse', (event: { tool_name: string; tool_input: Record<string, unknown>; session_id: string }) => {
     logger.info(`[example-plugin] Tool about to run: ${event.tool_name}`);
     toolCallHistory.push({ name: event.tool_name, startedAt: Date.now() });
 
@@ -150,7 +150,7 @@ function setupHandlers(): void {
    *
    * Can optionally modify the tool output returned to the model.
    */
-  jcode.on('PostToolUse', (event: {
+  nextcode.on('PostToolUse', (event: {
     tool_name: string;
     tool_input: Record<string, unknown>;
     tool_output: unknown;
@@ -167,19 +167,19 @@ function setupHandlers(): void {
    * Event fields: { level, message, session_id? }
    * Can suppress or modify the notification.
    */
-  jcode.on('Notification', (event: { level: string; message: string; session_id?: string }) => {
+  nextcode.on('Notification', (event: { level: string; message: string; session_id?: string }) => {
     logger.debug(`[example-plugin] Notification [${event.level}]: ${event.message}`);
   });
 }
 
 // ─── Tool Registration ─────────────────────────────────────────────────────
 //
-// Custom tools are registered via jcode.registerTool(toolDefinition).
+// Custom tools are registered via nextcode.registerTool(toolDefinition).
 // The tool definition must include a name, description, parameter schema,
 // and a handler function. The handler runs inside the QuickJS sandbox.
 
 function registerCustomTools(): void {
-  jcode.registerTool({
+  nextcode.registerTool({
     name: 'example_hello',
     description: 'Greet a user by name. Useful for demonstrating plugin tool registration.',
     parameters: {
@@ -196,7 +196,7 @@ function registerCustomTools(): void {
     },
   });
 
-  jcode.registerTool({
+  nextcode.registerTool({
     name: 'example_counter',
     description: 'Return the current turn counter value maintained by the plugin.',
     parameters: { type: 'object', properties: {} },
@@ -205,7 +205,7 @@ function registerCustomTools(): void {
     },
   });
 
-  jcode.registerTool({
+  nextcode.registerTool({
     name: 'example_echo',
     description: 'Echo back whatever input is provided. Use to verify plugin tool routing.',
     parameters: {
@@ -223,33 +223,33 @@ function registerCustomTools(): void {
 
 // ─── Configuration & Persistence ──────────────────────────────────────────
 //
-// jcode.getConfig(key) reads plugin config from the global jcode config.
-// jcode.kv.get(key) / jcode.kv.set(key, value) provides durable storage
+// next-code.getConfig(key) reads plugin config from the global next-code config.
+// next-code.kv.get(key) / next-code.kv.set(key, value) provides durable storage
 //   that persists across sessions (backed by the runtime).
 
 function loadConfig(): Record<string, unknown> {
-  const logLevel = jcode.getConfig('example-plugin.logLevel') || 'info';
-  const maxHistory = jcode.getConfig('example-plugin.maxHistory') || 100;
+  const logLevel = next-code.getConfig('example-plugin.logLevel') || 'info';
+  const maxHistory = next-code.getConfig('example-plugin.maxHistory') || 100;
 
   // Restore persistent state
-  const saved = jcode.kv.get('example-plugin.toolHistory');
+  const saved = next-code.kv.get('example-plugin.toolHistory');
   const history = saved ? JSON.parse(saved) : [];
 
   return { logLevel, maxHistory, history };
 }
 
 function saveState(): void {
-  jcode.kv.set('example-plugin.toolHistory', JSON.stringify(toolCallHistory.slice(-100)));
+  next-code.kv.set('example-plugin.toolHistory', JSON.stringify(toolCallHistory.slice(-100)));
 }
 
 // ─── Plugin Load ───────────────────────────────────────────────────────────
 //
 // The module scope runs at load time. This is where you wire up
 // everything: register tools, bind event handlers, read config.
-// jcode.logger is available immediately.
+// nextcode.logger is available immediately.
 
 const config = loadConfig();
-const logger = jcode.logger;
+const logger = nextcode.logger;
 
 logger.info(`[example-plugin] Loading v${manifest.version} (config: ${JSON.stringify(config)})`);
 
@@ -260,20 +260,20 @@ setupHandlers();
 registerCustomTools();
 
 // Log our identity.
-logger.info(`[example-plugin] Registered plugin: ${jcode.name}@${jcode.version}`);
+logger.info(`[example-plugin] Registered plugin: ${next-code.name}@${next-code.version}`);
 
 // ─── Graceful Shutdown (optional) ──────────────────────────────────────────
 //
-// jcode.on('SessionEnd') or jcode.on('Stop') can be used for cleanup.
+// nextcode.on('SessionEnd') or nextcode.on('Stop') can be used for cleanup.
 
-jcode.on('SessionEnd', () => {
+nextcode.on('SessionEnd', () => {
   saveState();
   logger.info('[example-plugin] Plugin shutting down, state persisted');
 });
 
 // ─── Default Export ────────────────────────────────────────────────────────
 //
-// jcode loads the module and reads the default export for plugin metadata.
+// next-code loads the module and reads the default export for plugin metadata.
 // The actual work (handlers, tools, config) happens at module scope above,
 // but the export ensures the runtime can identify the plugin.
 

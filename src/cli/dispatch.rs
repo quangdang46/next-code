@@ -1,5 +1,6 @@
 #![cfg_attr(test, allow(clippy::await_holding_lock))]
 
+use crate::env::{product_env, product_env_os};
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -17,8 +18,7 @@ use crate::{
 };
 
 use super::{
-    account, acp, commands, debug, hot_exec, login, output, provider_init, selfdev, terminal,
-    tui_launch,
+    acp, commands, debug, hot_exec, login, output, provider_init, selfdev, terminal, tui_launch,
 };
 use provider_init::ProviderChoice;
 
@@ -36,28 +36,28 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
         .filter(|value| !value.is_empty())
     {
         provider_catalog::apply_named_provider_profile_env(profile_name)?;
-        crate::env::set_var("JCODE_PROVIDER_PROFILE_NAME", profile_name);
-        crate::env::set_var("JCODE_PROVIDER_PROFILE_ACTIVE", "1");
+        crate::env::set_var("NEXT_CODE_PROVIDER_PROFILE_NAME", profile_name);
+        crate::env::set_var("NEXT_CODE_PROVIDER_PROFILE_ACTIVE", "1");
         let _ = provider_choice; // keep alive; named profiles override the provider flag
     }
 
     if let Some(tool_profile) = args.tool_profile.as_deref() {
-        crate::env::set_var("JCODE_TOOL_PROFILE", tool_profile);
+        crate::env::set_var("NEXT_CODE_TOOL_PROFILE", tool_profile);
     }
     if let Some(permission_mode) = args.permission_mode.as_deref() {
-        crate::env::set_var("JCODE_PERMISSION_MODE", permission_mode);
+        crate::env::set_var("NEXT_CODE_PERMISSION_MODE", permission_mode);
     }
     if args.dangerously_skip_permissions {
-        crate::env::set_var("JCODE_DANGEROUSLY_SKIP_PERMISSIONS", "1");
+        crate::env::set_var("NEXT_CODE_DANGEROUSLY_SKIP_PERMISSIONS", "1");
     }
     if let Some(tools) = args.tools.as_deref() {
-        crate::env::set_var("JCODE_TOOLS", tools);
+        crate::env::set_var("NEXT_CODE_TOOLS", tools);
     }
     if let Some(disabled_tools) = args.disabled_tools.as_deref() {
-        crate::env::set_var("JCODE_DISABLED_TOOLS", disabled_tools);
+        crate::env::set_var("NEXT_CODE_DISABLED_TOOLS", disabled_tools);
     }
     if args.disable_base_tools {
-        crate::env::set_var("JCODE_DISABLE_BASE_TOOLS", "1");
+        crate::env::set_var("NEXT_CODE_DISABLE_BASE_TOOLS", "1");
     }
     if args.tool_profile.is_some()
         || args.tools.is_some()
@@ -68,7 +68,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
     }
 
     // Initialize permission mode from config (TOML + env override)
-    // This reads from Config which merges JCODE_PERMISSION_MODE env var
+    // This reads from Config which merges NEXT_CODE_PERMISSION_MODE env var
     // and the [permission_mode] TOML field.
     {
         let config = crate::config::config();
@@ -76,14 +76,14 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             && !crate::dcg_bridge::set_mode_from_str(mode_str)
         {
             eprintln!(
-                "Warning: JCODE_PERMISSION_MODE='{mode_str}' is not a valid mode; using Default"
+                "Warning: NEXT_CODE_PERMISSION_MODE='{mode_str}' is not a valid mode; using Default"
             );
         }
         // --dangerously-skip-permissions CLI flag overrides everything
         if args.dangerously_skip_permissions {
             crate::dcg_bridge::set_mode_from_str("bypass-permissions");
         }
-        // JCODE_DANGEROUSLY_SKIP_PERMISSIONS env var (non-CLI consumers)
+        // NEXT_CODE_DANGEROUSLY_SKIP_PERMISSIONS env var (non-CLI consumers)
         if config.dangerously_skip_permissions && !args.dangerously_skip_permissions {
             crate::dcg_bridge::set_mode_from_str("bypass-permissions");
         }
@@ -100,7 +100,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             server_name,
         }) => {
             let serve_start = Instant::now();
-            crate::env::set_var("JCODE_NON_INTERACTIVE", "1");
+            crate::env::set_var("NEXT_CODE_NON_INTERACTIVE", "1");
             if temporary_server {
                 server::configure_temporary_server(owner_pid, temp_idle_timeout_secs);
             }
@@ -206,14 +206,6 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             )
             .await?;
         }
-        Some(Command::Account { action }) => match action {
-            super::args::AccountCommand::Login { no_browser } => {
-                account::run_login(no_browser).await?
-            }
-            super::args::AccountCommand::Status { json } => account::run_status(json).await?,
-            super::args::AccountCommand::Manage => account::run_manage()?,
-            super::args::AccountCommand::Logout => account::run_logout().await?,
-        },
         Some(Command::Repl) => {
             // Try catalog-backed RouteProvider first when the provider string
             // is not a recognized ProviderChoice alias.
@@ -396,15 +388,12 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
         Some(Command::Cloud(subcmd)) => {
             commands::run_cloud_command(map_cloud_subcommand(subcmd))?;
         }
-        Some(Command::Pair { list, revoke }) => {
-            commands::run_pair_command(list, revoke)?;
-        }
         Some(Command::Permissions) => {
-            // Deprecated alias: show current mode (same as `jcode permission mode`).
+            // Deprecated alias: show current mode (same as `next-code permission mode`).
             let mode = crate::dcg_bridge::current_mode();
             println!("Current permission mode: {:?}", mode);
             println!(
-                "(The `jcode permissions` command is deprecated; use `jcode permission mode`)"
+                "(The `next-code permissions` command is deprecated; use `next-code permission mode`)"
             );
         }
         Some(Command::Transcript {
@@ -493,7 +482,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             let coverage_path = coverage_file.as_deref().map(std::path::Path::new);
             let colorize = std::io::stdout().is_terminal()
                 && std::env::var_os("NO_COLOR").is_none()
-                && std::env::var_os("JCODE_NO_COLOR").is_none();
+                && product_env_os("NO_COLOR").is_none();
             if let Some(provider) = provider_query {
                 let model = model_query
                     .or_else(|| args.model.clone())
@@ -649,12 +638,12 @@ fn resolve_resume_arg(args: &mut Args) -> Result<()> {
             Err(e) => {
                 match resume_resolution_failure_action(&resume_id, |key| std::env::var_os(key)) {
                     // During a reload/update/restart handoff the client re-execs
-                    // itself with `--resume <id>` and `JCODE_RESUMING=1`. In the
+                    // itself with `--resume <id>` and `NEXT_CODE_RESUMING=1`. In the
                     // client/server architecture the shared server is the authority
                     // for session lifecycle, so an id that is not in the local store
                     // can still be valid server-side. Hard-exiting here dumped the
                     // user back to a shell with "No session found matching ...",
-                    // making jcode unusable after an auto-update (issue #328).
+                    // making next-code unusable after an auto-update (issue #328).
                     // Instead, keep the raw id and let the remote connection resolve
                     // it; if the server cannot find it either, the TUI surfaces a
                     // recoverable message and falls back to a fresh session rather
@@ -669,7 +658,7 @@ fn resolve_resume_arg(args: &mut Args) -> Result<()> {
                     ResumeResolutionFailureAction::Exit => {
                         eprintln!("Error: {}", e);
                         if !output::quiet_enabled() {
-                            eprintln!("\nUse `jcode --resume` to list available sessions.");
+                            eprintln!("\nUse `next-code --resume` to list available sessions.");
                         }
                         std::process::exit(1);
                     }
@@ -699,7 +688,7 @@ fn resume_resolution_failure_action<F, V>(
 where
     F: Fn(&str) -> Option<V>,
 {
-    if var_os("JCODE_RESUMING").is_some() {
+    if var_os("NEXT_CODE_RESUMING").is_some() {
         ResumeResolutionFailureAction::DeferToServer
     } else {
         ResumeResolutionFailureAction::Exit
@@ -923,17 +912,17 @@ async fn try_catalog_provider(
 
     #[allow(unreachable_code, unused_variables)]
     let is_auto = false;
-    use jcode_keyring_store::MockKeyringStore;
-    use jcode_provider_service::ProviderProfile;
-    use jcode_provider_service::boot;
-    use jcode_provider_service::catalog::InMemoryCatalog;
-    use jcode_provider_service::integration::InMemoryIntegration;
-    use jcode_provider_service::route_provider::RouteProvider;
-    use jcode_provider_service::runtime;
-    use jcode_provider_service::runtime::SessionError;
-    use jcode_provider_service::service::ResolvedRoute;
-    use jcode_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
-    use jcode_provider_service::types::ModelId;
+    use next_code_keyring_store::MockKeyringStore;
+    use next_code_provider_service::ProviderProfile;
+    use next_code_provider_service::boot;
+    use next_code_provider_service::catalog::InMemoryCatalog;
+    use next_code_provider_service::integration::InMemoryIntegration;
+    use next_code_provider_service::route_provider::RouteProvider;
+    use next_code_provider_service::runtime;
+    use next_code_provider_service::runtime::SessionError;
+    use next_code_provider_service::service::ResolvedRoute;
+    use next_code_provider_service::store::{DefaultProviderService, InMemoryCredentialStore};
+    use next_code_provider_service::types::ModelId;
 
     let catalog = Arc::new(InMemoryCatalog::new());
     let integration = Arc::new(InMemoryIntegration::new());
@@ -1040,21 +1029,21 @@ async fn run_default_command(args: Args) -> Result<()> {
     startup_profile::mark("crash_resume_hint");
 
     let cwd = std::env::current_dir()?;
-    let in_jcode_repo = build::is_jcode_repo(&cwd);
-    startup_profile::mark("is_jcode_repo");
+    let in_next_code_repo = build::is_next_code_repo(&cwd);
+    startup_profile::mark("is_next_code_repo");
     let already_in_selfdev = crate::cli::selfdev::client_selfdev_requested();
 
     // Record where this interactive launch happened so the system-wide launch
-    // hotkeys can reopen jcode in the last project directory (Cmd+') and the
-    // last jcode repo for self-dev (Cmd+Shift+'). Best-effort; ignored unless a
+    // hotkeys can reopen next-code in the last project directory (Cmd+') and the
+    // last next-code repo for self-dev (Cmd+Shift+'). Best-effort; ignored unless a
     // real TTY and not a fresh-spawn re-entry.
     if !args.fresh_spawn && std::io::IsTerminal::is_terminal(&std::io::stdin()) {
         let repo_dir = build::get_repo_dir();
         setup_hints::record_launch_dirs(&cwd, repo_dir.as_deref());
     }
 
-    if in_jcode_repo && !already_in_selfdev && !args.no_selfdev {
-        output::stderr_info("📍 Detected jcode repository - enabling self-dev mode");
+    if in_next_code_repo && !already_in_selfdev && !args.no_selfdev {
+        output::stderr_info("📍 Detected next-code repository - enabling self-dev mode");
         output::stderr_info("   Using shared server with self-dev session mode");
         output::stderr_info("   (use --no-selfdev to disable auto-detection)");
         output::stderr_blank_line();
@@ -1075,7 +1064,7 @@ async fn run_default_command(args: Args) -> Result<()> {
         server_running = wait_for_existing_reload_server("client startup").await;
     }
 
-    if !server_running && std::env::var("JCODE_RESUMING").is_ok() {
+    if !server_running && product_env("RESUMING").is_ok() {
         server_running = wait_for_resuming_server(
             "client startup without reload marker",
             std::time::Duration::from_secs(5),
@@ -1111,7 +1100,7 @@ async fn run_default_command(args: Args) -> Result<()> {
         // socket that has no live listener AND whose daemon lock is free, so it
         // can never disturb a running server.
         if server::reap_stale_socket_if_dead(&server::socket_path()).await {
-            output::stderr_info("Removed a stale jcode socket from a previous server.");
+            output::stderr_info("Removed a stale next-code socket from a previous server.");
         }
 
         maybe_prompt_server_bootstrap_login(&provider_choice).await?;
@@ -1124,7 +1113,7 @@ async fn run_default_command(args: Args) -> Result<()> {
     }
 
     startup_profile::mark("pre_tui_client");
-    if std::env::var("JCODE_RESUMING").is_err() && server_running {
+    if product_env("RESUMING").is_err() && server_running {
         output::stderr_info("Connecting to server...");
     }
     tui_launch::run_tui_client(
@@ -1232,7 +1221,10 @@ pub(crate) async fn wait_for_reloading_server() -> bool {
 }
 
 async fn server_is_running_at(path: &std::path::Path) -> bool {
-    server::is_server_ready(path).await || server::has_live_listener(path).await
+    // Prefer the cheap listener probe first. On Windows named pipes, a ping-based
+    // readiness connect can consume the only waiting server instance (or block)
+    // when nothing is accepting yet.
+    server::has_live_listener(path).await || server::is_server_ready(path).await
 }
 
 #[cfg(unix)]
@@ -1326,11 +1318,11 @@ pub(crate) async fn maybe_prompt_server_bootstrap_login(
     //
     // The only thing left to honor at the CLI layer is an explicit headless
     // bootstrap (e.g. CI / non-interactive provisioning), which opts in via the
-    // `JCODE_CLI_BOOTSTRAP_LOGIN` env var.
+    // `NEXT_CODE_CLI_BOOTSTRAP_LOGIN` env var.
     if cred_state.has_any || *provider_choice != ProviderChoice::Auto {
         return Ok(());
     }
-    if std::env::var_os("JCODE_CLI_BOOTSTRAP_LOGIN").is_none() {
+    if product_env_os("CLI_BOOTSTRAP_LOGIN").is_none() {
         return Ok(());
     }
 
@@ -1411,14 +1403,14 @@ pub(crate) async fn spawn_server(
     let mut cmd = ProcessCommand::new(&exe);
     cmd.env_remove(selfdev::CLIENT_SELFDEV_ENV);
     if client_requested_selfdev {
-        cmd.env("JCODE_DEBUG_CONTROL", "1");
+        cmd.env("NEXT_CODE_DEBUG_CONTROL", "1");
     }
     cmd.arg("--provider").arg(provider_choice.as_arg_value());
     // The interactive TUI owns first-run onboarding/login. Let the spawned
     // server boot with a deferred (credential-less) provider when nothing is
     // configured yet, instead of bailing; the TUI activates a provider via the
     // in-TUI `/login` flow. See init_provider_with_options.
-    cmd.env("JCODE_DEFERRED_AUTH_BOOTSTRAP", "1");
+    cmd.env("NEXT_CODE_DEFERRED_AUTH_BOOTSTRAP", "1");
     if let Some(provider_profile) = provider_profile {
         cmd.arg("--provider-profile").arg(provider_profile);
     }

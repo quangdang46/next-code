@@ -1,5 +1,5 @@
 {
-  description = "jcode — high-performance multi-session coding agent harness";
+  description = "next-code — high-performance multi-session coding agent harness";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -23,7 +23,7 @@
           overlays = [ (import rust-overlay) ];
         };
 
-        # jcode currently builds on a recent nightly. Override here if you want
+        # next-code currently builds on a recent nightly. Override here if you want
         # to pin a specific toolchain.
         rustToolchain = pkgs.rust-bin.nightly.latest.default.override {
           extensions = [ "rust-src" "rustfmt" "clippy" "rust-analyzer" ];
@@ -32,7 +32,7 @@
         craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
         # Filter to keep markdown / extra files crates depend on at build time
-        # (jcode reads include_str! files like src/prompt/system_prompt.md).
+        # (next-code reads include_str! files like src/prompt/system_prompt.md).
         src = pkgs.lib.cleanSourceWith {
           src = ./.;
           filter =
@@ -60,8 +60,8 @@
         commonArgs = {
           inherit src;
           strictDeps = true;
-          pname = "jcode";
-          version = "0.12.3";
+          pname = "next-code";
+          version = "0.32.0";
 
           nativeBuildInputs = with pkgs; [
             pkg-config
@@ -90,34 +90,36 @@
 
           # build.rs reads git metadata; supply something deterministic when the
           # store source has no .git/ (Nix typically strips it).
-          JCODE_GIT_HASH = if (self ? rev) then self.rev else "nix-${self.shortRev or "unknown"}";
-          JCODE_GIT_DATE = self.lastModifiedDate or "1970-01-01";
+          NEXT_CODE_GIT_HASH = if (self ? rev) then self.rev else "nix-${self.shortRev or "unknown"}";
+          NEXT_CODE_GIT_DATE = self.lastModifiedDate or "1970-01-01";
         };
 
         cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        jcode = craneLib.buildPackage (
+        next-code = craneLib.buildPackage (
           commonArgs
           // {
             inherit cargoArtifacts;
-            cargoExtraArgs = "-p jcode --bin jcode";
+            cargoExtraArgs = "-p next-code --bin next-code";
             doCheck = false;
           }
         );
       in
       {
         packages = {
-          default = jcode;
-          jcode = jcode;
+          default = next-code;
+          next-code = next-code;
+          # Compat package alias for one release (contract binary alias).
+          next-code = next-code;
         };
 
         apps.default = flake-utils.lib.mkApp {
-          drv = jcode;
-          name = "jcode";
+          drv = next-code;
+          name = "next-code";
         };
 
         devShells.default = pkgs.mkShell {
-          inherit (commonArgs) JCODE_GIT_HASH JCODE_GIT_DATE;
+          inherit (commonArgs) NEXT_CODE_GIT_HASH NEXT_CODE_GIT_DATE;
 
           buildInputs = commonArgs.buildInputs;
           nativeBuildInputs =
@@ -131,14 +133,14 @@
 
           shellHook = ''
             export RUSTC_WRAPPER=${pkgs.sccache}/bin/sccache
-            echo "jcode dev shell — rustc $(${rustToolchain}/bin/rustc --version)"
+            echo "next-code dev shell — rustc $(${rustToolchain}/bin/rustc --version)"
           '';
         };
 
         checks = {
-          inherit jcode;
+          inherit next-code;
 
-          jcode-clippy = craneLib.cargoClippy (
+          next-code-clippy = craneLib.cargoClippy (
             commonArgs
             // {
               inherit cargoArtifacts;
@@ -146,9 +148,9 @@
             }
           );
 
-          jcode-fmt = craneLib.cargoFmt {
+          next-code-fmt = craneLib.cargoFmt {
             inherit src;
-            pname = "jcode-fmt";
+            pname = "next-code-fmt";
             version = commonArgs.version;
           };
         };
