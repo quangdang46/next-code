@@ -3480,6 +3480,18 @@ pub(super) fn handle_statusline_command(app: &mut App, trimmed: &str) -> bool {
     }
 }
 
+fn apply_theme_and_mode(kind: next_code_tui_style::ThemeKind, label: &str) {
+    use next_code_tui_style::{ThemeKind, Theme};
+    Theme::set_kind(kind);
+    // Sync ThemeMode for buffer adaptation layer
+    let mode = if Theme::current().is_dark() {
+        next_code_tui_style::ThemeMode::Dark
+    } else {
+        next_code_tui_style::ThemeMode::Light
+    };
+    next_code_tui_style::set_theme_mode(mode);
+}
+
 pub(super) fn handle_theme_command(app: &mut App, trimmed: &str) -> bool {
     use next_code_tui_style::ThemeKind;
 
@@ -3499,37 +3511,22 @@ pub(super) fn handle_theme_command(app: &mut App, trimmed: &str) -> bool {
     }
 
     let theme_name = rest.to_ascii_lowercase();
-    match theme_name.as_str() {
-        "auto" | "system" => {
-            next_code_tui_style::Theme::apply_kind(ThemeKind::Auto);
-            app.push_display_message(DisplayMessage::system("Theme set to auto.".to_string()));
-        }
-        "groknight" | "dark" => {
-            next_code_tui_style::Theme::set_kind(ThemeKind::DefaultGrokNight);
-            app.push_display_message(DisplayMessage::system("Theme set to groknight.".to_string()));
-        }
-        "grokday" | "light" => {
-            next_code_tui_style::Theme::set_kind(ThemeKind::DefaultGrokDay);
-            app.push_display_message(DisplayMessage::system("Theme set to grokday.".to_string()));
-        }
-        "tokyonight" | "tokyo" => {
-            next_code_tui_style::Theme::set_kind(ThemeKind::TokyoNight);
-            app.push_display_message(DisplayMessage::system("Theme set to tokyonight.".to_string()));
-        }
-        "rosepine" | "rose-pine" | "rosepine-moon" => {
-            next_code_tui_style::Theme::set_kind(ThemeKind::RosePineMoon);
-            app.push_display_message(DisplayMessage::system("Theme set to rosepine-moon.".to_string()));
-        }
-        "oscura" | "oscura-midnight" => {
-            next_code_tui_style::Theme::set_kind(ThemeKind::OscuraMidnight);
-            app.push_display_message(DisplayMessage::system("Theme set to oscura-midnight.".to_string()));
-        }
+    let (kind, label) = match theme_name.as_str() {
+        "auto" | "system" => (ThemeKind::DefaultGrokNight, "auto"),
+        "groknight" | "dark" => (ThemeKind::DefaultGrokNight, "groknight"),
+        "grokday" | "light" => (ThemeKind::DefaultGrokDay, "grokday"),
+        "tokyonight" | "tokyo" => (ThemeKind::TokyoNight, "tokyonight"),
+        "rosepine" | "rose-pine" | "rosepine-moon" => (ThemeKind::RosePineMoon, "rosepine-moon"),
+        "oscura" | "oscura-midnight" => (ThemeKind::OscuraMidnight, "oscura-midnight"),
         _ => {
             app.push_display_message(DisplayMessage::error(format!(
                 "Unknown theme '{rest}'. Available: groknight, grokday, tokyonight, rosepine-moon, oscura-midnight, auto."
             )));
+            return true;
         }
-    }
+    };
+    apply_theme_and_mode(kind, label);
+    app.push_display_message(DisplayMessage::system(format!("Theme set to {label}.")));
     true
 }
 
