@@ -43,8 +43,8 @@ impl ThemeKind {
             Self::DefaultGrokNight => "groknight",
             Self::DefaultGrokDay => "grokday",
             Self::TokyoNight => "tokyonight",
-            Self::RosePineMoon => "rosepine",
-            Self::OscuraMidnight => "oscura",
+            Self::RosePineMoon => "rosepine-moon",
+            Self::OscuraMidnight => "oscura-midnight",
             Self::Auto => "auto",
         }
     }

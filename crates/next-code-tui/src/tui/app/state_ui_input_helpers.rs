@@ -963,6 +963,18 @@ impl App {
             return self.rank_suggestions(input, suggestions);
         }
 
+        if prefix.starts_with("/theme ") {
+            let suggestions = vec![
+                ("/theme groknight".into(), "Neutral dark theme"),
+                ("/theme grokday".into(), "Neutral light theme"),
+                ("/theme tokyonight".into(), "Blue-tinted dark theme"),
+                ("/theme rosepine-moon".into(), "Violet-tinted dark theme"),
+                ("/theme oscura-midnight".into(), "Muted dark theme"),
+                ("/theme auto".into(), "System appearance"),
+            ];
+            return self.rank_suggestions(input, suggestions);
+        }
+
         if prefix.starts_with("/login ")
             || prefix.starts_with("/auth ")
             || prefix.starts_with("/connect ")

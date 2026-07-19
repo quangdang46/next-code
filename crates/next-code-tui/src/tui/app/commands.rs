@@ -3493,7 +3493,7 @@ pub(super) fn handle_theme_command(app: &mut App, trimmed: &str) -> bool {
         let current = next_code_tui_style::Theme::current_kind();
         let name = current.display_name();
         app.push_display_message(DisplayMessage::system(format!(
-            "Current theme: {name}\n\nAvailable themes:\n  groknight   (neutral dark)\n  grokday     (neutral light)\n  tokyonight  (blue-tinted dark)\n  rosepine    (violet-tinted dark)\n  oscura      (muted dark)\n  auto        (system appearance)\n\nUse /theme <name> to switch."
+            "Current theme: {name}\n\nAvailable themes:\n  groknight        (neutral dark)\n  grokday          (neutral light)\n  tokyonight       (blue-tinted dark)\n  rosepine-moon    (violet-tinted dark)\n  oscura-midnight  (muted dark)\n  auto             (system appearance)\n\nUse /theme <name> to switch.",
         )));
         return true;
     }
@@ -3516,17 +3516,17 @@ pub(super) fn handle_theme_command(app: &mut App, trimmed: &str) -> bool {
             next_code_tui_style::Theme::set_kind(ThemeKind::TokyoNight);
             app.push_display_message(DisplayMessage::system("Theme set to tokyonight.".to_string()));
         }
-        "rosepine" | "rose-pine" => {
+        "rosepine" | "rose-pine" | "rosepine-moon" => {
             next_code_tui_style::Theme::set_kind(ThemeKind::RosePineMoon);
-            app.push_display_message(DisplayMessage::system("Theme set to rosepine.".to_string()));
+            app.push_display_message(DisplayMessage::system("Theme set to rosepine-moon.".to_string()));
         }
         "oscura" | "oscura-midnight" => {
             next_code_tui_style::Theme::set_kind(ThemeKind::OscuraMidnight);
-            app.push_display_message(DisplayMessage::system("Theme set to oscura.".to_string()));
+            app.push_display_message(DisplayMessage::system("Theme set to oscura-midnight.".to_string()));
         }
         _ => {
             app.push_display_message(DisplayMessage::error(format!(
-                "Unknown theme '{rest}'. Available: groknight, grokday, tokyonight, rosepine, oscura, auto."
+                "Unknown theme '{rest}'. Available: groknight, grokday, tokyonight, rosepine-moon, oscura-midnight, auto."
             )));
         }
     }

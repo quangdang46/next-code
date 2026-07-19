@@ -10,6 +10,7 @@ edition = "2024"
 
 [workspace]
 members = [
+    "crates/next-code-ratatui-textarea",
     ".",
     "crates/next-code-agent-runtime",
     "crates/next-code-experiment-flags",
