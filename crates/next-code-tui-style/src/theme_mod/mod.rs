@@ -2,11 +2,16 @@
 //! All colors come from the `Theme` struct via Theme::current().
 
 mod cache;
+mod color_support;
 mod grokday;
 mod groknight;
+pub mod md_style;
+mod osc11;
 mod oscura;
 mod rosepine;
 mod struct_def;
+mod system_appearance;
+mod terminal_default;
 mod tokyonight;
 
 pub use struct_def::Theme;

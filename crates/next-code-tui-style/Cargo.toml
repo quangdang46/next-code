@@ -7,3 +7,8 @@ publish = false
 [dependencies]
 next-code-core = { path = "../next-code-core" }
 ratatui = "0.30"
+dark-light = "2"
+serde = { version = "1", features = ["derive"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
