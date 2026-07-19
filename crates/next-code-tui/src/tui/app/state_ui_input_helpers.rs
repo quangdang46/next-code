@@ -170,6 +170,7 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/account", "Open the combined account picker"),
     RegisteredCommand::public("/accounts", "Alias for /account"),
     RegisteredCommand::public("/cache", "Show cache stats or set cache TTL"),
+    RegisteredCommand::public("/theme", "Show or switch the UI color theme"),
     RegisteredCommand::public("/debug-visual", "Toggle visual debug overlay"),
     RegisteredCommand::public("/screenshot-mode", "Toggle screenshot capture mode"),
     RegisteredCommand::public("/screenshot", "Capture a screenshot debug state"),

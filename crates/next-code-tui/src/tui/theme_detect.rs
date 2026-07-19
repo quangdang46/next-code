@@ -25,6 +25,8 @@ static DETECTED: OnceLock<ThemeMode> = OnceLock::new();
 pub fn init_theme_mode() -> ThemeMode {
     let mode = *DETECTED.get_or_init(resolve_theme_mode);
     next_code_tui_style::set_theme_mode(mode);
+    // Initialize the Theme struct (grok-migration) from env/config
+    next_code_tui_style::init_theme_from_env();
     mode
 }
 
