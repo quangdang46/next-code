@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 syntect = "5"
+anstyle = "1"
+toml = "0.8"

@@ -4,3 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+agent-client-protocol = { path = "../agent-client-protocol" }

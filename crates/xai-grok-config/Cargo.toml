@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 next-code-config-types = { path = "../next-code-config-types" }
+dirs = "6"
+toml = "0.8"

@@ -1,65 +1,98 @@
 [package]
 name = "next-code-grok-render"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 
 [dependencies]
-# xAI shim crates
-xai-ratatui-inline = { path = "../xai-ratatui-inline" }
-xai-ratatui-textarea = { path = "../xai-ratatui-textarea" }
-xai-grok-shared = { path = "../xai-grok-shared" }
-xai-grok-telemetry = { path = "../xai-grok-telemetry" }
-xai-grok-markdown = { path = "../xai-grok-markdown" }
+# TTY safety
+dunce = "1"
 xai-tty-utils = { path = "../xai-tty-utils" }
-xai-grok-config = { path = "../xai-grok-config" }
-xai-grok-config-types = { path = "../xai-grok-config-types" }
 
 # Rendering
 ratatui = { version = "0.28", features = ["crossterm", "unstable-widget-ref"] }
 ratatui-core = "0.1"
 crossterm = { version = "0.28", features = ["event-stream", "bracketed-paste"] }
 textwrap = "0.16"
+regex = "1"
 unicode-width = "0.2"
 unicode-segmentation = "1.12"
 linkify = "0.10"
+
+# Markdown / syntax highlighting
+xai-grok-markdown = { path = "../xai-grok-markdown" }
 syntect = "5"
 anstyle = "1"
 supports-color = "3"
-dark-light = "2"
-next-code-tui-render = { path = "../next-code-tui-render" }
-next-code-tui-style = { path = "../next-code-tui-style" }
 
 # Data
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 toml = "0.8"
 toml_edit = { version = "0.22", features = ["serde"] }
-
-# TTY
-dunce = "1"
-libc = "0.2"
+documented = "0.9"
 
 # VTE terminal emulation
 vte = "0.14"
 
+# System appearance detection (dark/light mode)
+dark-light = "2"
+
 # Utilities
 strum = { version = "0.26", features = ["derive"] }
 anyhow = "1"
-tokio = { version = "1", features = ["sync", "rt", "macros", "signal"] }
+tokio = { version = "1", features = ["sync", "rt", "macros", "signal", "io-util", "io-std", "time"] }
 tracing = "0.1"
-regex = "1"
-base64 = "0.22"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff", "gif", "webp"] }
-uuid = { version = "1", features = ["v4"] }
-dirs = "6"
-shellexpand = "3"
-url = "2"
-notify = { version = "7", optional = true }
-documented = "0.9"
 
+# Prompt text input
+xai-ratatui-textarea = { path = "../xai-ratatui-textarea" }
+xai-ratatui-inline = { path = "../xai-ratatui-inline" }
+
+# ACP
+xai-grok-config = { path = "../xai-grok-config" }
+xai-grok-shared = { path = "../xai-grok-shared" }
+xai-grok-workspace = { path = "../xai-grok-workspace" }
+xai-grok-telemetry = { path = "../xai-grok-telemetry" }
+xai-grok-tools = { path = "../xai-grok-tools" }
+xai-grok-paths = { path = "../xai-grok-paths" }
+
+# Agent client protocol
+agent-client-protocol = { path = "../agent-client-protocol" }
+
+# TUI scrollbar
+tui-scrollbar = { path = "../tui-scrollbar" }
+
+# Base64 encoding for image data
+base64 = "0.22"
+
+# Image decoding/resizing
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff", "gif", "webp"] }
+
+# ID generation
+uuid = { version = "1", features = ["v4"] }
+
+# Path computation
+dirs = "6"
+shellexpand = "3.1"
+
+# Parsing
+url = "2"
+
+# Hot-reload config (dev mode)
+notify = { version = "7", optional = true }
+
+# libc for non-blocking terminal reads
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Windows display refresh
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Graphics_Gdi"] }
 
+[dev-dependencies]
+pretty_assertions = "1"
+serial_test = "3"
+tempfile = "3"
+
 [features]
-default = []
+test-support = []
+default-bazel = ["test-support"]

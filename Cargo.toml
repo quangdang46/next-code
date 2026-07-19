@@ -122,6 +122,8 @@ members = [
     "crates/xai-grok-paths",
     "crates/xai-grok-workspace",
     "crates/xai-grok-tools",
+    "crates/agent-client-protocol",
+    "crates/tui-scrollbar",
     "evals/jbench",
     "evals/next-code-edit-bench",
 
