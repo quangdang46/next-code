@@ -7385,6 +7385,7 @@ dependencies = [
  "open",
  "rand 0.9.5",
  "ratatui 0.30.2",
+ "ratatui-core",
  "regex",
  "serde",
  "serde_json",

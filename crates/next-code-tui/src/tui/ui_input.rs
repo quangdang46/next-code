@@ -17,6 +17,7 @@ use next_code_tui_style::theme::{
     rainbow_prompt_color, user_color,
 };
 use ratatui::{prelude::*, style::Modifier, widgets::Paragraph};
+use ratatui::widgets::WidgetRef;
 
 fn shell_mode_color() -> Color {
     rgb(110, 214, 151)
@@ -2033,16 +2034,21 @@ pub(super) fn draw_input(
         }
     }
 
-    let paragraph = if centered {
-        Paragraph::new(
-            lines
-                .iter()
-                .map(|l| l.clone().alignment(Alignment::Center))
-                .collect::<Vec<_>>(),
-        )
-    } else {
-        Paragraph::new(lines.clone())
-    };
+    // Render input using grok's TextArea
+    {
+        let mut ta = next_code_ratatui_textarea::TextArea::new();
+        ta.set_text(input_text);
+        let ta_area = Rect {
+            x: area.x + prompt_len as u16,
+            y: area.y,
+            width: line_width.saturating_sub(1).max(1) as u16,
+            height: area.height.saturating_sub(suggestions_offset as u16).max(1),
+        };
+        if ta_area.width > 0 && ta_area.height > 0 {
+            WidgetRef::render_ref(&&ta, ta_area, frame.buffer_mut());
+        }
+    }
+    let paragraph = Paragraph::new(lines.clone());
     frame.render_widget(paragraph, area);
 
     let cursor_screen_line = cursor_line.saturating_sub(scroll_offset) + suggestions_offset;
