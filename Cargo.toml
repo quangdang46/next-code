@@ -99,6 +99,28 @@ members = [
     "crates/next-code-plugin-runtime",
     "crates/next-code-provider-doctor",
     "crates/next-code-render-core",
+    "crates/next-code-ratatui-inline",
+    "crates/next-code-ratatui-textarea",
+    "crates/xai-grok-config-types",
+    "crates/xai-grok-config",
+    "crates/xai-grok-markdown",
+    "crates/xai-grok-telemetry",
+    "crates/xai-grok-shared",
+    "crates/xai-tty-utils",
+    "crates/xai-grok-paths",
+    "crates/xai-grok-workspace",
+    "crates/xai-grok-tools",
+    "crates/xai-ratatui-textarea",
+    "crates/xai-grok-config-types",
+    "crates/xai-grok-config",
+    "crates/xai-grok-markdown",
+    "crates/xai-grok-telemetry",
+    "crates/xai-grok-shared",
+    "crates/xai-tty-utils",
+    "crates/xai-grok-paths",
+    "crates/xai-grok-workspace",
+    "crates/xai-grok-tools",
+    "crates/xai-ratatui-textarea",
     "evals/jbench",
     "evals/next-code-edit-bench",
 
@@ -279,7 +301,7 @@ arboard = "3"              # Clipboard support
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }  # Only PNG/JPEG (skip avif/rav1e, exr, gif, tiff, etc)
 
 # Markdown & syntax highlighting
-unicode-width = "0.2"   # Unicode character display width
+unicode-width = "0.2.2"   # Unicode character display width
 
 # PDF parsing (behind feature flag)
 next-code-pdf = { path = "crates/next-code-pdf", optional = true }

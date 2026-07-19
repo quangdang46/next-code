@@ -1,0 +1,7 @@
+[package]
+name = "xai-ratatui-textarea"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+next-code-ratatui-textarea = { path = "../next-code-ratatui-textarea" }

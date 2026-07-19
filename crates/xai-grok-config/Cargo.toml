@@ -1,0 +1,7 @@
+[package]
+name = "xai-grok-config"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+next-code-config-types = { path = "../next-code-config-types" }
