@@ -155,7 +155,7 @@ fn choose_grid(
 /// Render a single cell box of the given inner dimensions. `inner_w`/`inner_h`
 /// are the content area (excluding borders).
 fn render_cell(tile: &SwarmTile, inner_w: usize, inner_h: usize) -> Vec<Line<'static>> {
-    let border_style = Style::default().fg(Color::Rgb(80, 80, 92));
+    let border_style = Style::default().fg(next_code_tui_style::Theme::current().gray_dim);
     let accent_style = Style::default().fg(tile.accent);
 
     // ---- Title bar (drawn into the top border line) ----
@@ -220,7 +220,7 @@ fn render_cell(tile: &SwarmTile, inner_w: usize, inner_h: usize) -> Vec<Line<'st
     // ---- Body: bottom-anchored tail of the stream ----
     let body_lines = wrap_tail(&tile.body, inner_w, inner_h);
     let blank_top = inner_h.saturating_sub(body_lines.len());
-    let text_style = Style::default().fg(Color::Rgb(170, 172, 180));
+    let text_style = Style::default().fg(next_code_tui_style::Theme::current().gray_bright);
     for _ in 0..blank_top {
         lines.push(content_line("", inner_w, border_style, text_style));
     }
@@ -411,7 +411,7 @@ pub fn render_swarm_gallery(
                 hidden,
                 if hidden == 1 { "" } else { "s" }
             ),
-            Style::default().fg(Color::Rgb(140, 140, 150)),
+            Style::default().fg(next_code_tui_style::Theme::current().gray),
         )));
     }
 
@@ -423,7 +423,7 @@ mod tests {
     use super::*;
 
     fn tile(name: &str, body: &[&str]) -> SwarmTile {
-        SwarmTile::new(name, "running", Color::Rgb(255, 200, 100))
+        SwarmTile::new(name, "running", next_code_tui_style::Theme::current().accent_running)
             .with_body(body.iter().map(|s| s.to_string()).collect())
     }
 

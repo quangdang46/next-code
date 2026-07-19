@@ -111,8 +111,8 @@ pub(crate) fn full_frame_invalidation(
 fn full_repaint_sentinel_cell() -> ratatui::buffer::Cell {
     let mut cell = ratatui::buffer::Cell::EMPTY;
     cell.set_symbol("\u{FDD0}");
-    cell.fg = ratatui::style::Color::Rgb(1, 2, 3);
-    cell.bg = ratatui::style::Color::Rgb(3, 2, 1);
+    cell.fg = next_code_tui_style::Theme::current().bg_base;
+    cell.bg = next_code_tui_style::Theme::current().bg_base;
     cell
 }
 

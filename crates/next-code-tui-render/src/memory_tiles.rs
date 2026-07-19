@@ -198,19 +198,19 @@ fn format_memory_updated_age(updated_at: DateTime<Utc>) -> String {
 
 fn memory_age_text_tint(updated_at: Option<DateTime<Utc>>) -> Color {
     let Some(updated_at) = updated_at else {
-        return Color::Rgb(140, 144, 152);
+        return next_code_tui_style::Theme::current().gray;
     };
     let age = Utc::now().signed_duration_since(updated_at);
     if age.num_hours() < 1 {
-        Color::Rgb(146, 156, 149)
+        next_code_tui_style::Theme::current().gray
     } else if age.num_days() < 1 {
-        Color::Rgb(142, 148, 156)
+        next_code_tui_style::Theme::current().gray
     } else if age.num_days() < 7 {
-        Color::Rgb(145, 144, 154)
+        next_code_tui_style::Theme::current().gray
     } else if age.num_days() < 30 {
-        Color::Rgb(150, 143, 147)
+        next_code_tui_style::Theme::current().gray
     } else {
-        Color::Rgb(154, 144, 144)
+        next_code_tui_style::Theme::current().gray
     }
 }
 
@@ -227,7 +227,7 @@ fn memory_tile_content_lines(
     let mut content_lines: Vec<Line<'static>> = Vec::new();
     for item in items {
         let text_fill_style = text_style.fg(memory_age_text_tint(item.updated_at));
-        let meta_fill_style = Style::default().fg(Color::Rgb(160, 165, 172));
+        let meta_fill_style = Style::default().fg(next_code_tui_style::Theme::current().gray);
         let text_display_width = unicode_width::UnicodeWidthStr::width(item.content.as_str());
         if text_display_width <= item_width {
             let text = item.content.to_string();
