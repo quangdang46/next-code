@@ -17,6 +17,31 @@ pub mod clipboard {
     pub fn clipboard_prewarm() {}
     pub fn get_image() -> Result<Option<Vec<u8>>, String> { Ok(None) }
     pub fn detach_std_command(_: &mut std::process::Command) {}
+    pub fn mime_to_extension(_mime: &str) -> Option<&'static str> { Some(".bin") }
+    pub fn mime_from_bytes(_data: &[u8]) -> String { "application/octet-stream".into() }
+    pub fn native_tool_name() -> Option<String> { None }
 }
+
+/// Session stubs for Grok compatibility.
+pub mod session {
+    pub struct SessionHandle;
+    pub fn current_session() -> Option<SessionHandle> { None }
+}
+
+/// Stderr helpers for Grok compatibility.
+pub mod stderr {
+    pub fn capture_stderr() -> Option<std::fs::File> { None }
+}
+
+/// Placeholder images for Grok compatibility.
+pub mod placeholder_images {
+    pub fn placeholder_image() -> Option<Vec<u8>> { None }
+}
+
+/// UI config stubs.
+pub mod ui_config {
+    pub fn config_dir() -> Option<std::path::PathBuf> { None }
+}
+
 pub fn is_wsl() -> bool { false }
 pub fn dup_tui_stderr() -> Result<std::fs::File, std::io::Error> { std::fs::File::open("/dev/null") }
