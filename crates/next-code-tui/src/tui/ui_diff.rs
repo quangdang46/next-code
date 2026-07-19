@@ -2,11 +2,11 @@ use crate::{message::ToolCall, tui::ui::tools_ui};
 use ratatui::prelude::*;
 
 pub(super) fn diff_add_color() -> Color {
-    Color::Rgb(100, 200, 100)
+    next_code_tui_style::Theme::current().diff_insert_fg
 }
 
 pub(super) fn diff_del_color() -> Color {
-    Color::Rgb(200, 100, 100)
+    next_code_tui_style::Theme::current().diff_delete_fg
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

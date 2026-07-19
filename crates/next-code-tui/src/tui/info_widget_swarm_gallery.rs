@@ -8,6 +8,7 @@
 //! [`GalleryMember`] (label + body lines).
 
 use crate::protocol::SwarmMemberStatus;
+use next_code_tui_style::Theme;
 use next_code_tui_render::swarm_gallery::{
     GalleryMember, SwarmStripHint, display_order, humanize_age, is_active_status, render_gallery,
     render_swarm_compact, render_swarm_dock, render_swarm_live_card, render_swarm_panel,
@@ -175,10 +176,10 @@ pub(crate) fn render_swarm_page_lines(
         .count();
 
     let mut out = vec![Line::from(vec![
-        Span::styled("🐝 ", Style::default().fg(Color::Rgb(255, 200, 100))),
+        Span::styled("🐝 ", Style::default().fg(Theme::current().accent_running)),
         Span::styled(
             "swarm",
-            Style::default().fg(Color::Rgb(230, 230, 240)).bold(),
+            Style::default().fg(Theme::current().text_primary).bold(),
         ),
         Span::styled(
             format!(
@@ -186,13 +187,13 @@ pub(crate) fn render_swarm_page_lines(
                 members.len(),
                 if members.len() == 1 { "" } else { "s" }
             ),
-            Style::default().fg(Color::Rgb(150, 150, 160)),
+            Style::default().fg(Theme::current().gray),
         ),
     ])];
     if max_height > 1 {
         out.push(Line::from(Span::styled(
             "alt+n chat  ·  alt+↑/↓ select  ·  alt+o open  ·  alt+shift+p prompt  ·  esc chat",
-            Style::default().fg(Color::Rgb(105, 105, 120)),
+            Style::default().fg(Theme::current().gray_dim),
         )));
     }
 
@@ -222,7 +223,7 @@ pub(crate) fn render_swarm_page_lines(
     if remaining >= 3 {
         out.push(Line::from(Span::styled(
             "─".repeat(width),
-            Style::default().fg(Color::Rgb(60, 60, 72)),
+            Style::default().fg(Theme::current().bg_base),
         )));
         let mut selected_gallery = gallery[selected_member_index].clone();
         if let Some(task) = selected_gallery
@@ -369,12 +370,12 @@ fn render_swarm_tree_row(
     let mut spans = vec![
         Span::styled(
             if selected { "▸ " } else { "  " },
-            Style::default().fg(Color::Rgb(255, 200, 100)),
+            Style::default().fg(Theme::current().accent_running),
         ),
-        Span::styled(prefix, Style::default().fg(Color::Rgb(75, 75, 88))),
+        Span::styled(prefix, Style::default().fg(Theme::current().gray_dim)),
         Span::styled(
             format!("{icon} "),
-            Style::default().fg(Color::Rgb(255, 200, 100)),
+            Style::default().fg(Theme::current().accent_running),
         ),
         Span::styled(
             format!("{} ", status_glyph(&member.status, spinner_frame)),
@@ -399,13 +400,13 @@ fn render_swarm_tree_row(
     {
         spans.push(Span::styled(
             format!(" · {task}"),
-            Style::default().fg(Color::Rgb(145, 145, 158)),
+            Style::default().fg(Theme::current().gray),
         ));
     }
     if let Some((done, total)) = member.todo_progress {
         spans.push(Span::styled(
             format!("  {done}/{total}"),
-            Style::default().fg(Color::Rgb(105, 105, 120)),
+            Style::default().fg(Theme::current().gray_dim),
         ));
     }
     let mut line = Line::from(spans);

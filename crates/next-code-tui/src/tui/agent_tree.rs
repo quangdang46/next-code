@@ -22,6 +22,7 @@
 //!    partially via swarm strip / running_items; tree is the spinner-tree mode.
 
 use crate::tui::color_support::rgb as rgb_color;
+use next_code_tui_style::Theme;
 use ratatui::prelude::*;
 
 /// Status of an agent in the agent tree.
@@ -151,9 +152,9 @@ const AGENT_CHILD_COLORS: &[(u8, u8, u8)] = &[
     (80, 200, 230),
     (255, 150, 150),
 ];
-const DIM_COLOR: (u8, u8, u8) = (100, 100, 110);
-const ERROR_COLOR: (u8, u8, u8) = (255, 100, 100);
-const SUCCESS_COLOR: (u8, u8, u8) = (100, 180, 100);
+
+
+
 
 /// True when a status string is usable as on-screen activity (not a counter).
 ///
@@ -283,7 +284,7 @@ pub fn render(trees: &[AgentTreeNode], view: &AgentTreeViewState) -> Vec<Line<'s
                 ),
                 Span::styled(
                     "└─ ",
-                    Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+                    Style::default().fg(Theme::current().gray_dim),
                 ),
                 Span::styled(
                     "hide",
@@ -292,14 +293,14 @@ pub fn render(trees: &[AgentTreeNode], view: &AgentTreeViewState) -> Vec<Line<'s
                             .fg(rgb_color(255, 220, 100))
                             .add_modifier(Modifier::BOLD)
                     } else {
-                        Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2))
+                        Style::default().fg(Theme::current().gray_dim)
                     },
                 ),
             ];
             if is_hide_selected {
                 spans.push(Span::styled(
                     " · enter to collapse",
-                    Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+                    Style::default().fg(Theme::current().gray_dim),
                 ));
             }
             lines.push(Line::from(spans));
@@ -423,7 +424,7 @@ fn render_node(
         ),
         Span::styled(
             tree_char,
-            Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+            Style::default().fg(Theme::current().gray_dim),
         ),
         Span::styled(
             display_name,
@@ -482,20 +483,20 @@ fn render_node(
                     "uses"
                 }
             ),
-            Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+            Style::default().fg(Theme::current().gray_dim),
         ));
     }
     if node.token_count > 0 {
         spans.push(Span::styled(
             format!(" · {} tokens", node.token_count),
-            Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+            Style::default().fg(Theme::current().gray_dim),
         ));
     }
     if let Some((done, total)) = node.todo_progress {
         if total > 0 {
             spans.push(Span::styled(
                 format!(" · {done}/{total}"),
-                Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+                Style::default().fg(Theme::current().gray_dim),
             ));
         }
     }
@@ -507,13 +508,13 @@ fn render_node(
     if is_highlighted {
         spans.push(Span::styled(
             format!(" · {TEAMMATE_SELECT_HINT}"),
-            Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+            Style::default().fg(Theme::current().gray_dim),
         ));
     }
     if is_selected && !is_viewing {
         spans.push(Span::styled(
             format!(" · {TEAMMATE_VIEW_HINT}"),
-            Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+            Style::default().fg(Theme::current().gray_dim),
         ));
     }
 
@@ -532,7 +533,7 @@ fn render_node(
             Span::raw("  ".repeat(depth.max(1) + 1)),
             Span::styled(
                 format!("  {preview}"),
-                Style::default().fg(rgb_color(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2)),
+                Style::default().fg(Theme::current().gray_dim),
             ),
         ]));
     }
@@ -550,11 +551,11 @@ fn render_node(
 
 fn status_color(status: &AgentStatus) -> Color {
     match status {
-        AgentStatus::Running => Color::Rgb(200, 200, 210),
-        AgentStatus::Completed => Color::Rgb(SUCCESS_COLOR.0, SUCCESS_COLOR.1, SUCCESS_COLOR.2),
-        AgentStatus::Failed => Color::Rgb(ERROR_COLOR.0, ERROR_COLOR.1, ERROR_COLOR.2),
-        AgentStatus::Stopped => Color::Rgb(DIM_COLOR.0, DIM_COLOR.1, DIM_COLOR.2),
-        AgentStatus::Idle => Color::Rgb(150, 150, 160),
+        AgentStatus::Running => Theme::current().text_secondary,
+        AgentStatus::Completed => Theme::current().accent_success,
+        AgentStatus::Failed => Theme::current().accent_error,
+        AgentStatus::Stopped => Theme::current().gray_dim,
+        AgentStatus::Idle => Theme::current().gray,
     }
 }
 
