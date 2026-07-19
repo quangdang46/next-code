@@ -1,0 +1,63 @@
+[package]
+name = "next-code-grok-render"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+# xAI shim crates
+xai-ratatui-inline = { path = "../xai-ratatui-inline" }
+xai-ratatui-textarea = { path = "../xai-ratatui-textarea" }
+xai-grok-shared = { path = "../xai-grok-shared" }
+xai-grok-telemetry = { path = "../xai-grok-telemetry" }
+xai-grok-markdown = { path = "../xai-grok-markdown" }
+xai-tty-utils = { path = "../xai-tty-utils" }
+xai-grok-config = { path = "../xai-grok-config" }
+xai-grok-config-types = { path = "../xai-grok-config-types" }
+
+# Rendering
+ratatui = { version = "0.28", features = ["crossterm", "unstable-widget-ref"] }
+ratatui-core = "0.1"
+crossterm = { version = "0.28", features = ["event-stream", "bracketed-paste"] }
+textwrap = "0.16"
+unicode-width = "0.2"
+unicode-segmentation = "1.12"
+linkify = "0.10"
+syntect = "5"
+anstyle = "1"
+supports-color = "3"
+dark-light = "2"
+
+# Data
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+toml_edit = { version = "0.22", features = ["serde"] }
+
+# TTY
+dunce = "1"
+libc = "0.2"
+
+# VTE terminal emulation
+vte = "0.14"
+
+# Utilities
+strum = { version = "0.26", features = ["derive"] }
+anyhow = "1"
+tokio = { version = "1", features = ["sync", "rt", "macros", "signal"] }
+tracing = "0.1"
+regex = "1"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff", "gif", "webp"] }
+uuid = { version = "1", features = ["v4"] }
+dirs = "6"
+shellexpand = "3"
+url = "2"
+notify = { version = "7", optional = true }
+documented = "0.9"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Graphics_Gdi"] }
+
+[features]
+default = []

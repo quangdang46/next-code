@@ -111,6 +111,8 @@ members = [
     "crates/xai-grok-workspace",
     "crates/xai-grok-tools",
     "crates/xai-ratatui-textarea",
+    "crates/next-code-grok-render",
+    "crates/xai-ratatui-inline",
     "crates/xai-grok-config-types",
     "crates/xai-grok-config",
     "crates/xai-grok-markdown",
@@ -120,7 +122,6 @@ members = [
     "crates/xai-grok-paths",
     "crates/xai-grok-workspace",
     "crates/xai-grok-tools",
-    "crates/xai-ratatui-textarea",
     "evals/jbench",
     "evals/next-code-edit-bench",
 
