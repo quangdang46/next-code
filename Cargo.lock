@@ -6617,6 +6617,8 @@ dependencies = [
  "image",
  "libc",
  "linkify",
+ "next-code-tui-render",
+ "next-code-tui-style",
  "notify 7.0.0",
  "ratatui 0.28.1",
  "ratatui-core",

@@ -27,6 +27,8 @@ syntect = "5"
 anstyle = "1"
 supports-color = "3"
 dark-light = "2"
+next-code-tui-render = { path = "../next-code-tui-render" }
+next-code-tui-style = { path = "../next-code-tui-style" }
 
 # Data
 serde = { version = "1", features = ["derive"] }
