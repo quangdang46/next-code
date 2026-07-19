@@ -86,6 +86,7 @@ next-code-tui-render = { path = "../next-code-tui-render" }
 next-code-tui-visual-debug = { path = "../next-code-tui-visual-debug" }
 next-code-tui-session-picker = { path = "../next-code-tui-session-picker", features = ["serde"] }
 next-code-tui-style = { path = "../next-code-tui-style" }
+next-code-ratatui-textarea = { path = "../next-code-ratatui-textarea" }
 terminal-colorsaurus = "1.0"
 next-code-tui-permissions = { path = "../next-code-tui-permissions" }
 next-code-tui-tool-display = { path = "../next-code-tui-tool-display" }
