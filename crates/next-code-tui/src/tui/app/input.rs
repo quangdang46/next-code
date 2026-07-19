@@ -2832,6 +2832,12 @@ impl App {
             return Ok(());
         }
 
+        // Route remaining text editing keys through grok's classify_key_event
+        // for consistent multi-line editing semantics.
+        if self.handle_grok_text_input(code, modifiers) {
+            return Ok(());
+        }
+
         // Never fall through and insert literal text for unhandled Ctrl+key chords. This stays
         // after text_input so Ctrl+Alt/AltGr symbols delivered as final printable text still work.
         if modifiers.contains(KeyModifiers::CONTROL) {
@@ -3518,6 +3524,66 @@ impl App {
             }
         }
         *call_output_tokens_seen = output_tokens;
+    }
+
+    /// Handle text editing keys via grok's classify_key_event.
+    /// Returns true if the key was consumed as a text editing operation.
+    fn handle_grok_text_input(&mut self, code: KeyCode, modifiers: KeyModifiers) -> bool {
+        use next_code_ratatui_textarea::EditCommand as EC;
+        let event = KeyEvent { code, modifiers, kind: crossterm::event::KeyEventKind::Press, state: crossterm::event::KeyEventState::NONE };
+        let Some(cmd) = next_code_ratatui_textarea::classify_key_event(&event) else {
+            return false;
+        };
+        match cmd {
+            EC::Insert(c) => {
+                self.remember_input_undo_state();
+                self.input.insert(self.cursor_pos, c);
+                self.cursor_pos = self.cursor_pos.saturating_add(c.len_utf8());
+            }
+            EC::DeleteGraphemeBackward => {
+                if self.cursor_pos > 0 && !self.input.is_empty() {
+                    self.remember_input_undo_state();
+                    let prev = self.input[..self.cursor_pos].char_indices().next_back().map(|(i,_)| i).unwrap_or(0);
+                    self.input.drain(prev..self.cursor_pos);
+                    self.cursor_pos = prev;
+                }
+            }
+            EC::DeleteGraphemeForward => {
+                if self.cursor_pos < self.input.len() {
+                    self.remember_input_undo_state();
+                    let next = self.cursor_pos + self.input[self.cursor_pos..].chars().next().map(char::len_utf8).unwrap_or(0);
+                    self.input.drain(self.cursor_pos..next);
+                }
+            }
+            EC::DeleteWordBackward(_) | EC::DeleteToLineStart => {
+                if self.cursor_pos > 0 {
+                    self.remember_input_undo_state();
+                    let start = self.input[..self.cursor_pos].trim_end().rfind(|c: char| c.is_whitespace()).map(|i| i + 1).unwrap_or(0);
+                    self.input.drain(start..self.cursor_pos);
+                    self.cursor_pos = start;
+                }
+            }
+            EC::DeleteWordForward(_) | EC::DeleteToLineEnd => {
+                if self.cursor_pos < self.input.len() {
+                    self.remember_input_undo_state();
+                    self.input.truncate(self.cursor_pos);
+                }
+            }
+            EC::MoveGraphemeLeft => {
+                if self.cursor_pos > 0 {
+                    self.cursor_pos = self.input[..self.cursor_pos].char_indices().next_back().map(|(i,_)| i).unwrap_or(0);
+                }
+            }
+            EC::MoveGraphemeRight => {
+                if self.cursor_pos < self.input.len() {
+                    self.cursor_pos += self.input[self.cursor_pos..].chars().next().map(char::len_utf8).unwrap_or(0);
+                }
+            }
+            EC::MoveLogicalLineStart => self.cursor_pos = 0,
+            EC::MoveLogicalLineEnd => self.cursor_pos = self.input.len(),
+            _ => return false,
+        }
+        true
     }
 
     /// Submit input - just sets up message and flags, processing happens in next loop iteration

@@ -7363,6 +7363,7 @@ dependencies = [
  "next-code-protocol",
  "next-code-provider-core",
  "next-code-provider-service",
+ "next-code-ratatui-textarea",
  "next-code-redact",
  "next-code-selfdev-types",
  "next-code-session-types",
