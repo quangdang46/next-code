@@ -1,0 +1,87 @@
+[package]
+name = "xai-grok-pager-render"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Vendored from xai-org/grok-build pager-render — Face presentation layer (PR2)"
+
+[dependencies]
+dunce = "1"
+xai-tty-utils = { path = "../xai-tty-utils" }
+
+ratatui = { version = "0.28", features = [
+    "crossterm",
+    "unstable-widget-ref",
+] }
+# crates.io ratatui 0.28 has no ratatui-core split; keep tui-scrollbar if compatible,
+# otherwise render/scrollbar.rs will need adaptation (tracked during cargo check).
+crossterm = { version = "0.28", features = ["event-stream", "bracketed-paste"] }
+textwrap = "0.16"
+regex = "1"
+unicode-width = "0.2"
+unicode-segmentation = "1.12"
+linkify = "0.10"
+# tui-scrollbar / ratatui-core dropped — incompatible with workspace unicode-width /
+# ratatui 0.28 pin; scrollbar module adapted during check.
+
+xai-grok-markdown = { path = "../xai-grok-markdown" }
+syntect = "5.3"
+anstyle = "1.0"
+supports-color = "3.0"
+
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+toml_edit = { version = "0.22", features = ["serde"] }
+documented = "0.9"
+
+vte = "0.15"
+dark-light = "2"
+
+strum = { version = "0.27", features = ["derive"] }
+anyhow = "1"
+tokio = { version = "1", features = [
+    "sync",
+    "rt",
+    "macros",
+    "rt-multi-thread",
+    "signal",
+    "io-util",
+    "io-std",
+    "time",
+] }
+tracing = "0.1"
+
+# Rename so upstream `use xai_ratatui_*` keeps working with PR1 crates.
+xai-ratatui-textarea = { path = "../next-code-ratatui-textarea", package = "next-code-ratatui-textarea" }
+xai-ratatui-inline = { path = "../next-code-ratatui-inline", package = "next-code-ratatui-inline" }
+
+agent-client-protocol = { version = "0.10.4", features = ["unstable"] }
+xai-grok-config = { path = "../xai-grok-config" }
+xai-grok-shared = { path = "../xai-grok-shared" }
+xai-grok-workspace = { path = "../xai-grok-workspace" }
+xai-grok-telemetry = { path = "../xai-grok-telemetry" }
+xai-grok-tools = { path = "../xai-grok-tools" }
+xai-grok-paths = { path = "../xai-grok-paths" }
+
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff", "gif", "webp"] }
+uuid = { version = "1", features = ["v4"] }
+dirs = "6"
+shellexpand = "3.1"
+url = "2"
+notify = { version = "7", optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Graphics_Gdi"] }
+
+[features]
+default = []
+test-support = []
+
+[dev-dependencies]
+pretty_assertions = "1"
+serial_test = "3"
+tempfile = "3"

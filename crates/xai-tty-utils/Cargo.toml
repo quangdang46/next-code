@@ -1,0 +1,22 @@
+[package]
+name = "xai-tty-utils"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Vendored from xai-org/grok-build — TTY detach utilities (Apache-2.0)"
+
+[dependencies]
+tokio = { version = "1", features = ["process"] }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.30", features = ["signal", "process"] }
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_Console",
+    "Win32_System_JobObjects",
+    "Win32_Security",
+] }

@@ -1,0 +1,13 @@
+[package]
+name = "xai-grok-tools"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Shim: util detach + image validate for pager-render (Grok UI migration PR2)"
+
+[dependencies]
+crc32fast = "1"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp", "bmp", "tiff"] }
+thiserror = "2"
+xai-grok-config = { path = "../xai-grok-config" }
+xai-tty-utils = { path = "../xai-tty-utils" }
