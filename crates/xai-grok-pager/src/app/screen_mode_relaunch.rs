@@ -205,12 +205,18 @@ pub(crate) fn screen_mode_env_value(want_minimal: bool) -> &'static str {
 /// Pasteable shell command when auto re-exec fails (env + flag + `--resume`).
 pub(crate) fn screen_mode_relaunch_resume_hint(session_id: &str, want_minimal: bool) -> String {
     let mode = screen_mode_env_value(want_minimal);
-    let flag = if want_minimal {
-        "--minimal"
+    let cli = super::resume_cli_name();
+    if super::is_next_code_resume_cli(&cli) {
+        // next-code CLI has `--resume` but not Face screen-mode flags.
+        format!("{GROK_SCREEN_MODE_ENV}={mode} {cli} --resume {session_id}")
     } else {
-        "--fullscreen"
-    };
-    format!("{GROK_SCREEN_MODE_ENV}={mode} grok {flag} --resume {session_id}")
+        let flag = if want_minimal {
+            "--minimal"
+        } else {
+            "--fullscreen"
+        };
+        format!("{GROK_SCREEN_MODE_ENV}={mode} {cli} {flag} --resume {session_id}")
+    }
 }
 
 /// Replace the current process with a relaunch into the requested screen mode.
@@ -831,14 +837,26 @@ mod tests {
         // Recovery command must carry GROK_SCREEN_MODE so following the
         // hint after a failed `/fullscreen` does not reopen minimal/inline. The
         // explicit flag keeps the resume in the right mode if the env is dropped.
-        assert_eq!(
-            screen_mode_relaunch_resume_hint("abc-sid", false),
-            "GROK_SCREEN_MODE=fullscreen grok --fullscreen --resume abc-sid"
-        );
-        assert_eq!(
-            screen_mode_relaunch_resume_hint("abc-sid", true),
-            "GROK_SCREEN_MODE=minimal grok --minimal --resume abc-sid"
-        );
+        let cli = crate::app::resume_cli_name();
+        if crate::app::is_next_code_resume_cli(&cli) {
+            assert_eq!(
+                screen_mode_relaunch_resume_hint("abc-sid", false),
+                format!("GROK_SCREEN_MODE=fullscreen {cli} --resume abc-sid")
+            );
+            assert_eq!(
+                screen_mode_relaunch_resume_hint("abc-sid", true),
+                format!("GROK_SCREEN_MODE=minimal {cli} --resume abc-sid")
+            );
+        } else {
+            assert_eq!(
+                screen_mode_relaunch_resume_hint("abc-sid", false),
+                format!("GROK_SCREEN_MODE=fullscreen {cli} --fullscreen --resume abc-sid")
+            );
+            assert_eq!(
+                screen_mode_relaunch_resume_hint("abc-sid", true),
+                format!("GROK_SCREEN_MODE=minimal {cli} --minimal --resume abc-sid")
+            );
+        }
     }
 
     // ── effective_minimal_preference ─────────────────────────────────────

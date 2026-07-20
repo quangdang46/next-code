@@ -6303,6 +6303,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 name = "next-code"
 version = "0.32.0"
 dependencies = [
+ "agent-client-protocol",
  "anyhow",
  "arboard",
  "async-stream",
@@ -6434,6 +6435,8 @@ dependencies = [
  "uuid",
  "walkdir",
  "windows-sys 0.59.0",
+ "xai-acp-lib",
+ "xai-grok-pager",
 ]
 
 [[package]]
@@ -14213,6 +14216,7 @@ dependencies = [
  "agent-client-protocol",
  "ansi-to-tui",
  "anyhow",
+ "async-trait",
  "backon",
  "base64 0.22.1",
  "blake3",
@@ -14233,6 +14237,7 @@ dependencies = [
  "libc",
  "next-code-ratatui-inline",
  "next-code-ratatui-textarea",
+ "next-code-tui-anim",
  "nix 0.29.0",
  "nucleo",
  "obfstr",

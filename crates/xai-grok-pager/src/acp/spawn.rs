@@ -1,14 +1,17 @@
 //! Agent spawning — creates the agent process and ACP channels.
 //!
-//! Simplified to only support GrokShell (in-process) mode.
-//! Subprocess and remote modes can be added later if needed.
+//! Default: in-process GrokShell `MvpAgent` stub.
+//! Override: [`install_agent_factory`] (next-code Face cutover → daemon brain).
 
 use std::rc::Rc;
+use std::sync::Mutex;
 use std::thread;
 
 use anyhow::Result;
 use tokio_util::sync::CancellationToken;
 
+use agent_client_protocol as acp;
+use async_trait::async_trait;
 use xai_acp_lib::{
     AcpAgentChannel, AcpClientChannel, AcpClientTx, AcpGatewayReceiver, AcpGatewaySender,
     acp_channels,
@@ -18,6 +21,20 @@ use xai_grok_shell::{
     auth::AuthManager,
     util::grok_home::grok_home,
 };
+
+/// Factory that builds the in-process ACP agent Face will talk to.
+pub type AgentFactory =
+    Box<dyn FnOnce(AcpClientTx) -> Result<Rc<dyn acp::Agent>> + Send + 'static>;
+
+static AGENT_FACTORY: Mutex<Option<AgentFactory>> = Mutex::new(None);
+
+/// Install a one-shot agent factory used by the next [`spawn_grok_shell`] call.
+///
+/// Intended for the next-code binary to inject a daemon-backed ACP agent so Face
+/// keeps its ACP client surface while the brain stays next-code `serve`.
+pub fn install_agent_factory(factory: AgentFactory) {
+    *AGENT_FACTORY.lock().expect("agent factory lock") = Some(factory);
+}
 
 /// Result of spawning a child agent.
 pub struct SpawnedAgent {
@@ -72,7 +89,10 @@ pub async fn spawn_grok_shell(
     // pager (voice channel) can share the same refreshing bearer.
     let auth_manager_for_pager = auth_manager.clone();
 
-    let spawn_fn: Box<dyn FnOnce(AcpClientTx) -> Result<Rc<MvpAgent>> + Send + 'static> = {
+    let override_factory = AGENT_FACTORY.lock().expect("agent factory lock").take();
+    let spawn_fn: AgentFactory = if let Some(factory) = override_factory {
+        factory
+    } else {
         Box::new(move |client_tx| {
             let gateway: AcpGatewaySender<agent_client_protocol::AgentSide> =
                 AcpGatewaySender::new(client_tx);
@@ -82,7 +102,7 @@ pub async fn spawn_grok_shell(
             if let Some(mc) = memory_config {
                 agent.set_memory_config(mc);
             }
-            Ok(Rc::new(agent))
+            Ok(Rc::new(agent) as Rc<dyn acp::Agent>)
         })
     };
 
@@ -97,12 +117,55 @@ pub async fn spawn_grok_shell(
     })
 }
 
+/// Sized wrapper so `AcpGatewayReceiver` can dispatch to a type-erased agent.
+/// (`Rc<dyn Agent>` alone does not implement `Agent` — the blanket is `Rc<T: Agent>` with `T: Sized`.)
+struct AnyAgent(Rc<dyn acp::Agent>);
+
+#[async_trait(?Send)]
+impl acp::Agent for AnyAgent {
+    async fn initialize(
+        &self,
+        args: acp::InitializeRequest,
+    ) -> acp::Result<acp::InitializeResponse> {
+        self.0.initialize(args).await
+    }
+
+    async fn authenticate(
+        &self,
+        args: acp::AuthenticateRequest,
+    ) -> acp::Result<acp::AuthenticateResponse> {
+        self.0.authenticate(args).await
+    }
+
+    async fn new_session(
+        &self,
+        args: acp::NewSessionRequest,
+    ) -> acp::Result<acp::NewSessionResponse> {
+        self.0.new_session(args).await
+    }
+
+    async fn load_session(
+        &self,
+        args: acp::LoadSessionRequest,
+    ) -> acp::Result<acp::LoadSessionResponse> {
+        self.0.load_session(args).await
+    }
+
+    async fn prompt(&self, args: acp::PromptRequest) -> acp::Result<acp::PromptResponse> {
+        self.0.prompt(args).await
+    }
+
+    async fn cancel(&self, args: acp::CancelNotification) -> acp::Result<()> {
+        self.0.cancel(args).await
+    }
+}
+
 /// Spawn an agent in a dedicated thread with direct RPC dispatch.
 ///
 /// The agent runs on a single-threaded tokio LocalSet runtime.
 /// RPC requests go directly to the agent via Rc, bypassing simplex pipes.
 fn spawn_agent_thread_direct(
-    spawn_agent: Box<dyn FnOnce(AcpClientTx) -> Result<Rc<MvpAgent>> + Send + 'static>,
+    spawn_agent: AgentFactory,
     channel: AcpAgentChannel,
     cancel: CancellationToken,
 ) -> Result<thread::JoinHandle<Result<()>>> {
@@ -115,7 +178,7 @@ fn spawn_agent_thread_direct(
             let local = tokio::task::LocalSet::new();
             local.block_on(&rt, async move {
                 let client_tx = channel.tx.clone();
-                let agent_rc = spawn_agent(client_tx)?;
+                let agent_rc = AnyAgent(spawn_agent(client_tx)?);
 
                 // Direct dispatch: RPC requests go straight to the agent
                 let gw_rx = AcpGatewayReceiver::new(channel.rx, agent_rc).with_tracing(true);

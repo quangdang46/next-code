@@ -7,6 +7,8 @@ pub mod dispatch;
 pub mod hot_exec;
 pub mod login;
 pub mod output;
+pub mod pager_agent;
+pub mod pager_launch;
 pub mod proctitle;
 pub mod provider_doctor;
 pub mod provider_init;

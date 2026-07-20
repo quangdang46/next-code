@@ -3,6 +3,9 @@
 ## Origin Sync (fork management)
 This repo (`quangdang46/next-code`) is a rebranded fork of `quangdang46/next-code`. Several modules have been extracted into separate repos. When syncing from upstream, use the `origin-sync` skill: `skill(name="origin-sync")`. It provides a structured workflow for classifying conflicts (extracted-code, local-extension, upstream-only, dep, new-feature) and resolving them correctly.
 
+## Grok Face UI migration
+When replacing next-code interactive UI with Grok Face (`xai-grok-pager`) — copy, delete old TUI, wire ACP/daemon — use the `grok-migration-workflow` skill: `skill(name="grok-migration-workflow")`. LOOK→PLAN→BUILD, root-cause before fixes, research grok-build before inventing wire behavior.
+
 
 
 ## Development Workflow
