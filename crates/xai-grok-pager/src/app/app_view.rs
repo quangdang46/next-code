@@ -5195,9 +5195,11 @@ pub(crate) mod tests {
         crate::memory_release::run_deferred_release();
         let (frame_tx, _frame_rx) =
             std::sync::mpsc::channel::<crate::render::draw::WriterPayload>();
-        let writer =
-            crate::render::draw::TermWriter::new(frame_tx, crate::render::draw::WriterSync::new())
-                .expect("single test writer");
+        let writer = crate::render::draw::SharedTermWriter::new(
+            frame_tx,
+            crate::render::draw::WriterSync::new(),
+        )
+        .expect("single test writer");
         let backend = ratatui::backend::CrosstermBackend::new(writer);
         let mut terminal = xai_ratatui_inline::Terminal::with_options(
             backend,

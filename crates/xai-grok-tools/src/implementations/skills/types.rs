@@ -76,6 +76,8 @@ pub struct SkillInfo {
     pub disable_model_invocation: bool,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
 }
 
 impl Default for SkillInfo {
@@ -106,6 +108,7 @@ impl Default for SkillInfo {
             user_invocable: true,
             disable_model_invocation: false,
             enabled: true,
+            body: None,
         }
     }
 }

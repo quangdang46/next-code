@@ -12,3 +12,7 @@ pub mod roster;
 pub mod session_registry_client;
 
 pub use mvp_agent::MvpAgent;
+pub use roster::{
+    RosterActivity, RosterChanged, RosterEntry, RosterListResponse, RosterOrigin,
+    SESSIONS_CHANGED_METHOD, SESSIONS_LIST_METHOD,
+};

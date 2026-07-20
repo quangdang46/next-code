@@ -49,6 +49,32 @@ pub struct MediaGenOutput {
     pub uploaded_url: Option<String>,
 }
 
+impl MediaGenOutput {
+    pub fn new(path: PathBuf) -> Self {
+        let filename = path
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("media")
+            .to_string();
+        Self {
+            path,
+            filename,
+            session_folder: String::new(),
+            uploaded_url: None,
+        }
+    }
+
+    /// Uploaded-only media (no local path) — used by tracker tests.
+    pub fn uploaded(uploaded_url: impl AsRef<str>) -> Self {
+        Self {
+            path: PathBuf::new(),
+            filename: String::new(),
+            session_folder: String::new(),
+            uploaded_url: Some(uploaded_url.as_ref().to_string()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BashOutput {
     pub output: Vec<u8>,

@@ -126,5 +126,6 @@ test-support = ["xai-grok-pager-render/test-support"]
 [dev-dependencies]
 xai-grok-pager-render = { path = "../xai-grok-pager-render", features = ["test-support"] }
 pretty_assertions = "1"
+insta = "1"
 tempfile = "3"
 serial_test = "3"

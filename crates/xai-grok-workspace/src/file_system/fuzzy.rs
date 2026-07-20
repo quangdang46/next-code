@@ -1,12 +1,11 @@
-//! Empty fuzzy matcher stubs (no nucleo / ignore walk).
+//! Empty fuzzy matcher stubs (nucleo Utf32String path for pager test fixtures).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Default)]
 pub struct FuzzyMatchResult {
-    /// Path string (upstream uses nucleo::Utf32String; String is Display-compatible).
-    pub path: String,
+    pub path: nucleo::Utf32String,
     pub score: u32,
     pub indices: Vec<u32>,
     pub is_dir: bool,

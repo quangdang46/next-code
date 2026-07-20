@@ -29,7 +29,11 @@ pub struct BillingConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub used: Option<Cent>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub billing_period_start: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub billing_period_end: Option<String>,
+    #[serde(default)]
+    pub history: Vec<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_demand_cap: Option<Cent>,
     #[serde(skip_serializing_if = "Option::is_none")]

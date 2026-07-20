@@ -99,3 +99,27 @@ impl BuiltinAgentName {
         ]
     }
 }
+
+impl std::str::FromStr for BuiltinAgentName {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "grok-build" | "GrokBuild" => Ok(Self::GrokBuild),
+            "grok-build-concise" | "GrokBuildConcise" => Ok(Self::GrokBuildConcise),
+            "grok-build-plan" | "GrokBuildPlan" => Ok(Self::GrokBuildPlan),
+            "grok-build-plan-no-subagents" | "GrokBuildPlanNoSubagents" => {
+                Ok(Self::GrokBuildPlanNoSubagents)
+            }
+            "grok-build-ask-user" | "GrokBuildAskUser" => Ok(Self::GrokBuildAskUser),
+            "codex" | "Codex" => Ok(Self::Codex),
+            "opencode" | "Opencode" => Ok(Self::Opencode),
+            "general-purpose" | "GeneralPurpose" => Ok(Self::GeneralPurpose),
+            "explore" | "Explore" => Ok(Self::Explore),
+            "plan" | "Plan" => Ok(Self::Plan),
+            "browser-use" | "BrowserUse" => Ok(Self::BrowserUse),
+            "grok-build-orchestrator" | "GrokBuildOrchestrator" => Ok(Self::GrokBuildOrchestrator),
+            other => Err(format!("unknown builtin agent: {other}")),
+        }
+    }
+}

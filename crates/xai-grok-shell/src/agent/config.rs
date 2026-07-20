@@ -392,13 +392,31 @@ pub struct RuntimeResolutionContext<'a> {
     pub storage_mode: Option<&'a str>,
 }
 
-#[derive(Debug, Clone, thiserror::Error)]
-#[error("model switch incompatible with agent")]
-pub struct ModelSwitchIncompatibleAgentError;
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelSwitchIncompatibleAgentError {
+    pub code: String,
+    pub active_agent_type: String,
+    pub required_agent_type: String,
+    pub model_id: String,
+    pub suggestion: String,
+}
 
 impl ModelSwitchIncompatibleAgentError {
-    pub fn from_acp_error(_err: &agent_client_protocol::Error) -> Option<Self> {
-        None
+    pub fn from_acp_error(err: &agent_client_protocol::Error) -> Option<Self> {
+        let data = err.data.as_ref()?;
+        let code = data.get("code")?.as_str()?;
+        if code != "MODEL_SWITCH_INCOMPATIBLE_AGENT" {
+            return None;
+        }
+        serde_json::from_value(data.clone()).ok()
+    }
+
+    pub fn user_message(&self) -> String {
+        format!(
+            "Cannot switch to model '{}': it requires agent '{}' but the active agent is '{}'.",
+            self.model_id, self.required_agent_type, self.active_agent_type,
+        )
     }
 }
 

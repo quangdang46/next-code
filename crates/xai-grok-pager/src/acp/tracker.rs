@@ -6488,7 +6488,7 @@ mod tests {
     fn media_gen_ref_skips_uploaded_only_video() {
         let output =
             ToolOutput::ImageToVideo(xai_grok_tools::types::output::MediaGenOutput::uploaded(
-                "https://bucket.example/videos/x.mp4".into(),
+                "https://bucket.example/videos/x.mp4",
             ));
         let tc = acp::ToolCall::new(
             acp::ToolCallId::new(Arc::from("zdr-upload")),

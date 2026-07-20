@@ -9,6 +9,14 @@ pub const GROK_COM_METHOD_ID: &str = "xai.grok_com";
 pub const OIDC_METHOD_ID: &str = "xai.oidc";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PreferredAuthMethod {
+    ApiKey,
+    Oidc,
+    #[default]
+    Unspecified,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum AuthMethodKind {
     XaiApiKey,
     CachedToken,
@@ -39,5 +47,28 @@ impl AuthMethodKind {
 
     pub fn needs_interactive_login(self) -> bool {
         matches!(self, Self::GrokCom | Self::Oidc)
+    }
+}
+
+/// Inputs for [`build_auth_methods`] — shape matches upstream; stub ignores most.
+pub struct AuthMethodsBuildInputs<'a> {
+    pub has_external_api_key: bool,
+    pub has_cached_token: bool,
+    pub has_enterprise_oidc: bool,
+    pub enterprise_oidc_issuer: Option<&'a str>,
+    pub login_label: Option<&'a str>,
+    pub has_auth_provider_command: bool,
+    pub preferred_method: Option<PreferredAuthMethod>,
+}
+
+pub struct BuiltAuthMethods {
+    pub methods: Vec<acp::AuthMethod>,
+    pub default_auth_method_id: Option<acp::AuthMethodId>,
+}
+
+pub fn build_auth_methods(_inputs: AuthMethodsBuildInputs<'_>) -> BuiltAuthMethods {
+    BuiltAuthMethods {
+        methods: vec![],
+        default_auth_method_id: None,
     }
 }

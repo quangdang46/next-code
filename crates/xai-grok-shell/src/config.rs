@@ -61,8 +61,8 @@ pub fn add_dismissed_plugin_cta(_plugin_id: &str) -> Result<(), Box<dyn std::err
 }
 
 pub fn add_dismissed_plugin_cta_to_file(
-    _path: &Path,
     _plugin_id: &str,
+    _path: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }

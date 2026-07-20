@@ -1392,7 +1392,7 @@ mod tests {
         let (tx, _rx) = std::sync::mpsc::channel::<crate::render::draw::WriterPayload>();
         let sync = crate::render::draw::WriterSync::new();
         let backend = CrosstermBackend::new(
-            crate::render::draw::TermWriter::new(tx, sync).expect("single test writer"),
+            crate::render::draw::SharedTermWriter::new(tx, sync).expect("single test writer"),
         );
         let terminal = xai_ratatui_inline::Terminal::with_options(
             backend,
