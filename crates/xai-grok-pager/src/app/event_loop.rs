@@ -2810,34 +2810,19 @@ fn sync_appearance_watcher(watcher: &mut Option<SystemAppearanceWatcher>) {
 
 /// Build [`ExitInfo`] from the active agent's session (if any).
 ///
-/// Sole construction site of [`super::ExitSummary`]: fullscreen quits only
-/// (leaving the alt screen wipes the transcript; inline/minimal quits keep it
-/// visible in native scrollback), and only with at least one conversation
-/// line (a bare title is noise). Deliberately the root agent even when a
-/// subagent view is focused — `--resume` restores the root session, and a
-/// subagent's latest "prompt" is the parent's task brief, not user input.
+/// Quit hint prints only the resume command — no transcript summary replay.
+/// Deliberately the root agent even when a subagent view is focused —
+/// `--resume` restores the root session.
 ///
 /// `exit_info` is only consumed on the plain-quit path; a pending `relaunch`
 /// short-circuits before it is read and carries its own session id.
 fn make_run_result(app: &AppView) -> RunResult {
     let exit_info = app.active_agent().and_then(|agent| {
         let sid = agent.session.session_id.as_ref()?;
-        let summary = if app.screen_mode.is_fullscreen() {
-            use crate::views::session_title;
-            let last_prompt = session_title::last_user_prompt_line(agent);
-            let last_response = session_title::last_agent_message_line(agent);
-            (last_prompt.is_some() || last_response.is_some()).then(|| super::ExitSummary {
-                title: session_title::entry_title(agent),
-                last_prompt,
-                last_response,
-            })
-        } else {
-            None
-        };
+        // Quit hint prints only the resume command (no transcript replay).
         Some(super::ExitInfo {
             session_id: sid.0.to_string(),
             minimal: app.screen_mode.is_minimal(),
-            summary,
         })
     });
     RunResult {
@@ -4868,62 +4853,29 @@ mod tests {
     }
 
     #[test]
-    fn make_run_result_fullscreen_quit_builds_summary() {
+    fn make_run_result_quit_has_session_id() {
         let app = seeded_quit_app(crate::app::ScreenMode::Fullscreen);
         let info = make_run_result(&app).exit_info.expect("agent exit info");
         assert_eq!(info.session_id, "test-session");
         assert!(!info.minimal);
-        let summary = info.summary.expect("summary on fullscreen quit");
-        // Deliberate: title comes from the first prompt, last_prompt from the newest.
-        assert_eq!(summary.title, "fix the flaky CI test");
-        assert_eq!(
-            summary.last_prompt.as_deref(),
-            Some("make the suite deterministic")
-        );
-        assert_eq!(summary.last_response.as_deref(), Some("Pinned the seed."));
     }
 
     #[test]
-    fn make_run_result_unanswered_prompt_omits_stale_response() {
-        use crate::scrollback::block::RenderBlock;
-        let mut app = seeded_quit_app(crate::app::ScreenMode::Fullscreen);
-        let ActiveView::Agent(id) = app.active_view else {
-            panic!("test app must start on an agent");
-        };
-        app.agents
-            .get_mut(&id)
-            .unwrap()
-            .scrollback
-            .push_block(RenderBlock::user_prompt("now rerun the whole suite"));
-        let info = make_run_result(&app).exit_info.expect("agent exit info");
-        let summary = info.summary.expect("prompt alone still summarizes");
-        assert_eq!(
-            summary.last_prompt.as_deref(),
-            Some("now rerun the whole suite")
-        );
-        // The earlier reply answered an older prompt — it must not appear here.
-        assert!(summary.last_response.is_none());
-    }
-
-    #[test]
-    fn make_run_result_inline_and_minimal_quits_omit_summary() {
+    fn make_run_result_inline_and_minimal_set_minimal_flag() {
         let app = seeded_quit_app(crate::app::ScreenMode::Inline);
         let info = make_run_result(&app).exit_info.expect("agent exit info");
-        assert!(info.summary.is_none());
         assert!(!info.minimal);
 
         let app = seeded_quit_app(crate::app::ScreenMode::Minimal);
         let info = make_run_result(&app).exit_info.expect("agent exit info");
-        assert!(info.summary.is_none());
         assert!(info.minimal);
     }
 
     #[test]
-    fn make_run_result_empty_session_omits_summary() {
+    fn make_run_result_empty_session_still_has_exit_info() {
         let mut app = crate::app::app_view::tests::test_app_with_agent();
         app.screen_mode = crate::app::ScreenMode::Fullscreen;
-        let info = make_run_result(&app).exit_info.expect("agent exit info");
-        assert!(info.summary.is_none());
+        assert!(make_run_result(&app).exit_info.is_some());
     }
 
     #[test]

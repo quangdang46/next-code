@@ -52,18 +52,22 @@ pub(crate) async fn run_face_pager(
     }));
 
     let relaunch = xai_grok_pager::app::run(pager_args, None).await?;
-    // Quit diag file is written by Face; point the operator at it after return
-    // (may be invisible if the TTY is still black — open in another tab).
-    let diag = std::env::var_os("NEXT_CODE_FACE_QUIT_LOG").map(PathBuf::from).unwrap_or_else(|| {
-        #[cfg(windows)]
-        {
-            if let Some(la) = std::env::var_os("LOCALAPPDATA") {
-                return PathBuf::from(la).join("next-code").join("face-quit-diag.log");
-            }
-        }
-        PathBuf::from(".next-code").join("face-quit-diag.log")
-    });
-    eprintln!("Face quit diag: {}", diag.display());
+    // Opt-in only: Face still writes face-quit-diag.log; do not spam the quit
+    // tail unless the operator asked for the path.
+    if std::env::var_os("NEXT_CODE_FACE_QUIT_DIAG").is_some() {
+        let diag = std::env::var_os("NEXT_CODE_FACE_QUIT_LOG")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                #[cfg(windows)]
+                {
+                    if let Some(la) = std::env::var_os("LOCALAPPDATA") {
+                        return PathBuf::from(la).join("next-code").join("face-quit-diag.log");
+                    }
+                }
+                PathBuf::from(".next-code").join("face-quit-diag.log")
+            });
+        eprintln!("Face quit diag: {}", diag.display());
+    }
     if relaunch {
         eprintln!("Update accepted. Relaunch `next-code` to continue.");
     }

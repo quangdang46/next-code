@@ -346,20 +346,6 @@ fn finish_theme_after_probe(requested_minimal: bool, effective_mode: ScreenMode)
 pub(crate) struct ExitInfo {
     pub session_id: String,
     pub minimal: bool,
-    /// Glanceable session tail; `Some` exactly when it should print. The
-    /// presence policy lives at the sole construction site, `make_run_result`.
-    pub summary: Option<ExitSummary>,
-}
-/// Session tail printed above the resume command on fullscreen quits.
-///
-/// Invariant: every field is a pre-sanitized single line (built from the
-/// `views::session_title` helpers), so the printer only width-truncates.
-pub(crate) struct ExitSummary {
-    /// Display title (rename > generated > first prompt).
-    pub title: String,
-    pub last_prompt: Option<String>,
-    /// `None` when the newest prompt is still unanswered.
-    pub last_response: Option<String>,
 }
 /// Resolve leader mode → `(use_leader, policy_disable_reason)`.
 ///
@@ -790,35 +776,63 @@ pub async fn run(
         Err(run_error) => Err(run_error),
     }
 }
+/// CLI name for pasteable `--resume` hints.
+///
+/// Prefer `XAI_PAGER_RESUME_CLI`, else the process argv0 stem when it looks like
+/// `grok` / `next-code` / `nextcode` (embeds). Unit-test binaries fall back to
+/// `grok` so stock Face expectations stay stable.
+pub(crate) fn resume_cli_name() -> String {
+    if let Ok(name) = std::env::var("XAI_PAGER_RESUME_CLI") {
+        let name = name.trim();
+        if !name.is_empty() {
+            return name.to_owned();
+        }
+    }
+    if let Some(stem) = std::env::args_os().next().and_then(|a| {
+        std::path::PathBuf::from(a)
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+    }) {
+        let key = stem.to_ascii_lowercase();
+        if key == "grok" || key == "next-code" || key == "nextcode" || key.starts_with("next-code")
+        {
+            return stem;
+        }
+    }
+    "grok".to_owned()
+}
+
+pub(crate) fn is_next_code_resume_cli(cli: &str) -> bool {
+    let key = cli.to_ascii_lowercase();
+    key == "next-code" || key == "nextcode" || key.starts_with("next-code")
+}
+
+/// Pasteable resume command. next-code embeds expose `--resume` but not Face
+/// `--minimal` / `--fullscreen` flags.
+pub(crate) fn format_resume_command(cli: &str, session_id: &str, minimal: bool) -> String {
+    if is_next_code_resume_cli(cli) {
+        format!("{cli} --resume {session_id}")
+    } else if minimal {
+        format!("{cli} --minimal --resume {session_id}")
+    } else {
+        format!("{cli} --resume {session_id}")
+    }
+}
+
 /// Plain-quit "Resume this session with…" lines (after terminal restore).
 ///
-/// A summary, when present — title, last prompt, last response, one line
-/// each, width-truncated — precedes the command so a glance at the pane
-/// shows which session lives there and where it left off.
-/// Best-effort: closed-pane EIO/BrokenPipe must not panic (`panic = "abort"`).
-fn print_exit_resume_hint(info: &ExitInfo, max_width: usize, w: &mut impl Write) {
-    use crate::render::line_utils::truncate_str;
+/// Session transcript summary is intentionally omitted: replaying the last
+/// prompt/error on the main screen after LeaveAlternateScreen is noisy
+/// (especially provider/token failures). Best-effort: closed-pane
+/// EIO/BrokenPipe must not panic (`panic = "abort"`).
+fn print_exit_resume_hint(info: &ExitInfo, _max_width: usize, w: &mut impl Write) {
     let _ = writeln!(w);
-    if let Some(summary) = &info.summary {
-        let _ = writeln!(w, "{}", truncate_str(&summary.title, max_width));
-        if let Some(prompt) = summary.last_prompt.as_deref() {
-            let _ = writeln!(w, "> {}", truncate_str(prompt, max_width.saturating_sub(2)));
-        }
-        if let Some(response) = summary.last_response.as_deref() {
-            let _ = writeln!(
-                w,
-                "  {}",
-                truncate_str(response, max_width.saturating_sub(2))
-            );
-        }
-        let _ = writeln!(w);
-    }
     let _ = writeln!(w, "Resume this session with:");
-    if info.minimal {
-        let _ = writeln!(w, "  grok --minimal --resume {}", info.session_id);
-    } else {
-        let _ = writeln!(w, "  grok --resume {}", info.session_id);
-    }
+    let _ = writeln!(
+        w,
+        "  {}",
+        format_resume_command(&resume_cli_name(), &info.session_id, info.minimal)
+    );
 }
 /// Screen-mode relaunch failure fallback (same quit tail as plain resume).
 fn print_relaunch_failure_hint(
@@ -1959,76 +1973,54 @@ mod tests {
             Err(io::Error::from_raw_os_error(5))
         }
     }
-    /// [`ExitInfo`] with no summary, as built for inline/minimal quits.
+    /// [`ExitInfo`] as built for quit resume hints.
     fn bare_exit_info(session_id: &str, minimal: bool) -> ExitInfo {
         ExitInfo {
             session_id: session_id.to_string(),
             minimal,
-            summary: None,
         }
     }
     #[test]
     fn print_exit_resume_hint_writes_expected_lines() {
         let mut buf = Vec::new();
         print_exit_resume_hint(&bare_exit_info("sess-abc", false), 80, &mut buf);
-        assert_eq!(
-            String::from_utf8(buf).unwrap(),
-            "\nResume this session with:\n  grok --resume sess-abc\n"
-        );
+        let out = String::from_utf8(buf).unwrap();
+        assert!(out.starts_with("\nResume this session with:\n  "));
+        assert!(out.contains(" --resume sess-abc\n"));
+        // Default under cargo test is stock Face branding.
+        assert!(out.contains(&format!(
+            "  {}\n",
+            format_resume_command(&resume_cli_name(), "sess-abc", false)
+        )));
     }
     #[test]
     fn print_exit_resume_hint_includes_minimal_flag() {
         let mut buf = Vec::new();
         print_exit_resume_hint(&bare_exit_info("sess-abc", true), 80, &mut buf);
+        let out = String::from_utf8(buf).unwrap();
         assert_eq!(
-            String::from_utf8(buf).unwrap(),
-            "\nResume this session with:\n  grok --minimal --resume sess-abc\n"
-        );
-    }
-    #[test]
-    fn print_exit_resume_hint_includes_session_summary() {
-        let info = ExitInfo {
-            session_id: "sess-abc".to_string(),
-            minimal: false,
-            summary: Some(ExitSummary {
-                title: "Fix flaky CI test".to_string(),
-                last_prompt: Some("make the suite deterministic".to_string()),
-                last_response: Some("Pinned the seed; 200 consecutive green runs.".to_string()),
-            }),
-        };
-        let mut buf = Vec::new();
-        print_exit_resume_hint(&info, 80, &mut buf);
-        assert_eq!(
-            String::from_utf8(buf).unwrap(),
-            concat!(
-                "\n",
-                "Fix flaky CI test\n",
-                "> make the suite deterministic\n",
-                "  Pinned the seed; 200 consecutive green runs.\n",
-                "\n",
-                "Resume this session with:\n",
-                "  grok --resume sess-abc\n",
+            out,
+            format!(
+                "\nResume this session with:\n  {}\n",
+                format_resume_command(&resume_cli_name(), "sess-abc", true)
             )
         );
     }
+
     #[test]
-    fn print_exit_resume_hint_truncates_summary_to_width() {
-        let info = ExitInfo {
-            session_id: "sess-abc".to_string(),
-            minimal: false,
-            summary: Some(ExitSummary {
-                title: "t".repeat(50),
-                last_prompt: Some("p".repeat(50)),
-                last_response: Some("r".repeat(50)),
-            }),
-        };
-        let mut buf = Vec::new();
-        print_exit_resume_hint(&info, 20, &mut buf);
-        let out = String::from_utf8(buf).unwrap();
-        assert!(out.contains(&format!("\n{}…\n", "t".repeat(19))));
-        assert!(out.contains(&format!("\n> {}…\n", "p".repeat(17))));
-        assert!(out.contains(&format!("\n  {}…\n", "r".repeat(17))));
-        assert!(out.contains("  grok --resume sess-abc\n"));
+    fn format_resume_command_uses_nextcode_without_face_flags() {
+        assert_eq!(
+            format_resume_command("nextcode", "sess-1", true),
+            "nextcode --resume sess-1"
+        );
+        assert_eq!(
+            format_resume_command("next-code", "sess-1", false),
+            "next-code --resume sess-1"
+        );
+        assert_eq!(
+            format_resume_command("grok", "sess-1", true),
+            "grok --minimal --resume sess-1"
+        );
     }
     #[test]
     fn print_relaunch_failure_hint_writes_expected_lines() {
@@ -2043,24 +2035,13 @@ mod tests {
             )
         );
     }
-    /// [`ExitInfo`] with a full summary, for the failing-writer tests.
-    fn full_exit_info(session_id: &str) -> ExitInfo {
-        ExitInfo {
-            summary: Some(ExitSummary {
-                title: "title".to_string(),
-                last_prompt: Some("prompt".to_string()),
-                last_response: Some("response".to_string()),
-            }),
-            ..bare_exit_info(session_id, false)
-        }
-    }
     #[test]
     fn print_hints_survive_eio() {
         let mut w = AlwaysFailWrite;
         print_exit_resume_hint(&bare_exit_info("sess-abc", false), 80, &mut w);
         print_exit_resume_hint(&bare_exit_info("sess-abc", true), 80, &mut w);
-        print_exit_resume_hint(&full_exit_info("sess-abc"), 80, &mut w);
-        print_relaunch_failure_hint(&"exec failed", "sess-xyz", true, &mut w);
+        print_relaunch_failure_hint(&"exec failed", "pipe-sid", false, &mut w);
+        print_relaunch_failure_hint(&"exec failed", "pipe-sid", true, &mut w);
     }
     /// Close the *read* end so writes on the write end get EPIPE
     /// (SIGPIPE is SIG_IGN → BrokenPipe, not process death).
@@ -2077,7 +2058,6 @@ mod tests {
         let mut writer = unsafe { std::fs::File::from_raw_fd(fds[1]) };
         print_exit_resume_hint(&bare_exit_info("pipe-sid", false), 80, &mut writer);
         print_exit_resume_hint(&bare_exit_info("pipe-sid", true), 80, &mut writer);
-        print_exit_resume_hint(&full_exit_info("pipe-sid"), 80, &mut writer);
         print_relaunch_failure_hint(&"exec failed", "pipe-sid", false, &mut writer);
     }
 }
