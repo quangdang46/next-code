@@ -99,6 +99,11 @@ async fn request_history(session: &DaemonSession) -> Result<ServerEvent> {
 pub(crate) struct NextCodeFaceAgent {
     gateway: AcpGatewaySender<acp::AgentSide>,
     sessions: RefCell<HashMap<String, Rc<DaemonSession>>>,
+    /// Tool input accumulation buffer, keyed by tool call id.
+    /// Mirrors EventMapper::tool_inputs in acp.rs.
+    tool_inputs: RefCell<HashMap<String, String>>,
+    /// Current tool ID for ToolInput accumulation (ToolInput has no id field).
+    current_tool_id: RefCell<Option<String>>,
 }
 
 impl NextCodeFaceAgent {
@@ -106,6 +111,8 @@ impl NextCodeFaceAgent {
         Self {
             gateway,
             sessions: RefCell::new(HashMap::new()),
+            tool_inputs: RefCell::new(HashMap::new()),
+            current_tool_id: RefCell::new(None),
         }
     }
 
@@ -225,18 +232,24 @@ impl NextCodeFaceAgent {
             .await;
     }
 
-    /// Emit a `ToolCallUpdate` with the given status.
+    /// Emit a `ToolCallUpdate` with the given status and optional raw_input.
     async fn emit_tool_update(
         &self,
         session_id: &str,
         tool_id: &str,
         name: &str,
         status: ToolCallStatus,
+        raw_input: Option<serde_json::Value>,
     ) {
         let fields = ToolCallUpdateFields::new()
             .status(status)
             .title(Self::tool_title(name))
             .kind(Self::tool_kind(name));
+        let fields = if let Some(input) = raw_input {
+            fields.raw_input(input)
+        } else {
+            fields
+        };
         let _ = self
             .gateway
             .session_notification(acp::SessionNotification::new(
@@ -249,7 +262,8 @@ impl NextCodeFaceAgent {
             .await;
     }
 
-    /// Emit a `ToolCallUpdate` with Completed status and raw output.
+    /// Emit a `ToolCallUpdate` with Completed/Failed status, content blocks,
+    /// and raw output. Content blocks drive the Face tool result rendering.
     async fn emit_tool_done(
         &self,
         session_id: &str,
@@ -257,20 +271,44 @@ impl NextCodeFaceAgent {
         name: &str,
         output: &str,
         error: &Option<String>,
+        raw_input: Option<serde_json::Value>,
     ) {
         let status = if error.is_some() {
             ToolCallStatus::Failed
         } else {
             ToolCallStatus::Completed
         };
+        // Build raw_output as ToolOutput::Bash so Face tracker
+        // extract_bash_output_from_value finds the output bytes.
+        let exit_code = if error.is_some() { 1 } else { 0 };
+        let raw_output = Some(serde_json::json!({
+            "type": "Bash",
+            "output": output.as_bytes(),
+            "exit_code": exit_code,
+            "command": name,
+            "description": null,
+            "timed_out": false,
+            "truncated": false,
+            "signal": null,
+            "current_dir": "",
+            "output_file": "",
+            "total_bytes": output.len(),
+            "output_delta": null,
+            "was_bare_echo": false,
+        }));
         let fields = ToolCallUpdateFields::new()
             .status(status)
             .title(Self::tool_title(name))
             .kind(Self::tool_kind(name))
-            .raw_output(Some(serde_json::json!({
-                "output": output,
-                "error": error,
-            })));
+            .content(Some(vec![
+                acp::ContentBlock::Text(acp::TextContent::new(output)).into(),
+            ]))
+            .raw_output(raw_output);
+        let fields = if let Some(input) = raw_input {
+            fields.raw_input(input)
+        } else {
+            fields
+        };
         let _ = self
             .gateway
             .session_notification(acp::SessionNotification::new(
@@ -313,6 +351,13 @@ impl NextCodeFaceAgent {
                 )),
             ))
             .await;
+    }
+
+    /// Parse accumulated tool input as JSON and return the Value.
+    fn accumulated_raw_input(&self, tool_id: &str) -> Option<serde_json::Value> {
+        let buffer = self.tool_inputs.borrow();
+        let input = buffer.get(tool_id)?;
+        serde_json::from_str(input).ok()
     }
 
     /// Emit a session-info-update for renamed sessions.
@@ -464,13 +509,25 @@ impl acp::Agent for NextCodeFaceAgent {
                 }
                 // Tool lifecycle — typed ACP (Grok way)
                 ServerEvent::ToolStart { id, name } => {
+                    *self.current_tool_id.borrow_mut() = Some(id.clone());
+                    self.tool_inputs.borrow_mut().entry(id.clone()).or_default();
                     self.emit_tool_call(&session_id, &id, &name).await;
                 }
-                ServerEvent::ToolInput { .. } => {
-                    // Accumulate input; no Face notification needed per event
+                ServerEvent::ToolInput { delta } => {
+                    // Accumulate input delta into buffer for current tool
+                    // ToolInput has no id — use current_tool_id (mirrors EventMapper)
+                    let tid = self.current_tool_id.borrow().clone();
+                    if let Some(tid) = tid {
+                        self.tool_inputs.borrow_mut()
+                            .entry(tid)
+                            .or_default()
+                            .push_str(&delta);
+                    }
                 }
                 ServerEvent::ToolExec { id, name } => {
-                    self.emit_tool_update(&session_id, &id, &name, ToolCallStatus::InProgress)
+                    *self.current_tool_id.borrow_mut() = Some(id.clone());
+                    let raw_input = self.accumulated_raw_input(&id);
+                    self.emit_tool_update(&session_id, &id, &name, ToolCallStatus::InProgress, raw_input)
                         .await;
                 }
                 ServerEvent::ToolDone {
@@ -479,8 +536,10 @@ impl acp::Agent for NextCodeFaceAgent {
                     output,
                     error,
                 } => {
-                    self.emit_tool_done(&session_id, &id, &name, &output, &error)
+                    let raw_input = self.accumulated_raw_input(&id);
+                    self.emit_tool_done(&session_id, &id, &name, &output, &error, raw_input)
                         .await;
+                    self.tool_inputs.borrow_mut().remove(&id);
                 }
                 ServerEvent::GeneratedImage {
                     id,
