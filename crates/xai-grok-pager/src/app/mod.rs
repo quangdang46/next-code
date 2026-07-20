@@ -686,6 +686,12 @@ pub async fn run(
         writer_sync,
         cursor_blink,
     )?;
+    face_quit_diag(&format!(
+        "init_terminal effective_mode={:?} fullscreen={} entered_alt={}",
+        screen_mode,
+        screen_mode.is_fullscreen(),
+        screen_mode.is_fullscreen(),
+    ));
     MINIMAL_SHOW_SWITCH_BACK_TO_FULLSCREEN.store(
         relaunched_into_minimal && screen_mode.is_minimal(),
         Ordering::Release,
@@ -723,8 +729,20 @@ pub async fn run(
         writer_event_rx,
     )
     .await;
+    face_quit_diag(&format!(
+        "event_loop_done ok={} screen_mode={:?} fullscreen={} minimal={}",
+        result.is_ok(),
+        screen_mode,
+        screen_mode.is_fullscreen(),
+        screen_mode.is_minimal(),
+    ));
     crate::unified_log::flush_blocking().await;
+    face_quit_diag("restore_terminal_begin");
     let restore_result = restore_terminal(terminal, writer_thread, screen_mode);
+    face_quit_diag(&format!(
+        "restore_terminal_end ok={}",
+        restore_result.is_ok()
+    ));
     cancel.cancel();
     xai_tty_utils::global_process_scope().kill_all();
     if let Err(cleanup_error) = restore_result {
@@ -1244,12 +1262,31 @@ fn init_terminal(
 /// Drop the terminal (closing the writer mpsc channel) and join the
 /// writer thread. After this returns, subsequent direct stderr writes
 /// are guaranteed to land strictly after every queued frame.
+///
+/// Must call [`SharedTermWriter::deactivate`] before drop: the ratatui 0.28
+/// shim keeps a TLS clone that would otherwise keep the writer `Sender` alive
+/// and hang `join` forever (black alt screen, no Leave).
 fn drain_writer_thread_before_teardown(
     terminal: PagerTerminal,
     writer_thread: crate::render::draw::WriterThread,
 ) -> io::Result<()> {
+    face_quit_diag("drain_deactivate_begin");
+    crate::render::draw::SharedTermWriter::deactivate();
+    face_quit_diag("drain_drop_terminal_begin");
     drop(terminal);
-    writer_thread.join()
+    face_quit_diag("drain_drop_terminal_done join_writer_begin");
+    // Bounded join so teardown (LeaveAlternateScreen) still runs if the
+    // writer is stuck on Windows console I/O after the Sender is closed.
+    let result = writer_thread.join_timeout(std::time::Duration::from_secs(2));
+    face_quit_diag(&format!(
+        "drain_join_writer_done ok={} timed_out={}",
+        result.is_ok(),
+        matches!(
+            &result,
+            Err(e) if e.kind() == io::ErrorKind::TimedOut
+        )
+    ));
+    result
 }
 /// Inline teardown escape sequences in the canonical order, shared by
 /// `restore_terminal` and `set_panic_hook` so the on-wire byte order is
@@ -1261,7 +1298,48 @@ fn drain_writer_thread_before_teardown(
 /// (zellij/tmux) stop buffering before the resets arrive. Does NOT call
 /// `disable_raw_mode`. Callers should drain queued writer-thread frames
 /// first when possible; the panic hook can't (would deadlock).
+/// Append one line to a quit-diagnostics log that survives a black TTY.
+///
+/// Default path: `%LOCALAPPDATA%/next-code/face-quit-diag.log` (Windows) or
+/// `$HOME/.next-code/face-quit-diag.log`. Override with `NEXT_CODE_FACE_QUIT_LOG`.
+fn face_quit_diag(msg: &str) {
+    use std::io::Write;
+    let path = std::env::var_os("NEXT_CODE_FACE_QUIT_LOG")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            #[cfg(windows)]
+            {
+                if let Some(la) = std::env::var_os("LOCALAPPDATA") {
+                    return std::path::PathBuf::from(la)
+                        .join("next-code")
+                        .join("face-quit-diag.log");
+                }
+            }
+            dirs::home_dir()
+                .unwrap_or_else(|| std::path::PathBuf::from("."))
+                .join(".next-code")
+                .join("face-quit-diag.log")
+        });
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let ts = chrono::Local::now().format("%Y-%m-%dT%H:%M:%S%.3f");
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        let _ = writeln!(f, "{ts} pid={} {msg}", std::process::id());
+    }
+}
+
 fn emit_terminal_teardown_sequences(mode: ScreenMode, inline_cursor_row: Option<u16>) {
+    face_quit_diag(&format!(
+        "teardown_begin mode={:?} fullscreen={} inline_cursor_row={:?}",
+        mode,
+        mode.is_fullscreen(),
+        inline_cursor_row
+    ));
     xai_grok_shell::util::with_locked_stderr(|stderr| {
         let _ = stderr.write_all(crate::notifications::progress::OSC_CLEAR.as_bytes());
         let _ = stderr.flush();
@@ -1288,16 +1366,23 @@ fn emit_terminal_teardown_sequences(mode: ScreenMode, inline_cursor_row: Option<
     }
     let restore_style = CURSOR_STYLE_FORCED.load(Ordering::Acquire);
     if mode.is_fullscreen() {
+        face_quit_diag("teardown_branch=LeaveAlternateScreen (fullscreen)");
         xai_grok_shell::util::with_locked_stderr(|stderr| {
             if restore_style {
                 let _ = execute!(stderr, SetCursorStyle::DefaultUserShape);
             }
-            let _ = execute!(stderr, cursor::Show, LeaveAlternateScreen);
+            let leave = execute!(stderr, cursor::Show, LeaveAlternateScreen);
+            face_quit_diag(&format!("LeaveAlternateScreen_result={leave:?}"));
+            let flush = stderr.flush();
+            face_quit_diag(&format!("LeaveAlternateScreen_flush={flush:?}"));
         });
     } else {
         let rows = crossterm::terminal::size().map(|(_, r)| r).unwrap_or(24);
         let last = rows.saturating_sub(1);
         let target = inline_cursor_row.unwrap_or(last).min(last);
+        face_quit_diag(&format!(
+            "teardown_branch=inline MoveTo(0,{target}) rows={rows}"
+        ));
         xai_grok_shell::util::with_locked_stderr(|stderr| {
             if restore_style {
                 let _ = execute!(stderr, SetCursorStyle::DefaultUserShape);
@@ -1309,6 +1394,7 @@ fn emit_terminal_teardown_sequences(mode: ScreenMode, inline_cursor_row: Option<
     }
     #[cfg(windows)]
     win_native_selection::restore_stdin_mode();
+    face_quit_diag("teardown_end");
 }
 /// Consumes `terminal` and `writer_thread`: queues a final fullscreen clear,
 /// drains every accepted frame, then emits teardown sequences. Teardown still
@@ -1321,21 +1407,31 @@ fn restore_terminal_with(
     drain: impl FnOnce(PagerTerminal, crate::render::draw::WriterThread) -> io::Result<()>,
     teardown: impl FnOnce(ScreenMode, Option<u16>),
 ) -> io::Result<()> {
-    if mode.is_fullscreen() && !writer_thread.writer_sync().failed() {
+    let will_clear = mode.is_fullscreen() && !writer_thread.writer_sync().failed();
+    face_quit_diag(&format!(
+        "restore_with mode={:?} will_clear_alt={will_clear} writer_failed={}",
+        mode,
+        writer_thread.writer_sync().failed()
+    ));
+    if will_clear {
         let _ = terminal.clear();
         {
             use std::io::Write;
             let _ = terminal.backend_mut().flush();
         }
+        face_quit_diag("alt_buffer_cleared");
     }
     let inline_cursor_row = (!mode.is_fullscreen()).then(|| terminal.viewport_area().bottom());
     let drain_result = drain(terminal, writer_thread);
+    face_quit_diag(&format!("writer_drained ok={}", drain_result.is_ok()));
     teardown(mode, inline_cursor_row);
     drain_pending_events_with_timeout(std::time::Duration::from_millis(10));
-    let _ = terminal::disable_raw_mode();
+    let raw_off = terminal::disable_raw_mode();
+    face_quit_diag(&format!("disable_raw_mode={raw_off:?}"));
     signal_handler::mark_restored();
     xai_crash_handler::disable_terminal_escape_restore();
     xai_tty_utils::restore_native_stderr();
+    face_quit_diag("restore_with_done");
     drain_result
 }
 fn restore_terminal(
@@ -1410,6 +1506,7 @@ mod tests {
             writer_thread,
             ScreenMode::Inline,
             |terminal, writer_thread| {
+                crate::render::draw::SharedTermWriter::deactivate();
                 drop(terminal);
                 drop(writer_thread);
                 Err(io::Error::other("injected drain failure"))

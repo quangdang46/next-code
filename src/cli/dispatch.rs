@@ -18,7 +18,8 @@ use crate::{
 };
 
 use super::{
-    acp, commands, debug, hot_exec, login, output, provider_init, selfdev, terminal, tui_launch,
+    acp, commands, debug, hot_exec, login, output, pager_launch, provider_init, selfdev, terminal,
+    tui_launch,
 };
 use provider_init::ProviderChoice;
 
@@ -1116,14 +1117,21 @@ async fn run_default_command(args: Args) -> Result<()> {
     if product_env("RESUMING").is_err() && server_running {
         output::stderr_info("Connecting to server...");
     }
-    tui_launch::run_tui_client(
-        args.resume,
-        startup_hints,
-        !server_running,
-        args.fresh_spawn,
-        args.remote_working_dir,
-    )
-    .await?;
+
+    // PR8: default interactive UI is Grok Face (`xai-grok-pager`). Escape hatch:
+    // NEXT_CODE_LEGACY_TUI=1 keeps the old next-code-tui client for one release.
+    if pager_launch::legacy_tui_requested() {
+        tui_launch::run_tui_client(
+            args.resume,
+            startup_hints,
+            !server_running,
+            args.fresh_spawn,
+            args.remote_working_dir,
+        )
+        .await?;
+    } else {
+        pager_launch::run_face_pager(args.resume, startup_hints, args.remote_working_dir).await?;
+    }
 
     Ok(())
 }

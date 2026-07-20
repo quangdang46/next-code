@@ -143,23 +143,17 @@ PR 7: xai-grok-pager (keep Cargo name; do NOT delete old TUI here)
   └── Deferred to PR8: binary cutover, GrokHost, delete/stop old TUI path
 ```
 
-### Phase 4 — Entry Point (PR 8)
+### Phase 4 — Entry Point (PR 8) — IN PROGRESS on `pr-8-grok-entrypoint`
 
 ```
 PR 8: next-code entry point
-  ├── next-code cargo binary → serve (agent server) + TUI mode
-  ├── Grok CLI args: agent, serve, inspect, login, logout, sessions, …
-  │     → rename grok → next-code
-  ├── TUI launch: init_pager() → create AppView → connect to
-  │     next-code server runtime (in-process via GrokHost trait)
-  ├── Branding: Face welcome uses next-code animated logo (not Grok braille)
-  ├── Files: bin/next-code.rs, modified main.rs
-  └── CLI flags map:
-        next-code [no args] = interactive TUI (was: grok pager)
-        next-code serve     = agent server mode
-        next-code agent     = headless mode
-        next-code session   = session management
-        (grok login/logout → next-code auth)
+  ├── next-code [no args] → xai-grok-pager::app::run (Face)  ✅ wired
+  ├── Brain: NextCodeFaceAgent ACP bridge → serve socket   ✅ wired
+  ├── Escape: NEXT_CODE_LEGACY_TUI=1 → old next-code-tui    ✅
+  ├── Branding: welcome logo = next-code-tui-anim donut    ✅
+  ├── serve / agent CLI unchanged
+  └── next-code-tui* crates still in workspace (lib re-export + escape);
+        full delete deferred until Face smoke is solid
 ```
 
 ---

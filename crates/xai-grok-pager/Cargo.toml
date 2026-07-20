@@ -16,6 +16,8 @@ xai-grok-pager-render = { path = "../xai-grok-pager-render" }
 
 # Pin 0.28 to match Face substrate (pager-render / next-code-ratatui-*).
 ratatui = { version = "0.28", features = ["crossterm", "unstable-widget-ref"] }
+# next-code animated welcome logo (donut / orbit) — pure math, no ratatui dep.
+next-code-tui-anim = { path = "../next-code-tui-anim" }
 xai-grok-announcements = { path = "../xai-grok-announcements" }
 crossterm = { version = "0.28", features = ["event-stream", "bracketed-paste"] }
 textwrap = "0.16"
@@ -44,6 +46,7 @@ portable-pty = "0.9"
 
 derive_more = { version = "1", features = ["deref", "deref_mut"] }
 anyhow = "1"
+async-trait = "0.1"
 clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
 rand = "0.9"

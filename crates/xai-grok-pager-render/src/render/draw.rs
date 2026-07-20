@@ -89,6 +89,16 @@ impl SharedTermWriter {
         });
     }
 
+    /// Drop the process-local clone so teardown can close the writer mpsc
+    /// channel. Without this, `drop(terminal)` leaves `ACTIVE_SHARED_WRITER`
+    /// holding the last `Sender` and `WriterThread::join` hangs forever
+    /// (cleared alt buffer, no `LeaveAlternateScreen`).
+    pub fn deactivate() {
+        ACTIVE_SHARED_WRITER.with(|slot| {
+            *slot.borrow_mut() = None;
+        });
+    }
+
     pub fn current() -> Option<Self> {
         ACTIVE_SHARED_WRITER.with(|slot| slot.borrow().clone())
     }
@@ -315,6 +325,36 @@ impl WriterThread {
             Err(_) => Err(std::io::Error::other("terminal writer thread panicked")),
         }
     }
+
+    /// Like [`Self::join`], but return [`io::ErrorKind::TimedOut`] if the
+    /// writer has not exited within `timeout`. Callers must still have dropped
+    /// every [`WriterSender`] (including [`SharedTermWriter::deactivate`]).
+    pub fn join_timeout(mut self, timeout: Duration) -> std::io::Result<()> {
+        let Some(handle) = self.handle.take() else {
+            return Ok(());
+        };
+        let (tx, rx) = mpsc::channel();
+        std::thread::Builder::new()
+            .name("term-writer-join".into())
+            .spawn(move || {
+                let result = match handle.join() {
+                    Ok(result) => result,
+                    Err(_) => Err(std::io::Error::other("terminal writer thread panicked")),
+                };
+                let _ = tx.send(result);
+            })?;
+        match rx.recv_timeout(timeout) {
+            Ok(result) => result,
+            Err(mpsc::RecvTimeoutError::Timeout) => Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "terminal writer thread join timed out",
+            )),
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                Err(std::io::Error::other("terminal writer join helper exited"))
+            }
+        }
+    }
+
     pub fn writer_sync(&self) -> &WriterSync {
         &self.sync
     }
@@ -594,7 +634,28 @@ mod tests {
             second.len(),
             String::from_utf8_lossy(&second),
         );
+        SharedTermWriter::deactivate();
     }
+
+    /// Regression: TLS `activate()` must not keep the writer Sender alive across
+    /// quit drain (black alt screen / hung join).
+    #[test]
+    fn deactivate_closes_writer_channel_after_local_drop() {
+        let (tx, rx) = mpsc::channel::<WriterPayload>();
+        let writer = SharedTermWriter::new(tx, WriterSync::new()).expect("writer");
+        drop(writer);
+        // TLS still holds a clone — channel stays open.
+        assert!(matches!(
+            rx.try_recv(),
+            Err(mpsc::TryRecvError::Empty)
+        ));
+        SharedTermWriter::deactivate();
+        assert!(matches!(
+            rx.try_recv(),
+            Err(mpsc::TryRecvError::Disconnected)
+        ));
+    }
+
     #[test]
     fn writer_success_is_acknowledged_after_flush() {
         let (sync, mut events) = WriterSync::new_for_test();
