@@ -65,16 +65,34 @@ PR 4: deepen tools + workspace shims (DONE — PR #38)
   ├── Do NOT wire next-code Registry / full Grok worktree runtime
   └── Keep ACP id `enable-always-approve` (YOLO map = PR5)
 
-PR 5: xai-shim-agent + xai-shim-shell + xai-shim-acp
-  ├── xai_grok_agent → AgentId, AgentConfig from next-code agent
-  ├── xai_grok_shell → terminal, pty, clipboard → next-code shell
-  ├── xai_acp_lib → local channel + internal dispatch
-  ├── Files: 8 files
-  ├── Key: xai_shim_acp provides AgentTx/AgentRx that call
-  │        next-code agent runtime internally
-  └── This is the HEART of the adapter
+PR 5: xai-acp-lib + xai-grok-agent + xai-grok-shell (DONE — this PR)
+  ├── NOTE: kept Cargo names `xai-*` (not `xai-shim-*`, per PR2-4 decision —
+  │     the `xai-shim-*` naming below in this doc was stale/aspirational
+  │     and never matched what PR2-4 actually shipped)
+  ├── xai-acp-lib: vendored almost wholesale (8 files, channel/message/
+  │     gateway/normalize/line_reader/stdin_reader) — AcpAgentTx/Rx,
+  │     AcpClientTx/Rx, acp_send round-trip helper, message enums
+  ├── xai-grok-agent: compile stub for the ~6 real pager import sites
+  │     (agents_modal.rs + plugin_cmd.rs) — config::{BuiltinAgentName,
+  │     AgentDefinition, AgentScope, PromptMode}, discovery::discover,
+  │     plugins::{install_registry, manifest, git_install}
+  ├── xai-grok-shell: frequency-ordered façade (NOT a wholesale vendor of
+  │     upstream's ~434 files / ~14MB) — util::config (full RemoteSettings
+  │     DTO, distinct from the tiny PR3 xai-grok-config stub), agent::config,
+  │     auth (AuthMeta/GateInfo/AuthManager), sampling::{types, error},
+  │     extensions::{notification, session_search, mcp, task, billing},
+  │     top-level config (load_*/plugin toggles), util::{grok_home,
+  │     clipboard (re-exports xai-grok-shared), with_locked_stderr,
+  │     changelog, tips}, session (persistence/worktree/storage/merge/
+  │     restore/repo_changes/prompt_queue/info + ContextInfo/PromptOrigin),
+  │     models::default_model, tier::is_restricted_tier_name, active_sessions
+  ├── Empty/no-op function bodies + Default-derived DTOs, matching the
+  │     PR3/PR4 stub convention — no real disk/git/MCP/auth-network I/O
+  ├── Did NOT wire AcpAgentTx/channels into next-code-agent-runtime or
+  │     next-code-app-core's Registry — that stays PR8 (GrokHost)
+  └── Kept ACP option id `enable-always-approve` unchanged (no YOLO remap)
 
-PR 6: xai-shim-voice + xai-shim-announcements + xai-shim-file-utils
+PR 6: xai-grok-voice + xai-grok-announcements + xai-grok-file-utils
   ├── xai_grok_voice → stub (only used for voice toggle in settings)
   ├── xai_grok_announcements → stub (xAI OTA announcements)
   ├── xai_grok_file_util → FileUtil, path, … → std/next-code
@@ -98,7 +116,8 @@ PR 7: next-code-tui-pager
   ├── Remove: from old Cargo.toml
   │     ├── jcode-tui (if exists)
   │     └── old TUI source files
-  ├── Replace: xai-* deps → xai-shim-* in Cargo.toml
+  ├── Replace: real upstream xai-grok-shell/xai-grok-agent deps → the
+  │     PR5 xai-grok-shell/xai-grok-agent façade crates in Cargo.toml
   ├── Keep: Apache headers + attribution
   └── Add: next-code-app-core as dependency (for GrokHost::trait)
 ```
@@ -253,10 +272,10 @@ pub enum GrokHostEvent {
 flowchart LR
     PR1[PR 1: ratatui-inline + textarea]
     PR2[PR 2: tui-render]
-    PR3[PR 3: shim-config + telemetry]
-    PR4[PR 4: shim-tools + workspace]
-    PR5[PR 5: shim-agent + shell + ACP]
-    PR6[PR 6: shim-voice + announcements + file-utils]
+    PR3[PR 3: config + telemetry stubs]
+    PR4[PR 4: tools + workspace stubs]
+    PR5[PR 5: agent + shell + ACP stubs]
+    PR6[PR 6: voice + announcements + file-utils stubs]
     PR7[PR 7: Pager crate + old TUI delete]
     PR8[PR 8: Entry point + CLI]
 
