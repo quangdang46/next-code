@@ -114,6 +114,9 @@ members = [
     "crates/xai-acp-lib",
     "crates/xai-grok-agent",
     "crates/xai-grok-shell",
+    "crates/xai-grok-announcements",
+    "crates/xai-grok-voice",
+    "crates/xai-file-utils",
     "evals/jbench",
     "evals/next-code-edit-bench",
 

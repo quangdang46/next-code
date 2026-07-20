@@ -92,11 +92,38 @@ PR 5: xai-acp-lib + xai-grok-agent + xai-grok-shell (DONE — this PR)
   │     next-code-app-core's Registry — that stays PR8 (GrokHost)
   └── Kept ACP option id `enable-always-approve` unchanged (no YOLO remap)
 
-PR 6: xai-grok-voice + xai-grok-announcements + xai-grok-file-utils
-  ├── xai_grok_voice → stub (only used for voice toggle in settings)
-  ├── xai_grok_announcements → stub (xAI OTA announcements)
-  ├── xai_grok_file_util → FileUtil, path, … → std/next-code
-  └── Files: 4 files (< 50 LOC each)
+PR 6: xai-grok-voice + xai-grok-announcements + xai-file-utils (DONE — this PR)
+  ├── NOTE: crate names corrected vs the table above — pager's real Cargo dep
+  │     is `xai-file-utils` / `xai_file_utils::`, not `xai-grok-file-utils` /
+  │     `xai_grok_file_util`. "4 files / <50 LOC" was also outdated: upstream
+  │     announcements is one real lib.rs, voice is ~15 files, file-utils is
+  │     ~15 files (S3/GCS/auth machinery) — Option C (narrow) was used instead
+  │     of full vendor.
+  ├── xai-grok-announcements: vendored near-verbatim (types + pure helpers) —
+  │     RemoteAnnouncement, AnnouncementCta, AnnouncementsRefreshed, hide-key
+  │     logic, filter_expired/prune_hidden_announcement_ids, hidden-ids
+  │     read/write. Persistence routed through xai_grok_config::grok_home
+  │     (PR3) instead of upstream's xai_grok_tools::util::grok_home. Dropped
+  │     the ts-rs binding feature/export test (unused in this workspace).
+  ├── xai-grok-voice: compile stub, no audio. Vendored near-verbatim (pure):
+  │     error.rs, event.rs, config.rs (VoiceConfig + from_config_table/
+  │     stt_ws_url), language.rs (full STT_LANGUAGES catalog + helpers).
+  │     Adapted: auth.rs (SharedVoiceAuth/StaticVoiceAuth, dropped the
+  │     audio-gated require_bearer), pipeline.rs (VoiceCommand/
+  │     run_voice_pipeline now a no-op that drains until Shutdown). Hard
+  │     `AUDIO_SUPPORTED = false` — no audio feature, no cpal, no mic/STT
+  │     network calls anywhere in the crate. Did not vendor audio/, stt/,
+  │     probe.rs, bin/voice_probe.rs (no pager import needs them).
+  ├── xai-file-utils: façade for exactly the 3 pager import sites —
+  │     workspace_classifier::is_project_dir (ported faithfully, pure
+  │     fs-existence/path-matching logic), gcs::upload_bytes (stub, always
+  │     Err, no GCS/S3 client or network dep), trace_context::
+  │     span_from_meta_traceparent (no-op span, no OpenTelemetry dep). Did
+  │     NOT vendor queue/storage_client/s3/circuit_breaker/events/auth.
+  ├── pager-render currently has zero imports from any of the three crates
+  │     (same as PR5) — these are prep for PR7, not wired into any binary yet.
+  └── Did NOT touch next-code-agent-runtime / next-code-app-core, the old
+        TUI, or the ACP `enable-always-approve` option id.
 ```
 
 ### Phase 3 — Pager Copy + Old TUI Delete (PR 7)
