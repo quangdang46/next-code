@@ -40,28 +40,30 @@ PR 1: next-code-ratatui-inline + next-code-ratatui-textarea
   ├── Crate type: lib
   └── Dependency: crossterm, ratatui, tokio only
 
-PR 2: next-code-tui-render
-  ├── Copy from: grok-build/crates/codegen/xai-grok-pager-render
-  ├── Remove: xai_grok_markdown → next-code markdown
-  │           xai_grok_mermaid → next-code mermaid-rs-renderer
-  ├── Keep: ratatui render pipeline (Buffer, draw, diff)
-  ├── Files: ~30 .rs files
-  └── Crate type: lib
+PR 2: xai-grok-pager-render + minimal shims (DONE — merge to `dev` via PR #36)
+  ├── Keep Cargo names `xai-*` (fewer rewrites); PR1 via package= rename
+  ├── Vendor: pager-render, tty-utils, paths, markdown(+core)
+  ├── Shim: config, telemetry, workspace, tools, shared subset (compile stubs)
+  ├── Adapt: ratatui 0.28 (SharedTermWriter, proportional scrollbar, no tui-scrollbar)
+  ├── Success bar: cargo check -p xai-grok-pager-render green
+  └── Do NOT delete old TUI / change entry yet
 ```
 
-### Phase 2 — Shim Crates (PR 3–6)
+### Phase 2 — Deepen shims / pager prep (PR 3–6)
 
 ```
-PR 3: xai-shim-config + xai-shim-telemetry
-  ├── Shim crate xai_grok_config_types → next_code_config_types
-  ├── Shim crate xai_grok_telemetry → stub (no-op)
-  ├── Exports same types/struct names as xAI crates
-  └── Files: 4 files (< 200 LOC each)
+PR 3: deepen config + telemetry shims (toward next-code)
+  ├── NOTE: empty stubs already exist from PR2 (`xai-grok-config`, `xai-grok-telemetry`)
+  ├── Map `load_effective_config_disk_only` / grok_home → next-code config paths where safe
+  ├── Keep telemetry no-op OR wire structured logs if cheap
+  ├── Expand only symbols pager will need next (not full Grok config crate)
+  └── Files: grow existing shim crates; avoid duplicating PR2 stubs
 
-PR 4: xai-shim-tools + xai-shim-workspace  
-  ├── xai_grok_tools → map to next-code tool registry
+PR 4: deepen tools + workspace shims
+  ├── NOTE: permission/detach stubs already exist from PR2
+  ├── xai_grok_tools → map to next-code tool registry where needed by pager
   ├── xai_grok_workspace → map worktree/files to next-code git
-  ├── Files: 6 files
+  ├── Files: grow existing shim crates
   └── Shim exports: ExecuteResult, SearchResult, FileUtil…
 
 PR 5: xai-shim-agent + xai-shim-shell + xai-shim-acp

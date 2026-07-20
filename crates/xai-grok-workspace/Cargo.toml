@@ -1,0 +1,9 @@
+[package]
+name = "xai-grok-workspace"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Shim: permission constants for pager-render (Grok UI migration PR2)"
+
+[dependencies]
+agent-client-protocol = { version = "0.10.4", features = ["unstable"] }
