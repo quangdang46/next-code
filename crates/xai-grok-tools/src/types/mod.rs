@@ -1,4 +1,7 @@
 pub mod api_key_provider;
+pub mod compat;
+pub mod computer;
+pub mod config_source;
 pub mod output;
 pub mod session_mode;
 pub mod template_renderer;
@@ -11,5 +14,3 @@ pub use tool::ToolKind;
 
 // Re-exports used by pager as `xai_grok_tools::types::{KillOutcome, TaskSnapshot}`.
 pub use crate::types::computer::{KillOutcome, TaskKind, TaskSnapshot};
-
-pub mod computer;

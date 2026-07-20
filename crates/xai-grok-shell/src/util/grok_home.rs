@@ -8,8 +8,8 @@ pub use xai_grok_config::grok_home;
 /// session storage under the home dir; this stub does a simple
 /// lossy/sanitizing encode (not upstream's exact scheme) since no
 /// consumer round-trips it yet in this compile-stub layer.
-pub fn encode_cwd_dirname(cwd: &std::path::Path) -> String {
-    cwd.to_string_lossy()
+pub fn encode_cwd_dirname(cwd: impl AsRef<str>) -> String {
+    cwd.as_ref()
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '-' })
         .collect()

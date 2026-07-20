@@ -1,9 +1,6 @@
-//! Stub of upstream `xai-grok-agent::plugins::manifest`. `PluginManifest`
-//! carries only the fields the future pager touches; `load_manifest` is a
-//! no-op that always reports `NotFound` (no real `plugin.json`/`toml`
-//! parsing in this compile-stub layer).
+//! Stub of upstream `xai-grok-agent::plugins::manifest`.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -25,6 +22,51 @@ pub struct PluginManifest {
     pub author: Option<Author>,
 }
 
+impl PluginManifest {
+    pub fn validate(&self) -> Result<(), String> {
+        if self.name.is_empty() {
+            return Err("name is required".into());
+        }
+        Ok(())
+    }
+
+    pub fn skill_dirs(&self, _root: &Path) -> Vec<PathBuf> {
+        vec![]
+    }
+
+    pub fn command_dirs(&self, _root: &Path) -> Vec<PathBuf> {
+        vec![]
+    }
+
+    pub fn agent_dirs(&self, _root: &Path) -> Vec<PathBuf> {
+        vec![]
+    }
+
+    pub fn hooks_path(&self, _root: &Path) -> Option<PathBuf> {
+        None
+    }
+
+    pub fn inline_hooks(&self) -> Option<serde_json::Value> {
+        None
+    }
+
+    pub fn mcp_config_path(&self, _root: &Path) -> Option<PathBuf> {
+        None
+    }
+
+    pub fn inline_mcp_servers(&self) -> Option<serde_json::Value> {
+        None
+    }
+
+    pub fn lsp_config_path(&self, _root: &Path) -> Option<PathBuf> {
+        None
+    }
+
+    pub fn inline_lsp_servers(&self) -> Option<serde_json::Value> {
+        None
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum ManifestLoadResult {
     Found(PluginManifest),
@@ -37,14 +79,10 @@ pub enum ManifestError {
     NotImplemented,
 }
 
-/// Upstream parses `plugin.json`/`.grok-plugin.toml` from `plugin_root`;
-/// this stub never reads disk and always reports `NotFound`.
 pub fn load_manifest(_plugin_root: &Path) -> Result<ManifestLoadResult, ManifestError> {
     Ok(ManifestLoadResult::NotFound)
 }
 
-/// Upstream derives a display name from the install dirname; stub mirrors
-/// the signature and returns the dirname unchanged.
 pub fn name_from_dirname(dirname: &str) -> String {
     dirname.to_string()
 }

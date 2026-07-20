@@ -1,6 +1,7 @@
 use agent_client_protocol as acp;
 
 pub mod bash_command_splitting;
+pub mod resolution;
 pub mod rules;
 pub mod types;
 

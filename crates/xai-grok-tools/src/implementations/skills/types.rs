@@ -55,6 +55,8 @@ pub struct SkillInfo {
     pub path: String,
     pub scope: SkillScope,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_source: Option<crate::types::config_source::ConfigSource>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub plugin_name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plugin_version: Option<String>,
@@ -74,6 +76,8 @@ pub struct SkillInfo {
     pub disable_model_invocation: bool,
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub body: Option<String>,
 }
 
 impl Default for SkillInfo {
@@ -93,6 +97,7 @@ impl Default for SkillInfo {
             metadata: None,
             path: String::new(),
             scope: SkillScope::User,
+            config_source: None,
             plugin_name: None,
             plugin_version: None,
             plugin_root: None,
@@ -103,7 +108,14 @@ impl Default for SkillInfo {
             user_invocable: true,
             disable_model_invocation: false,
             enabled: true,
+            body: None,
         }
+    }
+}
+
+impl SkillInfo {
+    pub fn label(&self) -> &str {
+        self.display_name.as_deref().unwrap_or(&self.name)
     }
 }
 

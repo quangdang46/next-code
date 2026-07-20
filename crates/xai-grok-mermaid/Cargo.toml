@@ -1,0 +1,9 @@
+[package]
+name = "xai-grok-mermaid"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Facade of xai-org/grok-build xai-grok-mermaid — render surfaces the pager uses (PR7)"
+
+[dependencies]
+thiserror = "1"

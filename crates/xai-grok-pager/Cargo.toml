@@ -1,0 +1,131 @@
+[package]
+name = "xai-grok-pager"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+authors = ["xAI", "next-code contributors"]
+description = "Vendored from xai-org/grok-build xai-grok-pager — Grok Face TUI (PR7)"
+build = "build.rs"
+
+[dependencies]
+dunce = "1"
+xai-tty-utils = { path = "../xai-tty-utils" }
+xai-grok-version = { path = "../xai-grok-version" }
+xai-prompt-queue = { path = "../xai-prompt-queue" }
+xai-grok-pager-render = { path = "../xai-grok-pager-render" }
+
+# Pin 0.28 to match Face substrate (pager-render / next-code-ratatui-*).
+ratatui = { version = "0.28", features = ["crossterm", "unstable-widget-ref"] }
+xai-grok-announcements = { path = "../xai-grok-announcements" }
+crossterm = { version = "0.28", features = ["event-stream", "bracketed-paste"] }
+textwrap = "0.16"
+regex = "1"
+unicode-width = "0.2"
+unicode-segmentation = "1.12"
+strip-ansi-escapes = "0.2"
+enum_delegate = "0.2"
+
+xai-grok-markdown = { path = "../xai-grok-markdown" }
+xai-grok-mermaid = { path = "../xai-grok-mermaid" }
+syntect = "5.3"
+
+similar = "2"
+indexmap = "2"
+blake3 = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+toml_edit = { version = "0.22", features = ["serde"] }
+
+# 7.x pulls ratatui 0.29 (unicode-width =0.2.0 pin) which conflicts with
+# workspace unicode-width 0.2.2 + Face ratatui 0.28. 6.x targets 0.28.
+ansi-to-tui = "6"
+portable-pty = "0.9"
+
+derive_more = { version = "1", features = ["deref", "deref_mut"] }
+anyhow = "1"
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+rand = "0.9"
+tokio = { version = "1", features = [
+    "sync",
+    "rt",
+    "macros",
+    "rt-multi-thread",
+    "signal",
+    "io-util",
+    "io-std",
+    "time",
+    "process",
+    "fs",
+] }
+tokio-util = { version = "0.7", features = ["compat"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+obfstr = "0.4"
+nucleo = "0.5"
+
+xai-ratatui-textarea = { path = "../next-code-ratatui-textarea", package = "next-code-ratatui-textarea" }
+xai-ratatui-inline = { path = "../next-code-ratatui-inline", package = "next-code-ratatui-inline" }
+
+xai-grok-update = { path = "../xai-grok-update" }
+
+agent-client-protocol = { version = "0.10.4", features = ["unstable"] }
+xai-acp-lib = { path = "../xai-acp-lib" }
+xai-file-utils = { path = "../xai-file-utils" }
+xai-grok-config = { path = "../xai-grok-config" }
+# No audio feature — PR6 stub has AUDIO_SUPPORTED = false.
+xai-grok-voice = { path = "../xai-grok-voice", default-features = false }
+xai-grok-shell = { path = "../xai-grok-shell" }
+xai-grok-workspace = { path = "../xai-grok-workspace" }
+xai-token-estimation = { path = "../xai-token-estimation" }
+xai-grok-telemetry = { path = "../xai-grok-telemetry" }
+xai-fast-worktree = { path = "../xai-fast-worktree", features = ["metadata"] }
+backon = "1"
+chrono = { version = "0.4", features = ["serde"] }
+flate2 = "1"
+tar = "0.4"
+xai-grok-tools = { path = "../xai-grok-tools" }
+xai-grok-agent = { path = "../xai-grok-agent" }
+xai-grok-plugin-marketplace = { path = "../xai-grok-plugin-marketplace" }
+xai-hooks-plugins-types = { path = "../xai-hooks-plugins-types" }
+wait-timeout = "0.2"
+xai-grok-sandbox = { path = "../xai-grok-sandbox", default-features = false }
+
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff", "gif", "webp"] }
+uuid = { version = "1", features = ["v4"] }
+dirs = "6"
+shellexpand = "3.1"
+git2 = { version = "0.20", default-features = false, features = ["vendored-libgit2"] }
+urlencoding = "2"
+url = "2"
+xai-crash-handler = { path = "../xai-crash-handler" }
+parking_lot = "0.12"
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.29", features = ["signal"] }
+signal-hook = "0.3"
+libc = "0.2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_System_Console"] }
+
+[features]
+default = []
+# Empty mirrors upstream so `sandbox-enforce` feature gates resolve.
+jemalloc = []
+sandbox-enforce = ["xai-grok-sandbox/enforce"]
+release-dist = []
+test-support = ["xai-grok-pager-render/test-support"]
+
+[dev-dependencies]
+xai-grok-pager-render = { path = "../xai-grok-pager-render", features = ["test-support"] }
+pretty_assertions = "1"
+insta = "1"
+tempfile = "3"
+serial_test = "3"

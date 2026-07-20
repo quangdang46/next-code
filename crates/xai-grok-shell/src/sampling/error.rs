@@ -8,6 +8,8 @@ use agent_client_protocol as acp;
 
 use crate::extensions::notification::PromptUsage;
 
+pub const RATE_LIMITED_ERROR_CODE: i32 = -32003;
+
 pub const RATE_LIMITED_USER_MESSAGE_OAUTH: &str =
     "You\u{2019}ve hit the rate limit for your plan. Upgrade your account or try again later.";
 
@@ -41,6 +43,13 @@ pub fn http_status_from_error(err: &acp::Error) -> Option<u16> {
         .get("http_status")?
         .as_u64()
         .map(|s| s as u16)
+}
+
+pub fn error_detail_from_data(data: &serde_json::Value) -> Option<String> {
+    data.get("detail")
+        .or_else(|| data.get("message"))
+        .and_then(|v| v.as_str())
+        .map(str::to_owned)
 }
 
 const PROMPT_USAGE_DATA_KEY: &str = "promptUsage";

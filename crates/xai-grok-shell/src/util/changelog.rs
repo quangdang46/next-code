@@ -1,6 +1,4 @@
-//! Stub of upstream `xai-grok-shell::util::changelog`. Upstream reads a
-//! bundled/downloaded changelog file and renders bullet points for the
-//! "what's new" toast; this stub always reports empty (no disk I/O).
+//! Stub of upstream `xai-grok-shell::util::changelog`.
 
 #[derive(Debug, Clone, Default)]
 pub struct ChangelogEntry {
@@ -10,7 +8,8 @@ pub struct ChangelogEntry {
 
 #[derive(Debug, Clone, Default)]
 pub struct Changelog {
-    pub entries: Vec<ChangelogEntry>,
+    pub entries: Option<Vec<ChangelogEntry>>,
+    pub markdown: Option<String>,
 }
 
 #[derive(Debug, Default)]
@@ -26,8 +25,12 @@ impl ChangelogManager {
     pub fn changelog(&self) -> &Changelog {
         &self.changelog
     }
+
+    pub fn fetch(self) -> Changelog {
+        self.changelog
+    }
 }
 
-pub fn bullets_from_entries(entries: &[ChangelogEntry]) -> Vec<String> {
+pub fn bullets_from_entries(entries: &[ChangelogEntry], _limit: usize) -> Vec<String> {
     entries.iter().flat_map(|e| e.bullets.clone()).collect()
 }

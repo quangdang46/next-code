@@ -1,0 +1,8 @@
+[package]
+name = "xai-token-estimation"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Pure shared token-estimation primitives (vendored from xai-org/grok-build for PR7)"
+
+[dependencies]

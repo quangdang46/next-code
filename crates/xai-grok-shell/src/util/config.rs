@@ -30,14 +30,8 @@ pub struct GoalRoleModel {
     pub model: Option<String>,
 }
 
-/// Simplified stand-in for upstream `RemoteAnnouncement`.
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct RemoteAnnouncement {
-    #[serde(default)]
-    pub id: String,
-    #[serde(default)]
-    pub message: String,
-}
+/// Re-export announcements crate type so pager `filter_expired` type-checks.
+pub use xai_grok_announcements::RemoteAnnouncement;
 
 /// Simplified stand-in for upstream `CampaignOverride`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -636,6 +630,10 @@ pub struct ContextualHintsRemote {
     pub send_now: Option<bool>,
     #[serde(default)]
     pub small_screen: Option<bool>,
+    #[serde(default)]
+    pub word_select: Option<bool>,
+    #[serde(default)]
+    pub ssh_wrap: Option<bool>,
 }
 
 /// Simplified stand-in for upstream `McpServerTransportConfig` (Stdio /
@@ -661,6 +659,12 @@ pub enum McpServerTransportConfig {
         bearer_token_env_var: Option<String>,
         #[serde(default)]
         headers: Option<HashMap<String, String>>,
+        #[serde(default)]
+        oauth_client_id: Option<String>,
+        #[serde(default)]
+        oauth_client_secret_env_var: Option<String>,
+        #[serde(default)]
+        oauth_scopes: Option<Vec<String>>,
     },
 }
 
@@ -675,8 +679,7 @@ impl Default for McpServerTransportConfig {
     }
 }
 
-/// Simplified stand-in for upstream `McpServerConfig` (oauth/setup/timeout
-/// tuning fields dropped — see module doc).
+/// Simplified stand-in for upstream `McpServerConfig`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct McpServerConfig {
     #[serde(flatten)]
@@ -684,9 +687,29 @@ pub struct McpServerConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
     #[serde(default)]
+    pub oauth: Option<McpOAuthConfig>,
+    #[serde(default)]
+    pub setup: Option<serde_json::Value>,
+    #[serde(default)]
     pub startup_timeout_sec: Option<u64>,
     #[serde(default)]
     pub tool_timeout_sec: Option<u64>,
+    #[serde(default)]
+    pub tool_timeouts: Option<HashMap<String, u64>>,
+    #[serde(default)]
+    pub expose_image_base64: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct McpOAuthConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub client_id: Option<String>,
+    #[serde(default)]
+    pub client_secret: Option<String>,
+    #[serde(default)]
+    pub scopes: Option<Vec<String>>,
 }
 
 fn default_true() -> bool {
@@ -699,3 +722,481 @@ fn default_true() -> bool {
 pub fn load() -> RemoteSettings {
     RemoteSettings::default()
 }
+
+/// Persisted worktree preference for `/new` and `/fork` (`[hints]` in config.toml).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorktreeHintMode {
+    Ask,
+    Always,
+    #[default]
+    Never,
+}
+
+impl WorktreeHintMode {
+    pub fn from_config_str(s: &str) -> Self {
+        match s {
+            "always" => Self::Always,
+            "never" => Self::Never,
+            "ask" => Self::Ask,
+            _ => Self::Never,
+        }
+    }
+
+    pub fn as_config_str(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::Always => "always",
+            Self::Never => "never",
+        }
+    }
+
+    pub fn resolve_pair(hints: Option<&toml::Value>) -> (Self, Self) {
+        let get_str = |key: &str| -> Option<Self> {
+            hints
+                .and_then(|h| h.get(key))
+                .and_then(|v| v.as_str())
+                .map(Self::from_config_str)
+        };
+        let legacy = get_str("worktree_mode");
+        let new_session = get_str("new_session_worktree_mode")
+            .or(legacy)
+            .unwrap_or(Self::Never);
+        let fork = get_str("fork_worktree_mode")
+            .or(legacy)
+            .unwrap_or(Self::Ask);
+        (new_session, fork)
+    }
+}
+
+pub fn env_bool(name: &str) -> Option<bool> {
+    match std::env::var(name).ok()?.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    }
+}
+
+pub const DISPLAY_REFRESH_DEFAULT_CADENCE_MS: u64 = 16;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MotionCadence {
+    pub min_draw_ms: u64,
+    pub scroll_ms: u64,
+    pub auto_applied: bool,
+    pub reason: &'static str,
+}
+
+impl Default for MotionCadence {
+    fn default() -> Self {
+        Self {
+            min_draw_ms: DISPLAY_REFRESH_DEFAULT_CADENCE_MS,
+            scroll_ms: DISPLAY_REFRESH_DEFAULT_CADENCE_MS,
+            auto_applied: false,
+            reason: "default",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedContextualHints {
+    pub undo: bool,
+    pub plan_mode: bool,
+    pub image_input: bool,
+    pub send_now: bool,
+    pub small_screen: bool,
+    pub word_select: bool,
+    pub ssh_wrap: bool,
+}
+
+impl Default for ResolvedContextualHints {
+    fn default() -> Self {
+        Self {
+            undo: true,
+            plan_mode: true,
+            image_input: true,
+            send_now: true,
+            small_screen: true,
+            word_select: true,
+            ssh_wrap: true,
+        }
+    }
+}
+
+/// Effective display-refresh policy after layered resolve.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DisplayRefreshPolicy {
+    pub probe_enabled: bool,
+    pub auto_cadence_enabled: bool,
+    pub floor_ms: u32,
+    pub ceiling_ms: u32,
+    pub min_hz: u32,
+    pub max_hz: u32,
+}
+
+impl Default for DisplayRefreshPolicy {
+    fn default() -> Self {
+        Self {
+            probe_enabled: true,
+            auto_cadence_enabled: false,
+            floor_ms: 8,
+            ceiling_ms: 16,
+            min_hz: 55,
+            max_hz: 165,
+        }
+    }
+}
+
+pub fn resolve_display_refresh(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+    _remote: Option<&RemoteSettings>,
+) -> DisplayRefreshPolicy {
+    DisplayRefreshPolicy::default()
+}
+
+pub fn resolve_motion_cadence(
+    _policy: &DisplayRefreshPolicy,
+    _probe_hz: Option<u32>,
+    _min_draw_env: Option<u64>,
+    _scroll_env: Option<u64>,
+) -> MotionCadence {
+    MotionCadence::default()
+}
+
+pub fn resolve_contextual_hints(
+    _ui: &crate::agent::config::ContextualHints,
+    _remote: Option<&ContextualHintsRemote>,
+) -> ResolvedContextualHints {
+    ResolvedContextualHints::default()
+}
+
+pub fn use_leader_from_toml_opt(_root: &toml::Value) -> Option<bool> {
+    None
+}
+
+pub fn use_leader_from_toml(root: &toml::Value) -> bool {
+    use_leader_from_toml_opt(root).unwrap_or(false)
+}
+
+pub fn load_mcp_servers(
+    _cwd: &std::path::Path,
+    _compat: &xai_grok_tools::types::compat::CompatConfig,
+) -> Vec<agent_client_protocol::McpServer> {
+    Vec::new()
+}
+
+// --- PR7 stub surface: disk setters / resolvers (no-op) ---
+use std::path::{Path, PathBuf};
+
+pub async fn set_ask_user_question_timeout_enabled(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_auto_dark_theme(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_auto_light_theme(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_auto_update(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_cancel_subagents_on_turn_cancel(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_collapsed_edit_blocks(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_compact_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_contextual_hint_image_input(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_contextual_hint_plan_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_contextual_hint_send_now(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_contextual_hint_small_screen(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_contextual_hint_ssh_wrap(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_contextual_hint_undo(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_contextual_hint_word_select(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_default_model(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_default_selected_permission(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_display_refresh_auto_cadence(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_fork_secondary_model(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_group_tool_verbs(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_hunk_tracker_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_invert_scroll(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_keep_text_selection(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_max_thoughts_width(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_page_flip_on_send(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_prompt_suggestions(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_remember_tool_approvals(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_render_mermaid(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_screen_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_scroll_lines(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_scroll_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_scroll_speed(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_show_thinking_blocks(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_show_timeline(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_show_timestamps(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_show_tips(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_simple_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_theme(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_vim_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_voice_capture_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn set_voice_stt_language(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+pub async fn update_config(
+    f: impl FnOnce(&mut crate::agent::config::Config),
+) -> anyhow::Result<()> {
+    let mut cfg = crate::agent::config::Config::default();
+    f(&mut cfg);
+    Ok(())
+}
+pub fn user_config_path() -> PathBuf { crate::util::grok_home::grok_home().join("config.toml") }
+pub fn project_config_path(cwd: &Path) -> PathBuf { cwd.join(".grok").join("config.toml") }
+pub fn worktree_type() -> WorktreeHintMode { WorktreeHintMode::Never }
+
+/// Result of [`effective_yolo_for_launch`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct EffectiveYolo {
+    pub yolo: bool,
+    pub blocked_warning: Option<&'static str>,
+    pub policy_block: Option<&'static str>,
+}
+
+/// Where a resolved config value came from (Face stub).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ConfigSource {
+    Requirement,
+    Cli,
+    Env,
+    ManagedConfig,
+    UserConfig,
+    Remote,
+    #[default]
+    Default,
+}
+
+impl std::fmt::Display for ConfigSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Requirement => "requirement",
+            Self::Cli => "cli",
+            Self::Env => "env",
+            Self::ManagedConfig => "managed",
+            Self::UserConfig => "user",
+            Self::Remote => "remote",
+            Self::Default => "default",
+        };
+        f.write_str(s)
+    }
+}
+
+/// A resolved config value with its source.
+#[derive(Debug, Clone)]
+pub struct Resolved<T> {
+    pub value: T,
+    pub source: ConfigSource,
+}
+
+impl<T> Resolved<T> {
+    pub fn new(value: T, source: ConfigSource) -> Self {
+        Self { value, source }
+    }
+}
+
+fn resolved_bool(value: bool) -> Resolved<bool> {
+    Resolved::new(value, ConfigSource::Default)
+}
+
+/// Launch permission-mode discriminant used by display helpers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PermissionMode {
+    #[default]
+    Ask,
+    AlwaysApprove,
+    Auto,
+    Default,
+}
+
+impl PermissionMode {
+    pub fn is_always_approve(self) -> bool {
+        matches!(self, Self::AlwaysApprove)
+    }
+    pub fn is_auto(self) -> bool {
+        matches!(self, Self::Auto)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ResolvedHints {
+    pub project_picker_disabled: bool,
+    pub new_session_worktree_mode: WorktreeHintMode,
+    pub fork_worktree_mode: WorktreeHintMode,
+}
+
+pub fn effective_auto_for_launch(
+    _cli_always_approve: bool,
+    _cli_permission_mode: Option<&str>,
+    _remote_permission_mode: Option<&str>,
+) -> bool {
+    false
+}
+
+pub fn effective_yolo_for_launch(
+    _cli_always_approve: bool,
+    _cli_permission_mode: Option<&str>,
+    _remote_permission_mode: Option<&str>,
+) -> EffectiveYolo {
+    EffectiveYolo::default()
+}
+
+pub fn load_mcp_server_configs_with_project(
+    _cwd: &Path,
+) -> Vec<(String, (McpServerConfig, &'static str))> {
+    vec![]
+}
+pub async fn save_mcp_server_config_at(
+    _path: &Path,
+    _name: &str,
+    _cfg: &McpServerConfig,
+) -> anyhow::Result<()> {
+    Ok(())
+}
+pub async fn delete_mcp_server_config_at(_path: &Path, _name: &str) -> anyhow::Result<bool> {
+    Ok(false)
+}
+pub fn mcp_server_defined_at(_path: &Path, _name: &str) -> bool { false }
+pub fn cache_remote_auto_mode(_v: Option<serde_json::Value>) {}
+pub fn cache_remote_auto_permission_mode_enabled(_v: Option<bool>) {}
+pub fn auto_permission_mode_enabled_from_disk() -> bool { true }
+
+pub fn clamped_display_permission_mode(mode: PermissionMode) -> &'static str {
+    if mode.is_always_approve() || mode.is_auto() {
+        "ask"
+    } else {
+        match mode {
+            PermissionMode::Ask => "ask",
+            PermissionMode::Default => "default",
+            PermissionMode::AlwaysApprove => "always-approve",
+            PermissionMode::Auto => "auto",
+        }
+    }
+}
+
+pub fn parse_permission_mode_canonical(s: &str) -> PermissionMode {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "always-approve" | "yolo" | "bypasspermissions" => PermissionMode::AlwaysApprove,
+        "auto" => PermissionMode::Auto,
+        "default" => PermissionMode::Default,
+        _ => PermissionMode::Ask,
+    }
+}
+
+pub fn permission_mode_from_ui_if_set(ui: &toml::Value) -> Option<PermissionMode> {
+    ui.get("permission_mode")
+        .and_then(|v| v.as_str())
+        .map(parse_permission_mode_canonical)
+}
+
+pub fn resolved_display_permission_mode(
+    effective_ui: Option<&toml::Value>,
+    remote_permission_mode: Option<&str>,
+) -> &'static str {
+    clamped_display_permission_mode(resolve_permission_mode(
+        effective_ui,
+        remote_permission_mode,
+    ))
+}
+
+pub fn resolve_permission_mode(
+    effective_ui: Option<&toml::Value>,
+    remote_permission_mode: Option<&str>,
+) -> PermissionMode {
+    if let Some(ui) = effective_ui
+        && let Some(mode) = permission_mode_from_ui_if_set(ui)
+    {
+        return mode;
+    }
+    if let Some(mode_str) = remote_permission_mode {
+        return parse_permission_mode_canonical(mode_str);
+    }
+    PermissionMode::Ask
+}
+
+pub fn resolve_auto_permission_mode_enabled() -> bool { true }
+
+pub fn resolve_announcements(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+    _remote: Option<&[RemoteAnnouncement]>,
+) -> Vec<RemoteAnnouncement> {
+    vec![]
+}
+
+pub fn resolve_collapsed_edit_blocks(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+    _remote: Option<&RemoteSettings>,
+) -> Resolved<bool> {
+    resolved_bool(false)
+}
+
+pub fn resolve_group_tool_verbs(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+    _remote: Option<&RemoteSettings>,
+) -> Resolved<bool> {
+    resolved_bool(true)
+}
+
+pub fn resolve_hints(
+    _effective_config: Option<&toml::Value>,
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+) -> ResolvedHints {
+    ResolvedHints::default()
+}
+
+pub fn resolve_mcp_push_server_status(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+) -> bool {
+    false
+}
+
+pub fn resolve_mouse_reporting_toggle(
+    _effective: Option<&toml::Value>,
+    _ui: &crate::agent::config::UiConfig,
+) -> Resolved<bool> {
+    resolved_bool(false)
+}
+
+pub fn resolve_remote_fetch_enabled() -> bool { false }
+
+pub fn resolve_show_thinking_blocks(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+    _remote: Option<&RemoteSettings>,
+) -> Resolved<bool> {
+    resolved_bool(true)
+}
+
+pub fn resolve_tips(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+    _remote_tips: Option<&[String]>,
+) -> Vec<String> {
+    vec![]
+}
+
+pub fn resolve_zdr_access_enabled(
+    _requirements: Option<&toml::Value>,
+    _user: Option<&toml::Value>,
+    _managed: Option<&toml::Value>,
+    _remote: Option<&RemoteSettings>,
+) -> bool {
+    false
+}
+
+pub fn load_require_plan_approval() -> bool { false }
+pub async fn persist_models_default(
+    _model: Option<String>,
+    _reasoning_effort: Option<crate::sampling::types::ReasoningEffort>,
+) -> anyhow::Result<()> {
+    Ok(())
+}
+pub fn set_remote_campaigns_from_settings(_s: Option<&RemoteSettings>) {}
+

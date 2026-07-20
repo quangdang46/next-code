@@ -126,27 +126,21 @@ PR 6: xai-grok-voice + xai-grok-announcements + xai-file-utils (DONE — this PR
         TUI, or the ACP `enable-always-approve` option id.
 ```
 
-### Phase 3 — Pager Copy + Old TUI Delete (PR 7)
+### Phase 3 — Pager vendor (PR 7) — IN PROGRESS
 
 ```
-PR 7: next-code-tui-pager
-  ├── Copy: entire xai-grok-pager/src/ (all modules)
-  │     ├── app/ (event_loop, app_view, dispatch, effects, agent, …)
-  │     ├── scrollback/ (blocks, render, types)
-  │     ├── input/ (keyboard, mouse)
-  │     ├── views/ (prompt, welcome, settings, …)
-  │     ├── theme/ 
-  │     ├── appearance/ (already compatible)
-  │     ├── notifications/
-  │     ├── config_toml_edit.rs
-  │     └── lib.rs / bin.rs (entry points)
-  ├── Remove: from old Cargo.toml
-  │     ├── jcode-tui (if exists)
-  │     └── old TUI source files
-  ├── Replace: real upstream xai-grok-shell/xai-grok-agent deps → the
-  │     PR5 xai-grok-shell/xai-grok-agent façade crates in Cargo.toml
-  ├── Keep: Apache headers + attribution
-  └── Add: next-code-app-core as dependency (for GrokHost::trait)
+PR 7: xai-grok-pager (keep Cargo name; do NOT delete old TUI here)
+  ├── Copy: entire xai-grok-pager/src/ (~433 rs) into crates/xai-grok-pager
+  ├── Stub 10 missing Face deps: version, prompt-queue, token-estimation,
+  │     hooks-plugins-types, crash-handler, mermaid, sandbox, marketplace,
+  │     update, fast-worktree
+  ├── Wire path deps + next-code-ratatui-* package renames; voice no audio
+  ├── Grow PR3–6 Face stubs until cargo check -p xai-grok-pager green
+  ├── Keep: Apache headers + attribution; next-code-tui* still ships
+  ├── Branding (must): welcome / hero logo = **next-code animated idle logo**
+  │     (donut / orbit_rings from `next-code-tui` `ui_animations`), **not**
+  │     Grok braille `assets/logo/logo*.txt` — replace before shipping Face
+  └── Deferred to PR8: binary cutover, GrokHost, delete/stop old TUI path
 ```
 
 ### Phase 4 — Entry Point (PR 8)
@@ -158,6 +152,7 @@ PR 8: next-code entry point
   │     → rename grok → next-code
   ├── TUI launch: init_pager() → create AppView → connect to
   │     next-code server runtime (in-process via GrokHost trait)
+  ├── Branding: Face welcome uses next-code animated logo (not Grok braille)
   ├── Files: bin/next-code.rs, modified main.rs
   └── CLI flags map:
         next-code [no args] = interactive TUI (was: grok pager)
@@ -324,9 +319,9 @@ PR3–6 can be done in parallel (shims don't depend on each other).
 
 After PR8:
 1. `cd ~/Projects/next-code && cargo build`
-2. `next-code` → Grok pager UI should appear (fullscreen, ratatui)
+2. `next-code` → Face pager UI should appear (fullscreen, ratatui) with **next-code** animated logo (not Grok braille art)
 3. Welcome screen → create session → agent should respond via next-code runtime
 4. `next-code agent --help` → CLI flags work
 5. `next-code session list` → shows next-code sessions
 
-**The pager will render using Grok's UI code, but the agent is next-code with openproxy.**
+**The pager will render using Grok's UI code, but branding (logo) and the agent are next-code (openproxy).**

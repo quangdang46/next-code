@@ -1,11 +1,9 @@
-//! Stub of upstream `xai-grok-agent::config` — only the enums/struct shapes
-//! the future pager's `agents_modal.rs` imports (`BuiltinAgentName`,
-//! `AgentDefinition`, `AgentScope`, `PromptMode`). Upstream also carries
-//! `ToolServerConfig` / `SubagentCapabilityMode` fields on `AgentDefinition`
-//! (from `xai-grok-tools` / `xai-tool-types`); those are dropped here since
-//! nothing in this compile-stub layer consumes them yet.
+//! Stub of upstream `xai-grok-agent::config` — shapes the pager's
+//! `agents_modal.rs` imports (`BuiltinAgentName`, `AgentDefinition`, …).
 
 use serde::{Deserialize, Serialize};
+
+use xai_grok_tools::registry::types::ToolServerConfig;
 
 /// Built-in agent identifiers. Variant list matches upstream 1:1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,7 +33,7 @@ pub enum PromptMode {
 }
 
 /// Where the agent definition was discovered.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentScope {
     /// .grok/agents/ (project-level, highest priority)
     Project,
@@ -59,8 +57,7 @@ impl AgentScope {
     }
 }
 
-/// Simplified stand-in for upstream's `AgentDefinition` (tool_config /
-/// capability_mode fields dropped — see module doc).
+/// Simplified stand-in for upstream's `AgentDefinition`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentDefinition {
     pub name: String,
@@ -69,4 +66,60 @@ pub struct AgentDefinition {
     pub plugin_name: Option<String>,
     #[serde(default)]
     pub prompt_mode: PromptMode,
+    #[serde(default)]
+    pub scope: AgentScope,
+    #[serde(default)]
+    pub source_path: Option<std::path::PathBuf>,
+    #[serde(default)]
+    pub model: String,
+    #[serde(default)]
+    pub tool_config: ToolServerConfig,
+    #[serde(default)]
+    pub skills: Vec<String>,
+    #[serde(default)]
+    pub prompt_body: Option<String>,
+}
+
+impl BuiltinAgentName {
+    pub fn definition(self) -> AgentDefinition {
+        AgentDefinition {
+            name: format!("{self:?}"),
+            description: String::new(),
+            scope: AgentScope::BuiltIn,
+            ..Default::default()
+        }
+    }
+
+    pub fn subagent_variants() -> &'static [BuiltinAgentName] {
+        &[
+            Self::GeneralPurpose,
+            Self::Explore,
+            Self::Plan,
+            Self::BrowserUse,
+        ]
+    }
+}
+
+impl std::str::FromStr for BuiltinAgentName {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "grok-build" | "GrokBuild" => Ok(Self::GrokBuild),
+            "grok-build-concise" | "GrokBuildConcise" => Ok(Self::GrokBuildConcise),
+            "grok-build-plan" | "GrokBuildPlan" => Ok(Self::GrokBuildPlan),
+            "grok-build-plan-no-subagents" | "GrokBuildPlanNoSubagents" => {
+                Ok(Self::GrokBuildPlanNoSubagents)
+            }
+            "grok-build-ask-user" | "GrokBuildAskUser" => Ok(Self::GrokBuildAskUser),
+            "codex" | "Codex" => Ok(Self::Codex),
+            "opencode" | "Opencode" => Ok(Self::Opencode),
+            "general-purpose" | "GeneralPurpose" => Ok(Self::GeneralPurpose),
+            "explore" | "Explore" => Ok(Self::Explore),
+            "plan" | "Plan" => Ok(Self::Plan),
+            "browser-use" | "BrowserUse" => Ok(Self::BrowserUse),
+            "grok-build-orchestrator" | "GrokBuildOrchestrator" => Ok(Self::GrokBuildOrchestrator),
+            other => Err(format!("unknown builtin agent: {other}")),
+        }
+    }
 }
