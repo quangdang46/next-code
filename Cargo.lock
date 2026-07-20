@@ -13924,12 +13924,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "xai-file-utils"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 6.0.0",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "xai-grok-agent"
 version = "0.1.0"
 dependencies = [
  "dirs 5.0.1",
  "serde",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "xai-grok-announcements"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "xai-grok-config",
 ]
 
 [[package]]
@@ -14084,6 +14108,16 @@ dependencies = [
  "thiserror 2.0.19",
  "xai-grok-config",
  "xai-tty-utils",
+]
+
+[[package]]
+name = "xai-grok-voice"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.8.23",
 ]
 
 [[package]]
