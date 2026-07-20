@@ -126,36 +126,42 @@ PR 6: xai-grok-voice + xai-grok-announcements + xai-file-utils (DONE — this PR
         TUI, or the ACP `enable-always-approve` option id.
 ```
 
-### Phase 3 — Pager vendor (PR 7) — IN PROGRESS
+### Phase 3 — Pager vendor (PR 7) — DONE (merged #41)
 
 ```
 PR 7: xai-grok-pager (keep Cargo name; do NOT delete old TUI here)
-  ├── Copy: entire xai-grok-pager/src/ (~433 rs) into crates/xai-grok-pager
-  ├── Stub 10 missing Face deps: version, prompt-queue, token-estimation,
-  │     hooks-plugins-types, crash-handler, mermaid, sandbox, marketplace,
-  │     update, fast-worktree
-  ├── Wire path deps + next-code-ratatui-* package renames; voice no audio
-  ├── Grow PR3–6 Face stubs until cargo check -p xai-grok-pager green
-  ├── Keep: Apache headers + attribution; next-code-tui* still ships
-  ├── Branding (must): welcome / hero logo = **next-code animated idle logo**
-  │     (donut / orbit_rings from `next-code-tui` `ui_animations`), **not**
-  │     Grok braille `assets/logo/logo*.txt` — replace before shipping Face
-  └── Deferred to PR8: binary cutover, GrokHost, delete/stop old TUI path
+  ├── Copy: entire xai-grok-pager/src/ into crates/xai-grok-pager
+  ├── Stub missing Face deps; cargo check green
+  └── Deferred to PR8: binary cutover + delete old TUI
 ```
 
-### Phase 4 — Entry Point (PR 8) — IN PROGRESS on `pr-8-grok-entrypoint`
+### Phase 4 — Entry Point (PR 8) — DONE (merged #42 → `dev`)
 
 ```
 PR 8: next-code entry point
-  ├── next-code [no args] → xai-grok-pager::app::run (Face)  ✅ wired
-  ├── Brain: NextCodeFaceAgent ACP bridge → serve socket   ✅ wired
+  ├── next-code [no args] → xai-grok-pager::app::run (Face)  ✅
+  ├── Brain: NextCodeFaceAgent ACP bridge → serve socket   ✅
   ├── Escape: NEXT_CODE_LEGACY_TUI=1 → old next-code-tui    ✅
   ├── Branding: welcome logo = next-code-tui-anim donut    ✅
-  ├── serve / agent CLI unchanged
-  └── next-code-tui* crates still in workspace (lib re-export + escape);
-        full delete deferred until Face smoke is solid
+  ├── Quit/resume brand + black-screen drain fix           ✅
+  └── next-code-tui* still in workspace → delete in PR11
 ```
 
+### Phase 5 — Finish migration (PR 9–14) — DOCS READY
+
+Home-implementable plans (follow `.agents/skills/grok-migration-workflow`):
+
+| PR | Doc |
+|----|-----|
+| Roadmap | `docs/plans/PLAN-20260720-grok-post-pr8-roadmap.md` |
+| 9 Brain harden | `docs/plans/PLAN-20260720-grok-pr9-face-brain-harden.md` |
+| 10 Config/settings | `docs/plans/PLAN-20260720-grok-pr10-face-config-settings.md` |
+| 11 Retire legacy TUI | `docs/plans/PLAN-20260720-grok-pr11-retire-legacy-tui.md` |
+| 12 Stub→real shell | `docs/plans/PLAN-20260720-grok-pr12-stub-to-real-shell.md` |
+| 13 Sessions dashboard | `docs/plans/PLAN-20260720-grok-pr13-sessions-dashboard.md` |
+| 14 Parity cleanup | `docs/plans/PLAN-20260720-grok-pr14-parity-cleanup.md` |
+
+**Do not** implement SUMMARY §3 `GrokHost` unless ACP bridge fails — PR8 chose ACP mediator.
 ---
 
 ## 3. The Key Interface: GrokHost

@@ -147,6 +147,13 @@ Document every intentional delta in the Plan Report.
 - **origin-sync** — upstream fork sync; do not confuse with Face vendor copy from grok-build.
 - Repo **AGENTS.md** LOOK→PLAN→BUILD still applies; this skill specializes it for the migration goal.
 
+## Post-PR8 roadmap (home implement)
+
+After PR8 (#42) cutover, remaining work is **PR9–14**. Start here:
+
+- `docs/plans/PLAN-20260720-grok-post-pr8-roadmap.md` — index + order
+- Per-PR plans: `docs/plans/PLAN-20260720-grok-pr9-*.md` … `pr14-*.md`
+
 ## Done means
 
 - Behavior matches approved Plan
