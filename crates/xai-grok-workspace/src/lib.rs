@@ -1,11 +1,8 @@
-//! Minimal workspace permission shim for Face render.
+//! Compile stubs for Face/pager workspace imports (PR4).
 
-pub mod permission {
-    use agent_client_protocol as acp;
-
-    pub const ENABLE_ALWAYS_APPROVE_OPTION_ID: &str = "enable-always-approve";
-
-    pub fn is_enable_always_approve_option(opt: &acp::PermissionOption) -> bool {
-        opt.option_id.0.as_ref() == ENABLE_ALWAYS_APPROVE_OPTION_ID
-    }
-}
+pub mod file_system;
+pub mod folder_trust;
+pub mod foreign_sessions;
+pub mod permission;
+pub mod session;
+pub mod trust;
