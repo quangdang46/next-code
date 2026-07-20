@@ -132,14 +132,63 @@ impl CliAgentOverrides {
     }
 }
 
-/// Simplified stand-in for upstream's top-level agent `Config` (the
-/// resolved, merged view of `config.toml` + managed config + remote
-/// settings). Only the `agent` selection sub-config is kept — the other
-/// ~1000 fields upstream carries (models, providers, tools, memory,
-/// pruning, …) are out of scope for this façade layer.
+/// Nested endpoint settings the pager reads (trace upload, voice, …).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct EndpointsConfig {
+    pub api_base: Option<String>,
+    pub cli_chat_proxy_base_url: Option<String>,
+    pub telemetry_endpoint: Option<String>,
+}
+
+/// Nested telemetry toggles the pager reads.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TelemetryConfig {
+    pub enabled: bool,
+    pub trace_upload_enabled: bool,
+}
+
+impl TelemetryConfig {
+    pub fn is_trace_upload_enabled(&self) -> bool {
+        self.trace_upload_enabled
+    }
+}
+
+/// Nested grok.com / auth config the pager touches at spawn.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GrokComConfig {
+    pub enabled: bool,
+}
+
+/// Simplified stand-in for upstream's top-level agent `Config`.
+/// Fields added as the pager compile surface demands them (PR7).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     #[serde(default)]
     pub agent: AgentSelectionConfig,
+    #[serde(default)]
+    pub endpoints: EndpointsConfig,
+    #[serde(default)]
+    pub telemetry: TelemetryConfig,
+    #[serde(default)]
+    pub grok_com_config: GrokComConfig,
+}
+
+impl Config {
+    /// Upstream builds from a TOML table; stub returns defaults.
+    pub fn new_from_toml_cfg(_table: &toml::Table) -> anyhow::Result<Self> {
+        Ok(Self::default())
+    }
+
+    /// Upstream loads from disk; stub returns defaults in Ok.
+    pub fn load() -> anyhow::Result<Self> {
+        Ok(Self::default())
+    }
+
+    pub fn configure_refresher(&self) {}
+
+    pub fn start_system_power_listener(&self) {}
 }

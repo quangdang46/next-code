@@ -1,4 +1,4 @@
-//! No-op telemetry shim for Face render substrate.
+//! No-op telemetry shim for Face render substrate (grown for PR7 pager).
 
 pub mod client {
     pub fn is_enabled() -> bool {
@@ -6,7 +6,86 @@ pub mod client {
     }
 }
 
+pub mod debug_log {
+    pub fn write(_msg: &str) {}
+}
+
+pub mod unified_log {
+    pub fn write(_msg: &str) {}
+}
+
+pub mod otel_layer {
+    pub fn init() {}
+}
+
+pub mod instrumentation {
+    pub fn init() {}
+}
+
+pub mod sentry {
+    pub fn init() {}
+}
+
 pub mod events {
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum AnnouncementCtaSurface {
+        #[default]
+        Banner,
+        Welcome,
+        Modal,
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum ContextualTipAction {
+        #[default]
+        Shown,
+        Dismissed,
+        Clicked,
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum ContextualTipKind {
+        #[default]
+        Generic,
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum CreditLimitUpsellSurface {
+        #[default]
+        Banner,
+        Modal,
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum CreditLimitChoice {
+        #[default]
+        Dismiss,
+        Upgrade,
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum ExtensionsInputMethod {
+        #[default]
+        Keyboard,
+        Mouse,
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum ExtensionsModalTrigger {
+        #[default]
+        Slash,
+        Settings,
+        Welcome,
+    }
+
+    #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+    pub enum PromptSuggestionAction {
+        #[default]
+        Shown,
+        Accepted,
+        Dismissed,
+    }
+
     #[derive(Debug, Clone, Default)]
     pub struct TerminalTelemetry {
         pub brand: String,
@@ -37,7 +116,6 @@ pub mod events {
         pub route_tmux: bool,
         pub route_osc52: bool,
         pub route_label: String,
-        /// Joined tool names (`"+"`), matching pager-render `ClipboardWriteLegs`.
         pub cli_tools_tried: String,
         pub cli_ok_tools: String,
         pub cli_ok: bool,

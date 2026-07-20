@@ -35,7 +35,7 @@ pub enum PromptMode {
 }
 
 /// Where the agent definition was discovered.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentScope {
     /// .grok/agents/ (project-level, highest priority)
     Project,
@@ -59,8 +59,7 @@ impl AgentScope {
     }
 }
 
-/// Simplified stand-in for upstream's `AgentDefinition` (tool_config /
-/// capability_mode fields dropped — see module doc).
+/// Simplified stand-in for upstream's `AgentDefinition`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentDefinition {
     pub name: String,
@@ -69,4 +68,36 @@ pub struct AgentDefinition {
     pub plugin_name: Option<String>,
     #[serde(default)]
     pub prompt_mode: PromptMode,
+    #[serde(default)]
+    pub scope: AgentScope,
+    #[serde(default)]
+    pub source_path: Option<std::path::PathBuf>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub tool_config: Option<serde_json::Value>,
+    #[serde(default)]
+    pub skills: Vec<String>,
+    #[serde(default)]
+    pub prompt_body: String,
+}
+
+impl BuiltinAgentName {
+    pub fn definition(self) -> AgentDefinition {
+        AgentDefinition {
+            name: format!("{self:?}"),
+            description: String::new(),
+            scope: AgentScope::BuiltIn,
+            ..Default::default()
+        }
+    }
+
+    pub fn subagent_variants() -> &'static [BuiltinAgentName] {
+        &[
+            Self::GeneralPurpose,
+            Self::Explore,
+            Self::Plan,
+            Self::BrowserUse,
+        ]
+    }
 }

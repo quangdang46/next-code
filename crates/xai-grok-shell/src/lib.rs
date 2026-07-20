@@ -32,10 +32,17 @@
 pub mod active_sessions;
 pub mod agent;
 pub mod auth;
+pub mod claude_import;
+pub mod claude_import_state;
+pub mod cli_models;
 pub mod config;
 pub mod extensions;
+pub mod leader;
+pub mod managed_config;
 pub mod models;
+pub mod plugin;
 pub mod sampling;
 pub mod session;
 pub mod tier;
+pub mod tools;
 pub mod util;

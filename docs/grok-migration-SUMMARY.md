@@ -126,27 +126,18 @@ PR 6: xai-grok-voice + xai-grok-announcements + xai-file-utils (DONE — this PR
         TUI, or the ACP `enable-always-approve` option id.
 ```
 
-### Phase 3 — Pager Copy + Old TUI Delete (PR 7)
+### Phase 3 — Pager vendor (PR 7) — IN PROGRESS
 
 ```
-PR 7: next-code-tui-pager
-  ├── Copy: entire xai-grok-pager/src/ (all modules)
-  │     ├── app/ (event_loop, app_view, dispatch, effects, agent, …)
-  │     ├── scrollback/ (blocks, render, types)
-  │     ├── input/ (keyboard, mouse)
-  │     ├── views/ (prompt, welcome, settings, …)
-  │     ├── theme/ 
-  │     ├── appearance/ (already compatible)
-  │     ├── notifications/
-  │     ├── config_toml_edit.rs
-  │     └── lib.rs / bin.rs (entry points)
-  ├── Remove: from old Cargo.toml
-  │     ├── jcode-tui (if exists)
-  │     └── old TUI source files
-  ├── Replace: real upstream xai-grok-shell/xai-grok-agent deps → the
-  │     PR5 xai-grok-shell/xai-grok-agent façade crates in Cargo.toml
-  ├── Keep: Apache headers + attribution
-  └── Add: next-code-app-core as dependency (for GrokHost::trait)
+PR 7: xai-grok-pager (keep Cargo name; do NOT delete old TUI here)
+  ├── Copy: entire xai-grok-pager/src/ (~433 rs) into crates/xai-grok-pager
+  ├── Stub 10 missing Face deps: version, prompt-queue, token-estimation,
+  │     hooks-plugins-types, crash-handler, mermaid, sandbox, marketplace,
+  │     update, fast-worktree
+  ├── Wire path deps + next-code-ratatui-* package renames; voice no audio
+  ├── Grow PR3–6 Face stubs until cargo check -p xai-grok-pager green
+  ├── Keep: Apache headers + attribution; next-code-tui* still ships
+  └── Deferred to PR8: binary cutover, GrokHost, delete/stop old TUI path
 ```
 
 ### Phase 4 — Entry Point (PR 8)

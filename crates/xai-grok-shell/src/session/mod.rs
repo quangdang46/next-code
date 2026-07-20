@@ -6,6 +6,7 @@
 //! Upstream's real session engine (acp_session/, goal_orchestrator, mcp
 //! dispatch, compaction, two_pass, …) is NOT vendored here.
 
+pub mod acp_types;
 pub mod info;
 pub mod merge;
 pub mod persistence;
@@ -52,9 +53,15 @@ pub enum PromptOrigin {
 pub struct ContextInfo {
     pub used: u64,
     pub total: u64,
+    pub free_tokens: u64,
+    pub message_tokens: u64,
+    pub system_prompt_tokens: u64,
     pub turn_count: u64,
     pub tool_call_count: u64,
+    pub compaction_count: u64,
     pub usage_pct: u8,
+    #[serde(default)]
+    pub usage_categories: Vec<String>,
 }
 
 impl ContextInfo {

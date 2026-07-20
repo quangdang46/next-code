@@ -5,8 +5,10 @@
 //! keyring persistence) is reduced to a construction-shaped stub — no real
 //! credential storage or refresh loop in this compile-stub layer.
 
+mod credential_provider;
 mod meta;
 
+pub use credential_provider::CredentialProvider;
 pub use meta::{AuthMeta, GateInfo};
 
 use std::path::{Path, PathBuf};
@@ -64,4 +66,8 @@ impl AuthManager {
     pub fn grok_com_config(&self) -> &GrokComConfig {
         &self.grok_com_config
     }
+
+    pub fn configure_refresher(&self) {}
+
+    pub fn start_system_power_listener(&self) {}
 }
