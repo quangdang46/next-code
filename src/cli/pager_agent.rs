@@ -8,6 +8,9 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use agent_client_protocol as acp;
+use agent_client_protocol::{
+    Client as _, SessionId, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
+};
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -186,7 +189,6 @@ impl NextCodeFaceAgent {
     }
 
     async fn emit_text(&self, session_id: &str, text: String) {
-        use acp::Client as _;
         let notif = acp::SessionNotification::new(
             acp::SessionId::new(session_id),
             acp::SessionUpdate::AgentMessageChunk(acp::ContentChunk::new(
@@ -204,6 +206,164 @@ impl NextCodeFaceAgent {
             }
         }
         parts.join("\n")
+    }
+
+    // ── Tool lifecycle helpers (Grok typed ACP) ────────────────
+    /// Emit a `ToolCall` notification with Pending status. Face
+    /// `AcpUpdateTracker::handle_update()` creates a scrollback entry.
+    async fn emit_tool_call(&self, session_id: &str, tool_id: &str, name: &str) {
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new(ToolCallId::new(tool_id), Self::tool_title(name))
+                        .status(ToolCallStatus::Pending)
+                        .kind(Self::tool_kind(name)),
+                ),
+            ))
+            .await;
+    }
+
+    /// Emit a `ToolCallUpdate` with the given status.
+    async fn emit_tool_update(
+        &self,
+        session_id: &str,
+        tool_id: &str,
+        name: &str,
+        status: ToolCallStatus,
+    ) {
+        let fields = ToolCallUpdateFields::new()
+            .status(status)
+            .title(Self::tool_title(name))
+            .kind(Self::tool_kind(name));
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+                    ToolCallId::new(tool_id),
+                    fields,
+                )),
+            ))
+            .await;
+    }
+
+    /// Emit a `ToolCallUpdate` with Completed status and raw output.
+    async fn emit_tool_done(
+        &self,
+        session_id: &str,
+        tool_id: &str,
+        name: &str,
+        output: &str,
+        error: &Option<String>,
+    ) {
+        let status = if error.is_some() {
+            ToolCallStatus::Failed
+        } else {
+            ToolCallStatus::Completed
+        };
+        let fields = ToolCallUpdateFields::new()
+            .status(status)
+            .title(Self::tool_title(name))
+            .kind(Self::tool_kind(name))
+            .raw_output(Some(serde_json::json!({
+                "output": output,
+                "error": error,
+            })));
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+                    ToolCallId::new(tool_id),
+                    fields,
+                )),
+            ))
+            .await;
+    }
+
+    /// Emit a tool_call_update for GeneratedImage.
+    async fn emit_generated_image(
+        &self,
+        session_id: &str,
+        tool_id: &str,
+        path: &str,
+        output_format: &str,
+        revised_prompt: Option<&str>,
+    ) {
+        let text = format!(
+            "Generated image: {path} ({output_format}){}",
+            revised_prompt
+                .map(|rp| format!("\nRevised prompt: {rp}"))
+                .unwrap_or_default()
+        );
+        let fields = ToolCallUpdateFields::new()
+            .status(ToolCallStatus::Completed)
+            .content(Some(vec![
+                acp::ContentBlock::Text(acp::TextContent::new(text)).into(),
+            ]));
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCallUpdate(ToolCallUpdate::new(
+                    ToolCallId::new(tool_id),
+                    fields,
+                )),
+            ))
+            .await;
+    }
+
+    /// Emit a session-info-update for renamed sessions.
+    async fn emit_session_renamed(&self, session_id: &str, title: &str) {
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::SessionInfoUpdate(
+                    acp::SessionInfoUpdate::new().title(title),
+                ),
+            ))
+            .await;
+    }
+
+    /// Title string for a tool, matching stock EventMapper.
+    fn tool_title(name: &str) -> String {
+        if name.starts_with("Bash") {
+            "Bash".to_string()
+        } else if name.starts_with("Read")
+            || name.starts_with("Glob")
+            || name.starts_with("Grep")
+        {
+            "Read".to_string()
+        } else if name.starts_with("Edit") || name.starts_with("Write") {
+            "Edit".to_string()
+        } else if name.starts_with("Web") {
+            "Web".to_string()
+        } else if name.starts_with("Search") {
+            "Search".to_string()
+        } else {
+            name.to_string()
+        }
+    }
+
+    /// Kind enum for a tool, matching stock EventMapper.
+    fn tool_kind(name: &str) -> acp::ToolKind {
+        if name.starts_with("Bash") {
+            acp::ToolKind::Execute
+        } else if name.starts_with("Read")
+            || name.starts_with("Glob")
+            || name.starts_with("Grep")
+        {
+            acp::ToolKind::Read
+        } else if name.starts_with("Edit") || name.starts_with("Write") {
+            acp::ToolKind::Edit
+        } else if name.starts_with("Web") {
+            acp::ToolKind::Fetch
+        } else {
+            acp::ToolKind::Other
+        }
     }
 }
 
@@ -302,6 +462,55 @@ impl acp::Agent for NextCodeFaceAgent {
                 ServerEvent::TextDelta { text } | ServerEvent::TextReplace { text } => {
                     self.emit_text(&session_id, text).await;
                 }
+                // Tool lifecycle — typed ACP (Grok way)
+                ServerEvent::ToolStart { id, name } => {
+                    self.emit_tool_call(&session_id, &id, &name).await;
+                }
+                ServerEvent::ToolInput { .. } => {
+                    // Accumulate input; no Face notification needed per event
+                }
+                ServerEvent::ToolExec { id, name } => {
+                    self.emit_tool_update(&session_id, &id, &name, ToolCallStatus::InProgress)
+                        .await;
+                }
+                ServerEvent::ToolDone {
+                    id,
+                    name,
+                    output,
+                    error,
+                } => {
+                    self.emit_tool_done(&session_id, &id, &name, &output, &error)
+                        .await;
+                }
+                ServerEvent::GeneratedImage {
+                    id,
+                    path,
+                    output_format,
+                    revised_prompt,
+                    ..
+                } => {
+                    self.emit_generated_image(
+                        &session_id,
+                        &id,
+                        &path,
+                        &output_format,
+                        revised_prompt.as_deref(),
+                    )
+                    .await;
+                }
+                ServerEvent::Compaction { trigger, .. } => {
+                    self.emit_text(
+                        &session_id,
+                        format!("\n[Context compacted: {trigger}]\n"),
+                    )
+                    .await;
+                }
+                ServerEvent::SessionRenamed {
+                    display_title, ..
+                } => {
+                    self.emit_session_renamed(&session_id, &display_title)
+                        .await;
+                }
                 ServerEvent::Done { id } if id == prompt_id => break acp::StopReason::EndTurn,
                 ServerEvent::Error { id, message, .. } if id == prompt_id => {
                     self.emit_text(&session_id, format!("Error: {message}"))
@@ -323,5 +532,92 @@ impl acp::Agent for NextCodeFaceAgent {
             let _ = session.send(&Request::Cancel { id: cancel_id }).await;
         }
         Ok(())
+    }
+
+    async fn set_session_model(
+        &self,
+        args: acp::SetSessionModelRequest,
+    ) -> acp::Result<acp::SetSessionModelResponse> {
+        let model_id = args.model_id.to_string();
+        let session_id = args.session_id.to_string();
+        let session = self.sessions.borrow().get(&session_id).cloned();
+        let Some(session) = session else {
+            return Err(
+                acp::Error::invalid_params().data(format!("Unknown session: {session_id}"))
+            );
+        };
+        let req_id = session.next_id();
+        session
+            .send(&Request::SetModel {
+                id: req_id,
+                model: model_id,
+            })
+            .await
+            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+        Ok(acp::SetSessionModelResponse::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tool_title_bash() {
+        assert_eq!(NextCodeFaceAgent::tool_title("Bash"), "Bash");
+        assert_eq!(NextCodeFaceAgent::tool_title("BashDescription"), "Bash");
+    }
+
+    #[test]
+    fn test_tool_title_read() {
+        assert_eq!(NextCodeFaceAgent::tool_title("Read"), "Read");
+        assert_eq!(NextCodeFaceAgent::tool_title("Glob"), "Read");
+        assert_eq!(NextCodeFaceAgent::tool_title("Grep"), "Read");
+    }
+
+    #[test]
+    fn test_tool_title_edit() {
+        assert_eq!(NextCodeFaceAgent::tool_title("Edit"), "Edit");
+        assert_eq!(NextCodeFaceAgent::tool_title("Write"), "Edit");
+    }
+
+    #[test]
+    fn test_tool_title_web() {
+        assert_eq!(NextCodeFaceAgent::tool_title("WebSearch"), "Web");
+        assert_eq!(NextCodeFaceAgent::tool_title("WebFetch"), "Web");
+    }
+
+    #[test]
+    fn test_tool_title_unknown() {
+        assert_eq!(NextCodeFaceAgent::tool_title("Unknown"), "Unknown");
+        assert_eq!(NextCodeFaceAgent::tool_title("SomeNewTool"), "SomeNewTool");
+    }
+
+    #[test]
+    fn test_tool_kind_bash() {
+        assert_eq!(NextCodeFaceAgent::tool_kind("Bash"), acp::ToolKind::Execute);
+        assert_eq!(NextCodeFaceAgent::tool_kind("BashDescription"), acp::ToolKind::Execute);
+    }
+
+    #[test]
+    fn test_tool_kind_read() {
+        assert_eq!(NextCodeFaceAgent::tool_kind("Read"), acp::ToolKind::Read);
+        assert_eq!(NextCodeFaceAgent::tool_kind("Grep"), acp::ToolKind::Read);
+    }
+
+    #[test]
+    fn test_tool_kind_edit() {
+        assert_eq!(NextCodeFaceAgent::tool_kind("Edit"), acp::ToolKind::Edit);
+    }
+
+    #[test]
+    fn test_tool_kind_web() {
+        assert_eq!(NextCodeFaceAgent::tool_kind("WebSearch"), acp::ToolKind::Fetch);
+    }
+
+    #[test]
+    fn test_tool_kind_fallback() {
+        assert_eq!(NextCodeFaceAgent::tool_kind("Unknown"), acp::ToolKind::Other);
+        assert_eq!(NextCodeFaceAgent::tool_kind("Search"), acp::ToolKind::Other);
     }
 }
