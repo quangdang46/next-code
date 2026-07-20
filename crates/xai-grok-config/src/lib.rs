@@ -140,3 +140,11 @@ mod tests {
         }
     }
 }
+
+/// Remote feature flags (subset). Upstream lives in config_types; pager passes
+/// this into folder_trust::feature_enabled.
+#[derive(Debug, Clone, Default)]
+pub struct RemoteSettings {
+    pub folder_trust_enabled: Option<bool>,
+}
+

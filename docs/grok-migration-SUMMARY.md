@@ -58,7 +58,7 @@ PR 3: deepen config home → next-code (DONE — merged PR #37)
   ├── Face display labels: `~/.next-code` / `$NEXT_CODE_HOME`
   └── No `[ui]` ↔ `[display].theme` bridge yet
 
-PR 4: deepen tools + workspace shims (PLAN — `pr-4-grok-tools-workspace-shim`)
+PR 4: deepen tools + workspace shims (DONE — PR #38)
   ├── NOTE: Face already has detach / image_validate / enable-always-approve (PR2)
   ├── Grow compile stubs for top pager imports (ToolOutput, SessionMode, skills,
   │     ask_user_question, RestoreDegree, folder_trust, foreign_sessions empty…)
