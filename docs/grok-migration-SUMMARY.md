@@ -52,18 +52,18 @@ PR 2: xai-grok-pager-render + minimal shims (DONE — merge to `dev` via PR #36)
 ### Phase 2 — Deepen shims / pager prep (PR 3–6)
 
 ```
-PR 3: deepen config home → next-code (DONE — PR #37)
+PR 3: deepen config home → next-code (DONE — merged PR #37)
   ├── Map `grok_home` → `$GROK_HOME` > `$NEXT_CODE_HOME` > `~/.next-code` (dunce)
   ├── Keep empty `load_effective_config_disk_only` + no-op telemetry
   ├── Face display labels: `~/.next-code` / `$NEXT_CODE_HOME`
   └── No `[ui]` ↔ `[display].theme` bridge yet
 
-PR 4: deepen tools + workspace shims
-  ├── NOTE: permission/detach stubs already exist from PR2
-  ├── xai_grok_tools → map to next-code tool registry where needed by pager
-  ├── xai_grok_workspace → map worktree/files to next-code git
-  ├── Files: grow existing shim crates
-  └── Shim exports: ExecuteResult, SearchResult, FileUtil…
+PR 4: deepen tools + workspace shims (PLAN — `pr-4-grok-tools-workspace-shim`)
+  ├── NOTE: Face already has detach / image_validate / enable-always-approve (PR2)
+  ├── Grow compile stubs for top pager imports (ToolOutput, SessionMode, skills,
+  │     ask_user_question, RestoreDegree, folder_trust, foreign_sessions empty…)
+  ├── Do NOT wire next-code Registry / full Grok worktree runtime
+  └── Keep ACP id `enable-always-approve` (YOLO map = PR5)
 
 PR 5: xai-shim-agent + xai-shim-shell + xai-shim-acp
   ├── xai_grok_agent → AgentId, AgentConfig from next-code agent
