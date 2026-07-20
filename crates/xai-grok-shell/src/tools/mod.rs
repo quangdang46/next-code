@@ -1,4 +1,7 @@
-//! Stub of upstream `xai-grok-shell::tools`.
+//! Stub of upstream `xai-grok-shell::tools` — re-exports todo types for the pager.
 
-#[derive(Debug, Clone, Default)]
-pub struct ToolRegistry;
+pub mod todo;
+
+pub use todo::{TodoId, TodoItem, TodoPriority, TodoStatus};
+pub use xai_grok_tools::implementations::BashToolInput;
+

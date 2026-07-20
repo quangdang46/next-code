@@ -1,7 +1,4 @@
-//! Façade stub of upstream `xai-grok-shell::extensions::billing` — the
-//! billing/credit-usage DTOs the future pager's settings/usage views read.
-//! The `x.ai/billing` / `x.ai/auto-topup-rule` ext-method handlers
-//! themselves (upstream calls out to CCP) are not implemented here.
+//! Façade stub of upstream `xai-grok-shell::extensions::billing`.
 
 use serde::{Deserialize, Serialize};
 
@@ -29,6 +26,18 @@ pub struct BillingConfig {
     pub current_period: Option<UsagePeriod>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub monthly_limit: Option<Cent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub used: Option<Cent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub billing_period_end: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_demand_cap: Option<Cent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub on_demand_used: Option<Cent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prepaid_balance: Option<Cent>,
+    #[serde(default)]
+    pub is_unified_billing_user: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -48,6 +57,8 @@ pub struct AutoTopupRule {
     pub threshold: Option<Cent>,
     #[serde(default)]
     pub topup_amount: Option<Cent>,
+    #[serde(default)]
+    pub max_amount_per_month: Option<Cent>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

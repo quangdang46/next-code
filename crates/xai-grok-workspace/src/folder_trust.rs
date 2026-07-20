@@ -2,8 +2,6 @@
 
 use std::path::Path;
 
-use xai_grok_config::RemoteSettings;
-
 use crate::trust::{TrustStore, is_unsafe_trust_root};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,8 +61,12 @@ pub fn folder_trust_inert() -> bool {
     true
 }
 
-pub fn feature_enabled(remote: Option<&RemoteSettings>) -> bool {
-    let _ = remote;
+/// Remote folder-trust flag. Stub always returns `false`.
+///
+/// Generic over the remote settings type so pager can pass
+/// `xai_grok_shell::util::config::RemoteSettings` without coupling this crate
+/// to shell (Face stubs keep `RemoteSettings` in both config and shell).
+pub fn feature_enabled<R>(_remote: Option<&R>) -> bool {
     false
 }
 

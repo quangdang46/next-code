@@ -66,3 +66,4 @@
 - Expect **multiple commits** on the branch (stubs → copy → compile fixes).
 - `xai-grok-telemetry` already exists but is a thin no-op; pager will force many more symbols — grow in place, still no real OTLP.
 - PR8 remains: entrypoint + `GrokHost` + then remove / stop shipping old `next-code-tui` path.
+- **Branding (owner rule):** Face welcome/hero must use **next-code’s animated idle logo** (`next-code-tui` `ui_animations` — donut / orbit_rings), **not** upstream Grok braille `crates/xai-grok-pager/assets/logo/logo*.txt`. Swap in PR7 asset pass or PR8 cutover before shipping Face; do not leave Grok “X” braille art as the product mark.

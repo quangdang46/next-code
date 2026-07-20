@@ -3,6 +3,7 @@
 
 pub mod implementations;
 pub mod registry;
+pub mod reminders;
 pub mod types;
 pub mod util;
 

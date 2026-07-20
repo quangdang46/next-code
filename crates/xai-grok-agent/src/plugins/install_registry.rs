@@ -8,10 +8,17 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum InstallKind {
-    Git,
-    Local,
+    Git {
+        url: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ref_name: Option<String>,
+    },
+    Local {
+        source_path: PathBuf,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,11 +99,15 @@ impl InstallRegistry {
         self.repos.get_mut(repo_key)
     }
 
-    pub fn find_plugin(&self, plugin_name: &str) -> Option<(&str, &InstalledRepo)> {
-        self.repos
-            .iter()
-            .find(|(_, repo)| repo.plugins.contains_key(plugin_name))
-            .map(|(k, v)| (k.as_str(), v))
+    pub fn find_plugin(
+        &self,
+        plugin_name: &str,
+    ) -> Option<(&str, &InstalledRepo, &RepoPlugin)> {
+        self.repos.iter().find_map(|(k, repo)| {
+            repo.plugins
+                .get(plugin_name)
+                .map(|plugin| (k.as_str(), repo, plugin))
+        })
     }
 
     pub fn insert(&mut self, repo_key: String, repo: InstalledRepo) {

@@ -160,10 +160,13 @@ pub enum ReadFileOutput {
     PdfPageImages(PdfPageImages),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ListDirContent {
     pub absolute_path: PathBuf,
     pub entries: Vec<String>,
+    /// Upstream wire alias used by pager ACP tracker.
+    #[serde(default, alias = "entries")]
+    pub content: String,
     #[serde(default)]
     pub tool_output_for_prompt: String,
 }

@@ -1,11 +1,11 @@
 //! Façade stub of upstream `xai-grok-shell::session::merge` — merged
-//! local+remote session-list DTO for the pager's session picker. This
-//! stub never contacts a `SessionRegistryClient`; `fetch_merged` always
-//! returns empty.
+//! local+remote session-list DTO for the pager's session picker.
 
 use std::time::Duration;
 
 use serde::Serialize;
+
+use crate::agent::session_registry_client::SessionRegistryClient;
 
 pub const REMOTE_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -21,10 +21,14 @@ pub struct MergedSession {
     pub cwd: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hostname: Option<String>,
+    /// `"local"` | `"remote"` | `"conversation"` etc.
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worktree_label: Option<String>,
 }
 
 pub async fn fetch_merged(
-    _client: Option<&()>,
+    _client: Option<&SessionRegistryClient>,
     _cwd: Option<&str>,
     _query: Option<&str>,
     _limit: usize,

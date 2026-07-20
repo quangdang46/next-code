@@ -14117,7 +14117,9 @@ version = "0.1.0"
 dependencies = [
  "dirs 5.0.1",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
+ "xai-grok-tools",
 ]
 
 [[package]]
@@ -14207,7 +14209,7 @@ dependencies = [
  "parking_lot",
  "portable-pty",
  "pretty_assertions",
- "rand 0.8.7",
+ "rand 0.9.5",
  "ratatui 0.28.1",
  "regex",
  "serde",
@@ -14363,19 +14365,33 @@ name = "xai-grok-shell"
 version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
+ "anyhow",
  "chrono",
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "tokio",
+ "tokio-util",
+ "toml 0.8.23",
  "xai-file-utils",
+ "xai-grok-agent",
+ "xai-grok-announcements",
  "xai-grok-config",
  "xai-grok-shared",
+ "xai-grok-telemetry",
  "xai-grok-tools",
+ "xai-grok-workspace",
 ]
 
 [[package]]
 name = "xai-grok-telemetry"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "xai-grok-tools"

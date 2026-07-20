@@ -17,3 +17,8 @@ impl ChatMode {
         }
     }
 }
+
+/// Whether process-level chat mode features are enabled (Face stub: always on).
+pub fn process_chat_mode_enabled() -> bool {
+    true
+}

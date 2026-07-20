@@ -1,4 +1,5 @@
 pub mod api_key_provider;
+pub mod compat;
 pub mod computer;
 pub mod config_source;
 pub mod output;

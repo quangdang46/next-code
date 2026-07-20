@@ -1,7 +1,8 @@
-//! Stub of upstream `xai-grok-shell::util::tips` — rotates contextual
-//! "did you know" tip strings. This stub has no tip pool and always
-//! returns `None` (no-op advance).
+//! Stub of upstream `xai-grok-shell::util::tips`.
 
-pub fn pick_and_advance(_seen: &[String]) -> Option<String> {
-    None
+use std::path::Path;
+
+/// Pick one tip and advance the rotation cursor (Face stub: first tip).
+pub fn pick_and_advance(tips: &[String], _grok_home: &Path) -> Option<String> {
+    tips.first().cloned()
 }

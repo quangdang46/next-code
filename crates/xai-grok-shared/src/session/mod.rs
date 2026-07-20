@@ -7,7 +7,7 @@ pub mod info;
 pub use info::Info;
 
 /// Terminal fingerprint for feedback (local struct; not prod-mc).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FeedbackTerminalInfo {
     pub brand: String,
     pub multiplexer: String,

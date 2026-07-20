@@ -44,9 +44,9 @@ portable-pty = "0.9"
 
 derive_more = { version = "1", features = ["deref", "deref_mut"] }
 anyhow = "1"
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive", "env"] }
 clap_complete = "4"
-rand = "0.8"
+rand = "0.9"
 tokio = { version = "1", features = [
     "sync",
     "rt",

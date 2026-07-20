@@ -1,11 +1,14 @@
 //! Façade stub of upstream `xai-grok-shell::agent` — grow for PR7 pager compile.
 
+pub mod activity;
 pub mod auth_method;
 pub mod chat_modes;
 pub mod config;
+pub mod folder_trust;
 pub mod init;
 pub mod models;
+pub mod mvp_agent;
 pub mod roster;
 pub mod session_registry_client;
 
-pub use models::MvpAgent;
+pub use mvp_agent::MvpAgent;

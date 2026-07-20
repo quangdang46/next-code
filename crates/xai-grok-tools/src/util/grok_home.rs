@@ -2,7 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
-use xai_grok_config::grok_home;
+pub use xai_grok_config::grok_home;
 
 /// Directory for sessions under a given cwd key.
 pub fn sessions_cwd_dir(cwd: &str) -> PathBuf {

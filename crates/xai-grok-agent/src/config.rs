@@ -1,11 +1,9 @@
-//! Stub of upstream `xai-grok-agent::config` — only the enums/struct shapes
-//! the future pager's `agents_modal.rs` imports (`BuiltinAgentName`,
-//! `AgentDefinition`, `AgentScope`, `PromptMode`). Upstream also carries
-//! `ToolServerConfig` / `SubagentCapabilityMode` fields on `AgentDefinition`
-//! (from `xai-grok-tools` / `xai-tool-types`); those are dropped here since
-//! nothing in this compile-stub layer consumes them yet.
+//! Stub of upstream `xai-grok-agent::config` — shapes the pager's
+//! `agents_modal.rs` imports (`BuiltinAgentName`, `AgentDefinition`, …).
 
 use serde::{Deserialize, Serialize};
+
+use xai_grok_tools::registry::types::ToolServerConfig;
 
 /// Built-in agent identifiers. Variant list matches upstream 1:1.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -73,13 +71,13 @@ pub struct AgentDefinition {
     #[serde(default)]
     pub source_path: Option<std::path::PathBuf>,
     #[serde(default)]
-    pub model: Option<String>,
+    pub model: String,
     #[serde(default)]
-    pub tool_config: Option<serde_json::Value>,
+    pub tool_config: ToolServerConfig,
     #[serde(default)]
     pub skills: Vec<String>,
     #[serde(default)]
-    pub prompt_body: String,
+    pub prompt_body: Option<String>,
 }
 
 impl BuiltinAgentName {

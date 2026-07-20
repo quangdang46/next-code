@@ -16,7 +16,28 @@
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
+pub mod shell;
+
 static GROK_HOME: OnceLock<PathBuf> = OnceLock::new();
+
+/// Parse a boolean environment variable (`1`/`true`/`yes`/`on` vs `0`/`false`/`no`/`off`).
+///
+/// Returns `None` when unset or unrecognized — same contract as upstream
+/// `xai_grok_config::env_bool` / shell `util::config::env_bool`.
+pub fn env_bool(name: &str) -> Option<bool> {
+    match std::env::var(name).ok()?.to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" | "enabled" => Some(true),
+        "0" | "false" | "no" | "off" | "disabled" => Some(false),
+        _ => None,
+    }
+}
+
+/// Merged `requirements.toml` overlay. Face stub: no disk merge — always `None`.
+///
+/// Callers use `.and_then(|req| req.get(...))` on the `Option<toml::Value>`.
+pub fn load_merged_requirements() -> Option<toml::Value> {
+    None
+}
 
 /// Default Face/user directory when no env override is set: `~/.next-code`.
 ///

@@ -1,8 +1,13 @@
-//! Stub of upstream `xai-grok-shell::agent::roster` — lists sub-agents
-//! available for a session. Always empty in this compile-stub layer.
+//! Stub of upstream `xai-grok-shell::agent::roster`.
 
 #[derive(Debug, Clone, Default)]
 pub struct RosterEntry {
+    pub id: String,
     pub name: String,
-    pub description: String,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct Roster {
+    pub entries: Vec<RosterEntry>,
 }
