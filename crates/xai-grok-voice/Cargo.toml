@@ -1,0 +1,12 @@
+[package]
+name = "xai-grok-voice"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Compile-stub facade of xai-org/grok-build xai-grok-voice — no audio (PR6)"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+tokio = { version = "1", features = ["sync"] }
+toml = "0.8"
