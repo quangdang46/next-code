@@ -5,7 +5,7 @@
 - **What is going on:** Face (PR1–4) has render + config + tools/workspace compile stubs. Pager still needs ACP channels and huge `xai_grok_shell` / small `xai_grok_agent` import surfaces. SUMMARY’s `xai-shim-*` names would force mass renames; PR2–4 kept Cargo `xai-*`.
 - **We recommend:** **Option C (narrow)** — vendor small `xai-acp-lib` (~8 rs), stub `xai-grok-agent` (modal/plugin types), façade-stub `xai-grok-shell` high-frequency modules (full `RemoteSettings`, clipboard re-export, config/session/auth DTOs). **Do not** wire `AcpAgentTx` → next-code runtime yet (that is PR8 / `GrokHost`). Keep Cargo names `xai-acp-lib` / `xai-grok-agent` / `xai-grok-shell`. Keep ACP id `enable-always-approve` (YOLO bridge later).
 - **Risk:** Medium (shell stub surface is large; incomplete stubs → PR7 compile churn)
-- **Status:** Waiting for your OK — reply **go ahead** to implement
+- **Status:** Implemented on `pr-5-grok-agent-shell-acp` (PR #39) — merge-ready; review: APPROVE WITH NITS
 
 ## Feature planning
 - **Recommended approach:** Treat “shim” as a doc label only; keep package names matching pager `use xai_grok_*` / `xai_acp_lib`. Vendor ACP channel crate almost wholesale. Stub agent discovery/plugins. Grow shell as a compile façade (empty/no-op functions + Default DTOs), not a 14MB vendor.
@@ -30,12 +30,12 @@
 4. **PR4 review (merged):** ToolOutput variants 1:1, serde `tag=type`, permission ids, AskUserQuestion outcomes, KillOutcome, RestoreDegree match upstream. Deliberate gap: fuzzy `path: String` (upstream `Utf32String`) — OK until PR7 file-search.
 
 ## Steps
-1. [ ] Branch `pr-5-grok-agent-shell-acp` from `dev`
-2. [ ] Vendor `xai-acp-lib` (+ workspace member); `cargo check -p xai-acp-lib`
-3. [ ] Stub `xai-grok-agent` for pager modal/plugin symbols
-4. [ ] Façade `xai-grok-shell` for top import prefixes (util/config/clipboard/home, sampling, agent::config, auth DTOs, extensions, session types, active_sessions)
-5. [ ] `cargo check -p xai-acp-lib -p xai-grok-agent -p xai-grok-shell -p xai-grok-pager-render`
-6. [ ] Update SUMMARY; open PR → `dev`, Refs #35
+1. [x] Branch `pr-5-grok-agent-shell-acp` from `dev`
+2. [x] Vendor `xai-acp-lib` (+ workspace member); `cargo check -p xai-acp-lib`
+3. [x] Stub `xai-grok-agent` for pager modal/plugin symbols
+4. [x] Façade `xai-grok-shell` for top import prefixes (util/config/clipboard/home, sampling, agent::config, auth DTOs, extensions, session types, active_sessions)
+5. [x] `cargo check -p xai-acp-lib -p xai-grok-agent -p xai-grok-shell -p xai-grok-pager-render`
+6. [x] Update SUMMARY; open PR → `dev`, Refs #35 (merge pending)
 
 ## Files to touch
 - `crates/xai-acp-lib/**` (new, vendor)
