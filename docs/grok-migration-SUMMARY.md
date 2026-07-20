@@ -52,12 +52,11 @@ PR 2: xai-grok-pager-render + minimal shims (DONE — merge to `dev` via PR #36)
 ### Phase 2 — Deepen shims / pager prep (PR 3–6)
 
 ```
-PR 3: deepen config + telemetry shims (toward next-code)
-  ├── NOTE: empty stubs already exist from PR2 (`xai-grok-config`, `xai-grok-telemetry`)
-  ├── Map `load_effective_config_disk_only` / grok_home → next-code config paths where safe
-  ├── Keep telemetry no-op OR wire structured logs if cheap
-  ├── Expand only symbols pager will need next (not full Grok config crate)
-  └── Files: grow existing shim crates; avoid duplicating PR2 stubs
+PR 3: deepen config home → next-code (DONE — PR #37)
+  ├── Map `grok_home` → `$GROK_HOME` > `$NEXT_CODE_HOME` > `~/.next-code` (dunce)
+  ├── Keep empty `load_effective_config_disk_only` + no-op telemetry
+  ├── Face display labels: `~/.next-code` / `$NEXT_CODE_HOME`
+  └── No `[ui]` ↔ `[display].theme` bridge yet
 
 PR 4: deepen tools + workspace shims
   ├── NOTE: permission/detach stubs already exist from PR2
