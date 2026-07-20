@@ -37,4 +37,5 @@ libnext_code_base.rlib
 /*.mp4
 /*.png
 data/
-grok-build/*
+# Local upstream mirror only — never commit (avoid mode-160000 gitlink).
+/grok-build/
