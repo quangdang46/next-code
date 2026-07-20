@@ -3567,8 +3567,9 @@ impl StatefulWidgetRef for &TextArea {
 impl TextArea {
     /// Render a scrollbar in the rightmost column of `area`.
     ///
-    /// Uses `tui_scrollbar::ScrollBar` rendered into a scratch ratatui-core
-    /// buffer, then copies cells into the main buffer with muted styling.
+    /// Renders an inline scrollbar into a scratch buffer, then copies cells
+    /// into the main buffer with muted styling (tui-scrollbar removed for
+    /// crates.io ratatui 0.28 compatibility).
     fn render_scrollbar(
         &self,
         area: Rect,

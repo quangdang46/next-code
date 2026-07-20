@@ -5,7 +5,7 @@ use std::{
 
 use ratatui::layout::{Rect, Size};
 
-use next_code_ratatui_inline::common::TerminalLike;
+use crate::common::TerminalLike;
 
 /// Mock terminal for testing
 #[derive(Debug, Clone)]
@@ -100,7 +100,7 @@ mod links {
     use ratatui::style::Style;
     use ratatui::{TerminalOptions, Viewport};
 
-    use next_code_ratatui_inline::{LinkSpan, Terminal};
+    use crate::{LinkSpan, Terminal};
 
     /// Backend that records the raw byte stream and renders each drawn cell as
     /// its bare symbol, so tests can assert on OSC 8 sequences interleaved with

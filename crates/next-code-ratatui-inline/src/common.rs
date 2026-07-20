@@ -95,7 +95,7 @@ where
 mod tests {
     use std::io::Write;
 
-    use next_code_ratatui_inline::tests::MockTerminal;
+    use crate::tests::MockTerminal;
 
     use super::*;
 

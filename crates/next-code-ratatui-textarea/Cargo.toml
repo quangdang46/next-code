@@ -3,11 +3,24 @@ name = "next-code-ratatui-textarea"
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
+authors = ["xAI", "next-code contributors"]
+description = "Adapted from xai-org/grok-build xai-ratatui-textarea (Apache-2.0)"
 
 [dependencies]
-crossterm = { version = "0.28", features = ["event-stream"] }
+crossterm = { version = "0.28", features = ["event-stream", "bracketed-paste"] }
 ratatui = { version = "0.28", features = ["crossterm", "unstable-widget-ref"] }
 textwrap = "0.16"
 tracing = { version = "0.1", optional = true }
 unicode-segmentation = "1.12"
 unicode-width = "0.2"
+
+[dev-dependencies]
+chrono = "0.4"
+itertools = "0.13"
+pretty_assertions = "1"
+rand = "0.9"
+
+[features]
+default = []
+# Upstream feature name retained. Enables tracing-gated debug logs in textarea.
+debug-logs = ["dep:tracing"]

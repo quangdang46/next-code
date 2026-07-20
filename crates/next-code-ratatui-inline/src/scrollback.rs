@@ -75,7 +75,7 @@ pub fn emit_to_scrollback<T: TerminalLike>(terminal: &mut T, content: &str) -> i
 #[cfg(test)]
 mod tests {
 
-    use next_code_ratatui_inline::tests::MockTerminal;
+    use crate::tests::MockTerminal;
 
     use super::*;
 

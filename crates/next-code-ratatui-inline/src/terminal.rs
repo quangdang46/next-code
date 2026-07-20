@@ -150,9 +150,9 @@ impl<'a> From<Frame<'a>> for OurFrame<'a> {
 /// [Crossterm]: https://crates.io/crates/crossterm
 /// [Termion]: https://crates.io/crates/termion
 /// [Termwiz]: https://crates.io/crates/termwiz
-/// [`backend`]: next_code_ratatui_inline::backend
-/// [`Backend`]: next_code_ratatui_inline::backend::Backend
-/// [`Buffer`]: next_code_ratatui_inline::buffer::Buffer
+/// [`backend`]: crate::backend
+/// [`Backend`]: crate::backend::Backend
+/// [`Buffer`]: crate::buffer::Buffer
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
 pub struct Terminal<B>
 where

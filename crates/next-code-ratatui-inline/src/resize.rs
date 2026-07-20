@@ -184,7 +184,7 @@ pub fn resize_viewport_height<T: TerminalLike>(
 
 #[cfg(test)]
 mod tests {
-    use next_code_ratatui_inline::tests::MockTerminal;
+    use crate::tests::MockTerminal;
 
     use super::*;
 
