@@ -6,24 +6,36 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub use xai_grok_config::grok_home;
 
-/// Path to `$GROK_HOME/pager.toml`.
+/// Path to `$GROK_HOME` / `$NEXT_CODE_HOME` / `~/.next-code` `pager.toml`.
 pub fn pager_toml_path() -> PathBuf {
     grok_home().join("pager.toml")
 }
 
-/// User-facing label for the user grok directory (``~/.grok`` or ``$GROK_HOME``).
+/// User-facing label for the Face home directory.
 ///
 /// Derived from resolved [`grok_home()`] vs `xai_grok_config::default_grok_home()`,
-/// not from whether `GROK_HOME` is set in the environment.
+/// not solely from whether an env override is set.
+///
+/// - Default install: `~/.next-code`
+/// - `$GROK_HOME` override: `$GROK_HOME`
+/// - `$NEXT_CODE_HOME` override (and not equal to default path): `$NEXT_CODE_HOME`
 pub fn display_grok_home_prefix() -> String {
-    if grok_home() == xai_grok_config::default_grok_home() {
-        "~/.grok".to_string()
-    } else {
-        "$GROK_HOME".to_string()
+    let resolved = grok_home();
+    if resolved == xai_grok_config::default_grok_home() {
+        return "~/.next-code".to_string();
     }
+    if std::env::var_os("GROK_HOME").is_some() {
+        return "$GROK_HOME".to_string();
+    }
+    if std::env::var_os("NEXT_CODE_HOME").is_some() {
+        return "$NEXT_CODE_HOME".to_string();
+    }
+    // Resolved path differs from default without a known env (e.g. canonicalize
+    // drift) — still prefer the product label.
+    "~/.next-code".to_string()
 }
 
-/// User-facing path under [`grok_home()`], e.g. ``~/.grok/config.toml``.
+/// User-facing path under [`grok_home()`], e.g. ``~/.next-code/config.toml``.
 pub fn display_user_grok_path(relative: impl AsRef<Path>) -> String {
     let rel = relative.as_ref();
     let prefix = display_grok_home_prefix();
@@ -397,26 +409,33 @@ mod tests {
 
     #[test]
     fn display_grok_home_prefix_default_install() {
-        if std::env::var("GROK_HOME").is_ok() {
+        if std::env::var("GROK_HOME").is_ok() || std::env::var("NEXT_CODE_HOME").is_ok() {
             return;
         }
-        assert_eq!(display_grok_home_prefix(), "~/.grok");
+        assert_eq!(display_grok_home_prefix(), "~/.next-code");
     }
 
     #[test]
     fn display_user_grok_path_joins_relative() {
         let path = display_user_grok_path("config.toml");
         assert!(path.ends_with("/config.toml") || path.ends_with("\\config.toml"));
-        assert!(path.contains(".grok") || path.contains("$GROK_HOME"));
+        assert!(
+            path.contains(".next-code")
+                || path.contains("$GROK_HOME")
+                || path.contains("$NEXT_CODE_HOME")
+        );
     }
 
     #[test]
     fn abbreviate_path_uses_home_when_under_default_grok() {
+        if std::env::var("GROK_HOME").is_ok() || std::env::var("NEXT_CODE_HOME").is_ok() {
+            return;
+        }
         if let Ok(home) = std::env::var("HOME") {
             if home.is_empty() {
                 return;
             }
-            let full = format!("{home}/.grok/memory/MEMORY.md");
+            let full = format!("{home}/.next-code/memory/MEMORY.md");
             let abbreviated = abbreviate_path(&full);
             assert!(
                 abbreviated.contains("memory/MEMORY.md"),

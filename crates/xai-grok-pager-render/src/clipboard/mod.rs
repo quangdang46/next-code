@@ -509,10 +509,10 @@ impl CopyDelivery {
 /// Default path for the always-written copy backup file.
 ///
 /// Override with [`GROK_COPY_FILE_ENV`] (supports `~`). Otherwise
-/// `~/.grok/last-copy.txt` (grok's per-user home — short, stable, and
+/// `~/.next-code/last-copy.txt` (Face per-user home — short, stable, and
 /// readable in a toast, unlike macOS's `/var/folders/...` temp dir).
 ///
-/// `None` when no grok home resolves and the env var is unset: rather than
+/// `None` when no Face home resolves and the env var is unset: rather than
 /// writing to a predictable world-visible temp path, the backup file is
 /// simply skipped (the clipboard legs still fire).
 pub fn default_copy_fallback_path() -> Option<std::path::PathBuf> {
@@ -528,9 +528,10 @@ pub fn default_copy_fallback_path() -> Option<std::path::PathBuf> {
 }
 
 /// Render a backup-file path for user-facing messages using the codebase-wide
-/// abbreviation convention ([`crate::util::abbreviate_path`]): a grok-home
-/// prefix collapses to `~/.grok` (or `$GROK_HOME` when overridden), and a
-/// plain home prefix collapses to `~` — so toasts stay short.
+/// abbreviation convention ([`crate::util::abbreviate_path`]): a Face-home
+/// prefix collapses to `~/.next-code` (or `$GROK_HOME` / `$NEXT_CODE_HOME`
+/// when overridden), and a plain home prefix collapses to `~` — so toasts stay
+/// short.
 pub fn display_copy_path(path: &std::path::Path) -> String {
     crate::util::abbreviate_path(&path.to_string_lossy()).into_owned()
 }
@@ -2172,8 +2173,8 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&custom).expect("read"), "payload");
     }
 
-    /// Without `GROK_COPY_FILE`, the default is `~/.grok/last-copy.txt`
-    /// (grok home) — short and toast-friendly, unlike macOS's temp dir.
+    /// Without `GROK_COPY_FILE`, the default is `~/.next-code/last-copy.txt`
+    /// (Face home) — short and toast-friendly, unlike macOS's temp dir.
     #[test]
     #[serial_test::serial(grok_copy_file)]
     fn default_copy_fallback_path_is_grok_home() {
@@ -2181,23 +2182,24 @@ mod tests {
             std::env::remove_var(GROK_COPY_FILE_ENV);
         }
         let path = default_copy_fallback_path();
-        // Test envs always resolve a home (or set GROK_HOME).
+        // Test envs always resolve a home (or set GROK_HOME / NEXT_CODE_HOME).
         let expected = xai_grok_config::user_grok_home()
             .expect("home resolves in tests")
             .join("last-copy.txt");
         assert_eq!(path, Some(expected));
     }
 
-    /// Toast paths collapse the home prefix to `~` (grok-home paths go
+    /// Toast paths collapse the home prefix to `~` (Face-home paths go
     /// through the shared `abbreviate_path` convention, covered further by
     /// the `GROK_HOME`-override integration test in `xai-grok-pager`).
     #[test]
     fn display_copy_path_abbreviates_home() {
-        if std::env::var_os("GROK_HOME").is_none() {
+        if std::env::var_os("GROK_HOME").is_none() && std::env::var_os("NEXT_CODE_HOME").is_none()
+        {
             let home = dirs::home_dir().expect("home resolves in tests");
             assert_eq!(
-                display_copy_path(&home.join(".grok").join("last-copy.txt")),
-                "~/.grok/last-copy.txt"
+                display_copy_path(&home.join(".next-code").join("last-copy.txt")),
+                "~/.next-code/last-copy.txt"
             );
         }
         // Non-home paths pass through untouched — including multi-byte

@@ -3,7 +3,7 @@ name = "xai-grok-config"
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
-description = "Shim: minimal grok_home / config load for pager-render (Grok UI migration PR2)"
+description = "Shim: grok_home → NEXT_CODE_HOME / ~/.next-code for Face (Grok UI PR3)"
 
 [dependencies]
 dirs = "6"
