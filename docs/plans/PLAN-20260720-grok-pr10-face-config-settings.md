@@ -1,49 +1,77 @@
-# Plan Report — PR10 Face config / settings / slash
+# Plan Report — PR10 Face config / settings / slash brand
 
 ## Summary (read this first)
-- **You asked:** Wire Face settings UI to next-code real config (not shell no-ops).
-- **What is going on:** Face settings/slash call `xai_grok_shell::…::set_*` which are mostly `Ok(())` stubs (`crates/xai-grok-shell/src/util/config.rs`). User toggles appear to work then vanish; model/theme may not match daemon.
-- **We recommend:** Shim Face config writes/reads → next-code `config.toml` / `next-code-config-types` (and daemon reload if needed). Keep Face UI; replace stub bodies. Prefer Grok Face settings UX over old next-code-tui settings screens.
-- **Risk:** Medium (key name mismatches, hot-reload)
-- **Status:** Ready to implement after PR9 (can start research in parallel).
+- **You asked:** Settings persist in next-code; slash/brand still Grok — fix via wire + clean.
+- **What is going on:** Face settings call shell `set_*` no-ops. Slash catalog is stock Grok (`/usage`→grok.com, `/gboom`, `/imagine`, Grok login flows). Quit hint already says `nextcode` (PR8); slash does not.
+- **We recommend:** Keep **Face** settings/slash **UI**. **Wire** config to next-code. **Delete/hide** xAI-only slash and grok.com entry points; remap shared commands (`/model`, `/theme`) to next-code providers. Prefer Face UX over rebuilding old TUI settings.
+- **Risk:** Medium  
+- **Status:** After PR9 for model-affecting paths; slash hide can start earlier.
 
-## Goal for this PR
-Changing theme / model / common toggles in Face persists under `~/.next-code` (or `NEXT_CODE_HOME`) and affects the next turn.
+## Workflow map (required)
+
+| Kind | Do | Do not |
+|------|----|--------|
+| **Copy** | Keep Face settings screens + slash palette UX | Port old `next-code-tui` settings UI back |
+| **Wire** | `set_*`/`load_*` → `~/.next-code` config + provider catalog | Leave stubs that pretend to save |
+| **Delete / clean** | Hide or no-op xAI slash; replace grok.com URLs; drop Grok OAuth `/login` path in embed | Delete Face `/model` command itself |
 
 ## Research first (LOOK)
-1. Face settings views: `crates/xai-grok-pager/src/settings/`, slash commands that call shell config.
-2. List which `set_*` / `load_*` Face actually calls (rg from pager).
-3. next-code config schema: `next-code-config-types`, `~/.next-code/config.toml` docs.
-4. grok-build: how stock persists `[ui]` vs our `[display]` (PR3 already mapped home).
+1. Face: `settings/`, `slash/commands/*`, registry.
+2. rg pager → `xai_grok_shell::` set_/load_.
+3. next-code config + provider catalog.
+4. grok-build: which slash are xAI-only vs generic.
+
+## Evidence (fill before BUILD)
+
+| Claim | Citation | Status |
+|-------|----------|--------|
+| `set_*` mostly `Ok(())` | `xai-grok-shell/src/util/config.rs` | verified (pre-audit) |
+| `/usage manage` opens grok.com | `slash/commands/usage.rs` + tests in `slash/commands/mod.rs` | verified (pre-audit) |
+| Face still registers Grok-oriented slash set | `slash/commands/*.rs` | verified (pre-audit) |
+| next-code equivalent keys for theme/model | config types | unverified — needs matrix |
+
+## Slash brand matrix (complete during LOOK)
+
+| Slash | Keep for nextcode? | Action |
+|-------|-------------------|--------|
+| `/model`, `/theme`, `/help`, `/new`, `/resume`… | Yes (generic) | Wire to next-code |
+| `/usage` `/cost` | Maybe | Wire to next-code usage **or** hide if none |
+| `/login` `/logout` | Yes but next-code | Wire daemon login; **no** Grok OAuth |
+| `/gboom`, `/imagine`, `/imagine_video`, announcements→xAI | No | Hide/restrict in embed |
+| `/usage manage` → grok.com | No | Delete URL / replace docs link |
 
 ## Copy / wire / delete
 | Action | What |
 |--------|------|
-| **Wire** | Stub `set_*`/`get_*` → next-code config store |
-| **Wire** | Model catalog source → next-code provider catalog |
-| **Delete** | Do not delete Face settings UI |
+| **Wire** | Config R/W + model catalog |
+| **Wire** | Generic slash → next-code behavior |
+| **Delete** | xAI-only slash from embed registry (restrict list / feature) |
+| **Delete** | grok.com billing/docs links in embed |
 
 ## Implementation steps
-1. [ ] Build a call-site matrix: Face symbol → next-code config key.
-2. [ ] Implement read path first (`load_effective_config` / remote settings DTO already partially stubbed).
-3. [ ] Implement write path + optional broadcast `models-updated` / config reload (see `src/cli/startup.rs` patterns).
-4. [ ] Slash: keep generic; no-op or hide xAI-only commands (document list).
-5. [ ] Tests for mapping round-trip of 3–5 keys (theme, model, yolo/permission default).
-6. [ ] Manual: toggle theme, restart Face, theme stuck; switch model, next reply uses it.
+1. [ ] Call-site matrix Face symbol → next-code key (Evidence).
+2. [ ] Read path then write path + reload hooks.
+3. [ ] Slash brand matrix → restrict/hide list for embed (`nextcode` argv0 or env).
+4. [ ] Tests: 3–5 config keys + restricted slash not in menu.
+5. [ ] Manual: theme/model persist; `/` menu has no grok.com / gboom.
 
-## Files (expected)
-- `crates/xai-grok-shell/src/util/config.rs` (and related loaders)
-- Possibly thin adapter in `src/cli/` if shell must not depend on app-core (respect crate layering — use traits/callbacks registered from composition root like existing `on_config_reloaded`)
-- `docs/grok-migration-SUMMARY.md` note which keys are live
+## Files
+- `xai-grok-shell` config stubs  
+- Face slash registry restrict (prefer embed flag over editing every command)  
+- Composition root if callbacks needed  
 
 ## Manual verify
-1. Face → settings → change theme → quit → reopen → theme kept.
-2. Change default model → new session uses it.
-3. YOLO / default permission if exposed → survives restart.
+1. Theme/model survive restart.  
+2. Slash menu: no grok.com / imagine / gboom (or documented exceptions).  
+3. `/login` does not open Grok OAuth.
+
+## Open questions
+1. Keep `/usage` pointing at next-code billing, or hide until product has one?  
+2. Restrict slash via registry API already used for tier deny — reuse?  
+3. ACP skills slash collision with builtins?
 
 ## Out of scope
-- Full marketplace / plugin install (stub OK)
-- Voice settings
+TUI crate delete (PR11), stub git/trust (PR12).
 
 ## Done when
-Top Face settings that users hit daily persist in next-code config; stubs remain only for unused Face surfaces.
+Daily settings persist; embed slash/brand is nextcode-safe; Face UI kept.

@@ -1,59 +1,54 @@
 # Plan Report — PR12 Stub → real (shell / workspace Face hits)
 
 ## Summary (read this first)
-- **You asked:** Replace empty Face dependency stubs with real behavior where the UI actually calls them.
-- **What is going on:** PR3–6 shipped compile stubs. Face now runs; many `xai-grok-shell` / tools / workspace calls no-op (`Ok(())`, empty lists). That makes dashboard, trust, git, share, plugins look broken.
-- **We recommend:** Priority by **Face call frequency** (rg), not wholesale vendor of grok-build’s 400+ shell files. Prefer implementing via next-code APIs (sessions dir, git, trust) behind the existing Face-facing function signatures (**copy signature, wire body**).
-- **Risk:** Medium (crate layering; avoid shell→app-core cycles)
+- **You asked:** Real behavior behind Face-hit stubs.
+- **What is going on:** PR3–6 stubs no-op; Face looks broken on trust/git/sessions chrome.
+- **We recommend:** **Copy signature** (keep Face API). **Wire** body to next-code or **copy pure helper** from grok-build. Do **not** wholesale-vendor shell. Prefer Grok Face call sites over inventing next-code-tui chrome.
+- **Risk:** Medium  
 - **Status:** After PR9; can overlap late PR10.
 
-## Goal for this PR
-Top broken Face surfaces stop being silent no-ops: at least folder trust, active session register/unregister, basic git status/cwd helpers Face shows on welcome/agent chrome.
+## Workflow map (required)
+
+| Kind | Do | Do not |
+|------|----|--------|
+| **Copy** | Pure grok-build helpers when next-code lacks equivalent | Vendor entire `xai-grok-shell` upstream tree |
+| **Wire** | Stub → next-code sessions/git/trust | Silent `Ok(())` for P0 call sites |
+| **Delete** | Only if Face never imports (else PR14) | Delete Face UI that calls the stub |
 
 ## Research first (LOOK)
-1. From a Face session log / `rg` pager → `xai_grok_shell::` call sites; rank by path.
-2. grok-build real implementations for those symbols (DeepWiki + upstream file).
-3. next-code equivalents (session store under `~/.next-code/sessions`, git helpers).
+1. rg Face → `xai_grok_shell::` frequency report → paste into Evidence.  
+2. grok-build real body for P0 symbols.  
+3. next-code equivalents.
 
-## Priority table (fill during LOOK; starter list)
+## Evidence (fill before BUILD)
 
-| Stub area | Likely file | Priority |
-|-----------|-------------|----------|
-| `active_sessions` register/unregister | `xai-grok-shell/src/active_sessions.rs` | P0 |
-| folder trust / workspace classify | shell trust + `xai-file-utils` | P0 |
-| session persistence helpers Face reads | `session/persistence` | P0 |
-| git info for chrome | `session/git` / `git_info` | P1 |
-| clipboard | already re-exports shared — verify | P1 |
-| plugins install | keep stub / hide UI | P2 |
-| share | keep stub | P2 |
+| Stub | Face callers (count) | grok-build source | next-code target | Status |
+|------|---------------------|-------------------|------------------|--------|
+| `active_sessions` | | | | unverified |
+| folder trust / project dir | | | | unverified |
+| session persistence | | | | unverified |
+| git chrome | | | | unverified |
 
-## Copy / wire / delete
-| Action | What |
-|--------|------|
-| **Wire** | Stub body → next-code or faithful port of pure grok helper |
-| **Copy** | Pure functions from grok-build when next-code has no equivalent |
-| **Delete** | Dead stub modules Face never imports (PR14 if unsure) |
+## Priority
+P0: active_sessions, trust/project-dir, session persistence helpers.  
+P1: git info, clipboard verify.  
+P2: plugins/share — keep stub or hide UI (coordinate PR10 hide).
 
 ## Implementation steps
-1. [ ] Produce call-site frequency report (paste into this plan under Evidence).
-2. [ ] Implement P0 stubs with tests.
-3. [ ] Manual: trust prompt / workspace badge / session files update on disk.
-4. [ ] Do not vendor entire upstream shell.
-
-## Files (expected)
-- `crates/xai-grok-shell/src/**` selective
-- `crates/xai-grok-workspace/**`, `xai-file-utils` as needed
-- Composition root registration if callbacks required
+1. [ ] Frequency report in Evidence.  
+2. [ ] Implement P0 with tests.  
+3. [ ] Manual trust / session files / git hint.  
+4. [ ] No new voice/GCS network.
 
 ## Manual verify
-1. Face shows real cwd/git hint if applicable.
-2. Trust / project-dir behavior matches next-code expectations.
-3. No new network calls from “voice” or GCS stubs.
+Real cwd/git/trust; no pretend success on P0.
+
+## Open questions
+1. Layering: shell → app-core forbidden — use composition-root callbacks?  
+2. Hide P2 UI in PR10 vs leave stub?
 
 ## Out of scope
-- Full plugin marketplace
-- Voice audio
-- GrokHost
+GrokHost, voice, full marketplace, TUI delete.
 
 ## Done when
-P0 Face-hit stubs are real; P2 remain stub and are listed in SUMMARY.
+P0 real; P2 listed in SUMMARY as stub.

@@ -1,34 +1,41 @@
 # Plan Report — PR14 Parity cleanup / close migration
 
 ## Summary (read this first)
-- **You asked:** Final PR to close the Grok UI migration goal.
-- **What is going on:** After PR9–13, leftovers: unused stubs, brand strings, docs drift, optional Face features still stubbed, CI weight from dead crates.
-- **We recommend:** Cleanup-only PR — no new architecture. Document remaining stubs as permanent “won’t do” (voice, marketplace) or file follow-ups outside migration.
-- **Risk:** Low–Medium
-- **Status:** Last PR of the series.
+- **You asked:** Close migration cleanly.
+- **What is going on:** After PR9–13, leftovers: stubs, brand strings, docs, dead crates.
+- **We recommend:** **Delete**-heavy cleanup. No architecture. Prefer Grok Face already shipped; remove next-code dual paths and Grok brand leaks.
+- **Risk:** Low–Medium  
+- **Status:** Last PR.
 
-## Goal for this PR
-Migration marked **DONE** in SUMMARY; repo teaches Face-first; dead code/crates trimmed; skill + docs consistent.
+## Workflow map (required)
+
+| Kind | Do | Do not |
+|------|----|--------|
+| **Copy** | — | New features |
+| **Wire** | Hotfix only if smoke fails | Big new adapters |
+| **Delete** | Dead stubs/crates; leftover TUI; user-facing `grok` leaks in embed | Voice “someday” code left half-wired |
 
 ## Checklist
-1. [ ] `docs/grok-migration-SUMMARY.md` — PR1–14 table, status DONE, GrokHost marked abandoned/deferred forever.
-2. [ ] Remove or feature-gate unused stub crates Face never imports.
-3. [ ] rg for user-facing `grok` strings in quit/hints/titles under next-code embed paths; fix or document.
-4. [ ] Confirm `grok-migration-workflow` skill still accurate; update `reference.md` with PR9–13 lessons.
-5. [ ] Issue #35 (or tracker): close with link to this PR.
-6. [ ] Manual smoke: cold start, tool turn, settings, resume picker, quit hint, logo — 10 min script.
+1. [ ] SUMMARY: PR1–14 DONE; GrokHost abandoned.  
+2. [ ] Delete unused stub crates Face never imports.  
+3. [ ] `rg` user-facing `grok` / grok.com under embed paths — fix or document intentional.  
+4. [ ] Update `grok-migration-workflow` `reference.md` with PR9–13 lessons.  
+5. [ ] Close tracker issue #35.  
+6. [ ] 10‑min smoke: start, tool, settings, slash menu brand, sessions, quit hint, logo.
 
-## Copy / wire / delete
-| Action | What |
-|--------|------|
-| **Delete** | Dead stubs / leftover `next-code-tui*` if PR11 left them |
-| **Wire** | None required unless smoke finds a hole → bounce to hotfix PR |
+## Evidence (fill at end)
 
-## Explicit won’t-do (write into SUMMARY)
-- Voice / STT
-- GrokHost rewrite
-- Full grok.com foreign session sync
-- Re-adding legacy TUI
+| Smoke item | Result | Status |
+|------------|--------|--------|
+| Cold start Face | | |
+| Tool + permission | | |
+| Settings persist | | |
+| Slash no grok.com/gboom | | |
+| Session picker | | |
+| Quit `nextcode --resume` | | |
+
+## Explicit won’t-do
+Voice/STT; GrokHost; grok.com foreign sync; re-adding legacy TUI.
 
 ## Done when
-SUMMARY says migration complete; smoke script green; no open “must for Face cutover” items.
+SUMMARY = migration complete; smoke green; no open cutover musts.

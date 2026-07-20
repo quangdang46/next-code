@@ -149,17 +149,18 @@ PR 8: next-code entry point
 
 ### Phase 5 — Finish migration (PR 9–14) — DOCS READY
 
-Home-implementable plans (follow `.agents/skills/grok-migration-workflow`):
+Home-implementable plans (follow `.agents/skills/grok-migration-workflow`).  
+**2026-07-20 audit:** PR1–8 = bulk Copy; PR9–14 = Wire + Delete. Plans refreshed with Copy/Wire/Delete maps, Evidence slots, and slash/brand in **PR10** (was under-specified).
 
-| PR | Doc |
-|----|-----|
-| Roadmap | `docs/plans/PLAN-20260720-grok-post-pr8-roadmap.md` |
-| 9 Brain harden | `docs/plans/PLAN-20260720-grok-pr9-face-brain-harden.md` |
-| 10 Config/settings | `docs/plans/PLAN-20260720-grok-pr10-face-config-settings.md` |
-| 11 Retire legacy TUI | `docs/plans/PLAN-20260720-grok-pr11-retire-legacy-tui.md` |
-| 12 Stub→real shell | `docs/plans/PLAN-20260720-grok-pr12-stub-to-real-shell.md` |
-| 13 Sessions dashboard | `docs/plans/PLAN-20260720-grok-pr13-sessions-dashboard.md` |
-| 14 Parity cleanup | `docs/plans/PLAN-20260720-grok-pr14-parity-cleanup.md` |
+| PR | Doc | Focus |
+|----|-----|-------|
+| Roadmap | `docs/plans/PLAN-20260720-grok-post-pr8-roadmap.md` | Order + gate |
+| 9 Brain harden | `docs/plans/PLAN-20260720-grok-pr9-face-brain-harden.md` | Wire ACP↔daemon |
+| 10 Config/settings | `docs/plans/PLAN-20260720-grok-pr10-face-config-settings.md` | Wire config + clean Grok slash |
+| 11 Retire legacy TUI | `docs/plans/PLAN-20260720-grok-pr11-retire-legacy-tui.md` | Delete old TUI |
+| 12 Stub→real shell | `docs/plans/PLAN-20260720-grok-pr12-stub-to-real-shell.md` | Copy helpers + wire P0 |
+| 13 Sessions dashboard | `docs/plans/PLAN-20260720-grok-pr13-sessions-dashboard.md` | Keep Face UI, wire sessions |
+| 14 Parity cleanup | `docs/plans/PLAN-20260720-grok-pr14-parity-cleanup.md` | Delete leftovers + brand rg |
 
 **Do not** implement SUMMARY §3 `GrokHost` unless ACP bridge fails — PR8 chose ACP mediator.
 ---

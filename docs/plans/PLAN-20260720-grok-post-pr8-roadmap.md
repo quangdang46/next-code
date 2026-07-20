@@ -1,68 +1,69 @@
 # Post-PR8 roadmap — finish Grok Face migration
 
-**Date:** 2026-07-20  
-**Base:** `dev` @ `f3f2ec470` (PR #42 merged)  
+**Date:** 2026-07-20 (audited vs `grok-migration-workflow`)  
+**Base:** `dev` @ `f3f2ec470`+ (PR #42)  
 **Skill:** `.agents/skills/grok-migration-workflow/SKILL.md`  
-**Goal:** Replace next-code UI with Grok Face via **copy → delete old → wire**, and prefer Grok UX/lifecycle over weaker next-code UI logic. Daemon stays next-code brain.
+**Goal:** Replace next-code UI with Grok Face via **copy → delete old → wire**, prefer Grok UX over weaker next-code UI. Daemon = next-code brain.
+
+## Workflow audit (2026-07-20)
+
+| Skill requirement | Roadmap / PR9–14 before audit | After this refresh |
+|-------------------|-------------------------------|--------------------|
+| LOOK → PLAN → BUILD | Plans exist; Evidence mostly empty | Each PR has Evidence + Open questions slots |
+| Explicit copy / delete / wire | Wire-heavy; Copy thin; Delete mostly PR11/14 | Tables strengthened; slash/brand = PR10 |
+| Prefer Grok UI over next-code-tui | Implied | Explicit “keep Face UI; never re-home into TUI” |
+| Clean old UI | PR11 | Unchanged; PR11 is the delete PR |
+| Branding nextcode vs grok | Only quit hint (done PR8) | PR10 owns slash/URLs/titles; PR14 rg sweep |
+| No GrokHost rewrite | Stated | Still out of scope |
+| Verified citations before code | Weak | Required gate in every PR LOOK |
+
+**Phase note:** PR1–8 already did bulk **Copy** (vendor Face). PR9–14 are mostly **Wire + Delete leftovers** — that is correct. “Copy” now means: copy **stock Face/grok-build behavior or pure helpers** at the seam, not re-vendor the pager.
 
 ## Done (PR1–8)
 
 | PR | Outcome |
 |----|---------|
-| 1–7 | Vendor Face substrate + stubs; pager compiles |
-| 8 (#42) | Default entry = Face; `NextCodeFaceAgent` ↔ serve; logo; legacy escape; quit/resume brand fixes |
+| 1–7 | **Copy** Face substrate + stubs |
+| 8 (#42) | **Wire** entry + ACP brain; logo; quit brand; legacy escape |
 
-## Remaining PRs (implement at home)
+## Remaining PRs
 
-| PR | Branch suggestion | One-liner | Plan file | Risk |
-|----|-------------------|-----------|-----------|------|
-| **9** | `pr-9-face-brain-harden` | Stream + tools + permissions over ACP bridge | [PLAN-…-pr9-…](PLAN-20260720-grok-pr9-face-brain-harden.md) | High |
-| **10** | `pr-10-face-config-settings` | Face settings/slash → next-code config | [PLAN-…-pr10-…](PLAN-20260720-grok-pr10-face-config-settings.md) | Medium |
-| **11** | `pr-11-retire-legacy-tui` | Remove default legacy path; start deleting `next-code-tui*` | [PLAN-…-pr11-…](PLAN-20260720-grok-pr11-retire-legacy-tui.md) | High |
-| **12** | `pr-12-stub-to-real-shell` | Deepen `xai-grok-shell` stubs Face actually hits | [PLAN-…-pr12-…](PLAN-20260720-grok-pr12-stub-to-real-shell.md) | Medium |
-| **13** | `pr-13-sessions-dashboard` | Session picker / dashboard / resume list parity | [PLAN-…-pr13-…](PLAN-20260720-grok-pr13-sessions-dashboard.md) | Medium |
-| **14** | `pr-14-parity-cleanup` | Gaps + NOTICE + drop dead stubs; **close migration** | [PLAN-…-pr14-…](PLAN-20260720-grok-pr14-parity-cleanup.md) | Low–Med |
+| PR | Branch | Copy | Wire | Delete / clean | Plan |
+|----|--------|------|------|----------------|------|
+| **9** | `pr-9-face-brain-harden` | Stock Face ACP update/permission **patterns** | Daemon `ServerEvent` ↔ ACP | None (TUI stays) | [pr9](PLAN-20260720-grok-pr9-face-brain-harden.md) |
+| **10** | `pr-10-face-config-settings` | Face settings/slash **UX** (keep) | `set_*` → next-code config; model catalog | Hide/remap xAI slash + grok.com URLs | [pr10](PLAN-20260720-grok-pr10-face-config-settings.md) |
+| **11** | `pr-11-retire-legacy-tui` | — | CLI leftovers → Face | **Delete** legacy TUI path / re-exports | [pr11](PLAN-20260720-grok-pr11-retire-legacy-tui.md) |
+| **12** | `pr-12-stub-to-real-shell` | Pure helpers from grok-build when needed | Stub body → next-code APIs | Defer dead stubs to PR14 | [pr12](PLAN-20260720-grok-pr12-stub-to-real-shell.md) |
+| **13** | `pr-13-sessions-dashboard` | Face picker UI (keep) | List/open → `~/.next-code/sessions` | Fake foreign-session demos | [pr13](PLAN-20260720-grok-pr13-sessions-dashboard.md) |
+| **14** | `pr-14-parity-cleanup` | — | Hotfix only | Dead stubs/crates; brand rg; close SUMMARY | [pr14](PLAN-20260720-grok-pr14-parity-cleanup.md) |
 
-**Minimum to declare goal “shipped”:** PR9 + PR11 (+ smoke).  
-**Recommended “migration closed”:** PR9–14.
+**Minimum ship:** PR9 + PR11. **Migration closed:** PR9–14.
 
-## Order (do not reorder casually)
+## Order
 
 ```mermaid
 flowchart LR
-  PR9[PR9 brain harden] --> PR10[PR10 config]
-  PR9 --> PR11[PR11 retire TUI]
+  PR9[PR9 brain] --> PR10[PR10 config+slash brand]
+  PR9 --> PR11[PR11 delete old TUI]
   PR10 --> PR12[PR12 stub→real]
   PR11 --> PR12
   PR12 --> PR13[PR13 sessions]
   PR13 --> PR14[PR14 cleanup]
 ```
 
-- **PR9 before PR11** — do not delete old TUI until chat/tools/permissions work on Face.
-- **PR10 can parallel PR11** after PR9 lands (separate branches).
-- **Skip GrokHost rewrite** unless ACP bridge proves insufficient (documented in each plan).
+## Per-PR gate (must pass before BUILD)
 
-## How to implement each PR (house rules)
+```
+- [ ] LOOK done (DeepWiki / Face / seam) with verified citations in the PLAN Evidence section
+- [ ] Copy / Wire / Delete table matches this roadmap
+- [ ] No new Face rewrite; no re-homing into next-code-tui
+- [ ] User OK / go ahead (or home implementer treats PLAN as approved scope)
+- [ ] Manual smoke in that PLAN
+```
 
-1. Read **grok-migration-workflow** skill.
-2. Open that PR’s PLAN file; research grok-build / DeepWiki for the listed symbols.
-3. Write/update the PLAN Status only if scope changes; then implement on the suggested branch from latest `dev`.
-4. Manual smoke from the PLAN checklist before merge to `dev`.
-5. Update `docs/grok-migration-SUMMARY.md` checkboxes when merged.
+## Out of scope
 
-## Current known gaps (why these PRs exist)
-
-| Gap | Where | Fixed in |
-|-----|--------|----------|
-| Prompt mostly text dump; weak tool/permission streaming | `src/cli/pager_agent.rs` | PR9 |
-| Face settings write to shell stubs (no-ops) | `xai-grok-shell` `set_*` | PR10 / PR12 |
-| Legacy TUI still shippable + `pub use next_code_tui::*` | `src/lib.rs`, `NEXT_CODE_LEGACY_TUI` | PR11 |
-| Session dashboard / list UX | Face views + daemon list APIs | PR13 |
-| Stub noise, brand leftovers | shells/tools stubs | PR12 / PR14 |
-
-## Explicitly out of scope (unless you reopen)
-
-- Full `GrokHost` trait rewrite (SUMMARY §3)
-- xAI voice / mic (SUMMARY skip)
-- Foreign multi-agent reconnect parity
-- Replacing daemon/providers with Grok cloud auth
+- `GrokHost` trait rewrite  
+- Voice / STT  
+- grok.com foreign session sync  
+- Replacing daemon auth with Grok cloud  
