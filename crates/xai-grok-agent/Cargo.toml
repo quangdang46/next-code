@@ -1,0 +1,11 @@
+[package]
+name = "xai-grok-agent"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Compile stub of xai-org/grok-build xai-grok-agent — agent discovery / plugin types (PR5)"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "1"
+dirs = "5"
