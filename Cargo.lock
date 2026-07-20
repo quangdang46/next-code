@@ -14086,6 +14086,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+ "xai-file-utils",
  "xai-grok-config",
  "xai-grok-shared",
  "xai-grok-tools",

@@ -5,7 +5,7 @@
 - **What is going on:** SUMMARY said PR6 is three tiny stubs (~4 files / &lt;50 LOC). Upstream reality is larger: voice (~15 rs), announcements (1 solid lib), `xai-file-utils` (~15 rs / GCS+S3). Pager imports are still **narrow** — we stub only what PR7 needs to compile, not vendor upload stacks.
 - **We recommend:** **Option C (narrow)** — three workspace crates with Cargo names matching pager deps: `xai-grok-voice`, `xai-grok-announcements`, `xai-file-utils`. Keep no-op / Default convention. Do **not** enable real mic/STT or GCS uploads.
 - **Risk:** Low–Medium (voice `AUDIO_SUPPORTED` + STT catalog must match settings registry expectations)
-- **Status:** Waiting for your OK — reply **go ahead** to implement
+- **Status:** Implemented — reviewed vs grok-build; `upload_bytes` signature fixed to match pager `trace_cmd`
 
 ## Feature planning
 - **Recommended approach:**
