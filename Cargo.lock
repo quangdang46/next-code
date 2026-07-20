@@ -14366,6 +14366,7 @@ version = "0.1.0"
 dependencies = [
  "agent-client-protocol",
  "anyhow",
+ "async-trait",
  "chrono",
  "serde",
  "serde_json",
@@ -14381,6 +14382,7 @@ dependencies = [
  "xai-grok-telemetry",
  "xai-grok-tools",
  "xai-grok-workspace",
+ "xai-hooks-plugins-types",
 ]
 
 [[package]]

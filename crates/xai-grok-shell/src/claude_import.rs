@@ -76,7 +76,7 @@ impl ImportPlan {
 pub struct ImportResult {
     pub imported: usize,
     pub skipped: usize,
-    pub modified_files: Vec<std::path::PathBuf>,
+    pub modified_files: Vec<String>,
 }
 
 impl ImportResult {

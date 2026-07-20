@@ -1,7 +1,14 @@
 //! Stub of upstream `xai-grok-shell::agent::mvp_agent`.
+//!
+//! Upstream: `impl acp::Agent for MvpAgent` only. `Rc<MvpAgent>: Agent` comes
+//! from agent-client-protocol's blanket `impl<T: Agent> Agent for Rc<T>` —
+//! do not add an orphan `impl Agent for Rc<MvpAgent>` here.
 
 use std::path::Path;
 use std::sync::Arc;
+
+use agent_client_protocol as acp;
+use async_trait::async_trait;
 
 use crate::agent::config::{AgentSelectionConfig, Config};
 use crate::agent::models::ModelsManager;
@@ -45,3 +52,40 @@ impl MvpAgent {
 }
 
 pub fn warm_async_http_client() {}
+
+#[async_trait(?Send)]
+impl acp::Agent for MvpAgent {
+    async fn initialize(
+        &self,
+        _args: acp::InitializeRequest,
+    ) -> acp::Result<acp::InitializeResponse> {
+        // Upstream: `InitializeResponse::new(ProtocolVersion::V1)` then builders.
+        Ok(acp::InitializeResponse::new(acp::ProtocolVersion::V1)
+            .agent_capabilities(acp::AgentCapabilities::default())
+            .auth_methods(vec![]))
+    }
+
+    async fn authenticate(
+        &self,
+        _args: acp::AuthenticateRequest,
+    ) -> acp::Result<acp::AuthenticateResponse> {
+        Ok(acp::AuthenticateResponse::new())
+    }
+
+    async fn new_session(
+        &self,
+        _args: acp::NewSessionRequest,
+    ) -> acp::Result<acp::NewSessionResponse> {
+        Ok(acp::NewSessionResponse::new(acp::SessionId::new(
+            "stub-session",
+        )))
+    }
+
+    async fn prompt(&self, _args: acp::PromptRequest) -> acp::Result<acp::PromptResponse> {
+        Ok(acp::PromptResponse::new(acp::StopReason::EndTurn))
+    }
+
+    async fn cancel(&self, _args: acp::CancelNotification) -> acp::Result<()> {
+        Ok(())
+    }
+}

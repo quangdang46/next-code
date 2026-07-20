@@ -37,7 +37,7 @@ pub struct BillingConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub prepaid_balance: Option<Cent>,
     #[serde(default)]
-    pub is_unified_billing_user: bool,
+    pub is_unified_billing_user: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

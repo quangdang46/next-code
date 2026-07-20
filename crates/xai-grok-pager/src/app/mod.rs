@@ -1164,11 +1164,10 @@ fn init_terminal(
             );
         }
         crate::terminal::set_kitty_flags_pushed(use_keyboard_enhancement);
+        let shared_writer = crate::render::draw::SharedTermWriter::new(frame_tx, writer_sync)
+            .map_err(io::Error::other)?;
         if mode.is_fullscreen() {
-            let backend = CrosstermBackend::new(
-                crate::render::draw::TermWriter::new(frame_tx, writer_sync)
-                    .map_err(io::Error::other)?,
-            );
+            let backend = CrosstermBackend::new(shared_writer);
             Ok((
                 xai_ratatui_inline::Terminal::new(backend)?,
                 ScreenMode::Fullscreen,
@@ -1180,10 +1179,7 @@ fn init_terminal(
             } else {
                 rows
             };
-            let probe_backend = CrosstermBackend::new(
-                crate::render::draw::TermWriter::new(frame_tx.clone(), writer_sync.clone())
-                    .map_err(io::Error::other)?,
-            );
+            let probe_backend = CrosstermBackend::new(shared_writer.clone());
             if let Ok(term) = xai_ratatui_inline::Terminal::with_options(
                 probe_backend,
                 ratatui::TerminalOptions {
@@ -1207,10 +1203,7 @@ fn init_terminal(
                     execute!(stderr, event::EnableMouseCapture)
                 })?;
                 MOUSE_CAPTURE_ENABLED.store(true, Ordering::Release);
-                let retry_backend = CrosstermBackend::new(
-                    crate::render::draw::TermWriter::new(frame_tx.clone(), writer_sync.clone())
-                        .map_err(io::Error::other)?,
-                );
+                let retry_backend = CrosstermBackend::new(shared_writer.clone());
                 if let Ok(term) = xai_ratatui_inline::Terminal::with_options(
                     retry_backend,
                     ratatui::TerminalOptions {
@@ -1229,10 +1222,7 @@ fn init_terminal(
                     cursor::MoveTo(0, 0),
                 )
             })?;
-            let backend = CrosstermBackend::new(
-                crate::render::draw::TermWriter::new(frame_tx, writer_sync)
-                    .map_err(io::Error::other)?,
-            );
+            let backend = CrosstermBackend::new(shared_writer);
             let term = xai_ratatui_inline::Terminal::with_options(
                 backend,
                 ratatui::TerminalOptions {

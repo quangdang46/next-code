@@ -74,7 +74,8 @@ pub async fn spawn_grok_shell(
 
     let spawn_fn: Box<dyn FnOnce(AcpClientTx) -> Result<Rc<MvpAgent>> + Send + 'static> = {
         Box::new(move |client_tx| {
-            let gateway = AcpGatewaySender::new(client_tx);
+            let gateway: AcpGatewaySender<agent_client_protocol::AgentSide> =
+                AcpGatewaySender::new(client_tx);
 
             let mut agent =
                 MvpAgent::with_models(gateway, &agent_config, auth_manager, models_manager);

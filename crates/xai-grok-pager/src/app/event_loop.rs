@@ -258,7 +258,9 @@ fn suspend_for_child(
             "terminal input reader did not park before suspend",
         ));
     }
-    let writer_sync = terminal.backend_mut().writer_mut().writer_sync().clone();
+    let writer_sync = crate::render::draw::SharedTermWriter::current()
+        .expect("SharedTermWriter must be activated at init")
+        .writer_sync();
     match writer_sync.wait_drained(Duration::from_millis(750)) {
         Ok(crate::render::draw::WriterDrain::Drained) => {}
         Ok(crate::render::draw::WriterDrain::TimedOut) => {
@@ -383,7 +385,9 @@ impl Presenter {
     }
 
     fn present_if_dirty(&mut self, app: &mut AppView, terminal: &mut PagerTerminal) {
-        let sync = terminal.backend_mut().writer_mut().writer_sync().clone();
+        let sync = crate::render::draw::SharedTermWriter::current()
+            .expect("SharedTermWriter must be activated at init")
+            .writer_sync();
         let queued_before = sync.queued();
         let drew = self.try_present(
             queued_before,

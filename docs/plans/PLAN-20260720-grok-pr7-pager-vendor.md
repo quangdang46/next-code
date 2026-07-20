@@ -5,7 +5,7 @@
 - **What is going on:** SUMMARY PR7 says “copy entire `xai-grok-pager` + delete old TUI”. Upstream pager is **~433 `.rs` / ~374k LOC** and still depends on **10 crates we do not have** (plus ratatui package renames and deeper stubs). Deleting `next-code-tui*` in the same PR leaves next-code without a working UI until PR8 wiring lands.
 - **We recommend:** **Option C (vendor Face, keep brain UI until PR8)** — add workspace crate `xai-grok-pager` by copying upstream sources; add **narrow compile stubs** for the 10 missing deps; point ratatui deps at `next-code-ratatui-*` via `package =`; voice `default-features = false` / no `audio`. **Do not** delete `next-code-tui*` or switch `src/main.rs` in PR7. Success bar: `cargo check -p xai-grok-pager`.
 - **Risk:** **High** (size + stub churn; expect several compile-fix loops)
-- **Status:** Implementing — pager vendored + 10 stubs landed; iterating stub growth until `cargo check -p xai-grok-pager` green (~697 errors from incomplete Face stubs)
+- **Status:** Implemented — `cargo check -p xai-grok-pager` **green (0 errors)** after stub growth aligned to grok-build. Old TUI still kept; binary cutover = PR8.
 
 ## Feature planning
 - **Recommended approach (Option C):**

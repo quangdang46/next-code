@@ -93,4 +93,5 @@ pub fn parse_reasoning_efforts_meta(
 }
 
 pub fn reasoning_effort_meta_value(effort: ReasoningEffort) -> serde_json::Value {
-    serde_json::Value::String(effort.as_str().to_
+    serde_json::Value::String(effort.as_str().to_string())
+}

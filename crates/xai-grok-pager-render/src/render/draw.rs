@@ -68,15 +68,37 @@ pub struct SharedTermWriter {
     inner: Rc<RefCell<TermWriter>>,
 }
 
+thread_local! {
+    static ACTIVE_SHARED_WRITER: RefCell<Option<SharedTermWriter>> = const { RefCell::new(None) };
+}
+
 impl SharedTermWriter {
     pub fn new(tx: WriterSender, sync: WriterSync) -> Result<Self, WriterAlreadyActive> {
-        Ok(Self {
+        let writer = Self {
             inner: Rc::new(RefCell::new(TermWriter::new(tx, sync)?)),
-        })
+        };
+        writer.activate();
+        Ok(writer)
+    }
+
+    /// Register this writer as the process-local active presentation sink
+    /// (ratatui 0.28 has no public `CrosstermBackend::writer_mut`).
+    pub fn activate(&self) {
+        ACTIVE_SHARED_WRITER.with(|slot| {
+            *slot.borrow_mut() = Some(self.clone());
+        });
+    }
+
+    pub fn current() -> Option<Self> {
+        ACTIVE_SHARED_WRITER.with(|slot| slot.borrow().clone())
     }
 
     pub fn discard(&self) {
         self.inner.borrow_mut().discard();
+    }
+
+    pub fn writer_sync(&self) -> WriterSync {
+        self.inner.borrow().writer_sync().clone()
     }
 }
 
@@ -478,6 +500,21 @@ impl CursorState {
 ///   update block so the image appears atomically with the cell diff.
 pub fn draw_frame(
     terminal: &mut PagerTerminal,
+    cursor: &mut CursorState,
+    render_fn: impl FnOnce(
+        &mut Frame,
+        &mut Vec<LinkSpan>,
+    ) -> (
+        Option<(u16, u16)>,
+        Option<crate::terminal::overlay::PostFlush>,
+    ),
+) {
+    let writer = SharedTermWriter::current().expect("SharedTermWriter must be activated at init");
+    draw_frame_with_writer(terminal, &writer, cursor, render_fn);
+}
+
+pub fn draw_frame_with_writer(
+    terminal: &mut PagerTerminal,
     writer: &SharedTermWriter,
     cursor: &mut CursorState,
     render_fn: impl FnOnce(
@@ -546,10 +583,10 @@ mod tests {
         )
         .expect("build terminal");
         let mut cursor = CursorState::new();
-        draw_frame(&mut terminal, &writer, &mut cursor, render);
+        draw_frame(&mut terminal, &mut cursor, render);
         let first: Vec<u8> = rx.try_iter().flat_map(|payload| payload.data).collect();
         assert!(!first.is_empty(), "first frame should emit bytes");
-        draw_frame(&mut terminal, &writer, &mut cursor, render);
+        draw_frame(&mut terminal, &mut cursor, render);
         let second: Vec<u8> = rx.try_iter().flat_map(|payload| payload.data).collect();
         assert!(
             second.is_empty(),

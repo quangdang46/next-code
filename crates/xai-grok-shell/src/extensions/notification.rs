@@ -177,13 +177,13 @@ pub enum SessionUpdate {
         runs: Vec<HookRunEntryDto>,
     },
     HooksChanged {
-        hooks: Vec<serde_json::Value>,
+        hooks: Vec<xai_hooks_plugins_types::HookInfo>,
         project_trusted: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         load_errors: Vec<String>,
     },
     PluginsChanged {
-        plugins: Vec<serde_json::Value>,
+        plugins: Vec<xai_hooks_plugins_types::PluginInfo>,
     },
     HookAnnotation {
         #[serde(default)]
@@ -307,10 +307,12 @@ pub enum SessionUpdate {
         #[serde(default)]
         tokens_used: i64,
         elapsed_ms: u64,
+        #[serde(default)]
         total_deliverables: u32,
+        #[serde(default)]
         completed_deliverables: u32,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        current_deliverable_id: Option<String>,
+        current_deliverable_id: Option<u32>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         current_deliverable_title: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -323,16 +325,16 @@ pub enum SessionUpdate {
         token_baseline: i64,
         #[serde(default)]
         finished_subagent_tokens: i64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        live_subagent_tokens: Option<u64>,
         #[serde(default)]
-        live_subagent_tokens: i64,
-        #[serde(default)]
-        live_tokens_by_model: HashMap<String, i64>,
-        #[serde(default)]
-        live_context_pct: f32,
-        #[serde(default)]
-        live_turn_count: u32,
-        #[serde(default)]
-        live_tool_call_count: u32,
+        live_tokens_by_model: Vec<(String, u64)>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        live_context_pct: Option<u8>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        live_turn_count: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        live_tool_call_count: Option<u32>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         last_event: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -341,18 +343,18 @@ pub enum SessionUpdate {
         last_event_timestamp: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pause_message: Option<String>,
-        #[serde(default)]
-        classifier_runs_attempted: u32,
-        #[serde(default)]
-        classifier_max_runs: u32,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        last_classifier_verdict: Option<String>,
+        classifier_runs_attempted: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        classifier_max_runs: Option<u32>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        last_classifier_verdict: Option<GoalClassifierVerdict>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         last_classifier_details_path: Option<String>,
-        #[serde(default)]
-        verifying_completion: bool,
-        #[serde(default)]
-        planning: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        verifying_completion: Option<bool>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        planning: Option<bool>,
     },
     InteractionResolved {
         tool_call_id: String,
@@ -365,7 +367,7 @@ pub enum SessionUpdate {
     },
     ImageDropped {
         #[serde(default)]
-        notes: String,
+        notes: Vec<String>,
     },
     #[serde(other)]
     Unknown,

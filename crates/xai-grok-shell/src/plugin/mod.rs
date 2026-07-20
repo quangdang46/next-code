@@ -4,8 +4,6 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, thiserror::Error)]
 pub enum UninstallError {
-    #[error("uninstall stub: {0}")]
-    Stub(String),
     #[error("plugin not found: {name}")]
     NotFound { name: String },
     #[error("needs confirm")]
@@ -49,8 +47,8 @@ pub enum InstallError {
 }
 
 impl InstallError {
-    pub fn category(&self) -> &'static str {
-        "stub"
+    pub fn category(&self) -> String {
+        "stub".into()
     }
 }
 
@@ -70,6 +68,7 @@ pub struct InstallOutcome {
 
 #[derive(Debug, Clone, Default)]
 pub struct UninstallOutcome {
+    pub repo_key: String,
     pub removed_plugins: Vec<String>,
 }
 
@@ -86,7 +85,9 @@ pub fn uninstall_plugin(
     _confirm: bool,
     _keep_data: bool,
 ) -> Result<UninstallOutcome, UninstallError> {
-    Err(UninstallError::Stub("not implemented".into()))
+    Err(UninstallError::NotFound {
+        name: _name.to_string(),
+    })
 }
 
 pub fn classify_install_error(_err: &InstallError) -> String {

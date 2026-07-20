@@ -131,6 +131,14 @@ pub fn lookup_auth(
 /// Shared API-key credential provider handle for voice / STT paths.
 pub fn shared_api_key_provider(
     _auth: std::sync::Arc<AuthManager>,
-) -> credential_provider::CredentialProvider {
-    credential_provider::CredentialProvider::new()
+) -> xai_grok_tools::types::SharedApiKeyProvider {
+    std::sync::Arc::new(StubApiKeyProvider)
+}
+
+struct StubApiKeyProvider;
+
+impl xai_grok_tools::types::ApiKeyProvider for StubApiKeyProvider {
+    fn current_api_key(&self) -> Option<String> {
+        None
+    }
 }

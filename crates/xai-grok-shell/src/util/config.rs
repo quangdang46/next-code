@@ -1036,7 +1036,11 @@ pub fn effective_yolo_for_launch(
     EffectiveYolo::default()
 }
 
-pub fn load_mcp_server_configs_with_project(_cwd: &Path) -> Vec<(String, McpServerConfig)> { vec![] }
+pub fn load_mcp_server_configs_with_project(
+    _cwd: &Path,
+) -> Vec<(String, (McpServerConfig, &'static str))> {
+    vec![]
+}
 pub async fn save_mcp_server_config_at(
     _path: &Path,
     _name: &str,

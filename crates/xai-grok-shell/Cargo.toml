@@ -23,3 +23,5 @@ xai-grok-telemetry = { path = "../xai-grok-telemetry" }
 xai-grok-tools = { path = "../xai-grok-tools" }
 xai-grok-workspace = { path = "../xai-grok-workspace" }
 xai-grok-announcements = { path = "../xai-grok-announcements" }
+xai-hooks-plugins-types = { path = "../xai-hooks-plugins-types" }
+async-trait = "0.1"
