@@ -1,0 +1,20 @@
+[package]
+name = "next-code-ratatui-inline"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+authors = ["xAI", "next-code contributors"]
+description = "Adapted from xai-org/grok-build xai-ratatui-inline (Apache-2.0)"
+
+[dependencies]
+unicode-width = "0.2"
+anstyle-parse = "1"
+crossterm = "0.28"
+ratatui = "0.28"
+
+[features]
+default = []
+# Upstream Grok ratatui fork feature. Declared locally so cfg gates compile cleanly
+# against crates.io ratatui 0.28 (which has no scrolling-regions). Leave OFF — the
+# pager path uses the #[cfg(not(feature = "scrolling-regions"))] backend.
+scrolling-regions = []

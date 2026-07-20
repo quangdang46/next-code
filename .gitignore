@@ -37,3 +37,4 @@ libnext_code_base.rlib
 /*.mp4
 /*.png
 data/
+grok-build/*
