@@ -233,6 +233,8 @@ impl NextCodeFaceAgent {
         }
         self.emit_memory_info(&session_id).await;
         self.emit_git_status(&session_id).await;
+        // Face TodoPane / Todos float only paint from ACP Plan — bridge disk todos.
+        self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -304,6 +306,7 @@ impl NextCodeFaceAgent {
         }
         self.emit_memory_info(&attached).await;
         self.emit_git_status(&attached).await;
+        self.emit_todos_plan(&attached, /*allow_empty=*/ false).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -587,6 +590,27 @@ impl NextCodeFaceAgent {
             .await;
     }
 
+    /// Map next-code session todos → ACP `SessionUpdate::Plan` so Face
+    /// `TodoPane` / Todos float paint (classic TUI uses `BusEvent::TodoUpdated`
+    /// instead; pager never saw that bus).
+    async fn emit_todos_plan(&self, session_id: &str, allow_empty: bool) {
+        let todos = crate::todo::load_todos(session_id).unwrap_or_default();
+        if todos.is_empty() && !allow_empty {
+            return;
+        }
+        let entries: Vec<acp::PlanEntry> = todos
+            .iter()
+            .map(plan_entry_from_next_code_todo)
+            .collect();
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                acp::SessionId::new(session_id),
+                acp::SessionUpdate::Plan(acp::Plan::new(entries)),
+            ))
+            .await;
+    }
+
     /// Bridge git porcelain into Face GitStatus float (same gather as TUI widget).
     async fn emit_git_status(&self, session_id: &str) {
         let Some(info) = gather_git_status_snapshot() else {
@@ -819,6 +843,12 @@ impl acp::Agent for NextCodeFaceAgent {
                     self.emit_tool_done(&session_id, &id, &name, &output, &error, raw_input)
                         .await;
                     self.tool_inputs.borrow_mut().remove(&id);
+                    // `todo` tool persists via next-code store + BusEvent for TUI;
+                    // Face needs an ACP Plan refresh after each write (or clear).
+                    if name.eq_ignore_ascii_case("todo") {
+                        self.emit_todos_plan(&session_id, /*allow_empty=*/ true)
+                            .await;
+                    }
                 }
                 ServerEvent::GeneratedImage {
                     id,
@@ -879,7 +909,13 @@ impl acp::Agent for NextCodeFaceAgent {
                     crate::memory::apply_remote_activity_snapshot(&activity);
                     self.emit_memory_info(&session_id).await;
                 }
-                ServerEvent::Done { id } if id == prompt_id => break acp::StopReason::EndTurn,
+                ServerEvent::Done { id } if id == prompt_id => {
+                    // Refresh Plan in case compaction / other paths mutated todos
+                    // without a `todo` ToolDone this turn.
+                    self.emit_todos_plan(&session_id, /*allow_empty=*/ false)
+                        .await;
+                    break acp::StopReason::EndTurn;
+                }
                 ServerEvent::Error { id, message, .. } if id == prompt_id => {
                     self.emit_text(&session_id, format!("Error: {message}"))
                         .await;
@@ -988,6 +1024,61 @@ mod tests {
         assert_eq!(NextCodeFaceAgent::tool_kind("Unknown"), acp::ToolKind::Other);
         assert_eq!(NextCodeFaceAgent::tool_kind("Search"), acp::ToolKind::Other);
     }
+
+    #[test]
+    fn plan_entry_maps_next_code_todo_status_and_priority() {
+        let pending = crate::todo::TodoItem {
+            content: "wire Plan".into(),
+            status: "pending".into(),
+            active_form: None,
+            priority: "high".into(),
+            id: "1".into(),
+            group: None,
+            confidence: None,
+            completion_confidence: None,
+            confidence_history: Vec::new(),
+            blocked_by: Vec::new(),
+            assigned_to: None,
+        };
+        let entry = plan_entry_from_next_code_todo(&pending);
+        assert_eq!(entry.content, "wire Plan");
+        assert_eq!(entry.status, acp::PlanEntryStatus::Pending);
+        assert_eq!(entry.priority, acp::PlanEntryPriority::High);
+
+        let active = crate::todo::TodoItem {
+            status: "in_progress".into(),
+            priority: "low".into(),
+            ..pending.clone()
+        };
+        let entry = plan_entry_from_next_code_todo(&active);
+        assert_eq!(entry.status, acp::PlanEntryStatus::InProgress);
+        assert_eq!(entry.priority, acp::PlanEntryPriority::Low);
+
+        let done = crate::todo::TodoItem {
+            status: "cancelled".into(),
+            priority: "medium".into(),
+            ..pending
+        };
+        let entry = plan_entry_from_next_code_todo(&done);
+        assert_eq!(entry.status, acp::PlanEntryStatus::Completed);
+        assert_eq!(entry.priority, acp::PlanEntryPriority::Medium);
+    }
+}
+
+/// Convert next-code disk/bus `TodoItem` (string status/priority) into the ACP
+/// Plan entry shape Face already maps via `todo_item_from_plan_entry`.
+fn plan_entry_from_next_code_todo(item: &crate::todo::TodoItem) -> acp::PlanEntry {
+    let status = match item.status.as_str() {
+        "in_progress" => acp::PlanEntryStatus::InProgress,
+        "completed" | "cancelled" => acp::PlanEntryStatus::Completed,
+        _ => acp::PlanEntryStatus::Pending,
+    };
+    let priority = match item.priority.as_str() {
+        "high" => acp::PlanEntryPriority::High,
+        "low" => acp::PlanEntryPriority::Low,
+        _ => acp::PlanEntryPriority::Medium,
+    };
+    acp::PlanEntry::new(item.content.clone(), priority, status)
 }
 
 /// Paste of TUI `gather_git_info_inner` for Face float bridge (no tui dep from Face).

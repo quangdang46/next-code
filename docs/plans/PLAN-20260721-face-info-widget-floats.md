@@ -18,7 +18,7 @@
 | BackgroundTasks | **wired** | `session.bg_tasks` Running |
 | Compaction | **wired** | AutoCompact* → `info_float_compaction` |
 | SwarmStatus | **wired** | `subagent_sessions` as managed_members |
-| Todos | **wired** | TodoPane items (float parity with pane) |
+| Todos | **wired** | TodoPane via ACP SessionUpdate::Plan from pager_agent (load_todos -> Plan entries); float parity with pane |
 | WorkspaceMap | **text interim + commented buffer paint** | no Face `workspace_client`; `legacy_deferred` holds copied `render_workspace_map` registration under `TODO(face-floats)`; `build_info_float_data` leaves `None` with citation TODOs |
 | Diagrams | **text interim + commented image paint** | mermaid image float not registered; `legacy_deferred` holds copied `render_diagrams_widget` under `TODO(face-floats)`; data `None` until pipeline |
 | AmbientMode | **commented stub only** | legacy hard-disabled (`widget_disabled` + `has_data_for => false`) — copy in `legacy_deferred.rs` |
@@ -41,7 +41,7 @@ Face keeps **separate floats** by `preferred_side` (no Overview merge) so the fu
 ## Wire map
 | Seam | What |
 |---|---|
-| `pager_agent.rs` | emit `next-code/memory_info` + `next-code/git_status` on session create/attach; refresh memory on `ServerEvent::MemoryActivity` |
+| `pager_agent.rs` | emit `next-code/memory_info` + `next-code/git_status` on session create/attach; refresh memory on `ServerEvent::MemoryActivity`; emit ACP `SessionUpdate::Plan` from `load_todos` on create/attach, after `todo` ToolDone, and non-empty refresh on turn Done |
 | `acp_handler/mod.rs` | fold memory_info / git_status into `AgentView` |
 | `session_notification.rs` | AutoCompact* → compaction float card |
 | `agent_view/session.rs` | `build_info_float_data` assembles all float fields |
