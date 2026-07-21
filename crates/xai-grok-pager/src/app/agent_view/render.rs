@@ -1676,8 +1676,8 @@ impl AgentView {
                     }
                 }
             }
-            // Scroll-gated Overview (right) + KV (left) floats — paste-copy of
-            // legacy compact chrome; status-bar context chip stays painted above.
+            // Scroll-gated info floats (right-stacked, Overview merge) —
+            // paste-copy of legacy compact chrome; status-bar context chip stays above.
             if crate::views::info_floats::floats_visible(
                 self.last_scroll_activity_at,
                 std::time::Instant::now(),

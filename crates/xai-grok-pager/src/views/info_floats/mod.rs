@@ -16,8 +16,15 @@
 //! - Scroll-gated visibility ([`SCROLL_IDLE_HIDE_MS`])
 //! - [`CacheHitInfo::apply_request_sample`] for ACP TokenUsage fold-in
 //! - `Clear` under float boxes (legacy paints into empty margins)
-//! - Separate floats per preferred_side (no Overview merge) while scrolling
 //! - Slim [`InfoFloatData`] = fields those renderers need from `InfoWidgetData`
+//!
+//! ## Placement (copy of legacy layout rules — not preferred_side alone)
+//! - Face agent view is **non-centered**: legacy only opens a Left margin when
+//!   `margins.centered` (`info_widget_layout.rs`). Without Left docks, Phase 2
+//!   still seats `preferred_side == Left` widgets on the **Right**.
+//! - When Overview is shown, mergeable kinds (KV, Usage, Git, …) are suppressed
+//!   and their compact lines fold into Overview (`is_overview_mergeable` +
+//!   `render_sections`).
 
 mod widgets;
 
@@ -724,7 +731,6 @@ pub fn render_kv_cache_summary_line(cache: &CacheHitInfo) -> Option<Line<'static
 
 // ---------------------------------------------------------------------------
 // Compact Overview lines — copied from `render_sections` CompactOnly path
-// (model + context only; KV stays on the Left float, not merged)
 // ---------------------------------------------------------------------------
 
 fn render_overview_compact_lines(data: &InfoFloatData, inner: Rect) -> Vec<Line<'static>> {
@@ -738,6 +744,42 @@ fn render_overview_compact_lines(data: &InfoFloatData, inner: Rect) -> Vec<Line<
         lines.extend(render_context_compact(data, inner));
     }
 
+    if let Some(todos) = data.todos_info.as_ref()
+        && widgets::todos_has_data(Some(todos))
+    {
+        lines.extend(widgets::render_todos_compact(todos));
+    }
+
+    // Memory is *not* overview-mergeable in layout (standalone float may still
+    // place), but legacy `render_sections` still embeds the compact memory line
+    // inside Overview. Face keeps Memory as its own Right float (elevated), so
+    // we omit it here to avoid a duplicate card.
+
+    if let Some(bg) = data.background_info.as_ref()
+        && widgets::background_has_data(Some(bg))
+    {
+        lines.extend(widgets::render_background_lines(bg, inner.width as usize));
+    }
+
+    if let Some(usage) = data.usage_info.as_ref()
+        && widgets::usage_has_data(Some(usage))
+    {
+        lines.extend(widgets::render_usage_compact(usage, inner.width));
+    }
+
+    if let Some(cache) = data.cache_hit_info.as_ref()
+        && let Some(kv) = render_kv_cache_summary_line(cache)
+    {
+        lines.push(kv);
+    }
+
+    if let Some(git) = data.git_info.as_ref()
+        && widgets::git_has_data(Some(git))
+    {
+        // Compact = branch/stats line only (legacy `render_git_compact`).
+        lines.extend(widgets::render_git_widget(git, inner.width, 1));
+    }
+
     lines
 }
 
@@ -746,6 +788,20 @@ fn render_kv_compact_lines(cache: &CacheHitInfo) -> Vec<Line<'static>> {
         Some(line) => vec![line],
         None => Vec::new(),
     }
+}
+
+/// Copied from `info_widget.rs::is_overview_mergeable` (Face FloatKind subset).
+fn is_overview_mergeable(kind: FloatKind) -> bool {
+    matches!(
+        kind,
+        FloatKind::Todos
+            | FloatKind::SwarmStatus
+            | FloatKind::BackgroundTasks
+            | FloatKind::Compaction
+            | FloatKind::UsageLimits
+            | FloatKind::KvCache
+            | FloatKind::GitStatus
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -799,35 +855,43 @@ fn place_right_at(area: Rect, content_h: u16, y_cursor: u16) -> Option<Rect> {
     })
 }
 
-fn place_left_at(area: Rect, content_h: u16, y_cursor: u16) -> Option<Rect> {
-    let width = MAX_WIDGET_WIDTH.min(area.width.saturating_sub(FLOAT_INSET * 2));
-    if width < MIN_WIDGET_WIDTH {
-        return None;
+/// Section count for Overview eligibility — mirrors legacy
+/// `InfoWidgetData::has_data_for(Overview)` (sections >= 2).
+fn overview_section_count(data: &InfoFloatData) -> usize {
+    let mut sections = 0usize;
+    if data.model.is_some() {
+        sections += 1;
     }
-    let height = content_h
-        .saturating_add(2)
-        .min(area.height.saturating_sub(y_cursor.saturating_sub(area.y)));
-    if height < 3 {
-        return None;
+    if data.context_ready || data.observed_context_tokens.is_some() || data.context_info_stale {
+        sections += 1;
     }
-    let x = area.x.saturating_add(FLOAT_INSET);
-    let y = y_cursor;
-    if y.saturating_add(height) > area.y.saturating_add(area.height) {
-        return None;
+    if widgets::todos_has_data(data.todos_info.as_ref()) {
+        sections += 1;
     }
-    Some(Rect {
-        x,
-        y,
-        width,
-        height,
-    })
+    if widgets::background_has_data(data.background_info.as_ref()) {
+        sections += 1;
+    }
+    if widgets::usage_has_data(data.usage_info.as_ref()) {
+        sections += 1;
+    }
+    if data
+        .cache_hit_info
+        .as_ref()
+        .is_some_and(|c| render_kv_cache_summary_line(c).is_some())
+    {
+        sections += 1;
+    }
+    if widgets::compaction_has_data(data.compaction_info.as_ref()) {
+        sections += 1;
+    }
+    if widgets::git_has_data(data.git_info.as_ref()) {
+        sections += 1;
+    }
+    sections
 }
 
 fn overview_has_data(data: &InfoFloatData) -> bool {
-    data.model.is_some()
-        || data.context_ready
-        || data.observed_context_tokens.is_some()
-        || data.context_info_stale
+    overview_section_count(data) >= 2
 }
 
 fn measure_kind(kind: FloatKind, data: &InfoFloatData, inner_w: u16) -> Vec<Line<'static>> {
@@ -913,18 +977,24 @@ fn kind_has_data(kind: FloatKind, data: &InfoFloatData) -> bool {
     }
 }
 
-/// Paint separate Left/Right floats stacked by priority (no Overview merge).
+/// Compute Right-stacked placements for the current float set.
 ///
-/// Placement mirrors legacy `preferred_side`; Face keeps floats distinct so the
-/// full set is visible while scrolling.
-pub fn render_info_floats(buf: &mut Buffer, area: Rect, data: &InfoFloatData) {
+/// Mirrors legacy non-centered layout:
+/// - only Right docks (no Left margin unless centered)
+/// - Overview absorbs mergeable kinds when shown
+pub(crate) fn collect_float_placements(
+    area: Rect,
+    data: &InfoFloatData,
+) -> Vec<(FloatKind, Rect, Vec<Line<'static>>)> {
     if area.width < MIN_WIDGET_WIDTH || area.height < 3 {
-        return;
+        return Vec::new();
     }
 
     let provisional_inner_w = MAX_WIDGET_WIDTH
         .min(area.width.saturating_sub(FLOAT_INSET * 2))
         .saturating_sub(2);
+
+    let overview_active = overview_has_data(data);
 
     let mut kinds: Vec<FloatKind> = [
         FloatKind::MemoryActivity, // Face: elevated — show before Diagrams stub
@@ -941,11 +1011,12 @@ pub fn render_info_floats(buf: &mut Buffer, area: Rect, data: &InfoFloatData) {
     ]
     .into_iter()
     .filter(|k| kind_has_data(*k, data))
+    .filter(|k| !(overview_active && is_overview_mergeable(*k)))
     .collect();
     kinds.sort_by_key(|k| k.priority());
 
-    let mut left_y = area.y.saturating_add(FLOAT_INSET.min(area.height.saturating_sub(1)));
-    let mut right_y = left_y;
+    let mut right_y = area.y.saturating_add(FLOAT_INSET.min(area.height.saturating_sub(1)));
+    let mut out = Vec::new();
 
     for kind in kinds {
         let lines = measure_kind(kind, data, provisional_inner_w.max(1));
@@ -953,28 +1024,26 @@ pub fn render_info_floats(buf: &mut Buffer, area: Rect, data: &InfoFloatData) {
             continue;
         }
         let content_h = lines.len() as u16;
-        let rect = match kind.preferred_side() {
-            Side::Right => {
-                let r = place_right_at(area, content_h, right_y);
-                if let Some(rect) = r {
-                    right_y = rect.y.saturating_add(rect.height).saturating_add(1);
-                }
-                r
-            }
-            Side::Left => {
-                let r = place_left_at(area, content_h, left_y);
-                if let Some(rect) = r {
-                    left_y = rect.y.saturating_add(rect.height).saturating_add(1);
-                }
-                r
-            }
-        };
-        let Some(rect) = rect else {
+        // Non-centered: always Right — preferred_side is only a scoring bias in
+        // legacy Phase 2 when a Left margin actually exists.
+        let Some(rect) = place_right_at(area, content_h, right_y) else {
             continue;
         };
+        right_y = rect.y.saturating_add(rect.height).saturating_add(1);
         let inner_w = rect.width.saturating_sub(2).max(1);
         let paint_lines = measure_kind(kind, data, inner_w);
-        paint_bordered_float(buf, rect, paint_lines);
+        out.push((kind, rect, paint_lines));
+    }
+    out
+}
+
+/// Paint scroll-gated info floats stacked on the **right** margin.
+///
+/// Placement copies legacy non-centered behavior (see module docs), not
+/// `preferred_side` alone.
+pub fn render_info_floats(buf: &mut Buffer, area: Rect, data: &InfoFloatData) {
+    for (_kind, rect, lines) in collect_float_placements(area, data) {
+        paint_bordered_float(buf, rect, lines);
     }
 }
 
@@ -1069,5 +1138,91 @@ mod tests {
     #[test]
     fn pretty_model_title_cases_dashed_ids() {
         assert_eq!(pretty_model("deepseek-v4-flash"), "Deepseek v4 Flash");
+    }
+
+    fn line_text(line: &Line<'_>) -> String {
+        line.spans.iter().map(|s| s.content.as_ref()).collect()
+    }
+
+    fn sample_cache_priming() -> CacheHitInfo {
+        let mut cache = CacheHitInfo::default();
+        cache.apply_request_sample(1000, Some(0), Some(1000));
+        cache
+    }
+
+    #[test]
+    fn overview_merges_kv_and_places_only_on_right() {
+        let data = InfoFloatData {
+            model: Some("deepseek-v4-flash".into()),
+            provider_name: Some("opencode go".into()),
+            session_count: Some(1),
+            context_ready: true,
+            observed_context_tokens: Some(19_000),
+            context_limit: Some(1_000_000),
+            cache_hit_info: Some(sample_cache_priming()),
+            ..Default::default()
+        };
+        assert!(overview_has_data(&data));
+        assert!(is_overview_mergeable(FloatKind::KvCache));
+
+        let area = Rect::new(0, 0, 100, 40);
+        let placements = collect_float_placements(area, &data);
+        let kinds: Vec<FloatKind> = placements.iter().map(|(k, _, _)| *k).collect();
+        assert!(
+            kinds.contains(&FloatKind::Overview),
+            "expected Overview, got {kinds:?}"
+        );
+        assert!(
+            !kinds.contains(&FloatKind::KvCache),
+            "KV must merge into Overview, not place standalone: {kinds:?}"
+        );
+
+        let mid = area.x + area.width / 2;
+        for (kind, rect, _) in &placements {
+            assert!(
+                rect.x >= mid,
+                "{kind:?} must dock on the right half (x={} mid={mid}), got {rect:?}",
+                rect.x
+            );
+        }
+
+        let overview_lines = placements
+            .iter()
+            .find(|(k, _, _)| *k == FloatKind::Overview)
+            .map(|(_, _, lines)| lines)
+            .expect("overview lines");
+        let joined: String = overview_lines.iter().map(line_text).collect::<Vec<_>>().join("\n");
+        assert!(
+            joined.contains("KV cache"),
+            "Overview must include merged KV summary, got:\n{joined}"
+        );
+    }
+
+    #[test]
+    fn preferred_left_kv_alone_still_docks_right() {
+        // Single section → Overview inactive; KvCache preferred_side is Left,
+        // but non-centered Face placer must still seat it on the Right.
+        let data = InfoFloatData {
+            cache_hit_info: Some(sample_cache_priming()),
+            ..Default::default()
+        };
+        assert!(!overview_has_data(&data));
+        assert_eq!(FloatKind::KvCache.preferred_side(), Side::Left);
+
+        let area = Rect::new(0, 0, 100, 30);
+        let placements = collect_float_placements(area, &data);
+        assert_eq!(placements.len(), 1);
+        assert_eq!(placements[0].0, FloatKind::KvCache);
+        let mid = area.x + area.width / 2;
+        assert!(
+            placements[0].1.x >= mid,
+            "standalone KV must still dock right, got {:?}",
+            placements[0].1
+        );
+    }
+
+    #[test]
+    fn scroll_idle_hide_ms_remains_1000() {
+        assert_eq!(SCROLL_IDLE_HIDE_MS, 1000);
     }
 }

@@ -36,6 +36,10 @@ pub enum FloatKind {
 }
 
 impl FloatKind {
+    /// Legacy preferred dock side (Phase-2 scoring bias only).
+    ///
+    /// Face agent view is non-centered, so the placer seats everything on the
+    /// **Right** — Left only exists when `margins.centered` in legacy layout.
     pub fn preferred_side(self) -> Side {
         match self {
             FloatKind::Diagrams
