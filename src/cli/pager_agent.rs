@@ -918,6 +918,16 @@ impl acp::Agent for NextCodeFaceAgent {
                 // Toggle is a no-op for next-code skills (always enabled); return list.
                 crate::cli::face_auth::list_nextcode_skills(cwd.as_deref())
             }
+            "x.ai/plugins/list" => {
+                let cwd = params
+                    .get("cwd")
+                    .and_then(|v| v.as_str())
+                    .map(std::path::PathBuf::from);
+                crate::cli::face_plugins::plugins_list_payload(cwd.as_deref())
+            }
+            "x.ai/plugins/action" => crate::cli::face_plugins::plugins_action_payload(&params),
+            "x.ai/hooks/list" => crate::cli::face_plugins::hooks_list_payload(),
+            "x.ai/hooks/action" => crate::cli::face_plugins::hooks_action_payload(&params),
             "x.ai/session/list" => {
                 let limit = params
                     .get("limit")

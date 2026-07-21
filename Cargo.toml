@@ -95,8 +95,6 @@ members = [
     "crates/next-code-redact",
     "crates/next-code-keywords",
     "crates/next-code-secrets",
-    "crates/next-code-plugin-core",
-    "crates/next-code-plugin-runtime",
     "crates/next-code-provider-doctor",
     "crates/next-code-render-core",
     "crates/next-code-ratatui-inline",
@@ -193,8 +191,6 @@ required-features = ["dev-bins"]
 # Hook system for lifecycle events
 next-code-hooks = { path = "crates/next-code-hooks" }
 next-code-keyring-store = { path = "crates/next-code-keyring-store" }
-next-code-plugin-core = { path = "crates/next-code-plugin-core" }
-next-code-plugin-runtime = { path = "crates/next-code-plugin-runtime" }
 next-code-provider-doctor = { path = "crates/next-code-provider-doctor" }
 next-code-provider-anthropic-runtime = { path = "crates/next-code-provider-anthropic-runtime" }
 next-code-provider-antigravity-runtime = { path = "crates/next-code-provider-antigravity-runtime" }
@@ -334,6 +330,7 @@ next-code-tui = { path = "crates/next-code-tui", default-features = false }
 # PR8: Face (Grok pager) as interactive UI; brain stays next-code serve via ACP bridge.
 xai-grok-pager = { path = "crates/xai-grok-pager" }
 xai-acp-lib = { path = "crates/xai-acp-lib" }
+xai-hooks-plugins-types = { path = "crates/xai-hooks-plugins-types" }
 agent-client-protocol = { version = "0.10.4", features = ["unstable"] }
 next-code-compaction-core = { path = "crates/next-code-compaction-core" }
 next-code-config-types = { path = "crates/next-code-config-types" }

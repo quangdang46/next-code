@@ -62,7 +62,7 @@ use next_code_hooks::{
     legacy_v1_to_v2_handlers,
 };
 use next_code_message_types::ToolDefinition;
-use next_code_plugin_core::ToolTier;
+use next_code_tool_types::ToolTier;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -155,31 +155,19 @@ pub fn clear_best_of_n_handle() {
 }
 
 // ---------------------------------------------------------------------------
-// ApprovalGate dispatcher bridge
+// ApprovalGate (legacy QuickJS plugin gate removed — always allow)
 // ---------------------------------------------------------------------------
 
-/// Global handle to the plugin system's [`RcuDispatcher`] so the tool execution
-/// path can consult the ApprovalGate before running a tool.
+/// Run the approval gate check before executing a tool.
 ///
-/// Set once during plugin system initialisation. The handle is
-/// `Option<Arc<...>>` so that tools still work when the plugin system is
-/// disabled or not yet initialised — the gate check simply passes through.
-static GATE_DISPATCHER: StdRwLock<Option<std::sync::Arc<next_code_plugin_runtime::RcuDispatcher>>> =
-    StdRwLock::new(None);
-
-/// Install the global gate dispatcher. Called once during plugin system
-/// initialisation. Replacing it at runtime is safe (the old handle is dropped
-/// once the write lock is released).
-pub fn set_gate_dispatcher(dispatcher: std::sync::Arc<next_code_plugin_runtime::RcuDispatcher>) {
-    if let Ok(mut guard) = GATE_DISPATCHER.write() {
-        *guard = Some(dispatcher);
-    }
+/// The QuickJS/TS plugin ApprovalGate was removed; this always returns `Ok(())`.
+pub(crate) fn check_approval_gate(_tool_name: &str, _input: &Value) -> Result<()> {
+    Ok(())
 }
 
-/// Map a tool name to its [`ToolTier`] for the approval gate.
-///
-/// This is a built-in classification based on the tool's known behaviour.
-/// Plugin-registered tools default to `Exec` (the most restrictive tier).
+/// Map a tool name to its [`ToolTier`] (kept for call-site compatibility /
+/// future policy).
+#[allow(dead_code)]
 fn tool_name_to_tier(name: &str) -> ToolTier {
     // Read-only introspection tools.
     if matches!(
@@ -230,54 +218,12 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "notepad_write_priority"
             | "notepad_write_working"
             | "notepad_write_manual"
-            | "beads_create"
-            | "beads_ready"
-            | "beads_claim"
-            | "beads_close"
-            | "beads_dep"
-            | "batch"
-            | "bg"
-            | "todo"
-            | "mcp"
-            | "team_create"
-            | "team_delete"
-            | "team_send_message"
-            | "team_task_create"
-            | "team_task_claim"
-            | "team_shutdown"
+            | "notepad_prune"
     ) {
         return ToolTier::Write;
     }
     // Everything else is Exec (most restrictive).
     ToolTier::Exec
-}
-
-/// Run the plugin-system approval gate check before executing a tool.
-///
-/// Returns `Ok(())` if the gate allows or no gate is installed.
-/// Returns `Err` with a descriptive message if the gate denies the call.
-pub(crate) fn check_approval_gate(tool_name: &str, input: &Value) -> Result<()> {
-    let Ok(guard) = GATE_DISPATCHER.read() else {
-        return Ok(());
-    };
-    let Some(dispatcher) = guard.as_ref() else {
-        return Ok(());
-    };
-    let tier = tool_name_to_tier(tool_name);
-    match dispatcher.check_tool(tool_name, tier, input) {
-        None | Some(next_code_plugin_runtime::gate::GateDecision::Allow) => Ok(()),
-        Some(next_code_plugin_runtime::gate::GateDecision::Deny { reason, layer }) => {
-            Err(anyhow::anyhow!(
-                "Tool '{}' blocked by approval gate: {} ({})",
-                tool_name,
-                reason,
-                layer
-            ))
-        }
-        Some(next_code_plugin_runtime::gate::GateDecision::NeedsApproval { prompt }) => Err(
-            anyhow::anyhow!("Tool '{}' requires approval: {}", tool_name, prompt.reason),
-        ),
-    }
 }
 
 /// Registry of available tools (Arc-wrapped for sharing)

@@ -123,8 +123,6 @@ next-code-message-types = { path = "../next-code-message-types" }
 next-code-overnight-core = { path = "../next-code-overnight-core" }
 
 next-code-plan = { path = "../next-code-plan" }
-next-code-plugin-core = { path = "../next-code-plugin-core" }
-next-code-plugin-runtime = { path = "../next-code-plugin-runtime" }
 next-code-swarm-core = { path = "../next-code-swarm-core" }
 next-code-protocol = { path = "../next-code-protocol" }
 ffs-symbol = { workspace = true }

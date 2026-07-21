@@ -20,7 +20,6 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Update) => "next-code update".to_string(),
         Some(Command::Version { .. }) => "next-code version".to_string(),
         Some(Command::Usage { .. }) => "next-code usage".to_string(),
-        Some(Command::Plugin(..)) => "next-code plugin".to_string(),
         Some(Command::SelfDev { .. }) => "nc:selfdev".to_string(),
         Some(Command::Debug { .. }) => "next-code debug".to_string(),
         Some(Command::Auth(_)) => "next-code auth".to_string(),

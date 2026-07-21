@@ -122,8 +122,8 @@ pub const EMBED_BRAND_RESTRICTED_COMMANDS: &[&str] = &[
     "imagine-video",
     "announcements",
     "marketplace",
-    "plugins",
-    "hooks",
+    // `/plugins` + `/hooks` are wired to next-code ACP under `~/.next-code`
+    // (Grok-style bundle plugins). Marketplace stays brand-hidden.
     "privacy",
     "share",
 ];
@@ -164,8 +164,6 @@ mod embed_brand_tests {
             "imagine-video",
             "announcements",
             "marketplace",
-            "plugins",
-            "hooks",
             "privacy",
             "share",
         ] {
@@ -176,6 +174,8 @@ mod embed_brand_tests {
             assert!(is_embed_brand_hidden_command(name));
             assert!(is_embed_brand_hidden_command(&format!("/{name}")));
         }
+        assert!(!is_embed_brand_hidden_command("plugins"));
+        assert!(!is_embed_brand_hidden_command("hooks"));
         assert!(!is_embed_brand_hidden_command("usage"));
         assert!(!is_embed_brand_hidden_command("help"));
     }
