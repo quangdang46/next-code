@@ -857,6 +857,19 @@ pub(super) fn action_for_bool(key: SettingKey, new: bool) -> Option<Action> {
         "show_tips" => Some(Action::SetShowTips(new)),
         "auto_update" => Some(Action::SetAutoUpdate(new)),
         "display_refresh_auto_cadence" => Some(Action::SetDisplayRefreshAutoCadence(new)),
+        // Info float toggles
+        "info_float.model_info" => Some(Action::SetShowFloatModelInfo(new)),
+        "info_float.context_usage" => Some(Action::SetShowFloatContextUsage(new)),
+        "info_float.kv_cache" => Some(Action::SetShowFloatKvCache(new)),
+        "info_float.memory_activity" => Some(Action::SetShowFloatMemoryActivity(new)),
+        "info_float.usage_limits" => Some(Action::SetShowFloatUsageLimits(new)),
+        "info_float.git_status" => Some(Action::SetShowFloatGitStatus(new)),
+        "info_float.background_tasks" => Some(Action::SetShowFloatBackgroundTasks(new)),
+        "info_float.compaction" => Some(Action::SetShowFloatCompaction(new)),
+        "info_float.swarm_status" => Some(Action::SetShowFloatSwarmStatus(new)),
+        "info_float.todos" => Some(Action::SetShowFloatTodos(new)),
+        "info_float.workspace_map" => Some(Action::SetShowFloatWorkspaceMap(new)),
+        "info_float.diagrams" => Some(Action::SetShowFloatDiagrams(new)),
         _ => None,
     }
 }

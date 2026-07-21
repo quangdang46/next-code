@@ -4228,6 +4228,10 @@ impl AppView {
                                 0
                             };
                             agent.info_float_session_count = Some(info_float_session_count);
+                            agent.info_float_visibility =
+                                crate::views::info_floats::InfoFloatVisibility::from(
+                                    &self.current_ui.info_floats,
+                                );
                             if agent.info_float_provider.is_none() {
                                 agent.info_float_provider = self
                                     .login_method_id
@@ -4346,6 +4350,10 @@ impl AppView {
                                                 if let Some(agent) = agents.get_mut(&agent_id) {
                                                     agent.info_float_session_count =
                                                         Some(session_count);
+                                                    agent.info_float_visibility =
+                                                        crate::views::info_floats::InfoFloatVisibility::from(
+                                                            &self.current_ui.info_floats,
+                                                        );
                                                     agent.draw(
                                                         inner,
                                                         buf,

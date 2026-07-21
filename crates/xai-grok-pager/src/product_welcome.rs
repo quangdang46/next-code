@@ -126,6 +126,9 @@ pub const EMBED_BRAND_RESTRICTED_COMMANDS: &[&str] = &[
     // (Grok-style bundle plugins). Marketplace stays brand-hidden.
     "privacy",
     "share",
+    // `/usage` → no separate billing page for next-code. Provider usage
+    // shows directly in the chat (x.ai/usage handler → next-code providers).
+    "usage",
 ];
 
 /// True when `name` (canonical or alias token, no `/`) is on the embed brand-hide list.
@@ -176,7 +179,7 @@ mod embed_brand_tests {
         }
         assert!(!is_embed_brand_hidden_command("plugins"));
         assert!(!is_embed_brand_hidden_command("hooks"));
-        assert!(!is_embed_brand_hidden_command("usage"));
+        assert!(is_embed_brand_hidden_command("usage"));
         assert!(!is_embed_brand_hidden_command("help"));
     }
 }

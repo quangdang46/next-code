@@ -476,8 +476,29 @@ impl SlashController {
         // `/` before existing text shows the full list like an empty composer.
         // The two branches partition: analyze_input sets args_range exactly
         // when the cursor is past the command token.
+        //
+        // `$` prefix: filter to skills only and show `$name` display.
+        let is_dollar_prefix = text.as_bytes().first() == Some(&b'$');
         if input.cursor_in_command {
-            let matches = self.command_suggestions(&input.query, models);
+            let mut matches = self.command_suggestions(&input.query, models);
+            if is_dollar_prefix {
+                // Filter to skills only and rewrite display to `$name`.
+                let skill_set: std::collections::HashSet<String> = matches
+                    .iter()
+                    .filter(|row| {
+                        let name = row.command_name();
+                        self.registry.get_for_dispatch(name)
+                            .is_some_and(|cmd| cmd.is_skill())
+                    })
+                    .map(|row| row.command_name().to_string())
+                    .collect();
+                matches.retain(|row| skill_set.contains(row.command_name()));
+                for row in &mut matches {
+                    let name = row.command_name().to_string();
+                    row.display = format!("${name}");
+                    row.insert_text = format!("${name} ");
+                }
+            }
             snapshot.selected = Self::carry_selection(&previous, &matches, true, &input);
             snapshot.open = !matches.is_empty();
             snapshot.matches = matches;
@@ -1037,16 +1058,23 @@ struct SlashInput {
 
 /// Analyze prompt text for slash command structure.
 ///
-/// Returns `None` if the text doesn't start with `/` or is empty.
+/// Returns `None` if the text doesn't start with `/` or `$` or is empty.
 fn analyze_input(text: &str, cursor: usize) -> Option<SlashInput> {
-    if text.is_empty() || !text.starts_with('/') {
+    if text.is_empty() {
+        return None;
+    }
+    let prefix_char = text.as_bytes().first().copied()?;
+    let is_slash = prefix_char == b'/';
+    let is_dollar = prefix_char == b'$';
+    if !is_slash && !is_dollar {
         return None;
     }
 
     let cursor = cursor.min(text.len());
-    if text[1..].chars().all(|ch| ch.is_whitespace()) {
+    let prefix_len = 1; // skip leading / or $
+    if text[prefix_len..].chars().all(|ch| ch.is_whitespace()) {
         return Some(SlashInput {
-            command_range: 0..1,
+            command_range: 0..prefix_len,
             query: String::new(),
             cursor_in_command: true,
             args_range: None,
@@ -1065,11 +1093,11 @@ fn analyze_input(text: &str, cursor: usize) -> Option<SlashInput> {
         }
     }
 
-    let query_end = cursor.clamp(1, command_end);
-    let query = if query_end <= 1 {
+    let query_end = cursor.clamp(prefix_len, command_end);
+    let query = if query_end <= prefix_len {
         String::new()
     } else {
-        text[1..query_end].to_string()
+        text[prefix_len..query_end].to_string()
     };
 
     let cursor_in_command = cursor <= command_end;
@@ -1120,9 +1148,11 @@ pub struct SlashInvocation<'a> {
 
 /// Parse a line into a slash command invocation.
 ///
-/// Returns `None` if the line doesn't start with `/` or has no command token.
+/// Returns `None` if the line doesn't start with `/` or `$` or has no command token.
 pub fn parse_invocation(line: &str) -> Option<SlashInvocation<'_>> {
-    let remainder = line.strip_prefix('/')?;
+    let remainder = line
+        .strip_prefix('/')
+        .or_else(|| line.strip_prefix('$'))?;
     if remainder.is_empty() {
         return None;
     }
@@ -1292,10 +1322,10 @@ fn should_use_mid_text_refresh(
     }
 }
 
-/// Scan input for all `/word` tokens at any position.
+/// Scan input for all `/word` or `$word` tokens at any position.
 ///
-/// A slash token is `/` followed by one or more non-whitespace chars, where
-/// the `/` is either at position 0 or preceded by whitespace (avoids matching
+/// A slash token is `/` (or `$`) followed by one or more non-whitespace chars, where
+/// the `/` (or `$`) is either at position 0 or preceded by whitespace (avoids matching
 /// file paths like `foo/bar`).
 pub fn scan_inline_slash_tokens(text: &str, cursor: usize) -> Vec<InlineSlashToken> {
     let cursor = cursor.min(text.len());
@@ -1303,10 +1333,10 @@ pub fn scan_inline_slash_tokens(text: &str, cursor: usize) -> Vec<InlineSlashTok
     let mut iter = text.char_indices().peekable();
 
     while let Some((idx, ch)) = iter.next() {
-        if ch != '/' {
+        if ch != '/' && ch != '$' {
             continue;
         }
-        // `/` must be at start or preceded by whitespace.
+        // Token must be at start or preceded by whitespace.
         if idx > 0 {
             let prev_byte = text.as_bytes()[idx - 1];
             if !prev_byte.is_ascii_whitespace() {

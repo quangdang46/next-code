@@ -563,6 +563,19 @@ pub enum Action {
     /// Commit the `auto_update` preference. Persisted to `[cli].auto_update`.
     /// Restart-required — auto-update check fires once at startup.
     SetAutoUpdate(bool),
+    /// Per-float-kind visibility toggles. Persisted to `[ui.info_floats]`.
+    SetShowFloatModelInfo(bool),
+    SetShowFloatContextUsage(bool),
+    SetShowFloatKvCache(bool),
+    SetShowFloatMemoryActivity(bool),
+    SetShowFloatUsageLimits(bool),
+    SetShowFloatGitStatus(bool),
+    SetShowFloatBackgroundTasks(bool),
+    SetShowFloatCompaction(bool),
+    SetShowFloatSwarmStatus(bool),
+    SetShowFloatTodos(bool),
+    SetShowFloatWorkspaceMap(bool),
+    SetShowFloatDiagrams(bool),
     /// Commit `[ui.display_refresh].auto_cadence_enabled`. Restart-required —
     /// cadence is pinned once at startup.
     SetDisplayRefreshAutoCadence(bool),
