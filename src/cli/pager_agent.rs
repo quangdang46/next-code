@@ -353,6 +353,24 @@ impl NextCodeFaceAgent {
         parts.join("\n")
     }
 
+    /// Load initial ACP commands (skills) for the `InitializeResponse` meta.
+    /// Called once at Face connection time so the welcome prompt slash
+    /// completions include skills immediately.
+    fn load_initial_available_commands() -> Vec<acp::AvailableCommand> {
+        // Load global skills (no project-local overlay at this point).
+        let registry = match crate::skill::SkillRegistry::load_global() {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+        registry
+            .list()
+            .into_iter()
+            .map(|skill| {
+                acp::AvailableCommand::new(skill.name.clone(), skill.description.clone())
+            })
+            .collect()
+    }
+
     /// Advertise next-code skills to Face as ACP AvailableCommands (path+scope
     /// meta → Face `/skillname` InjectSkill path). `$skill` still works via
     /// [`Self::expand_skill_invocation`] on the prompt seam.
@@ -870,9 +888,17 @@ impl acp::Agent for NextCodeFaceAgent {
             acp::AuthMethodAgent::new(acp::AuthMethodId::new("xai.api_key"), "Next Code")
                 .description("Provider credentials owned by the next-code daemon"),
         );
+        // Seed available commands (skills) so the welcome prompt slash
+        // completions show skills immediately — stock grok-build agents
+        // include this in their InitializeResponse meta.
+        let commands = Self::load_initial_available_commands();
+        let meta = serde_json::json!({
+            "availableCommands": commands,
+        });
         Ok(acp::InitializeResponse::new(acp::ProtocolVersion::V1)
             .agent_capabilities(caps)
-            .auth_methods(vec![auth_key, crate::cli::face_auth::connect_auth_method()]))
+            .auth_methods(vec![auth_key, crate::cli::face_auth::connect_auth_method()])
+            .meta(meta.as_object().cloned().unwrap_or_default()))
     }
 
     async fn authenticate(
