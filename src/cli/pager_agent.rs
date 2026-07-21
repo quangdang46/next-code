@@ -925,7 +925,15 @@ impl acp::Agent for NextCodeFaceAgent {
                     .unwrap_or(30) as usize;
                 crate::cli::face_auth::list_nextcode_sessions(limit)
             }
-            _ => serde_json::json!({}),
+            other => {
+                if let Some(payload) =
+                    crate::cli::face_ext::handle_ext_method(other, &params).await
+                {
+                    payload
+                } else {
+                    serde_json::json!({})
+                }
+            }
         };
         let raw = serde_json::value::to_raw_value(&payload)
             .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;

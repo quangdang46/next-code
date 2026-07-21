@@ -1497,7 +1497,7 @@ impl AppView {
         let restricted = self.team_name.is_none()
             && !self.is_api_key_auth
             && is_restricted_tier(self.subscription_tier.as_deref());
-        let mut names: Vec<String> = if restricted {
+        let names: Vec<String> = if restricted {
             TIER_RESTRICTED_COMMANDS
                 .iter()
                 .map(|n| (*n).to_string())
@@ -1505,21 +1505,25 @@ impl AppView {
         } else {
             Vec::new()
         };
-        // nextcode embed: always hide xAI brand surfaces (merge, don't overwrite).
-        if crate::product_welcome::is_nextcode_embed() {
-            for name in crate::product_welcome::EMBED_BRAND_RESTRICTED_COMMANDS {
-                let s = (*name).to_string();
-                if !names.iter().any(|n| n == &s) {
-                    names.push(s);
-                }
-            }
-        }
+        // nextcode embed: brand-hide via menu_hidden + unavailable (not tier
+        // restricted — that path shows SuperGrok upsell).
+        let brand: Vec<String> = if crate::product_welcome::is_nextcode_embed() {
+            crate::product_welcome::EMBED_BRAND_RESTRICTED_COMMANDS
+                .iter()
+                .map(|n| (*n).to_string())
+                .collect()
+        } else {
+            Vec::new()
+        };
         for agent in self.agents.values_mut() {
             agent.set_restricted_commands(&names);
+            agent.set_brand_hidden_commands(&brand);
         }
         self.welcome_prompt.set_restricted_commands(&names);
+        self.welcome_prompt.set_brand_hidden_commands(&brand);
         if let Some(dashboard) = self.dashboard.as_mut() {
             dashboard.set_restricted_commands(&names);
+            dashboard.set_brand_hidden_commands(&brand);
         }
         self.tier_restricted_commands = names;
     }

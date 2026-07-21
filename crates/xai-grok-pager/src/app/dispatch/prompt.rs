@@ -391,36 +391,57 @@ pub(super) fn dispatch_send_prompt_inner(
 
     let mut effects = Vec::new();
 
-    // ── Tier-restricted command upsell ─────────────────────────────
-    // Restricted commands (`/usage`, `/imagine`, …) are hidden from the
+    // ── Tier-restricted / embed brand-hidden command gates ─────────
+    // Restricted commands (`/imagine` on free tier, …) are hidden from the
     // registry's `get()`, so a typed invocation would otherwise fall
     // through the unknown-command path below and leak to the model as a
     // raw prompt. Upsell instead; genuinely unknown commands still pass
     // through (shell/ACP commands depend on that).
+    //
+    // Embed brand-hidden commands are menu-hidden and must never SuperGrok —
+    // toast "not available in next-code" instead.
     if !literal
         && trimmed.starts_with('/')
         && let Some(invocation) = crate::slash::parse_invocation(trimmed)
-        && agent
-            .prompt
-            .slash_controller
-            .registry()
-            .is_restricted(invocation.token)
     {
-        // Only consume the composer when the upsell can actually open: with
-        // another question modal already up, `open_supergrok_upsell` would
-        // no-op and wiping the composer here would silently drop the typed
-        // text. Keep it instead so the user can resubmit after closing the
-        // modal — and never fall through to passthrough for restricted
-        // commands.
-        if agent.question_view.is_none() {
+        let reg = agent.prompt.slash_controller.registry();
+        if reg.is_brand_hidden(invocation.token) {
             if consume_input {
                 agent.prompt.set_text("");
             }
-            let opened =
-                super::billing::open_restricted_command_upsell(agent, login_method_id_from_app);
-            debug_assert!(opened, "no modal was open, so the upsell must open");
+            let token = invocation.token;
+            agent.scrollback.push_block(crate::scrollback::block::RenderBlock::system(
+                format!("/{token} is not available in next-code."),
+            ));
+            return vec![];
         }
-        return vec![];
+        if reg.is_restricted(invocation.token) {
+            // Only consume the composer when the upsell can actually open: with
+            // another question modal already up, `open_supergrok_upsell` would
+            // no-op and wiping the composer here would silently drop the typed
+            // text. Keep it instead so the user can resubmit after closing the
+            // modal — and never fall through to passthrough for restricted
+            // commands.
+            if crate::product_welcome::is_nextcode_embed() {
+                if consume_input {
+                    agent.prompt.set_text("");
+                }
+                let token = invocation.token;
+                agent.scrollback.push_block(crate::scrollback::block::RenderBlock::system(
+                    format!("/{token} is not available in next-code."),
+                ));
+                return vec![];
+            }
+            if agent.question_view.is_none() {
+                if consume_input {
+                    agent.prompt.set_text("");
+                }
+                let opened =
+                    super::billing::open_restricted_command_upsell(agent, login_method_id_from_app);
+                debug_assert!(opened, "no modal was open, so the upsell must open");
+            }
+            return vec![];
+        }
     }
 
     // ── Registry-based slash command execution ─────────────────────

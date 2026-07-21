@@ -1440,6 +1440,11 @@ impl DashboardState {
         self.peek_reply.set_restricted_commands(names);
     }
 
+    pub(crate) fn set_brand_hidden_commands(&mut self, names: &[String]) {
+        self.dispatch.set_brand_hidden_commands(names);
+        self.peek_reply.set_brand_hidden_commands(names);
+    }
+
     /// Set the dispatch feedback slot to an error `msg`, prefixed with
     /// the error glyph (`✗`, or `x` on legacy consoles). The badge
     /// (`paint_dispatch_feedback_badge`) paints the slot VERBATIM in a

@@ -263,10 +263,16 @@ pub(super) fn dispatch_show_context_info(app: &mut AppView) -> Vec<Effect> {
 /// RemoteSettings, targeted at personal-team users), skip the backend fetch and
 /// just point the user at that URL instead. This is a kill switch for the
 /// personal-team billing path while it is unreliable.
+///
+/// nextcode embed: never call xAI `FetchBilling` / credits — show connected
+/// provider usage/cost via ACP `x.ai/usage` instead (no manage→grok.com).
 pub(super) fn dispatch_show_usage(app: &mut AppView) -> Vec<Effect> {
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];
     };
+    if crate::product_welcome::is_nextcode_embed() {
+        return vec![Effect::FetchNextCodeUsage { agent_id: id }];
+    }
     if let Some(url) = app.usage_billing_redirect_url.clone() {
         if let Some(agent) = app.agents.get_mut(&id) {
             agent.scrollback.push_block(RenderBlock::System(

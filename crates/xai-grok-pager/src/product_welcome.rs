@@ -113,8 +113,9 @@ pub fn is_nextcode_embed() -> bool {
 
 /// xAI-only / brand-unsafe slash commands to hide in the nextcode embed.
 ///
-/// Applied via [`crate::slash::registry::CommandRegistry::set_restricted_commands`]
-/// (merged with subscription-tier restrictions). Canonical names, no leading `/`.
+/// Applied via [`crate::slash::registry::CommandRegistry::set_brand_hidden_commands`]
+/// (menu-hidden + unavailable — **not** tier `restricted`, so no SuperGrok upsell).
+/// Canonical names, no leading `/`.
 pub const EMBED_BRAND_RESTRICTED_COMMANDS: &[&str] = &[
     "gboom",
     "imagine",
@@ -126,6 +127,15 @@ pub const EMBED_BRAND_RESTRICTED_COMMANDS: &[&str] = &[
     "privacy",
     "share",
 ];
+
+/// True when `name` (canonical or alias token, no `/`) is on the embed brand-hide list.
+#[must_use]
+pub fn is_embed_brand_hidden_command(name: &str) -> bool {
+    let key = name.trim().trim_start_matches('/').to_lowercase();
+    EMBED_BRAND_RESTRICTED_COMMANDS
+        .iter()
+        .any(|n| *n == key)
+}
 
 /// Prefer product unseen bullets when present; otherwise keep Face/CDN bullets.
 pub fn merge_changelog_bullets(face_bullets: Vec<String>, limit: usize) -> Vec<String> {
@@ -163,7 +173,11 @@ mod embed_brand_tests {
                 EMBED_BRAND_RESTRICTED_COMMANDS.contains(&name),
                 "missing {name}"
             );
+            assert!(is_embed_brand_hidden_command(name));
+            assert!(is_embed_brand_hidden_command(&format!("/{name}")));
         }
+        assert!(!is_embed_brand_hidden_command("usage"));
+        assert!(!is_embed_brand_hidden_command("help"));
     }
 }
 

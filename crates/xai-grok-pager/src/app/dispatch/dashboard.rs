@@ -1330,14 +1330,27 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
         // path below (which would spawn a session with the raw slash text as
         // its first prompt). The dashboard has no question-modal surface, so
         // upsell via the feedback toast.
+        // Embed brand-hidden: menu-hidden + no SuperGrok — next-code toast.
+        if reg.is_brand_hidden(invocation.token) {
+            let token = invocation.token.to_string();
+            if let Some(d) = app.dashboard.as_mut() {
+                d.dispatch.set_text("");
+                d.set_error_toast(&format!("/{token} is not available in next-code"));
+            }
+            return vec![];
+        }
         if reg.is_restricted(invocation.token) {
             let token = invocation.token.to_string();
             if let Some(d) = app.dashboard.as_mut() {
                 d.dispatch.set_text("");
-                d.set_error_toast(&format!(
-                    "/{token} requires SuperGrok — upgrade at {}",
-                    super::billing::UPSELL_URL_UPGRADE
-                ));
+                if crate::product_welcome::is_nextcode_embed() {
+                    d.set_error_toast(&format!("/{token} is not available in next-code"));
+                } else {
+                    d.set_error_toast(&format!(
+                        "/{token} requires SuperGrok — upgrade at {}",
+                        super::billing::UPSELL_URL_UPGRADE
+                    ));
+                }
             }
             return vec![];
         }

@@ -3912,6 +3912,17 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchBilling { agent_id, silent } => {
+            if crate::product_welcome::is_nextcode_embed() {
+                // nextcode: no xAI credits path. Non-silent `/usage` uses
+                // FetchNextCodeUsage; silent turn-end refreshes are no-ops.
+                if !silent {
+                    let tx = acp_tx.clone();
+                    tasks.spawn(async move {
+                        let text = fetch_nextcode_usage_text(&tx).await;
+                        TaskResult::NextCodeUsageText { agent_id, text }
+                    });
+                }
+            } else {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -3966,6 +3977,14 @@ pub(crate) fn execute(
                         autotopup,
                     }
                 });
+            }
+        }
+        Effect::FetchNextCodeUsage { agent_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let text = fetch_nextcode_usage_text(&tx).await;
+                TaskResult::NextCodeUsageText { agent_id, text }
+            });
         }
         Effect::RefreshGate => {
             tasks
@@ -4007,6 +4026,9 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchAppBilling => {
+            if crate::product_welcome::is_nextcode_embed() {
+                // no welcome-screen xAI credit warning in nextcode
+            } else {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -4060,6 +4082,7 @@ pub(crate) fn execute(
                         }
                     }
                 });
+            }
         }
         Effect::DebounceSuggestions { agent_id, generation } => {
             tasks
@@ -4170,6 +4193,30 @@ pub(crate) fn execute(
     (false, meta)
 }
 /// Fetch session info from ACP via `x.ai/session/info`.
+/// Ask the next-code ACP agent for a plain-text usage/cost summary.
+async fn fetch_nextcode_usage_text(tx: &AcpAgentTx) -> String {
+    let req = acp::ExtRequest::new(
+        "x.ai/usage",
+        serde_json::value::to_raw_value(&serde_json::json!({}))
+            .expect("serialize usage params")
+            .into(),
+    );
+    match acp_send(req, tx).await {
+        Ok(resp) => {
+            let wrapper: serde_json::Value =
+                serde_json::from_str(resp.0.get()).unwrap_or_default();
+            wrapper
+                .get("result")
+                .and_then(|r| r.get("text"))
+                .and_then(|t| t.as_str())
+                .or_else(|| wrapper.get("text").and_then(|t| t.as_str()))
+                .unwrap_or("No usage data available.")
+                .to_string()
+        }
+        Err(e) => format!("Could not load usage: {}", sanitize_user_error(&format!("{e}"))),
+    }
+}
+
 async fn fetch_session_info(
     session_id: &acp::SessionId,
     tx: &AcpAgentTx,

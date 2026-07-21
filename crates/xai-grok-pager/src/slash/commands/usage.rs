@@ -23,11 +23,19 @@ impl SlashCommand for UsageCommand {
     }
 
     fn description(&self) -> &str {
-        "View credit usage or manage billing"
+        if crate::product_welcome::is_nextcode_embed() {
+            "View connected provider usage / cost"
+        } else {
+            "View credit usage or manage billing"
+        }
     }
 
     fn usage(&self) -> &str {
-        "/usage [show|manage]"
+        if crate::product_welcome::is_nextcode_embed() {
+            "/usage [show]"
+        } else {
+            "/usage [show|manage]"
+        }
     }
 
     fn takes_args(&self) -> bool {
