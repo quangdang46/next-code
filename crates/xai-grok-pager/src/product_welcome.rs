@@ -124,6 +124,7 @@ pub const EMBED_BRAND_RESTRICTED_COMMANDS: &[&str] = &[
     "plugins",
     "hooks",
     "privacy",
+    "share",
 ];
 
 /// Prefer product unseen bullets when present; otherwise keep Face/CDN bullets.
@@ -156,6 +157,7 @@ mod embed_brand_tests {
             "plugins",
             "hooks",
             "privacy",
+            "share",
         ] {
             assert!(
                 EMBED_BRAND_RESTRICTED_COMMANDS.contains(&name),

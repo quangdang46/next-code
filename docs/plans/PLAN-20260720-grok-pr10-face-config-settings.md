@@ -44,18 +44,18 @@
 ## Implementation notes (2026-07-21)
 
 ### Landed
-1. **Brand restrict:** `product_welcome::EMBED_BRAND_RESTRICTED_COMMANDS` merged in `AppView::apply_tier_restrictions` when `is_nextcode_embed()`.
-2. **URL gates:** `/usage manage` and `/docs web` refuse xAI URLs in embed.
-3. **Config persist:** `load_effective_config_disk_only` + shell `set_*` write `[ui].*` (ThemeKind ids) and `[provider].default_model` under `~/.next-code/config.toml` via toml_edit (preserves siblings). `collapsed_edit_blocks` resolve reads disk then defaults **true**.
+1. **Brand restrict:** `product_welcome::EMBED_BRAND_RESTRICTED_COMMANDS` merged in `AppView::apply_tier_restrictions` when `is_nextcode_embed()` — includes `share`.
+2. **URL gates:** `/usage manage` and `/docs web` refuse xAI URLs in embed; SuperGrok / share gated.
+3. **Config persist:** `load_effective_config_disk_only` + shell `set_*` write `[ui].*` (ThemeKind ids) and `[provider].default_model` under `~/.next-code/config.toml` via toml_edit. `update_config` persists `[ui].permission_mode`.
 4. **`/model`:** catalog already via `pager_agent` ACP History; default model setting persists to `[provider].default_model`.
-5. **`/connect` + `/login`:** Face `suggest_args` from `tui_login_providers()`; embed `/login` remapped away from Grok OAuth; credential write still via `next-code login <provider>` (partial).
-6. **Skills:** `AvailableCommandsUpdate` with path/scope meta; `$skill` / Face `/skill` expand via `system_reminder` in `pager_agent`.
-7. **Alias hazards documented:** `/clear`≡`/new`, `/log`≡transcript (Face meanings).
+5. **`/connect` + `/login`:** Face `suggest_args` + `Action::NextCodeConnect` → Face welcome auth paste/URL flow; ACP `authenticate` / `x.ai/auth/get_url` / `submit_code` write credentials under `~/.next-code` (no CLI handoff).
+6. **Skills:** `x.ai/skills/list` returns next-code skills; `$skill` / Face `/skill` expand via `system_reminder` in `pager_agent`.
+7. **Sessions:** `x.ai/session/list` lists `~/.next-code/sessions` for Face `/resume`.
+8. **Alias hazards:** `/clear`≡`/new`, `/log`≡transcript — Face meanings, documented in command descriptions.
 
-### Deferred
-- Full interactive OAuth/API-key capture **inside** Face (no Grok OAuth; CLI completes write).
+### Deferred (out of A/B/C)
 - Port swarm/overnight/selfdev slash set.
-- Remap Face `/sessions` vs next-code resume alias beyond docs.
+- Full multi-account `/account` center.
 
 ## Manual verify
 1. Theme survive restart (`[ui].theme` in `~/.next-code/config.toml`).

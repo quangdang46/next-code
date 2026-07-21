@@ -881,6 +881,37 @@ fn login_openai_compatible_flow(
 
 pub use crate::secret_input::read_secret_line;
 
+/// Face embed: begin scriptable OAuth/device login and return the auth URL
+/// (pending state is saved under ~/.next-code; no stdout print).
+pub struct FaceScriptableStart {
+    pub auth_url: String,
+    pub complete_only: bool,
+}
+
+pub async fn face_begin_scriptable(
+    provider: LoginProviderDescriptor,
+) -> Result<FaceScriptableStart> {
+    let options = LoginOptions {
+        print_auth_url: true,
+        ..Default::default()
+    };
+    let prepared = scriptable::prepare_scriptable_login(provider, None, &options).await?;
+    Ok(FaceScriptableStart {
+        auth_url: prepared.auth_url,
+        complete_only: prepared.complete_only,
+    })
+}
+
+/// Face embed: finish a pending scriptable login with pasted code/URL or `--complete`.
+pub async fn face_complete_scriptable(
+    provider: LoginProviderDescriptor,
+    options: LoginOptions,
+) -> Result<()> {
+    let input = options.resolve_provided_input()?;
+    let _ = scriptable::complete_scriptable_login(provider, None, &options, input).await?;
+    Ok(())
+}
+
 fn read_line_trimmed(prompt: &str) -> Result<String> {
     print!("{}", prompt);
     io::stdout().flush()?;

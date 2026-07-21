@@ -20,6 +20,10 @@ use crate::scrollback::block::RenderBlock;
 /// Produces Effect::ShareSession which spawns an async ACP ext request.
 /// On completion, TaskResult::ShareSessionComplete shows the URL in scrollback.
 pub(super) fn dispatch_share_session(app: &mut AppView) -> Vec<Effect> {
+    if crate::product_welcome::is_nextcode_embed() {
+        app.show_toast("Session sharing is not available in next-code");
+        return vec![];
+    }
     if !app.sharing_enabled {
         app.show_toast("Sharing is disabled");
         return vec![];

@@ -1,9 +1,10 @@
 //! `/connect` — next-code multi-provider login (Face chrome).
 //!
-//! Uses Face `suggest_args` dropdown with `tui_login_providers()`. Does **not**
-//! start Grok OAuth. Full interactive auth UI in Face is a follow-up; this
-//! slice wires the picker + clear next-step instructions (CLI `next-code login`).
+//! Uses Face `suggest_args` dropdown with `tui_login_providers()`, then starts
+//! the Face welcome auth paste/URL flow (credential write to `~/.next-code`).
+//! Does **not** start Grok OAuth and does **not** hand off to a CLI terminal.
 
+use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
 pub struct ConnectCommand;
@@ -14,8 +15,6 @@ impl SlashCommand for ConnectCommand {
     }
 
     fn aliases(&self) -> &[&str] {
-        // `/login` stays registered separately so help/branding stay clear;
-        // both share the same provider picker semantics in the nextcode embed.
         &[]
     }
 
@@ -63,10 +62,8 @@ pub(crate) fn connect_run(args: &str) -> CommandResult {
              {list}\n\
              \n\
              Then run: /connect <provider>\n\
-             Or in a terminal: next-code login <provider>\n\
-             \n\
-             Note: interactive OAuth/API-key capture inside Face is partial in PR10 — \
-             CLI login completes the credential write to ~/.next-code."
+             Face opens the auth URL / paste box — credentials save under ~/.next-code \
+             (not Grok OAuth)."
         ));
     }
 
@@ -74,24 +71,13 @@ pub(crate) fn connect_run(args: &str) -> CommandResult {
         || next_code_provider_metadata::resolve_login_provider_loose(trimmed),
     ) else {
         return CommandResult::Error(format!(
-            "Unknown provider {trimmed:?}. Try /connect and pick from the dropdown, or `next-code login --help`."
+            "Unknown provider {trimmed:?}. Try /connect and pick from the dropdown."
         ));
     };
 
-    CommandResult::Message(format!(
-        "Provider: {} ({})\n\
-         Auth: {}\n\
-         \n\
-         Complete login in a terminal (writes credentials under ~/.next-code):\n\
-           next-code login {}\n\
-         \n\
-         Then restart or continue this session — Face uses the next-code daemon auth store \
-         (not Grok OAuth).",
-        provider.display_name,
-        provider.id,
-        provider.auth_kind.label(),
-        provider.id,
-    ))
+    CommandResult::Action(Action::NextCodeConnect {
+        provider: provider.id.to_string(),
+    })
 }
 
 fn provider_arg_items() -> Vec<ArgItem> {
@@ -143,12 +129,9 @@ mod tests {
         let mut ctx = make_ctx(&models);
         match ConnectCommand.run(&mut ctx, "") {
             CommandResult::Message(msg) => {
-                assert!(msg.contains("next-code login"), "{msg}");
-                assert!(
-                    !msg.to_lowercase().contains("grok oauth")
-                        || msg.contains("not Grok OAuth"),
-                    "{msg}"
-                );
+                assert!(msg.contains("/connect <provider>"), "{msg}");
+                assert!(!msg.contains("next-code login"), "{msg}");
+                assert!(msg.contains("not Grok OAuth"), "{msg}");
             }
             other => panic!("expected Message, got {other:?}"),
         }
@@ -170,17 +153,16 @@ mod tests {
     }
 
     #[test]
-    fn known_provider_message() {
+    fn known_provider_dispatches_face_login() {
         let models = ModelState::default();
         let mut ctx = make_ctx(&models);
         let providers = next_code_provider_metadata::tui_login_providers();
         let id = providers.first().expect("catalog").id;
         match ConnectCommand.run(&mut ctx, id) {
-            CommandResult::Message(msg) => {
-                assert!(msg.contains(id), "{msg}");
-                assert!(msg.contains("next-code login"), "{msg}");
+            CommandResult::Action(Action::NextCodeConnect { provider }) => {
+                assert_eq!(provider, id);
             }
-            other => panic!("expected Message, got {other:?}"),
+            other => panic!("expected NextCodeConnect, got {other:?}"),
         }
     }
 }

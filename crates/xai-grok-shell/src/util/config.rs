@@ -1064,6 +1064,10 @@ pub async fn update_config(
 ) -> anyhow::Result<()> {
     let mut cfg = crate::agent::config::Config::default();
     f(&mut cfg);
+    // Face PersistPermissionMode writes through this path.
+    if let Some(ref mode) = cfg.ui.permission_mode {
+        set_ui_key("permission_mode", mode.clone()).await?;
+    }
     Ok(())
 }
 pub fn user_config_path() -> PathBuf {

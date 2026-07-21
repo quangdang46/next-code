@@ -5,7 +5,7 @@
 - **What is going on:** Face has a rich builtin registry (`builtin_commands()` ≈ 60 entries) with arg-suggest dropdowns (`suggest_args`), settings modal, model/theme pickers. next-code TUI has a larger product command set (`REGISTERED_COMMANDS` ≈ 90+ public) including multi-provider `/connect`/`/account`, swarm/overnight/selfdev, etc. PR10 already decided: **keep Face UI**, **wire** config/`set_*`, **hide/remap** xAI-only slash and grok.com links.
 - **We recommend:** Treat Face slash palette + arg dropdowns as the presentation layer. For PR10: (1) restrict/hide xAI-only commands via existing `CommandRegistry::set_restricted_commands`, (2) wire shared commands (`/model`, `/theme`, `/settings`, `/login`) to next-code config/auth, (3) add a Face-chrome `/connect` (or remap `/login` args) that reuses Face picker patterns with next-code provider catalog — do **not** resurrect old TUI chrome. Defer bulk next-code-only ports (swarm, overnight, …) past PR10 unless they already have ACP/daemon hooks.
 - **Risk:** Medium (auth remap + alias collisions: Face `/sessions`→dashboard vs next-code `/sessions`→resume; Face `/log`→transcript vs next-code `/log` mark).
-- **Status:** **Implemented (PR10 slash restrict + wire slice)** — 2026-07-21. Full next-code-only port list still deferred.
+- **Status:** **Implemented (A/B/C for PR #49 / issue #50)** — 2026-07-21. Swarm/overnight/selfdev still out of scope.
 
 ## Implementation notes (2026-07-21)
 

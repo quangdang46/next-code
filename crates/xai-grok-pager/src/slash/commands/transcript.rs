@@ -21,11 +21,13 @@ impl SlashCommand for TranscriptCommand {
     }
 
     fn aliases(&self) -> &[&str] {
+        // Face `/log` ≡ transcript. Legacy next-code TUI `/log` was a mark —
+        // embed keeps Face meaning (nextcode-safe).
         &["log"]
     }
 
     fn description(&self) -> &str {
-        "View the full conversation transcript in your pager ($PAGER)"
+        "View conversation transcript in $PAGER (alias: /log)"
     }
 
     fn session_scoped(&self) -> bool {

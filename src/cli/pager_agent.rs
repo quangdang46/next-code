@@ -863,23 +863,73 @@ impl acp::Agent for NextCodeFaceAgent {
         _args: acp::InitializeRequest,
     ) -> acp::Result<acp::InitializeResponse> {
         // Face treats empty authMethods as fail-closed → Grok login screen.
-        // Advertise a non-interactive method so the pager skips Grok OAuth;
-        // real provider login stays on next-code (serve bootstrap / `next-code login`).
+        // Advertise non-interactive next-code credentials first (eager skip),
+        // plus interactive `nextcode.connect` for welcome /login button.
         let caps = acp::AgentCapabilities::default().load_session(true);
-        let auth = acp::AuthMethod::Agent(
+        let auth_key = acp::AuthMethod::Agent(
             acp::AuthMethodAgent::new(acp::AuthMethodId::new("xai.api_key"), "Next Code")
                 .description("Provider credentials owned by the next-code daemon"),
         );
         Ok(acp::InitializeResponse::new(acp::ProtocolVersion::V1)
             .agent_capabilities(caps)
-            .auth_methods(vec![auth]))
+            .auth_methods(vec![auth_key, crate::cli::face_auth::connect_auth_method()]))
     }
 
     async fn authenticate(
         &self,
-        _args: acp::AuthenticateRequest,
+        args: acp::AuthenticateRequest,
     ) -> acp::Result<acp::AuthenticateResponse> {
-        Ok(acp::AuthenticateResponse::new())
+        let method_id = args.method_id.0.as_ref();
+        match crate::cli::face_auth::authenticate_method(method_id).await {
+            Ok(()) => Ok(acp::AuthenticateResponse::new()),
+            Err(err) => Err(acp::Error::internal_error().data(err.to_string())),
+        }
+    }
+
+    async fn logout(&self, _args: acp::LogoutRequest) -> acp::Result<acp::LogoutResponse> {
+        crate::cli::face_auth::clear_pending();
+        crate::auth::AuthStatus::invalidate_cache();
+        Ok(acp::LogoutResponse::new())
+    }
+
+    async fn ext_method(&self, args: acp::ExtRequest) -> acp::Result<acp::ExtResponse> {
+        let method = args.method.as_ref();
+        let params: serde_json::Value =
+            serde_json::from_str(args.params.get()).unwrap_or(serde_json::Value::Null);
+        let payload = match method {
+            "x.ai/auth/get_url" => crate::cli::face_auth::get_auth_url_payload(),
+            "x.ai/auth/submit_code" => {
+                let code = params
+                    .get("code")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                match crate::cli::face_auth::submit_auth_code(code).await {
+                    Ok(()) => serde_json::json!({ "ok": true }),
+                    Err(err) => {
+                        return Err(acp::Error::internal_error().data(err.to_string()));
+                    }
+                }
+            }
+            "x.ai/skills/list" | "x.ai/skills/toggle" | "x.ai/skills/refresh-baseline" => {
+                let cwd = params
+                    .get("cwd")
+                    .and_then(|v| v.as_str())
+                    .map(std::path::PathBuf::from);
+                // Toggle is a no-op for next-code skills (always enabled); return list.
+                crate::cli::face_auth::list_nextcode_skills(cwd.as_deref())
+            }
+            "x.ai/session/list" => {
+                let limit = params
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(30) as usize;
+                crate::cli::face_auth::list_nextcode_sessions(limit)
+            }
+            _ => serde_json::json!({}),
+        };
+        let raw = serde_json::value::to_raw_value(&payload)
+            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+        Ok(acp::ExtResponse::new(raw.into()))
     }
 
     async fn new_session(

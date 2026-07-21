@@ -90,7 +90,11 @@ impl SlashCommand for SkillsCommand {
     }
 
     fn description(&self) -> &str {
-        "View skills"
+        if crate::product_welcome::is_nextcode_embed() {
+            "View next-code skills"
+        } else {
+            "View skills"
+        }
     }
 
     fn usage(&self) -> &str {

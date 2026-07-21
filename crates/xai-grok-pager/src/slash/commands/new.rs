@@ -17,11 +17,13 @@ impl SlashCommand for NewCommand {
     }
 
     fn aliases(&self) -> &[&str] {
+        // Face `/clear` ≡ `/new` (fresh session). Legacy next-code TUI `/clear`
+        // meant clear-history — embed keeps Face meaning (nextcode-safe).
         &["clear"]
     }
 
     fn description(&self) -> &str {
-        "Start a new session"
+        "Start a new session (alias: /clear)"
     }
 
     fn usage(&self) -> &str {

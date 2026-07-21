@@ -1053,6 +1053,14 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             vec![]
         }
         Action::Login => dispatch_login(app),
+        Action::NextCodeConnect { provider } => {
+            app.login_method_id = Some(agent_client_protocol::AuthMethodId::new(format!(
+                "nextcode.{provider}"
+            )));
+            app.login_label = Some(provider);
+            app.auth_start_mode = crate::app::app_view::AuthMode::Pending;
+            dispatch_login(app)
+        }
         Action::CancelLogin => dispatch_cancel_login(app),
         Action::SubmitAuthCode(code) => dispatch_submit_auth_code(app, code),
         Action::CopyAuthUrl => {
