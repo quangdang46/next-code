@@ -944,6 +944,102 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "info_float.model_info" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.model_info", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_model_info(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.context_usage" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.context_usage", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_context_usage(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.kv_cache" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.kv_cache", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_kv_cache(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.memory_activity" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.memory_activity", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_memory_activity(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.usage_limits" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.usage_limits", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_usage_limits(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.git_status" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.git_status", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_git_status(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.background_tasks" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.background_tasks", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_background_tasks(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.compaction" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.compaction", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_compaction(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.swarm_status" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.swarm_status", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_swarm_status(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.todos" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.todos", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_todos(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.workspace_map" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.workspace_map", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_workspace_map(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.diagrams" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.diagrams", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_diagrams(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "scroll_lines" => {
             let SettingValue::Int(i) = value else {
                 return Err(kind_mismatch("scroll_lines", "Int", &value));

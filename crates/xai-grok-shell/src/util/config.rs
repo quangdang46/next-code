@@ -974,6 +974,43 @@ pub async fn set_contextual_hint_undo(v: impl serde::Serialize) -> anyhow::Resul
 pub async fn set_contextual_hint_word_select(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_nested("contextual_hints", "word_select", v).await
 }
+// Info float visibility helpers
+pub async fn set_info_float_model_info(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "model_info", v).await
+}
+pub async fn set_info_float_context_usage(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "context_usage", v).await
+}
+pub async fn set_info_float_kv_cache(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "kv_cache", v).await
+}
+pub async fn set_info_float_memory_activity(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "memory_activity", v).await
+}
+pub async fn set_info_float_usage_limits(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "usage_limits", v).await
+}
+pub async fn set_info_float_git_status(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "git_status", v).await
+}
+pub async fn set_info_float_background_tasks(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "background_tasks", v).await
+}
+pub async fn set_info_float_compaction(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "compaction", v).await
+}
+pub async fn set_info_float_swarm_status(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "swarm_status", v).await
+}
+pub async fn set_info_float_todos(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "todos", v).await
+}
+pub async fn set_info_float_workspace_map(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "workspace_map", v).await
+}
+pub async fn set_info_float_diagrams(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("info_floats", "diagrams", v).await
+}
 pub async fn set_default_model(v: impl serde::Serialize) -> anyhow::Result<()> {
     // Shared with next-code brain: `[provider].default_model`
     let value = serialize_to_toml_value(v)?;

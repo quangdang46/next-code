@@ -315,6 +315,8 @@ pub fn list_nextcode_skills(cwd: Option<&std::path::Path>) -> serde_json::Value 
                 "user_invocable": true,
                 "disable_model_invocation": false,
                 "has_user_specified_description": false,
+                // Scope is sent as SkillScope::User / SkillScope::Repo,
+                // matching the xai-grok-tools SkillInfo enum serialization.
             })
         })
         .collect();

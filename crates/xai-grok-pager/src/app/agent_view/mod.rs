@@ -840,6 +840,9 @@ pub struct AgentView {
     pub info_float_git: Option<crate::views::info_floats::GitInfo>,
     /// Compaction float card (AutoCompact* session updates).
     pub info_float_compaction: Option<crate::views::info_floats::CompactionInfo>,
+    /// Per-float-kind visibility flags, synced from `AppView::current_ui.info_floats`
+    /// before every draw call. Default all-true.
+    pub info_float_visibility: crate::views::info_floats::InfoFloatVisibility,
     /// Gateway light-frontend session (`kind: "chat"` / `--chat` / conversation
     /// resume). Suppresses Build credits / local sampler context telemetry so the
     /// status bar and prompt never imply remote usage from wrong metrics.

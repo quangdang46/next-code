@@ -6,13 +6,14 @@ use super::setters::{
     set_compact_mode, set_compact_mode_inner, set_contextual_hint_inner, set_default_model_inner,
     set_default_selected_permission_inner, set_display_refresh_auto_cadence_inner,
     set_fork_secondary_model_inner, set_group_tool_verbs_inner, set_hunk_tracker_mode_inner,
-    set_invert_scroll_inner, set_keep_text_selection_inner, set_max_thoughts_width_inner,
-    set_multiline_mode, set_page_flip_on_send_inner, set_prompt_suggestions_inner,
-    set_remember_tool_approvals_inner, set_render_mermaid_inner, set_respect_manual_folds_inner,
-    set_screen_mode_inner, set_scroll_lines_inner, set_scroll_mode_inner, set_scroll_speed_inner,
-    set_show_thinking_blocks_inner, set_show_tips_inner, set_simple_mode_inner, set_theme_inner,
-    set_timeline_inner, set_timestamps, set_timestamps_inner, set_vim_mode_inner,
-    set_voice_capture_mode_inner, set_voice_stt_language_inner,
+    set_info_float_inner, set_invert_scroll_inner, set_keep_text_selection_inner,
+    set_max_thoughts_width_inner, set_multiline_mode, set_page_flip_on_send_inner,
+    set_prompt_suggestions_inner, set_remember_tool_approvals_inner, set_render_mermaid_inner,
+    set_respect_manual_folds_inner, set_screen_mode_inner, set_scroll_lines_inner,
+    set_scroll_mode_inner, set_scroll_speed_inner, set_show_thinking_blocks_inner,
+    set_show_tips_inner, set_simple_mode_inner, set_theme_inner, set_timeline_inner,
+    set_timestamps, set_timestamps_inner, set_vim_mode_inner, set_voice_capture_mode_inner,
+    set_voice_stt_language_inner,
 };
 use crate::app::actions::{Action, Effect};
 use crate::app::app_view::{ActiveView, AppView};
@@ -709,6 +710,19 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("contextual_hints.ssh_wrap", SettingValue::Bool(b)) => {
             Some(Action::SetContextualHintSshWrap(*b))
         }
+        // Info float toggles — direct bool reset.
+        ("info_float.model_info", SettingValue::Bool(b)) => Some(Action::SetShowFloatModelInfo(*b)),
+        ("info_float.context_usage", SettingValue::Bool(b)) => Some(Action::SetShowFloatContextUsage(*b)),
+        ("info_float.kv_cache", SettingValue::Bool(b)) => Some(Action::SetShowFloatKvCache(*b)),
+        ("info_float.memory_activity", SettingValue::Bool(b)) => Some(Action::SetShowFloatMemoryActivity(*b)),
+        ("info_float.usage_limits", SettingValue::Bool(b)) => Some(Action::SetShowFloatUsageLimits(*b)),
+        ("info_float.git_status", SettingValue::Bool(b)) => Some(Action::SetShowFloatGitStatus(*b)),
+        ("info_float.background_tasks", SettingValue::Bool(b)) => Some(Action::SetShowFloatBackgroundTasks(*b)),
+        ("info_float.compaction", SettingValue::Bool(b)) => Some(Action::SetShowFloatCompaction(*b)),
+        ("info_float.swarm_status", SettingValue::Bool(b)) => Some(Action::SetShowFloatSwarmStatus(*b)),
+        ("info_float.todos", SettingValue::Bool(b)) => Some(Action::SetShowFloatTodos(*b)),
+        ("info_float.workspace_map", SettingValue::Bool(b)) => Some(Action::SetShowFloatWorkspaceMap(*b)),
+        ("info_float.diagrams", SettingValue::Bool(b)) => Some(Action::SetShowFloatDiagrams(*b)),
         ("multiline_mode", SettingValue::Bool(b)) => Some(Action::SetMultilineMode(*b)),
         ("render_mermaid", SettingValue::Enum(s)) => {
             crate::appearance::RenderMermaid::from_canonical(s).map(Action::SetRenderMermaid)
@@ -900,6 +914,43 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         }
         ("contextual_hints.ssh_wrap", SettingValue::Bool(b)) => {
             set_contextual_hint_inner(app, |h, v| h.ssh_wrap = v, *b)
+        }
+        // Info float rollback — direct inner mutation.
+        ("info_float.model_info", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.model_info = v, *b)
+        }
+        ("info_float.context_usage", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.context_usage = v, *b)
+        }
+        ("info_float.kv_cache", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.kv_cache = v, *b)
+        }
+        ("info_float.memory_activity", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.memory_activity = v, *b)
+        }
+        ("info_float.usage_limits", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.usage_limits = v, *b)
+        }
+        ("info_float.git_status", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.git_status = v, *b)
+        }
+        ("info_float.background_tasks", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.background_tasks = v, *b)
+        }
+        ("info_float.compaction", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.compaction = v, *b)
+        }
+        ("info_float.swarm_status", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.swarm_status = v, *b)
+        }
+        ("info_float.todos", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.todos = v, *b)
+        }
+        ("info_float.workspace_map", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.workspace_map = v, *b)
+        }
+        ("info_float.diagrams", SettingValue::Bool(b)) => {
+            set_info_float_inner(app, |f, v| f.diagrams = v, *b)
         }
         ("respect_manual_folds", SettingValue::Bool(b)) => set_respect_manual_folds_inner(app, *b),
         ("theme", SettingValue::Enum(s)) => set_theme_inner(app, s),
