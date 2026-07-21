@@ -7,6 +7,7 @@ pub mod dispatch;
 pub mod hot_exec;
 pub mod login;
 pub mod output;
+pub mod face_welcome_status;
 pub mod pager_agent;
 pub mod pager_launch;
 pub mod proctitle;

@@ -1265,7 +1265,7 @@ impl AppView {
             announcements_last_gen: 0,
             announcement: None,
             changelog_markdown: None,
-            changelog_bullets: Vec::new(),
+            changelog_bullets: crate::product_welcome::merge_changelog_bullets(Vec::new(), 3),
             tips: Vec::new(),
             tip: None,
             welcome_prompt,
@@ -3936,7 +3936,14 @@ impl AppView {
                         } else {
                             self.tip.as_deref()
                         };
-                        let model_name_base = self.models.current_model_name().unwrap_or_default();
+                        let model_name_base = self
+                            .models
+                            .current_model_name()
+                            .or_else(|| {
+                                crate::product_welcome::product_welcome_status()
+                                    .and_then(|s| s.model_line.clone())
+                            })
+                            .unwrap_or_default();
                         let model_name = match self.models.reasoning_effort {
                             Some(eff) => format!("{model_name_base} ({eff})"),
                             None => model_name_base,

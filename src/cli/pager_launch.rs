@@ -28,6 +28,11 @@ pub(crate) async fn run_face_pager(
     _startup_hints: Option<setup_hints::StartupHints>,
     remote_working_dir: Option<String>,
 ) -> Result<()> {
+    super::face_welcome_status::install_face_welcome_status(
+        resume_session.as_deref(),
+        remote_working_dir.as_deref(),
+    );
+
     // Force direct in-process ACP spawn so our factory is used (not grok leader).
     let mut pager_args = xai_grok_pager::app::PagerArgs::try_parse_from(["grok"])
         .map_err(|e| anyhow::anyhow!("failed to build Face pager args: {e}"))?;

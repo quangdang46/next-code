@@ -36,6 +36,119 @@ fn welcome_in_vscode_family() -> bool {
     crate::terminal::terminal_context().brand.is_vscode_family()
 }
 
+/// Dim product status strip — legacy splash field order (badge → animals →
+/// model → built → auth → Updates → mcp → skills → sessions).
+fn render_product_status_strip(
+    area: Rect,
+    buf: &mut Buffer,
+    theme: &Theme,
+    lines: &[crate::product_welcome::ChromeLine],
+    content_width: u16,
+) -> u16 {
+    use crate::product_welcome::ChromeLine;
+
+    if lines.is_empty() || area.height == 0 {
+        return 0;
+    }
+    let [_, centered, _] = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(content_width.min(area.width)),
+        Constraint::Min(0),
+    ])
+    .flex(Flex::Center)
+    .areas(area);
+
+    let dim = Style::default().fg(theme.gray);
+    let warm = Style::default().fg(ratatui::style::Color::Rgb(255, 200, 100));
+    // Legacy TUI model accent (pink, bold).
+    let model_pink = Style::default()
+        .fg(ratatui::style::Color::Rgb(255, 150, 200))
+        .add_modifier(Modifier::BOLD);
+
+    let mut used = 0u16;
+    let mut y = centered.y;
+
+    let paint_centered = |buf: &mut Buffer, y: u16, spans: Vec<Span<'static>>| {
+        if y >= centered.y.saturating_add(centered.height) {
+            return;
+        }
+        let row = Rect {
+            x: centered.x,
+            y,
+            width: centered.width,
+            height: 1,
+        };
+        Paragraph::new(Line::from(spans).alignment(Alignment::Center)).render(row, buf);
+    };
+
+    for line in lines {
+        if used >= area.height {
+            break;
+        }
+        match line {
+            ChromeLine::Dim(text) => {
+                paint_centered(buf, y, vec![Span::styled(text.clone(), dim)]);
+                y = y.saturating_add(1);
+                used = used.saturating_add(1);
+            }
+            ChromeLine::Emphasize(text) => {
+                paint_centered(buf, y, vec![Span::styled(text.clone(), warm)]);
+                y = y.saturating_add(1);
+                used = used.saturating_add(1);
+            }
+            ChromeLine::Model {
+                prefix,
+                model,
+                suffix,
+            } => {
+                let mut spans = Vec::new();
+                if !prefix.is_empty() {
+                    spans.push(Span::styled(prefix.clone(), dim));
+                }
+                spans.push(Span::styled(model.clone(), model_pink));
+                if !suffix.is_empty() {
+                    spans.push(Span::styled(suffix.clone(), dim));
+                }
+                paint_centered(buf, y, spans);
+                y = y.saturating_add(1);
+                used = used.saturating_add(1);
+            }
+            ChromeLine::Auth(entries) => {
+                let mut spans = Vec::new();
+                for (i, entry) in entries.iter().enumerate() {
+                    if i > 0 {
+                        spans.push(Span::styled(" ", dim));
+                    }
+                    let (r, g, b) = entry.state.rgb();
+                    spans.push(Span::styled(
+                        entry.state.glyph().to_string(),
+                        Style::default().fg(ratatui::style::Color::Rgb(r, g, b)),
+                    ));
+                    spans.push(Span::styled(format!(" {} ", entry.label), dim));
+                }
+                paint_centered(buf, y, spans);
+                y = y.saturating_add(1);
+                used = used.saturating_add(1);
+            }
+            ChromeLine::Updates { title, bullets } => {
+                let box_w = (centered.width as usize).clamp(24, 56);
+                let boxed = crate::product_welcome::format_updates_box_lines(bullets, box_w);
+                // Ensure title string is used even if box formatter changes.
+                let _ = title;
+                for row_text in boxed {
+                    if used >= area.height {
+                        break;
+                    }
+                    paint_centered(buf, y, vec![Span::styled(row_text, dim)]);
+                    y = y.saturating_add(1);
+                    used = used.saturating_add(1);
+                }
+            }
+        }
+    }
+    used
+}
+
 /// Build the quit hint spans used in Authenticating sub-screens.
 fn quit_hint_spans(theme: &Theme) -> Vec<Span<'static>> {
     let key = if welcome_in_vscode_family() {
@@ -453,6 +566,15 @@ pub(super) fn render_version_badge(
                     .fg(theme.text_primary)
                     .add_modifier(Modifier::BOLD),
             ));
+            if let Some(age) = crate::product_welcome::product_welcome_status()
+                .and_then(|s| s.build_age.as_deref())
+                .filter(|a| !a.is_empty())
+            {
+                spans.push(Span::styled(
+                    format!(" · built {age}"),
+                    Style::default().fg(theme.gray),
+                ));
+            }
         }
         VersionBadgeMode::HeroFooter => {
             let channel_display = if channel.is_empty() {
@@ -476,6 +598,15 @@ pub(super) fn render_version_badge(
                 xai_grok_version::VERSION,
                 Style::default().fg(theme.gray),
             ));
+            if let Some(age) = crate::product_welcome::product_welcome_status()
+                .and_then(|s| s.build_age.as_deref())
+                .filter(|a| !a.is_empty())
+            {
+                spans.push(Span::styled(
+                    format!(" · built {age}"),
+                    Style::default().fg(theme.gray),
+                ));
+            }
         }
     }
 
@@ -1564,7 +1695,7 @@ fn render_changelog_section(
             .fg(theme.gray_bright)
             .add_modifier(Modifier::DIM),
     );
-    let title = "Changelog";
+    let title = crate::product_welcome::updates_section_title();
     buf.set_span(
         centered.x,
         centered.y,
@@ -1705,7 +1836,7 @@ fn render_welcome_done(
     });
     let has_update_tip = p.pending_update_version.is_some();
     let has_resume_tip = !has_update_tip && p.foreign_resume_hint.is_some();
-    let tip_height = if !show_picker {
+    let tip_only_height = if !show_picker {
         if has_update_tip || has_resume_tip {
             1u16 // update/resume tips are short, always 1 row
         } else if let Some(tip_text) = p.tip {
@@ -1718,7 +1849,23 @@ fn render_welcome_done(
     } else {
         0
     };
-    let changelog_height = if p.has_access && !show_picker && !p.changelog_bullets.is_empty() {
+    // Product status: prefer legacy field presence; only trim on tiny terminals.
+    let status_budget = crate::product_welcome::status_line_budget(
+        content_area.height,
+        welcome_compact || show_picker,
+    );
+    let status_lines = crate::product_welcome::product_welcome_status()
+        .map(|s| s.chrome_lines(status_budget))
+        .unwrap_or_default();
+    let status_h = crate::product_welcome::ProductWelcomeStatus::chrome_row_count(&status_lines);
+    let tip_height = tip_only_height.saturating_add(status_h);
+    // Product Updates box lives in the chrome strip (legacy secondary header).
+    // Skip Face hero changelog when those bullets are already shown there.
+    let product_updates_in_chrome = crate::product_welcome::product_welcome_status()
+        .is_some_and(|s| !s.update_bullets.is_empty() && status_budget > 0);
+    let changelog_height = if product_updates_in_chrome {
+        0
+    } else if p.has_access && !show_picker && !p.changelog_bullets.is_empty() {
         2 + p.changelog_bullets.len() as u16
     } else {
         0
@@ -2020,12 +2167,38 @@ fn render_welcome_done(
         );
         (None, None)
     } else {
+        // Product status strip occupies the top of the tip slot; tip/update
+        // content uses the remaining rows below.
+        let status_used = if layout.tip.height > 0 && !status_lines.is_empty() {
+            render_product_status_strip(
+                layout.tip,
+                buf,
+                theme,
+                &status_lines,
+                content_area.width,
+            )
+        } else {
+            0
+        };
+        let tip_content = if status_used > 0 && layout.tip.height > status_used {
+            Rect {
+                x: layout.tip.x,
+                y: layout.tip.y.saturating_add(status_used),
+                width: layout.tip.width,
+                height: layout.tip.height.saturating_sub(status_used),
+            }
+        } else if status_used == 0 {
+            layout.tip
+        } else {
+            Rect::default()
+        };
+
         // When a background update is available, show the update
         // notification in the tip area instead of the random tip.
 
         // Render the update notification with accent styling when present.
         if let Some(ver) = p.pending_update_version
-            && layout.tip.height > 0
+            && tip_content.height > 0
         {
             let [_, tip_centered, _] = Layout::horizontal([
                 Constraint::Min(0),
@@ -2033,7 +2206,7 @@ fn render_welcome_done(
                 Constraint::Min(0),
             ])
             .flex(Flex::Center)
-            .areas(layout.tip);
+            .areas(tip_content);
             let inset = prompt::prompt_inset(p.compact);
             let tip_inset = Rect {
                 x: tip_centered.x + inset,
@@ -2063,7 +2236,7 @@ fn render_welcome_done(
         // (only when no update is pending — the update shares ctrl+u and wins).
         if p.pending_update_version.is_none()
             && let Some(hint) = p.foreign_resume_hint
-            && layout.tip.height > 0
+            && tip_content.height > 0
         {
             let [_, tip_centered, _] = Layout::horizontal([
                 Constraint::Min(0),
@@ -2071,7 +2244,7 @@ fn render_welcome_done(
                 Constraint::Min(0),
             ])
             .flex(Flex::Center)
-            .areas(layout.tip);
+            .areas(tip_content);
             let inset = prompt::prompt_inset(p.compact);
             let tip_inset = Rect {
                 x: tip_centered.x + inset,
@@ -2099,6 +2272,30 @@ fn render_welcome_done(
                 .render(tip_inset, buf);
         }
 
+        // Random tip goes into tip_content (below status). Skip when update/
+        // resume already claimed the tip slot.
+        if p.pending_update_version.is_none()
+            && p.foreign_resume_hint.is_none()
+            && let Some(tip_text) = p.tip
+            && tip_content.height > 0
+        {
+            let [_, tip_centered, _] = Layout::horizontal([
+                Constraint::Min(0),
+                Constraint::Length(content_area.width),
+                Constraint::Min(0),
+            ])
+            .flex(Flex::Center)
+            .areas(tip_content);
+            let inset = prompt::prompt_inset(p.compact);
+            let tip_inset = Rect {
+                x: tip_centered.x + inset,
+                y: tip_centered.y,
+                width: tip_centered.width.saturating_sub(inset * 2),
+                height: tip_centered.height,
+            };
+            crate::tips::render::render_tip(tip_inset, buf, tip_text);
+        }
+
         let warning = p.credit_balance.and_then(|bal| {
             crate::views::credit_bar::usage_warning(bal, p.auto_topup, p.usage_visible)
         });
@@ -2114,6 +2311,7 @@ fn render_welcome_done(
             usage_warning_critical,
         };
 
+        // Tip already painted into tip_content (or update/resume above).
         render_prompt_and_version(
             &layout,
             content_area.width,
@@ -2122,12 +2320,7 @@ fn render_welcome_done(
             p.prompt_focus,
             prompt,
             &usage_info,
-            if p.pending_update_version.is_some() || p.foreign_resume_hint.is_some() {
-                // Update/resume tip already rendered above with custom styling.
-                None
-            } else {
-                p.tip
-            },
+            None,
             p.team_name,
             h_margin,
             p.compact,
