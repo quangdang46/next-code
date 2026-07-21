@@ -5,7 +5,7 @@
 - **What is going on:** Stock Face already has Kitty/iTerm media + mermaid affordance UI (`[Open Image]` / `[Copy Image Path]` / `[Copy Source]`) and `mermaid_worker` (lazy render → PNG cache → open/copy). Our `xai-grok-mermaid` is still the **PR7 StubEngine** — `default_engine()` / `render_checked` always `Unsupported`. Diagrams scroll-float stays text-only until a real PNG pipeline exists.
 - **We recommend:** **Copy** the real `xai-grok-mermaid` engine (+ `third_party/mermaid-to-svg` if required) from grok-build; **Wire** `default_engine()` → `PureRustEngine` and ensure the next-code binary intercepts `__mermaid-render` like stock pager `main`. Do **not** rewrite Face UI. Diagrams float image paint = **follow-on** after this engine lands.
 - **Risk:** Medium–High (large vendor surface: layout + fonts + resvg; Windows subprocess/re-exec; binary must honor hidden subcommand)
-- **Status:** Waiting for your OK — reply **go ahead** to implement
+- **Status:** Implemented (copy → wire) — reply for smoke / merge when ready
 
 ## Feature planning
 - **Recommended approach:** Replace the PR7 façade body with upstream mermaid → SVG → PNG (`PureRustEngine` + `rasterize`; optional `MmdcEngine` only if we copy it and keep it non-default). Keep the public types the pager already imports. Wire crash-isolated child render: call `xai_grok_pager::app::mermaid_worker::maybe_run_render_subprocess()` at the top of `next-code` `main` (or `pager_launch` before `app::run`) so re-exec of `next-code __mermaid-render …` works when Face is embedded.
@@ -42,20 +42,20 @@
 | Not PR12 / PR14 / #45 | **verified** | PR12 = shell/workspace stubs; PR14 = parity cleanup; #45 = info floats |
 
 ## Steps (simple checklist)
-1. [ ] Confirm upstream tree at chosen SOURCE_REV (DeepWiki + raw paths / local grok-build mirror if available).
-2. [ ] **Copy** `xai-grok-mermaid` real modules + `third_party/mermaid-to-svg` (NOTICE update).
-3. [ ] Workspace deps: match upstream Cargo.toml (resvg stack, fonts, etc.); `cargo check -p xai-grok-mermaid` + `-p xai-grok-pager`.
-4. [ ] **Wire** next-code entry: early `maybe_run_render_subprocess()` so `next-code __mermaid-render` child works (stock parity).
-5. [ ] Unit: engine render of a tiny flowchart → PNG bytes; worker tests still pass.
+1. [x] Confirm upstream tree at chosen SOURCE_REV (DeepWiki + raw paths / local grok-build mirror if available).
+2. [x] **Copy** `xai-grok-mermaid` real modules + `third_party/mermaid-to-svg` (NOTICE update).
+3. [x] Workspace deps: match upstream Cargo.toml (resvg stack, fonts, etc.); `cargo check -p xai-grok-mermaid` + `-p xai-grok-pager`.
+4. [x] **Wire** next-code entry: early `maybe_run_render_subprocess()` so `next-code __mermaid-render` child works (stock parity).
+5. [x] Unit: engine render of a tiny flowchart → PNG bytes; worker tests still pass.
 6. [ ] Manual smoke (Kitty or iTerm if available; else Open → OS viewer + Copy path): mermaid in transcript → Open / Copy path / Copy source; stub error gone.
-7. [ ] Document Diagrams float follow-on (image paint) — do **not** block this PR on floats.
+7. [x] Document Diagrams float follow-on (image paint) — do **not** block this PR on floats.
 8. [ ] Rebuild/install both `next-code` / `nextcode` aliases after BUILD approval.
 
 ## Files to touch (BUILD — after go ahead)
 - `crates/xai-grok-mermaid/**` — replace StubEngine with real engine
-- `third_party/mermaid-to-svg/**` — vendor if required by PureRust path
-- Root / crate `Cargo.toml` — deps
-- `src/main.rs` (and/or `src/cli/pager_launch.rs`) — `__mermaid-render` intercept
+- `third_party/mermaid-to-svg/**` (+ `dagre_rust` / `graphlib_rust` / `ordered_hashmap`) — vendored
+- Root / crate `Cargo.toml` — deps + workspace members
+- `src/main.rs` — `__mermaid-render` intercept via `maybe_run_render_subprocess`
 - `docs/plans/PLAN-20260720-grok-post-pr8-roadmap.md` / SUMMARY — already note PR15 (this plan)
 
 ## Out of scope
@@ -71,4 +71,4 @@
 - Kitty/iTerm / image-viewer paths unchanged aside from receiving real PNGs  
 
 ## Status
-Waiting for your OK — reply **go ahead** to implement
+**Implemented** (copy → wire). SOURCE_REV `a881e6703f46b01d8c7d4a5437683546df30449d` (grok-build `main` tip; NOTICE pin `ba69d70` was stale/missing). Diagrams float image paint remains follow-on after #45. Manual Face smoke + rebuild/install still operator-side.
