@@ -360,9 +360,12 @@ impl NextCodeFaceAgent {
             .session_notification(acp::SessionNotification::new(
                 SessionId::new(session_id),
                 acp::SessionUpdate::ToolCall(
-                    acp::ToolCall::new(ToolCallId::new(tool_id), Self::tool_title(name))
-                        .status(ToolCallStatus::Pending)
-                        .kind(Self::tool_kind(name)),
+                    acp::ToolCall::new(
+                        ToolCallId::new(tool_id),
+                        Self::tool_title(name, None),
+                    )
+                    .status(ToolCallStatus::Pending)
+                    .kind(Self::tool_kind(name)),
                 ),
             ))
             .await;
@@ -379,7 +382,7 @@ impl NextCodeFaceAgent {
     ) {
         let fields = ToolCallUpdateFields::new()
             .status(status)
-            .title(Self::tool_title(name))
+            .title(Self::tool_title(name, raw_input.as_ref()))
             .kind(Self::tool_kind(name));
         let fields = if let Some(input) = raw_input {
             fields.raw_input(input)
@@ -434,7 +437,7 @@ impl NextCodeFaceAgent {
         }));
         let fields = ToolCallUpdateFields::new()
             .status(status)
-            .title(Self::tool_title(name))
+            .title(Self::tool_title(name, raw_input.as_ref()))
             .kind(Self::tool_kind(name))
             .content(Some(vec![
                 acp::ContentBlock::Text(acp::TextContent::new(output)).into(),
@@ -693,7 +696,14 @@ impl NextCodeFaceAgent {
     }
 
     /// Title string for a tool, matching stock EventMapper.
-    fn tool_title(name: &str) -> String {
+    ///
+    /// Memory tools use Face's `Memory search:` title convention so
+    /// `AcpUpdateTracker` materializes `MemorySearchToolCallBlock` (verb-group
+    /// + MemorySearch chrome). ACP has no `ToolKind::MemorySearch`.
+    fn tool_title(name: &str, raw_input: Option<&serde_json::Value>) -> String {
+        if name.eq_ignore_ascii_case("memory") {
+            return Self::memory_search_title(raw_input);
+        }
         if name.starts_with("Bash") {
             "Bash".to_string()
         } else if name.starts_with("Read")
@@ -712,7 +722,28 @@ impl NextCodeFaceAgent {
         }
     }
 
+    /// Face tracker matches `title.starts_with("Memory search:")`.
+    fn memory_search_title(raw_input: Option<&serde_json::Value>) -> String {
+        let detail = raw_input.and_then(|v| {
+            v.get("query")
+                .or_else(|| v.get("content"))
+                .or_else(|| v.get("id"))
+                .or_else(|| v.get("action"))
+                .and_then(|x| x.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+        });
+        match detail {
+            Some(d) => format!("Memory search: \"{d}\""),
+            None => "Memory search: ".to_string(),
+        }
+    }
+
     /// Kind enum for a tool, matching stock EventMapper.
+    ///
+    /// Memory stays `Other` so the title-based MemorySearch arm in Face
+    /// tracker wins (a bare `ToolKind::Search` would become a grep Search
+    /// block instead). ACP has no `ToolKind::MemorySearch`.
     fn tool_kind(name: &str) -> acp::ToolKind {
         if name.starts_with("Bash") {
             acp::ToolKind::Execute
@@ -999,39 +1030,64 @@ mod tests {
 
     #[test]
     fn test_tool_title_bash() {
-        assert_eq!(NextCodeFaceAgent::tool_title("Bash"), "Bash");
-        assert_eq!(NextCodeFaceAgent::tool_title("BashDescription"), "Bash");
+        assert_eq!(NextCodeFaceAgent::tool_title("Bash", None), "Bash");
+        assert_eq!(
+            NextCodeFaceAgent::tool_title("BashDescription", None),
+            "Bash"
+        );
     }
 
     #[test]
     fn test_tool_title_read() {
-        assert_eq!(NextCodeFaceAgent::tool_title("Read"), "Read");
-        assert_eq!(NextCodeFaceAgent::tool_title("Glob"), "Read");
-        assert_eq!(NextCodeFaceAgent::tool_title("Grep"), "Read");
+        assert_eq!(NextCodeFaceAgent::tool_title("Read", None), "Read");
+        assert_eq!(NextCodeFaceAgent::tool_title("Glob", None), "Read");
+        assert_eq!(NextCodeFaceAgent::tool_title("Grep", None), "Read");
     }
 
     #[test]
     fn test_tool_title_edit() {
-        assert_eq!(NextCodeFaceAgent::tool_title("Edit"), "Edit");
-        assert_eq!(NextCodeFaceAgent::tool_title("Write"), "Edit");
+        assert_eq!(NextCodeFaceAgent::tool_title("Edit", None), "Edit");
+        assert_eq!(NextCodeFaceAgent::tool_title("Write", None), "Edit");
     }
 
     #[test]
     fn test_tool_title_web() {
-        assert_eq!(NextCodeFaceAgent::tool_title("WebSearch"), "Web");
-        assert_eq!(NextCodeFaceAgent::tool_title("WebFetch"), "Web");
+        assert_eq!(NextCodeFaceAgent::tool_title("WebSearch", None), "Web");
+        assert_eq!(NextCodeFaceAgent::tool_title("WebFetch", None), "Web");
     }
 
     #[test]
     fn test_tool_title_unknown() {
-        assert_eq!(NextCodeFaceAgent::tool_title("Unknown"), "Unknown");
-        assert_eq!(NextCodeFaceAgent::tool_title("SomeNewTool"), "SomeNewTool");
+        assert_eq!(NextCodeFaceAgent::tool_title("Unknown", None), "Unknown");
+        assert_eq!(
+            NextCodeFaceAgent::tool_title("SomeNewTool", None),
+            "SomeNewTool"
+        );
+    }
+
+    #[test]
+    fn test_tool_title_memory_uses_face_memory_search_prefix() {
+        assert!(
+            NextCodeFaceAgent::tool_title("memory", None).starts_with("Memory search:")
+        );
+        let input = serde_json::json!({ "action": "search", "query": "auth prefs" });
+        assert_eq!(
+            NextCodeFaceAgent::tool_title("memory", Some(&input)),
+            "Memory search: \"auth prefs\""
+        );
+        assert_eq!(
+            NextCodeFaceAgent::tool_title("Memory", Some(&input)),
+            "Memory search: \"auth prefs\""
+        );
     }
 
     #[test]
     fn test_tool_kind_bash() {
         assert_eq!(NextCodeFaceAgent::tool_kind("Bash"), acp::ToolKind::Execute);
-        assert_eq!(NextCodeFaceAgent::tool_kind("BashDescription"), acp::ToolKind::Execute);
+        assert_eq!(
+            NextCodeFaceAgent::tool_kind("BashDescription"),
+            acp::ToolKind::Execute
+        );
     }
 
     #[test]
@@ -1047,7 +1103,17 @@ mod tests {
 
     #[test]
     fn test_tool_kind_web() {
-        assert_eq!(NextCodeFaceAgent::tool_kind("WebSearch"), acp::ToolKind::Fetch);
+        assert_eq!(
+            NextCodeFaceAgent::tool_kind("WebSearch"),
+            acp::ToolKind::Fetch
+        );
+    }
+
+    #[test]
+    fn test_tool_kind_memory_stays_other_for_title_route() {
+        // Face MemorySearch chrome is title-driven; Search kind would become
+        // a grep Search block instead.
+        assert_eq!(NextCodeFaceAgent::tool_kind("memory"), acp::ToolKind::Other);
     }
 
     #[test]
