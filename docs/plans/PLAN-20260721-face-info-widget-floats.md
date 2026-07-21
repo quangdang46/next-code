@@ -58,9 +58,9 @@ Face keeps **separate floats** by `preferred_side` (no Overview merge) so the fu
 - [x] Diagrams text interim + empty gate + commented image paint / data-fetch TODOs
 - [x] AmbientMode / Tips / TeamView commented copy stubs with legacy disable citations
 - [x] Unit tests for formatters / has_data gates
-- [x] `cargo test -p xai-grok-pager --lib views::info_floats`
+- [x] `cargo test -p xai-grok-pager --lib views::info_floats` (19 passed)
 - [x] `cargo check -p xai-grok-pager --lib` + `cargo check -p next-code --bin next-code`
-- [ ] Rebuild/install Face binary + restart serve (owner smoke)
+- [x] Rebuild/install Face binary (selfdev @ `f1c60a408`) — **restart serve** still required
 
 ## Smoke
 1. Rebuild + install; **restart** `next-code serve`.
