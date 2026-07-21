@@ -496,11 +496,12 @@ pub struct RemoteSettings {
     /// Whether the TUI shows Edit tool calls as a collapsed one-line `+N/-M`
     /// diffstat summary by default and merges back-to-back edits to the same
     /// file into one row (expand for the diffs). `None` defers to local
-    /// config / env / default (`false`); `Some(false)` is a remote kill
-    /// switch. Resolved via `resolve_collapsed_edit_blocks` (requirements >
-    /// env > user > managed > remote > default false). Explicit pager.toml
-    /// `[scrollback.blocks.edit]` shape keys override the flag's fold shape
-    /// client-side; merging always follows the flag.
+    /// config / env / default (`true` in next-code denser resting transcript);
+    /// `Some(false)` is a remote kill switch. Resolved via
+    /// `resolve_collapsed_edit_blocks` (requirements > env > user > managed >
+    /// remote > default true). Explicit pager.toml `[scrollback.blocks.edit]`
+    /// shape keys override the flag's fold shape client-side; merging always
+    /// follows the flag.
     #[serde(default)]
     pub collapsed_edit_blocks: Option<bool>,
     /// Display-refresh probe + auto-cadence. See [`DisplayRefreshSettings`].
@@ -1126,7 +1127,10 @@ pub fn resolve_collapsed_edit_blocks(
     _managed: Option<&toml::Value>,
     _remote: Option<&RemoteSettings>,
 ) -> Resolved<bool> {
-    resolved_bool(false)
+    // next-code product default: denser resting transcript (edit rows as
+    // one-line +N/-M). Stock grok-build ships false; Face startup primes the
+    // appearance cache from this resolve stub.
+    resolved_bool(true)
 }
 
 pub fn resolve_group_tool_verbs(
