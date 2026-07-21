@@ -25,6 +25,16 @@ impl MemoryTool {
         }
     }
 
+    /// Same pattern as `memory_agent::manager_for_working_dir` / turn_memory:
+    /// project graph paths require an explicit project dir or saves are no-ops.
+    fn manager_for_context(&self, ctx: &ToolContext) -> MemoryManager {
+        let base = self.manager.clone();
+        match ctx.working_dir.as_ref() {
+            Some(dir) if !dir.as_os_str().is_empty() => base.with_project_dir(dir),
+            _ => base,
+        }
+    }
+
     fn parse_scope(scope: Option<&str>, default: MemoryScope) -> Result<MemoryScope> {
         match scope.unwrap_or(match default {
             MemoryScope::Project => "project",
@@ -121,6 +131,7 @@ impl Tool for MemoryTool {
         let input: MemoryInput = serde_json::from_value(input)?;
         let action_label = input.action.clone();
         let session_id = ctx.session_id.clone();
+        let manager = self.manager_for_context(&ctx);
 
         match input.action.as_str() {
             "remember" => {
@@ -144,9 +155,9 @@ impl Tool for MemoryTool {
                     entry = entry.with_tags(tags);
                 }
                 let id = if scope == "global" {
-                    self.manager.remember_global(entry)?
+                    manager.remember_global(entry)?
                 } else {
-                    self.manager.remember_project(entry)?
+                    manager.remember_project(entry)?
                 };
                 // The agent just wrote this memory itself; the content is in
                 // the transcript (tool call + result), so auto-recall should
@@ -184,7 +195,7 @@ impl Tool for MemoryTool {
                             action: "recall".into(),
                             detail: "recent".into(),
                         });
-                        let all_entries = self.manager.list_all_scoped(scope)?;
+                        let all_entries = manager.list_all_scoped(scope)?;
                         let results: Vec<(MemoryEntry, f32)> = all_entries
                             .into_iter()
                             .take(limit)
@@ -224,13 +235,11 @@ impl Tool for MemoryTool {
                         });
 
                         let results: Vec<(MemoryEntry, f32)> = match mode {
-                            "semantic" | "cascade" => self
-                                .manager
+                            "semantic" | "cascade" => manager
                                 .find_similar_with_cascade_scoped(&query, 0.5, limit, scope)?
                                 .into_iter()
                                 .collect(),
-                            _ => self
-                                .manager
+                            _ => manager
                                 .find_similar_scoped(&query, 0.5, limit, scope)?
                                 .into_iter()
                                 .collect(),
@@ -286,7 +295,7 @@ impl Tool for MemoryTool {
                     action: "search".into(),
                     detail: truncate_for_widget(&query, 40),
                 });
-                let results = self.manager.search_scoped(&query, scope)?;
+                let results = manager.search_scoped(&query, scope)?;
                 memory::add_event(MemoryEventKind::ToolRecalled {
                     query: truncate_for_widget(&query, 40),
                     count: results.len(),
@@ -311,7 +320,7 @@ impl Tool for MemoryTool {
                     action: "list".into(),
                     detail: String::new(),
                 });
-                let all = self.manager.list_all_scoped(scope)?;
+                let all = manager.list_all_scoped(scope)?;
                 memory::add_event(MemoryEventKind::ToolListed { count: all.len() });
                 memory::set_state(MemoryState::Idle);
                 if all.is_empty() {
@@ -333,7 +342,7 @@ impl Tool for MemoryTool {
                     action: "forget".into(),
                     detail: truncate_for_widget(&id, 30),
                 });
-                let found = self.manager.forget(&id)?;
+                let found = manager.forget(&id)?;
                 memory::add_event(MemoryEventKind::ToolForgot { id: id.clone() });
                 memory::set_state(MemoryState::Idle);
                 if found {
@@ -355,7 +364,7 @@ impl Tool for MemoryTool {
                     detail: format!("{} +{}", truncate_for_widget(&id, 20), tags.join(",")),
                 });
                 for tag in &tags {
-                    self.manager.tag_memory(&id, tag)?;
+                    manager.tag_memory(&id, tag)?;
                 }
                 let tags_str = tags.join(", ");
                 memory::add_event(MemoryEventKind::ToolTagged {
@@ -386,7 +395,7 @@ impl Tool for MemoryTool {
                         truncate_for_widget(&to_id, 15)
                     ),
                 });
-                self.manager.link_memories(&from_id, &to_id, weight)?;
+                manager.link_memories(&from_id, &to_id, weight)?;
                 memory::add_event(MemoryEventKind::ToolLinked {
                     from: from_id.clone(),
                     to: to_id.clone(),
@@ -405,7 +414,7 @@ impl Tool for MemoryTool {
                     action: "related".into(),
                     detail: truncate_for_widget(&id, 30),
                 });
-                let related = self.manager.get_related(&id, depth)?;
+                let related = manager.get_related(&id, depth)?;
                 memory::add_event(MemoryEventKind::ToolRecalled {
                     query: format!("related:{}", truncate_for_widget(&id, 20)),
                     count: related.len(),
@@ -478,5 +487,92 @@ mod tests {
         assert!(!props.contains_key("weight"));
         assert!(!props.contains_key("depth"));
         assert!(!props.contains_key("mode"));
+    }
+
+    #[tokio::test]
+    async fn remember_project_persists_when_tool_has_working_dir() {
+        let _guard = crate::storage::lock_test_env();
+        let home = tempfile::tempdir().expect("temp home");
+        let project = tempfile::tempdir().expect("temp project");
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", home.path());
+
+        let tool = MemoryTool::new();
+        let ctx = ToolContext {
+            session_id: "mem-tool-persist".into(),
+            working_dir: Some(project.path().to_path_buf()),
+            ..Default::default()
+        };
+
+        let out = tool
+            .execute(
+                json!({
+                    "action": "remember",
+                    "content": "face float memory smoke fact",
+                    "category": "fact",
+                    "scope": "project"
+                }),
+                ctx.clone(),
+            )
+            .await
+            .expect("remember");
+        assert!(out.output.contains("Remembered"));
+
+        let listed = tool
+            .execute(json!({ "action": "list", "scope": "project" }), ctx)
+            .await
+            .expect("list");
+        assert!(
+            listed.output.contains("face float memory smoke fact"),
+            "list should see project memory after remember: {}",
+            listed.output
+        );
+
+        match prev_home {
+            Some(value) => crate::env::set_var("NEXT_CODE_HOME", value),
+            None => crate::env::remove_var("NEXT_CODE_HOME"),
+        }
+    }
+
+    #[tokio::test]
+    async fn remember_project_without_working_dir_does_not_persist() {
+        let _guard = crate::storage::lock_test_env();
+        let home = tempfile::tempdir().expect("temp home");
+        let prev_home = std::env::var_os("NEXT_CODE_HOME");
+        crate::env::set_var("NEXT_CODE_HOME", home.path());
+
+        let tool = MemoryTool::new();
+        let ctx = ToolContext {
+            session_id: "mem-tool-no-cwd".into(),
+            working_dir: None,
+            ..Default::default()
+        };
+
+        let _ = tool
+            .execute(
+                json!({
+                    "action": "remember",
+                    "content": "should not persist without project dir",
+                    "scope": "project"
+                }),
+                ctx.clone(),
+            )
+            .await
+            .expect("remember returns ok even when save is no-op");
+
+        let listed = tool
+            .execute(json!({ "action": "list", "scope": "project" }), ctx)
+            .await
+            .expect("list");
+        assert!(
+            !listed.output.contains("should not persist without project dir"),
+            "project remember without working_dir must be a no-op, got: {}",
+            listed.output
+        );
+
+        match prev_home {
+            Some(value) => crate::env::set_var("NEXT_CODE_HOME", value),
+            None => crate::env::remove_var("NEXT_CODE_HOME"),
+        }
     }
 }

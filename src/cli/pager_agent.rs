@@ -32,16 +32,26 @@ struct DaemonSession {
     writer: Mutex<WriteHalf>,
     next_request_id: AtomicU64,
     prompt_running: AtomicBool,
+    /// Session cwd — required so MemoryManager project graph saves/loads
+    /// (same pattern as turn_memory / memory_agent::manager_for_working_dir).
+    working_dir: Option<PathBuf>,
 }
 
 impl DaemonSession {
-    fn new(session_id: String, reader: ReadHalf, writer: WriteHalf, next_request_id: u64) -> Self {
+    fn new(
+        session_id: String,
+        reader: ReadHalf,
+        writer: WriteHalf,
+        next_request_id: u64,
+        working_dir: Option<PathBuf>,
+    ) -> Self {
         Self {
             session_id,
             reader: Mutex::new(BufReader::new(reader)),
             writer: Mutex::new(writer),
             next_request_id: AtomicU64::new(next_request_id),
             prompt_running: AtomicBool::new(false),
+            working_dir,
         }
     }
 
@@ -186,7 +196,7 @@ impl NextCodeFaceAgent {
 
     async fn create_session(&self, cwd: PathBuf) -> Result<SessionBootstrap> {
         let (reader, writer) = Self::connect_halves().await?;
-        let session = DaemonSession::new(String::new(), reader, writer, 2);
+        let session = DaemonSession::new(String::new(), reader, writer, 2, Some(cwd.clone()));
         let subscribe_id = 1;
         session
             .send(&Request::Subscribe {
@@ -224,6 +234,7 @@ impl NextCodeFaceAgent {
             session.reader.into_inner().into_inner(),
             session.writer.into_inner(),
             session.next_request_id.load(Ordering::Relaxed),
+            Some(cwd),
         ));
         self.sessions
             .borrow_mut()
@@ -243,7 +254,7 @@ impl NextCodeFaceAgent {
 
     async fn attach_session(&self, target: String) -> Result<SessionBootstrap> {
         let (reader, writer) = Self::connect_halves().await?;
-        let session = DaemonSession::new(String::new(), reader, writer, 2);
+        let session = DaemonSession::new(String::new(), reader, writer, 2, None);
         let resume_id = 1;
         session
             .send(&Request::ResumeSession {
@@ -294,11 +305,18 @@ impl NextCodeFaceAgent {
             provider_name.as_deref(),
         );
 
+        let working_dir = crate::session::Session::load(&attached)
+            .ok()
+            .and_then(|s| s.working_dir)
+            .filter(|d| !d.trim().is_empty())
+            .map(PathBuf::from);
+
         let live = Rc::new(DaemonSession::new(
             attached.clone(),
             session.reader.into_inner().into_inner(),
             session.writer.into_inner(),
             session.next_request_id.load(Ordering::Relaxed),
+            working_dir,
         ));
         self.sessions.borrow_mut().insert(attached.clone(), live.clone());
         if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
@@ -539,7 +557,17 @@ impl NextCodeFaceAgent {
 
     /// Bridge local MemoryManager counts + activity into Face MemoryActivity float.
     async fn emit_memory_info(&self, session_id: &str) {
-        let manager = crate::memory::MemoryManager::new();
+        let working_dir = self
+            .sessions
+            .borrow()
+            .get(session_id)
+            .and_then(|s| s.working_dir.clone());
+        // Copy of memory_agent::manager_for_working_dir — project graph is empty
+        // without with_project_dir, so Face float stayed at 🧠 0 after remember.
+        let manager = match working_dir.as_ref() {
+            Some(dir) => crate::memory::MemoryManager::new().with_project_dir(dir),
+            None => crate::memory::MemoryManager::new(),
+        };
         let project_count = manager
             .load_project_graph()
             .ok()
@@ -568,9 +596,8 @@ impl NextCodeFaceAgent {
             Some(_) => (Some("idle".to_string()), false),
             None => (None, false),
         };
-        if total_count == 0 && !show_activity {
-            return;
-        }
+        // Always emit so Face can clear/update after remember/forget (do not
+        // early-return forever on total_count == 0).
         let payload = serde_json::json!({
             "sessionId": session_id,
             "totalCount": total_count,
@@ -848,6 +875,10 @@ impl acp::Agent for NextCodeFaceAgent {
                     if name.eq_ignore_ascii_case("todo") {
                         self.emit_todos_plan(&session_id, /*allow_empty=*/ true)
                             .await;
+                    }
+                    // Same for memory: refresh float after remember/list/forget.
+                    if name.eq_ignore_ascii_case("memory") {
+                        self.emit_memory_info(&session_id).await;
                     }
                 }
                 ServerEvent::GeneratedImage {
