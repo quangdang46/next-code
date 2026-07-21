@@ -28,6 +28,10 @@ pub use super::legacy_deferred::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FloatKind {
     Overview,
+    /// Standalone model card — suppressed when Overview is placed (legacy merge).
+    ModelInfo,
+    /// Standalone context bar — suppressed when Overview is placed (legacy merge).
+    ContextUsage,
     KvCache,
     MemoryActivity,
     UsageLimits,
@@ -51,12 +55,14 @@ impl FloatKind {
             | FloatKind::WorkspaceMap
             | FloatKind::Overview
             | FloatKind::Todos
+            | FloatKind::ContextUsage
             | FloatKind::MemoryActivity => Side::Right,
             FloatKind::SwarmStatus
             | FloatKind::Compaction
             | FloatKind::BackgroundTasks
             | FloatKind::UsageLimits
             | FloatKind::KvCache
+            | FloatKind::ModelInfo
             | FloatKind::GitStatus => Side::Left,
         }
     }
@@ -68,10 +74,12 @@ impl FloatKind {
             FloatKind::WorkspaceMap => 1,
             FloatKind::Overview => 2,
             FloatKind::Todos => 3,
+            FloatKind::ContextUsage => 4,
             FloatKind::UsageLimits => 5,
             FloatKind::KvCache => 6,
             // Face product: MemoryActivity elevated above Model/Context siblings.
             FloatKind::MemoryActivity => 0,
+            FloatKind::ModelInfo => 8,
             FloatKind::Compaction => 9,
             FloatKind::BackgroundTasks => 10,
             FloatKind::GitStatus => 11,

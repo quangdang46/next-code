@@ -919,6 +919,10 @@ impl AgentView {
                 .clone()
                 .or_else(|| self.generated_session_title.clone()),
             provider_name: self.info_float_provider.clone(),
+            working_dir: {
+                let cwd = self.session.cwd.display().to_string();
+                (!cwd.trim().is_empty()).then_some(cwd)
+            },
             auth_method: AuthMethod::Unknown,
             context_info_stale: false,
             context_ready,

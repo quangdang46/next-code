@@ -23,9 +23,11 @@
 //! - Face agent view is **non-centered**: legacy only opens a Left margin when
 //!   `margins.centered` (`info_widget_layout.rs`). Without Left docks, Phase 2
 //!   still seats `preferred_side == Left` widgets on the **Right**.
-//! - When Overview is shown, mergeable kinds (KV, Usage, Git, …) are suppressed
-//!   and their compact lines fold into Overview (`is_overview_mergeable` +
-//!   `render_sections`).
+//! - When Overview is eligible (sections ≥ 2) **and placed**, mergeable kinds
+//!   (ModelInfo, ContextUsage, KV, Usage, Git, …) are suppressed and their
+//!   compact lines fold into Overview (`is_overview_mergeable` +
+//!   `render_sections`). If Overview is not eligible or cannot fit, mergeables
+//!   render as separate bordered cards. MemoryActivity is never mergeable.
 
 mod legacy_deferred;
 mod widgets;
@@ -227,6 +229,8 @@ pub struct InfoFloatData {
     pub session_count: Option<usize>,
     pub session_name: Option<String>,
     pub provider_name: Option<String>,
+    /// Working directory for standalone ModelInfo (legacy `render_model_widget`).
+    pub working_dir: Option<String>,
     pub auth_method: AuthMethod,
     pub context_info_stale: bool,
     /// Legacy gate: `context_info.as_ref().map(|c| c.total_chars > 0)`.
@@ -792,14 +796,155 @@ fn render_kv_compact_lines(cache: &CacheHitInfo) -> Vec<Line<'static>> {
     }
 }
 
+/// Standalone KvCache float — copied from `info_widget.rs::render_kv_cache_widget`.
+/// Overview keeps only the compact summary line via `render_sections`.
+fn render_kv_cache_widget(cache: &CacheHitInfo) -> Vec<Line<'static>> {
+    let mut lines = render_kv_compact_lines(cache);
+    if lines.is_empty() {
+        return lines;
+    }
+    lines.push(Line::from(vec![Span::styled(
+        "miss attribution",
+        Style::default().fg(rgb(140, 140, 150)).bold(),
+    )]));
+    if cache.miss_attributions.is_empty() {
+        lines.push(Line::from(vec![Span::styled(
+            "none",
+            Style::default().fg(rgb(110, 210, 140)),
+        )]));
+        return lines;
+    }
+    let total_missed: u64 = cache
+        .miss_attributions
+        .iter()
+        .map(|sample| sample.missed_tokens)
+        .sum();
+    lines.push(Line::from(vec![Span::styled(
+        format!("{} missed total", compact_token_count(total_missed)),
+        Style::default().fg(rgb(180, 180, 190)),
+    )]));
+    for sample in cache.miss_attributions.iter().take(5) {
+        lines.push(Line::from(vec![
+            Span::styled(
+                format_cache_turn_label(sample.turn_number, sample.call_index),
+                Style::default().fg(rgb(140, 180, 255)).bold(),
+            ),
+            Span::styled(
+                format!(" {} miss ", compact_token_count(sample.missed_tokens)),
+                Style::default().fg(rgb(255, 200, 100)),
+            ),
+            Span::styled(
+                format!("({})", sample.reason),
+                Style::default().fg(rgb(140, 140, 150)),
+            ),
+        ]));
+    }
+    if cache.miss_attributions.len() > 5 {
+        lines.push(Line::from(vec![Span::styled(
+            format!("… {} more", cache.miss_attributions.len() - 5),
+            Style::default().fg(rgb(100, 100, 110)),
+        )]));
+    }
+    lines
+}
+
+fn format_cache_turn_label(turn_number: usize, call_index: u16) -> String {
+    if call_index <= 1 {
+        format!("{}>", turn_number)
+    } else {
+        format!("{}.{}>", turn_number, call_index)
+    }
+}
+
+fn compact_token_count(tokens: u64) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M", tokens as f32 / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{:.0}k", tokens as f32 / 1_000.0)
+    } else {
+        tokens.to_string()
+    }
+}
+
+/// Standalone ModelInfo float — copied from `info_widget_model.rs::render_model_widget`.
+/// Overview uses `render_model_info` (compact) instead.
+fn render_model_widget(data: &InfoFloatData, inner: Rect) -> Vec<Line<'static>> {
+    let Some(model) = &data.model else {
+        return Vec::new();
+    };
+    let short_name = pretty_model(model);
+    let max_len = inner.width.saturating_sub(2) as usize;
+    let mut spans = vec![
+        Span::styled("⚡ ", Style::default().fg(rgb(140, 180, 255))),
+        Span::styled(
+            truncate_smart(&short_name, max_len.saturating_sub(2)),
+            Style::default().fg(rgb(255, 150, 200)).bold(),
+        ),
+    ];
+    append_model_runtime_metadata(&mut spans, data);
+    let mut lines = vec![Line::from(spans)];
+
+    if data.session_count.is_some() || data.session_name.is_some() {
+        let mut parts = Vec::new();
+        if let Some(sessions) = data.session_count {
+            parts.push(format!(
+                "{} session{}",
+                sessions,
+                if sessions == 1 { "" } else { "s" }
+            ));
+        }
+        if let Some(name) = data.session_name.as_deref()
+            && !name.trim().is_empty()
+        {
+            parts.push(name.to_string());
+        }
+        if !parts.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                truncate_smart(&parts.join(" · "), max_len.saturating_sub(2)),
+                Style::default().fg(rgb(140, 140, 150)),
+            )]));
+        }
+    }
+
+    if let Some(dir) = data
+        .working_dir
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        lines.push(Line::from(vec![Span::styled(
+            truncate_smart(dir, max_len.saturating_sub(2)),
+            Style::default().fg(rgb(140, 140, 150)),
+        )]));
+    }
+
+    if let Some(provider) = data
+        .provider_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        lines.push(Line::from(vec![
+            Span::styled("☁ ", Style::default().fg(rgb(140, 180, 255))),
+            Span::styled(
+                provider.to_lowercase(),
+                Style::default().fg(rgb(140, 180, 255)),
+            ),
+        ]));
+    }
+    lines
+}
+
 /// Copied from `info_widget.rs::is_overview_mergeable` (Face FloatKind subset).
 fn is_overview_mergeable(kind: FloatKind) -> bool {
     matches!(
         kind,
         FloatKind::Todos
+            | FloatKind::ContextUsage
             | FloatKind::SwarmStatus
             | FloatKind::BackgroundTasks
             | FloatKind::Compaction
+            | FloatKind::ModelInfo
             | FloatKind::UsageLimits
             | FloatKind::KvCache
             | FloatKind::GitStatus
@@ -907,10 +1052,28 @@ fn measure_kind(kind: FloatKind, data: &InfoFloatData, inner_w: u16) -> Vec<Line
             };
             render_overview_compact_lines(data, overview_inner)
         }
+        FloatKind::ModelInfo => {
+            let inner = Rect {
+                x: 0,
+                y: 0,
+                width: inner_w.max(1),
+                height: 10,
+            };
+            render_model_widget(data, inner)
+        }
+        FloatKind::ContextUsage => {
+            let inner = Rect {
+                x: 0,
+                y: 0,
+                width: inner_w.max(1),
+                height: 4,
+            };
+            render_context_compact(data, inner)
+        }
         FloatKind::KvCache => data
             .cache_hit_info
             .as_ref()
-            .map(render_kv_compact_lines)
+            .map(render_kv_cache_widget)
             .unwrap_or_default(),
         FloatKind::MemoryActivity => data
             .memory_info
@@ -968,6 +1131,12 @@ fn measure_kind(kind: FloatKind, data: &InfoFloatData, inner_w: u16) -> Vec<Line
 fn kind_has_data(kind: FloatKind, data: &InfoFloatData) -> bool {
     match kind {
         FloatKind::Overview => overview_has_data(data),
+        FloatKind::ModelInfo => data.model.is_some(),
+        FloatKind::ContextUsage => {
+            data.context_info_stale
+                || data.context_ready
+                || data.observed_context_tokens.is_some()
+        }
         FloatKind::KvCache => data
             .cache_hit_info
             .as_ref()
@@ -1001,7 +1170,12 @@ pub(crate) fn collect_float_placements(
         .min(area.width.saturating_sub(FLOAT_INSET * 2))
         .saturating_sub(2);
 
-    let overview_active = overview_has_data(data);
+    // Legacy (`info_widget_layout.rs`): suppress mergeables only when Overview
+    // is *actually shown*. Face has no hidden-in-place slots — place by
+    // priority, seat Overview when eligible *and* its full content fits, then
+    // suppress mergeables only if Overview placed. Otherwise split cards.
+    // MemoryActivity is never mergeable.
+    let overview_eligible = overview_has_data(data);
 
     let mut kinds: Vec<FloatKind> = [
         FloatKind::MemoryActivity, // Face: elevated — show before Diagrams stub
@@ -1009,8 +1183,10 @@ pub(crate) fn collect_float_placements(
         FloatKind::WorkspaceMap,
         FloatKind::Overview,
         FloatKind::Todos,
+        FloatKind::ContextUsage,
         FloatKind::UsageLimits,
         FloatKind::KvCache,
+        FloatKind::ModelInfo,
         FloatKind::Compaction,
         FloatKind::BackgroundTasks,
         FloatKind::GitStatus,
@@ -1018,19 +1194,36 @@ pub(crate) fn collect_float_placements(
     ]
     .into_iter()
     .filter(|k| kind_has_data(*k, data))
-    .filter(|k| !(overview_active && is_overview_mergeable(*k)))
     .collect();
     kinds.sort_by_key(|k| k.priority());
 
     let mut right_y = area.y.saturating_add(FLOAT_INSET.min(area.height.saturating_sub(1)));
     let mut out = Vec::new();
+    let mut overview_placed = false;
 
     for kind in kinds {
+        if kind == FloatKind::Overview && !overview_eligible {
+            continue;
+        }
+        if overview_placed && is_overview_mergeable(kind) {
+            continue;
+        }
         let lines = measure_kind(kind, data, provisional_inner_w.max(1));
         if lines.is_empty() {
             continue;
         }
         let content_h = lines.len() as u16;
+        // Overview: require full content height (no truncate). If it cannot fit,
+        // leave mergeables free to place as separate cards.
+        if kind == FloatKind::Overview {
+            let needed = content_h.saturating_add(2);
+            let remaining = area
+                .height
+                .saturating_sub(right_y.saturating_sub(area.y));
+            if needed > remaining {
+                continue;
+            }
+        }
         // Non-centered: always Right — preferred_side is only a scoring bias in
         // legacy Phase 2 when a Left margin actually exists.
         let Some(rect) = place_right_at(area, content_h, right_y) else {
@@ -1039,6 +1232,9 @@ pub(crate) fn collect_float_placements(
         right_y = rect.y.saturating_add(rect.height).saturating_add(1);
         let inner_w = rect.width.saturating_sub(2).max(1);
         let paint_lines = measure_kind(kind, data, inner_w);
+        if kind == FloatKind::Overview {
+            overview_placed = true;
+        }
         out.push((kind, rect, paint_lines));
     }
     out
@@ -1158,6 +1354,74 @@ mod tests {
     }
 
     #[test]
+    fn overview_merges_model_context_kv_into_exactly_one_card() {
+        let data = InfoFloatData {
+            model: Some("deepseek-v4-flash".into()),
+            provider_name: Some("opencode go".into()),
+            session_count: Some(1),
+            working_dir: Some(r"C:\Users\ADMIN".into()),
+            context_ready: true,
+            observed_context_tokens: Some(29_000),
+            context_limit: Some(1_000_000),
+            cache_hit_info: Some(sample_cache_priming()),
+            ..Default::default()
+        };
+        assert!(overview_has_data(&data));
+        assert!(is_overview_mergeable(FloatKind::ModelInfo));
+        assert!(is_overview_mergeable(FloatKind::ContextUsage));
+        assert!(is_overview_mergeable(FloatKind::KvCache));
+
+        let area = Rect::new(0, 0, 100, 40);
+        let placements = collect_float_placements(area, &data);
+        let kinds: Vec<FloatKind> = placements.iter().map(|(k, _, _)| *k).collect();
+
+        let family = [
+            FloatKind::Overview,
+            FloatKind::ModelInfo,
+            FloatKind::ContextUsage,
+            FloatKind::KvCache,
+        ];
+        let family_placed: Vec<_> = kinds.iter().copied().filter(|k| family.contains(k)).collect();
+        assert_eq!(
+            family_placed,
+            vec![FloatKind::Overview],
+            "model+context+KV must be exactly one Overview card, got {kinds:?}"
+        );
+
+        let overview_lines = placements
+            .iter()
+            .find(|(k, _, _)| *k == FloatKind::Overview)
+            .map(|(_, _, lines)| lines)
+            .expect("overview lines");
+        let joined: String = overview_lines
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(
+            joined.to_lowercase().contains("deepseek"),
+            "Overview must include model, got:\n{joined}"
+        );
+        assert!(
+            joined.contains("Context"),
+            "Overview must include context, got:\n{joined}"
+        );
+        assert!(
+            joined.contains("KV cache"),
+            "Overview must include merged KV summary, got:\n{joined}"
+        );
+        // Standalone ModelInfo chrome (⚡ / miss attribution) must not leak into Overview.
+        assert!(
+            !joined.contains('⚡'),
+            "Overview uses compact model_info, not standalone model_widget: {joined}"
+        );
+        assert!(
+            !joined.contains("miss attribution"),
+            "Overview keeps compact KV only: {joined}"
+        );
+    }
+
+    #[test]
     fn overview_merges_kv_and_places_only_on_right() {
         let data = InfoFloatData {
             model: Some("deepseek-v4-flash".into()),
@@ -1183,6 +1447,14 @@ mod tests {
             !kinds.contains(&FloatKind::KvCache),
             "KV must merge into Overview, not place standalone: {kinds:?}"
         );
+        assert!(
+            !kinds.contains(&FloatKind::ModelInfo),
+            "ModelInfo must merge into Overview: {kinds:?}"
+        );
+        assert!(
+            !kinds.contains(&FloatKind::ContextUsage),
+            "ContextUsage must merge into Overview: {kinds:?}"
+        );
 
         let mid = area.x + area.width / 2;
         for (kind, rect, _) in &placements {
@@ -1206,6 +1478,65 @@ mod tests {
     }
 
     #[test]
+    fn memory_activity_stays_separate_when_overview_merges() {
+        let data = InfoFloatData {
+            model: Some("deepseek-v4-flash".into()),
+            context_ready: true,
+            observed_context_tokens: Some(19_000),
+            context_limit: Some(1_000_000),
+            cache_hit_info: Some(sample_cache_priming()),
+            memory_info: Some(MemoryInfo {
+                total_count: 2,
+                disabled: false,
+                activity_summary: Some("working".into()),
+                show_activity: true,
+            }),
+            ..Default::default()
+        };
+        assert!(overview_has_data(&data));
+        assert!(!is_overview_mergeable(FloatKind::MemoryActivity));
+
+        let area = Rect::new(0, 0, 100, 40);
+        let placements = collect_float_placements(area, &data);
+        let kinds: Vec<FloatKind> = placements.iter().map(|(k, _, _)| *k).collect();
+        assert!(
+            kinds.contains(&FloatKind::Overview),
+            "expected Overview, got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&FloatKind::MemoryActivity),
+            "MemoryActivity must remain a separate float: {kinds:?}"
+        );
+        assert!(
+            !kinds.contains(&FloatKind::ModelInfo)
+                && !kinds.contains(&FloatKind::ContextUsage)
+                && !kinds.contains(&FloatKind::KvCache),
+            "mergeables must stay suppressed while Overview is placed: {kinds:?}"
+        );
+    }
+
+    #[test]
+    fn single_section_model_places_standalone_modelinfo() {
+        let data = InfoFloatData {
+            model: Some("deepseek-v4-flash".into()),
+            working_dir: Some(r"C:\Users\ADMIN".into()),
+            ..Default::default()
+        };
+        assert!(!overview_has_data(&data));
+        let area = Rect::new(0, 0, 100, 30);
+        let placements = collect_float_placements(area, &data);
+        assert_eq!(placements.len(), 1);
+        assert_eq!(placements[0].0, FloatKind::ModelInfo);
+        let joined: String = placements[0]
+            .2
+            .iter()
+            .map(line_text)
+            .collect::<Vec<_>>()
+            .join("\n");
+        assert!(joined.contains('⚡'), "standalone ModelInfo uses model_widget chrome");
+    }
+
+    #[test]
     fn preferred_left_kv_alone_still_docks_right() {
         // Single section → Overview inactive; KvCache preferred_side is Left,
         // but non-centered Face placer must still seat it on the Right.
@@ -1225,6 +1556,52 @@ mod tests {
             placements[0].1.x >= mid,
             "standalone KV must still dock right, got {:?}",
             placements[0].1
+        );
+    }
+
+    #[test]
+    fn overview_short_pocket_falls_back_to_split_cards() {
+        // Eligible for Overview, but Memory already consumed the vertical pocket
+        // so Overview cannot fit its full content. Mergeables must then place as
+        // separate Right cards (legacy: suppress only when Overview is shown).
+        let data = InfoFloatData {
+            model: Some("deepseek-v4-flash".into()),
+            working_dir: Some(r"C:\Users\ADMIN".into()),
+            context_ready: true,
+            observed_context_tokens: Some(19_000),
+            context_limit: Some(1_000_000),
+            cache_hit_info: Some(sample_cache_priming()),
+            memory_info: Some(MemoryInfo {
+                total_count: 3,
+                disabled: false,
+                activity_summary: Some("working".into()),
+                show_activity: true,
+            }),
+            ..Default::default()
+        };
+        assert!(overview_has_data(&data));
+
+        // Tall enough for Memory (priority 0) + one small card, too short for
+        // Overview's multi-line compact body after Memory seats.
+        let area = Rect::new(0, 0, 100, 8);
+        let placements = collect_float_placements(area, &data);
+        let kinds: Vec<FloatKind> = placements.iter().map(|(k, _, _)| *k).collect();
+        assert!(
+            !kinds.contains(&FloatKind::Overview),
+            "Overview must fail to place in short pocket, got {kinds:?}"
+        );
+        assert!(
+            kinds.contains(&FloatKind::MemoryActivity),
+            "MemoryActivity should still place: {kinds:?}"
+        );
+        assert!(
+            kinds.iter().any(|k| {
+                matches!(
+                    k,
+                    FloatKind::ModelInfo | FloatKind::ContextUsage | FloatKind::KvCache
+                )
+            }),
+            "expected split Model/Context/KV when Overview unplaced, got {kinds:?}"
         );
     }
 
