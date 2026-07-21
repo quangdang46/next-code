@@ -1,0 +1,10 @@
+The `next-code-ratatui-inline` and `next-code-ratatui-textarea` crates are adapted from:
+
+  https://github.com/xai-org/grok-build
+  Copyright 2023-2026 xAI
+  Licensed under Apache License, Version 2.0
+
+See `NOTICE.md` in this crate for provenance (including Ratatui attribution
+for the inline Terminal fork) and a list of next-code modifications.
+
+The full Apache License 2.0 text is in `LICENSE`.

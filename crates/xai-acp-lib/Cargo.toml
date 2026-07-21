@@ -1,0 +1,19 @@
+[package]
+name = "xai-acp-lib"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Vendored from xai-org/grok-build xai-acp-lib — ACP channel/message plumbing (PR5)"
+
+[dependencies]
+agent-client-protocol = { version = "0.10.4", features = ["unstable"] }
+async-trait = "0.1"
+derive_more = { version = "1", features = ["from"] }
+futures = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["raw_value"] }
+tokio = { version = "1", features = ["sync", "rt", "macros", "io-util", "io-std", "time"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["sync", "rt", "macros", "rt-multi-thread", "time", "test-util"] }

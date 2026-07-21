@@ -1,0 +1,193 @@
+//! Agent spawning — creates the agent process and ACP channels.
+//!
+//! Default: in-process GrokShell `MvpAgent` stub.
+//! Override: [`install_agent_factory`] (next-code Face cutover → daemon brain).
+
+use std::rc::Rc;
+use std::sync::Mutex;
+use std::thread;
+
+use anyhow::Result;
+use tokio_util::sync::CancellationToken;
+
+use agent_client_protocol as acp;
+use async_trait::async_trait;
+use xai_acp_lib::{
+    AcpAgentChannel, AcpClientChannel, AcpClientTx, AcpGatewayReceiver, AcpGatewaySender,
+    acp_channels,
+};
+use xai_grok_shell::{
+    agent::{MvpAgent, config::Config as AgentConfig, models::RefreshStrategy},
+    auth::AuthManager,
+    util::grok_home::grok_home,
+};
+
+/// Factory that builds the in-process ACP agent Face will talk to.
+pub type AgentFactory =
+    Box<dyn FnOnce(AcpClientTx) -> Result<Rc<dyn acp::Agent>> + Send + 'static>;
+
+static AGENT_FACTORY: Mutex<Option<AgentFactory>> = Mutex::new(None);
+
+/// Install a one-shot agent factory used by the next [`spawn_grok_shell`] call.
+///
+/// Intended for the next-code binary to inject a daemon-backed ACP agent so Face
+/// keeps its ACP client surface while the brain stays next-code `serve`.
+pub fn install_agent_factory(factory: AgentFactory) {
+    *AGENT_FACTORY.lock().expect("agent factory lock") = Some(factory);
+}
+
+/// Result of spawning a child agent.
+pub struct SpawnedAgent {
+    /// Kept alive so the thread isn't detached. Will be used for graceful shutdown.
+    pub _thread_handle: thread::JoinHandle<Result<()>>,
+    pub channel: AcpClientChannel,
+    pub cancel: CancellationToken,
+    /// The agent's `AuthManager`, shared so pager-side consumers (e.g. the voice
+    /// channel) resolve the same refreshing bearer as chat traffic.
+    pub auth_manager: std::sync::Arc<AuthManager>,
+}
+
+/// Spawn a GrokShell agent in a background thread.
+///
+/// Returns the ACP client channel for communication and a cancellation token.
+pub async fn spawn_grok_shell(
+    agent_config: AgentConfig,
+    cancel: &CancellationToken,
+    memory_config: Option<xai_grok_shell::config::MemoryConfig>,
+) -> Result<SpawnedAgent> {
+    let auth_manager = std::sync::Arc::new(AuthManager::new(
+        &grok_home(),
+        agent_config.grok_com_config.clone(),
+    ));
+    auth_manager.configure_refresher(
+        agent_config.grok_com_config.auth_provider_command.clone(),
+        None,
+    );
+    // Pause token refreshes across system sleep so an OIDC refresh can't
+    // straddle a suspend (which can revoke the refresh token and force
+    // re-login). No-op where the OS listener is unavailable.
+    auth_manager.start_system_power_listener();
+
+    // Best-effort refresh of managed policy before bootstrap reads it (repairs a wrong-identity/missing
+    // cache). Never errors — the OS-protected system/MDM layers still apply.
+    xai_grok_shell::managed_config::ensure_managed_policy_present(&auth_manager).await;
+
+    // Run the full bootstrap sequence: config resolution, process-level
+    // singletons (including `extract_bundled_files` which writes compiled-in
+    // skills to ~/.grok/skills/), and model catalog construction.
+    let (agent_config, models_manager) =
+        xai_grok_shell::agent::init::bootstrap(&agent_config, &auth_manager, None)
+            .map_err(|e| anyhow::anyhow!(e))?;
+    models_manager
+        .list_models(RefreshStrategy::OnlineIfUncached)
+        .await;
+
+    let agent_cancel = cancel.child_token();
+    let (acp_client, acp_agent) = acp_channels();
+
+    // Clone before `auth_manager` is moved into the agent closure below, so the
+    // pager (voice channel) can share the same refreshing bearer.
+    let auth_manager_for_pager = auth_manager.clone();
+
+    let override_factory = AGENT_FACTORY.lock().expect("agent factory lock").take();
+    let spawn_fn: AgentFactory = if let Some(factory) = override_factory {
+        factory
+    } else {
+        Box::new(move |client_tx| {
+            let gateway: AcpGatewaySender<agent_client_protocol::AgentSide> =
+                AcpGatewaySender::new(client_tx);
+
+            let mut agent =
+                MvpAgent::with_models(gateway, &agent_config, auth_manager, models_manager);
+            if let Some(mc) = memory_config {
+                agent.set_memory_config(mc);
+            }
+            Ok(Rc::new(agent) as Rc<dyn acp::Agent>)
+        })
+    };
+
+    // Spawn the agent thread with direct dispatch
+    let handle = spawn_agent_thread_direct(spawn_fn, acp_agent, agent_cancel.clone())?;
+
+    Ok(SpawnedAgent {
+        _thread_handle: handle,
+        channel: acp_client,
+        cancel: agent_cancel,
+        auth_manager: auth_manager_for_pager,
+    })
+}
+
+/// Sized wrapper so `AcpGatewayReceiver` can dispatch to a type-erased agent.
+/// (`Rc<dyn Agent>` alone does not implement `Agent` — the blanket is `Rc<T: Agent>` with `T: Sized`.)
+struct AnyAgent(Rc<dyn acp::Agent>);
+
+#[async_trait(?Send)]
+impl acp::Agent for AnyAgent {
+    async fn initialize(
+        &self,
+        args: acp::InitializeRequest,
+    ) -> acp::Result<acp::InitializeResponse> {
+        self.0.initialize(args).await
+    }
+
+    async fn authenticate(
+        &self,
+        args: acp::AuthenticateRequest,
+    ) -> acp::Result<acp::AuthenticateResponse> {
+        self.0.authenticate(args).await
+    }
+
+    async fn new_session(
+        &self,
+        args: acp::NewSessionRequest,
+    ) -> acp::Result<acp::NewSessionResponse> {
+        self.0.new_session(args).await
+    }
+
+    async fn load_session(
+        &self,
+        args: acp::LoadSessionRequest,
+    ) -> acp::Result<acp::LoadSessionResponse> {
+        self.0.load_session(args).await
+    }
+
+    async fn prompt(&self, args: acp::PromptRequest) -> acp::Result<acp::PromptResponse> {
+        self.0.prompt(args).await
+    }
+
+    async fn cancel(&self, args: acp::CancelNotification) -> acp::Result<()> {
+        self.0.cancel(args).await
+    }
+}
+
+/// Spawn an agent in a dedicated thread with direct RPC dispatch.
+///
+/// The agent runs on a single-threaded tokio LocalSet runtime.
+/// RPC requests go directly to the agent via Rc, bypassing simplex pipes.
+fn spawn_agent_thread_direct(
+    spawn_agent: AgentFactory,
+    channel: AcpAgentChannel,
+    cancel: CancellationToken,
+) -> Result<thread::JoinHandle<Result<()>>> {
+    Ok(thread::Builder::new()
+        .name("acp-agent-worker".into())
+        .spawn(move || -> Result<()> {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()?;
+            let local = tokio::task::LocalSet::new();
+            local.block_on(&rt, async move {
+                let client_tx = channel.tx.clone();
+                let agent_rc = AnyAgent(spawn_agent(client_tx)?);
+
+                // Direct dispatch: RPC requests go straight to the agent
+                let gw_rx = AcpGatewayReceiver::new(channel.rx, agent_rc).with_tracing(true);
+                tokio::task::spawn_local(gw_rx.run());
+                tokio::task::yield_now().await;
+
+                // Keep running until cancelled
+                cancel.cancelled().await;
+                anyhow::Result::Ok(())
+            })
+        })?)
+}

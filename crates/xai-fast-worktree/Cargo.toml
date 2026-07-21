@@ -1,0 +1,16 @@
+[package]
+name = "xai-fast-worktree"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Facade of xai-org/grok-build xai-fast-worktree — metadata DB surfaces the pager uses (PR7)"
+
+[features]
+default = []
+# Empty feature so pager Cargo.toml can enable `features = ["metadata"]`.
+metadata = []
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

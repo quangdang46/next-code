@@ -1,0 +1,11 @@
+[package]
+name = "xai-grok-paths"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+description = "Vendored from xai-org/grok-build — path helpers (Apache-2.0)"
+
+[dependencies]
+camino = "1.1"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"

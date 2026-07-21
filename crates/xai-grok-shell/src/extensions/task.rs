@@ -1,0 +1,44 @@
+//! Façade stub of upstream `xai-grok-shell::extensions::task` — DTOs for
+//! the `x.ai/task/kill` and subagent-cancel ext methods. `KillOutcome` is
+//! re-used from `xai-grok-tools` (PR4) rather than redefined.
+
+use serde::{Deserialize, Serialize};
+pub use xai_grok_tools::types::computer::KillOutcome;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KillTaskRequest {
+    pub session_id: String,
+    pub task_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KillTaskResponse {
+    pub task_id: String,
+    pub outcome: KillOutcome,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelSubagentRequest {
+    pub subagent_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum SubagentCancelOutcomeDto {
+    Cancelled,
+    AlreadyFinished { status: String },
+    NotFound,
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CancelSubagentResponse {
+    pub subagent_id: String,
+    pub cancelled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<SubagentCancelOutcomeDto>,
+}

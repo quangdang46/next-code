@@ -100,6 +100,13 @@ fn main() -> Result<()> {
 }
 
 fn run_main() -> Result<()> {
+    // Stock Face parity: intercept `next-code __mermaid-render …` before any
+    // TUI/agent/tokio init so the out-of-process Mermaid child stays minimal
+    // (crash isolation under `panic = "abort"`).
+    if let Some(code) = xai_grok_pager::app::mermaid_worker::maybe_run_render_subprocess() {
+        std::process::exit(code);
+    }
+
     // Log panics before abort so we can diagnose OOM / SIGKILL causes.
     let orig_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
