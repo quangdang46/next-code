@@ -5,7 +5,22 @@
 - **What is going on:** Face has a rich builtin registry (`builtin_commands()` ≈ 60 entries) with arg-suggest dropdowns (`suggest_args`), settings modal, model/theme pickers. next-code TUI has a larger product command set (`REGISTERED_COMMANDS` ≈ 90+ public) including multi-provider `/connect`/`/account`, swarm/overnight/selfdev, etc. PR10 already decided: **keep Face UI**, **wire** config/`set_*`, **hide/remap** xAI-only slash and grok.com links.
 - **We recommend:** Treat Face slash palette + arg dropdowns as the presentation layer. For PR10: (1) restrict/hide xAI-only commands via existing `CommandRegistry::set_restricted_commands`, (2) wire shared commands (`/model`, `/theme`, `/settings`, `/login`) to next-code config/auth, (3) add a Face-chrome `/connect` (or remap `/login` args) that reuses Face picker patterns with next-code provider catalog — do **not** resurrect old TUI chrome. Defer bulk next-code-only ports (swarm, overnight, …) past PR10 unless they already have ACP/daemon hooks.
 - **Risk:** Medium (auth remap + alias collisions: Face `/sessions`→dashboard vs next-code `/sessions`→resume; Face `/log`→transcript vs next-code `/log` mark).
-- **Status:** Waiting for your OK — reply **go ahead** to implement (PR10 slash restrict + wire only; this file is research).
+- **Status:** **Implemented (PR10 slash restrict + wire slice)** — 2026-07-21. Full next-code-only port list still deferred.
+
+## Implementation notes (2026-07-21)
+
+| Item | Result |
+|------|--------|
+| Restrict list | `EMBED_BRAND_RESTRICTED_COMMANDS` + merge in `apply_tier_restrictions` |
+| `/usage manage` / `/docs web` | Gated in embed |
+| `/connect` + `/login` | Face `suggest_args`; CLI login for credential write (partial) |
+| Alias hazards | Documented on `/new` (`/clear`) and `/transcript` (`/log`); Face meanings kept |
+| `$skill` | `pager_agent::expand_skill_invocation` + ACP skill advertise |
+
+Open questions from research — resolved for PR10:
+1. **`/usage`:** keep show; strip manage URL in embed.
+2. **`/connect`:** explicit Face command + `/login` alias in embed.
+3. **Aliases:** accept Face meanings; document (no silent restore of TUI `/clear` history).
 
 ## Feature planning
 - **Recommended approach:** Copy Face UX; wire next-code brain; delete/hide xAI brand surfaces. Prefer registry deny-list over editing every command file.
@@ -214,4 +229,4 @@ Aligned with PR10 Copy / Wire / Delete:
 3. **Alias collisions** (`/sessions`, `/log`, `/clear`): accept Face meanings in embed, or add next-code compatibility aliases?
 
 ## Status
-Waiting for your OK — reply **go ahead** to implement the PR10 slash restrict + wire slice (not the full next-code-only port list).
+**Implemented (PR10 slash restrict + wire slice)** — 2026-07-21. Full next-code-only port list still deferred.

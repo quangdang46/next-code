@@ -246,6 +246,7 @@ impl NextCodeFaceAgent {
         self.emit_git_status(&session_id).await;
         // Face TodoPane / Todos float only paint from ACP Plan — bridge disk todos.
         self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
+        self.emit_available_skills(&session_id).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -325,6 +326,7 @@ impl NextCodeFaceAgent {
         self.emit_memory_info(&attached).await;
         self.emit_git_status(&attached).await;
         self.emit_todos_plan(&attached, /*allow_empty=*/ false).await;
+        self.emit_available_skills(&attached).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -349,6 +351,98 @@ impl NextCodeFaceAgent {
             }
         }
         parts.join("\n")
+    }
+
+    /// Advertise next-code skills to Face as ACP AvailableCommands (path+scope
+    /// meta → Face `/skillname` InjectSkill path). `$skill` still works via
+    /// [`Self::expand_skill_invocation`] on the prompt seam.
+    async fn emit_available_skills(&self, session_id: &str) {
+        let working_dir = self
+            .sessions
+            .borrow()
+            .get(session_id)
+            .and_then(|s| s.working_dir.clone());
+        let registry = match crate::skill::SkillRegistry::load_for_working_dir(
+            working_dir.as_deref(),
+        ) {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        let commands: Vec<acp::AvailableCommand> = registry
+            .list()
+            .into_iter()
+            .map(|skill| {
+                let scope = if working_dir
+                    .as_ref()
+                    .is_some_and(|wd| skill.path.starts_with(wd))
+                {
+                    "repo"
+                } else {
+                    "user"
+                };
+                let meta = serde_json::json!({
+                    "path": skill.path.display().to_string(),
+                    "scope": scope,
+                });
+                acp::AvailableCommand::new(skill.name.clone(), skill.description.clone())
+                    .meta(meta.as_object().cloned().unwrap_or_default())
+            })
+            .collect();
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                acp::SessionId::new(session_id),
+                acp::SessionUpdate::AvailableCommandsUpdate(acp::AvailableCommandsUpdate::new(
+                    commands,
+                )),
+            ))
+            .await;
+    }
+
+    /// Expand `$skill` / Face `/skill` inject into (user content, system_reminder).
+    fn expand_skill_invocation(
+        text: &str,
+        working_dir: Option<&std::path::Path>,
+    ) -> (String, Option<String>) {
+        let trimmed = text.trim();
+        let invocation = crate::skill::SkillRegistry::parse_invocation(trimmed).or_else(|| {
+            // Face InjectSkill sends `/name [prompt]` — map to `$` namespace.
+            let rest = trimmed.strip_prefix('/')?;
+            let name_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+            let name = &rest[..name_end];
+            if name.is_empty()
+                || !name
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+            {
+                return None;
+            }
+            let prompt = rest[name_end..].trim();
+            Some(crate::skill::SkillInvocation {
+                name,
+                prompt: (!prompt.is_empty()).then_some(prompt),
+            })
+        });
+        let Some(invocation) = invocation else {
+            return (text.to_string(), None);
+        };
+        let Ok(registry) = crate::skill::SkillRegistry::load_for_working_dir(working_dir) else {
+            return (text.to_string(), None);
+        };
+        let Some(skill) = registry.get(invocation.name) else {
+            return (text.to_string(), None);
+        };
+        let reminder = Some(format!("# Active Skill\n\n{}", skill.get_prompt()));
+        let content = invocation
+            .prompt
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                format!(
+                    "(Skill `{}` activated — {})",
+                    skill.name, skill.description
+                )
+            });
+        (content, reminder)
     }
 
     // ── Tool lifecycle helpers (Grok typed ACP) ────────────────
@@ -842,13 +936,16 @@ impl acp::Agent for NextCodeFaceAgent {
         }
 
         let text = Self::prompt_text(&args);
+        let working_dir = session.working_dir.clone();
+        let (content, system_reminder) =
+            Self::expand_skill_invocation(&text, working_dir.as_deref());
         let prompt_id = session.next_id();
         if let Err(err) = session
             .send(&Request::Message {
                 id: prompt_id,
-                content: text,
+                content,
                 images: Vec::new(),
-                system_reminder: None,
+                system_reminder,
             })
             .await
         {

@@ -105,6 +105,27 @@ pub fn product_welcome_status() -> Option<&'static ProductWelcomeStatus> {
     STATUS.get()
 }
 
+/// True when Face is running under the next-code embed (welcome chrome installed).
+#[must_use]
+pub fn is_nextcode_embed() -> bool {
+    product_welcome_status().is_some()
+}
+
+/// xAI-only / brand-unsafe slash commands to hide in the nextcode embed.
+///
+/// Applied via [`crate::slash::registry::CommandRegistry::set_restricted_commands`]
+/// (merged with subscription-tier restrictions). Canonical names, no leading `/`.
+pub const EMBED_BRAND_RESTRICTED_COMMANDS: &[&str] = &[
+    "gboom",
+    "imagine",
+    "imagine-video",
+    "announcements",
+    "marketplace",
+    "plugins",
+    "hooks",
+    "privacy",
+];
+
 /// Prefer product unseen bullets when present; otherwise keep Face/CDN bullets.
 pub fn merge_changelog_bullets(face_bullets: Vec<String>, limit: usize) -> Vec<String> {
     if let Some(status) = product_welcome_status()
@@ -118,6 +139,30 @@ pub fn merge_changelog_bullets(face_bullets: Vec<String>, limit: usize) -> Vec<S
             .collect();
     }
     face_bullets.into_iter().take(limit).collect()
+}
+
+#[cfg(test)]
+mod embed_brand_tests {
+    use super::*;
+
+    #[test]
+    fn embed_brand_list_covers_pr10_matrix() {
+        for name in [
+            "gboom",
+            "imagine",
+            "imagine-video",
+            "announcements",
+            "marketplace",
+            "plugins",
+            "hooks",
+            "privacy",
+        ] {
+            assert!(
+                EMBED_BRAND_RESTRICTED_COMMANDS.contains(&name),
+                "missing {name}"
+            );
+        }
+    }
 }
 
 /// Hero/changelog section title: legacy uses **Updates**, Face stock uses Changelog.

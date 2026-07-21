@@ -5,6 +5,9 @@
 //! pager exits. Primarily for minimal mode, where there is no interactive
 //! scrollback pane and older blocks have scrolled into native history — but it
 //! works in every render mode.
+//!
+//! **Alias hazard (PR10):** Face `/log` opens the transcript. Legacy next-code
+//! TUI `/log` was a log-mark helper. Embed keeps Face meaning.
 
 use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};

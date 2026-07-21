@@ -39,26 +39,31 @@ impl SlashCommand for UsageCommand {
     }
 
     fn suggest_args(&self, _ctx: &AppCtx, _args_query: &str) -> Option<Vec<ArgItem>> {
-        Some(vec![
-            ArgItem {
-                display: "show".to_string(),
-                match_text: "show".to_string(),
-                insert_text: "show".to_string(),
-                description: "View credit usage".to_string(),
-            },
-            ArgItem {
+        let mut items = vec![ArgItem {
+            display: "show".to_string(),
+            match_text: "show".to_string(),
+            insert_text: "show".to_string(),
+            description: "View credit usage".to_string(),
+        }];
+        // nextcode embed: no grok.com billing manage link.
+        if !crate::product_welcome::is_nextcode_embed() {
+            items.push(ArgItem {
                 display: "manage".to_string(),
                 match_text: "manage".to_string(),
                 insert_text: "manage".to_string(),
                 description: "Open billing management page".to_string(),
-            },
-        ])
+            });
+        }
+        Some(items)
     }
 
     fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let arg = args.trim();
         match arg {
             "" | "show" => CommandResult::Action(Action::ShowUsage),
+            "manage" if crate::product_welcome::is_nextcode_embed() => CommandResult::Error(
+                "Billing manage is not available in next-code. Use /usage show, or connect a provider with /connect.".to_string(),
+            ),
             "manage" => {
                 CommandResult::Action(Action::OpenUrl("https://grok.com/?_s=usage".to_string()))
             }

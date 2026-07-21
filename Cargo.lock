@@ -14232,7 +14232,9 @@ version = "0.1.0"
 dependencies = [
  "dirs 6.0.0",
  "dunce",
+ "tempfile",
  "toml 0.8.23",
+ "toml_edit 0.22.27",
 ]
 
 [[package]]
@@ -14306,6 +14308,7 @@ dependencies = [
  "indexmap",
  "insta",
  "libc",
+ "next-code-provider-metadata",
  "next-code-ratatui-inline",
  "next-code-ratatui-textarea",
  "next-code-tui-anim",
@@ -14480,6 +14483,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml 0.8.23",
+ "toml_edit 0.22.27",
  "xai-file-utils",
  "xai-grok-agent",
  "xai-grok-announcements",

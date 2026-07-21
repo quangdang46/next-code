@@ -15,6 +15,7 @@ thiserror = "1"
 tokio = { version = "1", features = ["sync", "macros", "rt"] }
 tokio-util = { version = "0.7", default-features = true }
 toml = "0.8"
+toml_edit = { version = "0.22", features = ["serde"] }
 xai-file-utils = { path = "../xai-file-utils" }
 xai-grok-agent = { path = "../xai-grok-agent" }
 xai-grok-config = { path = "../xai-grok-config" }

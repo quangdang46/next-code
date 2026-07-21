@@ -888,49 +888,177 @@ pub fn load_mcp_servers(
     Vec::new()
 }
 
-// --- PR7 stub surface: disk setters / resolvers (no-op) ---
+// --- PR10: real disk setters → ~/.next-code/config.toml ---
 use std::path::{Path, PathBuf};
 
-pub async fn set_ask_user_question_timeout_enabled(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_auto_dark_theme(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_auto_light_theme(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_auto_update(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_cancel_subagents_on_turn_cancel(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_collapsed_edit_blocks(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_compact_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_contextual_hint_image_input(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_contextual_hint_plan_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_contextual_hint_send_now(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_contextual_hint_small_screen(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_contextual_hint_ssh_wrap(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_contextual_hint_undo(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_contextual_hint_word_select(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_default_model(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_default_selected_permission(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_display_refresh_auto_cadence(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_fork_secondary_model(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_group_tool_verbs(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_hunk_tracker_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_invert_scroll(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_keep_text_selection(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_max_thoughts_width(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_page_flip_on_send(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_prompt_suggestions(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_remember_tool_approvals(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_render_mermaid(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_screen_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_scroll_lines(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_scroll_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_scroll_speed(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_show_thinking_blocks(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_show_timeline(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_show_timestamps(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_show_tips(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_simple_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_theme(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_vim_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_voice_capture_mode(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
-pub async fn set_voice_stt_language(_v: impl serde::Serialize) -> anyhow::Result<()> { Ok(()) }
+fn serialize_to_toml_value(v: impl serde::Serialize) -> anyhow::Result<toml_edit::Value> {
+    let json = serde_json::to_value(v)?;
+    Ok(match json {
+        serde_json::Value::Bool(b) => toml_edit::Value::from(b),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                toml_edit::Value::from(i)
+            } else if let Some(u) = n.as_u64() {
+                toml_edit::Value::from(u as i64)
+            } else if let Some(f) = n.as_f64() {
+                toml_edit::Value::from(f)
+            } else {
+                anyhow::bail!("unsupported number for config write")
+            }
+        }
+        serde_json::Value::String(s) => toml_edit::Value::from(s),
+        other => anyhow::bail!("unsupported setting value kind: {other}"),
+    })
+}
+
+async fn set_ui_key(key: &str, v: impl serde::Serialize) -> anyhow::Result<()> {
+    let value = serialize_to_toml_value(v)?;
+    let key = key.to_string();
+    tokio::task::spawn_blocking(move || {
+        xai_grok_config::set_toml_key("ui", &key, value).map_err(anyhow::Error::from)
+    })
+    .await??;
+    Ok(())
+}
+
+async fn set_ui_nested(sub: &str, key: &str, v: impl serde::Serialize) -> anyhow::Result<()> {
+    let value = serialize_to_toml_value(v)?;
+    let sub = sub.to_string();
+    let key = key.to_string();
+    tokio::task::spawn_blocking(move || {
+        xai_grok_config::set_toml_nested_key("ui", &sub, &key, value).map_err(anyhow::Error::from)
+    })
+    .await??;
+    Ok(())
+}
+
+pub async fn set_ask_user_question_timeout_enabled(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("ask_user_question_timeout_enabled", v).await
+}
+pub async fn set_auto_dark_theme(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("auto_dark_theme", v).await
+}
+pub async fn set_auto_light_theme(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("auto_light_theme", v).await
+}
+pub async fn set_auto_update(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("auto_update", v).await
+}
+pub async fn set_cancel_subagents_on_turn_cancel(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("cancel_subagents_on_turn_cancel", v).await
+}
+pub async fn set_collapsed_edit_blocks(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("collapsed_edit_blocks", v).await
+}
+pub async fn set_compact_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("compact_mode", v).await
+}
+pub async fn set_contextual_hint_image_input(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("contextual_hints", "image_input", v).await
+}
+pub async fn set_contextual_hint_plan_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("contextual_hints", "plan_mode", v).await
+}
+pub async fn set_contextual_hint_send_now(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("contextual_hints", "send_now", v).await
+}
+pub async fn set_contextual_hint_small_screen(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("contextual_hints", "small_screen", v).await
+}
+pub async fn set_contextual_hint_ssh_wrap(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("contextual_hints", "ssh_wrap", v).await
+}
+pub async fn set_contextual_hint_undo(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("contextual_hints", "undo", v).await
+}
+pub async fn set_contextual_hint_word_select(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("contextual_hints", "word_select", v).await
+}
+pub async fn set_default_model(v: impl serde::Serialize) -> anyhow::Result<()> {
+    // Shared with next-code brain: `[provider].default_model`
+    let value = serialize_to_toml_value(v)?;
+    tokio::task::spawn_blocking(move || {
+        xai_grok_config::set_toml_key("provider", "default_model", value).map_err(anyhow::Error::from)
+    })
+    .await??;
+    Ok(())
+}
+pub async fn set_default_selected_permission(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("default_selected_permission", v).await
+}
+pub async fn set_display_refresh_auto_cadence(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("display_refresh", "auto_cadence_enabled", v).await
+}
+pub async fn set_fork_secondary_model(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("fork_secondary_model", v).await
+}
+pub async fn set_group_tool_verbs(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("group_tool_verbs", v).await
+}
+pub async fn set_hunk_tracker_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("hunk_tracker_mode", v).await
+}
+pub async fn set_invert_scroll(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("invert_scroll", v).await
+}
+pub async fn set_keep_text_selection(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("keep_text_selection", v).await
+}
+pub async fn set_max_thoughts_width(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("max_thoughts_width", v).await
+}
+pub async fn set_page_flip_on_send(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("page_flip_on_send", v).await
+}
+pub async fn set_prompt_suggestions(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("prompt_suggestions", v).await
+}
+pub async fn set_remember_tool_approvals(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("remember_tool_approvals", v).await
+}
+pub async fn set_render_mermaid(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("render_mermaid", v).await
+}
+pub async fn set_screen_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("screen_mode", v).await
+}
+pub async fn set_scroll_lines(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("scroll_lines", v).await
+}
+pub async fn set_scroll_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("scroll_mode", v).await
+}
+pub async fn set_scroll_speed(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("scroll_speed", v).await
+}
+pub async fn set_show_thinking_blocks(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("show_thinking_blocks", v).await
+}
+pub async fn set_show_timeline(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("show_timeline", v).await
+}
+pub async fn set_show_timestamps(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("show_timestamps", v).await
+}
+pub async fn set_show_tips(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("show_tips", v).await
+}
+pub async fn set_simple_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("simple_mode", v).await
+}
+pub async fn set_theme(v: impl serde::Serialize) -> anyhow::Result<()> {
+    // Face ThemeKind display name (e.g. "Grok Night") — NOT origin dark/light.
+    set_ui_key("theme", v).await
+}
+pub async fn set_vim_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("vim_mode", v).await
+}
+pub async fn set_voice_capture_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("voice_capture_mode", v).await
+}
+pub async fn set_voice_stt_language(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("voice_stt_language", v).await
+}
 pub async fn update_config(
     f: impl FnOnce(&mut crate::agent::config::Config),
 ) -> anyhow::Result<()> {
@@ -938,9 +1066,15 @@ pub async fn update_config(
     f(&mut cfg);
     Ok(())
 }
-pub fn user_config_path() -> PathBuf { crate::util::grok_home::grok_home().join("config.toml") }
-pub fn project_config_path(cwd: &Path) -> PathBuf { cwd.join(".grok").join("config.toml") }
-pub fn worktree_type() -> WorktreeHintMode { WorktreeHintMode::Never }
+pub fn user_config_path() -> PathBuf {
+    xai_grok_config::user_config_toml_path()
+}
+pub fn project_config_path(cwd: &Path) -> PathBuf {
+    cwd.join(".next-code").join("config.toml")
+}
+pub fn worktree_type() -> WorktreeHintMode {
+    WorktreeHintMode::Never
+}
 
 /// Result of [`effective_yolo_for_launch`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1123,22 +1257,35 @@ pub fn resolve_announcements(
 
 pub fn resolve_collapsed_edit_blocks(
     _requirements: Option<&toml::Value>,
-    _user: Option<&toml::Value>,
+    user: Option<&toml::Value>,
     _managed: Option<&toml::Value>,
     _remote: Option<&RemoteSettings>,
 ) -> Resolved<bool> {
-    // next-code product default: denser resting transcript (edit rows as
-    // one-line +N/-M). Stock grok-build ships false; Face startup primes the
-    // appearance cache from this resolve stub.
+    // Prefer explicit `[ui].collapsed_edit_blocks`; else next-code product
+    // default true (denser resting transcript). Do not regress to grok false.
+    if let Some(v) = user
+        .and_then(|u| u.get("ui"))
+        .and_then(|ui| ui.get("collapsed_edit_blocks"))
+        .and_then(|v| v.as_bool())
+    {
+        return Resolved::new(v, ConfigSource::UserConfig);
+    }
     resolved_bool(true)
 }
 
 pub fn resolve_group_tool_verbs(
     _requirements: Option<&toml::Value>,
-    _user: Option<&toml::Value>,
+    user: Option<&toml::Value>,
     _managed: Option<&toml::Value>,
     _remote: Option<&RemoteSettings>,
 ) -> Resolved<bool> {
+    if let Some(v) = user
+        .and_then(|u| u.get("ui"))
+        .and_then(|ui| ui.get("group_tool_verbs"))
+        .and_then(|v| v.as_bool())
+    {
+        return Resolved::new(v, ConfigSource::UserConfig);
+    }
     resolved_bool(true)
 }
 
@@ -1170,10 +1317,17 @@ pub fn resolve_remote_fetch_enabled() -> bool { false }
 
 pub fn resolve_show_thinking_blocks(
     _requirements: Option<&toml::Value>,
-    _user: Option<&toml::Value>,
+    user: Option<&toml::Value>,
     _managed: Option<&toml::Value>,
     _remote: Option<&RemoteSettings>,
 ) -> Resolved<bool> {
+    if let Some(v) = user
+        .and_then(|u| u.get("ui"))
+        .and_then(|ui| ui.get("show_thinking_blocks"))
+        .and_then(|v| v.as_bool())
+    {
+        return Resolved::new(v, ConfigSource::UserConfig);
+    }
     resolved_bool(true)
 }
 

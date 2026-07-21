@@ -1497,7 +1497,7 @@ impl AppView {
         let restricted = self.team_name.is_none()
             && !self.is_api_key_auth
             && is_restricted_tier(self.subscription_tier.as_deref());
-        let names: Vec<String> = if restricted {
+        let mut names: Vec<String> = if restricted {
             TIER_RESTRICTED_COMMANDS
                 .iter()
                 .map(|n| (*n).to_string())
@@ -1505,6 +1505,15 @@ impl AppView {
         } else {
             Vec::new()
         };
+        // nextcode embed: always hide xAI brand surfaces (merge, don't overwrite).
+        if crate::product_welcome::is_nextcode_embed() {
+            for name in crate::product_welcome::EMBED_BRAND_RESTRICTED_COMMANDS {
+                let s = (*name).to_string();
+                if !names.iter().any(|n| n == &s) {
+                    names.push(s);
+                }
+            }
+        }
         for agent in self.agents.values_mut() {
             agent.set_restricted_commands(&names);
         }
