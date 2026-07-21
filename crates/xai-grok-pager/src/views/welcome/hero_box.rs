@@ -523,7 +523,7 @@ fn render_hero_changelog(
             .fg(theme.gray_bright)
             .add_modifier(Modifier::DIM),
     );
-    let title = "Changelog";
+    let title = crate::product_welcome::updates_section_title();
     buf.set_span(
         area.x,
         area.y,

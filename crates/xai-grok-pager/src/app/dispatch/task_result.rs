@@ -485,8 +485,10 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         }
         TaskResult::ChangelogFetched { markdown, entries } => {
             app.changelog_markdown = markdown;
-            app.changelog_bullets =
+            let face_bullets =
                 xai_grok_shell::util::changelog::bullets_from_entries(&entries, 3);
+            app.changelog_bullets =
+                crate::product_welcome::merge_changelog_bullets(face_bullets, 3);
             vec![]
         }
         TaskResult::ClipboardAttachmentProbed {

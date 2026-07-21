@@ -5,6 +5,15 @@
 //! so any workspace crate can read identical values through e.g.
 //! `next_code_build_meta::VERSION` instead of `env!("NEXT_CODE_VERSION")`.
 
+mod age;
+mod changelog;
+
+pub use age::{binary_age, binary_age_from, format_age};
+pub use changelog::{
+    ChangelogEntry, parse_changelog, take_unseen_changelog_entries,
+    take_unseen_changelog_entries_at, unseen_changelog_subjects,
+};
+
 /// Human-readable version string, e.g. `v0.14.6-dev (abc1234)`.
 pub const VERSION: &str = env!("NEXT_CODE_VERSION");
 /// Short git hash of the build commit, e.g. `abc1234` (or `unknown`).
