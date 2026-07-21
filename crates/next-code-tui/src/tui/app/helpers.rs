@@ -1167,12 +1167,21 @@ pub(super) fn gather_todos_and_goals_for_session(
     (Vec::new(), Vec::new())
 }
 
-pub(super) fn gather_memory_info(memory_enabled: bool) -> Option<MemoryInfo> {
+pub(super) fn gather_memory_info(
+    memory_enabled: bool,
+    working_dir: Option<&str>,
+) -> Option<MemoryInfo> {
     use std::sync::Mutex;
     use std::time::Instant;
 
-    static CACHE: Mutex<Option<(Instant, Option<MemoryInfo>, bool)>> = Mutex::new(None);
+    static CACHE: Mutex<Option<(Instant, Option<String>, Option<MemoryInfo>, bool)>> =
+        Mutex::new(None);
     const TTL: Duration = Duration::from_secs(2);
+
+    let cache_key = working_dir
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
 
     // When memory is disabled we still surface the stored counts (with a
     // DISABLED badge) so the user can see they have memories but recall is off.
@@ -1201,32 +1210,44 @@ pub(super) fn gather_memory_info(memory_enabled: bool) -> Option<MemoryInfo> {
     };
 
     if let Ok(mut guard) = CACHE.lock() {
-        if let Some((ts, cached, refreshing)) = guard.as_mut() {
-            if ts.elapsed() < TTL || *refreshing {
+        if let Some((ts, cached_key, cached, refreshing)) = guard.as_mut() {
+            if cached_key == &cache_key && (ts.elapsed() < TTL || *refreshing) {
                 return match cached.clone() {
                     Some(info) => Some(finalize(info)),
                     None => fallback_memory_info(memory_enabled, &activity, &sidecar_model),
                 };
             }
-            let stale = match cached.clone() {
-                Some(info) => Some(finalize(info)),
-                None => fallback_memory_info(memory_enabled, &activity, &sidecar_model),
+            let stale = if cached_key == &cache_key {
+                match cached.clone() {
+                    Some(info) => Some(finalize(info)),
+                    None => fallback_memory_info(memory_enabled, &activity, &sidecar_model),
+                }
+            } else {
+                fallback_memory_info(memory_enabled, &activity, &sidecar_model)
             };
             *refreshing = true;
-            std::thread::spawn(|| {
-                let result = gather_memory_info_inner();
+            *cached_key = cache_key.clone();
+            let key_for_spawn = cache_key.clone();
+            std::thread::spawn(move || {
+                let result = gather_memory_info_inner(key_for_spawn.as_deref());
                 if let Ok(mut guard) = CACHE.lock() {
-                    *guard = Some((Instant::now(), result, false));
+                    *guard = Some((Instant::now(), key_for_spawn, result, false));
                 }
             });
             return stale;
         }
 
-        *guard = Some((Instant::now() - TTL - Duration::from_secs(1), None, true));
-        std::thread::spawn(|| {
-            let result = gather_memory_info_inner();
+        *guard = Some((
+            Instant::now() - TTL - Duration::from_secs(1),
+            cache_key.clone(),
+            None,
+            true,
+        ));
+        let key_for_spawn = cache_key.clone();
+        std::thread::spawn(move || {
+            let result = gather_memory_info_inner(key_for_spawn.as_deref());
             if let Ok(mut guard) = CACHE.lock() {
-                *guard = Some((Instant::now(), result, false));
+                *guard = Some((Instant::now(), key_for_spawn, result, false));
             }
         });
     }
@@ -1313,8 +1334,14 @@ fn gather_memory_info_with_manager(manager: &crate::memory::MemoryManager) -> Op
 }
 
 /// Gather memory info using MemoryManager directly.
-fn gather_memory_info_inner() -> Option<MemoryInfo> {
-    let manager = crate::memory::MemoryManager::new();
+fn gather_memory_info_inner(working_dir: Option<&str>) -> Option<MemoryInfo> {
+    // Same pattern as memory_agent::manager_for_working_dir / turn_memory.
+    let manager = match working_dir {
+        Some(dir) if !dir.trim().is_empty() => {
+            crate::memory::MemoryManager::new().with_project_dir(dir)
+        }
+        _ => crate::memory::MemoryManager::new(),
+    };
     gather_memory_info_with_manager(&manager)
 }
 

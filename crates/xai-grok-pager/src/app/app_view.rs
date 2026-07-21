@@ -4196,6 +4196,7 @@ impl AppView {
                         {
                             d.restore_peek_viewport(agents);
                         }
+                        let info_float_session_count = agents.len().max(1);
                         if let Some(agent) = agents.get_mut(&id) {
                             let announcement_banner_h =
                                 crate::views::announcements::session_banner_height(
@@ -4213,6 +4214,14 @@ impl AppView {
                             } else {
                                 0
                             };
+                            agent.info_float_session_count = Some(info_float_session_count);
+                            if agent.info_float_provider.is_none() {
+                                agent.info_float_provider = self
+                                    .login_method_id
+                                    .as_ref()
+                                    .map(|id| id.0.to_string())
+                                    .filter(|s| !s.is_empty());
+                            }
                             let result = agent.draw(
                                 agent_area,
                                 f.buffer_mut(),
@@ -4320,7 +4329,10 @@ impl AppView {
                                             &title,
                                             dashboard,
                                             |inner, buf| {
+                                                let session_count = agents.len().max(1);
                                                 if let Some(agent) = agents.get_mut(&agent_id) {
+                                                    agent.info_float_session_count =
+                                                        Some(session_count);
                                                     agent.draw(
                                                         inner,
                                                         buf,
@@ -4733,6 +4745,7 @@ impl AppView {
                 needs_redraw |= child_view.tick_drag_autoscroll();
                 needs_redraw |= child_view.poll_link_modifier();
                 needs_redraw |= child_view.poll_scrollback_search();
+                needs_redraw |= child_view.tick_info_floats();
                 needs_redraw |= child_view.mermaid_tick();
                 needs_redraw |= Self::tick_agent_image_load(child_view);
                 needs_redraw |= Self::tick_agent_block_viewer(child_view);
@@ -4770,6 +4783,7 @@ impl AppView {
             needs_redraw |= agent.tick_selection_highlight();
             needs_redraw |= agent.tick_drag_autoscroll();
             needs_redraw |= agent.poll_link_modifier();
+            needs_redraw |= agent.tick_info_floats();
             needs_redraw |= Self::tick_agent_image_load(agent);
             needs_redraw |= Self::tick_agent_block_viewer(agent);
             if let Some(ref mut viewer) = agent.video_viewer {
@@ -5069,6 +5083,14 @@ impl AppView {
                     });
                 if fast {
                     return TickDemand::Fast;
+                }
+                if agent.last_scroll_activity_at.is_some()
+                    || agent
+                        .subagent_views
+                        .values()
+                        .any(|child| child.last_scroll_activity_at.is_some())
+                {
+                    return TickDemand::Slow;
                 }
                 if cfg!(target_os = "macos")
                     && (agent.needs_link_modifier_poll()

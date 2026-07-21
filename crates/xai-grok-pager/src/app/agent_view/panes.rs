@@ -627,6 +627,7 @@ impl AgentView {
             .unwrap_or(ActivePane::Scrollback);
         match target {
             ActivePane::Scrollback => {
+                self.note_scroll_activity();
                 if lines > 0 {
                     self.scrollback.scroll_down(lines as u16);
                 } else {
