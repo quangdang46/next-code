@@ -612,8 +612,132 @@ fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> b
         "x.ai/mcp/servers_updated" => handle_mcp_servers_updated(notif, app),
         "next-code/token_usage" => handle_next_code_token_usage(notif, app),
         "next-code/provider_name" => handle_next_code_provider_name(notif, app),
+        "next-code/memory_info" => handle_next_code_memory_info(notif, app),
+        "next-code/git_status" => handle_next_code_git_status(notif, app),
         _ => false,
     }
+}
+
+/// next-code daemon memory snapshot → MemoryActivity float.
+fn handle_next_code_memory_info(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(notif.params.get()) else {
+        tracing::warn!("Failed to parse next-code/memory_info");
+        return false;
+    };
+    let Some(session_id) = parsed.get("sessionId").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    let total_count = parsed
+        .get("totalCount")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as usize;
+    let disabled = parsed
+        .get("disabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let activity_summary = parsed
+        .get("activitySummary")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let show_activity = parsed
+        .get("showActivity")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(activity_summary.is_some());
+
+    let info = crate::views::info_floats::MemoryInfo {
+        total_count,
+        disabled,
+        activity_summary,
+        show_activity,
+    };
+    if !info.should_render() && total_count == 0 && !show_activity {
+        // Still store so a later count refresh can clear.
+    }
+
+    let sid = acp::SessionId::new(session_id.to_string());
+    let Some(matched) = find_session_match(app, &sid) else {
+        return false;
+    };
+    let parent_id = matched.agent_id();
+    let is_active = is_matched_agent_active(app, parent_id);
+    let Some(agent) = app.agents.get_mut(&parent_id) else {
+        return false;
+    };
+    match matched {
+        SessionMatch::Root(_) => {
+            agent.info_float_memory = Some(info);
+        }
+        SessionMatch::Child(_) => {
+            let child_key: &str = sid.0.as_ref();
+            if let Some(child) = agent.subagent_views.get_mut(child_key) {
+                child.info_float_memory = Some(info);
+            }
+        }
+    }
+    is_active
+}
+
+/// next-code daemon git porcelain snapshot → GitStatus float.
+fn handle_next_code_git_status(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(notif.params.get()) else {
+        tracing::warn!("Failed to parse next-code/git_status");
+        return false;
+    };
+    let Some(session_id) = parsed.get("sessionId").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    let Some(branch) = parsed
+        .get("branch")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+    else {
+        return false;
+    };
+    let info = crate::views::info_floats::GitInfo {
+        branch,
+        modified: parsed
+            .get("modified")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize,
+        staged: parsed.get("staged").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+        untracked: parsed
+            .get("untracked")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0) as usize,
+        ahead: parsed.get("ahead").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+        behind: parsed.get("behind").and_then(|v| v.as_u64()).unwrap_or(0) as usize,
+        dirty_files: parsed
+            .get("dirtyFiles")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default(),
+    };
+
+    let sid = acp::SessionId::new(session_id.to_string());
+    let Some(matched) = find_session_match(app, &sid) else {
+        return false;
+    };
+    let parent_id = matched.agent_id();
+    let is_active = is_matched_agent_active(app, parent_id);
+    let Some(agent) = app.agents.get_mut(&parent_id) else {
+        return false;
+    };
+    match matched {
+        SessionMatch::Root(_) => {
+            agent.info_float_git = Some(info);
+        }
+        SessionMatch::Child(_) => {
+            let child_key: &str = sid.0.as_ref();
+            if let Some(child) = agent.subagent_views.get_mut(child_key) {
+                child.info_float_git = Some(info);
+            }
+        }
+    }
+    is_active
 }
 
 /// next-code daemon History provider_name → Overview float provider line.

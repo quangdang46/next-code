@@ -10,12 +10,21 @@
 //!   `format_token_k`
 //! - `info_widget_text.rs` — `truncate_smart`, `truncate_chars`
 //! - `app/helpers.rs` — `pretty_model_display_name` (+ claude/title helpers)
+//! - Remaining kinds → [`widgets`] (Memory / Usage / Git / Background / …)
 //!
 //! ## Face-only deltas (wire / overlay)
 //! - Scroll-gated visibility ([`SCROLL_IDLE_HIDE_MS`])
 //! - [`CacheHitInfo::apply_request_sample`] for ACP TokenUsage fold-in
 //! - `Clear` under float boxes (legacy paints into empty margins)
+//! - Separate floats per preferred_side (no Overview merge) while scrolling
 //! - Slim [`InfoFloatData`] = fields those renderers need from `InfoWidgetData`
+
+mod widgets;
+
+pub use widgets::{
+    BackgroundInfo, CompactionInfo, DiagramsInfo, FloatKind, GitInfo, MemoryInfo, Side, SwarmInfo,
+    SwarmMemberFloat, TodoFloatItem, TodosInfo, UsageInfo, UsageProvider, WorkspaceMapInfo,
+};
 
 use std::time::{Duration, Instant};
 
@@ -39,7 +48,7 @@ const DEFAULT_CONTEXT_LIMIT: usize = 200_000;
 
 const FLOAT_INSET: u16 = 1;
 
-fn rgb(r: u8, g: u8, b: u8) -> Color {
+pub(super) fn rgb(r: u8, g: u8, b: u8) -> Color {
     Color::Rgb(r, g, b)
 }
 
@@ -198,7 +207,7 @@ impl CacheHitInfo {
 // Slim input — fields used by copied renderers (from `InfoWidgetData`)
 // ---------------------------------------------------------------------------
 
-/// Subset of legacy `InfoWidgetData` needed by Overview compact + KV summary.
+/// Subset of legacy `InfoWidgetData` needed by Overview + remaining floats.
 #[derive(Debug, Default, Clone)]
 pub struct InfoFloatData {
     pub model: Option<String>,
@@ -217,13 +226,22 @@ pub struct InfoFloatData {
     pub context_limit: Option<usize>,
     pub is_compacting: bool,
     pub cache_hit_info: Option<CacheHitInfo>,
+    pub memory_info: Option<MemoryInfo>,
+    pub usage_info: Option<UsageInfo>,
+    pub git_info: Option<GitInfo>,
+    pub background_info: Option<BackgroundInfo>,
+    pub compaction_info: Option<CompactionInfo>,
+    pub swarm_info: Option<SwarmInfo>,
+    pub todos_info: Option<TodosInfo>,
+    pub workspace_map: Option<WorkspaceMapInfo>,
+    pub diagrams: Option<DiagramsInfo>,
 }
 
 // ---------------------------------------------------------------------------
 // Copied from `info_widget_text.rs`
 // ---------------------------------------------------------------------------
 
-fn truncate_smart(s: &str, max_len: usize) -> String {
+pub(super) fn truncate_smart(s: &str, max_len: usize) -> String {
     let char_len = s.chars().count();
     if char_len <= max_len {
         return s.to_string();
@@ -245,7 +263,7 @@ fn truncate_smart(s: &str, max_len: usize) -> String {
     format!("{}...", prefix)
 }
 
-fn truncate_chars(s: &str, max_chars: usize) -> &str {
+pub(super) fn truncate_chars(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
         Some((idx, _)) => &s[..idx],
         None => s,
@@ -755,21 +773,24 @@ fn paint_bordered_float(buf: &mut Buffer, rect: Rect, lines: Vec<Line<'static>>)
     Paragraph::new(clipped).render(inner, buf);
 }
 
-fn place_right(area: Rect, content_h: u16) -> Option<Rect> {
+fn place_right_at(area: Rect, content_h: u16, y_cursor: u16) -> Option<Rect> {
     let width = MAX_WIDGET_WIDTH.min(area.width.saturating_sub(FLOAT_INSET * 2));
     if width < MIN_WIDGET_WIDTH {
         return None;
     }
     let height = content_h
         .saturating_add(2) // borders
-        .min(area.height.saturating_sub(FLOAT_INSET));
+        .min(area.height.saturating_sub(y_cursor.saturating_sub(area.y)));
     if height < 3 {
         return None;
     }
     let x = area
         .x
         .saturating_add(area.width.saturating_sub(width).saturating_sub(FLOAT_INSET));
-    let y = area.y.saturating_add(FLOAT_INSET.min(area.height.saturating_sub(1)));
+    let y = y_cursor;
+    if y.saturating_add(height) > area.y.saturating_add(area.height) {
+        return None;
+    }
     Some(Rect {
         x,
         y,
@@ -778,19 +799,22 @@ fn place_right(area: Rect, content_h: u16) -> Option<Rect> {
     })
 }
 
-fn place_left(area: Rect, content_h: u16) -> Option<Rect> {
+fn place_left_at(area: Rect, content_h: u16, y_cursor: u16) -> Option<Rect> {
     let width = MAX_WIDGET_WIDTH.min(area.width.saturating_sub(FLOAT_INSET * 2));
     if width < MIN_WIDGET_WIDTH {
         return None;
     }
     let height = content_h
         .saturating_add(2)
-        .min(area.height.saturating_sub(FLOAT_INSET));
+        .min(area.height.saturating_sub(y_cursor.saturating_sub(area.y)));
     if height < 3 {
         return None;
     }
     let x = area.x.saturating_add(FLOAT_INSET);
-    let y = area.y.saturating_add(FLOAT_INSET.min(area.height.saturating_sub(1)));
+    let y = y_cursor;
+    if y.saturating_add(height) > area.y.saturating_add(area.height) {
+        return None;
+    }
     Some(Rect {
         x,
         y,
@@ -799,48 +823,158 @@ fn place_left(area: Rect, content_h: u16) -> Option<Rect> {
     })
 }
 
-/// Paint Right Overview compact + Left KV floats into the scrollback content rect.
+fn overview_has_data(data: &InfoFloatData) -> bool {
+    data.model.is_some()
+        || data.context_ready
+        || data.observed_context_tokens.is_some()
+        || data.context_info_stale
+}
+
+fn measure_kind(kind: FloatKind, data: &InfoFloatData, inner_w: u16) -> Vec<Line<'static>> {
+    match kind {
+        FloatKind::Overview => {
+            let overview_inner = Rect {
+                x: 0,
+                y: 0,
+                width: inner_w.max(1),
+                height: 20,
+            };
+            render_overview_compact_lines(data, overview_inner)
+        }
+        FloatKind::KvCache => data
+            .cache_hit_info
+            .as_ref()
+            .map(render_kv_compact_lines)
+            .unwrap_or_default(),
+        FloatKind::MemoryActivity => data
+            .memory_info
+            .as_ref()
+            .map(|m| widgets::render_memory_compact(m, inner_w))
+            .unwrap_or_default(),
+        FloatKind::UsageLimits => data
+            .usage_info
+            .as_ref()
+            .map(|u| widgets::render_usage_compact(u, inner_w))
+            .unwrap_or_default(),
+        FloatKind::GitStatus => data
+            .git_info
+            .as_ref()
+            .map(|g| widgets::render_git_widget(g, inner_w, 8))
+            .unwrap_or_default(),
+        FloatKind::BackgroundTasks => data
+            .background_info
+            .as_ref()
+            .map(|b| widgets::render_background_lines(b, inner_w as usize))
+            .unwrap_or_default(),
+        FloatKind::Compaction => data
+            .compaction_info
+            .as_ref()
+            .map(|c| widgets::render_compaction_widget(c, inner_w))
+            .unwrap_or_default(),
+        FloatKind::SwarmStatus => data
+            .swarm_info
+            .as_ref()
+            .map(|s| widgets::render_swarm_compact(s, inner_w as usize, 4))
+            .unwrap_or_default(),
+        FloatKind::Todos => data
+            .todos_info
+            .as_ref()
+            .map(widgets::render_todos_compact)
+            .unwrap_or_default(),
+        FloatKind::WorkspaceMap => data
+            .workspace_map
+            .as_ref()
+            .map(|w| widgets::render_workspace_stub(w, inner_w as usize))
+            .unwrap_or_default(),
+        FloatKind::Diagrams => data
+            .diagrams
+            .as_ref()
+            .map(|d| widgets::render_diagrams_stub(d, inner_w as usize))
+            .unwrap_or_default(),
+    }
+}
+
+fn kind_has_data(kind: FloatKind, data: &InfoFloatData) -> bool {
+    match kind {
+        FloatKind::Overview => overview_has_data(data),
+        FloatKind::KvCache => data
+            .cache_hit_info
+            .as_ref()
+            .is_some_and(|c| render_kv_cache_summary_line(c).is_some()),
+        FloatKind::MemoryActivity => widgets::memory_has_data(data.memory_info.as_ref()),
+        FloatKind::UsageLimits => widgets::usage_has_data(data.usage_info.as_ref()),
+        FloatKind::GitStatus => widgets::git_has_data(data.git_info.as_ref()),
+        FloatKind::BackgroundTasks => widgets::background_has_data(data.background_info.as_ref()),
+        FloatKind::Compaction => widgets::compaction_has_data(data.compaction_info.as_ref()),
+        FloatKind::SwarmStatus => widgets::swarm_has_data(data.swarm_info.as_ref()),
+        FloatKind::Todos => widgets::todos_has_data(data.todos_info.as_ref()),
+        FloatKind::WorkspaceMap => widgets::workspace_has_data(data.workspace_map.as_ref()),
+        FloatKind::Diagrams => widgets::diagrams_has_data(data.diagrams.as_ref()),
+    }
+}
+
+/// Paint separate Left/Right floats stacked by priority (no Overview merge).
 ///
-/// Placement mirrors legacy `preferred_side`: Overview/Context → Right, KvCache → Left.
+/// Placement mirrors legacy `preferred_side`; Face keeps floats distinct so the
+/// full set is visible while scrolling.
 pub fn render_info_floats(buf: &mut Buffer, area: Rect, data: &InfoFloatData) {
     if area.width < MIN_WIDGET_WIDTH || area.height < 3 {
         return;
     }
 
-    // Measure Overview with provisional inner width (outer - borders).
     let provisional_inner_w = MAX_WIDGET_WIDTH
         .min(area.width.saturating_sub(FLOAT_INSET * 2))
         .saturating_sub(2);
-    let overview_inner = Rect {
-        x: 0,
-        y: 0,
-        width: provisional_inner_w.max(1),
-        height: area.height.saturating_sub(2).max(1),
-    };
-    let overview_lines = render_overview_compact_lines(data, overview_inner);
-    if !overview_lines.is_empty()
-        && let Some(rect) = place_right(area, overview_lines.len() as u16)
-    {
-        let inner_w = rect.width.saturating_sub(2).max(1);
-        let lines = render_overview_compact_lines(
-            data,
-            Rect {
-                x: 0,
-                y: 0,
-                width: inner_w,
-                height: rect.height.saturating_sub(2).max(1),
-            },
-        );
-        paint_bordered_float(buf, rect, lines);
-    }
 
-    if let Some(cache) = data.cache_hit_info.as_ref() {
-        let kv_lines = render_kv_compact_lines(cache);
-        if !kv_lines.is_empty()
-            && let Some(rect) = place_left(area, kv_lines.len() as u16)
-        {
-            paint_bordered_float(buf, rect, kv_lines);
+    let mut kinds: Vec<FloatKind> = [
+        FloatKind::MemoryActivity, // Face: elevated — show before Diagrams stub
+        FloatKind::Diagrams,
+        FloatKind::WorkspaceMap,
+        FloatKind::Overview,
+        FloatKind::Todos,
+        FloatKind::UsageLimits,
+        FloatKind::KvCache,
+        FloatKind::Compaction,
+        FloatKind::BackgroundTasks,
+        FloatKind::GitStatus,
+        FloatKind::SwarmStatus,
+    ]
+    .into_iter()
+    .filter(|k| kind_has_data(*k, data))
+    .collect();
+    kinds.sort_by_key(|k| k.priority());
+
+    let mut left_y = area.y.saturating_add(FLOAT_INSET.min(area.height.saturating_sub(1)));
+    let mut right_y = left_y;
+
+    for kind in kinds {
+        let lines = measure_kind(kind, data, provisional_inner_w.max(1));
+        if lines.is_empty() {
+            continue;
         }
+        let content_h = lines.len() as u16;
+        let rect = match kind.preferred_side() {
+            Side::Right => {
+                let r = place_right_at(area, content_h, right_y);
+                if let Some(rect) = r {
+                    right_y = rect.y.saturating_add(rect.height).saturating_add(1);
+                }
+                r
+            }
+            Side::Left => {
+                let r = place_left_at(area, content_h, left_y);
+                if let Some(rect) = r {
+                    left_y = rect.y.saturating_add(rect.height).saturating_add(1);
+                }
+                r
+            }
+        };
+        let Some(rect) = rect else {
+            continue;
+        };
+        let inner_w = rect.width.saturating_sub(2).max(1);
+        let paint_lines = measure_kind(kind, data, inner_w);
+        paint_bordered_float(buf, rect, paint_lines);
     }
 }
 

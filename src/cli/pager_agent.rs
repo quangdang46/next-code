@@ -231,6 +231,8 @@ impl NextCodeFaceAgent {
         if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
             self.emit_provider_name(&session_id, provider).await;
         }
+        self.emit_memory_info(&session_id).await;
+        self.emit_git_status(&session_id).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -300,6 +302,8 @@ impl NextCodeFaceAgent {
         if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
             self.emit_provider_name(&attached, provider).await;
         }
+        self.emit_memory_info(&attached).await;
+        self.emit_git_status(&attached).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -525,6 +529,89 @@ impl NextCodeFaceAgent {
             .gateway
             .ext_notification(acp::ExtNotification::new(
                 "next-code/provider_name",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    /// Bridge local MemoryManager counts + activity into Face MemoryActivity float.
+    async fn emit_memory_info(&self, session_id: &str) {
+        let manager = crate::memory::MemoryManager::new();
+        let project_count = manager
+            .load_project_graph()
+            .ok()
+            .map(|g| g.memory_count())
+            .unwrap_or(0);
+        let global_count = manager
+            .load_global_graph()
+            .ok()
+            .map(|g| g.memory_count())
+            .unwrap_or(0);
+        let total_count = project_count + global_count;
+        let activity = crate::memory::get_activity();
+        let (activity_summary, show_activity) = match activity.as_ref() {
+            Some(a) if a.is_processing() => {
+                let summary = match &a.state {
+                    crate::memory_types::MemoryState::Embedding => "searching",
+                    crate::memory_types::MemoryState::SidecarChecking { .. } => "verifying",
+                    crate::memory_types::MemoryState::FoundRelevant { .. } => "ready",
+                    crate::memory_types::MemoryState::Extracting { .. } => "saving",
+                    crate::memory_types::MemoryState::Maintaining { .. } => "updating",
+                    crate::memory_types::MemoryState::ToolAction { .. } => "tool",
+                    crate::memory_types::MemoryState::Idle => "working",
+                };
+                (Some(summary.to_string()), true)
+            }
+            Some(_) => (Some("idle".to_string()), false),
+            None => (None, false),
+        };
+        if total_count == 0 && !show_activity {
+            return;
+        }
+        let payload = serde_json::json!({
+            "sessionId": session_id,
+            "totalCount": total_count,
+            "disabled": false,
+            "activitySummary": activity_summary,
+            "showActivity": show_activity,
+        });
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "next-code/memory_info",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    /// Bridge git porcelain into Face GitStatus float (same gather as TUI widget).
+    async fn emit_git_status(&self, session_id: &str) {
+        let Some(info) = gather_git_status_snapshot() else {
+            return;
+        };
+        if !info.is_interesting {
+            return;
+        }
+        let payload = serde_json::json!({
+            "sessionId": session_id,
+            "branch": info.branch,
+            "modified": info.modified,
+            "staged": info.staged,
+            "untracked": info.untracked,
+            "ahead": info.ahead,
+            "behind": info.behind,
+            "dirtyFiles": info.dirty_files,
+        });
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "next-code/git_status",
                 std::sync::Arc::from(raw),
             ))
             .await;
@@ -788,6 +875,10 @@ impl acp::Agent for NextCodeFaceAgent {
                     }
                     self.emit_models_update(&model, provider_name.as_deref(), &[]).await;
                 }
+                ServerEvent::MemoryActivity { activity } => {
+                    crate::memory::apply_remote_activity_snapshot(&activity);
+                    self.emit_memory_info(&session_id).await;
+                }
                 ServerEvent::Done { id } if id == prompt_id => break acp::StopReason::EndTurn,
                 ServerEvent::Error { id, message, .. } if id == prompt_id => {
                     self.emit_text(&session_id, format!("Error: {message}"))
@@ -897,4 +988,115 @@ mod tests {
         assert_eq!(NextCodeFaceAgent::tool_kind("Unknown"), acp::ToolKind::Other);
         assert_eq!(NextCodeFaceAgent::tool_kind("Search"), acp::ToolKind::Other);
     }
+}
+
+/// Paste of TUI `gather_git_info_inner` for Face float bridge (no tui dep from Face).
+struct GitStatusSnapshot {
+    branch: String,
+    modified: usize,
+    staged: usize,
+    untracked: usize,
+    ahead: usize,
+    behind: usize,
+    dirty_files: Vec<String>,
+    is_interesting: bool,
+}
+
+fn gather_git_status_snapshot() -> Option<GitStatusSnapshot> {
+    use std::process::Command;
+
+    let in_repo = Command::new("git")
+        .args(["rev-parse", "--is-inside-work-tree"])
+        .output()
+        .ok()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !in_repo {
+        return None;
+    }
+
+    let branch = Command::new("git")
+        .args(["branch", "--show-current"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                let b = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                if b.is_empty() {
+                    None
+                } else {
+                    Some(b)
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or_else(|| "HEAD".to_string());
+
+    let mut modified = 0;
+    let mut staged = 0;
+    let mut untracked = 0;
+    let mut dirty_files = Vec::new();
+
+    if let Ok(output) = Command::new("git").args(["status", "--porcelain"]).output()
+        && output.status.success()
+    {
+        let status = String::from_utf8_lossy(&output.stdout);
+        for line in status.lines() {
+            if line.len() < 3 {
+                continue;
+            }
+            let index_status = line.as_bytes()[0];
+            let worktree_status = line.as_bytes()[1];
+            let file_path = line[3..].to_string();
+            if index_status == b'?' {
+                untracked += 1;
+            } else {
+                if index_status != b' ' && index_status != b'?' {
+                    staged += 1;
+                }
+                if worktree_status != b' ' && worktree_status != b'?' {
+                    modified += 1;
+                }
+            }
+            if dirty_files.len() < 10 {
+                dirty_files.push(file_path);
+            }
+        }
+    }
+
+    let (ahead, behind) = Command::new("git")
+        .args(["rev-list", "--left-right", "--count", "HEAD...@{upstream}"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            if o.status.success() {
+                let text = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                let parts: Vec<&str> = text.split('\t').collect();
+                if parts.len() == 2 {
+                    Some((
+                        parts[0].parse::<usize>().unwrap_or(0),
+                        parts[1].parse::<usize>().unwrap_or(0),
+                    ))
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        })
+        .unwrap_or((0, 0));
+
+    let is_interesting =
+        modified > 0 || staged > 0 || untracked > 0 || ahead > 0 || behind > 0;
+    Some(GitStatusSnapshot {
+        branch,
+        modified,
+        staged,
+        untracked,
+        ahead,
+        behind,
+        dirty_files,
+        is_interesting,
+    })
 }

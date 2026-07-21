@@ -102,6 +102,9 @@ impl AgentView {
             last_scroll_activity_at: None,
             info_float_provider: None,
             info_float_session_count: None,
+            info_float_memory: None,
+            info_float_git: None,
+            info_float_compaction: None,
             chat_kind: false,
             app_chat_mode: false,
             credit_balance: None,
@@ -763,9 +766,14 @@ impl AgentView {
         self.last_scroll_activity_at = Some(Instant::now());
     }
 
-    /// Build slim Overview/KV float input from Face session state (wire into copied renderers).
+    /// Build slim float input from Face session state (wire into copied renderers).
     pub(crate) fn build_info_float_data(&self) -> crate::views::info_floats::InfoFloatData {
-        use crate::views::info_floats::{AuthMethod, InfoFloatData};
+        use crate::views::info_floats::{
+            AuthMethod, BackgroundInfo, InfoFloatData, SwarmInfo, SwarmMemberFloat, TodoFloatItem,
+            TodosInfo, UsageInfo, UsageProvider,
+        };
+        use crate::app::agent::BgTaskStatus;
+        use xai_grok_shell::tools::TodoStatus;
 
         let used = self.context_state.as_ref().map(|c| c.used);
         // Prefer catalog context window over TokenUsage snapshots that collapsed
@@ -784,6 +792,121 @@ impl AgentView {
             .reasoning_effort
             .map(|e| e.to_string());
 
+        let is_compacting = self
+            .info_float_compaction
+            .as_ref()
+            .is_some_and(|c| c.is_compacting)
+            || matches!(
+                self.resolve_turn_activity(),
+                Some(crate::acp::tracker::TurnActivity::AutoCompacting)
+            );
+
+        let todos_info = {
+            let items: Vec<TodoFloatItem> = self
+                .todo
+                .todos()
+                .iter()
+                .map(|t| TodoFloatItem {
+                    content: t.content.clone(),
+                    status: match t.status {
+                        TodoStatus::Pending => "pending".into(),
+                        TodoStatus::InProgress => "in_progress".into(),
+                        TodoStatus::Completed => "completed".into(),
+                        TodoStatus::Cancelled => "cancelled".into(),
+                    },
+                })
+                .collect();
+            (!items.is_empty()).then_some(TodosInfo {
+                items,
+                are_swarm_plan: false,
+            })
+        };
+
+        let background_info = {
+            let running: Vec<_> = self
+                .session
+                .bg_tasks
+                .values()
+                .filter(|t| matches!(t.status, BgTaskStatus::Running) && !t.pending_kill)
+                .collect();
+            (!running.is_empty()).then(|| {
+                let running_tasks: Vec<String> = running
+                    .iter()
+                    .map(|t| {
+                        t.description
+                            .clone()
+                            .filter(|d| !d.trim().is_empty())
+                            .unwrap_or_else(|| t.command.clone())
+                    })
+                    .collect();
+                BackgroundInfo {
+                    running_count: running.len(),
+                    progress_detail: None,
+                    running_tasks,
+                }
+            })
+        };
+
+        let swarm_info = {
+            let managed: Vec<SwarmMemberFloat> = self
+                .subagent_sessions
+                .values()
+                .map(|s| SwarmMemberFloat {
+                    session_id: s.child_session_id.to_string(),
+                    friendly_name: Some(
+                        s.description
+                            .chars()
+                            .take(24)
+                            .collect::<String>(),
+                    ),
+                    status: if s.finished {
+                        s.status
+                            .as_deref()
+                            .unwrap_or("completed")
+                            .to_string()
+                    } else if s.pending_kill {
+                        "stopped".into()
+                    } else {
+                        "running".into()
+                    },
+                    detail: s.activity_label.clone(),
+                    role: s.role.as_ref().map(|r| r.to_string()),
+                })
+                .collect();
+            (!managed.is_empty()).then_some(SwarmInfo {
+                managed_members: managed,
+                plan_progress: None,
+            })
+        };
+
+        let usage_info = self.credit_balance.as_ref().map(|bal| {
+            let used_frac = (bal.effective_usage_pct / 100.0).clamp(0.0, 1.0) as f32;
+            UsageInfo {
+                provider: UsageProvider::Credits,
+                primary_limit_label: Some(bal.usage_label().to_string()),
+                five_hour: used_frac,
+                five_hour_resets_at: bal.period_end_display.clone(),
+                available: true,
+                ..Default::default()
+            }
+        });
+
+        let mut compaction_info = self.info_float_compaction.clone();
+        if is_compacting {
+            match compaction_info.as_mut() {
+                Some(c) => c.is_compacting = true,
+                None => {
+                    compaction_info = Some(crate::views::info_floats::CompactionInfo {
+                        is_compacting: true,
+                        compacted_messages: 0,
+                        active_messages: 0,
+                        summary_chars: 0,
+                        mode: "auto".into(),
+                    });
+                }
+            }
+        }
+
         InfoFloatData {
             model: self.session.models.current_model_name(),
             reasoning_effort,
@@ -801,8 +924,17 @@ impl AgentView {
             context_ready,
             observed_context_tokens: used,
             context_limit: total.map(|t| t as usize),
-            is_compacting: false,
+            is_compacting,
             cache_hit_info: self.kv_cache_info.clone(),
+            memory_info: self.info_float_memory.clone(),
+            usage_info,
+            git_info: self.info_float_git.clone(),
+            background_info,
+            compaction_info,
+            swarm_info,
+            todos_info,
+            workspace_map: None, // Face: no workspace_client — deferred
+            diagrams: None,      // Face: mermaid image float deferred
         }
     }
 

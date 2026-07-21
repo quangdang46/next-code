@@ -834,6 +834,12 @@ pub struct AgentView {
     pub info_float_provider: Option<String>,
     /// Open session count for Overview float sessions line (wired from AppView).
     pub info_float_session_count: Option<usize>,
+    /// Memory float snapshot from `next-code/memory_info` ACP ext.
+    pub info_float_memory: Option<crate::views::info_floats::MemoryInfo>,
+    /// Git float snapshot from `next-code/git_status` ACP ext.
+    pub info_float_git: Option<crate::views::info_floats::GitInfo>,
+    /// Compaction float card (AutoCompact* session updates).
+    pub info_float_compaction: Option<crate::views::info_floats::CompactionInfo>,
     /// Gateway light-frontend session (`kind: "chat"` / `--chat` / conversation
     /// resume). Suppresses Build credits / local sampler context telemetry so the
     /// status bar and prompt never imply remote usage from wrong metrics.
