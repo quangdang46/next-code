@@ -197,9 +197,43 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
                 &mut agent.scrollback,
                 is_api_key_auth,
             );
-            if let XaiSessionUpdate::AutoCompactCompleted { tokens_after, .. } = update {
-                refresh_context_used(agent, *tokens_after);
-                agent.todo.update_todos(Vec::new());
+            match update {
+                XaiSessionUpdate::AutoCompactStarted { .. } => {
+                    agent.info_float_compaction =
+                        Some(crate::views::info_floats::CompactionInfo {
+                            is_compacting: true,
+                            compacted_messages: 0,
+                            active_messages: 0,
+                            summary_chars: 0,
+                            mode: "auto".into(),
+                        });
+                }
+                XaiSessionUpdate::AutoCompactCompleted {
+                    tokens_before,
+                    tokens_after,
+                    ..
+                } => {
+                    refresh_context_used(agent, *tokens_after);
+                    agent.todo.update_todos(Vec::new());
+                    let before = tokens_before.unwrap_or(*tokens_after);
+                    agent.info_float_compaction =
+                        Some(crate::views::info_floats::CompactionInfo {
+                            is_compacting: false,
+                            compacted_messages: 1,
+                            active_messages: 0,
+                            summary_chars: before
+                                .saturating_sub(*tokens_after)
+                                .saturating_mul(4) as usize,
+                            mode: "auto".into(),
+                        });
+                }
+                XaiSessionUpdate::AutoCompactFailed { .. }
+                | XaiSessionUpdate::AutoCompactCancelled { .. } => {
+                    if let Some(c) = agent.info_float_compaction.as_mut() {
+                        c.is_compacting = false;
+                    }
+                }
+                _ => {}
             }
             changed
         }

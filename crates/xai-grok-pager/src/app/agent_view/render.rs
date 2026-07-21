@@ -1676,6 +1676,19 @@ impl AgentView {
                     }
                 }
             }
+            // Scroll-gated info floats (right-stacked, Overview merge) —
+            // paste-copy of legacy compact chrome; status-bar context chip stays above.
+            if crate::views::info_floats::floats_visible(
+                self.last_scroll_activity_at,
+                std::time::Instant::now(),
+            ) {
+                let float_data = self.build_info_float_data();
+                crate::views::info_floats::render_info_floats(
+                    buf,
+                    layout.scrollback_content,
+                    &float_data,
+                );
+            }
         }
         if self.block_viewer.is_none() && !search_active {
             use crate::appearance::FollowIndicator;
