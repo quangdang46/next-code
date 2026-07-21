@@ -98,6 +98,10 @@ impl AgentView {
             modal_buttons: Vec::new(),
             modal_hovered_key: None,
             context_state: None,
+            kv_cache_info: None,
+            last_scroll_activity_at: None,
+            info_float_provider: None,
+            info_float_session_count: None,
             chat_kind: false,
             app_chat_mode: false,
             credit_balance: None,
@@ -718,6 +722,7 @@ impl AgentView {
     pub fn apply_full_context_info(&mut self, next: xai_grok_shell::session::ContextInfo) {
         if self.chat_kind {
             self.context_state = None;
+            self.kv_cache_info = None;
             return;
         }
         self.context_state = Some(next);
@@ -751,6 +756,99 @@ impl AgentView {
                     used, total,
                 ));
             }
+        }
+    }
+    /// Stamp scroll activity so Context/KV floats stay visible for the idle window.
+    pub fn note_scroll_activity(&mut self) {
+        self.last_scroll_activity_at = Some(Instant::now());
+    }
+
+    /// Build slim Overview/KV float input from Face session state (wire into copied renderers).
+    pub(crate) fn build_info_float_data(&self) -> crate::views::info_floats::InfoFloatData {
+        use crate::views::info_floats::{AuthMethod, InfoFloatData};
+
+        let used = self.context_state.as_ref().map(|c| c.used);
+        // Prefer catalog context window over TokenUsage snapshots that collapsed
+        // total==used when the model window was still unknown.
+        let total = self.session.models.get_context_window().or_else(|| {
+            self.context_state
+                .as_ref()
+                .and_then(|c| (c.total > 0 && c.total != c.used).then_some(c.total))
+        });
+        let context_ready = matches!((used, total), (Some(u), Some(t)) if u > 0 || t > 0)
+            || used.is_some_and(|u| u > 0);
+
+        let reasoning_effort = self
+            .session
+            .models
+            .reasoning_effort
+            .map(|e| e.to_string());
+
+        InfoFloatData {
+            model: self.session.models.current_model_name(),
+            reasoning_effort,
+            service_tier: None,
+            native_compaction_mode: None,
+            native_compaction_threshold_tokens: None,
+            session_count: self.info_float_session_count,
+            session_name: self
+                .display_name
+                .clone()
+                .or_else(|| self.generated_session_title.clone()),
+            provider_name: self.info_float_provider.clone(),
+            auth_method: AuthMethod::Unknown,
+            context_info_stale: false,
+            context_ready,
+            observed_context_tokens: used,
+            context_limit: total.map(|t| t as usize),
+            is_compacting: false,
+            cache_hit_info: self.kv_cache_info.clone(),
+        }
+    }
+
+    /// Keep redrawing while scroll-gated floats are visible; clear stamp on expiry.
+    pub(crate) fn tick_info_floats(&mut self) -> bool {
+        let Some(at) = self.last_scroll_activity_at else {
+            return false;
+        };
+        if crate::views::info_floats::floats_visible(Some(at), Instant::now()) {
+            true
+        } else {
+            self.last_scroll_activity_at = None;
+            true
+        }
+    }
+    /// Fold daemon TokenUsage (+ optional cache fields) into context + KV float state.
+    ///
+    /// No-op for gateway/chat-kind sessions.
+    pub fn apply_token_usage_sample(
+        &mut self,
+        input: u64,
+        _output: u64,
+        cache_read_input: Option<u64>,
+        cache_creation_input: Option<u64>,
+    ) {
+        if self.chat_kind {
+            self.context_state = None;
+            self.kv_cache_info = None;
+            return;
+        }
+        let read = cache_read_input.unwrap_or(0);
+        let creation = cache_creation_input.unwrap_or(0);
+        let used = if cache_read_input.is_some() || cache_creation_input.is_some() {
+            crate::views::info_floats::effective_prompt_tokens(input, read, creation)
+        } else {
+            input
+        };
+        if used > 0 {
+            let total = self.session.models.get_context_window().unwrap_or(0);
+            self.apply_context_used(used, total);
+        }
+        if cache_read_input.is_some() || cache_creation_input.is_some() {
+            let cache = self
+                .kv_cache_info
+                .get_or_insert_with(crate::views::info_floats::CacheHitInfo::default);
+            cache.apply_request_sample(input, cache_read_input, cache_creation_input);
         }
     }
     /// Apply Build coding-credit balance only for non-chat agents.

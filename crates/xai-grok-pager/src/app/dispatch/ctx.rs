@@ -102,6 +102,7 @@ pub(super) fn with_scrollback(app: &mut AppView, f: impl FnOnce(&mut ScrollbackS
 /// scrolling away from the selected region should dismiss the highlight.
 pub(super) fn navigate_clearing_selection(app: &mut AppView, f: impl FnOnce(&mut ScrollbackState)) {
     with_active_agent(app, |agent| {
+        agent.note_scroll_activity();
         agent.persistent_text_selection = None;
         agent.table_selection_geometry = None;
         agent.selection_created_at = None;

@@ -20,6 +20,12 @@ use xai_acp_lib::AcpGatewaySender;
 use crate::protocol::{Request, ServerEvent};
 use crate::transport::{ReadHalf, WriteHalf};
 
+/// Bootstrap fields Face needs for Overview floats (model + provider).
+struct SessionBootstrap {
+    session: Rc<DaemonSession>,
+    models: Option<acp::SessionModelState>,
+}
+
 struct DaemonSession {
     session_id: String,
     reader: Mutex<BufReader<ReadHalf>>,
@@ -95,6 +101,63 @@ async fn request_history(session: &DaemonSession) -> Result<ServerEvent> {
     }
 }
 
+/// Build ACP `SessionModelState` from daemon History fields so Face Overview
+/// gets model + context window (not a Context-only chip).
+fn session_model_state_from_history(
+    provider_model: Option<&str>,
+    available_models: &[String],
+    provider_name: Option<&str>,
+) -> Option<acp::SessionModelState> {
+    let current = provider_model
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            available_models
+                .iter()
+                .map(|s| s.trim())
+                .find(|s| !s.is_empty())
+                .map(str::to_string)
+        })?;
+
+    let mut ids: Vec<String> = Vec::new();
+    for id in available_models
+        .iter()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+    {
+        if !ids.iter().any(|existing| existing == &id) {
+            ids.push(id);
+        }
+    }
+    if !ids.iter().any(|id| id == &current) {
+        ids.insert(0, current.clone());
+    }
+
+    let available: Vec<acp::ModelInfo> = ids
+        .into_iter()
+        .map(|id| {
+            let mut info = acp::ModelInfo::new(acp::ModelId::new(std::sync::Arc::from(id.as_str())), id.clone());
+            if let Some(limit) =
+                next_code_provider_core::context_limit_for_model_with_provider(&id, provider_name)
+            {
+                info = info.meta(
+                    serde_json::json!({ "totalContextTokens": limit })
+                        .as_object()
+                        .cloned(),
+                );
+            }
+            info
+        })
+        .collect();
+
+    Some(acp::SessionModelState::new(
+        acp::ModelId::new(std::sync::Arc::from(current.as_str())),
+        available,
+    ))
+}
+
 /// Face-facing ACP agent: Client (pager) ↔ this ↔ next-code `serve` socket.
 pub(crate) struct NextCodeFaceAgent {
     gateway: AcpGatewaySender<acp::AgentSide>,
@@ -121,7 +184,7 @@ impl NextCodeFaceAgent {
         Ok(stream.into_split())
     }
 
-    async fn create_session(&self, cwd: PathBuf) -> Result<Rc<DaemonSession>> {
+    async fn create_session(&self, cwd: PathBuf) -> Result<SessionBootstrap> {
         let (reader, writer) = Self::connect_halves().await?;
         let session = DaemonSession::new(String::new(), reader, writer, 2);
         let subscribe_id = 1;
@@ -139,10 +202,22 @@ impl NextCodeFaceAgent {
             .await?;
         wait_for_done(&session, subscribe_id).await?;
         let history = request_history(&session).await?;
-        let session_id = match history {
-            ServerEvent::History { session_id, .. } => session_id,
+        let (session_id, provider_name, provider_model, available_models) = match history {
+            ServerEvent::History {
+                session_id,
+                provider_name,
+                provider_model,
+                available_models,
+                ..
+            } => (session_id, provider_name, provider_model, available_models),
             other => anyhow::bail!("expected history after session creation, got {other:?}"),
         };
+
+        let models = session_model_state_from_history(
+            provider_model.as_deref(),
+            &available_models,
+            provider_name.as_deref(),
+        );
 
         let live = Rc::new(DaemonSession::new(
             session_id.clone(),
@@ -152,11 +227,17 @@ impl NextCodeFaceAgent {
         ));
         self.sessions
             .borrow_mut()
-            .insert(session_id, live.clone());
-        Ok(live)
+            .insert(session_id.clone(), live.clone());
+        if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
+            self.emit_provider_name(&session_id, provider).await;
+        }
+        Ok(SessionBootstrap {
+            session: live,
+            models,
+        })
     }
 
-    async fn attach_session(&self, target: String) -> Result<Rc<DaemonSession>> {
+    async fn attach_session(&self, target: String) -> Result<SessionBootstrap> {
         let (reader, writer) = Self::connect_halves().await?;
         let session = DaemonSession::new(String::new(), reader, writer, 2);
         let resume_id = 1;
@@ -171,11 +252,29 @@ impl NextCodeFaceAgent {
             .await?;
 
         let mut attached = target;
+        let mut provider_name: Option<String> = None;
+        let mut provider_model: Option<String> = None;
+        let mut available_models: Vec<String> = Vec::new();
         loop {
             match session.read_event().await? {
                 ServerEvent::Ack { .. } => {}
-                ServerEvent::History { session_id, .. } => {
+                ServerEvent::History {
+                    session_id,
+                    provider_name: hist_provider,
+                    provider_model: hist_model,
+                    available_models: hist_models,
+                    ..
+                } => {
                     attached = session_id;
+                    if hist_provider.is_some() {
+                        provider_name = hist_provider;
+                    }
+                    if hist_model.is_some() {
+                        provider_model = hist_model;
+                    }
+                    if !hist_models.is_empty() {
+                        available_models = hist_models;
+                    }
                 }
                 ServerEvent::Done { id } if id == resume_id => break,
                 ServerEvent::Error { id, message, .. } if id == resume_id => {
@@ -185,14 +284,26 @@ impl NextCodeFaceAgent {
             }
         }
 
+        let models = session_model_state_from_history(
+            provider_model.as_deref(),
+            &available_models,
+            provider_name.as_deref(),
+        );
+
         let live = Rc::new(DaemonSession::new(
             attached.clone(),
             session.reader.into_inner().into_inner(),
             session.writer.into_inner(),
             session.next_request_id.load(Ordering::Relaxed),
         ));
-        self.sessions.borrow_mut().insert(attached, live.clone());
-        Ok(live)
+        self.sessions.borrow_mut().insert(attached.clone(), live.clone());
+        if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
+            self.emit_provider_name(&attached, provider).await;
+        }
+        Ok(SessionBootstrap {
+            session: live,
+            models,
+        })
     }
 
     async fn emit_text(&self, session_id: &str, text: String) {
@@ -373,6 +484,76 @@ impl NextCodeFaceAgent {
             .await;
     }
 
+    /// Bridge daemon TokenUsage into Face via ext notification (context + KV floats).
+    async fn emit_token_usage(
+        &self,
+        session_id: &str,
+        input: u64,
+        output: u64,
+        cache_read_input: Option<u64>,
+        cache_creation_input: Option<u64>,
+    ) {
+        let payload = serde_json::json!({
+            "sessionId": session_id,
+            "input": input,
+            "output": output,
+            "cacheReadInput": cache_read_input,
+            "cacheCreationInput": cache_creation_input,
+        });
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "next-code/token_usage",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    /// Bridge daemon History `provider_name` into Face Overview float.
+    async fn emit_provider_name(&self, session_id: &str, provider_name: &str) {
+        let payload = serde_json::json!({
+            "sessionId": session_id,
+            "providerName": provider_name,
+        });
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "next-code/provider_name",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    /// Mid-session model switch → Face catalog (Overview + prompt chrome).
+    async fn emit_models_update(
+        &self,
+        model: &str,
+        provider_name: Option<&str>,
+        available: &[String],
+    ) {
+        let Some(state) =
+            session_model_state_from_history(Some(model), available, provider_name)
+        else {
+            return;
+        };
+        let Ok(raw) = serde_json::value::to_raw_value(&state) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "x.ai/models/update",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
     /// Title string for a tool, matching stock EventMapper.
     fn tool_title(name: &str) -> String {
         if name.starts_with("Bash") {
@@ -444,9 +625,14 @@ impl acp::Agent for NextCodeFaceAgent {
     ) -> acp::Result<acp::NewSessionResponse> {
         let cwd = args.cwd;
         match self.create_session(cwd).await {
-            Ok(session) => Ok(acp::NewSessionResponse::new(acp::SessionId::new(
-                session.session_id.clone(),
-            ))),
+            Ok(boot) => {
+                let mut resp =
+                    acp::NewSessionResponse::new(acp::SessionId::new(boot.session.session_id.clone()));
+                if let Some(models) = boot.models {
+                    resp = resp.models(models);
+                }
+                Ok(resp)
+            }
             Err(err) => Err(acp::Error::internal_error().data(err.to_string())),
         }
     }
@@ -457,7 +643,13 @@ impl acp::Agent for NextCodeFaceAgent {
     ) -> acp::Result<acp::LoadSessionResponse> {
         let id = args.session_id.to_string();
         match self.attach_session(id).await {
-            Ok(_) => Ok(acp::LoadSessionResponse::new()),
+            Ok(boot) => {
+                let mut resp = acp::LoadSessionResponse::new();
+                if let Some(models) = boot.models {
+                    resp = resp.models(models);
+                }
+                Ok(resp)
+            }
             Err(err) => Err(acp::Error::internal_error().data(err.to_string())),
         }
     }
@@ -569,6 +761,32 @@ impl acp::Agent for NextCodeFaceAgent {
                 } => {
                     self.emit_session_renamed(&session_id, &display_title)
                         .await;
+                }
+                ServerEvent::TokenUsage {
+                    input,
+                    output,
+                    cache_read_input,
+                    cache_creation_input,
+                } => {
+                    self.emit_token_usage(
+                        &session_id,
+                        input,
+                        output,
+                        cache_read_input,
+                        cache_creation_input,
+                    )
+                    .await;
+                }
+                ServerEvent::ModelChanged {
+                    model,
+                    provider_name,
+                    error: None,
+                    ..
+                } => {
+                    if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
+                        self.emit_provider_name(&session_id, provider).await;
+                    }
+                    self.emit_models_update(&model, provider_name.as_deref(), &[]).await;
                 }
                 ServerEvent::Done { id } if id == prompt_id => break acp::StopReason::EndTurn,
                 ServerEvent::Error { id, message, .. } if id == prompt_id => {

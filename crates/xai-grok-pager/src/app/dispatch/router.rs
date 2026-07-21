@@ -439,11 +439,17 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             vec![]
         }
         Action::ScrollUp(n) => {
-            with_scrollback(app, |s| s.scroll_up(n));
+            with_active_agent(app, |agent| {
+                agent.note_scroll_activity();
+                agent.scrollback.scroll_up(n);
+            });
             vec![]
         }
         Action::ScrollDown(n) => {
-            with_scrollback(app, |s| s.scroll_down(n));
+            with_active_agent(app, |agent| {
+                agent.note_scroll_activity();
+                agent.scrollback.scroll_down(n);
+            });
             vec![]
         }
         Action::HalfPageUp => {
