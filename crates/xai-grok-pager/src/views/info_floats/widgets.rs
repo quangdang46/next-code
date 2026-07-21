@@ -8,13 +8,18 @@
 //! - `info_widget_swarm_background.rs` — background + swarm stats
 //! - `next_code_tui_render::swarm_gallery::render_swarm_compact` — dock tally
 //! - `info_widget_todos.rs` — `render_todos_compact`
-//! - WorkspaceMap / Diagrams — text stubs (image/map pipelines deferred)
+//! - WorkspaceMap / Diagrams / Ambient / Tips / TeamView → [`super::legacy_deferred`]
 
 use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
 use super::{rgb, truncate_chars, truncate_smart};
+
+pub use super::legacy_deferred::{
+    DiagramsInfo, WorkspaceMapInfo, diagrams_has_data, render_diagrams_lines,
+    render_workspace_lines, workspace_has_data,
+};
 
 // ---------------------------------------------------------------------------
 // WidgetKind (Face float subset) — copied side/priority from info_widget.rs
@@ -207,18 +212,6 @@ pub struct TodosInfo {
     pub are_swarm_plan: bool,
 }
 
-/// Workspace map stub — no graphical client on Face yet.
-#[derive(Debug, Default, Clone)]
-pub struct WorkspaceMapInfo {
-    pub row_labels: Vec<String>,
-}
-
-/// Diagram stub — image pipeline not wired on Face floats.
-#[derive(Debug, Default, Clone)]
-pub struct DiagramsInfo {
-    pub titles: Vec<String>,
-}
-
 // ---------------------------------------------------------------------------
 // has_data gates — copied from InfoWidgetData::has_data_for
 // ---------------------------------------------------------------------------
@@ -249,14 +242,6 @@ pub fn swarm_has_data(info: Option<&SwarmInfo>) -> bool {
 
 pub fn todos_has_data(info: Option<&TodosInfo>) -> bool {
     info.map(|t| !t.items.is_empty()).unwrap_or(false)
-}
-
-pub fn workspace_has_data(info: Option<&WorkspaceMapInfo>) -> bool {
-    info.map(|w| !w.row_labels.is_empty()).unwrap_or(false)
-}
-
-pub fn diagrams_has_data(info: Option<&DiagramsInfo>) -> bool {
-    info.map(|d| !d.titles.is_empty()).unwrap_or(false)
 }
 
 // ---------------------------------------------------------------------------
@@ -800,48 +785,6 @@ pub fn render_todos_compact(info: &TodosInfo) -> Vec<Line<'static>> {
     ]
 }
 
-// ---------------------------------------------------------------------------
-// WorkspaceMap / Diagrams stubs
-// ---------------------------------------------------------------------------
-
-pub fn render_workspace_stub(info: &WorkspaceMapInfo, width: usize) -> Vec<Line<'static>> {
-    if info.row_labels.is_empty() {
-        return Vec::new();
-    }
-    let mut lines = vec![Line::from(vec![Span::styled(
-        "Workspace",
-        Style::default().fg(rgb(180, 180, 190)).bold(),
-    )])];
-    for label in info.row_labels.iter().take(4) {
-        lines.push(Line::from(vec![
-            Span::styled("  · ", Style::default().fg(rgb(100, 100, 110))),
-            Span::styled(
-                truncate_smart(label, width.saturating_sub(4)),
-                Style::default().fg(rgb(140, 140, 150)),
-            ),
-        ]));
-    }
-    lines
-}
-
-pub fn render_diagrams_stub(info: &DiagramsInfo, width: usize) -> Vec<Line<'static>> {
-    if info.titles.is_empty() {
-        return Vec::new();
-    }
-    let mut lines = vec![Line::from(vec![Span::styled(
-        "Diagrams",
-        Style::default().fg(rgb(180, 180, 190)).bold(),
-    )])];
-    lines.push(Line::from(vec![Span::styled(
-        truncate_smart(
-            &format!("{} (image pipeline deferred)", info.titles[0]),
-            width.saturating_sub(2),
-        ),
-        Style::default().fg(rgb(140, 140, 150)),
-    )]));
-    lines
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -950,12 +893,6 @@ mod tests {
         let lines = render_swarm_compact(&info, 34, 3);
         assert!(line_text(&lines[0]).contains("1/1 agents"));
         assert_eq!(lines.len(), 2);
-    }
-
-    #[test]
-    fn stubs_empty_without_data() {
-        assert!(render_workspace_stub(&WorkspaceMapInfo::default(), 30).is_empty());
-        assert!(render_diagrams_stub(&DiagramsInfo::default(), 30).is_empty());
     }
 
     #[test]

@@ -11,6 +11,7 @@
 //! - `info_widget_text.rs` — `truncate_smart`, `truncate_chars`
 //! - `app/helpers.rs` — `pretty_model_display_name` (+ claude/title helpers)
 //! - Remaining kinds → [`widgets`] (Memory / Usage / Git / Background / …)
+//! - Deferred WorkspaceMap / Diagrams / Ambient / Tips / TeamView → [`legacy_deferred`]
 //!
 //! ## Face-only deltas (wire / overlay)
 //! - Scroll-gated visibility ([`SCROLL_IDLE_HIDE_MS`])
@@ -26,6 +27,7 @@
 //!   and their compact lines fold into Overview (`is_overview_mergeable` +
 //!   `render_sections`).
 
+mod legacy_deferred;
 mod widgets;
 
 pub use widgets::{
@@ -945,16 +947,21 @@ fn measure_kind(kind: FloatKind, data: &InfoFloatData, inner_w: u16) -> Vec<Line
             .as_ref()
             .map(widgets::render_todos_compact)
             .unwrap_or_default(),
+        // Text interim; buffer/image paint registration is commented in
+        // `legacy_deferred` under TODO(face-floats).
         FloatKind::WorkspaceMap => data
             .workspace_map
             .as_ref()
-            .map(|w| widgets::render_workspace_stub(w, inner_w as usize))
+            .map(|w| widgets::render_workspace_lines(w, inner_w as usize))
             .unwrap_or_default(),
         FloatKind::Diagrams => data
             .diagrams
             .as_ref()
-            .map(|d| widgets::render_diagrams_stub(d, inner_w as usize))
+            .map(|d| widgets::render_diagrams_lines(d, inner_w as usize))
             .unwrap_or_default(),
+        // TODO(face-floats): AmbientMode / Tips / TeamView — commented copies in
+        // `legacy_deferred.rs` (legacy hard-disabled / dead has_data_for). Do not
+        // add FloatKind arms until those gates are revived upstream.
     }
 }
 

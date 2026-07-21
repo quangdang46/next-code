@@ -933,8 +933,18 @@ impl AgentView {
             compaction_info,
             swarm_info,
             todos_info,
-            workspace_map: None, // Face: no workspace_client — deferred
-            diagrams: None,      // Face: mermaid image float deferred
+            // TODO(face-floats): WorkspaceMap — no Face `workspace_client` /
+            // `VisibleWorkspaceRow` yet. Text interim + commented buffer paint in
+            // `views/info_floats/legacy_deferred.rs`. Legacy fetch:
+            // `TuiState::workspace_map_rows` → `InfoWidgetData.workspace_rows`
+            // (`next-code-tui/.../tui_state.rs`, `info_widget.rs`).
+            workspace_map: None,
+            // TODO(face-floats): Diagrams — float image pipeline
+            // (`render_diagrams_widget` + `mermaid::render_image_widget_scale`)
+            // not registered on Face floats. Text interim + commented paint in
+            // `legacy_deferred.rs`. Legacy: `get_active_diagrams` →
+            // `InfoWidgetData.diagrams`.
+            diagrams: None,
         }
     }
 
