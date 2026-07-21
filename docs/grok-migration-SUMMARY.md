@@ -162,6 +162,12 @@ Home-implementable plans (follow `.agents/skills/grok-migration-workflow`).
 | 13 Sessions dashboard | `docs/plans/PLAN-20260720-grok-pr13-sessions-dashboard.md` | Keep Face UI, wire sessions |
 | 14 Parity cleanup | `docs/plans/PLAN-20260720-grok-pr14-parity-cleanup.md` | Delete leftovers + brand rg |
 
+**Phase 5 polish (parallel, not renumbering 9–14):**
+
+| PR | Doc | Focus |
+|----|-----|-------|
+| **15** Mermaid engine | `docs/plans/PLAN-20260721-face-mermaid-engine.md` | Un-stub PR7 `xai-grok-mermaid` so Face Open/Copy/expand work; Diagrams float image follow-on |
+
 **Do not** implement SUMMARY §3 `GrokHost` unless ACP bridge fails — PR8 chose ACP mediator.
 ---
 

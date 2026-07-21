@@ -37,7 +37,8 @@
 | **13** | `pr-13-sessions-dashboard` | Face picker UI (keep) | List/open → `~/.next-code/sessions` | Fake foreign-session demos | [pr13](PLAN-20260720-grok-pr13-sessions-dashboard.md) |
 | **14** | `pr-14-parity-cleanup` | — | Hotfix only | Dead stubs/crates; brand rg; close SUMMARY | [pr14](PLAN-20260720-grok-pr14-parity-cleanup.md) |
 
-**Minimum ship:** PR9 + PR11. **Migration closed:** PR9–14.
+**Minimum ship:** PR9 + PR11. **Migration closed:** PR9–14.  
+**Parallel polish (not renumbering 9–14):** **PR15** mermaid engine — see Related below.
 
 ## Order
 
@@ -49,6 +50,8 @@ flowchart LR
   PR11 --> PR12
   PR12 --> PR13[PR13 sessions]
   PR13 --> PR14[PR14 cleanup]
+  Floats[floats HUD] -.-> PR15[PR15 mermaid engine]
+  PR15 -.-> Diagrams[Diagrams float image]
 ```
 
 ## Per-PR gate (must pass before BUILD)
@@ -60,6 +63,13 @@ flowchart LR
 - [ ] User OK / go ahead (or home implementer treats PLAN as approved scope)
 - [ ] Manual smoke in that PLAN
 ```
+
+## Related (post-roadmap polish)
+
+| Item | Plan | Note |
+|------|------|------|
+| Face Context + KV floats (scroll-only HUD) | [PLAN-20260721-face-info-widget-floats.md](PLAN-20260721-face-info-widget-floats.md) | Copy legacy floats; wire Face; **show only while scrolling** (not PR9–14 gate); Diagrams stay text until mermaid PNGs |
+| **PR15** Face mermaid / image engine | [PLAN-20260721-face-mermaid-engine.md](PLAN-20260721-face-mermaid-engine.md) | Branch `pr-face-mermaid-engine`. Un-stub PR7 `xai-grok-mermaid` (copy PureRust engine + wire `default_engine` / `__mermaid-render`). **Not** PR12/14/floats #45. Diagrams float image paint = follow-on after engine |
 
 ## Out of scope
 
