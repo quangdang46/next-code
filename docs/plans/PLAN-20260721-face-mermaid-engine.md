@@ -49,7 +49,7 @@
 5. [x] Unit: engine render of a tiny flowchart → PNG bytes; worker tests still pass.
 6. [ ] Manual smoke (Kitty or iTerm if available; else Open → OS viewer + Copy path): mermaid in transcript → Open / Copy path / Copy source; stub error gone.
 7. [x] Document Diagrams float follow-on (image paint) — do **not** block this PR on floats.
-8. [ ] Rebuild/install both `next-code` / `nextcode` aliases after BUILD approval.
+8. [x] Rebuild/install both `next-code` / `nextcode` aliases after BUILD approval.
 
 ## Files to touch (BUILD — after go ahead)
 - `crates/xai-grok-mermaid/**` — replace StubEngine with real engine
@@ -71,4 +71,4 @@
 - Kitty/iTerm / image-viewer paths unchanged aside from receiving real PNGs  
 
 ## Status
-**Implemented** (copy → wire). SOURCE_REV `a881e6703f46b01d8c7d4a5437683546df30449d` (grok-build `main` tip; NOTICE pin `ba69d70` was stale/missing). Diagrams float image paint remains follow-on after #45. Manual Face smoke + rebuild/install still operator-side.
+**Implemented** (copy → wire). SOURCE_REV `a881e6703f46b01d8c7d4a5437683546df30449d` (grok-build `main` tip; NOTICE pin `ba69d70` was stale/missing). Diagrams float image paint remains follow-on after #45. Rebuild/install done (`52692e609`). Child smoke: installed `next-code __mermaid-render` → valid PNG. Manual Face Open/Copy UI smoke still operator-side.
