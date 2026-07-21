@@ -5,7 +5,7 @@
 - **What is going on:** Face already has a full fold system (`DisplayMode`, `e` / `E` / `Ctrl+E`, double-click). Edits often stayed Expanded because the shell resolve stub forced `collapsed_edit_blocks=false`; memory tools lacked Face `Memory search:` titles.
 - **We recommend / shipped:** Stock Face fold UX — denser resting defaults + memory title wire. No Cursor-style cards; no fold re-home into `next-code-tui`.
 - **Risk:** Medium (default density change for edits)
-- **Status:** Implemented — denser resting transcript via shell resolve stub + memory title wire. Stock double-click / `e` / `E` / `Ctrl+E` kept. No persisted prefs. PR: (fill after create)
+- **Status:** Implemented — denser resting transcript via shell resolve stub + memory title wire. Stock double-click / `e` / `E` / `Ctrl+E` kept. No persisted prefs. PR: https://github.com/quangdang46/next-code/pull/48
 
 ## Product decisions (approved)
 1. Gesture: stock Grok double-click + keys (`e` / `E` / `Ctrl+E`) — no single-click expand.
