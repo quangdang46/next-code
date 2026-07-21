@@ -8,7 +8,7 @@ next-code uses **Grok Face Extensions** bundle plugins -- not the old QuickJS/TS
 In the interactive Face UI:
 
 1. Run `/plugins` (or open Extensions and pick the Plugins tab).
-2. `/hooks` opens the same modal on the Hooks tab (list is wired; editing is limited).
+2. `/hooks` opens the same modal on the Hooks tab (lists `hooks.toml`; enable/disable/reload wired).
 3. Marketplace remains brand-hidden in the nextcode embed.
 
 ACP methods (daemon):
@@ -17,7 +17,8 @@ ACP methods (daemon):
 |--------|------|
 | `x.ai/plugins/list` | Installed / discovered plugins |
 | `x.ai/plugins/action` | install / uninstall / enable / disable / reload / update |
-| `x.ai/hooks/list` | Empty-but-valid hooks list for the modal |
+| `x.ai/hooks/list` | Lifecycle hooks from `~/.next-code/hooks.toml` layers |
+| `x.ai/hooks/action` | reload / enable / disable (add/remove/trust unsupported) |
 | `x.ai/skills/list` | Skills tab (includes skills from enabled plugin bundles) |
 
 ## Disk layout

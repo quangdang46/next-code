@@ -1,11 +1,75 @@
 # Lifecycle Hooks
 
-next-code can run external commands at well-defined lifecycle points so other
-programs can observe or gate agent behavior without forking next-code. Hooks
-complement the [spawn hook](SPAWN_HOOK.md) (which controls *where headed
-sessions appear*); lifecycle hooks tell you *what is happening inside them*.
+next-code can run external commands (and HTTP / plugin handlers) at well-defined
+lifecycle points so other programs can observe or gate agent behavior without
+forking next-code.
 
-## Configuration
+The canonical runtime is the **`next-code-hooks`** crate (v2). Face `/hooks`
+lists and enable/disables those same handlers — it does **not** use OpenCode’s
+in-process JS plugin `Hooks` model.
+
+## Canonical config (v2)
+
+Layers (lowest → highest priority; handlers **append**, settings override):
+
+| Layer | Path |
+|-------|------|
+| User | `~/.next-code/hooks.toml` (or `$NEXT_CODE_HOME/hooks.toml`) |
+| Project | `<cwd>/.next-code/hooks.toml` |
+| Env | `$NEXT_CODE_HOOKS_CONFIG` (path to a TOML file) |
+
+Kill-switch: `DISABLE_NEXT_CODE_HOOKS` (any value) disables all layers.
+
+```toml
+# ~/.next-code/hooks.toml
+[settings]
+timeout_secs = 30
+max_concurrency = 10
+
+[[events.PreToolUse]]
+type = "command"
+enabled = true
+command = "~/bin/next-code-tool-policy"
+timeout_secs = 5
+
+[[events.SessionStart]]
+type = "command"
+command = "~/bin/next-code-session-notify"
+
+[[events.TurnEnd]]
+type = "http"
+method = "POST"
+url = "http://127.0.0.1:9999/hooks/turn-end"
+```
+
+Handler types: `command` | `http` | `agent` | `plugin`.  
+CLI: `next-code hooks list|enable|disable|test|metrics`.
+
+Face Extensions → Hooks tab talks ACP `x.ai/hooks/list` and
+`x.ai/hooks/action` (reload, enable, disable). Hook ids look like
+`user/PreToolUse[0]`.
+
+### OpenCode event name aliases (docs only)
+
+OpenCode uses dotted in-process plugin callbacks. Map them to next-code
+`HookEvent` names when reading OpenCode docs:
+
+| OpenCode-style | next-code `HookEvent` |
+|----------------|------------------------|
+| `tool.execute.before` | `PreToolUse` |
+| `tool.execute.after` | `PostToolUse` |
+| `session.created` / start | `SessionStart` |
+| `session.idle` | `SessionIdle` |
+| `session.error` | `SessionError` |
+| `permission.ask` / asked | `PermissionAsked` / `PermissionRequest` |
+| compaction before/after | `PreCompact` / `PostCompact` |
+
+OpenCode authors mutate args in TypeScript; next-code command hooks use stdin
+JSON and exit `0` / `2` (allow / deny) for blocking events.
+
+## Legacy v1 (`config.toml [hooks]`)
+
+Still merged at runtime into v2 handlers via `legacy_v1_to_v2_handlers`:
 
 ```toml
 # ~/.next-code/config.toml
@@ -22,74 +86,33 @@ Env overrides (always win; empty value disables a config hook):
 `NEXT_CODE_HOOK_TURN_END`, `NEXT_CODE_HOOK_SESSION_START`, `NEXT_CODE_HOOK_SESSION_END`,
 `NEXT_CODE_HOOK_PRE_TOOL`, `NEXT_CODE_HOOK_POST_TOOL`, `NEXT_CODE_HOOK_PRE_TOOL_TIMEOUT_MS`.
 
-## Common contract
+Prefer v2 `hooks.toml` for new automation.
+
+## Common contract (command handlers)
 
 - The hook command line is parsed shell-style (quotes and backslash escapes
   work) but executed **directly**, not through a shell. A leading `~/` in the
   program path is expanded.
 - The hook runs in the session working directory when known.
-- Every hook receives:
+- Every hook receives env such as `NEXT_CODE_HOOK_EVENT`,
+  `NEXT_CODE_HOOK_SESSION_ID`, `NEXT_CODE_HOOK_CWD`, plus JSON on stdin for
+  tool gates. Nested next-code sees `NEXT_CODE_HOOKS_DISABLED=1` (recursion
+  guard).
 
-| Variable | Meaning |
-| --- | --- |
-| `NEXT_CODE_HOOK_EVENT` | `turn_end`, `session_start`, `session_end`, `pre_tool`, `post_tool` |
-| `NEXT_CODE_HOOK_SESSION_ID` | Session the event belongs to |
-| `NEXT_CODE_HOOK_CWD` | Session working directory |
-| `NEXT_CODE_HOOK_PAYLOAD` | JSON object mirroring all fields (capped at 16 KB) |
-| `NEXT_CODE_HOOKS_DISABLED` | Always `1`; suppresses hooks in nested next-code calls (recursion guard) |
+## Gate hook: `PreToolUse` / v1 `pre_tool`
 
-## Observer hooks
+Runs **synchronously before matching tool calls** and can block:
 
-`turn_end`, `session_start`, `session_end`, and `post_tool` are
-**observers**: spawned detached, fire-and-forget. They can never block or slow
-the agent; failures are only logged.
-
-### `turn_end`
-
-Fires when an agent turn completes (streaming turn path, which covers TUI,
-desktop, swarm workers, and headless sessions).
-
-Extra fields: `NEXT_CODE_HOOK_STATUS` (`ok`/`error`), `NEXT_CODE_HOOK_DURATION_MS`,
-`NEXT_CODE_HOOK_MODEL`, `NEXT_CODE_HOOK_LAST_ASSISTANT_TEXT` (first 4000 chars),
-`NEXT_CODE_HOOK_ERROR` (on failure).
-
-### `session_start` / `session_end`
-
-`session_start` fires when an agent session becomes active, with
-`NEXT_CODE_HOOK_SOURCE` = `create` (brand new), `attach` (existing session object
-attached), or `resume` (restored by id). `session_end` fires on normal close
-(`NEXT_CODE_HOOK_SOURCE=close`).
-
-### `post_tool`
-
-Fires after every tool call. Extra fields: `NEXT_CODE_HOOK_TOOL_NAME`,
-`NEXT_CODE_HOOK_STATUS`, `NEXT_CODE_HOOK_DURATION_MS`, `NEXT_CODE_HOOK_OUTPUT_BYTES` (on
-success), `NEXT_CODE_HOOK_ERROR` (on failure).
-
-## Gate hook: `pre_tool`
-
-`pre_tool` runs **synchronously before every tool call** and can block it:
-
-- The hook receives `NEXT_CODE_HOOK_TOOL_NAME` plus the full tool input JSON on
-  **stdin** (and a 16 KB-truncated copy in `NEXT_CODE_HOOK_TOOL_INPUT`).
-- **Exit 0**: allow the call.
-- **Exit 2**: block the call. The hook's stderr (trimmed, capped at 2000
-  chars) is returned to the model as the tool error, so the model can adapt.
-- **Anything else fails open** with a logged warning: other exit codes,
-  timeout (`pre_tool_timeout_ms`, default 5s), missing binary, spawn errors.
-
-Fail-open is deliberate: a broken policy script should degrade to "no policy"
-rather than brick every session. If you need fail-closed semantics, make the
-hook itself robust (it is your trust boundary, not next-code).
+- **Exit 0**: allow.
+- **Exit 2**: deny (stderr returned to the model when configured).
+- Other failures default to fail-open unless `[settings].fail_closed = true`.
 
 ### Example policy script
 
 ```bash
 #!/usr/bin/env bash
 # ~/bin/next-code-tool-policy
-# stdin: tool input JSON. Env: NEXT_CODE_HOOK_TOOL_NAME, NEXT_CODE_HOOK_SESSION_ID...
 input=$(cat)
-
 case "$NEXT_CODE_HOOK_TOOL_NAME" in
   bash)
     if grep -qE 'rm -rf /([^a-zA-Z]|$)|mkfs|dd if=' <<<"$input"; then
@@ -97,51 +120,14 @@ case "$NEXT_CODE_HOOK_TOOL_NAME" in
       exit 2
     fi
     ;;
-  write|edit)
-    if grep -q '"file_path":"/etc/' <<<"$input"; then
-      echo "blocked: writes to /etc are not allowed" >&2
-      exit 2
-    fi
-    ;;
 esac
 exit 0
 ```
 
-## Example: tmux status + desktop notification on turn end
-
-```bash
-#!/usr/bin/env bash
-# ~/bin/next-code-turn-notify
-if [ "$NEXT_CODE_HOOK_STATUS" = ok ]; then icon=✅; else icon=❌; fi
-tmux display-message "next-code $icon ${NEXT_CODE_HOOK_SESSION_ID:0:12}" 2>/dev/null
-notify-send "next-code turn $NEXT_CODE_HOOK_STATUS" \
-  "${NEXT_CODE_HOOK_LAST_ASSISTANT_TEXT:0:120}" 2>/dev/null
-exit 0
-```
-
-## Example: JSON event log of all hook activity
-
-Point several hooks at one script and fan out on `NEXT_CODE_HOOK_EVENT`:
-
-```bash
-#!/usr/bin/env bash
-# ~/bin/next-code-event-log
-echo "$NEXT_CODE_HOOK_PAYLOAD" >> ~/.local/state/next-code-events.jsonl
-```
-
-```toml
-[hooks]
-turn_end      = "~/bin/next-code-event-log"
-session_start = "~/bin/next-code-event-log"
-session_end   = "~/bin/next-code-event-log"
-post_tool     = "~/bin/next-code-event-log"
-```
-
 ## Design notes
 
-- Hook lookups are config-driven and re-read on config reload; you can add or
-  change hooks without restarting next-code.
-- Hot paths (`pre_tool`/`post_tool`) check whether a hook is configured before
-  building any payload, so unconfigured hooks cost ~nothing.
-- The recursion guard (`NEXT_CODE_HOOKS_DISABLED=1`) means a hook may safely call
-  `next-code` CLI commands without re-triggering hooks in that nested process.
+- Face `/hooks` manages **next-code** lifecycle hooks, not OpenCode/Bun plugins
+  and not `~/.grok/hooks` JSON files.
+- Bundle plugins (`/plugins`, `~/.next-code/plugins`) are a sibling Extensions
+  tab; optional import of plugin-bundled `hooks/` is a later phase.
+- Hot paths check whether handlers exist before building large payloads.

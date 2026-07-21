@@ -2233,11 +2233,43 @@ pub fn derive_source_label(source_dir: &str) -> (String, bool) {
     if source_dir == global_str || source_dir.starts_with(&format!("{global_str}/")) {
         return ("Global hooks".into(), false);
     }
+    // next-code embed: ~/.next-code (or $NEXT_CODE_HOME) + project `.next-code`
+    if let Ok(nc_home) = std::env::var("NEXT_CODE_HOME") {
+        let nc = std::path::Path::new(nc_home.trim());
+        if !nc_home.trim().is_empty()
+            && (source_path == nc
+                || source_dir == nc_home
+                || source_path.starts_with(nc))
+        {
+            return ("Global hooks".into(), false);
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        let user_nc = home.join(".next-code");
+        if source_path == user_nc.as_path()
+            || source_dir == user_nc.display().to_string()
+            || source_path.starts_with(&user_nc)
+        {
+            return ("Global hooks".into(), false);
+        }
+    }
+    let comps: Vec<_> = source_path
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    if comps.windows(1).any(|w| w[0] == ".next-code")
+        || source_dir.ends_with("/.next-code")
+        || source_dir.ends_with("\\.next-code")
+        || source_dir.contains("/.next-code/")
+        || source_dir.contains("\\.next-code\\")
+    {
+        return ("Project hooks".into(), false);
+    }
     // Settings under .claude/
     if source_dir.contains("/.claude/") {
         return ("Claude settings".into(), false);
     }
-    // Project hooks
+    // Project hooks (Grok layout)
     if source_dir.ends_with("/.grok/hooks") || source_dir.contains("/.grok/hooks/") {
         return ("Project hooks".into(), false);
     }
