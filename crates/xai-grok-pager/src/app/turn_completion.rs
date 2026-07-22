@@ -260,6 +260,8 @@ pub(super) fn finalize_turn_from_terminal(
         None => expected_send_now.is_some(),
     };
 
+    let turn_usage = agent.take_turn_token_usage();
+
     // A viewer never receives the driver's `PromptResponse` RPC — the source of
     // the driver's "Worked for X" marker. Surface the equivalent here.
     // The signal only carries a coarse `stop_reason` (no doom-loop category, no
@@ -279,9 +281,10 @@ pub(super) fn finalize_turn_from_terminal(
             elapsed: Some(elapsed),
         }),
         // end_turn / max_tokens / max_turn_requests / refusal / unknown → done.
-        _ => Some(SessionEvent::TurnCompleted {
-            elapsed: Some(elapsed),
-        }),
+        _ => Some(SessionEvent::turn_completed_with_usage(
+            Some(elapsed),
+            turn_usage,
+        )),
     };
     push_turn_terminal_marker(agent, event, ending_prompt_id.as_deref());
 

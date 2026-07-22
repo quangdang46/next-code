@@ -1201,6 +1201,9 @@ pub(super) fn handle_prompt_response(
 
         agent.session.finish_turn(&mut agent.scrollback);
 
+        // Capture next-code ↑/↓ sample before mark_turn_finished clears it.
+        let turn_usage = agent.take_turn_token_usage();
+
         // Insert session event message (skip TurnCompleted for bash-mode — no agent turn).
         let event = match (&result, was_cancelling) {
             // Send-now cancel: no marker (the new prompt is the next turn); the
@@ -1210,11 +1213,12 @@ pub(super) fn handle_prompt_response(
                 elapsed: elapsed.unwrap_or_default(),
             }),
             (Ok(_), false) if agent.bash_turn => None,
-            (Ok(_), false) => Some(SessionEvent::TurnCompleted {
+            (Ok(_), false) => Some(SessionEvent::turn_completed_with_usage(
                 // Legacy copy on purpose: unknown elapsed keeps the "in 0.0s"
                 // form here — only wake markers use the honest `None` form.
-                elapsed: Some(elapsed.unwrap_or_default()),
-            }),
+                Some(elapsed.unwrap_or_default()),
+                turn_usage,
+            )),
             (Err(_), _)
                 if rate_limited
                     || free_usage_blocked
