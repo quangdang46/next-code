@@ -2561,6 +2561,25 @@ mod tests {
     }
 
     #[test]
+    fn failover_countdown_status_matches_tui_prefix() {
+        let status = failover_countdown_status("OpenRouter", 3);
+        assert!(status.starts_with(FAILOVER_COUNTDOWN_STATUS_PREFIX));
+        assert!(status.contains("in 3s"));
+        assert!(status.contains("Esc to cancel"));
+    }
+
+    #[test]
+    fn retry_turn_request_roundtrips() {
+        let req = Request::RetryTurn { id: 42 };
+        let json = serde_json::to_value(&req).expect("serialize");
+        assert_eq!(json["type"], "retry_turn");
+        assert_eq!(json["id"], 42);
+        let decoded: Request = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(decoded.id(), 42);
+        assert!(matches!(decoded, Request::RetryTurn { id: 42 }));
+    }
+
+    #[test]
     fn model_auto_switched_payload_serializes_for_face() {
         let payload = xai_grok_shell::extensions::notification::SessionNotification {
             session_id: acp::SessionId::new("sess-1"),
