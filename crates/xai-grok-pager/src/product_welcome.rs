@@ -75,6 +75,9 @@ pub struct ProductWelcomeStatus {
     pub built_line: Option<String>,
     /// Unseen next-code changelog subjects (Updates box + hero merge).
     pub update_bullets: Vec<String>,
+    /// Full next-code embedded changelog markdown for `/changelog` DocViewer.
+    /// Empty when the build has no changelog payload.
+    pub changelog_markdown: Option<String>,
     /// e.g. `⟨client·perf:reduced⟩`
     pub badge_line: Option<String>,
     /// e.g. `server: Hut 🛖 · v0.14.6`
