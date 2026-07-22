@@ -4,6 +4,7 @@
 //! Credentials write into `~/.next-code` via the same login helpers as CLI —
 //! no "run `next-code login` in another terminal" handoff.
 
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -14,10 +15,16 @@ use super::login::LoginOptions;
 use super::provider_init::save_named_api_key;
 use crate::provider_catalog::{
     LoginProviderAuthKind, LoginProviderDescriptor, LoginProviderTarget, resolve_login_provider,
-    resolve_login_provider_loose, resolve_openai_compatible_profile, tui_login_providers,
+    resolve_login_provider_loose, resolve_openai_compatible_profile,
 };
 
 const METHOD_PREFIX: &str = "nextcode.";
+
+/// Bumped when Face ext_method wire shapes for skills/MCP change.
+/// Embedded in list payloads (ignored by Face serde) and printable via
+/// `NEXT_CODE_FACE_WIRE_REV` in `--version` only if we surface it — for now
+/// operators can grep the binary / list payload for this token.
+pub const FACE_EXT_WIRE_REV: &str = "20260722f-http-mcp";
 
 #[derive(Debug)]
 struct PendingFaceLogin {
@@ -289,23 +296,54 @@ async fn run_oauth_face_login(provider: LoginProviderDescriptor) -> Result<()> {
     Ok(())
 }
 
+/// Resolve Face `cwd` params. Face often sends `"."`; treat that as the process cwd.
+pub fn resolve_face_cwd(cwd: Option<&Path>) -> Option<PathBuf> {
+    match cwd {
+        None => std::env::current_dir().ok(),
+        Some(p) if p.as_os_str().is_empty() || p == Path::new(".") => {
+            std::env::current_dir().ok()
+        }
+        Some(p) => Some(p.to_path_buf()),
+    }
+}
+
 /// Skills list for Face Extensions Skills tab (`x.ai/skills/list`).
-pub fn list_nextcode_skills(cwd: Option<&std::path::Path>) -> serde_json::Value {
-    let registry = match crate::skill::SkillRegistry::load_for_working_dir(cwd) {
+///
+/// Wire shape matches grok-shell `ExtMethodResult { result: SkillsListResponse }`:
+/// `{ "result": { "skills": [SkillInfo, ...] } }` so Face's
+/// `wrapper.result.skills → Vec<SkillInfo>` parser succeeds.
+///
+/// Uses the same SkillRegistry sources as `$` / `availableCommands`
+/// (`load_global` + best-effort project overlay). Never returns an empty
+/// list solely because project-local overlay I/O failed.
+pub fn list_nextcode_skills(cwd: Option<&Path>) -> serde_json::Value {
+    let cwd = resolve_face_cwd(cwd);
+    // Match `$` / InitializeResponse: global skills must always appear.
+    // Project overlay is best-effort so a bad project dir cannot blank the tab.
+    let mut registry = match crate::skill::SkillRegistry::load_global() {
         Ok(r) => r,
         Err(_) => {
-            return serde_json::json!({ "result": { "skills": [] } });
+            return serde_json::json!({
+                "result": { "skills": [], "wireRev": FACE_EXT_WIRE_REV }
+            });
         }
     };
+    if let Ok(overlay) = crate::skill::SkillRegistry::load_project_overlay(cwd.as_deref()) {
+        registry.merge_overlay(overlay);
+    }
     let skills: Vec<serde_json::Value> = registry
         .list()
         .into_iter()
         .map(|skill| {
-            let scope = if cwd.is_some_and(|wd| skill.path.starts_with(wd)) {
+            let scope = if cwd
+                .as_deref()
+                .is_some_and(|wd| skill.path.starts_with(wd))
+            {
                 "repo"
             } else {
                 "user"
             };
+            // Fields required by xai_grok_tools::SkillInfo (Face deserializes this type).
             serde_json::json!({
                 "name": skill.name,
                 "description": skill.description,
@@ -315,12 +353,147 @@ pub fn list_nextcode_skills(cwd: Option<&std::path::Path>) -> serde_json::Value 
                 "user_invocable": true,
                 "disable_model_invocation": false,
                 "has_user_specified_description": false,
-                // Scope is sent as SkillScope::User / SkillScope::Repo,
-                // matching the xai-grok-tools SkillInfo enum serialization.
             })
         })
         .collect();
-    serde_json::json!({ "result": { "skills": skills } })
+    serde_json::json!({
+        "result": {
+            "skills": skills,
+            "wireRev": FACE_EXT_WIRE_REV,
+        }
+    })
+}
+
+/// MCP server list for Face Extensions MCP Servers tab (`x.ai/mcp/list`).
+///
+/// Face parses `McpsListResponse { servers }` from `result` (or the top-level
+/// object). Uses the catalog loader, then **probes** HTTP servers (initialize +
+/// tools/list) so status/tools match runtime. Stdio rows stay `ready` without
+/// spawning (spawn happens in the session/pool).
+pub async fn list_nextcode_mcps(cwd: Option<&Path>) -> serde_json::Value {
+    let cwd = resolve_face_cwd(cwd);
+    let config = crate::mcp::McpConfig::load_catalog_for_dir(cwd.as_deref());
+    let mut names: Vec<String> = config.servers.keys().cloned().collect();
+    names.sort();
+
+    let mut set = tokio::task::JoinSet::new();
+    for name in names {
+        let Some(cfg) = config.servers.get(&name).cloned() else {
+            continue;
+        };
+        set.spawn(async move {
+            let enabled = cfg.is_enabled();
+            let is_http = cfg.is_http();
+            let config_type = if is_http { "http" } else { "stdio" };
+
+            let (status, source_label, tools) = if !enabled {
+                (
+                    "unavailable",
+                    "~/.next-code/mcp.json".to_string(),
+                    Vec::new(),
+                )
+            } else if is_http {
+                match tokio::time::timeout(
+                    Duration::from_secs(20),
+                    crate::mcp::McpClient::connect(name.clone(), &cfg),
+                )
+                .await
+                {
+                    Ok(Ok(client)) => {
+                        let tools: Vec<serde_json::Value> = client
+                            .tools()
+                            .into_iter()
+                            .map(|t| {
+                                serde_json::json!({
+                                    "name": t.name,
+                                    "description": t.description,
+                                    "enabled": true,
+                                })
+                            })
+                            .collect();
+                        ("ready", "~/.next-code/mcp.json".to_string(), tools)
+                    }
+                    Ok(Err(e)) => (
+                        "unavailable",
+                        truncate_label(&format!("HTTP connect failed: {e}"), 120),
+                        Vec::new(),
+                    ),
+                    Err(_) => (
+                        "unavailable",
+                        "HTTP connect timed out".to_string(),
+                        Vec::new(),
+                    ),
+                }
+            } else {
+                ("ready", "~/.next-code/mcp.json".to_string(), Vec::new())
+            };
+
+            let mut entry = serde_json::json!({
+                "name": name,
+                "source": "local",
+                "sourceLabel": source_label,
+                "type": config_type,
+                "session": {
+                    "enabled": enabled,
+                    "status": status,
+                    "tools": tools,
+                    "authRequired": false,
+                    "setupRequired": false,
+                }
+            });
+            if let Some(url) = cfg.url.as_ref() {
+                entry
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("url".into(), serde_json::json!(url));
+            }
+            if !cfg.command.trim().is_empty() {
+                let obj = entry.as_object_mut().unwrap();
+                obj.insert("command".into(), serde_json::json!(cfg.command));
+                if !cfg.args.is_empty() {
+                    obj.insert("args".into(), serde_json::json!(cfg.args));
+                }
+            }
+            entry
+        });
+    }
+
+    let mut servers = Vec::new();
+    while let Some(joined) = set.join_next().await {
+        match joined {
+            Ok(entry) => servers.push(entry),
+            Err(e) => {
+                eprintln!("[nextcode.face] mcp list probe task failed: {e}");
+            }
+        }
+    }
+    servers.sort_by(|a, b| {
+        let an = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let bn = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        an.cmp(bn)
+    });
+
+    serde_json::json!({
+        "result": {
+            "servers": servers,
+            "wireRev": FACE_EXT_WIRE_REV,
+        }
+    })
+}
+
+fn truncate_label(s: &str, max: usize) -> String {
+    let t = s.trim().replace('\n', " ");
+    if t.chars().count() <= max {
+        t
+    } else {
+        let truncated: String = t.chars().take(max.saturating_sub(1)).collect();
+        format!("{truncated}…")
+    }
+}
+
+/// Empty-but-valid marketplace list so the Extensions fetch set does not error.
+pub fn list_nextcode_marketplace() -> serde_json::Value {
+    serde_json::json!({ "result": { "sources": [] } })
 }
 
 /// Session picker payload for Face `/resume` (`x.ai/session/list`).
@@ -383,6 +556,14 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
 mod tests {
     use super::*;
 
+    fn list_mcps_sync(cwd: Option<&Path>) -> serde_json::Value {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("tokio runtime")
+            .block_on(list_nextcode_mcps(cwd))
+    }
+
     #[test]
     fn method_id_roundtrip() {
         assert_eq!(method_id_for_provider("openrouter"), "nextcode.openrouter");
@@ -393,6 +574,206 @@ mod tests {
 
     #[test]
     fn catalog_has_providers() {
+        use crate::provider_catalog::tui_login_providers;
         assert!(!tui_login_providers().is_empty());
+    }
+
+    #[test]
+    fn skills_list_wire_shape_has_result_skills_array() {
+        let payload = list_nextcode_skills(Some(Path::new(".")));
+        let skills = payload
+            .pointer("/result/skills")
+            .and_then(|v| v.as_array())
+            .expect("Face expects result.skills array");
+        eprintln!("SKILLS_COUNT={}", skills.len());
+        for skill in skills.iter().take(3) {
+            eprintln!(
+                "SKILL_SAMPLE name={:?} path={:?}",
+                skill.get("name"),
+                skill.get("path")
+            );
+        }
+        for skill in skills {
+            assert!(skill.get("name").and_then(|v| v.as_str()).is_some());
+            assert!(skill.get("description").and_then(|v| v.as_str()).is_some());
+            assert!(skill.get("path").and_then(|v| v.as_str()).is_some());
+            let scope = skill.get("scope").and_then(|v| v.as_str()).unwrap_or("");
+            assert!(
+                matches!(scope, "user" | "repo" | "local" | "plugin" | "bundled" | "server"),
+                "unexpected scope {scope}"
+            );
+        }
+        // On a developer machine with ~/.agents/skills or ~/.next-code/skills,
+        // the dialog must not return an empty list while `$` works.
+        // Soft-check: if global dirs exist, count must be > 0.
+        let home = dirs::home_dir().unwrap_or_default();
+        let has_global = home.join(".agents").join("skills").is_dir()
+            || home.join(".next-code").join("skills").is_dir();
+        if has_global {
+            assert!(
+                !skills.is_empty(),
+                "skills list empty despite global skill dirs; Face would show No matches"
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_list_wire_shape_has_result_servers_array() {
+        let payload = list_mcps_sync(None);
+        eprintln!(
+            "MCP_PAYLOAD={}",
+            serde_json::to_string_pretty(&payload).unwrap_or_default()
+        );
+        let servers = payload
+            .pointer("/result/servers")
+            .and_then(|v| v.as_array())
+            .expect("Face expects result.servers array");
+        eprintln!("MCP_COUNT={}", servers.len());
+        for server in servers {
+            assert!(server.get("name").and_then(|v| v.as_str()).is_some());
+            assert_eq!(
+                server.get("source").and_then(|v| v.as_str()),
+                Some("local")
+            );
+            assert!(server.pointer("/session/enabled").and_then(|v| v.as_bool()).is_some());
+        }
+        let mcp_json = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".next-code")
+            .join("mcp.json");
+        if mcp_json.is_file() {
+            assert!(
+                !servers.is_empty(),
+                "mcp.json exists but list_nextcode_mcps returned no servers"
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_list_includes_http_servers_from_user_mcp_json() {
+        let payload = list_mcps_sync(None);
+        let servers = payload
+            .pointer("/result/servers")
+            .and_then(|v| v.as_array())
+            .expect("servers array");
+        let mcp_json = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".next-code")
+            .join("mcp.json");
+        if !mcp_json.is_file() {
+            return;
+        }
+        assert!(
+            !servers.is_empty(),
+            "HTTP-only mcp.json must still list servers in Face catalog"
+        );
+        let names: Vec<&str> = servers
+            .iter()
+            .filter_map(|s| s.get("name").and_then(|v| v.as_str()))
+            .collect();
+        assert!(
+            names.iter().any(|n| *n == "exa" || *n == "deepwiki" || *n == "livekit-docs"),
+            "expected known HTTP server names, got {names:?}"
+        );
+        for server in servers {
+            let is_http_name = matches!(
+                server.get("name").and_then(|v| v.as_str()),
+                Some("exa" | "deepwiki" | "livekit-docs" | "twilio-docs")
+            );
+            if !is_http_name {
+                continue;
+            }
+            assert_eq!(
+                server.get("type").and_then(|v| v.as_str()),
+                Some("http")
+            );
+            let status = server.pointer("/session/status").and_then(|v| v.as_str());
+            let label = server.get("sourceLabel").and_then(|v| v.as_str()).unwrap_or("");
+            // Healthy → ready + tools; offline/auth → unavailable with connect error (not the old honesty stub).
+            assert!(
+                status == Some("ready")
+                    || (status == Some("unavailable")
+                        && (label.contains("HTTP connect") || label.contains("timed out"))),
+                "unexpected HTTP status={status:?} label={label:?}"
+            );
+            assert_ne!(
+                label,
+                "HTTP — next-code connects stdio MCP only",
+                "honesty stub must be gone after HTTP port"
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_list_face_mcps_list_response_roundtrip() {
+        let payload = list_mcps_sync(None);
+        let body = serde_json::to_string(&payload).expect("serialize");
+        let converted = xai_grok_pager::views::mcps_modal::parse_mcp_list_ext_response(&body)
+            .expect("Face mcp list parse");
+        let mcp_json = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".next-code")
+            .join("mcp.json");
+        if mcp_json.is_file() {
+            assert!(
+                !converted.is_empty(),
+                "Face convert_list_response empty despite mcp.json; UI would show No matches"
+            );
+        }
+    }
+
+    #[test]
+    fn skills_list_count_matches_available_commands_source() {
+        let payload = list_nextcode_skills(None);
+        let n = payload
+            .pointer("/result/skills")
+            .and_then(|v| v.as_array())
+            .map(|a| a.len())
+            .unwrap_or(0);
+        let global = crate::skill::SkillRegistry::load_global()
+            .map(|r| r.list().len())
+            .unwrap_or(0);
+        // Dialog may include project overlay on top of global (`$` / welcome
+        // often uses session cwd effective set ≈ global+overlay too).
+        assert!(
+            n >= global,
+            "dialog skills count {n} < load_global count {global}"
+        );
+        assert!(n >= 40, "expected ~47 skills on this machine, got {n}");
+        assert_eq!(
+            payload.pointer("/result/wireRev").and_then(|v| v.as_str()),
+            Some(FACE_EXT_WIRE_REV)
+        );
+    }
+
+    #[test]
+    fn skills_list_face_skill_info_roundtrip() {
+        let payload = list_nextcode_skills(None);
+        let wrapper = payload.clone();
+        let inner = wrapper.get("result").unwrap_or(&wrapper);
+        let skills_val = match inner.get("skills") {
+            Some(v) if !v.is_null() => v.clone(),
+            _ => serde_json::json!([]),
+        };
+        let parsed: Result<
+            Vec<xai_grok_tools::implementations::skills::types::SkillInfo>,
+            _,
+        > = serde_json::from_value(skills_val);
+        assert!(
+            parsed.is_ok(),
+            "Face SkillInfo deserialize failed: {:?}\ninner={}",
+            parsed.err(),
+            inner
+        );
+        let skills = parsed.unwrap();
+        let home = dirs::home_dir().unwrap_or_default();
+        let has_global = home.join(".agents").join("skills").is_dir()
+            || home.join(".next-code").join("skills").is_dir();
+        if has_global {
+            assert!(
+                !skills.is_empty(),
+                "SkillInfo roundtrip empty despite global skill dirs"
+            );
+        }
     }
 }

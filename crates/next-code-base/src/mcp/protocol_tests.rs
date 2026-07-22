@@ -117,7 +117,61 @@ fn test_mcp_http_server_is_not_stdio() {
     let config: McpConfig = serde_json::from_str(json).unwrap();
     let server = config.servers.get("remote").unwrap();
     assert!(!server.is_stdio());
+    assert!(server.is_http());
+    assert!(server.is_connectable());
     assert_eq!(server.url.as_deref(), Some("https://example.com/mcp"));
+}
+
+#[test]
+fn test_mcp_http_headers_deserialize() {
+    let json = r#"{
+            "mcpServers": {
+                "authed": {
+                    "type": "http",
+                    "url": "https://example.com/mcp",
+                    "headers": {
+                        "Authorization": "Bearer secret"
+                    }
+                }
+            }
+        }"#;
+    let config: McpConfig = serde_json::from_str(json).unwrap();
+    let server = config.servers.get("authed").unwrap();
+    assert!(server.is_http());
+    assert_eq!(
+        server.headers.get("Authorization").map(String::as_str),
+        Some("Bearer secret")
+    );
+}
+
+#[test]
+fn load_for_dir_keeps_http_servers() {
+    let _guard = crate::storage::lock_test_env();
+    let previous_home = std::env::var_os("NEXT_CODE_HOME");
+    let home = tempfile::tempdir().expect("home tempdir");
+    crate::env::set_var("NEXT_CODE_HOME", home.path());
+    std::fs::create_dir_all(home.path()).unwrap();
+    std::fs::write(
+        home.path().join("mcp.json"),
+        r#"{"mcpServers":{"remote":{"type":"http","url":"https://example.com/mcp"}}}"#,
+    )
+    .expect("write mcp.json");
+
+    let result = std::panic::catch_unwind(|| {
+        let runtime = McpConfig::load_for_dir(None);
+        assert!(
+            runtime.servers.contains_key("remote"),
+            "HTTP servers must remain in runtime load_for_dir"
+        );
+        assert!(runtime.servers["remote"].is_http());
+    });
+
+    if let Some(previous_home) = previous_home {
+        crate::env::set_var("NEXT_CODE_HOME", previous_home);
+    } else {
+        crate::env::remove_var("NEXT_CODE_HOME");
+    }
+    result.expect("HTTP retained assertions");
 }
 
 #[test]

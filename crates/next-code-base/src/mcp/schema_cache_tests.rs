@@ -13,6 +13,7 @@ fn cfg(command: &str, args: &[&str]) -> McpServerConfig {
         shared: true,
         transport: None,
         url: None,
+        headers: HashMap::new(),
         enabled: None,
         disabled: None,
     }

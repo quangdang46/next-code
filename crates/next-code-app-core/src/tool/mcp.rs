@@ -236,6 +236,7 @@ impl McpManagementTool {
                 shared: true,
                 transport: None,
                 url: None,
+                headers: Default::default(),
                 enabled: None,
                 disabled: None,
             }
@@ -586,6 +587,7 @@ mod tests {
                 shared: true,
                 transport: None,
                 url: None,
+                headers: HashMap::new(),
                 enabled: Some(false),
                 disabled: None,
             },

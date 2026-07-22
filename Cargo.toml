@@ -331,6 +331,8 @@ next-code-tui = { path = "crates/next-code-tui", default-features = false }
 xai-grok-pager = { path = "crates/xai-grok-pager" }
 xai-acp-lib = { path = "crates/xai-acp-lib" }
 xai-hooks-plugins-types = { path = "crates/xai-hooks-plugins-types" }
+xai-grok-tools = { path = "crates/xai-grok-tools" }
+
 agent-client-protocol = { version = "0.10.4", features = ["unstable"] }
 next-code-compaction-core = { path = "crates/next-code-compaction-core" }
 next-code-config-types = { path = "crates/next-code-config-types" }

@@ -19,6 +19,8 @@ ACP methods (daemon):
 | `x.ai/plugins/action` | install / uninstall / enable / disable / reload / update |
 | `x.ai/hooks/list` | Empty-but-valid hooks list for the modal |
 | `x.ai/skills/list` | Skills tab (includes skills from enabled plugin bundles) |
+| `x.ai/mcp/list` | MCP Servers tab (`~/.next-code/mcp.json` + overlays). **stdio** and **HTTP/SSE** (streamable HTTP POST) connect; optional `headers` in mcp.json for static auth |
+
 
 ## Disk layout
 

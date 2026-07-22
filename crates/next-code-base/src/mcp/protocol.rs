@@ -169,8 +169,7 @@ pub struct ResourceContent {
 /// MCP server configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct McpServerConfig {
-    /// Command for stdio servers. Empty for HTTP/SSE servers, which next-code does
-    /// not yet support (such entries are skipped at load time).
+    /// Command for stdio servers. Empty for HTTP/SSE / streamable-HTTP servers.
     #[serde(default)]
     pub command: String,
     #[serde(default)]
@@ -182,13 +181,18 @@ pub struct McpServerConfig {
     /// Stateful servers (Playwright browser) should not be shared.
     #[serde(default = "default_shared")]
     pub shared: bool,
-    /// Transport type from Claude Code configs ("stdio", "http", "sse"). Used
-    /// only to recognize and skip non-stdio servers; defaults to stdio.
+    /// Transport type from Claude Code / Cursor configs ("stdio", "http", "sse",
+    /// "streamable-http"). Defaults to stdio when a command is present.
     #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
     pub transport: Option<String>,
-    /// URL for HTTP/SSE servers (Claude Code compat). Unused by next-code today.
+    /// URL for HTTP/SSE / streamable-HTTP servers (Claude Code / Cursor compat).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    /// Optional static HTTP headers (Authorization, API keys, etc.).
+    /// Mirrors grok `HttpConfig.headers` / mcp.json `headers` map — no OAuth
+    /// browser flow here (see grok `xai-grok-mcp::oauth`).
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub headers: std::collections::HashMap<String, String>,
     /// Whether this server is enabled (default: true). Disabled servers stay
     /// registered in config but are not spawned or connected at load time
     /// until re-enabled (issue #436). opencode-style `"enabled": false`.
@@ -201,17 +205,34 @@ pub struct McpServerConfig {
 }
 
 impl McpServerConfig {
-    /// next-code currently only supports stdio (command-based) MCP servers. A config
-    /// entry is stdio when it has a command and is not explicitly an http/sse
-    /// transport.
+    /// Stdio (command-based) MCP servers: non-empty command and not an HTTP
+    /// transport type.
     pub fn is_stdio(&self) -> bool {
+        if self.is_http() {
+            return false;
+        }
+        !self.command.trim().is_empty()
+    }
+
+    /// HTTP / SSE / streamable-HTTP MCP: explicit transport type, or empty
+    /// command with a URL (Cursor/Claude Code style).
+    pub fn is_http(&self) -> bool {
         if let Some(t) = &self.transport {
             let t = t.to_ascii_lowercase();
             if t == "http" || t == "sse" || t == "streamable-http" {
-                return false;
+                return true;
             }
         }
-        !self.command.trim().is_empty()
+        self.command.trim().is_empty()
+            && self
+                .url
+                .as_ref()
+                .is_some_and(|u| !u.trim().is_empty())
+    }
+
+    /// Whether next-code can connect this entry (stdio or HTTP).
+    pub fn is_connectable(&self) -> bool {
+        self.is_stdio() || self.is_http()
     }
 
     /// Whether this server should be spawned/connected automatically.
@@ -377,6 +398,7 @@ impl McpConfig {
                             shared,
                             transport: None,
                             url: None,
+                            headers: Default::default(),
                             enabled: None,
                             disabled: None,
                         },
@@ -464,17 +486,43 @@ impl McpConfig {
     /// Remote/client sessions run inside a long-lived server whose cwd is
     /// unrelated to the session's project, so the session working directory
     /// must be threaded through explicitly (issue #420).
+    ///
+    /// Runtime connect set: stdio + HTTP/SSE. Unknown shapes (empty command,
+    /// no URL) are dropped with a log line. Prefer
+    /// [`Self::load_catalog_for_dir`] when you need every raw catalog row.
     #[expect(
         clippy::collapsible_if,
         reason = "Import logic keeps source-specific MCP config merge order explicit"
     )]
     pub fn load_for_dir(project_dir: Option<&std::path::Path>) -> Self {
-        // First-run import from Claude Code / Codex CLI
+        let mut merged = Self::load_catalog_for_dir(project_dir);
+
+        merged.servers.retain(|name, cfg| {
+            let keep = cfg.is_connectable();
+            if !keep {
+                crate::logging::info(&format!(
+                    "MCP: Skipping unconnectable server '{}' (need command or http url; type={})",
+                    name,
+                    cfg.transport.as_deref().unwrap_or("-")
+                ));
+            }
+            keep
+        });
+
+        merged
+    }
+
+    /// Load MCP config for Face / UI catalog display (keeps all parsed rows,
+    /// including HTTP). Runtime spawn uses [`Self::load_for_dir`].
+    #[expect(
+        clippy::collapsible_if,
+        reason = "Import logic keeps source-specific MCP config merge order explicit"
+    )]
+    pub fn load_catalog_for_dir(project_dir: Option<&std::path::Path>) -> Self {
         Self::import_from_external();
 
         let mut merged = Self::default();
 
-        // Load next-code's own global config (~/.next-code/mcp.json)
         if let Ok(next_code_dir) = crate::storage::next_code_dir() {
             let next_code_mcp = next_code_dir.join("mcp.json");
             if next_code_mcp.exists() {
@@ -484,8 +532,6 @@ impl McpConfig {
             }
         }
 
-        // Claude Code user/global config (~/.claude.json): top-level mcpServers
-        // plus per-project entries for the project directory.
         if let Ok(claude_json) = crate::storage::user_home_path(".claude.json") {
             if claude_json.exists() {
                 let cwd = project_dir.map(std::path::Path::to_path_buf);
@@ -494,27 +540,11 @@ impl McpConfig {
             }
         }
 
-        // Project-local config files, resolved against the project directory.
         if let Some(project_root) = project_dir {
             merged
                 .servers
                 .extend(Self::load_project_locals(project_root).servers);
         }
-
-        // next-code only supports stdio servers today. Drop HTTP/SSE entries (common
-        // in Claude Code configs) so they don't fail to spawn, but log them so
-        // the omission is visible.
-        merged.servers.retain(|name, cfg| {
-            let keep = cfg.is_stdio();
-            if !keep {
-                crate::logging::info(&format!(
-                    "MCP: Skipping non-stdio server '{}' ({}); HTTP/SSE transports are not yet supported",
-                    name,
-                    cfg.transport.as_deref().unwrap_or("http")
-                ));
-            }
-            keep
-        });
 
         merged
     }
