@@ -372,6 +372,22 @@ impl Agent {
         result
     }
 
+    /// Retry the active conversation without appending another user message.
+    /// Used by Face/TUI after a cross-provider failover countdown switch
+    /// (mirrors local TUI `pending_turn` resend semantics).
+    pub async fn retry_turn_streaming_mpsc(
+        &mut self,
+        event_tx: mpsc::UnboundedSender<ServerEvent>,
+    ) -> Result<()> {
+        let turn_started_at = Instant::now();
+        let start_message_index = self.message_count();
+        self.fire_turn_start_hook("failover_retry");
+        let result = self.run_turn_streaming_mpsc(event_tx).await;
+        self.fire_turn_end_hook(&result, turn_started_at, start_message_index);
+        self.fire_stop_and_idle_hooks(&result);
+        result
+    }
+
     /// Fire the `turn_start` observer hook when a turn begins, before the model
     /// starts generating (and before the first `pre_tool`). This lets external
     /// integrations (terminal multiplexers, status bars) detect that the agent
