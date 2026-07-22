@@ -27,6 +27,12 @@ struct AuthStatusProviderReport {
 #[derive(Debug, Serialize)]
 struct AuthStatusReport {
     any_available: bool,
+    /// Absolute path to unified credential home (`~/.next-code` or `$NEXT_CODE_HOME`).
+    next_code_home: String,
+    /// Unified OpenCode-compatible store (`auth.json` under next_code_home).
+    unified_auth_json: String,
+    /// Legacy API-key `*.env` root (still dual-read).
+    app_config_dir: String,
     providers: Vec<AuthStatusProviderReport>,
 }
 
@@ -149,6 +155,9 @@ pub(super) fn run_auth_status_command(emit_json: bool, emit_toon: bool) -> Resul
         };
         crate::cli::output::emit_json_or_toon(&report, fmt)?;
     } else {
+        println!("next_code_home:\t{}", report.next_code_home);
+        println!("unified_auth_json:\t{}", report.unified_auth_json);
+        println!("app_config_dir:\t{} (legacy *.env, dual-read)", report.app_config_dir);
         for provider in report.providers {
             println!(
                 "{}\t{}\t{}\t{}\t{}\t{}",
@@ -162,6 +171,37 @@ pub(super) fn run_auth_status_command(emit_json: bool, emit_toon: bool) -> Resul
         }
     }
 
+    Ok(())
+}
+
+pub(super) fn run_auth_migrate_command(purge: bool) -> Result<()> {
+    if purge {
+        anyhow::bail!(
+            "--purge is not implemented yet; migrate only copies legacy *.env keys into \
+             auth.json and never deletes credentials"
+        );
+    }
+    let report = crate::provider_catalog::migrate_all_known_legacy_api_keys()?;
+    println!("unified_auth_json:\t{}", report.auth_json.display());
+    println!("app_config_dir:\t{}", report.config_dir.display());
+    if report.migrated.is_empty() {
+        println!("migrated:\t(none)");
+    } else {
+        println!("migrated:");
+        for item in &report.migrated {
+            println!("  - {item}");
+        }
+    }
+    if !report.skipped.is_empty() {
+        println!("skipped:");
+        for item in &report.skipped {
+            println!("  - {item}");
+        }
+    }
+    println!(
+        "Legacy *.env files were left intact. Re-run without --purge (default) anytime; \
+         deletion requires an explicit future --purge flag."
+    );
     Ok(())
 }
 
@@ -196,8 +236,21 @@ fn build_auth_status_report() -> AuthStatusReport {
         })
         .collect::<Vec<_>>();
 
+    let next_code_home = crate::storage::next_code_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "(unavailable)".to_string());
+    let unified_auth_json = crate::provider_catalog::auth_json_path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "(unavailable)".to_string());
+    let app_config_dir = crate::storage::app_config_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "(unavailable)".to_string());
+
     AuthStatusReport {
         any_available: status.has_any_available(),
+        next_code_home,
+        unified_auth_json,
+        app_config_dir,
         providers: reports,
     }
 }

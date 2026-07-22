@@ -249,6 +249,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
         }
         Some(Command::Auth(subcmd)) => match subcmd {
             AuthCommand::Status { json, toon } => commands::run_auth_status_command(json, toon)?,
+            AuthCommand::Migrate { purge } => commands::run_auth_migrate_command(purge)?,
             AuthCommand::Doctor {
                 provider,
                 validate,

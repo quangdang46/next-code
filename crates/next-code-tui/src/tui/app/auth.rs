@@ -2746,10 +2746,15 @@ impl App {
             anyhow::bail!("Invalid env file name: {}", env_file);
         }
 
-        let config_dir = crate::storage::app_config_dir()?;
-        let file_path = config_dir.join(env_file);
-        crate::storage::upsert_env_file_value(&file_path, key_name, Some(key))?;
+        if crate::provider_catalog::canonical_provider_id_for_env_key(key_name).is_some() {
+            crate::provider_catalog::save_api_key_to_unified_auth(key_name, key)?;
+        } else {
+            let config_dir = crate::storage::app_config_dir()?;
+            let file_path = config_dir.join(env_file);
+            crate::storage::upsert_env_file_value(&file_path, key_name, Some(key))?;
+        }
         crate::env::set_var(key_name, key);
+        crate::auth::AuthStatus::invalidate_cache();
         Ok(())
     }
 

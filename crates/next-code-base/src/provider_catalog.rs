@@ -1,8 +1,10 @@
 use crate::env::{product_env, product_env_os};
 pub use next_code_provider_env::{
-    load_api_key_from_env_or_config, load_env_value_from_config_file,
-    load_env_value_from_env_or_config, register_api_key_fallback_resolver,
-    save_env_value_to_env_file,
+    MigrateReport, auth_json_path, canonical_provider_id_for_env_key, known_legacy_api_key_files,
+    load_api_key_from_env_or_config, load_api_key_from_unified_auth, load_env_value_from_config_file,
+    load_env_value_from_env_or_config, migrate_all_known_legacy_api_keys,
+    migrate_legacy_env_file_into_unified, provider_ids_for_env_key, register_api_key_fallback_resolver,
+    save_api_key_to_unified_auth, save_env_value_to_env_file, unified_auth_has_api_key,
 };
 pub use next_code_provider_metadata::*;
 use std::collections::{HashMap, HashSet};
