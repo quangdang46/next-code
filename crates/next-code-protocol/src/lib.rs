@@ -621,6 +621,7 @@ impl Request {
             Request::SwitchAnthropicAccount { id, .. } => *id,
             Request::SwitchOpenAiAccount { id, .. } => *id,
             Request::StdinResponse { id, .. } => *id,
+            Request::AskUserQuestionResponse { id, .. } => *id,
             Request::SetPermissionMode { id, .. } => *id,
             Request::AgentRegister { id, .. } => *id,
             Request::AgentTask { id, .. } => *id,

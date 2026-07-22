@@ -1,8 +1,8 @@
 use super::client_actions::{
-    AgentTaskContext, NotifySessionContext, handle_agent_task, handle_compact, handle_input_shell,
-    handle_notify_session, handle_rename_session, handle_run_subagent, handle_set_feature,
-    handle_set_subagent_model, handle_split, handle_stdin_response, handle_transfer,
-    handle_trigger_memory_extraction,
+    AgentTaskContext, NotifySessionContext, handle_agent_task, handle_ask_user_question_response,
+    handle_compact, handle_input_shell, handle_notify_session, handle_rename_session,
+    handle_run_subagent, handle_set_feature, handle_set_subagent_model, handle_split,
+    handle_stdin_response, handle_transfer, handle_trigger_memory_extraction,
 };
 use super::client_comm::{
     handle_comm_channel_members, handle_comm_list, handle_comm_list_channels, handle_comm_message,
@@ -628,6 +628,14 @@ pub(super) async fn handle_client(
 
     let stdin_responses: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<String>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let ask_user_question_responses: Arc<
+        Mutex<
+            HashMap<
+                String,
+                tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+            >,
+        >,
+    > = Arc::new(Mutex::new(HashMap::new()));
 
     // Subscribe to bus events so we can forward ModelsUpdated to this client
     // (e.g. when Copilot finishes async init after the initial History was sent)
@@ -656,6 +664,34 @@ pub(super) async fn handle_client(
                     prompt: req.prompt,
                     is_password: req.is_password,
                     tool_call_id: tool_call_id.clone(),
+                });
+            }
+        })
+    };
+
+    // AskUserQuestion → Face ACP reverse request (not StdinRequest, not permission).
+    let (ask_req_tx, mut ask_req_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::tool::AskUserQuestionInputRequest>();
+    {
+        let mut agent_guard = agent.lock().await;
+        agent_guard.set_ask_user_question_tx(ask_req_tx);
+    }
+    let _ask_user_question_forwarder = {
+        let client_event_tx = client_event_tx.clone();
+        let ask_user_question_responses = ask_user_question_responses.clone();
+        tokio::spawn(async move {
+            while let Some(req) = ask_req_rx.recv().await {
+                let request_id = req.request_id.clone();
+                ask_user_question_responses
+                    .lock()
+                    .await
+                    .insert(request_id.clone(), req.response_tx);
+                let _ = client_event_tx.send(ServerEvent::AskUserQuestion {
+                    request_id,
+                    session_id: req.session_id,
+                    tool_call_id: req.tool_call_id,
+                    questions: req.questions,
+                    mode: req.mode,
                 });
             }
         })
@@ -1860,6 +1896,23 @@ pub(super) async fn handle_client(
             } => {
                 handle_stdin_response(id, request_id, input, &stdin_responses, &client_event_tx)
                     .await;
+            }
+
+            Request::AskUserQuestionResponse {
+                id,
+                request_id,
+                response,
+                error,
+            } => {
+                handle_ask_user_question_response(
+                    id,
+                    request_id,
+                    response,
+                    error,
+                    &ask_user_question_responses,
+                    &client_event_tx,
+                )
+                .await;
             }
 
             Request::AgentTask { id, task, .. } => {
