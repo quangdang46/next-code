@@ -20,6 +20,8 @@ ACP methods (daemon):
 | `x.ai/hooks/list` | Lifecycle hooks from `~/.next-code/hooks.toml` layers |
 | `x.ai/hooks/action` | reload / enable / disable (add/remove/trust unsupported) |
 | `x.ai/skills/list` | Skills tab (includes skills from enabled plugin bundles) |
+| `x.ai/mcp/list` | MCP Servers tab (`~/.next-code/mcp.json` + overlays). **stdio** and **HTTP/SSE** (streamable HTTP POST) connect; optional `headers` in mcp.json for static auth |
+
 
 ## Disk layout
 

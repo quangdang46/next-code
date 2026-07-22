@@ -1998,18 +1998,9 @@ pub(crate) fn execute(
                             .into(),
                     );
                     let result = match acp_send(req, &tx).await {
-                        Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            serde_json::from_value::<
-                                crate::views::mcps_modal::McpsListResponse,
-                            >(inner.clone())
-                                .map(crate::views::mcps_modal::convert_list_response)
-                                .map_err(|_| "couldn't load server list".to_string())
-                        }
+                        Ok(resp) => crate::views::mcps_modal::parse_mcp_list_ext_response(
+                            resp.0.get(),
+                        ),
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
@@ -2379,19 +2370,7 @@ pub(crate) fn execute(
                             .into(),
                     );
                     let result = match acp_send(req, &tx).await {
-                        Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            serde_json::from_value::<
-                                Vec<
-                                    xai_grok_tools::implementations::skills::types::SkillInfo,
-                                >,
-                            >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't load skills".to_string())
-                        }
+                        Ok(resp) => parse_skills_list_ext_response(resp.0.get()),
                         Err(e) => {
                             Err(
                                 sanitize_user_error(&format!("couldn't load skills: {e}")),
@@ -2419,17 +2398,10 @@ pub(crate) fn execute(
                     );
                     let result = match acp_send(req, &tx).await {
                         Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            let parsed = serde_json::from_value::<
-                                Vec<
-                                    xai_grok_tools::implementations::skills::types::SkillInfo,
-                                >,
-                            >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't toggle skill".to_string());
+                            let parsed = match parse_skills_list_ext_response(resp.0.get()) {
+                                Ok(skills) => Ok(skills),
+                                Err(_) => Err("couldn't toggle skill".to_string()),
+                            };
                             if parsed.is_ok() {
                                 let refresh = acp::ExtRequest::new(
                                     "x.ai/skills/refresh-baseline",

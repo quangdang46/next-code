@@ -353,6 +353,24 @@ impl NextCodeFaceAgent {
         parts.join("\n")
     }
 
+    /// Load initial ACP commands (skills) for the `InitializeResponse` meta.
+    /// Called once at Face connection time so the welcome prompt slash
+    /// completions include skills immediately.
+    fn load_initial_available_commands() -> Vec<acp::AvailableCommand> {
+        // Load global skills (no project-local overlay at this point).
+        let registry = match crate::skill::SkillRegistry::load_global() {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+        registry
+            .list()
+            .into_iter()
+            .map(|skill| {
+                acp::AvailableCommand::new(skill.name.clone(), skill.description.clone())
+            })
+            .collect()
+    }
+
     /// Advertise next-code skills to Face as ACP AvailableCommands (path+scope
     /// meta → Face `/skillname` InjectSkill path). `$skill` still works via
     /// [`Self::expand_skill_invocation`] on the prompt seam.
@@ -870,9 +888,17 @@ impl acp::Agent for NextCodeFaceAgent {
             acp::AuthMethodAgent::new(acp::AuthMethodId::new("xai.api_key"), "Next Code")
                 .description("Provider credentials owned by the next-code daemon"),
         );
+        // Seed available commands (skills) so the welcome prompt slash
+        // completions show skills immediately — stock grok-build agents
+        // include this in their InitializeResponse meta.
+        let commands = Self::load_initial_available_commands();
+        let meta = serde_json::json!({
+            "availableCommands": commands,
+        });
         Ok(acp::InitializeResponse::new(acp::ProtocolVersion::V1)
             .agent_capabilities(caps)
-            .auth_methods(vec![auth_key, crate::cli::face_auth::connect_auth_method()]))
+            .auth_methods(vec![auth_key, crate::cli::face_auth::connect_auth_method()])
+            .meta(meta.as_object().cloned().unwrap_or_default()))
     }
 
     async fn authenticate(
@@ -916,8 +942,53 @@ impl acp::Agent for NextCodeFaceAgent {
                     .and_then(|v| v.as_str())
                     .map(std::path::PathBuf::from);
                 // Toggle is a no-op for next-code skills (always enabled); return list.
-                crate::cli::face_auth::list_nextcode_skills(cwd.as_deref())
+                let payload = crate::cli::face_auth::list_nextcode_skills(cwd.as_deref());
+                if std::env::var_os("NEXT_CODE_FACE_DEBUG").is_some() {
+                    let n = payload
+                        .pointer("/result/skills")
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.len())
+                        .unwrap_or(0);
+                    eprintln!(
+                        "[nextcode.face] {} skills={} wireRev={}",
+                        method,
+                        n,
+                        crate::cli::face_auth::FACE_EXT_WIRE_REV
+                    );
+                }
+                payload
             }
+            "x.ai/mcp/list" => {
+                // Face FetchMcpsList sends sessionId + cache; resolve session cwd when known.
+                let session_cwd = params
+                    .get("sessionId")
+                    .or_else(|| params.get("session_id"))
+                    .and_then(|v| v.as_str())
+                    .and_then(|sid| {
+                        self.sessions
+                            .try_borrow()
+                            .ok()?
+                            .get(sid)
+                            .and_then(|s| s.working_dir.clone())
+                    });
+                let payload =
+                    crate::cli::face_auth::list_nextcode_mcps(session_cwd.as_deref()).await;
+                if std::env::var_os("NEXT_CODE_FACE_DEBUG").is_some() {
+                    let n = payload
+                        .pointer("/result/servers")
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.len())
+                        .unwrap_or(0);
+                    eprintln!(
+                        "[nextcode.face] {} servers={} wireRev={}",
+                        "x.ai/mcp/list",
+                        n,
+                        crate::cli::face_auth::FACE_EXT_WIRE_REV
+                    );
+                }
+                payload
+            }
+            "x.ai/marketplace/list" => crate::cli::face_auth::list_nextcode_marketplace(),
             "x.ai/plugins/list" => {
                 let cwd = params
                     .get("cwd")
@@ -941,7 +1012,16 @@ impl acp::Agent for NextCodeFaceAgent {
                 {
                     payload
                 } else {
-                    serde_json::json!({})
+                    // Never return bare `{}` — Face treats that as a successful
+                    // empty envelope and shows "No matches" / deserialize errors
+                    // without naming the missing method.
+                    serde_json::json!({
+                        "error": {
+                            "code": "unsupported_ext_method",
+                            "message": format!("unsupported ext method: {other}"),
+                            "method": other,
+                        }
+                    })
                 }
             }
         };

@@ -105,6 +105,7 @@ impl AgentView {
             info_float_memory: None,
             info_float_git: None,
             info_float_compaction: None,
+            info_float_visibility: crate::views::info_floats::InfoFloatVisibility::default(),
             chat_kind: false,
             app_chat_mode: false,
             credit_balance: None,
@@ -949,6 +950,7 @@ impl AgentView {
             // `legacy_deferred.rs`. Legacy: `get_active_diagrams` →
             // `InfoWidgetData.diagrams`.
             diagrams: None,
+            visibility: self.info_float_visibility.clone(),
         }
     }
 
