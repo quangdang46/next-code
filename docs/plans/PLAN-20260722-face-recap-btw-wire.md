@@ -5,7 +5,7 @@
 - **What is going on:** Face already paints `/btw` overlay and `/recap` scrollback. Daemon `face_ext::btw_payload` returns a “later turn” stub; `x.ai/recap` is unsupported and `sessionRecap` is not advertised (Face fail-closed).
 - **We recommend:** Advertise `sessionRecap: true`; replace `/btw` stub with a tool-free `MultiProvider::complete` over session transcript; handle `x.ai/recap` in `pager_agent` → model summary → `SessionRecap` / `SessionRecapUnavailable` via existing `x.ai/session_notification`.
 - **Risk:** Medium — live provider call; keep auto-recap best-effort; no new Face chrome.
-- **Status:** Implementing now (user: wire luôn / implement now).
+- **Status:** Implemented — advertise `sessionRecap`, real `/btw` side answer, `/recap` → `SessionRecap` notification.
 
 ### Copy / wire / delete map
 
