@@ -536,9 +536,72 @@ fn hooks_disable_success_refreshes_lists_without_plugins_reload_loop() {
             .any(|e| matches!(e, Effect::PluginsAction { .. })),
         "hooks disable must not chain PluginsAction::Reload: {effects:?}"
     );
+    assert!(
+        !effects.iter().any(|e| matches!(
+            e,
+            Effect::FetchPluginsList { .. }
+                | Effect::FetchMarketplaceList { .. }
+                | Effect::FetchMcpsList { .. }
+        )),
+        "hooks disable must refresh hooks only (not plugins/marketplace/mcp): {effects:?}"
+    );
+    assert_eq!(
+        effects.len(),
+        1,
+        "expected exactly one FetchHooksList effect, got {effects:?}"
+    );
     let modal = app.agents[&id].extensions_modal.as_ref().unwrap();
     let n = modal.result_notice.as_ref().expect("footer status");
     assert_eq!(n.message, "Disabled user/AgentEnd[0]");
+}
+
+#[test]
+fn hooks_list_reload_preserves_expanded_groups() {
+    use crate::views::extensions_modal::{ExtensionsModalState, ExtensionsTab, TabDataState};
+
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    let hook = xai_hooks_plugins_types::HookInfo {
+        name: "user/PreToolUse[0]".into(),
+        event: xai_hooks_plugins_types::HookEvent::PreToolUse,
+        handler_type: xai_hooks_plugins_types::HookHandlerType::Command,
+        matcher: None,
+        command: Some("echo".into()),
+        url: None,
+        timeout_ms: 1000,
+        source_dir: "/tmp/global-hooks".into(),
+        disabled: false,
+    };
+    {
+        let mut modal = ExtensionsModalState::new(ExtensionsTab::Hooks);
+        // Simulate first load seeding collapse, then user expanding the folder.
+        modal.seed_hooks_groups_once(std::slice::from_ref(&hook));
+        modal.hooks_collapsed_groups.remove("/tmp/global-hooks");
+        modal.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
+            hooks: vec![hook.clone()],
+            project_trusted: true,
+            load_errors: vec![],
+        });
+        app.agents.get_mut(&id).unwrap().extensions_modal = Some(modal);
+    }
+
+    dispatch(
+        Action::TaskComplete(TaskResult::HooksListLoaded {
+            agent_id: id,
+            result: Ok(xai_hooks_plugins_types::HooksListResponse {
+                hooks: vec![hook],
+                project_trusted: true,
+                load_errors: vec![],
+            }),
+        }),
+        &mut app,
+    );
+
+    let modal = app.agents[&id].extensions_modal.as_ref().unwrap();
+    assert!(
+        !modal.hooks_collapsed_groups.contains("/tmp/global-hooks"),
+        "Space toggle refresh must keep expanded folders open"
+    );
 }
 
 #[test]

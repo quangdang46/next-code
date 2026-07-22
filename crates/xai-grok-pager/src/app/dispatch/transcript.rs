@@ -619,12 +619,9 @@ pub(super) fn handle_hooks_list_loaded(
     {
         modal.hooks_data = match result {
             Ok(response) => {
-                // Default all groups to collapsed.
-                let mut seen = std::collections::HashSet::new();
-                for hook in &response.hooks {
-                    seen.insert(hook.source_dir.clone());
-                }
-                modal.hooks_collapsed_groups = seen;
+                // Collapse defaults once; refreshes after Space toggle must keep
+                // open folders (otherwise the list "closes" under the user).
+                modal.seed_hooks_groups_once(&response.hooks);
                 TabDataState::Loaded(response)
             }
             Err(e) => TabDataState::Error(e),

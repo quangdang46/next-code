@@ -1747,6 +1747,8 @@ pub struct ExtensionsModalState {
     /// Maps visible row offset to skill index (for mouse click).
     pub skills_visible_map: Vec<Option<usize>>,
     pub hooks_collapsed_groups: std::collections::HashSet<String>,
+    /// See [`Self::seed_hooks_groups_once`].
+    pub hooks_groups_seeded: bool,
     /// Collapsed plugin source groups (by [`PluginGroup`] key).
     pub plugins_collapsed_groups: std::collections::HashSet<String>,
     /// See [`Self::seed_plugin_groups_once`].
@@ -1831,6 +1833,7 @@ impl ExtensionsModalState {
             skills_visible_map: Vec::new(),
             skills_expanded: std::collections::HashSet::new(),
             hooks_collapsed_groups: std::collections::HashSet::new(),
+            hooks_groups_seeded: false,
             plugins_collapsed_groups: std::collections::HashSet::new(),
             plugins_groups_seeded: false,
             marketplace_collapsed: std::collections::HashSet::new(),
@@ -1890,10 +1893,19 @@ impl ExtensionsModalState {
         self.picker_state.hovered = None;
     }
 
-    /// Whether a group header at picker index `sel` with the given
-    /// `group_key` is currently expanded (children visible).
+    /// Seed the all-collapsed default for hook source groups exactly once.
     ///
-    /// The answer depends on the active tab: Hooks use
+    /// Later `FetchHooksList` refreshes (Space enable/disable) must preserve
+    /// the user's expand/collapse state — resetting here made open folders
+    /// vanish and felt like the modal closed.
+    pub fn seed_hooks_groups_once(&mut self, hooks: &[xai_hooks_plugins_types::HookInfo]) {
+        if self.hooks_groups_seeded {
+            return;
+        }
+        self.hooks_collapsed_groups = hooks.iter().map(|h| h.source_dir.clone()).collect();
+        self.hooks_groups_seeded = true;
+    }
+
     /// Seed the all-collapsed default for plugin source groups exactly once.
     ///
     /// Called from both plugin-data delivery channels (list fetch and the
@@ -1907,6 +1919,10 @@ impl ExtensionsModalState {
         self.plugins_groups_seeded = true;
     }
 
+    /// Whether a group header at picker index `sel` with the given
+    /// `group_key` is currently expanded (children visible).
+    ///
+    /// The answer depends on the active tab: Hooks use
     /// `hooks_collapsed_groups`, Marketplace uses
     /// `marketplace_collapsed_sources` (or `picker_state.expanded` for
     /// error-source headers), and other tabs use `picker_state.expanded`.

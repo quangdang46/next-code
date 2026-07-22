@@ -23,7 +23,7 @@ use super::rewind::{
     dispatch_rewind_success, handle_rewind_execute_failed, handle_rewind_points_loaded,
     handle_rewind_preview_complete, handle_rewind_preview_failed,
 };
-use super::router::{dispatch, dispatch_action_result};
+use super::router::{dispatch, dispatch_action_result, ActionRefreshScope};
 use super::session::foreign::{
     handle_foreign_sessions_scanned, handle_session_list_failed, handle_session_list_loaded,
 };
@@ -613,10 +613,14 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         TaskResult::PluginsListLoaded { agent_id, result } => {
             handle_plugins_list_loaded(app, agent_id, result)
         }
-        TaskResult::HooksActionResult { agent_id, result }
-        | TaskResult::PluginsActionResult { agent_id, result }
-        | TaskResult::MarketplaceActionResult { agent_id, result } => {
-            dispatch_action_result(app, agent_id, result)
+        TaskResult::HooksActionResult { agent_id, result } => {
+            dispatch_action_result(app, agent_id, result, ActionRefreshScope::Hooks)
+        }
+        TaskResult::PluginsActionResult { agent_id, result } => {
+            dispatch_action_result(app, agent_id, result, ActionRefreshScope::Plugins)
+        }
+        TaskResult::MarketplaceActionResult { agent_id, result } => {
+            dispatch_action_result(app, agent_id, result, ActionRefreshScope::Marketplace)
         }
         TaskResult::CtaPluginInstallDone {
             agent_id,
