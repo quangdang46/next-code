@@ -1414,13 +1414,11 @@ impl AgentView {
                 if let Some(ref mut state) = self.extensions_modal {
                     state.modal_message = None;
                     if matches!(hooks_action, xai_hooks_plugins_types::HooksAction::Reload) {
-                        // Reload rebuilds the entire plugin registry -- show
-                        // tab-level "Loading..." instead of a single-entry badge.
+                        // Hooks reload re-reads hooks.toml only — do not wipe
+                        // plugins/marketplace into Loading (nothing refreshes them).
                         state.pending_action = Some("Reloading...".into());
                         state.pending_entry_index = None;
                         state.hooks_data = TabDataState::Loading;
-                        state.plugins_data = TabDataState::Loading;
-                        state.marketplace_data = TabDataState::Loading;
                     } else {
                         state.pending_action = Some("Processing...".into());
                         state.pending_entry_index = Some(state.picker_state.selected);
@@ -1624,14 +1622,14 @@ impl AgentView {
                 InputOutcome::Action(Action::ExecuteMarketplaceAction(marketplace_action))
             }
             ButtonAction::RemoveSelectedHook => {
-                // Remove the hook source_dir of the currently selected hook.
+                // Remove the selected handler by Face ACP id (user/Event[n]).
                 if let Some(ref state) = self.extensions_modal {
                     use crate::views::extensions_modal::TabDataState;
                     if let TabDataState::Loaded(ref data) = state.hooks_data
                         && let Some(idx) = state.selected_data_index()
                         && let Some(hook) = data.hooks.get(idx)
                     {
-                        let path = hook.source_dir.clone();
+                        let path = hook.name.clone();
                         return self.execute_modal_button_action(
                             crate::views::extensions_modal::ButtonAction::HooksAction(
                                 xai_hooks_plugins_types::HooksAction::Remove { path },
@@ -1642,39 +1640,64 @@ impl AgentView {
                 InputOutcome::Changed
             }
             ButtonAction::ToggleSelectedHook => {
-                if let Some(ref state) = self.extensions_modal
-                    && let crate::views::extensions_modal::TabDataState::Loaded(ref data) =
+                let (idx, source, is_collapsed) = {
+                    let Some(ref state) = self.extensions_modal else {
+                        return InputOutcome::Changed;
+                    };
+                    let Some(idx) = state.selected_data_index() else {
+                        return InputOutcome::Changed;
+                    };
+                    let crate::views::extensions_modal::TabDataState::Loaded(ref data) =
                         state.hooks_data
-                    && let Some(idx) = state.selected_data_index()
-                    && let Some(hook) = data.hooks.get(idx)
-                {
-                    let source = &hook.source_dir;
-                    let is_collapsed = state.hooks_collapsed_groups.contains(source);
+                    else {
+                        return InputOutcome::Changed;
+                    };
+                    let Some(hook) = data.hooks.get(idx) else {
+                        return InputOutcome::Changed;
+                    };
+                    let source = hook.source_dir.clone();
+                    let is_collapsed = state.hooks_collapsed_groups.contains(&source);
+                    (idx, source, is_collapsed)
+                };
 
+                if let Some(ref mut state) = self.extensions_modal
+                    && let crate::views::extensions_modal::TabDataState::Loaded(ref mut data) =
+                        state.hooks_data
+                {
                     if is_collapsed {
                         // Group toggle: collect all hooks in this source group.
-                        let group_hooks: Vec<&xai_hooks_plugins_types::HookInfo> = data
+                        let any_enabled = data
                             .hooks
                             .iter()
-                            .filter(|h| h.source_dir == *source)
+                            .filter(|h| h.source_dir == source)
+                            .any(|h| !h.disabled);
+                        let hook_names: Vec<String> = data
+                            .hooks
+                            .iter()
+                            .filter(|h| h.source_dir == source)
+                            .map(|h| h.name.clone())
                             .collect();
-                        let any_enabled = group_hooks.iter().any(|h| !h.disabled);
-                        let hook_names: Vec<String> =
-                            group_hooks.iter().map(|h| h.name.clone()).collect();
+                        // Optimistic: flip checkmarks before ACP round-trip.
+                        for h in data.hooks.iter_mut().filter(|h| h.source_dir == source) {
+                            h.disabled = any_enabled;
+                        }
                         let action = xai_hooks_plugins_types::HooksAction::ToggleSource {
                             hook_names,
                             disable: any_enabled,
                         };
                         return self.execute_modal_button_action(ButtonAction::HooksAction(action));
                     } else {
-                        // Single hook toggle.
-                        let action = if hook.disabled {
+                        // Single hook toggle — optimistic flip.
+                        let currently_disabled = data.hooks[idx].disabled;
+                        let name = data.hooks[idx].name.clone();
+                        data.hooks[idx].disabled = !currently_disabled;
+                        let action = if currently_disabled {
                             xai_hooks_plugins_types::HooksAction::Enable {
-                                hook_name: hook.name.clone(),
+                                hook_name: name,
                             }
                         } else {
                             xai_hooks_plugins_types::HooksAction::Disable {
-                                hook_name: hook.name.clone(),
+                                hook_name: name,
                             }
                         };
                         return self.execute_modal_button_action(ButtonAction::HooksAction(action));

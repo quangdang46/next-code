@@ -315,6 +315,10 @@ pub(crate) enum Command {
     #[command(subcommand)]
     Memory(MemoryCommand),
 
+    /// Lifecycle hooks (`hooks.toml`) management
+    #[command(subcommand)]
+    Hooks(HooksCommand),
+
     /// Session management commands
     #[command(subcommand)]
     Session(SessionCommand),
@@ -1231,6 +1235,55 @@ pub(crate) enum MemoryCommand {
 
     /// Clear test memory storage (used by debug sessions)
     ClearTest,
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum HooksCommand {
+    /// List configured hooks from hooks.toml layers
+    List {
+        /// Only show hooks for this event (e.g. PreToolUse, SessionStart)
+        #[arg(long)]
+        event: Option<String>,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Enable a hook handler by event name and 0-based index
+    Enable {
+        /// Event name (e.g. PreToolUse)
+        event: String,
+        /// Handler index within that event
+        index: usize,
+    },
+
+    /// Disable a hook handler by event name and 0-based index
+    Disable {
+        /// Event name (e.g. PreToolUse)
+        event: String,
+        /// Handler index within that event
+        index: usize,
+    },
+
+    /// Dry-run (or execute) hooks for an event
+    Test {
+        /// Event name (e.g. SessionStart)
+        event: String,
+        /// Actually run handlers instead of dry-run
+        #[arg(long)]
+        execute: bool,
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show hook execution metrics / config summary
+    Metrics {
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[cfg(test)]

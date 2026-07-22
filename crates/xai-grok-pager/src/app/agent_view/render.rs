@@ -2019,7 +2019,13 @@ impl AgentView {
             self.hit_bg_button.clear();
             self.hit_plan_approval_status.clear();
         }
-        if let Some((ref msg, remaining)) = self.mode_switch_banner {
+        if let Some(ref banner) = self.reconnect_banner {
+            self.hit_announcement_hide.clear();
+            self.hit_announcement_cta.clear();
+            if layout.banner.height > 0 {
+                crate::views::reconnect_banner::render(layout.banner, buf, banner);
+            }
+        } else if let Some((ref msg, remaining)) = self.mode_switch_banner {
             self.hit_announcement_hide.clear();
             self.hit_announcement_cta.clear();
             if layout.banner.height > 0 && layout.banner.width > 4 {

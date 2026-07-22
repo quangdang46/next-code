@@ -71,9 +71,12 @@ impl SuggestionRow {
         }
     }
 
-    /// Bare command name from a command-row `display` (strips leading `/`).
+    /// Bare command name from a command-row `display` (strips leading `/` or `$`).
     pub(crate) fn command_name(&self) -> &str {
-        self.display.strip_prefix('/').unwrap_or(&self.display)
+        self.display
+            .strip_prefix('/')
+            .or_else(|| self.display.strip_prefix('$'))
+            .unwrap_or(&self.display)
     }
 }
 
@@ -481,24 +484,7 @@ impl SlashController {
         let is_dollar_prefix = text.as_bytes().first() == Some(&b'$');
         if input.cursor_in_command {
             let mut matches = self.command_suggestions(&input.query, models);
-            if is_dollar_prefix {
-                // Filter to skills only and rewrite display to `$name`.
-                let skill_set: std::collections::HashSet<String> = matches
-                    .iter()
-                    .filter(|row| {
-                        let name = row.command_name();
-                        self.registry.get_for_dispatch(name)
-                            .is_some_and(|cmd| cmd.is_skill())
-                    })
-                    .map(|row| row.command_name().to_string())
-                    .collect();
-                matches.retain(|row| skill_set.contains(row.command_name()));
-                for row in &mut matches {
-                    let name = row.command_name().to_string();
-                    row.display = format!("${name}");
-                    row.insert_text = format!("${name} ");
-                }
-            }
+            self.apply_dollar_skill_filter(&mut matches, is_dollar_prefix);
             snapshot.selected = Self::carry_selection(&previous, &matches, true, &input);
             snapshot.open = !matches.is_empty();
             snapshot.matches = matches;
@@ -575,7 +561,10 @@ impl SlashController {
                 })
             }
             MidTextSlashPhase::Command(_) => {
-                let matches = self.command_suggestions(&token.name, models);
+                let is_dollar =
+                    text.as_bytes().get(token.range.start).copied() == Some(b'$');
+                let mut matches = self.command_suggestions(&token.name, models);
+                self.apply_dollar_skill_filter(&mut matches, is_dollar);
                 let input = SlashInput {
                     command_range: token.range.clone(),
                     query: token.name.clone(),
@@ -814,6 +803,30 @@ impl SlashController {
         SlashSnapshot {
             recognized_tokens: self.recognized_token_ranges(text, models),
             ..SlashSnapshot::default()
+        }
+    }
+
+    /// When the trigger is `$`, keep skill commands only and rewrite
+    /// `display` / `insert_text` to `$name` (leading and mid-text `$`).
+    fn apply_dollar_skill_filter(&self, matches: &mut Vec<SuggestionRow>, is_dollar: bool) {
+        if !is_dollar {
+            return;
+        }
+        let skill_set: HashSet<String> = matches
+            .iter()
+            .filter(|row| {
+                let name = row.command_name();
+                self.registry
+                    .get_for_dispatch(name)
+                    .is_some_and(|cmd| cmd.is_skill())
+            })
+            .map(|row| row.command_name().to_string())
+            .collect();
+        matches.retain(|row| skill_set.contains(row.command_name()));
+        for row in matches.iter_mut() {
+            let name = row.command_name().to_string();
+            row.display = format!("${name}");
+            row.insert_text = format!("${name} ");
         }
     }
 
@@ -1324,9 +1337,14 @@ fn should_use_mid_text_refresh(
 
 /// Scan input for all `/word` or `$word` tokens at any position.
 ///
-/// A slash token is `/` (or `$`) followed by one or more non-whitespace chars, where
+/// A slash token is `/` (or `$`) followed by zero or more non-whitespace chars, where
 /// the `/` (or `$`) is either at position 0 or preceded by whitespace (avoids matching
 /// file paths like `foo/bar`).
+///
+/// Bare `/` or `$` (no name yet) is included **only when the cursor is on that
+/// prefix**, so mid-line completion can open the same way leading bare `/`/`$`
+/// does via [`analyze_input`]. Bare prefixes with the cursor elsewhere are
+/// omitted so they do not steal the args phase of a following word.
 pub fn scan_inline_slash_tokens(text: &str, cursor: usize) -> Vec<InlineSlashToken> {
     let cursor = cursor.min(text.len());
     let mut tokens = Vec::new();
@@ -1343,7 +1361,7 @@ pub fn scan_inline_slash_tokens(text: &str, cursor: usize) -> Vec<InlineSlashTok
                 continue;
             }
         }
-        // Collect non-whitespace chars after `/`.
+        // Collect non-whitespace chars after `/` or `$`.
         let name_start = idx + ch.len_utf8();
         let mut name_end = name_start;
         while let Some(&(next_idx, next_ch)) = iter.peek() {
@@ -1354,7 +1372,17 @@ pub fn scan_inline_slash_tokens(text: &str, cursor: usize) -> Vec<InlineSlashTok
             iter.next();
         }
         if name_end <= name_start {
-            continue; // bare `/` with nothing after
+            // Bare `/` or `$`: only for completion when the cursor is on it.
+            let range = idx..name_start;
+            let has_cursor = cursor >= range.start && cursor <= range.end;
+            if has_cursor {
+                tokens.push(InlineSlashToken {
+                    range,
+                    name: String::new(),
+                    has_cursor: true,
+                });
+            }
+            continue;
         }
         let name = text[name_start..name_end].to_string();
         let range = idx..name_end;
@@ -2058,9 +2086,35 @@ mod tests {
     }
 
     #[test]
-    fn scan_bare_slash_ignored() {
-        let tokens = scan_inline_slash_tokens("do / something", 4);
+    fn scan_bare_slash_ignored_when_cursor_past_it() {
+        // Cursor on "something" — bare `/` must not become a token (would
+        // otherwise steal the args phase of plain text after a stray `/`).
+        let tokens = scan_inline_slash_tokens("do / something", 6);
         assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn scan_bare_slash_under_cursor_is_token() {
+        let tokens = scan_inline_slash_tokens("do /", 4);
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0].name, "");
+        assert_eq!(tokens[0].range, 3..4);
+        assert!(tokens[0].has_cursor);
+    }
+
+    #[test]
+    fn scan_bare_dollar_under_cursor_is_token() {
+        let text = "$livekit-agents asdasdas $";
+        let cursor = text.len();
+        let tokens = scan_inline_slash_tokens(text, cursor);
+        assert!(
+            tokens.iter().any(|t| t.name.is_empty() && t.has_cursor),
+            "trailing bare $ under cursor must be a completion token; got {tokens:?}"
+        );
+        assert!(
+            tokens.iter().any(|t| t.name == "livekit-agents"),
+            "leading $skill must still scan; got {tokens:?}"
+        );
     }
 
     #[test]
@@ -2612,6 +2666,115 @@ mod tests {
             snapshot.command_range,
             Some(3..11),
             "Tab must target /imagine, not the later /execute-plan token"
+        );
+    }
+
+    fn test_acp_skill(name: &str) -> agent_client_protocol::AvailableCommand {
+        let meta = serde_json::json!({ "scope": "local", "path": "/x/SKILL.md" })
+            .as_object()
+            .cloned()
+            .unwrap();
+        agent_client_protocol::AvailableCommand::new(name.to_string(), format!("{name} skill"))
+            .meta(meta)
+    }
+
+    #[test]
+    fn mid_text_bare_dollar_opens_skill_suggestions() {
+        let mut ctrl = SlashController::with_builtins(std::path::PathBuf::from("."));
+        ctrl.registry_mut()
+            .set_acp_commands(&[test_acp_skill("livekit-agents")]);
+        let state = SlashState::default();
+        let models = ModelState::default();
+
+        // Repro: first skill chip + trailing bare `$` (cursor at end).
+        let text = "$livekit-agents asdasdas $";
+        let cursor = text.len();
+        ctrl.refresh(&state, text, cursor, &models);
+        let snapshot = state.snapshot();
+        assert!(
+            snapshot.active && snapshot.open,
+            "trailing bare $ must open skill suggestions"
+        );
+        assert!(
+            snapshot.cursor_in_command,
+            "cursor on trailing $ is in command phase"
+        );
+        assert_eq!(
+            snapshot.command_range,
+            Some(text.len() - 1..text.len()),
+            "command_range must be the trailing $, not the leading skill"
+        );
+        assert!(
+            snapshot
+                .matches
+                .iter()
+                .any(|r| r.display == "$livekit-agents"),
+            "matches must be $skill rows; got {:?}",
+            snapshot
+                .matches
+                .iter()
+                .map(|r| r.display.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            snapshot
+                .matches
+                .iter()
+                .all(|r| r.display.starts_with('$')),
+            "dollar trigger must not offer /slash builtins"
+        );
+    }
+
+    #[test]
+    fn mid_text_dollar_partial_filters_skills_only() {
+        let mut ctrl = SlashController::with_builtins(std::path::PathBuf::from("."));
+        ctrl.registry_mut()
+            .set_acp_commands(&[test_acp_skill("livekit-agents")]);
+        let state = SlashState::default();
+        let models = ModelState::default();
+
+        let text = "hello $live";
+        let cursor = text.len();
+        ctrl.refresh(&state, text, cursor, &models);
+        let snapshot = state.snapshot();
+        assert!(snapshot.open, "mid-text $partial must open suggestions");
+        assert!(
+            snapshot
+                .matches
+                .iter()
+                .any(|r| r.display == "$livekit-agents"),
+            "expected $livekit-agents; got {:?}",
+            snapshot
+                .matches
+                .iter()
+                .map(|r| r.display.as_str())
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            !snapshot.matches.iter().any(|r| r.display.starts_with('/')),
+            "$ trigger must filter out slash builtins"
+        );
+    }
+
+    #[test]
+    fn recognized_tokens_include_second_dollar_skill() {
+        let mut ctrl = SlashController::with_builtins(std::path::PathBuf::from("."));
+        ctrl.registry_mut().set_acp_commands(&[
+            test_acp_skill("livekit-agents"),
+            test_acp_skill("other-skill"),
+        ]);
+        let models = ModelState::default();
+        let text = "$livekit-agents then $other-skill";
+        let ranges = ctrl.recognized_token_ranges(text, &models);
+        assert_eq!(
+            ranges.len(),
+            2,
+            "both $skills must highlight; got {ranges:?}"
+        );
+        assert_eq!(ranges[0], 0.."$livekit-agents".len());
+        assert!(
+            ranges[1].start > ranges[0].end,
+            "second skill range after first"
         );
     }
 

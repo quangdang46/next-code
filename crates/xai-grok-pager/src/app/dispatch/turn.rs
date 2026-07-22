@@ -367,6 +367,7 @@ pub(crate) fn reconcile_overdue_turn_ends(app: &mut AppView) -> Option<Vec<Effec
         );
 
         agent.session.finish_turn(&mut agent.scrollback);
+        let turn_usage = agent.take_turn_token_usage();
         let event = if was_cancelling {
             // Send-now cancel renders no marker (the new prompt is the next turn).
             (!send_now_cancel).then_some(SessionEvent::TurnCancelled { elapsed })
@@ -382,9 +383,10 @@ pub(crate) fn reconcile_overdue_turn_ends(app: &mut AppView) -> Option<Vec<Effec
                         .unwrap_or_else(|| "unknown error".into()),
                     elapsed: Some(elapsed),
                 }),
-                _ => Some(SessionEvent::TurnCompleted {
-                    elapsed: Some(elapsed),
-                }),
+                _ => Some(SessionEvent::turn_completed_with_usage(
+                    Some(elapsed),
+                    turn_usage,
+                )),
             }
         };
         crate::app::turn_completion::push_turn_terminal_marker(

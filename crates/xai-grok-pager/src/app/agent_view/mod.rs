@@ -826,6 +826,8 @@ pub struct AgentView {
     pub(crate) modal_hovered_key: Option<char>,
     /// Cached server-reported context state.
     pub context_state: Option<xai_grok_shell::session::ContextInfo>,
+    /// Latest next-code TokenUsage sample for the in-flight turn (Worked-for footer).
+    pub turn_token_usage: Option<crate::scrollback::blocks::TurnTokenUsage>,
     /// Session KV-cache telemetry for the scroll-gated left float.
     pub kv_cache_info: Option<crate::views::info_floats::CacheHitInfo>,
     /// Last mouse/keyboard scroll delta on this agent (float HUD idle timer).
@@ -1186,6 +1188,8 @@ pub struct AgentView {
     /// Shift+Tab. (message, remaining_ticks). Full brightness for 2 s, then
     /// fades out over the final 0.3 s.
     pub(crate) mode_switch_banner: Option<(String, u8)>,
+    /// Orange origin-style reconnect card while daemon/leader IPC is down.
+    pub(crate) reconnect_banner: Option<crate::views::reconnect_banner::ReconnectBanner>,
     /// Session announcement banner (critical or promo) is showing (set at
     /// start of `draw`). Ephemeral-tip occluder — unlike short-lived
     /// mode-switch, an announcement can last the session, so tips must not

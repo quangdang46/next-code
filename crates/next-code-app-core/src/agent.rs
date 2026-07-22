@@ -504,6 +504,31 @@ impl Agent {
                 }
             });
         }
+        // AgentStart — primary agent create (alongside SessionStart)
+        {
+            let registry = agent.hook_registry.clone();
+            let config = agent.dispatch_config.clone();
+            let session_id = agent.session.id.clone();
+            let cwd = agent.session.working_dir.clone().unwrap_or_default();
+            let hook_input = HookInputBuilder::new()
+                .session(&session_id, &cwd)
+                .event("AgentStart")
+                .agent(&session_id, "primary")
+                .build();
+            let ctx = HookContext::for_agent_start(
+                session_id.clone(),
+                cwd,
+                Some(session_id),
+                Some("primary".to_string()),
+            );
+            let event = HookEvent::AgentStart;
+            tokio::spawn(async move {
+                let handlers = registry.get_matching(&event, &ctx);
+                if !handlers.is_empty() {
+                    next_code_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
+                }
+            });
+        }
 
         // Wire DCP plugin into registry so DCP tools can access it
         #[cfg(feature = "dcp")]
@@ -591,6 +616,31 @@ impl Agent {
                 .build();
             let ctx = HookContext::for_session_start(session_id, cwd);
             let event = HookEvent::SessionStart;
+            tokio::spawn(async move {
+                let handlers = registry.get_matching(&event, &ctx);
+                if !handlers.is_empty() {
+                    next_code_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
+                }
+            });
+        }
+        // AgentStart — session attach / restore
+        {
+            let registry = agent.hook_registry.clone();
+            let config = agent.dispatch_config.clone();
+            let session_id = agent.session.id.clone();
+            let cwd = agent.session.working_dir.clone().unwrap_or_default();
+            let hook_input = HookInputBuilder::new()
+                .session(&session_id, &cwd)
+                .event("AgentStart")
+                .agent(&session_id, "primary")
+                .build();
+            let ctx = HookContext::for_agent_start(
+                session_id.clone(),
+                cwd,
+                Some(session_id),
+                Some("primary".to_string()),
+            );
+            let event = HookEvent::AgentStart;
             tokio::spawn(async move {
                 let handlers = registry.get_matching(&event, &ctx);
                 if !handlers.is_empty() {

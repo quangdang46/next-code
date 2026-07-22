@@ -828,6 +828,7 @@ fn headless_materialize_ctx(has_worktree: bool) -> crate::app::session_startup::
         has_worktree,
         allow_remote_restore: false,
         chat_mode: false,
+        defer_existence_to_agent: false,
     }
 }
 
@@ -1897,6 +1898,7 @@ mod tests {
             let ctx = headless_materialize_ctx(has_worktree);
             assert!(!ctx.chat_mode);
             assert!(!ctx.allow_remote_restore);
+            assert!(!ctx.defer_existence_to_agent);
             assert_eq!(ctx.has_worktree, has_worktree);
         }
     }

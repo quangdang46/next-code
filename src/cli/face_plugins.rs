@@ -1,12 +1,14 @@
-//! Face ACP handlers for Grok-style **bundle plugins** under next-code paths.
+//! Face ACP handlers for Grok-style **bundle plugins** and next-code **lifecycle
+//! hooks** under `~/.next-code`.
 //!
 //! Product model (replaces the old QuickJS/TS `next-code plugin *` stack):
 //! - Discover plugin dirs from `~/.next-code/plugins/`, project
 //!   `.next-code/plugins/`, and `~/.next-code/installed-plugins/` (git/local
 //!   installs). Claude compat: `~/.claude/plugins/` (read-only list).
 //! - Wire Face Extensions Plugins tab via `x.ai/plugins/list|action`.
-//! - Hooks tab gets a real empty list (`x.ai/hooks/list`) so the modal stack
-//!   works; marketplace stays brand-hidden.
+//! - Wire Face Extensions Hooks tab via `x.ai/hooks/list|action` to
+//!   `next-code-hooks` (`hooks.toml` layers) — not OpenCode JS plugin hooks.
+//! - Marketplace stays brand-hidden.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -17,8 +19,9 @@ use std::process::Command;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use xai_hooks_plugins_types::{
-    ActionOutcome, HookStatus, HooksListResponse, McpStatus, OutcomeStatus, PluginInfo,
-    PluginOrigin, PluginScope, PluginsAction, PluginsListResponse,
+    ActionOutcome, HookEvent, HookHandlerType, HookInfo, HookStatus, HooksAction,
+    HooksListResponse, McpStatus, OutcomeStatus, PluginInfo, PluginOrigin, PluginScope,
+    PluginsAction, PluginsListResponse,
 };
 
 const STATE_FILE: &str = "plugins-state.json";
@@ -451,13 +454,113 @@ pub fn plugins_list_payload(cwd: Option<&Path>) -> serde_json::Value {
     wrap_result(PluginsListResponse { plugins })
 }
 
-/// `x.ai/hooks/list` — empty but valid so Extensions modal Hooks tab loads.
+/// `x.ai/hooks/list` — next-code `hooks.toml` layers (user / project / env).
 pub fn hooks_list_payload() -> serde_json::Value {
+    let (entries, load_errors) = next_code_hooks::list_hook_layer_entries();
+    let hooks: Vec<HookInfo> = entries.iter().map(hook_layer_to_info).collect();
     wrap_result(HooksListResponse {
-        hooks: vec![],
+        hooks,
         project_trusted: true,
-        load_errors: vec![],
+        load_errors,
     })
+}
+
+fn hook_layer_to_info(entry: &next_code_hooks::HookLayerEntry) -> HookInfo {
+    let name = next_code_hooks::face_hook_name(entry.scope, &entry.event, entry.index);
+    let source_dir = entry
+        .config_path
+        .parent()
+        .unwrap_or(entry.config_path.as_path())
+        .display()
+        .to_string();
+    let (handler_type, command, url, timeout_secs, matcher, disabled) =
+        match &entry.handler {
+            next_code_hooks::HookHandlerConfig::Command(cmd) => (
+                HookHandlerType::Command,
+                Some(cmd.command.clone()),
+                None,
+                cmd.timeout_secs,
+                matcher_display(cmd.matcher.as_ref()),
+                !cmd.enabled,
+            ),
+            next_code_hooks::HookHandlerConfig::Http(http) => (
+                HookHandlerType::Http,
+                None,
+                Some(http.url.clone()),
+                http.timeout_secs,
+                matcher_display(http.matcher.as_ref()),
+                !http.enabled,
+            ),
+            next_code_hooks::HookHandlerConfig::Agent(agent) => (
+                HookHandlerType::Command,
+                Some(format!("agent:{}", agent.agent_id)),
+                None,
+                Some(agent.timeout_secs),
+                matcher_display(agent.matcher.as_ref()),
+                !agent.enabled,
+            ),
+            next_code_hooks::HookHandlerConfig::Plugin(plugin) => (
+                HookHandlerType::Command,
+                Some(format!("plugin:{}", plugin.path)),
+                None,
+                Some(plugin.timeout_secs),
+                matcher_display(plugin.matcher.as_ref()),
+                !plugin.enabled,
+            ),
+        };
+    let timeout_ms = timeout_secs.unwrap_or(30).saturating_mul(1000);
+    HookInfo {
+        name,
+        event: map_hook_event(&entry.event),
+        handler_type,
+        matcher,
+        command,
+        url,
+        timeout_ms,
+        source_dir,
+        disabled,
+    }
+}
+
+fn matcher_display(m: Option<&next_code_hooks::HookMatcher>) -> Option<String> {
+    m.map(|m| match m {
+        next_code_hooks::HookMatcher::Wildcard => "*".to_string(),
+        next_code_hooks::HookMatcher::Exact(v) => v.clone(),
+        next_code_hooks::HookMatcher::Multi(parts) => parts.join("|"),
+        next_code_hooks::HookMatcher::Regex(pat) => format!("/{pat}/"),
+    })
+}
+
+fn map_hook_event(event: &str) -> HookEvent {
+    use next_code_hooks::HookEvent as Nc;
+    match Nc::parse(event) {
+        Some(Nc::PreToolUse) => HookEvent::PreToolUse,
+        Some(Nc::PostToolUse) => HookEvent::PostToolUse,
+        Some(Nc::PostToolUseFailure) => HookEvent::PostToolUseFailure,
+        Some(Nc::ToolError) => HookEvent::ToolError,
+        Some(Nc::UserPromptSubmit) | Some(Nc::UserPromptExpansion) => HookEvent::UserPromptSubmit,
+        Some(Nc::SessionStart) => HookEvent::SessionStart,
+        Some(Nc::SessionEnd) => HookEvent::SessionEnd,
+        Some(Nc::SessionIdle) => HookEvent::SessionIdle,
+        Some(Nc::PermissionDenied) => HookEvent::PermissionDenied,
+        Some(Nc::PermissionRequest) | Some(Nc::PermissionAsked) => HookEvent::PermissionRequest,
+        Some(Nc::SubagentStart) | Some(Nc::AgentStart) => HookEvent::SubagentStart,
+        Some(Nc::SubagentStop) | Some(Nc::AgentEnd) => HookEvent::SubagentStop,
+        Some(Nc::TurnEnd) => HookEvent::TurnEnd,
+        Some(Nc::Stop) => HookEvent::Stop,
+        Some(Nc::PreCompact) | Some(Nc::AutoCompactionControl) => HookEvent::PreCompact,
+        Some(Nc::PostCompact) => HookEvent::PostCompact,
+        Some(Nc::SessionUpdated)
+        | Some(Nc::SessionDiff)
+        | Some(Nc::SessionError)
+        | Some(Nc::PermissionReplied)
+        | Some(Nc::TaskCreated)
+        | Some(Nc::TaskCompleted)
+        | Some(Nc::Setup)
+        | Some(Nc::FileChanged)
+        | Some(Nc::Custom(_))
+        | None => HookEvent::Notification,
+    }
 }
 
 fn find_plugin<'a>(plugins: &'a [Discovered], plugin_id: &str) -> Option<&'a Discovered> {
@@ -685,7 +788,10 @@ pub fn plugins_action_payload(params: &serde_json::Value) -> serde_json::Value {
     };
 
     match action {
-        PluginsAction::Reload => outcome(OutcomeStatus::Success, "Plugins reloaded", true),
+        // Must be `requires_reload: false`. Face chains `requires_reload: true`
+        // into another PluginsAction::Reload — returning true here infinite-loops
+        // ACP tasks and freezes the Extensions modal (Space to disable hooks).
+        PluginsAction::Reload => outcome(OutcomeStatus::Success, "Plugins reloaded", false),
         PluginsAction::Enable { plugin_id } => match set_disabled(&plugin_id, false) {
             Ok(()) => outcome(
                 OutcomeStatus::Success,
@@ -786,13 +892,146 @@ pub fn plugins_action_payload(params: &serde_json::Value) -> serde_json::Value {
     }
 }
 
-/// `x.ai/hooks/action` — acknowledge; hooks runtime remains next-code hooks, not Grok shell.
-pub fn hooks_action_payload(_params: &serde_json::Value) -> serde_json::Value {
-    outcome(
-        OutcomeStatus::Unsupported,
-        "Hooks editing from Face is not wired yet; use next-code hooks config",
-        false,
-    )
+/// `x.ai/hooks/action` — reload + enable/disable against next-code `hooks.toml`.
+pub fn hooks_action_payload(params: &serde_json::Value) -> serde_json::Value {
+    let action: HooksAction = match serde_json::from_value(
+        params
+            .get("action")
+            .cloned()
+            .unwrap_or(serde_json::Value::Null),
+    ) {
+        Ok(a) => a,
+        Err(e) => {
+            return outcome(
+                OutcomeStatus::ValidationError,
+                format!("invalid hooks action: {e}"),
+                false,
+            );
+        }
+    };
+
+    match action {
+        // Hooks mutations rewrite hooks.toml only — Face should refresh lists
+        // (`requires_reload: false`), not chain PluginsAction::Reload.
+        HooksAction::Reload => outcome(
+            OutcomeStatus::Success,
+            "Hooks reloaded from ~/.next-code/hooks.toml layers",
+            false,
+        ),
+        HooksAction::Enable { hook_name } => {
+            match next_code_hooks::set_hook_enabled_by_face_name(&hook_name, true) {
+                Ok(()) => outcome(
+                    OutcomeStatus::Success,
+                    format!("Enabled {hook_name}"),
+                    false,
+                ),
+                Err(e) if e.contains("not found") || e.contains("no hooks") => {
+                    outcome(OutcomeStatus::NotFound, e, false)
+                }
+                Err(e) if e.contains("invalid hook name") || e.contains("out of range") => {
+                    outcome(OutcomeStatus::ValidationError, e, false)
+                }
+                Err(e) => outcome(OutcomeStatus::InternalError, e, false),
+            }
+        }
+        HooksAction::Disable { hook_name } => {
+            match next_code_hooks::set_hook_enabled_by_face_name(&hook_name, false) {
+                Ok(()) => outcome(
+                    OutcomeStatus::Success,
+                    format!("Disabled {hook_name}"),
+                    false,
+                ),
+                Err(e) if e.contains("not found") || e.contains("no hooks") => {
+                    outcome(OutcomeStatus::NotFound, e, false)
+                }
+                Err(e) if e.contains("invalid hook name") || e.contains("out of range") => {
+                    outcome(OutcomeStatus::ValidationError, e, false)
+                }
+                Err(e) => outcome(OutcomeStatus::InternalError, e, false),
+            }
+        }
+        HooksAction::ToggleSource {
+            hook_names,
+            disable,
+        } => {
+            let mut ok = 0usize;
+            let mut last_err: Option<String> = None;
+            for name in &hook_names {
+                match next_code_hooks::set_hook_enabled_by_face_name(name, !disable) {
+                    Ok(()) => ok += 1,
+                    Err(e) => last_err = Some(e),
+                }
+            }
+            if ok == 0 {
+                outcome(
+                    OutcomeStatus::InternalError,
+                    last_err.unwrap_or_else(|| "no hooks toggled".into()),
+                    false,
+                )
+            } else {
+                let verb = if disable { "Disabled" } else { "Enabled" };
+                outcome(
+                    OutcomeStatus::Success,
+                    format!("{verb} {ok} hook(s)"),
+                    false,
+                )
+            }
+        }
+        HooksAction::Trust | HooksAction::Untrust => outcome(
+            OutcomeStatus::Unsupported,
+            "Project hook trust is not required for next-code hooks.toml (always loaded)",
+            false,
+        ),
+        HooksAction::Add { path } => {
+            let source = std::path::PathBuf::from(path.trim());
+            if path.trim().is_empty() {
+                return outcome(
+                    OutcomeStatus::ValidationError,
+                    "Add requires a path to a hooks.toml file",
+                    false,
+                );
+            }
+            match next_code_hooks::merge_hooks_toml_into_user(&source) {
+                Ok(n) => outcome(
+                    OutcomeStatus::Success,
+                    format!(
+                        "Merged {n} handler(s) from {} into ~/.next-code/hooks.toml",
+                        source.display()
+                    ),
+                    false,
+                ),
+                Err(e) if e.contains("not found") => {
+                    outcome(OutcomeStatus::NotFound, e, false)
+                }
+                Err(e) => outcome(OutcomeStatus::ValidationError, e, false),
+            }
+        }
+        HooksAction::Remove { path } => {
+            let key = path.trim();
+            if key.is_empty() {
+                return outcome(
+                    OutcomeStatus::ValidationError,
+                    "Remove requires a hook id (user/Event[0])",
+                    false,
+                );
+            }
+            // Face passes the selected hook's ACP name (user/PreToolUse[0]).
+            match next_code_hooks::remove_hook_by_face_name(key) {
+                Ok(()) => outcome(
+                    OutcomeStatus::Success,
+                    format!("Removed {key}"),
+                    false,
+                ),
+                Err(e) if e.contains("not found") || e.contains("no hooks") => {
+                    outcome(OutcomeStatus::NotFound, e, false)
+                }
+                Err(e) if e.contains("invalid hook name") || e.contains("out of range") => {
+                    outcome(OutcomeStatus::ValidationError, e, false)
+                }
+                Err(e) => outcome(OutcomeStatus::InternalError, e, false),
+            }
+        }
+    }
 }
 
 /// Skill dirs contributed by enabled next-code bundle plugins (for SkillRegistry).
@@ -850,6 +1089,19 @@ mod tests {
             Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
             None => crate::env::remove_var("NEXT_CODE_HOME"),
         }
+    }
+
+    #[test]
+    fn plugins_reload_does_not_require_another_reload() {
+        let out = plugins_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "reload" }
+        }));
+        assert_eq!(out["result"]["status"], "success", "{out}");
+        assert_eq!(
+            out["result"]["requiresReload"], false,
+            "Plugins Reload must terminate the requires_reload chain"
+        );
     }
 
     #[test]
@@ -911,6 +1163,214 @@ mod tests {
         match prev {
             Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
             None => crate::env::remove_var("NEXT_CODE_HOME"),
+        }
+    }
+
+    fn write_user_hooks_toml(home: &Path) {
+        fs::write(
+            home.join("hooks.toml"),
+            r#"
+[settings]
+timeout_secs = 30
+
+[[events.PreToolUse]]
+type = "command"
+enabled = true
+command = "echo pre"
+
+[[events.SessionStart]]
+type = "command"
+enabled = true
+command = "echo start"
+"#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn hooks_list_reads_next_code_hooks_toml() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let tmp = TempDir::new().unwrap();
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        let prev_disable = std::env::var_os("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::set_var("NEXT_CODE_HOME", tmp.path());
+        write_user_hooks_toml(tmp.path());
+
+        let payload = hooks_list_payload();
+        let hooks = payload["result"]["hooks"].as_array().unwrap();
+        assert!(
+            hooks.len() >= 2,
+            "expected handlers from hooks.toml, got {payload}"
+        );
+        let names: Vec<&str> = hooks
+            .iter()
+            .filter_map(|h| h["name"].as_str())
+            .collect();
+        assert!(
+            names.iter().any(|n| n.starts_with("user/PreToolUse[")),
+            "names={names:?}"
+        );
+        assert!(
+            hooks.iter().any(|h| h["command"] == "echo pre"),
+            "{payload}"
+        );
+        assert!(
+            hooks
+                .iter()
+                .any(|h| h["sourceDir"].as_str() == Some(tmp.path().to_str().unwrap())),
+            "sourceDir should be NEXT_CODE_HOME: {payload}"
+        );
+
+        match prev {
+            Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
+            None => crate::env::remove_var("NEXT_CODE_HOME"),
+        }
+        match prev_disable {
+            Some(v) => crate::env::set_var("DISABLE_NEXT_CODE_HOOKS", v),
+            None => crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS"),
+        }
+    }
+
+    #[test]
+    fn hooks_action_enable_disable_rewrites_toml() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let tmp = TempDir::new().unwrap();
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        let prev_disable = std::env::var_os("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::set_var("NEXT_CODE_HOME", tmp.path());
+        write_user_hooks_toml(tmp.path());
+
+        let list = hooks_list_payload();
+        let name = list["result"]["hooks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["command"] == "echo pre")
+            .and_then(|h| h["name"].as_str())
+            .unwrap()
+            .to_string();
+
+        let disable = hooks_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "disable", "hook_name": name }
+        }));
+        assert_eq!(disable["result"]["status"], "success", "{disable}");
+        assert_eq!(
+            disable["result"]["requiresReload"], false,
+            "hooks disable must not chain PluginsAction::Reload (infinite loop)"
+        );
+
+        let list2 = hooks_list_payload();
+        let row = list2["result"]["hooks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["name"] == name)
+            .unwrap();
+        assert_eq!(row["disabled"], true, "{list2}");
+
+        let toml_body = fs::read_to_string(tmp.path().join("hooks.toml")).unwrap();
+        assert!(
+            toml_body.contains("enabled = false"),
+            "hooks.toml should persist enabled=false: {toml_body}"
+        );
+
+        let enable = hooks_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "enable", "hook_name": name }
+        }));
+        assert_eq!(enable["result"]["status"], "success", "{enable}");
+        assert_eq!(enable["result"]["requiresReload"], false);
+        let list3 = hooks_list_payload();
+        let row3 = list3["result"]["hooks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["name"] == name)
+            .unwrap();
+        assert_eq!(row3["disabled"], false, "{list3}");
+
+        let reload = hooks_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "reload" }
+        }));
+        assert_eq!(reload["result"]["status"], "success", "{reload}");
+        assert_eq!(
+            reload["result"]["requiresReload"], false,
+            "hooks reload must not re-chain PluginsAction::Reload"
+        );
+
+        match prev {
+            Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
+            None => crate::env::remove_var("NEXT_CODE_HOME"),
+        }
+        match prev_disable {
+            Some(v) => crate::env::set_var("DISABLE_NEXT_CODE_HOOKS", v),
+            None => crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS"),
+        }
+    }
+
+    #[test]
+    fn hooks_action_add_merges_and_remove_deletes() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let tmp = TempDir::new().unwrap();
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        let prev_disable = std::env::var_os("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::set_var("NEXT_CODE_HOME", tmp.path());
+        write_user_hooks_toml(tmp.path());
+
+        let import = tmp.path().join("import.toml");
+        fs::write(
+            &import,
+            r#"
+[[events.TurnEnd]]
+type = "command"
+command = "echo imported"
+"#,
+        )
+        .unwrap();
+
+        let add = hooks_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "add", "path": import.to_string_lossy() }
+        }));
+        assert_eq!(add["result"]["status"], "success", "{add}");
+
+        let list = hooks_list_payload();
+        let imported = list["result"]["hooks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["command"] == "echo imported")
+            .expect("imported hook missing");
+        let name = imported["name"].as_str().unwrap().to_string();
+
+        let remove = hooks_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "remove", "path": name }
+        }));
+        assert_eq!(remove["result"]["status"], "success", "{remove}");
+
+        let list2 = hooks_list_payload();
+        assert!(
+            list2["result"]["hooks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|h| h["command"] != "echo imported"),
+            "{list2}"
+        );
+
+        match prev {
+            Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
+            None => crate::env::remove_var("NEXT_CODE_HOME"),
+        }
+        match prev_disable {
+            Some(v) => crate::env::set_var("DISABLE_NEXT_CODE_HOOKS", v),
+            None => crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS"),
         }
     }
 }

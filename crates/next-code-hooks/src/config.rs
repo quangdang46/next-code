@@ -729,20 +729,65 @@ pub fn load_hooks_config() -> HooksConfig {
     merged
 }
 
-/// `$HOME/.next-code/hooks.toml`.
-fn user_hooks_config_path() -> Option<PathBuf> {
+/// Config layer identity for Face / CLI listing (user → project → env).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HooksConfigScope {
+    User,
+    Project,
+    Env,
+}
+
+impl HooksConfigScope {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::User => "user",
+            Self::Project => "project",
+            Self::Env => "env",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "user" => Some(Self::User),
+            "project" => Some(Self::Project),
+            "env" => Some(Self::Env),
+            _ => None,
+        }
+    }
+}
+
+/// One handler row from a single config file (not the merged view).
+#[derive(Debug, Clone)]
+pub struct HookLayerEntry {
+    pub scope: HooksConfigScope,
+    /// Absolute path to the `hooks.toml` (or env override file).
+    pub config_path: PathBuf,
+    pub event: String,
+    /// Index within this file's handler list for [`Self::event`].
+    pub index: usize,
+    pub handler: HookHandlerConfig,
+}
+
+/// `$NEXT_CODE_HOME/hooks.toml`, or `~/.next-code/hooks.toml` when unset.
+pub fn user_hooks_config_path() -> Option<PathBuf> {
+    if let Ok(home) = product_env("HOME") {
+        let p = PathBuf::from(home.trim());
+        if !p.as_os_str().is_empty() {
+            return Some(p.join("hooks.toml"));
+        }
+    }
     let home = dirs::home_dir()?;
     Some(home.join(".next-code").join("hooks.toml"))
 }
 
 /// `<cwd>/.next-code/hooks.toml`.
-fn project_hooks_config_path() -> Option<PathBuf> {
+pub fn project_hooks_config_path() -> Option<PathBuf> {
     let cwd = std::env::current_dir().ok()?;
     Some(cwd.join(".next-code").join("hooks.toml"))
 }
 
 /// Path from the `NEXT_CODE_HOOKS_CONFIG` environment variable.
-fn env_hooks_config_path() -> Option<PathBuf> {
+pub fn env_hooks_config_path() -> Option<PathBuf> {
     product_env("HOOKS_CONFIG")
         .ok()
         .filter(|s| !s.is_empty())
@@ -753,23 +798,239 @@ fn env_hooks_config_path() -> Option<PathBuf> {
 ///
 /// Returns `None` when the file does not exist or cannot be parsed (errors are
 /// logged at `warn` level).
-fn load_hooks_config_from_path(path: &std::path::Path) -> Option<HooksConfig> {
-    if !path.exists() {
-        return None;
-    }
-    match std::fs::read_to_string(path) {
-        Ok(content) => match toml::from_str::<HooksConfig>(&content) {
-            Ok(config) => Some(config),
-            Err(e) => {
-                eprintln!("Failed to parse hooks config {}: {}", path.display(), e);
-                None
-            }
-        },
+pub fn load_hooks_config_from_path(path: &std::path::Path) -> Option<HooksConfig> {
+    match load_hooks_config_from_path_detailed(path) {
+        Ok(Some(config)) => Some(config),
+        Ok(None) => None,
         Err(e) => {
-            eprintln!("Failed to read hooks config {}: {}", path.display(), e);
+            eprintln!("{e}");
             None
         }
     }
+}
+
+/// Like [`load_hooks_config_from_path`] but returns parse/IO errors instead of
+/// only logging them. `Ok(None)` means the file is missing.
+pub fn load_hooks_config_from_path_detailed(
+    path: &std::path::Path,
+) -> Result<Option<HooksConfig>, String> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read hooks config {}: {e}", path.display()))?;
+    let config = toml::from_str::<HooksConfig>(&content)
+        .map_err(|e| format!("Failed to parse hooks config {}: {e}", path.display()))?;
+    Ok(Some(config))
+}
+
+/// List handlers from each config layer separately (for Face `/hooks`).
+///
+/// Second tuple element collects load/parse errors (non-fatal).
+pub fn list_hook_layer_entries() -> (Vec<HookLayerEntry>, Vec<String>) {
+    let mut entries = Vec::new();
+    let mut errors = Vec::new();
+
+    if product_var_full("DISABLE_NEXT_CODE_HOOKS").is_ok() {
+        return (entries, errors);
+    }
+
+    let layers: [(HooksConfigScope, Option<PathBuf>); 3] = [
+        (HooksConfigScope::User, user_hooks_config_path()),
+        (HooksConfigScope::Project, project_hooks_config_path()),
+        (HooksConfigScope::Env, env_hooks_config_path()),
+    ];
+
+    for (scope, path_opt) in layers {
+        let Some(path) = path_opt else {
+            continue;
+        };
+        match load_hooks_config_from_path_detailed(&path) {
+            Ok(None) => {}
+            Ok(Some(config)) => {
+                let mut event_names: Vec<&String> = config.events.keys().collect();
+                event_names.sort();
+                for event_name in event_names {
+                    let handlers = &config.events[event_name];
+                    for (index, handler) in handlers.iter().enumerate() {
+                        entries.push(HookLayerEntry {
+                            scope,
+                            config_path: path.clone(),
+                            event: event_name.clone(),
+                            index,
+                            handler: handler.clone(),
+                        });
+                    }
+                }
+            }
+            Err(e) => errors.push(e),
+        }
+    }
+
+    (entries, errors)
+}
+
+/// Stable Face / ACP hook id: `{scope}/{Event}[{index}]`.
+pub fn face_hook_name(scope: HooksConfigScope, event: &str, index: usize) -> String {
+    format!("{}/{event}[{index}]", scope.as_str())
+}
+
+/// Parse [`face_hook_name`].
+pub fn parse_face_hook_name(name: &str) -> Option<(HooksConfigScope, String, usize)> {
+    let (scope_str, rest) = name.split_once('/')?;
+    let scope = HooksConfigScope::parse(scope_str)?;
+    let (event, index_br) = rest.rsplit_once('[')?;
+    let index_str = index_br.strip_suffix(']')?;
+    let index: usize = index_str.parse().ok()?;
+    if event.is_empty() {
+        return None;
+    }
+    Some((scope, event.to_string(), index))
+}
+
+fn config_path_for_scope(scope: HooksConfigScope) -> Option<PathBuf> {
+    match scope {
+        HooksConfigScope::User => user_hooks_config_path(),
+        HooksConfigScope::Project => project_hooks_config_path(),
+        HooksConfigScope::Env => env_hooks_config_path(),
+    }
+}
+
+/// Set `enabled` on a handler identified by [`face_hook_name`] and rewrite its
+/// source `hooks.toml`.
+pub fn set_hook_enabled_by_face_name(name: &str, enabled: bool) -> Result<(), String> {
+    let (scope, event, index) = parse_face_hook_name(name)
+        .ok_or_else(|| format!("invalid hook name: {name}"))?;
+    let path = config_path_for_scope(scope)
+        .ok_or_else(|| format!("no config path for scope '{}'", scope.as_str()))?;
+    set_hook_enabled_in_file(&path, &event, index, enabled)
+}
+
+/// Mutate one handler in `path` and write the file back.
+pub fn set_hook_enabled_in_file(
+    path: &std::path::Path,
+    event: &str,
+    index: usize,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut config = load_hooks_config_from_path_detailed(path)?
+        .ok_or_else(|| format!("hooks config not found: {}", path.display()))?;
+
+    let event_key = HookEvent::parse(event)
+        .map(|e| e.display_name().to_string())
+        .unwrap_or_else(|| event.to_string());
+
+    let key = if config.events.contains_key(&event_key) {
+        event_key
+    } else if config.events.contains_key(event) {
+        event.to_string()
+    } else {
+        return Err(format!(
+            "no hooks for event '{event}' in {}",
+            path.display()
+        ));
+    };
+
+    let handlers = config.events.get_mut(&key).unwrap();
+
+    if index >= handlers.len() {
+        return Err(format!(
+            "handler index {index} out of range for '{event}' ({} handlers)",
+            handlers.len()
+        ));
+    }
+
+    match &mut handlers[index] {
+        HookHandlerConfig::Command(cmd) => cmd.enabled = enabled,
+        HookHandlerConfig::Http(http) => http.enabled = enabled,
+        HookHandlerConfig::Agent(agent) => agent.enabled = enabled,
+        HookHandlerConfig::Plugin(plugin) => plugin.enabled = enabled,
+    }
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let body = toml::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    std::fs::write(path, body).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Remove one handler identified by [`face_hook_name`] and rewrite its source file.
+pub fn remove_hook_by_face_name(name: &str) -> Result<(), String> {
+    let (scope, event, index) = parse_face_hook_name(name)
+        .ok_or_else(|| format!("invalid hook name: {name}"))?;
+    let path = config_path_for_scope(scope)
+        .ok_or_else(|| format!("no config path for scope '{}'", scope.as_str()))?;
+    remove_hook_in_file(&path, &event, index)
+}
+
+/// Remove handler at `index` for `event` in `path` and write the file back.
+pub fn remove_hook_in_file(
+    path: &std::path::Path,
+    event: &str,
+    index: usize,
+) -> Result<(), String> {
+    let mut config = load_hooks_config_from_path_detailed(path)?
+        .ok_or_else(|| format!("hooks config not found: {}", path.display()))?;
+
+    let event_key = HookEvent::parse(event)
+        .map(|e| e.display_name().to_string())
+        .unwrap_or_else(|| event.to_string());
+
+    let key = if config.events.contains_key(&event_key) {
+        event_key
+    } else if config.events.contains_key(event) {
+        event.to_string()
+    } else {
+        return Err(format!(
+            "no hooks for event '{event}' in {}",
+            path.display()
+        ));
+    };
+
+    let handlers = config.events.get_mut(&key).unwrap();
+    if index >= handlers.len() {
+        return Err(format!(
+            "handler index {index} out of range for '{event}' ({} handlers)",
+            handlers.len()
+        ));
+    }
+    handlers.remove(index);
+    if handlers.is_empty() {
+        config.events.remove(&key);
+    }
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let body = toml::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    std::fs::write(path, body).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Merge handlers from `source_toml` into the user `hooks.toml` layer.
+///
+/// Creates `~/.next-code/hooks.toml` when missing. Settings from the source
+/// are applied via [`HooksConfig::merge`] (source wins for settings; handlers
+/// append).
+pub fn merge_hooks_toml_into_user(source_toml: &std::path::Path) -> Result<usize, String> {
+    let incoming = load_hooks_config_from_path_detailed(source_toml)?
+        .ok_or_else(|| format!("hooks file not found: {}", source_toml.display()))?;
+    let added: usize = incoming.events.values().map(|v| v.len()).sum();
+    if added == 0 {
+        return Err("source hooks.toml has no event handlers".to_string());
+    }
+
+    let dest = user_hooks_config_path().ok_or_else(|| "no user hooks.toml path".to_string())?;
+    let mut config = load_hooks_config_from_path_detailed(&dest)?.unwrap_or_default();
+    config.merge(incoming);
+
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let body = toml::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    std::fs::write(&dest, body).map_err(|e| e.to_string())?;
+    Ok(added)
 }
 
 // ---------------------------------------------------------------------------
@@ -1549,6 +1810,42 @@ command = "noop"
             "PostToolUseFailure",
         ] {
             assert!(names.contains(expected), "missing {expected}");
+        }
+    }
+
+    #[test]
+    fn face_hook_name_roundtrip() {
+        let name = face_hook_name(HooksConfigScope::User, "PreToolUse", 0);
+        assert_eq!(name, "user/PreToolUse[0]");
+        let (scope, event, index) = parse_face_hook_name(&name).unwrap();
+        assert_eq!(scope, HooksConfigScope::User);
+        assert_eq!(event, "PreToolUse");
+        assert_eq!(index, 0);
+        assert!(parse_face_hook_name("bad").is_none());
+    }
+
+    #[test]
+    fn user_hooks_path_respects_next_code_home() {
+        use next_code_core::env::{remove_var, set_var};
+        use std::sync::Mutex;
+        static LOCK: Mutex<()> = Mutex::new(());
+        let _g = LOCK.lock().unwrap_or_else(|p| p.into_inner());
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        set_var("NEXT_CODE_HOME", "/tmp/nc-home-test-hooks");
+        let path = user_hooks_config_path().unwrap();
+        assert!(
+            path.ends_with("hooks.toml"),
+            "path={}",
+            path.display()
+        );
+        assert!(
+            path.to_string_lossy().contains("nc-home-test-hooks"),
+            "path={}",
+            path.display()
+        );
+        match prev {
+            Some(v) => set_var("NEXT_CODE_HOME", v),
+            None => remove_var("NEXT_CODE_HOME"),
         }
     }
 }

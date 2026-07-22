@@ -4218,7 +4218,10 @@ impl AppView {
                                 );
                             let show_session_tip = self.tip.is_some() && agent.should_show_tip();
                             let has_mode_banner = agent.mode_switch_banner.is_some();
-                            let banner_height = if has_mode_banner {
+                            let has_reconnect_banner = agent.reconnect_banner.is_some();
+                            let banner_height = if has_reconnect_banner {
+                                crate::views::reconnect_banner::RECONNECT_BANNER_HEIGHT
+                            } else if has_mode_banner {
                                 1
                             } else if announcement_banner_h > 0 {
                                 announcement_banner_h
@@ -5077,6 +5080,7 @@ impl AppView {
                         .is_some_and(|m| m.result_notice.is_some())
                     || agent.ephemeral_tip_needs_tick()
                     || agent.mode_switch_banner.is_some()
+                    || agent.reconnect_banner.is_some()
                     || agent.has_drag_autoscroll()
                     || agent.selection_created_at.is_some()
                     || agent.block_viewer.is_some()

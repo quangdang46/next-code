@@ -2211,7 +2211,8 @@ mod tests {
         let mut parked_block =
             crate::scrollback::blocks::SessionEventBlock::new(SessionEvent::TurnCompleted {
                 elapsed: Some(std::time::Duration::from_secs(1)),
-            });
+            usage: None,
+        });
         parked_block.parked = true;
         let parked = state.push_block(RenderBlock::SessionEvent(parked_block));
         assert_eq!(state.latest_turn_marker_accepting("stop", None), None);
@@ -2219,6 +2220,7 @@ mod tests {
 
         let marker = state.push_block(RenderBlock::session_event(SessionEvent::TurnCompleted {
             elapsed: Some(std::time::Duration::from_secs(2)),
+            usage: None,
         }));
         // An unstamped marker can't confirm a stamped batch — refused; an
         // unstamped batch keeps the tail-only heuristic.
@@ -2265,7 +2267,8 @@ mod tests {
             SessionEventBlock::with_stop_hooks(
                 SessionEvent::TurnCompleted {
                     elapsed: Some(std::time::Duration::from_secs(2)),
-                },
+            usage: None,
+        },
                 Vec::new(),
                 Some("pid-new".into()),
             ),
@@ -2309,7 +2312,8 @@ mod tests {
             SessionEventBlock::with_stop_hooks(
                 SessionEvent::TurnCompleted {
                     elapsed: Some(std::time::Duration::from_secs(2)),
-                },
+            usage: None,
+        },
                 Vec::new(),
                 Some("pid-new".into()),
             ),
@@ -2343,7 +2347,8 @@ mod tests {
             SessionEventBlock::with_stop_hooks(
                 SessionEvent::TurnCompleted {
                     elapsed: Some(std::time::Duration::from_secs(3)),
-                },
+            usage: None,
+        },
                 Vec::new(),
                 Some("pid-newer".into()),
             ),
@@ -2375,13 +2380,15 @@ mod tests {
             SessionEventBlock::with_stop_hooks(
                 SessionEvent::TurnCompleted {
                     elapsed: Some(std::time::Duration::from_secs(2)),
-                },
+            usage: None,
+        },
                 Vec::new(),
                 Some("pid-a".into()),
             ),
         ));
         let mut parked_block = SessionEventBlock::new(SessionEvent::TurnCompleted {
             elapsed: Some(std::time::Duration::from_secs(1)),
+            usage: None,
         });
         parked_block.parked = true;
         parked_block.prompt_id = Some("pid-b".into());

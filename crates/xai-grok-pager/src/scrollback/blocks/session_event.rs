@@ -22,6 +22,33 @@ use crate::util::format_duration;
 /// Shared text-selection range id for recap body lines (header is excluded).
 const RECAP_BODY_RANGE: u16 = 0;
 
+/// Per-turn input/output tokens for the Worked-for footer (next-code bridge).
+///
+/// Upstream Face only shows duration on the terminal marker; next-code emits
+/// live `↑in ↓out` during the stream and we persist the same summary here so
+/// it does not vanish when the turn ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct TurnTokenUsage {
+    pub input: u64,
+    pub output: u64,
+}
+
+impl TurnTokenUsage {
+    /// True when either side reported a non-zero count.
+    pub fn has_tokens(self) -> bool {
+        self.input > 0 || self.output > 0
+    }
+
+    /// Compact `↑28k ↓101` (matches next-code-tui turn footer).
+    pub fn format_arrows(self) -> String {
+        format!(
+            "↑{} ↓{}",
+            format_footer_tokens(self.input),
+            format_footer_tokens(self.output)
+        )
+    }
+}
+
 /// A session-level event with structured data.
 ///
 /// Each variant carries the information needed to render a concise,
@@ -35,6 +62,8 @@ pub enum SessionEvent {
         /// wake turn whose deltas carried no `turnStartMs` (old shells)
         /// renders without a duration rather than lying with "0.0s".
         elapsed: Option<Duration>,
+        /// Optional next-code TokenUsage snapshot for this turn.
+        usage: Option<TurnTokenUsage>,
     },
     /// Agent turn was cancelled by the user.
     TurnCancelled {
@@ -139,16 +168,48 @@ pub enum SessionEvent {
 }
 
 impl SessionEvent {
+    /// Completed-turn marker with no token summary (parked waits, tests, legacy).
+    pub fn turn_completed(elapsed: Option<Duration>) -> Self {
+        Self::TurnCompleted {
+            elapsed,
+            usage: None,
+        }
+    }
+
+    /// Completed-turn marker carrying next-code ↑/↓ token counts when present.
+    pub fn turn_completed_with_usage(
+        elapsed: Option<Duration>,
+        usage: Option<TurnTokenUsage>,
+    ) -> Self {
+        Self::TurnCompleted { elapsed, usage }
+    }
+
     /// Format the event as a human-readable string.
     pub fn message(&self) -> String {
         match self {
             // Deliberately period-less — don't re-punctuate.
             SessionEvent::TurnCompleted {
                 elapsed: Some(elapsed),
+                usage,
             } => {
-                format!("Worked for {}", format_duration(*elapsed))
+                let mut msg = format!("Worked for {}", format_duration(*elapsed));
+                if let Some(u) = usage.filter(|u| u.has_tokens()) {
+                    msg.push_str(" · ");
+                    msg.push_str(&u.format_arrows());
+                }
+                msg
             }
-            SessionEvent::TurnCompleted { elapsed: None } => "Turn completed.".to_string(),
+            SessionEvent::TurnCompleted {
+                elapsed: None,
+                usage,
+            } => {
+                let mut msg = "Turn completed.".to_string();
+                if let Some(u) = usage.filter(|u| u.has_tokens()) {
+                    msg.push_str(" · ");
+                    msg.push_str(&u.format_arrows());
+                }
+                msg
+            }
             SessionEvent::TurnCancelled { elapsed } => {
                 format!("Turn cancelled by user in {}.", format_duration(*elapsed))
             }
@@ -287,6 +348,17 @@ impl SessionEvent {
 }
 
 /// Format a token count with "k" suffix for thousands.
+/// Compact token count for the Worked-for footer (`28k`, `440`, `1.2M`).
+fn format_footer_tokens(tokens: u64) -> String {
+    if tokens >= 1_000_000 {
+        format!("{:.1}M", tokens as f64 / 1_000_000.0)
+    } else if tokens >= 1_000 {
+        format!("{:.0}k", tokens as f64 / 1_000.0)
+    } else {
+        format!("{tokens}")
+    }
+}
+
 fn format_tokens(tokens: u64) -> String {
     if tokens >= 1000 {
         format!("{:.1}k", tokens as f64 / 1000.0)
@@ -667,8 +739,21 @@ mod tests {
     fn turn_completed_message() {
         let event = SessionEvent::TurnCompleted {
             elapsed: Some(Duration::from_secs(125)),
+            usage: None,
         };
         assert_eq!(event.message(), "Worked for 2m5s");
+    }
+
+    #[test]
+    fn turn_completed_message_includes_token_usage() {
+        let event = SessionEvent::turn_completed_with_usage(
+            Some(Duration::from_millis(5300)),
+            Some(TurnTokenUsage {
+                input: 28_000,
+                output: 101,
+            }),
+        );
+        assert_eq!(event.message(), "Worked for 5.3s · ↑28k ↓101");
     }
 
     #[test]
@@ -1128,6 +1213,7 @@ mod tests {
     fn non_recap_events_stay_non_interactive() {
         let block = SessionEventBlock::new(SessionEvent::TurnCompleted {
             elapsed: Some(Duration::from_secs(5)),
+            usage: None,
         });
         assert!(!block.is_foldable());
         assert!(!block.is_selectable());
@@ -1153,7 +1239,8 @@ mod tests {
         SessionEventBlock::with_stop_hooks(
             SessionEvent::TurnCompleted {
                 elapsed: Some(Duration::from_secs(5)),
-            },
+            usage: None,
+        },
             vec![stop_group("stop")],
             None,
         )
@@ -1290,7 +1377,8 @@ mod tests {
         let skipped = SessionEventBlock::with_stop_hooks(
             SessionEvent::TurnCompleted {
                 elapsed: Some(Duration::from_secs(5)),
-            },
+            usage: None,
+        },
             vec![(
                 "stop".into(),
                 vec![HookRunEntry {
@@ -1348,7 +1436,8 @@ mod tests {
         SessionEventBlock {
             event: SessionEvent::TurnCompleted {
                 elapsed: Some(Duration::from_secs(24)),
-            },
+            usage: None,
+        },
             stop_hooks: Vec::new(),
             prompt_id: None,
             parked: true,
@@ -1364,6 +1453,7 @@ mod tests {
         // The real terminal marker accepts.
         let settled = SessionEventBlock::new(SessionEvent::TurnCompleted {
             elapsed: Some(Duration::from_secs(24)),
+            usage: None,
         });
         assert!(settled.accepts_stop_hooks());
         // Non-terminal events never accept, parked or not.

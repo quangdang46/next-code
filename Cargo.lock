@@ -13970,9 +13970,11 @@ dependencies = [
  "agent-client-protocol",
  "dirs 5.0.1",
  "dunce",
+ "ffs-search",
  "nucleo",
  "serde",
  "serde_json",
+ "tempfile",
  "xai-grok-config",
 ]
 

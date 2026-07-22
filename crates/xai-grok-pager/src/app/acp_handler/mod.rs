@@ -614,6 +614,73 @@ fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> b
         "next-code/provider_name" => handle_next_code_provider_name(notif, app),
         "next-code/memory_info" => handle_next_code_memory_info(notif, app),
         "next-code/git_status" => handle_next_code_git_status(notif, app),
+        "next-code/connection_status" => handle_next_code_connection_status(notif, app),
+        _ => false,
+    }
+}
+
+/// Daemon/socket reconnect lifecycle → Face orange reconnect banner.
+fn handle_next_code_connection_status(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
+    let Ok(parsed) = serde_json::from_str::<serde_json::Value>(notif.params.get()) else {
+        tracing::warn!("Failed to parse next-code/connection_status");
+        return false;
+    };
+    let Some(session_id) = parsed.get("sessionId").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    let sid = acp::SessionId::new(session_id.to_string());
+    let Some(matched) = find_session_match(app, &sid) else {
+        return false;
+    };
+    let parent_id = matched.agent_id();
+    let Some(agent) = app.agents.get_mut(&parent_id) else {
+        return false;
+    };
+
+    let phase = parsed
+        .get("phase")
+        .and_then(|v| v.as_str())
+        .unwrap_or("clear");
+    match phase {
+        "reconnecting" => {
+            let attempt = parsed
+                .get("attempt")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(1) as u32;
+            let detail = parsed
+                .get("detail")
+                .and_then(|v| v.as_str())
+                .unwrap_or("server closed the connection")
+                .to_string();
+            let resume_hint = parsed
+                .get("resumeHint")
+                .and_then(|v| v.as_str())
+                .map(str::to_string)
+                .filter(|s| !s.is_empty());
+            let started_at = agent
+                .reconnect_banner
+                .as_ref()
+                .map(|b| b.started_at)
+                .unwrap_or_else(std::time::Instant::now);
+            agent.reconnect_banner = Some(crate::views::reconnect_banner::ReconnectBanner {
+                attempt: attempt.max(1),
+                started_at,
+                detail,
+                resume_hint,
+            });
+            true
+        }
+        "clear" | "connected" | "failed" => {
+            agent.reconnect_banner = None;
+            if phase == "failed" {
+                let detail = parsed
+                    .get("detail")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("connection failed");
+                agent.show_toast(&format!("Connection failed: {detail}"));
+            }
+            true
+        }
         _ => false,
     }
 }

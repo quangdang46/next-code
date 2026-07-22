@@ -537,7 +537,8 @@ pub fn display_copy_path(path: &std::path::Path) -> String {
 }
 
 /// Write `text` to `path` (tilde-expand, create parent dirs). Returns the
-/// expanded path on success.
+/// expanded path on success (may be a unique sibling when the requested path
+/// is locked — see [`crate::util::write_text_resilient`]).
 ///
 /// On unix the file is written `0600` (owner-only): copied text can be
 /// sensitive and the default fallback path is predictable, so other local
@@ -547,36 +548,12 @@ pub fn write_text_to_copy_file(
     path: &std::path::Path,
 ) -> std::io::Result<std::path::PathBuf> {
     let expanded = std::path::PathBuf::from(shellexpand::tilde(&path.to_string_lossy()).as_ref());
-    if let Some(parent) = expanded.parent()
-        && !parent.as_os_str().is_empty()
-    {
-        std::fs::create_dir_all(parent)?;
-    }
-    write_owner_only(&expanded, text)?;
-    Ok(expanded)
-}
-
-/// Write `text` to `path`, owner-readable only (`0600`) on unix.
-///
-/// A pre-existing file (e.g. a `last-copy.txt` created `0644` by an older
-/// grok) is tightened via `set_permissions` since the create-time `mode`
-/// only applies to newly created files. Non-unix falls back to a plain write.
-fn write_owner_only(path: &std::path::Path, text: &str) -> std::io::Result<()> {
-    #[cfg(unix)]
-    {
-        use std::io::Write;
-        use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(path)?;
-        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
-        file.write_all(text.as_bytes())
-    }
-    #[cfg(not(unix))]
-    std::fs::write(path, text)
+    let written = crate::util::write_text_resilient(
+        &expanded,
+        text,
+        crate::util::WriteTextOptions { owner_only: true },
+    )?;
+    Ok(written.path)
 }
 
 /// Write to the default fallback path ([`default_copy_fallback_path`]).

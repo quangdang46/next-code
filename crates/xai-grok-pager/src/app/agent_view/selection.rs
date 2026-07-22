@@ -867,8 +867,8 @@ impl AgentView {
 
     /// Handle a click on a scrollback entry with multi-click detection.
     ///
-    /// - Single click: select entry
-    /// - Double-click non-prompt: toggle fold in place
+    /// - Single click: select entry; tool rows / group headers also toggle fold
+    /// - Double-click non-prompt (non-tool): toggle fold in place
     /// - Double-click prompt: toggle fold + scroll to top
     /// - Triple-click non-prompt: toggle fold + scroll to top
     ///
@@ -898,11 +898,12 @@ impl AgentView {
             .is_some_and(|b| matches!(b, crate::scrollback::block::RenderBlock::BgTask(_)));
         let is_subagent = entry_block
             .is_some_and(|b| matches!(b, crate::scrollback::block::RenderBlock::Subagent(_)));
+        let is_tool_call = entry_block.is_some_and(|b| b.is_tool_call());
 
         // Word-select tip probe (see WORD_SELECT_REPEAT_WINDOW): assistant
         // messages only — headers / prompts / tool rows are fold-nav surfaces
-        // where double-click is the designed gesture, and bg-task / subagent
-        // double-clicks open a viewer that owns input.
+        // (tools fold on single click; other surfaces still use double-click),
+        // and bg-task / subagent double-clicks open a viewer that owns input.
         let word_select_probe = click_count == 2
             && entry_block.is_some_and(|b| b.is_agent_message())
             && !super::is_text_selection_on_double_click();
@@ -918,31 +919,27 @@ impl AgentView {
 
         // Expanded verb-group slot, header row (`header_row_click`): the slot
         // acts as member 0 everywhere else, so the group affordance lives
-        // here — double-click on the header row collapses the group; a
-        // single click just selects. Member rows fall through to the normal
-        // foldable path below.
+        // here — single click on the header row collapses the group.
+        // Clear multi-click so a rapid second click is another independent
+        // toggle rather than a no-op count-2.
         if header_row_click {
-            if click_count == 2 {
+            if click_count == 1 {
                 self.scrollback.collapse_group_if_expanded();
                 return (None, show_word_select_tip);
             }
-            if click_count >= 3 {
-                return (None, false);
-            }
+            return (None, false);
         }
 
-        // Double-click on a group header → expand/collapse the group.
+        // Single-click on a group header → expand/collapse the group.
         // Both expand ("N more") and collapse ("▾ N tool calls") headers
         // are standalone entries with their own index.
         let is_group_header = self.scrollback.is_selected_group_header();
         if is_group_header {
-            if click_count == 2 {
+            if click_count == 1 {
                 self.scrollback.toggle_group_expansion();
                 return (None, show_word_select_tip);
             }
-            if click_count >= 3 {
-                return (None, false);
-            }
+            return (None, false);
         }
 
         let foldable = self.scrollback.get(idx).is_some_and(|e| e.is_foldable());
@@ -952,20 +949,24 @@ impl AgentView {
             .is_some_and(|e| e.block.is_user_prompt());
 
         // Single-click on plan mode tool call → show plan preview/toast.
-        let is_plan_tool = !is_group_header
-            && self
-                .scrollback
-                .entry(idx)
-                .is_some_and(|e| e.block.is_plan_mode_tool());
+        let is_plan_tool = self
+            .scrollback
+            .entry(idx)
+            .is_some_and(|e| e.block.is_plan_mode_tool());
 
         // Credit-limit URL click is handled upstream (before this method)
         // so only the URL line is clickable, not the whole block.
 
         // Double-click on bg-task / subagent blocks (matched above) opens a
-        // viewer instead of folding.
+        // viewer instead of folding. Tool rows fold on single click (and
+        // clear multi-click so click-again collapses).
         match click_count {
             1 if is_plan_tool => {
                 self.show_plan_preview();
+            }
+            1 if is_tool_call && foldable => {
+                self.scrollback.toggle_fold_selected();
+                return (None, show_word_select_tip);
             }
             2 if is_bg_task => {
                 // Double-click bg task: open block viewer (same as Enter).
@@ -1012,12 +1013,12 @@ impl AgentView {
                     self.scrollback.scroll_to_entry_top(idx);
                 }
             }
-            2 => {
+            2 if !is_tool_call => {
                 if foldable {
                     self.scrollback.toggle_fold_selected();
                 }
             }
-            3.. if !is_prompt => {
+            3.. if !is_prompt && !is_tool_call => {
                 if foldable {
                     self.scrollback.toggle_fold_selected();
                 }
@@ -1682,6 +1683,78 @@ mod tests {
         assert!(
             double_click_gesture(&mut agent, t5, 0),
             "the expired attempt still re-arms for the next gesture"
+        );
+    }
+
+    /// Tool rows expand/collapse on a single click (not double-click).
+    #[test]
+    fn single_click_toggles_tool_row_fold() {
+        use crate::scrollback::types::DisplayMode;
+
+        let mut agent = make_agent();
+        agent
+            .scrollback
+            .push_block(crate::scrollback::block::RenderBlock::tool_call_with_details(
+                "notepad_read_priority",
+                "priority notes",
+                true,
+                "note body",
+            ));
+        agent.scrollback.prepare_layout(80, 40);
+        assert_eq!(
+            agent.scrollback.entry(0).map(|e| e.display_mode),
+            Some(DisplayMode::Collapsed)
+        );
+
+        let t0 = Instant::now();
+        let (last, tip) = agent.handle_scrollback_click(t0, 0, false);
+        assert!(!tip);
+        assert!(
+            last.is_none(),
+            "tool fold clears multi-click so click-again is an independent toggle"
+        );
+        assert_eq!(
+            agent.scrollback.entry(0).map(|e| e.display_mode),
+            Some(DisplayMode::Expanded),
+            "first click expands tool detail"
+        );
+
+        let (last2, tip2) =
+            agent.handle_scrollback_click(t0 + Duration::from_millis(50), 0, false);
+        assert!(!tip2);
+        assert!(last2.is_none());
+        assert_eq!(
+            agent.scrollback.entry(0).map(|e| e.display_mode),
+            Some(DisplayMode::Collapsed),
+            "second click collapses tool detail"
+        );
+    }
+
+    /// Assistant / thinking folds stay on double-click — single click only selects.
+    #[test]
+    fn single_click_on_assistant_does_not_fold() {
+        use crate::scrollback::types::DisplayMode;
+
+        let mut agent = make_agent();
+        agent
+            .scrollback
+            .push_block(crate::scrollback::block::RenderBlock::agent_message(
+                "assistant prose that may be foldable",
+            ));
+        agent.scrollback.prepare_layout(80, 40);
+        let before = agent
+            .scrollback
+            .entry(0)
+            .map(|e| e.display_mode)
+            .unwrap_or(DisplayMode::Expanded);
+
+        let (last, tip) = agent.handle_scrollback_click(Instant::now(), 0, false);
+        assert!(!tip);
+        assert!(last.is_some(), "non-tool single click keeps multi-click state");
+        assert_eq!(
+            agent.scrollback.entry(0).map(|e| e.display_mode),
+            Some(before),
+            "single click must not fold assistant text"
         );
     }
 

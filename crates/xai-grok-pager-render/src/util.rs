@@ -1,10 +1,175 @@
 //! Shared utility functions.
 
 use std::borrow::Cow;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub use xai_grok_config::grok_home;
+
+/// Outcome of [`write_text_resilient`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WrittenText {
+    /// Path that actually received the bytes (may differ from the request
+    /// when the destination was locked on Windows).
+    pub path: PathBuf,
+    /// `true` when we had to pick a sibling name because the requested path
+    /// could not be replaced (ERROR_SHARING_VIOLATION / lock).
+    pub redirected: bool,
+}
+
+/// Options for [`write_text_resilient`].
+#[derive(Debug, Clone, Copy, Default)]
+pub struct WriteTextOptions {
+    /// On Unix, create/tighten the final file to mode `0600`.
+    pub owner_only: bool,
+}
+
+/// Write `text` without truncating the destination in place.
+///
+/// Windows antivirus, Search Indexer, OneDrive, and editors often hold a share
+/// lock on a path Face just exported (or on the always-rewritten
+/// `last-copy.txt`). [`std::fs::write`] opens with truncate and fails with
+/// `ERROR_SHARING_VIOLATION` (os error 32). This helper:
+/// 1. writes a unique temp sibling in the same directory (handle closed)
+/// 2. renames onto `path`, retrying briefly on transient lock errors
+/// 3. if the destination stays locked, renames to a unique sibling instead
+pub fn write_text_resilient(
+    path: &Path,
+    text: &str,
+    opts: WriteTextOptions,
+) -> io::Result<WrittenText> {
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    let tmp = temp_sibling(path);
+    write_temp_file(&tmp, text.as_bytes(), opts.owner_only).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        e
+    })?;
+
+    const MAX_ATTEMPTS: u32 = 8;
+    for attempt in 0..MAX_ATTEMPTS {
+        match std::fs::rename(&tmp, path) {
+            Ok(()) => {
+                harden_owner_only(path, opts.owner_only)?;
+                return Ok(WrittenText {
+                    path: path.to_path_buf(),
+                    redirected: false,
+                });
+            }
+            Err(e) if is_sharing_or_lock_error(&e) && attempt + 1 < MAX_ATTEMPTS => {
+                std::thread::sleep(Duration::from_millis(15 + 15 * u64::from(attempt)));
+            }
+            Err(e) if is_sharing_or_lock_error(&e) => {
+                break;
+            }
+            Err(e) => {
+                let _ = std::fs::remove_file(&tmp);
+                return Err(e);
+            }
+        }
+    }
+
+    // Destination stayed locked — land on a unique sibling so export still
+    // succeeds (and the toast/scrollback can name the real path).
+    let alt = unique_sibling(path);
+    match std::fs::rename(&tmp, &alt) {
+        Ok(()) => {
+            harden_owner_only(&alt, opts.owner_only)?;
+            Ok(WrittenText {
+                path: alt,
+                redirected: true,
+            })
+        }
+        Err(rename_err) => {
+            // Last resort: rewrite to the alternate path (temp may still be
+            // usable if rename failed for a non-lock reason on alt).
+            let _ = std::fs::remove_file(&tmp);
+            write_temp_file(&alt, text.as_bytes(), opts.owner_only).map_err(|_| rename_err)?;
+            harden_owner_only(&alt, opts.owner_only)?;
+            Ok(WrittenText {
+                path: alt,
+                redirected: true,
+            })
+        }
+    }
+}
+
+fn temp_sibling(path: &Path) -> PathBuf {
+    let name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("export");
+    let id = uuid::Uuid::new_v4();
+    path.with_file_name(format!(".{name}.{id}.tmp"))
+}
+
+fn unique_sibling(path: &Path) -> PathBuf {
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("export");
+    let id = &uuid::Uuid::new_v4().to_string()[..8];
+    let name = match path.extension().and_then(|s| s.to_str()) {
+        Some(ext) => format!("{stem}-{id}.{ext}"),
+        None => format!("{stem}-{id}"),
+    };
+    path.with_file_name(name)
+}
+
+fn write_temp_file(path: &Path, bytes: &[u8], owner_only: bool) -> io::Result<()> {
+    {
+        #[cfg(unix)]
+        let mut file = {
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut opts = std::fs::OpenOptions::new();
+            opts.write(true).create_new(true);
+            if owner_only {
+                opts.mode(0o600);
+            }
+            opts.open(path)?
+        };
+        #[cfg(not(unix))]
+        let mut file = {
+            let _ = owner_only;
+            std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)?
+        };
+        file.write_all(bytes)?;
+        file.sync_all()?;
+    }
+    Ok(())
+}
+
+fn harden_owner_only(path: &Path, owner_only: bool) -> io::Result<()> {
+    #[cfg(unix)]
+    if owner_only {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    #[cfg(not(unix))]
+    let _ = (path, owner_only);
+    Ok(())
+}
+
+/// Windows `ERROR_SHARING_VIOLATION` (32) / `ERROR_LOCK_VIOLATION` (33), plus
+/// rename-over-open `ERROR_ACCESS_DENIED` (5). Also treat
+/// [`io::ErrorKind::PermissionDenied`] as retryable — some std mappings lose
+/// the raw code.
+fn is_sharing_or_lock_error(err: &io::Error) -> bool {
+    match err.raw_os_error() {
+        Some(32 | 33) => true,
+        #[cfg(windows)]
+        Some(5) => true,
+        _ => err.kind() == io::ErrorKind::PermissionDenied,
+    }
+}
 
 /// Path to `$GROK_HOME` / `$NEXT_CODE_HOME` / `~/.next-code` `pager.toml`.
 pub fn pager_toml_path() -> PathBuf {
@@ -457,5 +622,64 @@ mod tests {
             Some(home) => unsafe { std::env::set_var("HOME", home) },
             None => unsafe { std::env::remove_var("HOME") },
         }
+    }
+
+    #[test]
+    fn write_text_resilient_creates_parent_and_overwrites() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("nested").join("out.md");
+        let written = write_text_resilient(&path, "hello", WriteTextOptions::default())
+            .expect("first write");
+        assert_eq!(written.path, path);
+        assert!(!written.redirected);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello");
+
+        let written = write_text_resilient(&path, "world", WriteTextOptions::default())
+            .expect("overwrite");
+        assert_eq!(written.path, path);
+        assert!(!written.redirected);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "world");
+        // Temp siblings must not linger after a successful rename.
+        let leftovers: Vec<_> = std::fs::read_dir(dir.path().join("nested"))
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.file_name()
+                    .to_string_lossy()
+                    .contains(".tmp")
+            })
+            .collect();
+        assert!(leftovers.is_empty(), "leftover temps: {leftovers:?}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn write_text_resilient_redirects_when_destination_exclusively_locked() {
+        use std::fs::OpenOptions;
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("locked.md");
+        std::fs::write(&path, b"old").expect("seed");
+
+        // share_mode(0) = exclusive; blocks rename-replace (ERROR_SHARING_VIOLATION).
+        let guard = OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&path)
+            .expect("exclusive open");
+
+        let written = write_text_resilient(&path, "fresh export", WriteTextOptions::default())
+            .expect("redirected write");
+        assert!(written.redirected, "expected unique sibling path");
+        assert_ne!(written.path, path);
+        assert_eq!(
+            std::fs::read_to_string(&written.path).unwrap(),
+            "fresh export"
+        );
+
+        drop(guard);
+        // Original locked file must be untouched.
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "old");
     }
 }

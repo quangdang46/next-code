@@ -25,6 +25,7 @@ pub(crate) fn initial_title(args: &Args) -> String {
         Some(Command::Auth(_)) => "next-code auth".to_string(),
         Some(Command::Provider(_)) => "next-code provider".to_string(),
         Some(Command::Memory(_)) => "next-code memory".to_string(),
+        Some(Command::Hooks(_)) => "next-code hooks".to_string(),
         Some(Command::Session(_)) => "next-code session".to_string(),
         Some(Command::Secrets(_)) => "next-code secrets".to_string(),
         Some(Command::Ambient(subcommand)) => match subcommand {
