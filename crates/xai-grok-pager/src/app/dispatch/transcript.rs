@@ -167,22 +167,26 @@ pub(super) fn dispatch_export_conversation(
 
         if let Some(p) = file_path {
             // All fs logic (tilde, mkdir, write) lives here (single owner, thin command layer).
+            // Use temp+rename (+ Windows sharing-violation retry / unique sibling)
+            // instead of in-place truncate — AV/editors locking the destination
+            // previously surfaced as os error 32 ("Failed to write file").
             let expanded =
                 std::path::PathBuf::from(shellexpand::tilde(&p.to_string_lossy()).as_ref());
-            if let Some(parent) = expanded.parent()
-                && let Err(e) = std::fs::create_dir_all(parent)
-            {
-                agent.scrollback.push_block(RenderBlock::system(format!(
-                    "Failed to create directory: {e}"
-                )));
-                return;
-            }
-            match std::fs::write(&expanded, &md) {
-                Ok(()) => {
-                    agent.scrollback.push_block(RenderBlock::system(format!(
-                        "Conversation exported to {}",
-                        expanded.display()
-                    )));
+            match crate::util::write_text_resilient(
+                &expanded,
+                &md,
+                crate::util::WriteTextOptions::default(),
+            ) {
+                Ok(written) => {
+                    let msg = if written.redirected {
+                        format!(
+                            "Conversation exported to {} (requested path was in use)",
+                            written.path.display()
+                        )
+                    } else {
+                        format!("Conversation exported to {}", written.path.display())
+                    };
+                    agent.scrollback.push_block(RenderBlock::system(msg));
                 }
                 Err(e) => {
                     // Do not blindly re-emit a user-supplied path in the error message
