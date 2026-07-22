@@ -78,7 +78,8 @@ pub enum PluginOrigin {
 ///
 /// Maps from `HookEventName` in `xai-grok-hooks`. The source type's
 /// `SubagentEnd` variant (backward-compat alias) is collapsed into
-/// `SubagentStop` during conversion.
+/// `SubagentStop` during conversion. Extra variants cover next-code
+/// `hooks.toml` events that Face `/hooks` surfaces.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum HookEvent {
@@ -101,6 +102,11 @@ pub enum HookEvent {
     // Compaction
     PreCompact,
     PostCompact,
+    // next-code extras (Face list)
+    TurnEnd,
+    SessionIdle,
+    ToolError,
+    PermissionRequest,
 }
 
 impl std::fmt::Display for HookEvent {
@@ -120,6 +126,10 @@ impl std::fmt::Display for HookEvent {
             Self::SubagentStop => write!(f, "Subagent Stop"),
             Self::PreCompact => write!(f, "Pre-Compact"),
             Self::PostCompact => write!(f, "Post-Compact"),
+            Self::TurnEnd => write!(f, "Turn End"),
+            Self::SessionIdle => write!(f, "Session Idle"),
+            Self::ToolError => write!(f, "Tool Error"),
+            Self::PermissionRequest => write!(f, "Permission Request"),
         }
     }
 }
@@ -202,7 +212,7 @@ pub struct HookInfo {
     pub timeout_ms: u64,
     /// Source directory of the hook definition file.
     pub source_dir: String,
-    /// Whether this hook is disabled via ~/.grok/disabled-hooks.
+    /// Whether this hook is disabled (Face shows dimmed + badge).
     #[serde(default)]
     pub disabled: bool,
 }
@@ -869,6 +879,10 @@ mod tests {
             (HookEvent::SubagentStop, r#""subagent_stop""#),
             (HookEvent::PreCompact, r#""pre_compact""#),
             (HookEvent::PostCompact, r#""post_compact""#),
+            (HookEvent::TurnEnd, r#""turn_end""#),
+            (HookEvent::SessionIdle, r#""session_idle""#),
+            (HookEvent::ToolError, r#""tool_error""#),
+            (HookEvent::PermissionRequest, r#""permission_request""#),
         ] {
             let json = serde_json::to_string(&event).unwrap();
             assert_eq!(json, expected, "HookEvent::{event:?} serialized wrong");

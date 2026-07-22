@@ -98,6 +98,7 @@ impl AgentView {
             modal_buttons: Vec::new(),
             modal_hovered_key: None,
             context_state: None,
+            turn_token_usage: None,
             kv_cache_info: None,
             last_scroll_activity_at: None,
             info_float_provider: None,
@@ -225,6 +226,7 @@ impl AgentView {
             last_word_select_probe: None,
             sticky_toast: None,
             mode_switch_banner: None,
+            reconnect_banner: None,
             session_banner_active: false,
             pinned_upgrade_cta_live: false,
             block_viewer: None,
@@ -323,7 +325,13 @@ impl AgentView {
     pub fn mark_turn_finished(&mut self) {
         self.turn_started_at = None;
         self.turn_paused_duration = std::time::Duration::ZERO;
+        self.turn_token_usage = None;
         self.last_active_at = Some(Instant::now());
+    }
+
+    /// Snapshot and clear the in-flight next-code token sample for the footer.
+    pub fn take_turn_token_usage(&mut self) -> Option<crate::scrollback::blocks::TurnTokenUsage> {
+        self.turn_token_usage.take()
     }
     /// Invalidate and clear a minimal `/btw` lifecycle at a session boundary.
     pub(crate) fn clear_minimal_btw_lifecycle(&mut self) {
@@ -421,6 +429,7 @@ impl AgentView {
             self.expect_send_now_cancel = None;
         }
         self.session.start_turn(&mut self.scrollback);
+        self.turn_token_usage = None;
     }
     /// Adopt the in-flight turn another client is driving, conveyed by the
     /// `session/load` response meta (`x.ai/runningPromptId`): enter
@@ -968,18 +977,28 @@ impl AgentView {
     }
     /// Fold daemon TokenUsage (+ optional cache fields) into context + KV float state.
     ///
+    /// Also records the sample on [`Self::turn_token_usage`] so the terminal
+    /// "Worked for" marker can show ↑/↓ after the live status row disappears.
+    ///
     /// No-op for gateway/chat-kind sessions.
     pub fn apply_token_usage_sample(
         &mut self,
         input: u64,
-        _output: u64,
+        output: u64,
         cache_read_input: Option<u64>,
         cache_creation_input: Option<u64>,
     ) {
         if self.chat_kind {
             self.context_state = None;
             self.kv_cache_info = None;
+            self.turn_token_usage = None;
             return;
+        }
+        if input > 0 || output > 0 {
+            self.turn_token_usage = Some(crate::scrollback::blocks::TurnTokenUsage {
+                input,
+                output,
+            });
         }
         let read = cache_read_input.unwrap_or(0);
         let creation = cache_creation_input.unwrap_or(0);
@@ -1176,6 +1195,29 @@ mod resolve_turn_activity_tests {
             Some(TurnActivity::AutoCompacting)
         );
     }
+
+    #[test]
+    fn token_usage_sample_feeds_turn_footer_snapshot() {
+        let mut view = running_view();
+        view.apply_token_usage_sample(28_000, 101, None, None);
+        assert_eq!(
+            view.turn_token_usage,
+            Some(crate::scrollback::blocks::TurnTokenUsage {
+                input: 28_000,
+                output: 101,
+            })
+        );
+        let taken = view.take_turn_token_usage();
+        assert_eq!(
+            taken,
+            Some(crate::scrollback::blocks::TurnTokenUsage {
+                input: 28_000,
+                output: 101,
+            })
+        );
+        assert_eq!(view.turn_token_usage, None);
+    }
+
     /// When waiting on task output, the spinner subject is the bg task's
     /// description (preferred over the raw command).
     #[test]

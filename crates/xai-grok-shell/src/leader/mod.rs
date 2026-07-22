@@ -211,8 +211,8 @@ impl LeaderReconnector {
 
     pub async fn reconnect(
         &self,
-        _policy: ReconnectPolicy,
-        _cancel: &tokio_util::sync::CancellationToken,
+        policy: ReconnectPolicy,
+        cancel: &tokio_util::sync::CancellationToken,
     ) -> Result<
         (
             mpsc::UnboundedSender<String>,
@@ -221,7 +221,28 @@ impl LeaderReconnector {
         ),
         ConnectionError,
     > {
-        Err(ConnectionError::Stub("reconnect not implemented".into()))
+        let max_attempts = match policy {
+            ReconnectPolicy::Unbounded => u32::MAX,
+            ReconnectPolicy::Bounded { max_attempts } => max_attempts.max(1),
+        };
+        let mut attempt = 0u32;
+        while attempt < max_attempts {
+            if cancel.is_cancelled() {
+                return Err(ConnectionError::Cancelled);
+            }
+            attempt += 1;
+            let _ = self
+                .status_tx
+                .send(ConnectionStatus::Reconnecting { attempt });
+            // Stub transport: surface reconnect UI, then fail closed. Real
+            // leader IPC belongs in a non-stub shell build.
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+        let error = "reconnect not implemented".to_string();
+        let _ = self
+            .status_tx
+            .send(ConnectionStatus::Failed { error: error.clone() });
+        Err(ConnectionError::Stub(error))
     }
 }
 

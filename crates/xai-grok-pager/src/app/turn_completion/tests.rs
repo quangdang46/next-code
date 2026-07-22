@@ -101,6 +101,7 @@ fn marker_push_consumes_matching_stop_hook_stash() {
         &mut agent,
         Some(SessionEvent::TurnCompleted {
             elapsed: Some(std::time::Duration::from_secs(2)),
+            usage: None,
         }),
         Some("p1"),
     );
@@ -128,6 +129,7 @@ fn marker_push_flushes_stale_stash_standalone() {
         &mut agent,
         Some(SessionEvent::TurnCompleted {
             elapsed: Some(std::time::Duration::from_secs(2)),
+            usage: None,
         }),
         Some("p2"),
     );
@@ -156,6 +158,7 @@ fn marker_without_ending_pid_flushes_stamped_stash_standalone() {
         &mut agent,
         Some(SessionEvent::TurnCompleted {
             elapsed: Some(std::time::Duration::from_secs(2)),
+            usage: None,
         }),
         None,
     );
@@ -428,6 +431,7 @@ fn real_end_marker_stays_plain_with_running_work() {
         &mut agent,
         Some(SessionEvent::TurnCompleted {
             elapsed: Some(std::time::Duration::from_secs(2)),
+            usage: None,
         }),
         Some("p1"),
     );
@@ -451,6 +455,7 @@ fn workless_marker_renders_legacy_text() {
         &mut agent,
         Some(SessionEvent::TurnCompleted {
             elapsed: Some(std::time::Duration::from_secs(2)),
+            usage: None,
         }),
         Some("p1"),
     );

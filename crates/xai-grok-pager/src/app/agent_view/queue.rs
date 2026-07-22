@@ -238,7 +238,8 @@ impl AgentView {
                 // falling back to `None`'s bare "Turn completed." — the park
                 // boundary should read like every other turn marker.
                 elapsed: Some(self.turn_elapsed().unwrap_or_default()),
-            },
+            usage: None,
+        },
         );
         block.parked = true;
         block.prompt_id = Some(prompt_id.clone());

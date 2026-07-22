@@ -1165,6 +1165,7 @@ impl Agent {
             }
         }
 
+        self.fire_stop_and_idle_hooks(&Ok(()));
         Ok(final_text)
     }
 

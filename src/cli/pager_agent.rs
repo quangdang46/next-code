@@ -190,7 +190,15 @@ impl NextCodeFaceAgent {
     }
 
     async fn connect_halves() -> Result<(ReadHalf, WriteHalf)> {
-        let stream = crate::server::connect_socket(&crate::server::socket_path()).await?;
+        let path = crate::server::socket_path();
+        let stream = crate::server::connect_socket(&path).await.map_err(|err| {
+            anyhow::anyhow!(
+                "Cannot connect to next-code server at {} ({err}). \
+                 Is the server running? Try starting with `next-code` (no --resume), \
+                 or check that another next-code serve is healthy.",
+                path.display()
+            )
+        })?;
         Ok(stream.into_split())
     }
 
@@ -254,51 +262,72 @@ impl NextCodeFaceAgent {
     }
 
     async fn attach_session(&self, target: String) -> Result<SessionBootstrap> {
+        // Match legacy TUI: first message must be Subscribe (with absolute cwd).
+        // Pass `target_session_id` so the daemon attaches directly — do not send
+        // ResumeSession as the handshake (server rejects non-Subscribe first).
+        let working_dir = crate::session::Session::load(&target)
+            .ok()
+            .and_then(|s| s.working_dir)
+            .filter(|d| !d.trim().is_empty())
+            .map(PathBuf::from)
+            .or_else(|| std::env::current_dir().ok())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Cannot resolve working directory to resume session '{target}'"
+                )
+            })?;
+        let working_dir = if working_dir.is_absolute() {
+            working_dir
+        } else {
+            std::env::current_dir()
+                .unwrap_or_else(|_| PathBuf::from("."))
+                .join(working_dir)
+        };
+
         let (reader, writer) = Self::connect_halves().await?;
-        let session = DaemonSession::new(String::new(), reader, writer, 2, None);
-        let resume_id = 1;
+        let session = DaemonSession::new(
+            String::new(),
+            reader,
+            writer,
+            2,
+            Some(working_dir.clone()),
+        );
+        let subscribe_id = 1;
         session
-            .send(&Request::ResumeSession {
-                id: resume_id,
-                session_id: target.clone(),
+            .send(&Request::Subscribe {
+                id: subscribe_id,
+                working_dir: Some(working_dir.display().to_string()),
+                selfdev: None,
+                target_session_id: Some(target.clone()),
                 client_instance_id: Some("face".to_string()),
                 client_has_local_history: false,
                 allow_session_takeover: false,
+                terminal_env: crate::terminal_launch::snapshot_client_terminal_env(),
             })
             .await?;
-
-        let mut attached = target;
-        let mut provider_name: Option<String> = None;
-        let mut provider_model: Option<String> = None;
-        let mut available_models: Vec<String> = Vec::new();
-        loop {
-            match session.read_event().await? {
-                ServerEvent::Ack { .. } => {}
-                ServerEvent::History {
-                    session_id,
-                    provider_name: hist_provider,
-                    provider_model: hist_model,
-                    available_models: hist_models,
-                    ..
-                } => {
-                    attached = session_id;
-                    if hist_provider.is_some() {
-                        provider_name = hist_provider;
-                    }
-                    if hist_model.is_some() {
-                        provider_model = hist_model;
-                    }
-                    if !hist_models.is_empty() {
-                        available_models = hist_models;
-                    }
-                }
-                ServerEvent::Done { id } if id == resume_id => break,
-                ServerEvent::Error { id, message, .. } if id == resume_id => {
-                    anyhow::bail!(message);
-                }
-                _ => {}
-            }
+        // History may arrive during Subscribe; wait_for_done ignores it — re-fetch.
+        if let Err(err) = wait_for_done(&session, subscribe_id).await {
+            anyhow::bail!(
+                "Session '{target}' could not be resumed: {err}. \
+                 List sessions with `next-code --resume`, or start a new one with `next-code`."
+            );
         }
+        let history = request_history(&session).await.map_err(|err| {
+            anyhow::anyhow!(
+                "Session '{target}' attached but history failed: {err}. \
+                 List sessions with `next-code --resume`, or start a new one with `next-code`."
+            )
+        })?;
+        let (session_id, provider_name, provider_model, available_models) = match history {
+            ServerEvent::History {
+                session_id,
+                provider_name,
+                provider_model,
+                available_models,
+                ..
+            } => (session_id, provider_name, provider_model, available_models),
+            other => anyhow::bail!("expected history after resume subscribe, got {other:?}"),
+        };
 
         let models = session_model_state_from_history(
             provider_model.as_deref(),
@@ -306,27 +335,23 @@ impl NextCodeFaceAgent {
             provider_name.as_deref(),
         );
 
-        let working_dir = crate::session::Session::load(&attached)
-            .ok()
-            .and_then(|s| s.working_dir)
-            .filter(|d| !d.trim().is_empty())
-            .map(PathBuf::from);
-
         let live = Rc::new(DaemonSession::new(
-            attached.clone(),
+            session_id.clone(),
             session.reader.into_inner().into_inner(),
             session.writer.into_inner(),
             session.next_request_id.load(Ordering::Relaxed),
-            working_dir,
+            Some(working_dir),
         ));
-        self.sessions.borrow_mut().insert(attached.clone(), live.clone());
+        self.sessions
+            .borrow_mut()
+            .insert(session_id.clone(), live.clone());
         if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
-            self.emit_provider_name(&attached, provider).await;
+            self.emit_provider_name(&session_id, provider).await;
         }
-        self.emit_memory_info(&attached).await;
-        self.emit_git_status(&attached).await;
-        self.emit_todos_plan(&attached, /*allow_empty=*/ false).await;
-        self.emit_available_skills(&attached).await;
+        self.emit_memory_info(&session_id).await;
+        self.emit_git_status(&session_id).await;
+        self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
+        self.emit_available_skills(&session_id).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -650,6 +675,93 @@ impl NextCodeFaceAgent {
                 std::sync::Arc::from(raw),
             ))
             .await;
+    }
+
+    fn resume_hint_for(session_id: &str) -> Option<String> {
+        let name = crate::id::extract_session_name(session_id).unwrap_or(session_id);
+        if name.trim().is_empty() {
+            None
+        } else {
+            Some(format!("next-code --resume {name}"))
+        }
+    }
+
+    /// Drive Face's orange reconnect card (`next-code/connection_status`).
+    async fn emit_connection_status(
+        &self,
+        session_id: &str,
+        phase: &str,
+        attempt: u32,
+        detail: &str,
+    ) {
+        let mut payload = serde_json::json!({
+            "sessionId": session_id,
+            "phase": phase,
+        });
+        if phase == "reconnecting" {
+            payload["attempt"] = serde_json::json!(attempt.max(1));
+            payload["detail"] = serde_json::json!(detail);
+            if let Some(hint) = Self::resume_hint_for(session_id) {
+                payload["resumeHint"] = serde_json::json!(hint);
+            }
+        } else if phase == "failed" && !detail.is_empty() {
+            payload["detail"] = serde_json::json!(detail);
+        }
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "next-code/connection_status",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    fn is_daemon_disconnect(err: &anyhow::Error) -> bool {
+        let msg = err.to_string();
+        msg.contains("daemon disconnected")
+            || msg.contains("Connection reset")
+            || msg.contains("connection reset")
+            || msg.contains("Broken pipe")
+            || msg.contains("broken pipe")
+            || msg.contains("os error 10054")
+            || msg.contains("os error 32")
+    }
+
+    /// Re-open the daemon socket and resume `session_id`, updating Face banner.
+    async fn reconnect_daemon_session(&self, session_id: &str) -> Result<Rc<DaemonSession>> {
+        let detail = "server closed the connection";
+        let mut attempt = 0u32;
+        let mut last_err = anyhow::anyhow!("{detail}");
+        // Mirror origin TUI short early backoff, then cap at 30s.
+        while attempt < 40 {
+            attempt += 1;
+            self.emit_connection_status(session_id, "reconnecting", attempt, detail)
+                .await;
+            match self.attach_session(session_id.to_string()).await {
+                Ok(boot) => {
+                    self.emit_connection_status(session_id, "connected", attempt, "")
+                        .await;
+                    return Ok(boot.session);
+                }
+                Err(err) => {
+                    last_err = err;
+                    let backoff = if attempt <= 2 {
+                        std::time::Duration::from_millis(250 * attempt as u64)
+                    } else {
+                        std::time::Duration::from_secs(
+                            (1u64 << (attempt - 2).min(5)).min(30),
+                        )
+                    };
+                    tokio::time::sleep(backoff).await;
+                }
+            }
+        }
+        self.emit_connection_status(session_id, "failed", attempt, &last_err.to_string())
+            .await;
+        Err(last_err.context("failed to reconnect to next-code daemon"))
     }
 
     /// Bridge daemon History `provider_name` into Face Overview float.
@@ -1097,6 +1209,24 @@ impl acp::Agent for NextCodeFaceAgent {
             })
             .await
         {
+            if Self::is_daemon_disconnect(&err) {
+                match self.reconnect_daemon_session(&session_id).await {
+                    Ok(live) => {
+                        self.sessions
+                            .borrow_mut()
+                            .insert(session_id.clone(), live);
+                        session.prompt_running.store(false, Ordering::SeqCst);
+                        return Err(acp::Error::internal_error().data(
+                            "Server connection restored. Please resend your message."
+                                .to_string(),
+                        ));
+                    }
+                    Err(re) => {
+                        session.prompt_running.store(false, Ordering::SeqCst);
+                        return Err(acp::Error::internal_error().data(re.to_string()));
+                    }
+                }
+            }
             session.prompt_running.store(false, Ordering::SeqCst);
             return Err(acp::Error::internal_error().data(err.to_string()));
         }
@@ -1105,6 +1235,24 @@ impl acp::Agent for NextCodeFaceAgent {
             let event = match session.read_event().await {
                 Ok(e) => e,
                 Err(err) => {
+                    if Self::is_daemon_disconnect(&err) {
+                        match self.reconnect_daemon_session(&session_id).await {
+                            Ok(live) => {
+                                self.sessions
+                                    .borrow_mut()
+                                    .insert(session_id.clone(), live);
+                                session.prompt_running.store(false, Ordering::SeqCst);
+                                return Err(acp::Error::internal_error().data(
+                                    "Server connection restored. Please resend your message."
+                                        .to_string(),
+                                ));
+                            }
+                            Err(re) => {
+                                session.prompt_running.store(false, Ordering::SeqCst);
+                                return Err(acp::Error::internal_error().data(re.to_string()));
+                            }
+                        }
+                    }
                     session.prompt_running.store(false, Ordering::SeqCst);
                     return Err(acp::Error::internal_error().data(err.to_string()));
                 }

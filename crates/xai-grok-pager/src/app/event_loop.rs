@@ -2360,6 +2360,29 @@ pub(crate) async fn run(
                             None,
                             Some(serde_json::json!({ "attempt": attempt })),
                         );
+                        let resume_hint = app
+                            .agents
+                            .values()
+                            .find_map(|a| a.session.session_id.as_ref())
+                            .map(|sid| {
+                                let name: &str = sid.0.as_ref();
+                                format!("next-code --resume {name}")
+                            });
+                        let detail = "server closed the connection".to_string();
+                        for agent in app.agents.values_mut() {
+                            let started_at = agent
+                                .reconnect_banner
+                                .as_ref()
+                                .map(|b| b.started_at)
+                                .unwrap_or_else(std::time::Instant::now);
+                            agent.reconnect_banner =
+                                Some(crate::views::reconnect_banner::ReconnectBanner {
+                                    attempt: attempt.max(1),
+                                    started_at,
+                                    detail: detail.clone(),
+                                    resume_hint: resume_hint.clone(),
+                                });
+                        }
                         app.show_toast(&format!(
                             "Disconnected. Reconnecting... (attempt {attempt})"
                         ));
@@ -2552,6 +2575,9 @@ pub(crate) async fn run(
                         presenter.request(false);
                     }
                     ConnectionStatus::Failed { ref error } => {
+                        for agent in app.agents.values_mut() {
+                            agent.reconnect_banner = None;
+                        }
                         app.show_toast(&format!("Connection failed: {error}"));
                         presenter.request(false);
                     }
@@ -2571,6 +2597,9 @@ pub(crate) async fn run(
                 };
                 reconnect_abort_handle = None;
                 app.reconnect_pending = false;
+                for agent in app.agents.values_mut() {
+                    agent.reconnect_banner = None;
+                }
 
                 let outcome = match result {
                     Ok(outcome) => outcome,

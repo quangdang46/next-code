@@ -1343,10 +1343,21 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
     sync_sleep_inhibitor(app);
     effects
 }
+/// Which extension lists to refresh after a successful action (when
+/// `requires_reload` is false). Hooks Space toggle must not fan out to
+/// plugins/marketplace/MCP — that was the lag source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ActionRefreshScope {
+    Hooks,
+    Plugins,
+    Marketplace,
+}
+
 pub(super) fn dispatch_action_result(
     app: &mut AppView,
     agent_id: crate::app::agent::AgentId,
     result: Result<xai_hooks_plugins_types::ActionOutcome, String>,
+    refresh: ActionRefreshScope,
 ) -> Vec<Effect> {
     use xai_hooks_plugins_types::OutcomeStatus;
     let Some(agent) = app.agents.get_mut(&agent_id) else {
@@ -1387,23 +1398,34 @@ pub(super) fn dispatch_action_result(
                             action: xai_hooks_plugins_types::PluginsAction::Reload,
                         });
                     } else if agent.extensions_modal.is_some() {
-                        effects.push(Effect::FetchHooksList {
-                            agent_id,
-                            session_id: session_id.clone(),
-                        });
-                        effects.push(Effect::FetchPluginsList {
-                            agent_id,
-                            session_id: session_id.clone(),
-                        });
-                        effects.push(Effect::FetchMarketplaceList {
-                            agent_id,
-                            session_id: session_id.clone(),
-                        });
-                        effects.push(Effect::FetchMcpsList {
-                            agent_id,
-                            session_id,
-                            cache: false,
-                        });
+                        match refresh {
+                            ActionRefreshScope::Hooks => {
+                                effects.push(Effect::FetchHooksList {
+                                    agent_id,
+                                    session_id,
+                                });
+                            }
+                            ActionRefreshScope::Plugins => {
+                                effects.push(Effect::FetchPluginsList {
+                                    agent_id,
+                                    session_id: session_id.clone(),
+                                });
+                                effects.push(Effect::FetchMarketplaceList {
+                                    agent_id,
+                                    session_id,
+                                });
+                            }
+                            ActionRefreshScope::Marketplace => {
+                                effects.push(Effect::FetchMarketplaceList {
+                                    agent_id,
+                                    session_id: session_id.clone(),
+                                });
+                                effects.push(Effect::FetchPluginsList {
+                                    agent_id,
+                                    session_id,
+                                });
+                            }
+                        }
                     }
                 }
                 effects
@@ -1443,6 +1465,8 @@ pub(super) fn dispatch_action_result(
             | OutcomeStatus::InternalError
             | OutcomeStatus::Unsupported => {
                 if let Some(ref mut modal) = agent.extensions_modal {
+                    modal.pending_action = None;
+                    modal.pending_entry_index = None;
                     modal.modal_message = Some(
                         crate::views::extensions_modal::ModalMessage::Error(outcome.message),
                     );
