@@ -329,6 +329,7 @@ next-code-app-core = { path = "crates/next-code-app-core", default-features = fa
 next-code-tui = { path = "crates/next-code-tui", default-features = false }
 # PR8: Face (Grok pager) as interactive UI; brain stays next-code serve via ACP bridge.
 xai-grok-pager = { path = "crates/xai-grok-pager" }
+xai-grok-shell = { path = "crates/xai-grok-shell" }
 xai-acp-lib = { path = "crates/xai-acp-lib" }
 xai-hooks-plugins-types = { path = "crates/xai-hooks-plugins-types" }
 xai-grok-tools = { path = "crates/xai-grok-tools" }
