@@ -977,11 +977,55 @@ pub fn hooks_action_payload(params: &serde_json::Value) -> serde_json::Value {
             "Project hook trust is not required for next-code hooks.toml (always loaded)",
             false,
         ),
-        HooksAction::Add { .. } | HooksAction::Remove { .. } => outcome(
-            OutcomeStatus::Unsupported,
-            "Edit hooks via ~/.next-code/hooks.toml or `next-code hooks`; Face add/remove is not wired",
-            false,
-        ),
+        HooksAction::Add { path } => {
+            let source = std::path::PathBuf::from(path.trim());
+            if path.trim().is_empty() {
+                return outcome(
+                    OutcomeStatus::ValidationError,
+                    "Add requires a path to a hooks.toml file",
+                    false,
+                );
+            }
+            match next_code_hooks::merge_hooks_toml_into_user(&source) {
+                Ok(n) => outcome(
+                    OutcomeStatus::Success,
+                    format!(
+                        "Merged {n} handler(s) from {} into ~/.next-code/hooks.toml",
+                        source.display()
+                    ),
+                    true,
+                ),
+                Err(e) if e.contains("not found") => {
+                    outcome(OutcomeStatus::NotFound, e, false)
+                }
+                Err(e) => outcome(OutcomeStatus::ValidationError, e, false),
+            }
+        }
+        HooksAction::Remove { path } => {
+            let key = path.trim();
+            if key.is_empty() {
+                return outcome(
+                    OutcomeStatus::ValidationError,
+                    "Remove requires a hook id (user/Event[0])",
+                    false,
+                );
+            }
+            // Face passes the selected hook's ACP name (user/PreToolUse[0]).
+            match next_code_hooks::remove_hook_by_face_name(key) {
+                Ok(()) => outcome(
+                    OutcomeStatus::Success,
+                    format!("Removed {key}"),
+                    true,
+                ),
+                Err(e) if e.contains("not found") || e.contains("no hooks") => {
+                    outcome(OutcomeStatus::NotFound, e, false)
+                }
+                Err(e) if e.contains("invalid hook name") || e.contains("out of range") => {
+                    outcome(OutcomeStatus::ValidationError, e, false)
+                }
+                Err(e) => outcome(OutcomeStatus::InternalError, e, false),
+            }
+        }
     }
 }
 
@@ -1224,6 +1268,68 @@ command = "echo start"
             "action": { "type": "reload" }
         }));
         assert_eq!(reload["result"]["status"], "success", "{reload}");
+
+        match prev {
+            Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
+            None => crate::env::remove_var("NEXT_CODE_HOME"),
+        }
+        match prev_disable {
+            Some(v) => crate::env::set_var("DISABLE_NEXT_CODE_HOOKS", v),
+            None => crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS"),
+        }
+    }
+
+    #[test]
+    fn hooks_action_add_merges_and_remove_deletes() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let tmp = TempDir::new().unwrap();
+        let prev = std::env::var_os("NEXT_CODE_HOME");
+        let prev_disable = std::env::var_os("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::remove_var("DISABLE_NEXT_CODE_HOOKS");
+        crate::env::set_var("NEXT_CODE_HOME", tmp.path());
+        write_user_hooks_toml(tmp.path());
+
+        let import = tmp.path().join("import.toml");
+        fs::write(
+            &import,
+            r#"
+[[events.TurnEnd]]
+type = "command"
+command = "echo imported"
+"#,
+        )
+        .unwrap();
+
+        let add = hooks_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "add", "path": import.to_string_lossy() }
+        }));
+        assert_eq!(add["result"]["status"], "success", "{add}");
+
+        let list = hooks_list_payload();
+        let imported = list["result"]["hooks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|h| h["command"] == "echo imported")
+            .expect("imported hook missing");
+        let name = imported["name"].as_str().unwrap().to_string();
+
+        let remove = hooks_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "remove", "path": name }
+        }));
+        assert_eq!(remove["result"]["status"], "success", "{remove}");
+
+        let list2 = hooks_list_payload();
+        assert!(
+            list2["result"]["hooks"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|h| h["command"] != "echo imported"),
+            "{list2}"
+        );
 
         match prev {
             Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),

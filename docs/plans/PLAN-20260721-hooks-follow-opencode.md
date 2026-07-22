@@ -5,7 +5,7 @@
 - **What is going on:** OpenCode does **not** have a Claude/Grok-style `hooks.toml` / `hooks.json` command runner. Its “hooks” are the **return object of JS/TS plugins** (`Hooks` interface): in-process typed callbacks with mutable `output`, plus a catch-all `event` bus. next-code already has a **different, stronger** product for user automation: `crates/next-code-hooks` (v2 `hooks.toml` + v1 `[hooks]` in `config.toml`) that runs shell/HTTP/plugin **executables** at lifecycle points. Face `/hooks` is Grok Extensions chrome; ACP `x.ai/hooks/list` is currently an **empty stub**.
 - **We recommend:** **Do not replace** `next-code-hooks` with OpenCode’s TS-only model. **Copy OpenCode patterns** into (a) how we name/document lifecycle seams and (b) optional in-process plugin callbacks later. **Wire Face `/hooks`** to `~/.next-code/hooks.toml` (and project `.next-code/hooks.toml`) — keep Face UI, use next-code semantics. Treat PR49 Grok-plugins work as a **sibling tab** in the same Extensions modal, not the same runtime.
 - **Risk:** Medium if we conflate “OpenCode hooks” with “Face /hooks” and try a rewrite; Low if we wire list/action first and keep runtimes separate.
-- **Status:** Phase 0–1 **done** on `pr-face-hooks-wire` — Face `/hooks` lists/enable/disable real `next-code-hooks` config. Later phases still open.
+- **Status:** Phase 0–2 **done** on `pr-face-hooks-wire` — Face `/hooks` + CLI + high-value runtime dispatch. Phase 3 (in-process TS) and plugin-bundle hooks merge **deferred**.
 
 ---
 
@@ -156,11 +156,13 @@ Earlier inventory / docs may mention a QuickJS plugin event enum. On this disk s
 4. [x] Tests: list non-empty with temp hooks.toml; action enable/disable.
 
 ### Phase 2 — Runtime completeness
-1. [ ] Audit which `HookEvent`s are actually dispatched from app-core / session / compaction; fill gaps that OpenCode users expect (`SessionIdle`, compaction, permission).
-2. [ ] Optional: merge hooks from enabled bundle plugins’ `hooks/` dirs into registry (align with Plugins tab).
+1. [x] Audit which `HookEvent`s are actually dispatched from app-core / session / compaction; fill gaps that OpenCode users expect (`SessionIdle`, compaction, permission).
+2. [ ] Optional: merge hooks from enabled bundle plugins’ `hooks/` dirs into registry (align with Plugins tab). **Deferred** — discover flags `has_hooks` already; no Grok JSON→TOML importer yet. Follow-up ticket.
+3. [x] Wire `next-code hooks` CLI clap (`HooksCommand` → `run_hooks_command`).
+4. [x] Face Add (merge TOML) + Remove (by face hook id); Trust stays Unsupported with clear message.
 
 ### Phase 3 — OpenCode-like in-process (optional, large)
-1. [ ] Only if product wants TS plugin authors: revive/add JS runtime hooks with OpenCode-shaped names and sequential mutate triggers.
+1. [ ] **Deferred** — multi-week JS/TS runtime revival; not required for hooks product “done” on this stack. Shell/HTTP/`hooks.toml` + Face + CLI are the complete product for now.
 2. [ ] Do **not** deprecate shell hooks in the same change.
 
 **Out of scope for first PR:** Full OpenCode plugin loader, npm/Bun install, replacing `next-code-hooks`, marketplace hooks.
@@ -199,6 +201,8 @@ Earlier inventory / docs may mention a QuickJS plugin event enum. On this disk s
 ---
 
 ## Status
-**Phase 0–1 implemented** on branch `pr-face-hooks-wire` (Face ACP list/enable/disable + docs). Later phases still open.
+**Phase 0–2 done** on `pr-face-hooks-wire`: Face ACP list/enable/disable/add/remove, CLI `next-code hooks`, SessionIdle/Stop/PreCompact/PostCompact/AgentStart dispatch, docs audit table.
 
-Waiting only for review/merge of that PR — not for another “go ahead” on Phase 0–1.
+**Phase 3 deferred** (optional in-process TS). Plugin-bundle `hooks/` merge deferred (discover-only today).
+
+Waiting for review/merge of this PR — not for another “go ahead” on Phase 2.

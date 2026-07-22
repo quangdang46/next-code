@@ -11,7 +11,8 @@ pub mod types;
 pub use config::{
     env_hooks_config_path, face_hook_name, legacy_v1_to_v2_handlers, list_hook_layer_entries,
     load_hooks_config, load_hooks_config_from_path, load_hooks_config_from_path_detailed,
-    parse_face_hook_name, project_hooks_config_path, set_hook_enabled_by_face_name,
+    merge_hooks_toml_into_user, parse_face_hook_name, project_hooks_config_path,
+    remove_hook_by_face_name, remove_hook_in_file, set_hook_enabled_by_face_name,
     set_hook_enabled_in_file, user_hooks_config_path, AgentHandlerConfig, CommandHandlerConfig,
     HookEvent, HookHandlerConfig, HookLayerEntry, HookSettings, HooksConfig, HooksConfigScope,
     HttpHandlerConfig, PluginHandlerConfig,

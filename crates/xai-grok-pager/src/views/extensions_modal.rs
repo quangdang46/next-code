@@ -1324,7 +1324,7 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
             fields: vec![FieldSpec {
                 label: "Path".into(),
                 required: true,
-                placeholder: None,
+                placeholder: Some("path/to/hooks.toml to merge into ~/.next-code".into()),
             }],
         }),
         // Remove acts on the selected hook — resolved at dispatch time.

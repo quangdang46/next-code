@@ -1624,14 +1624,14 @@ impl AgentView {
                 InputOutcome::Action(Action::ExecuteMarketplaceAction(marketplace_action))
             }
             ButtonAction::RemoveSelectedHook => {
-                // Remove the hook source_dir of the currently selected hook.
+                // Remove the selected handler by Face ACP id (user/Event[n]).
                 if let Some(ref state) = self.extensions_modal {
                     use crate::views::extensions_modal::TabDataState;
                     if let TabDataState::Loaded(ref data) = state.hooks_data
                         && let Some(idx) = state.selected_data_index()
                         && let Some(hook) = data.hooks.get(idx)
                     {
-                        let path = hook.source_dir.clone();
+                        let path = hook.name.clone();
                         return self.execute_modal_button_action(
                             crate::views::extensions_modal::ButtonAction::HooksAction(
                                 xai_hooks_plugins_types::HooksAction::Remove { path },

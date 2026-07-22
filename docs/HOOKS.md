@@ -5,8 +5,8 @@ lifecycle points so other programs can observe or gate agent behavior without
 forking next-code.
 
 The canonical runtime is the **`next-code-hooks`** crate (v2). Face `/hooks`
-lists and enable/disables those same handlers — it does **not** use OpenCode’s
-in-process JS plugin `Hooks` model.
+lists, enables/disables, adds (merge TOML), and removes those same handlers —
+it does **not** use OpenCode’s in-process JS plugin `Hooks` model.
 
 ## Canonical config (v2)
 
@@ -42,12 +42,34 @@ method = "POST"
 url = "http://127.0.0.1:9999/hooks/turn-end"
 ```
 
-Handler types: `command` | `http` | `agent` | `plugin`.  
-CLI: `next-code hooks list|enable|disable|test|metrics`.
+Handler types: `command` | `http` | `agent` | `plugin`.
 
-Face Extensions → Hooks tab talks ACP `x.ai/hooks/list` and
-`x.ai/hooks/action` (reload, enable, disable). Hook ids look like
-`user/PreToolUse[0]`.
+### CLI
+
+```bash
+next-code hooks list
+next-code hooks list --event PreToolUse
+next-code hooks list --json
+next-code hooks enable PreToolUse 0
+next-code hooks disable SessionStart 0
+next-code hooks test SessionStart          # dry-run
+next-code hooks test PreToolUse --execute  # actually run
+next-code hooks metrics
+```
+
+### Face `/hooks`
+
+Extensions → Hooks tab uses ACP `x.ai/hooks/list` and `x.ai/hooks/action`:
+
+| Key | Action |
+|-----|--------|
+| `r` | Reload list from disk |
+| `Space` | Enable / disable selected hook (or whole source group) |
+| `a` | Merge another `hooks.toml` into `~/.next-code/hooks.toml` |
+| `x` | Remove selected handler by id (`user/PreToolUse[0]`) |
+
+Trust / untrust return Unsupported (next-code always loads project `hooks.toml`
+like other project config). Hook ids look like `user/PreToolUse[0]`.
 
 ### OpenCode event name aliases (docs only)
 
@@ -66,6 +88,29 @@ OpenCode uses dotted in-process plugin callbacks. Map them to next-code
 
 OpenCode authors mutate args in TypeScript; next-code command hooks use stdin
 JSON and exit `0` / `2` (allow / deny) for blocking events.
+
+## Runtime dispatch (what actually fires)
+
+| Event | Fired? | Where |
+|-------|--------|--------|
+| `Setup` | Yes | Agent create |
+| `SessionStart` | Yes | Agent create / attach / restore |
+| `AgentStart` | Yes | Agent create / attach (primary) |
+| `SessionEnd` / `AgentEnd` | Yes | `mark_closed` |
+| `SessionUpdated` / `SessionError` | Yes | Session state paths |
+| `SessionDiff` | Yes | After file-modifying tools |
+| `SessionIdle` | Yes | After turn completes (streaming + headless) |
+| `Stop` | Yes | After turn completes (fire-and-forget; deny cannot cancel finished turn) |
+| `TurnEnd` | Yes | Streaming chat path (`fire_turn_end_hook`) |
+| `UserPromptSubmit` / `UserPromptExpansion` | Yes | Turn start |
+| `PreToolUse` / `PostToolUse` / `PostToolUseFailure` / `ToolError` | Yes | Tool registry |
+| `FileChanged` | Yes | Write tool |
+| `PermissionRequest` / `PermissionDenied` / `PermissionAsked` / `PermissionReplied` | Yes | DCG bridge |
+| `PreCompact` / `PostCompact` | Yes | Manual compact, auto context-limit compact, compact completion poll |
+| `SubagentStart` / `SubagentStop` | **Not yet** | Swarm/subagent spawn sites not wired — configure handlers for future use |
+| `TaskCreated` / `TaskCompleted` | **Not yet** | No dedicated dispatch site |
+| `AutoCompactionControl` | **Not yet** | Control plane not exposed as a hook seam |
+| `Custom(...)` | Only if you call dispatch with that name | No built-in emitter |
 
 ## Legacy v1 (`config.toml [hooks]`)
 
@@ -129,5 +174,8 @@ exit 0
 - Face `/hooks` manages **next-code** lifecycle hooks, not OpenCode/Bun plugins
   and not `~/.grok/hooks` JSON files.
 - Bundle plugins (`/plugins`, `~/.next-code/plugins`) are a sibling Extensions
-  tab; optional import of plugin-bundled `hooks/` is a later phase.
+  tab. Import of plugin-bundled `hooks/` JSON into the registry is **deferred**
+  (follow-up); enable the plugin for skills/agents today.
 - Hot paths check whether handlers exist before building large payloads.
+- Phase 3 (OpenCode-like in-process TypeScript hooks) is **deferred** — large
+  optional work; shell/HTTP hooks remain the product.

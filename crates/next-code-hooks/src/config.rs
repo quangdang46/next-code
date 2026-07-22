@@ -955,6 +955,84 @@ pub fn set_hook_enabled_in_file(
     Ok(())
 }
 
+/// Remove one handler identified by [`face_hook_name`] and rewrite its source file.
+pub fn remove_hook_by_face_name(name: &str) -> Result<(), String> {
+    let (scope, event, index) = parse_face_hook_name(name)
+        .ok_or_else(|| format!("invalid hook name: {name}"))?;
+    let path = config_path_for_scope(scope)
+        .ok_or_else(|| format!("no config path for scope '{}'", scope.as_str()))?;
+    remove_hook_in_file(&path, &event, index)
+}
+
+/// Remove handler at `index` for `event` in `path` and write the file back.
+pub fn remove_hook_in_file(
+    path: &std::path::Path,
+    event: &str,
+    index: usize,
+) -> Result<(), String> {
+    let mut config = load_hooks_config_from_path_detailed(path)?
+        .ok_or_else(|| format!("hooks config not found: {}", path.display()))?;
+
+    let event_key = HookEvent::parse(event)
+        .map(|e| e.display_name().to_string())
+        .unwrap_or_else(|| event.to_string());
+
+    let key = if config.events.contains_key(&event_key) {
+        event_key
+    } else if config.events.contains_key(event) {
+        event.to_string()
+    } else {
+        return Err(format!(
+            "no hooks for event '{event}' in {}",
+            path.display()
+        ));
+    };
+
+    let handlers = config.events.get_mut(&key).unwrap();
+    if index >= handlers.len() {
+        return Err(format!(
+            "handler index {index} out of range for '{event}' ({} handlers)",
+            handlers.len()
+        ));
+    }
+    handlers.remove(index);
+    if handlers.is_empty() {
+        config.events.remove(&key);
+    }
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let body = toml::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    std::fs::write(path, body).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Merge handlers from `source_toml` into the user `hooks.toml` layer.
+///
+/// Creates `~/.next-code/hooks.toml` when missing. Settings from the source
+/// are applied via [`HooksConfig::merge`] (source wins for settings; handlers
+/// append).
+pub fn merge_hooks_toml_into_user(source_toml: &std::path::Path) -> Result<usize, String> {
+    let incoming = load_hooks_config_from_path_detailed(source_toml)?
+        .ok_or_else(|| format!("hooks file not found: {}", source_toml.display()))?;
+    let added: usize = incoming.events.values().map(|v| v.len()).sum();
+    if added == 0 {
+        return Err("source hooks.toml has no event handlers".to_string());
+    }
+
+    let dest = user_hooks_config_path().ok_or_else(|| "no user hooks.toml path".to_string())?;
+    let mut config = load_hooks_config_from_path_detailed(&dest)?.unwrap_or_default();
+    config.merge(incoming);
+
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let body = toml::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    std::fs::write(&dest, body).map_err(|e| e.to_string())?;
+    Ok(added)
+}
+
 // ---------------------------------------------------------------------------
 // Legacy v1-to-v2 bridge
 // ---------------------------------------------------------------------------

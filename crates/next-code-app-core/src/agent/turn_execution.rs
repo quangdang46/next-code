@@ -368,6 +368,7 @@ impl Agent {
         let result = self.run_turn_streaming_mpsc(event_tx).await;
         self.current_turn_system_reminder = None;
         self.fire_turn_end_hook(&result, turn_started_at, start_message_index);
+        self.fire_stop_and_idle_hooks(&result);
         result
     }
 
@@ -441,6 +442,65 @@ impl Agent {
             let refs: Vec<&next_code_hooks::HookHandlerConfig> = handlers.iter().collect();
             next_code_hooks::dispatch_hooks(&event, &input, &refs, &dispatch_config).await;
         });
+    }
+
+    /// Fire `Stop` (end of agent reply) then `SessionIdle` (waiting for user).
+    /// Both are fire-and-forget; blocking `Stop` handlers cannot cancel the
+    /// already-finished turn (deny is logged via dispatch metrics only).
+    pub(super) fn fire_stop_and_idle_hooks(&self, result: &Result<()>) {
+        let session_id = self.session.id.clone();
+        let cwd = self.working_dir().unwrap_or_default().to_string();
+        let dispatch_config = self.dispatch_config.clone();
+        let registry = self.hook_registry.clone();
+        let stop_reason = result.as_ref().err().map(|e| {
+            const ERROR_LIMIT: usize = 1000;
+            e.to_string().chars().take(ERROR_LIMIT).collect::<String>()
+        });
+
+        // Stop
+        {
+            let ctx = HookContext::for_stop(session_id.clone(), cwd.clone(), None);
+            let handlers: Vec<next_code_hooks::HookHandlerConfig> = registry
+                .get_matching(&HookEvent::Stop, &ctx)
+                .into_iter()
+                .cloned()
+                .collect();
+            if !handlers.is_empty() {
+                let mut input = HookInputBuilder::new()
+                    .session(&session_id, &cwd)
+                    .event("Stop")
+                    .build();
+                input.stop_reason = stop_reason.clone();
+                let event = HookEvent::Stop;
+                let config = dispatch_config.clone();
+                tokio::spawn(async move {
+                    let refs: Vec<&next_code_hooks::HookHandlerConfig> = handlers.iter().collect();
+                    next_code_hooks::dispatch_hooks(&event, &input, &refs, &config).await;
+                });
+            }
+        }
+
+        // SessionIdle
+        {
+            let ctx = HookContext::for_session_idle(session_id.clone(), cwd.clone());
+            let handlers: Vec<next_code_hooks::HookHandlerConfig> = registry
+                .get_matching(&HookEvent::SessionIdle, &ctx)
+                .into_iter()
+                .cloned()
+                .collect();
+            if !handlers.is_empty() {
+                let input = HookInputBuilder::new()
+                    .session(&session_id, &cwd)
+                    .event("SessionIdle")
+                    .idle_state(0, None, Some(chrono::Utc::now()))
+                    .build();
+                let event = HookEvent::SessionIdle;
+                tokio::spawn(async move {
+                    let refs: Vec<&next_code_hooks::HookHandlerConfig> = handlers.iter().collect();
+                    next_code_hooks::dispatch_hooks(&event, &input, &refs, &dispatch_config).await;
+                });
+            }
+        }
     }
 
     /// Clear conversation history
