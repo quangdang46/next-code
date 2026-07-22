@@ -10,6 +10,7 @@ pub mod output;
 pub mod face_auth;
 pub mod face_ask_user;
 pub mod face_ext;
+pub mod face_permission;
 pub mod face_plugins;
 pub mod face_welcome_status;
 pub mod pager_agent;

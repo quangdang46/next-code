@@ -108,6 +108,67 @@ fn test_stdin_request_event_defaults() -> Result<()> {
 }
 
 #[test]
+fn test_permission_request_event_roundtrip() -> Result<()> {
+    let event = ServerEvent::PermissionRequest {
+        request_id: "perm-abc123".to_string(),
+        session_id: "sess-1".to_string(),
+        tool_name: "bash".to_string(),
+        reason: "destructive command".to_string(),
+        allow_once_code: "a1b2c3".to_string(),
+        alternatives: vec!["use read instead".to_string()],
+        tool_input: Some(serde_json::json!({"command": "rm -rf /"})),
+        tool_call_id: "call_1".to_string(),
+    };
+    let json = encode_event(&event);
+    assert!(json.contains("\"type\":\"permission_request\""));
+    assert!(json.contains("\"tool_name\":\"bash\""));
+
+    let decoded = parse_event_json(json.trim())?;
+    let ServerEvent::PermissionRequest {
+        request_id,
+        tool_name,
+        allow_once_code,
+        ..
+    } = decoded
+    else {
+        return Err(anyhow!("expected PermissionRequest"));
+    };
+    assert_eq!(request_id, "perm-abc123");
+    assert_eq!(tool_name, "bash");
+    assert_eq!(allow_once_code, "a1b2c3");
+    Ok(())
+}
+
+#[test]
+fn test_permission_response_request_roundtrip() -> Result<()> {
+    let req = Request::PermissionResponse {
+        id: 9,
+        request_id: "perm-abc123".to_string(),
+        outcome: "allow-once".to_string(),
+        session_id: "sess-1".to_string(),
+        tool_name: "bash".to_string(),
+        allow_once_code: "a1b2c3".to_string(),
+    };
+    let json = serde_json::to_string(&req)?;
+    assert!(json.contains("\"type\":\"permission_response\""));
+    assert!(json.contains("\"outcome\":\"allow-once\""));
+    let decoded = parse_request_json(&json)?;
+    let Request::PermissionResponse {
+        id,
+        outcome,
+        tool_name,
+        ..
+    } = decoded
+    else {
+        return Err(anyhow!("expected PermissionResponse"));
+    };
+    assert_eq!(id, 9);
+    assert_eq!(outcome, "allow-once");
+    assert_eq!(tool_name, "bash");
+    Ok(())
+}
+
+#[test]
 fn test_comm_await_members_roundtrip() -> Result<()> {
     let req = Request::CommAwaitMembers {
         id: 55,

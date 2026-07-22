@@ -116,7 +116,7 @@ impl DaemonSession {
         Ok(())
     }
 
-    async fn read_event(&self) -> Result<ServerEvent> {
+    pub(crate) async fn read_event(&self) -> Result<ServerEvent> {
         if let Some(event) = self.pop_pending().await {
             return Ok(event);
         }
@@ -1787,6 +1787,18 @@ impl acp::Agent for NextCodeFaceAgent {
                         &available_models,
                     )
                     .await;
+                }
+                event @ ServerEvent::PermissionRequest { .. } => {
+                    // Blocking Face ACP permission overlay (`permission_view`).
+                    if let Err(err) = crate::cli::face_permission::bridge_permission_request(
+                        &self.gateway,
+                        session.as_ref(),
+                        event,
+                    )
+                    .await
+                    {
+                        crate::logging::warn(&format!("Face permission bridge failed: {err}"));
+                    }
                 }
                 ServerEvent::MemoryActivity { activity } => {
                     crate::memory::apply_remote_activity_snapshot(&activity);

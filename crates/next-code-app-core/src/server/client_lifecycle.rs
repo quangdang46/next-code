@@ -1,8 +1,8 @@
 use super::client_actions::{
     AgentTaskContext, NotifySessionContext, handle_agent_task, handle_ask_user_question_response,
-    handle_compact, handle_input_shell, handle_notify_session, handle_rename_session,
-    handle_run_subagent, handle_set_feature, handle_set_subagent_model, handle_split,
-    handle_stdin_response, handle_transfer, handle_trigger_memory_extraction,
+    handle_compact, handle_input_shell, handle_notify_session, handle_permission_response,
+    handle_rename_session, handle_run_subagent, handle_set_feature, handle_set_subagent_model,
+    handle_split, handle_stdin_response, handle_transfer, handle_trigger_memory_extraction,
 };
 use super::client_comm::{
     handle_comm_channel_members, handle_comm_list, handle_comm_list_channels, handle_comm_message,
@@ -872,6 +872,34 @@ pub(super) async fn handle_client(
                                 let _ = tx.send(event);
                             }
                         });
+                    }
+                    Ok(BusEvent::PermissionRequested(req)) => {
+                        // Socket clients (Face) never see the in-process bus.
+                        // Forward so Face can emit ACP session/request_permission.
+                        if req.session_id == client_session_id {
+                            let request_id = if req.allow_once_code.is_empty() {
+                                format!(
+                                    "perm-{}-{}",
+                                    req.session_id,
+                                    std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .map(|d| d.as_millis())
+                                        .unwrap_or(0)
+                                )
+                            } else {
+                                format!("perm-{}", req.allow_once_code)
+                            };
+                            let _ = client_event_tx.send(ServerEvent::PermissionRequest {
+                                request_id,
+                                session_id: req.session_id,
+                                tool_name: req.tool_name,
+                                reason: req.reason,
+                                allow_once_code: req.allow_once_code,
+                                alternatives: req.alternatives,
+                                tool_input: req.tool_input,
+                                tool_call_id: String::new(),
+                            });
+                        }
                     }
                     _ => {}
                 }
@@ -1910,6 +1938,26 @@ pub(super) async fn handle_client(
                     response,
                     error,
                     &ask_user_question_responses,
+                    &client_event_tx,
+                )
+                .await;
+            }
+
+            Request::PermissionResponse {
+                id,
+                request_id,
+                outcome,
+                session_id,
+                tool_name,
+                allow_once_code,
+            } => {
+                handle_permission_response(
+                    id,
+                    request_id,
+                    outcome,
+                    session_id,
+                    tool_name,
+                    allow_once_code,
                     &client_event_tx,
                 )
                 .await;
