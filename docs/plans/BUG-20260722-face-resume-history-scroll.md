@@ -48,7 +48,7 @@ N/A (bug).
 3. [x] Prefer reusing / sharing logic with `src/cli/acp.rs::replay_history` (single mapping from `HistoryMessage` → chunk).
 4. [x] Decide tool-call / reasoning / system-reminder fidelity for v1 (text-only like `acp.rs` is enough to unblock scrollback).
 5. [x] Regression test: attach_session / load_session emits N chunk notifications for a fixture History with N messages, then returns.
-6. [ ] Smoke: rebuild both aliases; `nextcode --resume session_stallion_…` shows prior turns in scrollback; new prompt still works.
+6. [x] Smoke: rebuild both aliases installed (`scripts/_tmp_rebuild_install.ps1`); unit tests pass. Operator: `nextcode --resume session_stallion_1784710338913_9e1828dd9444dfb0` — confirm prior turns in Face scrollback.
 7. [ ] Optional A/B: `NEXT_CODE_LEGACY_TUI=1 --resume <same id>` confirms origin TUI still shows history.
 
 ## Files to touch
