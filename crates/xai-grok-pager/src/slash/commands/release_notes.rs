@@ -24,6 +24,26 @@ impl SlashCommand for ReleaseNotesCommand {
     }
 
     fn run(&self, _ctx: &mut CommandExecCtx, _args: &str) -> CommandResult {
+        if crate::product_welcome::is_nextcode_embed() {
+            if let Some(status) = crate::product_welcome::product_welcome_status()
+                && !status.update_bullets.is_empty()
+            {
+                let content = status
+                    .update_bullets
+                    .iter()
+                    .map(|b| format!("- {b}"))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                return CommandResult::Action(Action::ShowReleaseNotes {
+                    title: "Changelog".to_string(),
+                    content,
+                });
+            }
+            return CommandResult::Action(Action::ShowReleaseNotes {
+                title: "Changelog".to_string(),
+                content: "No new next-code changelog entries for this build.".to_string(),
+            });
+        }
         let changelog = xai_grok_shell::util::changelog::ChangelogManager::new().fetch();
         match changelog.markdown {
             Some(content) => CommandResult::Action(Action::ShowReleaseNotes {

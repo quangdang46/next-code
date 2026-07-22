@@ -251,6 +251,14 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             }
             vec![]
         }
+        TaskResult::NextCodeUsageText { agent_id, text } => {
+            if let Some(agent) = app.agents.get_mut(&agent_id) {
+                agent.scrollback.push_block(RenderBlock::System(
+                    crate::scrollback::blocks::SystemMessageBlock::new(text),
+                ));
+            }
+            vec![]
+        }
         TaskResult::AppBillingFetched { balance, autotopup } => {
             app.credit_balance = balance;
             apply_auto_topup(&mut app.auto_topup, &autotopup);

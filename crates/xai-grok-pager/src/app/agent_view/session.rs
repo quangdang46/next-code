@@ -105,6 +105,7 @@ impl AgentView {
             info_float_memory: None,
             info_float_git: None,
             info_float_compaction: None,
+            info_float_visibility: crate::views::info_floats::InfoFloatVisibility::default(),
             chat_kind: false,
             app_chat_mode: false,
             credit_balance: None,
@@ -949,6 +950,7 @@ impl AgentView {
             // `legacy_deferred.rs`. Legacy: `get_active_diagrams` →
             // `InfoWidgetData.diagrams`.
             diagrams: None,
+            visibility: self.info_float_visibility.clone(),
         }
     }
 
@@ -1083,6 +1085,10 @@ impl AgentView {
     pub fn set_restricted_commands(&mut self, names: &[String]) {
         self.prompt.set_restricted_commands(names);
     }
+    /// nextcode embed brand-hide (menu + block, no SuperGrok upsell).
+    pub fn set_brand_hidden_commands(&mut self, names: &[String]) {
+        self.prompt.set_brand_hidden_commands(names);
+    }
     /// Show or hide the `/dashboard` slash command in this agent's registry.
     /// Driven by the dashboard feature flag
     /// (`crate::views::dashboard::dashboard_enabled()`) at agent-creation
@@ -1118,6 +1124,8 @@ impl AgentView {
             announcements,
         ));
         self.set_restricted_commands(restricted_commands);
+        // Brand-hide is applied by AppView::apply_tier_restrictions; new
+        // agents inherit the current list when that runs after creation.
     }
     /// Show or hide the `/recap` slash command in this agent's registry.
     pub fn set_session_recap_available(&mut self, available: bool) {

@@ -69,7 +69,14 @@ pub(super) fn dispatch_send_feedback(app: &mut AppView, text: String) -> Vec<Eff
     };
 
     agent.scrollback.push_block(RenderBlock::system(
-        "Thanks for the feedback! The Grok Build team is on it.".to_string(),
+        if crate::product_welcome::is_nextcode_embed() {
+            format!(
+                "Thanks for the feedback! Open a next-code issue if you want follow-up:\n{}",
+                "https://github.com/quangdang46/next-code/issues/new"
+            )
+        } else {
+            "Thanks for the feedback! The Grok Build team is on it.".to_string()
+        },
     ));
 
     vec![Effect::SendFeedback {

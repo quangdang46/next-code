@@ -1142,6 +1142,76 @@ pub(in crate::app::dispatch) fn set_contextual_hint_ssh_wrap(
 }
 
 // ---------------------------------------------------------------------------
+// Info float visibility toggles — Shared, via `app.current_ui.info_floats.*`
+// ---------------------------------------------------------------------------
+
+/// Shared inner for per-float-kind toggles: mutate `current_ui.info_floats.*`.
+pub(super) fn set_info_float_inner(
+    app: &mut AppView,
+    write: fn(&mut xai_grok_shell::agent::config::InfoFloatsConfig, Option<bool>),
+    new: bool,
+) {
+    write(&mut app.current_ui.info_floats, Some(new));
+}
+
+/// Shared outer for per-float-kind toggles: idempotency gate, state mutation,
+/// modal refresh, toast, and `Effect::PersistSetting`.
+fn set_info_float(
+    app: &mut AppView,
+    key: crate::settings::SettingKey,
+    label: &str,
+    prev: Option<bool>,
+    write: fn(&mut xai_grok_shell::agent::config::InfoFloatsConfig, Option<bool>),
+    new: bool,
+) -> Vec<Effect> {
+    if prev == Some(new) {
+        return vec![];
+    }
+    let rollback = prev.unwrap_or(true);
+    set_info_float_inner(app, write, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(target: "settings", key, value = new, "setting changed");
+    app.show_toast(&save_success_toast(label, new));
+    vec![Effect::PersistSetting {
+        key,
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(rollback),
+    }]
+}
+
+macro_rules! define_info_float_setter {
+    ($fn_name:ident, $key:expr, $label:expr, $field:ident) => {
+        pub(in crate::app::dispatch) fn $fn_name(
+            app: &mut AppView,
+            new: bool,
+        ) -> Vec<Effect> {
+            let prev = app.current_ui.info_floats.$field;
+            set_info_float(
+                app,
+                $key,
+                $label,
+                prev,
+                |f, v| f.$field = v,
+                new,
+            )
+        }
+    };
+}
+
+define_info_float_setter!(set_show_float_model_info, "info_float.model_info", "Model Info", model_info);
+define_info_float_setter!(set_show_float_context_usage, "info_float.context_usage", "Context Usage", context_usage);
+define_info_float_setter!(set_show_float_kv_cache, "info_float.kv_cache", "KV Cache", kv_cache);
+define_info_float_setter!(set_show_float_memory_activity, "info_float.memory_activity", "Memory Activity", memory_activity);
+define_info_float_setter!(set_show_float_usage_limits, "info_float.usage_limits", "Usage Limits", usage_limits);
+define_info_float_setter!(set_show_float_git_status, "info_float.git_status", "Git Status", git_status);
+define_info_float_setter!(set_show_float_background_tasks, "info_float.background_tasks", "Background Tasks", background_tasks);
+define_info_float_setter!(set_show_float_compaction, "info_float.compaction", "Compaction", compaction);
+define_info_float_setter!(set_show_float_swarm_status, "info_float.swarm_status", "Swarm Status", swarm_status);
+define_info_float_setter!(set_show_float_todos, "info_float.todos", "Todos", todos);
+define_info_float_setter!(set_show_float_workspace_map, "info_float.workspace_map", "Workspace Map", workspace_map);
+define_info_float_setter!(set_show_float_diagrams, "info_float.diagrams", "Diagrams", diagrams);
+
+// ---------------------------------------------------------------------------
 // Theme settings: `theme`, `auto_dark_theme`, `auto_light_theme`.
 //
 // Each has a preview/commit split:

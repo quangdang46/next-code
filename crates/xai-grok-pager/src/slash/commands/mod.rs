@@ -11,6 +11,7 @@ pub mod cd;
 pub mod compact;
 pub mod compact_mode;
 pub mod config_agents;
+pub mod connect;
 pub mod context;
 pub mod copy;
 pub mod dashboard;
@@ -131,6 +132,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(rewind::RewindCommand),
         Arc::new(jump::JumpCommand),
         Arc::new(login::LoginCommand),
+        Arc::new(connect::ConnectCommand),
         Arc::new(logout::LogoutCommand),
         Arc::new(import_claude::ImportClaudeCommand),
         Arc::new(usage::UsageCommand),

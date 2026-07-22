@@ -1505,12 +1505,25 @@ impl AppView {
         } else {
             Vec::new()
         };
+        // nextcode embed: brand-hide via menu_hidden + unavailable (not tier
+        // restricted — that path shows SuperGrok upsell).
+        let brand: Vec<String> = if crate::product_welcome::is_nextcode_embed() {
+            crate::product_welcome::EMBED_BRAND_RESTRICTED_COMMANDS
+                .iter()
+                .map(|n| (*n).to_string())
+                .collect()
+        } else {
+            Vec::new()
+        };
         for agent in self.agents.values_mut() {
             agent.set_restricted_commands(&names);
+            agent.set_brand_hidden_commands(&brand);
         }
         self.welcome_prompt.set_restricted_commands(&names);
+        self.welcome_prompt.set_brand_hidden_commands(&brand);
         if let Some(dashboard) = self.dashboard.as_mut() {
             dashboard.set_restricted_commands(&names);
+            dashboard.set_brand_hidden_commands(&brand);
         }
         self.tier_restricted_commands = names;
     }
@@ -4215,6 +4228,10 @@ impl AppView {
                                 0
                             };
                             agent.info_float_session_count = Some(info_float_session_count);
+                            agent.info_float_visibility =
+                                crate::views::info_floats::InfoFloatVisibility::from(
+                                    &self.current_ui.info_floats,
+                                );
                             if agent.info_float_provider.is_none() {
                                 agent.info_float_provider = self
                                     .login_method_id
@@ -4333,6 +4350,10 @@ impl AppView {
                                                 if let Some(agent) = agents.get_mut(&agent_id) {
                                                     agent.info_float_session_count =
                                                         Some(session_count);
+                                                    agent.info_float_visibility =
+                                                        crate::views::info_floats::InfoFloatVisibility::from(
+                                                            &self.current_ui.info_floats,
+                                                        );
                                                     agent.draw(
                                                         inner,
                                                         buf,

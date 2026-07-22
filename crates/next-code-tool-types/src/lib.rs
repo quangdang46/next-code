@@ -57,7 +57,15 @@ impl ToolOutput {
     }
 }
 
-pub use next_code_plugin_core::ToolTier;
+/// Built-in tool risk tier (formerly in next-code-plugin-core).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolTier {
+    Read,  // pure read of already-loaded data
+    Write, // mutates workspace/session state
+    #[default]
+    Exec, // spawns subprocesses or network
+}
 
 /// Resolve tool name aliases to their canonical internal names.
 ///

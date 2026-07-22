@@ -1998,18 +1998,9 @@ pub(crate) fn execute(
                             .into(),
                     );
                     let result = match acp_send(req, &tx).await {
-                        Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            serde_json::from_value::<
-                                crate::views::mcps_modal::McpsListResponse,
-                            >(inner.clone())
-                                .map(crate::views::mcps_modal::convert_list_response)
-                                .map_err(|_| "couldn't load server list".to_string())
-                        }
+                        Ok(resp) => crate::views::mcps_modal::parse_mcp_list_ext_response(
+                            resp.0.get(),
+                        ),
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
@@ -2379,19 +2370,7 @@ pub(crate) fn execute(
                             .into(),
                     );
                     let result = match acp_send(req, &tx).await {
-                        Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            serde_json::from_value::<
-                                Vec<
-                                    xai_grok_tools::implementations::skills::types::SkillInfo,
-                                >,
-                            >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't load skills".to_string())
-                        }
+                        Ok(resp) => parse_skills_list_ext_response(resp.0.get()),
                         Err(e) => {
                             Err(
                                 sanitize_user_error(&format!("couldn't load skills: {e}")),
@@ -2419,17 +2398,10 @@ pub(crate) fn execute(
                     );
                     let result = match acp_send(req, &tx).await {
                         Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            let parsed = serde_json::from_value::<
-                                Vec<
-                                    xai_grok_tools::implementations::skills::types::SkillInfo,
-                                >,
-                            >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't toggle skill".to_string());
+                            let parsed = match parse_skills_list_ext_response(resp.0.get()) {
+                                Ok(skills) => Ok(skills),
+                                Err(_) => Err("couldn't toggle skill".to_string()),
+                            };
                             if parsed.is_ok() {
                                 let refresh = acp::ExtRequest::new(
                                     "x.ai/skills/refresh-baseline",
@@ -3912,6 +3884,17 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchBilling { agent_id, silent } => {
+            if crate::product_welcome::is_nextcode_embed() {
+                // nextcode: no xAI credits path. Non-silent `/usage` uses
+                // FetchNextCodeUsage; silent turn-end refreshes are no-ops.
+                if !silent {
+                    let tx = acp_tx.clone();
+                    tasks.spawn(async move {
+                        let text = fetch_nextcode_usage_text(&tx).await;
+                        TaskResult::NextCodeUsageText { agent_id, text }
+                    });
+                }
+            } else {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -3966,6 +3949,14 @@ pub(crate) fn execute(
                         autotopup,
                     }
                 });
+            }
+        }
+        Effect::FetchNextCodeUsage { agent_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let text = fetch_nextcode_usage_text(&tx).await;
+                TaskResult::NextCodeUsageText { agent_id, text }
+            });
         }
         Effect::RefreshGate => {
             tasks
@@ -4007,6 +3998,9 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchAppBilling => {
+            if crate::product_welcome::is_nextcode_embed() {
+                // no welcome-screen xAI credit warning in nextcode
+            } else {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -4060,6 +4054,7 @@ pub(crate) fn execute(
                         }
                     }
                 });
+            }
         }
         Effect::DebounceSuggestions { agent_id, generation } => {
             tasks
@@ -4170,6 +4165,30 @@ pub(crate) fn execute(
     (false, meta)
 }
 /// Fetch session info from ACP via `x.ai/session/info`.
+/// Ask the next-code ACP agent for a plain-text usage/cost summary.
+async fn fetch_nextcode_usage_text(tx: &AcpAgentTx) -> String {
+    let req = acp::ExtRequest::new(
+        "x.ai/usage",
+        serde_json::value::to_raw_value(&serde_json::json!({}))
+            .expect("serialize usage params")
+            .into(),
+    );
+    match acp_send(req, tx).await {
+        Ok(resp) => {
+            let wrapper: serde_json::Value =
+                serde_json::from_str(resp.0.get()).unwrap_or_default();
+            wrapper
+                .get("result")
+                .and_then(|r| r.get("text"))
+                .and_then(|t| t.as_str())
+                .or_else(|| wrapper.get("text").and_then(|t| t.as_str()))
+                .unwrap_or("No usage data available.")
+                .to_string()
+        }
+        Err(e) => format!("Could not load usage: {}", sanitize_user_error(&format!("{e}"))),
+    }
+}
+
 async fn fetch_session_info(
     session_id: &acp::SessionId,
     tx: &AcpAgentTx,

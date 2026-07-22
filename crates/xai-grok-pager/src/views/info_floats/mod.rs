@@ -248,6 +248,65 @@ pub struct InfoFloatData {
     pub todos_info: Option<TodosInfo>,
     pub workspace_map: Option<WorkspaceMapInfo>,
     pub diagrams: Option<DiagramsInfo>,
+    /// Per-float-kind visibility — `true` = show, `false` = hide.
+    /// Synced from AppView before each draw call. Default all-true.
+    pub visibility: InfoFloatVisibility,
+}
+
+/// Per-float-kind visibility flags. `true` means the float kind is allowed
+/// to appear (subject to the scroll-gate and data availability).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InfoFloatVisibility {
+    pub model_info: bool,
+    pub context_usage: bool,
+    pub kv_cache: bool,
+    pub memory_activity: bool,
+    pub usage_limits: bool,
+    pub git_status: bool,
+    pub background_tasks: bool,
+    pub compaction: bool,
+    pub swarm_status: bool,
+    pub todos: bool,
+    pub workspace_map: bool,
+    pub diagrams: bool,
+}
+
+impl Default for InfoFloatVisibility {
+    fn default() -> Self {
+        Self {
+            model_info: true,
+            context_usage: true,
+            kv_cache: true,
+            memory_activity: true,
+            usage_limits: true,
+            git_status: true,
+            background_tasks: true,
+            compaction: true,
+            swarm_status: true,
+            todos: true,
+            workspace_map: true,
+            diagrams: true,
+        }
+    }
+}
+
+impl From<&xai_grok_shell::agent::config::InfoFloatsConfig> for InfoFloatVisibility {
+    fn from(f: &xai_grok_shell::agent::config::InfoFloatsConfig) -> Self {
+        Self {
+            model_info: f.model_info.unwrap_or(true),
+            context_usage: f.context_usage.unwrap_or(true),
+            kv_cache: f.kv_cache.unwrap_or(true),
+            memory_activity: f.memory_activity.unwrap_or(true),
+            usage_limits: f.usage_limits.unwrap_or(true),
+            git_status: f.git_status.unwrap_or(true),
+            background_tasks: f.background_tasks.unwrap_or(true),
+            compaction: f.compaction.unwrap_or(true),
+            swarm_status: f.swarm_status.unwrap_or(true),
+            todos: f.todos.unwrap_or(true),
+            workspace_map: f.workspace_map.unwrap_or(true),
+            diagrams: f.diagrams.unwrap_or(true),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -740,18 +799,22 @@ pub fn render_kv_cache_summary_line(cache: &CacheHitInfo) -> Option<Line<'static
 // ---------------------------------------------------------------------------
 
 fn render_overview_compact_lines(data: &InfoFloatData, inner: Rect) -> Vec<Line<'static>> {
+    let vis = &data.visibility;
     let mut lines: Vec<Line<'static>> = Vec::new();
 
-    if data.model.is_some() {
+    if data.model.is_some() && vis.model_info {
         lines.extend(render_model_info(data, inner));
     }
 
-    if data.context_ready || data.observed_context_tokens.is_some() || data.context_info_stale {
+    if (data.context_ready || data.observed_context_tokens.is_some() || data.context_info_stale)
+        && vis.context_usage
+    {
         lines.extend(render_context_compact(data, inner));
     }
 
     if let Some(todos) = data.todos_info.as_ref()
         && widgets::todos_has_data(Some(todos))
+        && vis.todos
     {
         lines.extend(widgets::render_todos_compact(todos));
     }
@@ -763,24 +826,28 @@ fn render_overview_compact_lines(data: &InfoFloatData, inner: Rect) -> Vec<Line<
 
     if let Some(bg) = data.background_info.as_ref()
         && widgets::background_has_data(Some(bg))
+        && vis.background_tasks
     {
         lines.extend(widgets::render_background_lines(bg, inner.width as usize));
     }
 
     if let Some(usage) = data.usage_info.as_ref()
         && widgets::usage_has_data(Some(usage))
+        && vis.usage_limits
     {
         lines.extend(widgets::render_usage_compact(usage, inner.width));
     }
 
     if let Some(cache) = data.cache_hit_info.as_ref()
         && let Some(kv) = render_kv_cache_summary_line(cache)
+        && vis.kv_cache
     {
         lines.push(kv);
     }
 
     if let Some(git) = data.git_info.as_ref()
         && widgets::git_has_data(Some(git))
+        && vis.git_status
     {
         // Compact = branch/stats line only (legacy `render_git_compact`).
         lines.extend(widgets::render_git_widget(git, inner.width, 1));
@@ -1005,33 +1072,37 @@ fn place_right_at(area: Rect, content_h: u16, y_cursor: u16) -> Option<Rect> {
 /// Section count for Overview eligibility — mirrors legacy
 /// `InfoWidgetData::has_data_for(Overview)` (sections >= 2).
 fn overview_section_count(data: &InfoFloatData) -> usize {
+    let vis = &data.visibility;
     let mut sections = 0usize;
-    if data.model.is_some() {
+    if data.model.is_some() && vis.model_info {
         sections += 1;
     }
-    if data.context_ready || data.observed_context_tokens.is_some() || data.context_info_stale {
+    if (data.context_ready || data.observed_context_tokens.is_some() || data.context_info_stale)
+        && vis.context_usage
+    {
         sections += 1;
     }
-    if widgets::todos_has_data(data.todos_info.as_ref()) {
+    if widgets::todos_has_data(data.todos_info.as_ref()) && vis.todos {
         sections += 1;
     }
-    if widgets::background_has_data(data.background_info.as_ref()) {
+    if widgets::background_has_data(data.background_info.as_ref()) && vis.background_tasks {
         sections += 1;
     }
-    if widgets::usage_has_data(data.usage_info.as_ref()) {
+    if widgets::usage_has_data(data.usage_info.as_ref()) && vis.usage_limits {
         sections += 1;
     }
     if data
         .cache_hit_info
         .as_ref()
         .is_some_and(|c| render_kv_cache_summary_line(c).is_some())
+        && vis.kv_cache
     {
         sections += 1;
     }
-    if widgets::compaction_has_data(data.compaction_info.as_ref()) {
+    if widgets::compaction_has_data(data.compaction_info.as_ref()) && vis.compaction {
         sections += 1;
     }
-    if widgets::git_has_data(data.git_info.as_ref()) {
+    if widgets::git_has_data(data.git_info.as_ref()) && vis.git_status {
         sections += 1;
     }
     sections
@@ -1128,6 +1199,26 @@ fn measure_kind(kind: FloatKind, data: &InfoFloatData, inner_w: u16) -> Vec<Line
     }
 }
 
+/// Whether a float kind's visibility gate allows it to appear.
+/// Overview is always visible (its sub-kinds are individually gated).
+fn kind_visible(kind: FloatKind, vis: &InfoFloatVisibility) -> bool {
+    match kind {
+        FloatKind::Overview => true,
+        FloatKind::ModelInfo => vis.model_info,
+        FloatKind::ContextUsage => vis.context_usage,
+        FloatKind::KvCache => vis.kv_cache,
+        FloatKind::MemoryActivity => vis.memory_activity,
+        FloatKind::UsageLimits => vis.usage_limits,
+        FloatKind::GitStatus => vis.git_status,
+        FloatKind::BackgroundTasks => vis.background_tasks,
+        FloatKind::Compaction => vis.compaction,
+        FloatKind::SwarmStatus => vis.swarm_status,
+        FloatKind::Todos => vis.todos,
+        FloatKind::WorkspaceMap => vis.workspace_map,
+        FloatKind::Diagrams => vis.diagrams,
+    }
+}
+
 fn kind_has_data(kind: FloatKind, data: &InfoFloatData) -> bool {
     match kind {
         FloatKind::Overview => overview_has_data(data),
@@ -1194,6 +1285,7 @@ pub(crate) fn collect_float_placements(
     ]
     .into_iter()
     .filter(|k| kind_has_data(*k, data))
+    .filter(|k| kind_visible(*k, &data.visibility))
     .collect();
     kinds.sort_by_key(|k| k.priority());
 

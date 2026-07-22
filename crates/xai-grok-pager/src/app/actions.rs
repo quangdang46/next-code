@@ -563,6 +563,19 @@ pub enum Action {
     /// Commit the `auto_update` preference. Persisted to `[cli].auto_update`.
     /// Restart-required — auto-update check fires once at startup.
     SetAutoUpdate(bool),
+    /// Per-float-kind visibility toggles. Persisted to `[ui.info_floats]`.
+    SetShowFloatModelInfo(bool),
+    SetShowFloatContextUsage(bool),
+    SetShowFloatKvCache(bool),
+    SetShowFloatMemoryActivity(bool),
+    SetShowFloatUsageLimits(bool),
+    SetShowFloatGitStatus(bool),
+    SetShowFloatBackgroundTasks(bool),
+    SetShowFloatCompaction(bool),
+    SetShowFloatSwarmStatus(bool),
+    SetShowFloatTodos(bool),
+    SetShowFloatWorkspaceMap(bool),
+    SetShowFloatDiagrams(bool),
     /// Commit `[ui.display_refresh].auto_cadence_enabled`. Restart-required —
     /// cadence is pinned once at startup.
     SetDisplayRefreshAutoCadence(bool),
@@ -609,6 +622,10 @@ pub enum Action {
     SwitchAccount,
     /// User pressed login on the welcome screen.
     Login,
+    /// next-code embed: start Face auth for a specific provider (`/connect <id>`).
+    NextCodeConnect {
+        provider: String,
+    },
     /// Cancel an in-progress login that was started from inside a session
     /// (`/login` or a 401 re-auth prompt) and return to the previous view.
     /// Distinct from `Quit`: abandoning a mid-session re-auth must not exit
@@ -1992,6 +2009,9 @@ pub enum Effect {
     /// pushing a system message into scrollback (used for automatic refreshes
     /// on session init and after each turn).
     FetchBilling { agent_id: AgentId, silent: bool },
+    /// nextcode embed: fetch connected-provider usage/cost text via ACP
+    /// `x.ai/usage` (no xAI credits / grok.com manage).
+    FetchNextCodeUsage { agent_id: AgentId },
     /// Fetch billing data at the app level (no agent required).
     /// Used on startup to populate the welcome-screen credit warning.
     FetchAppBilling,
@@ -2676,6 +2696,11 @@ pub enum TaskResult {
         error: String,
         /// When true, swallow the error silently (background refresh).
         silent: bool,
+    },
+    /// nextcode embed `/usage` text (connected providers / cost).
+    NextCodeUsageText {
+        agent_id: AgentId,
+        text: String,
     },
     /// Debounce timer for shell suggestions expired. Routed by the arming
     /// `agent_id`, like the sibling `PluginCtaDebounceExpired`.

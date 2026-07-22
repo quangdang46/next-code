@@ -119,6 +119,11 @@ pub async fn spawn_grok_shell(
 
 /// Sized wrapper so `AcpGatewayReceiver` can dispatch to a type-erased agent.
 /// (`Rc<dyn Agent>` alone does not implement `Agent` — the blanket is `Rc<T: Agent>` with `T: Sized`.)
+///
+/// **Must forward every method the gateway can invoke.** Omitting a method
+/// falls through to the ACP trait default — for `ext_method` that is
+/// `Ok(ExtResponse(null))`, which Face surfaces as
+/// `couldn't load server list: null body`.
 struct AnyAgent(Rc<dyn acp::Agent>);
 
 #[async_trait(?Send)]
@@ -137,6 +142,10 @@ impl acp::Agent for AnyAgent {
         self.0.authenticate(args).await
     }
 
+    async fn logout(&self, args: acp::LogoutRequest) -> acp::Result<acp::LogoutResponse> {
+        self.0.logout(args).await
+    }
+
     async fn new_session(
         &self,
         args: acp::NewSessionRequest,
@@ -151,12 +160,48 @@ impl acp::Agent for AnyAgent {
         self.0.load_session(args).await
     }
 
+    async fn set_session_mode(
+        &self,
+        args: acp::SetSessionModeRequest,
+    ) -> acp::Result<acp::SetSessionModeResponse> {
+        self.0.set_session_mode(args).await
+    }
+
     async fn prompt(&self, args: acp::PromptRequest) -> acp::Result<acp::PromptResponse> {
         self.0.prompt(args).await
     }
 
     async fn cancel(&self, args: acp::CancelNotification) -> acp::Result<()> {
         self.0.cancel(args).await
+    }
+
+    async fn set_session_model(
+        &self,
+        args: acp::SetSessionModelRequest,
+    ) -> acp::Result<acp::SetSessionModelResponse> {
+        self.0.set_session_model(args).await
+    }
+
+    async fn set_session_config_option(
+        &self,
+        args: acp::SetSessionConfigOptionRequest,
+    ) -> acp::Result<acp::SetSessionConfigOptionResponse> {
+        self.0.set_session_config_option(args).await
+    }
+
+    async fn list_sessions(
+        &self,
+        args: acp::ListSessionsRequest,
+    ) -> acp::Result<acp::ListSessionsResponse> {
+        self.0.list_sessions(args).await
+    }
+
+    async fn ext_method(&self, args: acp::ExtRequest) -> acp::Result<acp::ExtResponse> {
+        self.0.ext_method(args).await
+    }
+
+    async fn ext_notification(&self, args: acp::ExtNotification) -> acp::Result<()> {
+        self.0.ext_notification(args).await
     }
 }
 

@@ -246,6 +246,7 @@ impl NextCodeFaceAgent {
         self.emit_git_status(&session_id).await;
         // Face TodoPane / Todos float only paint from ACP Plan — bridge disk todos.
         self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
+        self.emit_available_skills(&session_id).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -325,6 +326,7 @@ impl NextCodeFaceAgent {
         self.emit_memory_info(&attached).await;
         self.emit_git_status(&attached).await;
         self.emit_todos_plan(&attached, /*allow_empty=*/ false).await;
+        self.emit_available_skills(&attached).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -349,6 +351,116 @@ impl NextCodeFaceAgent {
             }
         }
         parts.join("\n")
+    }
+
+    /// Load initial ACP commands (skills) for the `InitializeResponse` meta.
+    /// Called once at Face connection time so the welcome prompt slash
+    /// completions include skills immediately.
+    fn load_initial_available_commands() -> Vec<acp::AvailableCommand> {
+        // Load global skills (no project-local overlay at this point).
+        let registry = match crate::skill::SkillRegistry::load_global() {
+            Ok(r) => r,
+            Err(_) => return Vec::new(),
+        };
+        registry
+            .list()
+            .into_iter()
+            .map(|skill| {
+                acp::AvailableCommand::new(skill.name.clone(), skill.description.clone())
+            })
+            .collect()
+    }
+
+    /// Advertise next-code skills to Face as ACP AvailableCommands (path+scope
+    /// meta → Face `/skillname` InjectSkill path). `$skill` still works via
+    /// [`Self::expand_skill_invocation`] on the prompt seam.
+    async fn emit_available_skills(&self, session_id: &str) {
+        let working_dir = self
+            .sessions
+            .borrow()
+            .get(session_id)
+            .and_then(|s| s.working_dir.clone());
+        let registry = match crate::skill::SkillRegistry::load_for_working_dir(
+            working_dir.as_deref(),
+        ) {
+            Ok(r) => r,
+            Err(_) => return,
+        };
+        let commands: Vec<acp::AvailableCommand> = registry
+            .list()
+            .into_iter()
+            .map(|skill| {
+                let scope = if working_dir
+                    .as_ref()
+                    .is_some_and(|wd| skill.path.starts_with(wd))
+                {
+                    "repo"
+                } else {
+                    "user"
+                };
+                let meta = serde_json::json!({
+                    "path": skill.path.display().to_string(),
+                    "scope": scope,
+                });
+                acp::AvailableCommand::new(skill.name.clone(), skill.description.clone())
+                    .meta(meta.as_object().cloned().unwrap_or_default())
+            })
+            .collect();
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                acp::SessionId::new(session_id),
+                acp::SessionUpdate::AvailableCommandsUpdate(acp::AvailableCommandsUpdate::new(
+                    commands,
+                )),
+            ))
+            .await;
+    }
+
+    /// Expand `$skill` / Face `/skill` inject into (user content, system_reminder).
+    fn expand_skill_invocation(
+        text: &str,
+        working_dir: Option<&std::path::Path>,
+    ) -> (String, Option<String>) {
+        let trimmed = text.trim();
+        let invocation = crate::skill::SkillRegistry::parse_invocation(trimmed).or_else(|| {
+            // Face InjectSkill sends `/name [prompt]` — map to `$` namespace.
+            let rest = trimmed.strip_prefix('/')?;
+            let name_end = rest.find(char::is_whitespace).unwrap_or(rest.len());
+            let name = &rest[..name_end];
+            if name.is_empty()
+                || !name
+                    .chars()
+                    .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_'))
+            {
+                return None;
+            }
+            let prompt = rest[name_end..].trim();
+            Some(crate::skill::SkillInvocation {
+                name,
+                prompt: (!prompt.is_empty()).then_some(prompt),
+            })
+        });
+        let Some(invocation) = invocation else {
+            return (text.to_string(), None);
+        };
+        let Ok(registry) = crate::skill::SkillRegistry::load_for_working_dir(working_dir) else {
+            return (text.to_string(), None);
+        };
+        let Some(skill) = registry.get(invocation.name) else {
+            return (text.to_string(), None);
+        };
+        let reminder = Some(format!("# Active Skill\n\n{}", skill.get_prompt()));
+        let content = invocation
+            .prompt
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                format!(
+                    "(Skill `{}` activated — {})",
+                    skill.name, skill.description
+                )
+            });
+        (content, reminder)
     }
 
     // ── Tool lifecycle helpers (Grok typed ACP) ────────────────
@@ -769,23 +881,153 @@ impl acp::Agent for NextCodeFaceAgent {
         _args: acp::InitializeRequest,
     ) -> acp::Result<acp::InitializeResponse> {
         // Face treats empty authMethods as fail-closed → Grok login screen.
-        // Advertise a non-interactive method so the pager skips Grok OAuth;
-        // real provider login stays on next-code (serve bootstrap / `next-code login`).
+        // Advertise non-interactive next-code credentials first (eager skip),
+        // plus interactive `nextcode.connect` for welcome /login button.
         let caps = acp::AgentCapabilities::default().load_session(true);
-        let auth = acp::AuthMethod::Agent(
+        let auth_key = acp::AuthMethod::Agent(
             acp::AuthMethodAgent::new(acp::AuthMethodId::new("xai.api_key"), "Next Code")
                 .description("Provider credentials owned by the next-code daemon"),
         );
+        // Seed available commands (skills) so the welcome prompt slash
+        // completions show skills immediately — stock grok-build agents
+        // include this in their InitializeResponse meta.
+        let commands = Self::load_initial_available_commands();
+        let meta = serde_json::json!({
+            "availableCommands": commands,
+        });
         Ok(acp::InitializeResponse::new(acp::ProtocolVersion::V1)
             .agent_capabilities(caps)
-            .auth_methods(vec![auth]))
+            .auth_methods(vec![auth_key, crate::cli::face_auth::connect_auth_method()])
+            .meta(meta.as_object().cloned().unwrap_or_default()))
     }
 
     async fn authenticate(
         &self,
-        _args: acp::AuthenticateRequest,
+        args: acp::AuthenticateRequest,
     ) -> acp::Result<acp::AuthenticateResponse> {
-        Ok(acp::AuthenticateResponse::new())
+        let method_id = args.method_id.0.as_ref();
+        match crate::cli::face_auth::authenticate_method(method_id).await {
+            Ok(()) => Ok(acp::AuthenticateResponse::new()),
+            Err(err) => Err(acp::Error::internal_error().data(err.to_string())),
+        }
+    }
+
+    async fn logout(&self, _args: acp::LogoutRequest) -> acp::Result<acp::LogoutResponse> {
+        crate::cli::face_auth::clear_pending();
+        crate::auth::AuthStatus::invalidate_cache();
+        Ok(acp::LogoutResponse::new())
+    }
+
+    async fn ext_method(&self, args: acp::ExtRequest) -> acp::Result<acp::ExtResponse> {
+        let method = args.method.as_ref();
+        let params: serde_json::Value =
+            serde_json::from_str(args.params.get()).unwrap_or(serde_json::Value::Null);
+        let payload = match method {
+            "x.ai/auth/get_url" => crate::cli::face_auth::get_auth_url_payload(),
+            "x.ai/auth/submit_code" => {
+                let code = params
+                    .get("code")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                match crate::cli::face_auth::submit_auth_code(code).await {
+                    Ok(()) => serde_json::json!({ "ok": true }),
+                    Err(err) => {
+                        return Err(acp::Error::internal_error().data(err.to_string()));
+                    }
+                }
+            }
+            "x.ai/skills/list" | "x.ai/skills/toggle" | "x.ai/skills/refresh-baseline" => {
+                let cwd = params
+                    .get("cwd")
+                    .and_then(|v| v.as_str())
+                    .map(std::path::PathBuf::from);
+                // Toggle is a no-op for next-code skills (always enabled); return list.
+                let payload = crate::cli::face_auth::list_nextcode_skills(cwd.as_deref());
+                if std::env::var_os("NEXT_CODE_FACE_DEBUG").is_some() {
+                    let n = payload
+                        .pointer("/result/skills")
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.len())
+                        .unwrap_or(0);
+                    eprintln!(
+                        "[nextcode.face] {} skills={} wireRev={}",
+                        method,
+                        n,
+                        crate::cli::face_auth::FACE_EXT_WIRE_REV
+                    );
+                }
+                payload
+            }
+            "x.ai/mcp/list" => {
+                // Face FetchMcpsList sends sessionId + cache; resolve session cwd when known.
+                let session_cwd = params
+                    .get("sessionId")
+                    .or_else(|| params.get("session_id"))
+                    .and_then(|v| v.as_str())
+                    .and_then(|sid| {
+                        self.sessions
+                            .try_borrow()
+                            .ok()?
+                            .get(sid)
+                            .and_then(|s| s.working_dir.clone())
+                    });
+                let payload =
+                    crate::cli::face_auth::list_nextcode_mcps(session_cwd.as_deref()).await;
+                if std::env::var_os("NEXT_CODE_FACE_DEBUG").is_some() {
+                    let n = payload
+                        .pointer("/result/servers")
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.len())
+                        .unwrap_or(0);
+                    eprintln!(
+                        "[nextcode.face] {} servers={} wireRev={}",
+                        "x.ai/mcp/list",
+                        n,
+                        crate::cli::face_auth::FACE_EXT_WIRE_REV
+                    );
+                }
+                payload
+            }
+            "x.ai/marketplace/list" => crate::cli::face_auth::list_nextcode_marketplace(),
+            "x.ai/plugins/list" => {
+                let cwd = params
+                    .get("cwd")
+                    .and_then(|v| v.as_str())
+                    .map(std::path::PathBuf::from);
+                crate::cli::face_plugins::plugins_list_payload(cwd.as_deref())
+            }
+            "x.ai/plugins/action" => crate::cli::face_plugins::plugins_action_payload(&params),
+            "x.ai/hooks/list" => crate::cli::face_plugins::hooks_list_payload(),
+            "x.ai/hooks/action" => crate::cli::face_plugins::hooks_action_payload(&params),
+            "x.ai/session/list" => {
+                let limit = params
+                    .get("limit")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(30) as usize;
+                crate::cli::face_auth::list_nextcode_sessions(limit)
+            }
+            other => {
+                if let Some(payload) =
+                    crate::cli::face_ext::handle_ext_method(other, &params).await
+                {
+                    payload
+                } else {
+                    // Never return bare `{}` — Face treats that as a successful
+                    // empty envelope and shows "No matches" / deserialize errors
+                    // without naming the missing method.
+                    serde_json::json!({
+                        "error": {
+                            "code": "unsupported_ext_method",
+                            "message": format!("unsupported ext method: {other}"),
+                            "method": other,
+                        }
+                    })
+                }
+            }
+        };
+        let raw = serde_json::value::to_raw_value(&payload)
+            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+        Ok(acp::ExtResponse::new(raw.into()))
     }
 
     async fn new_session(
@@ -842,13 +1084,16 @@ impl acp::Agent for NextCodeFaceAgent {
         }
 
         let text = Self::prompt_text(&args);
+        let working_dir = session.working_dir.clone();
+        let (content, system_reminder) =
+            Self::expand_skill_invocation(&text, working_dir.as_deref());
         let prompt_id = session.next_id();
         if let Err(err) = session
             .send(&Request::Message {
                 id: prompt_id,
-                content: text,
+                content,
                 images: Vec::new(),
-                system_reminder: None,
+                system_reminder,
             })
             .await
         {

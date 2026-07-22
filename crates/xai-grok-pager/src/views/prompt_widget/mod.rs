@@ -1118,6 +1118,13 @@ impl PromptWidget {
             .set_restricted_commands(names);
     }
 
+    /// Replace the nextcode embed brand-hide list (menu-hidden, no SuperGrok).
+    pub(crate) fn set_brand_hidden_commands(&mut self, names: &[String]) {
+        self.slash_controller
+            .registry_mut()
+            .set_brand_hidden_commands(names);
+    }
+
     /// Access the current slash snapshot (for dropdown rendering).
     pub fn slash_snapshot(&self) -> crate::slash::SlashSnapshot {
         self.slash_state.snapshot()
