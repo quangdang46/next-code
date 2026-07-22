@@ -795,7 +795,7 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
         ActionDef {
             id: ActionId::ModelPicker,
             label: "model",
-            description: "Pick model",
+            description: "Select model",
             default_key: key!('m', CONTROL),
             alt_keys: vec![],
             category: Category::Session,
@@ -804,7 +804,7 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
             hint_key_display: None,
             requires_confirmation: false,
             long_help: Some(
-                "Opens the model picker to switch the model for this session; the choice applies to later turns.\nBound to Ctrl+M, but while the prompt is focused that chord toggles multiline instead.\nReach it from the scrollback or the command palette.",
+                "Opens the Select model palette (search, provider groups, current checkmark).\nCtrl+A views all connectable providers. Bound to Ctrl+M off the prompt; in the prompt that chord toggles multiline.\nAlso: /model or the command palette.",
             ),
         },
         ActionDef {

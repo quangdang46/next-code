@@ -148,15 +148,25 @@ fn session_model_state_from_history(
     let available: Vec<acp::ModelInfo> = ids
         .into_iter()
         .map(|id| {
-            let mut info = acp::ModelInfo::new(acp::ModelId::new(std::sync::Arc::from(id.as_str())), id.clone());
+            let mut info =
+                acp::ModelInfo::new(acp::ModelId::new(std::sync::Arc::from(id.as_str())), id.clone());
+            let mut meta = serde_json::Map::new();
             if let Some(limit) =
                 next_code_provider_core::context_limit_for_model_with_provider(&id, provider_name)
             {
-                info = info.meta(
-                    serde_json::json!({ "totalContextTokens": limit })
-                        .as_object()
-                        .cloned(),
+                meta.insert(
+                    "totalContextTokens".into(),
+                    serde_json::Value::Number(limit.into()),
                 );
+            }
+            if let Some(name) = provider_name {
+                meta.insert(
+                    "providerName".into(),
+                    serde_json::Value::String(name.to_string()),
+                );
+            }
+            if !meta.is_empty() {
+                info = info.meta(Some(meta));
             }
             info
         })

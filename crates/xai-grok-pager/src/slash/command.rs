@@ -77,7 +77,7 @@ pub enum CommandResult {
 }
 
 /// A suggestion item for command argument completion.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ArgItem {
     /// Display text shown in the dropdown.
     pub display: String,
@@ -87,6 +87,40 @@ pub struct ArgItem {
     pub insert_text: String,
     /// Description shown alongside the item.
     pub description: String,
+    /// Optional group label (e.g. provider name) for section headers in
+    /// the Select-model palette. Empty/None → ungrouped.
+    pub category: Option<String>,
+    /// Optional badge rendered after the label (e.g. "Free").
+    pub badge: Option<String>,
+    /// When true, render a checkmark as the row's right label (current model).
+    pub is_current: bool,
+    /// When true, selecting this row runs `/connect <insert_text>` instead of
+    /// treating it as a model name (Popular providers / view-all rows).
+    pub provider_connect: bool,
+    /// Non-selectable section header row (provider group label).
+    pub is_section_header: bool,
+}
+
+impl ArgItem {
+    /// Plain arg row (no category / badge / current / connect).
+    pub fn plain(
+        display: impl Into<String>,
+        match_text: impl Into<String>,
+        insert_text: impl Into<String>,
+        description: impl Into<String>,
+    ) -> Self {
+        Self {
+            display: display.into(),
+            match_text: match_text.into(),
+            insert_text: insert_text.into(),
+            description: description.into(),
+            category: None,
+            badge: None,
+            is_current: false,
+            provider_connect: false,
+            is_section_header: false,
+        }
+    }
 }
 
 /// Read-only context for generating suggestions.

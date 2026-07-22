@@ -139,6 +139,54 @@ pub(in crate::app::dispatch) fn dispatch_open_howto_guides(app: &mut AppView) ->
     vec![]
 }
 
+/// Open the Select-model ArgPicker (bare `/model`, Ctrl+M). Toggles closed if
+/// already open on the model list.
+pub(in crate::app::dispatch) fn dispatch_open_model_picker(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::modal::ActiveModal;
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    if matches!(
+        &agent.active_modal,
+        Some(ActiveModal::ArgPicker {
+            command,
+            args_query,
+            ..
+        }) if matches!(command.as_str(), "model" | "m") && args_query.is_empty()
+    ) {
+        agent.active_modal = None;
+        return vec![];
+    }
+
+    let command = "model";
+    let Some(cmd) = agent.prompt.slash_controller.registry().get(command) else {
+        return vec![];
+    };
+    let ctx = agent
+        .prompt
+        .slash_controller
+        .app_ctx(&agent.session.models);
+    let Some(items) = cmd.suggest_args(&ctx, "") else {
+        return vec![];
+    };
+    if items.is_empty() {
+        return vec![];
+    }
+    agent.active_modal = Some(ActiveModal::ArgPicker {
+        command: command.to_string(),
+        args_query: String::new(),
+        items: items.clone(),
+        original_items: items,
+        state: crate::views::picker::PickerState::input_active(),
+        previous_palette: None,
+        window: crate::views::modal_window::ModalWindowState::new(),
+    });
+    vec![]
+}
+
 /// Open the settings modal. Reads the live `UiConfig` snapshot
 /// (sans-IO). Single-instance: `debug_assert!` catches routing bugs.
 pub(in crate::app::dispatch) fn dispatch_open_settings(app: &mut AppView) -> Vec<Effect> {

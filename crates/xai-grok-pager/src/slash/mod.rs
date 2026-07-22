@@ -1438,9 +1438,9 @@ mod tests {
     #[test]
     fn required_arg_command_blocks_without_args() {
         let reg = test_registry();
-        // /model has takes_args=true, args_required=true.
-        assert!(!is_command_complete("/model", &reg));
-        assert!(!is_command_complete("/model ", &reg));
+        // /model opens the Select-model palette with empty args (args_required=false).
+        assert!(is_command_complete("/model", &reg));
+        assert!(is_command_complete("/model ", &reg));
         assert!(is_command_complete("/model grok-4", &reg));
     }
 
@@ -2638,6 +2638,7 @@ mod tests {
                 match_text: match_text.into(),
                 insert_text: insert.into(),
                 description: String::new(),
+                ..Default::default()
             };
             if let Some(rest) = args_query.strip_prefix("first")
                 && rest.starts_with(char::is_whitespace)

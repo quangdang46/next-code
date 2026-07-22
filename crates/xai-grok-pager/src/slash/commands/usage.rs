@@ -52,7 +52,8 @@ impl SlashCommand for UsageCommand {
             match_text: "show".to_string(),
             insert_text: "show".to_string(),
             description: "View credit usage".to_string(),
-        }];
+                ..Default::default()
+            }];
         // nextcode embed: no grok.com billing manage link.
         if !crate::product_welcome::is_nextcode_embed() {
             items.push(ArgItem {
@@ -60,6 +61,7 @@ impl SlashCommand for UsageCommand {
                 match_text: "manage".to_string(),
                 insert_text: "manage".to_string(),
                 description: "Open billing management page".to_string(),
+                ..Default::default()
             });
         }
         Some(items)

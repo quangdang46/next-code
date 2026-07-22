@@ -631,9 +631,10 @@ impl ActiveModal {
                 args_query,
                 ..
             } => match command.as_str() {
-                "model" | "m" if !args_query.is_empty() => "Pick reasoning effort",
-                "model" | "m" => "Pick model",
+                "model" | "m" if !args_query.is_empty() => "Select reasoning effort",
+                "model" | "m" => "Select model",
                 "theme" | "t" => "Pick theme",
+                "connect" => "Connect provider",
                 _ => "Pick option",
             },
             ActiveModal::DocPicker { .. } => "How-to Guides",

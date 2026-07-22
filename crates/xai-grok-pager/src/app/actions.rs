@@ -949,6 +949,8 @@ pub enum Action {
     },
     /// Open the memory browser modal.
     OpenMemoryModal,
+    /// Open the Select-model ArgPicker (bare `/model` / palette UX).
+    OpenModelPicker,
     /// Open the hidden `/gboom` easter egg (DOOM-style raycaster modal).
     OpenGboom,
     /// Suspend the TUI and open a file in $EDITOR.
