@@ -3456,6 +3456,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fs2"
+version = "0.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9564fc758e15025b46aa6643b1b77d047d1a56a1aea6e01002ac0c7026876213"
+dependencies = [
+ "libc",
+ "winapi",
+]
+
+[[package]]
 name = "fs_extra"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13899,13 +13909,17 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "fs2",
+ "libc",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tokio-util",
  "toml 0.8.23",
  "toml_edit 0.22.27",
+ "windows-sys 0.59.0",
  "xai-file-utils",
  "xai-grok-agent",
  "xai-grok-announcements",
@@ -13971,11 +13985,14 @@ dependencies = [
  "dirs 5.0.1",
  "dunce",
  "ffs-search",
+ "fs2",
  "nucleo",
  "serde",
  "serde_json",
  "tempfile",
+ "toml 0.8.23",
  "xai-grok-config",
+ "xai-grok-version",
 ]
 
 [[package]]
