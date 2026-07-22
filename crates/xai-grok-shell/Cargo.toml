@@ -9,10 +9,11 @@ description = "Compile-stub facade of xai-org/grok-build xai-grok-shell (PR5)"
 agent-client-protocol = { version = "0.10.4", features = ["unstable"] }
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
+fs2 = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
-tokio = { version = "1", features = ["sync", "macros", "rt"] }
+tokio = { version = "1", features = ["sync", "macros", "rt", "time"] }
 tokio-util = { version = "0.7", default-features = true }
 toml = "0.8"
 toml_edit = { version = "0.22", features = ["serde"] }
@@ -26,3 +27,15 @@ xai-grok-workspace = { path = "../xai-grok-workspace" }
 xai-grok-announcements = { path = "../xai-grok-announcements" }
 xai-hooks-plugins-types = { path = "../xai-hooks-plugins-types" }
 async-trait = "0.1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+] }
+
+[dev-dependencies]
+tempfile = "3"

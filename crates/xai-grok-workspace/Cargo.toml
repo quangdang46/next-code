@@ -11,10 +11,14 @@ dirs = "5"
 dunce = "1"
 # Face `@` file pickup — same ffs FilePicker stack as next-code TUI AtPicker.
 ffs-search = { workspace = true }
+fs2 = "0.4"
 nucleo = "0.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tempfile = "3"
+toml = "0.8"
 xai-grok-config = { path = "../xai-grok-config" }
+xai-grok-version = { path = "../xai-grok-version" }
 
 [dev-dependencies]
 tempfile = "3"
