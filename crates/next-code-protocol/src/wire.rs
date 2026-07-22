@@ -355,6 +355,19 @@ pub enum Request {
         input: String,
     },
 
+    /// Reply to a blocking AskUserQuestion reverse request (Face ACP outcome JSON).
+    #[serde(rename = "ask_user_question_response")]
+    AskUserQuestionResponse {
+        id: u64,
+        /// Matches the request_id from AskUserQuestion
+        request_id: String,
+        /// `AskUserQuestionExtResponse` JSON, or null + error via separate Error event
+        response: serde_json::Value,
+        /// When set, the bridge failed before producing a typed response
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+
     // === Agent-to-agent communication ===
     /// Register as an external agent
     #[serde(rename = "agent_register")]
@@ -1440,5 +1453,18 @@ pub enum ServerEvent {
         is_password: bool,
         /// Tool call ID this is associated with
         tool_call_id: String,
+    },
+
+    /// AskUserQuestion tool needs Face ACP `x.ai/ask_user_question` reverse request.
+    /// Distinct from StdinRequest (freeform) and from permission approval.
+    #[serde(rename = "ask_user_question")]
+    AskUserQuestion {
+        request_id: String,
+        session_id: String,
+        tool_call_id: String,
+        /// JSON array of Face `Question` objects
+        questions: serde_json::Value,
+        /// `"default"` or `"plan"`
+        mode: String,
     },
 }

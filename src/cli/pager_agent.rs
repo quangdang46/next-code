@@ -26,7 +26,7 @@ struct SessionBootstrap {
     models: Option<acp::SessionModelState>,
 }
 
-struct DaemonSession {
+pub(crate) struct DaemonSession {
     session_id: String,
     reader: Mutex<BufReader<ReadHalf>>,
     writer: Mutex<WriteHalf>,
@@ -38,7 +38,7 @@ struct DaemonSession {
 }
 
 impl DaemonSession {
-    fn new(
+    pub(crate) fn new(
         session_id: String,
         reader: ReadHalf,
         writer: WriteHalf,
@@ -55,11 +55,11 @@ impl DaemonSession {
         }
     }
 
-    fn next_id(&self) -> u64 {
+    pub(crate) fn next_id(&self) -> u64 {
         self.next_request_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    async fn send(&self, request: &Request) -> Result<()> {
+    pub(crate) async fn send(&self, request: &Request) -> Result<()> {
         let mut json = serde_json::to_string(request)?;
         json.push('\n');
         let mut writer = self.writer.lock().await;
@@ -1430,6 +1430,32 @@ impl acp::Agent for NextCodeFaceAgent {
                 ServerEvent::MemoryActivity { activity } => {
                     crate::memory::apply_remote_activity_snapshot(&activity);
                     self.emit_memory_info(&session_id).await;
+                }
+                ServerEvent::AskUserQuestion {
+                    request_id,
+                    session_id: ask_session_id,
+                    tool_call_id,
+                    questions,
+                    mode,
+                } => {
+                    // Blocking reverse ACP → Face question_view (not permission_view).
+                    if let Err(err) = crate::cli::face_ask_user::bridge_ask_user_question(
+                        &self.gateway,
+                        session.as_ref(),
+                        request_id,
+                        ask_session_id,
+                        tool_call_id,
+                        questions,
+                        mode,
+                    )
+                    .await
+                    {
+                        self.emit_text(
+                            &session_id,
+                            format!("AskUserQuestion bridge error: {err}"),
+                        )
+                        .await;
+                    }
                 }
                 ServerEvent::Done { id } if id == prompt_id => {
                     // Refresh Plan in case compaction / other paths mutated todos

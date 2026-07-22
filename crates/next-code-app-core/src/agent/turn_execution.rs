@@ -707,6 +707,14 @@ impl Agent {
         self.stdin_request_tx = Some(tx);
     }
 
+    /// Set the AskUserQuestion channel for Face ACP reverse requests.
+    pub fn set_ask_user_question_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::AskUserQuestionInputRequest>,
+    ) {
+        self.ask_user_question_tx = Some(tx);
+    }
+
     pub(super) async fn tool_definitions(&mut self) -> Vec<ToolDefinition> {
         if self.session.is_canary {
             self.registry.register_selfdev_tools().await;
@@ -848,6 +856,7 @@ impl Agent {
             tool_call_id: call_id,
             working_dir: self.working_dir().map(PathBuf::from),
             stdin_request_tx: self.stdin_request_tx.clone(),
+            ask_user_question_tx: self.ask_user_question_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             execution_mode: ToolExecutionMode::Direct,
             best_of_n_run_id: self.best_of_n_run_id.clone(),
