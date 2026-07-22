@@ -1080,9 +1080,14 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                 if unchanged {
                     vec![]
                 } else {
+                    let provider_key = agent
+                        .info_float_provider
+                        .as_deref()
+                        .map(super::super::settings::setters::config_provider_key_from_float);
                     vec![Effect::PersistPreferredModel {
                         model_id: model_id.clone(),
                         reasoning_effort: resolved_effort,
+                        provider_key,
                     }]
                 }
             }

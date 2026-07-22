@@ -1563,9 +1563,15 @@ pub enum Effect {
         config_key: &'static str,
     },
     /// Persist preferred model (and effort if Some) to config.toml.
+    ///
+    /// next-code: writes `[provider].default_model` and, when `provider_key` is
+    /// set, `[provider].default_provider` in one atomic toml_edit write.
     PersistPreferredModel {
         model_id: acp::ModelId,
         reasoning_effort: Option<ReasoningEffort>,
+        /// Config `default_provider` pin (profile id / provider key). `None`
+        /// leaves the existing provider key unchanged.
+        provider_key: Option<String>,
     },
     /// Persist the permission mode to config.toml and notify the agent
     /// via ACP. See [`PermissionModePersist`] for rollback semantics.

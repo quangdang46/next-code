@@ -1717,17 +1717,21 @@ pub(in crate::app::dispatch) fn set_default_model(
     //
     // Chat (`--chat` / GROK_CHAT_MODE) catalogs use opaque `/rest/modes`
     // slugs that must not become the global Build `default_model`.
+    //
+    // next-code: use PersistPreferredModel so we can pin `default_provider`
+    // alongside `default_model` in one atomic write (PersistSetting alone
+    // only wrote the model key).
     let mut effects: Vec<Effect> = Vec::new();
     if !xai_grok_shell::agent::chat_modes::process_chat_mode_enabled() {
-        let new_id_str = new_id.0.to_string();
-        let prev_id_str = prev_id
-            .as_ref()
-            .map(|id| id.0.to_string())
-            .unwrap_or_default();
-        effects.push(Effect::PersistSetting {
-            key: "default_model",
-            value: crate::settings::SettingValue::String(new_id_str),
-            rollback_value: crate::settings::SettingValue::String(prev_id_str),
+        let provider_key = app
+            .agents
+            .get(&aid)
+            .and_then(|a| a.info_float_provider.as_deref())
+            .map(config_provider_key_from_float);
+        effects.push(Effect::PersistPreferredModel {
+            model_id: new_id.clone(),
+            reasoning_effort: None,
+            provider_key,
         });
     }
 
@@ -1754,6 +1758,23 @@ pub(in crate::app::dispatch) fn set_default_model(
         agent.session.deferred_model_switch = Some((new_id, None));
     }
     effects
+}
+
+/// Map Overview/provider float label → config `default_provider` key.
+/// Mirrors next-code `derive_session_provider_key` fallback (no env pins).
+pub(in crate::app::dispatch) fn config_provider_key_from_float(name: &str) -> String {
+    let normalized = name.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "anthropic" | "claude" | "claude cli" => "claude".to_string(),
+        "openai" => "openai".to_string(),
+        "github copilot" | "copilot" => "copilot".to_string(),
+        "openrouter" => "openrouter".to_string(),
+        "cursor" => "cursor".to_string(),
+        "gemini" => "gemini".to_string(),
+        "antigravity" => "antigravity".to_string(),
+        "bedrock" | "aws bedrock" => "bedrock".to_string(),
+        other => other.to_string(),
+    }
 }
 
 /// Clear the default model override. Persists `[models].default = None`;

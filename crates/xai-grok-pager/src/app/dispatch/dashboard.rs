@@ -1454,17 +1454,24 @@ pub(super) fn dispatch_dashboard_dispatch_slash(app: &mut AppView, text: String)
             dispatch(Action::ExitDashboard, app)
         }
         // `/model` on the session-less dashboard stages the model for the
-        // NEXT spawned agent instead of switching a (nonexistent) session.
-        // Both the effort-bearing (`SwitchModel`) and bare
-        // (`SetDefaultModel`) forms map to the same per-spawn staging — we
-        // deliberately do NOT persist a global default here.
+        // NEXT spawned agent and also persists the global default so quit /
+        // reopen picks up the same model (next-code product choice; stock Grok
+        // dashboard is stage-only).
         CommandResult::Action(Action::SwitchModel { model_id, effort }) => {
-            stage_dashboard_model(app, model_id, effort);
-            vec![]
+            stage_dashboard_model(app, model_id.clone(), effort);
+            vec![Effect::PersistPreferredModel {
+                model_id,
+                reasoning_effort: effort,
+                provider_key: None,
+            }]
         }
         CommandResult::Action(Action::SetDefaultModel(model_id)) => {
-            stage_dashboard_model(app, model_id, None);
-            vec![]
+            stage_dashboard_model(app, model_id.clone(), None);
+            vec![Effect::PersistPreferredModel {
+                model_id,
+                reasoning_effort: None,
+                provider_key: None,
+            }]
         }
         // `/plan` toggles whether the next spawned agent starts in plan
         // mode. The command always reports `On` here (the dashboard's
