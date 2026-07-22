@@ -51,6 +51,7 @@ impl SlashCommand for ModelCommand {
     }
 
     fn usage(&self) -> &str {
+        // Bracketed optional args — bare `/model` opens the Select-model palette.
         "/model [name] [effort]"
     }
 

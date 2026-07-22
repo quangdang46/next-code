@@ -804,7 +804,7 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
             hint_key_display: None,
             requires_confirmation: false,
             long_help: Some(
-                "Opens the Select model palette (search, provider groups, current checkmark).\nCtrl+A views all connectable providers. Bound to Ctrl+M off the prompt; in the prompt that chord toggles multiline.\nAlso: /model or the command palette.",
+                "Opens the Select model palette (search, provider groups, current checkmark).\nCtrl+A views all connectable providers. Bound to Ctrl+M on the dashboard and off the agent prompt; in the agent prompt that chord toggles multiline (`/multiline` everywhere).\nAlso: bare /model (Enter) or the command palette.",
             ),
         },
         ActionDef {

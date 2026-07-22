@@ -51,7 +51,12 @@ pub struct SuggestionRow {
 impl SuggestionRow {
     fn from_command(trigger: &CommandTrigger) -> Self {
         let mut insert_text = trigger.display.clone();
-        if trigger.takes_args {
+        // `/model` opens the centered Select-model ArgPicker on Enter. A
+        // trailing space would "chain" into the inline slash arg dropdown
+        // (provider headers like "OpenCode Go" + ghost `<model> [effort]`),
+        // which steals that path. Typed `/model <name>` still works when the
+        // user adds a space themselves.
+        if trigger.takes_args && !command_opens_centered_arg_picker(&trigger.canonical) {
             insert_text.push(' ');
         }
         Self {
@@ -491,8 +496,16 @@ impl SlashController {
         } else if input.args_range.is_some() {
             let matches = self.arg_suggestions_for_input(text, &input, models);
             snapshot.selected = Self::carry_selection(&previous, &matches, false, &input);
-            snapshot.open = !matches.is_empty();
-            snapshot.matches = matches;
+            // Bare `/model ` opens the centered Select-model palette on Enter —
+            // do not steal that path with the inline arg dropdown + ghost.
+            let suppress_empty_inline = args_text_empty
+                && command_opens_centered_arg_picker(input.query.as_str());
+            snapshot.open = !matches.is_empty() && !suppress_empty_inline;
+            snapshot.matches = if suppress_empty_inline {
+                Vec::new()
+            } else {
+                matches
+            };
         }
 
         // Resolve the command for args placeholder and skill detection.
@@ -506,7 +519,9 @@ impl SlashController {
             if command_offered(command.as_ref(), &ctx, self.hide_session_scoped) {
                 snapshot.command_recognized = true;
                 snapshot.is_skill = command.is_skill();
-                if args_text_empty {
+                if args_text_empty
+                    && !command_opens_centered_arg_picker(command.name())
+                {
                     snapshot.args_placeholder = command.arg_placeholder().map(|s| s.to_string());
                 }
             }
@@ -695,10 +710,16 @@ impl SlashController {
 
         snapshot.args_query_is_empty = args_empty;
         snapshot.args_range = args_range;
-        snapshot.open = !arg_matches.is_empty();
-        snapshot.matches = arg_matches;
+        let suppress_empty_inline =
+            args_empty && command_opens_centered_arg_picker(command.name());
+        snapshot.open = !arg_matches.is_empty() && !suppress_empty_inline;
+        snapshot.matches = if suppress_empty_inline {
+            Vec::new()
+        } else {
+            arg_matches
+        };
         snapshot.selected = Self::carry_selection(previous, &snapshot.matches, false, &input);
-        if args_empty {
+        if args_empty && !suppress_empty_inline {
             snapshot.args_placeholder = command.arg_placeholder().map(|s| s.to_string());
         }
 
@@ -1192,6 +1213,13 @@ pub fn parse_invocation(line: &str) -> Option<SlashInvocation<'_>> {
 // ---------------------------------------------------------------------------
 // Completeness check
 // ---------------------------------------------------------------------------
+
+/// Commands whose bare form opens a centered ArgPicker (not the inline
+/// slash arg dropdown). Keep in sync with `ModelCommand` / palette special
+/// cases (`"model" | "m"`).
+pub(crate) fn command_opens_centered_arg_picker(name_or_alias: &str) -> bool {
+    matches!(name_or_alias, "model" | "m")
+}
 
 /// Check if a slash command line is complete (ready to execute on Enter).
 ///
@@ -2627,7 +2655,7 @@ mod tests {
     }
 
     #[test]
-    fn mid_text_slash_args_after_token() {
+    fn mid_text_slash_args_after_model_suppresses_empty_inline() {
         let mut ctrl = SlashController::with_builtins(std::path::PathBuf::from("."));
         let state = SlashState::default();
         let models = ModelState::default();
@@ -2642,8 +2670,8 @@ mod tests {
         );
         assert!(snapshot.args_range.is_some());
         assert!(
-            snapshot.open || snapshot.args_placeholder.is_some(),
-            "args phase should show suggestions or placeholder for /model"
+            !snapshot.open && snapshot.args_placeholder.is_none(),
+            "empty /model args must not show inline dropdown or ghost (palette on Enter)"
         );
     }
 

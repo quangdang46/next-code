@@ -451,7 +451,10 @@ pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
         PaletteEntry {
             label: "Switch Model".into(),
             shortcut: "/model".into(),
-            command: PaletteCommand::SlashCommand("/model ".into()),
+            // No trailing space — bare `/model` opens the Select-model palette
+            // (see command-palette `is_picker` path); trailing space would land
+            // in the inline arg dropdown instead.
+            command: PaletteCommand::SlashCommand("/model".into()),
         },
         PaletteEntry {
             label: "Always Approve Mode".into(),
