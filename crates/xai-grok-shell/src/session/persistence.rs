@@ -1,6 +1,7 @@
-//! Façade stub of upstream `xai-grok-shell::session::persistence` — local
-//! session-id resolution helpers the future pager uses for resume/restore.
-//! No real on-disk session store in this compile-stub layer.
+//! Local session helpers for Face resume / `--continue` / project picker.
+//!
+//! Maps onto next-code's flat store under `<grok_home>/sessions/<id>.json`.
+//! Pure FS — no `next-code-base` / app-core dependency.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -24,27 +25,63 @@ pub struct UserFeedbackEntry {
     pub comment: String,
 }
 
-pub fn session_exists_by_id(_session_id: &str) -> bool {
-    false
+#[derive(Debug, Clone, Deserialize)]
+struct SessionSnapshot {
+    id: String,
+    #[serde(default)]
+    working_dir: Option<String>,
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    custom_title: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default)]
+    parent_id: Option<String>,
+    #[serde(default)]
+    messages: Vec<serde_json::Value>,
 }
 
-pub fn session_exists_for_cwd(_session_id: &str, _cwd: &str) -> bool {
-    false
+pub fn session_exists_by_id(session_id: &str) -> bool {
+    session_snapshot_path(session_id).is_file()
 }
 
-pub fn find_local_child_for_remote(_session_id: &str, _cwd: &str) -> Option<String> {
-    None
+pub fn session_exists_for_cwd(session_id: &str, cwd: &str) -> bool {
+    load_snapshot(session_id)
+        .map(|s| cwd_matches(s.working_dir.as_deref().unwrap_or(""), cwd))
+        .unwrap_or(false)
 }
 
-pub fn resolve_local_session(_session_id: &str, _cwd: &str) -> Option<String> {
-    None
+pub fn find_local_child_for_remote(session_id: &str, cwd: &str) -> Option<String> {
+    let mut best: Option<(chrono::DateTime<chrono::Utc>, String)> = None;
+    for snap in iter_snapshots() {
+        if snap.parent_id.as_deref() != Some(session_id) {
+            continue;
+        }
+        if !cwd_matches(snap.working_dir.as_deref().unwrap_or(""), cwd) {
+            continue;
+        }
+        match &best {
+            Some((ts, _)) if snap.updated_at <= *ts => {}
+            _ => best = Some((snap.updated_at, snap.id.clone())),
+        }
+    }
+    best.map(|(_, id)| id)
 }
 
-pub fn resolve_local_session_any_cwd(_session_id: &str) -> Option<String> {
-    None
+pub fn resolve_local_session(session_id: &str, cwd: &str) -> Option<String> {
+    if session_exists_for_cwd(session_id, cwd) {
+        return Some(session_id.to_string());
+    }
+    find_local_child_for_remote(session_id, cwd)
 }
 
-/// Per-session summary row (`summary.json` shape).
+pub fn resolve_local_session_any_cwd(session_id: &str) -> Option<String> {
+    load_snapshot(session_id).and_then(|s| s.working_dir)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Info {
     pub id: SessionId,
@@ -129,29 +166,31 @@ impl Summary {
     }
 }
 
-/// List local session summaries, optionally filtered to a cwd.
-pub async fn list_summaries(_cwd: Option<&str>) -> anyhow::Result<Vec<Summary>> {
-    Ok(vec![])
+pub async fn list_summaries(cwd: Option<&str>) -> anyhow::Result<Vec<Summary>> {
+    let cwd_owned = cwd.map(str::to_owned);
+    Ok(tokio::task::spawn_blocking(move || {
+        list_summaries_sync(cwd_owned.as_deref())
+    })
+    .await?)
 }
 
-pub async fn list_recent_summaries(_limit: usize) -> std::io::Result<Vec<Summary>> {
-    Ok(vec![])
+pub async fn list_recent_summaries(limit: usize) -> std::io::Result<Vec<Summary>> {
+    let mut all = list_summaries_sync(None);
+    all.truncate(limit);
+    Ok(all)
 }
 
-/// Resolve the on-disk directory for a session path key.
 pub fn session_dir(info: &SessionPathInfo) -> PathBuf {
-    grok_home()
-        .join("sessions")
-        .join(info.cwd.replace(['/', '\\', ':'], "-"))
-        .join(info.id.0.as_ref())
+    sessions_root().join(info.id.0.as_ref())
 }
 
-/// Find a session directory by id across all cwd buckets (stub: synthetic path).
 pub fn find_session_dir_by_id(session_id: &str) -> anyhow::Result<PathBuf> {
-    Ok(grok_home().join("sessions").join("_").join(session_id))
+    if session_snapshot_path(session_id).is_file() {
+        return Ok(sessions_root().join(session_id));
+    }
+    Ok(sessions_root().join("_").join(session_id))
 }
 
-/// Best-effort sandbox profile recorded with a resumed session.
 pub fn resumed_session_sandbox_profile(
     _session_id: Option<&str>,
     _cwd: Option<&str>,
@@ -171,17 +210,30 @@ impl SessionHistoryDeletion {
     }
 }
 
-/// Delete local (+ optional remote) session history. Stub always reports nothing removed.
 pub async fn delete_session_history(
-    _session_id: &str,
+    session_id: &str,
     _cwd: Option<&str>,
     _needs_remote: bool,
     _auth: Arc<AuthManager>,
 ) -> anyhow::Result<SessionHistoryDeletion> {
-    Ok(SessionHistoryDeletion::default())
+    let id = session_id.to_owned();
+    Ok(tokio::task::spawn_blocking(move || {
+        let mut out = SessionHistoryDeletion::default();
+        let snap = session_snapshot_path(&id);
+        let journal = sessions_root().join(format!("{id}.journal.jsonl"));
+        if snap.is_file() {
+            std::fs::remove_file(&snap)?;
+            out.local_removed = true;
+        }
+        if journal.is_file() {
+            let _ = std::fs::remove_file(&journal);
+            out.local_removed = true;
+        }
+        Ok::<_, std::io::Error>(out)
+    })
+    .await??)
 }
 
-/// Convenience: build a path-info key without pulling ACP into every call site.
 pub fn path_info(session_id: impl Into<String>, cwd: impl Into<String>) -> SessionPathInfo {
     SessionPathInfo {
         id: SessionId::new(session_id.into()),
@@ -189,13 +241,170 @@ pub fn path_info(session_id: impl Into<String>, cwd: impl Into<String>) -> Sessi
     }
 }
 
-/// Unused helper kept for API parity with upstream path encoding.
 pub fn sessions_root() -> PathBuf {
-    grok_home().join("sessions")
+    resolve_home().join("sessions")
 }
 
-/// Accept either `&str` or `&Path` filter args at call sites that pass Path.
+fn resolve_home() -> PathBuf {
+    if let Ok(v) = std::env::var("GROK_HOME") {
+        let trimmed = v.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    if let Ok(v) = std::env::var("NEXT_CODE_HOME") {
+        let trimmed = v.trim();
+        if !trimmed.is_empty() {
+            return PathBuf::from(trimmed);
+        }
+    }
+    grok_home()
+}
+
 pub async fn list_summaries_path(cwd: Option<&Path>) -> anyhow::Result<Vec<Summary>> {
     let owned = cwd.map(|p| p.to_string_lossy().into_owned());
     list_summaries(owned.as_deref()).await
+}
+
+fn session_snapshot_path(session_id: &str) -> PathBuf {
+    sessions_root().join(format!("{session_id}.json"))
+}
+
+fn load_snapshot(session_id: &str) -> Option<SessionSnapshot> {
+    let raw = std::fs::read_to_string(session_snapshot_path(session_id)).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+fn iter_snapshots() -> Vec<SessionSnapshot> {
+    let Ok(entries) = std::fs::read_dir(sessions_root()) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !name.ends_with(".json") || name.contains(".journal.") {
+            continue;
+        }
+        let Ok(raw) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        if let Ok(snap) = serde_json::from_str::<SessionSnapshot>(&raw) {
+            out.push(snap);
+        }
+    }
+    out
+}
+
+fn list_summaries_sync(cwd: Option<&str>) -> Vec<Summary> {
+    let mut summaries: Vec<Summary> = iter_snapshots()
+        .into_iter()
+        .filter(|s| match cwd {
+            Some(c) => cwd_matches(s.working_dir.as_deref().unwrap_or(""), c),
+            None => true,
+        })
+        .map(snapshot_to_summary)
+        .collect();
+    summaries.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+    summaries
+}
+
+fn snapshot_to_summary(s: SessionSnapshot) -> Summary {
+    let title = s
+        .custom_title
+        .clone()
+        .filter(|t| !t.trim().is_empty())
+        .or(s.title.clone());
+    let n = s.messages.len();
+    Summary {
+        info: Info {
+            id: SessionId::new(s.id),
+            cwd: s.working_dir.clone().unwrap_or_default(),
+            title: title.clone(),
+        },
+        session_summary: title.clone().unwrap_or_default(),
+        created_at: s.created_at,
+        updated_at: s.updated_at,
+        num_messages: n,
+        num_chat_messages: n,
+        current_model_id: s.model.unwrap_or_default(),
+        parent_session_id: s.parent_id,
+        manual_title: s.custom_title.filter(|t| !t.trim().is_empty()),
+    }
+}
+
+fn cwd_matches(a: &str, b: &str) -> bool {
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    normalize_cwd(a) == normalize_cwd(b)
+}
+
+fn normalize_cwd(s: &str) -> String {
+    let path = PathBuf::from(s);
+    let canon = std::fs::canonicalize(&path).unwrap_or(path);
+    let lossy = canon.to_string_lossy();
+    #[cfg(windows)]
+    {
+        lossy.replace('\\', "/").to_ascii_lowercase()
+    }
+    #[cfg(not(windows))]
+    {
+        lossy.replace('\\', "/").into_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn write_session(home: &Path, id: &str, cwd: &str) {
+        let sessions = home.join("sessions");
+        std::fs::create_dir_all(&sessions).unwrap();
+        let body = serde_json::json!({
+            "id": id,
+            "parent_id": null,
+            "title": "hello",
+            "created_at": "2026-07-21T00:00:00Z",
+            "updated_at": "2026-07-21T01:00:00Z",
+            "messages": [],
+            "working_dir": cwd,
+            "model": "test-model",
+            "status": "Closed",
+            "is_canary": false,
+            "is_debug": false,
+            "saved": false
+        });
+        std::fs::write(
+            sessions.join(format!("{id}.json")),
+            serde_json::to_string_pretty(&body).unwrap(),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn resolve_and_list_flat_sessions() {
+        let home = TempDir::new().unwrap();
+        unsafe { std::env::set_var("GROK_HOME", home.path()) };
+        let cwd = home.path().join("proj");
+        std::fs::create_dir_all(&cwd).unwrap();
+        let cwd_str = cwd.to_string_lossy().to_string();
+        write_session(home.path(), "session_a", &cwd_str);
+        assert!(session_exists_for_cwd("session_a", &cwd_str));
+        assert_eq!(
+            resolve_local_session("session_a", &cwd_str).as_deref(),
+            Some("session_a")
+        );
+        assert_eq!(
+            resolve_local_session_any_cwd("session_a").as_deref(),
+            Some(cwd_str.as_str())
+        );
+        let listed = list_summaries_sync(Some(&cwd_str));
+        assert_eq!(listed.len(), 1);
+        assert_eq!(&*listed[0].info.id.0, "session_a");
+        assert_eq!(listed[0].current_model_id, "test-model");
+    }
 }

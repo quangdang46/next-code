@@ -241,6 +241,15 @@ pub(crate) fn install_face_welcome_status(
         .iter()
         .cloned()
         .collect();
+    // Full history for `/changelog` / welcome DocViewer (not just unseen bullets).
+    let changelog_markdown = {
+        let md = next_code_build_meta::embedded_changelog_markdown();
+        if md.trim().is_empty() {
+            None
+        } else {
+            Some(md.to_string())
+        }
+    };
 
     let server_info = crate::registry::find_server_by_socket_sync(&crate::server::socket_path());
     let auth = AuthStatus::check_fast();
@@ -336,6 +345,7 @@ pub(crate) fn install_face_welcome_status(
         build_age,
         built_line,
         update_bullets,
+        changelog_markdown,
         badge_line,
         server_line,
         client_line,
