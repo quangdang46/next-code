@@ -10,7 +10,8 @@ mod changelog;
 
 pub use age::{binary_age, binary_age_from, format_age};
 pub use changelog::{
-    ChangelogEntry, parse_changelog, take_unseen_changelog_entries,
+    ChangelogEntry, ChangelogGroup, embedded_changelog_markdown, format_changelog_markdown,
+    group_changelog_entries, parse_changelog, take_unseen_changelog_entries,
     take_unseen_changelog_entries_at, unseen_changelog_subjects,
 };
 
