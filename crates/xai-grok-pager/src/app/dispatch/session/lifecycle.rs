@@ -443,6 +443,7 @@ pub(in crate::app::dispatch) fn drain_startup_actions(app: &mut AppView) -> Vec<
         new_session,
         prompt,
         open_dashboard,
+        open_session_picker,
         pending_chat,
     } = app.deferred_startup.take();
     let mut effects = Vec::new();
@@ -542,7 +543,7 @@ pub(in crate::app::dispatch) fn drain_startup_actions(app: &mut AppView) -> Vec<
                     worktree_ref,
                     None,
                 ));
-            } else if new_session {
+            } else if new_session && !open_session_picker {
                 effects.extend(dispatch_new_session(app));
             } else {
                 app.deferred_startup.pending_chat = false;
@@ -551,6 +552,9 @@ pub(in crate::app::dispatch) fn drain_startup_actions(app: &mut AppView) -> Vec<
     }
     if let Some(prompt) = prompt {
         effects.extend(dispatch_initial_prompt(app, prompt));
+    }
+    if open_session_picker {
+        effects.extend(dispatch(Action::ShowSessionPicker, app));
     }
     if open_dashboard {
         effects.extend(dispatch(Action::OpenDashboard, app));

@@ -1650,6 +1650,26 @@ pub(crate) async fn run(
         }
     }
 
+    // Bare `next-code --resume` (empty id): open Face session picker.
+    // Set by `pager_launch` via `NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP`.
+    let mut open_session_picker_at_startup = false;
+    if std::env::var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP").as_deref() == Ok("1") {
+        // SAFETY: we are pre-multithreaded init for this app loop.
+        unsafe { std::env::remove_var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP") };
+        open_session_picker_at_startup = true;
+        if app.session_startup_allowed() {
+            let effs = dispatch::dispatch(Action::ShowSessionPicker, &mut app);
+            if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+                return Ok(make_run_result(&app));
+            }
+            presenter.request_presentation(&mut app, terminal, false);
+        } else {
+            app.deferred_startup.open_session_picker = true;
+            // Prefer picker over auto-creating an empty session after auth.
+            app.deferred_startup.new_session = false;
+        }
+    }
+
     // Minimal (scrollback-native) mode has no welcome screen: the live region
     // only renders for an Agent view. If nothing above already started a
     // session (no resume / initial prompt / worktree / dashboard), open an
@@ -1659,6 +1679,8 @@ pub(crate) async fn run(
     if term_state.screen_mode.is_minimal()
         && matches!(app.active_view, ActiveView::Welcome)
         && !app.is_zdr_blocked()
+        && !open_session_picker_at_startup
+        && !app.deferred_startup.open_session_picker
     {
         if app.session_startup_allowed() {
             // Already authenticated + trusted: open the empty session now so the
