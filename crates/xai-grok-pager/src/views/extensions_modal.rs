@@ -393,6 +393,32 @@ fn build_hook_groups<'a>(
     groups
 }
 
+/// Row label for a hook event.
+///
+/// Prefer the raw event segment from the ACP id (`user/AgentEnd[0]` →
+/// `Agent End`) so aliases that collapse into Face `HookEvent` (e.g.
+/// `AgentEnd` → `SubagentStop`) still match the footer / hooks.toml name.
+fn hook_event_row_label(hook: &xai_hooks_plugins_types::HookInfo) -> String {
+    if let Some((_, rest)) = hook.name.split_once('/')
+        && let Some((event, _)) = rest.rsplit_once('[')
+        && !event.is_empty()
+    {
+        return camel_case_to_title(event);
+    }
+    hook.event.to_string()
+}
+
+fn camel_case_to_title(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && c.is_ascii_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Find the next visible hook index after `current`, skipping collapsed groups.
 pub fn next_visible_hook(
     hooks: &[xai_hooks_plugins_types::HookInfo],
@@ -2761,7 +2787,7 @@ pub fn render_extensions_modal(
                             continue;
                         }
                         for &(hi, hook) in hooks {
-                            let event_str = hook.event.to_string();
+                            let event_str = hook_event_row_label(hook);
                             let matcher_str = hook
                                 .matcher
                                 .as_deref()
@@ -5510,6 +5536,14 @@ mod tests {
     }
 
     // ── Hook helpers with StatusFilter ───────────────────────────────
+
+    #[test]
+    fn hook_event_row_label_prefers_raw_name_event() {
+        let hook = make_hook("user/AgentEnd[0]", "/tmp", false);
+        assert_eq!(hook_event_row_label(&hook), "Agent End");
+        let pre = make_hook("user/PreToolUse[1]", "/tmp", false);
+        assert_eq!(hook_event_row_label(&pre), "Pre Tool Use");
+    }
 
     fn make_hook(
         name: &str,

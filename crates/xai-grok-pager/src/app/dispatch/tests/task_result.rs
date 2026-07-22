@@ -492,6 +492,56 @@ fn tab_wide_action_success_sets_tab_wide_result_notice() {
 }
 
 #[test]
+fn hooks_disable_success_refreshes_lists_without_plugins_reload_loop() {
+    use crate::views::extensions_modal::{ExtensionsModalState, ExtensionsTab, TabDataState};
+
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    {
+        let mut modal = ExtensionsModalState::new(ExtensionsTab::Hooks);
+        modal.pending_action = Some("Processing...".into());
+        modal.pending_entry_index = Some(0);
+        modal.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
+            hooks: vec![],
+            project_trusted: true,
+            load_errors: vec![],
+        });
+        app.agents.get_mut(&id).unwrap().extensions_modal = Some(modal);
+    }
+
+    let effects = dispatch(
+        Action::TaskComplete(TaskResult::HooksActionResult {
+            agent_id: id,
+            result: Ok(xai_hooks_plugins_types::ActionOutcome {
+                status: xai_hooks_plugins_types::OutcomeStatus::Success,
+                message: "Disabled user/AgentEnd[0]".into(),
+                // face_plugins now returns false for hooks disable — must refresh
+                // lists directly, never chain PluginsAction::Reload.
+                requires_reload: false,
+                requires_restart: false,
+            }),
+        }),
+        &mut app,
+    );
+
+    assert!(
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::FetchHooksList { .. })),
+        "expected FetchHooksList, got {effects:?}"
+    );
+    assert!(
+        !effects
+            .iter()
+            .any(|e| matches!(e, Effect::PluginsAction { .. })),
+        "hooks disable must not chain PluginsAction::Reload: {effects:?}"
+    );
+    let modal = app.agents[&id].extensions_modal.as_ref().unwrap();
+    let n = modal.result_notice.as_ref().expect("footer status");
+    assert_eq!(n.message, "Disabled user/AgentEnd[0]");
+}
+
+#[test]
 fn uninstall_result_notice_is_footer_only_not_row_anchored() {
     use crate::views::extensions_modal::{ExtensionsModalState, ExtensionsTab};
 

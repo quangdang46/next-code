@@ -629,6 +629,10 @@ pub(super) fn handle_hooks_list_loaded(
             }
             Err(e) => TabDataState::Error(e),
         };
+        // Unblock the modal as soon as hooks data arrives (Space disable/enable
+        // refreshes this list with requires_reload: false — do not wait on plugins).
+        modal.pending_action = None;
+        modal.pending_entry_index = None;
     }
     vec![]
 }

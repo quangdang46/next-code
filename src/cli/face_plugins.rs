@@ -788,7 +788,10 @@ pub fn plugins_action_payload(params: &serde_json::Value) -> serde_json::Value {
     };
 
     match action {
-        PluginsAction::Reload => outcome(OutcomeStatus::Success, "Plugins reloaded", true),
+        // Must be `requires_reload: false`. Face chains `requires_reload: true`
+        // into another PluginsAction::Reload — returning true here infinite-loops
+        // ACP tasks and freezes the Extensions modal (Space to disable hooks).
+        PluginsAction::Reload => outcome(OutcomeStatus::Success, "Plugins reloaded", false),
         PluginsAction::Enable { plugin_id } => match set_disabled(&plugin_id, false) {
             Ok(()) => outcome(
                 OutcomeStatus::Success,
@@ -908,17 +911,19 @@ pub fn hooks_action_payload(params: &serde_json::Value) -> serde_json::Value {
     };
 
     match action {
+        // Hooks mutations rewrite hooks.toml only — Face should refresh lists
+        // (`requires_reload: false`), not chain PluginsAction::Reload.
         HooksAction::Reload => outcome(
             OutcomeStatus::Success,
             "Hooks reloaded from ~/.next-code/hooks.toml layers",
-            true,
+            false,
         ),
         HooksAction::Enable { hook_name } => {
             match next_code_hooks::set_hook_enabled_by_face_name(&hook_name, true) {
                 Ok(()) => outcome(
                     OutcomeStatus::Success,
                     format!("Enabled {hook_name}"),
-                    true,
+                    false,
                 ),
                 Err(e) if e.contains("not found") || e.contains("no hooks") => {
                     outcome(OutcomeStatus::NotFound, e, false)
@@ -934,7 +939,7 @@ pub fn hooks_action_payload(params: &serde_json::Value) -> serde_json::Value {
                 Ok(()) => outcome(
                     OutcomeStatus::Success,
                     format!("Disabled {hook_name}"),
-                    true,
+                    false,
                 ),
                 Err(e) if e.contains("not found") || e.contains("no hooks") => {
                     outcome(OutcomeStatus::NotFound, e, false)
@@ -968,7 +973,7 @@ pub fn hooks_action_payload(params: &serde_json::Value) -> serde_json::Value {
                 outcome(
                     OutcomeStatus::Success,
                     format!("{verb} {ok} hook(s)"),
-                    true,
+                    false,
                 )
             }
         }
@@ -993,7 +998,7 @@ pub fn hooks_action_payload(params: &serde_json::Value) -> serde_json::Value {
                         "Merged {n} handler(s) from {} into ~/.next-code/hooks.toml",
                         source.display()
                     ),
-                    true,
+                    false,
                 ),
                 Err(e) if e.contains("not found") => {
                     outcome(OutcomeStatus::NotFound, e, false)
@@ -1015,7 +1020,7 @@ pub fn hooks_action_payload(params: &serde_json::Value) -> serde_json::Value {
                 Ok(()) => outcome(
                     OutcomeStatus::Success,
                     format!("Removed {key}"),
-                    true,
+                    false,
                 ),
                 Err(e) if e.contains("not found") || e.contains("no hooks") => {
                     outcome(OutcomeStatus::NotFound, e, false)
@@ -1084,6 +1089,19 @@ mod tests {
             Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
             None => crate::env::remove_var("NEXT_CODE_HOME"),
         }
+    }
+
+    #[test]
+    fn plugins_reload_does_not_require_another_reload() {
+        let out = plugins_action_payload(&json!({
+            "sessionId": "s",
+            "action": { "type": "reload" }
+        }));
+        assert_eq!(out["result"]["status"], "success", "{out}");
+        assert_eq!(
+            out["result"]["requiresReload"], false,
+            "Plugins Reload must terminate the requires_reload chain"
+        );
     }
 
     #[test]
@@ -1239,6 +1257,10 @@ command = "echo start"
             "action": { "type": "disable", "hook_name": name }
         }));
         assert_eq!(disable["result"]["status"], "success", "{disable}");
+        assert_eq!(
+            disable["result"]["requiresReload"], false,
+            "hooks disable must not chain PluginsAction::Reload (infinite loop)"
+        );
 
         let list2 = hooks_list_payload();
         let row = list2["result"]["hooks"]
@@ -1249,11 +1271,18 @@ command = "echo start"
             .unwrap();
         assert_eq!(row["disabled"], true, "{list2}");
 
+        let toml_body = fs::read_to_string(tmp.path().join("hooks.toml")).unwrap();
+        assert!(
+            toml_body.contains("enabled = false"),
+            "hooks.toml should persist enabled=false: {toml_body}"
+        );
+
         let enable = hooks_action_payload(&json!({
             "sessionId": "s",
             "action": { "type": "enable", "hook_name": name }
         }));
         assert_eq!(enable["result"]["status"], "success", "{enable}");
+        assert_eq!(enable["result"]["requiresReload"], false);
         let list3 = hooks_list_payload();
         let row3 = list3["result"]["hooks"]
             .as_array()
@@ -1268,6 +1297,10 @@ command = "echo start"
             "action": { "type": "reload" }
         }));
         assert_eq!(reload["result"]["status"], "success", "{reload}");
+        assert_eq!(
+            reload["result"]["requiresReload"], false,
+            "hooks reload must not re-chain PluginsAction::Reload"
+        );
 
         match prev {
             Some(v) => crate::env::set_var("NEXT_CODE_HOME", v),
