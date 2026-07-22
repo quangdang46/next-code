@@ -435,6 +435,29 @@ impl NextCodeFaceAgent {
         let _ = self.gateway.session_notification(notif).await;
     }
 
+    /// Emit a session recap (or unavailable) for Face `/recap` scrollback.
+    async fn emit_session_recap_update(
+        &self,
+        session_id: &str,
+        update: xai_grok_shell::extensions::notification::SessionUpdate,
+    ) {
+        let payload = xai_grok_shell::extensions::notification::SessionNotification {
+            session_id: acp::SessionId::new(session_id),
+            update,
+            meta: None,
+        };
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "x.ai/session_notification",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
     fn prompt_text(args: &acp::PromptRequest) -> String {
         let mut parts = Vec::new();
         for block in &args.prompt {
@@ -1073,6 +1096,8 @@ impl acp::Agent for NextCodeFaceAgent {
         let commands = Self::load_initial_available_commands();
         let meta = serde_json::json!({
             "availableCommands": commands,
+            // Face fail-closes `/recap` until the shell advertises this.
+            "sessionRecap": true,
         });
         Ok(acp::InitializeResponse::new(acp::ProtocolVersion::V1)
             .agent_capabilities(caps)
@@ -1184,6 +1209,42 @@ impl acp::Agent for NextCodeFaceAgent {
                     .and_then(|v| v.as_u64())
                     .unwrap_or(30) as usize;
                 crate::cli::face_auth::list_nextcode_sessions(limit)
+            }
+            "x.ai/recap" => {
+                let sid = params
+                    .get("sessionId")
+                    .or_else(|| params.get("session_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let auto = params
+                    .get("auto")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                // Fire-and-forget ack shape: Face shows a loading block until
+                // SessionRecap / SessionRecapUnavailable arrives.
+                match crate::cli::face_ext::generate_recap_summary(&sid).await {
+                    Ok(summary) => {
+                        self.emit_session_recap_update(
+                            &sid,
+                            xai_grok_shell::extensions::notification::SessionUpdate::SessionRecap {
+                                summary,
+                                auto,
+                            },
+                        )
+                        .await;
+                    }
+                    Err(_) => {
+                        if !auto {
+                            self.emit_session_recap_update(
+                                &sid,
+                                xai_grok_shell::extensions::notification::SessionUpdate::SessionRecapUnavailable,
+                            )
+                            .await;
+                        }
+                    }
+                }
+                serde_json::json!({ "result": { "ok": true } })
             }
             other => {
                 if let Some(payload) =

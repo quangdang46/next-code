@@ -3,9 +3,17 @@
 //! Face chrome keeps calling stock method names; we implement the brain here
 //! instead of returning empty `{}`.
 
+use futures::StreamExt;
 use serde_json::json;
 
+use crate::message::{ContentBlock, Message, Role, StreamEvent};
+use crate::provider::{MultiProvider, Provider};
 use crate::session::Session;
+
+/// Soft cap on transcript turns fed into `/btw` and `/recap` side calls.
+const SIDE_CALL_MAX_TURNS: usize = 40;
+/// Hard cap on recap body characters (stock grok-build uses 1200).
+const RECAP_MAX_CHARS: usize = 1200;
 
 const FEEDBACK_ISSUE_URL: &str = "https://github.com/quangdang46/next-code/issues/new";
 
@@ -145,19 +153,179 @@ pub fn feedback_payload(feedback_text: Option<&str>) -> serde_json::Value {
     })
 }
 
-/// `x.ai/btw` — side question acknowledgment (Face chrome; next-code brain note).
-pub fn btw_payload(question: &str) -> serde_json::Value {
-    let q = question.trim();
-    let answer = if q.is_empty() {
-        "Usage: /btw <question>".to_string()
-    } else {
-        format!(
-            "Side question noted: {q}\n\n\
-             next-code Face will answer side questions from session context on a later turn; \
-             for an immediate reply, ask in the main composer."
-        )
+/// Whether the session has at least one visible user message (for `/recap` gates).
+pub fn session_has_user_messages(session_id: &str) -> bool {
+    let Ok(session) = Session::load(session_id) else {
+        return false;
     };
-    json!({ "result": { "answer": answer } })
+    session.visible_conversation_messages().iter().any(|m| {
+        matches!(m.role, Role::User)
+            && m.content.iter().any(|b| match b {
+                ContentBlock::Text { text, .. } => {
+                    let t = text.trim();
+                    !t.is_empty() && !t.starts_with("<system-reminder>")
+                }
+                _ => false,
+            })
+    })
+}
+
+/// Extract plain-text user/assistant turns for a tool-free side model call.
+fn text_only_transcript(session: &Session) -> Vec<Message> {
+    let visible = session.visible_conversation_messages();
+    let start = visible.len().saturating_sub(SIDE_CALL_MAX_TURNS);
+    let mut out = Vec::new();
+    for stored in &visible[start..] {
+        let text = stored
+            .content
+            .iter()
+            .filter_map(|b| match b {
+                ContentBlock::Text { text, .. } => {
+                    let t = text.trim();
+                    if t.is_empty() || t.starts_with("<system-reminder>") {
+                        None
+                    } else {
+                        Some(t)
+                    }
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        if text.is_empty() {
+            continue;
+        }
+        match stored.role {
+            Role::User => out.push(Message::user(&text)),
+            Role::Assistant => out.push(Message::assistant_text(&text)),
+        }
+    }
+    out
+}
+
+async fn complete_text(messages: &[Message], system: &str) -> Result<String, String> {
+    let provider = MultiProvider::new();
+    let stream = provider
+        .complete(messages, &[], system, None)
+        .await
+        .map_err(|e| format!("model call failed: {e}"))?;
+    let mut text = String::new();
+    let mut stream = stream;
+    while let Some(event) = stream.next().await {
+        if let Ok(StreamEvent::TextDelta(delta)) = event {
+            text.push_str(&delta);
+        }
+    }
+    let trimmed = text.trim().to_string();
+    if trimmed.is_empty() {
+        Err("No response from model".to_string())
+    } else {
+        Ok(trimmed)
+    }
+}
+
+/// Stock-style tidy for recap body (UI adds the "Recap —" label).
+pub fn clean_recap_text(raw: &str) -> String {
+    let mut s = raw.trim().to_string();
+    for prefix in [
+        "Recap —",
+        "Recap -",
+        "Recap:",
+        "Session recap:",
+        "Session Recap:",
+    ] {
+        if let Some(rest) = s.strip_prefix(prefix) {
+            s = rest.trim().to_string();
+        }
+    }
+    // First paragraph / sentence block only.
+    if let Some((first, _)) = s.split_once("\n\n") {
+        s = first.trim().to_string();
+    }
+    s = s.replace('\n', " ").trim().to_string();
+    while s.contains("  ") {
+        s = s.replace("  ", " ");
+    }
+    if s.chars().count() > RECAP_MAX_CHARS {
+        let mut cut = s.chars().take(RECAP_MAX_CHARS).collect::<String>();
+        if let Some(idx) = cut.rfind(' ') {
+            cut.truncate(idx);
+        }
+        s = cut;
+    }
+    s
+}
+
+/// `x.ai/btw` — tool-free side answer from session context (stock Face overlay).
+pub async fn btw_payload(session_id: &str, question: &str) -> serde_json::Value {
+    let q = question.trim();
+    if q.is_empty() {
+        return json!({ "result": { "answer": "Usage: /btw <question>" } });
+    }
+    if session_id.trim().is_empty() {
+        return json!({ "error": "Missing sessionId for /btw" });
+    }
+    let Ok(session) = Session::load(session_id) else {
+        return json!({ "error": format!("Unknown session id: {session_id}") });
+    };
+
+    let mut messages = text_only_transcript(&session);
+    let wrapped = format!(
+        "<system-reminder>This is a side question from the user. \
+You must answer this question directly in a single response.\n\n\
+IMPORTANT CONTEXT:\n\
+- You are a separate, lightweight agent spawned to answer this one question\n\
+- The main agent is NOT interrupted — it continues working independently\n\
+- You share the conversation context but are a completely separate instance\n\
+- Do NOT reference being interrupted or what you were \"previously doing\"\n\n\
+CRITICAL CONSTRAINTS:\n\
+- You have NO tools available — you cannot read files, run commands, search, or take any actions\n\
+- This is a one-off response — there will be no follow-up turns\n\
+- You can ONLY provide information based on what you already know from the conversation context\n\
+- NEVER say things like \"Let me try...\", \"I'll now...\", or promise to take any action\n\
+- If you don't know the answer, say so — do not offer to look it up or investigate\n\n\
+Simply answer the question with the information you have.</system-reminder>\n\n\
+{q}"
+    );
+    messages.push(Message::user(&wrapped));
+
+    let system = "You answer brief side questions about the current coding session using only the conversation context. Be concise. No tools.";
+    match complete_text(&messages, system).await {
+        Ok(answer) => json!({ "result": { "answer": answer } }),
+        Err(err) => json!({ "result": { "answer": format!("Couldn't answer side question: {err}") } }),
+    }
+}
+
+/// Generate a one-line session recap from transcript (does not mutate session).
+pub async fn generate_recap_summary(session_id: &str) -> Result<String, String> {
+    if session_id.trim().is_empty() {
+        return Err("Missing sessionId".to_string());
+    }
+    let session = Session::load(session_id).map_err(|_| format!("Unknown session id: {session_id}"))?;
+    if !session_has_user_messages(session_id) {
+        return Err("empty".to_string());
+    }
+
+    let mut messages = text_only_transcript(&session);
+    let instruction = "\
+<system-reminder>Write ONE sentence recap body for a user returning from idle. \
+Output ONLY the body (the UI adds the \"Recap —\" label). \
+Do NOT call any tools — respond with plain text only.\n\n\
+Lead with agency:\n\
+- \"You asked …\" if the session was mainly questions, walkthroughs, or review with no landed change.\n\
+- \"We …\" if the agent implemented, fixed, merged, or changed code/config/docs.\n\
+- If almost nothing happened: \"You had just begun this session.\"\n\n\
+Shape: ~25–40 words. No bullets, markdown, or extra labels.</system-reminder>";
+    messages.push(Message::user(instruction));
+
+    let system = "You write short session recaps. One sentence. Plain text only.";
+    let raw = complete_text(&messages, system).await?;
+    let summary = clean_recap_text(&raw);
+    if summary.is_empty() {
+        Err("empty summary".to_string())
+    } else {
+        Ok(summary)
+    }
 }
 
 /// `x.ai/rewind/points` — user turns as rewind targets.
@@ -327,11 +495,16 @@ pub async fn handle_ext_method(
             feedback_payload(text)
         }
         "x.ai/btw" => {
+            let sid = params
+                .get("sessionId")
+                .or_else(|| params.get("session_id"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
             let q = params
                 .get("question")
                 .and_then(|v| v.as_str())
                 .unwrap_or_default();
-            btw_payload(q)
+            btw_payload(sid, q).await
         }
         "x.ai/rewind/points" => {
             let sid = params
@@ -396,12 +569,23 @@ mod tests {
 
     #[test]
     fn btw_empty_usage() {
-        let v = btw_payload("  ");
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        let v = rt.block_on(btw_payload("sess", "  "));
         assert!(
             v["result"]["answer"]
                 .as_str()
                 .unwrap_or_default()
                 .contains("Usage:")
         );
+    }
+
+    #[test]
+    fn clean_recap_strips_label_and_caps() {
+        let cleaned = clean_recap_text("Recap — We wired the Face /btw side path.\n\nExtra");
+        assert_eq!(cleaned, "We wired the Face /btw side path.");
+        assert!(!cleaned.to_lowercase().starts_with("recap"));
     }
 }
