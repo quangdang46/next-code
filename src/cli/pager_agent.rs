@@ -111,6 +111,37 @@ async fn request_history(session: &DaemonSession) -> Result<ServerEvent> {
     }
 }
 
+/// Text-only ACP chunk from a daemon [`HistoryMessage`] — same role mapping as
+/// `src/cli/acp.rs::replay_history` (user → user_message_chunk, else agent).
+fn session_update_from_history_message(
+    message: &crate::protocol::HistoryMessage,
+) -> acp::SessionUpdate {
+    let chunk = acp::ContentChunk::new(acp::ContentBlock::Text(acp::TextContent::new(
+        message.content.clone(),
+    )));
+    match message.role.as_str() {
+        "user" => acp::SessionUpdate::UserMessageChunk(chunk),
+        _ => acp::SessionUpdate::AgentMessageChunk(chunk),
+    }
+}
+
+/// Build a `session/update` notification stamped `_meta.isReplay: true` so Face
+/// treats it as `session/load` history (see `xai_grok_pager::acp::meta::ReplayMetaStamp`).
+fn replay_session_notification(
+    session_id: &str,
+    message: &crate::protocol::HistoryMessage,
+) -> acp::SessionNotification {
+    acp::SessionNotification::new(
+        acp::SessionId::new(session_id),
+        session_update_from_history_message(message),
+    )
+    .meta(
+        xai_grok_pager::acp::meta::ReplayMetaStamp::replayed()
+            .as_object()
+            .cloned(),
+    )
+}
+
 /// Build ACP `SessionModelState` from daemon History fields so Face Overview
 /// gets model + context window (not a Context-only chip).
 fn session_model_state_from_history(
@@ -318,16 +349,26 @@ impl NextCodeFaceAgent {
                  List sessions with `next-code --resume`, or start a new one with `next-code`."
             )
         })?;
-        let (session_id, provider_name, provider_model, available_models) = match history {
-            ServerEvent::History {
-                session_id,
-                provider_name,
-                provider_model,
-                available_models,
-                ..
-            } => (session_id, provider_name, provider_model, available_models),
-            other => anyhow::bail!("expected history after resume subscribe, got {other:?}"),
-        };
+        let (session_id, messages, provider_name, provider_model, available_models) =
+            match history {
+                ServerEvent::History {
+                    session_id,
+                    messages,
+                    provider_name,
+                    provider_model,
+                    available_models,
+                    ..
+                } => (
+                    session_id,
+                    messages,
+                    provider_name,
+                    provider_model,
+                    available_models,
+                ),
+                other => {
+                    anyhow::bail!("expected history after resume subscribe, got {other:?}")
+                }
+            };
 
         let models = session_model_state_from_history(
             provider_model.as_deref(),
@@ -345,6 +386,9 @@ impl NextCodeFaceAgent {
         self.sessions
             .borrow_mut()
             .insert(session_id.clone(), live.clone());
+        // ACP session/load: replay conversation as session/update chunks before
+        // LoadSessionResponse (Face scrollback only fills from these).
+        self.replay_history(&session_id, messages).await;
         if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
             self.emit_provider_name(&session_id, provider).await;
         }
@@ -356,6 +400,19 @@ impl NextCodeFaceAgent {
             session: live,
             models,
         })
+    }
+
+    /// Emit daemon history as ACP `user_message_chunk` / `agent_message_chunk`
+    /// with `_meta.isReplay: true` — mirrors `acp.rs::replay_history` for Face.
+    async fn replay_history(
+        &self,
+        session_id: &str,
+        messages: Vec<crate::protocol::HistoryMessage>,
+    ) {
+        for message in messages {
+            let notif = replay_session_notification(session_id, &message);
+            let _ = self.gateway.session_notification(notif).await;
+        }
     }
 
     async fn emit_text(&self, session_id: &str, text: String) {
@@ -1513,6 +1570,62 @@ mod tests {
     fn test_tool_kind_fallback() {
         assert_eq!(NextCodeFaceAgent::tool_kind("Unknown"), acp::ToolKind::Other);
         assert_eq!(NextCodeFaceAgent::tool_kind("Search"), acp::ToolKind::Other);
+    }
+
+    #[test]
+    fn history_message_maps_to_user_or_agent_chunk() {
+        let user = crate::protocol::HistoryMessage {
+            role: "user".into(),
+            content: "hello".into(),
+            tool_calls: None,
+            tool_data: None,
+        };
+        match session_update_from_history_message(&user) {
+            acp::SessionUpdate::UserMessageChunk(chunk) => match chunk.content {
+                acp::ContentBlock::Text(t) => assert_eq!(t.text, "hello"),
+                other => panic!("expected text content, got {other:?}"),
+            },
+            other => panic!("expected UserMessageChunk, got {other:?}"),
+        }
+
+        let assistant = crate::protocol::HistoryMessage {
+            role: "assistant".into(),
+            content: "ready".into(),
+            tool_calls: None,
+            tool_data: None,
+        };
+        assert!(matches!(
+            session_update_from_history_message(&assistant),
+            acp::SessionUpdate::AgentMessageChunk(_)
+        ));
+
+        let tool = crate::protocol::HistoryMessage {
+            role: "tool".into(),
+            content: "ok".into(),
+            tool_calls: None,
+            tool_data: None,
+        };
+        assert!(matches!(
+            session_update_from_history_message(&tool),
+            acp::SessionUpdate::AgentMessageChunk(_)
+        ));
+    }
+
+    #[test]
+    fn replay_notification_stamps_is_replay_meta() {
+        let msg = crate::protocol::HistoryMessage {
+            role: "user".into(),
+            content: "2".into(),
+            tool_calls: None,
+            tool_data: None,
+        };
+        let notif = replay_session_notification("sess-1", &msg);
+        let meta = notif.meta.expect("replay must stamp _meta");
+        assert_eq!(meta.get("isReplay"), Some(&serde_json::json!(true)));
+        assert!(matches!(
+            notif.update,
+            acp::SessionUpdate::UserMessageChunk(_)
+        ));
     }
 
     #[test]
