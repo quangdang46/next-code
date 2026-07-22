@@ -51,6 +51,11 @@ pub enum Request {
     #[serde(rename = "cancel")]
     Cancel { id: u64 },
 
+    /// Retry the current conversation turn without appending another user
+    /// message (Face/TUI provider-failover resend after a countdown switch).
+    #[serde(rename = "retry_turn")]
+    RetryTurn { id: u64 },
+
     /// Move the currently executing tool to background
     #[serde(rename = "background_tool")]
     BackgroundTool { id: u64 },
