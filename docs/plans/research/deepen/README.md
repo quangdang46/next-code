@@ -17,7 +17,7 @@ Frozen / near-frozen design notes that turn the master plan into implementable c
 | **D1–D13** design contracts | **≥120** lines | Problem, frozen intent, acceptance tests, exit criteria |
 | **README** / **audit** | Meta | Index + honesty scorecard; not subject to ≥120 |
 
-**Stubs expanded:** **Yes** (2026-07-22 expand wave). Recreate-era stubs (~15–50 lines) were expanded by parallel deepen agents + follow-up fill for any file still under target. Re-count with full line count (including blanks), not PowerShell `Measure-Object -Line` (skips blanks).
+**Stubs expanded:** **Yes** (2026-07-22 expand wave + finish pass). Re-count with full line count (including blanks), not PowerShell `Measure-Object -Line` (skips blanks).
 
 ```powershell
 Get-ChildItem .\*.md | ForEach-Object {
@@ -25,6 +25,33 @@ Get-ChildItem .\*.md | ForEach-Object {
   "{0,5} {1}" -f $n, $_.Name
 }
 ```
+
+---
+
+## Final line-count table (2026-07-22 finish pass)
+
+Counts = `@(Get-Content).Count` (includes blanks).
+
+| ID | File | Lines | Target | Status |
+|----|------|------:|-------:|--------|
+| — | `README.md` | 81 | meta | OK |
+| — | `20260722-docs-completeness-audit.md` | 145 | meta | OK |
+| D0 | `20260722-bare-host-no-prompt-inject.md` | 154 | ≥80 | **met** |
+| D1 | `20260722-trust-gate-design.md` | 339 | ≥120 | **met** |
+| D2 | `20260722-plugins-state-skill-gate.md` | 307 | ≥120 | **met** |
+| D3 | `20260722-bundle-counts-honesty.md` | 316 | ≥120 | **met** |
+| D4 | `20260722-bundle-hooks-mcp-merge.md` | 423 | ≥120 | **met** |
+| D5 | `20260722-hooks-cookbook-layout.md` | 442 | ≥120 | **met** |
+| D6 | `20260722-host-callback-bin-path.md` | 314 | ≥120 | **met** |
+| D7 | `20260722-hook-registry-reload.md` | 215 | ≥120 | **met** (expanded finish) |
+| D8 | `20260722-plugin-manifest-abi-v1.md` | 152 | ≥120 | **met** |
+| D9 | `20260722-package-slash-acp.md` | 285 | ≥120 | **met** |
+| D10 | `20260722-nextcode-pack-extraction.md` | 174 | ≥120 | **met** (expanded finish) |
+| D11 | `20260722-tools-abi-v1.md` | 293 | ≥120 | **met** |
+| D12 | `20260722-face-ui-hints-external-pane.md` | 141 | ≥120 | **met** |
+| D13 | `20260722-argv-plugin-security.md` | 174 | ≥120 | **met** (expanded finish) |
+
+**Finish-pass expansions:** D7 (live vs UI reload), D10 (prompt.rs cite), D13 (execute.rs + D11 freeze link). D3–D5 were already full contracts from the parallel wave (no stub left).
 
 ---
 

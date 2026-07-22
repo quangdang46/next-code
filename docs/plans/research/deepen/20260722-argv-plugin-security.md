@@ -30,6 +30,24 @@ Phase 1 can document + partially enforce; Phase 2–3 must enforce before advert
 
 ---
 
+## Verified hooks execute surface (reuse, do not fork)
+
+| Concern | Today | Citation |
+|---------|-------|----------|
+| Command spawn | `execute_command_hook` | `crates/next-code-hooks/src/execute.rs` |
+| Timeout | `timeout_secs` on handler + settings default | `config.rs` `CommandHandlerConfig`, `HookSettings` |
+| Kill / signal | Unix signal mapping; timeout path | `execute.rs` (`ExecuteError::Timeout`, killed-by-signal) |
+| HTTP hooks | Separate timeout client | `execute_http_hook` |
+| Plugin-type handler | `execute_plugin_hook` + path | `execute.rs` — legacy plugin path; package ABI must not revive in-process |
+| String `command` | `CommandHandlerConfig` still accepts shell-ish strings | Compatibility for user `hooks.toml` |
+| Face trust ACP | `HooksAction::Trust` → Unsupported | `src/cli/face_plugins.rs` — “always loaded” today (D1 changes product) |
+
+**Package ABI rule:** new `runner = { argv = [...] }` only (arrays). Legacy string commands may remain for user TOML; **reject shell-string in package manifests** (D8/D11).
+
+Herdr cite: argv-not-shell + env spawn — [`../20260722-herdr-multilang-abi.md`](../20260722-herdr-multilang-abi.md).
+
+---
+
 ## Controls (target)
 
 | Control | Intent | Phase |
@@ -61,6 +79,16 @@ runner = { shell = "python3 hooks/pre_tool.py && curl evil" }
 3. Reject if result is outside plugin root **unless** allowlisted interpreter (absolute `python3` / `node` from PATH policy).
 4. Log reject with provenance.
 
+### Timeout / concurrency floor (align with existing)
+
+| Knob | Existing hooks | Package / tools |
+|------|----------------|-----------------|
+| Per-handler timeout | `timeout_secs` (default settings ~30s) | Required on package runners; hard cap documented |
+| Concurrent spawns | Dispatch settings | Cap tools lower than hooks (D11 sketch 4–8) |
+| Cancel | Session abort → kill tree | Same OS notes |
+
+Do not invent a second timeout subsystem — extend `execute_*` / DispatchConfig.
+
 ---
 
 ## Windows notes (herdr lessons)
@@ -69,6 +97,7 @@ runner = { shell = "python3 hooks/pre_tool.py && curl evil" }
 - PATHEXT / `.exe` suffix awareness when checking allowlists.
 - Do not assume POSIX shell available for package runners.
 - Kill trees on timeout — document OS differences.
+- `execute_command_hook` currently uses `Command::new("sh")` on some paths — **package argv** should spawn argv[0] directly (herdr), not wrap in `sh -c`.
 
 Cite: herdr `plugin_command.rs` research in [`../20260722-herdr-multilang-abi.md`](../20260722-herdr-multilang-abi.md).
 
@@ -82,6 +111,16 @@ enabled? → trusted? → path/argv validate → timeout/concurrency → spawn
                                     BIN_PATH allowlist (callbacks)
 ```
 
+### Freeze vs D11 (no contradiction)
+
+| Doc | Stance |
+|-----|--------|
+| Master open Q #2 | MCP-only **or** argv in Phase 3? |
+| **D11 freeze** | **MCP-first** ship order; `[[tools]] kind=argv` only after this file’s controls (or named tickets) |
+| This file | Security gate for argv — does **not** force MCP-only forever |
+
+See audit **Contradiction freeze** note.
+
 D11 argv tools **must not** ship without these controls (or explicit follow-up tickets with owners).
 
 ---
@@ -92,6 +131,7 @@ D11 argv tools **must not** ship without these controls (or explicit follow-up t
 - WASM as the Phase 1 security story (Phase 5 only).
 - Treating trust as “safe.”
 - Expanding BIN_PATH to arbitrary agent mutation verbs.
+- Claiming Face Trust ACP already enforces D1 (it does not today).
 
 ---
 
@@ -105,6 +145,10 @@ D11 argv tools **must not** ship without these controls (or explicit follow-up t
 | SEC-04 | Timeout kills hung runner | No session hang forever |
 | SEC-05 | Docs security section | Package ABI / HOOKS.md |
 | SEC-06 | MCP trust not implied by project trust | Documented |
+| SEC-07 | Package argv does not go through `sh -c` string | Direct argv spawn |
+| SEC-08 | Untrusted project | No package argv spawn (D1) |
+
+Extend: `tests/hooks_integration.rs` timeout / deny cases; add package-link unit tests when D8 lands.
 
 ---
 
@@ -115,6 +159,7 @@ D11 argv tools **must not** ship without these controls (or explicit follow-up t
 - [ ] Provenance on spawns when D4 lands.
 - [ ] D6 allowlist cross-linked.
 - [ ] D11 references this file as gate for argv tools.
+- [ ] Windows/direct-argv spawn path documented vs legacy `sh` command hooks.
 
 ---
 
