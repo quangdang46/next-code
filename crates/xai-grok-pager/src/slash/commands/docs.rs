@@ -49,7 +49,8 @@ impl SlashCommand for DocsCommand {
             match_text: "how-to".into(),
             insert_text: "how-to".into(),
             description: "Browse in-TUI How-to Guides".into(),
-        }];
+                ..Default::default()
+            }];
         // nextcode embed: hide docs.x.ai web link.
         if !crate::product_welcome::is_nextcode_embed() {
             items.push(ArgItem {
@@ -57,6 +58,7 @@ impl SlashCommand for DocsCommand {
                 match_text: "web".into(),
                 insert_text: "web".into(),
                 description: "Open docs.x.ai/build in the browser".into(),
+                ..Default::default()
             });
         }
         items.extend(all_titles().map(|title| ArgItem {
@@ -64,7 +66,8 @@ impl SlashCommand for DocsCommand {
             match_text: title.into(),
             insert_text: title.into(),
             description: format!("Open \"{title}\""),
-        }));
+                ..Default::default()
+            }));
         Some(items)
     }
 

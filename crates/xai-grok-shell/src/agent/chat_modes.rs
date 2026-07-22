@@ -18,7 +18,12 @@ impl ChatMode {
     }
 }
 
-/// Whether process-level chat mode features are enabled (Face stub: always on).
+/// Whether process-level Grok **Chat** mode features are enabled.
+///
+/// Stock grok-build: true only under `--chat` / `GROK_CHAT_MODE`.
+/// next-code Face is Build-equivalent (coding agent), so this is always
+/// `false` — otherwise `SetDefaultModel` skips persisting
+/// `[provider].default_model` (gated on `!process_chat_mode_enabled()`).
 pub fn process_chat_mode_enabled() -> bool {
-    true
+    false
 }

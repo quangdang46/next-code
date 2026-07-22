@@ -1855,12 +1855,17 @@ pub(crate) fn execute(
             );
             persist_hint(tasks, config_key, mode.as_config_str(), "worktree mode");
         }
-        Effect::PersistPreferredModel { model_id, reasoning_effort } => {
+        Effect::PersistPreferredModel {
+            model_id,
+            reasoning_effort,
+            provider_key,
+        } => {
             let model_id_str = model_id.0.to_string();
             tasks
                 .spawn(async move {
-                    let result = xai_grok_shell::util::config::persist_models_default(
+                    let result = xai_grok_shell::util::config::persist_models_default_with_provider(
                             Some(model_id_str),
+                            provider_key,
                             reasoning_effort,
                         )
                         .await

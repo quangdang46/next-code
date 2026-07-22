@@ -85,11 +85,59 @@ pub fn parse_reasoning_effort_meta(
     s.parse().ok()
 }
 
+/// Parse the server's per-model `reasoningEfforts` menu.
+///
+/// Returns `None` when the key is absent, not an array, empty, or every entry
+/// is unusable — callers fall back to the built-in low..xhigh menu.
 pub fn parse_reasoning_efforts_meta(
     meta: Option<&serde_json::Map<String, serde_json::Value>>,
 ) -> Option<Vec<ReasoningEffortOption>> {
-    let _ = meta;
-    Some(vec![])
+    let raw = meta?.get(REASONING_EFFORTS_META_KEY)?;
+    let arr = raw.as_array()?;
+    let mut out = Vec::with_capacity(arr.len());
+    for entry in arr {
+        let obj = match entry.as_object() {
+            Some(o) => o,
+            None => continue,
+        };
+        let value_raw = match obj.get("value").and_then(|v| v.as_str()) {
+            Some(s) => s,
+            None => continue,
+        };
+        let Ok(value) = value_raw.parse::<ReasoningEffort>() else {
+            continue;
+        };
+        let id = obj
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or(value_raw)
+            .to_string();
+        let label = obj
+            .get("label")
+            .and_then(|v| v.as_str())
+            .map(str::to_string)
+            .unwrap_or_else(|| value.to_string());
+        let description = obj
+            .get("description")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
+        let default = obj
+            .get("default")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        out.push(ReasoningEffortOption {
+            id,
+            value,
+            label,
+            description,
+            default,
+        });
+    }
+    if out.is_empty() {
+        None
+    } else {
+        Some(out)
+    }
 }
 
 pub fn reasoning_effort_meta_value(effort: ReasoningEffort) -> serde_json::Value {
