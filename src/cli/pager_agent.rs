@@ -652,6 +652,93 @@ impl NextCodeFaceAgent {
             .await;
     }
 
+    fn resume_hint_for(session_id: &str) -> Option<String> {
+        let name = crate::id::extract_session_name(session_id).unwrap_or(session_id);
+        if name.trim().is_empty() {
+            None
+        } else {
+            Some(format!("next-code --resume {name}"))
+        }
+    }
+
+    /// Drive Face's orange reconnect card (`next-code/connection_status`).
+    async fn emit_connection_status(
+        &self,
+        session_id: &str,
+        phase: &str,
+        attempt: u32,
+        detail: &str,
+    ) {
+        let mut payload = serde_json::json!({
+            "sessionId": session_id,
+            "phase": phase,
+        });
+        if phase == "reconnecting" {
+            payload["attempt"] = serde_json::json!(attempt.max(1));
+            payload["detail"] = serde_json::json!(detail);
+            if let Some(hint) = Self::resume_hint_for(session_id) {
+                payload["resumeHint"] = serde_json::json!(hint);
+            }
+        } else if phase == "failed" && !detail.is_empty() {
+            payload["detail"] = serde_json::json!(detail);
+        }
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "next-code/connection_status",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    fn is_daemon_disconnect(err: &anyhow::Error) -> bool {
+        let msg = err.to_string();
+        msg.contains("daemon disconnected")
+            || msg.contains("Connection reset")
+            || msg.contains("connection reset")
+            || msg.contains("Broken pipe")
+            || msg.contains("broken pipe")
+            || msg.contains("os error 10054")
+            || msg.contains("os error 32")
+    }
+
+    /// Re-open the daemon socket and resume `session_id`, updating Face banner.
+    async fn reconnect_daemon_session(&self, session_id: &str) -> Result<Rc<DaemonSession>> {
+        let detail = "server closed the connection";
+        let mut attempt = 0u32;
+        let mut last_err = anyhow::anyhow!("{detail}");
+        // Mirror origin TUI short early backoff, then cap at 30s.
+        while attempt < 40 {
+            attempt += 1;
+            self.emit_connection_status(session_id, "reconnecting", attempt, detail)
+                .await;
+            match self.attach_session(session_id.to_string()).await {
+                Ok(boot) => {
+                    self.emit_connection_status(session_id, "connected", attempt, "")
+                        .await;
+                    return Ok(boot.session);
+                }
+                Err(err) => {
+                    last_err = err;
+                    let backoff = if attempt <= 2 {
+                        std::time::Duration::from_millis(250 * attempt as u64)
+                    } else {
+                        std::time::Duration::from_secs(
+                            (1u64 << (attempt - 2).min(5)).min(30),
+                        )
+                    };
+                    tokio::time::sleep(backoff).await;
+                }
+            }
+        }
+        self.emit_connection_status(session_id, "failed", attempt, &last_err.to_string())
+            .await;
+        Err(last_err.context("failed to reconnect to next-code daemon"))
+    }
+
     /// Bridge daemon History `provider_name` into Face Overview float.
     async fn emit_provider_name(&self, session_id: &str, provider_name: &str) {
         let payload = serde_json::json!({
@@ -1097,6 +1184,24 @@ impl acp::Agent for NextCodeFaceAgent {
             })
             .await
         {
+            if Self::is_daemon_disconnect(&err) {
+                match self.reconnect_daemon_session(&session_id).await {
+                    Ok(live) => {
+                        self.sessions
+                            .borrow_mut()
+                            .insert(session_id.clone(), live);
+                        session.prompt_running.store(false, Ordering::SeqCst);
+                        return Err(acp::Error::internal_error().data(
+                            "Server connection restored. Please resend your message."
+                                .to_string(),
+                        ));
+                    }
+                    Err(re) => {
+                        session.prompt_running.store(false, Ordering::SeqCst);
+                        return Err(acp::Error::internal_error().data(re.to_string()));
+                    }
+                }
+            }
             session.prompt_running.store(false, Ordering::SeqCst);
             return Err(acp::Error::internal_error().data(err.to_string()));
         }
@@ -1105,6 +1210,24 @@ impl acp::Agent for NextCodeFaceAgent {
             let event = match session.read_event().await {
                 Ok(e) => e,
                 Err(err) => {
+                    if Self::is_daemon_disconnect(&err) {
+                        match self.reconnect_daemon_session(&session_id).await {
+                            Ok(live) => {
+                                self.sessions
+                                    .borrow_mut()
+                                    .insert(session_id.clone(), live);
+                                session.prompt_running.store(false, Ordering::SeqCst);
+                                return Err(acp::Error::internal_error().data(
+                                    "Server connection restored. Please resend your message."
+                                        .to_string(),
+                                ));
+                            }
+                            Err(re) => {
+                                session.prompt_running.store(false, Ordering::SeqCst);
+                                return Err(acp::Error::internal_error().data(re.to_string()));
+                            }
+                        }
+                    }
                     session.prompt_running.store(false, Ordering::SeqCst);
                     return Err(acp::Error::internal_error().data(err.to_string()));
                 }
