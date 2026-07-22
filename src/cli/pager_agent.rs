@@ -26,7 +26,7 @@ struct SessionBootstrap {
     models: Option<acp::SessionModelState>,
 }
 
-struct DaemonSession {
+pub(crate) struct DaemonSession {
     session_id: String,
     reader: Mutex<BufReader<ReadHalf>>,
     writer: Mutex<WriteHalf>,
@@ -55,11 +55,11 @@ impl DaemonSession {
         }
     }
 
-    fn next_id(&self) -> u64 {
+    pub(crate) fn next_id(&self) -> u64 {
         self.next_request_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    async fn send(&self, request: &Request) -> Result<()> {
+    pub(crate) async fn send(&self, request: &Request) -> Result<()> {
         let mut json = serde_json::to_string(request)?;
         json.push('\n');
         let mut writer = self.writer.lock().await;
@@ -68,7 +68,7 @@ impl DaemonSession {
         Ok(())
     }
 
-    async fn read_event(&self) -> Result<ServerEvent> {
+    pub(crate) async fn read_event(&self) -> Result<ServerEvent> {
         let mut line = String::new();
         let mut reader = self.reader.lock().await;
         let n = reader.read_line(&mut line).await?;
@@ -1426,6 +1426,18 @@ impl acp::Agent for NextCodeFaceAgent {
                         self.emit_provider_name(&session_id, provider).await;
                     }
                     self.emit_models_update(&model, provider_name.as_deref(), &[]).await;
+                }
+                event @ ServerEvent::PermissionRequest { .. } => {
+                    // Blocking Face ACP permission overlay (`permission_view`).
+                    if let Err(err) = crate::cli::face_permission::bridge_permission_request(
+                        &self.gateway,
+                        session.as_ref(),
+                        event,
+                    )
+                    .await
+                    {
+                        crate::logging::warn(&format!("Face permission bridge failed: {err}"));
+                    }
                 }
                 ServerEvent::MemoryActivity { activity } => {
                     crate::memory::apply_remote_activity_snapshot(&activity);

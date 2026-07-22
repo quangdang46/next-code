@@ -355,6 +355,21 @@ pub enum Request {
         input: String,
     },
 
+    /// Reply to a blocking tool-approval permission prompt (Face ACP outcome).
+    /// Distinct from AskUserQuestion and StdinResponse.
+    #[serde(rename = "permission_response")]
+    PermissionResponse {
+        id: u64,
+        /// Matches the request_id from PermissionRequest
+        request_id: String,
+        /// `allow-once` | `allow-always` | `allow-all` | `reject-once` | `cancelled`
+        outcome: String,
+        session_id: String,
+        tool_name: String,
+        #[serde(default)]
+        allow_once_code: String,
+    },
+
     // === Agent-to-agent communication ===
     /// Register as an external agent
     #[serde(rename = "agent_register")]
@@ -1439,6 +1454,25 @@ pub enum ServerEvent {
         #[serde(default)]
         is_password: bool,
         /// Tool call ID this is associated with
+        tool_call_id: String,
+    },
+
+    /// Tool execution needs user approval (Face ACP `session/request_permission`).
+    /// Distinct from AskUserQuestion (`question_view`) and StdinRequest.
+    #[serde(rename = "permission_request")]
+    PermissionRequest {
+        request_id: String,
+        session_id: String,
+        tool_name: String,
+        reason: String,
+        #[serde(default)]
+        allow_once_code: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        alternatives: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tool_input: Option<serde_json::Value>,
+        /// Best-effort tool call id for ACP ToolCallUpdate (may be empty).
+        #[serde(default)]
         tool_call_id: String,
     },
 }
