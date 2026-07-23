@@ -473,7 +473,14 @@ pub(super) fn parse_session_picker_entries(
                 .get("firstPrompt")
                 .or_else(|| v.get("first_prompt"))
                 .and_then(|s| s.as_str())
-                .map(String::from);
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            let short_name = v
+                .get("shortName")
+                .or_else(|| v.get("short_name"))
+                .and_then(|s| s.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
             let is_conversation = v
                 .get("_meta")
                 .and_then(|m| m.get("x.ai/session"))
@@ -504,27 +511,62 @@ pub(super) fn parse_session_picker_entries(
                 }
             };
             use xai_grok_tools::implementations::skills::skill::extract_skill_display_text;
-            let display = if let Some(ref fp) = first_prompt {
-                if let Some(d) = extract_skill_display_text(fp) {
-                    d
-                } else if !summary.is_empty() {
-                    extract_skill_display_text(&summary).unwrap_or(summary)
-                } else {
-                    fp.lines().next().unwrap_or_default().trim().to_string()
-                }
-            } else if !summary.is_empty() {
-                extract_skill_display_text(&summary).unwrap_or(summary)
-            } else {
-                let info_cwd = v
-                    .get("cwd")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let info = xai_grok_shell::session::info::Info {
-                    id: acp::SessionId::new(id.clone()),
-                    cwd: info_cwd,
+            let custom_title = v
+                .get("customTitle")
+                .or_else(|| v.get("custom_title"))
+                .and_then(|s| s.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            // Claude Code–style: customTitle → real summary → firstPrompt →
+            // short_name/id. Never keep memorable animal short_name as the
+            // primary label when a chat brief exists.
+            let display = {
+                let prompt_brief = first_prompt.as_ref().and_then(|fp| {
+                    let cleaned = extract_skill_display_text(fp).unwrap_or_else(|| {
+                        fp.lines().next().unwrap_or_default().trim().to_string()
+                    });
+                    let trimmed = cleaned.trim().to_string();
+                    (!trimmed.is_empty()).then_some(trimmed)
+                });
+                let summary_clean = {
+                    let cleaned = if summary.is_empty() {
+                        String::new()
+                    } else {
+                        extract_skill_display_text(&summary).unwrap_or(summary.clone())
+                    };
+                    let trimmed = cleaned.trim().to_string();
+                    (!trimmed.is_empty()).then_some(trimmed)
                 };
-                extract_first_user_prompt(&info).unwrap_or_default()
+                let summary_is_short_name = short_name
+                    .as_ref()
+                    .zip(summary_clean.as_ref())
+                    .is_some_and(|(sn, sum)| sn == sum);
+                if let Some(ct) = custom_title {
+                    ct
+                } else if let Some(sum) = summary_clean
+                    .as_ref()
+                    .filter(|_| !summary_is_short_name)
+                    .cloned()
+                {
+                    sum
+                } else if let Some(fp) = prompt_brief {
+                    fp
+                } else if let Some(sn) = short_name.clone() {
+                    sn
+                } else if let Some(sum) = summary_clean {
+                    sum
+                } else {
+                    let info_cwd = v
+                        .get("cwd")
+                        .and_then(|s| s.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    let info = xai_grok_shell::session::info::Info {
+                        id: acp::SessionId::new(id.clone()),
+                        cwd: info_cwd,
+                    };
+                    extract_first_user_prompt(&info).unwrap_or_default()
+                }
             };
             let created_at: chrono::DateTime<chrono::Utc> = parsed_created
                 .unwrap_or(updated_at);
@@ -549,6 +591,16 @@ pub(super) fn parse_session_picker_entries(
                 .or_else(|| v.get("num_messages"))
                 .and_then(|n| n.as_u64())
                 .unwrap_or(0) as usize;
+            let user_message_count = v
+                .get("userMessages")
+                .or_else(|| v.get("user_messages"))
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0) as usize;
+            let assistant_message_count = v
+                .get("assistantMessages")
+                .or_else(|| v.get("assistant_messages"))
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0) as usize;
             let last_active_at: Option<chrono::DateTime<chrono::Utc>> = v
                 .get("lastActiveAt")
                 .or_else(|| v.get("last_active_at"))
@@ -571,6 +623,10 @@ pub(super) fn parse_session_picker_entries(
                 source,
                 model_id,
                 num_messages,
+                user_message_count,
+                assistant_message_count,
+                first_prompt,
+                short_name,
                 last_active_at,
                 branch,
                 repo_name,

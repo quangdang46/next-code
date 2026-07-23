@@ -43,6 +43,8 @@ pub struct DeferredStartupActions {
     pub new_session: bool,
     pub prompt: Option<String>,
     pub open_dashboard: bool,
+    /// Bare `--resume` / `NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP` → Face 2-panel resume browser.
+    pub open_session_picker: bool,
     pub pending_chat: bool,
 }
 impl DeferredStartupActions {
