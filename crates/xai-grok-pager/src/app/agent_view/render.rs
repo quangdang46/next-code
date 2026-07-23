@@ -1077,8 +1077,16 @@ impl AgentView {
         };
         let voice_recording_height = if voice_listening { 1 } else { 0 };
         let _tool_usage_height = 0u16;
-        let btw_height =
+        let btw_hidden = self.btw_sidebar && !self.btw_sidebar_visible;
+        let prefer_btw_sidebar =
+            self.btw_sidebar && self.btw_sidebar_visible && self.btw_state.is_some();
+        let inline_btw_height =
             crate::views::btw_overlay::btw_panel_height(self.btw_state.as_ref(), inner_width);
+        let mut btw_height = if btw_hidden || prefer_btw_sidebar {
+            0
+        } else {
+            inline_btw_height
+        };
         let cta_height = match &self.plugin_cta.phase {
             CtaPhase::Hidden => 0,
             CtaPhase::Matched { .. } if self.prompt.text().trim().is_empty() => 0,
@@ -1112,6 +1120,33 @@ impl AgentView {
             1,
             compact,
         );
+        if prefer_btw_sidebar
+            && !layout.apply_btw_sidebar(AgentViewLayout::BTW_SIDEBAR_PREFERRED_WIDTH)
+        {
+            // Too narrow after scrollbar/timeline gutters — fall back to overlay.
+            btw_height = inline_btw_height;
+            layout = AgentViewLayout::compute(
+                area,
+                layout_cfg,
+                scrollbar_cfg,
+                timeline_width,
+                prompt_height,
+                tasks_height,
+                catalog_height,
+                todo_height,
+                queue_height,
+                btw_height,
+                turn_status_height,
+                banner_height,
+                cta_height,
+                follow_ups_height,
+                0,
+                prompt_gap,
+                voice_recording_height,
+                1,
+                compact,
+            );
+        }
         let search_active =
             self.scrollback_search.is_some() && self.active_pane == AgentPane::Scrollback;
         let search_reserved_rows =
@@ -1188,6 +1223,33 @@ impl AgentView {
                         1,
                         compact,
                     );
+                    if prefer_btw_sidebar
+                        && !layout
+                            .apply_btw_sidebar(AgentViewLayout::BTW_SIDEBAR_PREFERRED_WIDTH)
+                    {
+                        btw_height = inline_btw_height;
+                        layout = AgentViewLayout::compute(
+                            area,
+                            layout_cfg,
+                            scrollbar_cfg,
+                            0,
+                            prompt_height,
+                            tasks_height,
+                            catalog_height,
+                            todo_height,
+                            queue_height,
+                            btw_height,
+                            turn_status_height,
+                            banner_height,
+                            cta_height,
+                            follow_ups_height,
+                            0,
+                            prompt_gap,
+                            voice_recording_height,
+                            1,
+                            compact,
+                        );
+                    }
                     if search_reserved_rows > 0 {
                         layout.scrollback.height -= search_reserved_rows;
                         layout.scrollback_content.height = layout
@@ -1852,7 +1914,8 @@ impl AgentView {
         }
         self.last_btw_selection_model = ResolvedSelectionModel::default();
         self.last_btw_area = Rect::default();
-        if btw_height > 0
+        let paint_btw = layout.btw.width >= 12 && layout.btw.height >= 3;
+        if paint_btw
             && let Some(ref btw) = self.btw_state
         {
             let tick = self.scrollback.animation_tick();
@@ -1867,6 +1930,7 @@ impl AgentView {
                 &mut self.last_btw_selection_model,
                 Some(&mut btw_links),
                 &self.media_link_paths,
+                self.btw_sidebar,
             );
             self.last_btw_area = layout.btw;
             if !btw_links.is_empty() {

@@ -1153,6 +1153,13 @@ pub struct AgentView {
     pub btw_state: Option<crate::views::btw_overlay::BtwOverlayState>,
     /// Minimal-only ownership/correlation for `btw_state`; absent in fullscreen.
     pub(crate) minimal_btw_lifecycle: Option<crate::minimal_api::MinimalBtwLifecycle>,
+    /// When true, this `/btw` session uses the right-hand side panel (legacy TUI
+    /// parity) instead of the Face/Grok overlay above the prompt. Stamped at
+    /// send time from `[ui].btw_output_mode`.
+    pub(crate) btw_sidebar: bool,
+    /// Side-panel visibility while `btw_sidebar` is active. Alt+M toggles;
+    /// Esc still dismisses the whole `/btw` session.
+    pub(crate) btw_sidebar_visible: bool,
     /// Whether the /btw panel holds keyboard focus. The panel is non-blocking,
     /// so Up/Down/PgUp/PgDn scroll it when focused and otherwise reach the
     /// prompt. Set on a `Done` answer; cleared when the user types in or clicks

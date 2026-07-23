@@ -401,6 +401,41 @@ impl AgentViewLayout {
             timeline_width,
         }
     }
+
+    /// Preferred width for the `/btw` right-hand side panel (legacy TUI parity).
+    pub const BTW_SIDEBAR_PREFERRED_WIDTH: u16 = 36;
+    /// Minimum main scrollback width that must remain after carving a sidebar.
+    pub const BTW_SIDEBAR_MIN_MAIN_WIDTH: u16 = 28;
+
+    /// Carve a right-hand `/btw` column from `scrollback_content`.
+    ///
+    /// Returns `true` when the sidebar was placed. Callers pass `btw_height = 0`
+    /// into [`Self::compute`] first so the vertical overlay strip is omitted.
+    pub fn apply_btw_sidebar(&mut self, preferred_width: u16) -> bool {
+        const GAP: u16 = 1;
+        let avail = self.scrollback_content.width;
+        if avail < preferred_width + GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH {
+            return false;
+        }
+        let side_w = preferred_width
+            .min(avail.saturating_sub(GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH))
+            .max(20);
+        let main_w = avail.saturating_sub(side_w + GAP);
+        let content = self.scrollback_content;
+        self.scrollback_content.width = main_w;
+        // Keep pane hit-testing aligned with the narrowed content column.
+        if self.scrollback.x == content.x {
+            self.scrollback.width = main_w;
+        }
+        self.btw = Rect {
+            x: content.x + main_w + GAP,
+            y: content.y,
+            width: side_w,
+            height: content.height,
+        };
+        true
+    }
+
     /// Inner area width (for prompt height computation before full layout).
     ///
     /// This computes just the inner width without the full layout split,

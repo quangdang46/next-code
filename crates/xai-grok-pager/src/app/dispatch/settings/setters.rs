@@ -98,6 +98,10 @@ pub(super) fn set_screen_mode_inner(app: &mut AppView, canonical: &str) {
     app.current_ui.screen_mode = Some(canonical.to_string());
 }
 
+pub(super) fn set_btw_output_mode_inner(app: &mut AppView, canonical: &str) {
+    app.current_ui.btw_output_mode = Some(canonical.to_string());
+}
+
 /// Persist `[ui].screen_mode` (`fullscreen` | `minimal`). Restart-required.
 ///
 /// Unset is *displayed* as Fullscreen but is not an explicit on-disk value —
@@ -118,6 +122,37 @@ pub(in crate::app::dispatch) fn set_screen_mode(app: &mut AppView, value: String
     ));
     vec![Effect::PersistSetting {
         key: "screen_mode",
+        value: crate::settings::SettingValue::Enum(canonical),
+        rollback_value: crate::settings::SettingValue::Enum(prev),
+    }]
+}
+
+/// Persist `[ui].btw_output_mode` (`inline` | `sidebar`). Live-applies to the next `/btw`.
+pub(in crate::app::dispatch) fn set_btw_output_mode(
+    app: &mut AppView,
+    value: String,
+) -> Vec<Effect> {
+    let canonical = crate::settings::canonical_btw_output_mode(Some(&value));
+    let prev = crate::settings::canonical_btw_output_mode(app.current_ui.btw_output_mode.as_deref());
+    if prev == canonical {
+        return vec![];
+    }
+    set_btw_output_mode_inner(app, canonical);
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "btw_output_mode",
+        value = canonical,
+        "setting changed",
+    );
+    let label = if canonical == "sidebar" {
+        "Side panel (legacy TUI)"
+    } else {
+        "Overlay (Face / Grok)"
+    };
+    app.show_toast(&format!("\u{2713} /btw output: {label}"));
+    vec![Effect::PersistSetting {
+        key: "btw_output_mode",
         value: crate::settings::SettingValue::Enum(canonical),
         rollback_value: crate::settings::SettingValue::Enum(prev),
     }]

@@ -218,6 +218,8 @@ impl AgentView {
             persona_detail: None,
             btw_state: None,
             minimal_btw_lifecycle: None,
+            btw_sidebar: false,
+            btw_sidebar_visible: true,
             btw_focused: false,
             hit_btw_close: Default::default(),
             toast: None,

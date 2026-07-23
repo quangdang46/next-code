@@ -420,3 +420,79 @@ fn btw_no_session_feedback_is_mode_specific() {
     );
     assert_eq!(fullscreen.agents[&id].scrollback.len(), 0);
 }
+
+#[test]
+fn send_btw_default_is_inline_overlay() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    let effects = dispatch(Action::SendBtw("side question".into()), &mut app);
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::SendBtw {
+            minimal_request_id: None,
+            ..
+        }]
+    ));
+    let agent = &app.agents[&id];
+    assert!(!agent.btw_sidebar);
+    assert!(agent.btw_sidebar_visible);
+    assert!(matches!(
+        agent.btw_state,
+        Some(crate::views::btw_overlay::BtwOverlayState::Loading { ref question })
+            if question == "side question"
+    ));
+    assert!(agent.toast.is_none());
+}
+
+#[test]
+fn send_btw_sidebar_mode_stamps_agent_and_toasts() {
+    let mut app = test_app_with_agent();
+    app.current_ui.btw_output_mode = Some("sidebar".into());
+    let id = AgentId(0);
+    let effects = dispatch(Action::SendBtw("side question".into()), &mut app);
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::SendBtw {
+            minimal_request_id: None,
+            ..
+        }]
+    ));
+    let agent = &app.agents[&id];
+    assert!(agent.btw_sidebar);
+    assert!(agent.btw_sidebar_visible);
+    assert!(matches!(
+        agent.btw_state,
+        Some(crate::views::btw_overlay::BtwOverlayState::Loading { ref question })
+            if question == "side question"
+    ));
+    assert_eq!(
+        agent.toast.as_ref().map(|(s, _)| s.as_str()),
+        Some("Running /btw - answer will appear in the side panel.")
+    );
+}
+
+#[test]
+fn set_btw_output_mode_live_applies_cache() {
+    let mut app = test_app_with_agent();
+    assert!(app.current_ui.btw_output_mode.is_none());
+    let effects = dispatch(Action::SetBtwOutputMode("sidebar".into()), &mut app);
+    assert_eq!(app.current_ui.btw_output_mode.as_deref(), Some("sidebar"));
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::PersistSetting {
+            key: "btw_output_mode",
+            value: crate::settings::SettingValue::Enum("sidebar"),
+            rollback_value: crate::settings::SettingValue::Enum("inline"),
+        }]
+    ));
+    let effects = dispatch(Action::SetBtwOutputMode("inline".into()), &mut app);
+    assert_eq!(app.current_ui.btw_output_mode.as_deref(), Some("inline"));
+    assert!(matches!(
+        effects.as_slice(),
+        [Effect::PersistSetting {
+            key: "btw_output_mode",
+            value: crate::settings::SettingValue::Enum("inline"),
+            ..
+        }]
+    ));
+}
