@@ -259,6 +259,7 @@ pub(super) fn dispatch_cancel_login(app: &mut AppView) -> Vec<Effect> {
     let Some(return_view) = app.auth_return_view.take() else {
         return vec![];
     };
+    app.open_model_picker_after_auth = false;
     // Capture the attempt's request_seq before abort clears Authenticating so
     // the shell cancel is scoped to this attempt only (a delayed RPC must not
     // cancel a fast re-login).
@@ -371,6 +372,7 @@ pub(super) fn handle_auth_complete(
                 effects.push(Effect::FetchAppBilling);
             }
             effects.extend(retry_effects);
+            maybe_open_model_picker_after_connect(app, &mut effects);
             return effects;
         }
 
@@ -395,6 +397,7 @@ pub(super) fn handle_auth_complete(
         // deferred startup (they cannot start a session).
         if app.is_zdr_blocked() {
             clear_startup_actions(app);
+            app.open_model_picker_after_auth = false;
             return effects;
         }
 
@@ -407,9 +410,41 @@ pub(super) fn handle_auth_complete(
         if app.session_startup_allowed() {
             effects.extend(drain_startup_actions(app));
         }
+        maybe_open_model_picker_after_connect(app, &mut effects);
         return effects;
     }
     vec![]
+}
+
+/// After `/connect` auth succeeds, open the Select-model ArgPicker (OpenCode
+/// `dialog.replace(DialogModel)` parity). No-op when the flag is unset
+/// (plain `/login` / 401 re-auth) or when the active view cannot host a picker.
+fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: &mut Vec<Effect>) {
+    if !app.open_model_picker_after_auth {
+        return;
+    }
+    app.open_model_picker_after_auth = false;
+
+    // Prefer the shared catalog so the picker is populated when agents still
+    // hold a stale/empty session ModelState (cold start / pre-refresh).
+    if !app.models.is_empty() {
+        match app.active_view {
+            ActiveView::Agent(id) => {
+                if let Some(agent) = app.agents.get_mut(&id) {
+                    agent.session.models = app.models.clone();
+                }
+            }
+            ActiveView::AgentDashboard => {
+                if let Some(dashboard) = app.dashboard.as_mut() {
+                    dashboard.models = app.models.clone();
+                }
+            }
+            ActiveView::Welcome => {}
+        }
+    }
+
+    app.show_toast("Connected — pick a model");
+    effects.extend(dispatch(Action::OpenModelPicker, app));
 }
 
 pub(super) fn handle_auth_url_ready(

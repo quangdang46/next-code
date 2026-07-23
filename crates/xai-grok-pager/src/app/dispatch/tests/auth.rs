@@ -656,3 +656,74 @@ fn auth_complete_preserves_show_resolved_model_when_absent() {
 
     assert!(!app.show_resolved_model);
 }
+
+/// OpenCode parity: successful `/connect` (NextCodeConnect) opens the
+/// Select-model ArgPicker after AuthComplete restores the agent view.
+#[test]
+fn nextcode_connect_opens_model_picker_after_auth() {
+    use crate::views::modal::ActiveModal;
+
+    let mut app = test_app_with_agent();
+    dispatch(
+        Action::NextCodeConnect {
+            provider: "openai".into(),
+        },
+        &mut app,
+    );
+    assert!(app.open_model_picker_after_auth);
+    assert_eq!(app.active_view, ActiveView::Welcome);
+    let seq = super::authenticating_seq(&app);
+
+    dispatch(
+        Action::TaskComplete(TaskResult::AuthComplete {
+            request_seq: seq,
+            meta: None,
+        }),
+        &mut app,
+    );
+
+    assert_eq!(app.active_view, ActiveView::Agent(AgentId(0)));
+    assert!(!app.open_model_picker_after_auth);
+    let modal = app.agents[&AgentId(0)]
+        .active_modal
+        .as_ref()
+        .expect("model ArgPicker should open after connect");
+    match modal {
+        ActiveModal::ArgPicker { command, .. } => {
+            assert!(
+                matches!(command.as_str(), "model" | "m"),
+                "expected model picker, got {command}"
+            );
+        }
+        _ => panic!("expected ArgPicker model modal after connect"),
+    }
+}
+
+/// Plain mid-session `/login` must not open the model picker (re-auth only).
+#[test]
+fn mid_session_login_does_not_open_model_picker() {
+    let mut app = test_app_with_agent();
+    // `/login` without NextCodeConnect must leave the post-connect flag clear.
+    dispatch(Action::Login, &mut app);
+    assert!(!app.open_model_picker_after_auth);
+
+    // Simulate a successful mid-session re-auth without going through
+    // NextCodeConnect (empty auth_methods would otherwise leave Login pending).
+    app.auth_return_view = Some(ActiveView::Agent(AgentId(0)));
+    app.active_view = ActiveView::Welcome;
+    app.auth_state = AuthState::Authenticating {
+        request_seq: 42,
+        handle: None,
+        auth_url: None,
+        mode: AuthMode::Pending,
+    };
+    dispatch(
+        Action::TaskComplete(TaskResult::AuthComplete {
+            request_seq: 42,
+            meta: None,
+        }),
+        &mut app,
+    );
+    assert_eq!(app.active_view, ActiveView::Agent(AgentId(0)));
+    assert!(app.agents[&AgentId(0)].active_modal.is_none());
+}

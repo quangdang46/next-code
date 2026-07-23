@@ -599,6 +599,10 @@ pub struct AppView {
     /// (e.g. `Agent`) afterwards. `None` at startup so the normal
     /// login-then-load flow is preserved.
     pub auth_return_view: Option<ActiveView>,
+    /// When true, successful auth opens the Select-model ArgPicker (OpenCode
+    /// `DialogModel` parity after `/connect`). Set by `NextCodeConnect`;
+    /// cleared on AuthComplete / AuthFailed / CancelLogin.
+    pub open_model_picker_after_auth: bool,
     /// Per-agent views (keyed by AgentId).
     pub agents: IndexMap<AgentId, AgentView>,
     /// Monotonically increasing counter for agent ID allocation.
@@ -1244,6 +1248,7 @@ impl AppView {
         Self {
             active_view: ActiveView::Welcome,
             auth_return_view: None,
+            open_model_picker_after_auth: false,
             agents: IndexMap::new(),
             next_agent_id: 0,
             models,
@@ -5311,6 +5316,7 @@ pub(crate) mod tests {
         AppView {
             active_view: ActiveView::Welcome,
             auth_return_view: None,
+            open_model_picker_after_auth: false,
             agents: indexmap::IndexMap::new(),
             next_agent_id: 0,
             models: ModelState::default(),

@@ -139,9 +139,7 @@
 
 ## Status
 
-**Waiting for your OK — reply `go ahead` to implement UX-1 (+ decide Q1–Q3).**
+**Implemented (UX-1/2 on #61; UX-3 post-connect model picker on `pr-face-connect-open-model`).**
 
-Worktree: `C:\Users\ADMIN\Documents\Projects\next-code-worktrees\pr-face-connect-opencode-ux`  
-Branch: `pr-face-connect-opencode-ux` (from `origin/dev` @ `fb8a527b6`)
-
-No production code in this report.
+Worktree: `C:\Users\ADMIN\Documents\Projects\next-code-worktrees\pr-face-connect-open-model`  
+Branch: `pr-face-connect-open-model` (from `origin/dev` @ `de04a0a4d`)
