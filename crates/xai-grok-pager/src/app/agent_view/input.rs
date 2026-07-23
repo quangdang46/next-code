@@ -1010,6 +1010,21 @@ impl AgentView {
         }
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
+            && key!('m', ALT).matches(key)
+            && self.btw_sidebar
+            && self.btw_state.is_some()
+        {
+            self.btw_sidebar_visible = !self.btw_sidebar_visible;
+            if self.btw_sidebar_visible {
+                self.show_toast("Side panel shown");
+            } else {
+                self.btw_focused = false;
+                self.show_toast("Side panel hidden (Alt+M to show)");
+            }
+            return InputOutcome::Changed;
+        }
+        if let Event::Key(key) = ev
+            && key.kind != KeyEventKind::Release
             && key!('b', CONTROL).matches(key)
         {
             self.tasks.overlay.toggle();
