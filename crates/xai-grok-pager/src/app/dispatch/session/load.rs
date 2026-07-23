@@ -1191,6 +1191,8 @@ pub(in crate::app::dispatch) fn handle_deep_search_results(
 }
 pub(in crate::app::dispatch) fn dispatch_show_session_picker(app: &mut AppView) -> Vec<Effect> {
     use crate::views::modal::ActiveModal;
+    // Mutual exclusion: modal `/resume` must not stack under/over bare `--resume`.
+    app.resume_browser = None;
     with_active_agent(app, |agent| {
         agent.active_modal = Some(ActiveModal::SessionPicker {
             state: crate::views::picker::PickerState::default(),
@@ -1209,6 +1211,103 @@ pub(in crate::app::dispatch) fn dispatch_show_session_picker(app: &mut AppView) 
     });
     dispatch_fetch_session_list(app)
 }
+
+/// Bare `--resume`: open Face 2-panel resume browser (list + transcript preview).
+///
+/// Clears any `SessionPicker` modal / welcome expand-card surface first so bare
+/// `--resume` cannot stack ResumeBrowser on top of a Loading `[✗]` picker
+/// (`FetchSessionList` arms welcome `session_picker_loading`; list results then
+/// prefer `resume_browser` and leave the picker stuck Loading underneath).
+pub(in crate::app::dispatch) fn dispatch_show_resume_browser(app: &mut AppView) -> Vec<Effect> {
+    dismiss_session_picker_surfaces(app);
+    app.resume_browser = Some(crate::views::resume_browser::ResumeBrowserState::new_loading());
+    dispatch_fetch_session_list(app)
+}
+
+/// Drop modal + welcome session-picker UI and invalidate in-flight picker fetches
+/// so they cannot steal a list response or leave a Loading shell under ResumeBrowser.
+fn dismiss_session_picker_surfaces(app: &mut AppView) {
+    use crate::views::modal::ActiveModal;
+    if let Some(agent) = get_active_agent_mut(app)
+        && matches!(agent.active_modal, Some(ActiveModal::SessionPicker { .. }))
+    {
+        agent.active_modal = None;
+    }
+    app.session_picker_entries = None;
+    app.session_picker_loading = false;
+    app.session_picker_lanes = Default::default();
+    app.session_picker_state.reset();
+    app.session_picker_content_results = None;
+    app.session_picker_content_loading = false;
+    app.session_picker_entries_query = None;
+    invalidate_picker_fetch_on_dismiss(app);
+}
+
+/// Enter on resume-browser row → load session (same path as picker pick).
+pub(in crate::app::dispatch) fn dispatch_pick_resume_browser_session(
+    app: &mut AppView,
+    session_id: String,
+    cwd: String,
+    source: String,
+) -> Vec<Effect> {
+    app.resume_browser = None;
+    if let Some(foreign_source) =
+        crate::app::foreign_sessions::ForeignPickerSource::from_picker_source(&source)
+    {
+        let prompt = foreign_source.resume_prompt(&session_id);
+        clear_startup_actions(app);
+        if !app.session_startup_allowed() {
+            app.deferred_startup.session = Some(
+                crate::app::session_startup::DeferredSessionStartup::ForeignResume {
+                    tool: foreign_source.tool(),
+                    native_id: session_id,
+                },
+            );
+            return vec![];
+        }
+        let mut effects = dispatch_new_session_inner(app, None);
+        effects.extend(dispatch(Action::SendPrompt(prompt), app));
+        return effects;
+    }
+    let chat_kind = source == "conversation";
+    if chat_kind {
+        return dispatch_load_session(app, session_id, None, true);
+    }
+    let local_cwd = app.cwd.to_string_lossy().to_string();
+    if xai_grok_shell::session::resolve_local_session(&session_id, &local_cwd).is_some() {
+        return dispatch_load_session(app, session_id, None, false);
+    }
+    if let Some(original_cwd) = xai_grok_shell::session::resolve_local_session_any_cwd(&session_id)
+    {
+        return dispatch_load_session(
+            app,
+            session_id,
+            Some(std::path::PathBuf::from(original_cwd)),
+            false,
+        );
+    }
+    if !cwd.trim().is_empty()
+        && xai_grok_shell::session::resolve_local_session(&session_id, &cwd).is_some()
+    {
+        return dispatch_load_session(
+            app,
+            session_id,
+            Some(std::path::PathBuf::from(cwd)),
+            false,
+        );
+    }
+    if source == "remote" || source == "both" {
+        if focus_if_session_already_open(app, &session_id, false).is_some() {
+            return vec![];
+        }
+        app.show_toast("Restoring session from remote...");
+        dispatch_load_session_with_restore(app, session_id, cwd)
+    } else {
+        app.show_toast("Session not found locally");
+        vec![]
+    }
+}
+
 /// The picker (modal `/resume` or welcome screen) was dismissed without a
 /// pick. Its own fields die with it, but a still-current in-flight
 /// list/search fetch would fall through to the welcome picker fields in

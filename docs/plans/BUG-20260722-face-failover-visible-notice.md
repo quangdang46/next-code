@@ -5,7 +5,7 @@
 - **What is going on:** Cross-provider failover is a **client UX** in the legacy TUI (parse `[next-code-provider-failover]`, countdown, “Auto-switched…”). Face’s ACP bridge (`NextCodeFaceAgent`) does not parse that prompt — it prints `Error: {raw message}`. Midstream / daemon `ModelChanged` only refreshes Face’s model catalog via `x.ai/models/update`; Face’s `ModelChanged` handler is **intentionally silent** (no toast, no scrollback). Stock Face already has a visible path (`ModelAutoSwitched` → scrollback `SessionEvent::ModelUnavailable`), but the embed **never emits** it.
 - **We recommend:** Smallest wire at `src/cli/pager_agent.rs`: (1) on failover-prompt `Error`, emit a human notice (not raw JSON); (2) on auto `ModelChanged`, also emit `x.ai/session/update` `ModelAutoSwitched` so Face reuses its existing scrollback line. Defer full TUI countdown/Esc cancel to a follow-up unless you want parity in this PR.
 - **Risk:** Low (bridge-only; reuse existing Face render path; no Face rewrite).
-- **Status:** Waiting for your OK — reply **go ahead** to implement
+- **Status:** Implemented — `pager_agent` emits `x.ai/session_notification` `ModelAutoSwitched` on auto `ModelChanged` and humanizes failover-prompt `Error`s (no raw `[next-code-provider-failover]` dump). Countdown/Esc cancel deferred.
 
 ## Bug investigation
 - **Verified root cause:** Face embed maps failover/model-switch events without the TUI’s notice layer and without Face’s stock `ModelAutoSwitched` notification.
@@ -53,9 +53,9 @@ Midstream daemon resync (e.g. retired model name → served model): `crates/next
 **Optional thinner MVP:** only humanize failover `Error` text via `emit_text` / system-like chunk — still leaves midstream chrome-only jumps silent; prefer also `ModelAutoSwitched`.
 
 ## Steps (simple checklist)
-1. [ ] In `pager_agent` prompt loop: if `Error` parses as failover prompt, emit readable notice (from/to/reason); skip raw prefix dump.
-2. [ ] Track previous model before turn / on `ModelChanged`; emit `ModelAutoSwitched` with a short reason (`"provider failover"` / `"provider switched model mid-request"`).
-3. [ ] Unit/regression: failover error → no `[next-code-provider-failover]` in emitted text; `ModelChanged` → ext payload includes `ModelAutoSwitched`.
+1. [x] In `pager_agent` prompt loop: if `Error` parses as failover prompt, emit readable notice (from/to/reason); skip raw prefix dump.
+2. [x] Track previous model before turn / on `ModelChanged`; emit `ModelAutoSwitched` with a short reason (`"provider failover"` / `"provider switched model mid-request"`).
+3. [x] Unit/regression: failover error → no `[next-code-provider-failover]` in emitted text; `ModelChanged` → ext payload includes `ModelAutoSwitched`.
 4. [ ] Manual: force Fable→other failover under Face — scrollback shows why; status/model chrome still updates.
 5. [ ] Rebuild/install both `next-code` / `nextcode` aliases if UI path changes.
 

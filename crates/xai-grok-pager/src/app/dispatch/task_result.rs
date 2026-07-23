@@ -362,6 +362,16 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             generation,
             detail,
         } => handle_card_detail_loaded(app, source, session_id, generation, detail),
+        TaskResult::ResumePreviewLoaded {
+            session_id,
+            seq,
+            lines,
+        } => {
+            if let Some(rb) = app.resume_browser.as_mut() {
+                let _ = rb.apply_preview(&session_id, seq, lines);
+            }
+            vec![]
+        }
         TaskResult::SessionRestored {
             agent_id,
             local_session_id,

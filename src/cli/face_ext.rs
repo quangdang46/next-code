@@ -542,8 +542,39 @@ pub async fn handle_ext_method(
                 .and_then(|v| v.as_str());
             session_fork_payload(sid, nid)
         }
+        "x.ai/session/delete" => {
+            let sid = params
+                .get("sessionId")
+                .or_else(|| params.get("session_id"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            session_delete_payload(sid)
+        }
         _ => return None,
     })
+}
+
+/// `x.ai/session/delete` — remove flat `{id}.json` + journal under
+/// `~/.next-code/sessions` (Face picker / dashboard delete).
+pub fn session_delete_payload(session_id: &str) -> serde_json::Value {
+    let sid = session_id.trim();
+    if sid.is_empty() {
+        return json!({ "error": "sessionId is required" });
+    }
+    let Ok(path) = crate::session::session_path(sid) else {
+        return json!({ "error": format!("Unknown session id: {sid}") });
+    };
+    if !path.is_file() {
+        return json!({ "error": format!("Unknown session id: {sid}") });
+    }
+    if let Err(e) = std::fs::remove_file(&path) {
+        return json!({ "error": format!("Failed to delete session: {e}") });
+    }
+    if let Ok(journal) = crate::session::session_journal_path(sid) {
+        let _ = std::fs::remove_file(journal);
+    }
+    crate::tui::session_picker::invalidate_session_list_cache();
+    json!({ "result": { "ok": true, "sessionId": sid } })
 }
 
 #[cfg(test)]
@@ -584,8 +615,146 @@ mod tests {
 
     #[test]
     fn clean_recap_strips_label_and_caps() {
-        let cleaned = clean_recap_text("Recap — We wired the Face /btw side path.\n\nExtra");
+        let cleaned = clean_recap_text("Recap — We wired the Face /btw side path.
+
+Extra");
         assert_eq!(cleaned, "We wired the Face /btw side path.");
         assert!(!cleaned.to_lowercase().starts_with("recap"));
+    }
+
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    struct EnvVarGuard {
+        key: &'static str,
+        previous: Option<std::ffi::OsString>,
+    }
+
+    impl EnvVarGuard {
+        fn set_path(key: &'static str, value: &std::path::Path) -> Self {
+            let previous = std::env::var_os(key);
+            unsafe { std::env::set_var(key, value) };
+            Self { key, previous }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            unsafe {
+                match &self.previous {
+                    Some(v) => std::env::set_var(self.key, v),
+                    None => std::env::remove_var(self.key),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn session_list_and_delete_roundtrip_against_flat_store() {
+        let _env_lock = ENV_LOCK.lock().expect("env lock");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+        std::fs::create_dir_all(temp.path().join("sessions")).expect("mkdir");
+
+        let mut session =
+            Session::create_with_id("session_face_pr13_roundtrip".into(), None, None);
+        session.short_name = Some("otter".into());
+        session.working_dir = Some("/tmp/demo-repo".into());
+        session.model = Some("gpt-test".into());
+        session.last_active_at = Some(chrono::Utc::now());
+        session.save().expect("save");
+
+        let listed = crate::cli::face_auth::list_nextcode_sessions(50);
+        let sessions = listed
+            .get("sessions")
+            .and_then(|v| v.as_array())
+            .expect("sessions array");
+        assert_eq!(sessions.len(), 1);
+        let row = &sessions[0];
+        assert_eq!(
+            row.get("sessionId").and_then(|v| v.as_str()),
+            Some("session_face_pr13_roundtrip")
+        );
+        assert_eq!(row.get("cwd").and_then(|v| v.as_str()), Some("/tmp/demo-repo"));
+        assert_eq!(
+            row.get("modelId").and_then(|v| v.as_str()),
+            Some("gpt-test")
+        );
+        assert_eq!(row.get("source").and_then(|v| v.as_str()), Some("local"));
+        assert_eq!(
+            row.get("summary").and_then(|v| v.as_str()),
+            Some("otter")
+        );
+        assert_eq!(
+            row.get("shortName").and_then(|v| v.as_str()),
+            Some("otter")
+        );
+        assert!(
+            row.get("firstPrompt").and_then(|v| v.as_str()).is_none()
+                || row.get("firstPrompt").map(|v| v.is_null()).unwrap_or(true)
+        );
+
+        let path = crate::session::session_path(&session.id).expect("path");
+        let journal = crate::session::session_journal_path(&session.id).expect("journal path");
+        std::fs::write(&journal, "{\"meta\":{}}\n").expect("journal");
+        assert!(path.is_file());
+
+        let out = session_delete_payload(&session.id);
+        assert_eq!(out["result"]["ok"], true);
+        assert!(!path.exists());
+        assert!(!journal.exists());
+
+        let missing = session_delete_payload(&session.id);
+        assert!(missing.get("error").is_some());
+
+        let after = crate::cli::face_auth::list_nextcode_sessions(50);
+        assert_eq!(
+            after
+                .get("sessions")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0),
+            0
+        );
+    }
+
+    #[test]
+    fn session_list_summary_prefers_first_prompt_over_animal_name() {
+        let _env_lock = ENV_LOCK.lock().expect("env lock");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+        std::fs::create_dir_all(temp.path().join("sessions")).expect("mkdir");
+
+        let mut session =
+            Session::create_with_id("session_rooster_list_brief".into(), None, None);
+        session.short_name = Some("rooster".into());
+        session.working_dir = Some("/tmp/demo".into());
+        session.add_message(
+            crate::message::Role::User,
+            vec![crate::message::ContentBlock::Text {
+                text: "Fix resume titles to show chat briefs".into(),
+                cache_control: None,
+            }],
+        );
+        session.save().expect("save");
+
+        let listed = crate::cli::face_auth::list_nextcode_sessions(50);
+        let row = listed
+            .get("sessions")
+            .and_then(|v| v.as_array())
+            .and_then(|a| a.first())
+            .expect("one session");
+        assert_eq!(
+            row.get("shortName").and_then(|v| v.as_str()),
+            Some("rooster")
+        );
+        assert_eq!(
+            row.get("firstPrompt").and_then(|v| v.as_str()),
+            Some("Fix resume titles to show chat briefs")
+        );
+        assert_eq!(
+            row.get("summary").and_then(|v| v.as_str()),
+            Some("Fix resume titles to show chat briefs"),
+            "animal short_name must not be primary when a first prompt exists"
+        );
     }
 }

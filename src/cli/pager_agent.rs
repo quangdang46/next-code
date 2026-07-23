@@ -35,6 +35,8 @@ struct DaemonSession {
     /// Session cwd — required so MemoryManager project graph saves/loads
     /// (same pattern as turn_memory / memory_agent::manager_for_working_dir).
     working_dir: Option<PathBuf>,
+    /// Last model id Face was told about — used to detect ModelChanged failover.
+    last_model: Mutex<Option<String>>,
 }
 
 impl DaemonSession {
@@ -52,7 +54,20 @@ impl DaemonSession {
             next_request_id: AtomicU64::new(next_request_id),
             prompt_running: AtomicBool::new(false),
             working_dir,
+            last_model: Mutex::new(None),
         }
+    }
+
+    async fn set_last_model(&self, model: Option<&str>) {
+        let mut slot = self.last_model.lock().await;
+        *slot = model
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string);
+    }
+
+    async fn peek_last_model(&self) -> Option<String> {
+        self.last_model.lock().await.clone()
     }
 
     fn next_id(&self) -> u64 {
@@ -209,6 +224,24 @@ fn session_model_state_from_history(
     ))
 }
 
+/// Human-readable reason for Face `ModelAutoSwitched` (parity with TUI system notices).
+fn model_changed_notice_reason(provider_name: Option<&str>, model: &str) -> String {
+    match provider_name.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(provider) => format!("Auto-switched provider/model → {provider} / {model}."),
+        None => format!("Auto-switched model → {model}."),
+    }
+}
+
+/// Face scrollback notice when the daemon surfaces a cross-provider failover prompt.
+fn failover_prompt_notice_reason(
+    prompt: &next_code_provider_core::ProviderFailoverPrompt,
+) -> String {
+    format!(
+        "{} became unavailable ({}); next-code suggests {} — use /model to switch or resend after auto-switch.",
+        prompt.from_label, prompt.reason, prompt.to_label
+    )
+}
+
 /// Face-facing ACP agent: Client (pager) ↔ this ↔ next-code `serve` socket.
 pub(crate) struct NextCodeFaceAgent {
     gateway: AcpGatewaySender<acp::AgentSide>,
@@ -296,6 +329,7 @@ impl NextCodeFaceAgent {
         // Face TodoPane / Todos float only paint from ACP Plan — bridge disk todos.
         self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
         self.emit_available_skills(&session_id).await;
+        live.set_last_model(provider_model.as_deref()).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -406,6 +440,7 @@ impl NextCodeFaceAgent {
         self.emit_git_status(&session_id).await;
         self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
         self.emit_available_skills(&session_id).await;
+        live.set_last_model(provider_model.as_deref()).await;
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -444,6 +479,37 @@ impl NextCodeFaceAgent {
         let payload = xai_grok_shell::extensions::notification::SessionNotification {
             session_id: acp::SessionId::new(session_id),
             update,
+            meta: None,
+        };
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "x.ai/session_notification",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    /// Visible Face scrollback notice when provider/model failover changes the active model.
+    /// Uses `ModelAutoSwitched` (renders as `SessionEvent::ModelUnavailable`) — not silent
+    /// `ModelChanged`, which Face intentionally keeps toast/scrollback-free for followers.
+    async fn emit_model_auto_switched(
+        &self,
+        session_id: &str,
+        previous_model_id: &str,
+        new_model_id: &str,
+        reason: &str,
+    ) {
+        let payload = xai_grok_shell::extensions::notification::SessionNotification {
+            session_id: acp::SessionId::new(session_id),
+            update: xai_grok_shell::extensions::notification::SessionUpdate::ModelAutoSwitched {
+                previous_model_id: previous_model_id.to_string(),
+                new_model_id: new_model_id.to_string(),
+                reason: reason.to_string(),
+            },
             meta: None,
         };
         let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
@@ -1487,6 +1553,31 @@ impl acp::Agent for NextCodeFaceAgent {
                         self.emit_provider_name(&session_id, provider).await;
                     }
                     self.emit_models_update(&model, provider_name.as_deref(), &[]).await;
+                    let previous = session.peek_last_model().await;
+                    let changed = previous.as_deref() != Some(model.as_str());
+                    if changed {
+                        let reason =
+                            model_changed_notice_reason(provider_name.as_deref(), &model);
+                        self.emit_model_auto_switched(
+                            &session_id,
+                            previous.as_deref().unwrap_or(""),
+                            &model,
+                            &reason,
+                        )
+                        .await;
+                    }
+                    session.set_last_model(Some(&model)).await;
+                }
+                ServerEvent::ModelChanged {
+                    model,
+                    error: Some(err),
+                    ..
+                } => {
+                    self.emit_text(
+                        &session_id,
+                        format!("Couldn't switch model to {model}: {err}"),
+                    )
+                    .await;
                 }
                 ServerEvent::MemoryActivity { activity } => {
                     crate::memory::apply_remote_activity_snapshot(&activity);
@@ -1500,8 +1591,21 @@ impl acp::Agent for NextCodeFaceAgent {
                     break acp::StopReason::EndTurn;
                 }
                 ServerEvent::Error { id, message, .. } if id == prompt_id => {
-                    self.emit_text(&session_id, format!("Error: {message}"))
+                    if let Some(prompt) =
+                        next_code_provider_core::parse_failover_prompt_message(&message)
+                    {
+                        let reason = failover_prompt_notice_reason(&prompt);
+                        self.emit_model_auto_switched(
+                            &session_id,
+                            &prompt.from_label,
+                            &prompt.to_label,
+                            &reason,
+                        )
                         .await;
+                    } else {
+                        self.emit_text(&session_id, format!("Error: {message}"))
+                            .await;
+                    }
                     break acp::StopReason::EndTurn;
                 }
                 _ => {}
@@ -1736,6 +1840,57 @@ mod tests {
         let entry = plan_entry_from_next_code_todo(&done);
         assert_eq!(entry.status, acp::PlanEntryStatus::Completed);
         assert_eq!(entry.priority, acp::PlanEntryPriority::Medium);
+    }
+
+    #[test]
+    fn model_changed_notice_reason_includes_provider_when_present() {
+        assert_eq!(
+            model_changed_notice_reason(Some("openrouter"), "gpt-5"),
+            "Auto-switched provider/model → openrouter / gpt-5."
+        );
+        assert_eq!(
+            model_changed_notice_reason(None, "gpt-5"),
+            "Auto-switched model → gpt-5."
+        );
+        assert_eq!(
+            model_changed_notice_reason(Some("  "), "gpt-5"),
+            "Auto-switched model → gpt-5."
+        );
+    }
+
+    #[test]
+    fn failover_prompt_notice_is_human_readable() {
+        let prompt = next_code_provider_core::ProviderFailoverPrompt {
+            from_provider: "anthropic".into(),
+            from_label: "Anthropic".into(),
+            to_provider: "openrouter".into(),
+            to_label: "OpenRouter".into(),
+            reason: "rate limited".into(),
+            estimated_input_chars: 100,
+            estimated_input_tokens: 25,
+        };
+        let notice = failover_prompt_notice_reason(&prompt);
+        assert!(notice.contains("Anthropic became unavailable"));
+        assert!(notice.contains("rate limited"));
+        assert!(notice.contains("OpenRouter"));
+        assert!(!notice.contains("[next-code-provider-failover]"));
+    }
+
+    #[test]
+    fn model_auto_switched_payload_serializes_for_face() {
+        let payload = xai_grok_shell::extensions::notification::SessionNotification {
+            session_id: acp::SessionId::new("sess-1"),
+            update: xai_grok_shell::extensions::notification::SessionUpdate::ModelAutoSwitched {
+                previous_model_id: "old".into(),
+                new_model_id: "new".into(),
+                reason: "Auto-switched model → new.".into(),
+            },
+            meta: None,
+        };
+        let json = serde_json::to_value(&payload).expect("serialize");
+        assert_eq!(json["update"]["sessionUpdate"], "model_auto_switched");
+        assert_eq!(json["update"]["previous_model_id"], "old");
+        assert_eq!(json["update"]["new_model_id"], "new");
     }
 }
 
