@@ -498,6 +498,14 @@ mod tests {
             row.get("summary").and_then(|v| v.as_str()),
             Some("otter")
         );
+        assert_eq!(
+            row.get("shortName").and_then(|v| v.as_str()),
+            Some("otter")
+        );
+        assert!(
+            row.get("firstPrompt").and_then(|v| v.as_str()).is_none()
+                || row.get("firstPrompt").map(|v| v.is_null()).unwrap_or(true)
+        );
 
         let path = crate::session::session_path(&session.id).expect("path");
         let journal = crate::session::session_journal_path(&session.id).expect("journal path");
@@ -520,6 +528,47 @@ mod tests {
                 .map(|a| a.len())
                 .unwrap_or(0),
             0
+        );
+    }
+
+    #[test]
+    fn session_list_summary_prefers_first_prompt_over_animal_name() {
+        let _env_lock = ENV_LOCK.lock().expect("env lock");
+        let temp = tempfile::tempdir().expect("tempdir");
+        let _home = EnvVarGuard::set_path("NEXT_CODE_HOME", temp.path());
+        std::fs::create_dir_all(temp.path().join("sessions")).expect("mkdir");
+
+        let mut session =
+            Session::create_with_id("session_rooster_list_brief".into(), None, None);
+        session.short_name = Some("rooster".into());
+        session.working_dir = Some("/tmp/demo".into());
+        session.add_message(
+            crate::message::Role::User,
+            vec![crate::message::ContentBlock::Text {
+                text: "Fix resume titles to show chat briefs".into(),
+                cache_control: None,
+            }],
+        );
+        session.save().expect("save");
+
+        let listed = crate::cli::face_auth::list_nextcode_sessions(50);
+        let row = listed
+            .get("sessions")
+            .and_then(|v| v.as_array())
+            .and_then(|a| a.first())
+            .expect("one session");
+        assert_eq!(
+            row.get("shortName").and_then(|v| v.as_str()),
+            Some("rooster")
+        );
+        assert_eq!(
+            row.get("firstPrompt").and_then(|v| v.as_str()),
+            Some("Fix resume titles to show chat briefs")
+        );
+        assert_eq!(
+            row.get("summary").and_then(|v| v.as_str()),
+            Some("Fix resume titles to show chat briefs"),
+            "animal short_name must not be primary when a first prompt exists"
         );
     }
 }

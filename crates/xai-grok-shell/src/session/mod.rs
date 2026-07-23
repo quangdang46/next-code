@@ -18,7 +18,10 @@ pub mod share;
 pub mod storage;
 pub mod worktree;
 
-pub use persistence::{resolve_local_session, resolve_local_session_any_cwd};
+pub use persistence::{
+    load_transcript_preview, resolve_local_session, resolve_local_session_any_cwd,
+    TranscriptPreviewLine,
+};
 pub use result::{Empty, ExtMethodResult};
 pub use share::{ShareSessionRequest, ShareSessionResponse};
 

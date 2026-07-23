@@ -43,8 +43,9 @@ pub(crate) async fn run_face_pager(
     }
     match resume_session {
         Some(id) if id.is_empty() => {
-            // Bare `next-code --resume`: open Face session picker (not
-            // continue-last). Face reads this env once at startup.
+            // Bare `next-code --resume`: open Face 2-panel resume browser
+            // (not continue-last, not expand-card `/resume` picker).
+            // Face reads this env once at startup → ShowResumeBrowser.
             // SAFETY: pre-multithreaded Face launch; single-threaded set.
             unsafe {
                 std::env::set_var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP", "1");

@@ -270,9 +270,306 @@ fn session_snapshot_path(session_id: &str) -> PathBuf {
     sessions_root().join(format!("{session_id}.json"))
 }
 
+fn session_journal_path(session_id: &str) -> PathBuf {
+    sessions_root().join(format!("{session_id}.journal.jsonl"))
+}
+
 fn load_snapshot(session_id: &str) -> Option<SessionSnapshot> {
     let raw = std::fs::read_to_string(session_snapshot_path(session_id)).ok()?;
     serde_json::from_str(&raw).ok()
+}
+
+/// One line in the Face resume-browser transcript preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranscriptPreviewLine {
+    pub role: String,
+    pub text: String,
+}
+
+/// Load last `max_messages` visible turns from flat `sessions/<id>.json`
+/// plus journal `append_messages` (if present).
+///
+/// Mirrors origin TUI preview richness: user/assistant **text** plus tool
+/// fold lines (`✓ read path · 1.1k tok`) from paired `tool_use` /
+/// `tool_result` blocks. Skips system-reminder / display_role=system noise.
+/// Pure FS — no ACP / no `next-code-base`.
+pub fn load_transcript_preview(
+    session_id: &str,
+    max_messages: usize,
+) -> Vec<TranscriptPreviewLine> {
+    let mut messages = load_snapshot(session_id)
+        .map(|s| s.messages)
+        .unwrap_or_default();
+    append_journal_messages(session_id, &mut messages);
+    let visible = messages_to_preview_lines(&messages);
+    let start = visible.len().saturating_sub(max_messages);
+    visible[start..].to_vec()
+}
+
+fn append_journal_messages(session_id: &str, messages: &mut Vec<serde_json::Value>) {
+    let Ok(raw) = std::fs::read_to_string(session_journal_path(session_id)) else {
+        return;
+    };
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) else {
+            continue;
+        };
+        let Some(appended) = value.get("append_messages").and_then(|v| v.as_array()) else {
+            continue;
+        };
+        messages.extend(appended.iter().cloned());
+    }
+}
+
+#[derive(Clone)]
+struct PendingTool {
+    name: String,
+    input: serde_json::Value,
+}
+
+/// Walk stored messages like origin `session::render_messages`: register
+/// `tool_use`, emit a fold line on each `tool_result`, flush text turns.
+fn messages_to_preview_lines(messages: &[serde_json::Value]) -> Vec<TranscriptPreviewLine> {
+    let mut out = Vec::new();
+    let mut tool_map: std::collections::HashMap<String, PendingTool> =
+        std::collections::HashMap::new();
+
+    for msg in messages {
+        let display_role = msg
+            .get("display_role")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if display_role.eq_ignore_ascii_case("system") {
+            continue;
+        }
+
+        let role = msg
+            .get("role")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown");
+
+        let Some(content) = msg.get("content") else {
+            continue;
+        };
+
+        if let Some(s) = content.as_str() {
+            push_text_preview(&mut out, role, s);
+            continue;
+        }
+
+        let Some(arr) = content.as_array() else {
+            continue;
+        };
+
+        let mut text = String::new();
+        for part in arr {
+            let part_type = part.get("type").and_then(|t| t.as_str()).unwrap_or("");
+            match part_type {
+                "text" => {
+                    if let Some(t) = part.get("text").and_then(|t| t.as_str()) {
+                        text.push_str(t);
+                    }
+                }
+                "tool_use" => {
+                    let id = part
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    if id.is_empty() {
+                        continue;
+                    }
+                    let name = part
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("tool")
+                        .to_string();
+                    let input = part
+                        .get("input")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null);
+                    tool_map.insert(id, PendingTool { name, input });
+                }
+                "tool_result" => {
+                    if !text.is_empty() {
+                        push_text_preview(&mut out, role, &text);
+                        text.clear();
+                    }
+                    let tool_use_id = part
+                        .get("tool_use_id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+                    let result_text = extract_tool_result_text(part);
+                    let pending = tool_map.remove(tool_use_id).unwrap_or(PendingTool {
+                        name: "tool".into(),
+                        input: serde_json::Value::Null,
+                    });
+                    out.push(TranscriptPreviewLine {
+                        role: "tool".into(),
+                        text: format_tool_fold_line(&pending.name, &pending.input, &result_text),
+                    });
+                }
+                // reasoning / images / etc. — skip for preview density
+                _ => {}
+            }
+        }
+        if !text.is_empty() {
+            push_text_preview(&mut out, role, &text);
+        }
+    }
+    out
+}
+
+fn push_text_preview(out: &mut Vec<TranscriptPreviewLine>, role: &str, text: &str) {
+    let trimmed = text.trim();
+    if trimmed.is_empty() || trimmed.contains("<system-reminder>") {
+        return;
+    }
+    out.push(TranscriptPreviewLine {
+        role: role.to_string(),
+        text: trimmed.to_string(),
+    });
+}
+
+fn extract_tool_result_text(part: &serde_json::Value) -> String {
+    let Some(content) = part.get("content") else {
+        return String::new();
+    };
+    if let Some(s) = content.as_str() {
+        return s.to_string();
+    }
+    let Some(arr) = content.as_array() else {
+        return content.to_string();
+    };
+    let mut parts = Vec::new();
+    for item in arr {
+        if let Some(t) = item.get("text").and_then(|t| t.as_str()) {
+            parts.push(t);
+        } else if let Some(s) = item.as_str() {
+            parts.push(s);
+        }
+    }
+    parts.join("\n")
+}
+
+fn format_tool_fold_line(name: &str, input: &serde_json::Value, result: &str) -> String {
+    let failed = tool_result_looks_failed(result);
+    let icon = if failed { "✗" } else { "✓" };
+    let display = display_tool_name(name);
+    let summary = tool_summary(name, input);
+    let tok = format_approx_token_count(estimate_tokens(result));
+    if summary.is_empty() {
+        format!("{icon} {display} · {tok}")
+    } else {
+        format!("{icon} {display} {summary} · {tok}")
+    }
+}
+
+fn tool_result_looks_failed(result: &str) -> bool {
+    let t = result.trim_start();
+    t.starts_with("Error:")
+        || t.starts_with("error:")
+        || t.starts_with("Failed ")
+        || t.starts_with("FAILED")
+}
+
+fn display_tool_name(name: &str) -> String {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "read_file" | "readfile" => "read".into(),
+        "write_file" | "writefile" => "write".into(),
+        "run_terminal_cmd" | "shell" => "bash".into(),
+        other => other.to_string(),
+    }
+}
+
+fn tool_summary(name: &str, input: &serde_json::Value) -> String {
+    let key = name.trim().to_ascii_lowercase();
+    match key.as_str() {
+        "read" | "read_file" | "readfile" => input_path(input).unwrap_or_default(),
+        "write" | "write_file" | "writefile" | "edit" | "apply_patch" | "multiedit" => {
+            input_path(input).unwrap_or_default()
+        }
+        "bash" | "shell" | "run_terminal_cmd" => input
+            .get("command")
+            .and_then(|v| v.as_str())
+            .map(|cmd| {
+                let truncated = truncate_chars(cmd.trim(), 48);
+                format!("$ {truncated}")
+            })
+            .unwrap_or_default(),
+        "glob" => input
+            .get("pattern")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        "grep" => input
+            .get("pattern")
+            .or_else(|| input.get("query"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        _ => input_path(input)
+            .or_else(|| {
+                input
+                    .get("command")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
+            .unwrap_or_default(),
+    }
+}
+
+fn input_path(input: &serde_json::Value) -> Option<String> {
+    input
+        .get("file_path")
+        .or_else(|| input.get("path"))
+        .and_then(|v| v.as_str())
+        .map(|p| truncate_path_display(p, 56))
+}
+
+fn truncate_path_display(path: &str, max_chars: usize) -> String {
+    let trimmed = path.trim();
+    if trimmed.chars().count() <= max_chars {
+        return trimmed.to_string();
+    }
+    let chars: Vec<char> = trimmed.chars().collect();
+    let keep = max_chars.saturating_sub(1);
+    let start = chars.len().saturating_sub(keep);
+    format!("…{}", chars[start..].iter().collect::<String>())
+}
+
+fn truncate_chars(s: &str, max_chars: usize) -> String {
+    let count = s.chars().count();
+    if count <= max_chars {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max_chars.saturating_sub(1)).collect();
+    out.push('…');
+    out
+}
+
+fn estimate_tokens(s: &str) -> usize {
+    s.len() / 4
+}
+
+fn format_approx_token_count(tokens: usize) -> String {
+    match tokens {
+        0..=999 => format!("{tokens} tok"),
+        1_000..=9_999 => {
+            let whole = tokens / 1_000;
+            let tenth = (tokens % 1_000) / 100;
+            if tenth == 0 {
+                format!("{whole}k tok")
+            } else {
+                format!("{whole}.{tenth}k tok")
+            }
+        }
+        _ => format!("{}k tok", tokens / 1_000),
+    }
 }
 
 fn iter_snapshots() -> Vec<SessionSnapshot> {
@@ -359,7 +656,23 @@ fn normalize_cwd(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
     use tempfile::TempDir;
+
+    static GROK_HOME_LOCK: Mutex<()> = Mutex::new(());
+
+    fn with_temp_grok_home<R>(f: impl FnOnce(&Path) -> R) -> R {
+        let _guard = GROK_HOME_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let home = TempDir::new().unwrap();
+        let prev = std::env::var_os("GROK_HOME");
+        unsafe { std::env::set_var("GROK_HOME", home.path()) };
+        let out = f(home.path());
+        match prev {
+            Some(v) => unsafe { std::env::set_var("GROK_HOME", v) },
+            None => unsafe { std::env::remove_var("GROK_HOME") },
+        }
+        out
+    }
 
     fn write_session(home: &Path, id: &str, cwd: &str) {
         let sessions = home.join("sessions");
@@ -387,24 +700,177 @@ mod tests {
 
     #[test]
     fn resolve_and_list_flat_sessions() {
-        let home = TempDir::new().unwrap();
-        unsafe { std::env::set_var("GROK_HOME", home.path()) };
-        let cwd = home.path().join("proj");
-        std::fs::create_dir_all(&cwd).unwrap();
-        let cwd_str = cwd.to_string_lossy().to_string();
-        write_session(home.path(), "session_a", &cwd_str);
-        assert!(session_exists_for_cwd("session_a", &cwd_str));
-        assert_eq!(
-            resolve_local_session("session_a", &cwd_str).as_deref(),
-            Some("session_a")
-        );
-        assert_eq!(
-            resolve_local_session_any_cwd("session_a").as_deref(),
-            Some(cwd_str.as_str())
-        );
-        let listed = list_summaries_sync(Some(&cwd_str));
-        assert_eq!(listed.len(), 1);
-        assert_eq!(&*listed[0].info.id.0, "session_a");
-        assert_eq!(listed[0].current_model_id, "test-model");
+        with_temp_grok_home(|home| {
+            let cwd = home.join("proj");
+            std::fs::create_dir_all(&cwd).unwrap();
+            let cwd_str = cwd.to_string_lossy().to_string();
+            write_session(home, "session_a", &cwd_str);
+            assert!(session_exists_for_cwd("session_a", &cwd_str));
+            assert_eq!(
+                resolve_local_session("session_a", &cwd_str).as_deref(),
+                Some("session_a")
+            );
+            assert_eq!(
+                resolve_local_session_any_cwd("session_a").as_deref(),
+                Some(cwd_str.as_str())
+            );
+            let listed = list_summaries_sync(Some(&cwd_str));
+            assert_eq!(listed.len(), 1);
+            assert_eq!(&*listed[0].info.id.0, "session_a");
+            assert_eq!(listed[0].current_model_id, "test-model");
+        });
+    }
+
+    #[test]
+    fn transcript_preview_merges_snapshot_and_journal() {
+        with_temp_grok_home(|home| {
+            let sessions = home.join("sessions");
+            std::fs::create_dir_all(&sessions).unwrap();
+            let body = serde_json::json!({
+                "id": "session_prev",
+                "parent_id": null,
+                "title": "preview",
+                "created_at": "2026-07-21T00:00:00Z",
+                "updated_at": "2026-07-21T01:00:00Z",
+                "messages": [
+                    {
+                        "role": "user",
+                        "display_role": "system",
+                        "content": [{"type": "text", "text": "<system-reminder>\nhidden\n</system-reminder>"}]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": "hello from snapshot"}]
+                    }
+                ],
+                "working_dir": "/tmp/proj",
+                "model": "test-model",
+                "status": "Closed",
+                "is_canary": false,
+                "is_debug": false,
+                "saved": false
+            });
+            std::fs::write(
+                sessions.join("session_prev.json"),
+                serde_json::to_string_pretty(&body).unwrap(),
+            )
+            .unwrap();
+            let journal = serde_json::json!({
+                "meta": { "updated_at": "2026-07-21T02:00:00Z" },
+                "append_messages": [
+                    {
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": "hello from journal"}]
+                    }
+                ]
+            });
+            std::fs::write(
+                sessions.join("session_prev.journal.jsonl"),
+                format!("{}\n", serde_json::to_string(&journal).unwrap()),
+            )
+            .unwrap();
+
+            let lines = load_transcript_preview("session_prev", 20);
+            assert_eq!(lines.len(), 2);
+            assert_eq!(lines[0].role, "user");
+            assert_eq!(lines[0].text, "hello from snapshot");
+            assert_eq!(lines[1].role, "assistant");
+            assert_eq!(lines[1].text, "hello from journal");
+        });
+    }
+
+    #[test]
+    fn transcript_preview_emits_tool_fold_lines_like_origin() {
+        with_temp_grok_home(|home| {
+            let sessions = home.join("sessions");
+            std::fs::create_dir_all(&sessions).unwrap();
+            // Shape matches live bonehound: assistant tool_use + user tool_result,
+            // often with no assistant text — origin preview still shows ✓ read · tok.
+            let body = serde_json::json!({
+                "id": "session_tools",
+                "parent_id": null,
+                "title": "tools",
+                "created_at": "2026-07-21T00:00:00Z",
+                "updated_at": "2026-07-21T01:00:00Z",
+                "messages": [
+                    {
+                        "role": "user",
+                        "display_role": "system",
+                        "content": [{"type": "text", "text": "<system-reminder>\nhidden\n</system-reminder>"}]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{"type": "text", "text": "2"}]
+                    },
+                    {
+                        "role": "assistant",
+                        "content": [
+                            {"type": "reasoning", "text": "thinking"},
+                            {
+                                "type": "tool_use",
+                                "id": "call_a",
+                                "name": "read",
+                                "input": {"file_path": "C:/proj/AGENTS.md"}
+                            },
+                            {
+                                "type": "tool_use",
+                                "id": "call_b",
+                                "name": "read",
+                                "input": {"file_path": "C:/proj/prompts/SPEC_DRIVEN.en.md"}
+                            }
+                        ]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": "call_a",
+                            "content": "x".repeat(4400)
+                        }]
+                    },
+                    {
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": "call_b",
+                            "content": "y".repeat(31600)
+                        }]
+                    }
+                ],
+                "working_dir": "/tmp/proj",
+                "model": "test-model",
+                "status": "Closed",
+                "is_canary": false,
+                "is_debug": false,
+                "saved": false
+            });
+            std::fs::write(
+                sessions.join("session_tools.json"),
+                serde_json::to_string_pretty(&body).unwrap(),
+            )
+            .unwrap();
+
+            let lines = load_transcript_preview("session_tools", 20);
+            assert_eq!(lines[0].role, "user");
+            assert_eq!(lines[0].text, "2");
+            assert_eq!(lines[1].role, "tool");
+            assert!(
+                lines[1].text.starts_with("✓ read ") && lines[1].text.contains("AGENTS.md"),
+                "expected read AGENTS fold, got {}",
+                lines[1].text
+            );
+            assert!(
+                lines[1].text.contains(" tok"),
+                "expected tok badge, got {}",
+                lines[1].text
+            );
+            assert_eq!(lines[2].role, "tool");
+            assert!(
+                lines[2].text.contains("SPEC_DRIVEN.en.md") && lines[2].text.contains("k tok"),
+                "expected SPEC fold with k tok, got {}",
+                lines[2].text
+            );
+            assert_eq!(lines.len(), 3);
+        });
     }
 }

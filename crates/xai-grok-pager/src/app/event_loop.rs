@@ -1650,22 +1650,23 @@ pub(crate) async fn run(
         }
     }
 
-    // Bare `next-code --resume` (empty id): open Face session picker.
-    // Set by `pager_launch` via `NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP`.
+    // Bare `next-code --resume` (empty id): open Face 2-panel resume browser.
+    // Set by `pager_launch` via `NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP`
+    // (env name kept; target is ResumeBrowser, not expand-card SessionPicker).
     let mut open_session_picker_at_startup = false;
     if std::env::var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP").as_deref() == Ok("1") {
         // SAFETY: we are pre-multithreaded init for this app loop.
         unsafe { std::env::remove_var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP") };
         open_session_picker_at_startup = true;
         if app.session_startup_allowed() {
-            let effs = dispatch::dispatch(Action::ShowSessionPicker, &mut app);
+            let effs = dispatch::dispatch(Action::ShowResumeBrowser, &mut app);
             if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
                 return Ok(make_run_result(&app));
             }
             presenter.request_presentation(&mut app, terminal, false);
         } else {
             app.deferred_startup.open_session_picker = true;
-            // Prefer picker over auto-creating an empty session after auth.
+            // Prefer resume browser over auto-creating an empty session after auth.
             app.deferred_startup.new_session = false;
         }
     }
