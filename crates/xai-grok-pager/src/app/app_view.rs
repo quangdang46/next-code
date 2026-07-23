@@ -359,6 +359,14 @@ pub struct SessionPickerEntry {
     pub source: String,
     pub model_id: Option<String>,
     pub num_messages: usize,
+    /// Visible user turns (when the list API provides a split count).
+    pub user_message_count: usize,
+    /// Visible assistant turns (when the list API provides a split count).
+    pub assistant_message_count: usize,
+    /// First meaningful user prompt snippet (for resume-browser secondary line).
+    pub first_prompt: Option<String>,
+    /// Memorable short name when the primary title is only that name.
+    pub short_name: Option<String>,
     /// When the session last had content added (most recent of local and remote).
     pub last_active_at: Option<chrono::DateTime<chrono::Utc>>,
     /// Git branch associated with the session (if available from the server response).
@@ -7036,6 +7044,10 @@ pub(crate) mod tests {
             source: "local".into(),
             model_id: None,
             num_messages: 0,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
             last_active_at: None,
             branch: None,
             repo_name: "tmp-repo".into(),
@@ -10770,6 +10782,10 @@ pub(crate) mod tests {
             source: "conversation".into(),
             model_id: None,
             num_messages: 0,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
             last_active_at: None,
             branch: None,
             repo_name: "r".into(),

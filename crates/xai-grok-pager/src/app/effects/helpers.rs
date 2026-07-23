@@ -473,7 +473,14 @@ pub(super) fn parse_session_picker_entries(
                 .get("firstPrompt")
                 .or_else(|| v.get("first_prompt"))
                 .and_then(|s| s.as_str())
-                .map(String::from);
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            let short_name = v
+                .get("shortName")
+                .or_else(|| v.get("short_name"))
+                .and_then(|s| s.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
             let is_conversation = v
                 .get("_meta")
                 .and_then(|m| m.get("x.ai/session"))
@@ -504,16 +511,16 @@ pub(super) fn parse_session_picker_entries(
                 }
             };
             use xai_grok_tools::implementations::skills::skill::extract_skill_display_text;
-            let display = if let Some(ref fp) = first_prompt {
+            // Primary title prefers API summary (custom/title/short_name). Use
+            // firstPrompt only when summary is empty or for skill-display extract.
+            let display = if !summary.is_empty() {
+                extract_skill_display_text(&summary).unwrap_or(summary)
+            } else if let Some(ref fp) = first_prompt {
                 if let Some(d) = extract_skill_display_text(fp) {
                     d
-                } else if !summary.is_empty() {
-                    extract_skill_display_text(&summary).unwrap_or(summary)
                 } else {
                     fp.lines().next().unwrap_or_default().trim().to_string()
                 }
-            } else if !summary.is_empty() {
-                extract_skill_display_text(&summary).unwrap_or(summary)
             } else {
                 let info_cwd = v
                     .get("cwd")
@@ -549,6 +556,16 @@ pub(super) fn parse_session_picker_entries(
                 .or_else(|| v.get("num_messages"))
                 .and_then(|n| n.as_u64())
                 .unwrap_or(0) as usize;
+            let user_message_count = v
+                .get("userMessages")
+                .or_else(|| v.get("user_messages"))
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0) as usize;
+            let assistant_message_count = v
+                .get("assistantMessages")
+                .or_else(|| v.get("assistant_messages"))
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0) as usize;
             let last_active_at: Option<chrono::DateTime<chrono::Utc>> = v
                 .get("lastActiveAt")
                 .or_else(|| v.get("last_active_at"))
@@ -571,6 +588,10 @@ pub(super) fn parse_session_picker_entries(
                 source,
                 model_id,
                 num_messages,
+                user_message_count,
+                assistant_message_count,
+                first_prompt,
+                short_name,
                 last_active_at,
                 branch,
                 repo_name,

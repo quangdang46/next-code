@@ -163,6 +163,36 @@ fn picker_still_drops_build_row_with_empty_summary() {
     assert!(entries.is_empty(), "empty-summary Build rows stay dropped");
 }
 #[test]
+fn picker_parses_first_prompt_and_message_splits() {
+    let payload = serde_json::json!({
+        "sessions": [{
+            "sessionId": "sess-blazing",
+            "summary": "blazing",
+            "shortName": "blazing",
+            "firstPrompt": "Enrich Face resume list rows",
+            "cwd": "/Users/me/Projects/next-code",
+            "source": "local",
+            "updatedAt": "2026-07-22T00:00:00Z",
+            "numMessages": 4,
+            "userMessages": 2,
+            "assistantMessages": 2,
+            "modelId": "gpt-test"
+        }]
+    });
+    let entries = parse_session_picker_entries(&payload);
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].summary, "blazing");
+    assert_eq!(entries[0].short_name.as_deref(), Some("blazing"));
+    assert_eq!(
+        entries[0].first_prompt.as_deref(),
+        Some("Enrich Face resume list rows")
+    );
+    assert_eq!(entries[0].num_messages, 4);
+    assert_eq!(entries[0].user_message_count, 2);
+    assert_eq!(entries[0].assistant_message_count, 2);
+    assert_eq!(entries[0].model_id.as_deref(), Some("gpt-test"));
+}
+#[test]
 fn session_list_partial_parses_reasons() {
     let payload = |reason: &str| {
         serde_json::json!(
@@ -2050,6 +2080,10 @@ fn session_picker_entry_maps_to_dormant_roster_row() {
         source: "local".to_string(),
         model_id: Some("grok-4".to_string()),
         num_messages: 3,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
         last_active_at: Some(updated),
         branch: None,
         repo_name: "repo-app".to_string(),

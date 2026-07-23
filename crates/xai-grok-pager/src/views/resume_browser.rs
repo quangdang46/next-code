@@ -4,8 +4,6 @@
 //! session_picker layout and Face `MemoryBrowser` chrome. Distinct from the
 //! expand-card `SessionPicker` used by `/resume`.
 
-use std::borrow::Cow;
-
 use crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -24,6 +22,10 @@ use crate::views::modal_window::{
 const SPLIT_MIN_WIDTH: u16 = 80;
 const LIST_WIDTH_RATIO: f64 = 0.40;
 const PREVIEW_MAX_MESSAGES: usize = 20;
+/// Visual lines per list entry (title · time; counts; prompt/cwd).
+const LIST_ROW_LINES: u16 = 3;
+const CWD_DISPLAY_MAX: usize = 36;
+const PROMPT_DISPLAY_MAX: usize = 56;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResumeBrowserFocus {
@@ -151,6 +153,12 @@ impl ResumeBrowserState {
                         || e.id.to_ascii_lowercase().contains(&q)
                         || e.cwd.to_ascii_lowercase().contains(&q)
                         || e.repo_name.to_ascii_lowercase().contains(&q)
+                        || e.first_prompt
+                            .as_deref()
+                            .is_some_and(|fp| fp.to_ascii_lowercase().contains(&q))
+                        || e.short_name
+                            .as_deref()
+                            .is_some_and(|sn| sn.to_ascii_lowercase().contains(&q))
                 })
                 .map(|(i, _)| i)
                 .collect(),
@@ -353,11 +361,12 @@ fn render_session_list(
 
     let entries_start_y = search_y + 1;
     let available_height = area.height.saturating_sub(1) as usize;
+    let visible_slots = (available_height / LIST_ROW_LINES as usize).max(1);
     if state.selected < state.scroll_offset {
         state.scroll_offset = state.selected;
     }
-    if state.selected >= state.scroll_offset + available_height {
-        state.scroll_offset = state.selected.saturating_sub(available_height.saturating_sub(1));
+    if state.selected >= state.scroll_offset + visible_slots {
+        state.scroll_offset = state.selected.saturating_sub(visible_slots.saturating_sub(1));
     }
 
     if state.loading && state.entries.is_none() {
@@ -389,11 +398,11 @@ fn render_session_list(
         return;
     }
 
-    let end = filtered.len().min(state.scroll_offset + available_height);
+    let end = filtered.len().min(state.scroll_offset + visible_slots);
     let entries = state.entries.as_ref().map(|e| e.as_slice()).unwrap_or(&[]);
     for (row, &orig_idx) in filtered[state.scroll_offset..end].iter().enumerate() {
-        let y = entries_start_y + row as u16;
-        if y >= area.y + area.height {
+        let y0 = entries_start_y + (row as u16) * LIST_ROW_LINES;
+        if y0 >= area.y + area.height {
             break;
         }
         let Some(entry) = entries.get(orig_idx) else {
@@ -406,11 +415,12 @@ fn render_session_list(
         } else {
             theme.bg_base
         };
+        let row_h = LIST_ROW_LINES.min(area.y + area.height - y0);
         let row_rect = Rect {
             x: area.x,
-            y,
+            y: y0,
             width: area.width,
-            height: 1,
+            height: row_h,
         };
         buf.set_style(row_rect, Style::default().bg(bg));
 
@@ -419,46 +429,127 @@ fn render_session_list(
         } else {
             entry.summary.as_str()
         };
-        let meta = format_entry_meta(entry);
-        let max_label_w = area.width.saturating_sub(2) as usize;
-        let truncated: Cow<str> = if title.width() > max_label_w {
-            let trunc = truncate_to_width(title, max_label_w.saturating_sub(3));
-            format!("{trunc}...").into()
-        } else {
-            Cow::Borrowed(title)
-        };
+        let ago = relative_time(entry.updated_at);
+        let max_w = area.width.saturating_sub(2) as usize;
+        let title_budget = max_w.saturating_sub(ago.width() + 3);
+        let title_disp = truncate_ellipsis(title, title_budget);
+        let line1 = format!("{title_disp} · {ago}");
         buf.set_span(
             area.x + 1,
-            y,
+            y0,
             &Span::styled(
-                truncated.as_ref(),
-                Style::default().fg(theme.text_primary).bg(bg),
+                truncate_ellipsis(&line1, max_w),
+                Style::default()
+                    .fg(theme.text_primary)
+                    .bg(bg)
+                    .add_modifier(if is_selected {
+                        Modifier::BOLD
+                    } else {
+                        Modifier::empty()
+                    }),
             ),
             area.width.saturating_sub(1),
         );
-        if !meta.is_empty() && area.width > 12 {
-            let meta_w = meta.width().min(area.width as usize / 3) as u16;
-            let meta_x = (area.x + area.width).saturating_sub(meta_w + 1);
+
+        if row_h >= 2 {
+            let counts = format_entry_counts(entry);
+            let meta = if entry.repo_name.is_empty() {
+                counts
+            } else if counts.is_empty() {
+                entry.repo_name.clone()
+            } else {
+                format!("{} · {}", entry.repo_name, counts)
+            };
             buf.set_span(
-                meta_x,
-                y,
+                area.x + 1,
+                y0 + 1,
                 &Span::styled(
-                    crate::render::line_utils::truncate_str(&meta, meta_w as usize),
+                    truncate_ellipsis(&meta, max_w),
                     Style::default().fg(theme.gray).bg(bg),
                 ),
-                meta_w,
+                area.width.saturating_sub(1),
+            );
+        }
+
+        if row_h >= 3 {
+            let line3 = format_entry_secondary(entry);
+            buf.set_span(
+                area.x + 1,
+                y0 + 2,
+                &Span::styled(
+                    truncate_ellipsis(&line3, max_w),
+                    Style::default().fg(theme.gray_dim).bg(bg),
+                ),
+                area.width.saturating_sub(1),
             );
         }
     }
 }
 
-fn format_entry_meta(entry: &SessionPickerEntry) -> String {
-    let ago = relative_time(entry.updated_at);
-    if entry.repo_name.is_empty() {
-        ago
+fn format_entry_counts(entry: &SessionPickerEntry) -> String {
+    if entry.user_message_count > 0 || entry.assistant_message_count > 0 {
+        format!(
+            "{} user · {} asst",
+            entry.user_message_count, entry.assistant_message_count
+        )
+    } else if entry.num_messages > 0 {
+        format!("{} msgs", entry.num_messages)
     } else {
-        format!("{} · {}", entry.repo_name, ago)
+        String::new()
     }
+}
+
+fn title_is_short_name(entry: &SessionPickerEntry) -> bool {
+    if let Some(sn) = entry.short_name.as_deref() {
+        return entry.summary == sn;
+    }
+    !entry.summary.contains(' ') && entry.summary.chars().count() <= 24
+}
+
+fn format_entry_secondary(entry: &SessionPickerEntry) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if title_is_short_name(entry)
+        && let Some(fp) = entry.first_prompt.as_deref().map(str::trim).filter(|s| !s.is_empty())
+    {
+        let snippet = truncate_ellipsis(fp, PROMPT_DISPLAY_MAX);
+        parts.push(format!("prompt: {snippet}"));
+    }
+    if !entry.cwd.is_empty() {
+        parts.push(truncate_cwd(&entry.cwd, CWD_DISPLAY_MAX));
+    }
+    if parts.is_empty() {
+        entry.id.chars().take(12).collect()
+    } else {
+        parts.join(" · ")
+    }
+}
+
+fn truncate_cwd(cwd: &str, max: usize) -> String {
+    if cwd.chars().count() <= max {
+        return cwd.to_string();
+    }
+    let chars: Vec<char> = cwd.chars().collect();
+    let take = max.saturating_sub(3);
+    let suffix: String = chars
+        .iter()
+        .rev()
+        .take(take)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect();
+    format!("...{suffix}")
+}
+
+fn truncate_ellipsis(s: &str, max_width: usize) -> String {
+    if max_width == 0 {
+        return String::new();
+    }
+    if s.width() <= max_width {
+        return s.to_string();
+    }
+    let trunc = truncate_to_width(s, max_width.saturating_sub(3));
+    format!("{trunc}...")
 }
 
 fn relative_time(ts: chrono::DateTime<chrono::Utc>) -> String {
@@ -478,26 +569,65 @@ fn relative_time(ts: chrono::DateTime<chrono::Utc>) -> String {
 fn render_preview(buf: &mut Buffer, area: Rect, state: &mut ResumeBrowserState, theme: &Theme) {
     buf.set_style(area, Style::default().bg(theme.bg_base));
     let preview_focused = state.focus == ResumeBrowserFocus::Preview;
-    let header = if preview_focused {
-        "Preview (focused)"
-    } else {
-        "Preview"
-    };
-    buf.set_span(
-        area.x,
-        area.y,
-        &Span::styled(
-            header,
+    let selected = state.selected_entry();
+
+    let mut header_lines: Vec<(String, Style)> = Vec::new();
+    if let Some(entry) = selected {
+        let title = if entry.summary.trim().is_empty() {
+            entry.id.as_str()
+        } else {
+            entry.summary.as_str()
+        };
+        let focus_mark = if preview_focused { " ▸" } else { "" };
+        header_lines.push((
+            format!("{title}{focus_mark}"),
             Style::default()
                 .fg(theme.accent_user)
                 .bg(theme.bg_base)
                 .add_modifier(Modifier::BOLD),
-        ),
-        area.width,
-    );
+        ));
+        if !entry.cwd.is_empty() {
+            header_lines.push((
+                truncate_cwd(&entry.cwd, area.width.saturating_sub(2) as usize),
+                Style::default().fg(theme.gray).bg(theme.bg_base),
+            ));
+        }
+        if let Some(model) = entry.model_id.as_deref().filter(|s| !s.is_empty()) {
+            header_lines.push((
+                model.to_string(),
+                Style::default().fg(theme.gray_dim).bg(theme.bg_base),
+            ));
+        }
+    } else {
+        header_lines.push((
+            if preview_focused {
+                "Preview (focused)".into()
+            } else {
+                "Preview".into()
+            },
+            Style::default()
+                .fg(theme.accent_user)
+                .bg(theme.bg_base)
+                .add_modifier(Modifier::BOLD),
+        ));
+    }
 
-    let body_y = area.y + 1;
-    let body_h = area.height.saturating_sub(1);
+    for (i, (text, style)) in header_lines.iter().enumerate() {
+        let y = area.y + i as u16;
+        if y >= area.y + area.height {
+            return;
+        }
+        buf.set_span(
+            area.x,
+            y,
+            &Span::styled(truncate_ellipsis(text, area.width as usize), *style),
+            area.width,
+        );
+    }
+
+    let header_h = header_lines.len() as u16;
+    let body_y = area.y + header_h;
+    let body_h = area.height.saturating_sub(header_h);
     if body_h == 0 {
         return;
     }
@@ -516,7 +646,7 @@ fn render_preview(buf: &mut Buffer, area: Rect, state: &mut ResumeBrowserState, 
     }
 
     if state.preview_lines.is_empty() {
-        let msg = if state.selected_entry().is_some() {
+        let msg = if selected.is_some() {
             "No transcript preview"
         } else {
             "Select a session"
@@ -839,6 +969,10 @@ mod tests {
             source: "local".into(),
             model_id: None,
             num_messages: 1,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
             last_active_at: None,
             branch: None,
             repo_name: "repo".into(),
@@ -859,6 +993,28 @@ mod tests {
         assert_eq!(state.filtered_cache.len(), 1);
         assert_eq!(state.selected_entry().map(|e| e.id.as_str()), Some("b"));
         assert!(state.preview_seq >= seq_before);
+    }
+
+    #[test]
+    fn secondary_line_prefers_prompt_when_title_is_short_name() {
+        let mut e = entry("sess-blazing", "blazing");
+        e.short_name = Some("blazing".into());
+        e.first_prompt = Some("Fix the resume list density".into());
+        e.cwd = "/Users/me/Projects/next-code".into();
+        let secondary = format_entry_secondary(&e);
+        assert!(secondary.starts_with("prompt: Fix the resume"), "{secondary}");
+        assert!(secondary.contains("next-code"), "{secondary}");
+    }
+
+    #[test]
+    fn secondary_line_skips_prompt_when_title_is_custom() {
+        let mut e = entry("sess-blazing", "Resume list enrichment");
+        e.short_name = Some("blazing".into());
+        e.first_prompt = Some("Fix the resume list density".into());
+        e.cwd = "/repo".into();
+        let secondary = format_entry_secondary(&e);
+        assert!(!secondary.contains("prompt:"), "{secondary}");
+        assert!(secondary.contains("/repo"), "{secondary}");
     }
 
     #[test]
