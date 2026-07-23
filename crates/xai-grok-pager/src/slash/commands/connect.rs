@@ -7,21 +7,21 @@
 
 use next_code_provider_metadata::{
     LoginProviderAuthKind, LoginProviderAuthStateKey, LoginProviderDescriptor,
-    LoginProviderTarget,
 };
 
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
 /// OpenCode TUI `PROVIDER_PRIORITY` order (`dialog-provider.tsx`).
-/// Resolved against Face-wired `tui_login_providers()`; missing ids skipped.
+/// Resolved against `tui_login_providers()`; missing ids skipped.
+/// OpenCode ids: opencode, opencode-go, openai, github-copilot, anthropic, google.
 const POPULAR_CONNECT_IDS: &[&str] = &[
     "opencode",
     "opencode-go",
     "openai",
-    "copilot",
-    "claude",
-    "gemini",
+    "copilot", // OpenCode: github-copilot
+    "claude",  // OpenCode: anthropic
+    "gemini",  // OpenCode: google (models); next-code Gmail OAuth stays out of TUI list
 ];
 
 /// OpenCode list-row descriptions (same file, `providerOptions` map).
@@ -113,13 +113,6 @@ pub(crate) fn connect_run(args: &str) -> CommandResult {
         ));
     };
 
-    if !face_connect_wired(provider) {
-        return CommandResult::Error(format!(
-            "{} is not available in Face /connect (use CLI `nextcode login {}`).",
-            provider.display_name, provider.id
-        ));
-    }
-
     CommandResult::Action(Action::NextCodeConnect {
         provider: provider.id.to_string(),
     })
@@ -135,32 +128,10 @@ pub(crate) fn suggest_connect_args(args_query: &str) -> Vec<ArgItem> {
     build_connect_family_items()
 }
 
-/// Providers Face can actually authenticate (no Bedrock/Azure/AutoImport crash).
-fn face_connect_wired(p: LoginProviderDescriptor) -> bool {
-    match p.target {
-        LoginProviderTarget::Bedrock
-        | LoginProviderTarget::Azure
-        | LoginProviderTarget::AutoImport => false,
-        LoginProviderTarget::Claude
-        | LoginProviderTarget::ClaudeApiKey
-        | LoginProviderTarget::OpenAi
-        | LoginProviderTarget::OpenAiApiKey
-        | LoginProviderTarget::OpenRouter
-        | LoginProviderTarget::OpenAiCompatible(_)
-        | LoginProviderTarget::Cursor
-        | LoginProviderTarget::Copilot
-        | LoginProviderTarget::Gemini
-        | LoginProviderTarget::Antigravity
-        | LoginProviderTarget::Google => true,
-    }
-}
-
 /// Flat searchable list used by OpenConnectPicker and Tab suggest.
+/// Full TUI login catalog (OpenCode Popular + rest) — Face auth is wired for all.
 pub(crate) fn build_connect_family_items() -> Vec<ArgItem> {
-    let providers: Vec<LoginProviderDescriptor> = next_code_provider_metadata::tui_login_providers()
-        .into_iter()
-        .filter(|p| face_connect_wired(*p))
-        .collect();
+    let providers = next_code_provider_metadata::tui_login_providers();
     let families = group_families(&providers);
 
     let mut out = Vec::new();
@@ -201,14 +172,8 @@ fn connect_method_items_for_query(args_query: &str) -> Option<Vec<ArgItem>> {
     }
     let provider = next_code_provider_metadata::resolve_login_provider(id)
         .or_else(|| next_code_provider_metadata::resolve_login_provider_loose(id))?;
-    if !face_connect_wired(provider) {
-        return None;
-    }
     let methods = methods_for_key(
-        &next_code_provider_metadata::tui_login_providers()
-            .into_iter()
-            .filter(|p| face_connect_wired(*p))
-            .collect::<Vec<_>>(),
+        &next_code_provider_metadata::tui_login_providers(),
         provider.auth_state_key,
     );
     if methods.len() < 2 {
@@ -482,24 +447,30 @@ mod tests {
     }
 
     #[test]
-    fn bedrock_excluded_from_picker() {
+    fn bedrock_listed_under_other() {
         let items = build_connect_family_items();
+        let bedrock = items
+            .iter()
+            .find(|i| i.insert_text.trim() == "bedrock")
+            .expect("bedrock in Other");
+        assert!(!bedrock.is_section_header);
         assert!(
-            !items.iter().any(|i| i.insert_text.trim() == "bedrock"
-                || i.display.contains("Bedrock")),
+            items
+                .iter()
+                .any(|i| i.is_section_header && i.display == "Other"),
             "{items:?}"
         );
     }
 
     #[test]
-    fn typed_bedrock_errors_without_dispatch() {
+    fn typed_bedrock_dispatches_face_login() {
         let models = ModelState::default();
         let mut ctx = make_ctx(&models);
         match ConnectCommand.run(&mut ctx, "bedrock") {
-            CommandResult::Error(msg) => {
-                assert!(msg.contains("not available in Face"), "{msg}");
+            CommandResult::Action(Action::NextCodeConnect { provider }) => {
+                assert_eq!(provider, "bedrock");
             }
-            other => panic!("expected Error, got {other:?}"),
+            other => panic!("expected NextCodeConnect bedrock, got {other:?}"),
         }
     }
 

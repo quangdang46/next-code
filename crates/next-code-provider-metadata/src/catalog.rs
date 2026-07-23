@@ -1049,7 +1049,7 @@ pub const COPILOT_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescrip
     auth_kind: LoginProviderAuthKind::DeviceCode,
     auth_state_key: LoginProviderAuthStateKey::Copilot,
     auth_status_method: "device code",
-    aliases: &[],
+    aliases: &["github-copilot", "github_copilot"],
     menu_detail: "GitHub device flow",
     recommended: false,
     target: LoginProviderTarget::Copilot,

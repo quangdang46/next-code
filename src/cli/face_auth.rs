@@ -37,11 +37,8 @@ struct PendingFaceLogin {
 
 #[derive(Debug)]
 enum PendingKind {
-    ApiKey {
-        env_file: String,
-        key_name: String,
-        optional: bool,
-    },
+    /// Waiting for Face paste (API key / Azure multi-step field).
+    ApiKeyPaste,
     ScriptableOAuth,
     /// Device / complete-only (Copilot).
     ScriptableComplete,
@@ -132,6 +129,14 @@ pub async fn authenticate_method(method_id: &str) -> Result<()> {
         .or_else(|| resolve_login_provider_loose(provider_key))
         .ok_or_else(|| anyhow!("Unknown provider {provider_key:?}"))?;
 
+    // Multi-step / non-paste targets before the generic API-key/OAuth branches.
+    match provider.target {
+        LoginProviderTarget::AutoImport => return run_auto_import_face_login().await,
+        LoginProviderTarget::Azure => return run_azure_face_login(provider).await,
+        LoginProviderTarget::Bedrock => return run_bedrock_face_login(provider).await,
+        _ => {}
+    }
+
     match provider.auth_kind {
         LoginProviderAuthKind::ApiKey | LoginProviderAuthKind::Local | LoginProviderAuthKind::Hybrid => {
             run_api_key_face_login(provider).await
@@ -200,17 +205,6 @@ async fn run_api_key_face_login(provider: LoginProviderDescriptor) -> Result<()>
                 !resolved.requires_api_key,
             )
         }
-        // Unwired Face targets (still CLI/TUI elsewhere). Never list these in
-        // Face `/connect` — this arm is a hard stop for typed `/connect <id>`.
-        LoginProviderTarget::Bedrock
-        | LoginProviderTarget::Azure
-        | LoginProviderTarget::AutoImport => {
-            anyhow::bail!(
-                "{} is not available in Face /connect. Use CLI: nextcode login {}",
-                provider.display_name,
-                provider.id
-            );
-        }
         other => {
             anyhow::bail!(
                 "{} ({other:?}) cannot use Face API-key login.",
@@ -219,36 +213,17 @@ async fn run_api_key_face_login(provider: LoginProviderDescriptor) -> Result<()>
         }
     };
 
-    let (tx, rx) = oneshot::channel();
-    {
-        let mut g = PENDING.lock().map_err(|_| anyhow!("auth lock poisoned"))?;
-        *g = Some(PendingFaceLogin {
-            provider_id: provider.id.to_string(),
-            auth_url: Some(setup_url),
-            mode: "loopback".into(),
-            kind: PendingKind::ApiKey {
-                env_file: env_file.clone(),
-                key_name: key_name.clone(),
-                optional,
-            },
-            code_tx: Some(tx),
-        });
-    }
-
-    let code = tokio::time::timeout(Duration::from_secs(15 * 60), rx)
-        .await
-        .map_err(|_| anyhow!("Timed out waiting for API key paste"))?
-        .map_err(|_| anyhow!("Login cancelled"))?;
-
-    clear_pending();
+    let code = face_prompt_paste(provider.id, &setup_url).await?;
 
     if code.is_empty() {
+        clear_pending();
         if optional {
             return Ok(());
         }
         anyhow::bail!("No API key provided");
     }
 
+    clear_pending();
     save_named_api_key(&env_file, &key_name, &code)?;
     crate::auth::AuthStatus::invalidate_cache();
     if let Ok(path) = crate::provider_catalog::auth_json_path() {
@@ -257,6 +232,135 @@ async fn run_api_key_face_login(provider: LoginProviderDescriptor) -> Result<()>
             "Face /connect saved API key; credential path: {}",
             path.display()
         ));
+    }
+    Ok(())
+}
+
+/// Bedrock: same as legacy TUI — API key paste + default region `us-east-2`.
+async fn run_bedrock_face_login(provider: LoginProviderDescriptor) -> Result<()> {
+    let setup_url = "https://console.aws.amazon.com/bedrock/home#/api-keys";
+    let code = face_prompt_paste(provider.id, setup_url).await?;
+    clear_pending();
+    if code.is_empty() {
+        anyhow::bail!("No API key provided");
+    }
+
+    save_named_api_key(
+        crate::provider::bedrock::ENV_FILE,
+        crate::provider::bedrock::API_KEY_ENV,
+        &code,
+    )?;
+    crate::provider_catalog::save_env_value_to_env_file(
+        crate::provider::bedrock::REGION_ENV,
+        crate::provider::bedrock::ENV_FILE,
+        Some("us-east-2"),
+    )?;
+    crate::auth::AuthStatus::invalidate_cache();
+    if let Ok(path) = crate::storage::app_config_dir() {
+        let stored = path.join(crate::provider::bedrock::ENV_FILE);
+        remember_connect_credential_path(stored.display().to_string());
+    }
+    Ok(())
+}
+
+/// Azure OpenAI: Face multi-step paste (endpoint → deployment → API key).
+/// Entra ID remains CLI (`nextcode login azure`); Face uses API-key path only.
+async fn run_azure_face_login(provider: LoginProviderDescriptor) -> Result<()> {
+    use crate::auth::azure;
+
+    let docs = "https://portal.azure.com/#create/Microsoft.CognitiveServicesOpenAI";
+    let endpoint_raw = face_prompt_paste(provider.id, docs).await?;
+    let endpoint = match azure::normalize_endpoint(&endpoint_raw) {
+        Some(endpoint) => endpoint,
+        None => {
+            clear_pending();
+            anyhow::bail!(
+                "Invalid Azure OpenAI endpoint. Use https://<resource>.openai.azure.com (or the full /openai/v1 URL)."
+            );
+        }
+    };
+
+    let model = face_prompt_paste(provider.id, docs).await?;
+    if model.is_empty() {
+        clear_pending();
+        anyhow::bail!("No deployment/model name provided");
+    }
+
+    let key = face_prompt_paste(provider.id, docs).await?;
+    clear_pending();
+    if key.is_empty() {
+        anyhow::bail!("No API key provided");
+    }
+
+    let assignments = [
+        (azure::ENDPOINT_ENV, endpoint),
+        (azure::MODEL_ENV, model),
+        (azure::USE_ENTRA_ENV, "0".to_string()),
+        (azure::API_KEY_ENV, key),
+    ];
+    save_face_env_vars(azure::ENV_FILE, &assignments)?;
+    azure::apply_runtime_env()?;
+    crate::auth::AuthStatus::invalidate_cache();
+    if let Ok(path) = crate::storage::app_config_dir() {
+        remember_connect_credential_path(path.join(azure::ENV_FILE).display().to_string());
+    }
+    Ok(())
+}
+
+async fn run_auto_import_face_login() -> Result<()> {
+    let imported = super::provider_init::maybe_run_external_auth_auto_import_flow()
+        .await?
+        .unwrap_or(0);
+    if imported == 0 {
+        anyhow::bail!(
+            "No existing logins were imported. Either none were found, nothing was approved, or validation failed."
+        );
+    }
+    crate::auth::AuthStatus::invalidate_cache();
+    Ok(())
+}
+
+/// Show Face welcome paste chrome and wait for submit_auth_code.
+async fn face_prompt_paste(provider_id: &str, auth_url: &str) -> Result<String> {
+    let (tx, rx) = oneshot::channel();
+    {
+        let mut g = PENDING.lock().map_err(|_| anyhow!("auth lock poisoned"))?;
+        *g = Some(PendingFaceLogin {
+            provider_id: provider_id.to_string(),
+            auth_url: Some(auth_url.to_string()),
+            mode: "loopback".into(),
+            kind: PendingKind::ApiKeyPaste,
+            code_tx: Some(tx),
+        });
+    }
+
+    tokio::time::timeout(Duration::from_secs(15 * 60), rx)
+        .await
+        .map_err(|_| anyhow!("Timed out waiting for paste"))?
+        .map_err(|_| anyhow!("Login cancelled"))
+}
+
+fn save_face_env_vars(env_file: &str, vars: &[(&str, String)]) -> Result<()> {
+    if !crate::provider_catalog::is_safe_env_file_name(env_file) {
+        anyhow::bail!("Invalid env file name: {env_file}");
+    }
+    for (key, _) in vars {
+        if !crate::provider_catalog::is_safe_env_key_name(key) {
+            anyhow::bail!("Invalid env key name: {key}");
+        }
+    }
+    let config_dir = crate::storage::app_config_dir()?;
+    std::fs::create_dir_all(&config_dir)?;
+    crate::platform::set_directory_permissions_owner_only(&config_dir)?;
+    let file_path = config_dir.join(env_file);
+    let mut content = String::new();
+    for (key, value) in vars {
+        content.push_str(&format!("{key}={value}\n"));
+    }
+    std::fs::write(&file_path, &content)?;
+    crate::platform::set_permissions_owner_only(&file_path)?;
+    for (key, value) in vars {
+        crate::env::set_var(key, value);
     }
     Ok(())
 }

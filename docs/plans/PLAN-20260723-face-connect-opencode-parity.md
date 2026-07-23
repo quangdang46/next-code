@@ -1,40 +1,54 @@
-# Plan Report — Face `/connect` OpenCode parity
+# Plan Report — Face `/connect` OpenCode parity (full wire)
 
 ## Summary
 
-- **Problem:** Face `/connect` Popular/Providers catalog diverges from OpenCode; Bedrock (and peers) appear but Face API-key login is unwired → fatal Quit screen.
-- **Fix:** Copy OpenCode TUI connect shape (`dialog-provider.tsx`): Popular order + descriptions, **Other** section, only Face-wired methods; after auth keep PR #72 model picker. Delete sparse nextcode-only Popular list and dead Face API-key arms that crash.
-- **Risk:** Low–medium (picker + catalog filter; CLI Bedrock/Azure remain).
-- **Status:** Implemented — PR https://github.com/quangdang46/next-code/pull/73 (`38d6050f1`); issue #74.
+- **Problem:** Face `/connect` catalog/auth diverged from OpenCode; unwired targets (Bedrock/Azure/AutoImport) crashed with Quit, then a partial PR **hid** them — user rejected that as incomplete.
+- **Fix:** Copy OpenCode connect shape end-to-end: Popular order + descriptions + Other section + method step + post-auth model picker; **wire Face login for every TUI catalog provider** (Bedrock API key, Azure multi-step paste, Auto Import). Delete hide-filter / dual “not wired” path.
+- **Risk:** Medium (Azure multi-step UX is Face paste chain, not full OpenCode prompt widgets; Entra stays CLI).
+- **Status:** Implementing on `pr-face-connect-opencode-ux` (extends `38d6050f1` / issue #74 / PR #73).
 
 ## Evidence (verified)
 
 | Source | Citation |
 |--------|----------|
-| OpenCode TUI connect | `.tmp-research-plugins/opencode/packages/tui/src/component/dialog-provider.tsx` — `PROVIDER_PRIORITY`, `providerOptions`, `ApiMethod`, `DialogModel` handoff |
-| OpenCode Popular ids | `opencode`, `opencode-go`, `openai`, `github-copilot`, `anthropic`, `google` |
-| OpenCode Go key copy | `ApiMethod` → body + `https://opencode.ai/go`; Zen → `https://opencode.ai/zen` |
-| Face picker today | `crates/xai-grok-pager/src/slash/commands/connect.rs` — `POPULAR_CONNECT_IDS`, `build_connect_family_items` |
-| Bedrock crash | `src/cli/face_auth.rs` `run_api_key_face_login` bail for unwired targets |
-| Post-connect model | PR #72 `open_model_picker_after_auth` |
+| OpenCode TUI connect | `.tmp-research-plugins/opencode/packages/tui/src/component/dialog-provider.tsx` — `PROVIDER_PRIORITY`, `providerOptions`, `ApiMethod`, `DialogModel` |
+| Popular ids | `opencode`, `opencode-go`, `openai`, `github-copilot`, `anthropic`, `google` |
+| Zen/Go copy + URLs | `ApiMethod` → `opencode.ai/zen`, `opencode.ai/go` |
+| Legacy TUI Bedrock/Azure | `crates/next-code-tui/src/tui/app/auth.rs` `start_bedrock_login` / `start_azure_login` |
+| CLI twins | `src/cli/login.rs` `login_bedrock_flow` / `login_azure_flow` / AutoImport |
+
+## Provider matrix (OpenCode → next-code Face)
+
+| OpenCode id | next-code id | Auth | Face status |
+|-------------|--------------|------|-------------|
+| opencode | opencode | API key | Wired (OpenAI-compat) |
+| opencode-go | opencode-go | API key | Wired |
+| openai | openai (+ openai-api) | OAuth / API key | Wired (method step) |
+| github-copilot | copilot (+ alias) | device code | Wired |
+| anthropic | claude (+ anthropic-api) | OAuth / API key | Wired (method step) |
+| google | gemini (+ gemini-api) | OAuth / API key | Wired |
+| (models.dev rest) | TUI catalog Other | mostly API key | Wired via OpenAiCompatible |
+| amazon-bedrock | bedrock | API key | **Wired** (default region us-east-2) |
+| azure | azure | prompts + key | **Wired** (endpoint→model→key; Entra = CLI follow-up) |
+| Other custom | auto-import / custom ids | import / key | Auto Import wired; arbitrary custom id = OpenCode-only follow-up |
 
 ## copy / delete / wire
 
 | Kind | What |
 |------|------|
-| **Copy** | OpenCode Popular order + per-id descriptions; Zen/Go setup URLs; StepFun Step Plan + Mixlayer as OpenAI-compatible API-key rows under Other |
-| **Wire** | Face picker lists only Face-wired providers; `face_auth` rejects unwired with clear error (no fatal “not wired” for listed items) |
-| **Delete** | Old Popular ids (`openrouter`/`xai` as Popular anchors); Popular dedupe by `OpenRouterLike` key (hid Zen/Go); dead `LoginProviderTarget::Gemini` API-key arm; Bedrock/Azure/AutoImport from Face connect list |
+| **Copy** | OpenCode Popular order + blurbs; Zen/Go URLs; StepFun + Mixlayer under Other |
+| **Wire** | Bedrock Face API-key + region; Azure Face multi-step paste; Auto Import; list **all** `tui_login_providers()` |
+| **Delete** | `face_connect_wired` hide filter; Face bail “not available / not wired” for listed providers |
+
+## Follow-up (explicit, not blocking)
+
+- Azure Entra ID in Face (CLI today).
+- OpenCode “Other → custom provider id” free-text credential (models.dev dump beyond TUI catalog).
+- Richer Azure step labels in welcome chrome (today reuses portal URL + paste box).
 
 ## Files
 
 - `docs/plans/PLAN-20260723-face-connect-opencode-parity.md`
 - `crates/xai-grok-pager/src/slash/commands/connect.rs`
-- `crates/next-code-provider-metadata/src/{lib,catalog}.rs`
+- `crates/next-code-provider-metadata/src/catalog.rs`
 - `src/cli/face_auth.rs`
-
-## Out of scope
-
-- Full models.dev (159) catalog dump
-- Wiring Face Bedrock/Azure/AutoImport (CLI keeps them)
-- Auth.json unify (#61)
