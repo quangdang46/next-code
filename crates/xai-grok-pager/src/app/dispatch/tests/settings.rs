@@ -261,7 +261,7 @@ fn set_default_model_allowed_when_agent_chat_kind() {
     assert!(app.agents[&id].session.model_switch_pending);
 }
 /// `/model <name>` dispatches `SetDefaultModel` which routes
-/// through both `PersistSetting` and `SwitchModel`.
+/// through both `PersistPreferredModel` and `SwitchModel`.
 #[test]
 fn slash_model_valid_dispatches_set_default_model_with_switch_and_persist() {
     let mut app = test_app_with_agent();
@@ -277,21 +277,23 @@ fn slash_model_valid_dispatches_set_default_model_with_switch_and_persist() {
             model_id.clone(),
             acp::ModelInfo::new(model_id.clone(), "Grok 4.5".to_string()),
         );
+    app.agents.get_mut(&id).unwrap().info_float_provider = Some("DeepSeek".to_string());
     let effects = dispatch(Action::SendPrompt("/model Grok 4.5".into()), &mut app);
     assert_eq!(
         effects.len(),
         2,
-        "expected PersistSetting + SwitchModel effects, got {effects:?}",
+        "expected PersistPreferredModel + SwitchModel effects, got {effects:?}",
     );
     assert!(
         matches!(
             &effects[0],
-            Effect::PersistSetting {
-                key: "default_model",
+            Effect::PersistPreferredModel {
+                model_id: mid,
+                provider_key: Some(pk),
                 ..
-            }
+            } if mid == &model_id && pk == "deepseek"
         ),
-        "first effect must be PersistSetting(default_model), got {:?}",
+        "first effect must be PersistPreferredModel with provider pin, got {:?}",
         effects[0],
     );
     assert!(
@@ -1005,7 +1007,7 @@ fn clear_default_model_persists_but_keeps_live_current() {
 }
 /// `Action::SetDefaultModel(<known id>)` resolves the
 /// id against the live catalog, mutates current, and emits both
-/// PersistSetting + SwitchModel effects. This is the
+/// PersistPreferredModel + SwitchModel effects. This is the
 /// dispatch-level analog of the slash-command's
 /// `slash_model_valid_dispatches_set_default_model_with_switch_and_persist`
 /// test.
@@ -1027,8 +1029,15 @@ fn set_default_model_resolves_known_name() {
     let effects = dispatch(Action::SetDefaultModel(id.clone()), &mut app);
     assert_eq!(effects.len(), 2);
     assert!(
-        matches!(& effects[0], Effect::PersistSetting { key : "default_model", value :
-        crate ::settings::SettingValue::String(s), .. } if s == "grok-4.5")
+        matches!(
+            &effects[0],
+            Effect::PersistPreferredModel {
+                model_id: mid,
+                ..
+            } if mid == &id
+        ),
+        "expected PersistPreferredModel, got {:?}",
+        effects[0],
     );
     assert!(matches!(& effects[1], Effect::SwitchModel { model_id : mid, .. } if mid == & id));
     assert_eq!(app.agents[&agent_id].session.models.current, Some(id));

@@ -869,6 +869,7 @@ fn switch_model_complete_persists_resolved_effort_from_catalog_meta() {
         Effect::PersistPreferredModel {
             model_id: mid,
             reasoning_effort,
+            ..
         } => {
             assert_eq!(*mid, model_id);
             assert_eq!(

@@ -181,6 +181,41 @@ pub fn set_toml_key_at(
     std::fs::write(path, doc.to_string())
 }
 
+/// Atomically write `[provider].default_model` and/or `[provider].default_provider`.
+///
+/// `None` leaves that key unchanged. Empty string clears the key (writes `""`).
+/// One read-modify-write so Face and cold-start never see a half-updated pair.
+pub fn set_provider_defaults(
+    model: Option<&str>,
+    provider: Option<&str>,
+) -> std::io::Result<()> {
+    set_provider_defaults_at(&user_config_toml_path(), model, provider)
+}
+
+/// Path-injectable core of [`set_provider_defaults`].
+pub fn set_provider_defaults_at(
+    path: &Path,
+    model: Option<&str>,
+    provider: Option<&str>,
+) -> std::io::Result<()> {
+    if model.is_none() && provider.is_none() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let Some(mut doc) = read_config_document_for_edit(path) else {
+        return Ok(());
+    };
+    if let Some(model) = model {
+        doc["provider"]["default_model"] = toml_edit::value(model);
+    }
+    if let Some(provider) = provider {
+        doc["provider"]["default_provider"] = toml_edit::value(provider);
+    }
+    std::fs::write(path, doc.to_string())
+}
+
 /// Set a nested `[section.sub].key` (e.g. `ui.contextual_hints.undo`).
 pub fn set_toml_nested_key(
     section: &str,
@@ -256,6 +291,71 @@ mod tests {
             Some(v) => unsafe { std::env::set_var("NEXT_CODE_HOME", v) },
             None => unsafe { std::env::remove_var("NEXT_CODE_HOME") },
         }
+    }
+
+    #[test]
+    fn set_provider_defaults_writes_model_and_provider_atomically() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "[provider]\ndefault_model = \"old\"\ndefault_provider = \"opencode-go\"\n\n[ui]\ntheme = \"Grok Night\"\n",
+        )
+        .unwrap();
+
+        set_provider_defaults_at(&path, Some("new-model"), Some("deepseek")).unwrap();
+
+        let loaded = load_config_toml_at(&path).unwrap();
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_model"))
+                .and_then(|v| v.as_str()),
+            Some("new-model")
+        );
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_provider"))
+                .and_then(|v| v.as_str()),
+            Some("deepseek")
+        );
+        assert_eq!(
+            loaded
+                .get("ui")
+                .and_then(|u| u.get("theme"))
+                .and_then(|v| v.as_str()),
+            Some("Grok Night")
+        );
+    }
+
+    #[test]
+    fn set_provider_defaults_model_only_preserves_provider() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "[provider]\ndefault_model = \"old\"\ndefault_provider = \"opencode-go\"\n",
+        )
+        .unwrap();
+
+        set_provider_defaults_at(&path, Some("new-model"), None).unwrap();
+
+        let loaded = load_config_toml_at(&path).unwrap();
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_model"))
+                .and_then(|v| v.as_str()),
+            Some("new-model")
+        );
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_provider"))
+                .and_then(|v| v.as_str()),
+            Some("opencode-go")
+        );
     }
 
     #[test]

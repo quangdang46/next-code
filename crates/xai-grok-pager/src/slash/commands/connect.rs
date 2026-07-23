@@ -88,7 +88,8 @@ fn provider_arg_items() -> Vec<ArgItem> {
             match_text: p.id.to_string(),
             insert_text: p.id.to_string(),
             description: format!("{} · {}", p.display_name, p.auth_kind.label()),
-        })
+                ..Default::default()
+            })
         .collect()
 }
 

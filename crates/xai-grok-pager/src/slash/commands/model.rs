@@ -1,6 +1,9 @@
 //! `/model` (alias `/m`) — switch model + (optionally) reasoning effort.
-//! Chained autocomplete: pick a reasoning-supported model → trailing space
-//! re-opens the dropdown into a `low|medium|high|xhigh` sub-menu.
+//!
+//! Bare `/model` opens the Select-model palette (searchable list with provider
+//! groups, current checkmark, Popular providers, `ctrl+a` view-all). Typed
+//! `/model <name> [effort]` still works; reasoning models chain into an effort
+//! sub-menu when selected from the palette.
 
 use agent_client_protocol as acp;
 use xai_grok_shell::sampling::types::supports_reasoning_effort_meta;
@@ -9,6 +12,17 @@ use crate::acp::model_state::ModelState;
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 use crate::slash::commands::effort_levels::build_effort_arg_items;
+
+/// Popular provider ids shown under "Popular providers" (OpenCode-style).
+/// Ids match `next_code_provider_metadata::tui_login_providers()`.
+const POPULAR_PROVIDER_IDS: &[&str] = &[
+    "claude",
+    "openai",
+    "gemini",
+    "openrouter",
+    "xai",
+    "copilot",
+];
 
 /// Switch the active model (and optionally its reasoning effort).
 pub struct ModelCommand;
@@ -37,7 +51,8 @@ impl SlashCommand for ModelCommand {
     }
 
     fn usage(&self) -> &str {
-        "/model <name> [effort]"
+        // Bracketed optional args — bare `/model` opens the Select-model palette.
+        "/model [name] [effort]"
     }
 
     fn takes_args(&self) -> bool {
@@ -45,7 +60,8 @@ impl SlashCommand for ModelCommand {
     }
 
     fn args_required(&self) -> bool {
-        true
+        // Empty args open the Select-model palette (OpenCode-style).
+        false
     }
 
     fn arg_placeholder(&self) -> Option<&str> {
@@ -54,7 +70,8 @@ impl SlashCommand for ModelCommand {
 
     fn suggest_args(&self, ctx: &AppCtx, args_query: &str) -> Option<Vec<ArgItem>> {
         if ctx.models.is_empty() {
-            return None;
+            // Still offer Popular providers so the user can connect.
+            return Some(build_popular_provider_items(true));
         }
 
         // Effort phase if input is "<reasoning-model> ", else model phase.
@@ -67,7 +84,7 @@ impl SlashCommand for ModelCommand {
     fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let trimmed = args.trim();
         if trimmed.is_empty() {
-            return CommandResult::Error("Usage: /model <name> [effort]".into());
+            return CommandResult::Action(Action::OpenModelPicker);
         }
 
         // Prefer an exact full-string catalog match first. Model display names
@@ -148,38 +165,254 @@ fn detect_effort_phase(models: &ModelState, args_query: &str) -> Option<acp::Mod
     None
 }
 
-/// One row per logical model. Reasoning models get a trailing space in
-/// `insert_text` so the prompt widget chains into the effort sub-menu.
+/// Infer a human provider label for grouping in the Select-model palette.
+pub(crate) fn provider_label_for_model(id: &str, info: &acp::ModelInfo) -> String {
+    if let Some(name) = info
+        .meta
+        .as_ref()
+        .and_then(|m| m.get("providerName"))
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        return name.to_string();
+    }
+
+    let id_l = id.to_ascii_lowercase();
+    if id_l.starts_with("claude") || id_l.contains("anthropic") {
+        "Anthropic".into()
+    } else if id_l.starts_with("gpt-")
+        || id_l.starts_with("o1")
+        || id_l.starts_with("o3")
+        || id_l.starts_with("o4")
+        || id_l.starts_with("chatgpt")
+    {
+        "OpenAI".into()
+    } else if id_l.starts_with("gemini") {
+        "Gemini".into()
+    } else if id_l.starts_with("grok") || id_l.contains("xai") {
+        "xAI".into()
+    } else if id_l.contains('/') || id_l.contains('@') {
+        "OpenRouter".into()
+    } else if id_l.starts_with("deepseek") {
+        "DeepSeek".into()
+    } else if id_l.starts_with("mistral") || id_l.starts_with("codestral") {
+        "Mistral".into()
+    } else {
+        "Models".into()
+    }
+}
+
+fn model_looks_free(id: &str, info: &acp::ModelInfo) -> bool {
+    let id_l = id.to_ascii_lowercase();
+    if id_l.contains(":free") || id_l.ends_with("-free") {
+        return true;
+    }
+    if info.name.to_ascii_lowercase().contains(" free") {
+        return true;
+    }
+    info.meta
+        .as_ref()
+        .and_then(|m| m.get("cost"))
+        .and_then(|c| c.get("input"))
+        .and_then(|v| v.as_f64())
+        == Some(0.0)
+}
+
+fn popular_provider_rank(label: &str) -> usize {
+    let key = label.to_ascii_lowercase();
+    const ORDER: &[&str] = &[
+        "anthropic",
+        "openai",
+        "gemini",
+        "google",
+        "openrouter",
+        "xai",
+        "copilot",
+        "github-copilot",
+        "models",
+    ];
+    ORDER
+        .iter()
+        .position(|p| key.contains(p))
+        .unwrap_or(ORDER.len())
+}
+
+/// One row per logical model, grouped by provider, plus Popular providers.
+/// Reasoning models get a trailing space in `insert_text` so the prompt widget
+/// / palette chains into the effort sub-menu.
 fn build_model_items(models: &ModelState) -> Vec<ArgItem> {
     let current_id = models.current.as_ref();
-    let mut items: Vec<ArgItem> = Vec::with_capacity(models.available.len());
+    let mut rows: Vec<(String, ArgItem)> = Vec::with_capacity(models.available.len());
+
     for (id, info) in &models.available {
         let is_current = current_id == Some(id);
         let supports = supports_reasoning_effort(info);
-
-        let display = if is_current {
-            format!("{} (current)", info.name)
+        let category = provider_label_for_model(id.0.as_ref(), info);
+        let badge = if model_looks_free(id.0.as_ref(), info) {
+            Some("Free".into())
         } else {
-            info.name.clone()
+            None
         };
 
         // Trailing space on reasoning models: signals "more input
-        // expected" to the prompt widget so Enter advances to effort
-        // phase instead of submitting.
+        // expected" so Enter advances to effort phase instead of submitting.
         let insert_text = if supports {
             format!("{} ", info.name)
         } else {
             info.name.clone()
         };
 
+        rows.push((
+            category.clone(),
+            ArgItem {
+                display: info.name.clone(),
+                match_text: format!("{} {}", category, info.name),
+                insert_text,
+                description: category.clone(),
+                category: Some(category),
+                badge,
+                is_current,
+                provider_connect: false,
+                is_section_header: false,
+            },
+        ));
+    }
+
+    rows.sort_by(|a, b| {
+        popular_provider_rank(&a.0)
+            .cmp(&popular_provider_rank(&b.0))
+            .then_with(|| a.0.cmp(&b.0))
+            .then_with(|| a.1.display.to_ascii_lowercase().cmp(&b.1.display.to_ascii_lowercase()))
+    });
+
+    let mut items: Vec<ArgItem> = Vec::new();
+    let mut last_cat: Option<String> = None;
+    for (cat, item) in rows {
+        if last_cat.as_deref() != Some(cat.as_str()) {
+            items.push(ArgItem {
+                display: cat.clone(),
+                match_text: String::new(),
+                insert_text: String::new(),
+                description: String::new(),
+                category: Some(cat.clone()),
+                badge: None,
+                is_current: false,
+                provider_connect: false,
+                is_section_header: true,
+            });
+            last_cat = Some(cat);
+        }
+        items.push(item);
+    }
+    let popular = build_popular_provider_items(false);
+    if !popular.is_empty() {
         items.push(ArgItem {
-            display,
-            match_text: info.name.clone(),
-            insert_text,
-            description: info.description.clone().unwrap_or_default(),
+            display: "Popular providers".into(),
+            match_text: String::new(),
+            insert_text: String::new(),
+            description: String::new(),
+            category: Some("Popular providers".into()),
+            badge: None,
+            is_current: false,
+            provider_connect: false,
+            is_section_header: true,
         });
+        // Strip per-row categories so we don't double-header.
+        for mut row in popular {
+            row.category = None;
+            items.push(row);
+        }
     }
     items
+}
+
+fn build_popular_provider_items(only_section: bool) -> Vec<ArgItem> {
+    let providers = next_code_provider_metadata::tui_login_providers();
+    let mut out = Vec::new();
+    if only_section {
+        out.push(ArgItem {
+            display: "Popular providers".into(),
+            match_text: String::new(),
+            insert_text: String::new(),
+            description: String::new(),
+            category: Some("Popular providers".into()),
+            badge: None,
+            is_current: false,
+            provider_connect: false,
+            is_section_header: true,
+        });
+    }
+    for id in POPULAR_PROVIDER_IDS {
+        let Some(p) = providers.iter().find(|d| &d.id == id) else {
+            continue;
+        };
+        out.push(ArgItem {
+            display: p.display_name.to_string(),
+            match_text: format!("Popular providers {} {}", p.display_name, p.id),
+            insert_text: p.id.to_string(),
+            description: format!("{} · connect", p.auth_kind.label()),
+            category: if only_section {
+                None
+            } else {
+                Some("Popular providers".into())
+            },
+            badge: None,
+            is_current: false,
+            provider_connect: true,
+            is_section_header: false,
+        });
+        if only_section && out.iter().filter(|i| i.provider_connect).count() >= 6 {
+            break;
+        }
+    }
+    if !out.iter().any(|i| i.provider_connect) {
+        for p in providers.into_iter().filter(|d| d.recommended).take(6) {
+            out.push(ArgItem {
+                display: p.display_name.to_string(),
+                match_text: format!("Popular providers {} {}", p.display_name, p.id),
+                insert_text: p.id.to_string(),
+                description: format!("{} · connect", p.auth_kind.label()),
+                category: None,
+                badge: None,
+                is_current: false,
+                provider_connect: true,
+                is_section_header: false,
+            });
+        }
+    }
+    out
+}
+
+/// Flat list of all login providers for `ctrl+a` "view all".
+pub(crate) fn build_all_provider_connect_items() -> Vec<ArgItem> {
+    let mut out = vec![ArgItem {
+        display: "All providers".into(),
+        match_text: String::new(),
+        insert_text: String::new(),
+        description: String::new(),
+        category: Some("All providers".into()),
+        badge: None,
+        is_current: false,
+        provider_connect: false,
+        is_section_header: true,
+    }];
+    out.extend(
+        next_code_provider_metadata::tui_login_providers()
+            .into_iter()
+            .map(|p| ArgItem {
+                display: p.display_name.to_string(),
+                match_text: format!("{} {}", p.display_name, p.id),
+                insert_text: p.id.to_string(),
+                description: format!("{} · {}", p.id, p.auth_kind.label()),
+                category: None,
+                badge: None,
+                is_current: false,
+                provider_connect: true,
+                is_section_header: false,
+            }),
+    );
+    out
 }
 
 /// One row per effort level for the `/model` chained effort phase.
@@ -264,7 +497,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_query_returns_one_row_per_logical_model() {
+    fn empty_query_returns_models_plus_popular_providers() {
         let mut state = ModelState::default();
         let (rid, rinfo) = model_with_reasoning("reasoning-x", "Reasoning X");
         let (pid, pinfo) = plain_model("grok-4.5", "Grok 4.5");
@@ -279,20 +512,34 @@ mod tests {
             screen_mode: crate::app::ScreenMode::Fullscreen,
         };
         let items = cmd.suggest_args(&ctx, "").unwrap();
-        assert_eq!(items.len(), 2, "model phase: one row per logical model");
+        assert!(
+            items.iter().any(|i| i.match_text.contains("Reasoning X")),
+            "expected model rows"
+        );
+        assert!(
+            items.iter().any(|i| i.provider_connect),
+            "expected Popular providers connect rows"
+        );
 
-        // Reasoning model has trailing space in insert_text -- this is the
-        // signal the prompt widget reads to keep the dropdown open after
-        // Enter so the effort sub-menu can render.
         let reasoning = items
             .iter()
-            .find(|i| i.match_text == "Reasoning X")
+            .find(|i| i.display == "Reasoning X")
             .unwrap();
         assert_eq!(reasoning.insert_text, "Reasoning X ");
+        assert!(!reasoning.display.contains("(current)"));
 
-        // Plain model has no trailing space -- Enter commits immediately.
-        let plain = items.iter().find(|i| i.match_text == "Grok 4.5").unwrap();
+        let plain = items.iter().find(|i| i.display == "Grok 4.5").unwrap();
         assert_eq!(plain.insert_text, "Grok 4.5");
+    }
+
+    #[test]
+    fn bare_model_opens_picker() {
+        let state = ModelState::default();
+        let mut ctx = dummy_exec_ctx(&state);
+        assert!(matches!(
+            ModelCommand.run(&mut ctx, ""),
+            CommandResult::Action(Action::OpenModelPicker)
+        ));
     }
 
     #[test]
@@ -357,8 +604,12 @@ mod tests {
         };
         // No trailing space, user is still typing the model name.
         let items = cmd.suggest_args(&ctx, "Reason").unwrap();
-        assert_eq!(items.len(), 1);
-        assert_eq!(items[0].insert_text, "Reasoning X ");
+        let models: Vec<_> = items
+            .iter()
+            .filter(|i| !i.provider_connect && !i.is_section_header)
+            .collect();
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].insert_text, "Reasoning X ");
     }
 
     #[test]
@@ -480,5 +731,19 @@ mod tests {
             }
             other => panic!("expected Action::SetDefaultModel(<id>), got {other:?}"),
         }
+    }
+
+    #[test]
+    fn provider_label_uses_meta_then_heuristics() {
+        let (_, mut info) = plain_model("custom-1", "Custom");
+        let mut meta = serde_json::Map::new();
+        meta.insert(
+            "providerName".into(),
+            serde_json::Value::String("Acme".into()),
+        );
+        info = info.meta(Some(meta));
+        assert_eq!(provider_label_for_model("custom-1", &info), "Acme");
+        let (_, grok) = plain_model("grok-4.5", "Grok 4.5");
+        assert_eq!(provider_label_for_model("grok-4.5", &grok), "xAI");
     }
 }
