@@ -5,7 +5,7 @@
 - **Problem:** Face `/connect` Popular/Providers catalog diverges from OpenCode; Bedrock (and peers) appear but Face API-key login is unwired → fatal Quit screen.
 - **Fix:** Copy OpenCode TUI connect shape (`dialog-provider.tsx`): Popular order + descriptions, **Other** section, only Face-wired methods; after auth keep PR #72 model picker. Delete sparse nextcode-only Popular list and dead Face API-key arms that crash.
 - **Risk:** Low–medium (picker + catalog filter; CLI Bedrock/Azure remain).
-- **Status:** Approved (user: sửa đi / xóa code cũ) — implementing on branch based on PR #72 (`c69f32ada`).
+- **Status:** Implemented — PR https://github.com/quangdang46/next-code/pull/73 (`38d6050f1`); issue #74.
 
 ## Evidence (verified)
 
