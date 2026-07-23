@@ -186,7 +186,11 @@ fn header_provider_label(provider_name: &str, auth: &AuthStatus) -> String {
     if trimmed.is_empty() {
         return String::new();
     }
-    let name = trimmed.to_lowercase();
+    // Prefer catalog id over display name so chrome matches daemon pins
+    // (e.g. "OpenCode Go" / "opencode go" → "opencode-go").
+    let name = crate::provider_catalog::openai_compatible_profile_id_for_display_name(trimmed)
+        .unwrap_or(trimmed)
+        .to_ascii_lowercase();
     let auth_tag = header_provider_auth_tag(&name, auth);
     if auth_tag.is_empty() {
         name
@@ -339,6 +343,10 @@ pub(crate) fn install_face_welcome_status(
     let built_line = build_age.as_deref().and_then(format_built_line);
 
     install_product_welcome_status(ProductWelcomeStatus {
+        title_name: Some(xai_grok_pager::product_welcome::EMBED_TITLE_NAME.to_string()),
+        product_name: Some(xai_grok_pager::product_welcome::EMBED_PRODUCT_NAME.to_string()),
+        product_version: Some(next_code_build_meta::VERSION.to_string()),
+        hero_subtitle: Some(xai_grok_pager::product_welcome::EMBED_HERO_SUBTITLE.to_string()),
         model_prefix,
         model_name,
         model_line,
@@ -396,6 +404,23 @@ mod tests {
         assert_eq!(
             header_provider_label("openrouter", &auth),
             "api-key:openrouter"
+        );
+    }
+
+    #[test]
+    fn provider_label_prefers_catalog_id_over_display_name() {
+        let auth = AuthStatus::default();
+        assert_eq!(
+            header_provider_label("opencode go", &auth),
+            "api-key:opencode-go"
+        );
+        assert_eq!(
+            header_provider_label("OpenCode Go", &auth),
+            "api-key:opencode-go"
+        );
+        assert_eq!(
+            header_provider_label("opencode-go", &auth),
+            "api-key:opencode-go"
         );
     }
 }
