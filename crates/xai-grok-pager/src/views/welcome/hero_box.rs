@@ -28,8 +28,6 @@ const LOGO_H_PAD: u16 = 3;
 /// message never paints over the button.
 const UPGRADE_CTA_ROWS: u16 = 2;
 
-const HERO_SUBTITLE: &str = "Thanks for trying Grok Build, give feedback with /feedback!";
-
 use super::{PROMPT_HEIGHT, VERSION_GAP};
 
 /// Rows the "thanks" subtitle occupies. Hidden when the in-box info slot
@@ -334,7 +332,10 @@ pub(super) fn render_hero_box(
         buf.set_span(
             layout.hero_subtitle.x,
             layout.hero_subtitle.y,
-            &Span::styled(HERO_SUBTITLE, subtitle_style),
+            &Span::styled(
+                crate::product_welcome::brand_hero_subtitle(),
+                subtitle_style,
+            ),
             layout.hero_subtitle.width,
         );
     }

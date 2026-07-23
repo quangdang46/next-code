@@ -64,6 +64,14 @@ pub enum ChromeLine {
 /// Launch-time status fields for Face welcome (legacy splash parity).
 #[derive(Debug, Clone, Default)]
 pub struct ProductWelcomeStatus {
+    /// Short product token for WT/OSC title (e.g. `nextcode`). Stock Face omits.
+    pub title_name: Option<String>,
+    /// Hero/badge product name (e.g. `nextcode`). Stock Face omits → Grok Build.
+    pub product_name: Option<String>,
+    /// Product version for badge (next-code VERSION). Stock Face omits → Face crate.
+    pub product_version: Option<String>,
+    /// Hero subtitle override. Stock Face omits → Grok Build thanks line.
+    pub hero_subtitle: Option<String>,
     /// e.g. `api-key:openrouter · Model · /model to switch` pieces for paint.
     pub model_prefix: Option<String>,
     pub model_name: Option<String>,
@@ -112,6 +120,65 @@ pub fn product_welcome_status() -> Option<&'static ProductWelcomeStatus> {
 #[must_use]
 pub fn is_nextcode_embed() -> bool {
     product_welcome_status().is_some()
+}
+
+/// Stock Grok WT/OSC title token.
+pub const STOCK_TITLE_NAME: &str = "grok";
+/// Default nextcode embed WT/OSC title token.
+pub const EMBED_TITLE_NAME: &str = "nextcode";
+/// Default nextcode embed hero/badge product name.
+pub const EMBED_PRODUCT_NAME: &str = "nextcode";
+/// Stock Grok hero thanks line.
+pub const STOCK_HERO_SUBTITLE: &str =
+    "Thanks for trying Grok Build, give feedback with /feedback!";
+/// Default nextcode embed hero thanks line.
+pub const EMBED_HERO_SUBTITLE: &str =
+    "Thanks for trying nextcode, give feedback with /feedback!";
+
+/// WT/OSC / `TitleItem::Grok` product token: `nextcode` under embed, else `grok`.
+#[must_use]
+pub fn brand_title_token() -> &'static str {
+    if !is_nextcode_embed() {
+        return STOCK_TITLE_NAME;
+    }
+    product_welcome_status()
+        .and_then(|s| s.title_name.as_deref())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(EMBED_TITLE_NAME)
+}
+
+/// Hero/badge product display name under embed (`None` → stock Grok Build path).
+#[must_use]
+pub fn brand_product_name() -> Option<&'static str> {
+    if !is_nextcode_embed() {
+        return None;
+    }
+    Some(
+        product_welcome_status()
+            .and_then(|s| s.product_name.as_deref())
+            .filter(|s| !s.is_empty())
+            .unwrap_or(EMBED_PRODUCT_NAME),
+    )
+}
+
+/// Badge version string under embed (`None` → Face crate version).
+#[must_use]
+pub fn brand_product_version() -> Option<&'static str> {
+    product_welcome_status()
+        .and_then(|s| s.product_version.as_deref())
+        .filter(|s| !s.is_empty())
+}
+
+/// Hero subtitle: embed override when installed, else stock Grok thanks line.
+#[must_use]
+pub fn brand_hero_subtitle() -> &'static str {
+    if !is_nextcode_embed() {
+        return STOCK_HERO_SUBTITLE;
+    }
+    product_welcome_status()
+        .and_then(|s| s.hero_subtitle.as_deref())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(EMBED_HERO_SUBTITLE)
 }
 
 /// xAI-only / brand-unsafe slash commands to hide in the nextcode embed.
@@ -184,6 +251,15 @@ mod embed_brand_tests {
         assert!(!is_embed_brand_hidden_command("hooks"));
         assert!(is_embed_brand_hidden_command("usage"));
         assert!(!is_embed_brand_hidden_command("help"));
+    }
+
+    #[test]
+    fn stock_brand_tokens_without_embed() {
+        // Unit tests do not install product welcome → stock Grok path.
+        assert!(!is_nextcode_embed());
+        assert_eq!(brand_title_token(), STOCK_TITLE_NAME);
+        assert_eq!(brand_product_name(), None);
+        assert_eq!(brand_hero_subtitle(), STOCK_HERO_SUBTITLE);
     }
 }
 

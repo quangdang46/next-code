@@ -491,11 +491,11 @@ impl WelcomeLayout {
 
 /// Controls what the version badge renders.
 pub(super) enum VersionBadgeMode<'a> {
-    /// Full badge: team | tier | api_key | **Grok Build** VERSION+channel **Beta** (right-aligned).
+    /// Full badge: team | tier | api_key | **product** VERSION… (right-aligned).
     Full { subscription_tier: Option<&'a str> },
-    /// Hero footer: team | api_key | Grok Build Beta [channel] (right-aligned, gray).
+    /// Hero footer: team | api_key | channel (right-aligned, gray).
     HeroFooter,
-    /// Hero inline: **Grok Build Beta**  VERSION (left-aligned).
+    /// Hero inline: **product**  VERSION (left-aligned).
     HeroInline,
 }
 
@@ -517,6 +517,7 @@ pub(super) fn render_version_badge(
         Style::default().fg(theme.gray).add_modifier(Modifier::DIM),
     );
     let mut spans = Vec::new();
+    let embed = crate::product_welcome::is_nextcode_embed();
 
     let (show_team, show_tier, show_api_key, align) = match &mode {
         VersionBadgeMode::Full { .. } => (true, true, true, Alignment::Right),
@@ -539,7 +540,9 @@ pub(super) fn render_version_badge(
         ));
         spans.push(sep.clone());
     }
-    if show_api_key && is_api_key_auth {
+    // Embed: model line + provider dots already tell the auth story — suppress
+    // redundant Face "Logged in with API key" footer (policy A).
+    if show_api_key && is_api_key_auth && !embed {
         spans.push(Span::styled(
             "Logged in with API key",
             Style::default().fg(theme.gray),
@@ -548,24 +551,41 @@ pub(super) fn render_version_badge(
     }
 
     let channel = xai_grok_update::channel_label();
+    let product_name = crate::product_welcome::brand_product_name();
+    let product_version = crate::product_welcome::brand_product_version()
+        .unwrap_or(xai_grok_version::VERSION);
     match &mode {
         VersionBadgeMode::Full { .. } => {
-            spans.push(Span::styled(
-                "Grok Build  ",
-                Style::default()
-                    .fg(theme.text_primary)
-                    .add_modifier(Modifier::BOLD),
-            ));
-            spans.push(Span::styled(
-                format!("{}{}", xai_grok_version::VERSION, channel),
-                Style::default().fg(theme.gray),
-            ));
-            spans.push(Span::styled(
-                " Beta",
-                Style::default()
-                    .fg(theme.text_primary)
-                    .add_modifier(Modifier::BOLD),
-            ));
+            if let Some(name) = product_name {
+                // nextcode embed: product + real version only (no Grok Beta channel).
+                spans.push(Span::styled(
+                    format!("{name}  "),
+                    Style::default()
+                        .fg(theme.text_primary)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                spans.push(Span::styled(
+                    product_version,
+                    Style::default().fg(theme.gray),
+                ));
+            } else {
+                spans.push(Span::styled(
+                    "Grok Build  ",
+                    Style::default()
+                        .fg(theme.text_primary)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                spans.push(Span::styled(
+                    format!("{}{}", xai_grok_version::VERSION, channel),
+                    Style::default().fg(theme.gray),
+                ));
+                spans.push(Span::styled(
+                    " Beta",
+                    Style::default()
+                        .fg(theme.text_primary)
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
             if let Some(age) = crate::product_welcome::product_welcome_status()
                 .and_then(|s| s.build_age.as_deref())
                 .filter(|a| !a.is_empty())
@@ -577,27 +597,45 @@ pub(super) fn render_version_badge(
             }
         }
         VersionBadgeMode::HeroFooter => {
-            let channel_display = if channel.is_empty() {
-                "Beta"
+            if embed {
+                // Embed hero already shows product+version inline; footer skips
+                // Grok release-channel "Beta".
             } else {
-                channel.trim()
-            };
-            spans.push(Span::styled(
-                channel_display,
-                Style::default().fg(theme.gray),
-            ));
+                let channel_display = if channel.is_empty() {
+                    "Beta"
+                } else {
+                    channel.trim()
+                };
+                spans.push(Span::styled(
+                    channel_display,
+                    Style::default().fg(theme.gray),
+                ));
+            }
         }
         VersionBadgeMode::HeroInline => {
-            spans.push(Span::styled(
-                "Grok Build Beta  ",
-                Style::default()
-                    .fg(theme.text_primary)
-                    .add_modifier(Modifier::BOLD),
-            ));
-            spans.push(Span::styled(
-                xai_grok_version::VERSION,
-                Style::default().fg(theme.gray),
-            ));
+            if let Some(name) = product_name {
+                spans.push(Span::styled(
+                    format!("{name}  "),
+                    Style::default()
+                        .fg(theme.text_primary)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                spans.push(Span::styled(
+                    product_version,
+                    Style::default().fg(theme.gray),
+                ));
+            } else {
+                spans.push(Span::styled(
+                    "Grok Build Beta  ",
+                    Style::default()
+                        .fg(theme.text_primary)
+                        .add_modifier(Modifier::BOLD),
+                ));
+                spans.push(Span::styled(
+                    xai_grok_version::VERSION,
+                    Style::default().fg(theme.gray),
+                ));
+            }
             if let Some(age) = crate::product_welcome::product_welcome_status()
                 .and_then(|s| s.build_age.as_deref())
                 .filter(|a| !a.is_empty())
