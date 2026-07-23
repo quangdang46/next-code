@@ -2,10 +2,11 @@
 //! daemon socket protocol — same brain path as `next-code acp`, without stdio.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::time::Duration;
 
 use agent_client_protocol as acp;
 use agent_client_protocol::{
@@ -37,6 +38,13 @@ struct DaemonSession {
     working_dir: Option<PathBuf>,
     /// Last model id Face was told about — used to detect ModelChanged failover.
     last_model: Mutex<Option<String>>,
+    /// Last full model catalog from History / AvailableModelsUpdated.
+    /// ModelChanged must reuse this — emitting `&[]` shrinks Face to current-only.
+    available_models: Mutex<Vec<String>>,
+    /// Events the idle catalog pump read while a prompt/set_model loop owns the
+    /// socket — drained first by [`DaemonSession::read_event`].
+    pending_events: Mutex<VecDeque<ServerEvent>>,
+    idle_pump_started: AtomicBool,
 }
 
 impl DaemonSession {
@@ -55,6 +63,9 @@ impl DaemonSession {
             prompt_running: AtomicBool::new(false),
             working_dir,
             last_model: Mutex::new(None),
+            available_models: Mutex::new(Vec::new()),
+            pending_events: Mutex::new(VecDeque::new()),
+            idle_pump_started: AtomicBool::new(false),
         }
     }
 
@@ -68,6 +79,28 @@ impl DaemonSession {
 
     async fn peek_last_model(&self) -> Option<String> {
         self.last_model.lock().await.clone()
+    }
+
+    async fn set_available_models(&self, models: &[String]) {
+        let mut slot = self.available_models.lock().await;
+        *slot = models
+            .iter()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .collect();
+    }
+
+    async fn peek_available_models(&self) -> Vec<String> {
+        self.available_models.lock().await.clone()
+    }
+
+    async fn push_pending(&self, event: ServerEvent) {
+        self.pending_events.lock().await.push_back(event);
+    }
+
+    async fn pop_pending(&self) -> Option<ServerEvent> {
+        self.pending_events.lock().await.pop_front()
     }
 
     fn next_id(&self) -> u64 {
@@ -84,6 +117,9 @@ impl DaemonSession {
     }
 
     async fn read_event(&self) -> Result<ServerEvent> {
+        if let Some(event) = self.pop_pending().await {
+            return Ok(event);
+        }
         let mut line = String::new();
         let mut reader = self.reader.lock().await;
         let n = reader.read_line(&mut line).await?;
@@ -93,6 +129,45 @@ impl DaemonSession {
         serde_json::from_str(&line)
             .with_context(|| format!("failed to decode daemon event: {}", line.trim_end()))
     }
+
+    /// Timed socket read for the idle catalog pump (releases the reader lock
+    /// on timeout so prompt/set_model can take over).
+    async fn try_read_event_timed(&self, timeout: Duration) -> Result<Option<ServerEvent>> {
+        if let Some(event) = self.pop_pending().await {
+            return Ok(Some(event));
+        }
+        let mut line = String::new();
+        let mut reader = self.reader.lock().await;
+        match tokio::time::timeout(timeout, reader.read_line(&mut line)).await {
+            Err(_) => Ok(None),
+            Ok(Ok(0)) => anyhow::bail!("Next Code daemon disconnected"),
+            Ok(Ok(_)) => serde_json::from_str(&line)
+                .map(Some)
+                .with_context(|| format!("failed to decode daemon event: {}", line.trim_end())),
+            Ok(Err(err)) => Err(err.into()),
+        }
+    }
+}
+
+/// Push `x.ai/models/update` so Face refreshes `ModelState.available` / current.
+async fn emit_models_update_via(
+    gateway: &AcpGatewaySender<acp::AgentSide>,
+    model: &str,
+    provider_name: Option<&str>,
+    available: &[String],
+) {
+    let Some(state) = session_model_state_from_history(Some(model), available, provider_name) else {
+        return;
+    };
+    let Ok(raw) = serde_json::value::to_raw_value(&state) else {
+        return;
+    };
+    let _ = gateway
+        .ext_notification(acp::ExtNotification::new(
+            "x.ai/models/update",
+            std::sync::Arc::from(raw),
+        ))
+        .await;
 }
 
 async fn wait_for_done(session: &DaemonSession, request_id: u64) -> Result<()> {
@@ -318,6 +393,7 @@ impl NextCodeFaceAgent {
             session.next_request_id.load(Ordering::Relaxed),
             Some(cwd),
         ));
+        live.set_available_models(&available_models).await;
         self.sessions
             .borrow_mut()
             .insert(session_id.clone(), live.clone());
@@ -330,6 +406,7 @@ impl NextCodeFaceAgent {
         self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
         self.emit_available_skills(&session_id).await;
         live.set_last_model(provider_model.as_deref()).await;
+        self.start_idle_catalog_pump(live.clone());
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -427,6 +504,7 @@ impl NextCodeFaceAgent {
             session.next_request_id.load(Ordering::Relaxed),
             Some(working_dir),
         ));
+        live.set_available_models(&available_models).await;
         self.sessions
             .borrow_mut()
             .insert(session_id.clone(), live.clone());
@@ -441,6 +519,7 @@ impl NextCodeFaceAgent {
         self.emit_todos_plan(&session_id, /*allow_empty=*/ false).await;
         self.emit_available_skills(&session_id).await;
         live.set_last_model(provider_model.as_deref()).await;
+        self.start_idle_catalog_pump(live.clone());
         Ok(SessionBootstrap {
             session: live,
             models,
@@ -1058,21 +1137,124 @@ impl NextCodeFaceAgent {
         provider_name: Option<&str>,
         available: &[String],
     ) {
-        let Some(state) =
-            session_model_state_from_history(Some(model), available, provider_name)
-        else {
+        emit_models_update_via(&self.gateway, model, provider_name, available).await;
+    }
+
+    /// Forward daemon `AvailableModelsUpdated` (and keep catalog cache warm).
+    async fn apply_available_models_updated(
+        &self,
+        session: &DaemonSession,
+        provider_name: Option<&str>,
+        provider_model: Option<&str>,
+        available_models: &[String],
+    ) {
+        session.set_available_models(available_models).await;
+        let current = provider_model
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+            .or(session.peek_last_model().await);
+        let Some(current) = current else {
             return;
         };
-        let Ok(raw) = serde_json::value::to_raw_value(&state) else {
-            return;
-        };
-        let _ = self
-            .gateway
-            .ext_notification(acp::ExtNotification::new(
-                "x.ai/models/update",
-                std::sync::Arc::from(raw),
-            ))
+        if let Some(provider) = provider_name.filter(|s| !s.is_empty()) {
+            self.emit_provider_name(&session.session_id, provider).await;
+        }
+        self.emit_models_update(&current, provider_name, available_models)
             .await;
+        session.set_last_model(Some(&current)).await;
+    }
+
+    /// While Face is idle (between prompts), drain daemon events so prefetch
+    /// `AvailableModelsUpdated` reaches `x.ai/models/update` — TUI already
+    /// does this via its continuous server-event loop.
+    fn start_idle_catalog_pump(&self, session: Rc<DaemonSession>) {
+        if session
+            .idle_pump_started
+            .swap(true, Ordering::SeqCst)
+        {
+            return;
+        }
+        let gateway = self.gateway.clone();
+        tokio::task::spawn_local(async move {
+            loop {
+                if session.prompt_running.load(Ordering::SeqCst) {
+                    tokio::time::sleep(Duration::from_millis(25)).await;
+                    continue;
+                }
+                let event = match session
+                    .try_read_event_timed(Duration::from_millis(250))
+                    .await
+                {
+                    Ok(Some(event)) => event,
+                    Ok(None) => continue,
+                    Err(_) => break,
+                };
+                if session.prompt_running.load(Ordering::SeqCst) {
+                    // Prompt/set_model claimed the socket — hand the line back.
+                    session.push_pending(event).await;
+                    continue;
+                }
+                match event {
+                    ServerEvent::AvailableModelsUpdated {
+                        provider_name,
+                        provider_model,
+                        available_models,
+                        ..
+                    } => {
+                        session.set_available_models(&available_models).await;
+                        let current = provider_model
+                            .as_deref()
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty())
+                            .map(str::to_string)
+                            .or(session.peek_last_model().await);
+                        if let Some(current) = current {
+                            emit_models_update_via(
+                                &gateway,
+                                &current,
+                                provider_name.as_deref(),
+                                &available_models,
+                            )
+                            .await;
+                            session.set_last_model(Some(&current)).await;
+                        }
+                    }
+                    ServerEvent::ModelChanged {
+                        model,
+                        provider_name,
+                        error: None,
+                        ..
+                    } => {
+                        let available = session.peek_available_models().await;
+                        emit_models_update_via(
+                            &gateway,
+                            &model,
+                            provider_name.as_deref(),
+                            &available,
+                        )
+                        .await;
+                        session.set_last_model(Some(&model)).await;
+                    }
+                    ServerEvent::ModelChanged {
+                        fallback_model,
+                        error: Some(_),
+                        ..
+                    } => {
+                        if let Some(fallback) =
+                            fallback_model.as_deref().filter(|s| !s.is_empty())
+                        {
+                            let available = session.peek_available_models().await;
+                            emit_models_update_via(&gateway, fallback, None, &available).await;
+                            session.set_last_model(Some(fallback)).await;
+                        }
+                    }
+                    // Idle path only keeps the Face model catalog warm; turn
+                    // events stay for prompt/set_model (re-queued above when busy).
+                    _ => {}
+                }
+            }
+        });
     }
 
     /// Title string for a tool, matching stock EventMapper.
@@ -1552,7 +1734,9 @@ impl acp::Agent for NextCodeFaceAgent {
                     if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
                         self.emit_provider_name(&session_id, provider).await;
                     }
-                    self.emit_models_update(&model, provider_name.as_deref(), &[]).await;
+                    let available = session.peek_available_models().await;
+                    self.emit_models_update(&model, provider_name.as_deref(), &available)
+                        .await;
                     let previous = session.peek_last_model().await;
                     let changed = previous.as_deref() != Some(model.as_str());
                     if changed {
@@ -1585,9 +1769,24 @@ impl acp::Agent for NextCodeFaceAgent {
                     };
                     self.emit_text(&session_id, msg).await;
                     if let Some(fallback) = fallback_model.as_deref().filter(|s| !s.is_empty()) {
-                        self.emit_models_update(fallback, None, &[]).await;
+                        let available = session.peek_available_models().await;
+                        self.emit_models_update(fallback, None, &available).await;
                         session.set_last_model(Some(fallback)).await;
                     }
+                }
+                ServerEvent::AvailableModelsUpdated {
+                    provider_name,
+                    provider_model,
+                    available_models,
+                    ..
+                } => {
+                    self.apply_available_models_updated(
+                        session.as_ref(),
+                        provider_name.as_deref(),
+                        provider_model.as_deref(),
+                        &available_models,
+                    )
+                    .await;
                 }
                 ServerEvent::MemoryActivity { activity } => {
                     crate::memory::apply_remote_activity_snapshot(&activity);
@@ -1648,22 +1847,34 @@ impl acp::Agent for NextCodeFaceAgent {
             );
         };
         let req_id = session.next_id();
+        // Claim the socket so the idle catalog pump yields (same flag as prompt).
+        let claimed_socket = session
+            .prompt_running
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok();
         session
             .send(&Request::SetModel {
                 id: req_id,
                 model: requested_model.clone(),
             })
             .await
-            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+            .map_err(|e| {
+                if claimed_socket {
+                    session.prompt_running.store(false, Ordering::SeqCst);
+                }
+                acp::Error::internal_error().data(e.to_string())
+            })?;
 
         // Wait for matching ModelChanged before ACP-acking. Returning Ok
         // immediately let Face commit chrome to the requested model while the
         // daemon was still on (or fell back to) a different model.
-        loop {
-            let event = session
-                .read_event()
-                .await
-                .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+        let result = loop {
+            let event = match session.read_event().await {
+                Ok(event) => event,
+                Err(e) => {
+                    break Err(acp::Error::internal_error().data(e.to_string()));
+                }
+            };
             match event {
                 ServerEvent::ModelChanged {
                     id,
@@ -1675,10 +1886,11 @@ impl acp::Agent for NextCodeFaceAgent {
                     if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
                         self.emit_provider_name(&session_id, provider).await;
                     }
-                    self.emit_models_update(&model, provider_name.as_deref(), &[])
+                    let available = session.peek_available_models().await;
+                    self.emit_models_update(&model, provider_name.as_deref(), &available)
                         .await;
                     session.set_last_model(Some(&model)).await;
-                    return Ok(acp::SetSessionModelResponse::new());
+                    break Ok(acp::SetSessionModelResponse::new());
                 }
                 ServerEvent::ModelChanged {
                     id,
@@ -1697,24 +1909,43 @@ impl acp::Agent for NextCodeFaceAgent {
                         None => format!("Couldn't switch model to {model}: {err}"),
                     };
                     if let Some(fallback) = fallback_model.as_deref().filter(|s| !s.is_empty()) {
-                        self.emit_models_update(fallback, None, &[]).await;
+                        let available = session.peek_available_models().await;
+                        self.emit_models_update(fallback, None, &available).await;
                         session.set_last_model(Some(fallback)).await;
                     }
-                    return Err(acp::Error::internal_error().data(msg));
+                    break Err(acp::Error::internal_error().data(msg));
+                }
+                ServerEvent::AvailableModelsUpdated {
+                    provider_name,
+                    provider_model,
+                    available_models,
+                    ..
+                } => {
+                    self.apply_available_models_updated(
+                        session.as_ref(),
+                        provider_name.as_deref(),
+                        provider_model.as_deref(),
+                        &available_models,
+                    )
+                    .await;
                 }
                 ServerEvent::Error {
                     id,
                     message,
                     ..
                 } if id == req_id => {
-                    return Err(acp::Error::internal_error().data(message));
+                    break Err(acp::Error::internal_error().data(message));
                 }
                 ServerEvent::Done { id } if id == req_id => {
-                    return Ok(acp::SetSessionModelResponse::new());
+                    break Ok(acp::SetSessionModelResponse::new());
                 }
                 _ => {}
             }
+        };
+        if claimed_socket {
+            session.prompt_running.store(false, Ordering::SeqCst);
         }
+        result
     }
 }
 
@@ -1960,6 +2191,59 @@ mod tests {
         assert_eq!(json["update"]["sessionUpdate"], "model_auto_switched");
         assert_eq!(json["update"]["previous_model_id"], "old");
         assert_eq!(json["update"]["new_model_id"], "new");
+    }
+
+    fn available_ids(state: &acp::SessionModelState) -> Vec<String> {
+        serde_json::to_value(state)
+            .expect("SessionModelState serializes")
+            .get("availableModels")
+            .and_then(|v| v.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|m| {
+                m.get("name")
+                    .or_else(|| m.get("modelId"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn session_model_state_none_when_history_has_no_current_or_catalog() {
+        assert!(session_model_state_from_history(None, &[], None).is_none());
+        assert!(session_model_state_from_history(Some("  "), &[], None).is_none());
+    }
+
+    #[test]
+    fn session_model_state_one_entry_fallback_when_only_current() {
+        let state = session_model_state_from_history(Some("gpt-4o"), &[], Some("openai"))
+            .expect("current alone must still bind Face ModelState");
+        let ids = available_ids(&state);
+        assert_eq!(ids, vec!["gpt-4o".to_string()]);
+    }
+
+    #[test]
+    fn session_model_state_preserves_full_catalog_for_models_update() {
+        let catalog = vec![
+            "openai/gpt-4o".into(),
+            "anthropic/claude-sonnet-4".into(),
+            "openrouter/moonshotai/kimi-k2".into(),
+        ];
+        let state = session_model_state_from_history(
+            Some("openai/gpt-4o"),
+            &catalog,
+            Some("openrouter"),
+        )
+        .expect("catalog + current");
+        let ids = available_ids(&state);
+        assert_eq!(ids.len(), 3, "full catalog must survive models/update");
+        assert!(ids.iter().any(|id| id == "anthropic/claude-sonnet-4"));
+        // Empty available shrinks to current-only — the ModelChanged bug.
+        let shrunk =
+            session_model_state_from_history(Some("openai/gpt-4o"), &[], Some("openrouter"))
+                .expect("current-only");
+        assert_eq!(available_ids(&shrunk).len(), 1);
     }
 }
 
