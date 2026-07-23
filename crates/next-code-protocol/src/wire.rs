@@ -1195,15 +1195,21 @@ pub enum ServerEvent {
         output: Option<String>,
     },
 
-    /// Model changed (response to cycle_model)
+    /// Model changed (response to cycle_model / set_model)
     #[serde(rename = "model_changed")]
     ModelChanged {
         id: u64,
+        /// On success: the active model. On failure: the **requested** model
+        /// (so clients can say "Couldn't switch to X" instead of naming the
+        /// fallback that was already active).
         model: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         provider_name: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+        /// On failure: model the daemon stayed on / fell back to.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fallback_model: Option<String>,
     },
 
     /// Reasoning effort changed (response to set_reasoning_effort)

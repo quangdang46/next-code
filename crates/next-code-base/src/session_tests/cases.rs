@@ -70,6 +70,23 @@ fn derive_session_provider_key_keeps_openai_compatible_profile_namespace() {
 }
 
 #[test]
+fn derive_session_provider_key_maps_opencode_go_display_name() {
+    let _lock = lock_env();
+    let _runtime = EnvVarGuard::remove("NEXT_CODE_RUNTIME_PROVIDER");
+    let _namespace = EnvVarGuard::remove("NEXT_CODE_OPENROUTER_CACHE_NAMESPACE");
+    let _active = EnvVarGuard::remove("NEXT_CODE_ACTIVE_PROVIDER");
+
+    assert_eq!(
+        derive_session_provider_key("OpenCode Go").as_deref(),
+        Some("opencode-go")
+    );
+    assert_eq!(
+        derive_session_provider_key("opencode go").as_deref(),
+        Some("opencode-go")
+    );
+}
+
+#[test]
 fn rename_title_preserves_generated_title_for_clear() {
     let mut session = Session::create_with_id(
         "session_rename_clear_123".to_string(),

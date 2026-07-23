@@ -364,13 +364,16 @@ impl MultiProvider {
 
         if let Some((prefix, rest)) = model.split_once(':') {
             let prefix = prefix.trim();
-            if !prefix.is_empty()
-                && !rest.trim().is_empty()
-                && (crate::provider_catalog::resolve_openai_compatible_profile_selection(prefix)
-                    .is_some()
-                    || crate::config::config().providers.contains_key(prefix))
-            {
-                return model.to_string();
+            let rest = rest.trim();
+            if !prefix.is_empty() && !rest.is_empty() {
+                if let Some(profile) =
+                    crate::provider_catalog::resolve_openai_compatible_profile_selection(prefix)
+                {
+                    return format!("{}:{rest}", profile.id);
+                }
+                if crate::config::config().providers.contains_key(prefix) {
+                    return model.to_string();
+                }
             }
         }
 
@@ -397,12 +400,15 @@ impl MultiProvider {
                 format!("{provider_key}:{model}")
             }
             _ => {
-                if crate::provider_catalog::resolve_openai_compatible_profile_selection(
-                    provider_key,
-                )
-                .is_some()
-                    || crate::config::config().providers.contains_key(provider_key)
+                if let Some(profile) =
+                    crate::provider_catalog::resolve_openai_compatible_profile_selection(
+                        provider_key,
+                    )
                 {
+                    // Always emit catalog id (`opencode-go`), never a display
+                    // pin (`opencode go` / `OpenCode Go`) that Face may persist.
+                    format!("{}:{model}", profile.id)
+                } else if crate::config::config().providers.contains_key(provider_key) {
                     format!("{provider_key}:{model}")
                 } else {
                     model.to_string()
@@ -801,5 +807,41 @@ mod tests {
             Some(ActiveProvider::OpenRouter)
         );
         assert!(MultiProvider::resolve_config_provider_selection("unknown", &cfg).is_none());
+
+        // Face float / bad pin: display name with space must resolve to catalog id.
+        assert_eq!(
+            MultiProvider::resolve_config_provider_selection("opencode go", &cfg),
+            MultiProvider::resolve_config_provider_selection("opencode-go", &cfg),
+        );
+        assert_eq!(
+            MultiProvider::resolve_config_provider_selection("OpenCode Go", &cfg),
+            MultiProvider::resolve_config_provider_selection("opencode-go", &cfg),
+        );
+    }
+
+    #[test]
+    fn model_switch_request_prefixes_opencode_go_display_name_pins() {
+        assert_eq!(
+            MultiProvider::model_switch_request_for_session_model(
+                "deepseek-v4-flash",
+                Some("opencode-go"),
+            ),
+            "opencode-go:deepseek-v4-flash"
+        );
+        assert_eq!(
+            MultiProvider::model_switch_request_for_session_model(
+                "deepseek-v4-flash",
+                Some("opencode go"),
+            ),
+            "opencode-go:deepseek-v4-flash",
+            "spaced display-name pin must not emit a bare model"
+        );
+        assert_eq!(
+            MultiProvider::model_switch_request_for_session_model(
+                "deepseek-v4-flash",
+                Some("OpenCode Go"),
+            ),
+            "opencode-go:deepseek-v4-flash"
+        );
     }
 }

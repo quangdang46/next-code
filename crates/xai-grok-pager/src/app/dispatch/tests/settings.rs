@@ -3397,3 +3397,14 @@ fn mouse_reporting_toggle_off_sticky_persists_after_transient_toast() {
     );
     reset_mouse_capture_enabled(true);
 }
+
+#[test]
+fn config_provider_key_from_float_maps_opencode_go_display_name() {
+    use crate::app::dispatch::settings::setters::config_provider_key_from_float;
+
+    assert_eq!(config_provider_key_from_float("OpenCode Go"), "opencode-go");
+    assert_eq!(config_provider_key_from_float("opencode go"), "opencode-go");
+    assert_eq!(config_provider_key_from_float("opencode-go"), "opencode-go");
+    assert_eq!(config_provider_key_from_float("DeepSeek"), "deepseek");
+    assert_eq!(config_provider_key_from_float("claude"), "claude");
+}

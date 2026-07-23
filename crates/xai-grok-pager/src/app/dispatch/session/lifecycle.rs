@@ -1104,6 +1104,9 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                 return open_agent_type_mismatch_question(app, model_id, effort, &display_name);
             }
             Err(SwitchModelError::Other(msg)) => {
+                if let Some(ref prev) = prev_model_id {
+                    agent.session.models.set_current(prev.clone(), None);
+                }
                 agent
                     .scrollback
                     .push_block(RenderBlock::system(format!("Couldn't switch model: {msg}")));

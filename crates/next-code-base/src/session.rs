@@ -296,7 +296,16 @@ pub fn derive_session_provider_key(provider_name: &str) -> Option<String> {
         "gemini" => "gemini",
         "antigravity" => "antigravity",
         "" => return None,
-        other => other,
+        other => {
+            // Face/Overview floats persist display labels ("OpenCode Go" →
+            // "opencode go"). Map those to catalog ids before storing.
+            if let Some(provider) =
+                crate::provider_catalog::resolve_login_provider_loose(other)
+            {
+                return Some(provider.id.to_string());
+            }
+            other
+        }
     };
 
     Some(fallback.to_string())
