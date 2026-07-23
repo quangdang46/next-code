@@ -73,3 +73,35 @@ fn close_resume_browser_clears_state() {
     let _ = dispatch(Action::CloseResumeBrowser, &mut app);
     assert!(app.resume_browser.is_none());
 }
+
+#[test]
+fn pick_resume_browser_session_emits_load_session_like_picker() {
+    let mut app = test_app();
+    let _ = dispatch(Action::ShowResumeBrowser, &mut app);
+    // `conversation` bypasses local resolve — same ungated LoadSession as
+    // SessionPicker conversation rows (proves Enter is not close-only).
+    let effects = dispatch(
+        Action::PickResumeBrowserSession {
+            session_id: "session_bonehound_test".into(),
+            cwd: "/tmp".into(),
+            source: "conversation".into(),
+        },
+        &mut app,
+    );
+    assert!(app.resume_browser.is_none(), "Enter must close resume browser");
+    assert!(
+        matches!(
+            &effects[..],
+            [Effect::LoadSession {
+                session_id,
+                chat_kind: true,
+                ..
+            }] if session_id == "session_bonehound_test"
+        ),
+        "Enter must emit LoadSession (chat), got {effects:?}"
+    );
+    assert!(
+        matches!(app.active_view, crate::app::app_view::ActiveView::Agent(_)),
+        "must switch to agent scroll view after pick"
+    );
+}

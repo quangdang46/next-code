@@ -776,19 +776,34 @@ fn render_preview(buf: &mut Buffer, area: Rect, state: &mut ResumeBrowserState, 
 
     let mut display_lines: Vec<Line<'static>> = Vec::new();
     for line in &state.preview_lines {
+        let wrap_width = area.width.saturating_sub(1) as usize;
+        // Origin fold lines already carry `✓ read path · N tok` — no role prefix.
+        if line.role == "tool" {
+            let tool_style = Style::default().fg(theme.accent_assistant).bg(theme.bg_base);
+            for chunk in wrap_text(&line.text, wrap_width) {
+                display_lines.push(Line::from(Span::styled(chunk, tool_style)));
+            }
+            display_lines.push(Line::from(""));
+            continue;
+        }
         let role_style = match line.role.as_str() {
             "user" => Style::default().fg(theme.accent_user).bg(theme.bg_base),
             "assistant" => Style::default().fg(theme.accent_assistant).bg(theme.bg_base),
             _ => Style::default().fg(theme.gray).bg(theme.bg_base),
         };
         let role_label = format!("{}: ", line.role);
-        let wrap_width = area.width.saturating_sub(1) as usize;
-        let body = wrap_text(&line.text, wrap_width.saturating_sub(role_label.width().min(12)));
+        let body = wrap_text(
+            &line.text,
+            wrap_width.saturating_sub(role_label.width().min(12)),
+        );
         for (i, chunk) in body.into_iter().enumerate() {
             if i == 0 {
                 display_lines.push(Line::from(vec![
                     Span::styled(role_label.clone(), role_style),
-                    Span::styled(chunk, Style::default().fg(theme.text_primary).bg(theme.bg_base)),
+                    Span::styled(
+                        chunk,
+                        Style::default().fg(theme.text_primary).bg(theme.bg_base),
+                    ),
                 ]));
             } else {
                 display_lines.push(Line::from(Span::styled(
