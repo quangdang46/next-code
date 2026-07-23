@@ -1,56 +1,32 @@
 //! `/connect` — next-code multi-provider login (Face chrome).
 //!
 //! OpenCode-shaped wizard (see OpenCode `dialog-provider.tsx`):
-//! searchable provider picker → optional auth-method step → Face welcome
-//! paste/URL flow → model picker (PR #72). Credentials write via daemon
-//! `face_auth` / `~/.next-code`. Does **not** start Grok OAuth.
+//! models.dev provider list → Popular 6 + searchable rest + Other custom →
+//! optional auth-method step → Face welcome paste/URL flow → model picker.
+//! Credentials write via daemon `face_auth` / `~/.next-code`.
 
 use next_code_provider_metadata::{
-    LoginProviderAuthKind, LoginProviderAuthStateKey, LoginProviderDescriptor,
+    CUSTOM_PROVIDER_SENTINEL, LoginProviderAuthKind, LoginProviderAuthStateKey,
+    LoginProviderDescriptor, POPULAR_MODELS_DEV_IDS, face_auth_id_for_models_dev,
+    face_auth_id_needs_method_picker, is_valid_custom_provider_id, models_dev_connect_providers,
+    normalize_custom_provider_id,
 };
 
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
-/// OpenCode TUI `PROVIDER_PRIORITY` order (`dialog-provider.tsx`).
-/// Resolved against `tui_login_providers()`; missing ids skipped.
-/// OpenCode ids: opencode, opencode-go, openai, github-copilot, anthropic, google.
-const POPULAR_CONNECT_IDS: &[&str] = &[
-    "opencode",
-    "opencode-go",
-    "openai",
-    "copilot", // OpenCode: github-copilot
-    "claude",  // OpenCode: anthropic
-    "gemini",  // OpenCode: google (models); next-code Gmail OAuth stays out of TUI list
-];
-
-/// OpenCode list-row descriptions (same file, `providerOptions` map).
-fn opencode_row_description(id: &str) -> Option<&'static str> {
-    match id {
+/// OpenCode list-row descriptions (`providerOptions` map in dialog-provider.tsx).
+fn opencode_row_description(models_dev_or_face_id: &str) -> Option<&'static str> {
+    match models_dev_or_face_id {
         "opencode" => Some("(Recommended)"),
         "opencode-go" => Some("Low cost subscription for everyone"),
         "openai" => Some("(ChatGPT Plus/Pro or API key)"),
         "claude" | "anthropic" => Some("(OAuth or API key)"),
         "anthropic-api" => Some("(API key)"),
+        "github-copilot" | "copilot" => Some("(device code)"),
+        "google" | "gemini" => Some("(OAuth or API key)"),
+        CUSTOM_PROVIDER_SENTINEL => Some("Custom provider"),
         _ => None,
-    }
-}
-
-/// Display names matching OpenCode models.dev / TUI (not nextcode CLI labels).
-fn opencode_display_name(rep: LoginProviderDescriptor) -> &'static str {
-    match rep.id {
-        "claude" => "Anthropic",
-        "gemini" => "Google",
-        "opencode" => "OpenCode Zen",
-        "opencode-go" => "OpenCode Go",
-        other => {
-            // Prefer catalog display when it already matches product naming.
-            if other == "copilot" {
-                "GitHub Copilot"
-            } else {
-                rep.display_name
-            }
-        }
     }
 }
 
@@ -105,17 +81,41 @@ pub(crate) fn connect_run(args: &str) -> CommandResult {
         return CommandResult::Action(Action::OpenConnectPicker);
     }
 
-    let Some(provider) = next_code_provider_metadata::resolve_login_provider(trimmed).or_else(
-        || next_code_provider_metadata::resolve_login_provider_loose(trimmed),
-    ) else {
-        return CommandResult::Error(format!(
-            "Unknown provider {trimmed:?}. Try /connect and pick from the list."
-        ));
-    };
+    if trimmed == CUSTOM_PROVIDER_SENTINEL {
+        return CommandResult::Action(Action::NextCodeConnect {
+            provider: CUSTOM_PROVIDER_SENTINEL.to_string(),
+        });
+    }
 
-    CommandResult::Action(Action::NextCodeConnect {
-        provider: provider.id.to_string(),
-    })
+    let resolved = next_code_provider_metadata::resolve_login_provider(trimmed)
+        .or_else(|| next_code_provider_metadata::resolve_login_provider_loose(trimmed));
+    if let Some(provider) = resolved {
+        return CommandResult::Action(Action::NextCodeConnect {
+            provider: provider.id.to_string(),
+        });
+    }
+
+    // models.dev id → Face auth id, or free-text custom id (OpenCode Other).
+    let models_dev_id = models_dev_connect_providers()
+        .iter()
+        .find(|p| p.id.eq_ignore_ascii_case(trimmed))
+        .map(|p| p.id.as_str());
+    if let Some(md_id) = models_dev_id {
+        let face_id = face_auth_id_for_models_dev(md_id);
+        return CommandResult::Action(Action::NextCodeConnect {
+            provider: face_id.to_string(),
+        });
+    }
+
+    if let Some(custom) = normalize_custom_provider_id(trimmed)
+        && is_valid_custom_provider_id(&custom)
+    {
+        return CommandResult::Action(Action::NextCodeConnect { provider: custom });
+    }
+
+    CommandResult::Error(format!(
+        "Unknown provider {trimmed:?}. Try /connect and pick from the list."
+    ))
 }
 
 pub(crate) fn suggest_connect_args(args_query: &str) -> Vec<ArgItem> {
@@ -129,37 +129,78 @@ pub(crate) fn suggest_connect_args(args_query: &str) -> Vec<ArgItem> {
 }
 
 /// Flat searchable list used by OpenConnectPicker and Tab suggest.
-/// Full TUI login catalog (OpenCode Popular + rest) — Face auth is wired for all.
+/// OpenCode shape: Popular (6) + models.dev rest + synthetic Other (custom).
 pub(crate) fn build_connect_family_items() -> Vec<ArgItem> {
-    let providers = next_code_provider_metadata::tui_login_providers();
-    let families = group_families(&providers);
-
-    let mut out = Vec::new();
-    let mut popular_ids: Vec<&str> = Vec::new();
+    let catalog = models_dev_connect_providers();
+    let mut out = Vec::with_capacity(catalog.len() + 8);
+    let mut used_models_dev: Vec<&str> = Vec::new();
 
     out.push(section_header("Popular"));
-    for id in POPULAR_CONNECT_IDS {
-        let Some(family) = families.iter().find(|f| f.iter().any(|p| p.id == *id)) else {
-            continue;
+    for md_id in POPULAR_MODELS_DEV_IDS {
+        let row = catalog.iter().find(|p| p.id == *md_id);
+        let (name, id) = match row {
+            Some(p) => (p.name.as_str(), p.id.as_str()),
+            None => continue,
         };
-        let rep_id = family_representative(family).id;
-        if popular_ids.contains(&rep_id) {
-            continue;
-        }
-        popular_ids.push(rep_id);
-        out.push(family_arg_item(family));
+        used_models_dev.push(id);
+        out.push(models_dev_arg_item(id, name));
     }
 
-    // OpenCode app twin uses "Other"; TUI uses "Providers". Screenshots show Other.
+    // OpenCode TUI uses "Providers"; app twin / screenshots use "Other".
     out.push(section_header("Other"));
-    for family in &families {
-        let rep_id = family_representative(family).id;
-        if popular_ids.contains(&rep_id) {
-            continue;
-        }
-        out.push(family_arg_item(family));
+    let mut rest: Vec<&next_code_provider_metadata::ModelsDevProvider> = catalog
+        .iter()
+        .filter(|p| !used_models_dev.contains(&p.id.as_str()))
+        .collect();
+    rest.sort_by(|a, b| {
+        a.name
+            .to_ascii_lowercase()
+            .cmp(&b.name.to_ascii_lowercase())
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    for p in rest {
+        out.push(models_dev_arg_item(&p.id, &p.name));
     }
+
+    // Synthetic Other = custom provider id (OpenCode CUSTOM_PROVIDER_OPTION_VALUE).
+    out.push(ArgItem {
+        display: "Other".into(),
+        match_text: "other custom provider".into(),
+        insert_text: CUSTOM_PROVIDER_SENTINEL.to_string(),
+        description: "Custom provider".into(),
+        category: None,
+        badge: None,
+        is_current: false,
+        provider_connect: true,
+        is_section_header: false,
+    });
+
     out
+}
+
+fn models_dev_arg_item(models_dev_id: &str, name: &str) -> ArgItem {
+    let face_id = face_auth_id_for_models_dev(models_dev_id);
+    let description = opencode_row_description(models_dev_id)
+        .or_else(|| opencode_row_description(face_id))
+        .unwrap_or("")
+        .to_string();
+    let multi = face_auth_id_needs_method_picker(face_id);
+    let (insert_text, provider_connect) = if multi {
+        (format!("{face_id} "), false)
+    } else {
+        (face_id.to_string(), true)
+    };
+    ArgItem {
+        display: name.to_string(),
+        match_text: format!("{name} {models_dev_id} {face_id} {description}"),
+        insert_text,
+        description,
+        category: None,
+        badge: None,
+        is_current: false,
+        provider_connect,
+        is_section_header: false,
+    }
 }
 
 fn connect_method_items_for_query(args_query: &str) -> Option<Vec<ArgItem>> {
@@ -172,10 +213,17 @@ fn connect_method_items_for_query(args_query: &str) -> Option<Vec<ArgItem>> {
     }
     let provider = next_code_provider_metadata::resolve_login_provider(id)
         .or_else(|| next_code_provider_metadata::resolve_login_provider_loose(id))?;
-    let methods = methods_for_key(
-        &next_code_provider_metadata::tui_login_providers(),
-        provider.auth_state_key,
-    );
+    let catalog = next_code_provider_metadata::tui_login_providers();
+    let mut methods = methods_for_key(&catalog, provider.auth_state_key);
+    // OpenCode lists Google as OAuth + API key; next-code stores Gemini API under
+    // OpenRouterLike, so merge explicitly for the Face method step.
+    if matches!(id, "gemini" | "google") {
+        for extra in &catalog {
+            if extra.id == "gemini-api" && !methods.iter().any(|m| m.id == extra.id) {
+                methods.push(*extra);
+            }
+        }
+    }
     if methods.len() < 2 {
         return None;
     }
@@ -200,58 +248,6 @@ fn build_connect_method_items(methods: &[LoginProviderDescriptor]) -> Vec<ArgIte
         .collect()
 }
 
-fn group_families(providers: &[LoginProviderDescriptor]) -> Vec<Vec<LoginProviderDescriptor>> {
-    // Collapse into a multi-method family only when the same auth_state_key
-    // has both a browser path (OAuth/device) and a key/local path — e.g.
-    // Anthropic (`claude` + `anthropic-api`). Shared OpenRouterLike API-key
-    // rows stay separate (OpenCode lists each provider id).
-    let mut fork_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
-    let mut seen_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
-    for p in providers {
-        if seen_keys.contains(&p.auth_state_key) {
-            continue;
-        }
-        seen_keys.push(p.auth_state_key);
-        let methods = methods_for_key(providers, p.auth_state_key);
-        let has_browser = methods.iter().any(|m| {
-            matches!(
-                m.auth_kind,
-                LoginProviderAuthKind::OAuth | LoginProviderAuthKind::DeviceCode
-            )
-        });
-        let has_key = methods.iter().any(|m| {
-            matches!(
-                m.auth_kind,
-                LoginProviderAuthKind::ApiKey
-                    | LoginProviderAuthKind::Hybrid
-                    | LoginProviderAuthKind::Local
-            )
-        });
-        if has_browser && has_key && methods.len() > 1 {
-            fork_keys.push(p.auth_state_key);
-        }
-    }
-
-    let mut used_ids: Vec<&str> = Vec::new();
-    let mut families = Vec::new();
-    for p in providers {
-        if used_ids.contains(&p.id) {
-            continue;
-        }
-        if fork_keys.contains(&p.auth_state_key) {
-            let methods = methods_for_key(providers, p.auth_state_key);
-            for m in &methods {
-                used_ids.push(m.id);
-            }
-            families.push(methods);
-        } else {
-            used_ids.push(p.id);
-            families.push(vec![*p]);
-        }
-    }
-    families
-}
-
 fn methods_for_key(
     providers: &[LoginProviderDescriptor],
     key: LoginProviderAuthStateKey,
@@ -261,81 +257,6 @@ fn methods_for_key(
         .copied()
         .filter(|p| p.auth_state_key == key)
         .collect()
-}
-
-fn family_representative(methods: &[LoginProviderDescriptor]) -> LoginProviderDescriptor {
-    methods
-        .iter()
-        .copied()
-        .find(|p| p.recommended)
-        .or_else(|| methods.first().copied())
-        .expect("non-empty family")
-}
-
-fn family_arg_item(methods: &[LoginProviderDescriptor]) -> ArgItem {
-    let rep = family_representative(methods);
-    let multi = methods.len() > 1;
-    let display = opencode_display_name(rep).to_string();
-    let (insert_text, provider_connect, description) = if multi {
-        (
-            format!("{} ", rep.id),
-            false,
-            opencode_row_description(rep.id)
-                .map(str::to_string)
-                .unwrap_or_else(|| multi_method_hint(methods)),
-        )
-    } else {
-        (
-            rep.id.to_string(),
-            true,
-            opencode_row_description(rep.id)
-                .map(str::to_string)
-                .unwrap_or_else(|| single_method_hint(rep)),
-        )
-    };
-    ArgItem {
-        display: display.clone(),
-        match_text: format!(
-            "{} {} {}",
-            display,
-            methods
-                .iter()
-                .map(|m| m.id)
-                .collect::<Vec<_>>()
-                .join(" "),
-            description
-        ),
-        insert_text,
-        description,
-        category: None,
-        badge: None,
-        is_current: false,
-        provider_connect,
-        is_section_header: false,
-    }
-}
-
-fn single_method_hint(p: LoginProviderDescriptor) -> String {
-    if p.menu_detail.is_empty() {
-        p.auth_kind.label().to_string()
-    } else {
-        format!("{} · {}", p.auth_kind.label(), p.menu_detail)
-    }
-}
-
-fn multi_method_hint(methods: &[LoginProviderDescriptor]) -> String {
-    let kinds: Vec<&str> = methods
-        .iter()
-        .map(|m| match m.auth_kind {
-            LoginProviderAuthKind::OAuth => "OAuth",
-            LoginProviderAuthKind::ApiKey => "API key",
-            LoginProviderAuthKind::DeviceCode => "device code",
-            LoginProviderAuthKind::Cli => "CLI",
-            LoginProviderAuthKind::Hybrid => "API key / CLI",
-            LoginProviderAuthKind::Local => "local",
-        })
-        .collect();
-    format!("{} · pick method", kinds.join(" or "))
 }
 
 fn method_display_name(p: LoginProviderDescriptor) -> String {
@@ -405,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn suggest_args_has_popular_and_other() {
+    fn suggest_args_has_popular_other_and_custom() {
         let items = build_connect_family_items();
         assert!(
             items
@@ -419,7 +340,17 @@ mod tests {
                 .any(|i| i.is_section_header && i.display == "Other"),
             "{items:?}"
         );
-        assert!(items.iter().any(|i| !i.is_section_header));
+        assert!(
+            items
+                .iter()
+                .any(|i| i.insert_text == CUSTOM_PROVIDER_SENTINEL && i.display == "Other"),
+            "missing synthetic Other custom row"
+        );
+        let selectable = items.iter().filter(|i| !i.is_section_header).count();
+        assert!(
+            selectable >= 150,
+            "expected OpenCode-scale list, got {selectable}"
+        );
     }
 
     #[test]
@@ -432,18 +363,21 @@ mod tests {
             .take_while(|i| !i.is_section_header)
             .map(|i| i.insert_text.trim())
             .collect();
-        assert!(
-            popular.iter().any(|id| *id == "opencode" || *id == "opencode-go"),
-            "expected OpenCode Zen/Go in Popular, got {popular:?}"
+        assert_eq!(
+            popular,
+            vec!["opencode", "opencode-go", "openai", "copilot", "claude", "gemini"]
         );
-        assert!(
-            popular.iter().any(|id| *id == "openai" || id.starts_with("openai")),
-            "{popular:?}"
-        );
-        assert!(
-            !popular.iter().any(|id| *id == "bedrock"),
-            "Bedrock must not be Popular"
-        );
+    }
+
+    #[test]
+    fn long_tail_providers_listed() {
+        let items = build_connect_family_items();
+        for needle in ["cohere", "venice", "poe", "siliconflow", "databricks"] {
+            assert!(
+                items.iter().any(|i| i.insert_text.trim() == needle || i.match_text.contains(needle)),
+                "missing {needle}"
+            );
+        }
     }
 
     #[test]
@@ -454,12 +388,7 @@ mod tests {
             .find(|i| i.insert_text.trim() == "bedrock")
             .expect("bedrock in Other");
         assert!(!bedrock.is_section_header);
-        assert!(
-            items
-                .iter()
-                .any(|i| i.is_section_header && i.display == "Other"),
-            "{items:?}"
-        );
+        assert_eq!(bedrock.display, "Amazon Bedrock");
     }
 
     #[test]
@@ -472,13 +401,19 @@ mod tests {
             }
             other => panic!("expected NextCodeConnect bedrock, got {other:?}"),
         }
+        match ConnectCommand.run(&mut ctx, "amazon-bedrock") {
+            CommandResult::Action(Action::NextCodeConnect { provider }) => {
+                assert_eq!(provider, "bedrock");
+            }
+            other => panic!("expected NextCodeConnect bedrock via models.dev id, got {other:?}"),
+        }
     }
 
     #[test]
     fn anthropic_family_chains_to_method_picker() {
         let family = build_connect_family_items()
             .into_iter()
-            .find(|i| !i.is_section_header && (i.display == "Anthropic" || i.display.contains("Claude")))
+            .find(|i| !i.is_section_header && i.display == "Anthropic")
             .expect("anthropic family");
         assert!(
             family.insert_text.ends_with(' '),
@@ -518,6 +453,30 @@ mod tests {
                 assert_eq!(provider, "opencode-go");
             }
             other => panic!("expected NextCodeConnect, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn long_tail_models_dev_id_dispatches() {
+        let models = ModelState::default();
+        let mut ctx = make_ctx(&models);
+        match ConnectCommand.run(&mut ctx, "cohere") {
+            CommandResult::Action(Action::NextCodeConnect { provider }) => {
+                assert_eq!(provider, "cohere");
+            }
+            other => panic!("expected NextCodeConnect cohere, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn custom_sentinel_dispatches() {
+        let models = ModelState::default();
+        let mut ctx = make_ctx(&models);
+        match ConnectCommand.run(&mut ctx, CUSTOM_PROVIDER_SENTINEL) {
+            CommandResult::Action(Action::NextCodeConnect { provider }) => {
+                assert_eq!(provider, CUSTOM_PROVIDER_SENTINEL);
+            }
+            other => panic!("expected custom sentinel, got {other:?}"),
         }
     }
 }

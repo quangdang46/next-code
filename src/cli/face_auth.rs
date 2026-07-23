@@ -14,7 +14,8 @@ use tokio::sync::oneshot;
 use super::login::LoginOptions;
 use super::provider_init::save_named_api_key;
 use crate::provider_catalog::{
-    LoginProviderAuthKind, LoginProviderDescriptor, LoginProviderTarget, resolve_login_provider,
+    CUSTOM_PROVIDER_SENTINEL, LoginProviderAuthKind, LoginProviderDescriptor, LoginProviderTarget,
+    is_valid_custom_provider_id, normalize_custom_provider_id, resolve_login_provider,
     resolve_login_provider_loose, resolve_openai_compatible_profile,
 };
 
@@ -125,32 +126,44 @@ pub async fn authenticate_method(method_id: &str) -> Result<()> {
         anyhow::bail!("Pick a provider with /connect (opens the Face picker).");
     }
 
-    let provider = resolve_login_provider(provider_key)
+    // OpenCode Other → custom provider id + API key.
+    if provider_key == CUSTOM_PROVIDER_SENTINEL {
+        return run_custom_provider_face_login().await;
+    }
+
+    if let Some(provider) = resolve_login_provider(provider_key)
         .or_else(|| resolve_login_provider_loose(provider_key))
-        .ok_or_else(|| anyhow!("Unknown provider {provider_key:?}"))?;
+    {
+        // Multi-step / non-paste targets before the generic API-key/OAuth branches.
+        match provider.target {
+            LoginProviderTarget::AutoImport => return run_auto_import_face_login().await,
+            LoginProviderTarget::Azure => return run_azure_face_login(provider).await,
+            LoginProviderTarget::Bedrock => return run_bedrock_face_login(provider).await,
+            _ => {}
+        }
 
-    // Multi-step / non-paste targets before the generic API-key/OAuth branches.
-    match provider.target {
-        LoginProviderTarget::AutoImport => return run_auto_import_face_login().await,
-        LoginProviderTarget::Azure => return run_azure_face_login(provider).await,
-        LoginProviderTarget::Bedrock => return run_bedrock_face_login(provider).await,
-        _ => {}
+        return match provider.auth_kind {
+            LoginProviderAuthKind::ApiKey
+            | LoginProviderAuthKind::Local
+            | LoginProviderAuthKind::Hybrid => run_api_key_face_login(provider).await,
+            LoginProviderAuthKind::OAuth | LoginProviderAuthKind::DeviceCode => {
+                run_oauth_face_login(provider).await
+            }
+            LoginProviderAuthKind::Cli => {
+                anyhow::bail!(
+                    "{} uses CLI credentials (e.g. az login). Configure outside Face, then restart.",
+                    provider.display_name
+                );
+            }
+        };
     }
 
-    match provider.auth_kind {
-        LoginProviderAuthKind::ApiKey | LoginProviderAuthKind::Local | LoginProviderAuthKind::Hybrid => {
-            run_api_key_face_login(provider).await
-        }
-        LoginProviderAuthKind::OAuth | LoginProviderAuthKind::DeviceCode => {
-            run_oauth_face_login(provider).await
-        }
-        LoginProviderAuthKind::Cli => {
-            anyhow::bail!(
-                "{} uses CLI credentials (e.g. az login). Configure outside Face, then restart.",
-                provider.display_name
-            );
-        }
+    // models.dev long-tail / free-text custom id: store API key under provider id
+    // (OpenCode auth.set twin). Requires a valid OpenCode-style provider id.
+    if !is_valid_custom_provider_id(provider_key) {
+        anyhow::bail!("Unknown provider {provider_key:?}");
     }
+    run_models_dev_api_key_face_login(provider_key).await
 }
 
 pub async fn submit_auth_code(code: &str) -> Result<()> {
@@ -317,6 +330,41 @@ async fn run_auto_import_face_login() -> Result<()> {
         );
     }
     crate::auth::AuthStatus::invalidate_cache();
+    Ok(())
+}
+
+/// OpenCode Other: prompt custom provider id, then API key → auth.json.
+async fn run_custom_provider_face_login() -> Result<()> {
+    let docs = "https://opencode.ai/docs/providers";
+    let raw_id = face_prompt_paste(CUSTOM_PROVIDER_SENTINEL, docs).await?;
+    let Some(provider_id) = normalize_custom_provider_id(&raw_id)
+        .filter(|id| is_valid_custom_provider_id(id))
+    else {
+        clear_pending();
+        anyhow::bail!(
+            "Provider ids must start with a lowercase letter or number and only use lowercase letters, numbers, hyphens, and underscores"
+        );
+    };
+    run_models_dev_api_key_face_login(&provider_id).await
+}
+
+/// Store API key under models.dev / custom provider id in `~/.next-code/auth.json`.
+async fn run_models_dev_api_key_face_login(provider_id: &str) -> Result<()> {
+    let setup_url = format!("https://models.dev/{provider_id}");
+    let code = face_prompt_paste(provider_id, &setup_url).await?;
+    clear_pending();
+    if code.is_empty() {
+        anyhow::bail!("No API key provided");
+    }
+    crate::provider_catalog::save_api_key_for_provider_id(provider_id, &code)?;
+    crate::auth::AuthStatus::invalidate_cache();
+    if let Ok(path) = crate::provider_catalog::auth_json_path() {
+        remember_connect_credential_path(path.display().to_string());
+        crate::logging::info(&format!(
+            "Face /connect saved API key for {provider_id}; credential path: {}",
+            path.display()
+        ));
+    }
     Ok(())
 }
 
