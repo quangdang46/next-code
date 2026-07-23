@@ -31,7 +31,21 @@ Source tree: `.tmp-research-plugins/claude-code`
 2. [x] Extend `list_nextcode_sessions` with `firstPrompt`, better `numMessages`, user/assistant counts from snapshot+journal
 3. [x] Extend `SessionPickerEntry` + `parse_session_picker_entries`
 4. [x] Multi-line left rows + right-pane header in `resume_browser`
-5. [ ] Tests + rebuild/install + push PR #67
+5. [x] Tests + rebuild/install + push PR #67
 
-## Status
-Implementing on `pr-face-resume-dual-entry` — reply not needed (approved go ahead).
+## Files to touch
+- `docs/plans/PLAN-20260723-face-resume-list-enrich.md` — this note
+- `src/cli/face_auth.rs` — list payload enrichment
+- `crates/xai-grok-pager/src/app/app_view.rs` — entry fields
+- `crates/xai-grok-pager/src/app/effects/helpers.rs` — parse
+- `crates/xai-grok-pager/src/views/resume_browser.rs` — multi-line + header
+- Call sites constructing `SessionPickerEntry`
+
+## Out of scope
+- Defaulting `NEXT_CODE_LEGACY_TUI`
+- Server / project tree grouping
+- Changing `/resume` expand-card chrome beyond shared entry fields
+
+## Shipped
+- Commit `7c8c30d6e` on `pr-face-resume-dual-entry` → PR #67
+- Local install: `%LOCALAPPDATA%\next-code\builds\versions\7c8c30d6e\` (bin replaced via rename)
