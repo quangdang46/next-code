@@ -372,6 +372,22 @@ impl Agent {
         result
     }
 
+    /// Retry the active conversation without appending another user message.
+    /// Used by Face/TUI after a cross-provider failover countdown switch
+    /// (mirrors local TUI `pending_turn` resend semantics).
+    pub async fn retry_turn_streaming_mpsc(
+        &mut self,
+        event_tx: mpsc::UnboundedSender<ServerEvent>,
+    ) -> Result<()> {
+        let turn_started_at = Instant::now();
+        let start_message_index = self.message_count();
+        self.fire_turn_start_hook("failover_retry");
+        let result = self.run_turn_streaming_mpsc(event_tx).await;
+        self.fire_turn_end_hook(&result, turn_started_at, start_message_index);
+        self.fire_stop_and_idle_hooks(&result);
+        result
+    }
+
     /// Fire the `turn_start` observer hook when a turn begins, before the model
     /// starts generating (and before the first `pre_tool`). This lets external
     /// integrations (terminal multiplexers, status bars) detect that the agent
@@ -707,6 +723,14 @@ impl Agent {
         self.stdin_request_tx = Some(tx);
     }
 
+    /// Set the AskUserQuestion channel for Face ACP reverse requests.
+    pub fn set_ask_user_question_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::AskUserQuestionInputRequest>,
+    ) {
+        self.ask_user_question_tx = Some(tx);
+    }
+
     pub(super) async fn tool_definitions(&mut self) -> Vec<ToolDefinition> {
         if self.session.is_canary {
             self.registry.register_selfdev_tools().await;
@@ -848,6 +872,7 @@ impl Agent {
             tool_call_id: call_id,
             working_dir: self.working_dir().map(PathBuf::from),
             stdin_request_tx: self.stdin_request_tx.clone(),
+            ask_user_question_tx: self.ask_user_question_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             execution_mode: ToolExecutionMode::Direct,
             best_of_n_run_id: self.best_of_n_run_id.clone(),

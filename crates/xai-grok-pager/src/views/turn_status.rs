@@ -658,11 +658,14 @@ fn compute_activity(
             "Compacting…".to_string(),
             false,
         ),
-        (AgentState::TurnRunning, Some(TurnActivity::Retrying { attempt, .. })) => (
-            Style::default().fg(theme.warning),
-            format!("Retrying (attempt {attempt})…"),
-            false,
-        ),
+        (AgentState::TurnRunning, Some(TurnActivity::Retrying { attempt, reason, .. })) => {
+            let label = if reason.starts_with("Provider auto-switch →") {
+                reason.clone()
+            } else {
+                format!("Retrying (attempt {attempt})…")
+            };
+            (Style::default().fg(theme.warning), label, false)
+        }
         (AgentState::TurnRunning, Some(TurnActivity::Waiting(reason))) => (
             // Explicit wait reason (model / subagent / task output / tasks /
             // sleep): name what the agent is blocked on instead of a generic

@@ -27,7 +27,7 @@ struct SessionBootstrap {
     models: Option<acp::SessionModelState>,
 }
 
-struct DaemonSession {
+pub(crate) struct DaemonSession {
     session_id: String,
     reader: Mutex<BufReader<ReadHalf>>,
     writer: Mutex<WriteHalf>,
@@ -45,10 +45,14 @@ struct DaemonSession {
     /// socket — drained first by [`DaemonSession::read_event`].
     pending_events: Mutex<VecDeque<ServerEvent>>,
     idle_pump_started: AtomicBool,
+    /// Face provider-failover countdown is armed (Esc → cancel without daemon Cancel).
+    pending_failover: AtomicBool,
+    /// Set by ACP `cancel` while [`Self::pending_failover`] is true.
+    failover_cancel: AtomicBool,
 }
 
 impl DaemonSession {
-    fn new(
+    pub(crate) fn new(
         session_id: String,
         reader: ReadHalf,
         writer: WriteHalf,
@@ -66,6 +70,8 @@ impl DaemonSession {
             available_models: Mutex::new(Vec::new()),
             pending_events: Mutex::new(VecDeque::new()),
             idle_pump_started: AtomicBool::new(false),
+            pending_failover: AtomicBool::new(false),
+            failover_cancel: AtomicBool::new(false),
         }
     }
 
@@ -79,6 +85,28 @@ impl DaemonSession {
 
     async fn peek_last_model(&self) -> Option<String> {
         self.last_model.lock().await.clone()
+    }
+
+    fn arm_failover_countdown(&self) {
+        self.failover_cancel.store(false, Ordering::SeqCst);
+        self.pending_failover.store(true, Ordering::SeqCst);
+    }
+
+    fn clear_failover_countdown(&self) {
+        self.pending_failover.store(false, Ordering::SeqCst);
+        self.failover_cancel.store(false, Ordering::SeqCst);
+    }
+
+    fn request_failover_cancel(&self) -> bool {
+        if !self.pending_failover.load(Ordering::SeqCst) {
+            return false;
+        }
+        self.failover_cancel.store(true, Ordering::SeqCst);
+        true
+    }
+
+    fn failover_cancel_requested(&self) -> bool {
+        self.failover_cancel.load(Ordering::SeqCst)
     }
 
     async fn set_available_models(&self, models: &[String]) {
@@ -103,11 +131,11 @@ impl DaemonSession {
         self.pending_events.lock().await.pop_front()
     }
 
-    fn next_id(&self) -> u64 {
+    pub(crate) fn next_id(&self) -> u64 {
         self.next_request_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    async fn send(&self, request: &Request) -> Result<()> {
+    pub(crate) async fn send(&self, request: &Request) -> Result<()> {
         let mut json = serde_json::to_string(request)?;
         json.push('\n');
         let mut writer = self.writer.lock().await;
@@ -116,7 +144,7 @@ impl DaemonSession {
         Ok(())
     }
 
-    async fn read_event(&self) -> Result<ServerEvent> {
+    pub(crate) async fn read_event(&self) -> Result<ServerEvent> {
         if let Some(event) = self.pop_pending().await {
             return Ok(event);
         }
@@ -307,14 +335,79 @@ fn model_changed_notice_reason(provider_name: Option<&str>, model: &str) -> Stri
     }
 }
 
-/// Face scrollback notice when the daemon surfaces a cross-provider failover prompt.
+/// Prefix Face Esc policy + turn status use to recognize provider-failover countdown.
+const FAILOVER_COUNTDOWN_STATUS_PREFIX: &str = "Provider auto-switch →";
+
+fn failover_config_hint() -> &'static str {
+    "To turn this off, set [provider].cross_provider_failover = \"manual\" in ~/.next-code/config.toml or export NEXT_CODE_CROSS_PROVIDER_FAILOVER=manual."
+}
+
+fn format_failover_input_summary(
+    prompt: &next_code_provider_core::ProviderFailoverPrompt,
+) -> String {
+    format!(
+        "about {} input tokens (~{} chars)",
+        prompt.estimated_input_tokens, prompt.estimated_input_chars
+    )
+}
+
+/// Face scrollback notice when the daemon surfaces a cross-provider failover prompt (manual).
 fn failover_prompt_notice_reason(
     prompt: &next_code_provider_core::ProviderFailoverPrompt,
 ) -> String {
     format!(
-        "{} became unavailable ({}); next-code suggests {} — use /model to switch or resend after auto-switch.",
-        prompt.from_label, prompt.reason, prompt.to_label
+        "{} became unavailable ({}); next-code suggests {} — use /model to switch or resend after auto-switch. {}",
+        prompt.from_label,
+        prompt.reason,
+        prompt.to_label,
+        failover_config_hint()
     )
+}
+
+fn failover_countdown_arm_reason(
+    prompt: &next_code_provider_core::ProviderFailoverPrompt,
+) -> String {
+    format!(
+        "{} became unavailable — next-code will switch to {} in 3 seconds unless you cancel. Reason: {}. Retrying would send {}. Press Esc to cancel. {}",
+        prompt.from_label,
+        prompt.to_label,
+        prompt.reason,
+        format_failover_input_summary(prompt),
+        failover_config_hint()
+    )
+}
+
+fn failover_countdown_status(to_label: &str, remaining_secs: u32) -> String {
+    format!(
+        "{FAILOVER_COUNTDOWN_STATUS_PREFIX} {to_label} in {remaining_secs}s (Esc to cancel)"
+    )
+}
+
+fn failover_cancel_notice_reason(from_label: &str) -> String {
+    format!(
+        "Canceled provider auto-switch — kept {from_label} active. You can switch manually with /model, then resend. {}",
+        failover_config_hint()
+    )
+}
+
+fn failover_switched_notice_reason(
+    prompt: &next_code_provider_core::ProviderFailoverPrompt,
+    active_model: &str,
+) -> String {
+    format!(
+        "Auto-switched provider after countdown: {} → {}. Resending {} on model {}. {}",
+        prompt.from_label,
+        prompt.to_label,
+        format_failover_input_summary(prompt),
+        active_model,
+        failover_config_hint()
+    )
+}
+
+fn cross_provider_failover_mode() -> next_code_config_types::CrossProviderFailoverMode {
+    crate::config::Config::load()
+        .provider
+        .cross_provider_failover
 }
 
 /// Face-facing ACP agent: Client (pager) ↔ this ↔ next-code `serve` socket.
@@ -601,6 +694,234 @@ impl NextCodeFaceAgent {
                 std::sync::Arc::from(raw),
             ))
             .await;
+    }
+
+    /// Drive Face turn-status chrome during provider-failover countdown
+    /// (`TurnActivity::Retrying`).
+    async fn emit_retry_state(
+        &self,
+        session_id: &str,
+        state: xai_grok_shell::extensions::notification::RetryState,
+    ) {
+        let payload = xai_grok_shell::extensions::notification::SessionNotification {
+            session_id: acp::SessionId::new(session_id),
+            update: xai_grok_shell::extensions::notification::SessionUpdate::RetryState(state),
+            meta: None,
+        };
+        let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+            return;
+        };
+        let _ = self
+            .gateway
+            .ext_notification(acp::ExtNotification::new(
+                "x.ai/session_notification",
+                std::sync::Arc::from(raw),
+            ))
+            .await;
+    }
+
+    /// Wait up to `secs` for Esc/cancel, returning true when canceled.
+    async fn wait_failover_countdown_tick(session: &DaemonSession, secs: u64) -> bool {
+        let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(secs);
+        loop {
+            if session.failover_cancel_requested() {
+                return true;
+            }
+            let now = tokio::time::Instant::now();
+            if now >= deadline {
+                return session.failover_cancel_requested();
+            }
+            let slice = (deadline - now).min(tokio::time::Duration::from_millis(50));
+            tokio::time::sleep(slice).await;
+        }
+    }
+
+    /// Resolve a routed model spec for `to_provider` via GetModelCatalog.
+    async fn routed_model_spec_for_provider(
+        session: &DaemonSession,
+        to_provider: &str,
+    ) -> Result<String> {
+        let catalog_id = session.next_id();
+        session
+            .send(&Request::GetModelCatalog { id: catalog_id })
+            .await?;
+        let routes = loop {
+            match session.read_event().await? {
+                ServerEvent::History {
+                    id,
+                    available_model_routes,
+                    provider_model,
+                    ..
+                } if id == catalog_id => {
+                    if !available_model_routes.is_empty() {
+                        break available_model_routes;
+                    }
+                    // Catalog empty — fall back to provider-prefixed current model if any.
+                    if let Some(model) = provider_model
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                    {
+                        return Ok(format!("{to_provider}:{model}"));
+                    }
+                    break Vec::new();
+                }
+                ServerEvent::Error {
+                    id,
+                    message,
+                    ..
+                } if id == catalog_id => anyhow::bail!(message),
+                _ => {}
+            }
+        };
+
+        let target = to_provider.trim().to_ascii_lowercase();
+        let route = routes
+            .iter()
+            .find(|r| r.available && r.provider.eq_ignore_ascii_case(&target))
+            .or_else(|| {
+                routes
+                    .iter()
+                    .find(|r| r.provider.eq_ignore_ascii_case(&target))
+            })
+            .cloned()
+            .ok_or_else(|| {
+                anyhow::anyhow!("No model route available for provider `{to_provider}`")
+            })?;
+        Ok(next_code_provider_core::RouteSelection::from_model_route(&route).routed_model_spec())
+    }
+
+    /// Switch to failover target and start `RetryTurn` (no duplicate user message).
+    /// Returns the new prompt id to continue reading events for.
+    async fn apply_failover_switch_and_retry(
+        &self,
+        session: &DaemonSession,
+        session_id: &str,
+        prompt: &next_code_provider_core::ProviderFailoverPrompt,
+    ) -> Result<u64> {
+        let model_spec = Self::routed_model_spec_for_provider(session, &prompt.to_provider).await?;
+        let set_id = session.next_id();
+        session
+            .send(&Request::SetModel {
+                id: set_id,
+                model: model_spec.clone(),
+            })
+            .await?;
+
+        let mut active_model = model_spec.clone();
+        loop {
+            match session.read_event().await? {
+                ServerEvent::ModelChanged {
+                    id,
+                    model,
+                    provider_name,
+                    error: None,
+                    ..
+                } if id == set_id => {
+                    active_model = model.clone();
+                    if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
+                        self.emit_provider_name(session_id, provider).await;
+                    }
+                    self.emit_models_update(&model, provider_name.as_deref(), &[])
+                        .await;
+                    let previous = session.peek_last_model().await;
+                    self.emit_model_auto_switched(
+                        session_id,
+                        previous.as_deref().unwrap_or(prompt.from_label.as_str()),
+                        &model,
+                        &failover_switched_notice_reason(prompt, &model),
+                    )
+                    .await;
+                    session.set_last_model(Some(&model)).await;
+                    break;
+                }
+                ServerEvent::ModelChanged {
+                    id,
+                    model,
+                    error: Some(err),
+                    ..
+                } if id == set_id => {
+                    anyhow::bail!("Couldn't switch provider to {model}: {err}");
+                }
+                ServerEvent::Error {
+                    id,
+                    message,
+                    ..
+                } if id == set_id => anyhow::bail!(message),
+                ServerEvent::Done { id } if id == set_id => break,
+                _ => {}
+            }
+        }
+
+        let retry_id = session.next_id();
+        session.send(&Request::RetryTurn { id: retry_id }).await?;
+        let _ = active_model;
+        Ok(retry_id)
+    }
+
+    /// Countdown + Esc cancel + switch/retry. Returns Some(stop) when the ACP
+    /// prompt should end (cancel / switch failure); None when retry was armed
+    /// and `prompt_id` was updated for continued event reading.
+    async fn run_failover_countdown(
+        &self,
+        session: &DaemonSession,
+        session_id: &str,
+        prompt: &next_code_provider_core::ProviderFailoverPrompt,
+        prompt_id: &mut u64,
+    ) -> Option<acp::StopReason> {
+        session.arm_failover_countdown();
+        self.emit_model_auto_switched(
+            session_id,
+            &prompt.from_label,
+            &prompt.to_label,
+            &failover_countdown_arm_reason(prompt),
+        )
+        .await;
+
+        for remaining in [3_u32, 2, 1] {
+            self.emit_retry_state(
+                session_id,
+                xai_grok_shell::extensions::notification::RetryState::Retrying {
+                    attempt: remaining,
+                    max_retries: 3,
+                    reason: failover_countdown_status(&prompt.to_label, remaining),
+                },
+            )
+            .await;
+            if Self::wait_failover_countdown_tick(session, 1).await {
+                session.clear_failover_countdown();
+                self.emit_model_auto_switched(
+                    session_id,
+                    &prompt.from_label,
+                    &prompt.from_label,
+                    &failover_cancel_notice_reason(&prompt.from_label),
+                )
+                .await;
+                return Some(acp::StopReason::Cancelled);
+            }
+        }
+
+        session.clear_failover_countdown();
+        match self
+            .apply_failover_switch_and_retry(session, session_id, prompt)
+            .await
+        {
+            Ok(new_id) => {
+                *prompt_id = new_id;
+                None
+            }
+            Err(err) => {
+                self.emit_text(
+                    session_id,
+                    format!(
+                        "Failed to switch provider to {}: {err}",
+                        prompt.to_label
+                    ),
+                )
+                .await;
+                Some(acp::StopReason::EndTurn)
+            }
+        }
     }
 
     fn prompt_text(args: &acp::PromptRequest) -> String {
@@ -1575,7 +1896,7 @@ impl acp::Agent for NextCodeFaceAgent {
         let working_dir = session.working_dir.clone();
         let (content, system_reminder) =
             Self::expand_skill_invocation(&text, working_dir.as_deref());
-        let prompt_id = session.next_id();
+        let mut prompt_id = session.next_id();
         if let Err(err) = session
             .send(&Request::Message {
                 id: prompt_id,
@@ -1788,9 +2109,47 @@ impl acp::Agent for NextCodeFaceAgent {
                     )
                     .await;
                 }
+                event @ ServerEvent::PermissionRequest { .. } => {
+                    // Blocking Face ACP permission overlay (`permission_view`).
+                    if let Err(err) = crate::cli::face_permission::bridge_permission_request(
+                        &self.gateway,
+                        session.as_ref(),
+                        event,
+                    )
+                    .await
+                    {
+                        crate::logging::warn(&format!("Face permission bridge failed: {err}"));
+                    }
+                }
                 ServerEvent::MemoryActivity { activity } => {
                     crate::memory::apply_remote_activity_snapshot(&activity);
                     self.emit_memory_info(&session_id).await;
+                }
+                ServerEvent::AskUserQuestion {
+                    request_id,
+                    session_id: ask_session_id,
+                    tool_call_id,
+                    questions,
+                    mode,
+                } => {
+                    // Blocking reverse ACP → Face question_view (not permission_view).
+                    if let Err(err) = crate::cli::face_ask_user::bridge_ask_user_question(
+                        &self.gateway,
+                        session.as_ref(),
+                        request_id,
+                        ask_session_id,
+                        tool_call_id,
+                        questions,
+                        mode,
+                    )
+                    .await
+                    {
+                        self.emit_text(
+                            &session_id,
+                            format!("AskUserQuestion bridge error: {err}"),
+                        )
+                        .await;
+                    }
                 }
                 ServerEvent::Done { id } if id == prompt_id => {
                     // Refresh Plan in case compaction / other paths mutated todos
@@ -1803,19 +2162,39 @@ impl acp::Agent for NextCodeFaceAgent {
                     if let Some(prompt) =
                         next_code_provider_core::parse_failover_prompt_message(&message)
                     {
-                        let reason = failover_prompt_notice_reason(&prompt);
-                        self.emit_model_auto_switched(
-                            &session_id,
-                            &prompt.from_label,
-                            &prompt.to_label,
-                            &reason,
-                        )
-                        .await;
+                        match cross_provider_failover_mode() {
+                            next_code_config_types::CrossProviderFailoverMode::Countdown => {
+                                if let Some(stop) = self
+                                    .run_failover_countdown(
+                                        &session,
+                                        &session_id,
+                                        &prompt,
+                                        &mut prompt_id,
+                                    )
+                                    .await
+                                {
+                                    break stop;
+                                }
+                                // RetryTurn armed — keep reading events for the new id.
+                                continue;
+                            }
+                            next_code_config_types::CrossProviderFailoverMode::Manual => {
+                                let reason = failover_prompt_notice_reason(&prompt);
+                                self.emit_model_auto_switched(
+                                    &session_id,
+                                    &prompt.from_label,
+                                    &prompt.to_label,
+                                    &reason,
+                                )
+                                .await;
+                                break acp::StopReason::EndTurn;
+                            }
+                        }
                     } else {
                         self.emit_text(&session_id, format!("Error: {message}"))
                             .await;
+                        break acp::StopReason::EndTurn;
                     }
-                    break acp::StopReason::EndTurn;
                 }
                 _ => {}
             }
@@ -1828,6 +2207,11 @@ impl acp::Agent for NextCodeFaceAgent {
     async fn cancel(&self, args: acp::CancelNotification) -> acp::Result<()> {
         let session_id = args.session_id.to_string();
         if let Some(session) = self.sessions.borrow().get(&session_id).cloned() {
+            // Esc during Face failover countdown cancels the pending switch
+            // (TUI `pending_provider_failover` parity) — do not Cancel a finished turn.
+            if session.request_failover_cancel() {
+                return Ok(());
+            }
             let cancel_id = session.next_id();
             let _ = session.send(&Request::Cancel { id: cancel_id }).await;
         }
@@ -2174,6 +2558,25 @@ mod tests {
         assert!(notice.contains("rate limited"));
         assert!(notice.contains("OpenRouter"));
         assert!(!notice.contains("[next-code-provider-failover]"));
+    }
+
+    #[test]
+    fn failover_countdown_status_matches_tui_prefix() {
+        let status = failover_countdown_status("OpenRouter", 3);
+        assert!(status.starts_with(FAILOVER_COUNTDOWN_STATUS_PREFIX));
+        assert!(status.contains("in 3s"));
+        assert!(status.contains("Esc to cancel"));
+    }
+
+    #[test]
+    fn retry_turn_request_roundtrips() {
+        let req = Request::RetryTurn { id: 42 };
+        let json = serde_json::to_value(&req).expect("serialize");
+        assert_eq!(json["type"], "retry_turn");
+        assert_eq!(json["id"], 42);
+        let decoded: Request = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(decoded.id(), 42);
+        assert!(matches!(decoded, Request::RetryTurn { id: 42 }));
     }
 
     #[test]

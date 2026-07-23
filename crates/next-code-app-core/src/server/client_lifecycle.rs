@@ -1,8 +1,8 @@
 use super::client_actions::{
-    AgentTaskContext, NotifySessionContext, handle_agent_task, handle_compact, handle_input_shell,
-    handle_notify_session, handle_rename_session, handle_run_subagent, handle_set_feature,
-    handle_set_subagent_model, handle_split, handle_stdin_response, handle_transfer,
-    handle_trigger_memory_extraction,
+    AgentTaskContext, NotifySessionContext, handle_agent_task, handle_ask_user_question_response,
+    handle_compact, handle_input_shell, handle_notify_session, handle_permission_response,
+    handle_rename_session, handle_run_subagent, handle_set_feature, handle_set_subagent_model,
+    handle_split, handle_stdin_response, handle_transfer, handle_trigger_memory_extraction,
 };
 use super::client_comm::{
     handle_comm_channel_members, handle_comm_list, handle_comm_list_channels, handle_comm_message,
@@ -628,6 +628,14 @@ pub(super) async fn handle_client(
 
     let stdin_responses: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<String>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let ask_user_question_responses: Arc<
+        Mutex<
+            HashMap<
+                String,
+                tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+            >,
+        >,
+    > = Arc::new(Mutex::new(HashMap::new()));
 
     // Subscribe to bus events so we can forward ModelsUpdated to this client
     // (e.g. when Copilot finishes async init after the initial History was sent)
@@ -656,6 +664,34 @@ pub(super) async fn handle_client(
                     prompt: req.prompt,
                     is_password: req.is_password,
                     tool_call_id: tool_call_id.clone(),
+                });
+            }
+        })
+    };
+
+    // AskUserQuestion → Face ACP reverse request (not StdinRequest, not permission).
+    let (ask_req_tx, mut ask_req_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::tool::AskUserQuestionInputRequest>();
+    {
+        let mut agent_guard = agent.lock().await;
+        agent_guard.set_ask_user_question_tx(ask_req_tx);
+    }
+    let _ask_user_question_forwarder = {
+        let client_event_tx = client_event_tx.clone();
+        let ask_user_question_responses = ask_user_question_responses.clone();
+        tokio::spawn(async move {
+            while let Some(req) = ask_req_rx.recv().await {
+                let request_id = req.request_id.clone();
+                ask_user_question_responses
+                    .lock()
+                    .await
+                    .insert(request_id.clone(), req.response_tx);
+                let _ = client_event_tx.send(ServerEvent::AskUserQuestion {
+                    request_id,
+                    session_id: req.session_id,
+                    tool_call_id: req.tool_call_id,
+                    questions: req.questions,
+                    mode: req.mode,
                 });
             }
         })
@@ -836,6 +872,34 @@ pub(super) async fn handle_client(
                                 let _ = tx.send(event);
                             }
                         });
+                    }
+                    Ok(BusEvent::PermissionRequested(req)) => {
+                        // Socket clients (Face) never see the in-process bus.
+                        // Forward so Face can emit ACP session/request_permission.
+                        if req.session_id == client_session_id {
+                            let request_id = if req.allow_once_code.is_empty() {
+                                format!(
+                                    "perm-{}-{}",
+                                    req.session_id,
+                                    std::time::SystemTime::now()
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .map(|d| d.as_millis())
+                                        .unwrap_or(0)
+                                )
+                            } else {
+                                format!("perm-{}", req.allow_once_code)
+                            };
+                            let _ = client_event_tx.send(ServerEvent::PermissionRequest {
+                                request_id,
+                                session_id: req.session_id,
+                                tool_name: req.tool_name,
+                                reason: req.reason,
+                                allow_once_code: req.allow_once_code,
+                                alternatives: req.alternatives,
+                                tool_input: req.tool_input,
+                                tool_call_id: String::new(),
+                            });
+                        }
                     }
                     _ => {}
                 }
@@ -1067,6 +1131,37 @@ pub(super) async fn handle_client(
                         images,
                         system_reminder,
                     },
+                    &client_session_id,
+                    &mut ProcessingState {
+                        client_is_processing: &mut client_is_processing,
+                        message_id: &mut processing_message_id,
+                        session_id: &mut processing_session_id,
+                        task: &mut processing_task,
+                    },
+                    &agent,
+                    &client_event_tx,
+                    &processing_done_tx,
+                    &SwarmStatusRefs {
+                        members: &swarm_members,
+                        swarms_by_id: &swarms_by_id,
+                        event_history: &event_history,
+                        event_counter: &event_counter,
+                        event_tx: &swarm_event_tx,
+                    },
+                )
+                .await;
+            }
+
+            Request::RetryTurn { id } => {
+                if !client_is_processing {
+                    let mut connections = client_connections.write().await;
+                    if let Some(info) = connections.get_mut(&client_connection_id) {
+                        info.is_processing = true;
+                        info.current_tool_name = None;
+                    }
+                }
+                start_retry_turn(
+                    id,
                     &client_session_id,
                     &mut ProcessingState {
                         client_is_processing: &mut client_is_processing,
@@ -1860,6 +1955,43 @@ pub(super) async fn handle_client(
             } => {
                 handle_stdin_response(id, request_id, input, &stdin_responses, &client_event_tx)
                     .await;
+            }
+
+            Request::AskUserQuestionResponse {
+                id,
+                request_id,
+                response,
+                error,
+            } => {
+                handle_ask_user_question_response(
+                    id,
+                    request_id,
+                    response,
+                    error,
+                    &ask_user_question_responses,
+                    &client_event_tx,
+                )
+                .await;
+            }
+
+            Request::PermissionResponse {
+                id,
+                request_id,
+                outcome,
+                session_id,
+                tool_name,
+                allow_once_code,
+            } => {
+                handle_permission_response(
+                    id,
+                    request_id,
+                    outcome,
+                    session_id,
+                    tool_name,
+                    allow_once_code,
+                    &client_event_tx,
+                )
+                .await;
             }
 
             Request::AgentTask { id, task, .. } => {
@@ -2836,6 +2968,117 @@ async fn start_processing_message(
     }));
 }
 
+async fn start_retry_turn(
+    id: u64,
+    client_session_id: &str,
+    state: &mut ProcessingState<'_>,
+    agent: &Arc<Mutex<Agent>>,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+    processing_done_tx: &mpsc::UnboundedSender<(u64, Result<()>, Option<String>)>,
+    swarm: &SwarmStatusRefs<'_>,
+) {
+    if server_reload_starting() {
+        crate::logging::info(&format!(
+            "Rejecting retry_turn for session {} because server reload is starting",
+            client_session_id
+        ));
+        let _ = client_event_tx.send(ServerEvent::Reloading { new_socket: None });
+        return;
+    }
+
+    if *state.client_is_processing {
+        let _ = client_event_tx.send(ServerEvent::Error {
+            id,
+            message: "Already processing a message".to_string(),
+            retry_after_secs: None,
+        });
+        return;
+    }
+
+    *state.client_is_processing = true;
+    *state.message_id = Some(id);
+    *state.session_id = Some(client_session_id.to_string());
+
+    update_member_status(
+        client_session_id,
+        "running",
+        Some("retrying after provider failover".to_string()),
+        swarm.members,
+        swarm.swarms_by_id,
+        Some(swarm.event_history),
+        Some(swarm.event_counter),
+        Some(swarm.event_tx),
+    )
+    .await;
+
+    let start_message_index = {
+        let agent_guard = agent.lock().await;
+        agent_guard.message_count()
+    };
+    let agent = Arc::clone(agent);
+    let report_agent = Arc::clone(&agent);
+    let tx = super::state::session_event_fanout_sender_with_fallback(
+        client_session_id.to_string(),
+        Arc::clone(swarm.members),
+        client_event_tx.clone(),
+    );
+    let done_tx = processing_done_tx.clone();
+    crate::logging::info(&format!("Processing retry_turn id={} spawning task", id));
+    *state.task = Some(tokio::spawn(async move {
+        let event_tx = tx.clone();
+        let result = match std::panic::AssertUnwindSafe(process_retry_turn_streaming_mpsc(
+            agent, event_tx,
+        ))
+        .catch_unwind()
+        .await
+        {
+            Ok(result) => result,
+            Err(panic_payload) => {
+                let msg = if let Some(text) = panic_payload.downcast_ref::<&str>() {
+                    text.to_string()
+                } else if let Some(text) = panic_payload.downcast_ref::<String>() {
+                    text.clone()
+                } else {
+                    "unknown panic".to_string()
+                };
+                crate::logging::error(&format!(
+                    "Retry turn task PANICKED for id={}: {}",
+                    id, msg
+                ));
+                Err(anyhow::anyhow!("Retry turn task panicked: {}", msg))
+            }
+        };
+        match &result {
+            Ok(()) => crate::logging::info(&format!(
+                "Retry turn task completed OK for id={}",
+                id
+            )),
+            Err(error) => crate::logging::warn(&format!(
+                "Retry turn task completed with error for id={}: {}",
+                id, error
+            )),
+        }
+        let completion_report = if result.is_ok() {
+            let agent = report_agent.lock().await;
+            agent.latest_assistant_text_after(start_message_index)
+        } else {
+            None
+        };
+        let terminal_event = match &result {
+            Ok(()) => ServerEvent::Done { id },
+            Err(error) => ServerEvent::Error {
+                id,
+                message: crate::util::format_error_chain(error),
+                retry_after_secs: error
+                    .downcast_ref::<StreamError>()
+                    .and_then(|stream_error| stream_error.retry_after_secs),
+            },
+        };
+        let _ = tx.send(terminal_event);
+        let _ = done_tx.send((id, result, completion_report));
+    }));
+}
+
 async fn cancel_processing_message(
     state: &mut ProcessingState<'_>,
     session_control: &SessionControlHandle,
@@ -3111,6 +3354,31 @@ pub(super) async fn process_message_streaming_mpsc(
             crate::runtime_memory_log::RuntimeMemoryLogEvent::new(
                 "turn_completed",
                 "message_turn_finished",
+            )
+            .with_session_id(session_id)
+            .force_attribution(),
+        );
+        crate::process_memory::release_retained_heap_debounced(
+            "server_turn_completed",
+            std::time::Duration::from_secs(30),
+        );
+    }
+    result
+}
+
+/// Retry the current conversation turn without appending another user message.
+pub(super) async fn process_retry_turn_streaming_mpsc(
+    agent: Arc<Mutex<Agent>>,
+    event_tx: tokio::sync::mpsc::UnboundedSender<ServerEvent>,
+) -> Result<()> {
+    let mut agent = agent.lock().await;
+    let session_id = agent.session_id().to_string();
+    let result = agent.retry_turn_streaming_mpsc(event_tx).await;
+    if result.is_ok() {
+        crate::runtime_memory_log::emit_event(
+            crate::runtime_memory_log::RuntimeMemoryLogEvent::new(
+                "turn_completed",
+                "failover_retry_turn_finished",
             )
             .with_session_id(session_id)
             .force_attribution(),

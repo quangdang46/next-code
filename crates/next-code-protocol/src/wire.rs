@@ -51,6 +51,11 @@ pub enum Request {
     #[serde(rename = "cancel")]
     Cancel { id: u64 },
 
+    /// Retry the current conversation turn without appending another user
+    /// message (Face/TUI provider-failover resend after a countdown switch).
+    #[serde(rename = "retry_turn")]
+    RetryTurn { id: u64 },
+
     /// Move the currently executing tool to background
     #[serde(rename = "background_tool")]
     BackgroundTool { id: u64 },
@@ -353,6 +358,34 @@ pub enum Request {
         request_id: String,
         /// The user's input (line of text)
         input: String,
+    },
+
+    /// Reply to a blocking AskUserQuestion reverse request (Face ACP outcome JSON).
+    #[serde(rename = "ask_user_question_response")]
+    AskUserQuestionResponse {
+        id: u64,
+        /// Matches the request_id from AskUserQuestion
+        request_id: String,
+        /// `AskUserQuestionExtResponse` JSON, or null + error via separate Error event
+        response: serde_json::Value,
+        /// When set, the bridge failed before producing a typed response
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+
+    /// Reply to a blocking tool-approval permission prompt (Face ACP outcome).
+    /// Distinct from AskUserQuestion and StdinResponse.
+    #[serde(rename = "permission_response")]
+    PermissionResponse {
+        id: u64,
+        /// Matches the request_id from PermissionRequest
+        request_id: String,
+        /// `allow-once` | `allow-always` | `allow-all` | `reject-once` | `cancelled`
+        outcome: String,
+        session_id: String,
+        tool_name: String,
+        #[serde(default)]
+        allow_once_code: String,
     },
 
     // === Agent-to-agent communication ===
@@ -1445,6 +1478,38 @@ pub enum ServerEvent {
         #[serde(default)]
         is_password: bool,
         /// Tool call ID this is associated with
+        tool_call_id: String,
+    },
+
+    /// AskUserQuestion tool needs Face ACP `x.ai/ask_user_question` reverse request.
+    /// Distinct from StdinRequest (freeform) and from permission approval.
+    #[serde(rename = "ask_user_question")]
+    AskUserQuestion {
+        request_id: String,
+        session_id: String,
+        tool_call_id: String,
+        /// JSON array of Face `Question` objects
+        questions: serde_json::Value,
+        /// `"default"` or `"plan"`
+        mode: String,
+    },
+
+    /// Tool execution needs user approval (Face ACP `session/request_permission`).
+    /// Distinct from AskUserQuestion (`question_view`) and StdinRequest.
+    #[serde(rename = "permission_request")]
+    PermissionRequest {
+        request_id: String,
+        session_id: String,
+        tool_name: String,
+        reason: String,
+        #[serde(default)]
+        allow_once_code: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        alternatives: Vec<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tool_input: Option<serde_json::Value>,
+        /// Best-effort tool call id for ACP ToolCallUpdate (may be empty).
+        #[serde(default)]
         tool_call_id: String,
     },
 }

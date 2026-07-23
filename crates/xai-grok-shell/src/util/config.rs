@@ -1073,6 +1073,9 @@ pub async fn set_render_mermaid(v: impl serde::Serialize) -> anyhow::Result<()> 
 pub async fn set_screen_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_key("screen_mode", v).await
 }
+pub async fn set_btw_output_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("btw_output_mode", v).await
+}
 pub async fn set_scroll_lines(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_key("scroll_lines", v).await
 }

@@ -179,6 +179,10 @@ pub struct UiConfig {
     /// `"fullscreen"` | `"minimal"`; unset → product default fullscreen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_mode: Option<String>,
+    /// Face `/btw` answer surface: `"inline"` (overlay above prompt, default) or
+    /// `"sidebar"` (legacy TUI-style right-hand panel). Unset → `inline`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub btw_output_mode: Option<String>,
     /// Retired hidden opt-in for terminal-like double/triple-click word/line
     /// selection. Superseded by `keep_text_selection = "word_select"`. Still
     /// read only when `keep_text_selection` is unset; Settings clears this on
@@ -355,6 +359,7 @@ impl Default for UiConfig {
             prompt_suggestions: None,
             cursor_blink: None,
             screen_mode: None,
+            btw_output_mode: None,
             double_click_action: None,
             contextual_hints: ContextualHints::default(),
             display_refresh: DisplayRefreshSettings::default(),

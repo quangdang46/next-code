@@ -313,6 +313,19 @@ const SCREEN_MODE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
+const BTW_OUTPUT_MODE_CHOICES: &[EnumChoice] = &[
+    EnumChoice {
+        canonical: "inline",
+        display: "Overlay (Face / Grok)",
+        description: "Show /btw answers in the compact panel above the prompt. Default.",
+    },
+    EnumChoice {
+        canonical: "sidebar",
+        display: "Side panel (legacy TUI)",
+        description: "Show /btw answers in a right-hand side panel (Alt+M hides).",
+    },
+];
+
 // Voice-capture-mode catalog. SHELL-owned, persisted to `[ui].voice_capture_mode`.
 // `hold` is only offered on terminals that report key releases (Kitty keyboard
 // protocol); `effective_enum_choices` hides it elsewhere, and it falls back to
@@ -581,6 +594,32 @@ pub fn default_settings() -> Vec<SettingMeta> {
             },
             restart_required: true,
             hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "btw_output_mode",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "/btw output",
+            description: "Where /btw answers appear: Overlay above the prompt (Face / Grok \
+                          default) or a right-hand side panel (legacy TUI parity). Live-applies \
+                          to the next /btw. Writes [ui] btw_output_mode in config.toml.",
+            keywords: &[
+                "btw",
+                "sidebar",
+                "side",
+                "panel",
+                "inline",
+                "overlay",
+                "side-question",
+                "output",
+            ],
+            kind: SettingKind::Enum {
+                default: "inline",
+                choices: BTW_OUTPUT_MODE_CHOICES,
+                supports_preview: false,
+            },
+            restart_required: false,
+            hidden_in_minimal: true,
         },
         SettingMeta {
             key: "show_timestamps",

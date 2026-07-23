@@ -6421,6 +6421,7 @@ dependencies = [
  "hex",
  "ignore",
  "image",
+ "indexmap",
  "libc",
  "next-code-agent-runtime",
  "next-code-ambient-types",
@@ -6491,6 +6492,7 @@ dependencies = [
  "uuid",
  "walkdir",
  "windows-sys 0.59.0",
+ "xai-grok-tools",
 ]
 
 [[package]]
@@ -13954,6 +13956,7 @@ dependencies = [
  "serde_json",
  "strum 0.26.3",
  "thiserror 2.0.19",
+ "tokio",
  "xai-grok-config",
  "xai-tty-utils",
 ]

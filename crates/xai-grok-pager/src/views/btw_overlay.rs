@@ -175,7 +175,8 @@ pub fn btw_panel_height(state: Option<&BtwOverlayState>, content_width: u16) -> 
 ///
 /// The panel renders as a compact bordered box with the question in the
 /// top border and the status in the body. It sits in the normal layout
-/// flow (above queue / turn status / prompt).
+/// flow (above queue / turn status / prompt), or as a right-hand column
+/// when `sidebar` is true (legacy TUI parity).
 ///
 /// When `link_overlay` is `Some`, markdown hyperlinks in the Done body are
 /// mapped into screen-space overlay links (same path as scrollback) so OSC 8
@@ -192,6 +193,7 @@ pub fn render_btw_panel(
     link_overlay: Option<&mut LinkOverlay>,
     // Generated-media paths for resolving relative file-path link targets.
     media_paths: &[std::path::PathBuf],
+    sidebar: bool,
 ) {
     if area.width < 12 || area.height < 3 {
         return;
@@ -233,8 +235,13 @@ pub fn render_btw_panel(
     // affordance ([Esc]) always stays visible: its columns are reserved here
     // first, and on panels too narrow for the full Done-state hint we drop the
     // scroll indicator and keep a bare "[Esc]" (fallback below).
+    let dismiss = if sidebar {
+        "[Alt+M] [Esc]"
+    } else {
+        "[Esc]"
+    };
     let hint = match state {
-        BtwOverlayState::Loading { .. } | BtwOverlayState::Error { .. } => "[Esc]".to_string(),
+        BtwOverlayState::Loading { .. } | BtwOverlayState::Error { .. } => dismiss.to_string(),
         BtwOverlayState::Done {
             content,
             scroll_offset,
@@ -248,13 +255,13 @@ pub fn render_btw_panel(
                 let pos = offset + 1;
                 let end = (offset + max_body).min(total);
                 if focus_active {
-                    format!("{pos}-{end}/{total}  \u{2191}\u{2193}  [Esc]")
+                    format!("{pos}-{end}/{total}  \u{2191}\u{2193}  {dismiss}")
                 } else {
                     // Not focused: arrows go to the prompt, so omit the ↑↓ hint.
-                    format!("{pos}-{end}/{total}  [Esc]")
+                    format!("{pos}-{end}/{total}  {dismiss}")
                 }
             } else {
-                "[Esc]".to_string()
+                dismiss.to_string()
             }
         }
     };
@@ -473,7 +480,7 @@ mod tests {
         let area = Rect::new(0, 0, width, height);
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
-        render_btw_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[]);
+        render_btw_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[], false);
         model
     }
 
@@ -482,7 +489,7 @@ mod tests {
         let area = Rect::new(0, 0, width, height);
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
-        render_btw_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[]);
+        render_btw_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[], false);
         buf
     }
 
@@ -512,6 +519,7 @@ mod tests {
             &mut model,
             Some(&mut links),
             &[],
+            false,
         );
         (model, links)
     }
@@ -889,6 +897,7 @@ mod tests {
             &mut model,
             None,
             &[],
+            false,
         );
         let rect = hit
             .rect
