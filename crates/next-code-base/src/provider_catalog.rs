@@ -236,7 +236,9 @@ fn apply_profile_key_based_endpoint_overrides(
 }
 
 pub fn resolve_openai_compatible_profile_selection(input: &str) -> Option<OpenAiCompatibleProfile> {
-    let provider = resolve_login_provider(input)?;
+    // Loose resolve accepts display names / spaced pins (e.g. Face float
+    // "OpenCode Go" → "opencode go") in addition to catalog ids/aliases.
+    let provider = resolve_login_provider_loose(input)?;
     match provider.target {
         LoginProviderTarget::OpenAiCompatible(profile) => Some(profile),
         _ => None,

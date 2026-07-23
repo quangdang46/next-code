@@ -869,13 +869,14 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 agent.session.deferred_model_switch = Some((model_id, effort));
                 return vec![];
             };
+            let prev_model_id = agent.session.models.current.clone();
             agent.session.model_switch_pending = true;
             vec![Effect::SwitchModel {
                 agent_id: id,
                 session_id,
                 model_id,
                 effort,
-                prev_model_id: None,
+                prev_model_id,
             }]
         }
         Action::AnnouncementsHide => {
