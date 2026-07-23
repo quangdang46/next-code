@@ -424,18 +424,52 @@ fn render_session_list(
         };
         buf.set_style(row_rect, Style::default().bg(bg));
 
-        let title = if entry.summary.trim().is_empty() {
-            entry.id.as_str()
+        // Leading status + selection bar (Face glyphs, not animal emoji titles).
+        let has_content = entry.num_messages > 0
+            || entry.user_message_count > 0
+            || entry.assistant_message_count > 0
+            || entry.first_prompt.as_ref().is_some_and(|s| !s.trim().is_empty());
+        let status_glyph = if has_content {
+            crate::glyphs::filled_dot()
         } else {
-            entry.summary.as_str()
+            "\u{25cb}" // ○
         };
+        let status_color = if has_content {
+            theme.accent_success
+        } else {
+            theme.gray_dim
+        };
+        let lead_x = area.x;
+        if is_selected {
+            buf.set_span(
+                lead_x,
+                y0,
+                &Span::styled(
+                    crate::glyphs::selection_bar(),
+                    Style::default().fg(theme.accent_user).bg(bg),
+                ),
+                1,
+            );
+        }
+        buf.set_span(
+            lead_x + 1,
+            y0,
+            &Span::styled(
+                status_glyph,
+                Style::default().fg(status_color).bg(bg),
+            ),
+            1,
+        );
+
+        let title = primary_title(entry);
         let ago = relative_time(entry.updated_at);
-        let max_w = area.width.saturating_sub(2) as usize;
+        let text_x = lead_x + 3;
+        let max_w = area.width.saturating_sub(3) as usize;
         let title_budget = max_w.saturating_sub(ago.width() + 3);
-        let title_disp = truncate_ellipsis(title, title_budget);
+        let title_disp = truncate_ellipsis(&title, title_budget);
         let line1 = format!("{title_disp} · {ago}");
         buf.set_span(
-            area.x + 1,
+            text_x,
             y0,
             &Span::styled(
                 truncate_ellipsis(&line1, max_w),
@@ -448,11 +482,16 @@ fn render_session_list(
                         Modifier::empty()
                     }),
             ),
-            area.width.saturating_sub(1),
+            area.width.saturating_sub(3),
         );
 
         if row_h >= 2 {
             let counts = format_entry_counts(entry);
+            let counts_style = if counts.is_empty() {
+                Style::default().fg(theme.gray_dim).bg(bg)
+            } else {
+                Style::default().fg(theme.accent_user).bg(bg)
+            };
             let meta = if entry.repo_name.is_empty() {
                 counts
             } else if counts.is_empty() {
@@ -461,26 +500,23 @@ fn render_session_list(
                 format!("{} · {}", entry.repo_name, counts)
             };
             buf.set_span(
-                area.x + 1,
+                text_x,
                 y0 + 1,
-                &Span::styled(
-                    truncate_ellipsis(&meta, max_w),
-                    Style::default().fg(theme.gray).bg(bg),
-                ),
-                area.width.saturating_sub(1),
+                &Span::styled(truncate_ellipsis(&meta, max_w), counts_style),
+                area.width.saturating_sub(3),
             );
         }
 
         if row_h >= 3 {
             let line3 = format_entry_secondary(entry);
             buf.set_span(
-                area.x + 1,
+                text_x,
                 y0 + 2,
                 &Span::styled(
                     truncate_ellipsis(&line3, max_w),
                     Style::default().fg(theme.gray_dim).bg(bg),
                 ),
-                area.width.saturating_sub(1),
+                area.width.saturating_sub(3),
             );
         }
     }
@@ -499,23 +535,61 @@ fn format_entry_counts(entry: &SessionPickerEntry) -> String {
     }
 }
 
-fn title_is_short_name(entry: &SessionPickerEntry) -> bool {
-    if let Some(sn) = entry.short_name.as_deref() {
-        return entry.summary == sn;
+/// Scannable list/header title: chat brief first, animal short_name last.
+///
+/// Order: `summary` when it is a real title/brief → `first_prompt` →
+/// `short_name` → truncated `id`. (List API already prefers customTitle /
+/// generated title / firstPrompt into `summary`.)
+fn primary_title(entry: &SessionPickerEntry) -> String {
+    let summary = entry.summary.trim();
+    let short = entry.short_name.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let prompt = entry
+        .first_prompt
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    let summary_is_short = short.is_some_and(|sn| summary == sn)
+        || (short.is_none()
+            && !summary.is_empty()
+            && !summary.contains(' ')
+            && summary.chars().count() <= 24);
+
+    if !summary.is_empty() && !summary_is_short {
+        return truncate_ellipsis(summary, PROMPT_DISPLAY_MAX);
     }
-    !entry.summary.contains(' ') && entry.summary.chars().count() <= 24
+    if let Some(fp) = prompt {
+        return truncate_ellipsis(fp, PROMPT_DISPLAY_MAX);
+    }
+    if !summary.is_empty() {
+        return summary.to_string();
+    }
+    if let Some(sn) = short {
+        return sn.to_string();
+    }
+    entry.id.chars().take(12).collect()
 }
 
 fn format_entry_secondary(entry: &SessionPickerEntry) -> String {
     let mut parts: Vec<String> = Vec::new();
-    if title_is_short_name(entry)
-        && let Some(fp) = entry.first_prompt.as_deref().map(str::trim).filter(|s| !s.is_empty())
+    let title = primary_title(entry);
+    // Tiny dim badge for memorable name when title is the chat brief.
+    if let Some(sn) = entry
+        .short_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
     {
-        let snippet = truncate_ellipsis(fp, PROMPT_DISPLAY_MAX);
-        parts.push(format!("prompt: {snippet}"));
+        if sn != title.as_str() {
+            parts.push(format!("@{sn}"));
+        }
     }
     if !entry.cwd.is_empty() {
-        parts.push(truncate_cwd(&entry.cwd, CWD_DISPLAY_MAX));
+        parts.push(format!(
+            "{} {}",
+            crate::glyphs::diamond_hollow(),
+            truncate_cwd(&entry.cwd, CWD_DISPLAY_MAX)
+        ));
     }
     if parts.is_empty() {
         entry.id.chars().take(12).collect()
@@ -573,11 +647,7 @@ fn render_preview(buf: &mut Buffer, area: Rect, state: &mut ResumeBrowserState, 
 
     let mut header_lines: Vec<(String, Style)> = Vec::new();
     if let Some(entry) = selected {
-        let title = if entry.summary.trim().is_empty() {
-            entry.id.as_str()
-        } else {
-            entry.summary.as_str()
-        };
+        let title = primary_title(entry);
         let focus_mark = if preview_focused { " ▸" } else { "" };
         header_lines.push((
             format!("{title}{focus_mark}"),
@@ -586,9 +656,24 @@ fn render_preview(buf: &mut Buffer, area: Rect, state: &mut ResumeBrowserState, 
                 .bg(theme.bg_base)
                 .add_modifier(Modifier::BOLD),
         ));
+        if let Some(sn) = entry
+            .short_name
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty() && *s != title.as_str())
+        {
+            header_lines.push((
+                format!("@{sn}"),
+                Style::default().fg(theme.gray_dim).bg(theme.bg_base),
+            ));
+        }
         if !entry.cwd.is_empty() {
             header_lines.push((
-                truncate_cwd(&entry.cwd, area.width.saturating_sub(2) as usize),
+                format!(
+                    "{} {}",
+                    crate::glyphs::diamond_hollow(),
+                    truncate_cwd(&entry.cwd, area.width.saturating_sub(4) as usize)
+                ),
                 Style::default().fg(theme.gray).bg(theme.bg_base),
             ));
         }
@@ -646,17 +731,46 @@ fn render_preview(buf: &mut Buffer, area: Rect, state: &mut ResumeBrowserState, 
     }
 
     if state.preview_lines.is_empty() {
-        let msg = if selected.is_some() {
-            "No transcript preview"
-        } else {
-            "Select a session"
+        let (icon_line, why) = match selected {
+            Some(entry)
+                if entry.num_messages == 0
+                    && entry.user_message_count == 0
+                    && entry.assistant_message_count == 0 =>
+            {
+                (
+                    format!("{} No transcript preview", crate::glyphs::diamond_hollow()),
+                    "Empty session — no visible user/assistant turns yet",
+                )
+            }
+            Some(_) => (
+                format!("{} No transcript preview", crate::glyphs::diamond_hollow()),
+                "Journal/snapshot had no previewable turns (system-only or unloadable)",
+            ),
+            None => (
+                format!("{} Select a session", crate::glyphs::diamond_hollow()),
+                "Pick a row on the left to load the transcript",
+            ),
         };
         buf.set_span(
             area.x,
             body_y,
-            &Span::styled(msg, Style::default().fg(theme.gray_dim).bg(theme.bg_base)),
+            &Span::styled(
+                truncate_ellipsis(&icon_line, area.width as usize),
+                Style::default().fg(theme.gray).bg(theme.bg_base),
+            ),
             area.width,
         );
+        if body_h >= 2 {
+            buf.set_span(
+                area.x,
+                body_y + 1,
+                &Span::styled(
+                    truncate_ellipsis(why, area.width as usize),
+                    Style::default().fg(theme.gray_dim).bg(theme.bg_base),
+                ),
+                area.width,
+            );
+        }
         return;
     }
 
@@ -996,24 +1110,43 @@ mod tests {
     }
 
     #[test]
-    fn secondary_line_prefers_prompt_when_title_is_short_name() {
+    fn primary_title_prefers_first_prompt_over_animal_short_name() {
+        let mut e = entry("sess-rooster", "rooster");
+        e.short_name = Some("rooster".into());
+        e.first_prompt = Some("Fix the resume list density for Face".into());
+        assert_eq!(
+            primary_title(&e),
+            "Fix the resume list density for Face"
+        );
+    }
+
+    #[test]
+    fn primary_title_keeps_real_summary() {
+        let mut e = entry("sess-rooster", "Resume list enrichment");
+        e.short_name = Some("rooster".into());
+        e.first_prompt = Some("Fix the resume list density".into());
+        assert_eq!(primary_title(&e), "Resume list enrichment");
+    }
+
+    #[test]
+    fn secondary_line_badges_short_name_when_title_is_brief() {
         let mut e = entry("sess-blazing", "blazing");
         e.short_name = Some("blazing".into());
         e.first_prompt = Some("Fix the resume list density".into());
         e.cwd = "/Users/me/Projects/next-code".into();
         let secondary = format_entry_secondary(&e);
-        assert!(secondary.starts_with("prompt: Fix the resume"), "{secondary}");
+        assert!(secondary.contains("@blazing"), "{secondary}");
         assert!(secondary.contains("next-code"), "{secondary}");
+        assert!(!secondary.contains("prompt:"), "{secondary}");
     }
 
     #[test]
-    fn secondary_line_skips_prompt_when_title_is_custom() {
-        let mut e = entry("sess-blazing", "Resume list enrichment");
+    fn secondary_line_skips_short_badge_when_title_is_short_name() {
+        let mut e = entry("sess-blazing", "blazing");
         e.short_name = Some("blazing".into());
-        e.first_prompt = Some("Fix the resume list density".into());
         e.cwd = "/repo".into();
         let secondary = format_entry_secondary(&e);
-        assert!(!secondary.contains("prompt:"), "{secondary}");
+        assert!(!secondary.contains("@blazing"), "{secondary}");
         assert!(secondary.contains("/repo"), "{secondary}");
     }
 

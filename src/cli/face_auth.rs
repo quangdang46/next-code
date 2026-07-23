@@ -596,8 +596,11 @@ fn list_message_text(msg: &serde_json::Value) -> String {
 /// Shape matches Face `parse_session_picker_entries`: `sessionId`, `summary`,
 /// timestamps, plus `cwd` / `modelId` / `source` so welcome grouping and
 /// resume-by-cwd work against `~/.next-code/sessions`. Also emits
-/// `firstPrompt`, `shortName`, and user/assistant counts for resume-browser
-/// multi-line briefs.
+/// `customTitle`, `firstPrompt`, `shortName`, and user/assistant counts.
+///
+/// `summary` is Claude Code–style: custom/generated title → first user prompt
+/// brief → memorable short_name last. Animal names are not the scannable title
+/// when a chat brief exists.
 pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
     let Ok(base) = crate::storage::next_code_dir() else {
         return serde_json::json!({ "sessions": [] });
@@ -623,7 +626,15 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
         let Ok(session) = crate::session::Session::load_startup_stub(stem) else {
             continue;
         };
-        let summary = session.display_title_or_name().to_string();
+        let brief = load_session_list_brief(&dir, stem);
+        // Claude Code–style scannable title: custom/generated title → first
+        // user prompt brief → memorable short_name / id last resort.
+        // Do not promote animal short_name when a chat brief exists.
+        let summary = session
+            .display_title()
+            .map(|s| s.to_string())
+            .or_else(|| brief.first_prompt.clone())
+            .unwrap_or_else(|| session.display_name().to_string());
         if summary.trim().is_empty() {
             continue;
         }
@@ -636,10 +647,11 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
         let cwd = session.working_dir.clone().unwrap_or_default();
         let model_id = session.model.clone();
         let short_name = session.short_name.clone();
-        let brief = load_session_list_brief(&dir, stem);
+        let custom_title = session.custom_title.clone();
         rows.push(serde_json::json!({
             "sessionId": stem,
             "summary": summary,
+            "customTitle": custom_title,
             "shortName": short_name,
             "firstPrompt": brief.first_prompt,
             "updatedAt": updated,
