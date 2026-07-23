@@ -200,16 +200,21 @@ async fn run_api_key_face_login(provider: LoginProviderDescriptor) -> Result<()>
                 !resolved.requires_api_key,
             )
         }
-        LoginProviderTarget::Gemini => (
-            "gemini.env".to_string(),
-            "GEMINI_API_KEY".to_string(),
-            "https://aistudio.google.com/apikey".to_string(),
-            false,
-        ),
+        // Unwired Face targets (still CLI/TUI elsewhere). Never list these in
+        // Face `/connect` — this arm is a hard stop for typed `/connect <id>`.
+        LoginProviderTarget::Bedrock
+        | LoginProviderTarget::Azure
+        | LoginProviderTarget::AutoImport => {
+            anyhow::bail!(
+                "{} is not available in Face /connect. Use CLI: nextcode login {}",
+                provider.display_name,
+                provider.id
+            );
+        }
         other => {
             anyhow::bail!(
-                "Face API-key login is not wired for {:?}. Use a catalog API-key provider.",
-                other
+                "{} ({other:?}) cannot use Face API-key login.",
+                provider.display_name
             );
         }
     };

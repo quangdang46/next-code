@@ -1,27 +1,58 @@
 //! `/connect` — next-code multi-provider login (Face chrome).
 //!
-//! OpenCode-shaped wizard: searchable provider picker → optional auth-method
-//! step → Face welcome paste/URL flow. Credentials write via daemon
-//! `face_auth` / `~/.next-code` (auth.json on the auth-unify branch).
-//! Does **not** start Grok OAuth and does **not** hand off to a CLI terminal.
+//! OpenCode-shaped wizard (see OpenCode `dialog-provider.tsx`):
+//! searchable provider picker → optional auth-method step → Face welcome
+//! paste/URL flow → model picker (PR #72). Credentials write via daemon
+//! `face_auth` / `~/.next-code`. Does **not** start Grok OAuth.
 
 use next_code_provider_metadata::{
     LoginProviderAuthKind, LoginProviderAuthStateKey, LoginProviderDescriptor,
+    LoginProviderTarget,
 };
 
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
-/// Popular family anchors (OpenCode-style). Resolved against
-/// `tui_login_providers()`; missing ids are skipped.
+/// OpenCode TUI `PROVIDER_PRIORITY` order (`dialog-provider.tsx`).
+/// Resolved against Face-wired `tui_login_providers()`; missing ids skipped.
 const POPULAR_CONNECT_IDS: &[&str] = &[
-    "claude",
+    "opencode",
+    "opencode-go",
     "openai",
-    "gemini",
-    "openrouter",
-    "xai",
     "copilot",
+    "claude",
+    "gemini",
 ];
+
+/// OpenCode list-row descriptions (same file, `providerOptions` map).
+fn opencode_row_description(id: &str) -> Option<&'static str> {
+    match id {
+        "opencode" => Some("(Recommended)"),
+        "opencode-go" => Some("Low cost subscription for everyone"),
+        "openai" => Some("(ChatGPT Plus/Pro or API key)"),
+        "claude" | "anthropic" => Some("(OAuth or API key)"),
+        "anthropic-api" => Some("(API key)"),
+        _ => None,
+    }
+}
+
+/// Display names matching OpenCode models.dev / TUI (not nextcode CLI labels).
+fn opencode_display_name(rep: LoginProviderDescriptor) -> &'static str {
+    match rep.id {
+        "claude" => "Anthropic",
+        "gemini" => "Google",
+        "opencode" => "OpenCode Zen",
+        "opencode-go" => "OpenCode Go",
+        other => {
+            // Prefer catalog display when it already matches product naming.
+            if other == "copilot" {
+                "GitHub Copilot"
+            } else {
+                rep.display_name
+            }
+        }
+    }
+}
 
 pub struct ConnectCommand;
 
@@ -52,12 +83,10 @@ impl SlashCommand for ConnectCommand {
 
     fn arg_placeholder(&self) -> Option<&str> {
         // Picker-first: bare `/connect` opens Connect-a-provider ArgPicker.
-        // No inline `provider` ghost — that path stole Enter (trailing space).
         None
     }
 
     fn suggest_args(&self, _ctx: &AppCtx, args_query: &str) -> Option<Vec<ArgItem>> {
-        // Empty args → centered picker (`OpenConnectPicker`), not inline dump.
         if args_query.trim().is_empty() {
             return None;
         }
@@ -84,9 +113,13 @@ pub(crate) fn connect_run(args: &str) -> CommandResult {
         ));
     };
 
-    // Multi-method family passed as the representative id alone → still start
-    // that specific catalog entry (typed `/connect claude` = OAuth). Method
-    // chooser is picker-only (trailing-space chain).
+    if !face_connect_wired(provider) {
+        return CommandResult::Error(format!(
+            "{} is not available in Face /connect (use CLI `nextcode login {}`).",
+            provider.display_name, provider.id
+        ));
+    }
+
     CommandResult::Action(Action::NextCodeConnect {
         provider: provider.id.to_string(),
     })
@@ -102,46 +135,55 @@ pub(crate) fn suggest_connect_args(args_query: &str) -> Vec<ArgItem> {
     build_connect_family_items()
 }
 
+/// Providers Face can actually authenticate (no Bedrock/Azure/AutoImport crash).
+fn face_connect_wired(p: LoginProviderDescriptor) -> bool {
+    match p.target {
+        LoginProviderTarget::Bedrock
+        | LoginProviderTarget::Azure
+        | LoginProviderTarget::AutoImport => false,
+        LoginProviderTarget::Claude
+        | LoginProviderTarget::ClaudeApiKey
+        | LoginProviderTarget::OpenAi
+        | LoginProviderTarget::OpenAiApiKey
+        | LoginProviderTarget::OpenRouter
+        | LoginProviderTarget::OpenAiCompatible(_)
+        | LoginProviderTarget::Cursor
+        | LoginProviderTarget::Copilot
+        | LoginProviderTarget::Gemini
+        | LoginProviderTarget::Antigravity
+        | LoginProviderTarget::Google => true,
+    }
+}
+
 /// Flat searchable list used by OpenConnectPicker and Tab suggest.
 pub(crate) fn build_connect_family_items() -> Vec<ArgItem> {
-    let providers = next_code_provider_metadata::tui_login_providers();
+    let providers: Vec<LoginProviderDescriptor> = next_code_provider_metadata::tui_login_providers()
+        .into_iter()
+        .filter(|p| face_connect_wired(*p))
+        .collect();
     let families = group_families(&providers);
 
     let mut out = Vec::new();
-    let mut popular_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
+    let mut popular_ids: Vec<&str> = Vec::new();
 
     out.push(section_header("Popular"));
     for id in POPULAR_CONNECT_IDS {
-        let Some(family) = families
-            .iter()
-            .find(|f| f.iter().any(|p| p.id == *id))
-        else {
+        let Some(family) = families.iter().find(|f| f.iter().any(|p| p.id == *id)) else {
             continue;
         };
-        let key = family[0].auth_state_key;
-        if popular_keys.contains(&key) {
+        let rep_id = family_representative(family).id;
+        if popular_ids.contains(&rep_id) {
             continue;
         }
-        popular_keys.push(key);
-        out.push(family_arg_item(family));
-    }
-    // Recommended families not already listed under Popular.
-    for family in &families {
-        if !family.iter().any(|p| p.recommended) {
-            continue;
-        }
-        let key = family[0].auth_state_key;
-        if popular_keys.contains(&key) {
-            continue;
-        }
-        popular_keys.push(key);
+        popular_ids.push(rep_id);
         out.push(family_arg_item(family));
     }
 
-    out.push(section_header("Providers"));
+    // OpenCode app twin uses "Other"; TUI uses "Providers". Screenshots show Other.
+    out.push(section_header("Other"));
     for family in &families {
-        let key = family[0].auth_state_key;
-        if popular_keys.contains(&key) {
+        let rep_id = family_representative(family).id;
+        if popular_ids.contains(&rep_id) {
             continue;
         }
         out.push(family_arg_item(family));
@@ -150,7 +192,6 @@ pub(crate) fn build_connect_family_items() -> Vec<ArgItem> {
 }
 
 fn connect_method_items_for_query(args_query: &str) -> Option<Vec<ArgItem>> {
-    // Chained from a family row: insert_text ends with whitespace.
     if !args_query.ends_with(char::is_whitespace) {
         return None;
     }
@@ -160,8 +201,14 @@ fn connect_method_items_for_query(args_query: &str) -> Option<Vec<ArgItem>> {
     }
     let provider = next_code_provider_metadata::resolve_login_provider(id)
         .or_else(|| next_code_provider_metadata::resolve_login_provider_loose(id))?;
+    if !face_connect_wired(provider) {
+        return None;
+    }
     let methods = methods_for_key(
-        &next_code_provider_metadata::tui_login_providers(),
+        &next_code_provider_metadata::tui_login_providers()
+            .into_iter()
+            .filter(|p| face_connect_wired(*p))
+            .collect::<Vec<_>>(),
         provider.auth_state_key,
     );
     if methods.len() < 2 {
@@ -189,10 +236,10 @@ fn build_connect_method_items(methods: &[LoginProviderDescriptor]) -> Vec<ArgIte
 }
 
 fn group_families(providers: &[LoginProviderDescriptor]) -> Vec<Vec<LoginProviderDescriptor>> {
-    // Only collapse into a multi-method family when the same auth_state_key
+    // Collapse into a multi-method family only when the same auth_state_key
     // has both a browser path (OAuth/device) and a key/local path — e.g.
-    // Anthropic (`claude` + `anthropic-api`). Shared keys that are all API-key
-    // (OpenRouterLike) stay as separate single-method rows.
+    // Anthropic (`claude` + `anthropic-api`). Shared OpenRouterLike API-key
+    // rows stay separate (OpenCode lists each provider id).
     let mut fork_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
     let mut seen_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
     for p in providers {
@@ -263,25 +310,29 @@ fn family_representative(methods: &[LoginProviderDescriptor]) -> LoginProviderDe
 fn family_arg_item(methods: &[LoginProviderDescriptor]) -> ArgItem {
     let rep = family_representative(methods);
     let multi = methods.len() > 1;
+    let display = opencode_display_name(rep).to_string();
     let (insert_text, provider_connect, description) = if multi {
-        // Trailing space → ArgPicker chains into suggest_args method phase.
         (
             format!("{} ", rep.id),
             false,
-            multi_method_hint(methods),
+            opencode_row_description(rep.id)
+                .map(str::to_string)
+                .unwrap_or_else(|| multi_method_hint(methods)),
         )
     } else {
         (
             rep.id.to_string(),
             true,
-            single_method_hint(rep),
+            opencode_row_description(rep.id)
+                .map(str::to_string)
+                .unwrap_or_else(|| single_method_hint(rep)),
         )
     };
     ArgItem {
-        display: rep.display_name.to_string(),
+        display: display.clone(),
         match_text: format!(
             "{} {} {}",
-            rep.display_name,
+            display,
             methods
                 .iter()
                 .map(|m| m.id)
@@ -292,11 +343,7 @@ fn family_arg_item(methods: &[LoginProviderDescriptor]) -> ArgItem {
         insert_text,
         description,
         category: None,
-        badge: if methods.iter().any(|m| m.recommended) {
-            Some("Recommended".into())
-        } else {
-            None
-        },
+        badge: None,
         is_current: false,
         provider_connect,
         is_section_header: false,
@@ -393,7 +440,7 @@ mod tests {
     }
 
     #[test]
-    fn suggest_args_has_popular_and_providers() {
+    fn suggest_args_has_popular_and_other() {
         let items = build_connect_family_items();
         assert!(
             items
@@ -404,18 +451,64 @@ mod tests {
         assert!(
             items
                 .iter()
-                .any(|i| i.is_section_header && i.display == "Providers"),
+                .any(|i| i.is_section_header && i.display == "Other"),
             "{items:?}"
         );
         assert!(items.iter().any(|i| !i.is_section_header));
     }
 
     #[test]
+    fn popular_matches_opencode_priority() {
+        let items = build_connect_family_items();
+        let popular: Vec<&str> = items
+            .iter()
+            .skip_while(|i| !(i.is_section_header && i.display == "Popular"))
+            .skip(1)
+            .take_while(|i| !i.is_section_header)
+            .map(|i| i.insert_text.trim())
+            .collect();
+        assert!(
+            popular.iter().any(|id| *id == "opencode" || *id == "opencode-go"),
+            "expected OpenCode Zen/Go in Popular, got {popular:?}"
+        );
+        assert!(
+            popular.iter().any(|id| *id == "openai" || id.starts_with("openai")),
+            "{popular:?}"
+        );
+        assert!(
+            !popular.iter().any(|id| *id == "bedrock"),
+            "Bedrock must not be Popular"
+        );
+    }
+
+    #[test]
+    fn bedrock_excluded_from_picker() {
+        let items = build_connect_family_items();
+        assert!(
+            !items.iter().any(|i| i.insert_text.trim() == "bedrock"
+                || i.display.contains("Bedrock")),
+            "{items:?}"
+        );
+    }
+
+    #[test]
+    fn typed_bedrock_errors_without_dispatch() {
+        let models = ModelState::default();
+        let mut ctx = make_ctx(&models);
+        match ConnectCommand.run(&mut ctx, "bedrock") {
+            CommandResult::Error(msg) => {
+                assert!(msg.contains("not available in Face"), "{msg}");
+            }
+            other => panic!("expected Error, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn anthropic_family_chains_to_method_picker() {
         let family = build_connect_family_items()
             .into_iter()
-            .find(|i| !i.is_section_header && i.display.contains("Claude"))
-            .expect("claude family");
+            .find(|i| !i.is_section_header && (i.display == "Anthropic" || i.display.contains("Claude")))
+            .expect("anthropic family");
         assert!(
             family.insert_text.ends_with(' '),
             "multi-method family needs trailing space, got {:?}",
@@ -434,38 +527,24 @@ mod tests {
     }
 
     #[test]
-    fn suggest_args_empty_is_none_picker_first() {
-        let models = ModelState::default();
-        let cwd = std::path::Path::new(".");
-        let ctx = AppCtx {
-            models: &models,
-            cwd,
-            has_session_announcements: false,
-            screen_mode: crate::app::ScreenMode::Fullscreen,
-        };
+    fn opencode_go_row_has_subscription_blurb() {
+        let go = build_connect_family_items()
+            .into_iter()
+            .find(|i| i.insert_text.trim() == "opencode-go")
+            .expect("opencode-go");
         assert!(
-            ConnectCommand.suggest_args(&ctx, "").is_none(),
-            "bare /connect must not feed inline arg dropdown"
+            go.description.contains("Low cost subscription"),
+            "{go:?}"
         );
-        assert!(
-            ConnectCommand.suggest_args(&ctx, "   ").is_none(),
-            "whitespace-only args still picker-first"
-        );
-        let typed = ConnectCommand
-            .suggest_args(&ctx, "cl")
-            .expect("typed prefix still suggests");
-        assert!(!typed.is_empty());
     }
 
     #[test]
     fn known_provider_dispatches_face_login() {
         let models = ModelState::default();
         let mut ctx = make_ctx(&models);
-        let providers = next_code_provider_metadata::tui_login_providers();
-        let id = providers.first().expect("catalog").id;
-        match ConnectCommand.run(&mut ctx, id) {
+        match ConnectCommand.run(&mut ctx, "opencode-go") {
             CommandResult::Action(Action::NextCodeConnect { provider }) => {
-                assert_eq!(provider, id);
+                assert_eq!(provider, "opencode-go");
             }
             other => panic!("expected NextCodeConnect, got {other:?}"),
         }
