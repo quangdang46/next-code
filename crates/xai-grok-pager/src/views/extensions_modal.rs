@@ -393,6 +393,32 @@ fn build_hook_groups<'a>(
     groups
 }
 
+/// Row label for a hook event.
+///
+/// Prefer the raw event segment from the ACP id (`user/AgentEnd[0]` →
+/// `Agent End`) so aliases that collapse into Face `HookEvent` (e.g.
+/// `AgentEnd` → `SubagentStop`) still match the footer / hooks.toml name.
+fn hook_event_row_label(hook: &xai_hooks_plugins_types::HookInfo) -> String {
+    if let Some((_, rest)) = hook.name.split_once('/')
+        && let Some((event, _)) = rest.rsplit_once('[')
+        && !event.is_empty()
+    {
+        return camel_case_to_title(event);
+    }
+    hook.event.to_string()
+}
+
+fn camel_case_to_title(s: &str) -> String {
+    let mut out = String::with_capacity(s.len() + 4);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && c.is_ascii_uppercase() {
+            out.push(' ');
+        }
+        out.push(c);
+    }
+    out
+}
+
 /// Find the next visible hook index after `current`, skipping collapsed groups.
 pub fn next_visible_hook(
     hooks: &[xai_hooks_plugins_types::HookInfo],
@@ -1324,7 +1350,7 @@ pub fn resolve_key(tab: ExtensionsTab, ch: char) -> Option<ButtonAction> {
             fields: vec![FieldSpec {
                 label: "Path".into(),
                 required: true,
-                placeholder: None,
+                placeholder: Some("path/to/hooks.toml to merge into ~/.next-code".into()),
             }],
         }),
         // Remove acts on the selected hook — resolved at dispatch time.
@@ -1721,6 +1747,8 @@ pub struct ExtensionsModalState {
     /// Maps visible row offset to skill index (for mouse click).
     pub skills_visible_map: Vec<Option<usize>>,
     pub hooks_collapsed_groups: std::collections::HashSet<String>,
+    /// See [`Self::seed_hooks_groups_once`].
+    pub hooks_groups_seeded: bool,
     /// Collapsed plugin source groups (by [`PluginGroup`] key).
     pub plugins_collapsed_groups: std::collections::HashSet<String>,
     /// See [`Self::seed_plugin_groups_once`].
@@ -1805,6 +1833,7 @@ impl ExtensionsModalState {
             skills_visible_map: Vec::new(),
             skills_expanded: std::collections::HashSet::new(),
             hooks_collapsed_groups: std::collections::HashSet::new(),
+            hooks_groups_seeded: false,
             plugins_collapsed_groups: std::collections::HashSet::new(),
             plugins_groups_seeded: false,
             marketplace_collapsed: std::collections::HashSet::new(),
@@ -1864,10 +1893,19 @@ impl ExtensionsModalState {
         self.picker_state.hovered = None;
     }
 
-    /// Whether a group header at picker index `sel` with the given
-    /// `group_key` is currently expanded (children visible).
+    /// Seed the all-collapsed default for hook source groups exactly once.
     ///
-    /// The answer depends on the active tab: Hooks use
+    /// Later `FetchHooksList` refreshes (Space enable/disable) must preserve
+    /// the user's expand/collapse state — resetting here made open folders
+    /// vanish and felt like the modal closed.
+    pub fn seed_hooks_groups_once(&mut self, hooks: &[xai_hooks_plugins_types::HookInfo]) {
+        if self.hooks_groups_seeded {
+            return;
+        }
+        self.hooks_collapsed_groups = hooks.iter().map(|h| h.source_dir.clone()).collect();
+        self.hooks_groups_seeded = true;
+    }
+
     /// Seed the all-collapsed default for plugin source groups exactly once.
     ///
     /// Called from both plugin-data delivery channels (list fetch and the
@@ -1881,6 +1919,10 @@ impl ExtensionsModalState {
         self.plugins_groups_seeded = true;
     }
 
+    /// Whether a group header at picker index `sel` with the given
+    /// `group_key` is currently expanded (children visible).
+    ///
+    /// The answer depends on the active tab: Hooks use
     /// `hooks_collapsed_groups`, Marketplace uses
     /// `marketplace_collapsed_sources` (or `picker_state.expanded` for
     /// error-source headers), and other tabs use `picker_state.expanded`.
@@ -2233,11 +2275,43 @@ pub fn derive_source_label(source_dir: &str) -> (String, bool) {
     if source_dir == global_str || source_dir.starts_with(&format!("{global_str}/")) {
         return ("Global hooks".into(), false);
     }
+    // next-code embed: ~/.next-code (or $NEXT_CODE_HOME) + project `.next-code`
+    if let Ok(nc_home) = std::env::var("NEXT_CODE_HOME") {
+        let nc = std::path::Path::new(nc_home.trim());
+        if !nc_home.trim().is_empty()
+            && (source_path == nc
+                || source_dir == nc_home
+                || source_path.starts_with(nc))
+        {
+            return ("Global hooks".into(), false);
+        }
+    }
+    if let Some(home) = dirs::home_dir() {
+        let user_nc = home.join(".next-code");
+        if source_path == user_nc.as_path()
+            || source_dir == user_nc.display().to_string()
+            || source_path.starts_with(&user_nc)
+        {
+            return ("Global hooks".into(), false);
+        }
+    }
+    let comps: Vec<_> = source_path
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    if comps.windows(1).any(|w| w[0] == ".next-code")
+        || source_dir.ends_with("/.next-code")
+        || source_dir.ends_with("\\.next-code")
+        || source_dir.contains("/.next-code/")
+        || source_dir.contains("\\.next-code\\")
+    {
+        return ("Project hooks".into(), false);
+    }
     // Settings under .claude/
     if source_dir.contains("/.claude/") {
         return ("Claude settings".into(), false);
     }
-    // Project hooks
+    // Project hooks (Grok layout)
     if source_dir.ends_with("/.grok/hooks") || source_dir.contains("/.grok/hooks/") {
         return ("Project hooks".into(), false);
     }
@@ -2729,7 +2803,7 @@ pub fn render_extensions_modal(
                             continue;
                         }
                         for &(hi, hook) in hooks {
-                            let event_str = hook.event.to_string();
+                            let event_str = hook_event_row_label(hook);
                             let matcher_str = hook
                                 .matcher
                                 .as_deref()
@@ -5478,6 +5552,14 @@ mod tests {
     }
 
     // ── Hook helpers with StatusFilter ───────────────────────────────
+
+    #[test]
+    fn hook_event_row_label_prefers_raw_name_event() {
+        let hook = make_hook("user/AgentEnd[0]", "/tmp", false);
+        assert_eq!(hook_event_row_label(&hook), "Agent End");
+        let pre = make_hook("user/PreToolUse[1]", "/tmp", false);
+        assert_eq!(hook_event_row_label(&pre), "Pre Tool Use");
+    }
 
     fn make_hook(
         name: &str,

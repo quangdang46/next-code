@@ -130,6 +130,7 @@ fn parse_plugin_name(source_label: &str) -> Option<String> {
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpsListResponse {
+    #[serde(default)]
     pub servers: Vec<McpsServerEntry>,
 }
 
@@ -254,6 +255,115 @@ impl McpServerDisplayStatus {
             Self::Initializing => "initializing",
         }
     }
+}
+
+/// Parse an ACP `x.ai/mcp/list` ExtResponse body into display rows.
+///
+/// Accepts grok-shell `ExtMethodResult` (`{ "result": { "servers": [...] } }`),
+/// a bare `{ "servers": [...] }`, a double-wrapped result, or a map-shaped
+/// `servers` object (raw mcp.json mistake). Surfaces serde/body detail on
+/// failure so the UI is not stuck on a silent `"couldn't load server list"`.
+pub fn parse_mcp_list_ext_response(resp_body: &str) -> Result<Vec<McpServerInfo>, String> {
+    let wrapper: serde_json::Value = serde_json::from_str(resp_body).map_err(|e| {
+        format!(
+            "couldn't load server list: bad json ({e}); body={}",
+            truncate_for_ui(resp_body, 180)
+        )
+    })?;
+    if wrapper.is_null() {
+        return Err(
+            "couldn't load server list: null body (agent returned empty ExtResponse)".into(),
+        );
+    }
+
+    let mut candidates: Vec<serde_json::Value> = Vec::new();
+    if let Some(r) = wrapper.get("result") {
+        candidates.push(r.clone());
+        if let Some(inner) = r.get("result") {
+            candidates.push(inner.clone());
+        }
+    }
+    candidates.push(wrapper.clone());
+
+    let mut last_err: Option<String> = None;
+    for candidate in candidates {
+        match coerce_mcps_list_response(&candidate) {
+            Ok(parsed) => return Ok(convert_list_response(parsed)),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(format!(
+        "couldn't load server list: {}; body={}",
+        last_err.unwrap_or_else(|| "unrecognized shape".into()),
+        truncate_for_ui(resp_body, 180)
+    ))
+}
+
+fn truncate_for_ui(s: &str, max: usize) -> String {
+    let trimmed = s.trim();
+    if trimmed.len() <= max {
+        trimmed.to_string()
+    } else {
+        format!("{}…", &trimmed[..max])
+    }
+}
+
+fn coerce_mcps_list_response(value: &serde_json::Value) -> Result<McpsListResponse, String> {
+    if let Ok(parsed) = serde_json::from_value::<McpsListResponse>(value.clone()) {
+        return Ok(parsed);
+    }
+    // Raw mcp.json style: servers is a map of name → config.
+    if let Some(map) = value.get("servers").and_then(|s| s.as_object()) {
+        let servers: Vec<McpsServerEntry> = map
+            .iter()
+            .map(|(name, cfg)| {
+                let is_http = cfg
+                    .get("type")
+                    .and_then(|t| t.as_str())
+                    .is_some_and(|t| {
+                        matches!(
+                            t.to_ascii_lowercase().as_str(),
+                            "http" | "sse" | "streamable-http"
+                        )
+                    })
+                    || (cfg.get("url").and_then(|u| u.as_str()).is_some()
+                        && cfg
+                            .get("command")
+                            .and_then(|c| c.as_str())
+                            .unwrap_or("")
+                            .trim()
+                            .is_empty());
+                McpsServerEntry {
+                    name: name.clone(),
+                    display_name: None,
+                    source: Some("local".into()),
+                    source_label: Some("~/.next-code/mcp.json".into()),
+                    config_type: Some(if is_http { "http" } else { "stdio" }.into()),
+                    setup: None,
+                    setup_values: None,
+                    session: Some(McpsServerSession {
+                        enabled: cfg
+                            .get("enabled")
+                            .and_then(|v| v.as_bool())
+                            .unwrap_or(true),
+                        status: Some(if is_http {
+                            "unavailable".into()
+                        } else {
+                            "ready".into()
+                        }),
+                        tools: vec![],
+                        auth_required: false,
+                        setup_required: false,
+                    }),
+                }
+            })
+            .collect();
+        return Ok(McpsListResponse { servers });
+    }
+    Err(format!(
+        "expected {{servers:[...]}} got {}",
+        truncate_for_ui(&value.to_string(), 120)
+    ))
 }
 
 pub fn convert_list_response(resp: McpsListResponse) -> Vec<McpServerInfo> {
@@ -737,5 +847,27 @@ mod tests {
         assert_eq!(servers[0].tool_count, 3);
         assert_eq!(servers[0].tools.len(), 1);
         assert_eq!(servers[0].tools[0].name, "existing");
+    }
+
+    #[test]
+    fn parse_mcp_list_accepts_map_shaped_servers() {
+        let body = r#"{"result":{"servers":{"exa":{"type":"http","url":"https://mcp.exa.ai/mcp","command":""}}}}"#;
+        let parsed = parse_mcp_list_ext_response(body).expect("map-shaped servers");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].name, "exa");
+    }
+
+    #[test]
+    fn parse_mcp_list_rejects_null_body() {
+        let err = parse_mcp_list_ext_response("null").unwrap_err();
+        assert!(err.contains("null body"), "{err}");
+    }
+
+    #[test]
+    fn parse_mcp_list_accepts_canonical_array() {
+        let body = r#"{"result":{"servers":[{"name":"local-stdio","source":"local","type":"stdio","session":{"enabled":true,"status":"ready","tools":[],"authRequired":false,"setupRequired":false}}]}}"#;
+        let parsed = parse_mcp_list_ext_response(body).expect("array servers");
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].name, "local-stdio");
     }
 }

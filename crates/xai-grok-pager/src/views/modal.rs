@@ -451,7 +451,10 @@ pub fn default_palette_entries(sharing_enabled: bool) -> Vec<PaletteEntry> {
         PaletteEntry {
             label: "Switch Model".into(),
             shortcut: "/model".into(),
-            command: PaletteCommand::SlashCommand("/model ".into()),
+            // No trailing space — bare `/model` opens the Select-model palette
+            // (see command-palette `is_picker` path); trailing space would land
+            // in the inline arg dropdown instead.
+            command: PaletteCommand::SlashCommand("/model".into()),
         },
         PaletteEntry {
             label: "Always Approve Mode".into(),
@@ -631,9 +634,10 @@ impl ActiveModal {
                 args_query,
                 ..
             } => match command.as_str() {
-                "model" | "m" if !args_query.is_empty() => "Pick reasoning effort",
-                "model" | "m" => "Pick model",
+                "model" | "m" if !args_query.is_empty() => "Select reasoning effort",
+                "model" | "m" => "Select model",
                 "theme" | "t" => "Pick theme",
+                "connect" => "Connect provider",
                 _ => "Pick option",
             },
             ActiveModal::DocPicker { .. } => "How-to Guides",

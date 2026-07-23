@@ -87,6 +87,21 @@ pub enum Action {
     },
     /// Open the session picker overlay (from within an active session via /resume).
     ShowSessionPicker,
+    /// Bare `next-code --resume`: open Face 2-panel resume browser (list + transcript).
+    ShowResumeBrowser,
+    /// Dismiss the Face 2-panel resume browser (Esc) without picking.
+    CloseResumeBrowser,
+    /// Enter on a resume-browser row — load that session.
+    PickResumeBrowserSession {
+        session_id: String,
+        cwd: String,
+        source: String,
+    },
+    /// Async-load transcript preview for the selected resume-browser row.
+    LoadResumePreview {
+        session_id: String,
+        seq: u64,
+    },
     /// The session picker overlay was dismissed without a pick: invalidate any
     /// in-flight list/search/foreign scan so a late response can't fall
     /// through to the welcome picker fields.
@@ -501,6 +516,8 @@ pub enum Action {
     SetHunkTrackerMode(String),
     /// Set default screen mode (`fullscreen` | `minimal`); restart-required.
     SetScreenMode(String),
+    /// Set `/btw` output surface (`inline` | `sidebar`). Live-applies to the next `/btw`.
+    SetBtwOutputMode(String),
     /// Set the voice capture mode (`toggle` | `hold`). SHELL-owned; persisted to
     /// `[ui].voice_capture_mode`. Takes effect for the next Ctrl+Space press.
     SetVoiceCaptureMode(String),
@@ -563,6 +580,19 @@ pub enum Action {
     /// Commit the `auto_update` preference. Persisted to `[cli].auto_update`.
     /// Restart-required — auto-update check fires once at startup.
     SetAutoUpdate(bool),
+    /// Per-float-kind visibility toggles. Persisted to `[ui.info_floats]`.
+    SetShowFloatModelInfo(bool),
+    SetShowFloatContextUsage(bool),
+    SetShowFloatKvCache(bool),
+    SetShowFloatMemoryActivity(bool),
+    SetShowFloatUsageLimits(bool),
+    SetShowFloatGitStatus(bool),
+    SetShowFloatBackgroundTasks(bool),
+    SetShowFloatCompaction(bool),
+    SetShowFloatSwarmStatus(bool),
+    SetShowFloatTodos(bool),
+    SetShowFloatWorkspaceMap(bool),
+    SetShowFloatDiagrams(bool),
     /// Commit `[ui.display_refresh].auto_cadence_enabled`. Restart-required —
     /// cadence is pinned once at startup.
     SetDisplayRefreshAutoCadence(bool),
@@ -609,6 +639,10 @@ pub enum Action {
     SwitchAccount,
     /// User pressed login on the welcome screen.
     Login,
+    /// next-code embed: start Face auth for a specific provider (`/connect <id>`).
+    NextCodeConnect {
+        provider: String,
+    },
     /// Cancel an in-progress login that was started from inside a session
     /// (`/login` or a 401 re-auth prompt) and return to the previous view.
     /// Distinct from `Quit`: abandoning a mid-session re-auth must not exit
@@ -932,6 +966,10 @@ pub enum Action {
     },
     /// Open the memory browser modal.
     OpenMemoryModal,
+    /// Open the Select-model ArgPicker (bare `/model` / palette UX).
+    OpenModelPicker,
+    /// Open the Connect-a-provider ArgPicker (bare `/connect` / OpenCode-shaped UX).
+    OpenConnectPicker,
     /// Open the hidden `/gboom` easter egg (DOOM-style raycaster modal).
     OpenGboom,
     /// Suspend the TUI and open a file in $EDITOR.
@@ -1434,6 +1472,11 @@ pub enum Effect {
         cwd: String,
         generation: u64,
     },
+    /// Load transcript preview lines for Face resume browser from flat store.
+    LoadResumePreview {
+        session_id: String,
+        seq: u64,
+    },
     /// Restore a remote session from GCS then load it. Only Build rows reach
     /// this effect: conversation rows have no GCS archive.
     RestoreAndLoadSession {
@@ -1544,9 +1587,15 @@ pub enum Effect {
         config_key: &'static str,
     },
     /// Persist preferred model (and effort if Some) to config.toml.
+    ///
+    /// next-code: writes `[provider].default_model` and, when `provider_key` is
+    /// set, `[provider].default_provider` in one atomic toml_edit write.
     PersistPreferredModel {
         model_id: acp::ModelId,
         reasoning_effort: Option<ReasoningEffort>,
+        /// Config `default_provider` pin (profile id / provider key). `None`
+        /// leaves the existing provider key unchanged.
+        provider_key: Option<String>,
     },
     /// Persist the permission mode to config.toml and notify the agent
     /// via ACP. See [`PermissionModePersist`] for rollback semantics.
@@ -1992,6 +2041,9 @@ pub enum Effect {
     /// pushing a system message into scrollback (used for automatic refreshes
     /// on session init and after each turn).
     FetchBilling { agent_id: AgentId, silent: bool },
+    /// nextcode embed: fetch connected-provider usage/cost text via ACP
+    /// `x.ai/usage` (no xAI credits / grok.com manage).
+    FetchNextCodeUsage { agent_id: AgentId },
     /// Fetch billing data at the app level (no agent required).
     /// Used on startup to populate the welcome-screen credit warning.
     FetchAppBilling,
@@ -2206,6 +2258,12 @@ pub enum TaskResult {
         session_id: String,
         generation: u64,
         detail: crate::app::app_view::CardDetail,
+    },
+    /// Transcript preview loaded for Face resume browser.
+    ResumePreviewLoaded {
+        session_id: String,
+        seq: u64,
+        lines: Vec<crate::views::resume_browser::ResumePreviewLine>,
     },
     /// Remote session restored successfully — now load it. Always a Build
     /// disk row (see [`Effect::RestoreAndLoadSession`]).
@@ -2676,6 +2734,11 @@ pub enum TaskResult {
         error: String,
         /// When true, swallow the error silently (background refresh).
         silent: bool,
+    },
+    /// nextcode embed `/usage` text (connected providers / cost).
+    NextCodeUsageText {
+        agent_id: AgentId,
+        text: String,
     },
     /// Debounce timer for shell suggestions expired. Routed by the arming
     /// `agent_id`, like the sibling `PluginCtaDebounceExpired`.

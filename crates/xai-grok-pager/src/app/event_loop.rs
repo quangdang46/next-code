@@ -1650,6 +1650,27 @@ pub(crate) async fn run(
         }
     }
 
+    // Bare `next-code --resume` (empty id): open Face 2-panel resume browser.
+    // Set by `pager_launch` via `NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP`
+    // (env name kept; target is ResumeBrowser, not expand-card SessionPicker).
+    let mut open_session_picker_at_startup = false;
+    if std::env::var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP").as_deref() == Ok("1") {
+        // SAFETY: we are pre-multithreaded init for this app loop.
+        unsafe { std::env::remove_var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP") };
+        open_session_picker_at_startup = true;
+        if app.session_startup_allowed() {
+            let effs = dispatch::dispatch(Action::ShowResumeBrowser, &mut app);
+            if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+                return Ok(make_run_result(&app));
+            }
+            presenter.request_presentation(&mut app, terminal, false);
+        } else {
+            app.deferred_startup.open_session_picker = true;
+            // Prefer resume browser over auto-creating an empty session after auth.
+            app.deferred_startup.new_session = false;
+        }
+    }
+
     // Minimal (scrollback-native) mode has no welcome screen: the live region
     // only renders for an Agent view. If nothing above already started a
     // session (no resume / initial prompt / worktree / dashboard), open an
@@ -1659,6 +1680,8 @@ pub(crate) async fn run(
     if term_state.screen_mode.is_minimal()
         && matches!(app.active_view, ActiveView::Welcome)
         && !app.is_zdr_blocked()
+        && !open_session_picker_at_startup
+        && !app.deferred_startup.open_session_picker
     {
         if app.session_startup_allowed() {
             // Already authenticated + trusted: open the empty session now so the
@@ -2360,6 +2383,29 @@ pub(crate) async fn run(
                             None,
                             Some(serde_json::json!({ "attempt": attempt })),
                         );
+                        let resume_hint = app
+                            .agents
+                            .values()
+                            .find_map(|a| a.session.session_id.as_ref())
+                            .map(|sid| {
+                                let name: &str = sid.0.as_ref();
+                                format!("next-code --resume {name}")
+                            });
+                        let detail = "server closed the connection".to_string();
+                        for agent in app.agents.values_mut() {
+                            let started_at = agent
+                                .reconnect_banner
+                                .as_ref()
+                                .map(|b| b.started_at)
+                                .unwrap_or_else(std::time::Instant::now);
+                            agent.reconnect_banner =
+                                Some(crate::views::reconnect_banner::ReconnectBanner {
+                                    attempt: attempt.max(1),
+                                    started_at,
+                                    detail: detail.clone(),
+                                    resume_hint: resume_hint.clone(),
+                                });
+                        }
                         app.show_toast(&format!(
                             "Disconnected. Reconnecting... (attempt {attempt})"
                         ));
@@ -2552,6 +2598,9 @@ pub(crate) async fn run(
                         presenter.request(false);
                     }
                     ConnectionStatus::Failed { ref error } => {
+                        for agent in app.agents.values_mut() {
+                            agent.reconnect_banner = None;
+                        }
                         app.show_toast(&format!("Connection failed: {error}"));
                         presenter.request(false);
                     }
@@ -2571,6 +2620,9 @@ pub(crate) async fn run(
                 };
                 reconnect_abort_handle = None;
                 app.reconnect_pending = false;
+                for agent in app.agents.values_mut() {
+                    agent.reconnect_banner = None;
+                }
 
                 let outcome = match result {
                     Ok(outcome) => outcome,

@@ -1,4 +1,9 @@
 //! `/new` (alias `/clear`) -- create a new session.
+//!
+//! **Alias hazard (PR10 / Face vs next-code TUI):** Face `/clear` is an alias of
+//! `/new` (fresh session). Legacy next-code TUI `/clear` meant clear-history in
+//! the current session. Embed users who type `/clear` get Face semantics
+//! (new session). Prefer `/new` in docs; do not silently restore TUI clear-history.
 
 use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
@@ -12,11 +17,13 @@ impl SlashCommand for NewCommand {
     }
 
     fn aliases(&self) -> &[&str] {
+        // Face `/clear` ≡ `/new` (fresh session). Legacy next-code TUI `/clear`
+        // meant clear-history — embed keeps Face meaning (nextcode-safe).
         &["clear"]
     }
 
     fn description(&self) -> &str {
-        "Start a new session"
+        "Start a new session (alias: /clear)"
     }
 
     fn usage(&self) -> &str {

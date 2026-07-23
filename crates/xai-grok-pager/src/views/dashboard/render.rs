@@ -470,6 +470,29 @@ pub fn render_dashboard(
         return None;
     }
 
+    // Select-model ArgPicker (bare `/model` / Ctrl+M).
+    if let Some(crate::views::modal::ActiveModal::ArgPicker {
+        command,
+        args_query,
+        items,
+        state: picker_state,
+        window,
+        ..
+    }) = state.model_picker.as_mut()
+    {
+        render_dashboard_model_picker(
+            buf,
+            area,
+            &theme,
+            command,
+            args_query,
+            items,
+            picker_state,
+            window,
+        );
+        return None;
+    }
+
     // The worktree-label dialog overlays the dashboard while the user names
     // the worktree for a dashboard-dispatched agent. Input is routed to it,
     // so the dispatch cursor is suppressed.
@@ -1002,6 +1025,131 @@ fn underline_location_on_hover(spans: Vec<Span<'static>>, icon: &str) -> Vec<Spa
         out.push(Span::styled(content, s));
     }
     out
+}
+
+/// Render the Select-model ArgPicker over the dashboard (bare `/model` / Ctrl+M).
+fn render_dashboard_model_picker(
+    buf: &mut Buffer,
+    area: Rect,
+    theme: &Theme,
+    command: &str,
+    args_query: &str,
+    items: &[crate::slash::command::ArgItem],
+    picker_state: &mut crate::views::picker::PickerState,
+    window: &mut crate::views::modal_window::ModalWindowState,
+) {
+    use crate::views::modal_window::{
+        ModalSizing, ModalWindowConfig, Shortcut, push_vim_nav_search_hint, render_modal_window,
+    };
+    use crate::views::picker::{PickerEntry, PickerRow, render_picker_in_modal};
+
+    let title = match command {
+        "model" | "m" if !args_query.is_empty() => "Select reasoning effort",
+        "model" | "m" => "Select model",
+        "connect" | "login" if !args_query.is_empty() => "Select auth method",
+        "connect" | "login" => "Connect a provider",
+        _ => "Pick option",
+    };
+    let right_labels: Vec<String> = items
+        .iter()
+        .map(|item| {
+            if item.is_section_header {
+                String::new()
+            } else if item.is_current {
+                "\u{2713}".to_string()
+            } else if item.provider_connect
+                || matches!(command, "connect" | "login")
+            {
+                item.description.clone()
+            } else {
+                String::new()
+            }
+        })
+        .collect();
+    let badges: Vec<&str> = items
+        .iter()
+        .map(|item| item.badge.as_deref().unwrap_or(""))
+        .collect();
+    let non_sel: Vec<bool> = items.iter().map(|i| i.is_section_header).collect();
+    let picker_entries: Vec<PickerEntry> = items
+        .iter()
+        .enumerate()
+        .map(|(i, item)| {
+            if item.is_section_header {
+                PickerEntry::Header {
+                    label: item.display.as_str(),
+                }
+            } else {
+                PickerEntry::Row(PickerRow {
+                    label: item.display.as_str(),
+                    right_label: right_labels[i].as_str(),
+                    selected: picker_state.hovered == Some(i)
+                        || (picker_state.hovered.is_none() && i == picker_state.selected),
+                    expanded: false,
+                    fields: &[],
+                    description_lines: &[],
+                    summary_lines: &[],
+                    dimmed: false,
+                    indent: 0,
+                    badge: badges[i],
+                    badge_color: if badges[i] == "Free" {
+                        Some(theme.accent_success)
+                    } else {
+                        None
+                    },
+                    collapsible: false,
+                    underline_last_desc: false,
+                })
+            }
+        })
+        .collect();
+
+    let mut shortcuts = vec![
+        Shortcut {
+            label: "\u{2191}\u{2193} nav",
+            clickable: false,
+            id: 0,
+        },
+        Shortcut {
+            label: "Enter select",
+            clickable: false,
+            id: 1,
+        },
+        Shortcut {
+            label: "Esc close",
+            clickable: false,
+            id: 2,
+        },
+    ];
+    push_vim_nav_search_hint(&mut shortcuts, picker_state.search_active);
+    let modal_config = ModalWindowConfig {
+        title,
+        tabs: None,
+        shortcuts: &shortcuts,
+        sizing: ModalSizing {
+            width_pct: 0.55,
+            max_width: 88,
+            min_width: 48,
+            v_margin: 3,
+            h_pad: 2,
+            v_pad: 1,
+            footer_lines: 2,
+        },
+        fold_info: None,
+    };
+    if let Some(mca) = render_modal_window(buf, area, window, &modal_config, theme) {
+        render_picker_in_modal(
+            buf,
+            mca.content,
+            mca.inner_x,
+            mca.inner_width,
+            theme,
+            picker_state,
+            &picker_entries,
+            &non_sel,
+            false,
+        );
+    }
 }
 
 /// Render the location picker modal over the dashboard. Content-row hit

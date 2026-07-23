@@ -315,6 +315,10 @@ pub(crate) enum Command {
     #[command(subcommand)]
     Memory(MemoryCommand),
 
+    /// Lifecycle hooks (`hooks.toml`) management
+    #[command(subcommand)]
+    Hooks(HooksCommand),
+
     /// Session management commands
     #[command(subcommand)]
     Session(SessionCommand),
@@ -562,13 +566,6 @@ pub(crate) enum Command {
         #[command(subcommand)]
         action: RestartCommand,
     },
-
-    /// Plugin management (load, clone, list, unload, enable, disable, reload, info).
-    ///
-    /// Plugin distribution is local-path, git clone, or workspace crate only.
-    /// No npm, no registry, no marketplace.
-    #[command(subcommand)]
-    Plugin(PluginSubcommand),
 }
 
 #[derive(Subcommand, Debug)]
@@ -864,53 +861,6 @@ pub(crate) enum RestartCommand {
 }
 
 #[derive(Subcommand, Debug)]
-pub(crate) enum PluginSubcommand {
-    /// Load a plugin from a local path
-    Load {
-        /// Local path to the plugin directory or file
-        path: std::path::PathBuf,
-    },
-    /// Clone a plugin from a git URL
-    Clone {
-        /// Git URL of the plugin repository
-        url: String,
-        /// Optional git ref (branch, tag, commit) to clone
-        rev: Option<String>,
-    },
-    /// List all loaded plugins
-    List {
-        /// Filter by plugin source kind ("workspace", "local", "git")
-        #[arg(long)]
-        kind: Option<String>,
-    },
-    /// Unload a plugin
-    Unload {
-        /// Plugin package name
-        name: String,
-    },
-    /// Enable a disabled plugin
-    Enable {
-        /// Plugin package name
-        name: String,
-    },
-    /// Disable an enabled plugin
-    Disable {
-        /// Plugin package name
-        name: String,
-    },
-    /// Hot-reload a plugin
-    Reload {
-        /// Plugin package name
-        name: String,
-    },
-    /// Show plugin info
-    Info {
-        /// Plugin package name
-        name: String,
-    },
-}
-
-#[derive(Subcommand, Debug)]
 pub(crate) enum ModelCommand {
     /// List model names you can pass to -m/--model
     List {
@@ -1172,6 +1122,12 @@ pub(crate) enum AuthCommand {
         #[arg(long, conflicts_with = "json")]
         toon: bool,
     },
+    /// Copy legacy app-config `*.env` API keys into `~/.next-code/auth.json`
+    Migrate {
+        /// Reserved: delete legacy files after copy (not implemented; refuse)
+        #[arg(long)]
+        purge: bool,
+    },
     /// Diagnose provider auth issues and suggest next steps
     Doctor {
         /// Optional provider id or alias to focus diagnosis on one provider
@@ -1285,6 +1241,55 @@ pub(crate) enum MemoryCommand {
 
     /// Clear test memory storage (used by debug sessions)
     ClearTest,
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum HooksCommand {
+    /// List configured hooks from hooks.toml layers
+    List {
+        /// Only show hooks for this event (e.g. PreToolUse, SessionStart)
+        #[arg(long)]
+        event: Option<String>,
+
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Enable a hook handler by event name and 0-based index
+    Enable {
+        /// Event name (e.g. PreToolUse)
+        event: String,
+        /// Handler index within that event
+        index: usize,
+    },
+
+    /// Disable a hook handler by event name and 0-based index
+    Disable {
+        /// Event name (e.g. PreToolUse)
+        event: String,
+        /// Handler index within that event
+        index: usize,
+    },
+
+    /// Dry-run (or execute) hooks for an event
+    Test {
+        /// Event name (e.g. SessionStart)
+        event: String,
+        /// Actually run handlers instead of dry-run
+        #[arg(long)]
+        execute: bool,
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Show hook execution metrics / config summary
+    Metrics {
+        /// Emit JSON instead of human-readable output
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[cfg(test)]

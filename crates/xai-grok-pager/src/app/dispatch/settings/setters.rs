@@ -98,6 +98,10 @@ pub(super) fn set_screen_mode_inner(app: &mut AppView, canonical: &str) {
     app.current_ui.screen_mode = Some(canonical.to_string());
 }
 
+pub(super) fn set_btw_output_mode_inner(app: &mut AppView, canonical: &str) {
+    app.current_ui.btw_output_mode = Some(canonical.to_string());
+}
+
 /// Persist `[ui].screen_mode` (`fullscreen` | `minimal`). Restart-required.
 ///
 /// Unset is *displayed* as Fullscreen but is not an explicit on-disk value —
@@ -118,6 +122,37 @@ pub(in crate::app::dispatch) fn set_screen_mode(app: &mut AppView, value: String
     ));
     vec![Effect::PersistSetting {
         key: "screen_mode",
+        value: crate::settings::SettingValue::Enum(canonical),
+        rollback_value: crate::settings::SettingValue::Enum(prev),
+    }]
+}
+
+/// Persist `[ui].btw_output_mode` (`inline` | `sidebar`). Live-applies to the next `/btw`.
+pub(in crate::app::dispatch) fn set_btw_output_mode(
+    app: &mut AppView,
+    value: String,
+) -> Vec<Effect> {
+    let canonical = crate::settings::canonical_btw_output_mode(Some(&value));
+    let prev = crate::settings::canonical_btw_output_mode(app.current_ui.btw_output_mode.as_deref());
+    if prev == canonical {
+        return vec![];
+    }
+    set_btw_output_mode_inner(app, canonical);
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "btw_output_mode",
+        value = canonical,
+        "setting changed",
+    );
+    let label = if canonical == "sidebar" {
+        "Side panel (legacy TUI)"
+    } else {
+        "Overlay (Face / Grok)"
+    };
+    app.show_toast(&format!("\u{2713} /btw output: {label}"));
+    vec![Effect::PersistSetting {
+        key: "btw_output_mode",
         value: crate::settings::SettingValue::Enum(canonical),
         rollback_value: crate::settings::SettingValue::Enum(prev),
     }]
@@ -1142,6 +1177,76 @@ pub(in crate::app::dispatch) fn set_contextual_hint_ssh_wrap(
 }
 
 // ---------------------------------------------------------------------------
+// Info float visibility toggles — Shared, via `app.current_ui.info_floats.*`
+// ---------------------------------------------------------------------------
+
+/// Shared inner for per-float-kind toggles: mutate `current_ui.info_floats.*`.
+pub(super) fn set_info_float_inner(
+    app: &mut AppView,
+    write: fn(&mut xai_grok_shell::agent::config::InfoFloatsConfig, Option<bool>),
+    new: bool,
+) {
+    write(&mut app.current_ui.info_floats, Some(new));
+}
+
+/// Shared outer for per-float-kind toggles: idempotency gate, state mutation,
+/// modal refresh, toast, and `Effect::PersistSetting`.
+fn set_info_float(
+    app: &mut AppView,
+    key: crate::settings::SettingKey,
+    label: &str,
+    prev: Option<bool>,
+    write: fn(&mut xai_grok_shell::agent::config::InfoFloatsConfig, Option<bool>),
+    new: bool,
+) -> Vec<Effect> {
+    if prev == Some(new) {
+        return vec![];
+    }
+    let rollback = prev.unwrap_or(true);
+    set_info_float_inner(app, write, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(target: "settings", key, value = new, "setting changed");
+    app.show_toast(&save_success_toast(label, new));
+    vec![Effect::PersistSetting {
+        key,
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(rollback),
+    }]
+}
+
+macro_rules! define_info_float_setter {
+    ($fn_name:ident, $key:expr, $label:expr, $field:ident) => {
+        pub(in crate::app::dispatch) fn $fn_name(
+            app: &mut AppView,
+            new: bool,
+        ) -> Vec<Effect> {
+            let prev = app.current_ui.info_floats.$field;
+            set_info_float(
+                app,
+                $key,
+                $label,
+                prev,
+                |f, v| f.$field = v,
+                new,
+            )
+        }
+    };
+}
+
+define_info_float_setter!(set_show_float_model_info, "info_float.model_info", "Model Info", model_info);
+define_info_float_setter!(set_show_float_context_usage, "info_float.context_usage", "Context Usage", context_usage);
+define_info_float_setter!(set_show_float_kv_cache, "info_float.kv_cache", "KV Cache", kv_cache);
+define_info_float_setter!(set_show_float_memory_activity, "info_float.memory_activity", "Memory Activity", memory_activity);
+define_info_float_setter!(set_show_float_usage_limits, "info_float.usage_limits", "Usage Limits", usage_limits);
+define_info_float_setter!(set_show_float_git_status, "info_float.git_status", "Git Status", git_status);
+define_info_float_setter!(set_show_float_background_tasks, "info_float.background_tasks", "Background Tasks", background_tasks);
+define_info_float_setter!(set_show_float_compaction, "info_float.compaction", "Compaction", compaction);
+define_info_float_setter!(set_show_float_swarm_status, "info_float.swarm_status", "Swarm Status", swarm_status);
+define_info_float_setter!(set_show_float_todos, "info_float.todos", "Todos", todos);
+define_info_float_setter!(set_show_float_workspace_map, "info_float.workspace_map", "Workspace Map", workspace_map);
+define_info_float_setter!(set_show_float_diagrams, "info_float.diagrams", "Diagrams", diagrams);
+
+// ---------------------------------------------------------------------------
 // Theme settings: `theme`, `auto_dark_theme`, `auto_light_theme`.
 //
 // Each has a preview/commit split:
@@ -1647,17 +1752,21 @@ pub(in crate::app::dispatch) fn set_default_model(
     //
     // Chat (`--chat` / GROK_CHAT_MODE) catalogs use opaque `/rest/modes`
     // slugs that must not become the global Build `default_model`.
+    //
+    // next-code: use PersistPreferredModel so we can pin `default_provider`
+    // alongside `default_model` in one atomic write (PersistSetting alone
+    // only wrote the model key).
     let mut effects: Vec<Effect> = Vec::new();
     if !xai_grok_shell::agent::chat_modes::process_chat_mode_enabled() {
-        let new_id_str = new_id.0.to_string();
-        let prev_id_str = prev_id
-            .as_ref()
-            .map(|id| id.0.to_string())
-            .unwrap_or_default();
-        effects.push(Effect::PersistSetting {
-            key: "default_model",
-            value: crate::settings::SettingValue::String(new_id_str),
-            rollback_value: crate::settings::SettingValue::String(prev_id_str),
+        let provider_key = app
+            .agents
+            .get(&aid)
+            .and_then(|a| a.info_float_provider.as_deref())
+            .map(config_provider_key_from_float);
+        effects.push(Effect::PersistPreferredModel {
+            model_id: new_id.clone(),
+            reasoning_effort: None,
+            provider_key,
         });
     }
 
@@ -1684,6 +1793,29 @@ pub(in crate::app::dispatch) fn set_default_model(
         agent.session.deferred_model_switch = Some((new_id, None));
     }
     effects
+}
+
+/// Map Overview/provider float label → config `default_provider` key.
+/// Mirrors next-code `derive_session_provider_key` fallback (no env pins).
+///
+/// Must write catalog ids (`opencode-go`), never display-name pins
+/// (`"opencode go"`), or daemon `model_switch_request_for_session_model`
+/// emits a bare model and mis-routes to OpenRouter.
+pub(in crate::app::dispatch) fn config_provider_key_from_float(name: &str) -> String {
+    let normalized = name.trim().to_ascii_lowercase();
+    match normalized.as_str() {
+        "anthropic" | "claude" | "claude cli" => "claude".to_string(),
+        "openai" => "openai".to_string(),
+        "github copilot" | "copilot" => "copilot".to_string(),
+        "openrouter" => "openrouter".to_string(),
+        "cursor" => "cursor".to_string(),
+        "gemini" => "gemini".to_string(),
+        "antigravity" => "antigravity".to_string(),
+        "bedrock" | "aws bedrock" => "bedrock".to_string(),
+        other => next_code_provider_metadata::resolve_login_provider_loose(other)
+            .map(|provider| provider.id.to_string())
+            .unwrap_or_else(|| other.to_string()),
+    }
 }
 
 /// Clear the default model override. Persists `[models].default = None`;

@@ -62,16 +62,7 @@ pub(super) async fn fetch_plugin_cta_mcps(
             .into(),
     );
     let result = match acp_send(req, &tx).await {
-        Ok(resp) => {
-            let wrapper: serde_json::Value = serde_json::from_str(resp.0.get())
-                .unwrap_or_default();
-            let inner = wrapper.get("result").unwrap_or(&wrapper);
-            serde_json::from_value::<
-                crate::views::mcps_modal::McpsListResponse,
-            >(inner.clone())
-                .map(crate::views::mcps_modal::convert_list_response)
-                .map_err(|_| "couldn't load server list".to_string())
-        }
+        Ok(resp) => crate::views::mcps_modal::parse_mcp_list_ext_response(resp.0.get()),
         Err(e) => Err(sanitize_user_error(&format!("couldn't load server list: {e}"))),
     };
     TaskResult::PluginCtaMcpsLoaded {
@@ -482,7 +473,14 @@ pub(super) fn parse_session_picker_entries(
                 .get("firstPrompt")
                 .or_else(|| v.get("first_prompt"))
                 .and_then(|s| s.as_str())
-                .map(String::from);
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            let short_name = v
+                .get("shortName")
+                .or_else(|| v.get("short_name"))
+                .and_then(|s| s.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
             let is_conversation = v
                 .get("_meta")
                 .and_then(|m| m.get("x.ai/session"))
@@ -513,27 +511,62 @@ pub(super) fn parse_session_picker_entries(
                 }
             };
             use xai_grok_tools::implementations::skills::skill::extract_skill_display_text;
-            let display = if let Some(ref fp) = first_prompt {
-                if let Some(d) = extract_skill_display_text(fp) {
-                    d
-                } else if !summary.is_empty() {
-                    extract_skill_display_text(&summary).unwrap_or(summary)
-                } else {
-                    fp.lines().next().unwrap_or_default().trim().to_string()
-                }
-            } else if !summary.is_empty() {
-                extract_skill_display_text(&summary).unwrap_or(summary)
-            } else {
-                let info_cwd = v
-                    .get("cwd")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or_default()
-                    .to_string();
-                let info = xai_grok_shell::session::info::Info {
-                    id: acp::SessionId::new(id.clone()),
-                    cwd: info_cwd,
+            let custom_title = v
+                .get("customTitle")
+                .or_else(|| v.get("custom_title"))
+                .and_then(|s| s.as_str())
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            // Claude Code–style: customTitle → real summary → firstPrompt →
+            // short_name/id. Never keep memorable animal short_name as the
+            // primary label when a chat brief exists.
+            let display = {
+                let prompt_brief = first_prompt.as_ref().and_then(|fp| {
+                    let cleaned = extract_skill_display_text(fp).unwrap_or_else(|| {
+                        fp.lines().next().unwrap_or_default().trim().to_string()
+                    });
+                    let trimmed = cleaned.trim().to_string();
+                    (!trimmed.is_empty()).then_some(trimmed)
+                });
+                let summary_clean = {
+                    let cleaned = if summary.is_empty() {
+                        String::new()
+                    } else {
+                        extract_skill_display_text(&summary).unwrap_or(summary.clone())
+                    };
+                    let trimmed = cleaned.trim().to_string();
+                    (!trimmed.is_empty()).then_some(trimmed)
                 };
-                extract_first_user_prompt(&info).unwrap_or_default()
+                let summary_is_short_name = short_name
+                    .as_ref()
+                    .zip(summary_clean.as_ref())
+                    .is_some_and(|(sn, sum)| sn == sum);
+                if let Some(ct) = custom_title {
+                    ct
+                } else if let Some(sum) = summary_clean
+                    .as_ref()
+                    .filter(|_| !summary_is_short_name)
+                    .cloned()
+                {
+                    sum
+                } else if let Some(fp) = prompt_brief {
+                    fp
+                } else if let Some(sn) = short_name.clone() {
+                    sn
+                } else if let Some(sum) = summary_clean {
+                    sum
+                } else {
+                    let info_cwd = v
+                        .get("cwd")
+                        .and_then(|s| s.as_str())
+                        .unwrap_or_default()
+                        .to_string();
+                    let info = xai_grok_shell::session::info::Info {
+                        id: acp::SessionId::new(id.clone()),
+                        cwd: info_cwd,
+                    };
+                    extract_first_user_prompt(&info).unwrap_or_default()
+                }
             };
             let created_at: chrono::DateTime<chrono::Utc> = parsed_created
                 .unwrap_or(updated_at);
@@ -558,6 +591,16 @@ pub(super) fn parse_session_picker_entries(
                 .or_else(|| v.get("num_messages"))
                 .and_then(|n| n.as_u64())
                 .unwrap_or(0) as usize;
+            let user_message_count = v
+                .get("userMessages")
+                .or_else(|| v.get("user_messages"))
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0) as usize;
+            let assistant_message_count = v
+                .get("assistantMessages")
+                .or_else(|| v.get("assistant_messages"))
+                .and_then(|n| n.as_u64())
+                .unwrap_or(0) as usize;
             let last_active_at: Option<chrono::DateTime<chrono::Utc>> = v
                 .get("lastActiveAt")
                 .or_else(|| v.get("last_active_at"))
@@ -580,6 +623,10 @@ pub(super) fn parse_session_picker_entries(
                 source,
                 model_id,
                 num_messages,
+                user_message_count,
+                assistant_message_count,
+                first_prompt,
+                short_name,
                 last_active_at,
                 branch,
                 repo_name,
@@ -944,6 +991,102 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "info_float.model_info" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.model_info", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_model_info(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.context_usage" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.context_usage", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_context_usage(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.kv_cache" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.kv_cache", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_kv_cache(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.memory_activity" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.memory_activity", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_memory_activity(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.usage_limits" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.usage_limits", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_usage_limits(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.git_status" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.git_status", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_git_status(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.background_tasks" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.background_tasks", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_background_tasks(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.compaction" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.compaction", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_compaction(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.swarm_status" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.swarm_status", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_swarm_status(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.todos" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.todos", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_todos(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.workspace_map" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.workspace_map", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_workspace_map(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "info_float.diagrams" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("info_float.diagrams", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_info_float_diagrams(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "scroll_lines" => {
             let SettingValue::Int(i) = value else {
                 return Err(kind_mismatch("scroll_lines", "Int", &value));
@@ -1074,6 +1217,14 @@ pub(crate) async fn persist_setting(
                 return Err(kind_mismatch("screen_mode", "Enum", &value));
             };
             xai_grok_shell::util::config::set_screen_mode(s.to_string())
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "btw_output_mode" => {
+            let SettingValue::Enum(s) = value else {
+                return Err(kind_mismatch("btw_output_mode", "Enum", &value));
+            };
+            xai_grok_shell::util::config::set_btw_output_mode(s.to_string())
                 .await
                 .map_err(|e| e.to_string())
         }
@@ -1421,6 +1572,79 @@ pub(super) fn parse_auto_topup_response(
         Err(_) => AutoTopupFetch::Unchanged,
     }
 }
+/// Parse `x.ai/skills/list` ExtResponse into Face `SkillInfo` rows.
+///
+/// Accepts `{ "result": { "skills": [...] } }`, bare `{ "skills": [...] }`,
+/// and double-wrapped results. Missing/null `skills` becomes `[]` only when the
+/// candidate object looks like a skills list envelope; a null/empty ExtResponse
+/// is an error (same class of bug as MCP's silent `{}`).
+pub(super) fn parse_skills_list_ext_response(
+    resp_body: &str,
+) -> Result<Vec<xai_grok_tools::implementations::skills::types::SkillInfo>, String> {
+    let wrapper: serde_json::Value = serde_json::from_str(resp_body).map_err(|e| {
+        format!(
+            "couldn't load skills: bad json ({e}); body={}",
+            truncate_skills_body(resp_body)
+        )
+    })?;
+    if wrapper.is_null() {
+        return Err("couldn't load skills: null body (agent returned empty ExtResponse)".into());
+    }
+
+    let mut candidates: Vec<serde_json::Value> = Vec::new();
+    if let Some(r) = wrapper.get("result") {
+        candidates.push(r.clone());
+        if let Some(inner) = r.get("result") {
+            candidates.push(inner.clone());
+        }
+    }
+    candidates.push(wrapper.clone());
+
+    let mut last_err: Option<String> = None;
+    for candidate in candidates {
+        let skills_val = match candidate.get("skills") {
+            Some(v) if !v.is_null() => v.clone(),
+            // Only treat missing skills as empty when this looks like the list
+            // envelope (object without a conflicting error payload).
+            None if candidate.is_object()
+                && candidate.get("error").is_none()
+                && candidate.get("servers").is_none() =>
+            {
+                serde_json::json!([])
+            }
+            Some(_) => {
+                last_err = Some("skills field was null".into());
+                continue;
+            }
+            None => {
+                last_err = Some("no skills field".into());
+                continue;
+            }
+        };
+        match serde_json::from_value::<
+            Vec<xai_grok_tools::implementations::skills::types::SkillInfo>,
+        >(skills_val)
+        {
+            Ok(skills) => return Ok(skills),
+            Err(e) => last_err = Some(format!("SkillInfo deserialize: {e}")),
+        }
+    }
+    Err(format!(
+        "couldn't load skills: {}; body={}",
+        last_err.unwrap_or_else(|| "unrecognized shape".into()),
+        truncate_skills_body(resp_body)
+    ))
+}
+
+fn truncate_skills_body(s: &str) -> String {
+    let trimmed = s.trim();
+    if trimmed.len() <= 180 {
+        trimmed.to_string()
+    } else {
+        format!("{}…", &trimmed[..180])
+    }
+}
+
 /// A blocking flock on the shared, possibly-network `~/.grok` lock must never
 /// stall the event-loop thread (and would hang exit on `/quit`); the registry
 /// is best-effort, so skip on contention.

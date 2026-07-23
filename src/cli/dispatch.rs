@@ -9,9 +9,9 @@ use std::process::{Command as ProcessCommand, Stdio};
 use std::time::Instant;
 
 use super::args::{
-    AmbientCommand, Args, AuthCommand, CloudCommand, CloudSessionsCommand, Command, MemoryCommand,
-    ModelCommand, PermissionCommand, ProviderCommand, RestartCommand, SecretsCommand,
-    ServerCommand, SessionCommand, TranscriptModeArg,
+    AmbientCommand, Args, AuthCommand, CloudCommand, CloudSessionsCommand, Command, HooksCommand,
+    MemoryCommand, ModelCommand, PermissionCommand, ProviderCommand, RestartCommand,
+    SecretsCommand, ServerCommand, SessionCommand, TranscriptModeArg,
 };
 use crate::{
     agent, auth, build, provider, provider_catalog, server, session, setup_hints, startup_profile,
@@ -249,6 +249,7 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
         }
         Some(Command::Auth(subcmd)) => match subcmd {
             AuthCommand::Status { json, toon } => commands::run_auth_status_command(json, toon)?,
+            AuthCommand::Migrate { purge } => commands::run_auth_migrate_command(purge)?,
             AuthCommand::Doctor {
                 provider,
                 validate,
@@ -317,6 +318,11 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
         },
         Some(Command::Memory(subcmd)) => {
             commands::run_memory_command(map_memory_subcommand(subcmd))?;
+        }
+        Some(Command::Hooks(subcmd)) => {
+            next_code_hooks::cli::run_hooks_command(map_hooks_subcommand(subcmd))
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
         }
         Some(Command::Session(subcmd)) => match subcmd {
             SessionCommand::Rename {
@@ -603,9 +609,6 @@ pub(crate) async fn run_main(mut args: Args) -> Result<()> {
             RestartCommand::Status => commands::run_restart_status_command()?,
             RestartCommand::Clear => commands::run_restart_clear_command()?,
         },
-        Some(Command::Plugin(subcmd)) => {
-            commands::run_plugin_command(subcmd).await?;
-        }
         None => run_default_command(args).await?,
     }
 
@@ -628,7 +631,12 @@ fn auth_doctor_provider_arg<'a>(
 fn resolve_resume_arg(args: &mut Args) -> Result<()> {
     if let Some(ref resume_id) = args.resume {
         if resume_id.is_empty() {
-            return tui_launch::list_sessions();
+            // Face default: keep empty resume sentinel so pager opens the
+            // Face session picker. Legacy TUI still uses the old list UI.
+            if pager_launch::legacy_tui_requested() {
+                return tui_launch::list_sessions();
+            }
+            return Ok(());
         }
 
         let resume_id = resume_id.clone();
@@ -726,6 +734,30 @@ fn map_memory_subcommand(subcmd: MemoryCommand) -> commands::MemorySubcommand {
         },
         MemoryCommand::Stats => commands::MemorySubcommand::Stats,
         MemoryCommand::ClearTest => commands::MemorySubcommand::ClearTest,
+    }
+}
+
+fn map_hooks_subcommand(subcmd: HooksCommand) -> next_code_hooks::cli::HooksSubcommand {
+    match subcmd {
+        HooksCommand::List { event, json } => {
+            next_code_hooks::cli::HooksSubcommand::List { event, json }
+        }
+        HooksCommand::Enable { event, index } => {
+            next_code_hooks::cli::HooksSubcommand::Enable { event, index }
+        }
+        HooksCommand::Disable { event, index } => {
+            next_code_hooks::cli::HooksSubcommand::Disable { event, index }
+        }
+        HooksCommand::Test {
+            event,
+            execute,
+            json,
+        } => next_code_hooks::cli::HooksSubcommand::Test {
+            event,
+            execute,
+            json,
+        },
+        HooksCommand::Metrics { json } => next_code_hooks::cli::HooksSubcommand::Metrics { json },
     }
 }
 

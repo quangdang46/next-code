@@ -532,6 +532,10 @@ pub(super) fn handle_credit_limit_recheck_complete(
 // Action handlers.
 
 pub(super) fn dispatch_open_supergrok_url(app: &mut AppView) -> Vec<Effect> {
+    if crate::product_welcome::is_nextcode_embed() {
+        app.show_toast("xAI billing links are not available in next-code");
+        return vec![];
+    }
     log_event(SuperGrokUpsellClicked {
         source: SuperGrokUpsell::WelcomeScreen,
         auth_method: app.login_method_id.as_ref().map(|id| id.0.to_string()),

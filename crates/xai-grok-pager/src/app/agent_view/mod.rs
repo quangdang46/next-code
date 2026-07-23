@@ -826,6 +826,8 @@ pub struct AgentView {
     pub(crate) modal_hovered_key: Option<char>,
     /// Cached server-reported context state.
     pub context_state: Option<xai_grok_shell::session::ContextInfo>,
+    /// Latest next-code TokenUsage sample for the in-flight turn (Worked-for footer).
+    pub turn_token_usage: Option<crate::scrollback::blocks::TurnTokenUsage>,
     /// Session KV-cache telemetry for the scroll-gated left float.
     pub kv_cache_info: Option<crate::views::info_floats::CacheHitInfo>,
     /// Last mouse/keyboard scroll delta on this agent (float HUD idle timer).
@@ -840,6 +842,9 @@ pub struct AgentView {
     pub info_float_git: Option<crate::views::info_floats::GitInfo>,
     /// Compaction float card (AutoCompact* session updates).
     pub info_float_compaction: Option<crate::views::info_floats::CompactionInfo>,
+    /// Per-float-kind visibility flags, synced from `AppView::current_ui.info_floats`
+    /// before every draw call. Default all-true.
+    pub info_float_visibility: crate::views::info_floats::InfoFloatVisibility,
     /// Gateway light-frontend session (`kind: "chat"` / `--chat` / conversation
     /// resume). Suppresses Build credits / local sampler context telemetry so the
     /// status bar and prompt never imply remote usage from wrong metrics.
@@ -1148,6 +1153,13 @@ pub struct AgentView {
     pub btw_state: Option<crate::views::btw_overlay::BtwOverlayState>,
     /// Minimal-only ownership/correlation for `btw_state`; absent in fullscreen.
     pub(crate) minimal_btw_lifecycle: Option<crate::minimal_api::MinimalBtwLifecycle>,
+    /// When true, this `/btw` session uses the right-hand side panel (legacy TUI
+    /// parity) instead of the Face/Grok overlay above the prompt. Stamped at
+    /// send time from `[ui].btw_output_mode`.
+    pub(crate) btw_sidebar: bool,
+    /// Side-panel visibility while `btw_sidebar` is active. Alt+M toggles;
+    /// Esc still dismisses the whole `/btw` session.
+    pub(crate) btw_sidebar_visible: bool,
     /// Whether the /btw panel holds keyboard focus. The panel is non-blocking,
     /// so Up/Down/PgUp/PgDn scroll it when focused and otherwise reach the
     /// prompt. Set on a `Done` answer; cleared when the user types in or clicks
@@ -1183,6 +1195,8 @@ pub struct AgentView {
     /// Shift+Tab. (message, remaining_ticks). Full brightness for 2 s, then
     /// fades out over the final 0.3 s.
     pub(crate) mode_switch_banner: Option<(String, u8)>,
+    /// Orange origin-style reconnect card while daemon/leader IPC is down.
+    pub(crate) reconnect_banner: Option<crate::views::reconnect_banner::ReconnectBanner>,
     /// Session announcement banner (critical or promo) is showing (set at
     /// start of `draw`). Ephemeral-tip occluder — unlike short-lived
     /// mode-switch, an announcement can last the session, so tips must not

@@ -359,6 +359,14 @@ pub struct SessionPickerEntry {
     pub source: String,
     pub model_id: Option<String>,
     pub num_messages: usize,
+    /// Visible user turns (when the list API provides a split count).
+    pub user_message_count: usize,
+    /// Visible assistant turns (when the list API provides a split count).
+    pub assistant_message_count: usize,
+    /// First meaningful user prompt snippet (for resume-browser secondary line).
+    pub first_prompt: Option<String>,
+    /// Memorable short name when the primary title is only that name.
+    pub short_name: Option<String>,
     /// When the session last had content added (most recent of local and remote).
     pub last_active_at: Option<chrono::DateTime<chrono::Utc>>,
     /// Git branch associated with the session (if available from the server response).
@@ -862,6 +870,9 @@ pub struct AppView {
     pub session_picker_state: crate::views::picker::PickerState,
     /// Source filter for the welcome-screen session picker.
     pub session_picker_source_filter: crate::views::session_picker::SourceFilter,
+    /// Bare `--resume` Face 2-panel resume browser (list + transcript preview).
+    /// Distinct from expand-card [`Self::session_picker_*`] / modal SessionPicker.
+    pub resume_browser: Option<crate::views::resume_browser::ResumeBrowserState>,
     /// Content-based (deep search) results from ACP session search.
     pub session_picker_content_results:
         Option<Vec<xai_grok_shell::extensions::session_search::SearchSessionHit>>,
@@ -1304,6 +1315,7 @@ impl AppView {
                 crate::views::picker::PickerMode::FullScreen,
             ),
             session_picker_source_filter: crate::views::session_picker::SourceFilter::default(),
+            resume_browser: None,
             session_picker_content_results: None,
             session_picker_content_loading: false,
             session_picker_deep_search_seq: 0,
@@ -1505,12 +1517,25 @@ impl AppView {
         } else {
             Vec::new()
         };
+        // nextcode embed: brand-hide via menu_hidden + unavailable (not tier
+        // restricted — that path shows SuperGrok upsell).
+        let brand: Vec<String> = if crate::product_welcome::is_nextcode_embed() {
+            crate::product_welcome::EMBED_BRAND_RESTRICTED_COMMANDS
+                .iter()
+                .map(|n| (*n).to_string())
+                .collect()
+        } else {
+            Vec::new()
+        };
         for agent in self.agents.values_mut() {
             agent.set_restricted_commands(&names);
+            agent.set_brand_hidden_commands(&brand);
         }
         self.welcome_prompt.set_restricted_commands(&names);
+        self.welcome_prompt.set_brand_hidden_commands(&brand);
         if let Some(dashboard) = self.dashboard.as_mut() {
             dashboard.set_restricted_commands(&names);
+            dashboard.set_brand_hidden_commands(&brand);
         }
         self.tier_restricted_commands = names;
     }
@@ -2193,6 +2218,17 @@ impl AppView {
         )
         .is_some_and(|(owner, _, _)| !crate::views::announcements::is_dismissible(owner));
         let has_foreign_resume = self.foreign_resume_hint().is_some();
+        if self.resume_browser.is_some() {
+            return match ev {
+                Event::Key(key) => {
+                    let Some(rb) = self.resume_browser.as_mut() else {
+                        return InputOutcome::Unchanged;
+                    };
+                    crate::views::resume_browser::handle_resume_browser_key(rb, key)
+                }
+                _ => InputOutcome::Unchanged,
+            };
+        }
         let outcome = match self.active_view {
             ActiveView::Welcome => handle_welcome_input(
                 ev,
@@ -3917,6 +3953,9 @@ impl AppView {
                     (None, full_area)
                 };
             if view_area.height > 0 {
+                if let Some(rb) = self.resume_browser.as_mut() {
+                    crate::views::resume_browser::render_resume_browser(f.buffer_mut(), view_area, rb);
+                } else {
                 match *active_view {
                     ActiveView::Welcome => {
                         let mut flags_vec: Vec<crate::views::prompt_widget::PromptFlag<'_>> =
@@ -4205,7 +4244,10 @@ impl AppView {
                                 );
                             let show_session_tip = self.tip.is_some() && agent.should_show_tip();
                             let has_mode_banner = agent.mode_switch_banner.is_some();
-                            let banner_height = if has_mode_banner {
+                            let has_reconnect_banner = agent.reconnect_banner.is_some();
+                            let banner_height = if has_reconnect_banner {
+                                crate::views::reconnect_banner::RECONNECT_BANNER_HEIGHT
+                            } else if has_mode_banner {
                                 1
                             } else if announcement_banner_h > 0 {
                                 announcement_banner_h
@@ -4215,6 +4257,10 @@ impl AppView {
                                 0
                             };
                             agent.info_float_session_count = Some(info_float_session_count);
+                            agent.info_float_visibility =
+                                crate::views::info_floats::InfoFloatVisibility::from(
+                                    &self.current_ui.info_floats,
+                                );
                             if agent.info_float_provider.is_none() {
                                 agent.info_float_provider = self
                                     .login_method_id
@@ -4333,6 +4379,10 @@ impl AppView {
                                                 if let Some(agent) = agents.get_mut(&agent_id) {
                                                     agent.info_float_session_count =
                                                         Some(session_count);
+                                                    agent.info_float_visibility =
+                                                        crate::views::info_floats::InfoFloatVisibility::from(
+                                                            &self.current_ui.info_floats,
+                                                        );
                                                     agent.draw(
                                                         inner,
                                                         buf,
@@ -4379,6 +4429,7 @@ impl AppView {
                         }
                     }
                 }
+                } // else (not resume_browser)
             }
             if let Some(fps) = &fps_overlay {
                 fps.render(full_area, f.buffer_mut());
@@ -5056,6 +5107,7 @@ impl AppView {
                         .is_some_and(|m| m.result_notice.is_some())
                     || agent.ephemeral_tip_needs_tick()
                     || agent.mode_switch_banner.is_some()
+                    || agent.reconnect_banner.is_some()
                     || agent.has_drag_autoscroll()
                     || agent.selection_created_at.is_some()
                     || agent.block_viewer.is_some()
@@ -5383,6 +5435,7 @@ pub(crate) mod tests {
                 crate::views::picker::PickerMode::FullScreen,
             ),
             session_picker_source_filter: crate::views::session_picker::SourceFilter::default(),
+            resume_browser: None,
             session_picker_content_results: None,
             session_picker_content_loading: false,
             session_picker_deep_search_seq: 0,
@@ -6991,6 +7044,10 @@ pub(crate) mod tests {
             source: "local".into(),
             model_id: None,
             num_messages: 0,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
             last_active_at: None,
             branch: None,
             repo_name: "tmp-repo".into(),
@@ -10725,6 +10782,10 @@ pub(crate) mod tests {
             source: "conversation".into(),
             model_id: None,
             num_messages: 0,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
             last_active_at: None,
             branch: None,
             repo_name: "r".into(),

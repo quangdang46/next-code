@@ -2247,3 +2247,108 @@ fn runtime_display_name_tracks_active_openai_compatible_profile() {
         .expect("switch back to openrouter aggregator");
     assert_eq!(Provider::display_name(&provider), "OpenRouter");
 }
+
+#[test]
+fn config_default_provider_pin_skips_full_compat_scan_for_credentials() {
+    // Cold-start regression: default_provider=opencode-go with only that profile's
+    // key must resolve credentials without requiring OPENROUTER_API_KEY, and must
+    // still win when a second compat profile is also configured (pin > ambiguity).
+    let _lock = crate::storage::lock_test_env();
+    let temp = tempfile::TempDir::new().expect("temp home");
+    let next_code_home = temp.path().join("next-code-home");
+    let _next_code_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _home = OrEnvVarGuard::set("HOME", temp.path());
+    let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
+    let _env = isolate_openrouter_autodetect_env_or();
+    let _go = OrEnvVarGuard::set("OPENCODE_GO_API_KEY", "test-opencode-go-key");
+    let _groq = OrEnvVarGuard::set("GROQ_API_KEY", "test-groq-key");
+
+    std::fs::create_dir_all(&next_code_home).expect("create home");
+    std::fs::write(
+        next_code_home.join("config.toml"),
+        r#"
+[provider]
+default_provider = "opencode-go"
+"#,
+    )
+    .expect("write config");
+    crate::config::invalidate_config_cache();
+    crate::auth::AuthStatus::invalidate_cached_status();
+
+    assert!(
+        crate::provider::openrouter::has_credentials(),
+        "pinned opencode-go must count as openrouter/compat credentials"
+    );
+    let key = crate::provider::openrouter::get_api_key().expect("pinned key");
+    assert_eq!(key, "test-opencode-go-key");
+    assert_eq!(
+        crate::provider::openrouter::configured_api_key_name_for_test(),
+        "OPENCODE_GO_API_KEY"
+    );
+}
+
+#[test]
+fn config_default_provider_pin_miss_falls_back_to_unique_compat_match() {
+    let _lock = crate::storage::lock_test_env();
+    let temp = tempfile::TempDir::new().expect("temp home");
+    let next_code_home = temp.path().join("next-code-home");
+    let _next_code_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _home = OrEnvVarGuard::set("HOME", temp.path());
+    let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
+    let _env = isolate_openrouter_autodetect_env_or();
+    // Pin asks for opencode-go, but only groq is configured → pin miss → unique scan.
+    let _groq = OrEnvVarGuard::set("GROQ_API_KEY", "test-groq-only-key");
+
+    std::fs::create_dir_all(&next_code_home).expect("create home");
+    std::fs::write(
+        next_code_home.join("config.toml"),
+        r#"
+[provider]
+default_provider = "opencode-go"
+"#,
+    )
+    .expect("write config");
+    crate::config::invalidate_config_cache();
+    crate::auth::AuthStatus::invalidate_cached_status();
+
+    assert!(crate::provider::openrouter::has_credentials());
+    let key = crate::provider::openrouter::get_api_key().expect("fallback key");
+    assert_eq!(key, "test-groq-only-key");
+    assert_eq!(
+        crate::provider::openrouter::configured_api_key_name_for_test(),
+        "GROQ_API_KEY"
+    );
+}
+
+#[test]
+fn multi_compat_keys_without_pin_remain_ambiguous() {
+    let _lock = crate::storage::lock_test_env();
+    let temp = tempfile::TempDir::new().expect("temp home");
+    let next_code_home = temp.path().join("next-code-home");
+    let _next_code_home = OrEnvVarGuard::set("NEXT_CODE_HOME", &next_code_home);
+    let _home = OrEnvVarGuard::set("HOME", temp.path());
+    let _appdata = OrEnvVarGuard::set("APPDATA", temp.path().join("AppData").join("Roaming"));
+    let _env = isolate_openrouter_autodetect_env_or();
+    let _go = OrEnvVarGuard::set("OPENCODE_GO_API_KEY", "test-opencode-go-key");
+    let _groq = OrEnvVarGuard::set("GROQ_API_KEY", "test-groq-key");
+
+    std::fs::create_dir_all(&next_code_home).expect("create home");
+    std::fs::write(
+        next_code_home.join("config.toml"),
+        r#"
+[provider]
+# no default_provider pin
+"#,
+    )
+    .expect("write config");
+    crate::config::invalidate_config_cache();
+    crate::auth::AuthStatus::invalidate_cached_status();
+
+    // Historical exactly-one semantics: multiple matches → no autodetection →
+    // default OPENROUTER_API_KEY path (absent here) → no credentials.
+    assert!(
+        !crate::provider::openrouter::has_credentials(),
+        "ambiguous multi-compat without pin must not invent a preferred profile"
+    );
+}
+

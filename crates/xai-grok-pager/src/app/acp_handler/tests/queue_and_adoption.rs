@@ -2279,7 +2279,8 @@
         match last_session_event(&agent.scrollback) {
             Some(SessionEvent::TurnCompleted {
                 elapsed: Some(elapsed),
-            }) => assert!(
+            usage: None,
+        }) => assert!(
                 elapsed.as_secs() >= 4,
                 "completion marker must reflect the back-dated start, got {elapsed:?}"
             ),

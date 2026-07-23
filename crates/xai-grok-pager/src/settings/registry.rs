@@ -350,6 +350,16 @@ pub fn canonical_screen_mode(value: Option<&str>) -> &'static str {
     }
 }
 
+/// `sidebar` stays; everything else (including unset) → `inline` (Face/Grok default).
+pub fn canonical_btw_output_mode(value: Option<&str>) -> &'static str {
+    let raw = value.unwrap_or_default().trim();
+    if raw.eq_ignore_ascii_case("sidebar") || raw.eq_ignore_ascii_case("side") {
+        "sidebar"
+    } else {
+        "inline"
+    }
+}
+
 impl PagerLocalSnapshot {
     /// Iterate over just the display names. Convenience helper for
     /// validator paths that don't need the ids.
@@ -512,6 +522,44 @@ pub fn current_value_for(
         "contextual_hints.ssh_wrap" => Some(SettingValue::Bool(
             ui.contextual_hints.ssh_wrap.unwrap_or(true),
         )),
+        // Info float children — `None` (inherit) reads as the default ON.
+        "info_floats" => Some(SettingValue::Bool(true)),
+        "info_float.model_info" => {
+            Some(SettingValue::Bool(ui.info_floats.model_info.unwrap_or(true)))
+        }
+        "info_float.context_usage" => Some(SettingValue::Bool(
+            ui.info_floats.context_usage.unwrap_or(true),
+        )),
+        "info_float.kv_cache" => Some(SettingValue::Bool(
+            ui.info_floats.kv_cache.unwrap_or(true),
+        )),
+        "info_float.memory_activity" => Some(SettingValue::Bool(
+            ui.info_floats.memory_activity.unwrap_or(true),
+        )),
+        "info_float.usage_limits" => Some(SettingValue::Bool(
+            ui.info_floats.usage_limits.unwrap_or(true),
+        )),
+        "info_float.git_status" => Some(SettingValue::Bool(
+            ui.info_floats.git_status.unwrap_or(true),
+        )),
+        "info_float.background_tasks" => Some(SettingValue::Bool(
+            ui.info_floats.background_tasks.unwrap_or(true),
+        )),
+        "info_float.compaction" => Some(SettingValue::Bool(
+            ui.info_floats.compaction.unwrap_or(true),
+        )),
+        "info_float.swarm_status" => Some(SettingValue::Bool(
+            ui.info_floats.swarm_status.unwrap_or(true),
+        )),
+        "info_float.todos" => Some(SettingValue::Bool(
+            ui.info_floats.todos.unwrap_or(true),
+        )),
+        "info_float.workspace_map" => Some(SettingValue::Bool(
+            ui.info_floats.workspace_map.unwrap_or(true),
+        )),
+        "info_float.diagrams" => Some(SettingValue::Bool(
+            ui.info_floats.diagrams.unwrap_or(true),
+        )),
         "keep_text_selection" => Some(SettingValue::Enum(
             crate::appearance::cache::load_keep_text_selection().as_canonical(),
         )),
@@ -561,6 +609,9 @@ pub fn current_value_for(
         ))),
         "screen_mode" => Some(SettingValue::Enum(canonical_screen_mode(
             ui.screen_mode.as_deref(),
+        ))),
+        "btw_output_mode" => Some(SettingValue::Enum(canonical_btw_output_mode(
+            ui.btw_output_mode.as_deref(),
         ))),
         // SHELL — canonicalized from `[ui].voice_capture_mode`; None → "hold".
         "voice_capture_mode" => Some(SettingValue::Enum(canonical_voice_capture_mode(
@@ -767,6 +818,91 @@ mod tests {
                         *default,
                         ui.contextual_hints.ssh_wrap.unwrap_or(true),
                         "contextual_hints.ssh_wrap default drifts from UiConfig::default()"
+                    );
+                }
+                // Info float visibility toggles: `None` (inherit) → default ON.
+                ("info_float.model_info", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.model_info.unwrap_or(true),
+                        "info_float.model_info default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.context_usage", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.context_usage.unwrap_or(true),
+                        "info_float.context_usage default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.kv_cache", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.kv_cache.unwrap_or(true),
+                        "info_float.kv_cache default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.memory_activity", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.memory_activity.unwrap_or(true),
+                        "info_float.memory_activity default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.usage_limits", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.usage_limits.unwrap_or(true),
+                        "info_float.usage_limits default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.git_status", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.git_status.unwrap_or(true),
+                        "info_float.git_status default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.background_tasks", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.background_tasks.unwrap_or(true),
+                        "info_float.background_tasks default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.compaction", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.compaction.unwrap_or(true),
+                        "info_float.compaction default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.swarm_status", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.swarm_status.unwrap_or(true),
+                        "info_float.swarm_status default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.todos", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.todos.unwrap_or(true),
+                        "info_float.todos default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.workspace_map", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.workspace_map.unwrap_or(true),
+                        "info_float.workspace_map default drifts from UiConfig::default()"
+                    );
+                }
+                ("info_float.diagrams", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.info_floats.diagrams.unwrap_or(true),
+                        "info_float.diagrams default drifts from UiConfig::default()"
                     );
                 }
                 ("show_timestamps", SettingKind::Bool { default }) => {
@@ -1015,6 +1151,18 @@ mod tests {
                         "screen_mode default drifts from UiConfig::default()",
                     );
                     assert_eq!(*default, "fullscreen");
+                }
+                ("btw_output_mode", SettingKind::Enum { default, .. }) => {
+                    assert_eq!(
+                        ui.btw_output_mode, None,
+                        "test assumes UiConfig::default().btw_output_mode is None",
+                    );
+                    assert_eq!(
+                        *default,
+                        canonical_btw_output_mode(ui.btw_output_mode.as_deref()),
+                        "btw_output_mode default drifts from UiConfig::default()",
+                    );
+                    assert_eq!(*default, "inline");
                 }
                 // render_mermaid: Option<String>; None → "auto".
                 ("render_mermaid", SettingKind::Enum { default, .. }) => {
@@ -1344,6 +1492,18 @@ mod tests {
         assert_eq!(canonical_screen_mode(Some("bogus")), "fullscreen");
         assert_eq!(canonical_screen_mode(Some("")), "fullscreen");
         assert_eq!(canonical_screen_mode(None), "fullscreen");
+    }
+
+    #[test]
+    fn canonical_btw_output_mode_maps_aliases_and_unknowns() {
+        assert_eq!(canonical_btw_output_mode(Some("sidebar")), "sidebar");
+        assert_eq!(canonical_btw_output_mode(Some("side")), "sidebar");
+        assert_eq!(canonical_btw_output_mode(Some("  SIDEBAR ")), "sidebar");
+        assert_eq!(canonical_btw_output_mode(Some("inline")), "inline");
+        assert_eq!(canonical_btw_output_mode(Some("overlay")), "inline");
+        assert_eq!(canonical_btw_output_mode(Some("bogus")), "inline");
+        assert_eq!(canonical_btw_output_mode(Some("")), "inline");
+        assert_eq!(canonical_btw_output_mode(None), "inline");
     }
 
     /// Corrupted `auto_dark_theme = "auto"` (would cause circular ref)

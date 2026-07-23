@@ -122,6 +122,11 @@ pub struct CommandRegistry {
     /// setters can never un-hide a restricted command: the deny list always
     /// wins over every other visibility gate.
     restricted: HashSet<String>,
+    /// nextcode embed brand-hide: absent from the slash **menu** and blocked
+    /// from dispatch **without** SuperGrok upsell (unlike [`Self::restricted`]).
+    /// Matches canonical name or aliases. Synced into [`Self::menu_hidden`]
+    /// on set so completion/ghost/palette never offer them.
+    brand_hidden: HashSet<String>,
     /// Names of tools the connected agent has advertised.
     ///
     /// Semantics (fail-closed):
@@ -162,6 +167,7 @@ impl CommandRegistry {
             hidden,
             menu_hidden: HashSet::new(),
             restricted: HashSet::new(),
+            brand_hidden: HashSet::new(),
             available_tools: None,
         };
         reg.rebuild_triggers();
@@ -211,6 +217,7 @@ impl CommandRegistry {
             .and_then(|idx| self.commands.get(*idx))
             .filter(|cmd| !self.hidden.contains(cmd.name()))
             .filter(|cmd| !self.restricted_match(cmd))
+            .filter(|cmd| !self.brand_hidden_match(cmd))
             .filter(|cmd| self.tools_satisfied(cmd))
     }
 
@@ -233,6 +240,17 @@ impl CommandRegistry {
                 .any(|a| self.restricted.contains(&a.to_lowercase()))
     }
 
+    fn brand_hidden_match(&self, cmd: &Arc<dyn SlashCommand>) -> bool {
+        if self.brand_hidden.is_empty() {
+            return false;
+        }
+        self.brand_hidden.contains(&cmd.name().to_lowercase())
+            || cmd
+                .aliases()
+                .iter()
+                .any(|a| self.brand_hidden.contains(&a.to_lowercase()))
+    }
+
     /// Replace the restricted-command deny list (e.g. tier restrictions).
     ///
     /// Entries are normalized via [`Self::normalize_deny_name`]. Restricted
@@ -248,6 +266,40 @@ impl CommandRegistry {
             .filter(|n| !n.is_empty())
             .collect();
         self.rebuild_triggers();
+    }
+
+    /// Replace the nextcode embed brand-hide list.
+    ///
+    /// Commands are **menu-hidden** (no dropdown/ghost/palette row) and
+    /// blocked from [`Self::get_for_dispatch`]. Typed invoke is handled by
+    /// the dispatcher as "not available in next-code" — never SuperGrok.
+    pub fn set_brand_hidden_commands(&mut self, names: &[String]) {
+        self.brand_hidden = names
+            .iter()
+            .map(|n| Self::normalize_deny_name(n))
+            .filter(|n| !n.is_empty())
+            .collect();
+        self.rebuild_triggers();
+    }
+
+    /// True when `key` names an embed brand-hidden command (canonical or alias).
+    pub fn is_brand_hidden(&self, key: &str) -> bool {
+        if self.brand_hidden.is_empty() {
+            return false;
+        }
+        let key = Self::normalize_deny_name(key);
+        self.commands.iter().any(|cmd| {
+            self.brand_hidden_match(cmd)
+                && (cmd.name().to_lowercase() == key
+                    || cmd.aliases().iter().any(|a| a.to_lowercase() == key))
+        })
+    }
+
+    /// Current brand-hide list (normalized).
+    pub fn brand_hidden_commands(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.brand_hidden.iter().cloned().collect();
+        names.sort();
+        names
     }
 
     /// True when `key` (canonical name or alias, `/` and case ignored)
@@ -551,7 +603,10 @@ impl CommandRegistry {
             // Menu-hidden commands keep their key entries (so
             // `get_for_dispatch()` resolves a typed invocation) but emit no
             // triggers — the inverse of the restricted trade-off below.
-            let menu_only = self.menu_hidden.contains(canonical);
+            // Brand-hidden (nextcode embed) is also menu-only for triggers,
+            // but `get_for_dispatch` additionally blocks them (no SuperGrok).
+            let menu_only =
+                self.menu_hidden.contains(canonical) || self.brand_hidden_match(command);
 
             // Restricted commands (per-user deny list, e.g. tier
             // restrictions) deliberately stay listed: they keep their
@@ -1206,6 +1261,36 @@ mod tests {
                 .iter()
                 .any(|t| t.canonical == "always-approve")
         );
+    }
+
+    /// nextcode embed brand-hide: absent from menu AND blocked from dispatch
+    /// (no SuperGrok upsell path — dispatcher uses `is_brand_hidden`).
+    #[test]
+    fn brand_hidden_is_menu_hidden_and_blocks_dispatch() {
+        let imagine: Arc<dyn SlashCommand> = Arc::new(DummyCommand {
+            name: "imagine",
+            aliases: &[],
+        });
+        let help: Arc<dyn SlashCommand> = Arc::new(DummyCommand {
+            name: "help",
+            aliases: &[],
+        });
+        let mut reg = CommandRegistry::new(vec![imagine, help]);
+        reg.set_brand_hidden_commands(&["imagine".to_string()]);
+
+        assert!(reg.is_brand_hidden("imagine"));
+        assert!(reg.get("imagine").is_none(), "not in completion menu");
+        assert!(
+            reg.get_for_dispatch("imagine").is_none(),
+            "typed invoke must not execute brand-hidden commands"
+        );
+        assert!(!reg.triggers().iter().any(|t| t.canonical == "imagine"));
+        assert!(!reg.is_restricted("imagine"), "must not use SuperGrok path");
+        assert!(reg.get("help").is_some());
+
+        reg.set_brand_hidden_commands(&[]);
+        assert!(reg.get("imagine").is_some());
+        assert!(reg.get_for_dispatch("imagine").is_some());
     }
 
     /// The `/auto` feature gate stays HARD (fail-closed): gated off, `/auto`

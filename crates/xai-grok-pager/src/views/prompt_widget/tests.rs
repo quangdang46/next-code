@@ -1560,19 +1560,43 @@
     }
 
     #[test]
-    fn accept_completion_adds_trailing_space_for_arg_command() {
+    fn accept_completion_model_does_not_trail_space() {
         let mut pw = PromptWidget::new();
         let models = crate::acp::model_state::ModelState::default();
 
-        // Type "/mod" → should match "/model" which takes_args.
+        // Type "/mod" → should match "/model". Bare `/model` opens the
+        // centered Select-model palette, so completion must NOT append a
+        // trailing space (that would chain into the inline arg dropdown).
         pw.textarea.insert_str("/mod");
         pw.refresh_slash(&models);
 
         pw.accept_slash_completion(&models);
         let text = pw.textarea.text().to_string();
         assert_eq!(
-            text, "/model ",
-            "arg-taking command should get trailing space"
+            text, "/model",
+            "model command must not trail-space-chain into inline args"
+        );
+    }
+
+    #[test]
+    fn accept_completion_adds_trailing_space_for_theme() {
+        let mut pw = PromptWidget::new();
+        let models = crate::acp::model_state::ModelState::default();
+
+        pw.textarea.insert_str("/the");
+        pw.refresh_slash(&models);
+        // Select /theme if not already first.
+        let snap = pw.slash_snapshot();
+        if let Some(idx) = snap.matches.iter().position(|r| r.display == "/theme") {
+            for _ in 0..idx {
+                pw.slash_move_selection(1);
+            }
+        }
+        pw.accept_slash_completion(&models);
+        assert_eq!(
+            pw.textarea.text(),
+            "/theme ",
+            "other arg-taking commands still trail-space for inline args"
         );
     }
 
@@ -1581,32 +1605,33 @@
         let mut pw = PromptWidget::new();
         let models = crate::acp::model_state::ModelState::default();
 
+        // Use `/theme` (still trail-spaces) to cover the absorb path.
         // Cursor inside the command token with args already present.
-        pw.textarea.insert_str("/mod grok-4");
+        pw.textarea.insert_str("/the dark");
         pw.textarea.set_cursor(3);
         pw.refresh_slash(&models);
 
         let snap = pw.slash_snapshot();
         assert!(snap.open, "menu opens with the cursor inside the command");
-        let model_idx = snap
+        let theme_idx = snap
             .matches
             .iter()
-            .position(|r| r.display == "/model")
-            .expect("/model in matches");
-        for _ in 0..model_idx {
+            .position(|r| r.display == "/theme")
+            .expect("/theme in matches");
+        for _ in 0..theme_idx {
             pw.slash_move_selection(1);
         }
 
         assert!(pw.accept_slash_completion(&models));
         assert_eq!(
             pw.textarea.text(),
-            "/model grok-4",
+            "/theme dark",
             "the row's trailing space must not stack on the existing separator"
         );
         // Absorb (not trim-the-insert): the cursor must land after the
         // separator so the post-accept refresh is in the args phase — the
         // Enter-chains flow. Trimming would leave it at the command end.
-        assert_eq!(pw.textarea.cursor(), "/model ".len());
+        assert_eq!(pw.textarea.cursor(), "/theme ".len());
         assert!(!pw.slash_snapshot().cursor_in_command);
     }
 

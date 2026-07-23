@@ -66,10 +66,10 @@ use super::session::lifecycle::{
 };
 use super::session::load::{
     dispatch_cycle_session_source_filter, dispatch_load_session, dispatch_pick_content_session,
-    dispatch_pick_content_session_in_worktree, dispatch_pick_session,
-    dispatch_pick_session_in_worktree, dispatch_session_picker_closed,
-    dispatch_show_session_picker, dispatch_trigger_deep_search, session_picker_entry_matches,
-    session_picker_external_filter_active,
+    dispatch_pick_content_session_in_worktree, dispatch_pick_resume_browser_session,
+    dispatch_pick_session, dispatch_pick_session_in_worktree, dispatch_session_picker_closed,
+    dispatch_show_resume_browser, dispatch_show_session_picker, dispatch_trigger_deep_search,
+    session_picker_entry_matches, session_picker_external_filter_active,
 };
 use super::session::modal::dispatch_rename_session;
 use super::settings::setters::{
@@ -82,14 +82,21 @@ use super::settings::setters::{
     set_default_selected_permission, set_display_refresh_auto_cadence, set_fork_secondary_model,
     set_group_tool_verbs, set_hunk_tracker_mode, set_invert_scroll, set_keep_text_selection,
     set_max_thoughts_width, set_multiline_mode, set_page_flip_on_send, set_prompt_suggestions,
-    set_remember_tool_approvals, set_render_mermaid, set_respect_manual_folds, set_screen_mode,
-    set_scroll_lines, set_scroll_mode, set_scroll_speed, set_show_thinking_blocks, set_show_tips,
+    set_remember_tool_approvals, set_render_mermaid, set_respect_manual_folds, set_btw_output_mode,
+    set_screen_mode,
+    set_scroll_lines, set_scroll_mode, set_scroll_speed, set_show_float_background_tasks,
+    set_show_float_compaction, set_show_float_context_usage, set_show_float_diagrams,
+    set_show_float_git_status, set_show_float_kv_cache, set_show_float_memory_activity,
+    set_show_float_model_info, set_show_float_swarm_status, set_show_float_todos,
+    set_show_float_usage_limits, set_show_float_workspace_map, set_show_thinking_blocks, set_show_tips,
     set_simple_mode, set_theme, set_timeline, set_timestamps, set_vim_mode, set_voice_capture_mode,
     set_voice_stt_language,
 };
 use super::settings::ui::{
     dispatch_confirm_reset_setting, dispatch_open_command_palette, dispatch_open_howto_guides,
-    dispatch_open_reset_confirm, dispatch_open_settings, dispatch_toggle_compact_mode,
+    dispatch_open_connect_picker, dispatch_open_model_picker, dispatch_open_reset_confirm,
+    dispatch_open_settings,
+    dispatch_toggle_compact_mode,
     dispatch_toggle_mouse_capture, dispatch_toggle_multiline, dispatch_toggle_timestamps,
     dispatch_toggle_vim_mode,
 };
@@ -218,6 +225,22 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::FetchSessionList => dispatch_fetch_session_list(app),
         Action::CycleSessionSourceFilter => dispatch_cycle_session_source_filter(app),
         Action::ShowSessionPicker => dispatch_show_session_picker(app),
+        Action::ShowResumeBrowser => dispatch_show_resume_browser(app),
+        Action::CloseResumeBrowser => {
+            app.resume_browser = None;
+            // Defensive: never leave a stuck welcome Loading shell after Esc.
+            app.session_picker_loading = false;
+            app.session_picker_entries = None;
+            vec![]
+        }
+        Action::PickResumeBrowserSession {
+            session_id,
+            cwd,
+            source,
+        } => dispatch_pick_resume_browser_session(app, session_id, cwd, source),
+        Action::LoadResumePreview { session_id, seq } => {
+            vec![Effect::LoadResumePreview { session_id, seq }]
+        }
         Action::SessionPickerClosed => dispatch_session_picker_closed(app),
         Action::PickSession(index) => dispatch_pick_session(app, index),
         Action::PickSessionInWorktree(index) => dispatch_pick_session_in_worktree(app, index),
@@ -848,13 +871,14 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 agent.session.deferred_model_switch = Some((model_id, effort));
                 return vec![];
             };
+            let prev_model_id = agent.session.models.current.clone();
             agent.session.model_switch_pending = true;
             vec![Effect::SwitchModel {
                 agent_id: id,
                 session_id,
                 model_id,
                 effort,
-                prev_model_id: None,
+                prev_model_id,
             }]
         }
         Action::AnnouncementsHide => {
@@ -959,6 +983,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::SetDefaultSelectedPermission(s) => set_default_selected_permission(app, s),
         Action::SetHunkTrackerMode(s) => set_hunk_tracker_mode(app, s),
         Action::SetScreenMode(s) => set_screen_mode(app, s),
+        Action::SetBtwOutputMode(s) => set_btw_output_mode(app, s),
         Action::SetVoiceCaptureMode(s) => set_voice_capture_mode(app, s),
         Action::SetVoiceSttLanguage(s) => set_voice_stt_language(app, s),
         Action::ToggleTimestamps => dispatch_toggle_timestamps(app),
@@ -988,6 +1013,18 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::SetMaxThoughtsWidth(v) => set_max_thoughts_width(app, v),
         Action::SetShowTips(v) => set_show_tips(app, v),
         Action::SetAutoUpdate(v) => set_auto_update(app, v),
+        Action::SetShowFloatModelInfo(v) => set_show_float_model_info(app, v),
+        Action::SetShowFloatContextUsage(v) => set_show_float_context_usage(app, v),
+        Action::SetShowFloatKvCache(v) => set_show_float_kv_cache(app, v),
+        Action::SetShowFloatMemoryActivity(v) => set_show_float_memory_activity(app, v),
+        Action::SetShowFloatUsageLimits(v) => set_show_float_usage_limits(app, v),
+        Action::SetShowFloatGitStatus(v) => set_show_float_git_status(app, v),
+        Action::SetShowFloatBackgroundTasks(v) => set_show_float_background_tasks(app, v),
+        Action::SetShowFloatCompaction(v) => set_show_float_compaction(app, v),
+        Action::SetShowFloatSwarmStatus(v) => set_show_float_swarm_status(app, v),
+        Action::SetShowFloatTodos(v) => set_show_float_todos(app, v),
+        Action::SetShowFloatWorkspaceMap(v) => set_show_float_workspace_map(app, v),
+        Action::SetShowFloatDiagrams(v) => set_show_float_diagrams(app, v),
         Action::SetDisplayRefreshAutoCadence(v) => set_display_refresh_auto_cadence(app, v),
         Action::PreviewTheme(v) => preview_theme(app, v),
         Action::PreviewAutoDarkTheme(v) => preview_auto_dark_theme(app, v),
@@ -995,6 +1032,8 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::OpenSettings => dispatch_open_settings(app),
         Action::OpenCommandPalette => dispatch_open_command_palette(app),
         Action::OpenHowtoGuides => dispatch_open_howto_guides(app),
+        Action::OpenModelPicker => dispatch_open_model_picker(app),
+        Action::OpenConnectPicker => dispatch_open_connect_picker(app),
         Action::OpenResetConfirm { key } => dispatch_open_reset_confirm(app, key),
         Action::ConfirmResetSetting { choice } => dispatch_confirm_reset_setting(app, choice),
         Action::DumpInputLog => dispatch_dump_input_log(app),
@@ -1053,6 +1092,14 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             vec![]
         }
         Action::Login => dispatch_login(app),
+        Action::NextCodeConnect { provider } => {
+            app.login_method_id = Some(agent_client_protocol::AuthMethodId::new(format!(
+                "nextcode.{provider}"
+            )));
+            app.login_label = Some(provider);
+            app.auth_start_mode = crate::app::app_view::AuthMode::Pending;
+            dispatch_login(app)
+        }
         Action::CancelLogin => dispatch_cancel_login(app),
         Action::SubmitAuthCode(code) => dispatch_submit_auth_code(app, code),
         Action::CopyAuthUrl => {
@@ -1319,10 +1366,21 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
     sync_sleep_inhibitor(app);
     effects
 }
+/// Which extension lists to refresh after a successful action (when
+/// `requires_reload` is false). Hooks Space toggle must not fan out to
+/// plugins/marketplace/MCP — that was the lag source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum ActionRefreshScope {
+    Hooks,
+    Plugins,
+    Marketplace,
+}
+
 pub(super) fn dispatch_action_result(
     app: &mut AppView,
     agent_id: crate::app::agent::AgentId,
     result: Result<xai_hooks_plugins_types::ActionOutcome, String>,
+    refresh: ActionRefreshScope,
 ) -> Vec<Effect> {
     use xai_hooks_plugins_types::OutcomeStatus;
     let Some(agent) = app.agents.get_mut(&agent_id) else {
@@ -1363,23 +1421,34 @@ pub(super) fn dispatch_action_result(
                             action: xai_hooks_plugins_types::PluginsAction::Reload,
                         });
                     } else if agent.extensions_modal.is_some() {
-                        effects.push(Effect::FetchHooksList {
-                            agent_id,
-                            session_id: session_id.clone(),
-                        });
-                        effects.push(Effect::FetchPluginsList {
-                            agent_id,
-                            session_id: session_id.clone(),
-                        });
-                        effects.push(Effect::FetchMarketplaceList {
-                            agent_id,
-                            session_id: session_id.clone(),
-                        });
-                        effects.push(Effect::FetchMcpsList {
-                            agent_id,
-                            session_id,
-                            cache: false,
-                        });
+                        match refresh {
+                            ActionRefreshScope::Hooks => {
+                                effects.push(Effect::FetchHooksList {
+                                    agent_id,
+                                    session_id,
+                                });
+                            }
+                            ActionRefreshScope::Plugins => {
+                                effects.push(Effect::FetchPluginsList {
+                                    agent_id,
+                                    session_id: session_id.clone(),
+                                });
+                                effects.push(Effect::FetchMarketplaceList {
+                                    agent_id,
+                                    session_id,
+                                });
+                            }
+                            ActionRefreshScope::Marketplace => {
+                                effects.push(Effect::FetchMarketplaceList {
+                                    agent_id,
+                                    session_id: session_id.clone(),
+                                });
+                                effects.push(Effect::FetchPluginsList {
+                                    agent_id,
+                                    session_id,
+                                });
+                            }
+                        }
                     }
                 }
                 effects
@@ -1419,6 +1488,8 @@ pub(super) fn dispatch_action_result(
             | OutcomeStatus::InternalError
             | OutcomeStatus::Unsupported => {
                 if let Some(ref mut modal) = agent.extensions_modal {
+                    modal.pending_action = None;
+                    modal.pending_entry_index = None;
                     modal.modal_message = Some(
                         crate::views::extensions_modal::ModalMessage::Error(outcome.message),
                     );

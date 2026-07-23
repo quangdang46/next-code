@@ -43,6 +43,8 @@ pub struct DeferredStartupActions {
     pub new_session: bool,
     pub prompt: Option<String>,
     pub open_dashboard: bool,
+    /// Bare `--resume` / `NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP` → Face 2-panel resume browser.
+    pub open_session_picker: bool,
     pub pending_chat: bool,
 }
 impl DeferredStartupActions {
@@ -379,6 +381,11 @@ pub struct MaterializeCtx {
     /// the local disk store. Always `false` without the optional feature;
     /// setting it anyway errors rather than silently falling back to disk.
     pub chat_mode: bool,
+    /// When true, skip Grok on-disk existence checks and let the ACP agent
+    /// (e.g. next-code daemon) validate `session/load`. Stock Grok keeps this
+    /// false; next-code embed sets it because shell persistence is a stub and
+    /// the CLI already resolved the id under `NEXT_CODE_HOME`.
+    pub defer_existence_to_agent: bool,
 }
 impl MaterializeCtx {
     pub fn from_pager_args(args: &PagerArgs) -> Self {
@@ -386,6 +393,7 @@ impl MaterializeCtx {
             has_worktree: args.worktree.is_some(),
             allow_remote_restore: false,
             chat_mode: args.chat(),
+            defer_existence_to_agent: crate::product_welcome::is_nextcode_embed(),
         }
     }
 }
@@ -600,6 +608,19 @@ async fn resolve_existing_session(
         eprintln!(
             "Session {} not found locally; it will be restored into the new worktree.",
             session_id
+        );
+        return Ok(ResolvedExisting {
+            id: session_id.to_string(),
+            original_cwd: None,
+            title: None,
+        });
+    }
+    // next-code embed: Grok `~/.grok/sessions` is stubbed; the daemon ACP agent
+    // is the session authority (CLI already resolved under NEXT_CODE_HOME).
+    if ctx.defer_existence_to_agent {
+        tracing::info!(
+            session_id = % session_id,
+            "Deferring session existence check to ACP agent (next-code embed)"
         );
         return Ok(ResolvedExisting {
             id: session_id.to_string(),
@@ -885,6 +906,7 @@ mod tests {
             has_worktree: false,
             allow_remote_restore: true,
             chat_mode: true,
+            defer_existence_to_agent: false,
         }
     }
     #[test]
@@ -907,6 +929,7 @@ mod tests {
     #[test]
     fn materialize_ctx_chat_mode_from_args() {
         assert!(!MaterializeCtx::from_pager_args(&parse(&["grok"])).chat_mode);
+        assert!(!MaterializeCtx::from_pager_args(&parse(&["grok"])).defer_existence_to_agent);
     }
     /// Explicit-id resume under `--chat` passes the id through untouched:
     /// no disk resolution, no GCS restore (the cwd does not even exist).
@@ -984,6 +1007,7 @@ mod tests {
             has_worktree: false,
             allow_remote_restore: false,
             chat_mode: false,
+            defer_existence_to_agent: false,
         };
         let err = materialize_startup_for_cwd(
             ctx,
@@ -999,6 +1023,35 @@ mod tests {
             err.to_string().contains("does not exist"),
             "unexpected error: {err}"
         );
+    }
+
+    /// next-code embed must not hard-fail on the stubbed Grok disk store; the
+    /// ACP agent validates the id on `session/load`.
+    #[tokio::test]
+    async fn materialize_resume_defers_existence_when_agent_owns_store() {
+        let ctx = MaterializeCtx {
+            has_worktree: false,
+            allow_remote_restore: false,
+            chat_mode: false,
+            defer_existence_to_agent: true,
+        };
+        let id = "session_skunk_1784700214859_9acd76f0a639d463";
+        let out = materialize_startup_for_cwd(
+            ctx,
+            SessionStartupIntent::Resume {
+                session_id: Some(id.into()),
+                most_recent_for_cwd: false,
+            },
+            "/nonexistent/cwd/for/embed-resume-test",
+        )
+        .await
+        .expect("embed resume should pass through");
+        match out {
+            MaterializedStartup::Resume { session_id, .. } => {
+                assert_eq!(session_id, id);
+            }
+            other => panic!("expected Resume, got {other:?}"),
+        }
     }
     #[tokio::test]
     async fn materialize_fork_refused_under_chat_mode() {

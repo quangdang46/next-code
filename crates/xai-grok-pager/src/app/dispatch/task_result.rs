@@ -23,7 +23,7 @@ use super::rewind::{
     dispatch_rewind_success, handle_rewind_execute_failed, handle_rewind_points_loaded,
     handle_rewind_preview_complete, handle_rewind_preview_failed,
 };
-use super::router::{dispatch, dispatch_action_result};
+use super::router::{dispatch, dispatch_action_result, ActionRefreshScope};
 use super::session::foreign::{
     handle_foreign_sessions_scanned, handle_session_list_failed, handle_session_list_loaded,
 };
@@ -251,6 +251,14 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             }
             vec![]
         }
+        TaskResult::NextCodeUsageText { agent_id, text } => {
+            if let Some(agent) = app.agents.get_mut(&agent_id) {
+                agent.scrollback.push_block(RenderBlock::System(
+                    crate::scrollback::blocks::SystemMessageBlock::new(text),
+                ));
+            }
+            vec![]
+        }
         TaskResult::AppBillingFetched { balance, autotopup } => {
             app.credit_balance = balance;
             apply_auto_topup(&mut app.auto_topup, &autotopup);
@@ -354,6 +362,16 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             generation,
             detail,
         } => handle_card_detail_loaded(app, source, session_id, generation, detail),
+        TaskResult::ResumePreviewLoaded {
+            session_id,
+            seq,
+            lines,
+        } => {
+            if let Some(rb) = app.resume_browser.as_mut() {
+                let _ = rb.apply_preview(&session_id, seq, lines);
+            }
+            vec![]
+        }
         TaskResult::SessionRestored {
             agent_id,
             local_session_id,
@@ -605,10 +623,14 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
         TaskResult::PluginsListLoaded { agent_id, result } => {
             handle_plugins_list_loaded(app, agent_id, result)
         }
-        TaskResult::HooksActionResult { agent_id, result }
-        | TaskResult::PluginsActionResult { agent_id, result }
-        | TaskResult::MarketplaceActionResult { agent_id, result } => {
-            dispatch_action_result(app, agent_id, result)
+        TaskResult::HooksActionResult { agent_id, result } => {
+            dispatch_action_result(app, agent_id, result, ActionRefreshScope::Hooks)
+        }
+        TaskResult::PluginsActionResult { agent_id, result } => {
+            dispatch_action_result(app, agent_id, result, ActionRefreshScope::Plugins)
+        }
+        TaskResult::MarketplaceActionResult { agent_id, result } => {
+            dispatch_action_result(app, agent_id, result, ActionRefreshScope::Marketplace)
         }
         TaskResult::CtaPluginInstallDone {
             agent_id,

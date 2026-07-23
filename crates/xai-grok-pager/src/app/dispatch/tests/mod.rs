@@ -8,6 +8,7 @@ mod modes;
 mod notes;
 mod permissions;
 mod prompt;
+mod resume_browser;
 mod rewind;
 mod router;
 mod session;
@@ -203,6 +204,7 @@ fn test_app() -> AppView {
             crate::views::picker::PickerMode::FullScreen,
         ),
         session_picker_source_filter: crate::views::session_picker::SourceFilter::default(),
+        resume_browser: None,
         session_picker_content_results: None,
         session_picker_content_loading: false,
         session_picker_deep_search_seq: 0,
@@ -732,6 +734,10 @@ fn make_picker_entry(id: &str, cwd: &str) -> crate::app::app_view::SessionPicker
         source: "local".into(),
         model_id: None,
         num_messages: 0,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
         last_active_at: None,
         branch: None,
         repo_name: "repo".into(),

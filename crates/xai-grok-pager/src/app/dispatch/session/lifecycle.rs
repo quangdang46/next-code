@@ -443,6 +443,7 @@ pub(in crate::app::dispatch) fn drain_startup_actions(app: &mut AppView) -> Vec<
         new_session,
         prompt,
         open_dashboard,
+        open_session_picker,
         pending_chat,
     } = app.deferred_startup.take();
     let mut effects = Vec::new();
@@ -542,7 +543,7 @@ pub(in crate::app::dispatch) fn drain_startup_actions(app: &mut AppView) -> Vec<
                     worktree_ref,
                     None,
                 ));
-            } else if new_session {
+            } else if new_session && !open_session_picker {
                 effects.extend(dispatch_new_session(app));
             } else {
                 app.deferred_startup.pending_chat = false;
@@ -551,6 +552,9 @@ pub(in crate::app::dispatch) fn drain_startup_actions(app: &mut AppView) -> Vec<
     }
     if let Some(prompt) = prompt {
         effects.extend(dispatch_initial_prompt(app, prompt));
+    }
+    if open_session_picker {
+        effects.extend(dispatch(Action::ShowResumeBrowser, app));
     }
     if open_dashboard {
         effects.extend(dispatch(Action::OpenDashboard, app));
@@ -1080,9 +1084,14 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                 if unchanged {
                     vec![]
                 } else {
+                    let provider_key = agent
+                        .info_float_provider
+                        .as_deref()
+                        .map(super::super::settings::setters::config_provider_key_from_float);
                     vec![Effect::PersistPreferredModel {
                         model_id: model_id.clone(),
                         reasoning_effort: resolved_effort,
+                        provider_key,
                     }]
                 }
             }
@@ -1095,6 +1104,9 @@ pub(in crate::app::dispatch) fn handle_switch_model_complete(
                 return open_agent_type_mismatch_question(app, model_id, effort, &display_name);
             }
             Err(SwitchModelError::Other(msg)) => {
+                if let Some(ref prev) = prev_model_id {
+                    agent.session.models.set_current(prev.clone(), None);
+                }
                 agent
                     .scrollback
                     .push_block(RenderBlock::system(format!("Couldn't switch model: {msg}")));

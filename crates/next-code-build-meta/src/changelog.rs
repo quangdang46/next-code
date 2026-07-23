@@ -124,6 +124,103 @@ pub fn take_unseen_changelog_entries() -> &'static Vec<String> {
     })
 }
 
+/// A group of changelog entries under a version heading.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChangelogGroup {
+    pub version: String,
+    pub released_at: Option<String>,
+    pub entries: Vec<String>,
+}
+
+fn format_changelog_timestamp(timestamp: i64) -> Option<String> {
+    chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
+        .map(|dt| dt.format("%Y-%m-%d %H:%M UTC").to_string())
+}
+
+/// Group embedded changelog entries by release tag (legacy TUI overlay shape).
+pub fn group_changelog_entries(
+    entries: &[ChangelogEntry<'_>],
+    current_version: &str,
+    current_git_date: &str,
+) -> Vec<ChangelogGroup> {
+    if entries.is_empty() {
+        return Vec::new();
+    }
+
+    let version_label = current_version
+        .split_whitespace()
+        .next()
+        .unwrap_or(current_version);
+    let unreleased_time =
+        chrono::DateTime::parse_from_str(current_git_date, "%Y-%m-%d %H:%M:%S %z")
+            .ok()
+            .map(|dt| {
+                dt.with_timezone(&chrono::Utc)
+                    .format("%Y-%m-%d %H:%M UTC")
+                    .to_string()
+            });
+
+    let mut groups: Vec<ChangelogGroup> = Vec::new();
+    let mut current_group = ChangelogGroup {
+        version: format!("{version_label} (unreleased)"),
+        released_at: unreleased_time,
+        entries: Vec::new(),
+    };
+
+    for entry in entries {
+        if !entry.tag.is_empty() {
+            if !current_group.entries.is_empty() {
+                groups.push(current_group);
+            }
+            current_group = ChangelogGroup {
+                version: entry.tag.to_string(),
+                released_at: entry.timestamp.and_then(format_changelog_timestamp),
+                entries: vec![entry.subject.to_string()],
+            };
+        } else {
+            current_group.entries.push(entry.subject.to_string());
+        }
+    }
+    if !current_group.entries.is_empty() {
+        groups.push(current_group);
+    }
+
+    groups
+}
+
+/// Render grouped changelog as markdown for Face DocViewer / `/changelog`.
+pub fn format_changelog_markdown(groups: &[ChangelogGroup]) -> String {
+    if groups.is_empty() {
+        return String::new();
+    }
+    let mut out = String::new();
+    for group in groups {
+        let heading = match &group.released_at {
+            Some(released_at) => format!("## {} · {}\n\n", group.version, released_at),
+            None => format!("## {}\n\n", group.version),
+        };
+        out.push_str(&heading);
+        for entry in &group.entries {
+            out.push_str("- ");
+            out.push_str(entry);
+            out.push('\n');
+        }
+        out.push('\n');
+    }
+    out
+}
+
+/// Full embedded build changelog as markdown (cached for the process).
+pub fn embedded_changelog_markdown() -> &'static str {
+    static MD: OnceLock<String> = OnceLock::new();
+    MD.get_or_init(|| {
+        let entries = parse_changelog(crate::CHANGELOG);
+        let groups = group_changelog_entries(&entries, crate::VERSION, crate::GIT_DATE);
+        format_changelog_markdown(&groups)
+    })
+    .as_str()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +274,26 @@ mod tests {
 
         let unseen2 = take_unseen_changelog_entries_at(raw, &state, 5);
         assert!(unseen2.is_empty());
+    }
+
+    #[test]
+    fn group_and_format_markdown() {
+        // Newest-first (git log order): unreleased commits, then a tagged cut.
+        let entries = parse_changelog(
+            "aaa\x1e\x1e\x1eadd two\x1fbbb\x1ev1.2.3\x1e1700000000\x1efix one",
+        );
+        let groups =
+            group_changelog_entries(&entries, "v9.9.9 (deadbee)", "2024-03-23 16:46:40 +0000");
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].version, "v9.9.9 (unreleased)");
+        assert_eq!(groups[0].entries, vec!["add two".to_string()]);
+        assert_eq!(groups[1].version, "v1.2.3");
+        assert_eq!(groups[1].entries, vec!["fix one".to_string()]);
+
+        let md = format_changelog_markdown(&groups);
+        assert!(md.contains("## v9.9.9 (unreleased)"));
+        assert!(md.contains("- add two"));
+        assert!(md.contains("## v1.2.3 · "));
+        assert!(md.contains("- fix one"));
     }
 }

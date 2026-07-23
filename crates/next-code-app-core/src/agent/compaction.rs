@@ -25,6 +25,7 @@ impl Agent {
         if event.is_some() {
             self.note_compaction_applied();
             self.persist_session_best_effort("compaction completion");
+            self.fire_compaction_hook(HookEvent::PostCompact, None);
         }
 
         event
@@ -63,6 +64,11 @@ impl Agent {
                     } else {
                         "no"
                     }
+                );
+
+                self.fire_compaction_hook(
+                    HookEvent::PreCompact,
+                    Some((stats.effective_tokens.saturating_mul(4)) as u64),
                 );
 
                 match manager.force_compact_with(&messages, provider) {
@@ -131,6 +137,8 @@ impl Agent {
         let context_limit = self.provider.context_window() as u64;
         let compaction = self.registry.compaction();
 
+        self.fire_compaction_hook(HookEvent::PreCompact, Some(context_limit.saturating_mul(4)));
+
         let (dropped, usage_pct) = match compaction.try_write() {
             Ok(mut manager) => {
                 let (dropped, usage_pct) = {
@@ -178,6 +186,8 @@ impl Agent {
             ))
             .force_attribution(),
         );
+
+        self.fire_compaction_hook(HookEvent::PostCompact, None);
 
         true
     }
@@ -340,5 +350,39 @@ impl Agent {
         if let Ok(mut manager) = compaction.try_write() {
             manager.push_embedding_snapshot(text);
         };
+    }
+
+    /// Fire PreCompact / PostCompact observer hooks (fire-and-forget).
+    fn fire_compaction_hook(&self, event: HookEvent, size_bytes: Option<u64>) {
+        let session_id = self.session.id.clone();
+        let cwd = self.session.working_dir.clone().unwrap_or_default();
+        let ctx = match event {
+            HookEvent::PreCompact => {
+                HookContext::for_pre_compact(session_id.clone(), cwd.clone(), size_bytes.unwrap_or(0))
+            }
+            HookEvent::PostCompact => HookContext::for_post_compact(session_id.clone(), cwd.clone()),
+            _ => return,
+        };
+        let handlers: Vec<next_code_hooks::HookHandlerConfig> = self
+            .hook_registry
+            .get_matching(&event, &ctx)
+            .into_iter()
+            .cloned()
+            .collect();
+        if handlers.is_empty() {
+            return;
+        }
+        let mut input = HookInputBuilder::new()
+            .session(&session_id, &cwd)
+            .event(event.display_name())
+            .build();
+        if let Some(bytes) = size_bytes {
+            input.current_size_bytes = Some(bytes);
+        }
+        let config = self.dispatch_config.clone();
+        tokio::spawn(async move {
+            let refs: Vec<&next_code_hooks::HookHandlerConfig> = handlers.iter().collect();
+            next_code_hooks::dispatch_hooks(&event, &input, &refs, &config).await;
+        });
     }
 }

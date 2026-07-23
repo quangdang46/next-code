@@ -247,6 +247,18 @@ impl SkillRegistry {
             registry.load_plugin_skills_from_root(&plugins_root);
         }
 
+        // Grok-style bundle plugins under ~/.next-code/plugins/*/skills
+        if let Ok(next_code_dir) = crate::storage::next_code_dir() {
+            let user_plugins = next_code_dir.join("plugins");
+            if user_plugins.is_dir() {
+                registry.load_plugin_skills_from_root(&user_plugins);
+            }
+            let installed = next_code_dir.join("installed-plugins");
+            if installed.is_dir() {
+                registry.load_plugin_skills_from_root(&installed);
+            }
+        }
+
         // Load from ~/.next-code/skills/ (next-code's own global skills)
         if let Ok(next_code_dir) = crate::storage::next_code_dir() {
             let next_code_skills = next_code_dir.join("skills");
@@ -591,6 +603,18 @@ impl SkillRegistry {
         // first, so explicit next-code/agents skills with the same name win below.
         if let Some(plugins_root) = Self::claude_plugins_root() {
             count += self.load_plugin_skills_from_root(&plugins_root);
+        }
+
+        // Grok-style bundle plugins under ~/.next-code/plugins and installed-plugins
+        if let Ok(next_code_dir) = crate::storage::next_code_dir() {
+            let user_plugins = next_code_dir.join("plugins");
+            if user_plugins.is_dir() {
+                count += self.load_plugin_skills_from_root(&user_plugins);
+            }
+            let installed = next_code_dir.join("installed-plugins");
+            if installed.is_dir() {
+                count += self.load_plugin_skills_from_root(&installed);
+            }
         }
 
         // Load from ~/.next-code/skills/ (next-code's own global skills)

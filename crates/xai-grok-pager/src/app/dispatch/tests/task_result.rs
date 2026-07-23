@@ -492,6 +492,119 @@ fn tab_wide_action_success_sets_tab_wide_result_notice() {
 }
 
 #[test]
+fn hooks_disable_success_refreshes_lists_without_plugins_reload_loop() {
+    use crate::views::extensions_modal::{ExtensionsModalState, ExtensionsTab, TabDataState};
+
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    {
+        let mut modal = ExtensionsModalState::new(ExtensionsTab::Hooks);
+        modal.pending_action = Some("Processing...".into());
+        modal.pending_entry_index = Some(0);
+        modal.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
+            hooks: vec![],
+            project_trusted: true,
+            load_errors: vec![],
+        });
+        app.agents.get_mut(&id).unwrap().extensions_modal = Some(modal);
+    }
+
+    let effects = dispatch(
+        Action::TaskComplete(TaskResult::HooksActionResult {
+            agent_id: id,
+            result: Ok(xai_hooks_plugins_types::ActionOutcome {
+                status: xai_hooks_plugins_types::OutcomeStatus::Success,
+                message: "Disabled user/AgentEnd[0]".into(),
+                // face_plugins now returns false for hooks disable — must refresh
+                // lists directly, never chain PluginsAction::Reload.
+                requires_reload: false,
+                requires_restart: false,
+            }),
+        }),
+        &mut app,
+    );
+
+    assert!(
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::FetchHooksList { .. })),
+        "expected FetchHooksList, got {effects:?}"
+    );
+    assert!(
+        !effects
+            .iter()
+            .any(|e| matches!(e, Effect::PluginsAction { .. })),
+        "hooks disable must not chain PluginsAction::Reload: {effects:?}"
+    );
+    assert!(
+        !effects.iter().any(|e| matches!(
+            e,
+            Effect::FetchPluginsList { .. }
+                | Effect::FetchMarketplaceList { .. }
+                | Effect::FetchMcpsList { .. }
+        )),
+        "hooks disable must refresh hooks only (not plugins/marketplace/mcp): {effects:?}"
+    );
+    assert_eq!(
+        effects.len(),
+        1,
+        "expected exactly one FetchHooksList effect, got {effects:?}"
+    );
+    let modal = app.agents[&id].extensions_modal.as_ref().unwrap();
+    let n = modal.result_notice.as_ref().expect("footer status");
+    assert_eq!(n.message, "Disabled user/AgentEnd[0]");
+}
+
+#[test]
+fn hooks_list_reload_preserves_expanded_groups() {
+    use crate::views::extensions_modal::{ExtensionsModalState, ExtensionsTab, TabDataState};
+
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    let hook = xai_hooks_plugins_types::HookInfo {
+        name: "user/PreToolUse[0]".into(),
+        event: xai_hooks_plugins_types::HookEvent::PreToolUse,
+        handler_type: xai_hooks_plugins_types::HookHandlerType::Command,
+        matcher: None,
+        command: Some("echo".into()),
+        url: None,
+        timeout_ms: 1000,
+        source_dir: "/tmp/global-hooks".into(),
+        disabled: false,
+    };
+    {
+        let mut modal = ExtensionsModalState::new(ExtensionsTab::Hooks);
+        // Simulate first load seeding collapse, then user expanding the folder.
+        modal.seed_hooks_groups_once(std::slice::from_ref(&hook));
+        modal.hooks_collapsed_groups.remove("/tmp/global-hooks");
+        modal.hooks_data = TabDataState::Loaded(xai_hooks_plugins_types::HooksListResponse {
+            hooks: vec![hook.clone()],
+            project_trusted: true,
+            load_errors: vec![],
+        });
+        app.agents.get_mut(&id).unwrap().extensions_modal = Some(modal);
+    }
+
+    dispatch(
+        Action::TaskComplete(TaskResult::HooksListLoaded {
+            agent_id: id,
+            result: Ok(xai_hooks_plugins_types::HooksListResponse {
+                hooks: vec![hook],
+                project_trusted: true,
+                load_errors: vec![],
+            }),
+        }),
+        &mut app,
+    );
+
+    let modal = app.agents[&id].extensions_modal.as_ref().unwrap();
+    assert!(
+        !modal.hooks_collapsed_groups.contains("/tmp/global-hooks"),
+        "Space toggle refresh must keep expanded folders open"
+    );
+}
+
+#[test]
 fn uninstall_result_notice_is_footer_only_not_row_anchored() {
     use crate::views::extensions_modal::{ExtensionsModalState, ExtensionsTab};
 
@@ -756,6 +869,7 @@ fn switch_model_complete_persists_resolved_effort_from_catalog_meta() {
         Effect::PersistPreferredModel {
             model_id: mid,
             reasoning_effort,
+            ..
         } => {
             assert_eq!(*mid, model_id);
             assert_eq!(
@@ -863,6 +977,48 @@ fn switch_model_complete_failure_pushes_error_and_clears_pending() {
     assert_eq!(app.agents[&id].session.models.current, old_current);
     // Error message pushed to scrollback.
     assert_eq!(app.agents[&id].scrollback.len(), initial_scrollback + 1);
+}
+
+#[test]
+fn switch_model_complete_other_error_reverts_optimistic_chrome() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    let prev_model = acp::ModelId::new(std::sync::Arc::from("kimi-k2.7-code"));
+    let requested = acp::ModelId::new(std::sync::Arc::from("deepseek-v4-flash"));
+
+    let agent = app.agents.get_mut(&id).unwrap();
+    agent.session.models.available.insert(
+        prev_model.clone(),
+        acp::ModelInfo::new(prev_model.clone(), "Kimi".to_string()),
+    );
+    agent.session.models.available.insert(
+        requested.clone(),
+        acp::ModelInfo::new(requested.clone(), "DeepSeek".to_string()),
+    );
+    // Optimistic Overview /model apply already flipped chrome to requested.
+    agent.session.models.set_current(requested.clone(), None);
+    agent.session.model_switch_pending = true;
+
+    dispatch(
+        Action::TaskComplete(TaskResult::SwitchModelComplete {
+            agent_id: id,
+            model_id: requested,
+            effort: None,
+            result: Err(SwitchModelError::Other(
+                "Couldn't switch model to deepseek-v4-flash (staying on kimi-k2.7-code): OPENROUTER_API_KEY not found"
+                    .into(),
+            )),
+            prev_model_id: Some(prev_model.clone()),
+        }),
+        &mut app,
+    );
+
+    assert!(!app.agents[&id].session.model_switch_pending);
+    assert_eq!(
+        app.agents[&id].session.models.current,
+        Some(prev_model),
+        "failed switch must roll chrome back to prev_model_id",
+    );
 }
 
 #[test]

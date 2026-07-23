@@ -23,6 +23,27 @@ pub(crate) fn legacy_tui_requested() -> bool {
     }
 }
 
+/// Argv0 stem for Face `PagerArgs` / resume hints (`nextcode` / `next-code`).
+fn face_cli_stem() -> String {
+    if let Ok(name) = std::env::var("XAI_PAGER_RESUME_CLI") {
+        let name = name.trim();
+        if !name.is_empty() {
+            return name.to_owned();
+        }
+    }
+    if let Some(stem) = std::env::args_os().next().and_then(|a| {
+        PathBuf::from(a)
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+    }) {
+        let key = stem.to_ascii_lowercase();
+        if key == "next-code" || key == "nextcode" || key.starts_with("next-code") {
+            return stem;
+        }
+    }
+    xai_grok_pager::product_welcome::EMBED_TITLE_NAME.to_string()
+}
+
 pub(crate) async fn run_face_pager(
     resume_session: Option<String>,
     _startup_hints: Option<setup_hints::StartupHints>,
@@ -33,8 +54,17 @@ pub(crate) async fn run_face_pager(
         remote_working_dir.as_deref(),
     );
 
+    let cli_stem = face_cli_stem();
+    // Brand Face resume hints / any argv0-sensitive paths as nextcode, not grok.
+    // SAFETY: pre-multithreaded Face launch; single-threaded set.
+    if std::env::var_os("XAI_PAGER_RESUME_CLI").is_none() {
+        unsafe {
+            std::env::set_var("XAI_PAGER_RESUME_CLI", &cli_stem);
+        }
+    }
+
     // Force direct in-process ACP spawn so our factory is used (not grok leader).
-    let mut pager_args = xai_grok_pager::app::PagerArgs::try_parse_from(["grok"])
+    let mut pager_args = xai_grok_pager::app::PagerArgs::try_parse_from([&cli_stem])
         .map_err(|e| anyhow::anyhow!("failed to build Face pager args: {e}"))?;
     pager_args.no_leader = true;
 
@@ -43,7 +73,13 @@ pub(crate) async fn run_face_pager(
     }
     match resume_session {
         Some(id) if id.is_empty() => {
-            pager_args.continue_last_session = true;
+            // Bare `next-code --resume`: open Face 2-panel resume browser
+            // (not continue-last, not expand-card `/resume` picker).
+            // Face reads this env once at startup → ShowResumeBrowser.
+            // SAFETY: pre-multithreaded Face launch; single-threaded set.
+            unsafe {
+                std::env::set_var("NEXT_CODE_OPEN_SESSION_PICKER_AT_STARTUP", "1");
+            }
         }
         Some(id) => {
             pager_args.resume_session = Some(id);

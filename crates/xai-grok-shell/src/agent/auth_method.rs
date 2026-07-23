@@ -22,13 +22,19 @@ pub enum AuthMethodKind {
     CachedToken,
     GrokCom,
     Oidc,
+    /// next-code embed multi-provider auth (`nextcode.*`).
+    NextCode,
     #[default]
     Unknown,
 }
 
 impl AuthMethodKind {
     pub fn from_id(id: &acp::AuthMethodId) -> Self {
-        match id.0.as_ref() {
+        let raw = id.0.as_ref();
+        if raw.starts_with("nextcode.") {
+            return Self::NextCode;
+        }
+        match raw {
             XAI_API_KEY_METHOD_ID => Self::XaiApiKey,
             CACHED_TOKEN_AUTH_METHOD_ID => Self::CachedToken,
             GROK_COM_METHOD_ID => Self::GrokCom,
@@ -46,7 +52,7 @@ impl AuthMethodKind {
     }
 
     pub fn needs_interactive_login(self) -> bool {
-        matches!(self, Self::GrokCom | Self::Oidc)
+        matches!(self, Self::GrokCom | Self::Oidc | Self::NextCode)
     }
 }
 

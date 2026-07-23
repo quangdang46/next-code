@@ -123,8 +123,6 @@ next-code-message-types = { path = "../next-code-message-types" }
 next-code-overnight-core = { path = "../next-code-overnight-core" }
 
 next-code-plan = { path = "../next-code-plan" }
-next-code-plugin-core = { path = "../next-code-plugin-core" }
-next-code-plugin-runtime = { path = "../next-code-plugin-runtime" }
 next-code-swarm-core = { path = "../next-code-swarm-core" }
 next-code-protocol = { path = "../next-code-protocol" }
 ffs-symbol = { workspace = true }
@@ -138,6 +136,8 @@ next-code-tool-core = { path = "../next-code-tool-core" }
 next-code-best-of-n = { path = "../next-code-best-of-n" }
 next-code-tool-types = { path = "../next-code-tool-types" }
 next-code-side-panel-types = { path = "../next-code-side-panel-types" }
+xai-grok-tools = { path = "../xai-grok-tools" }
+indexmap = { version = "2", features = ["serde"] }
 
 # Archive extraction (for auto-update)
 flate2 = "1"

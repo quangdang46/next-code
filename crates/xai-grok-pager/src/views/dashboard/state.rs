@@ -710,8 +710,12 @@ pub struct DashboardState {
     /// Mirror of `AppView::voice_interim` — the live partial transcript.
     pub voice_interim: Option<String>,
     /// Surface-local compose mode for dispatch + peek (not persisted; not
-    /// shared with agent sessions). `/multiline` or Ctrl+M.
+    /// shared with agent sessions). `/multiline` or Ctrl+M when the model
+    /// picker is not preferred.
     pub multiline_mode: bool,
+    /// Centered Select-model ArgPicker (`/model`, Ctrl+M). `Some` while open;
+    /// input is routed here before the dashboard's own handlers.
+    pub model_picker: Option<crate::views::modal::ActiveModal>,
 }
 
 /// Mode staged for the next agent the dashboard spawns. Mirrors the agent
@@ -1391,6 +1395,7 @@ impl DashboardState {
             voice_listening: false,
             voice_interim: None,
             multiline_mode: false,
+            model_picker: None,
             // Fresh dashboard with no rows seeded → the `[+ New
             // Agent]` button is the default cursor target. Open
             // sites that want a specific row seeded call
@@ -1438,6 +1443,11 @@ impl DashboardState {
     pub(crate) fn set_restricted_commands(&mut self, names: &[String]) {
         self.dispatch.set_restricted_commands(names);
         self.peek_reply.set_restricted_commands(names);
+    }
+
+    pub(crate) fn set_brand_hidden_commands(&mut self, names: &[String]) {
+        self.dispatch.set_brand_hidden_commands(names);
+        self.peek_reply.set_brand_hidden_commands(names);
     }
 
     /// Set the dispatch feedback slot to an error `msg`, prefixed with
@@ -2002,6 +2012,11 @@ impl DashboardState {
         // any `active_modal` before the per-pane handlers run.
         if self.shortcuts_modal.is_some() {
             return self.handle_shortcuts_modal_input(ev);
+        }
+
+        // Select-model ArgPicker owns input while open.
+        if self.model_picker.is_some() {
+            return self.handle_model_picker_input(ev);
         }
 
         // The location picker owns input while open — its query field,
@@ -2895,11 +2910,10 @@ impl DashboardState {
             }
         }
 
-        // Ctrl+M: ToggleMultiline is PromptFocused only, so hardcode here.
+        // Ctrl+M: open Select-model palette (same ActionId::ModelPicker as
+        // agent). Multiline stays on `/multiline` on the dashboard.
         if key!('m', CONTROL).matches(key) {
-            return Some(InputOutcome::Action(Action::SetMultilineMode(
-                !self.multiline_mode,
-            )));
+            return Some(InputOutcome::Action(Action::OpenModelPicker));
         }
 
         // Space is just text now (the peek is tied to selection, so there
@@ -3252,10 +3266,19 @@ impl DashboardState {
                 KeyCode::Enter if key.modifiers.is_empty() => {
                     // Accept the selected completion; if its insert text
                     // ends with a space the row "chains" (more input
-                    // expected, e.g. `/model `), otherwise close the
+                    // expected, e.g. `/theme `), otherwise close the
                     // dropdown and fall through to the Enter handler which
                     // dispatches the slash command.
                     let snap = self.dispatch.slash_snapshot();
+                    // Bare `/model ` → Select-model palette (not first inline row).
+                    if !snap.cursor_in_command
+                        && snap.args_query_is_empty
+                        && matches!(snap.query.as_str(), "model" | "m")
+                    {
+                        self.dispatch.slash_close();
+                        self.dispatch.set_text("");
+                        return InputOutcome::Action(Action::OpenModelPicker);
+                    }
                     let chains = snap
                         .selection()
                         .is_some_and(|row| row.insert_text.ends_with(' '));
@@ -3413,9 +3436,10 @@ impl DashboardState {
             return self.dispatch_send_action(true);
         }
 
-        // Ctrl+M: ToggleMultiline is PromptFocused only, so hardcode here.
+        // Ctrl+M: Select-model palette (ActionId::ModelPicker). Multiline:
+        // `/multiline` on the dashboard.
         if key!('m', CONTROL).matches(key) && !self.search_mode {
-            return InputOutcome::Action(Action::SetMultilineMode(!self.multiline_mode));
+            return InputOutcome::Action(Action::OpenModelPicker);
         }
 
         if matches!(key.code, KeyCode::Enter) {
@@ -4137,6 +4161,217 @@ impl DashboardState {
         }
     }
 
+    /// Route input to the open Select-model ArgPicker. Selection stages via
+    /// `DashboardDispatchSlash` (`/model <name>`), matching the agent path.
+    fn handle_model_picker_input(&mut self, ev: &Event) -> InputOutcome {
+        use crate::views::modal::ActiveModal;
+        use crate::views::modal_window as mw;
+        use crate::views::picker::{PickerConfig, PickerOutcome, handle_picker_input};
+
+        let Some(ActiveModal::ArgPicker {
+            command,
+            args_query,
+            items,
+            original_items,
+            state,
+            window,
+            ..
+        }) = self.model_picker.as_mut()
+        else {
+            self.model_picker = None;
+            return InputOutcome::Changed;
+        };
+
+        let command_clone = command.clone();
+        let in_effort = !args_query.is_empty();
+
+        match ev {
+            Event::Key(key) if key.kind != KeyEventKind::Release => {
+                let chrome_cfg = mw::ModalWindowConfig {
+                    title: "",
+                    tabs: None,
+                    shortcuts: &[],
+                    sizing: mw::ModalSizing::default(),
+                    fold_info: None,
+                };
+                match mw::handle_modal_key(window, key, &chrome_cfg) {
+                    mw::ModalWindowOutcome::CloseRequested => {
+                        if in_effort {
+                            // Step back to model list.
+                            let Some(cmd) =
+                                self.dispatch.slash_controller.registry().get(&command_clone)
+                            else {
+                                self.model_picker = None;
+                                return InputOutcome::Changed;
+                            };
+                            let ctx = self.dispatch.slash_controller.app_ctx(&self.models);
+                            if let Some(model_items) = cmd.suggest_args(&ctx, "")
+                                && !model_items.is_empty()
+                            {
+                                if let Some(ActiveModal::ArgPicker {
+                                    args_query,
+                                    items,
+                                    original_items,
+                                    state,
+                                    ..
+                                }) = self.model_picker.as_mut()
+                                {
+                                    args_query.clear();
+                                    *items = model_items.clone();
+                                    *original_items = model_items;
+                                    *state = crate::views::picker::PickerState::input_active();
+                                }
+                                return InputOutcome::Changed;
+                            }
+                        }
+                        self.model_picker = None;
+                        return InputOutcome::Changed;
+                    }
+                    mw::ModalWindowOutcome::Unhandled => {}
+                    _ => return InputOutcome::Changed,
+                }
+
+                let non_sel: Vec<bool> = items.iter().map(|i| i.is_section_header).collect();
+                let entry_count = items.len();
+                let config = PickerConfig {
+                    title: None,
+                    show_search_hint: false,
+                    expandable: false,
+                    esc_clears_query: false,
+                    shortcuts: Some(crate::views::picker::picker_shortcuts()),
+                    pending_hint: None,
+                    non_selectable: &non_sel,
+                    non_selectable_clickable: &[],
+                    shortcuts_area: None,
+                    tabs: None,
+                    active_tab: 0,
+                    filter_label: None,
+                    filter_key_hint: None,
+                    filter_active: false,
+                    action_keys: &[],
+                    disable_search: false,
+                    compact_bottom_bar: false,
+                    search_only_on_slash: false,
+                    vim_normal_first: crate::appearance::cache::load_vim_mode(),
+                };
+                let outcome = handle_picker_input(ev, state, entry_count, &config);
+                match outcome {
+                    PickerOutcome::Selected(idx) => {
+                        let Some(item) = items.get(idx).cloned() else {
+                            return InputOutcome::Changed;
+                        };
+                        if item.is_section_header {
+                            return InputOutcome::Changed;
+                        }
+                        if item.provider_connect {
+                            self.model_picker = None;
+                            return InputOutcome::Action(Action::NextCodeConnect {
+                                provider: item.insert_text,
+                            });
+                        }
+                        let chains_to_effort = item.insert_text.ends_with(char::is_whitespace);
+                        if chains_to_effort {
+                            let next_query = item.insert_text.clone();
+                            if let Some(cmd) =
+                                self.dispatch.slash_controller.registry().get(&command_clone)
+                            {
+                                let ctx = self.dispatch.slash_controller.app_ctx(&self.models);
+                                if let Some(effort_items) = cmd.suggest_args(&ctx, &next_query)
+                                    && !effort_items.is_empty()
+                                    && effort_items.iter().filter(|i| !i.is_section_header).all(
+                                        |i| !i.insert_text.ends_with(char::is_whitespace),
+                                    )
+                                {
+                                    if let Some(ActiveModal::ArgPicker {
+                                        args_query,
+                                        items,
+                                        original_items,
+                                        state,
+                                        ..
+                                    }) = self.model_picker.as_mut()
+                                    {
+                                        *args_query = next_query;
+                                        *items = effort_items.clone();
+                                        *original_items = effort_items;
+                                        *state =
+                                            crate::views::picker::PickerState::input_active();
+                                    }
+                                    return InputOutcome::Changed;
+                                }
+                            }
+                        }
+                        let full = format!(
+                            "/{} {}",
+                            command_clone,
+                            item.insert_text.trim_end()
+                        );
+                        self.model_picker = None;
+                        InputOutcome::Action(Action::DashboardDispatchSlash { text: full })
+                    }
+                    PickerOutcome::Closed => {
+                        self.model_picker = None;
+                        InputOutcome::Changed
+                    }
+                    PickerOutcome::QueryChanged => {
+                        let query = state.query().to_string();
+                        let filtered: Vec<_> = original_items
+                            .iter()
+                            .filter(|item| {
+                                if item.is_section_header {
+                                    return true;
+                                }
+                                let q = query.to_ascii_lowercase();
+                                item.match_text.to_ascii_lowercase().contains(&q)
+                                    || item.display.to_ascii_lowercase().contains(&q)
+                            })
+                            .cloned()
+                            .collect();
+                        *items = filtered;
+                        let first_sel = items
+                            .iter()
+                            .position(|i| !i.is_section_header)
+                            .unwrap_or(0);
+                        state.selected = state
+                            .selected
+                            .min(items.len().saturating_sub(1))
+                            .max(if items.is_empty() {
+                                0
+                            } else {
+                                first_sel.min(items.len().saturating_sub(1))
+                            });
+                        if items
+                            .get(state.selected)
+                            .is_some_and(|it| it.is_section_header)
+                        {
+                            state.selected = first_sel;
+                        }
+                        InputOutcome::Changed
+                    }
+                    PickerOutcome::Changed => InputOutcome::Changed,
+                    PickerOutcome::Unchanged => InputOutcome::Unchanged,
+                    _ => InputOutcome::Changed,
+                }
+            }
+            Event::Mouse(mouse) => {
+                match mw::handle_modal_mouse(
+                    window,
+                    mouse.kind,
+                    mouse.column,
+                    mouse.row,
+                ) {
+                    mw::ModalWindowOutcome::CloseRequested => {
+                        self.model_picker = None;
+                        return InputOutcome::Changed;
+                    }
+                    mw::ModalWindowOutcome::Handled => return InputOutcome::Changed,
+                    _ => {}
+                }
+                InputOutcome::Unchanged
+            }
+            _ => InputOutcome::Unchanged,
+        }
+    }
+
     /// Route a top-level event to the open shortcuts cheatsheet
     /// modal. Caller has already confirmed `shortcuts_modal.is_some()`
     /// — that gate sits in [`Self::handle_input`] so the no-modal
@@ -4454,7 +4689,6 @@ fn dashboard_action_for_id(
         | ActionId::ExitSession
         | ActionId::NewSessionInWorktree
         | ActionId::CommandPalette
-        | ActionId::ModelPicker
         | ActionId::ShortcutsHelp
         | ActionId::OpenSettings
         | ActionId::OpenDashboard
@@ -4467,6 +4701,7 @@ fn dashboard_action_for_id(
         | ActionId::DashboardOverlayPrev
         | ActionId::DashboardOverlayNext
         | ActionId::DashboardOverlayStop => None,
+        ActionId::ModelPicker => Some(InputOutcome::Action(Action::OpenModelPicker)),
     }
 }
 
@@ -7460,29 +7695,19 @@ mod tests {
         }
     }
 
-    /// Ctrl+M toggles multiline via SetMultilineMode (same chord as agent).
+    /// Ctrl+M opens the Select-model palette (same as agent ModelPicker).
     #[test]
-    fn ctrl_m_toggles_multiline_mode() {
+    fn ctrl_m_opens_model_picker() {
         use crate::app::actions::Action;
         let reg = crate::actions::ActionRegistry::defaults();
         let mut state = DashboardState::new();
-        assert!(!state.multiline_mode);
         let outcome = state.handle_key(
             &KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL),
             &reg,
         );
         match outcome {
-            InputOutcome::Action(Action::SetMultilineMode(true)) => {}
-            other => panic!("Ctrl+M must emit SetMultilineMode(true), got {other:?}"),
-        }
-        state.multiline_mode = true;
-        let outcome = state.handle_key(
-            &KeyEvent::new(KeyCode::Char('m'), KeyModifiers::CONTROL),
-            &reg,
-        );
-        match outcome {
-            InputOutcome::Action(Action::SetMultilineMode(false)) => {}
-            other => panic!("Ctrl+M when on must emit SetMultilineMode(false), got {other:?}"),
+            InputOutcome::Action(Action::OpenModelPicker) => {}
+            other => panic!("Ctrl+M must emit OpenModelPicker, got {other:?}"),
         }
     }
 
@@ -9012,7 +9237,9 @@ mod tests {
             has_scrollbar: false,
         };
 
-        // Seed a model catalog and open `/model ` so arg suggestions exist.
+        // Seed a model catalog and open `/model B` so filtered arg
+        // suggestions exist (empty `/model ` suppresses the inline list —
+        // that path opens the centered Select-model palette on Enter).
         let model_id = acp::ModelId::new("beta-model");
         let mut available = IndexMap::new();
         available.insert(
@@ -9025,15 +9252,15 @@ mod tests {
         );
         state.models.update_catalog(available, Some(model_id));
         // Mirror how the real dashboard types into the dispatch box:
-        // caret at end so `/model ` is in the args phase.
-        state.dispatch.set_text("/model ");
+        // caret at end so `/model B` is in the args phase with a filter.
+        state.dispatch.set_text("/model B");
         let end = state.dispatch.text().len();
         state.dispatch.textarea.set_cursor(end);
         state.dispatch.refresh_slash(&state.models);
         let snap = state.dispatch.slash_snapshot();
         assert!(
             !snap.matches.is_empty(),
-            "expected model arg suggestions for /model "
+            "expected model arg suggestions for /model B"
         );
 
         let click = MouseEvent {
@@ -9092,7 +9319,7 @@ mod tests {
             acp::ModelInfo::new(model_id.clone(), "Hover Model"),
         );
         state.models.update_catalog(available, Some(model_id));
-        state.dispatch.set_text("/model ");
+        state.dispatch.set_text("/model H");
         let end = state.dispatch.text().len();
         state.dispatch.textarea.set_cursor(end);
         state.dispatch.refresh_slash(&state.models);

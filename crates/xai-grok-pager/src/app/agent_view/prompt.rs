@@ -203,6 +203,17 @@ impl AgentView {
                 // stay open (row's insert_text ends with space => chains).
                 KeyCode::Enter if key.modifiers.is_empty() => {
                     let snap = self.prompt.slash_snapshot();
+                    // Bare `/model ` (empty args) opens the Select-model
+                    // palette — do not accept the first inline arg row.
+                    if !snap.cursor_in_command
+                        && snap.args_query_is_empty
+                        && matches!(snap.query.as_str(), "model" | "m")
+                    {
+                        self.prompt.slash_cancel_preview();
+                        self.prompt.slash_close();
+                        self.prompt.set_text("");
+                        return InputOutcome::Action(Action::OpenModelPicker);
+                    }
                     // Trailing space = "more input expected" (command takes
                     // args, or arg row chains into a sub-menu).
                     let chains = snap
@@ -763,8 +774,19 @@ impl AgentView {
         // handling the Esc, a following `d` is the user's text, not a dump.
         self.esc_pressed_at = None;
 
-        // Mid-turn running: swallow Esc (do not cancel or arm clear/rewind).
+        // Mid-turn running: Esc cancels provider-failover countdown (Face
+        // status shows `Provider auto-switch → …`); otherwise swallow Esc
+        // (Ctrl+C is the normal CancelTurn gesture).
         if self.session.state.is_turn_running() {
+            let failover_countdown = matches!(
+                self.session.turn_activity(),
+                Some(crate::acp::tracker::TurnActivity::Retrying { reason, .. })
+                    if reason.starts_with("Provider auto-switch →")
+            );
+            if failover_countdown {
+                self.cancel_trigger_hint = Some(crate::app::actions::CancelTrigger::Esc);
+                return Some(InputOutcome::Action(Action::CancelTurn));
+            }
             return Some(InputOutcome::Changed);
         }
         // Stuck cancel: re-send CancelTurn (Ctrl+C escalates to Quit instead).

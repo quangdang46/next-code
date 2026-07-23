@@ -44,26 +44,30 @@ impl SlashCommand for DocsCommand {
     }
 
     fn suggest_args(&self, _ctx: &AppCtx, _args_query: &str) -> Option<Vec<ArgItem>> {
-        let mut items = vec![
-            ArgItem {
-                display: "how-to".into(),
-                match_text: "how-to".into(),
-                insert_text: "how-to".into(),
-                description: "Browse in-TUI How-to Guides".into(),
-            },
-            ArgItem {
+        let mut items = vec![ArgItem {
+            display: "how-to".into(),
+            match_text: "how-to".into(),
+            insert_text: "how-to".into(),
+            description: "Browse in-TUI How-to Guides".into(),
+                ..Default::default()
+            }];
+        // nextcode embed: hide docs.x.ai web link.
+        if !crate::product_welcome::is_nextcode_embed() {
+            items.push(ArgItem {
                 display: "web".into(),
                 match_text: "web".into(),
                 insert_text: "web".into(),
                 description: "Open docs.x.ai/build in the browser".into(),
-            },
-        ];
+                ..Default::default()
+            });
+        }
         items.extend(all_titles().map(|title| ArgItem {
             display: title.into(),
             match_text: title.into(),
             insert_text: title.into(),
             description: format!("Open \"{title}\""),
-        }));
+                ..Default::default()
+            }));
         Some(items)
     }
 
@@ -73,6 +77,11 @@ impl SlashCommand for DocsCommand {
             return CommandResult::Action(Action::OpenHowtoGuides);
         }
         if is_web_arg(trimmed) {
+            if crate::product_welcome::is_nextcode_embed() {
+                return CommandResult::Error(
+                    "Online docs.x.ai is not linked from next-code. Use /docs or /docs how-to for in-app guides.".to_string(),
+                );
+            }
             return CommandResult::Action(Action::OpenUrl(BUILD_DOCS_URL.into()));
         }
         match find_doc(trimmed) {

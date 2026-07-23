@@ -20,9 +20,11 @@ The modal has three tabs: **Hooks**, **Plugins**, and **Marketplace**. Switch be
 
 Hooks are shell commands (or HTTP calls) that run automatically on events like `session_start`, `post_tool_use`, `notification`, etc. See [Creating Custom Hooks](custom-hooks.md) for how to write your own.
 
+**next-code embed:** Face `/hooks` reads **`~/.next-code/hooks.toml`** (and project / `$NEXT_CODE_HOOKS_CONFIG` layers) via ACP — not `~/.grok/hooks`. See repo `docs/HOOKS.md`.
+
 Hooks are grouped by source:
-- **Global hooks** — from `~/.grok/hooks/`
-- **Project hooks** — from `.grok/hooks/` in your repo
+- **Global hooks** — from `~/.next-code/hooks.toml` (embed) or `~/.grok/hooks/` (stock Grok)
+- **Project hooks** — from `<cwd>/.next-code/hooks.toml` (embed) or `.grok/hooks/` in your repo
 - **Plugin hooks** — bundled with installed plugins
 - **Custom hooks** — added manually via a path
 

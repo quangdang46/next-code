@@ -572,6 +572,7 @@ impl AuthStatus {
             crate::provider_catalog::LoginProviderTarget::OpenRouter => {
                 let (source, detail) = summarize_sources(vec![
                     env_source("OPENROUTER_API_KEY"),
+                    unified_auth_source("OPENROUTER_API_KEY"),
                     config_source(
                         "OPENROUTER_API_KEY",
                         "openrouter.env",
@@ -590,6 +591,7 @@ impl AuthStatus {
             crate::provider_catalog::LoginProviderTarget::OpenAiApiKey => {
                 let (source, detail) = summarize_sources(vec![
                     env_source("OPENAI_API_KEY"),
+                    unified_auth_source("OPENAI_API_KEY"),
                     config_source("OPENAI_API_KEY", "openai.env", "~/.config/next-code/openai.env"),
                     external_api_key_source("OPENAI_API_KEY"),
                 ]);
@@ -602,13 +604,14 @@ impl AuthStatus {
                 )
             }
             crate::provider_catalog::LoginProviderTarget::ClaudeApiKey => {
-                // The Anthropic API key is most commonly stored in the app
-                // config file (`~/.config/next-code/anthropic.env`), *not* an env
-                // var and *not* `~/.next-code/auth.json` (which holds the separate
-                // OAuth accounts). List every place it can live so the real
-                // source is always discoverable instead of looking "absent".
+                // The Anthropic API key is most commonly stored in the unified
+                // `~/.next-code/auth.json` map (`anthropic: {type:api,key}`), then
+                // legacy `~/.config/next-code/anthropic.env`, *not* an env var and
+                // *not* the OAuth `anthropic_accounts` array. List every place it
+                // can live so the real source is always discoverable.
                 let (source, detail) = summarize_sources(vec![
                     env_source("ANTHROPIC_API_KEY"),
+                    unified_auth_source("ANTHROPIC_API_KEY"),
                     config_source(
                         "ANTHROPIC_API_KEY",
                         "anthropic.env",
@@ -675,6 +678,7 @@ impl AuthStatus {
                 {
                     summarize_sources(vec![
                         env_source(&key_env),
+                        unified_auth_source(&key_env),
                         config_source(&key_env, &env_file, format!("~/.config/next-code/{}", env_file)),
                         external_api_key_source(&key_env),
                     ])
@@ -683,6 +687,7 @@ impl AuthStatus {
                         crate::provider_catalog::resolve_openai_compatible_profile(profile);
                     summarize_sources(vec![
                         env_source(&resolved.api_key_env),
+                        unified_auth_source(&resolved.api_key_env),
                         config_source(
                             &resolved.api_key_env,
                             &resolved.env_file,
@@ -729,6 +734,7 @@ impl AuthStatus {
         if let Ok(mut cache) = AUTH_STATUS_FAST_CACHE.write() {
             *cache = None;
         }
+        crate::provider::openrouter::invalidate_autodetect_cache();
     }
 
     /// Invalidate all auth-derived state after credentials actually change.
@@ -1144,6 +1150,15 @@ fn env_source(env_key: &str) -> Option<(AuthCredentialSource, String)> {
     })
 }
 
+fn unified_auth_source(env_key: &str) -> Option<(AuthCredentialSource, String)> {
+    crate::provider_catalog::unified_auth_has_api_key(env_key).then(|| {
+        let detail = crate::provider_catalog::auth_json_path()
+            .map(|p| format!("{} ({env_key})", p.display()))
+            .unwrap_or_else(|_| format!("~/.next-code/auth.json ({env_key})"));
+        (AuthCredentialSource::NextCodeManagedFile, detail)
+    })
+}
+
 fn config_source(
     env_key: &str,
     file_name: &str,
@@ -1326,6 +1341,9 @@ fn cursor_source() -> Option<(AuthCredentialSource, String)> {
             AuthCredentialSource::TrustedExternalAppState,
             format!("trusted Cursor app state ({})", path.display()),
         ));
+    }
+    if let Some(source) = unified_auth_source("CURSOR_API_KEY") {
+        return Some(source);
     }
     if config_source("CURSOR_API_KEY", "cursor.env", "~/.config/next-code/cursor.env").is_some() {
         return config_source("CURSOR_API_KEY", "cursor.env", "~/.config/next-code/cursor.env");

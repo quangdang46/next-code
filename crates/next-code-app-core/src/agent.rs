@@ -255,6 +255,9 @@ pub struct Agent {
     rewind_undo_snapshot: Option<RewindUndoSnapshot>,
     /// Channel for tools to request stdin input from the user
     stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tool::StdinInputRequest>>,
+    /// Channel for AskUserQuestion tool → Face ACP reverse request
+    ask_user_question_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<crate::tool::AskUserQuestionInputRequest>>,
     /// Canonical reducer-backed view of runtime provider/model selection.
     provider_runtime_state: ProviderRuntimeState,
     /// Hook registry for dispatching lifecycle hooks.
@@ -372,6 +375,7 @@ impl Agent {
             inline_output_tap: false,
             rewind_undo_snapshot: None,
             stdin_request_tx: None,
+            ask_user_question_tx: None,
             provider_runtime_state: ProviderRuntimeState::observed(initial_provider_model),
             hook_registry: HookRegistry::default(),
             dispatch_config: DispatchConfig::default(),
@@ -504,6 +508,31 @@ impl Agent {
                 }
             });
         }
+        // AgentStart — primary agent create (alongside SessionStart)
+        {
+            let registry = agent.hook_registry.clone();
+            let config = agent.dispatch_config.clone();
+            let session_id = agent.session.id.clone();
+            let cwd = agent.session.working_dir.clone().unwrap_or_default();
+            let hook_input = HookInputBuilder::new()
+                .session(&session_id, &cwd)
+                .event("AgentStart")
+                .agent(&session_id, "primary")
+                .build();
+            let ctx = HookContext::for_agent_start(
+                session_id.clone(),
+                cwd,
+                Some(session_id),
+                Some("primary".to_string()),
+            );
+            let event = HookEvent::AgentStart;
+            tokio::spawn(async move {
+                let handlers = registry.get_matching(&event, &ctx);
+                if !handlers.is_empty() {
+                    next_code_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
+                }
+            });
+        }
 
         // Wire DCP plugin into registry so DCP tools can access it
         #[cfg(feature = "dcp")]
@@ -591,6 +620,31 @@ impl Agent {
                 .build();
             let ctx = HookContext::for_session_start(session_id, cwd);
             let event = HookEvent::SessionStart;
+            tokio::spawn(async move {
+                let handlers = registry.get_matching(&event, &ctx);
+                if !handlers.is_empty() {
+                    next_code_hooks::dispatch_hooks(&event, &hook_input, &handlers, &config).await;
+                }
+            });
+        }
+        // AgentStart — session attach / restore
+        {
+            let registry = agent.hook_registry.clone();
+            let config = agent.dispatch_config.clone();
+            let session_id = agent.session.id.clone();
+            let cwd = agent.session.working_dir.clone().unwrap_or_default();
+            let hook_input = HookInputBuilder::new()
+                .session(&session_id, &cwd)
+                .event("AgentStart")
+                .agent(&session_id, "primary")
+                .build();
+            let ctx = HookContext::for_agent_start(
+                session_id.clone(),
+                cwd,
+                Some(session_id),
+                Some("primary".to_string()),
+            );
+            let event = HookEvent::AgentStart;
             tokio::spawn(async move {
                 let handlers = registry.get_matching(&event, &ctx);
                 if !handlers.is_empty() {

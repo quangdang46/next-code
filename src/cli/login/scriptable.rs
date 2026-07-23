@@ -54,6 +54,34 @@ pub(super) async fn start_scriptable_login(
     account_label: Option<&str>,
     options: &LoginOptions,
 ) -> Result<LoginFlowOutcome> {
+    let start = prepare_scriptable_login(provider, account_label, options).await?;
+    emit_scriptable_auth_prompt(
+        provider.id,
+        &start.auth_url,
+        start.input_kind,
+        &start.pending_path,
+        start.user_code.as_deref(),
+        start.expires_at_ms,
+        options.json,
+    )?;
+    Ok(LoginFlowOutcome::Deferred)
+}
+
+pub(crate) struct PreparedScriptableLogin {
+    pub auth_url: String,
+    pub input_kind: &'static str,
+    pub pending_path: PathBuf,
+    pub user_code: Option<String>,
+    pub expires_at_ms: i64,
+    pub complete_only: bool,
+}
+
+/// Shared OAuth/device start used by CLI `--print-auth-url` and Face embed login.
+pub(crate) async fn prepare_scriptable_login(
+    provider: LoginProviderDescriptor,
+    account_label: Option<&str>,
+    options: &LoginOptions,
+) -> Result<PreparedScriptableLogin> {
     let (pending, auth_url, input_kind, user_code, expires_at_ms) = match provider.target {
         LoginProviderTarget::Claude => {
             let label = auth::claude::login_target_label(account_label)?;
@@ -210,16 +238,14 @@ pub(super) async fn start_scriptable_login(
         login: pending,
     };
     crate::storage::write_json_secret(&pending_path, &record)?;
-    emit_scriptable_auth_prompt(
-        provider.id,
-        &auth_url,
+    Ok(PreparedScriptableLogin {
+        auth_url,
         input_kind,
-        &pending_path,
-        user_code.as_deref(),
+        pending_path,
+        user_code,
         expires_at_ms,
-        options.json,
-    )?;
-    Ok(LoginFlowOutcome::Deferred)
+        complete_only: input_kind == "complete",
+    })
 }
 
 pub(super) async fn complete_scriptable_login(

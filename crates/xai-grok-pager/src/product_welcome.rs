@@ -64,6 +64,14 @@ pub enum ChromeLine {
 /// Launch-time status fields for Face welcome (legacy splash parity).
 #[derive(Debug, Clone, Default)]
 pub struct ProductWelcomeStatus {
+    /// Short product token for WT/OSC title (e.g. `nextcode`). Stock Face omits.
+    pub title_name: Option<String>,
+    /// Hero/badge product name (e.g. `nextcode`). Stock Face omits → Grok Build.
+    pub product_name: Option<String>,
+    /// Product version for badge (next-code VERSION). Stock Face omits → Face crate.
+    pub product_version: Option<String>,
+    /// Hero subtitle override. Stock Face omits → Grok Build thanks line.
+    pub hero_subtitle: Option<String>,
     /// e.g. `api-key:openrouter · Model · /model to switch` pieces for paint.
     pub model_prefix: Option<String>,
     pub model_name: Option<String>,
@@ -75,6 +83,9 @@ pub struct ProductWelcomeStatus {
     pub built_line: Option<String>,
     /// Unseen next-code changelog subjects (Updates box + hero merge).
     pub update_bullets: Vec<String>,
+    /// Full next-code embedded changelog markdown for `/changelog` DocViewer.
+    /// Empty when the build has no changelog payload.
+    pub changelog_markdown: Option<String>,
     /// e.g. `⟨client·perf:reduced⟩`
     pub badge_line: Option<String>,
     /// e.g. `server: Hut 🛖 · v0.14.6`
@@ -105,6 +116,100 @@ pub fn product_welcome_status() -> Option<&'static ProductWelcomeStatus> {
     STATUS.get()
 }
 
+/// True when Face is running under the next-code embed (welcome chrome installed).
+#[must_use]
+pub fn is_nextcode_embed() -> bool {
+    product_welcome_status().is_some()
+}
+
+/// Stock Grok WT/OSC title token.
+pub const STOCK_TITLE_NAME: &str = "grok";
+/// Default nextcode embed WT/OSC title token.
+pub const EMBED_TITLE_NAME: &str = "nextcode";
+/// Default nextcode embed hero/badge product name.
+pub const EMBED_PRODUCT_NAME: &str = "nextcode";
+/// Stock Grok hero thanks line.
+pub const STOCK_HERO_SUBTITLE: &str =
+    "Thanks for trying Grok Build, give feedback with /feedback!";
+/// Default nextcode embed hero thanks line.
+pub const EMBED_HERO_SUBTITLE: &str =
+    "Thanks for trying nextcode, give feedback with /feedback!";
+
+/// WT/OSC / `TitleItem::Grok` product token: `nextcode` under embed, else `grok`.
+#[must_use]
+pub fn brand_title_token() -> &'static str {
+    if !is_nextcode_embed() {
+        return STOCK_TITLE_NAME;
+    }
+    product_welcome_status()
+        .and_then(|s| s.title_name.as_deref())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(EMBED_TITLE_NAME)
+}
+
+/// Hero/badge product display name under embed (`None` → stock Grok Build path).
+#[must_use]
+pub fn brand_product_name() -> Option<&'static str> {
+    if !is_nextcode_embed() {
+        return None;
+    }
+    Some(
+        product_welcome_status()
+            .and_then(|s| s.product_name.as_deref())
+            .filter(|s| !s.is_empty())
+            .unwrap_or(EMBED_PRODUCT_NAME),
+    )
+}
+
+/// Badge version string under embed (`None` → Face crate version).
+#[must_use]
+pub fn brand_product_version() -> Option<&'static str> {
+    product_welcome_status()
+        .and_then(|s| s.product_version.as_deref())
+        .filter(|s| !s.is_empty())
+}
+
+/// Hero subtitle: embed override when installed, else stock Grok thanks line.
+#[must_use]
+pub fn brand_hero_subtitle() -> &'static str {
+    if !is_nextcode_embed() {
+        return STOCK_HERO_SUBTITLE;
+    }
+    product_welcome_status()
+        .and_then(|s| s.hero_subtitle.as_deref())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(EMBED_HERO_SUBTITLE)
+}
+
+/// xAI-only / brand-unsafe slash commands to hide in the nextcode embed.
+///
+/// Applied via [`crate::slash::registry::CommandRegistry::set_brand_hidden_commands`]
+/// (menu-hidden + unavailable — **not** tier `restricted`, so no SuperGrok upsell).
+/// Canonical names, no leading `/`.
+pub const EMBED_BRAND_RESTRICTED_COMMANDS: &[&str] = &[
+    "gboom",
+    "imagine",
+    "imagine-video",
+    "announcements",
+    "marketplace",
+    // `/plugins` + `/hooks` are wired to next-code ACP under `~/.next-code`
+    // (Grok-style bundle plugins). Marketplace stays brand-hidden.
+    "privacy",
+    "share",
+    // `/usage` → no separate billing page for next-code. Provider usage
+    // shows directly in the chat (x.ai/usage handler → next-code providers).
+    "usage",
+];
+
+/// True when `name` (canonical or alias token, no `/`) is on the embed brand-hide list.
+#[must_use]
+pub fn is_embed_brand_hidden_command(name: &str) -> bool {
+    let key = name.trim().trim_start_matches('/').to_lowercase();
+    EMBED_BRAND_RESTRICTED_COMMANDS
+        .iter()
+        .any(|n| *n == key)
+}
+
 /// Prefer product unseen bullets when present; otherwise keep Face/CDN bullets.
 pub fn merge_changelog_bullets(face_bullets: Vec<String>, limit: usize) -> Vec<String> {
     if let Some(status) = product_welcome_status()
@@ -118,6 +223,44 @@ pub fn merge_changelog_bullets(face_bullets: Vec<String>, limit: usize) -> Vec<S
             .collect();
     }
     face_bullets.into_iter().take(limit).collect()
+}
+
+#[cfg(test)]
+mod embed_brand_tests {
+    use super::*;
+
+    #[test]
+    fn embed_brand_list_covers_pr10_matrix() {
+        for name in [
+            "gboom",
+            "imagine",
+            "imagine-video",
+            "announcements",
+            "marketplace",
+            "privacy",
+            "share",
+        ] {
+            assert!(
+                EMBED_BRAND_RESTRICTED_COMMANDS.contains(&name),
+                "missing {name}"
+            );
+            assert!(is_embed_brand_hidden_command(name));
+            assert!(is_embed_brand_hidden_command(&format!("/{name}")));
+        }
+        assert!(!is_embed_brand_hidden_command("plugins"));
+        assert!(!is_embed_brand_hidden_command("hooks"));
+        assert!(is_embed_brand_hidden_command("usage"));
+        assert!(!is_embed_brand_hidden_command("help"));
+    }
+
+    #[test]
+    fn stock_brand_tokens_without_embed() {
+        // Unit tests do not install product welcome → stock Grok path.
+        assert!(!is_nextcode_embed());
+        assert_eq!(brand_title_token(), STOCK_TITLE_NAME);
+        assert_eq!(brand_product_name(), None);
+        assert_eq!(brand_hero_subtitle(), STOCK_HERO_SUBTITLE);
+    }
 }
 
 /// Hero/changelog section title: legacy uses **Updates**, Face stock uses Changelog.

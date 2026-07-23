@@ -1026,6 +1026,30 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::LoadResumePreview { session_id, seq } => {
+            tasks.spawn(async move {
+                let result_session_id = session_id.clone();
+                let lines = tokio::task::spawn_blocking(move || {
+                    xai_grok_shell::session::persistence::load_transcript_preview(
+                        &session_id,
+                        crate::views::resume_browser::preview_max_messages(),
+                    )
+                    .into_iter()
+                    .map(|line| crate::views::resume_browser::ResumePreviewLine {
+                        role: line.role,
+                        text: line.text,
+                    })
+                    .collect::<Vec<_>>()
+                })
+                .await
+                .unwrap_or_default();
+                TaskResult::ResumePreviewLoaded {
+                    session_id: result_session_id,
+                    seq,
+                    lines,
+                }
+            });
+        }
         Effect::SendPrompt {
             agent_id,
             session_id,
@@ -1759,25 +1783,46 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchChangelog => {
-            tasks
-                .spawn(async move {
-                    let changelog = tokio::task::spawn_blocking(|| {
-                            xai_grok_shell::util::changelog::ChangelogManager::new()
-                                .fetch()
-                        })
-                        .await
-                        .unwrap_or_else(|e| {
-                            tracing::warn!(error = % e, "changelog fetch task failed");
-                            xai_grok_shell::util::changelog::Changelog {
-                                markdown: None,
-                                entries: None,
-                            }
-                        });
-                    TaskResult::ChangelogFetched {
-                        markdown: changelog.markdown,
-                        entries: changelog.entries.unwrap_or_default(),
-                    }
+            // next-code embed: seed from build-meta via product welcome (no grok CDN).
+            if crate::product_welcome::is_nextcode_embed() {
+                let markdown = crate::product_welcome::product_welcome_status()
+                    .and_then(|s| s.changelog_markdown.clone());
+                let entries = crate::product_welcome::product_welcome_status()
+                    .map(|s| {
+                        if s.update_bullets.is_empty() {
+                            Vec::new()
+                        } else {
+                            vec![xai_grok_shell::util::changelog::ChangelogEntry {
+                                version: String::new(),
+                                bullets: s.update_bullets.clone(),
+                            }]
+                        }
+                    })
+                    .unwrap_or_default();
+                tasks.spawn(async move {
+                    TaskResult::ChangelogFetched { markdown, entries }
                 });
+            } else {
+                tasks
+                    .spawn(async move {
+                        let changelog = tokio::task::spawn_blocking(|| {
+                                xai_grok_shell::util::changelog::ChangelogManager::new()
+                                    .fetch()
+                            })
+                            .await
+                            .unwrap_or_else(|e| {
+                                tracing::warn!(error = % e, "changelog fetch task failed");
+                                xai_grok_shell::util::changelog::Changelog {
+                                    markdown: None,
+                                    entries: None,
+                                }
+                            });
+                        TaskResult::ChangelogFetched {
+                            markdown: changelog.markdown,
+                            entries: changelog.entries.unwrap_or_default(),
+                        }
+                    });
+            }
         }
         Effect::PersistAnnouncementsHidden { hidden_ids } => {
             tasks
@@ -1834,12 +1879,17 @@ pub(crate) fn execute(
             );
             persist_hint(tasks, config_key, mode.as_config_str(), "worktree mode");
         }
-        Effect::PersistPreferredModel { model_id, reasoning_effort } => {
+        Effect::PersistPreferredModel {
+            model_id,
+            reasoning_effort,
+            provider_key,
+        } => {
             let model_id_str = model_id.0.to_string();
             tasks
                 .spawn(async move {
-                    let result = xai_grok_shell::util::config::persist_models_default(
+                    let result = xai_grok_shell::util::config::persist_models_default_with_provider(
                             Some(model_id_str),
+                            provider_key,
                             reasoning_effort,
                         )
                         .await
@@ -1998,18 +2048,9 @@ pub(crate) fn execute(
                             .into(),
                     );
                     let result = match acp_send(req, &tx).await {
-                        Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            serde_json::from_value::<
-                                crate::views::mcps_modal::McpsListResponse,
-                            >(inner.clone())
-                                .map(crate::views::mcps_modal::convert_list_response)
-                                .map_err(|_| "couldn't load server list".to_string())
-                        }
+                        Ok(resp) => crate::views::mcps_modal::parse_mcp_list_ext_response(
+                            resp.0.get(),
+                        ),
                         Err(e) => {
                             Err(
                                 sanitize_user_error(
@@ -2379,19 +2420,7 @@ pub(crate) fn execute(
                             .into(),
                     );
                     let result = match acp_send(req, &tx).await {
-                        Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            serde_json::from_value::<
-                                Vec<
-                                    xai_grok_tools::implementations::skills::types::SkillInfo,
-                                >,
-                            >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't load skills".to_string())
-                        }
+                        Ok(resp) => parse_skills_list_ext_response(resp.0.get()),
                         Err(e) => {
                             Err(
                                 sanitize_user_error(&format!("couldn't load skills: {e}")),
@@ -2419,17 +2448,10 @@ pub(crate) fn execute(
                     );
                     let result = match acp_send(req, &tx).await {
                         Ok(resp) => {
-                            let wrapper: serde_json::Value = serde_json::from_str(
-                                    resp.0.get(),
-                                )
-                                .unwrap_or_default();
-                            let inner = wrapper.get("result").unwrap_or(&wrapper);
-                            let parsed = serde_json::from_value::<
-                                Vec<
-                                    xai_grok_tools::implementations::skills::types::SkillInfo,
-                                >,
-                            >(inner.get("skills").cloned().unwrap_or_default())
-                                .map_err(|_| "couldn't toggle skill".to_string());
+                            let parsed = match parse_skills_list_ext_response(resp.0.get()) {
+                                Ok(skills) => Ok(skills),
+                                Err(_) => Err("couldn't toggle skill".to_string()),
+                            };
                             if parsed.is_ok() {
                                 let refresh = acp::ExtRequest::new(
                                     "x.ai/skills/refresh-baseline",
@@ -3912,6 +3934,17 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchBilling { agent_id, silent } => {
+            if crate::product_welcome::is_nextcode_embed() {
+                // nextcode: no xAI credits path. Non-silent `/usage` uses
+                // FetchNextCodeUsage; silent turn-end refreshes are no-ops.
+                if !silent {
+                    let tx = acp_tx.clone();
+                    tasks.spawn(async move {
+                        let text = fetch_nextcode_usage_text(&tx).await;
+                        TaskResult::NextCodeUsageText { agent_id, text }
+                    });
+                }
+            } else {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -3966,6 +3999,14 @@ pub(crate) fn execute(
                         autotopup,
                     }
                 });
+            }
+        }
+        Effect::FetchNextCodeUsage { agent_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let text = fetch_nextcode_usage_text(&tx).await;
+                TaskResult::NextCodeUsageText { agent_id, text }
+            });
         }
         Effect::RefreshGate => {
             tasks
@@ -4007,6 +4048,9 @@ pub(crate) fn execute(
                 });
         }
         Effect::FetchAppBilling => {
+            if crate::product_welcome::is_nextcode_embed() {
+                // no welcome-screen xAI credit warning in nextcode
+            } else {
             let tx = acp_tx.clone();
             tasks
                 .spawn(async move {
@@ -4060,6 +4104,7 @@ pub(crate) fn execute(
                         }
                     }
                 });
+            }
         }
         Effect::DebounceSuggestions { agent_id, generation } => {
             tasks
@@ -4170,6 +4215,30 @@ pub(crate) fn execute(
     (false, meta)
 }
 /// Fetch session info from ACP via `x.ai/session/info`.
+/// Ask the next-code ACP agent for a plain-text usage/cost summary.
+async fn fetch_nextcode_usage_text(tx: &AcpAgentTx) -> String {
+    let req = acp::ExtRequest::new(
+        "x.ai/usage",
+        serde_json::value::to_raw_value(&serde_json::json!({}))
+            .expect("serialize usage params")
+            .into(),
+    );
+    match acp_send(req, tx).await {
+        Ok(resp) => {
+            let wrapper: serde_json::Value =
+                serde_json::from_str(resp.0.get()).unwrap_or_default();
+            wrapper
+                .get("result")
+                .and_then(|r| r.get("text"))
+                .and_then(|t| t.as_str())
+                .or_else(|| wrapper.get("text").and_then(|t| t.as_str()))
+                .unwrap_or("No usage data available.")
+                .to_string()
+        }
+        Err(e) => format!("Could not load usage: {}", sanitize_user_error(&format!("{e}"))),
+    }
+}
+
 async fn fetch_session_info(
     session_id: &acp::SessionId,
     tx: &AcpAgentTx,

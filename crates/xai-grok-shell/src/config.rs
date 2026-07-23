@@ -15,14 +15,15 @@ pub struct MemoryConfig {
     pub enabled: bool,
 }
 
-/// Effective merged config as a TOML value (empty table stub).
+/// Effective merged config as a TOML value (disk-only for PR10; no
+/// requirements/managed merge yet).
 pub fn load_effective_config() -> anyhow::Result<toml::Value> {
-    Ok(toml::Value::Table(toml::map::Map::new()))
+    load_from_disk()
 }
 
 /// Disk-only `config.toml` parse (no merge).
 pub fn load_from_disk() -> anyhow::Result<toml::Value> {
-    Ok(toml::Value::Table(toml::map::Map::new()))
+    Ok(xai_grok_config::load_effective_config_disk_only()?)
 }
 
 /// Org-managed config overlay.

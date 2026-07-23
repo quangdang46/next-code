@@ -2032,6 +2032,7 @@ pub(in crate::tui::app) fn handle_server_event(
             model,
             provider_name,
             error,
+            fallback_model,
             ..
         } => {
             app.remote_model_switch_in_flight = false;
@@ -2039,9 +2040,17 @@ pub(in crate::tui::app) fn handle_server_event(
                 if let Some(prepared) = app.pending_prompt_after_model_switch.take() {
                     super::input_dispatch::restore_prepared_remote_input(app, prepared);
                 }
-                app.push_display_message(DisplayMessage::error(
-                    crate::tui::app::model_context::model_switch_failure_message(&err, true),
-                ));
+                let guidance = crate::tui::app::model_context::model_switch_failure_message(&err, true);
+                let message = match fallback_model
+                    .as_deref()
+                    .filter(|fallback| *fallback != model.as_str())
+                {
+                    Some(fallback) => format!(
+                        "Couldn't switch to {model} (staying on {fallback}). {guidance}"
+                    ),
+                    None => guidance,
+                };
+                app.push_display_message(DisplayMessage::error(message));
                 app.set_status_notice("Model switch failed");
             } else {
                 app.update_context_limit_for_model(&model);

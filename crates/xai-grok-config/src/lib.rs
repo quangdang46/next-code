@@ -9,11 +9,11 @@
 //!
 //! Provenance: `xai-org/grok-build` `paths.rs` (`default_grok_home` / `grok_home`
 //! / `user_grok_home`) + next-code `next_code_dir()` (`NEXT_CODE_HOME` /
-//! `~/.next-code`). Managed-config merge is intentionally **not** ported —
-//! [`load_effective_config_disk_only`] stays empty until `[ui]` ↔ next-code
-//! display schema is designed.
+//! `~/.next-code`). PR10: [`load_effective_config_disk_only`] reads real
+//! `config.toml`; Face `[ui]` ThemeKind ids persist beside next-code tables
+//! (not remapped to `[display].theme` dark/light/auto).
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 pub mod shell;
@@ -96,10 +96,142 @@ pub fn user_grok_home() -> Option<PathBuf> {
     resolvable.then(grok_home)
 }
 
-/// Disk-only effective config. Shim returns empty TOML table (Grok `[ui]` keys
-/// are not bridged to next-code `[display]` yet).
+/// Path to the user `config.toml` under [`grok_home`].
+pub fn user_config_toml_path() -> PathBuf {
+    grok_home().join("config.toml")
+}
+
+/// Disk-only effective config: parse `~/.next-code/config.toml` (or home
+/// override). Missing file → empty table. Malformed file → `io::Error`.
+///
+/// Face settings live under `[ui]` (ThemeKind display names, compact_mode,
+/// …). next-code brain keys (`[provider]`, `[display]`, …) coexist in the
+/// same file; Face does **not** map ThemeKind down to origin dark/light.
 pub fn load_effective_config_disk_only() -> std::io::Result<toml::Value> {
-    Ok(toml::Value::Table(toml::map::Map::new()))
+    load_config_toml_at(&user_config_toml_path())
+}
+
+/// Parse a config.toml path into a `toml::Value` table.
+pub fn load_config_toml_at(path: &Path) -> std::io::Result<toml::Value> {
+    if !path.exists() {
+        return Ok(toml::Value::Table(toml::map::Map::new()));
+    }
+    let content = std::fs::read_to_string(path)?;
+    if content.trim().is_empty() {
+        return Ok(toml::Value::Table(toml::map::Map::new()));
+    }
+    content.parse::<toml::Value>().map_err(|e| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("parse {}: {e}", path.display()),
+        )
+    })
+}
+
+/// Read `config.toml` as a [`toml_edit::DocumentMut`] for in-place edits.
+/// Missing / empty → empty doc. Non-empty unparseable → `None` (do not clobber).
+pub fn read_config_document_for_edit(path: &Path) -> Option<toml_edit::DocumentMut> {
+    let content = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => String::new(),
+    };
+    match content.parse() {
+        Ok(d) => Some(d),
+        Err(e) => {
+            if content.is_empty() {
+                return Some(toml_edit::DocumentMut::new());
+            }
+            tracing_warn_unparseable(path, &e);
+            None
+        }
+    }
+}
+
+fn tracing_warn_unparseable(path: &Path, err: &impl std::fmt::Display) {
+    // Keep this crate light — no tracing dep; stderr is fine for rare warn.
+    eprintln!(
+        "xai-grok-config: config.toml at {} is not valid TOML ({err}); refusing overwrite",
+        path.display()
+    );
+}
+
+/// Set `[section].key = value` in `config.toml`, preserving siblings.
+pub fn set_toml_key(
+    section: &str,
+    key: &str,
+    value: impl Into<toml_edit::Value>,
+) -> std::io::Result<()> {
+    set_toml_key_at(&user_config_toml_path(), section, key, value)
+}
+
+/// Path-injectable core of [`set_toml_key`].
+pub fn set_toml_key_at(
+    path: &Path,
+    section: &str,
+    key: &str,
+    value: impl Into<toml_edit::Value>,
+) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let Some(mut doc) = read_config_document_for_edit(path) else {
+        return Ok(());
+    };
+    doc[section][key] = toml_edit::value(value);
+    std::fs::write(path, doc.to_string())
+}
+
+/// Atomically write `[provider].default_model` and/or `[provider].default_provider`.
+///
+/// `None` leaves that key unchanged. Empty string clears the key (writes `""`).
+/// One read-modify-write so Face and cold-start never see a half-updated pair.
+pub fn set_provider_defaults(
+    model: Option<&str>,
+    provider: Option<&str>,
+) -> std::io::Result<()> {
+    set_provider_defaults_at(&user_config_toml_path(), model, provider)
+}
+
+/// Path-injectable core of [`set_provider_defaults`].
+pub fn set_provider_defaults_at(
+    path: &Path,
+    model: Option<&str>,
+    provider: Option<&str>,
+) -> std::io::Result<()> {
+    if model.is_none() && provider.is_none() {
+        return Ok(());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let Some(mut doc) = read_config_document_for_edit(path) else {
+        return Ok(());
+    };
+    if let Some(model) = model {
+        doc["provider"]["default_model"] = toml_edit::value(model);
+    }
+    if let Some(provider) = provider {
+        doc["provider"]["default_provider"] = toml_edit::value(provider);
+    }
+    std::fs::write(path, doc.to_string())
+}
+
+/// Set a nested `[section.sub].key` (e.g. `ui.contextual_hints.undo`).
+pub fn set_toml_nested_key(
+    section: &str,
+    sub: &str,
+    key: &str,
+    value: impl Into<toml_edit::Value>,
+) -> std::io::Result<()> {
+    let path = user_config_toml_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let Some(mut doc) = read_config_document_for_edit(&path) else {
+        return Ok(());
+    };
+    doc[section][sub][key] = toml_edit::value(value);
+    std::fs::write(path, doc.to_string())
 }
 
 #[cfg(test)]
@@ -159,6 +291,115 @@ mod tests {
             Some(v) => unsafe { std::env::set_var("NEXT_CODE_HOME", v) },
             None => unsafe { std::env::remove_var("NEXT_CODE_HOME") },
         }
+    }
+
+    #[test]
+    fn set_provider_defaults_writes_model_and_provider_atomically() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "[provider]\ndefault_model = \"old\"\ndefault_provider = \"opencode-go\"\n\n[ui]\ntheme = \"Grok Night\"\n",
+        )
+        .unwrap();
+
+        set_provider_defaults_at(&path, Some("new-model"), Some("deepseek")).unwrap();
+
+        let loaded = load_config_toml_at(&path).unwrap();
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_model"))
+                .and_then(|v| v.as_str()),
+            Some("new-model")
+        );
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_provider"))
+                .and_then(|v| v.as_str()),
+            Some("deepseek")
+        );
+        assert_eq!(
+            loaded
+                .get("ui")
+                .and_then(|u| u.get("theme"))
+                .and_then(|v| v.as_str()),
+            Some("Grok Night")
+        );
+    }
+
+    #[test]
+    fn set_provider_defaults_model_only_preserves_provider() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "[provider]\ndefault_model = \"old\"\ndefault_provider = \"opencode-go\"\n",
+        )
+        .unwrap();
+
+        set_provider_defaults_at(&path, Some("new-model"), None).unwrap();
+
+        let loaded = load_config_toml_at(&path).unwrap();
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_model"))
+                .and_then(|v| v.as_str()),
+            Some("new-model")
+        );
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_provider"))
+                .and_then(|v| v.as_str()),
+            Some("opencode-go")
+        );
+    }
+
+    #[test]
+    fn set_toml_key_preserves_sibling_tables_and_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            "[provider]\ndefault_model = \"x\"\n\n[ui]\ncompact_mode = false\n",
+        )
+        .unwrap();
+
+        set_toml_key_at(&path, "ui", "theme", "Grok Night").unwrap();
+
+        let loaded = load_config_toml_at(&path).unwrap();
+        assert_eq!(
+            loaded
+                .get("ui")
+                .and_then(|u| u.get("theme"))
+                .and_then(|v| v.as_str()),
+            Some("Grok Night")
+        );
+        assert_eq!(
+            loaded
+                .get("provider")
+                .and_then(|p| p.get("default_model"))
+                .and_then(|v| v.as_str()),
+            Some("x")
+        );
+        assert_eq!(
+            loaded
+                .get("ui")
+                .and_then(|u| u.get("compact_mode"))
+                .and_then(|v| v.as_bool()),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn missing_config_loads_empty_table() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("absent.toml");
+        let v = load_config_toml_at(&path).unwrap();
+        assert!(v.as_table().unwrap().is_empty());
     }
 }
 

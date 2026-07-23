@@ -69,7 +69,14 @@ pub(super) fn dispatch_send_feedback(app: &mut AppView, text: String) -> Vec<Eff
     };
 
     agent.scrollback.push_block(RenderBlock::system(
-        "Thanks for the feedback! The Grok Build team is on it.".to_string(),
+        if crate::product_welcome::is_nextcode_embed() {
+            format!(
+                "Thanks for the feedback! Open a next-code issue if you want follow-up:\n{}",
+                "https://github.com/quangdang46/next-code/issues/new"
+            )
+        } else {
+            "Thanks for the feedback! The Grok Build team is on it.".to_string()
+        },
     ));
 
     vec![Effect::SendFeedback {
@@ -286,6 +293,8 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
         return vec![];
     };
     let minimal = app.screen_mode.is_minimal();
+    let sidebar = crate::settings::canonical_btw_output_mode(app.current_ui.btw_output_mode.as_deref())
+        == "sidebar";
     let (session_id, minimal_request_id) = {
         let Some(agent) = app.agents.get_mut(&id) else {
             return vec![];
@@ -305,16 +314,24 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
 
         agent.prompt.set_text("");
         let minimal_request_id = if minimal {
+            // Minimal hosts /btw in the live region — always the overlay path.
+            agent.btw_sidebar = false;
+            agent.btw_sidebar_visible = true;
             Some(crate::minimal_api::start_minimal_btw(
                 agent,
                 question.clone(),
             ))
         } else {
+            agent.btw_sidebar = sidebar;
+            agent.btw_sidebar_visible = true;
             agent.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::Loading {
                 question: question.clone(),
             });
             // Prompt keeps focus while the answer is in flight (panel focuses on Done).
             agent.btw_focused = false;
+            if sidebar {
+                agent.show_toast("Running /btw - answer will appear in the side panel.");
+            }
             None
         };
         (session_id, minimal_request_id)

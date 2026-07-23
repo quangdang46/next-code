@@ -179,6 +179,10 @@ pub struct UiConfig {
     /// `"fullscreen"` | `"minimal"`; unset → product default fullscreen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub screen_mode: Option<String>,
+    /// Face `/btw` answer surface: `"inline"` (overlay above prompt, default) or
+    /// `"sidebar"` (legacy TUI-style right-hand panel). Unset → `inline`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub btw_output_mode: Option<String>,
     /// Retired hidden opt-in for terminal-like double/triple-click word/line
     /// selection. Superseded by `keep_text_selection = "word_select"`. Still
     /// read only when `keep_text_selection` is unset; Settings clears this on
@@ -195,6 +199,10 @@ pub struct UiConfig {
     /// `None` inherits remote/default; skipped when untouched.
     #[serde(default, skip_serializing_if = "DisplayRefreshSettings::is_default")]
     pub display_refresh: DisplayRefreshSettings,
+    /// Per-float-kind visibility for info float cards (`[ui.info_floats]`).
+    /// Skipped when untouched so the section only appears once a user toggles a float.
+    #[serde(default, skip_serializing_if = "InfoFloatsConfig::is_default")]
+    pub info_floats: InfoFloatsConfig,
 }
 
 /// User-config opt-outs for the per-tip contextual hints, serialized as
@@ -226,6 +234,55 @@ pub struct ContextualHints {
     /// runs over SSH without an OSC 52 sink).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh_wrap: Option<bool>,
+}
+
+/// Per-float-kind visibility for info float cards, serialized as
+/// `[ui.info_floats]`. Per-field `None` means "inherit default (on)".
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InfoFloatsConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_info: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_usage: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kv_cache: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_activity: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_limits: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_status: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_tasks: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compaction: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub swarm_status: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub todos: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workspace_map: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub diagrams: Option<bool>,
+}
+
+impl InfoFloatsConfig {
+    /// True when no float kind has a user-explicit value (all inherit).
+    /// Lets the section stay absent from `config.toml` until the user toggles one.
+    pub fn is_default(&self) -> bool {
+        self.model_info.is_none()
+            && self.context_usage.is_none()
+            && self.kv_cache.is_none()
+            && self.memory_activity.is_none()
+            && self.usage_limits.is_none()
+            && self.git_status.is_none()
+            && self.background_tasks.is_none()
+            && self.compaction.is_none()
+            && self.swarm_status.is_none()
+            && self.todos.is_none()
+            && self.workspace_map.is_none()
+            && self.diagrams.is_none()
+    }
 }
 
 impl ContextualHints {
@@ -302,9 +359,11 @@ impl Default for UiConfig {
             prompt_suggestions: None,
             cursor_blink: None,
             screen_mode: None,
+            btw_output_mode: None,
             double_click_action: None,
             contextual_hints: ContextualHints::default(),
             display_refresh: DisplayRefreshSettings::default(),
+            info_floats: InfoFloatsConfig::default(),
         }
     }
 }

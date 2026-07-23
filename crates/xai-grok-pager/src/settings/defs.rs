@@ -313,6 +313,19 @@ const SCREEN_MODE_CHOICES: &[EnumChoice] = &[
     },
 ];
 
+const BTW_OUTPUT_MODE_CHOICES: &[EnumChoice] = &[
+    EnumChoice {
+        canonical: "inline",
+        display: "Overlay (Face / Grok)",
+        description: "Show /btw answers in the compact panel above the prompt. Default.",
+    },
+    EnumChoice {
+        canonical: "sidebar",
+        display: "Side panel (legacy TUI)",
+        description: "Show /btw answers in a right-hand side panel (Alt+M hides).",
+    },
+];
+
 // Voice-capture-mode catalog. SHELL-owned, persisted to `[ui].voice_capture_mode`.
 // `hold` is only offered on terminals that report key releases (Kitty keyboard
 // protocol); `effective_enum_choices` hides it elsewhere, and it falls back to
@@ -506,6 +519,21 @@ const CONCRETE_THEME_CHOICES: &[EnumChoice] = &[
 /// globally unique — bare `plan_mode` collides with the plan-mode enum row).
 /// They are registered as normal Bool settings but hidden from the top-level
 /// list (`build_rows` skips any key that is a group child).
+const INFO_FLOATS_CHILDREN: &[&str] = &[
+    "info_float.model_info",
+    "info_float.context_usage",
+    "info_float.kv_cache",
+    "info_float.memory_activity",
+    "info_float.usage_limits",
+    "info_float.git_status",
+    "info_float.background_tasks",
+    "info_float.compaction",
+    "info_float.swarm_status",
+    "info_float.todos",
+    "info_float.workspace_map",
+    "info_float.diagrams",
+];
+
 const CONTEXTUAL_HINTS_CHILDREN: &[&str] = &[
     "contextual_hints.undo",
     "contextual_hints.plan_mode",
@@ -566,6 +594,32 @@ pub fn default_settings() -> Vec<SettingMeta> {
             },
             restart_required: true,
             hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "btw_output_mode",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "/btw output",
+            description: "Where /btw answers appear: Overlay above the prompt (Face / Grok \
+                          default) or a right-hand side panel (legacy TUI parity). Live-applies \
+                          to the next /btw. Writes [ui] btw_output_mode in config.toml.",
+            keywords: &[
+                "btw",
+                "sidebar",
+                "side",
+                "panel",
+                "inline",
+                "overlay",
+                "side-question",
+                "output",
+            ],
+            kind: SettingKind::Enum {
+                default: "inline",
+                choices: BTW_OUTPUT_MODE_CHOICES,
+                supports_preview: false,
+            },
+            restart_required: false,
+            hidden_in_minimal: true,
         },
         SettingMeta {
             key: "show_timestamps",
@@ -1005,6 +1059,160 @@ pub fn default_settings() -> Vec<SettingMeta> {
             },
             restart_required: true,
             hidden_in_minimal: true,
+        },
+        // SHARED group: per-float-kind visibility. Opens a sub-sheet of
+        // individual Bool toggles. Children are hidden from the top-level list.
+        SettingMeta {
+            key: "info_floats",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Show info floats",
+            description: "Info cards for model, context, cache, memory, git, and more \
+                          on the right side of the chat view. Toggle each one \
+                          individually.",
+            keywords: &[
+                "float", "info", "card", "panel", "widget", "model", "context", "cache",
+                "memory", "git", "usage", "background", "compaction", "swarm", "todos",
+                "workspace", "diagrams",
+            ],
+            kind: SettingKind::Group {
+                children: INFO_FLOATS_CHILDREN,
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        // SHARED info float children (hidden from top-level; reached via group sub-sheet).
+        SettingMeta {
+            key: "info_float.model_info",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Model Info",
+            description: "Show model name and provider in the info card.",
+            keywords: &["float", "model", "info", "provider"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.context_usage",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Context Usage",
+            description: "Show context usage bar (tokens consumed vs limit) in the info card.",
+            keywords: &["float", "context", "usage", "tokens", "bar"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.kv_cache",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "KV Cache",
+            description: "Show KV cache hit ratio in the info card.",
+            keywords: &["float", "kv", "cache", "hit", "ratio"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.memory_activity",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Memory Activity",
+            description: "Show recent memory activity in the info card.",
+            keywords: &["float", "memory", "activity", "card"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.usage_limits",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Usage Limits",
+            description: "Show provider usage limits and remaining credits in the info card.",
+            keywords: &["float", "usage", "limits", "credits", "rate"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.git_status",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Git Status",
+            description: "Show working directory git status in the info card.",
+            keywords: &["float", "git", "status", "branch", "dirty"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.background_tasks",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Background Tasks",
+            description: "Show running background tasks in the info card.",
+            keywords: &["float", "background", "tasks", "card"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.compaction",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Compaction",
+            description: "Show context compaction status in the info card.",
+            keywords: &["float", "compaction", "context", "card"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.swarm_status",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Swarm Status",
+            description: "Show swarm agent status in the info card.",
+            keywords: &["float", "swarm", "agent", "status", "card"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.todos",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Todos",
+            description: "Show pending todo items in the info card.",
+            keywords: &["float", "todo", "todos", "tasks", "card"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.workspace_map",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Workspace Map",
+            description: "Show workspace file map in the info card.",
+            keywords: &["float", "workspace", "map", "files", "card"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "info_float.diagrams",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Diagrams",
+            description: "Show diagram preview in the info card.",
+            keywords: &["float", "diagram", "diagrams", "card"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
         },
         // SHELL-owned, persisted to `[ui].scroll_speed` in config.toml.
         SettingMeta {

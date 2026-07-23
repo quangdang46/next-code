@@ -566,7 +566,9 @@ impl AcpRuntime {
                             "type": "text",
                             "text": message.content,
                         }
-                    }
+                    },
+                    // Face / ACP session/load clients stamp replay for dedup.
+                    "_meta": { "isReplay": true }
                 }),
             )
             .await?;

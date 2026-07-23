@@ -63,6 +63,15 @@ fn matrix_login_provider_aliases_resolve_to_canonical_ids() {
         Some("opencode-go")
     );
     assert_eq!(
+        resolve_openai_compatible_profile_selection("opencode go").map(|p| p.id),
+        Some("opencode-go"),
+        "spaced Face float pin must resolve like catalog id"
+    );
+    assert_eq!(
+        resolve_openai_compatible_profile_selection("OpenCode Go").map(|p| p.id),
+        Some("opencode-go")
+    );
+    assert_eq!(
         resolve_login_provider("z.ai").map(|provider| provider.id),
         Some("zai")
     );

@@ -2,6 +2,14 @@ use std::sync::{LazyLock, RwLock};
 
 use next_code_provider_metadata::{is_safe_env_file_name, is_safe_env_key_name};
 
+pub mod unified_auth;
+pub use unified_auth::{
+    MigrateReport, auth_json_path, canonical_provider_id_for_env_key, known_legacy_api_key_files,
+    load_api_key_from_unified_auth, migrate_all_known_legacy_api_keys,
+    migrate_legacy_env_file_into_unified, provider_ids_for_env_key, save_api_key_to_unified_auth,
+    unified_auth_has_api_key,
+};
+
 /// Fallback resolvers consulted by [`load_api_key_from_env_or_config`] after the
 /// environment and config-file lookups fail. Higher-level crates register
 /// resolvers at startup so this leaf crate does not need to depend on auth.
@@ -104,34 +112,44 @@ pub fn load_api_key_from_env_or_config(env_key: &str, file_name: &str) -> Option
         return Some(key);
     }
 
-    let config_path = next_code_storage::app_config_dir().ok()?.join(file_name);
-    next_code_storage::harden_secret_file_permissions(&config_path);
-    let content = std::fs::read_to_string(config_path).ok()?;
-    let prefix = format!("{}=", env_key);
-
-    for line in content.lines() {
-        if let Some(key) = line.strip_prefix(&prefix)
-            && let Some(key) = clean_loaded_value(key, env_key)
-        {
-            return Some(key);
-        }
+    // Unified store (`~/.next-code/auth.json`) wins over legacy app-config `*.env`.
+    if let Some(key) = load_api_key_from_unified_auth(env_key)
+        && let Some(key) = clean_loaded_value(&key, env_key)
+    {
+        return Some(key);
     }
 
-    if env_key == "ZHIPU_API_KEY" {
-        if let Ok(key) = std::env::var("ZAI_API_KEY")
-            && let Some(key) = clean_loaded_value(&key, "ZAI_API_KEY")
-        {
-            return Some(key);
-        }
+    let config_path = next_code_storage::app_config_dir().ok()?.join(file_name);
+    next_code_storage::harden_secret_file_permissions(&config_path);
+    let content = std::fs::read_to_string(&config_path).ok();
+    let prefix = format!("{}=", env_key);
 
-        let legacy_prefix = "ZAI_API_KEY=";
+    if let Some(content) = content.as_deref() {
         for line in content.lines() {
-            if let Some(key) = line.strip_prefix(legacy_prefix)
-                && let Some(key) = clean_loaded_value(key, "ZAI_API_KEY")
+            if let Some(key) = line.strip_prefix(&prefix)
+                && let Some(key) = clean_loaded_value(key, env_key)
             {
                 return Some(key);
             }
         }
+
+        if env_key == "ZHIPU_API_KEY" {
+            let legacy_prefix = "ZAI_API_KEY=";
+            for line in content.lines() {
+                if let Some(key) = line.strip_prefix(legacy_prefix)
+                    && let Some(key) = clean_loaded_value(key, "ZAI_API_KEY")
+                {
+                    return Some(key);
+                }
+            }
+        }
+    }
+
+    if env_key == "ZHIPU_API_KEY"
+        && let Ok(key) = std::env::var("ZAI_API_KEY")
+        && let Some(key) = clean_loaded_value(&key, "ZAI_API_KEY")
+    {
+        return Some(key);
     }
 
     if let Some(key) = resolve_api_key_fallback(env_key) {
@@ -235,9 +253,7 @@ pub fn save_env_value_to_env_file(
 mod tests {
     use super::*;
     use std::ffi::OsString;
-    use std::sync::{Mutex, MutexGuard};
-
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    use std::sync::MutexGuard;
 
     struct EnvGuard {
         _lock: MutexGuard<'static, ()>,
@@ -246,7 +262,7 @@ mod tests {
 
     impl EnvGuard {
         fn new(keys: &[&'static str]) -> Self {
-            let lock = ENV_LOCK
+            let lock = unified_auth::TEST_ENV_LOCK
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
             let saved = keys

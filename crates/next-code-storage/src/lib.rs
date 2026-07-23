@@ -206,14 +206,17 @@ pub fn harden_user_config_permissions() {
 /// Best-effort hardening for a secret-bearing file and its parent directory.
 ///
 /// This is used before reading credential files so legacy permissive modes can
-/// be tightened opportunistically.
+/// be tightened opportunistically. Missing paths are a no-op: presence probes
+/// (e.g. openai-compatible autodetection) must not pay Windows ACL rewrites
+/// for every absent `*.env` candidate on cold start.
 pub fn harden_secret_file_permissions(path: &Path) {
+    if !path.exists() {
+        return;
+    }
     if let Some(parent) = path.parent() {
         let _ = next_code_core::fs::set_directory_permissions_owner_only(parent);
     }
-    if path.exists() {
-        let _ = next_code_core::fs::set_permissions_owner_only(path);
-    }
+    let _ = next_code_core::fs::set_permissions_owner_only(path);
 }
 
 /// Validate an external auth file managed by another tool before reading it.

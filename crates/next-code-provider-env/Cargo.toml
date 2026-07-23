@@ -13,6 +13,7 @@ next-code-core = { path = "../next-code-core" }
 next-code-logging = { path = "../next-code-logging" }
 next-code-provider-metadata = { path = "../next-code-provider-metadata" }
 next-code-storage = { path = "../next-code-storage" }
+serde_json = { version = "1", features = ["raw_value"] }
 
 [dev-dependencies]
 tempfile = "3"

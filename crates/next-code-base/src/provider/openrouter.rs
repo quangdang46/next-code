@@ -13,11 +13,14 @@
 //! - re-exports of the pure catalog/cache types from
 //!   `next-code-provider-openrouter`.
 
+use std::sync::Mutex;
+
 use crate::env::{product_env, product_env_os};
 use crate::provider_catalog::{
-    OPENAI_COMPAT_PROFILE, is_safe_env_file_name, is_safe_env_key_name,
-    load_api_key_from_env_or_config, normalize_api_base, openai_compatible_profiles,
-    resolve_openai_compatible_profile,
+    OPENAI_COMPAT_PROFILE, ResolvedOpenAiCompatibleProfile, is_safe_env_file_name,
+    is_safe_env_key_name, load_api_key_from_env_or_config, normalize_api_base,
+    openai_compatible_profile_is_configured, openai_compatible_profiles,
+    resolve_openai_compatible_profile, resolve_openai_compatible_profile_selection,
 };
 pub use next_code_provider_openrouter::{
     EndpointInfo, ModelInfo, ModelPricing, ModelTimestampIndex, ProviderRouting,
@@ -72,8 +75,11 @@ pub fn has_credentials() -> bool {
 
 /// Resolve the configured API key for the OpenRouter/OpenAI-compatible slot.
 pub fn get_api_key() -> Option<String> {
-    let key_name = configured_api_key_name();
-    let env_file = configured_env_file_name();
+    // Resolve autodetection once so key-name + env-file lookups do not double-scan
+    // the 36-profile catalog on cold serve.
+    let profile = autodetected_openai_compatible_profile();
+    let key_name = api_key_name_from_profile(profile.as_ref());
+    let env_file = env_file_from_profile(profile.as_ref());
     load_api_key_from_env_or_config(&key_name, &env_file)
 }
 
@@ -81,6 +87,30 @@ pub fn get_api_key() -> Option<String> {
 const DEFAULT_API_BASE: &str = "https://openrouter.ai/api/v1";
 const DEFAULT_API_KEY_NAME: &str = "OPENROUTER_API_KEY";
 const DEFAULT_ENV_FILE: &str = "openrouter.env";
+
+/// Process-local memo for openai-compatible autodetection.
+/// Cleared on config reload so tests / runtime pin changes recompute.
+static AUTODETECT_CACHE: Mutex<Option<Option<ResolvedOpenAiCompatibleProfile>>> = Mutex::new(None);
+
+fn clear_autodetect_cache() {
+    if let Ok(mut guard) = AUTODETECT_CACHE.lock() {
+        *guard = None;
+    }
+}
+
+/// Drop the openai-compatible autodetection memo (config reload / auth invalidate).
+pub(crate) fn invalidate_autodetect_cache() {
+    clear_autodetect_cache();
+}
+
+fn ensure_autodetect_cache_invalidation_hook() {
+    use std::sync::Once;
+    static HOOK: Once = Once::new();
+    HOOK.call_once(|| {
+        crate::config::on_config_reloaded(clear_autodetect_cache);
+    });
+}
+
 fn explicit_openrouter_runtime_configured() -> bool {
     [
         "OPENROUTER_API_BASE",
@@ -92,8 +122,50 @@ fn explicit_openrouter_runtime_configured() -> bool {
     .any(|suffix| crate::env::product_env_os(suffix).is_some())
 }
 
-fn autodetected_openai_compatible_profile()
--> Option<crate::provider_catalog::ResolvedOpenAiCompatibleProfile> {
+/// When `config.provider.default_provider` names a built-in openai-compatible
+/// profile and that profile already has credentials, use it immediately.
+/// Returns `None` on pin miss so callers fall through to the full scan.
+fn config_pinned_openai_compatible_profile() -> Option<ResolvedOpenAiCompatibleProfile> {
+    let pref = crate::config::config()
+        .provider
+        .default_provider
+        .as_deref()?
+        .trim();
+    if pref.is_empty() {
+        return None;
+    }
+
+    let profile = resolve_openai_compatible_profile_selection(pref)?;
+    if profile.id == OPENAI_COMPAT_PROFILE.id {
+        return None;
+    }
+    if !openai_compatible_profile_is_configured(profile) {
+        return None;
+    }
+    Some(resolve_openai_compatible_profile(profile))
+}
+
+fn scan_unique_openai_compatible_profile() -> Option<ResolvedOpenAiCompatibleProfile> {
+    let mut matches = openai_compatible_profiles()
+        .iter()
+        .filter(|profile| profile.id != OPENAI_COMPAT_PROFILE.id)
+        .filter_map(|profile| {
+            if openai_compatible_profile_is_configured(*profile) {
+                Some(resolve_openai_compatible_profile(*profile))
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if matches.len() == 1 {
+        matches.pop()
+    } else {
+        None
+    }
+}
+
+fn autodetected_openai_compatible_profile_uncached() -> Option<ResolvedOpenAiCompatibleProfile> {
     if explicit_openrouter_runtime_configured() {
         return None;
     }
@@ -107,23 +179,63 @@ fn autodetected_openai_compatible_profile()
         return Some(compat);
     }
 
-    let mut matches = openai_compatible_profiles()
-        .iter()
-        .filter(|profile| profile.id != OPENAI_COMPAT_PROFILE.id)
-        .filter_map(|profile| {
-            let resolved = resolve_openai_compatible_profile(*profile);
-            if crate::provider_catalog::openai_compatible_profile_is_configured(*profile) {
-                Some(resolved)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+    // Config pin first: skip the 36-profile scan when default_provider already
+    // resolves (e.g. opencode-go). Pin miss falls through to the unique-match scan.
+    if let Some(pinned) = config_pinned_openai_compatible_profile() {
+        return Some(pinned);
+    }
 
-    if matches.len() == 1 {
-        matches.pop()
+    scan_unique_openai_compatible_profile()
+}
+
+fn autodetected_openai_compatible_profile() -> Option<ResolvedOpenAiCompatibleProfile> {
+    ensure_autodetect_cache_invalidation_hook();
+    if let Ok(guard) = AUTODETECT_CACHE.lock()
+        && let Some(cached) = guard.as_ref()
+    {
+        return cached.clone();
+    }
+
+    let result = autodetected_openai_compatible_profile_uncached();
+    if let Ok(mut guard) = AUTODETECT_CACHE.lock() {
+        *guard = Some(result.clone());
+    }
+    result
+}
+
+fn api_key_name_from_profile(profile: Option<&ResolvedOpenAiCompatibleProfile>) -> String {
+    let raw = product_env("OPENROUTER_API_KEY_NAME")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| profile.map(|p| p.api_key_env.clone()))
+        .unwrap_or_else(|| DEFAULT_API_KEY_NAME.to_string());
+    if is_safe_env_key_name(&raw) {
+        raw
     } else {
-        None
+        crate::logging::warn(&format!(
+            "Ignoring invalid NEXT_CODE_OPENROUTER_API_KEY_NAME '{}'; using {}",
+            raw, DEFAULT_API_KEY_NAME
+        ));
+        DEFAULT_API_KEY_NAME.to_string()
+    }
+}
+
+fn env_file_from_profile(profile: Option<&ResolvedOpenAiCompatibleProfile>) -> String {
+    let raw = product_env("OPENROUTER_ENV_FILE")
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| profile.map(|p| p.env_file.clone()))
+        .unwrap_or_else(|| DEFAULT_ENV_FILE.to_string());
+    if is_safe_env_file_name(&raw) {
+        raw
+    } else {
+        crate::logging::warn(&format!(
+            "Ignoring invalid NEXT_CODE_OPENROUTER_ENV_FILE '{}'; using {}",
+            raw, DEFAULT_ENV_FILE
+        ));
+        DEFAULT_ENV_FILE.to_string()
     }
 }
 
@@ -143,40 +255,9 @@ fn configured_api_base() -> String {
     })
 }
 
-fn configured_api_key_name() -> String {
-    let raw = product_env("OPENROUTER_API_KEY_NAME")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .or_else(|| autodetected_openai_compatible_profile().map(|profile| profile.api_key_env))
-        .unwrap_or_else(|| DEFAULT_API_KEY_NAME.to_string());
-    if is_safe_env_key_name(&raw) {
-        raw
-    } else {
-        crate::logging::warn(&format!(
-            "Ignoring invalid NEXT_CODE_OPENROUTER_API_KEY_NAME '{}'; using {}",
-            raw, DEFAULT_API_KEY_NAME
-        ));
-        DEFAULT_API_KEY_NAME.to_string()
-    }
-}
-
-fn configured_env_file_name() -> String {
-    let raw = product_env("OPENROUTER_ENV_FILE")
-        .ok()
-        .map(|v| v.trim().to_string())
-        .filter(|v| !v.is_empty())
-        .or_else(|| autodetected_openai_compatible_profile().map(|profile| profile.env_file))
-        .unwrap_or_else(|| DEFAULT_ENV_FILE.to_string());
-    if is_safe_env_file_name(&raw) {
-        raw
-    } else {
-        crate::logging::warn(&format!(
-            "Ignoring invalid NEXT_CODE_OPENROUTER_ENV_FILE '{}'; using {}",
-            raw, DEFAULT_ENV_FILE
-        ));
-        DEFAULT_ENV_FILE.to_string()
-    }
+#[cfg(test)]
+pub(crate) fn configured_api_key_name_for_test() -> String {
+    api_key_name_from_profile(autodetected_openai_compatible_profile().as_ref())
 }
 
 fn parse_env_bool(value: &str) -> Option<bool> {
