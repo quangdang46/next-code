@@ -138,15 +138,22 @@ impl PickerSurface<'_> {
 
 pub(in crate::app::dispatch) fn dispatch_fetch_session_list(app: &mut AppView) -> Vec<Effect> {
     app.session_picker_detail_generation += 1;
-    app.session_picker_loading = true;
+    // ResumeBrowser owns the list fetch: do not arm the welcome expand-card
+    // Loading shell (that surface is dismissed while the 2-panel is open).
+    let resume_browser_owns_list = app.resume_browser.is_some();
     app.session_picker_entries = None;
-    app.session_picker_state.selected = 0;
-    app.session_picker_state.set_query("");
-    app.session_picker_state.search_active = false;
-    app.session_picker_state.expanded.clear();
     app.session_picker_content_results = None;
     app.session_picker_content_loading = false;
     app.session_picker_entries_query = None;
+    if resume_browser_owns_list {
+        app.session_picker_loading = false;
+    } else {
+        app.session_picker_loading = true;
+        app.session_picker_state.selected = 0;
+        app.session_picker_state.set_query("");
+        app.session_picker_state.search_active = false;
+        app.session_picker_state.expanded.clear();
+    }
     if app.chat_mode {
         app.session_picker_list_seq += 1;
     }
@@ -222,6 +229,9 @@ pub(in crate::app::dispatch) fn handle_session_list_loaded(
             }
         }
         rb.set_entries(list);
+        // Keep welcome/modal picker shells inert — list was consumed here.
+        app.session_picker_loading = false;
+        app.session_picker_entries = None;
         let preview_effect = rb.request_preview_effect().and_then(|action| match action {
             Action::LoadResumePreview { session_id, seq } => {
                 Some(Effect::LoadResumePreview { session_id, seq })
@@ -310,6 +320,8 @@ pub(in crate::app::dispatch) fn handle_session_list_failed(
     if let Some(rb) = app.resume_browser.as_mut() {
         rb.set_list_failed(&error_notice);
         notice = Some(error_notice.clone());
+        app.session_picker_loading = false;
+        app.session_picker_entries = None;
         handled = true;
     }
     if let Some(agent) = get_active_agent_mut(app) {

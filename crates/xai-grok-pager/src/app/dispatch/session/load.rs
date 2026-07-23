@@ -1191,6 +1191,8 @@ pub(in crate::app::dispatch) fn handle_deep_search_results(
 }
 pub(in crate::app::dispatch) fn dispatch_show_session_picker(app: &mut AppView) -> Vec<Effect> {
     use crate::views::modal::ActiveModal;
+    // Mutual exclusion: modal `/resume` must not stack under/over bare `--resume`.
+    app.resume_browser = None;
     with_active_agent(app, |agent| {
         agent.active_modal = Some(ActiveModal::SessionPicker {
             state: crate::views::picker::PickerState::default(),
@@ -1211,12 +1213,34 @@ pub(in crate::app::dispatch) fn dispatch_show_session_picker(app: &mut AppView) 
 }
 
 /// Bare `--resume`: open Face 2-panel resume browser (list + transcript preview).
+///
+/// Clears any `SessionPicker` modal / welcome expand-card surface first so bare
+/// `--resume` cannot stack ResumeBrowser on top of a Loading `[✗]` picker
+/// (`FetchSessionList` arms welcome `session_picker_loading`; list results then
+/// prefer `resume_browser` and leave the picker stuck Loading underneath).
 pub(in crate::app::dispatch) fn dispatch_show_resume_browser(app: &mut AppView) -> Vec<Effect> {
+    dismiss_session_picker_surfaces(app);
     app.resume_browser = Some(crate::views::resume_browser::ResumeBrowserState::new_loading());
-    // Avoid also painting the welcome expand-card picker underneath.
+    dispatch_fetch_session_list(app)
+}
+
+/// Drop modal + welcome session-picker UI and invalidate in-flight picker fetches
+/// so they cannot steal a list response or leave a Loading shell under ResumeBrowser.
+fn dismiss_session_picker_surfaces(app: &mut AppView) {
+    use crate::views::modal::ActiveModal;
+    if let Some(agent) = get_active_agent_mut(app)
+        && matches!(agent.active_modal, Some(ActiveModal::SessionPicker { .. }))
+    {
+        agent.active_modal = None;
+    }
     app.session_picker_entries = None;
     app.session_picker_loading = false;
-    dispatch_fetch_session_list(app)
+    app.session_picker_lanes = Default::default();
+    app.session_picker_state.reset();
+    app.session_picker_content_results = None;
+    app.session_picker_content_loading = false;
+    app.session_picker_entries_query = None;
+    invalidate_picker_fetch_on_dismiss(app);
 }
 
 /// Enter on resume-browser row → load session (same path as picker pick).

@@ -12,11 +12,48 @@ fn show_resume_browser_sets_app_state_and_fetches_list() {
     assert!(app.resume_browser.is_some());
     assert!(app.resume_browser.as_ref().unwrap().loading);
     assert!(
+        !app.session_picker_loading,
+        "bare --resume must not arm welcome expand-card Loading underneath"
+    );
+    assert!(app.session_picker_entries.is_none());
+    assert!(
         effects
             .iter()
             .any(|e| matches!(e, Effect::FetchSessionList { .. })),
         "expected FetchSessionList, got {effects:?}"
     );
+}
+
+#[test]
+fn show_resume_browser_dismisses_session_picker_modal() {
+    let mut app = test_app_with_agent();
+    let _ = dispatch(Action::ShowSessionPicker, &mut app);
+    assert!(matches!(
+        get_active_agent(&app).and_then(|a| a.active_modal.as_ref()),
+        Some(ActiveModal::SessionPicker { .. })
+    ));
+    let _ = dispatch(Action::ShowResumeBrowser, &mut app);
+    assert!(app.resume_browser.is_some());
+    assert!(
+        get_active_agent(&app)
+            .and_then(|a| a.active_modal.as_ref())
+            .is_none(),
+        "ShowResumeBrowser must clear SessionPicker so UIs do not stack"
+    );
+    assert!(!app.session_picker_loading);
+}
+
+#[test]
+fn show_session_picker_closes_resume_browser() {
+    let mut app = test_app_with_agent();
+    let _ = dispatch(Action::ShowResumeBrowser, &mut app);
+    assert!(app.resume_browser.is_some());
+    let _ = dispatch(Action::ShowSessionPicker, &mut app);
+    assert!(app.resume_browser.is_none());
+    assert!(matches!(
+        get_active_agent(&app).and_then(|a| a.active_modal.as_ref()),
+        Some(ActiveModal::SessionPicker { .. })
+    ));
 }
 
 #[test]
@@ -58,6 +95,10 @@ fn session_list_loaded_fills_resume_browser_not_welcome_picker() {
     );
     assert!(app.session_picker_entries.is_none());
     assert!(
+        !app.session_picker_loading,
+        "list consume must leave welcome picker Loading false"
+    );
+    assert!(
         effects
             .iter()
             .any(|e| matches!(e, Effect::LoadResumePreview { session_id, .. } if session_id == "sess-1")),
@@ -66,12 +107,16 @@ fn session_list_loaded_fills_resume_browser_not_welcome_picker() {
 }
 
 #[test]
-fn close_resume_browser_clears_state() {
+fn close_resume_browser_clears_state_without_loading_shell() {
     let mut app = test_app();
     let _ = dispatch(Action::ShowResumeBrowser, &mut app);
+    // Simulate a stale arm that older fetch paths left behind.
+    app.session_picker_loading = true;
     assert!(app.resume_browser.is_some());
     let _ = dispatch(Action::CloseResumeBrowser, &mut app);
     assert!(app.resume_browser.is_none());
+    assert!(!app.session_picker_loading);
+    assert!(app.session_picker_entries.is_none());
 }
 
 #[test]

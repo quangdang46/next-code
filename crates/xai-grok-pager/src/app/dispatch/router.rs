@@ -226,6 +226,9 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::ShowResumeBrowser => dispatch_show_resume_browser(app),
         Action::CloseResumeBrowser => {
             app.resume_browser = None;
+            // Defensive: never leave a stuck welcome Loading shell after Esc.
+            app.session_picker_loading = false;
+            app.session_picker_entries = None;
             vec![]
         }
         Action::PickResumeBrowserSession {
