@@ -862,6 +862,9 @@ pub struct AppView {
     pub session_picker_state: crate::views::picker::PickerState,
     /// Source filter for the welcome-screen session picker.
     pub session_picker_source_filter: crate::views::session_picker::SourceFilter,
+    /// Bare `--resume` Face 2-panel resume browser (list + transcript preview).
+    /// Distinct from expand-card [`Self::session_picker_*`] / modal SessionPicker.
+    pub resume_browser: Option<crate::views::resume_browser::ResumeBrowserState>,
     /// Content-based (deep search) results from ACP session search.
     pub session_picker_content_results:
         Option<Vec<xai_grok_shell::extensions::session_search::SearchSessionHit>>,
@@ -1304,6 +1307,7 @@ impl AppView {
                 crate::views::picker::PickerMode::FullScreen,
             ),
             session_picker_source_filter: crate::views::session_picker::SourceFilter::default(),
+            resume_browser: None,
             session_picker_content_results: None,
             session_picker_content_loading: false,
             session_picker_deep_search_seq: 0,
@@ -2206,6 +2210,17 @@ impl AppView {
         )
         .is_some_and(|(owner, _, _)| !crate::views::announcements::is_dismissible(owner));
         let has_foreign_resume = self.foreign_resume_hint().is_some();
+        if self.resume_browser.is_some() {
+            return match ev {
+                Event::Key(key) => {
+                    let Some(rb) = self.resume_browser.as_mut() else {
+                        return InputOutcome::Unchanged;
+                    };
+                    crate::views::resume_browser::handle_resume_browser_key(rb, key)
+                }
+                _ => InputOutcome::Unchanged,
+            };
+        }
         let outcome = match self.active_view {
             ActiveView::Welcome => handle_welcome_input(
                 ev,
@@ -3930,6 +3945,9 @@ impl AppView {
                     (None, full_area)
                 };
             if view_area.height > 0 {
+                if let Some(rb) = self.resume_browser.as_mut() {
+                    crate::views::resume_browser::render_resume_browser(f.buffer_mut(), view_area, rb);
+                } else {
                 match *active_view {
                     ActiveView::Welcome => {
                         let mut flags_vec: Vec<crate::views::prompt_widget::PromptFlag<'_>> =
@@ -4403,6 +4421,7 @@ impl AppView {
                         }
                     }
                 }
+                } // else (not resume_browser)
             }
             if let Some(fps) = &fps_overlay {
                 fps.render(full_area, f.buffer_mut());
@@ -5408,6 +5427,7 @@ pub(crate) mod tests {
                 crate::views::picker::PickerMode::FullScreen,
             ),
             session_picker_source_filter: crate::views::session_picker::SourceFilter::default(),
+            resume_browser: None,
             session_picker_content_results: None,
             session_picker_content_loading: false,
             session_picker_deep_search_seq: 0,

@@ -8,6 +8,7 @@ mod modes;
 mod notes;
 mod permissions;
 mod prompt;
+mod resume_browser;
 mod rewind;
 mod router;
 mod session;
@@ -203,6 +204,7 @@ fn test_app() -> AppView {
             crate::views::picker::PickerMode::FullScreen,
         ),
         session_picker_source_filter: crate::views::session_picker::SourceFilter::default(),
+        resume_browser: None,
         session_picker_content_results: None,
         session_picker_content_loading: false,
         session_picker_deep_search_seq: 0,

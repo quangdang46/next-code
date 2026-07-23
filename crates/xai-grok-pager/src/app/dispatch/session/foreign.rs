@@ -1,4 +1,4 @@
-use crate::app::actions::Effect;
+use crate::app::actions::{Action, Effect};
 use crate::app::app_view::{AppView, SessionPickerEntry};
 use crate::app::dispatch::ctx::get_active_agent_mut;
 use crate::app::effects::ConversationsPartial;
@@ -210,6 +210,30 @@ pub(in crate::app::dispatch) fn handle_session_list_loaded(
     let chat_mode = app.chat_mode;
     let mut sessions = Some(sessions);
     let mut notice = None;
+
+    // Bare `--resume` 2-panel browser takes precedence over welcome/modal pickers.
+    if let Some(rb) = app.resume_browser.as_mut() {
+        let list = sessions.take().unwrap_or_default();
+        if list.is_empty() {
+            if let Some(msg) = partial_notice {
+                notice = Some(msg.to_owned());
+            } else {
+                notice = Some(empty_notice.clone());
+            }
+        }
+        rb.set_entries(list);
+        let preview_effect = rb.request_preview_effect().and_then(|action| match action {
+            Action::LoadResumePreview { session_id, seq } => {
+                Some(Effect::LoadResumePreview { session_id, seq })
+            }
+            _ => None,
+        });
+        if let Some(notice) = notice {
+            app.show_toast(&notice);
+        }
+        return preview_effect.into_iter().collect();
+    }
+
     if let Some(agent) = get_active_agent_mut(app) {
         let current_repo = repo_name_from_cwd(&agent.session.cwd.to_string_lossy());
         if let Some(ActiveModal::SessionPicker {
@@ -283,9 +307,15 @@ pub(in crate::app::dispatch) fn handle_session_list_failed(
     let chat_mode = app.chat_mode;
     let mut handled = false;
     let mut notice = None;
+    if let Some(rb) = app.resume_browser.as_mut() {
+        rb.set_list_failed(&error_notice);
+        notice = Some(error_notice.clone());
+        handled = true;
+    }
     if let Some(agent) = get_active_agent_mut(app) {
         let current_repo = repo_name_from_cwd(&agent.session.cwd.to_string_lossy());
-        if let Some(ActiveModal::SessionPicker {
+        if !handled
+            && let Some(ActiveModal::SessionPicker {
             entries,
             loading,
             lanes,

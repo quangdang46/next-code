@@ -554,7 +554,7 @@ pub(in crate::app::dispatch) fn drain_startup_actions(app: &mut AppView) -> Vec<
         effects.extend(dispatch_initial_prompt(app, prompt));
     }
     if open_session_picker {
-        effects.extend(dispatch(Action::ShowSessionPicker, app));
+        effects.extend(dispatch(Action::ShowResumeBrowser, app));
     }
     if open_dashboard {
         effects.extend(dispatch(Action::OpenDashboard, app));

@@ -270,9 +270,106 @@ fn session_snapshot_path(session_id: &str) -> PathBuf {
     sessions_root().join(format!("{session_id}.json"))
 }
 
+fn session_journal_path(session_id: &str) -> PathBuf {
+    sessions_root().join(format!("{session_id}.journal.jsonl"))
+}
+
 fn load_snapshot(session_id: &str) -> Option<SessionSnapshot> {
     let raw = std::fs::read_to_string(session_snapshot_path(session_id)).ok()?;
     serde_json::from_str(&raw).ok()
+}
+
+/// One line in the Face resume-browser transcript preview.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranscriptPreviewLine {
+    pub role: String,
+    pub text: String,
+}
+
+/// Load last `max_messages` visible turns from flat `sessions/<id>.json`
+/// plus journal `append_messages` (if present). Skips system-reminder /
+/// display_role=system noise. Pure FS — no ACP.
+pub fn load_transcript_preview(
+    session_id: &str,
+    max_messages: usize,
+) -> Vec<TranscriptPreviewLine> {
+    let mut messages = load_snapshot(session_id)
+        .map(|s| s.messages)
+        .unwrap_or_default();
+    append_journal_messages(session_id, &mut messages);
+    let visible: Vec<TranscriptPreviewLine> = messages
+        .iter()
+        .filter_map(message_to_preview_line)
+        .collect();
+    let start = visible.len().saturating_sub(max_messages);
+    visible[start..].to_vec()
+}
+
+fn append_journal_messages(session_id: &str, messages: &mut Vec<serde_json::Value>) {
+    let Ok(raw) = std::fs::read_to_string(session_journal_path(session_id)) else {
+        return;
+    };
+    for line in raw.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) else {
+            continue;
+        };
+        let Some(appended) = value.get("append_messages").and_then(|v| v.as_array()) else {
+            continue;
+        };
+        messages.extend(appended.iter().cloned());
+    }
+}
+
+fn message_to_preview_line(msg: &serde_json::Value) -> Option<TranscriptPreviewLine> {
+    let display_role = msg
+        .get("display_role")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if display_role.eq_ignore_ascii_case("system") {
+        return None;
+    }
+    let role = msg
+        .get("role")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let text = extract_message_text(msg);
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if trimmed.contains("<system-reminder>") {
+        return None;
+    }
+    Some(TranscriptPreviewLine {
+        role,
+        text: trimmed.to_string(),
+    })
+}
+
+fn extract_message_text(msg: &serde_json::Value) -> String {
+    let Some(content) = msg.get("content") else {
+        return String::new();
+    };
+    if let Some(s) = content.as_str() {
+        return s.to_string();
+    }
+    let Some(arr) = content.as_array() else {
+        return String::new();
+    };
+    let mut parts = Vec::new();
+    for part in arr {
+        if part.get("type").and_then(|t| t.as_str()) == Some("text")
+            && let Some(t) = part.get("text").and_then(|t| t.as_str())
+        {
+            parts.push(t);
+        }
+    }
+    parts.join("\n")
 }
 
 fn iter_snapshots() -> Vec<SessionSnapshot> {
@@ -406,5 +503,63 @@ mod tests {
         assert_eq!(listed.len(), 1);
         assert_eq!(&*listed[0].info.id.0, "session_a");
         assert_eq!(listed[0].current_model_id, "test-model");
+    }
+
+    #[test]
+    fn transcript_preview_merges_snapshot_and_journal() {
+        let home = TempDir::new().unwrap();
+        unsafe { std::env::set_var("GROK_HOME", home.path()) };
+        let sessions = home.path().join("sessions");
+        std::fs::create_dir_all(&sessions).unwrap();
+        let body = serde_json::json!({
+            "id": "session_prev",
+            "parent_id": null,
+            "title": "preview",
+            "created_at": "2026-07-21T00:00:00Z",
+            "updated_at": "2026-07-21T01:00:00Z",
+            "messages": [
+                {
+                    "role": "user",
+                    "display_role": "system",
+                    "content": [{"type": "text", "text": "<system-reminder>\nhidden\n</system-reminder>"}]
+                },
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": "hello from snapshot"}]
+                }
+            ],
+            "working_dir": "/tmp/proj",
+            "model": "test-model",
+            "status": "Closed",
+            "is_canary": false,
+            "is_debug": false,
+            "saved": false
+        });
+        std::fs::write(
+            sessions.join("session_prev.json"),
+            serde_json::to_string_pretty(&body).unwrap(),
+        )
+        .unwrap();
+        let journal = serde_json::json!({
+            "meta": { "updated_at": "2026-07-21T02:00:00Z" },
+            "append_messages": [
+                {
+                    "role": "assistant",
+                    "content": [{"type": "text", "text": "hello from journal"}]
+                }
+            ]
+        });
+        std::fs::write(
+            sessions.join("session_prev.journal.jsonl"),
+            format!("{}\n", serde_json::to_string(&journal).unwrap()),
+        )
+        .unwrap();
+
+        let lines = load_transcript_preview("session_prev", 20);
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0].role, "user");
+        assert_eq!(lines[0].text, "hello from snapshot");
+        assert_eq!(lines[1].role, "assistant");
+        assert_eq!(lines[1].text, "hello from journal");
     }
 }
