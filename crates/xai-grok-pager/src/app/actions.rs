@@ -87,6 +87,21 @@ pub enum Action {
     },
     /// Open the session picker overlay (from within an active session via /resume).
     ShowSessionPicker,
+    /// Bare `next-code --resume`: open Face 2-panel resume browser (list + transcript).
+    ShowResumeBrowser,
+    /// Dismiss the Face 2-panel resume browser (Esc) without picking.
+    CloseResumeBrowser,
+    /// Enter on a resume-browser row — load that session.
+    PickResumeBrowserSession {
+        session_id: String,
+        cwd: String,
+        source: String,
+    },
+    /// Async-load transcript preview for the selected resume-browser row.
+    LoadResumePreview {
+        session_id: String,
+        seq: u64,
+    },
     /// The session picker overlay was dismissed without a pick: invalidate any
     /// in-flight list/search/foreign scan so a late response can't fall
     /// through to the welcome picker fields.
@@ -1453,6 +1468,11 @@ pub enum Effect {
         cwd: String,
         generation: u64,
     },
+    /// Load transcript preview lines for Face resume browser from flat store.
+    LoadResumePreview {
+        session_id: String,
+        seq: u64,
+    },
     /// Restore a remote session from GCS then load it. Only Build rows reach
     /// this effect: conversation rows have no GCS archive.
     RestoreAndLoadSession {
@@ -2234,6 +2254,12 @@ pub enum TaskResult {
         session_id: String,
         generation: u64,
         detail: crate::app::app_view::CardDetail,
+    },
+    /// Transcript preview loaded for Face resume browser.
+    ResumePreviewLoaded {
+        session_id: String,
+        seq: u64,
+        lines: Vec<crate::views::resume_browser::ResumePreviewLine>,
     },
     /// Remote session restored successfully — now load it. Always a Build
     /// disk row (see [`Effect::RestoreAndLoadSession`]).
