@@ -512,9 +512,7 @@ fn login_anthropic_api_key_flow() -> Result<()> {
     eprintln!("\nSuccessfully saved Anthropic API key!");
     eprintln!(
         "Stored at {}",
-        crate::storage::app_config_dir()?
-            .join("anthropic.env")
-            .display()
+        crate::provider_catalog::auth_json_path()?.display()
     );
     eprintln!("Provider: claude (native Anthropic Messages API)");
     Ok(())

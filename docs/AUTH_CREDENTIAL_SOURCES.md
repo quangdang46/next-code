@@ -8,31 +8,59 @@ lives somewhere the naive search did not look.
 
 If you are debugging "does provider X have a credential?", read this first.
 
+## Unified home (preferred)
+
+All next-code credentials belong under **`~/.next-code`** (or `$NEXT_CODE_HOME`):
+
+| Path | Contents |
+|------|----------|
+| `~/.next-code/auth.json` | **Unified store** — Claude OAuth in `anthropic_accounts[]`; API keys and single-account OpenCode-shaped entries as flat provider map (`anthropic` / `openai` / `openrouter` / … → `{ "type": "api", "key": "…" }` or `{ "type": "oauth", … }`) |
+| `~/.next-code/openai-auth.json` | OpenAI / Codex OAuth (still separate file during transition; dual-read) |
+| `~/.next-code/config.toml` | Non-secret settings |
+
+**Resolution order for API keys:** process env → unified `auth.json` → legacy `app_config_dir()/*.env` → trusted external imports / secrets fallbacks.
+
+Face `/connect` and `next-code login` write API keys into **`auth.json`** (not `%APPDATA%\next-code\*.env`). Legacy `*.env` files are still **read**. Copy them in with:
+
+```sh
+next-code auth migrate
+```
+
+(`--purge` is reserved and currently refused — migrate never deletes.)
+
 ## The two "dual-auth" providers: Anthropic and OpenAI
 
 Anthropic/Claude and OpenAI each support **two completely independent credential
 paths**, surfaced as **two separate login providers**:
 
-| Concept            | Login provider id | Auth kind | Where the credential lives                                  |
-|--------------------|-------------------|-----------|-------------------------------------------------------------|
+| Concept            | Login provider id | Auth kind | Where the credential lives |
+|--------------------|-------------------|-----------|----------------------------|
 | Claude, OAuth/sub  | `claude`          | OAuth     | `~/.next-code/auth.json` → `anthropic_accounts[].access` (`sk-ant-oat...`) |
-| Claude, API key    | `anthropic-api`   | API key   | `ANTHROPIC_API_KEY` env **or** `~/.config/next-code/anthropic.env`         |
-| OpenAI, OAuth      | `openai`          | OAuth     | `~/.next-code/openai-auth.json` (Codex/ChatGPT login)            |
-| OpenAI, API key    | `openai-api`      | API key   | `OPENAI_API_KEY` env **or** `~/.config/next-code/openai.env`     |
+| Claude, API key    | `anthropic-api`   | API key   | `ANTHROPIC_API_KEY` env **or** `auth.json` → `anthropic: {type:api,key}` **or** legacy `~/.config/next-code/anthropic.env` |
+| OpenAI, OAuth      | `openai`          | OAuth     | `~/.next-code/openai-auth.json` (Codex/ChatGPT login) |
+| OpenAI, API key    | `openai-api`      | API key   | `OPENAI_API_KEY` env **or** `auth.json` → `openai: {type:api,key}` **or** legacy `openai.env` |
+
+### Provider id mapping (frozen)
+
+| Login id / env | Unified `auth.json` map key | Shape |
+|----------------|-----------------------------|-------|
+| `claude` | `anthropic_accounts[]` (+ `active_anthropic_account`) | next-code multi-account OAuth |
+| `anthropic-api` / `ANTHROPIC_API_KEY` | `anthropic` | OpenCode `{type:api,key}` |
+| `openai-api` / `OPENAI_API_KEY` | `openai` | OpenCode `{type:api,key}` |
+| `openrouter` / … | OpenCode provider slug (see `provider_ids_for_env_key`) | `{type:api,key}` |
+
+Multi-account choice: **keep account arrays** for Claude OAuth; use **OpenCode flat entries** for single-account API keys (and future single-account OAuth folded into the same map). Do **not** replace `anthropic_accounts` with namespaced keys.
 
 Key facts that trip people up:
 
 - The **OAuth token is not an API key.** Anthropic OAuth tokens are `sk-ant-oat01-...`
   (and refresh tokens `sk-ant-ort01-...`). A direct API key is `sk-ant-api03-...`.
-  Grepping for `sk-ant-api` will miss an OAuth-only setup, and vice versa.
-- The **API key is usually in the app config dir, not an env var.** The canonical
-  store is `~/.config/next-code/anthropic.env` (XDG `$XDG_CONFIG_HOME/next-code/anthropic.env`),
-  written by `next-code login --provider anthropic-api`. `printenv ANTHROPIC_API_KEY`
-  returning nothing does **not** mean there is no key.
-- `~/.next-code/auth.json` holds **only OAuth accounts**, never the API key.
-- `claude` and `anthropic-api` are **different providers** with different
-  availability. Having a Claude subscription login (OAuth) does **not** make
-  `anthropic-api` usable, and vice versa.
+- **`auth.json` holds both** OAuth accounts and API-key map entries. Grepping only
+  for `anthropic_accounts` misses API keys under `anthropic.type == "api"`.
+- Legacy **`~/.config/next-code/*.env`** (Windows: `%APPDATA%\next-code\*.env`) is
+  still dual-read but is no longer the primary write path for catalog API keys.
+- `claude` and `anthropic-api` are **different providers**. Having a Claude
+  subscription login (OAuth) does **not** make `anthropic-api` usable, and vice versa.
 
 ### How to actually check (don't guess)
 
@@ -41,8 +69,14 @@ Key facts that trip people up:
 next-code auth status --json
 ```
 
+The JSON report always includes absolute paths:
+
+- `next_code_home`
+- `unified_auth_json`
+- `app_config_dir` (legacy `*.env` root)
+
 Each provider entry reports `status`, `auth_kind` ("OAuth" vs "API key"),
-`credential_source` (env var / app config file / next-code-managed file), and the
+`credential_source` (env var / next-code-managed file / app config file / …), and the
 exact `method`. This is the canonical surface; prefer it over grepping files.
 
 Programmatically, the single source of truth is
@@ -64,7 +98,7 @@ anthropic_reasoning_effort = "xhigh"
 - `default_provider = "claude"` uses the OAuth/subscription credential.
 - `default_provider = "anthropic-api"` uses the direct API key. In this mode the
   runtime **does not** fall back to OAuth: if no API key is configured the request
-  fails. Make sure `~/.config/next-code/anthropic.env` (or `ANTHROPIC_API_KEY`) exists.
+  fails. Prefer `auth.json` (`anthropic` api entry) or `ANTHROPIC_API_KEY`.
 
 The full alias/vocabulary mapping (runtime env, route stable-id, CLI `--provider`,
 model prefix) is centralized in
@@ -91,8 +125,8 @@ next-code auth-test --provider <id>
 
 1. Run `next-code auth status --json` and read the entry for the **specific** login
    provider id (`claude` vs `anthropic-api` are different!).
-2. If you must inspect files: OAuth → `~/.next-code/auth.json` (and external imports);
-   API key → `ANTHROPIC_API_KEY` env or `~/.config/next-code/<provider>.env`.
+2. If you must inspect files: OAuth Claude → `auth.json` `anthropic_accounts`;
+   API keys → `auth.json` flat map, then env, then legacy `*.env`.
 3. Ignore `auth-validation.json` verdicts older than 7 days (shown as `stale`);
    re-run `next-code auth-test` instead.
 

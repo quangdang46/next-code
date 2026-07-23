@@ -44,7 +44,7 @@ fn next_code_auth_file_roundtrip() {
             subscription_type: Some("max".to_string()),
         }],
         active_anthropic_account: Some("work".to_string()),
-        anthropic: None,
+        providers: Default::default(),
     };
 
     let json = serde_json::to_string_pretty(&auth).unwrap();
@@ -146,7 +146,7 @@ fn next_code_auth_file_multi_account() {
             },
         ],
         active_anthropic_account: Some("work".to_string()),
-        anthropic: None,
+        providers: Default::default(),
     };
 
     let json = serde_json::to_string(&auth).unwrap();
@@ -166,7 +166,42 @@ fn next_code_auth_file_legacy_migration_format() {
     }"#;
     let parsed: NextCodeAuthFile = serde_json::from_str(legacy_json).unwrap();
     assert!(parsed.anthropic_accounts.is_empty());
-    assert!(parsed.anthropic.is_some());
+    assert!(parsed.providers.get("anthropic").is_some());
+    assert!(parsed.providers["anthropic"].get("type").is_none());
+}
+
+#[test]
+fn load_auth_file_migrates_legacy_anthropic_blob_and_keeps_api_keys() {
+    let _lock = crate::storage::lock_test_env();
+    let temp = tempfile::TempDir::new().unwrap();
+    let _home = EnvVarGuard::set("NEXT_CODE_HOME", temp.path());
+    set_active_account_override(None);
+
+    let auth_path = temp.path().join("auth.json");
+    std::fs::write(
+        &auth_path,
+        r#"{
+            "anthropic": {
+                "access": "legacy_acc",
+                "refresh": "legacy_ref",
+                "expires": 12345
+            },
+            "openrouter": {
+                "type": "api",
+                "key": "or-key"
+            }
+        }"#,
+    )
+    .unwrap();
+
+    let auth = load_auth_file().unwrap();
+    assert_eq!(auth.anthropic_accounts.len(), 1);
+    assert_eq!(auth.anthropic_accounts[0].access, "legacy_acc");
+    assert!(auth.providers.get("anthropic").is_none());
+    assert_eq!(
+        auth.providers["openrouter"]["key"].as_str(),
+        Some("or-key")
+    );
 }
 
 #[test]

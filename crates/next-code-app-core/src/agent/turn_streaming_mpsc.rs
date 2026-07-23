@@ -939,6 +939,7 @@ impl Agent {
                     model: model_after_stream,
                     provider_name: Some(provider_name),
                     error: None,
+                    fallback_model: None,
                 });
             }
 

@@ -1762,6 +1762,10 @@ pub(in crate::app::dispatch) fn set_default_model(
 
 /// Map Overview/provider float label → config `default_provider` key.
 /// Mirrors next-code `derive_session_provider_key` fallback (no env pins).
+///
+/// Must write catalog ids (`opencode-go`), never display-name pins
+/// (`"opencode go"`), or daemon `model_switch_request_for_session_model`
+/// emits a bare model and mis-routes to OpenRouter.
 pub(in crate::app::dispatch) fn config_provider_key_from_float(name: &str) -> String {
     let normalized = name.trim().to_ascii_lowercase();
     match normalized.as_str() {
@@ -1773,7 +1777,9 @@ pub(in crate::app::dispatch) fn config_provider_key_from_float(name: &str) -> St
         "gemini" => "gemini".to_string(),
         "antigravity" => "antigravity".to_string(),
         "bedrock" | "aws bedrock" => "bedrock".to_string(),
-        other => other.to_string(),
+        other => next_code_provider_metadata::resolve_login_provider_loose(other)
+            .map(|provider| provider.id.to_string())
+            .unwrap_or_else(|| other.to_string()),
     }
 }
 

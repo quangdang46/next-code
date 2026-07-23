@@ -1890,6 +1890,10 @@ pub fn run_auth_status_command(emit_json: bool, emit_toon: bool) -> Result<()> {
     report_info::run_auth_status_command(emit_json, emit_toon)
 }
 
+pub fn run_auth_migrate_command(purge: bool) -> Result<()> {
+    report_info::run_auth_migrate_command(purge)
+}
+
 pub async fn run_auth_doctor_command(
     provider_arg: Option<&str>,
     validate: bool,

@@ -36,11 +36,16 @@ Windows-specific configuration paths:
 | File/Directory | Windows Path |
 |----------------|--------------|
 | Main config | `%USERPROFILE%\.next-code\config.toml` |
-| Auth credentials | `%USERPROFILE%\.next-code\auth.json` |
-| Provider env files | `%APPDATA%\next-code\` |
+| Auth credentials (unified) | `%USERPROFILE%\.next-code\auth.json` |
+| Legacy provider `*.env` (dual-read only) | `%APPDATA%\next-code\` |
 | Build artifacts | `%LOCALAPPDATA%\next-code\builds\` |
 | Browser components | `%LOCALAPPDATA%\next-code\browser\` |
 | Logs | `%USERPROFILE%\.next-code\logs\` |
+
+API keys from Face `/connect` and `next-code login` write into
+`%USERPROFILE%\.next-code\auth.json` (OpenCode-compatible map). Legacy
+`%APPDATA%\next-code\*.env` files are still read; migrate with
+`next-code auth migrate`. See `docs/AUTH_CREDENTIAL_SOURCES.md`.
 
 ## Login and Authentication
 

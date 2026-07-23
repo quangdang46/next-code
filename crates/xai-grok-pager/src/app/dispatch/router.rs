@@ -93,7 +93,8 @@ use super::settings::setters::{
 };
 use super::settings::ui::{
     dispatch_confirm_reset_setting, dispatch_open_command_palette, dispatch_open_howto_guides,
-    dispatch_open_model_picker, dispatch_open_reset_confirm, dispatch_open_settings,
+    dispatch_open_connect_picker, dispatch_open_model_picker, dispatch_open_reset_confirm,
+    dispatch_open_settings,
     dispatch_toggle_compact_mode,
     dispatch_toggle_mouse_capture, dispatch_toggle_multiline, dispatch_toggle_timestamps,
     dispatch_toggle_vim_mode,
@@ -869,13 +870,14 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 agent.session.deferred_model_switch = Some((model_id, effort));
                 return vec![];
             };
+            let prev_model_id = agent.session.models.current.clone();
             agent.session.model_switch_pending = true;
             vec![Effect::SwitchModel {
                 agent_id: id,
                 session_id,
                 model_id,
                 effort,
-                prev_model_id: None,
+                prev_model_id,
             }]
         }
         Action::AnnouncementsHide => {
@@ -1029,6 +1031,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::OpenCommandPalette => dispatch_open_command_palette(app),
         Action::OpenHowtoGuides => dispatch_open_howto_guides(app),
         Action::OpenModelPicker => dispatch_open_model_picker(app),
+        Action::OpenConnectPicker => dispatch_open_connect_picker(app),
         Action::OpenResetConfirm { key } => dispatch_open_reset_confirm(app, key),
         Action::ConfirmResetSetting { choice } => dispatch_confirm_reset_setting(app, choice),
         Action::DumpInputLog => dispatch_dump_input_log(app),

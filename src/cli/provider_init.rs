@@ -1348,11 +1348,30 @@ pub fn save_named_api_key(env_file: &str, key_name: &str, key: &str) -> Result<(
         anyhow::bail!("Invalid env file name: {}", env_file);
     }
 
-    let config_dir = crate::storage::app_config_dir()?;
-    let file_path = config_dir.join(env_file);
-    crate::storage::upsert_env_file_value(&file_path, key_name, Some(key))?;
+    // Primary durable store: OpenCode-compatible entry in ~/.next-code/auth.json.
+    let unified_path = if crate::provider_catalog::canonical_provider_id_for_env_key(key_name).is_some()
+    {
+        let provider_id = crate::provider_catalog::save_api_key_to_unified_auth(key_name, key)?;
+        let path = crate::provider_catalog::auth_json_path()?;
+        Some((provider_id, path))
+    } else {
+        // Custom / unmapped openai-compat profiles still use app-config *.env.
+        let config_dir = crate::storage::app_config_dir()?;
+        let file_path = config_dir.join(env_file);
+        crate::storage::upsert_env_file_value(&file_path, key_name, Some(key))?;
+        None
+    };
 
     crate::env::set_var(key_name, key);
+    crate::auth::AuthStatus::invalidate_cache();
+
+    if let Some((provider_id, path)) = unified_path {
+        crate::logging::info(&format!(
+            "Saved API key for {key_name} to {} (provider id `{provider_id}`)",
+            path.display()
+        ));
+    }
+
     Ok(())
 }
 

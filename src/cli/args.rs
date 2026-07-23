@@ -1122,6 +1122,12 @@ pub(crate) enum AuthCommand {
         #[arg(long, conflicts_with = "json")]
         toon: bool,
     },
+    /// Copy legacy app-config `*.env` API keys into `~/.next-code/auth.json`
+    Migrate {
+        /// Reserved: delete legacy files after copy (not implemented; refuse)
+        #[arg(long)]
+        purge: bool,
+    },
     /// Diagnose provider auth issues and suggest next steps
     Doctor {
         /// Optional provider id or alias to focus diagnosis on one provider

@@ -338,6 +338,7 @@ fn send_model_changed_result(
     id: u64,
     result: anyhow::Result<(String, String)>,
     fallback_model: String,
+    requested_model: String,
     client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
 ) {
     match result {
@@ -355,6 +356,7 @@ fn send_model_changed_result(
                 model: updated,
                 provider_name: Some(provider_name),
                 error: None,
+                fallback_model: None,
             });
         }
         Err(error) => {
@@ -362,15 +364,20 @@ fn send_model_changed_result(
                 "server_model_change_failed",
                 vec![
                     ("id", id.to_string()),
+                    ("requested_model", requested_model.clone()),
                     ("fallback_model", fallback_model.clone()),
                     ("error", error.to_string()),
                 ],
             );
             let _ = client_event_tx.send(ServerEvent::ModelChanged {
                 id,
-                model: fallback_model,
+                // Name the model the user asked for — not the fallback — so
+                // Face/TUI copy says "Couldn't switch to deepseek…" instead of
+                // "Couldn't switch to kimi…" when deepseek was requested.
+                model: requested_model,
                 provider_name: None,
                 error: Some(error.to_string()),
+                fallback_model: Some(fallback_model),
             });
         }
     }
@@ -389,6 +396,7 @@ fn apply_cycle_model(
             model: agent.provider_model(),
             provider_name: None,
             error: Some("Model switching is not available for this provider.".to_string()),
+            fallback_model: None,
         });
         return;
     }
@@ -419,7 +427,7 @@ fn apply_cycle_model(
         }
         result.map(|_| (agent.provider_model(), agent.provider_name()))
     };
-    send_model_changed_result(id, result, current, client_event_tx);
+    send_model_changed_result(id, result, current, next_model, client_event_tx);
 }
 
 pub(super) async fn handle_cycle_model(
@@ -523,9 +531,10 @@ fn apply_set_model(
         );
         let _ = client_event_tx.send(ServerEvent::ModelChanged {
             id,
-            model: current,
+            model: model.clone(),
             provider_name: None,
             error: Some("Model switching is not available for this provider.".to_string()),
+            fallback_model: Some(current),
         });
         return;
     }
@@ -557,7 +566,7 @@ fn apply_set_model(
         }
         result.map(|_| (agent.provider_model(), agent.provider_name()))
     };
-    send_model_changed_result(id, result, current, client_event_tx);
+    send_model_changed_result(id, result, current, model, client_event_tx);
 }
 
 fn apply_set_route(
@@ -588,16 +597,19 @@ fn apply_set_route(
                 ("current_model", current.clone()),
             ],
         );
+        let requested = selection.routed_model_spec();
         let _ = client_event_tx.send(ServerEvent::ModelChanged {
             id,
-            model: current,
+            model: requested,
             provider_name: None,
             error: Some("Model switching is not available for this provider.".to_string()),
+            fallback_model: Some(current),
         });
         return;
     }
 
     let current = agent.provider_model();
+    let requested = selection.routed_model_spec();
     let result = {
         let result = agent.set_route_selection(&selection);
         if result.is_ok() {
@@ -623,7 +635,7 @@ fn apply_set_route(
         }
         result.map(|_| (agent.provider_model(), agent.provider_name()))
     };
-    send_model_changed_result(id, result, current, client_event_tx);
+    send_model_changed_result(id, result, current, requested, client_event_tx);
 }
 
 pub(super) async fn handle_set_model(
@@ -1486,6 +1498,7 @@ mod tests {
                 model,
                 provider_name: Some(provider_name),
                 error: None,
+                fallback_model: None,
             }) if model == "test-model-b" && provider_name == "test-effort"
         ));
     }

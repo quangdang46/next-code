@@ -9,7 +9,17 @@
   - **UX:** follow Claude — first-run / Face `/connect` feels like one browser or paste flow; no “check the other folder” mental model.
   - **Do not** copy Claude’s Anthropic-only keychain-first architecture as the primary multi-provider store.
 - **Risk:** Medium (migration of existing OAuth + `.env` keys; Windows path confusion).
-- **Status:** Waiting for your OK — reply **go ahead** to implement. **No production code in this report.**
+- **Status:** **Implementing / Phase 0–3 landed on `pr-auth-unify-opencode-store`.** Reply was **ok implement**.
+
+### Phase 0 schema freeze (locked 2026-07-22)
+
+| Decision | Choice |
+|----------|--------|
+| Filename | **`auth.json`** under `next_code_dir()` (`~/.next-code/auth.json` / `$NEXT_CODE_HOME/auth.json`) — not `credentials.json` |
+| Multi-account | **Keep `anthropic_accounts[]`** for Claude OAuth; **OpenCode flat map** for single-account API keys (and optional future oauth/wellknown entries). Rejected pure namespaced keys (`anthropic:label`) for v1 |
+| Provider id mapping | Login `claude` → accounts array; `anthropic-api` → map key **`anthropic`** `{type:api,key}`; `openai-api` → **`openai`**; other catalog API keys → first id in `provider_ids_for_env_key` (OpenCode-compatible). OpenAI OAuth remains `openai-auth.json` (dual-read) |
+| Precedence | process env → unified `auth.json` → legacy `app_config_dir()/*.env` → external / secrets fallbacks |
+| Writes | New catalog API-key logins write **only** unified `auth.json` (Phase 3: stop writing legacy `*.env`). Migrate copies legacy → unified; **never deletes** without future `--purge` |
 
 ### Vietnamese bullets (plain)
 
@@ -118,26 +128,26 @@ Related platform plans (`PLAN-20260722-pi-full-custom-platform.md`) stay orthogo
 
 ### Phase 0 — Spec + diagnostics (no behavior change)
 
-1. [ ] Freeze target schema (OpenCode-compatible entries + next-code multi-account extensions documented).
-2. [ ] Extend `auth status --json` to always print **both** roots + which path won (home OAuth vs config `.env`).
-3. [ ] Face: show credential path in connect success toast (one line).
+1. [x] Freeze target schema (OpenCode-compatible entries + next-code multi-account extensions documented).
+2. [x] Extend `auth status --json` to always print **both** roots + which path won (home OAuth vs config `.env`).
+3. [x] Face: show credential path in connect success toast (one line).
 
 ### Phase 1 — Unified **write** path (reads stay dual)
 
-1. [ ] New logins (CLI + Face) write API keys into **`~/.next-code/auth.json`** (or `credentials.json`) as `{ type: "api", key }` under provider id — **in addition to** or instead of `app_config_dir()/*.env` (prefer dual-write briefly).
-2. [ ] OAuth continues in existing JSON files **or** folds into the same map under stable provider keys (`anthropic` / `openai` / …) while preserving multi-account labels.
-3. [ ] Keep reading legacy `*.env` and old OAuth files.
+1. [x] New logins (CLI + Face) write API keys into **`~/.next-code/auth.json`** as `{ type: "api", key }` under provider id — **instead of** `app_config_dir()/*.env` for mapped keys (legacy still dual-read).
+2. [x] OAuth continues in existing JSON (`anthropic_accounts` / `openai-auth.json`) while API keys share the same `auth.json` map under stable provider keys.
+3. [x] Keep reading legacy `*.env` and old OAuth files.
 
 ### Phase 2 — Unified **read** path
 
-1. [ ] Resolution order (proposal): process env → unified auth map → legacy `app_config_dir()/*.env` → external consented sources.
-2. [ ] `auth-test` / doctor: if only legacy file has the key, offer one-shot migrate (copy into unified map; leave legacy intact).
-3. [ ] Windows: update `WINDOWS_SETUP.md` / `AUTH_CREDENTIAL_SOURCES.md` to “one home” story.
+1. [x] Resolution order: process env → unified auth map → legacy `app_config_dir()/*.env` → external consented sources.
+2. [x] `next-code auth migrate`: copy legacy → unified; leave legacy intact (`--purge` refused).
+3. [x] Docs: update `AUTH_CREDENTIAL_SOURCES.md` to “one home” story.
 
 ### Phase 3 — Soft deprecation
 
-1. [ ] Stop writing new secrets to `%APPDATA%\next-code\*.env` / `~/.config/next-code/*.env`.
-2. [ ] Optional `next-code auth migrate` copies legacy → unified; never deletes without `--purge`.
+1. [x] Stop writing new secrets to `%APPDATA%\next-code\*.env` / `~/.config/next-code/*.env` for mapped catalog keys.
+2. [x] `next-code auth migrate` copies legacy → unified; never deletes without `--purge` (purge not implemented).
 3. [ ] After one release cycle, warn on legacy-only reads; keep forever-read for safety if cheap.
 
 ### Rollback
@@ -183,6 +193,6 @@ Related platform plans (`PLAN-20260722-pi-full-custom-platform.md`) stay orthogo
 
 ## Status
 
-**Waiting for your OK — reply `go ahead` to implement Phase 0–1.**
+**Phase 0–3 (minus legacy-read warnings) implemented on branch `pr-auth-unify-opencode-store`.**
 
-No code changes in this report.
+Schema freeze and dual-read/migrate semantics are documented above and in `docs/AUTH_CREDENTIAL_SOURCES.md`.

@@ -980,6 +980,48 @@ fn switch_model_complete_failure_pushes_error_and_clears_pending() {
 }
 
 #[test]
+fn switch_model_complete_other_error_reverts_optimistic_chrome() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    let prev_model = acp::ModelId::new(std::sync::Arc::from("kimi-k2.7-code"));
+    let requested = acp::ModelId::new(std::sync::Arc::from("deepseek-v4-flash"));
+
+    let agent = app.agents.get_mut(&id).unwrap();
+    agent.session.models.available.insert(
+        prev_model.clone(),
+        acp::ModelInfo::new(prev_model.clone(), "Kimi".to_string()),
+    );
+    agent.session.models.available.insert(
+        requested.clone(),
+        acp::ModelInfo::new(requested.clone(), "DeepSeek".to_string()),
+    );
+    // Optimistic Overview /model apply already flipped chrome to requested.
+    agent.session.models.set_current(requested.clone(), None);
+    agent.session.model_switch_pending = true;
+
+    dispatch(
+        Action::TaskComplete(TaskResult::SwitchModelComplete {
+            agent_id: id,
+            model_id: requested,
+            effort: None,
+            result: Err(SwitchModelError::Other(
+                "Couldn't switch model to deepseek-v4-flash (staying on kimi-k2.7-code): OPENROUTER_API_KEY not found"
+                    .into(),
+            )),
+            prev_model_id: Some(prev_model.clone()),
+        }),
+        &mut app,
+    );
+
+    assert!(!app.agents[&id].session.model_switch_pending);
+    assert_eq!(
+        app.agents[&id].session.models.current,
+        Some(prev_model),
+        "failed switch must roll chrome back to prev_model_id",
+    );
+}
+
+#[test]
 fn switch_model_incompatible_agent_shows_question_modal() {
     let mut app = test_app_with_agent();
     let id = AgentId(0);

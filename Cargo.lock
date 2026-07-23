@@ -7195,6 +7195,7 @@ dependencies = [
  "next-code-logging",
  "next-code-provider-metadata",
  "next-code-storage",
+ "serde_json",
  "tempfile",
 ]
 

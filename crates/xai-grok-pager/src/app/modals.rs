@@ -59,7 +59,9 @@ impl AgentView {
         else {
             return false;
         };
-        if args_query.is_empty() || !matches!(command.as_str(), "model" | "m") {
+        if args_query.is_empty()
+            || !matches!(command.as_str(), "model" | "m" | "connect" | "login")
+        {
             return false;
         }
         let command = command.clone();
@@ -732,30 +734,35 @@ impl AgentView {
                         provider: item.insert_text,
                     });
                 }
-                let chains_to_effort = matches!(command_clone.as_str(), "model" | "m")
-                    && item.insert_text.ends_with(char::is_whitespace);
-                if chains_to_effort {
+                let chains_to_subphase = item.insert_text.ends_with(char::is_whitespace)
+                    && matches!(command_clone.as_str(), "model" | "m" | "connect" | "login");
+                if chains_to_subphase {
                     let next_query = item.insert_text.clone();
                     if let Some(cmd) = self.prompt.slash_controller.registry().get(&command_clone) {
                         let ctx = self.prompt.slash_controller.app_ctx(&self.session.models);
-                        if let Some(effort_items) = cmd.suggest_args(&ctx, &next_query)
-                            && Self::arg_items_look_like_effort_phase(&effort_items)
-                        {
-                            if let Some(ActiveModal::ArgPicker {
-                                args_query,
-                                items,
-                                original_items,
-                                state,
-                                ..
-                            }) = self.active_modal.as_mut()
-                            {
-                                *args_query = next_query;
-                                *items = effort_items.clone();
-                                *original_items = effort_items;
-                                // Effort sub-step is part of the type-to-find /model picker: open input-focused (cursor + type-to-filter), matching the rest of the flow.
-                                *state = crate::views::picker::PickerState::input_active();
+                        if let Some(sub_items) = cmd.suggest_args(&ctx, &next_query) {
+                            let accept = if matches!(command_clone.as_str(), "model" | "m") {
+                                Self::arg_items_look_like_effort_phase(&sub_items)
+                            } else {
+                                // connect method phase: any selectable row
+                                sub_items.iter().any(|i| !i.is_section_header)
+                            };
+                            if accept {
+                                if let Some(ActiveModal::ArgPicker {
+                                    args_query,
+                                    items,
+                                    original_items,
+                                    state,
+                                    ..
+                                }) = self.active_modal.as_mut()
+                                {
+                                    *args_query = next_query;
+                                    *items = sub_items.clone();
+                                    *original_items = sub_items;
+                                    *state = crate::views::picker::PickerState::input_active();
+                                }
+                                return InputOutcome::Changed;
                             }
-                            return InputOutcome::Changed;
                         }
                     }
                 }
@@ -1855,7 +1862,8 @@ impl AgentView {
                     "model" | "m" if !args_query.is_empty() => "Select reasoning effort",
                     "model" | "m" => "Select model",
                     "theme" | "t" => "Pick theme",
-                    "connect" => "Connect provider",
+                    "connect" | "login" if !args_query.is_empty() => "Select auth method",
+                    "connect" | "login" => "Connect a provider",
                     _ => "Pick option",
                 };
                 // Owned strings for checkmarks / empty rights so PickerRow
@@ -1867,7 +1875,9 @@ impl AgentView {
                             String::new()
                         } else if item.is_current {
                             "\u{2713}".to_string()
-                        } else if item.provider_connect {
+                        } else if item.provider_connect
+                            || matches!(command.as_str(), "connect" | "login")
+                        {
                             item.description.clone()
                         } else {
                             String::new()

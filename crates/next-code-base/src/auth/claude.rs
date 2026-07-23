@@ -73,7 +73,14 @@ pub struct AnthropicAccount {
 }
 
 /// Multi-account next-code auth.json format.
-/// Backwards-compatible: also reads the old single-account `{"anthropic": {...}}` layout.
+///
+/// Claude OAuth lives in `anthropic_accounts`. OpenCode-compatible flat provider
+/// entries (`anthropic` / `openai` / … with `{type: api|oauth|wellknown, …}`) are
+/// stored in [`Self::providers`] via serde flatten so API keys and OAuth accounts
+/// share one file under `~/.next-code/auth.json`.
+///
+/// Also migrates the old single-account `{"anthropic": {access, refresh, expires}}`
+/// blob (no `type` field) into `anthropic_accounts`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NextCodeAuthFile {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -81,19 +88,9 @@ pub struct NextCodeAuthFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_anthropic_account: Option<String>,
 
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    anthropic: Option<LegacyAnthropicAuth>,
-}
-
-/// Legacy single-account format (for migration).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct LegacyAnthropicAuth {
-    #[serde(default)]
-    access: String,
-    #[serde(default)]
-    refresh: String,
-    #[serde(default)]
-    expires: i64,
+    /// OpenCode-compatible provider map + any unrecognized top-level keys.
+    #[serde(flatten)]
+    pub providers: std::collections::HashMap<String, serde_json::Value>,
 }
 
 const ACCOUNT_LABEL_PREFIX: &str = "claude";
@@ -308,21 +305,37 @@ pub fn load_auth_file() -> Result<NextCodeAuthFile> {
         .with_context(|| format!("Could not read next-code credentials from {:?}", path))?;
 
     if auth.anthropic_accounts.is_empty()
-        && let Some(legacy) = auth.anthropic.take()
-        && !legacy.access.is_empty()
+        && let Some(legacy_val) = auth.providers.get("anthropic").cloned()
+        && legacy_val.get("type").is_none()
     {
-        crate::logging::info("Migrating legacy single-account auth.json to multi-account format");
-        auth.anthropic_accounts.push(AnthropicAccount {
-            label: "default".to_string(),
-            access: legacy.access,
-            refresh: legacy.refresh,
-            expires: legacy.expires,
-            email: None,
-            subscription_type: Some("max".to_string()),
-            scopes: Vec::new(),
-        });
-        auth.active_anthropic_account = Some("default".to_string());
-        let _ = save_auth_file(&auth);
+        let access = legacy_val
+            .get("access")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let refresh = legacy_val
+            .get("refresh")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        let expires = legacy_val.get("expires").and_then(|v| v.as_i64()).unwrap_or(0);
+        if !access.is_empty() {
+            crate::logging::info(
+                "Migrating legacy single-account auth.json to multi-account format",
+            );
+            auth.anthropic_accounts.push(AnthropicAccount {
+                label: "default".to_string(),
+                access,
+                refresh,
+                expires,
+                email: None,
+                subscription_type: Some("max".to_string()),
+                scopes: Vec::new(),
+            });
+            auth.active_anthropic_account = Some("default".to_string());
+            auth.providers.remove("anthropic");
+            let _ = save_auth_file(&auth);
+        }
     }
 
     if relabel_accounts(&mut auth) {
@@ -336,13 +349,18 @@ pub fn load_auth_file() -> Result<NextCodeAuthFile> {
 }
 
 /// Write the next-code auth file (multi-account format).
+///
+/// Preserves OpenCode-style flat provider entries in [`NextCodeAuthFile::providers`]
+/// (API keys, etc.) so Claude OAuth saves do not wipe unified credentials.
+/// Callers that mutate accounts must [`load_auth_file`] first so `providers` is
+/// populated from disk.
 pub fn save_auth_file(auth: &NextCodeAuthFile) -> Result<()> {
     let auth_path = next_code_path()?;
 
     let clean = NextCodeAuthFile {
         anthropic_accounts: auth.anthropic_accounts.clone(),
         active_anthropic_account: auth.active_anthropic_account.clone(),
-        anthropic: None,
+        providers: auth.providers.clone(),
     };
 
     crate::storage::write_json_secret(&auth_path, &clean)?;

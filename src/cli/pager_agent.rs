@@ -1570,14 +1570,24 @@ impl acp::Agent for NextCodeFaceAgent {
                 }
                 ServerEvent::ModelChanged {
                     model,
+                    fallback_model,
                     error: Some(err),
                     ..
                 } => {
-                    self.emit_text(
-                        &session_id,
-                        format!("Couldn't switch model to {model}: {err}"),
-                    )
-                    .await;
+                    let msg = match fallback_model
+                        .as_deref()
+                        .filter(|fallback| *fallback != model.as_str())
+                    {
+                        Some(fallback) => format!(
+                            "Couldn't switch model to {model} (staying on {fallback}): {err}"
+                        ),
+                        None => format!("Couldn't switch model to {model}: {err}"),
+                    };
+                    self.emit_text(&session_id, msg).await;
+                    if let Some(fallback) = fallback_model.as_deref().filter(|s| !s.is_empty()) {
+                        self.emit_models_update(fallback, None, &[]).await;
+                        session.set_last_model(Some(fallback)).await;
+                    }
                 }
                 ServerEvent::MemoryActivity { activity } => {
                     crate::memory::apply_remote_activity_snapshot(&activity);
@@ -1629,7 +1639,7 @@ impl acp::Agent for NextCodeFaceAgent {
         &self,
         args: acp::SetSessionModelRequest,
     ) -> acp::Result<acp::SetSessionModelResponse> {
-        let model_id = args.model_id.to_string();
+        let requested_model = args.model_id.to_string();
         let session_id = args.session_id.to_string();
         let session = self.sessions.borrow().get(&session_id).cloned();
         let Some(session) = session else {
@@ -1641,11 +1651,70 @@ impl acp::Agent for NextCodeFaceAgent {
         session
             .send(&Request::SetModel {
                 id: req_id,
-                model: model_id,
+                model: requested_model.clone(),
             })
             .await
             .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
-        Ok(acp::SetSessionModelResponse::new())
+
+        // Wait for matching ModelChanged before ACP-acking. Returning Ok
+        // immediately let Face commit chrome to the requested model while the
+        // daemon was still on (or fell back to) a different model.
+        loop {
+            let event = session
+                .read_event()
+                .await
+                .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+            match event {
+                ServerEvent::ModelChanged {
+                    id,
+                    model,
+                    provider_name,
+                    error: None,
+                    ..
+                } if id == req_id => {
+                    if let Some(provider) = provider_name.as_deref().filter(|s| !s.is_empty()) {
+                        self.emit_provider_name(&session_id, provider).await;
+                    }
+                    self.emit_models_update(&model, provider_name.as_deref(), &[])
+                        .await;
+                    session.set_last_model(Some(&model)).await;
+                    return Ok(acp::SetSessionModelResponse::new());
+                }
+                ServerEvent::ModelChanged {
+                    id,
+                    model,
+                    fallback_model,
+                    error: Some(err),
+                    ..
+                } if id == req_id => {
+                    let msg = match fallback_model
+                        .as_deref()
+                        .filter(|fallback| *fallback != model.as_str())
+                    {
+                        Some(fallback) => format!(
+                            "Couldn't switch model to {model} (staying on {fallback}): {err}"
+                        ),
+                        None => format!("Couldn't switch model to {model}: {err}"),
+                    };
+                    if let Some(fallback) = fallback_model.as_deref().filter(|s| !s.is_empty()) {
+                        self.emit_models_update(fallback, None, &[]).await;
+                        session.set_last_model(Some(fallback)).await;
+                    }
+                    return Err(acp::Error::internal_error().data(msg));
+                }
+                ServerEvent::Error {
+                    id,
+                    message,
+                    ..
+                } if id == req_id => {
+                    return Err(acp::Error::internal_error().data(message));
+                }
+                ServerEvent::Done { id } if id == req_id => {
+                    return Ok(acp::SetSessionModelResponse::new());
+                }
+                _ => {}
+            }
+        }
     }
 }
 

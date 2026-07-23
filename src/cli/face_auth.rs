@@ -48,6 +48,8 @@ enum PendingKind {
 }
 
 static PENDING: Mutex<Option<PendingFaceLogin>> = Mutex::new(None);
+/// Last successful Face `/connect` credential path (one-line toast / status).
+static LAST_CONNECT_CREDENTIAL_PATH: Mutex<Option<String>> = Mutex::new(None);
 
 pub fn method_id_for_provider(provider_id: &str) -> String {
     format!("{METHOD_PREFIX}{provider_id}")
@@ -59,6 +61,19 @@ pub fn provider_id_from_method(method_id: &str) -> Option<&str> {
 
 pub fn is_nextcode_auth_method(method_id: &str) -> bool {
     method_id.starts_with(METHOD_PREFIX)
+}
+
+pub fn last_connect_credential_path() -> Option<String> {
+    LAST_CONNECT_CREDENTIAL_PATH
+        .lock()
+        .ok()
+        .and_then(|g| g.clone())
+}
+
+fn remember_connect_credential_path(path: impl Into<String>) {
+    if let Ok(mut g) = LAST_CONNECT_CREDENTIAL_PATH.lock() {
+        *g = Some(path.into());
+    }
 }
 
 /// Advertise interactive next-code connect method (after `xai.api_key`).
@@ -85,13 +100,20 @@ pub fn clear_pending() {
 pub fn get_auth_url_payload() -> serde_json::Value {
     let g = PENDING.lock().ok();
     let pending = g.as_ref().and_then(|p| p.as_ref());
+    let credential_path = LAST_CONNECT_CREDENTIAL_PATH
+        .lock()
+        .ok()
+        .and_then(|guard| guard.clone());
     match pending {
         Some(p) => serde_json::json!({
             "auth_url": p.auth_url,
             "mode": p.mode,
             "external_provider": true,
+            "credential_path": credential_path,
         }),
-        None => serde_json::json!({}),
+        None => serde_json::json!({
+            "credential_path": credential_path,
+        }),
     }
 }
 
@@ -103,7 +125,7 @@ pub async fn authenticate_method(method_id: &str) -> Result<()> {
         anyhow::bail!("Unknown auth method: {method_id}");
     };
     if provider_key == "connect" {
-        anyhow::bail!("Pick a provider with /connect <provider> (Face dropdown after /connect ).");
+        anyhow::bail!("Pick a provider with /connect (opens the Face picker).");
     }
 
     let provider = resolve_login_provider(provider_key)
@@ -224,6 +246,13 @@ async fn run_api_key_face_login(provider: LoginProviderDescriptor) -> Result<()>
 
     save_named_api_key(&env_file, &key_name, &code)?;
     crate::auth::AuthStatus::invalidate_cache();
+    if let Ok(path) = crate::provider_catalog::auth_json_path() {
+        remember_connect_credential_path(path.display().to_string());
+        crate::logging::info(&format!(
+            "Face /connect saved API key; credential path: {}",
+            path.display()
+        ));
+    }
     Ok(())
 }
 

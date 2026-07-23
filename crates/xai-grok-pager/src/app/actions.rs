@@ -966,6 +966,8 @@ pub enum Action {
     OpenMemoryModal,
     /// Open the Select-model ArgPicker (bare `/model` / palette UX).
     OpenModelPicker,
+    /// Open the Connect-a-provider ArgPicker (bare `/connect` / OpenCode-shaped UX).
+    OpenConnectPicker,
     /// Open the hidden `/gboom` easter egg (DOOM-style raycaster modal).
     OpenGboom,
     /// Suspend the TUI and open a file in $EDITOR.

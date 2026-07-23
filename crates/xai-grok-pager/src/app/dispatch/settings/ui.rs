@@ -139,6 +139,100 @@ pub(in crate::app::dispatch) fn dispatch_open_howto_guides(app: &mut AppView) ->
     vec![]
 }
 
+/// Open the Connect-a-provider ArgPicker (bare `/connect`). Toggles closed if
+/// already open on the connect list. Agent sessions and session-less dashboard.
+pub(in crate::app::dispatch) fn dispatch_open_connect_picker(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::modal::ActiveModal;
+
+    match app.active_view {
+        ActiveView::Agent(id) => {
+            let Some(agent) = app.agents.get_mut(&id) else {
+                return vec![];
+            };
+            if matches!(
+                &agent.active_modal,
+                Some(ActiveModal::ArgPicker {
+                    command,
+                    args_query,
+                    ..
+                }) if matches!(command.as_str(), "connect" | "login") && args_query.is_empty()
+            ) {
+                agent.active_modal = None;
+                return vec![];
+            }
+
+            let command = "connect";
+            let Some(cmd) = agent.prompt.slash_controller.registry().get(command) else {
+                return vec![];
+            };
+            let ctx = agent
+                .prompt
+                .slash_controller
+                .app_ctx(&agent.session.models);
+            let Some(items) = cmd.suggest_args(&ctx, "") else {
+                return vec![];
+            };
+            if items.is_empty() {
+                return vec![];
+            }
+            agent.active_modal = Some(ActiveModal::ArgPicker {
+                command: command.to_string(),
+                args_query: String::new(),
+                items: items.clone(),
+                original_items: items,
+                state: crate::views::picker::PickerState::input_active(),
+                previous_palette: None,
+                window: crate::views::modal_window::ModalWindowState::new(),
+            });
+            vec![]
+        }
+        ActiveView::AgentDashboard => {
+            let Some(dashboard) = app.dashboard.as_mut() else {
+                return vec![];
+            };
+            if matches!(
+                &dashboard.model_picker,
+                Some(ActiveModal::ArgPicker {
+                    command,
+                    args_query,
+                    ..
+                }) if matches!(command.as_str(), "connect" | "login") && args_query.is_empty()
+            ) {
+                dashboard.model_picker = None;
+                return vec![];
+            }
+
+            let command = "connect";
+            let Some(cmd) = dashboard.dispatch.slash_controller.registry().get(command) else {
+                return vec![];
+            };
+            let ctx = dashboard
+                .dispatch
+                .slash_controller
+                .app_ctx(&dashboard.models);
+            let Some(items) = cmd.suggest_args(&ctx, "") else {
+                return vec![];
+            };
+            if items.is_empty() {
+                return vec![];
+            }
+            dashboard.dispatch.set_text("");
+            dashboard.dispatch.slash_close();
+            dashboard.model_picker = Some(ActiveModal::ArgPicker {
+                command: command.to_string(),
+                args_query: String::new(),
+                items: items.clone(),
+                original_items: items,
+                state: crate::views::picker::PickerState::input_active(),
+                previous_palette: None,
+                window: crate::views::modal_window::ModalWindowState::new(),
+            });
+            vec![]
+        }
+        _ => vec![],
+    }
+}
+
 /// Open the Select-model ArgPicker (bare `/model`, Ctrl+M). Toggles closed if
 /// already open on the model list. Works on both agent sessions and the
 /// session-less dashboard (stages the next spawn there).
