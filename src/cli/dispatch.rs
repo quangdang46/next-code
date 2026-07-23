@@ -630,7 +630,12 @@ fn auth_doctor_provider_arg<'a>(
 fn resolve_resume_arg(args: &mut Args) -> Result<()> {
     if let Some(ref resume_id) = args.resume {
         if resume_id.is_empty() {
-            return tui_launch::list_sessions();
+            // Face default: keep empty resume sentinel so pager opens the
+            // Face session picker. Legacy TUI still uses the old list UI.
+            if pager_launch::legacy_tui_requested() {
+                return tui_launch::list_sessions();
+            }
+            return Ok(());
         }
 
         let resume_id = resume_id.clone();

@@ -497,6 +497,10 @@ pub fn list_nextcode_marketplace() -> serde_json::Value {
 }
 
 /// Session picker payload for Face `/resume` (`x.ai/session/list`).
+///
+/// Shape matches Face `parse_session_picker_entries`: `sessionId`, `summary`,
+/// timestamps, plus `cwd` / `modelId` / `source` so welcome grouping and
+/// resume-by-cwd work against `~/.next-code/sessions`.
 pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
     let Ok(base) = crate::storage::next_code_dir() else {
         return serde_json::json!({ "sessions": [] });
@@ -506,7 +510,7 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
         return serde_json::json!({ "sessions": [] });
     };
 
-    let mut rows: Vec<(String, String, String, String)> = Vec::new();
+    let mut rows: Vec<serde_json::Value> = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -522,34 +526,49 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
         let Ok(session) = crate::session::Session::load_startup_stub(stem) else {
             continue;
         };
-        let summary = session
-            .display_title()
-            .unwrap_or_else(|| session.display_name())
-            .to_string();
+        let summary = session.display_title_or_name().to_string();
         if summary.trim().is_empty() {
             continue;
         }
+        let last_active = session
+            .last_active_at
+            .unwrap_or(session.updated_at)
+            .to_rfc3339();
         let updated = session.updated_at.to_rfc3339();
         let created = session.created_at.to_rfc3339();
-        rows.push((stem.to_string(), summary, updated, created));
+        let cwd = session.working_dir.clone().unwrap_or_default();
+        let model_id = session.model.clone();
+        // Startup stubs omit transcript vectors; Face still wants the field.
+        let num_messages = session.messages.len();
+        rows.push(serde_json::json!({
+            "sessionId": stem,
+            "summary": summary,
+            "updatedAt": updated,
+            "createdAt": created,
+            "lastActiveAt": last_active,
+            "cwd": cwd,
+            "modelId": model_id,
+            "numMessages": num_messages,
+            "source": "local",
+        }));
     }
 
-    rows.sort_by(|a, b| b.2.cmp(&a.2));
+    rows.sort_by(|a, b| {
+        let a_key = a
+            .get("lastActiveAt")
+            .or_else(|| a.get("updatedAt"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let b_key = b
+            .get("lastActiveAt")
+            .or_else(|| b.get("updatedAt"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        b_key.cmp(a_key)
+    });
     rows.truncate(limit.max(1));
 
-    let sessions: Vec<serde_json::Value> = rows
-        .into_iter()
-        .map(|(id, summary, updated, created)| {
-            serde_json::json!({
-                "sessionId": id,
-                "summary": summary,
-                "updatedAt": updated,
-                "createdAt": created,
-            })
-        })
-        .collect();
-
-    serde_json::json!({ "sessions": sessions })
+    serde_json::json!({ "sessions": rows })
 }
 
 #[cfg(test)]
