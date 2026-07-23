@@ -24,8 +24,12 @@ impl AgentView {
     /// effort rows do not. Require a non-empty list with no trailing-space
     /// rows before treating the picker as effort phase.
     fn arg_items_look_like_effort_phase(items: &[crate::slash::command::ArgItem]) -> bool {
-        !items.is_empty()
-            && items
+        let selectable: Vec<_> = items
+            .iter()
+            .filter(|item| !item.is_section_header && !item.provider_connect)
+            .collect();
+        !selectable.is_empty()
+            && selectable
                 .iter()
                 .all(|item| !item.insert_text.ends_with(char::is_whitespace))
     }
@@ -531,24 +535,85 @@ impl AgentView {
             FilterChanged,
         }
 
-        let (command_clone, in_effort_phase, entry_count) = match self.active_modal.as_ref() {
-            Some(ActiveModal::ArgPicker {
+        // Ctrl+A on model list → view all connectable providers (OpenCode parity).
+        if let Event::Key(key) = ev
+            && key.kind == KeyEventKind::Press
+            && key.code == KeyCode::Char('a')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && let Some(ActiveModal::ArgPicker {
                 command,
                 args_query,
-                items,
                 ..
-            }) => (command.clone(), !args_query.is_empty(), items.len()),
-            _ => return InputOutcome::Changed,
-        };
+            }) = self.active_modal.as_ref()
+            && matches!(command.as_str(), "model" | "m")
+            && args_query.is_empty()
+        {
+            let items = crate::slash::commands::model::build_all_provider_connect_items();
+            if let Some(ActiveModal::ArgPicker {
+                command,
+                args_query,
+                items: cur,
+                original_items,
+                state,
+                ..
+            }) = self.active_modal.as_mut()
+            {
+                *command = "connect".to_string();
+                args_query.clear();
+                *cur = items.clone();
+                *original_items = items;
+                *state = crate::views::picker::PickerState::input_active();
+            }
+            return InputOutcome::Changed;
+        }
+
+        let (command_clone, in_effort_phase, entry_count, non_sel) =
+            match self.active_modal.as_ref() {
+                Some(ActiveModal::ArgPicker {
+                    command,
+                    args_query,
+                    items,
+                    ..
+                }) => {
+                    let non_sel: Vec<bool> =
+                        items.iter().map(|i| i.is_section_header).collect();
+                    (
+                        command.clone(),
+                        !args_query.is_empty(),
+                        items.len(),
+                        non_sel,
+                    )
+                }
+                _ => return InputOutcome::Changed,
+            };
+
+        let model_shortcuts = [
+            crate::views::shortcuts_bar::HintItem {
+                keys: vec![],
+                label: "nav".into(),
+                custom_display: Some("\u{2191}/\u{2193}".into()),
+                description: None,
+                pinned: false,
+            },
+            crate::views::shortcuts_bar::HintItem::new(crate::key!(Enter), "select"),
+            crate::views::shortcuts_bar::HintItem::new(crate::key!(Esc), "close"),
+            crate::views::shortcuts_bar::HintItem::new(crate::key!('a', CONTROL), "view all"),
+        ];
+        let use_model_shortcuts =
+            matches!(command_clone.as_str(), "model" | "m") && !in_effort_phase;
 
         let config = PickerConfig {
             title: None,
             show_search_hint: false,
             expandable: false,
             esc_clears_query: false,
-            shortcuts: Some(crate::views::picker::picker_shortcuts()),
+            shortcuts: Some(if use_model_shortcuts {
+                model_shortcuts.as_slice()
+            } else {
+                crate::views::picker::picker_shortcuts()
+            }),
             pending_hint: None,
-            non_selectable: &[],
+            non_selectable: &non_sel,
             non_selectable_clickable: &[],
             shortcuts_area: None,
             tabs: None,
@@ -570,8 +635,8 @@ impl AgentView {
             };
             match handle_picker_input(ev, state, entry_count, &config) {
                 PickerOutcome::Selected(i) => match items.get(i).cloned() {
-                    Some(item) => ArgPickerStep::Selected(item),
-                    None => return InputOutcome::Changed,
+                    Some(item) if !item.is_section_header => ArgPickerStep::Selected(item),
+                    _ => return InputOutcome::Changed,
                 },
                 PickerOutcome::Closed => ArgPickerStep::Closed,
                 PickerOutcome::QueryChanged => ArgPickerStep::FilterChanged,
@@ -594,6 +659,11 @@ impl AgentView {
                     *items = original_items
                         .iter()
                         .filter(|item| {
+                            if item.is_section_header {
+                                // Keep headers when any following item in that
+                                // category might match — filter after rebuild.
+                                return true;
+                            }
                             q.is_empty()
                                 || item.match_text.to_lowercase().contains(&q)
                                 || item.display.to_lowercase().contains(&q)
@@ -601,7 +671,36 @@ impl AgentView {
                         })
                         .cloned()
                         .collect();
-                    state.selected = state.selected.min(items.len().saturating_sub(1));
+                    // Drop headers with no following selectable row until next header.
+                    let mut cleaned = Vec::with_capacity(items.len());
+                    let mut i = 0;
+                    while i < items.len() {
+                        if items[i].is_section_header {
+                            let has_child = items[i + 1..]
+                                .iter()
+                                .take_while(|x| !x.is_section_header)
+                                .any(|x| !x.is_section_header);
+                            if has_child {
+                                cleaned.push(items[i].clone());
+                            }
+                        } else {
+                            cleaned.push(items[i].clone());
+                        }
+                        i += 1;
+                    }
+                    *items = cleaned;
+                    // Prefer first selectable row.
+                    let first_sel = items
+                        .iter()
+                        .position(|it| !it.is_section_header)
+                        .unwrap_or(0);
+                    state.selected = state
+                        .selected
+                        .min(items.len().saturating_sub(1))
+                        .max(if items.is_empty() { 0 } else { first_sel.min(items.len().saturating_sub(1)) });
+                    if items.get(state.selected).is_some_and(|it| it.is_section_header) {
+                        state.selected = first_sel;
+                    }
                 }
                 InputOutcome::Changed
             }
@@ -627,6 +726,12 @@ impl AgentView {
                 InputOutcome::Changed
             }
             ArgPickerStep::Selected(item) => {
+                if item.provider_connect {
+                    self.active_modal = None;
+                    return InputOutcome::Action(Action::NextCodeConnect {
+                        provider: item.insert_text,
+                    });
+                }
                 let chains_to_effort = matches!(command_clone.as_str(), "model" | "m")
                     && item.insert_text.ends_with(char::is_whitespace);
                 if chains_to_effort {
@@ -1747,45 +1852,89 @@ impl AgentView {
             {
                 // Arg picker: ModalWindow chrome + picker content.
                 let title = match command.as_str() {
-                    "model" | "m" if !args_query.is_empty() => "Pick reasoning effort",
-                    "model" | "m" => "Pick model",
+                    "model" | "m" if !args_query.is_empty() => "Select reasoning effort",
+                    "model" | "m" => "Select model",
                     "theme" | "t" => "Pick theme",
+                    "connect" => "Connect provider",
                     _ => "Pick option",
                 };
+                // Owned strings for checkmarks / empty rights so PickerRow
+                // borrows stay valid across the render call.
+                let right_labels: Vec<String> = items
+                    .iter()
+                    .map(|item| {
+                        if item.is_section_header {
+                            String::new()
+                        } else if item.is_current {
+                            "\u{2713}".to_string()
+                        } else if item.provider_connect {
+                            item.description.clone()
+                        } else {
+                            String::new()
+                        }
+                    })
+                    .collect();
+                let badges: Vec<&str> = items
+                    .iter()
+                    .map(|item| item.badge.as_deref().unwrap_or(""))
+                    .collect();
+                let non_sel: Vec<bool> =
+                    items.iter().map(|i| i.is_section_header).collect();
                 let picker_entries: Vec<PickerEntry> = items
                     .iter()
                     .enumerate()
                     .map(|(i, item)| {
-                        PickerEntry::Row(PickerRow {
-                            label: &item.display,
-                            right_label: &item.description,
-                            selected: state.hovered == Some(i)
-                                || (state.hovered.is_none() && i == state.selected),
-                            expanded: false,
-                            fields: &[],
-                            description_lines: &[],
-                            summary_lines: &[],
-                            dimmed: false,
-                            indent: 0,
-                            badge: "",
-                            badge_color: None,
-                            collapsible: false,
-                            underline_last_desc: false,
-                        })
+                        if item.is_section_header {
+                            PickerEntry::Header {
+                                label: item.display.as_str(),
+                            }
+                        } else {
+                            PickerEntry::Row(PickerRow {
+                                label: item.display.as_str(),
+                                right_label: right_labels[i].as_str(),
+                                selected: state.hovered == Some(i)
+                                    || (state.hovered.is_none() && i == state.selected),
+                                expanded: false,
+                                fields: &[],
+                                description_lines: &[],
+                                summary_lines: &[],
+                                dimmed: false,
+                                indent: if item.category.is_some() || item.provider_connect {
+                                    0
+                                } else {
+                                    0
+                                },
+                                badge: badges[i],
+                                badge_color: if badges[i] == "Free" {
+                                    Some(theme.accent_success)
+                                } else {
+                                    None
+                                },
+                                collapsible: false,
+                                underline_last_desc: false,
+                            })
+                        }
                     })
                     .collect();
                 let compact = self.scrollback.appearance().prompt.compact;
                 // Surface `i search` in the footer when vim nav mode is active.
                 mw::push_vim_nav_search_hint(&mut picker_shortcuts, state.search_active);
+                if matches!(command.as_str(), "model" | "m") && args_query.is_empty() {
+                    picker_shortcuts.push(Shortcut {
+                        label: "ctrl+a view all",
+                        clickable: false,
+                        id: 0,
+                    });
+                }
                 let modal_config = ModalWindowConfig {
                     title,
                     tabs: None,
                     shortcuts: &picker_shortcuts,
                     sizing: ModalSizing {
-                        width_pct: 0.50,
-                        max_width: 80,
-                        min_width: 44,
-                        v_margin: 4,
+                        width_pct: 0.55,
+                        max_width: 88,
+                        min_width: 48,
+                        v_margin: 3,
                         h_pad: 2,
                         v_pad: 1,
                         footer_lines: 2,
@@ -1803,7 +1952,7 @@ impl AgentView {
                         &theme,
                         state,
                         &picker_entries,
-                        &[],
+                        &non_sel,
                         false,
                     );
                 }
@@ -2339,6 +2488,10 @@ mod session_picker_delete_tests {
             source: "local".into(),
             model_id: None,
             num_messages: 0,
+            user_message_count: 0,
+            assistant_message_count: 0,
+            first_prompt: None,
+            short_name: None,
             last_active_at: None,
             branch: None,
             repo_name: "repo".into(),

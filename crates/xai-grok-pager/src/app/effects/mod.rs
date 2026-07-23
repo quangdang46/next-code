@@ -1026,6 +1026,30 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::LoadResumePreview { session_id, seq } => {
+            tasks.spawn(async move {
+                let result_session_id = session_id.clone();
+                let lines = tokio::task::spawn_blocking(move || {
+                    xai_grok_shell::session::persistence::load_transcript_preview(
+                        &session_id,
+                        crate::views::resume_browser::preview_max_messages(),
+                    )
+                    .into_iter()
+                    .map(|line| crate::views::resume_browser::ResumePreviewLine {
+                        role: line.role,
+                        text: line.text,
+                    })
+                    .collect::<Vec<_>>()
+                })
+                .await
+                .unwrap_or_default();
+                TaskResult::ResumePreviewLoaded {
+                    session_id: result_session_id,
+                    seq,
+                    lines,
+                }
+            });
+        }
         Effect::SendPrompt {
             agent_id,
             session_id,
@@ -1855,12 +1879,17 @@ pub(crate) fn execute(
             );
             persist_hint(tasks, config_key, mode.as_config_str(), "worktree mode");
         }
-        Effect::PersistPreferredModel { model_id, reasoning_effort } => {
+        Effect::PersistPreferredModel {
+            model_id,
+            reasoning_effort,
+            provider_key,
+        } => {
             let model_id_str = model_id.0.to_string();
             tasks
                 .spawn(async move {
-                    let result = xai_grok_shell::util::config::persist_models_default(
+                    let result = xai_grok_shell::util::config::persist_models_default_with_provider(
                             Some(model_id_str),
+                            provider_key,
                             reasoning_effort,
                         )
                         .await

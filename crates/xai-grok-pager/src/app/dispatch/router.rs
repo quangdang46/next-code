@@ -66,10 +66,10 @@ use super::session::lifecycle::{
 };
 use super::session::load::{
     dispatch_cycle_session_source_filter, dispatch_load_session, dispatch_pick_content_session,
-    dispatch_pick_content_session_in_worktree, dispatch_pick_session,
-    dispatch_pick_session_in_worktree, dispatch_session_picker_closed,
-    dispatch_show_session_picker, dispatch_trigger_deep_search, session_picker_entry_matches,
-    session_picker_external_filter_active,
+    dispatch_pick_content_session_in_worktree, dispatch_pick_resume_browser_session,
+    dispatch_pick_session, dispatch_pick_session_in_worktree, dispatch_session_picker_closed,
+    dispatch_show_resume_browser, dispatch_show_session_picker, dispatch_trigger_deep_search,
+    session_picker_entry_matches, session_picker_external_filter_active,
 };
 use super::session::modal::dispatch_rename_session;
 use super::settings::setters::{
@@ -93,7 +93,8 @@ use super::settings::setters::{
 };
 use super::settings::ui::{
     dispatch_confirm_reset_setting, dispatch_open_command_palette, dispatch_open_howto_guides,
-    dispatch_open_reset_confirm, dispatch_open_settings, dispatch_toggle_compact_mode,
+    dispatch_open_model_picker, dispatch_open_reset_confirm, dispatch_open_settings,
+    dispatch_toggle_compact_mode,
     dispatch_toggle_mouse_capture, dispatch_toggle_multiline, dispatch_toggle_timestamps,
     dispatch_toggle_vim_mode,
 };
@@ -222,6 +223,22 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::FetchSessionList => dispatch_fetch_session_list(app),
         Action::CycleSessionSourceFilter => dispatch_cycle_session_source_filter(app),
         Action::ShowSessionPicker => dispatch_show_session_picker(app),
+        Action::ShowResumeBrowser => dispatch_show_resume_browser(app),
+        Action::CloseResumeBrowser => {
+            app.resume_browser = None;
+            // Defensive: never leave a stuck welcome Loading shell after Esc.
+            app.session_picker_loading = false;
+            app.session_picker_entries = None;
+            vec![]
+        }
+        Action::PickResumeBrowserSession {
+            session_id,
+            cwd,
+            source,
+        } => dispatch_pick_resume_browser_session(app, session_id, cwd, source),
+        Action::LoadResumePreview { session_id, seq } => {
+            vec![Effect::LoadResumePreview { session_id, seq }]
+        }
         Action::SessionPickerClosed => dispatch_session_picker_closed(app),
         Action::PickSession(index) => dispatch_pick_session(app, index),
         Action::PickSessionInWorktree(index) => dispatch_pick_session_in_worktree(app, index),
@@ -1011,6 +1028,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::OpenSettings => dispatch_open_settings(app),
         Action::OpenCommandPalette => dispatch_open_command_palette(app),
         Action::OpenHowtoGuides => dispatch_open_howto_guides(app),
+        Action::OpenModelPicker => dispatch_open_model_picker(app),
         Action::OpenResetConfirm { key } => dispatch_open_reset_confirm(app, key),
         Action::ConfirmResetSetting { choice } => dispatch_confirm_reset_setting(app, choice),
         Action::DumpInputLog => dispatch_dump_input_log(app),

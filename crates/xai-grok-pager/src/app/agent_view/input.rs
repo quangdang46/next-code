@@ -1025,21 +1025,7 @@ impl AgentView {
             && key.kind != KeyEventKind::Release
             && key!('s', CONTROL).matches(key)
         {
-            self.active_modal = Some(ActiveModal::SessionPicker {
-                state: crate::views::picker::PickerState::default(),
-                entries: None,
-                loading: true,
-                lanes: Default::default(),
-                previous_palette: None,
-                window: crate::views::modal_window::ModalWindowState::new(),
-                content_results: None,
-                content_loading: false,
-                deep_search_seq: 0,
-                entries_query: None,
-                source_filter: crate::views::session_picker::SourceFilter::default(),
-                pending_delete: None,
-            });
-            return InputOutcome::Action(Action::FetchSessionList);
+            return InputOutcome::Action(Action::ShowSessionPicker);
         }
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
@@ -1173,27 +1159,7 @@ impl AgentView {
                 });
                 InputOutcome::Changed
             }
-            ActionId::ModelPicker => {
-                let command = "model";
-                if let Some(cmd) = self.prompt.slash_controller.registry().get(command) {
-                    let ctx = self.prompt.slash_controller.app_ctx(&self.session.models);
-                    if let Some(items) = cmd.suggest_args(&ctx, "")
-                        && !items.is_empty()
-                    {
-                        self.active_modal = Some(crate::views::modal::ActiveModal::ArgPicker {
-                            command: command.to_string(),
-                            args_query: String::new(),
-                            items: items.clone(),
-                            original_items: items,
-                            state: crate::views::picker::PickerState::input_active(),
-                            previous_palette: None,
-                            window: crate::views::modal_window::ModalWindowState::new(),
-                        });
-                        return InputOutcome::Changed;
-                    }
-                }
-                InputOutcome::Changed
-            }
+            ActionId::ModelPicker => InputOutcome::Action(Action::OpenModelPicker),
             ActionId::ShortcutsHelp => {
                 use crate::views::shortcuts_help;
                 let reg = crate::actions::ActionRegistry::defaults();

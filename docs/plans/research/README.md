@@ -14,11 +14,16 @@ All five reports are research-only (no production code). Read the master plan fi
 | 4 | [`20260722-nextcode-extension-inventory.md`](./20260722-nextcode-extension-inventory.md) | What is CORE / PLUG / GAP / PROD in today’s next-code tree? Platform vs **nextcode** default pack split. |
 | 5 | [`20260722-face-customization-limits.md`](./20260722-face-customization-limits.md) | Face embed ceiling: brand/ACP/widgets yes; Pi `ctx.ui.custom` / Face plugin-host **no** without fork. |
 
+## Deepen (Phase 1–4 design tickets)
+
+Implement contracts live under [`deepen/`](./deepen/README.md) (D0–D13), including the frozen bare-host no-prompt-inject rule. Readiness gate: [`../PLAN-20260722-platform-implement-readiness.md`](../PLAN-20260722-platform-implement-readiness.md).
+
 ## How to use
 
 1. Product / phase decisions → master plan Summary + roadmap.
 2. “Does Pi have X?” → report 1.
 3. “How do we support Python/Bash?” → report 2.
 4. “Should plugins be in-process TS?” → report 3 (avoid) + master plan Option B′.
-5. “Is this host or nextcode pack?” → report 4.
+5. “Is this host or nextcode pack?” → report 4 + [`deepen/20260722-bare-host-no-prompt-inject.md`](./deepen/20260722-bare-host-no-prompt-inject.md).
 6. “Can Face draw guest UI?” → report 5 (defer).
+7. Phase 1 ticket detail → `deepen/` index.

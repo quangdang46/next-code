@@ -525,7 +525,111 @@ pub fn list_nextcode_marketplace() -> serde_json::Value {
     serde_json::json!({ "result": { "sources": [] } })
 }
 
+/// Cheap list-row metrics from flat `sessions/<id>.json` (+ journal appends).
+///
+/// Startup stubs omit transcript vectors, so Face resume briefs scan messages
+/// here without a full `Session::load`. Skips system-reminder / display_role
+/// system noise (same visibility idea as transcript preview).
+#[derive(Debug, Default, Clone)]
+struct SessionListBrief {
+    first_prompt: Option<String>,
+    num_messages: usize,
+    user_messages: usize,
+    assistant_messages: usize,
+}
+
+const FIRST_PROMPT_MAX_CHARS: usize = 72;
+
+fn load_session_list_brief(sessions_dir: &Path, stem: &str) -> SessionListBrief {
+    let mut messages: Vec<serde_json::Value> = Vec::new();
+    let snapshot_path = sessions_dir.join(format!("{stem}.json"));
+    if let Ok(raw) = std::fs::read_to_string(&snapshot_path)
+        && let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw)
+        && let Some(arr) = value.get("messages").and_then(|m| m.as_array())
+    {
+        messages.extend(arr.iter().cloned());
+    }
+    let journal_path = sessions_dir.join(format!("{stem}.journal.jsonl"));
+    if let Ok(raw) = std::fs::read_to_string(&journal_path) {
+        for line in raw.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let Ok(value) = serde_json::from_str::<serde_json::Value>(trimmed) else {
+                continue;
+            };
+            if let Some(appended) = value.get("append_messages").and_then(|v| v.as_array()) {
+                messages.extend(appended.iter().cloned());
+            }
+        }
+    }
+
+    let mut brief = SessionListBrief::default();
+    for msg in &messages {
+        let display_role = msg
+            .get("display_role")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if display_role.eq_ignore_ascii_case("system") {
+            continue;
+        }
+        let text = list_message_text(msg);
+        let trimmed = text.trim();
+        if trimmed.is_empty() || trimmed.contains("<system-reminder>") {
+            continue;
+        }
+        let role = msg
+            .get("role")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        brief.num_messages += 1;
+        match role.as_str() {
+            "user" => {
+                brief.user_messages += 1;
+                if brief.first_prompt.is_none() {
+                    brief.first_prompt = Some(truncate_label(trimmed, FIRST_PROMPT_MAX_CHARS));
+                }
+            }
+            "assistant" => brief.assistant_messages += 1,
+            _ => {}
+        }
+    }
+    brief
+}
+
+fn list_message_text(msg: &serde_json::Value) -> String {
+    let Some(content) = msg.get("content") else {
+        return String::new();
+    };
+    if let Some(s) = content.as_str() {
+        return s.to_string();
+    }
+    let Some(arr) = content.as_array() else {
+        return String::new();
+    };
+    let mut parts = Vec::new();
+    for part in arr {
+        if part.get("type").and_then(|t| t.as_str()) == Some("text")
+            && let Some(t) = part.get("text").and_then(|t| t.as_str())
+        {
+            parts.push(t);
+        }
+    }
+    parts.join("\n")
+}
+
 /// Session picker payload for Face `/resume` (`x.ai/session/list`).
+///
+/// Shape matches Face `parse_session_picker_entries`: `sessionId`, `summary`,
+/// timestamps, plus `cwd` / `modelId` / `source` so welcome grouping and
+/// resume-by-cwd work against `~/.next-code/sessions`. Also emits
+/// `customTitle`, `firstPrompt`, `shortName`, and user/assistant counts.
+///
+/// `summary` is Claude Code–style: custom/generated title → first user prompt
+/// brief → memorable short_name last. Animal names are not the scannable title
+/// when a chat brief exists.
 pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
     let Ok(base) = crate::storage::next_code_dir() else {
         return serde_json::json!({ "sessions": [] });
@@ -535,7 +639,7 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
         return serde_json::json!({ "sessions": [] });
     };
 
-    let mut rows: Vec<(String, String, String, String)> = Vec::new();
+    let mut rows: Vec<serde_json::Value> = Vec::new();
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().and_then(|e| e.to_str()) != Some("json") {
@@ -551,34 +655,62 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
         let Ok(session) = crate::session::Session::load_startup_stub(stem) else {
             continue;
         };
+        let brief = load_session_list_brief(&dir, stem);
+        // Claude Code–style scannable title: custom/generated title → first
+        // user prompt brief → memorable short_name / id last resort.
+        // Do not promote animal short_name when a chat brief exists.
         let summary = session
             .display_title()
-            .unwrap_or_else(|| session.display_name())
-            .to_string();
+            .map(|s| s.to_string())
+            .or_else(|| brief.first_prompt.clone())
+            .unwrap_or_else(|| session.display_name().to_string());
         if summary.trim().is_empty() {
             continue;
         }
+        let last_active = session
+            .last_active_at
+            .unwrap_or(session.updated_at)
+            .to_rfc3339();
         let updated = session.updated_at.to_rfc3339();
         let created = session.created_at.to_rfc3339();
-        rows.push((stem.to_string(), summary, updated, created));
+        let cwd = session.working_dir.clone().unwrap_or_default();
+        let model_id = session.model.clone();
+        let short_name = session.short_name.clone();
+        let custom_title = session.custom_title.clone();
+        rows.push(serde_json::json!({
+            "sessionId": stem,
+            "summary": summary,
+            "customTitle": custom_title,
+            "shortName": short_name,
+            "firstPrompt": brief.first_prompt,
+            "updatedAt": updated,
+            "createdAt": created,
+            "lastActiveAt": last_active,
+            "cwd": cwd,
+            "modelId": model_id,
+            "numMessages": brief.num_messages,
+            "userMessages": brief.user_messages,
+            "assistantMessages": brief.assistant_messages,
+            "source": "local",
+        }));
     }
 
-    rows.sort_by(|a, b| b.2.cmp(&a.2));
+    rows.sort_by(|a, b| {
+        let a_key = a
+            .get("lastActiveAt")
+            .or_else(|| a.get("updatedAt"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let b_key = b
+            .get("lastActiveAt")
+            .or_else(|| b.get("updatedAt"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        b_key.cmp(a_key)
+    });
     rows.truncate(limit.max(1));
 
-    let sessions: Vec<serde_json::Value> = rows
-        .into_iter()
-        .map(|(id, summary, updated, created)| {
-            serde_json::json!({
-                "sessionId": id,
-                "summary": summary,
-                "updatedAt": updated,
-                "createdAt": created,
-            })
-        })
-        .collect();
-
-    serde_json::json!({ "sessions": sessions })
+    serde_json::json!({ "sessions": rows })
 }
 
 #[cfg(test)]

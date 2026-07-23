@@ -1012,10 +1012,24 @@ pub async fn set_info_float_diagrams(v: impl serde::Serialize) -> anyhow::Result
     set_ui_nested("info_floats", "diagrams", v).await
 }
 pub async fn set_default_model(v: impl serde::Serialize) -> anyhow::Result<()> {
-    // Shared with next-code brain: `[provider].default_model`
+    // Shared with next-code brain: `[provider].default_model` (+ optional provider).
+    // Prefer [`set_default_model_and_provider`] when the provider pin is known.
     let value = serialize_to_toml_value(v)?;
+    let Some(model) = value.as_str().map(str::to_string) else {
+        anyhow::bail!("default_model must be a string");
+    };
+    set_default_model_and_provider(model, None).await
+}
+
+/// Persist `[provider].default_model` and optionally `[provider].default_provider`
+/// in one toml_edit write (preserves `[ui]` and other sibling tables).
+pub async fn set_default_model_and_provider(
+    model: String,
+    provider: Option<String>,
+) -> anyhow::Result<()> {
     tokio::task::spawn_blocking(move || {
-        xai_grok_config::set_toml_key("provider", "default_model", value).map_err(anyhow::Error::from)
+        xai_grok_config::set_provider_defaults(Some(model.as_str()), provider.as_deref())
+            .map_err(anyhow::Error::from)
     })
     .await??;
     Ok(())
@@ -1391,11 +1405,31 @@ pub fn resolve_zdr_access_enabled(
 }
 
 pub fn load_require_plan_approval() -> bool { false }
+
+/// Persist preferred model for next cold start.
+///
+/// Stock Grok writes `[models].default`; next-code remaps to
+/// `[provider].default_model` (and optional `default_provider` via
+/// [`persist_models_default_with_provider`]).
 pub async fn persist_models_default(
-    _model: Option<String>,
+    model: Option<String>,
+    reasoning_effort: Option<crate::sampling::types::ReasoningEffort>,
+) -> anyhow::Result<()> {
+    persist_models_default_with_provider(model, None, reasoning_effort).await
+}
+
+/// Like [`persist_models_default`], but also pins `[provider].default_provider`
+/// when `provider` is `Some` (atomic pair write).
+pub async fn persist_models_default_with_provider(
+    model: Option<String>,
+    provider: Option<String>,
     _reasoning_effort: Option<crate::sampling::types::ReasoningEffort>,
 ) -> anyhow::Result<()> {
-    Ok(())
+    let Some(model) = model else {
+        return Ok(());
+    };
+    set_default_model_and_provider(model, provider).await
 }
+
 pub fn set_remote_campaigns_from_settings(_s: Option<&RemoteSettings>) {}
 

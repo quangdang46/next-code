@@ -66,12 +66,12 @@ pub(crate) fn build_effort_arg_items(
             // Sort-key prefix: 'a' for top row, 'b' for next, etc. Only
             // affects matcher tiebreak ordering, never rendered.
             let sort_prefix = char::from(b'a' + idx as u8);
-            ArgItem {
-                display: format!("{}{active_suffix}", option.label),
-                match_text: format!("{sort_prefix} {insert_text}"),
+            ArgItem::plain(
+                format!("{}{active_suffix}", option.label),
+                format!("{sort_prefix} {insert_text}"),
                 insert_text,
-                description: option.description.clone().unwrap_or_default(),
-            }
+                option.description.clone().unwrap_or_default(),
+            )
         })
         .collect()
 }
