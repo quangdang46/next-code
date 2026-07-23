@@ -74,12 +74,23 @@ impl AgentView {
             has_session_announcements: slash_controller.has_session_announcements(),
             screen_mode: slash_controller.screen_mode(),
         };
-        let Some(model_items) = cmd.suggest_args(&ctx, "") else {
-            return false;
+        // Connect/login root list is picker-owned (`build_connect_family_items`);
+        // empty `suggest_args` is intentional so the inline slash path cannot steal Enter.
+        let model_items = if matches!(command.as_str(), "connect" | "login") {
+            let items = crate::slash::commands::connect::build_connect_family_items();
+            if items.is_empty() {
+                return false;
+            }
+            items
+        } else {
+            let Some(items) = cmd.suggest_args(&ctx, "") else {
+                return false;
+            };
+            if items.is_empty() {
+                return false;
+            }
+            items
         };
-        if model_items.is_empty() {
-            return false;
-        }
         if let Some(ActiveModal::ArgPicker {
             args_query,
             items,

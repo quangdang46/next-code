@@ -203,16 +203,17 @@ impl AgentView {
                 // stay open (row's insert_text ends with space => chains).
                 KeyCode::Enter if key.modifiers.is_empty() => {
                     let snap = self.prompt.slash_snapshot();
-                    // Bare `/model ` (empty args) opens the Select-model
-                    // palette — do not accept the first inline arg row.
+                    // Bare `/model ` / `/connect ` (empty args) open the
+                    // centered ArgPicker — do not accept / chain into args.
                     if !snap.cursor_in_command
                         && snap.args_query_is_empty
-                        && matches!(snap.query.as_str(), "model" | "m")
+                        && let Some(action) =
+                            crate::slash::centered_arg_picker_action(snap.query.as_str())
                     {
                         self.prompt.slash_cancel_preview();
                         self.prompt.slash_close();
                         self.prompt.set_text("");
-                        return InputOutcome::Action(Action::OpenModelPicker);
+                        return InputOutcome::Action(action);
                     }
                     // Trailing space = "more input expected" (command takes
                     // args, or arg row chains into a sub-menu).

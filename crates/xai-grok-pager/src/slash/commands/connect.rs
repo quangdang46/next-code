@@ -51,10 +51,16 @@ impl SlashCommand for ConnectCommand {
     }
 
     fn arg_placeholder(&self) -> Option<&str> {
-        Some("provider")
+        // Picker-first: bare `/connect` opens Connect-a-provider ArgPicker.
+        // No inline `provider` ghost — that path stole Enter (trailing space).
+        None
     }
 
     fn suggest_args(&self, _ctx: &AppCtx, args_query: &str) -> Option<Vec<ArgItem>> {
+        // Empty args → centered picker (`OpenConnectPicker`), not inline dump.
+        if args_query.trim().is_empty() {
+            return None;
+        }
         Some(suggest_connect_args(args_query))
     }
 
@@ -428,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn suggest_args_non_empty() {
+    fn suggest_args_empty_is_none_picker_first() {
         let models = ModelState::default();
         let cwd = std::path::Path::new(".");
         let ctx = AppCtx {
@@ -437,8 +443,18 @@ mod tests {
             has_session_announcements: false,
             screen_mode: crate::app::ScreenMode::Fullscreen,
         };
-        let items = ConnectCommand.suggest_args(&ctx, "").expect("items");
-        assert!(!items.is_empty());
+        assert!(
+            ConnectCommand.suggest_args(&ctx, "").is_none(),
+            "bare /connect must not feed inline arg dropdown"
+        );
+        assert!(
+            ConnectCommand.suggest_args(&ctx, "   ").is_none(),
+            "whitespace-only args still picker-first"
+        );
+        let typed = ConnectCommand
+            .suggest_args(&ctx, "cl")
+            .expect("typed prefix still suggests");
+        assert!(!typed.is_empty());
     }
 
     #[test]

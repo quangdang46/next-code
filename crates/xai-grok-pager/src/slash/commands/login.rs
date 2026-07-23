@@ -34,11 +34,8 @@ impl SlashCommand for LoginCommand {
     }
 
     fn arg_placeholder(&self) -> Option<&str> {
-        if crate::product_welcome::is_nextcode_embed() {
-            Some("provider")
-        } else {
-            None
-        }
+        // Embed `/login` is picker-first (same as `/connect`); no inline ghost.
+        None
     }
 
     fn suggest_args(&self, ctx: &AppCtx, args_query: &str) -> Option<Vec<ArgItem>> {
