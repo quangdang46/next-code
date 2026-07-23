@@ -1,11 +1,27 @@
 //! `/connect` — next-code multi-provider login (Face chrome).
 //!
-//! Uses Face `suggest_args` dropdown with `tui_login_providers()`, then starts
-//! the Face welcome auth paste/URL flow (credential write to `~/.next-code`).
+//! OpenCode-shaped wizard: searchable provider picker → optional auth-method
+//! step → Face welcome paste/URL flow. Credentials write via daemon
+//! `face_auth` / `~/.next-code` (auth.json on the auth-unify branch).
 //! Does **not** start Grok OAuth and does **not** hand off to a CLI terminal.
+
+use next_code_provider_metadata::{
+    LoginProviderAuthKind, LoginProviderAuthStateKey, LoginProviderDescriptor,
+};
 
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
+
+/// Popular family anchors (OpenCode-style). Resolved against
+/// `tui_login_providers()`; missing ids are skipped.
+const POPULAR_CONNECT_IDS: &[&str] = &[
+    "claude",
+    "openai",
+    "gemini",
+    "openrouter",
+    "xai",
+    "copilot",
+];
 
 pub struct ConnectCommand;
 
@@ -38,8 +54,8 @@ impl SlashCommand for ConnectCommand {
         Some("provider")
     }
 
-    fn suggest_args(&self, _ctx: &AppCtx, _args_query: &str) -> Option<Vec<ArgItem>> {
-        Some(provider_arg_items())
+    fn suggest_args(&self, _ctx: &AppCtx, args_query: &str) -> Option<Vec<ArgItem>> {
+        Some(suggest_connect_args(args_query))
     }
 
     fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
@@ -51,46 +67,282 @@ impl SlashCommand for ConnectCommand {
 pub(crate) fn connect_run(args: &str) -> CommandResult {
     let trimmed = args.trim();
     if trimmed.is_empty() {
-        let list = provider_arg_items()
-            .into_iter()
-            .map(|i| format!("  {} — {}", i.insert_text, i.description))
-            .collect::<Vec<_>>()
-            .join("\n");
-        return CommandResult::Message(format!(
-            "Connect a provider (Face picker: Tab after /connect ).\n\
-             \n\
-             {list}\n\
-             \n\
-             Then run: /connect <provider>\n\
-             Face opens the auth URL / paste box — credentials save under ~/.next-code \
-             (not Grok OAuth)."
-        ));
+        return CommandResult::Action(Action::OpenConnectPicker);
     }
 
     let Some(provider) = next_code_provider_metadata::resolve_login_provider(trimmed).or_else(
         || next_code_provider_metadata::resolve_login_provider_loose(trimmed),
     ) else {
         return CommandResult::Error(format!(
-            "Unknown provider {trimmed:?}. Try /connect and pick from the dropdown."
+            "Unknown provider {trimmed:?}. Try /connect and pick from the list."
         ));
     };
 
+    // Multi-method family passed as the representative id alone → still start
+    // that specific catalog entry (typed `/connect claude` = OAuth). Method
+    // chooser is picker-only (trailing-space chain).
     CommandResult::Action(Action::NextCodeConnect {
         provider: provider.id.to_string(),
     })
 }
 
-fn provider_arg_items() -> Vec<ArgItem> {
-    next_code_provider_metadata::tui_login_providers()
-        .into_iter()
+pub(crate) fn suggest_connect_args(args_query: &str) -> Vec<ArgItem> {
+    let trimmed = args_query.trim();
+    if !trimmed.is_empty()
+        && let Some(methods) = connect_method_items_for_query(args_query)
+    {
+        return methods;
+    }
+    build_connect_family_items()
+}
+
+/// Flat searchable list used by OpenConnectPicker and Tab suggest.
+pub(crate) fn build_connect_family_items() -> Vec<ArgItem> {
+    let providers = next_code_provider_metadata::tui_login_providers();
+    let families = group_families(&providers);
+
+    let mut out = Vec::new();
+    let mut popular_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
+
+    out.push(section_header("Popular"));
+    for id in POPULAR_CONNECT_IDS {
+        let Some(family) = families
+            .iter()
+            .find(|f| f.iter().any(|p| p.id == *id))
+        else {
+            continue;
+        };
+        let key = family[0].auth_state_key;
+        if popular_keys.contains(&key) {
+            continue;
+        }
+        popular_keys.push(key);
+        out.push(family_arg_item(family));
+    }
+    // Recommended families not already listed under Popular.
+    for family in &families {
+        if !family.iter().any(|p| p.recommended) {
+            continue;
+        }
+        let key = family[0].auth_state_key;
+        if popular_keys.contains(&key) {
+            continue;
+        }
+        popular_keys.push(key);
+        out.push(family_arg_item(family));
+    }
+
+    out.push(section_header("Providers"));
+    for family in &families {
+        let key = family[0].auth_state_key;
+        if popular_keys.contains(&key) {
+            continue;
+        }
+        out.push(family_arg_item(family));
+    }
+    out
+}
+
+fn connect_method_items_for_query(args_query: &str) -> Option<Vec<ArgItem>> {
+    // Chained from a family row: insert_text ends with whitespace.
+    if !args_query.ends_with(char::is_whitespace) {
+        return None;
+    }
+    let id = args_query.trim();
+    if id.is_empty() {
+        return None;
+    }
+    let provider = next_code_provider_metadata::resolve_login_provider(id)
+        .or_else(|| next_code_provider_metadata::resolve_login_provider_loose(id))?;
+    let methods = methods_for_key(
+        &next_code_provider_metadata::tui_login_providers(),
+        provider.auth_state_key,
+    );
+    if methods.len() < 2 {
+        return None;
+    }
+    Some(build_connect_method_items(&methods))
+}
+
+fn build_connect_method_items(methods: &[LoginProviderDescriptor]) -> Vec<ArgItem> {
+    methods
+        .iter()
+        .copied()
         .map(|p| ArgItem {
-            display: p.id.to_string(),
-            match_text: p.id.to_string(),
+            display: method_display_name(p),
+            match_text: format!("{} {} {}", p.display_name, p.id, p.auth_kind.label()),
             insert_text: p.id.to_string(),
-            description: format!("{} · {}", p.display_name, p.auth_kind.label()),
-                ..Default::default()
-            })
+            description: p.menu_detail.to_string(),
+            category: Some("Select auth method".into()),
+            badge: None,
+            is_current: false,
+            provider_connect: true,
+            is_section_header: false,
+        })
         .collect()
+}
+
+fn group_families(providers: &[LoginProviderDescriptor]) -> Vec<Vec<LoginProviderDescriptor>> {
+    // Only collapse into a multi-method family when the same auth_state_key
+    // has both a browser path (OAuth/device) and a key/local path — e.g.
+    // Anthropic (`claude` + `anthropic-api`). Shared keys that are all API-key
+    // (OpenRouterLike) stay as separate single-method rows.
+    let mut fork_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
+    let mut seen_keys: Vec<LoginProviderAuthStateKey> = Vec::new();
+    for p in providers {
+        if seen_keys.contains(&p.auth_state_key) {
+            continue;
+        }
+        seen_keys.push(p.auth_state_key);
+        let methods = methods_for_key(providers, p.auth_state_key);
+        let has_browser = methods.iter().any(|m| {
+            matches!(
+                m.auth_kind,
+                LoginProviderAuthKind::OAuth | LoginProviderAuthKind::DeviceCode
+            )
+        });
+        let has_key = methods.iter().any(|m| {
+            matches!(
+                m.auth_kind,
+                LoginProviderAuthKind::ApiKey
+                    | LoginProviderAuthKind::Hybrid
+                    | LoginProviderAuthKind::Local
+            )
+        });
+        if has_browser && has_key && methods.len() > 1 {
+            fork_keys.push(p.auth_state_key);
+        }
+    }
+
+    let mut used_ids: Vec<&str> = Vec::new();
+    let mut families = Vec::new();
+    for p in providers {
+        if used_ids.contains(&p.id) {
+            continue;
+        }
+        if fork_keys.contains(&p.auth_state_key) {
+            let methods = methods_for_key(providers, p.auth_state_key);
+            for m in &methods {
+                used_ids.push(m.id);
+            }
+            families.push(methods);
+        } else {
+            used_ids.push(p.id);
+            families.push(vec![*p]);
+        }
+    }
+    families
+}
+
+fn methods_for_key(
+    providers: &[LoginProviderDescriptor],
+    key: LoginProviderAuthStateKey,
+) -> Vec<LoginProviderDescriptor> {
+    providers
+        .iter()
+        .copied()
+        .filter(|p| p.auth_state_key == key)
+        .collect()
+}
+
+fn family_representative(methods: &[LoginProviderDescriptor]) -> LoginProviderDescriptor {
+    methods
+        .iter()
+        .copied()
+        .find(|p| p.recommended)
+        .or_else(|| methods.first().copied())
+        .expect("non-empty family")
+}
+
+fn family_arg_item(methods: &[LoginProviderDescriptor]) -> ArgItem {
+    let rep = family_representative(methods);
+    let multi = methods.len() > 1;
+    let (insert_text, provider_connect, description) = if multi {
+        // Trailing space → ArgPicker chains into suggest_args method phase.
+        (
+            format!("{} ", rep.id),
+            false,
+            multi_method_hint(methods),
+        )
+    } else {
+        (
+            rep.id.to_string(),
+            true,
+            single_method_hint(rep),
+        )
+    };
+    ArgItem {
+        display: rep.display_name.to_string(),
+        match_text: format!(
+            "{} {} {}",
+            rep.display_name,
+            methods
+                .iter()
+                .map(|m| m.id)
+                .collect::<Vec<_>>()
+                .join(" "),
+            description
+        ),
+        insert_text,
+        description,
+        category: None,
+        badge: if methods.iter().any(|m| m.recommended) {
+            Some("Recommended".into())
+        } else {
+            None
+        },
+        is_current: false,
+        provider_connect,
+        is_section_header: false,
+    }
+}
+
+fn single_method_hint(p: LoginProviderDescriptor) -> String {
+    if p.menu_detail.is_empty() {
+        p.auth_kind.label().to_string()
+    } else {
+        format!("{} · {}", p.auth_kind.label(), p.menu_detail)
+    }
+}
+
+fn multi_method_hint(methods: &[LoginProviderDescriptor]) -> String {
+    let kinds: Vec<&str> = methods
+        .iter()
+        .map(|m| match m.auth_kind {
+            LoginProviderAuthKind::OAuth => "OAuth",
+            LoginProviderAuthKind::ApiKey => "API key",
+            LoginProviderAuthKind::DeviceCode => "device code",
+            LoginProviderAuthKind::Cli => "CLI",
+            LoginProviderAuthKind::Hybrid => "API key / CLI",
+            LoginProviderAuthKind::Local => "local",
+        })
+        .collect();
+    format!("{} · pick method", kinds.join(" or "))
+}
+
+fn method_display_name(p: LoginProviderDescriptor) -> String {
+    match p.auth_kind {
+        LoginProviderAuthKind::OAuth => format!("{} (OAuth)", p.display_name),
+        LoginProviderAuthKind::ApiKey => format!("{} (API key)", p.display_name),
+        LoginProviderAuthKind::DeviceCode => format!("{} (device code)", p.display_name),
+        LoginProviderAuthKind::Cli => format!("{} (CLI)", p.display_name),
+        LoginProviderAuthKind::Hybrid => format!("{} (API key / CLI)", p.display_name),
+        LoginProviderAuthKind::Local => format!("{} (local)", p.display_name),
+    }
+}
+
+fn section_header(label: &str) -> ArgItem {
+    ArgItem {
+        display: label.into(),
+        match_text: String::new(),
+        insert_text: String::new(),
+        description: String::new(),
+        category: Some(label.into()),
+        badge: None,
+        is_current: false,
+        provider_connect: false,
+        is_section_header: true,
+    }
 }
 
 #[cfg(test)]
@@ -125,17 +377,54 @@ mod tests {
     }
 
     #[test]
-    fn bare_connect_lists_providers() {
+    fn bare_connect_opens_picker() {
         let models = ModelState::default();
         let mut ctx = make_ctx(&models);
         match ConnectCommand.run(&mut ctx, "") {
-            CommandResult::Message(msg) => {
-                assert!(msg.contains("/connect <provider>"), "{msg}");
-                assert!(!msg.contains("next-code login"), "{msg}");
-                assert!(msg.contains("not Grok OAuth"), "{msg}");
-            }
-            other => panic!("expected Message, got {other:?}"),
+            CommandResult::Action(Action::OpenConnectPicker) => {}
+            other => panic!("expected OpenConnectPicker, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn suggest_args_has_popular_and_providers() {
+        let items = build_connect_family_items();
+        assert!(
+            items
+                .iter()
+                .any(|i| i.is_section_header && i.display == "Popular"),
+            "{items:?}"
+        );
+        assert!(
+            items
+                .iter()
+                .any(|i| i.is_section_header && i.display == "Providers"),
+            "{items:?}"
+        );
+        assert!(items.iter().any(|i| !i.is_section_header));
+    }
+
+    #[test]
+    fn anthropic_family_chains_to_method_picker() {
+        let family = build_connect_family_items()
+            .into_iter()
+            .find(|i| !i.is_section_header && i.display.contains("Claude"))
+            .expect("claude family");
+        assert!(
+            family.insert_text.ends_with(' '),
+            "multi-method family needs trailing space, got {:?}",
+            family.insert_text
+        );
+        let methods = suggest_connect_args(&family.insert_text);
+        assert!(
+            methods.iter().any(|i| i.insert_text == "claude"),
+            "{methods:?}"
+        );
+        assert!(
+            methods.iter().any(|i| i.insert_text == "anthropic-api"),
+            "{methods:?}"
+        );
+        assert!(methods.iter().all(|i| i.provider_connect || i.is_section_header));
     }
 
     #[test]
@@ -150,7 +439,6 @@ mod tests {
         };
         let items = ConnectCommand.suggest_args(&ctx, "").expect("items");
         assert!(!items.is_empty());
-        assert!(items.iter().any(|i| !i.insert_text.is_empty()));
     }
 
     #[test]

@@ -125,7 +125,7 @@ pub async fn authenticate_method(method_id: &str) -> Result<()> {
         anyhow::bail!("Unknown auth method: {method_id}");
     };
     if provider_key == "connect" {
-        anyhow::bail!("Pick a provider with /connect <provider> (Face dropdown after /connect ).");
+        anyhow::bail!("Pick a provider with /connect (opens the Face picker).");
     }
 
     let provider = resolve_login_provider(provider_key)

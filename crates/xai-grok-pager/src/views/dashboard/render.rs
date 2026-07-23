@@ -1046,6 +1046,8 @@ fn render_dashboard_model_picker(
     let title = match command {
         "model" | "m" if !args_query.is_empty() => "Select reasoning effort",
         "model" | "m" => "Select model",
+        "connect" | "login" if !args_query.is_empty() => "Select auth method",
+        "connect" | "login" => "Connect a provider",
         _ => "Pick option",
     };
     let right_labels: Vec<String> = items
@@ -1055,7 +1057,9 @@ fn render_dashboard_model_picker(
                 String::new()
             } else if item.is_current {
                 "\u{2713}".to_string()
-            } else if item.provider_connect {
+            } else if item.provider_connect
+                || matches!(command, "connect" | "login")
+            {
                 item.description.clone()
             } else {
                 String::new()
