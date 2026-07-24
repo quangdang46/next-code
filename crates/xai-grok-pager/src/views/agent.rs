@@ -407,8 +407,13 @@ impl AgentViewLayout {
 
     /// Preferred width for the `/btw` right-hand side panel (legacy TUI parity).
     pub const BTW_SIDEBAR_PREFERRED_WIDTH: u16 = 36;
-    /// Minimum main scrollback width that must remain after carving a sidebar.
+    /// Hard floor for a `/btw` side column (drag / keyboard resize clamp).
+    pub const BTW_SIDEBAR_MIN_WIDTH: u16 = 20;
+    /// Minimum main column width that must remain after carving a sidebar.
     pub const BTW_SIDEBAR_MIN_MAIN_WIDTH: u16 = 28;
+    /// Gap columns between the main agent column and the `/btw` side panel
+    /// (also the mouse drag hit target).
+    pub const BTW_SIDEBAR_GAP: u16 = 1;
 
     /// Carve a Claude-style agent panel from the bottom of scrollback.
     ///
@@ -434,32 +439,133 @@ impl AgentViewLayout {
         };
     }
 
-    /// Carve a right-hand `/btw` column from `scrollback_content`.
+    /// Horizontally split `area` into `(main, sidebar)` for a full-height
+    /// right-hand `/btw` column (legacy TUI parity).
+    ///
+    /// Callers run [`Self::compute`] on `main` with `btw_height = 0`, then assign
+    /// `layout.btw = sidebar`. Returns `None` when the frame is too narrow.
+    pub fn split_btw_sidebar_column(area: Rect, preferred_width: u16) -> Option<(Rect, Rect)> {
+        let min_total = Self::BTW_SIDEBAR_MIN_WIDTH
+            .saturating_add(Self::BTW_SIDEBAR_GAP)
+            .saturating_add(Self::BTW_SIDEBAR_MIN_MAIN_WIDTH);
+        if area.width < min_total || area.height < 3 {
+            return None;
+        }
+        let max_side = area
+            .width
+            .saturating_sub(Self::BTW_SIDEBAR_GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH);
+        let side_w = preferred_width
+            .clamp(Self::BTW_SIDEBAR_MIN_WIDTH, max_side)
+            .min(max_side);
+        if side_w < Self::BTW_SIDEBAR_MIN_WIDTH {
+            return None;
+        }
+        let main_w = area
+            .width
+            .saturating_sub(side_w.saturating_add(Self::BTW_SIDEBAR_GAP));
+        if main_w < Self::BTW_SIDEBAR_MIN_MAIN_WIDTH {
+            return None;
+        }
+        let main = Rect {
+            x: area.x,
+            y: area.y,
+            width: main_w,
+            height: area.height,
+        };
+        let sidebar = Rect {
+            x: area.x + main_w + Self::BTW_SIDEBAR_GAP,
+            y: area.y,
+            width: side_w,
+            height: area.height,
+        };
+        Some((main, sidebar))
+    }
+
+    /// Clamp a desired `/btw` sidebar width for the given frame width.
+    pub fn clamp_btw_sidebar_width(frame_width: u16, desired: u16) -> u16 {
+        let max_side = frame_width.saturating_sub(
+            Self::BTW_SIDEBAR_GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH,
+        );
+        if max_side < Self::BTW_SIDEBAR_MIN_WIDTH {
+            return Self::BTW_SIDEBAR_MIN_WIDTH;
+        }
+        desired.clamp(Self::BTW_SIDEBAR_MIN_WIDTH, max_side)
+    }
+
+    /// Carve a right-hand `/btw` column spanning the full agent frame height
+    /// (status through shortcuts), matching legacy TUI side-panel geometry.
+    ///
+    /// Prefer [`Self::split_btw_sidebar_column`] + compute-on-main for new
+    /// call sites; this post-process path remains for narrow fallbacks and tests.
     ///
     /// Returns `true` when the sidebar was placed. Callers pass `btw_height = 0`
     /// into [`Self::compute`] first so the vertical overlay strip is omitted.
     pub fn apply_btw_sidebar(&mut self, preferred_width: u16) -> bool {
-        const GAP: u16 = 1;
-        let avail = self.scrollback_content.width;
-        if avail < preferred_width + GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH {
-            return false;
-        }
-        let side_w = preferred_width
-            .min(avail.saturating_sub(GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH))
-            .max(20);
-        let main_w = avail.saturating_sub(side_w + GAP);
-        let content = self.scrollback_content;
-        self.scrollback_content.width = main_w;
-        // Keep pane hit-testing aligned with the narrowed content column.
-        if self.scrollback.x == content.x {
-            self.scrollback.width = main_w;
-        }
-        self.btw = Rect {
-            x: content.x + main_w + GAP,
-            y: content.y,
-            width: side_w,
-            height: content.height,
+        let frame_x = self.status_bar.x;
+        let frame_y = self.status_bar.y;
+        let frame_bottom = if self.shortcuts.height > 0 {
+            self.shortcuts
+                .y
+                .saturating_add(self.shortcuts.height)
+        } else {
+            self.prompt.y.saturating_add(self.prompt.height)
         };
+        let frame_h = frame_bottom.saturating_sub(frame_y);
+        let frame_w = self.status_bar.width;
+        let Some((main, sidebar)) = Self::split_btw_sidebar_column(
+            Rect {
+                x: frame_x,
+                y: frame_y,
+                width: frame_w,
+                height: frame_h,
+            },
+            preferred_width,
+        ) else {
+            return false;
+        };
+        let main_w = main.width;
+        let shrink = |r: &mut Rect| {
+            if r.width == 0 {
+                return;
+            }
+            if r.x == frame_x {
+                r.width = main_w;
+            } else if r.x > frame_x {
+                let max_right = frame_x.saturating_add(main_w);
+                if r.x >= max_right {
+                    *r = Rect::default();
+                } else if r.x.saturating_add(r.width) > max_right {
+                    r.width = max_right.saturating_sub(r.x);
+                }
+            }
+        };
+        shrink(&mut self.status_bar);
+        shrink(&mut self.startup_warnings);
+        shrink(&mut self.tasks);
+        shrink(&mut self.catalog);
+        shrink(&mut self.todo);
+        shrink(&mut self.scrollback);
+        shrink(&mut self.scrollback_content);
+        shrink(&mut self.agent_panel);
+        shrink(&mut self.queue);
+        shrink(&mut self.turn_status);
+        shrink(&mut self.banner);
+        shrink(&mut self.plugin_cta);
+        shrink(&mut self.follow_ups);
+        shrink(&mut self.voice_recording);
+        shrink(&mut self.prompt);
+        shrink(&mut self.shortcuts);
+        // Keep scrollbar / timeline inside the narrowed main column.
+        if self.scrollbar_x >= frame_x.saturating_add(main_w) {
+            self.scrollbar_x = frame_x.saturating_add(main_w).saturating_sub(1);
+        }
+        if self.timeline_width > 0 {
+            self.timeline_x = self
+                .scrollbar_x
+                .saturating_add(1)
+                .saturating_sub(self.timeline_width);
+        }
+        self.btw = sidebar;
         true
     }
 
@@ -1871,6 +1977,60 @@ mod tests {
             false,
         )
     }
+    #[test]
+    fn split_btw_sidebar_column_is_full_frame_height() {
+        let area = Rect::new(2, 1, 100, 40);
+        let (main, side) = AgentViewLayout::split_btw_sidebar_column(area, 36)
+            .expect("wide frame should split");
+        assert_eq!(side.height, area.height, "sidebar must span full frame height");
+        assert_eq!(main.height, area.height);
+        assert_eq!(side.y, area.y);
+        assert_eq!(main.y, area.y);
+        assert_eq!(side.width, 36);
+        assert_eq!(
+            main.width + AgentViewLayout::BTW_SIDEBAR_GAP + side.width,
+            area.width
+        );
+        assert_eq!(side.x, main.x + main.width + AgentViewLayout::BTW_SIDEBAR_GAP);
+    }
+
+    #[test]
+    fn apply_btw_sidebar_spans_status_through_shortcuts() {
+        let area = Rect::new(0, 0, 100, 40);
+        let mut layout = layout_with_rows(area, 0, 0, 0);
+        let before_w = layout.status_bar.width;
+        let top = layout.status_bar.y;
+        let bottom = layout
+            .shortcuts
+            .y
+            .saturating_add(layout.shortcuts.height);
+        assert!(layout.apply_btw_sidebar(36));
+        assert_eq!(layout.btw.y, top);
+        assert_eq!(layout.btw.y + layout.btw.height, bottom);
+        assert!(
+            layout.btw.height > layout.scrollback.height,
+            "sidebar must be taller than scrollback alone"
+        );
+        assert_eq!(
+            layout.status_bar.width + AgentViewLayout::BTW_SIDEBAR_GAP + layout.btw.width,
+            before_w
+        );
+        assert_eq!(layout.prompt.width, layout.status_bar.width);
+    }
+
+    #[test]
+    fn clamp_btw_sidebar_width_respects_min_main() {
+        assert_eq!(
+            AgentViewLayout::clamp_btw_sidebar_width(80, 10),
+            AgentViewLayout::BTW_SIDEBAR_MIN_WIDTH
+        );
+        assert_eq!(AgentViewLayout::clamp_btw_sidebar_width(80, 36), 36);
+        let max = 80
+            - AgentViewLayout::BTW_SIDEBAR_GAP
+            - AgentViewLayout::BTW_SIDEBAR_MIN_MAIN_WIDTH;
+        assert_eq!(AgentViewLayout::clamp_btw_sidebar_width(80, 200), max);
+    }
+
     #[test]
     fn timeline_rail_replaces_the_scrollbar_column() {
         let area = Rect::new(0, 0, 80, 40);
