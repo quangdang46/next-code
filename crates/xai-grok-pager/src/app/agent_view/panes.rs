@@ -315,11 +315,11 @@ impl AgentView {
     pub(super) fn handle_bg_tasks_key(
         &mut self,
         key: &KeyEvent,
-        _registry: &ActionRegistry,
+        registry: &ActionRegistry,
     ) -> InputOutcome {
         use crate::views::overlay::{handle_overlay_key, handle_overlay_nav_key};
         use crate::views::tasks_pane::TaskEntry;
-        if key!('b', CONTROL).matches(key) {
+        if registry.matches_id(ActionId::ToggleTasks, key) {
             self.tasks.overlay.toggle();
             self.tasks.on_state_change();
             if !self.tasks.overlay.focused {
