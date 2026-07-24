@@ -121,6 +121,8 @@ pub struct AgentViewLayout {
     /// Single-row record indicator ("◉ Recording") directly above the prompt,
     /// shown only while voice capture is active.
     pub voice_recording: Rect,
+    /// Claude-style agent panel carved from the bottom of scrollback.
+    pub agent_panel: Rect,
     pub prompt: Rect,
     pub shortcuts: Rect,
     /// Scrollback area narrowed for scrollbar (content rendering uses this).
@@ -393,6 +395,7 @@ impl AgentViewLayout {
             plugin_cta,
             follow_ups,
             voice_recording,
+            agent_panel: Rect::default(),
             prompt,
             shortcuts,
             scrollback_content,
@@ -411,6 +414,30 @@ impl AgentViewLayout {
     /// Gap columns between the main agent column and the `/btw` side panel
     /// (also the mouse drag hit target).
     pub const BTW_SIDEBAR_GAP: u16 = 1;
+
+    /// Carve a Claude-style agent panel from the bottom of scrollback.
+    ///
+    /// Places `agent_panel` in the freed strip between the shrunk scrollback
+    /// and the next lower band (btw / queue / turn status / prompt).
+    pub fn apply_agent_panel(&mut self, panel_height: u16) {
+        if panel_height == 0 {
+            self.agent_panel = Rect::default();
+            return;
+        }
+        let take = panel_height.min(self.scrollback.height.saturating_sub(5));
+        if take == 0 {
+            self.agent_panel = Rect::default();
+            return;
+        }
+        self.scrollback.height = self.scrollback.height.saturating_sub(take);
+        self.scrollback_content.height = self.scrollback_content.height.saturating_sub(take);
+        self.agent_panel = Rect {
+            x: self.scrollback.x,
+            y: self.scrollback.y.saturating_add(self.scrollback.height),
+            width: self.scrollback.width,
+            height: take,
+        };
+    }
 
     /// Horizontally split `area` into `(main, sidebar)` for a full-height
     /// right-hand `/btw` column (legacy TUI parity).
@@ -519,6 +546,7 @@ impl AgentViewLayout {
         shrink(&mut self.todo);
         shrink(&mut self.scrollback);
         shrink(&mut self.scrollback_content);
+        shrink(&mut self.agent_panel);
         shrink(&mut self.queue);
         shrink(&mut self.turn_status);
         shrink(&mut self.banner);

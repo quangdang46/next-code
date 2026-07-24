@@ -1,7 +1,8 @@
 # PLAN-20260724 — Face agent team UX (Claude Code–first)
 
-> **Status:** Research / temporary plan only — no product code in this PR.  
-> **Branch:** `docs/agent-team-claude-ux-plan`  
+> **Status:** Implemented (Face UI + ACP glue) — see §12 for shipped vs deferred.  
+> **Implementation branch:** `pr-face-agent-team-claude-ux`  
+> **Plan / research PR:** #85 (`docs/agent-team-claude-ux-plan`)  
 > **Primary target UX:** Claude Code **agent teams + in-session agent panel** (not Cursor Agents Window / `/multitask`).  
 > **Secondary reference:** Grok Build / Face subagent surfaces (tasks pane, fullscreen child, worktree isolation).  
 > **Related (do not collide):** parallel multitask / ask-user plans use different filenames (`PLAN-20260724-face-multitask-mvp.md`, `PLAN-20260724-face-ask-user-multiquestion.md`).  
@@ -309,3 +310,45 @@ Esc → back to lead (or interrupt if mid-turn, match CC rules)
 - `docs/plans/PLAN-20260721-face-info-widget-floats.md`  
 
 **DeepWiki note:** `ask_question` on `anthropics/claude-code` conflated **agent view** (`claude agents`) with **in-session agent panel**; prefer official agent-teams doc + local swarm sources above for UI specifics.
+
+---
+
+## 12. Implementation status (2026-07-24)
+
+**Verdict:** Face Claude-style agent-team shell is implemented on `pr-face-agent-team-claude-ux`. Plan research PR: #85.
+
+### Keybindings (Face deviations)
+
+| Claude Code | Face |
+|-------------|------|
+| Up/Down select roster | **Shift+Up/Down** (bare arrows remain scrollback) |
+| Ctrl+T tasks | **Ctrl+Shift+T** (Ctrl+T stays todo pane) |
+| Enter / Esc / x | Same while panel selecting |
+| Shift+Enter claim | Claim selected team task then SendPrompt (task strip open; no roster selecting required) |
+| (none) | **Shift+Left/Right** select team task |
+
+### Shipped
+
+- Unified roster: lead + Grok `subagent_sessions` + live swarm mirrors (`agent_roster.rs`)
+- Under-prompt agent panel + status chips + idle collapse (`views/agent_panel.rs`)
+- Enter opens Grok fullscreen (interactive prompt) or swarm soft transcript
+- Esc clears selection / exits soft / exits fullscreen
+- x kills Grok subagent; swarm stop via daemon `CommStop` (`x.ai/swarm/stop`)
+- Message routing: Grok child via ACP `SendPrompt`; swarm DM via `x.ai/swarm/dm` (CommMessage, NotifySession fallback) + soft buffer echo
+- Live ACP: `x.ai/swarm/status` / `member_message` / `plan` from pager idle pump + prompt loop
+- Team task strip + claim (Shift+Left/Right; Shift+Enter without roster selecting; todo seed fallback)
+- Permission provenance label includes swarm teammates (`Teammate "name":`)
+
+### Deferred (hard blockers / non-goals)
+
+- tmux / split-pane teammate layout (Claude click-into-pane path)
+- True multi-root / Agents Window / Cursor `/multitask`
+- TeamView float stub left as-is (panel is the interactive surface)
+- `SubagentStart`/`Stop` hook wiring at swarm spawn sites
+- Mouse click-to-enter on in-process panel rows (Claude in-process uses Enter)
+
+### Verify
+
+- Unit: `cargo test -p xai-grok-pager --lib agent_roster` / `agent_panel`
+- Check: `cargo check -p xai-grok-pager -p next-code --bins`
+

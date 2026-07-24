@@ -415,6 +415,8 @@ pub enum Action {
     KillBgTask(String),
     /// Kill (cancel) a subagent by subagent_id.
     KillSubagent(String),
+    /// Stop a swarm teammate via daemon `CommStop` (`x.ai/swarm/stop`).
+    StopSwarmMember(String),
     CancelScheduledTask(String),
     /// Demote the currently running execute tool to a background task.
     DemoteToBackground,
@@ -1541,6 +1543,17 @@ pub enum Effect {
     KillSubagent {
         session_id: acp::SessionId,
         subagent_id: String,
+    },
+    /// DM a swarm teammate via `x.ai/swarm/dm` (CommMessage / NotifySession).
+    MessageSwarmMember {
+        session_id: acp::SessionId,
+        target_session_id: String,
+        message: String,
+    },
+    /// Stop a swarm teammate via `x.ai/swarm/stop` (CommStop).
+    StopSwarmMember {
+        session_id: acp::SessionId,
+        target_session_id: String,
     },
     DeleteScheduledTask {
         session_id: acp::SessionId,

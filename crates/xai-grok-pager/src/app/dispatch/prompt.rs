@@ -383,6 +383,23 @@ pub(super) fn dispatch_send_prompt_inner(
         return vec![];
     }
 
+    // Agent-team panel: soft DM to a swarm member via daemon CommMessage.
+    // Echo into soft buffer, then short-circuit (do not send to lead).
+    if !literal && !text.trim().starts_with('/') {
+        use crate::app::agent_roster::MessageRoute;
+        if let MessageRoute::SwarmMember { session_id } = agent.current_message_route() {
+            let trimmed = text.trim().to_string();
+            if !trimmed.is_empty() {
+                agent.soft_message_swarm_member(&session_id, &trimmed);
+                let effects = agent.effects_message_swarm_member(session_id, trimmed);
+                if consume_input {
+                    agent.prompt.set_text("");
+                }
+                return effects;
+            }
+        }
+    }
+
     // Submitting the prompt retires any edit-contextual ephemeral tip
     // (ambient tips live out their TTL across the submit).
     agent.ephemeral_tip.clear_on_submit();
@@ -730,9 +747,8 @@ pub(super) fn dispatch_send_prompt_inner(
 
         if immediate_server_send {
             let session_id = agent
-                .session
-                .session_id
-                .clone()
+                .routed_acp_session_id()
+                .or_else(|| agent.session.session_id.clone())
                 .expect("session_id is_some checked");
             let agent_id = agent.session.id;
             let prompt_id = uuid::Uuid::new_v4().to_string();
