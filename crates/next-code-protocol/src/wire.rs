@@ -373,6 +373,19 @@ pub enum Request {
         error: Option<String>,
     },
 
+    /// Reply to a blocking ExitPlanMode reverse request (Face ACP outcome JSON).
+    #[serde(rename = "exit_plan_mode_response")]
+    ExitPlanModeResponse {
+        id: u64,
+        /// Matches the request_id from ExitPlanMode
+        request_id: String,
+        /// `ExitPlanModeExtResponse` JSON, or null + error
+        response: serde_json::Value,
+        /// When set, the bridge failed before producing a typed response
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+
     /// Reply to a blocking tool-approval permission prompt (Face ACP outcome).
     /// Distinct from AskUserQuestion and StdinResponse.
     #[serde(rename = "permission_response")]
@@ -1492,6 +1505,16 @@ pub enum ServerEvent {
         questions: serde_json::Value,
         /// `"default"` or `"plan"`
         mode: String,
+    },
+
+    /// ExitPlanMode tool needs Face ACP `x.ai/exit_plan_mode` reverse request.
+    #[serde(rename = "exit_plan_mode")]
+    ExitPlanMode {
+        request_id: String,
+        session_id: String,
+        tool_call_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        plan_content: Option<String>,
     },
 
     /// Tool execution needs user approval (Face ACP `session/request_permission`).

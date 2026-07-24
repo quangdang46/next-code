@@ -41,6 +41,17 @@ pub struct AskUserQuestionInputRequest {
     pub response_tx: tokio::sync::oneshot::Sender<Result<Value, String>>,
 }
 
+/// Blocking ExitPlanMode bridge request (daemon tool → client / Face).
+///
+/// Response JSON matches `ExitPlanModeExtResponse` (or an error string via `Err`).
+pub struct ExitPlanModeInputRequest {
+    pub request_id: String,
+    pub session_id: String,
+    pub tool_call_id: String,
+    pub plan_content: Option<String>,
+    pub response_tx: tokio::sync::oneshot::Sender<Result<Value, String>>,
+}
+
 #[derive(Clone)]
 pub struct ToolContext {
     pub session_id: String,
@@ -50,6 +61,7 @@ pub struct ToolContext {
     pub stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<StdinInputRequest>>,
     pub ask_user_question_tx:
         Option<tokio::sync::mpsc::UnboundedSender<AskUserQuestionInputRequest>>,
+    pub exit_plan_mode_tx: Option<tokio::sync::mpsc::UnboundedSender<ExitPlanModeInputRequest>>,
     pub graceful_shutdown_signal: Option<InterruptSignal>,
     pub execution_mode: ToolExecutionMode,
     /// Best-of-N run ID, set by the orchestrator before spawning
@@ -78,6 +90,7 @@ impl Default for ToolContext {
             working_dir: None,
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            exit_plan_mode_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: ToolExecutionMode::AgentTurn,
             best_of_n_run_id: None,
@@ -95,6 +108,7 @@ impl ToolContext {
             working_dir: self.working_dir.clone(),
             stdin_request_tx: self.stdin_request_tx.clone(),
             ask_user_question_tx: self.ask_user_question_tx.clone(),
+            exit_plan_mode_tx: self.exit_plan_mode_tx.clone(),
             graceful_shutdown_signal: self.graceful_shutdown_signal.clone(),
             execution_mode: self.execution_mode,
             best_of_n_run_id: self.best_of_n_run_id.clone(),
