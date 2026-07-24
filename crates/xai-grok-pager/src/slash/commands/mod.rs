@@ -37,6 +37,7 @@ pub mod login;
 pub mod logout;
 pub mod loop_cmd;
 pub mod mcps;
+pub mod memory;
 pub mod model;
 pub mod multiline;
 pub mod new;
@@ -112,6 +113,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(feedback::FeedbackCommand),
         Arc::new(announcements::AnnouncementsCommand),
         Arc::new(remember::RememberCommand),
+        Arc::new(memory::MemoryCommand),
         Arc::new(plan::PlanCommand),
         Arc::new(view_plan::ViewPlanCommand),
         Arc::new(resume::ResumeCommand),
@@ -212,6 +214,10 @@ mod tests {
             "/vim-mode should be registered"
         );
         assert!(reg.get("find").is_some(), "/find should be registered");
+        assert!(
+            reg.get("memory").is_some(),
+            "/memory should be registered"
+        );
     }
     #[test]
     fn loop_command_declares_scheduler_tool_requirement() {

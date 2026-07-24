@@ -39,6 +39,10 @@ pub struct MemoryFileInfo {
     pub size_bytes: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub modified_epoch_secs: Option<u64>,
+    /// Claude memdir taxonomy (`user` / `feedback` / `project` / `reference`)
+    /// or notepad tier (`priority` / `working` / `manual`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
