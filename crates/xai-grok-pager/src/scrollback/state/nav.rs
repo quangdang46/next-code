@@ -424,8 +424,8 @@ impl ScrollbackState {
         if range.is_empty() {
             return 0;
         }
-        self.current_sticky_layout(cache, &range)
-            .header_screen_rows()
+        let chrome = self.appearance.scrollback.display.sticky_chrome;
+        sticky_header_screen_rows(&self.current_sticky_layout(cache, &range), chrome)
     }
 
     /// Page up: scroll viewport, then select the topmost selectable on-screen entry.
@@ -707,9 +707,8 @@ impl ScrollbackState {
         let relative_prompts = self.build_relative_prompt_descriptors(cache, &visible_range);
 
         // Compute sticky header at current scroll position
-        let sticky =
-            compute_sticky_layout(self.scroll_offset, self.viewport_height, &relative_prompts);
-        let header_height = sticky.header_screen_rows();
+        let sticky = self.sticky_layout_at(self.scroll_offset, &relative_prompts);
+        let header_height = self.sticky_header_h(&sticky);
 
         // Content area bounds
         let content_top = self.scroll_offset + header_height as usize;
@@ -750,8 +749,8 @@ impl ScrollbackState {
                 // But check: at the new scroll position, will a sticky header appear
                 // that clips the entry's top?
                 let sticky_at_target =
-                    compute_sticky_layout(target_scroll, self.viewport_height, &relative_prompts);
-                let header_at_target = sticky_at_target.header_screen_rows();
+                    self.sticky_layout_at(target_scroll, &relative_prompts);
+                let header_at_target = self.sticky_header_h(&sticky_at_target);
                 let content_top_at_target = target_scroll + header_at_target as usize;
 
                 if entry_y >= content_top_at_target {
@@ -845,7 +844,35 @@ impl ScrollbackState {
         visible_range: &Range<usize>,
     ) -> StickyHeaderLayout {
         let relative_prompts = self.build_relative_prompt_descriptors(cache, visible_range);
-        compute_sticky_layout(self.scroll_offset, self.viewport_height, &relative_prompts)
+        self.sticky_layout_at(self.scroll_offset, &relative_prompts)
+    }
+
+    /// Whether Claude-style sticky chrome is active for this appearance.
+    #[inline]
+    pub(super) fn uses_sticky_chrome(&self) -> bool {
+        self.appearance.scrollback.display.sticky_headers
+            && self.appearance.scrollback.display.sticky_chrome
+            && !self.appearance.prompt.compact
+    }
+
+    /// Sticky layout at an arbitrary scroll offset (chrome-aware).
+    pub(super) fn sticky_layout_at(
+        &self,
+        scroll_offset: usize,
+        relative_prompts: &[PromptDescriptor],
+    ) -> StickyHeaderLayout {
+        let layout = compute_sticky_layout(scroll_offset, self.viewport_height, relative_prompts);
+        if self.uses_sticky_chrome() {
+            to_chrome_layout(&layout)
+        } else {
+            layout
+        }
+    }
+
+    /// Header screen rows for a sticky layout (chrome-aware).
+    #[inline]
+    pub(super) fn sticky_header_h(&self, layout: &StickyHeaderLayout) -> u16 {
+        sticky_header_screen_rows(layout, self.uses_sticky_chrome())
     }
 
     /// Find scroll position that puts entry_y at top of content area.
@@ -862,9 +889,8 @@ impl ScrollbackState {
         // Iterate to find fixed point (max 3 iterations as safety bound).
         // Converges quickly because header shrinks monotonically as we scroll up.
         for _ in 0..3 {
-            let sticky =
-                compute_sticky_layout(target_scroll, self.viewport_height, relative_prompts);
-            let header_at_target = sticky.header_screen_rows();
+            let sticky = self.sticky_layout_at(target_scroll, relative_prompts);
+            let header_at_target = self.sticky_header_h(&sticky);
             let content_top_at_target = target_scroll + header_at_target as usize;
 
             if entry_y >= content_top_at_target {
@@ -927,8 +953,8 @@ impl ScrollbackState {
         let relative_prompts = self.build_relative_prompt_descriptors(cache, &visible_range);
         let mut scroll = entry_y;
         for _ in 0..3 {
-            let sticky = compute_sticky_layout(scroll, self.viewport_height, &relative_prompts);
-            let header = sticky.header_screen_rows();
+            let sticky = self.sticky_layout_at(scroll, &relative_prompts);
+            let header = self.sticky_header_h(&sticky);
             scroll = entry_y.saturating_sub(header as usize);
         }
 
@@ -957,8 +983,8 @@ impl ScrollbackState {
         let relative_prompts = self.build_relative_prompt_descriptors(cache, &visible_range);
         let mut scroll = target;
         for _ in 0..3 {
-            let sticky = compute_sticky_layout(scroll, self.viewport_height, &relative_prompts);
-            let header = sticky.header_screen_rows();
+            let sticky = self.sticky_layout_at(scroll, &relative_prompts);
+            let header = self.sticky_header_h(&sticky);
             scroll = entry_y.saturating_sub(half_vp + header as usize);
         }
         self.scroll_offset = scroll;
@@ -2285,6 +2311,8 @@ mod tests {
     #[test]
     fn page_down_does_not_skip_lines_behind_sticky_header() {
         let mut h = ScrollTestHarness::new(80, 20);
+        // Exercise Face multi-row sticky (not Claude 1-row chrome).
+        h.state.appearance.scrollback.display.sticky_chrome = false;
         // A multi-line prompt so the pinned header is taller than the 2-row
         // overlap (single-line prompts render as exactly 1 row + 1 gap = 2,
         // which happens to match the overlap and would hide the bug), followed
@@ -2354,6 +2382,8 @@ mod tests {
     #[test]
     fn page_delta_ignores_header_when_sticky_headers_disabled() {
         let mut h = ScrollTestHarness::new(80, 20);
+        // Face multi-row sticky so the on-header measurement is >2 rows.
+        h.state.appearance.scrollback.display.sticky_chrome = false;
         // Same setup as the sticky-header test: a multi-line prompt that would
         // pin a >2-row header when enabled, plus a long response with room to
         // page through the middle without clamping at the bottom.

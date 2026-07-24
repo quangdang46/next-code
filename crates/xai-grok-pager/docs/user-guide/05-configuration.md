@@ -688,6 +688,7 @@ respect_manual_folds = true           # opt-in (default: false): keep manually f
 
 [scrollback.display]
 sticky_headers = true                 # pin user prompts as sticky headers
+sticky_chrome = true                  # Claude-style 1-row ❯ preview (false = Face multi-row sticky)
 tab_width = 4                         # spaces per tab character
 expandable_indicator = true           # show expand indicator on foldable entries
 expandable_indicator_running = true   # show indicator on running entries

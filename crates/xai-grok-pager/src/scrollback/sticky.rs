@@ -223,6 +223,15 @@ impl StickyHeaderLayout {
         self.pushed.as_ref().map(|_| 0)
     }
 
+    /// Entry index shown in the sticky header (pinned preferred, else pushed).
+    #[inline]
+    pub fn header_entry_idx(&self) -> Option<usize> {
+        self.pinned
+            .as_ref()
+            .or(self.pushed.as_ref())
+            .map(|p| p.entry_idx)
+    }
+
     /// Screen row where the gap between pushed and pinned is (if both present).
     pub fn gap_between_row(&self) -> Option<u16> {
         if let (Some(pushed), Some(_)) = (&self.pushed, &self.pinned) {
@@ -285,6 +294,93 @@ impl StickyHeaderLayout {
         }
         None
     }
+}
+
+/// Fixed height of Claude Code–style sticky prompt chrome (1 row, no gap).
+pub const STICKY_CHROME_ROWS: u16 = 1;
+
+/// Cap on sticky-chrome preview text (matches Claude `STICKY_TEXT_CAP`).
+pub const STICKY_CHROME_TEXT_CAP: usize = 500;
+
+/// Collapse a sticky layout to Claude-style 1-row chrome (no push animation).
+///
+/// Claude's `StickyPromptHeader` is a fixed 1-row breadcrumb outside the
+/// scroll region. Face's sticky headers are multi-row section pins; chrome
+/// mode keeps the same pin target but renders a compact preview row.
+pub fn to_chrome_layout(layout: &StickyHeaderLayout) -> StickyHeaderLayout {
+    match layout.header_entry_idx() {
+        Some(entry_idx) => StickyHeaderLayout {
+            pushed: None,
+            pinned: Some(RenderedPrompt {
+                entry_idx,
+                render_height: STICKY_CHROME_ROWS,
+                clip_top: 0,
+            }),
+        },
+        None => StickyHeaderLayout::default(),
+    }
+}
+
+/// Screen rows occupied by the sticky header, accounting for chrome mode.
+///
+/// Chrome is always exactly [`STICKY_CHROME_ROWS`] (no post-header gap) so the
+/// scroll viewport does not jump when the pinned prompt text changes.
+pub fn sticky_header_screen_rows(layout: &StickyHeaderLayout, chrome: bool) -> u16 {
+    if !layout.has_header() {
+        0
+    } else if chrome {
+        STICKY_CHROME_ROWS
+    } else {
+        layout.header_screen_rows()
+    }
+}
+
+/// Scroll offset for content under a sticky header (chrome-aware).
+pub fn sticky_scroll_for_content(
+    layout: &StickyHeaderLayout,
+    chrome: bool,
+    scroll_offset: usize,
+) -> usize {
+    scroll_offset + sticky_header_screen_rows(layout, chrome) as usize
+}
+
+/// Format user-prompt text for Claude-style sticky chrome.
+///
+/// First paragraph only, whitespace collapsed, capped at
+/// [`STICKY_CHROME_TEXT_CAP`] — mirrors Claude `StickyTracker` collapse.
+pub fn format_sticky_chrome_text(raw: &str) -> String {
+    let trimmed = raw.trim_start();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    let para = first_paragraph(trimmed);
+    let collapsed = para.split_whitespace().collect::<Vec<_>>().join(" ");
+    truncate_chars(&collapsed, STICKY_CHROME_TEXT_CAP)
+}
+
+fn first_paragraph(text: &str) -> &str {
+    let bytes = text.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'\n' {
+            let mut j = i + 1;
+            while j < bytes.len() && matches!(bytes[j], b' ' | b'\t' | b'\r') {
+                j += 1;
+            }
+            if j < bytes.len() && bytes[j] == b'\n' {
+                return &text[..i];
+            }
+        }
+        i += 1;
+    }
+    text
+}
+
+fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    s.chars().take(max).collect()
 }
 
 /// Compute sticky header layout for AllTurns view.
@@ -1425,5 +1521,33 @@ mod tests {
         // Well past B — still no header
         let layout_far = compute_sticky_layout(25, 24, &prompts);
         assert!(!layout_far.has_header());
+    }
+
+    #[test]
+    fn chrome_layout_collapses_to_one_row() {
+        let prompts = make_prompts(&[(0, 5), (20, 5)]);
+        let full = compute_sticky_layout(10, 24, &prompts);
+        assert!(full.pinned.is_some());
+        let chrome = to_chrome_layout(&full);
+        assert_eq!(chrome.pinned.map(|p| p.entry_idx), Some(0));
+        assert_eq!(chrome.pinned.map(|p| p.render_height), Some(1));
+        assert!(chrome.pushed.is_none());
+        assert_eq!(sticky_header_screen_rows(&chrome, true), 1);
+        assert_eq!(sticky_scroll_for_content(&chrome, true, 10), 11);
+    }
+
+    #[test]
+    fn format_sticky_chrome_text_first_paragraph_and_cap() {
+        assert_eq!(
+            format_sticky_chrome_text("  still seeing bugs:\n\n1. foo\n2. bar"),
+            "still seeing bugs:"
+        );
+        assert_eq!(
+            format_sticky_chrome_text("one\nline\ntwo"),
+            "one line two"
+        );
+        let long = "x".repeat(600);
+        assert_eq!(format_sticky_chrome_text(&long).chars().count(), 500);
+        assert!(format_sticky_chrome_text("   \n\n").is_empty());
     }
 }

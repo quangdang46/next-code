@@ -14,7 +14,10 @@ use crate::scrollback::layout::HorizontalLayout;
 use crate::scrollback::render::{ScratchBuffer, render_scrolled_entries_with_selection_boundaries};
 use crate::scrollback::selection::{RenderOutput, ScrollInfo, SelectionBox};
 use crate::scrollback::state::{ScrollbackState, ViewMode};
-use crate::scrollback::sticky::{PromptDescriptor, StickyHeaderLayout, compute_sticky_layout};
+use crate::scrollback::sticky::{
+    PromptDescriptor, StickyHeaderLayout, compute_sticky_layout, format_sticky_chrome_text,
+    sticky_header_screen_rows, sticky_scroll_for_content, to_chrome_layout,
+};
 use crate::scrollback::text_selection::ResolvedSelectionBoundaries;
 use crate::scrollback::types::{BlockContext, DisplayMode};
 use crate::theme::Theme;
@@ -365,15 +368,21 @@ impl ScrollbackPane {
         // Compute sticky header layout (disabled in compact mode).
         let use_sticky = state.appearance().scrollback.display.sticky_headers
             && !state.appearance().prompt.compact;
+        let chrome = use_sticky && state.appearance().scrollback.display.sticky_chrome;
         let sticky = if use_sticky {
-            compute_sticky_layout(state.scroll_offset(), area.height, &prompts)
+            let layout = compute_sticky_layout(state.scroll_offset(), area.height, &prompts);
+            if chrome {
+                to_chrome_layout(&layout)
+            } else {
+                layout
+            }
         } else {
             StickyHeaderLayout::default()
         };
 
         // The sticky layout encapsulates all 1D coordinate math.
         // We just ask it for screen positions and scroll offsets.
-        let header_height = sticky.header_screen_rows();
+        let header_height = sticky_header_screen_rows(&sticky, chrome);
 
         let content_area = if header_height > 0 && header_height < area.height {
             Rect {
@@ -399,7 +408,9 @@ impl ScrollbackPane {
         // Render pushed header (if any) - this one is being pushed off
         // Also track selection info for pushed headers
         let mut pushed_header_selection_box: Option<SelectionBox> = None;
-        if let Some(ref pushed) = sticky.pushed {
+        if !chrome
+            && let Some(ref pushed) = sticky.pushed
+        {
             let visible_height = pushed.visible_height();
             if visible_height > 0 {
                 let screen_row = sticky.pushed_screen_row().unwrap_or(0);
@@ -459,25 +470,40 @@ impl ScrollbackPane {
         if let Some(ref pinned) = sticky.pinned {
             let visible_height = pinned.visible_height();
             if visible_height > 0 {
-                let screen_row = sticky.pinned_screen_row().unwrap_or(0);
+                let screen_row = if chrome {
+                    0
+                } else {
+                    sticky.pinned_screen_row().unwrap_or(0)
+                };
                 let header_area = Rect {
                     x: area.x,
                     y: area.y + screen_row,
                     width: area.width,
                     height: visible_height,
                 };
-                self.render_sticky_header(
-                    buf,
-                    header_area,
-                    state,
-                    pinned.entry_idx,
-                    theme,
-                    pinned.render_height,
-                    pinned.clip_top,
-                    scratch,
-                    self.is_active && state.selected() == Some(pinned.entry_idx),
-                    self.mouse_pos,
-                );
+                if chrome {
+                    self.render_sticky_chrome(
+                        buf,
+                        header_area,
+                        state,
+                        pinned.entry_idx,
+                        theme,
+                        self.mouse_pos,
+                    );
+                } else {
+                    self.render_sticky_header(
+                        buf,
+                        header_area,
+                        state,
+                        pinned.entry_idx,
+                        theme,
+                        pinned.render_height,
+                        pinned.clip_top,
+                        scratch,
+                        self.is_active && state.selected() == Some(pinned.entry_idx),
+                        self.mouse_pos,
+                    );
+                }
 
                 // For selection, use HorizontalLayout to match content entries' selection width
                 let layout = HorizontalLayout::new(header_area, layout_cfg);
@@ -519,7 +545,7 @@ impl ScrollbackPane {
             let visible_range = entry_range.clone();
 
             // Use the sticky layout's scroll_for_content() which maintains bottom line continuity.
-            let scroll_for_content = sticky.scroll_for_content(state.scroll_offset());
+            let scroll_for_content = sticky_scroll_for_content(&sticky, chrome, state.scroll_offset());
 
             // Get the entry index shown in the pinned header (to avoid duplicate selection)
             let pinned_entry_idx = sticky.pinned_entry_idx();
@@ -604,6 +630,65 @@ impl ScrollbackPane {
                 sticky: p.sticky,
             })
             .collect()
+    }
+
+    /// Claude Code–style 1-row sticky prompt chrome (`❯ preview…`).
+    fn render_sticky_chrome(
+        &self,
+        buf: &mut Buffer,
+        area: Rect,
+        state: &ScrollbackState,
+        entry_idx: usize,
+        theme: &Theme,
+        mouse_pos: Option<(u16, u16)>,
+    ) {
+        use ratatui::style::Modifier;
+        use ratatui::text::{Line, Span};
+        use ratatui::widgets::{Paragraph, Widget};
+        use unicode_width::UnicodeWidthStr;
+
+        let Some(entry) = state.entry(entry_idx) else {
+            return;
+        };
+        let raw = entry.block.copy_text(false).unwrap_or_default();
+        let preview = format_sticky_chrome_text(&raw);
+        if preview.is_empty() || area.height == 0 || area.width == 0 {
+            return;
+        }
+
+        let hovered = mouse_pos.is_some_and(|(c, r)| {
+            c >= area.x && c < area.x.saturating_add(area.width) && r == area.y
+        });
+        let bg = if hovered {
+            theme.bg_hover
+        } else {
+            theme.bg_highlight
+        };
+        let fg = theme.text_secondary;
+
+        for x in area.x..area.x.saturating_add(area.width) {
+            if let Some(cell) = buf.cell_mut((x, area.y)) {
+                cell.set_symbol(" ");
+                cell.set_style(Style::default().bg(bg));
+            }
+        }
+
+        let arrow = crate::glyphs::prompt_arrow();
+        let arrow_w = UnicodeWidthStr::width(arrow) as u16;
+        let pad_right: u16 = 1;
+        let text_budget = area
+            .width
+            .saturating_sub(arrow_w)
+            .saturating_sub(pad_right) as usize;
+        let truncated = truncate_to_width(&preview, text_budget);
+        let line = Line::from(vec![
+            Span::styled(arrow, Style::default().fg(fg).bg(bg)),
+            Span::styled(
+                truncated,
+                Style::default().fg(fg).bg(bg).add_modifier(Modifier::DIM),
+            ),
+        ]);
+        Paragraph::new(line).render(area, buf);
     }
 
     /// Render a sticky header (pushed or pinned).
@@ -1183,6 +1268,34 @@ impl ScrollbackPane {
 /// and the caret is the MEMBER's affordance, so it sits one row below the
 /// slot top — unless the header is top-clipped off-screen, in which case the
 /// slot's first visible row already IS the member row.
+fn truncate_to_width(s: &str, max_cols: usize) -> String {
+    use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+    if max_cols == 0 {
+        return String::new();
+    }
+    if UnicodeWidthStr::width(s) <= max_cols {
+        return s.to_string();
+    }
+    let ellipsis = "…";
+    let ellipsis_w = UnicodeWidthStr::width(ellipsis);
+    if max_cols <= ellipsis_w {
+        return ellipsis.chars().take(max_cols).collect();
+    }
+    let budget = max_cols - ellipsis_w;
+    let mut out = String::new();
+    let mut w = 0usize;
+    for ch in s.chars() {
+        let cw = UnicodeWidthChar::width(ch).unwrap_or(0);
+        if w + cw > budget {
+            break;
+        }
+        out.push(ch);
+        w += cw;
+    }
+    out.push_str(ellipsis);
+    out
+}
+
 fn verb_member_indicator_row(slot_top: u16, verb_expanded: bool, header_clipped: bool) -> u16 {
     slot_top + u16::from(verb_expanded && !header_clipped)
 }
