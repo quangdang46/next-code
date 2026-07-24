@@ -28,7 +28,8 @@
 //! Phase 2 (planned): `propose_edit` and `propose_write` tools, turn-loop
 //! integration, auto-detection of edit tool calls.
 //!
-//! Phase 3 (planned): `show` mode UI, user picker for candidate diffs.
+//! Phase 3 (current): `show` mode Face picker + progress candidate cards
+//! (see `ui` module + Face `best_of_n_view`).
 //!
 //! Phase 4 (planned): Multi-model diversity (spawn across providers),
 //! streaming selector, confidence metrics.
@@ -38,6 +39,7 @@ pub mod selector;
 pub mod store;
 pub mod strategies;
 pub mod types;
+pub mod ui;
 
 // Re-export key types at the crate root.
 pub use config::{BestOfNConfig, BestOfNMode};
@@ -48,6 +50,10 @@ pub use types::{
     SelectScore,
 };
 pub use types::{HashlineAnchor, ProposeOp, ProposeOpKind};
+pub use ui::{
+    BestOfNCandidateUi, BestOfNPhase, BestOfNPickExtRequest, BestOfNPickExtResponse,
+    BestOfNProgressPayload, format_progress_cards, index_from_option_label,
+};
 
 /// High-level entry point for running a best-of-N edit cycle.
 ///

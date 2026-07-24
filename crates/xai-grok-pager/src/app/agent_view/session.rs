@@ -236,6 +236,7 @@ impl AgentView {
             hit_sb_copy: Default::default(),
             hit_sb_view: Default::default(),
             question_view: None,
+            best_of_n: None,
             hit_question_scrollbar: Default::default(),
             hovered_question_item: None,
             question_scrollbar_dragging: false,

@@ -2151,6 +2151,43 @@ impl acp::Agent for NextCodeFaceAgent {
                         .await;
                     }
                 }
+                ServerEvent::BestOfNProgress { payload } => {
+                    crate::cli::face_best_of_n::emit_best_of_n_progress(
+                        &self.gateway,
+                        &session_id,
+                        payload,
+                    )
+                    .await;
+                }
+                ServerEvent::BestOfNPickRequest {
+                    request_id,
+                    session_id: pick_session_id,
+                    run_id,
+                    tool_call_id,
+                    recommended_index,
+                    selection_reason,
+                    candidates,
+                } => {
+                    if let Err(err) = crate::cli::face_best_of_n::bridge_best_of_n_pick(
+                        &self.gateway,
+                        session.as_ref(),
+                        request_id,
+                        pick_session_id,
+                        run_id,
+                        tool_call_id,
+                        recommended_index,
+                        selection_reason,
+                        candidates,
+                    )
+                    .await
+                    {
+                        self.emit_text(
+                            &session_id,
+                            format!("Best-of-N pick bridge error: {err}"),
+                        )
+                        .await;
+                    }
+                }
                 ServerEvent::Done { id } if id == prompt_id => {
                     // Refresh Plan in case compaction / other paths mutated todos
                     // without a `todo` ToolDone this turn.
