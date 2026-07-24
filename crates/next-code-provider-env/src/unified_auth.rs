@@ -120,30 +120,32 @@ fn write_auth_root(map: &Map<String, Value>) -> Result<()> {
     Ok(())
 }
 
-/// Upsert `{ "type": "api", "key": ... }` under the canonical provider id.
+/// Upsert `{ "type": "api", "key": ... }` under an arbitrary provider id
+/// (OpenCode `auth.set` twin for models.dev / custom Other).
 ///
-/// Preserves `anthropic_accounts` and other OpenCode provider entries.
-/// Does **not** delete legacy `app_config_dir()/*.env` files.
-pub fn save_api_key_to_unified_auth(env_key: &str, key: &str) -> Result<&'static str> {
-    let provider_id = canonical_provider_id_for_env_key(env_key).ok_or_else(|| {
-        anyhow::anyhow!(
-            "No unified auth provider id mapping for env key '{env_key}'; cannot write auth.json"
-        )
-    })?;
+/// Preserves `anthropic_accounts` and other entries. Does **not** overwrite
+/// an existing oauth/wellknown entry for the same id.
+pub fn save_api_key_for_provider_id(provider_id: &str, key: &str) -> Result<()> {
+    let provider_id = provider_id.trim();
+    if provider_id.is_empty() {
+        anyhow::bail!("Refusing to write API key for empty provider id");
+    }
+    if provider_id == "anthropic_accounts" || provider_id == "active_anthropic_account" {
+        anyhow::bail!("Refusing to overwrite reserved auth.json key '{provider_id}'");
+    }
     let key = key.trim();
     if key.is_empty() {
-        anyhow::bail!("Refusing to write empty API key for {env_key}");
+        anyhow::bail!("Refusing to write empty API key for {provider_id}");
     }
 
     let mut map = load_auth_root()?;
-    // Do not overwrite an existing oauth/wellknown entry for the same id.
     if let Some(existing) = map.get(provider_id)
         && let Some(entry_type) = existing.get("type").and_then(Value::as_str)
         && entry_type != "api"
     {
         anyhow::bail!(
             "auth.json provider '{provider_id}' already has type '{entry_type}'; \
-             refusing to replace with API key (env {env_key})"
+             refusing to replace with API key"
         );
     }
 
@@ -155,6 +157,20 @@ pub fn save_api_key_to_unified_auth(env_key: &str, key: &str) -> Result<&'static
         }),
     );
     write_auth_root(&map)?;
+    Ok(())
+}
+
+/// Upsert `{ "type": "api", "key": ... }` under the canonical provider id.
+///
+/// Preserves `anthropic_accounts` and other OpenCode provider entries.
+/// Does **not** delete legacy `app_config_dir()/*.env` files.
+pub fn save_api_key_to_unified_auth(env_key: &str, key: &str) -> Result<&'static str> {
+    let provider_id = canonical_provider_id_for_env_key(env_key).ok_or_else(|| {
+        anyhow::anyhow!(
+            "No unified auth provider id mapping for env key '{env_key}'; cannot write auth.json"
+        )
+    })?;
+    save_api_key_for_provider_id(provider_id, key)?;
     Ok(provider_id)
 }
 
@@ -357,5 +373,18 @@ mod tests {
 
         let err = save_api_key_to_unified_auth("OPENAI_API_KEY", "sk-test").unwrap_err();
         assert!(err.to_string().contains("oauth"));
+    }
+
+    #[test]
+    fn save_api_key_for_arbitrary_provider_id() {
+        let temp = tempfile::TempDir::new().unwrap();
+        let _home = EnvGuard::set_home(temp.path());
+
+        save_api_key_for_provider_id("cohere", "sk-cohere-test").unwrap();
+        let auth_path = temp.path().join("auth.json");
+        let root: Value =
+            serde_json::from_str(&std::fs::read_to_string(&auth_path).unwrap()).unwrap();
+        assert_eq!(root["cohere"]["type"], json!("api"));
+        assert_eq!(root["cohere"]["key"], json!("sk-cohere-test"));
     }
 }

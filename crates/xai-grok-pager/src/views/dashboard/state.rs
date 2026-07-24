@@ -3270,14 +3270,15 @@ impl DashboardState {
                     // dropdown and fall through to the Enter handler which
                     // dispatches the slash command.
                     let snap = self.dispatch.slash_snapshot();
-                    // Bare `/model ` → Select-model palette (not first inline row).
+                    // Bare `/model ` / `/connect ` → centered ArgPicker.
                     if !snap.cursor_in_command
                         && snap.args_query_is_empty
-                        && matches!(snap.query.as_str(), "model" | "m")
+                        && let Some(action) =
+                            crate::slash::centered_arg_picker_action(snap.query.as_str())
                     {
                         self.dispatch.slash_close();
                         self.dispatch.set_text("");
-                        return InputOutcome::Action(Action::OpenModelPicker);
+                        return InputOutcome::Action(action);
                     }
                     let chains = snap
                         .selection()
@@ -4197,17 +4198,29 @@ impl DashboardState {
                 match mw::handle_modal_key(window, key, &chrome_cfg) {
                     mw::ModalWindowOutcome::CloseRequested => {
                         if in_effort {
-                            // Step back to model list.
-                            let Some(cmd) =
-                                self.dispatch.slash_controller.registry().get(&command_clone)
-                            else {
-                                self.model_picker = None;
-                                return InputOutcome::Changed;
+                            // Step back to model / connect root list.
+                            let root_items = if matches!(
+                                command_clone.as_str(),
+                                "connect" | "login"
+                            ) {
+                                let items =
+                                    crate::slash::commands::connect::build_connect_family_items();
+                                (!items.is_empty()).then_some(items)
+                            } else {
+                                let Some(cmd) = self
+                                    .dispatch
+                                    .slash_controller
+                                    .registry()
+                                    .get(&command_clone)
+                                else {
+                                    self.model_picker = None;
+                                    return InputOutcome::Changed;
+                                };
+                                let ctx = self.dispatch.slash_controller.app_ctx(&self.models);
+                                cmd.suggest_args(&ctx, "")
+                                    .filter(|items| !items.is_empty())
                             };
-                            let ctx = self.dispatch.slash_controller.app_ctx(&self.models);
-                            if let Some(model_items) = cmd.suggest_args(&ctx, "")
-                                && !model_items.is_empty()
-                            {
+                            if let Some(model_items) = root_items {
                                 if let Some(ActiveModal::ArgPicker {
                                     args_query,
                                     items,

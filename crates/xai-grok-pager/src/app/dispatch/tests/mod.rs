@@ -77,6 +77,7 @@ fn test_app() -> AppView {
     AppView {
         active_view: ActiveView::Welcome,
         auth_return_view: None,
+        open_model_picker_after_auth: false,
         agents: IndexMap::new(),
         next_agent_id: 0,
         models: ModelState::default(),

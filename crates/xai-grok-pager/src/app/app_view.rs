@@ -599,6 +599,10 @@ pub struct AppView {
     /// (e.g. `Agent`) afterwards. `None` at startup so the normal
     /// login-then-load flow is preserved.
     pub auth_return_view: Option<ActiveView>,
+    /// When true, successful auth opens the Select-model ArgPicker (OpenCode
+    /// `DialogModel` parity after `/connect`). Set by `NextCodeConnect`;
+    /// cleared on AuthComplete / AuthFailed / CancelLogin.
+    pub open_model_picker_after_auth: bool,
     /// Per-agent views (keyed by AgentId).
     pub agents: IndexMap<AgentId, AgentView>,
     /// Monotonically increasing counter for agent ID allocation.
@@ -1244,6 +1248,7 @@ impl AppView {
         Self {
             active_view: ActiveView::Welcome,
             auth_return_view: None,
+            open_model_picker_after_auth: false,
             agents: IndexMap::new(),
             next_agent_id: 0,
             models,
@@ -3267,7 +3272,12 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
         {
             return InputOutcome::ActionThenForward(Action::NewSession);
         }
-        if *ctx.prompt_focused {
+        // Welcome prompt is only interactive when auth is Done. During
+        // Authenticating (loopback paste) / Pending, keys must reach the
+        // auth handlers below — otherwise a leftover `welcome_prompt_focused`
+        // (common after mid-session `/connect`) swallows typing into the
+        // invisible welcome prompt while the paste box stays empty.
+        if *ctx.prompt_focused && matches!(ctx.auth_state, AuthState::Done) {
             match ctx.prompt.handle_key(key) {
                 crate::views::prompt_widget::PromptEvent::Edited => {
                     return InputOutcome::Changed;
@@ -5311,6 +5321,7 @@ pub(crate) mod tests {
         AppView {
             active_view: ActiveView::Welcome,
             auth_return_view: None,
+            open_model_picker_after_auth: false,
             agents: indexmap::IndexMap::new(),
             next_agent_id: 0,
             models: ModelState::default(),
@@ -8680,6 +8691,26 @@ pub(crate) mod tests {
         let outcome = app.handle_input(&key_event(KeyCode::Char('a'), KeyModifiers::NONE));
         assert!(matches!(outcome, InputOutcome::Changed));
         assert_eq!(app.auth_code_input.text(), "a");
+    }
+    /// Mid-session `/connect` leaves `welcome_prompt_focused` true from the
+    /// prior welcome visit; typing must still land in the loopback paste box.
+    #[test]
+    fn authenticating_loopback_types_despite_stale_welcome_prompt_focus() {
+        let mut app = test_app();
+        app.welcome_prompt_focused = true;
+        app.auth_state = AuthState::Authenticating {
+            request_seq: 1,
+            handle: None,
+            auth_url: Some("https://example.com/auth".into()),
+            mode: AuthMode::Loopback,
+        };
+        let outcome = app.handle_input(&key_event(KeyCode::Char('t'), KeyModifiers::NONE));
+        assert!(matches!(outcome, InputOutcome::Changed));
+        assert_eq!(app.auth_code_input.text(), "t");
+        assert!(
+            app.welcome_prompt.text().is_empty(),
+            "stale welcome prompt must not swallow auth token keystrokes"
+        );
     }
     #[test]
     fn authenticating_loopback_readline_control_chords_are_ignored() {

@@ -580,6 +580,7 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             } = &app.auth_state
                 && *current_seq == request_seq
             {
+                app.open_model_picker_after_auth = false;
                 app.auth_state = AuthState::Pending { error: Some(error) };
                 app.auth_code_input.reset();
             }

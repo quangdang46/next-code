@@ -163,16 +163,7 @@ pub(in crate::app::dispatch) fn dispatch_open_connect_picker(app: &mut AppView) 
             }
 
             let command = "connect";
-            let Some(cmd) = agent.prompt.slash_controller.registry().get(command) else {
-                return vec![];
-            };
-            let ctx = agent
-                .prompt
-                .slash_controller
-                .app_ctx(&agent.session.models);
-            let Some(items) = cmd.suggest_args(&ctx, "") else {
-                return vec![];
-            };
+            let items = crate::slash::commands::connect::build_connect_family_items();
             if items.is_empty() {
                 return vec![];
             }
@@ -204,16 +195,7 @@ pub(in crate::app::dispatch) fn dispatch_open_connect_picker(app: &mut AppView) 
             }
 
             let command = "connect";
-            let Some(cmd) = dashboard.dispatch.slash_controller.registry().get(command) else {
-                return vec![];
-            };
-            let ctx = dashboard
-                .dispatch
-                .slash_controller
-                .app_ctx(&dashboard.models);
-            let Some(items) = cmd.suggest_args(&ctx, "") else {
-                return vec![];
-            };
+            let items = crate::slash::commands::connect::build_connect_family_items();
             if items.is_empty() {
                 return vec![];
             }

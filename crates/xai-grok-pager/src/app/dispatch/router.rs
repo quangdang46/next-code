@@ -1098,6 +1098,8 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             )));
             app.login_label = Some(provider);
             app.auth_start_mode = crate::app::app_view::AuthMode::Pending;
+            // OpenCode parity: after successful connect, jump to model select.
+            app.open_model_picker_after_auth = true;
             dispatch_login(app)
         }
         Action::CancelLogin => dispatch_cancel_login(app),
