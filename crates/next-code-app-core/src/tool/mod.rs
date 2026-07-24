@@ -48,6 +48,7 @@ mod session_search;
 pub(crate) mod session_search_index;
 mod side_panel;
 mod skill;
+mod task_management;
 mod team;
 mod todo;
 mod webfetch;
@@ -203,6 +204,8 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "skill_manage"
             | "team_status"
             | "team_task_list"
+            | "TaskGet"
+            | "TaskList"
     ) {
         return ToolTier::Read;
     }
@@ -222,6 +225,8 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "notepad_write_working"
             | "notepad_write_manual"
             | "notepad_prune"
+            | "TaskCreate"
+            | "TaskUpdate"
     ) {
         return ToolTier::Write;
     }
@@ -464,6 +469,31 @@ impl Registry {
             Self::insert_tool_timed(&mut m, &mut timings, "invalid", invalid::InvalidTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "lsp", lsp::LspTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "todo", todo::TodoTool::new);
+            // Claude-style session task graph (coexists with todo + team_task_*).
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskCreate",
+                task_management::TaskCreateTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskGet",
+                task_management::TaskGetTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskList",
+                task_management::TaskListTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskUpdate",
+                task_management::TaskUpdateTool::new,
+            );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
