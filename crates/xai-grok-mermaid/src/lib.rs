@@ -9,12 +9,12 @@
 //!
 //! # Pipeline
 //!
-//! 1. A [`MermaidEngine`] turns Mermaid source into an SVG and rasterizes it.
-//!    The default engine ([`PureRustEngine`]) uses the vendored, dagre-based
-//!    `mermaid-to-svg` for layout, then [`rasterize`].
-//! 2. [`rasterize`] converts SVG to PNG with `resvg`/`usvg`/`tiny-skia`,
-//!    configured with **no remote/file resolvers** and a **bundled font** so it
-//!    is safe over untrusted input and deterministic across machines.
+//! 1. A [`MermaidEngine`] turns Mermaid source into a PNG. The default engine
+//!    ([`MmdrEngine`]) calls `mermaid-rs-renderer`'s Face embed API
+//!    (`render_png_bytes` + `Theme::face_light` / `face_dark`, hardened
+//!    bundled-font raster, megapixel/axis caps).
+//! 2. [`rasterize`] remains available for SVG→PNG ([`MmdcEngine`]) with **no
+//!    remote/file resolvers** and a **bundled font**.
 //!
 //! # Untrusted input and crash isolation
 //!
@@ -45,14 +45,14 @@
 #![warn(missing_docs)]
 
 mod engine;
+mod mmdr;
 mod mmdc;
-mod pure;
 mod raster;
 mod subprocess;
 
 pub use engine::{MermaidEngine, MermaidError, RenderLimits, render_checked};
+pub use mmdr::MmdrEngine;
 pub use mmdc::{MmdcEngine, detect_mmdc};
-pub use pure::PureRustEngine;
 pub use raster::{MAX_OUTPUT_MEGAPIXELS, rasterize};
 pub use subprocess::{SubprocessError, run_with_timeout};
 
@@ -71,9 +71,8 @@ pub enum MermaidTheme {
     Dark,
 }
 
-/// Default opaque surface colors. Single source of truth, shared by the raster
-/// background ([`MermaidTheme::surface_background`]) and the vendored engine's
-/// theme background (`pure::theme_for`, via [`Rgba::to_hex`]).
+/// Default opaque surface colors. Single source of truth for the raster
+/// background ([`MermaidTheme::surface_background`]).
 pub(crate) const LIGHT_SURFACE: Rgba = Rgba::new(0xFA, 0xFA, 0xFA, 0xFF);
 pub(crate) const DARK_SURFACE: Rgba = Rgba::new(0x18, 0x18, 0x1B, 0xFF);
 
@@ -194,12 +193,12 @@ pub struct RenderedDiagram {
     pub height_px: u32,
 }
 
-/// Construct the default engine: the offline, pure-Rust [`PureRustEngine`].
+/// Construct the default engine: offline [`MmdrEngine`] (`mermaid-rs-renderer`).
 ///
-/// `mmdc` is never selected automatically — construct [`MmdcEngine`] explicitly
-/// to opt in.
+/// Optional [`MmdcEngine`] is never selected automatically — construct it
+/// explicitly to opt in.
 pub fn default_engine() -> Arc<dyn MermaidEngine> {
-    Arc::new(PureRustEngine::new())
+    Arc::new(MmdrEngine::new())
 }
 
 #[cfg(test)]

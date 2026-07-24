@@ -131,36 +131,47 @@ impl AgentMessageBlock {
         )
     }
 
-    /// Build the block's output and the diagram affordance rows together so the
-    /// inserted rows (in the output) and the anchored placements (their offsets)
-    /// are always derived from the same layout.
+    /// Build output + affordance rows + optional inline PNG placements together
+    /// so reserved rows and offsets stay aligned.
     ///
-    /// [`output`](Self::output) and [`diagram_affordances`](Self::diagram_affordances)
-    /// each call this independently (so it runs twice per frame for a diagram
-    /// message); it is deterministic for a given `ctx`, so the two calls produce
-    /// matching rows + offsets without a shared cache that could drift.
-    ///
-    /// Only callers that have already confirmed there are diagrams and we are
-    /// not in raw mode should reach here (so the common diagram-free path never
-    /// pays this build).
+    /// [`output`](Self::output), [`diagram_affordances`](Self::diagram_affordances),
+    /// and [`inline_media_placements`](Self::inline_media_placements) each call
+    /// this independently (deterministic for a given `ctx`).
     fn rendered_output(
         &self,
         ctx: &BlockContext,
-    ) -> (BlockOutput, Vec<mermaid_content::DiagramAffordance>) {
+    ) -> (
+        BlockOutput,
+        Vec<mermaid_content::DiagramAffordance>,
+        Vec<mermaid_content::DiagramInlinePlacement>,
+    ) {
         let mut out = self.content.output(ctx.width as usize);
-        // Diagram pre-wrap ranges in document order. The fence count and order
-        // are width-invariant, so range index `idx` pairs positionally with the
-        // diagram's source (`self.mermaid.source(idx)`).
         let ranges = self.content.mermaid_block_ranges();
 
         match self.mermaid_display_mode() {
-            mermaid_content::MermaidDisplay::SourceOnly => (out, Vec::new()),
+            mermaid_content::MermaidDisplay::SourceOnly => (out, Vec::new(), Vec::new()),
             mermaid_content::MermaidDisplay::Affordances => {
-                let affordances =
-                    mermaid_content::apply_affordance_rows(&mut out, &ranges, |idx| {
-                        self.mermaid.source(idx).unwrap_or_default().to_string()
-                    });
-                (out, affordances)
+                let theme = crate::theme::cache::current_kind();
+                let overlay = crate::terminal::image::scrollback_inline_overlay_active();
+                let (affordances, media) = mermaid_content::apply_diagram_layout(
+                    &mut out,
+                    &ranges,
+                    |idx| self.mermaid.source(idx).unwrap_or_default().to_string(),
+                    |source| {
+                        if !overlay {
+                            return None;
+                        }
+                        let key = mermaid_content::MermaidCacheKey::derive(
+                            source,
+                            theme,
+                            ctx.width,
+                            mermaid_content::MermaidRenderQuality::Terminal,
+                        );
+                        mermaid_content::lookup_inline_png(&key)
+                    },
+                    ctx.width,
+                );
+                (out, affordances, media)
             }
         }
     }
@@ -168,8 +179,6 @@ impl AgentMessageBlock {
 
 impl BlockContent for AgentMessageBlock {
     fn output(&self, ctx: &BlockContext) -> BlockOutput {
-        // Common path: no diagrams (or raw mode) → plain markdown, no affordance
-        // machinery and no extra output rebuild.
         if ctx.raw || self.mermaid.is_empty() {
             return self.content.output(ctx.width as usize);
         }
@@ -177,9 +186,6 @@ impl BlockContent for AgentMessageBlock {
     }
 
     fn diagram_affordances(&self, ctx: &BlockContext) -> Vec<mermaid_content::DiagramAffordance> {
-        // Affordance rows exist only under the affordance display with diagrams;
-        // for every other (much more common) case, return without building
-        // output().
         if ctx.raw
             || self.mermaid.is_empty()
             || self.mermaid_display_mode() != mermaid_content::MermaidDisplay::Affordances
@@ -189,19 +195,69 @@ impl BlockContent for AgentMessageBlock {
         self.rendered_output(ctx).1
     }
 
+    fn inline_media_placements(
+        &self,
+        ctx: &BlockContext,
+    ) -> Vec<crate::scrollback::block::AnchoredMedia> {
+        if ctx.raw
+            || self.mermaid.is_empty()
+            || self.mermaid_display_mode() != mermaid_content::MermaidDisplay::Affordances
+            || !crate::terminal::image::scrollback_inline_overlay_active()
+        {
+            return Vec::new();
+        }
+        self.rendered_output(ctx)
+            .2
+            .into_iter()
+            .map(|m| crate::scrollback::block::AnchoredMedia {
+                info: crate::prompt_images::InlineMediaInfo {
+                    path: m.png.path,
+                    width: m.png.width,
+                    height: m.png.height,
+                    is_video: false,
+                    alt_text: String::new(),
+                },
+                row_offset: m.row_offset,
+                rows: m.rows,
+                has_button_row: false,
+            })
+            .collect()
+    }
+
     fn estimate_extra_rows(&self) -> u16 {
-        // Each detected diagram inserts one treatment row (affordance row or
-        // fallback caption) into output() that the source-text estimate can't
-        // see. Count one per diagram (a safe over-estimate if a range is empty)
-        // so the off-screen estimate never under-reserves; raw mode and the
-        // `off` setting add no such row.
+        // Affordance row (+ optional terminal-tier image rows when a PNG is
+        // already remembered). Width/theme for the cache key use a stable
+        // representative; under-reserve is avoided when a ready PNG exists.
         if self.mermaid.is_empty()
             || self.content.is_raw()
             || self.mermaid_display_mode() == mermaid_content::MermaidDisplay::SourceOnly
         {
             return 0;
         }
-        self.mermaid.len() as u16
+        let mut extra = self.mermaid.len() as u16;
+        if crate::terminal::image::scrollback_inline_overlay_active() {
+            let theme = crate::theme::cache::current_kind();
+            const EST_COLS: u16 = 80;
+            for i in 0..self.mermaid.len() {
+                let Some(source) = self.mermaid.source(i) else {
+                    continue;
+                };
+                let key = mermaid_content::MermaidCacheKey::derive(
+                    source,
+                    theme,
+                    EST_COLS,
+                    mermaid_content::MermaidRenderQuality::Terminal,
+                );
+                if let Some(png) = mermaid_content::lookup_inline_png(&key) {
+                    extra = extra.saturating_add(mermaid_content::mermaid_inline_image_rows(
+                        png.width,
+                        png.height,
+                        EST_COLS,
+                    ));
+                }
+            }
+        }
+        extra
     }
 
     fn accent(&self, _ctx: &BlockContext) -> Option<AccentStyle> {

@@ -145,10 +145,8 @@ pub struct InlineMediaPlacement {
 
 /// A visible Mermaid diagram affordance row with its screen position and the
 /// diagram source its buttons act on. The draw loop paints
-/// `◇ mermaid [Open Image] [Copy Image Path] [Copy Source]` onto `screen_rect` and registers
-/// the click hit-rects; the reserved (blank) row already scrolls with the
-/// surrounding content. Rendering is lazy (driven from the source on click), so
-/// no rendered path/state is carried here.
+/// `◇ mermaid [Open Image] [Copy Image Path] [Copy Source]` onto `screen_rect`,
+/// may kick a terminal-tier inline render, and registers click hit-rects.
 #[derive(Debug, Clone)]
 pub struct DiagramAffordancePlacement {
     /// Screen rect of the affordance row (one row tall, content-area width).
@@ -747,16 +745,22 @@ pub(crate) fn render_scrolled_entries_with_selection_boundaries(
                 if visible_h >= 1 {
                     // Tool media exposes its second output line as the
                     // click-to-copy filepath and reserves a button row.
-                    let filepath_virtual_y = content_y_start + 1;
-                    let filepath_screen_rect = if filepath_virtual_y >= viewport_start
-                        && filepath_virtual_y < viewport_bottom
-                    {
-                        Some(ratatui::layout::Rect {
-                            x: entry_content_area.x,
-                            y: viewport.y + (filepath_virtual_y - viewport_start) as u16,
-                            width: entry_content_area.width,
-                            height: 1,
-                        })
+                    // Mermaid inline paint sets has_button_row=false (Open/Copy
+                    // live on the affordance row), so skip filepath hit-rects.
+                    let filepath_screen_rect = if placement.has_button_row {
+                        let filepath_virtual_y = content_y_start + 1;
+                        if filepath_virtual_y >= viewport_start
+                            && filepath_virtual_y < viewport_bottom
+                        {
+                            Some(ratatui::layout::Rect {
+                                x: entry_content_area.x,
+                                y: viewport.y + (filepath_virtual_y - viewport_start) as u16,
+                                width: entry_content_area.width,
+                                height: 1,
+                            })
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     };
@@ -773,7 +777,7 @@ pub(crate) fn render_scrolled_entries_with_selection_boundaries(
                         top_crop_rows: top_crop,
                         filepath_screen_rect,
                         open_button_screen_rect: None,
-                        has_button_row: true,
+                        has_button_row: placement.has_button_row,
                     });
                 }
             }
