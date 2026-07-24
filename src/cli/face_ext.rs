@@ -73,48 +73,16 @@ fn format_usage_text(providers: &[crate::usage::ProviderUsage]) -> String {
 }
 
 /// `x.ai/session/info` — context + session snapshot for `/context` / session info.
+///
+/// Context breakdown is API-true (compact boundary + system/tools/skills), not
+/// cumulative billing totals. See [`super::face_context_viz`].
 pub fn session_info_payload(session_id: &str) -> serde_json::Value {
     let Ok(session) = Session::load(session_id) else {
         return json!({
             "error": format!("Unknown session id: {session_id}")
         });
     };
-    let totals = session.token_usage_totals();
-    let used = totals.input_tokens.saturating_add(totals.output_tokens);
-    let total = used.max(1);
-    let usage_pct = ((used as f64 / total as f64) * 100.0).round() as u8;
-    let turn_count = session
-        .messages
-        .iter()
-        .filter(|m| matches!(m.role, crate::message::Role::User))
-        .count() as u64;
-    let cwd = session.working_dir.clone().unwrap_or_default();
-    let model = session.model.clone().unwrap_or_else(|| "unknown".into());
-    json!({
-        "result": {
-            "sessionId": session.id,
-            "cwd": cwd,
-            "data": {
-                "model": model,
-                "modelDisplayName": session.display_title_or_name(),
-                "turns": turn_count,
-                "turnIndex": turn_count,
-                "context": {
-                    "used": used,
-                    "total": total,
-                    "freeTokens": 0,
-                    "messageTokens": used,
-                    "systemPromptTokens": 0,
-                    "turnCount": turn_count,
-                    "toolCallCount": 0,
-                    "compactionCount": 0,
-                    "usagePct": usage_pct,
-                    "messageCount": session.messages.len() as u64,
-                    "autoCompactThresholdPercent": 85,
-                }
-            }
-        }
-    })
+    super::face_context_viz::session_info_json(&session)
 }
 
 /// `x.ai/session/rename`
