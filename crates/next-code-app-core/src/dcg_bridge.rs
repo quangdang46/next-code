@@ -36,11 +36,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
-use dcg_core::{Decision, Effect, Engine, EngineConfig, Mode, Session, ToolCall};
+use dcg_core::{Decision, Effect, Engine, EngineConfig, Session, ToolCall};
 use next_code_agent_runtime::PermissionMode;
 use next_code_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry};
 
 pub use crate::yolo_classifier::YoloClassifier;
+pub use dcg_core::Mode;
 
 /// Globally configured permission mode. Set once during CLI startup, read
 /// from every `SafetySystem::classify` call.
@@ -109,6 +110,11 @@ pub fn permission_mode_to_dcg(pm: PermissionMode) -> Mode {
 /// here keyed by the child session id. `classify_for_agent` checks this
 /// map before falling back to the global mode.
 static SESSION_MODES: LazyLock<Mutex<HashMap<String, Mode>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Mode to restore when leaving plan mode (Claude `prePlanMode`).
+/// Stashed on first transition into `Plan`; cleared on leave or session clear.
+static PRE_PLAN_MODES: LazyLock<Mutex<HashMap<String, Mode>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// Per-session tool allow-list. When the user approves a specific pending
@@ -376,17 +382,30 @@ pub fn cycle_mode() -> Mode {
     next
 }
 
+/// Parse a Face chrome or DCG wire permission-mode string into [`Mode`].
+///
+/// Accepts Face aliases (`ask`, `always-approve`, `yolo`) in addition to DCG
+/// ids. Face `ask` maps to [`Mode::Default`] (prompt), not [`Mode::DontAsk`].
+#[must_use]
+pub fn parse_permission_mode_str(s: &str) -> Option<Mode> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "default" | "ask" => Some(Mode::Default),
+        "accept-edits" => Some(Mode::AcceptEdits),
+        "plan" => Some(Mode::Plan),
+        "auto" => Some(Mode::Auto),
+        "dont-ask" => Some(Mode::DontAsk),
+        "bypass-permissions" | "always-approve" | "yolo" | "bypass" => {
+            Some(Mode::BypassPermissions)
+        }
+        _ => None,
+    }
+}
+
 /// Set permission mode from a string (e.g., from CLI args or config).
 /// Returns true if the string was a valid mode and the mode was changed.
 pub fn set_mode_from_str(s: &str) -> bool {
-    let mode = match s.trim().to_ascii_lowercase().as_str() {
-        "default" => Mode::Default,
-        "accept-edits" => Mode::AcceptEdits,
-        "plan" => Mode::Plan,
-        "auto" => Mode::Auto,
-        "dont-ask" => Mode::DontAsk,
-        "bypass-permissions" => Mode::BypassPermissions,
-        _ => return false,
+    let Some(mode) = parse_permission_mode_str(s) else {
+        return false;
     };
     set_mode(mode);
     true
@@ -496,10 +515,60 @@ pub fn set_session_mode(session_id: &str, mode: Mode) {
     }
 }
 
+/// Enter plan mode for a session, stashing the prior mode for ExitPlanMode.
+///
+/// Idempotent when already in `Plan`: does not overwrite a stored pre-plan
+/// mode. Also updates the process-global mode (Face / single-session daemon).
+pub fn enter_plan_mode_for_session(session_id: &str) {
+    let previous = session_mode(session_id).unwrap_or_else(current_mode);
+    if previous != Mode::Plan
+        && let Ok(mut guard) = PRE_PLAN_MODES.lock()
+    {
+        guard.entry(session_id.to_string()).or_insert(previous);
+    }
+    set_session_mode(session_id, Mode::Plan);
+    set_mode(Mode::Plan);
+}
+
+/// Leave plan mode, restoring the stashed pre-plan mode (or `Default`).
+pub fn leave_plan_mode_for_session(session_id: &str) -> Mode {
+    let restored = PRE_PLAN_MODES
+        .lock()
+        .ok()
+        .and_then(|mut guard| guard.remove(session_id))
+        .unwrap_or(Mode::Default);
+    set_session_mode(session_id, restored);
+    set_mode(restored);
+    restored
+}
+
+/// Apply a permission mode, stashing/restoring around plan transitions.
+pub fn apply_session_permission_mode(session_id: &str, mode: Mode) {
+    match mode {
+        Mode::Plan => enter_plan_mode_for_session(session_id),
+        other => {
+            let was_plan = session_mode(session_id).unwrap_or_else(current_mode) == Mode::Plan;
+            if was_plan {
+                // Leaving plan via `/plan` toggle or SetSessionMode — drop stash
+                // if the client asked for an explicit non-plan mode.
+                let _ = PRE_PLAN_MODES
+                    .lock()
+                    .ok()
+                    .map(|mut guard| guard.remove(session_id));
+            }
+            set_session_mode(session_id, other);
+            set_mode(other);
+        }
+    }
+}
+
 /// Remove the per-session permission mode override for a session that
 /// has finished. Prevents unbounded growth of the map.
 pub fn clear_session_mode(session_id: &str) {
     if let Ok(mut guard) = SESSION_MODES.lock() {
+        guard.remove(session_id);
+    }
+    if let Ok(mut guard) = PRE_PLAN_MODES.lock() {
         guard.remove(session_id);
     }
     // Also drop any per-session allow-list entries for this session so a
@@ -1247,10 +1316,28 @@ mod tests {
         assert!(set_mode_from_str("bypass-permissions"));
         assert!(set_mode_from_str("Default"));
         assert!(set_mode_from_str("BYPASS-PERMISSIONS"));
+        // Face chrome aliases
+        assert!(set_mode_from_str("ask"));
+        assert!(set_mode_from_str("always-approve"));
+        assert!(set_mode_from_str("yolo"));
         // Invalid strings are rejected
         assert!(!set_mode_from_str(""));
         assert!(!set_mode_from_str("nonsense"));
         assert!(!set_mode_from_str("accept_edits"));
+    }
+
+    #[test]
+    fn face_ask_is_default_not_dont_ask() {
+        assert_eq!(parse_permission_mode_str("ask"), Some(Mode::Default));
+        assert_eq!(parse_permission_mode_str("dont-ask"), Some(Mode::DontAsk));
+        assert_eq!(
+            parse_permission_mode_str("always-approve"),
+            Some(Mode::BypassPermissions)
+        );
+        assert_eq!(
+            parse_permission_mode_str("yolo"),
+            Some(Mode::BypassPermissions)
+        );
     }
 
     #[test]

@@ -217,31 +217,45 @@ fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Opt
     Some("Child session (untracked):".to_string())
 }
 
+/// Max lines of edit/write preview shown under the permission title.
+const EDIT_PREVIEW_MAX_LINES: usize = 12;
+/// Max characters per preview line (wrap is separate at render).
+const EDIT_PREVIEW_MAX_CHARS: usize = 120;
+
 /// Build title, description lines, and optional raw command for a permission request.
 ///
 /// Deserializes `raw_input` into the shared [`BashToolInput`] from
 /// `xai-grok-tools` for typed access to `command` and `description`.
 /// Falls back to ACP-level `title`/`kind` fields when deserialization fails.
 ///
+/// For bash: description may include cwd + risk cues (Claude-style context).
+/// For edit/write: description is a path summary + unified-diff-ish preview.
+///
 /// Returns `(title, description, bash_command_raw)`.
-fn build_permission_display(
+pub(super) fn build_permission_display(
     req: &acp::RequestPermissionRequest,
     bash_highlights: Option<&BashCommandHighlights>,
 ) -> (String, Vec<String>, Option<String>) {
     let is_bash = bash_highlights.is_some();
+    let raw = req.tool_call.fields.raw_input.as_ref();
 
-    let bash_input = req.tool_call.fields.raw_input.as_ref().and_then(|v| {
+    let bash_input = raw.and_then(|v| {
         serde_json::from_value::<xai_grok_tools::implementations::BashToolInput>(v.clone()).ok()
     });
 
     let raw_command = bash_input.as_ref().map(|b| b.command.clone()).or_else(|| {
-        req.tool_call
-            .fields
-            .title
-            .as_deref()
-            .and_then(|t| t.strip_prefix("Execute `"))
-            .and_then(|t| t.strip_suffix('`'))
+        raw.and_then(|v| v.get("command"))
+            .and_then(|c| c.as_str())
             .map(|s| s.to_string())
+            .or_else(|| {
+                req.tool_call
+                    .fields
+                    .title
+                    .as_deref()
+                    .and_then(|t| t.strip_prefix("Execute `"))
+                    .and_then(|t| t.strip_suffix('`'))
+                    .map(|s| s.to_string())
+            })
     });
 
     let bash_description = bash_input.map(|b| b.description);
@@ -250,7 +264,32 @@ fn build_permission_display(
         || req.tool_call.fields.kind == Some(acp::ToolKind::Execute)
         || raw_command.is_some();
 
-    let title = if is_execute {
+    let is_edit = is_edit_permission(req)
+        || req.tool_call.fields.kind == Some(acp::ToolKind::Edit)
+        || raw.is_some_and(|v| {
+            v.get("file_path").and_then(|p| p.as_str()).is_some()
+                && (v.get("old_string").is_some()
+                    || v.get("new_string").is_some()
+                    || v.get("content").is_some()
+                    || v.get("edits").is_some())
+        });
+
+    // Prefer agent/bridge-provided title when present (next-code face_permission
+    // already formats Claude-style titles).
+    let bridged_title = req
+        .tool_call
+        .fields
+        .title
+        .as_deref()
+        .map(str::trim)
+        .filter(|t| !t.is_empty() && *t != "Allow?");
+
+    let title = if let Some(t) = bridged_title.filter(|t| {
+        // Keep bash description titles and "Allow …?" cards from the bridge.
+        is_execute || is_edit || t.starts_with("Allow ")
+    }) {
+        t.to_string()
+    } else if is_execute {
         bash_description
             .as_deref()
             .map(str::trim)
@@ -262,16 +301,16 @@ fn build_permission_display(
                     None => "Allow Execute?".to_string(),
                 },
             )
-    } else if is_edit_permission(req) {
-        let file_path = req
-            .tool_call
-            .fields
-            .raw_input
-            .as_ref()
-            .and_then(|v| v.get("file_path"))
+    } else if is_edit {
+        let file_path = raw
+            .and_then(|v| v.get("file_path").or_else(|| v.get("path")))
             .and_then(|v| v.as_str());
         if let Some(path) = file_path {
-            format!("Allow Edit to {}?", path)
+            if raw.is_some_and(|v| v.get("content").is_some() && v.get("old_string").is_none()) {
+                format!("Allow Write to {}?", path)
+            } else {
+                format!("Allow Edit to {}?", path)
+            }
         } else if let Some(ref t) = req.tool_call.fields.title {
             format!(
                 "Allow {}?",
@@ -294,9 +333,183 @@ fn build_permission_display(
         }
     };
 
-    let description = mcp_args_lines(req);
+    let mut description = mcp_args_lines(req);
+    if description.is_empty() {
+        if is_execute {
+            description = bash_context_lines(raw, raw_command.as_deref());
+        } else if is_edit {
+            description = edit_preview_lines(raw);
+        }
+    }
+
     let bash_cmd = if is_execute { raw_command } else { None };
     (title, description, bash_cmd)
+}
+
+/// Cwd + lightweight risk cues for bash permission cards.
+fn bash_context_lines(raw: Option<&serde_json::Value>, command: Option<&str>) -> Vec<String> {
+    let mut lines = Vec::new();
+    if let Some(cwd) = raw
+        .and_then(|v| {
+            v.get("cwd")
+                .or_else(|| v.get("working_directory"))
+                .or_else(|| v.get("workdir"))
+        })
+        .and_then(|c| c.as_str())
+        .map(str::trim)
+        .filter(|c| !c.is_empty())
+    {
+        lines.push(format!("cwd: {cwd}"));
+    }
+    if let Some(reason) = raw
+        .and_then(|v| v.get("permission_reason"))
+        .and_then(|r| r.as_str())
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+    {
+        // Avoid duplicating the full "(command: …)" suffix in the chrome.
+        let cleaned = reason
+            .rsplit_once("(command: ")
+            .map(|(head, _)| head.trim())
+            .unwrap_or(reason);
+        if !cleaned.is_empty() {
+            lines.push(format!("reason: {cleaned}"));
+        }
+    }
+    if let Some(cmd) = command {
+        for cue in bash_risk_cues(cmd) {
+            lines.push(format!("risk: {cue}"));
+        }
+    }
+    lines
+}
+
+fn bash_risk_cues(command: &str) -> Vec<&'static str> {
+    let lower = command.to_ascii_lowercase();
+    let mut cues = Vec::new();
+    if lower.contains("rm -rf") || lower.contains("rm -fr") || lower.contains("del /s") {
+        cues.push("destructive delete");
+    }
+    if lower.contains("sudo ") || lower.contains(" runas ") {
+        cues.push("elevated privileges");
+    }
+    if lower.contains("curl ") && (lower.contains("| sh") || lower.contains("| bash"))
+        || lower.contains("wget ") && lower.contains("| sh")
+    {
+        cues.push("pipe remote script to shell");
+    }
+    if lower.contains("mkfs") || lower.contains("dd if=") {
+        cues.push("disk/filesystem rewrite");
+    }
+    if lower.contains(":(){:|:&};:") {
+        cues.push("fork bomb pattern");
+    }
+    cues
+}
+
+/// Path + unified-diff-ish preview for edit/write permission cards.
+fn edit_preview_lines(raw: Option<&serde_json::Value>) -> Vec<String> {
+    let Some(raw) = raw else {
+        return Vec::new();
+    };
+    let mut lines = Vec::new();
+    if let Some(path) = raw
+        .get("file_path")
+        .or_else(|| raw.get("path"))
+        .and_then(|p| p.as_str())
+    {
+        lines.push(format!("file: {path}"));
+    }
+    if let Some(reason) = raw
+        .get("permission_reason")
+        .and_then(|r| r.as_str())
+        .map(str::trim)
+        .filter(|r| !r.is_empty())
+    {
+        lines.push(format!("reason: {reason}"));
+    }
+
+    if let Some(edits) = raw.get("edits").and_then(|e| e.as_array()) {
+        lines.push(format!("{} edit(s)", edits.len()));
+        for (i, edit) in edits.iter().take(3).enumerate() {
+            let old = edit.get("old_string").and_then(|s| s.as_str()).unwrap_or("");
+            let new = edit.get("new_string").and_then(|s| s.as_str()).unwrap_or("");
+            lines.push(format!("── edit {} ──", i + 1));
+            lines.extend(diff_preview_lines(old, new));
+        }
+        if edits.len() > 3 {
+            lines.push(format!("… (+{} more edits)", edits.len() - 3));
+        }
+        return truncate_preview(lines);
+    }
+
+    if let (Some(old), Some(new)) = (
+        raw.get("old_string").and_then(|s| s.as_str()),
+        raw.get("new_string").and_then(|s| s.as_str()),
+    ) {
+        lines.extend(diff_preview_lines(old, new));
+        return truncate_preview(lines);
+    }
+
+    if let Some(content) = raw.get("content").and_then(|c| c.as_str()) {
+        lines.push("── write content ──".to_string());
+        for line in content.lines().take(EDIT_PREVIEW_MAX_LINES) {
+            lines.push(format!("+ {}", truncate_chars(line, EDIT_PREVIEW_MAX_CHARS)));
+        }
+        let total = content.lines().count();
+        if total > EDIT_PREVIEW_MAX_LINES {
+            lines.push(format!("… (+{} more lines)", total - EDIT_PREVIEW_MAX_LINES));
+        }
+        return truncate_preview(lines);
+    }
+
+    truncate_preview(lines)
+}
+
+fn diff_preview_lines(old: &str, new: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let old_lines: Vec<&str> = old.lines().collect();
+    let new_lines: Vec<&str> = new.lines().collect();
+    // Prefer a short context preview: show removed then added (Claude-ish).
+    for line in old_lines.iter().take(EDIT_PREVIEW_MAX_LINES / 2) {
+        out.push(format!("- {}", truncate_chars(line, EDIT_PREVIEW_MAX_CHARS)));
+    }
+    if old_lines.len() > EDIT_PREVIEW_MAX_LINES / 2 {
+        out.push(format!(
+            "… (+{} more removed)",
+            old_lines.len() - EDIT_PREVIEW_MAX_LINES / 2
+        ));
+    }
+    for line in new_lines.iter().take(EDIT_PREVIEW_MAX_LINES / 2) {
+        out.push(format!("+ {}", truncate_chars(line, EDIT_PREVIEW_MAX_CHARS)));
+    }
+    if new_lines.len() > EDIT_PREVIEW_MAX_LINES / 2 {
+        out.push(format!(
+            "… (+{} more added)",
+            new_lines.len() - EDIT_PREVIEW_MAX_LINES / 2
+        ));
+    }
+    if out.is_empty() {
+        out.push("(empty change)".to_string());
+    }
+    out
+}
+
+fn truncate_chars(s: &str, max: usize) -> String {
+    match s.char_indices().nth(max) {
+        Some((idx, _)) => format!("{}…", &s[..idx]),
+        None => s.to_string(),
+    }
+}
+
+fn truncate_preview(mut lines: Vec<String>) -> Vec<String> {
+    const CAP: usize = 24;
+    if lines.len() > CAP {
+        let hidden = lines.len() - CAP;
+        lines.truncate(CAP);
+        lines.push(format!("… (+{hidden} more lines)"));
+    }
+    lines
 }
 
 /// Maximum stored lines for the MCP planned-arguments display. The overlay
@@ -354,11 +567,14 @@ pub(super) fn mcp_args_lines(req: &acp::RequestPermissionRequest) -> Vec<String>
     lines
 }
 
-/// Check if this is an edit permission by looking at option names.
+/// Check if this is an edit permission by looking at option names or kind.
 ///
-/// The shell's edit options include "allow all edits" in the AllowAlways
-/// option name. This is reliable even when tool_call.fields.kind is None.
+/// The shell's edit options include "allow all edits" / "Always allow edits"
+/// in the AllowAlways option name. next-code Face bridge uses the same cue.
 fn is_edit_permission(req: &acp::RequestPermissionRequest) -> bool {
+    if req.tool_call.fields.kind == Some(acp::ToolKind::Edit) {
+        return true;
+    }
     req.options.iter().any(|o| {
         o.kind == acp::PermissionOptionKind::AllowAlways && o.name.to_lowercase().contains("edit")
     })

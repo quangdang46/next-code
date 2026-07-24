@@ -707,7 +707,15 @@ Alternatives: {}",
                         allow_once_code,
                         ..
                     } => {
-                        // Publish bus event so the TUI can show a permission dialog
+                        // Publish bus event so Face / TUI can show a bash permission card
+                        let mut tool_input = serde_json::json!({
+                            "command": params.command,
+                        });
+                        if let Some(ref dir) = ctx.working_dir {
+                            tool_input["cwd"] = serde_json::Value::String(
+                                dir.to_string_lossy().into_owned(),
+                            );
+                        }
                         crate::bus::Bus::global().publish(
                             crate::bus::BusEvent::PermissionRequested(
                                 crate::bus::PermissionRequested {
@@ -716,7 +724,7 @@ Alternatives: {}",
                                     reason: format!("{} (command: {})", reason, params.command),
                                     allow_once_code,
                                     alternatives: vec![],
-                                    tool_input: None,
+                                    tool_input: Some(tool_input),
                                 },
                             ),
                         );
@@ -989,7 +997,15 @@ Alternatives: {}",
                         allow_once_code,
                         ..
                     } => {
-                        // Publish bus event so the TUI can show a permission dialog
+                        // Publish bus event so Face / TUI can show a bash permission card
+                        let mut tool_input = serde_json::json!({
+                            "command": params.command,
+                        });
+                        if let Some(ref dir) = ctx.working_dir {
+                            tool_input["cwd"] = serde_json::Value::String(
+                                dir.to_string_lossy().into_owned(),
+                            );
+                        }
                         crate::bus::Bus::global().publish(
                             crate::bus::BusEvent::PermissionRequested(
                                 crate::bus::PermissionRequested {
@@ -998,7 +1014,7 @@ Alternatives: {}",
                                     reason: format!("{} (command: {})", reason, params.command),
                                     allow_once_code,
                                     alternatives: vec![],
-                                    tool_input: None,
+                                    tool_input: Some(tool_input),
                                 },
                             ),
                         );

@@ -186,3 +186,93 @@
         );
     }
 
+    fn permission_req_execute(raw: serde_json::Value, title: &str) -> acp::RequestPermissionRequest {
+        let fields = acp::ToolCallUpdateFields::new()
+            .title(title.to_string())
+            .kind(acp::ToolKind::Execute)
+            .raw_input(raw);
+        acp::RequestPermissionRequest::new(
+            acp::SessionId::new(std::sync::Arc::from("s1")),
+            acp::ToolCallUpdate::new(
+                acp::ToolCallId::new(std::sync::Arc::from("call-1")),
+                fields,
+            ),
+            vec![],
+        )
+    }
+
+    fn permission_req_edit(raw: serde_json::Value, title: &str) -> acp::RequestPermissionRequest {
+        let fields = acp::ToolCallUpdateFields::new()
+            .title(title.to_string())
+            .kind(acp::ToolKind::Edit)
+            .raw_input(raw);
+        let options = vec![acp::PermissionOption::new(
+            acp::PermissionOptionId::new(std::sync::Arc::from("allow-always")),
+            "Always allow edits".to_string(),
+            acp::PermissionOptionKind::AllowAlways,
+        )];
+        acp::RequestPermissionRequest::new(
+            acp::SessionId::new(std::sync::Arc::from("s1")),
+            acp::ToolCallUpdate::new(
+                acp::ToolCallId::new(std::sync::Arc::from("call-1")),
+                fields,
+            ),
+            options,
+        )
+    }
+
+    #[test]
+    fn build_permission_display_bash_shows_command_cwd_and_risk() {
+        let req = permission_req_execute(
+            serde_json::json!({
+                "command": "rm -rf /tmp/x",
+                "description": "Clean scratch",
+                "cwd": "/repo",
+                "permission_reason": "policy gate",
+            }),
+            "Clean scratch",
+        );
+        let (title, description, bash_cmd) = build_permission_display(&req, None);
+        assert_eq!(title, "Clean scratch");
+        assert_eq!(bash_cmd.as_deref(), Some("rm -rf /tmp/x"));
+        let joined = description.join("\n");
+        assert!(joined.contains("cwd: /repo"), "{joined}");
+        assert!(joined.contains("reason: policy gate"), "{joined}");
+        assert!(joined.contains("risk: destructive delete"), "{joined}");
+    }
+
+    #[test]
+    fn build_permission_display_edit_shows_path_and_diff_preview() {
+        let req = permission_req_edit(
+            serde_json::json!({
+                "file_path": "src/lib.rs",
+                "old_string": "fn a() {}\n",
+                "new_string": "fn a() { todo!() }\n",
+            }),
+            "Allow Edit to src/lib.rs?",
+        );
+        let (title, description, bash_cmd) = build_permission_display(&req, None);
+        assert_eq!(title, "Allow Edit to src/lib.rs?");
+        assert!(bash_cmd.is_none());
+        let joined = description.join("\n");
+        assert!(joined.contains("file: src/lib.rs"), "{joined}");
+        assert!(joined.contains("- fn a() {}"), "{joined}");
+        assert!(joined.contains("+ fn a() { todo!() }"), "{joined}");
+    }
+
+    #[test]
+    fn build_permission_display_write_shows_content_preview() {
+        let req = permission_req_edit(
+            serde_json::json!({
+                "file_path": "README.md",
+                "content": "# Hello\nworld\n",
+            }),
+            "Allow Write to README.md?",
+        );
+        let (title, description, _) = build_permission_display(&req, None);
+        assert_eq!(title, "Allow Write to README.md?");
+        let joined = description.join("\n");
+        assert!(joined.contains("file: README.md"), "{joined}");
+        assert!(joined.contains("+ # Hello"), "{joined}");
+    }
+

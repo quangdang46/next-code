@@ -52,13 +52,26 @@ pub(super) fn dispatch_enter_plan_mode(
         return vec![];
     }
 
-    let agent = app.agents.get_mut(&id).unwrap();
-    let Some(session_id) = agent.session.session_id.clone() else {
-        agent.show_toast("No active session");
-        return vec![];
+    let (session_id, should_stash) = {
+        let agent = app.agents.get_mut(&id).unwrap();
+        let Some(session_id) = agent.session.session_id.clone() else {
+            agent.show_toast("No active session");
+            return vec![];
+        };
+        (session_id, agent.pre_plan_mode.is_none())
     };
 
+    // Stash pre-plan mode (same contract as set_plan_mode).
+    if should_stash {
+        let current = match app.current_ui.permission_mode.as_deref() {
+            Some("ask") => xai_grok_tools::types::SessionMode::Ask,
+            _ => xai_grok_tools::types::SessionMode::Default,
+        };
+        app.agents.get_mut(&id).unwrap().pre_plan_mode = Some(current);
+    }
+
     // Set optimistic pending state (same pattern as dispatch_cycle_mode).
+    let agent = app.agents.get_mut(&id).unwrap();
     agent.plan_mode_pending = Some(true);
     tracing::info!("Plan mode entered via /plan slash command");
 
@@ -138,54 +151,114 @@ pub(super) fn set_plan_mode(
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];
     };
+    // Snapshot before agent mut borrow (prePlanMode stash).
+    let ui_perm = app.current_ui.permission_mode.clone();
+
+    enum PlanModeOutcome {
+        Idempotent,
+        Transition {
+            session_id: acp::SessionId,
+            mode_id: acp::SessionModeId,
+            new: bool,
+        },
+    }
+
+    let outcome = {
+        let Some(agent) = app.agents.get_mut(&id) else {
+            return vec![];
+        };
+
+        let Some(session_id) = agent.session.session_id.clone() else {
+            agent.show_toast("No active session");
+            return vec![];
+        };
+
+        // Effective state: prefer optimistic pending over confirmed
+        // active. Mirrors `dispatch_cycle_mode`'s `in_plan` read so
+        // rapid toggles don't double-send.
+        let prev = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
+        let new = kind.to_bool();
+
+        // Idempotent: toast but skip the ACP round-trip — unless we are
+        // turning OFF while pending is already false but plan_mode_active
+        // is still true (approve path: pending=false, active=true).
+        if prev == new && (new || !agent.plan_mode_active) {
+            PlanModeOutcome::Idempotent
+        } else {
+            // Optimistic mutation: pager-side pending flag, then UI feedback,
+            // then effect. The shell's `CurrentModeUpdate` broadcast will
+            // confirm + clear `plan_mode_pending` via `detect_plan_mode_change`.
+            if new {
+                // Stash pre-plan mode on enter (only if not already stashed).
+                if agent.pre_plan_mode.is_none() {
+                    let current = match ui_perm.as_deref() {
+                        Some("ask") => xai_grok_tools::types::SessionMode::Ask,
+                        _ => xai_grok_tools::types::SessionMode::Default,
+                    };
+                    agent.pre_plan_mode = Some(current);
+                }
+            }
+            agent.plan_mode_pending = Some(new);
+
+            // OFF restores prePlanMode when available; otherwise Default.
+            let mode_id = acp::SessionModeId::new(if new {
+                xai_grok_tools::types::SessionMode::Plan.as_id()
+            } else {
+                agent
+                    .pre_plan_mode
+                    .take()
+                    .unwrap_or(xai_grok_tools::types::SessionMode::Default)
+                    .as_id()
+            });
+            PlanModeOutcome::Transition {
+                session_id,
+                mode_id,
+                new,
+            }
+        }
+    };
+
+    match outcome {
+        PlanModeOutcome::Idempotent => {
+            app.show_toast(&plan_mode_toast(kind));
+            vec![]
+        }
+        PlanModeOutcome::Transition {
+            session_id,
+            mode_id,
+            new,
+        } => {
+            refresh_open_settings_modals(app);
+            app.show_toast(&plan_mode_toast(kind));
+            tracing::info!(
+                target: "settings",
+                key = "plan_mode",
+                value = new,
+                "setting changed",
+            );
+            vec![Effect::SetSessionMode {
+                session_id,
+                mode_id,
+            }]
+        }
+    }
+}
+
+/// Open `plan.md` in `$EDITOR` via `SuspendForEditor` plumbing.
+pub(super) fn dispatch_open_plan_in_editor(app: &mut AppView) -> Vec<Effect> {
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
     let Some(agent) = app.agents.get_mut(&id) else {
         return vec![];
     };
-
-    let Some(session_id) = agent.session.session_id.clone() else {
+    let Some(path) = agent.plan_file_path() else {
         agent.show_toast("No active session");
         return vec![];
     };
-
-    // Effective state: prefer optimistic pending over confirmed
-    // active. Mirrors `dispatch_cycle_mode`'s `in_plan` read so
-    // rapid toggles don't double-send.
-    let prev = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
-    let new = kind.to_bool();
-
-    // Idempotent: toast but skip the ACP round-trip.
-    if prev == new {
-        app.show_toast(&plan_mode_toast(kind));
-        return vec![];
-    }
-
-    // Optimistic mutation: pager-side pending flag, then UI feedback,
-    // then effect. The shell's `CurrentModeUpdate` broadcast will
-    // confirm + clear `plan_mode_pending` via `detect_plan_mode_change`.
-    agent.plan_mode_pending = Some(new);
-    refresh_open_settings_modals(app);
-    app.show_toast(&plan_mode_toast(kind));
-
-    tracing::info!(
-        target: "settings",
-        key = "plan_mode",
-        value = new,
-        "setting changed",
-    );
-
-    // OFF targets `SessionMode::Default`, not the user's prior mode.
-    // If the user was in `Ask` (shell-injection only), that preference
-    // is silently dropped. See `PLAN_MODE_CHOICES` in `settings/defs.rs`.
-    let mode_id = acp::SessionModeId::new(if new {
-        xai_grok_tools::types::SessionMode::Plan.as_id()
-    } else {
-        xai_grok_tools::types::SessionMode::Default.as_id()
-    });
-
-    vec![Effect::SetSessionMode {
-        session_id,
-        mode_id,
-    }]
+    agent.active_modal = None;
+    app.pending_editor_path = Some(path);
+    vec![]
 }
 
 /// Format the `Plan mode` toast. Non-destructive in both directions

@@ -50,7 +50,9 @@ mod settings;
 mod subagent_activity;
 
 #[cfg(test)]
-use permissions::{MCP_ARGS_MAX_LINE_CHARS, MCP_ARGS_MAX_LINES, mcp_args_lines};
+use permissions::{
+    MCP_ARGS_MAX_LINE_CHARS, MCP_ARGS_MAX_LINES, build_permission_display, mcp_args_lines,
+};
 use permissions::{apply_recap_block, handle_permission_request, should_drop_late_auto_recap};
 
 // Hub + child modules (via `use super::*`) need sibling symbols in this scope.

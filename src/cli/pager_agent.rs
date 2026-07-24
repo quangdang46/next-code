@@ -2151,6 +2151,29 @@ impl acp::Agent for NextCodeFaceAgent {
                         .await;
                     }
                 }
+                ServerEvent::ExitPlanMode {
+                    request_id,
+                    session_id: plan_session_id,
+                    tool_call_id,
+                    plan_content,
+                } => {
+                    if let Err(err) = crate::cli::face_exit_plan::bridge_exit_plan_mode(
+                        &self.gateway,
+                        session.as_ref(),
+                        request_id,
+                        plan_session_id,
+                        tool_call_id,
+                        plan_content,
+                    )
+                    .await
+                    {
+                        self.emit_text(
+                            &session_id,
+                            format!("ExitPlanMode bridge error: {err}"),
+                        )
+                        .await;
+                    }
+                }
                 ServerEvent::Done { id } if id == prompt_id => {
                     // Refresh Plan in case compaction / other paths mutated todos
                     // without a `todo` ToolDone this turn.
@@ -2330,6 +2353,107 @@ impl acp::Agent for NextCodeFaceAgent {
             session.prompt_running.store(false, Ordering::SeqCst);
         }
         result
+    }
+
+    async fn set_session_mode(
+        &self,
+        args: acp::SetSessionModeRequest,
+    ) -> acp::Result<acp::SetSessionModeResponse> {
+        let session_id = args.session_id.to_string();
+        let mode_id = args.mode_id.0.as_ref().to_string();
+        let session = self.sessions.borrow().get(&session_id).cloned();
+        let Some(session) = session else {
+            return Err(
+                acp::Error::invalid_params().data(format!("Unknown session: {session_id}"))
+            );
+        };
+
+        let permission =
+            crate::cli::face_permission_mode::face_mode_to_daemon_permission(&mode_id);
+
+        self.apply_daemon_permission_mode(&session, permission)
+            .await?;
+
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                acp::SessionId::new(session_id),
+                acp::SessionUpdate::CurrentModeUpdate(acp::CurrentModeUpdate::new(
+                    acp::SessionModeId::new(mode_id),
+                )),
+            ))
+            .await;
+
+        Ok(acp::SetSessionModeResponse::new())
+    }
+
+    async fn ext_notification(&self, args: acp::ExtNotification) -> acp::Result<()> {
+        let method = args.method.as_ref();
+        if method != "x.ai/yolo_mode_changed" {
+            return Ok(());
+        }
+
+        let params: serde_json::Value =
+            serde_json::from_str(args.params.get()).unwrap_or(serde_json::Value::Null);
+        let permission_mode = params
+            .get("permission_mode")
+            .and_then(|v| v.as_str());
+        let yolo_mode = params
+            .get("yolo_mode")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let auto_mode = params
+            .get("auto_mode")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let permission = crate::cli::face_permission_mode::yolo_notification_to_daemon_permission(
+            permission_mode,
+            yolo_mode,
+            auto_mode,
+        );
+
+        // Face PersistPermissionMode does not include session_id in the
+        // notification body — apply to every live daemon session (typical
+        // next-code Face embed is one active session).
+        let sessions: Vec<Rc<DaemonSession>> =
+            self.sessions.borrow().values().cloned().collect();
+        for session in sessions {
+            if let Err(e) = self.apply_daemon_permission_mode(&session, permission).await {
+                eprintln!(
+                    "[nextcode.face] yolo_mode_changed → SetPermissionMode({permission}) failed: {e}"
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+impl NextCodeFaceAgent {
+    /// Push `Request::SetPermissionMode` and wait for `Done`.
+    async fn apply_daemon_permission_mode(
+        &self,
+        session: &DaemonSession,
+        permission: &str,
+    ) -> acp::Result<()> {
+        let req_id = session.next_id();
+        session
+            .send(&Request::SetPermissionMode {
+                id: req_id,
+                mode: permission.to_string(),
+            })
+            .await
+            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+
+        loop {
+            match session.read_event().await {
+                Ok(ServerEvent::Done { id }) if id == req_id => return Ok(()),
+                Ok(ServerEvent::Error { id, message, .. }) if id == req_id => {
+                    return Err(acp::Error::internal_error().data(message));
+                }
+                Ok(_) => continue,
+                Err(e) => return Err(acp::Error::internal_error().data(e.to_string())),
+            }
+        }
     }
 }
 

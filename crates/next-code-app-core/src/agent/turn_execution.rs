@@ -731,6 +731,14 @@ impl Agent {
         self.ask_user_question_tx = Some(tx);
     }
 
+    /// Set the ExitPlanMode channel for Face ACP reverse requests.
+    pub fn set_exit_plan_mode_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::ExitPlanModeInputRequest>,
+    ) {
+        self.exit_plan_mode_tx = Some(tx);
+    }
+
     pub(super) async fn tool_definitions(&mut self) -> Vec<ToolDefinition> {
         if self.session.is_canary {
             self.registry.register_selfdev_tools().await;
@@ -873,6 +881,7 @@ impl Agent {
             working_dir: self.working_dir().map(PathBuf::from),
             stdin_request_tx: self.stdin_request_tx.clone(),
             ask_user_question_tx: self.ask_user_question_tx.clone(),
+            exit_plan_mode_tx: self.exit_plan_mode_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             execution_mode: ToolExecutionMode::Direct,
             best_of_n_run_id: self.best_of_n_run_id.clone(),
@@ -944,6 +953,18 @@ impl Agent {
         if self.disabled_tools.contains(name) {
             return Err(anyhow::anyhow!("Tool '{}' is disabled", name));
         }
+
+        // Plan mode: allow write-shaped tools only when the target basename is plan.md.
+        let plan_mode = crate::dcg_bridge::session_mode(&self.session.id)
+            .unwrap_or_else(crate::dcg_bridge::current_mode)
+            == crate::dcg_bridge::Mode::Plan;
+        if plan_mode
+            && is_write_shaped_tool(name)
+            && tool_input_targets_plan_md(input)
+        {
+            return Ok(());
+        }
+
         // Delegate to dcg_bridge for permission mode evaluation.
         // Uses classify_for_session so that per-session overrides (e.g. a
         // subagent spawned with an explicit mode) are honored; falls back to
@@ -960,6 +981,13 @@ impl Agent {
                     alternatives,
                     ..
                 } => {
+                    let reason = if plan_mode && is_write_shaped_tool(name) {
+                        format!(
+                            "{reason}. In plan mode only writes to plan.md are allowed."
+                        )
+                    } else {
+                        reason
+                    };
                     let msg = if alternatives.is_empty() {
                         format!(
                             "Tool '{}' blocked: {}. Current mode: {:?}",
@@ -1491,3 +1519,79 @@ fn looks_like_edit_request(msg: &str) -> bool {
     ];
     VERBS.iter().any(|v| lower.contains(v))
 }
+
+/// Write-shaped tools that Plan mode normally blocks.
+pub(crate) fn is_write_shaped_tool(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "write"
+            | "edit"
+            | "multiedit"
+            | "apply_patch"
+            | "hashline_edit"
+            | "propose_write"
+            | "propose_edit"
+            | "propose_hashline_edit"
+            | "notebookedit"
+            | "notebook_edit"
+    )
+}
+
+/// True when tool input targets a path whose basename is `plan.md`.
+pub(crate) fn tool_input_targets_plan_md(input: Option<&serde_json::Value>) -> bool {
+    let Some(input) = input else {
+        return false;
+    };
+    for key in ["path", "file_path", "filePath", "file"] {
+        if let Some(p) = input.get(key).and_then(|v| v.as_str())
+            && path_basename_is_plan_md(p)
+        {
+            return true;
+        }
+    }
+    if let Some(arr) = input.get("paths").and_then(|v| v.as_array()) {
+        return arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .any(path_basename_is_plan_md);
+    }
+    false
+}
+
+fn path_basename_is_plan_md(path: &str) -> bool {
+    std::path::Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.eq_ignore_ascii_case("plan.md"))
+}
+
+#[cfg(test)]
+mod plan_mode_write_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn write_shaped_detection() {
+        assert!(is_write_shaped_tool("write"));
+        assert!(is_write_shaped_tool("Edit"));
+        assert!(is_write_shaped_tool("multiedit"));
+        assert!(!is_write_shaped_tool("read"));
+        assert!(!is_write_shaped_tool("ExitPlanMode"));
+    }
+
+    #[test]
+    fn plan_md_path_detection() {
+        assert!(tool_input_targets_plan_md(Some(&json!({ "path": "plan.md" }))));
+        assert!(tool_input_targets_plan_md(Some(
+            &json!({ "file_path": "/tmp/sessions/abc/plan.md" })
+        )));
+        assert!(tool_input_targets_plan_md(Some(
+            &json!({ "paths": ["src/main.rs", "plan.md"] })
+        )));
+        assert!(!tool_input_targets_plan_md(Some(
+            &json!({ "path": "src/main.rs" })
+        )));
+        assert!(!tool_input_targets_plan_md(None));
+    }
+}
+

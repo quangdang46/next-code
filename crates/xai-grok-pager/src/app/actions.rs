@@ -699,6 +699,8 @@ pub enum Action {
     /// to config.toml). `/plan <desc>` uses `EnterPlanMode` instead
     /// because it also starts a turn.
     SetPlanMode(PlanModeKind),
+    /// Open the session `plan.md` in `$EDITOR` (`/plan open`).
+    OpenPlanInEditor,
     /// Enter feedback mode (visual prompt change, not a send).
     EnterFeedbackMode,
     /// Send feedback text collected in feedback mode.
