@@ -2294,10 +2294,75 @@ impl AgentView {
             Some(eff) => format!("{model_id} ({eff})"),
             None => model_id,
         };
+        let cwd_basename = self
+            .session
+            .cwd
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .filter(|s| !s.is_empty());
+        let git_branch = self.current_branch.clone().or_else(|| {
+            crate::git_info::cwd_git_info_lazy(&self.session.cwd).and_then(|info| info.branch)
+        });
+        let context_pct = self.context_state.as_ref().map(|c| c.usage_pct);
+        let context_pct_label = context_pct.map(|pct| format!("{pct}%"));
+        let status_seg_owned: Vec<(String, bool, Option<ratatui::style::Color>)> = {
+            use xai_grok_shell::agent::config::StatusLineSegment;
+            let mut out = Vec::new();
+            for segment in self.status_line_config.selected_segments() {
+                match segment {
+                    StatusLineSegment::Mode => {
+                        for flag in &mode_flags_vec {
+                            if !flag.text.is_empty() {
+                                out.push((flag.text.to_string(), false, flag.color));
+                            }
+                        }
+                    }
+                    StatusLineSegment::Model => {
+                        if !model_label.is_empty() {
+                            out.push((model_label.clone(), true, None));
+                        }
+                    }
+                    StatusLineSegment::Context => {
+                        if let Some(label) = context_pct_label.as_ref() {
+                            let color = match context_pct {
+                                Some(pct) if pct >= 90 => Some(theme.accent_error),
+                                Some(pct) if pct >= 70 => Some(theme.warning),
+                                _ => None,
+                            };
+                            out.push((label.clone(), false, color));
+                        }
+                    }
+                    StatusLineSegment::Cwd => {
+                        if let Some(cwd) = cwd_basename.as_ref() {
+                            out.push((cwd.clone(), false, None));
+                        }
+                    }
+                    StatusLineSegment::Git => {
+                        if let Some(branch) = git_branch.as_ref() {
+                            out.push((branch.clone(), false, None));
+                        }
+                    }
+                }
+            }
+            out
+        };
+        let status_segments: Vec<crate::views::prompt_widget::PromptStatusSegment<'_>> =
+            status_seg_owned
+                .iter()
+                .map(|(text, model_style, color)| {
+                    crate::views::prompt_widget::PromptStatusSegment {
+                        text: text.as_str(),
+                        color: *color,
+                        bold: false,
+                        model_style: *model_style,
+                    }
+                })
+                .collect();
         let info = match &self.prompt_mode {
             PromptMode::Normal => PromptInfo {
                 model_name: &model_label,
                 flags: mode_flags,
+                status_segments: Some(status_segments.as_slice()),
                 multiline,
                 usage_warning,
                 usage_warning_critical,
@@ -2308,6 +2373,7 @@ impl AgentView {
                 PromptInfo {
                     model_name: &editing_label,
                     flags: mode_flags,
+                    status_segments: None,
                     multiline,
                     usage_warning,
                     usage_warning_critical,
@@ -2318,6 +2384,7 @@ impl AgentView {
             PromptInfo {
                 model_name: label,
                 flags: &[],
+                status_segments: None,
                 multiline: false,
                 usage_warning,
                 usage_warning_critical,

@@ -1247,6 +1247,181 @@ define_info_float_setter!(set_show_float_workspace_map, "info_float.workspace_ma
 define_info_float_setter!(set_show_float_diagrams, "info_float.diagrams", "Diagrams", diagrams);
 
 // ---------------------------------------------------------------------------
+// Status line segments — Shared, via `app.current_ui.status_line.*`
+// ---------------------------------------------------------------------------
+
+pub(super) fn set_status_line_bool_inner(
+    app: &mut AppView,
+    write: fn(&mut xai_grok_shell::agent::config::StatusLineConfig, Option<bool>),
+    new: bool,
+) {
+    write(&mut app.current_ui.status_line, Some(new));
+}
+
+fn set_status_line_bool(
+    app: &mut AppView,
+    key: crate::settings::SettingKey,
+    label: &str,
+    prev: Option<bool>,
+    default_on: bool,
+    write: fn(&mut xai_grok_shell::agent::config::StatusLineConfig, Option<bool>),
+    new: bool,
+) -> Vec<Effect> {
+    if prev == Some(new) || (prev.is_none() && new == default_on) {
+        // Still allow writing explicit Some when flipping away from inherit.
+        if prev.is_none() && new == default_on {
+            return vec![];
+        }
+        if prev == Some(new) {
+            return vec![];
+        }
+    }
+    let rollback = prev.unwrap_or(default_on);
+    set_status_line_bool_inner(app, write, new);
+    refresh_open_settings_modals(app);
+    tracing::info!(target: "settings", key, value = new, "setting changed");
+    app.show_toast(&save_success_toast(label, new));
+    vec![Effect::PersistSetting {
+        key,
+        value: crate::settings::SettingValue::Bool(new),
+        rollback_value: crate::settings::SettingValue::Bool(rollback),
+    }]
+}
+
+macro_rules! define_status_line_bool_setter {
+    ($fn_name:ident, $key:expr, $label:expr, $field:ident, $default_on:expr) => {
+        pub(in crate::app::dispatch) fn $fn_name(
+            app: &mut AppView,
+            new: bool,
+        ) -> Vec<Effect> {
+            let prev = app.current_ui.status_line.$field;
+            set_status_line_bool(
+                app,
+                $key,
+                $label,
+                prev,
+                $default_on,
+                |c, v| c.$field = v,
+                new,
+            )
+        }
+    };
+}
+
+define_status_line_bool_setter!(set_status_line_enabled, "status_line.enabled", "Status line", enabled, true);
+define_status_line_bool_setter!(set_status_line_mode, "status_line.mode", "Status mode", mode, true);
+define_status_line_bool_setter!(set_status_line_model, "status_line.model", "Status model", model, true);
+define_status_line_bool_setter!(set_status_line_context, "status_line.context", "Status context %", context, true);
+define_status_line_bool_setter!(set_status_line_cwd, "status_line.cwd", "Status directory", cwd, false);
+define_status_line_bool_setter!(set_status_line_git, "status_line.git", "Status git", git, false);
+
+pub(super) fn set_status_line_order_inner(app: &mut AppView, raw: &str) {
+    use xai_grok_shell::agent::config::StatusLineConfig;
+    if StatusLineConfig::is_implicit_default_order(raw) {
+        app.current_ui.status_line.order = None;
+    } else {
+        app.current_ui.status_line.order = Some(StatusLineConfig::canonicalize_order(raw));
+    }
+}
+
+pub(in crate::app::dispatch) fn set_status_line_order(
+    app: &mut AppView,
+    raw: String,
+) -> Vec<Effect> {
+    use xai_grok_shell::agent::config::StatusLineConfig;
+    let prev = app
+        .current_ui
+        .status_line
+        .order
+        .clone()
+        .unwrap_or_else(|| "mode,model,context".to_string());
+    let next = if StatusLineConfig::is_implicit_default_order(&raw) {
+        "mode,model,context".to_string()
+    } else {
+        StatusLineConfig::canonicalize_order(&raw)
+    };
+    if prev == next && app.current_ui.status_line.order.is_some() == !StatusLineConfig::is_implicit_default_order(&raw) {
+        // allow no-op when already default-implicit
+        if StatusLineConfig::is_implicit_default_order(&raw) && app.current_ui.status_line.order.is_none() {
+            return vec![];
+        }
+        if !StatusLineConfig::is_implicit_default_order(&raw)
+            && app.current_ui.status_line.order.as_deref() == Some(next.as_str())
+        {
+            return vec![];
+        }
+    }
+    set_status_line_order_inner(app, &raw);
+    refresh_open_settings_modals(app);
+    tracing::info!(target: "settings", key = "status_line.order", value = %next, "setting changed");
+    app.show_toast(&format!("\u{2713} Status order: {next}"));
+    vec![Effect::PersistSetting {
+        key: "status_line.order",
+        value: crate::settings::SettingValue::String(next),
+        rollback_value: crate::settings::SettingValue::String(prev),
+    }]
+}
+
+pub(in crate::app::dispatch) fn toggle_status_line_segment(
+    app: &mut AppView,
+    segment: xai_grok_shell::agent::config::StatusLineSegment,
+) -> Vec<Effect> {
+    let on = !app.current_ui.status_line.segment_visible(segment);
+    match segment {
+        xai_grok_shell::agent::config::StatusLineSegment::Mode => set_status_line_mode(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::Model => set_status_line_model(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::Context => set_status_line_context(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::Cwd => set_status_line_cwd(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::Git => set_status_line_git(app, on),
+    }
+}
+
+pub(in crate::app::dispatch) fn reset_status_line(app: &mut AppView) -> Vec<Effect> {
+    app.current_ui.status_line = xai_grok_shell::agent::config::StatusLineConfig::default();
+    refresh_open_settings_modals(app);
+    tracing::info!(target: "settings", key = "status_line", "reset to defaults");
+    app.show_toast("\u{2713} Status line reset");
+    // Persist defaults explicitly so on-disk overrides clear.
+    vec![
+        Effect::PersistSetting {
+            key: "status_line.enabled",
+            value: crate::settings::SettingValue::Bool(true),
+            rollback_value: crate::settings::SettingValue::Bool(true),
+        },
+        Effect::PersistSetting {
+            key: "status_line.mode",
+            value: crate::settings::SettingValue::Bool(true),
+            rollback_value: crate::settings::SettingValue::Bool(true),
+        },
+        Effect::PersistSetting {
+            key: "status_line.model",
+            value: crate::settings::SettingValue::Bool(true),
+            rollback_value: crate::settings::SettingValue::Bool(true),
+        },
+        Effect::PersistSetting {
+            key: "status_line.context",
+            value: crate::settings::SettingValue::Bool(true),
+            rollback_value: crate::settings::SettingValue::Bool(true),
+        },
+        Effect::PersistSetting {
+            key: "status_line.cwd",
+            value: crate::settings::SettingValue::Bool(false),
+            rollback_value: crate::settings::SettingValue::Bool(false),
+        },
+        Effect::PersistSetting {
+            key: "status_line.git",
+            value: crate::settings::SettingValue::Bool(false),
+            rollback_value: crate::settings::SettingValue::Bool(false),
+        },
+        Effect::PersistSetting {
+            key: "status_line.order",
+            value: crate::settings::SettingValue::String("mode,model,context".into()),
+            rollback_value: crate::settings::SettingValue::String("mode,model,context".into()),
+        },
+    ]
+}
+
+// ---------------------------------------------------------------------------
 // Theme settings: `theme`, `auto_dark_theme`, `auto_light_theme`.
 //
 // Each has a preview/commit split:

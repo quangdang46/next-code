@@ -278,12 +278,23 @@ pub struct PromptFlag<'a> {
     pub bold: bool,
 }
 
+/// One remappable statusline segment for the prompt info line.
+pub struct PromptStatusSegment<'a> {
+    pub text: &'a str,
+    pub color: Option<ratatui::style::Color>,
+    pub bold: bool,
+    /// When true, use the model caption style (primary label look).
+    pub model_style: bool,
+}
+
 /// Optional info line rendered below the prompt text.
 pub struct PromptInfo<'a> {
     /// Primary label to display on the info line (left side).
     pub model_name: &'a str,
     /// Flags to display on the left side, joined by " · " (e.g., "plan", "always-approve").
     pub flags: &'a [PromptFlag<'a>],
+    /// When set, render these ordered segments instead of model_name + flags.
+    pub status_segments: Option<&'a [PromptStatusSegment<'a>]>,
     /// Whether multiline mode is active (shown right-aligned).
     pub multiline: bool,
     /// Optional usage warning displayed right-aligned (e.g. "5% usage left").
@@ -3355,19 +3366,23 @@ impl PromptWidget {
             left_spans.push(Span::styled(warning.to_owned(), warning_style));
             left_spans.push(Span::styled(" · ", sep_style));
         }
-        left_spans.push(Span::styled(info.model_name, model_style));
-        for flag in info.flags {
+        let push_flag = |left_spans: &mut Vec<Span<'_>>,
+                         text: &str,
+                         color: Option<ratatui::style::Color>,
+                         bold: bool,
+                         use_model_style: bool| {
             left_spans.push(Span::styled(" · ", sep_style));
-            let mut style = if let Some(color) = flag.color {
-                if flag.bold {
-                    // Bold flags use full color for visibility.
+            let mut style = if use_model_style {
+                model_style
+            } else if let Some(color) = color {
+                if bold {
                     Style::default().fg(color).bg(bg)
                 } else {
                     let dimmed = crate::render::color::blend_color(bg, color, flag_opacity)
                         .unwrap_or(theme.gray);
                     Style::default().fg(dimmed).bg(bg)
                 }
-            } else if flag.bold {
+            } else if bold {
                 Style::default().fg(theme.text_primary).bg(bg)
             } else if focused {
                 flag_style
@@ -3376,10 +3391,45 @@ impl PromptWidget {
                     .unwrap_or(theme.gray);
                 Style::default().fg(dimmed).bg(bg)
             };
-            if flag.bold {
+            if bold {
                 style = style.add_modifier(Modifier::BOLD);
             }
-            left_spans.push(Span::styled(flag.text, style));
+            left_spans.push(Span::styled(text.to_owned(), style));
+        };
+        if let Some(segments) = info.status_segments {
+            let mut first = true;
+            for seg in segments {
+                if seg.text.is_empty() {
+                    continue;
+                }
+                if first {
+                    first = false;
+                    let style = if seg.model_style {
+                        model_style
+                    } else if let Some(color) = seg.color {
+                        Style::default().fg(color).bg(bg)
+                    } else {
+                        flag_style
+                    };
+                    left_spans.push(Span::styled(seg.text.to_owned(), style));
+                } else {
+                    push_flag(
+                        &mut left_spans,
+                        seg.text,
+                        seg.color,
+                        seg.bold,
+                        seg.model_style,
+                    );
+                }
+            }
+            if first && !info.model_name.is_empty() {
+                left_spans.push(Span::styled(info.model_name, model_style));
+            }
+        } else {
+            left_spans.push(Span::styled(info.model_name, model_style));
+            for flag in info.flags {
+                push_flag(&mut left_spans, flag.text, flag.color, flag.bold, false);
+            }
         }
         // Trailing pad mirrors the leading pad above.
         left_spans.push(Span::styled(" ", pad_style));

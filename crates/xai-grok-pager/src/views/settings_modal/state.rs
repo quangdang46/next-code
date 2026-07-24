@@ -870,6 +870,12 @@ pub(super) fn action_for_bool(key: SettingKey, new: bool) -> Option<Action> {
         "info_float.todos" => Some(Action::SetShowFloatTodos(new)),
         "info_float.workspace_map" => Some(Action::SetShowFloatWorkspaceMap(new)),
         "info_float.diagrams" => Some(Action::SetShowFloatDiagrams(new)),
+        "status_line.enabled" => Some(Action::SetStatusLineEnabled(new)),
+        "status_line.mode" => Some(Action::SetStatusLineMode(new)),
+        "status_line.model" => Some(Action::SetStatusLineModel(new)),
+        "status_line.context" => Some(Action::SetStatusLineContext(new)),
+        "status_line.cwd" => Some(Action::SetStatusLineCwd(new)),
+        "status_line.git" => Some(Action::SetStatusLineGit(new)),
         _ => None,
     }
 }
@@ -978,6 +984,7 @@ pub(super) fn action_for_string(
                     .map(Action::SetForkSecondaryModel)
             }
         }
+        "status_line.order" => Some(Action::SetStatusLineOrder(value)),
 
         _ => {
             let _ = value;
