@@ -1,4 +1,5 @@
 pub mod ambient;
+mod agent;
 mod apply_patch;
 mod ask_user_question;
 mod bash;
@@ -477,6 +478,8 @@ impl Registry {
                 "swarm",
                 communicate::CommunicateTool::new,
             );
+            // Claude-compatible Agent façade over swarm spawn/DM (+ worktree isolation).
+            Self::insert_tool_timed(&mut m, &mut timings, "Agent", agent::AgentTool::new);
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
