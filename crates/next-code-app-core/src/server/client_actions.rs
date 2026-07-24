@@ -321,6 +321,7 @@ pub(super) fn handle_run_subagent(
             tool_call_id: tool_call_id.clone(),
             working_dir,
             stdin_request_tx: None,
+            ask_user_question_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
             best_of_n_run_id: None,
@@ -1080,6 +1081,85 @@ pub(super) async fn handle_stdin_response(
         let _ = tx.send(input);
     }
     let _ = client_event_tx.send(ServerEvent::Done { id });
+}
+
+pub(super) async fn handle_ask_user_question_response(
+    id: u64,
+    request_id: String,
+    response: serde_json::Value,
+    error: Option<String>,
+    ask_responses: &Arc<
+        Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>>>,
+    >,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+) {
+    if let Some(tx) = ask_responses.lock().await.remove(&request_id) {
+        let payload = match error {
+            Some(err) => Err(err),
+            None => Ok(response),
+        };
+        let _ = tx.send(payload);
+    }
+    let _ = client_event_tx.send(ServerEvent::Done { id });
+}
+
+/// Apply Face/TUI permission outcomes and unblock `await_permission_response`.
+///
+/// Outcome ids match Face ACP option ids from `face_permission`:
+/// `allow-once` | `allow-always` | `allow-all` | `reject-once` | `cancelled`.
+pub(super) async fn handle_permission_response(
+    id: u64,
+    _request_id: String,
+    outcome: String,
+    session_id: String,
+    tool_name: String,
+    allow_once_code: String,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+) {
+    apply_permission_outcome(&outcome, &session_id, &tool_name, &allow_once_code);
+    let _ = client_event_tx.send(ServerEvent::Done { id });
+}
+
+/// Shared mapping used by the daemon response handler (and unit tests).
+pub(crate) fn apply_permission_outcome(
+    outcome: &str,
+    session_id: &str,
+    tool_name: &str,
+    allow_once_code: &str,
+) {
+    match outcome {
+        "allow-once" => {
+            crate::dcg_bridge::approve_session_action(session_id, tool_name);
+            if !allow_once_code.is_empty() {
+                crate::dcg_bridge::consume_allow_once(allow_once_code);
+            }
+            crate::dcg_bridge::record_approval(session_id);
+            crate::dcg_bridge::signal_permission_response(true);
+        }
+        "allow-always" => {
+            crate::dcg_bridge::approve_session_action(session_id, tool_name);
+            let _ = crate::config::Config::add_always_allow_tool(tool_name);
+            crate::dcg_bridge::record_approval(session_id);
+            crate::dcg_bridge::signal_permission_response(true);
+        }
+        "allow-all" => {
+            crate::dcg_bridge::approve_session_all(session_id);
+            crate::dcg_bridge::record_approval(session_id);
+            crate::dcg_bridge::signal_permission_response(true);
+        }
+        "reject-once" | "cancelled" => {
+            if outcome == "reject-once" {
+                crate::dcg_bridge::record_denial(session_id);
+            }
+            crate::dcg_bridge::signal_permission_response(false);
+        }
+        other => {
+            crate::logging::warn(&format!(
+                "[permission] unknown Face permission outcome '{other}'; treating as deny"
+            ));
+            crate::dcg_bridge::signal_permission_response(false);
+        }
+    }
 }
 
 pub(super) struct AgentTaskContext<'a> {

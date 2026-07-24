@@ -775,8 +775,19 @@ impl AgentView {
         // handling the Esc, a following `d` is the user's text, not a dump.
         self.esc_pressed_at = None;
 
-        // Mid-turn running: swallow Esc (do not cancel or arm clear/rewind).
+        // Mid-turn running: Esc cancels provider-failover countdown (Face
+        // status shows `Provider auto-switch → …`); otherwise swallow Esc
+        // (Ctrl+C is the normal CancelTurn gesture).
         if self.session.state.is_turn_running() {
+            let failover_countdown = matches!(
+                self.session.turn_activity(),
+                Some(crate::acp::tracker::TurnActivity::Retrying { reason, .. })
+                    if reason.starts_with("Provider auto-switch →")
+            );
+            if failover_countdown {
+                self.cancel_trigger_hint = Some(crate::app::actions::CancelTrigger::Esc);
+                return Some(InputOutcome::Action(Action::CancelTurn));
+            }
             return Some(InputOutcome::Changed);
         }
         // Stuck cancel: re-send CancelTurn (Ctrl+C escalates to Quit instead).

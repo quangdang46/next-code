@@ -43,4 +43,4 @@ Face:     /connect → provider → method → key/OAuth → OpenModelPicker
 3. Flag cleared on AuthFailed / CancelLogin; plain `/login` does not set it.
 4. Syncs non-empty `app.models` into agent/dashboard before opening picker.
 
-**Status:** Implemented.
+**Status:** Implemented; bundled into `pr-bundle-72-73`.

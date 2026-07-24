@@ -350,6 +350,16 @@ pub fn canonical_screen_mode(value: Option<&str>) -> &'static str {
     }
 }
 
+/// `sidebar` stays; everything else (including unset) → `inline` (Face/Grok default).
+pub fn canonical_btw_output_mode(value: Option<&str>) -> &'static str {
+    let raw = value.unwrap_or_default().trim();
+    if raw.eq_ignore_ascii_case("sidebar") || raw.eq_ignore_ascii_case("side") {
+        "sidebar"
+    } else {
+        "inline"
+    }
+}
+
 impl PagerLocalSnapshot {
     /// Iterate over just the display names. Convenience helper for
     /// validator paths that don't need the ids.
@@ -599,6 +609,9 @@ pub fn current_value_for(
         ))),
         "screen_mode" => Some(SettingValue::Enum(canonical_screen_mode(
             ui.screen_mode.as_deref(),
+        ))),
+        "btw_output_mode" => Some(SettingValue::Enum(canonical_btw_output_mode(
+            ui.btw_output_mode.as_deref(),
         ))),
         // SHELL — canonicalized from `[ui].voice_capture_mode`; None → "hold".
         "voice_capture_mode" => Some(SettingValue::Enum(canonical_voice_capture_mode(
@@ -1139,6 +1152,18 @@ mod tests {
                     );
                     assert_eq!(*default, "fullscreen");
                 }
+                ("btw_output_mode", SettingKind::Enum { default, .. }) => {
+                    assert_eq!(
+                        ui.btw_output_mode, None,
+                        "test assumes UiConfig::default().btw_output_mode is None",
+                    );
+                    assert_eq!(
+                        *default,
+                        canonical_btw_output_mode(ui.btw_output_mode.as_deref()),
+                        "btw_output_mode default drifts from UiConfig::default()",
+                    );
+                    assert_eq!(*default, "inline");
+                }
                 // render_mermaid: Option<String>; None → "auto".
                 ("render_mermaid", SettingKind::Enum { default, .. }) => {
                     assert_eq!(
@@ -1467,6 +1492,18 @@ mod tests {
         assert_eq!(canonical_screen_mode(Some("bogus")), "fullscreen");
         assert_eq!(canonical_screen_mode(Some("")), "fullscreen");
         assert_eq!(canonical_screen_mode(None), "fullscreen");
+    }
+
+    #[test]
+    fn canonical_btw_output_mode_maps_aliases_and_unknowns() {
+        assert_eq!(canonical_btw_output_mode(Some("sidebar")), "sidebar");
+        assert_eq!(canonical_btw_output_mode(Some("side")), "sidebar");
+        assert_eq!(canonical_btw_output_mode(Some("  SIDEBAR ")), "sidebar");
+        assert_eq!(canonical_btw_output_mode(Some("inline")), "inline");
+        assert_eq!(canonical_btw_output_mode(Some("overlay")), "inline");
+        assert_eq!(canonical_btw_output_mode(Some("bogus")), "inline");
+        assert_eq!(canonical_btw_output_mode(Some("")), "inline");
+        assert_eq!(canonical_btw_output_mode(None), "inline");
     }
 
     /// Corrupted `auto_dark_theme = "auto"` (would cause circular ref)

@@ -1,5 +1,6 @@
 pub mod ambient;
 mod apply_patch;
+mod ask_user_question;
 mod bash;
 mod batch;
 mod best_of_n;
@@ -73,7 +74,9 @@ use std::sync::{LazyLock, RwLock as StdRwLock};
 use tokio::sync::RwLock;
 
 pub(crate) use next_code_tool_core::intent_schema_property;
-pub use next_code_tool_core::{StdinInputRequest, Tool, ToolContext, ToolExecutionMode};
+pub use next_code_tool_core::{
+    AskUserQuestionInputRequest, StdinInputRequest, Tool, ToolContext, ToolExecutionMode,
+};
 pub use next_code_tool_types::{ToolImage, ToolOutput};
 pub(crate) use session_search::spawn_recent_index_warmup;
 
@@ -461,6 +464,12 @@ impl Registry {
             Self::insert_tool_timed(&mut m, &mut timings, "invalid", invalid::InvalidTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "lsp", lsp::LspTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "todo", todo::TodoTool::new);
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "AskUserQuestion",
+                ask_user_question::AskUserQuestionTool::new,
+            );
             Self::insert_tool_timed(&mut m, &mut timings, "bg", bg::BgTool::new);
             Self::insert_tool_timed(
                 &mut m,

@@ -1,5 +1,5 @@
-# (1) Next code UI migration
-_Exported on 7/22/2026 at 17:01:02 GMT+7 from Cursor (3.12.29)_
+# code 2
+_Exported on 7/23/2026 at 17:43:35 GMT+7 from Cursor (3.12.29)_
 
 ---
 
@@ -3109,4 +3109,191 @@ output_path: c:\Users\ADMIN\.cursor\projects\c-Users-ADMIN-Documents-Projects-de
 **Cursor**
 
 D1/D2 expand xong (~300+ dòng). Còn D3–D5 + index.
+
+---
+
+**User**
+
+tieeps
+
+---
+
+**Cursor**
+
+Tiếp tục expand deepen — kiểm tra D3–D5 + index còn dang dở.
+
+Đang kiểm tra + expand nốt D3–D5 (và file nào còn mỏng), rồi chốt bảng line count.
+
+---
+
+**User**
+
+<timestamp>Wednesday, Jul 22, 2026, 5:24 PM (UTC+7)</timestamp>
+<system_notification>
+The following task has finished. If you were already aware, ignore this notification and do not restate prior responses.
+
+<task>
+kind: subagent
+status: success
+task_id: f72d4eef-fe5d-485d-9dcd-7a32e6938028
+title: Expand D3 D4 D5 honesty merge cookbook
+tool_call_id: call-b559acbc-0296-4aae-8018-cc4bedec1359-59
+fc_14c705dc-1305-963d-9ca4-0083d7a3e869_1
+agent_id: f72d4eef-fe5d-485d-9dcd-7a32e6938028
+detail: <user_visible_high_level_summary>
+Expanded all three deepen stubs into full design contracts (docs only, no production code):
+
+- **D3 counts honesty** (~316 lines) — Phase 1 Decision B demote; exact `to_info` / `build_plugin_fields` string changes; cites `face_plugins.rs`, types, MCP load paths.
+- **D4 hooks/MCP merge** (~280+ lines) — Phase 1.5/2 ABI for `hooks.json` + `.mcp.json` compile-into `next-code-hooks` / `McpConfig`; provenance, precedence, gates, tests.
+- **D5 hooks cookbook** (~440 lines) — full `docs/examples/hooks-cookbook/` tree, golden Hook I/O (`continue_` key locked), Windows notes, test matrix.
+</user_visible_high_level_summary>
+<response>
+Expanded all three deepen stubs into full design contracts (docs only — no production code).
+
+| File | Lines | Frozen focus |
+|------|------:|--------------|
+| `docs/plans/research/deepen/20260722-bundle-counts-honesty.md` | 316 | **Decision B demote** — exact `to_info` / Face `build_plugin_fields` string changes; cites `src/cli/face_plugins.rs`, `xai-hooks-plugins-types`, MCP load paths |
+| `docs/plans/research/deepen/20260722-bundle-hooks-mcp-merge.md` | 423 | **Phase 1.5/2 merge ABI** — `hooks.json` + `.mcp.json` → `next-code-hooks` / `McpConfig`; provenance, precedence, gates, tests |
+| `docs/plans/research/deepen/20260722-hooks-cookbook-layout.md` | 442 | Full `docs/examples/hooks-cookbook/` tree, golden Hook I/O (`continue_` locked), Windows notes, test matrix |
+</response>
+output_path: c:\Users\ADMIN\.cursor\projects\c-Users-ADMIN-Documents-Projects-demo-retell-ai-dashboard\agent-transcripts\0d3b1065-3503-481b-aa4c-3931d59b130c\subagents\f72d4eef-fe5d-485d-9dcd-7a32e6938028.jsonl
+</task>
+</system_notification>
+<user_query>Perform any necessary follow-up actions in response to the subagent completion above. If no follow-up work is needed, no further action is required. If you mention an agent or subagent in your response, link it with the `[Name](id)` Don't use generic label such as `[agent]`, `[worker]`, or `[subagent]`. For cloud subagents, when the agent has edited code, link to `[Review](bc-id#changes)`, or, if you know the exact added and deleted line counts, `[Review +A −D](bc-id#changes)`, replacing A and D with those counts. Never write A or D literally. Use `[Try Live](bc-id#desktop)` only when the agent used computer use. Don't repeat the same confirmation every time.</user_query>
+
+<timestamp>Wednesday, Jul 22, 2026, 5:24 PM (UTC+7)</timestamp>
+<system_notification>
+The following task has finished. If you were already aware, ignore this notification and do not restate prior responses.
+
+<task>
+kind: subagent
+status: success
+task_id: edd9e72e-6896-4814-a13f-022ad9f19983
+title: Expand D0 crosslinks update index
+tool_call_id: call-b559acbc-0296-4aae-8018-cc4bedec1359-63
+fc_14c705dc-1305-963d-9ca4-0083d7a3e869_5
+agent_id: edd9e72e-6896-4814-a13f-022ad9f19983
+detail: <user_visible_high_level_summary>
+All deepen design files now meet depth targets (D0 ≥80, D1–D13 ≥120). D0 freezes bare = no system/brand inject and `system_prompt.md` as nextcode pack (not CORE). README, audit (re-scored ~92% post-expand), and readiness were updated. Remaining thin files: none.
+</user_visible_high_level_summary>
+<response>
+All deepen design files meet depth targets. D0 freezes bare = no opinionated prompt inject; `system_prompt.md` = nextcode pack (not CORE).
+
+### Final line counts (`deepen/*.md`)
+
+| Lines | Status | File |
+|------:|--------|------|
+| 154 | D0 ok (≥80) | `20260722-bare-host-no-prompt-inject.md` |
+| 339 | ok (≥120) | `20260722-trust-gate-design.md` |
+| 307 | ok | `20260722-plugins-state-skill-gate.md` |
+| 316 | ok | `20260722-bundle-counts-honesty.md` |
+| 423 | ok | `20260722-bundle-hooks-mcp-merge.md` |
+| 442 | ok | `20260722-hooks-cookbook-layout.md` |
+| 314 | ok | `20260722-host-callback-bin-path.md` |
+| 121 | ok | `20260722-hook-registry-reload.md` |
+| 152 | ok | `20260722-plugin-manifest-abi-v1.md` |
+| 285 | ok | `20260722-package-slash-acp.md` |
+| 127 | ok | `20260722-nextcode-pack-extraction.md` |
+| 293 | ok | `20260722-tools-abi-v1.md` |
+| 141 | ok | `20260722-face-ui-hints-external-pane.md` |
+| 129 | ok | `20260722-argv-plugin-security.md` |
+| 54 | meta | `README.md` |
+| 117 | meta | `20260722-docs-completeness-audit.md` |
+
+### Also updated
+- `README.md` — line-count expectations + **stubs expanded: Yes**
+- Audit — re-scored after expand (~92% combined; recreate-era ~85% called out as overstated while stubs)
+- `PLAN-20260722-platform-implement-readiness.md` — post-expand gate notes
+
+### Remaining thin files
+**None** (all D0–D13 ≥ target).
+</response>
+output_path: c:\Users\ADMIN\.cursor\projects\c-Users-ADMIN-Documents-Projects-demo-retell-ai-dashboard\agent-transcripts\0d3b1065-3503-481b-aa4c-3931d59b130c\subagents\edd9e72e-6896-4814-a13f-022ad9f19983.jsonl
+</task>
+</system_notification>
+<user_query>Perform any necessary follow-up actions in response to the subagent completion above. If no follow-up work is needed, no further action is required. If you mention an agent or subagent in your response, link it with the `[Name](id)` Don't use generic label such as `[agent]`, `[worker]`, or `[subagent]`. For cloud subagents, when the agent has edited code, link to `[Review](bc-id#changes)`, or, if you know the exact added and deleted line counts, `[Review +A −D](bc-id#changes)`, replacing A and D with those counts. Never write A or D literally. Use `[Try Live](bc-id#desktop)` only when the agent used computer use. Don't repeat the same confirmation every time.</user_query>
+
+---
+
+**Cursor**
+
+Expand deepen **xong** — D0–D13 đều đủ dày (~120–440 dòng), audit ~**92%**. Index: `docs/plans/research/deepen/README.md`.
+
+Docs vẫn **untracked** — nên **commit** sớm. Bảo nếu muốn commit (nhánh nào).
+
+---
+
+**User**
+
+<timestamp>Wednesday, Jul 22, 2026, 5:29 PM (UTC+7)</timestamp>
+<system_notification>
+The following task has finished. If you were already aware, ignore this notification and do not restate prior responses.
+
+<task>
+kind: subagent
+status: success
+task_id: 962dacc7-25d6-4e38-b737-52bb0c5461c9
+title: Finish expand deepen remaining
+tool_call_id: call-87ed70af-4d11-4b84-8a94-7dedf8f268a5-65
+fc_8ea5e91a-a4e4-9102-bfca-b6e9cec5f0d5_0
+agent_id: 962dacc7-25d6-4e38-b737-52bb0c5461c9
+detail: <user_visible_high_level_summary>
+Deepen finish pass is done: all D0–D13 meet depth targets (D0≥80, others≥120). D3–D5 were already full; this turn expanded D7/D10/D13 with real-code cites and refreshed README, audit, and readiness with the final line-count table. Tools contradiction frozen as MCP-first (argv after D13). No production Rust. Recommend committing the deepen docs set when ready.
+</user_visible_high_level_summary>
+<response>
+Deepen finish pass complete. All D0–D13 meet targets; D3–D5 were already full (no stall). No production Rust.
+
+### Final line-count table
+(`@(Get-Content).Count`, includes blanks)
+
+| ID | File | Lines | Target |
+|----|------|------:|-------:|
+| — | README.md | 81 | meta |
+| — | docs-completeness-audit.md | 145 | meta |
+| D0 | bare-host-no-prompt-inject | 154 | ≥80 |
+| D1 | trust-gate-design | 339 | ≥120 |
+| D2 | plugins-state-skill-gate | 307 | ≥120 |
+| D3 | bundle-counts-honesty | 316 | ≥120 |
+| D4 | bundle-hooks-mcp-merge | 423 | ≥120 |
+| D5 | hooks-cookbook-layout | 442 | ≥120 |
+| D6 | host-callback-bin-path | 314 | ≥120 |
+| D7 | hook-registry-reload | 215 | ≥120 |
+| D8 | plugin-manifest-abi-v1 | 152 | ≥120 |
+| D9 | package-slash-acp | 285 | ≥120 |
+| D10 | nextcode-pack-extraction | 174 | ≥120 |
+| D11 | tools-abi-v1 | 293 | ≥120 |
+| D12 | face-ui-hints-external-pane | 141 | ≥120 |
+| D13 | argv-plugin-security | 174 | ≥120 |
+
+Also refreshed: `PLAN-20260722-platform-implement-readiness.md` (94).
+
+### Expanded this turn
+- `20260722-hook-registry-reload.md` — Face Reload is UI-catalog only; live `ToolRegistry.hook_registry` not swapped
+- `20260722-nextcode-pack-extraction.md` — cites `prompt.rs` / `system_prompt.md`
+- `20260722-argv-plugin-security.md` — cites `execute.rs` + D11 freeze link
+- Meta: deepen `README.md`, `20260722-docs-completeness-audit.md`, readiness plan
+
+### Contradiction freeze
+**MCP-first ship order** (D11 authoritative). Phase 3 exit can be MCP-only; `[[tools]] argv` only after D1+D13. Not “MCP forever,” not equal day-one argv+MCP.
+
+### Recommend commit
+```text
+docs(deepen): finish expand wave — D7/D10/D13 contracts + final line table
+
+Close UI-only hooks reload gap in D7; freeze tools as MCP-first in audit.
+```
+Paths: `docs/plans/research/deepen/**` + `docs/plans/PLAN-20260722-platform-implement-readiness.md`. Say if you want me to create the commit.
+</response>
+output_path: c:\Users\ADMIN\.cursor\projects\c-Users-ADMIN-Documents-Projects-demo-retell-ai-dashboard\agent-transcripts\0d3b1065-3503-481b-aa4c-3931d59b130c\subagents\962dacc7-25d6-4e38-b737-52bb0c5461c9.jsonl
+</task>
+</system_notification>
+<user_query>Perform any necessary follow-up actions in response to the subagent completion above. If no follow-up work is needed, no further action is required. If you mention an agent or subagent in your response, link it with the `[Name](id)` Don't use generic label such as `[agent]`, `[worker]`, or `[subagent]`. For cloud subagents, when the agent has edited code, link to `[Review](bc-id#changes)`, or, if you know the exact added and deleted line counts, `[Review +A −D](bc-id#changes)`, replacing A and D with those counts. Never write A or D literally. Use `[Try Live](bc-id#desktop)` only when the agent used computer use. Don't repeat the same confirmation every time.</user_query>
+
+---
+
+**Cursor**
+
+Deepen expand **hoàn tất** — D0–D13 đủ contract; tools freeze **MCP-first**. Meta/README/audit đã cập nhật.
+
+Nên commit `docs/plans/research/deepen/**` + readiness sớm. Bảo nếu muốn tôi commit.
 

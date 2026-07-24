@@ -255,6 +255,9 @@ pub struct Agent {
     rewind_undo_snapshot: Option<RewindUndoSnapshot>,
     /// Channel for tools to request stdin input from the user
     stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::tool::StdinInputRequest>>,
+    /// Channel for AskUserQuestion tool → Face ACP reverse request
+    ask_user_question_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<crate::tool::AskUserQuestionInputRequest>>,
     /// Canonical reducer-backed view of runtime provider/model selection.
     provider_runtime_state: ProviderRuntimeState,
     /// Hook registry for dispatching lifecycle hooks.
@@ -372,6 +375,7 @@ impl Agent {
             inline_output_tap: false,
             rewind_undo_snapshot: None,
             stdin_request_tx: None,
+            ask_user_question_tx: None,
             provider_runtime_state: ProviderRuntimeState::observed(initial_provider_model),
             hook_registry: HookRegistry::default(),
             dispatch_config: DispatchConfig::default(),

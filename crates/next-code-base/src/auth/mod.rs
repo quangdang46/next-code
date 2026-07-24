@@ -734,6 +734,7 @@ impl AuthStatus {
         if let Ok(mut cache) = AUTH_STATUS_FAST_CACHE.write() {
             *cache = None;
         }
+        crate::provider::openrouter::invalidate_autodetect_cache();
     }
 
     /// Invalidate all auth-derived state after credentials actually change.

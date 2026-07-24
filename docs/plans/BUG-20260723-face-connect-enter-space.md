@@ -17,4 +17,4 @@ Bare `/connect` + Enter completed the optional `provider` arg (trailing space / 
 
 ## Status
 
-Fixed on `pr-face-connect-open-model` (PR #72).
+Fixed on `pr-face-connect-open-model` (PR #72); bundled into `pr-bundle-72-73`.

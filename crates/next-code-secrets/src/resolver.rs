@@ -36,6 +36,13 @@ pub fn current_manager() -> Option<SecretsManager> {
 /// Matches the `fn(&str) -> Option<String>` signature expected by
 /// `next_code_provider_env::register_api_key_fallback_resolver`.
 pub fn secrets_api_key_resolver(env_key: &str) -> Option<String> {
+    // Cold credential probes call this on every openai-compatible miss. When
+    // the encrypted store has never been created, skip cwd/git scoping work —
+    // there is nothing to resolve.
+    let next_code_home = next_code_storage::next_code_dir().ok()?;
+    if !next_code_home.join("secrets/local.age").exists() {
+        return None;
+    }
     let manager = current_manager()?;
     let cwd = std::env::current_dir().ok()?;
     resolve_with_manager(&manager, &cwd, env_key)
