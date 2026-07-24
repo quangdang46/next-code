@@ -121,6 +121,8 @@ pub struct AgentViewLayout {
     /// Single-row record indicator ("◉ Recording") directly above the prompt,
     /// shown only while voice capture is active.
     pub voice_recording: Rect,
+    /// Claude-style agent panel carved from the bottom of scrollback.
+    pub agent_panel: Rect,
     pub prompt: Rect,
     pub shortcuts: Rect,
     /// Scrollback area narrowed for scrollbar (content rendering uses this).
@@ -393,6 +395,7 @@ impl AgentViewLayout {
             plugin_cta,
             follow_ups,
             voice_recording,
+            agent_panel: Rect::default(),
             prompt,
             shortcuts,
             scrollback_content,
@@ -406,6 +409,30 @@ impl AgentViewLayout {
     pub const BTW_SIDEBAR_PREFERRED_WIDTH: u16 = 36;
     /// Minimum main scrollback width that must remain after carving a sidebar.
     pub const BTW_SIDEBAR_MIN_MAIN_WIDTH: u16 = 28;
+
+    /// Carve a Claude-style agent panel from the bottom of scrollback.
+    ///
+    /// Places `agent_panel` in the freed strip between the shrunk scrollback
+    /// and the next lower band (btw / queue / turn status / prompt).
+    pub fn apply_agent_panel(&mut self, panel_height: u16) {
+        if panel_height == 0 {
+            self.agent_panel = Rect::default();
+            return;
+        }
+        let take = panel_height.min(self.scrollback.height.saturating_sub(5));
+        if take == 0 {
+            self.agent_panel = Rect::default();
+            return;
+        }
+        self.scrollback.height = self.scrollback.height.saturating_sub(take);
+        self.scrollback_content.height = self.scrollback_content.height.saturating_sub(take);
+        self.agent_panel = Rect {
+            x: self.scrollback.x,
+            y: self.scrollback.y.saturating_add(self.scrollback.height),
+            width: self.scrollback.width,
+            height: take,
+        };
+    }
 
     /// Carve a right-hand `/btw` column from `scrollback_content`.
     ///

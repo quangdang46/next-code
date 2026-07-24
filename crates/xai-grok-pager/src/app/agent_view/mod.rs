@@ -149,6 +149,7 @@ use ratatui::widgets::Widget;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 mod cta;
+mod agent_team;
 mod input;
 mod interactions;
 mod jump;
@@ -1345,6 +1346,14 @@ pub struct AgentView {
     /// Currently open subagent view (child_session_id). When Some, the
     /// scrollback area is replaced by the subagent's framed view.
     pub active_subagent: Option<String>,
+    /// Claude-style under-prompt agent panel selection / team-task strip.
+    pub agent_panel: crate::app::agent_roster::AgentPanelState,
+    /// Swarm members mirrored for the unified roster (ACP / soft bridge).
+    pub swarm_members: HashMap<String, crate::app::agent_roster::SwarmMemberMirror>,
+    /// Soft transcript buffers keyed by swarm member session id.
+    pub swarm_soft_transcripts: HashMap<String, Vec<crate::app::agent_roster::SoftTranscriptLine>>,
+    /// Shared team task strip items (from SwarmPlan ACP updates).
+    pub team_tasks: Vec<crate::app::agent_roster::TeamTaskItem>,
     /// When true, this AgentView is rendering as a subagent (read-only):
     /// - Prompt is hidden
     /// - Cancel turn / demote to bg shortcuts are disabled
@@ -2039,6 +2048,9 @@ fn resolve_action(action_id: Option<ActionId>) -> Option<InputOutcome> {
         ActionId::ShortcutsHelp => return None,
         ActionId::OpenSettings => return None,
         ActionId::ToggleTodos
+        | ActionId::ToggleTeamTasks
+        | ActionId::AgentPanelSelectPrev
+        | ActionId::AgentPanelSelectNext
         | ActionId::ToggleTasks
         | ActionId::ToggleQueue
         | ActionId::OpenSessions

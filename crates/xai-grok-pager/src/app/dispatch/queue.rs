@@ -238,7 +238,10 @@ pub(super) fn maybe_drain_queue(agent: &mut AgentView) -> QueueDrain {
         log_blocked("server_queue_owns_next_turn", sid);
         return QueueDrain::blocked();
     }
-    let Some(session_id) = agent.session.session_id.clone() else {
+    let Some(session_id) = agent
+        .routed_acp_session_id()
+        .or_else(|| agent.session.session_id.clone())
+    else {
         log_blocked("no_session_id", None);
         return QueueDrain::blocked();
     };

@@ -66,9 +66,18 @@ impl AgentView {
     }
     /// Open the fullscreen subagent view for `child_sid`, replaying child
     /// `updates.jsonl` when scrollback only has the injected task prompt.
+    ///
+    /// Enables the child prompt so the user can message the worker (Claude
+    /// agent-panel Enter → type). `SendPrompt` is routed to the child session
+    /// via [`AgentView::current_message_route`].
     pub(crate) fn open_subagent_fullscreen(&mut self, child_sid: String) {
         if self.subagent_views.contains_key(&child_sid) {
             crate::app::subagent::ensure_subagent_child_replayed(self, &child_sid);
+            if let Some(child) = self.subagent_views.get_mut(&child_sid) {
+                // Interactive teammate view: show prompt (Claude message-worker).
+                child.is_subagent_view = false;
+                child.active_pane = AgentPane::Prompt;
+            }
             self.active_subagent = Some(child_sid);
         }
     }
@@ -726,6 +735,7 @@ impl AgentView {
                 bundle_state,
             );
         }
+        // Soft swarm teammate view: keep lead chrome; paint soft buffer in scrollback.
         if let Some(esc) = self.take_subagent_inline_media_clear_escapes() {
             xai_grok_shell::util::with_locked_stderr(|stderr| {
                 let _ = std::io::Write::write_all(stderr, esc.as_bytes());
@@ -1158,6 +1168,10 @@ impl AgentView {
                 .height
                 .saturating_sub(search_reserved_rows);
         }
+        {
+            let panel_h = self.agent_panel_desired_height(6);
+            layout.apply_agent_panel(panel_h);
+        }
         let overlay_blocks_rail_hover = self.jump_state.is_some()
             || self.rewind_state.is_some()
             || self.question_view.is_some()
@@ -1256,6 +1270,10 @@ impl AgentView {
                             .scrollback_content
                             .height
                             .saturating_sub(search_reserved_rows);
+                    }
+                    {
+                        let panel_h = self.agent_panel_desired_height(6);
+                        layout.apply_agent_panel(panel_h);
                     }
                     self.scrollback.prepare_layout(
                         layout.scrollback_content.width,
@@ -1952,6 +1970,59 @@ impl AgentView {
             }
         } else {
             self.hit_btw_close.clear();
+        }
+        if layout.agent_panel.height > 0 {
+            let rows = self.agent_team_roster();
+            self.agent_panel.clamp_selection(rows.len());
+            let viewing = self.viewing_worker_label();
+            crate::views::agent_panel::render(
+                layout.agent_panel,
+                buf,
+                &theme,
+                &rows,
+                &self.agent_panel,
+                &self.team_tasks,
+                viewing.as_deref(),
+            );
+        }
+        if let Some(ref sid) = self.agent_panel.soft_view_session.clone() {
+            let label = self
+                .swarm_members
+                .get(sid)
+                .map(|m| m.display_name())
+                .unwrap_or_else(|| sid.clone());
+            let empty: Vec<crate::app::agent_roster::SoftTranscriptLine> = Vec::new();
+            let lines = self
+                .swarm_soft_transcripts
+                .get(sid)
+                .map(|v| v.as_slice())
+                .unwrap_or(empty.as_slice());
+            // Soft teammate view replaces the lead scrollback content area.
+            for y in layout.scrollback_content.y
+                ..layout
+                    .scrollback_content
+                    .y
+                    .saturating_add(layout.scrollback_content.height)
+            {
+                for x in layout.scrollback_content.x
+                    ..layout
+                        .scrollback_content
+                        .x
+                        .saturating_add(layout.scrollback_content.width)
+                {
+                    if let Some(cell) = buf.cell_mut((x, y)) {
+                        cell.set_symbol(" ");
+                        cell.set_style(Style::default().bg(theme.bg_base).fg(theme.text_primary));
+                    }
+                }
+            }
+            crate::views::agent_panel::render_soft_transcript(
+                layout.scrollback_content,
+                buf,
+                &theme,
+                &label,
+                lines,
+            );
         }
         if let Some(idx) = self.highlighted_link_idx {
             if self.visible_link_map.is_empty() {

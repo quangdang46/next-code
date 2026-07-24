@@ -15,7 +15,6 @@ use crate::actions::{ActionId, ActionRegistry, When};
 use crate::app::actions::Action;
 use crate::app::app_view::InputOutcome;
 use crate::key;
-use crate::views::modal::ActiveModal;
 use crate::views::plan_approval_view::PlanApprovalFocus;
 use crossterm::event::{
     Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -350,6 +349,10 @@ impl AgentView {
                     .contains(mouse.column, mouse.row)
             {
                 self.active_subagent = None;
+                // Restore observational default for nested child views.
+                for child in self.subagent_views.values_mut() {
+                    child.is_subagent_view = true;
+                }
                 return InputOutcome::Changed;
             }
             if let Event::Mouse(mouse) = ev
@@ -370,12 +373,70 @@ impl AgentView {
                 && (key!('q').matches(key) || key.code == KeyCode::Esc)
             {
                 self.active_subagent = None;
+                for child in self.subagent_views.values_mut() {
+                    child.is_subagent_view = true;
+                }
                 return InputOutcome::Changed;
+            }
+            // While viewing a worker, keep Shift+↑/↓ panel nav + team-task
+            // toggle on the parent (Claude panel stays interactive).
+            if let Event::Key(key) = ev
+                && key.kind != KeyEventKind::Release
+            {
+                if let Some(action_id) = registry.lookup(key, When::AgentScreen)
+                    && matches!(
+                        action_id,
+                        ActionId::AgentPanelSelectPrev
+                            | ActionId::AgentPanelSelectNext
+                            | ActionId::ToggleTeamTasks
+                    )
+                {
+                    return self.handle_agent_action(action_id);
+                }
             }
             if let Some(child_view) = self.subagent_views.get_mut(child_sid) {
                 return child_view.handle_input_inner(ev, registry, prompt_paging);
             }
             return InputOutcome::Unchanged;
+        }
+        // Soft swarm teammate view: Esc returns to lead.
+        if self.agent_panel.soft_view_session.is_some()
+            && let Event::Key(key) = ev
+            && key.kind != KeyEventKind::Release
+            && key.code == KeyCode::Esc
+            && key.modifiers.is_empty()
+        {
+            self.agent_panel.soft_view_session = None;
+            return InputOutcome::Changed;
+        }
+        // Agent panel: Enter open / x kill / Esc clear selection (only while selecting).
+        if self.agent_panel.selecting
+            && let Event::Key(key) = ev
+            && key.kind != KeyEventKind::Release
+        {
+            if key.code == KeyCode::Esc && key.modifiers.is_empty() {
+                self.agent_panel.exit_selection();
+                return InputOutcome::Changed;
+            }
+            if key.code == KeyCode::Enter && key.modifiers.is_empty() {
+                let _ = self.agent_panel_enter_selected();
+                return InputOutcome::Changed;
+            }
+            if key!('x').matches(key) {
+                if let Some(action) = self.agent_panel_kill_selected() {
+                    return InputOutcome::Action(action);
+                }
+                return InputOutcome::Changed;
+            }
+            if key.code == KeyCode::Enter
+                && key.modifiers.contains(KeyModifiers::SHIFT)
+                && self.agent_panel.show_team_tasks
+            {
+                if let Some(claim_prompt) = self.agent_panel_claim_selected_task() {
+                    return InputOutcome::Action(Action::SendPrompt(claim_prompt));
+                }
+                return InputOutcome::Changed;
+            }
         }
         if self.dismiss_jump_picker_if_suppressed()
             && let Event::Key(key) = ev
@@ -1205,6 +1266,30 @@ impl AgentView {
                     )),
                 );
                 InputOutcome::Action(Action::ToggleMouseCapture)
+            }
+            ActionId::AgentPanelSelectPrev => {
+                let n = self.agent_team_roster().len();
+                if n <= 1 {
+                    return InputOutcome::Unchanged;
+                }
+                self.agent_panel.select_prev(n);
+                InputOutcome::Changed
+            }
+            ActionId::AgentPanelSelectNext => {
+                let n = self.agent_team_roster().len();
+                if n <= 1 {
+                    return InputOutcome::Unchanged;
+                }
+                self.agent_panel.select_next(n);
+                InputOutcome::Changed
+            }
+            ActionId::ToggleTeamTasks => {
+                self.agent_panel.toggle_team_tasks();
+                // Seed team tasks from the todo pane when swarm plan ACP is absent.
+                if self.agent_panel.show_team_tasks && self.team_tasks.is_empty() {
+                    self.sync_team_tasks_from_todos();
+                }
+                InputOutcome::Changed
             }
             other => resolve_action(Some(other)).unwrap_or(InputOutcome::Unchanged),
         }
