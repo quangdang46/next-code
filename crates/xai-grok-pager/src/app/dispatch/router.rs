@@ -1200,16 +1200,28 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         }
         Action::OpenMemoryModal => {
             if let ActiveView::Agent(id) = app.active_view
-                && let Some(agent) = app.agents.get(&id)
-                && let Some(session_id) = agent.session.session_id.clone()
+                && let Some(agent) = app.agents.get_mut(&id)
             {
-                return vec![Effect::SendPrompt {
-                    agent_id: id,
-                    session_id,
-                    text: "/memory".to_string(),
-                    prompt_id: uuid::Uuid::new_v4().to_string(),
-                    skill_token_ranges: Vec::new(),
-                }];
+                let cwd = if agent.session.cwd.as_os_str().is_empty() {
+                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+                } else {
+                    agent.session.cwd.clone()
+                };
+                let files = crate::views::memory_typed::collect_memory_catalog(&cwd);
+                let entries = crate::views::memory_modal::build_entries(files);
+                let mut modal_state =
+                    crate::views::memory_modal::MemoryModalState::new(entries);
+                // Preserve prior enable flag if reopening; default on.
+                if let Some(crate::views::modal::ActiveModal::MemoryBrowser { state }) =
+                    agent.active_modal.as_ref()
+                {
+                    modal_state.memory_enabled = state.memory_enabled;
+                    modal_state.fullscreen = state.fullscreen;
+                }
+                agent.active_modal =
+                    Some(crate::views::modal::ActiveModal::MemoryBrowser {
+                        state: Box::new(modal_state),
+                    });
             }
             vec![]
         }

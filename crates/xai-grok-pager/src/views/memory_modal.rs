@@ -300,6 +300,7 @@ fn compute_filtered(entries: &[MemoryFileEntry], query: &str) -> Vec<usize> {
             section_has_match = false;
         } else if entry.label.to_lowercase().contains(&needle)
             || entry.source.to_lowercase().contains(&needle)
+            || entry.meta_display.to_lowercase().contains(&needle)
         {
             if let Some(h) = pending_header.take() {
                 result.push(h);
@@ -325,48 +326,67 @@ pub fn build_entries(
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let mut global = Vec::new();
-    let mut workspace = Vec::new();
-    let mut session = Vec::new();
+    // Bucket by Claude-style typed section (notepad + memdir types + scope fallback).
+    let mut buckets: Vec<(String, Vec<MemoryFileEntry>)> = Vec::new();
 
     for f in files {
-        let label = file_label(&f.path);
+        let label = if f.source == "notepad" {
+            match f.memory_type.as_deref() {
+                Some("priority") => "priority.md".to_string(),
+                Some("working") => "working.md".to_string(),
+                Some("manual") => "manual.md".to_string(),
+                _ => file_label(&f.path),
+            }
+        } else {
+            file_label(&f.path)
+        };
         let size = format_size(f.size_bytes);
         let modified = format_modified(f.modified_epoch_secs, now_secs);
-        let meta_display = format!("{size} \u{00B7} {modified}");
-        let bucket = match f.source.as_str() {
-            "global" => &mut global,
-            "workspace" => &mut workspace,
-            _ => &mut session,
-        };
-        bucket.push(MemoryFileEntry {
+        let type_tag = f
+            .memory_type
+            .as_deref()
+            .filter(|_| f.source != "notepad")
+            .map(|t| format!(" · {t}"))
+            .unwrap_or_default();
+        let meta_display = format!("{size} \u{00B7} {modified}{type_tag}");
+        let section = crate::views::memory_typed::typed_section_label(&f).to_string();
+        let entry = MemoryFileEntry {
             label,
             meta_display,
             path: f.path.into(),
             source: f.source,
             is_header: false,
-        });
+        };
+        if let Some((_, items)) = buckets.iter_mut().find(|(l, _)| *l == section) {
+            items.push(entry);
+        } else {
+            buckets.push((section, vec![entry]));
+        }
     }
 
-    // Session logs: reverse chronological (newest first).
-    session.reverse();
+    buckets.sort_by_key(|(label, _)| crate::views::memory_typed::typed_section_ord(label));
+
+    // Sessions: reverse chronological within the section (newest first).
+    for (label, items) in &mut buckets {
+        if label == "Sessions" {
+            items.reverse();
+        }
+    }
 
     let mut entries = Vec::new();
-    let mut push_section = |label: &str, items: Vec<MemoryFileEntry>| {
-        if !items.is_empty() {
-            entries.push(MemoryFileEntry {
-                path: PathBuf::new(),
-                source: String::new(),
-                meta_display: String::new(),
-                label: label.to_string(),
-                is_header: true,
-            });
-            entries.extend(items);
+    for (label, items) in buckets {
+        if items.is_empty() {
+            continue;
         }
-    };
-    push_section("Global", global);
-    push_section("Workspace", workspace);
-    push_section("Sessions", session);
+        entries.push(MemoryFileEntry {
+            path: PathBuf::new(),
+            source: String::new(),
+            meta_display: String::new(),
+            label,
+            is_header: true,
+        });
+        entries.extend(items);
+    }
     entries
 }
 
@@ -995,6 +1015,24 @@ fn handle_browse(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
             }
             InputOutcome::Unchanged
         }
+        // Claude `/memory` selects a file and opens $EDITOR. Face mirrors that
+        // with Enter / `e` (vim-nav keeps `i` as search).
+        KeyCode::Enter | KeyCode::Char('e') if key.modifiers.is_empty() => {
+            if let Some(entry) = state.selected_entry()
+                && !entry.is_header
+            {
+                let path = entry.path.clone();
+                if let Err(err) = crate::views::memory_typed::ensure_memory_file(&path) {
+                    tracing::warn!(error = %err, path = %path.display(), "memory ensure failed");
+                    return InputOutcome::Unchanged;
+                }
+                return InputOutcome::Action(Action::SuspendForEditor {
+                    path,
+                    refresh_agents_modal: None,
+                });
+            }
+            InputOutcome::Unchanged
+        }
         KeyCode::Char('t') if key.modifiers.is_empty() => {
             let cmd = if state.memory_enabled {
                 "/memory off"
@@ -1040,6 +1078,11 @@ fn build_shortcuts(
             let mut shortcuts = vec![
                 Shortcut {
                     label: "\u{2191}/\u{2193} nav",
+                    clickable: false,
+                    id: 0,
+                },
+                Shortcut {
+                    label: "Enter edit",
                     clickable: false,
                     id: 0,
                 },
@@ -1214,18 +1257,21 @@ mod tests {
                 source: "global".into(),
                 size_bytes: 100,
                 modified_epoch_secs: Some(1_700_000_000),
+                memory_type: None,
             },
             MemoryFileInfo {
                 path: "/workspace/MEMORY.md".into(),
                 source: "workspace".into(),
                 size_bytes: 200,
                 modified_epoch_secs: Some(1_700_000_000),
+                memory_type: None,
             },
             MemoryFileInfo {
                 path: "/sessions/log1.md".into(),
                 source: "session".into(),
                 size_bytes: 50,
                 modified_epoch_secs: None,
+                memory_type: None,
             },
         ];
 
@@ -1238,6 +1284,64 @@ mod tests {
         assert_eq!(entries[2].label, "Workspace");
         assert!(entries[4].is_header);
         assert_eq!(entries[4].label, "Sessions");
+    }
+
+    #[test]
+    fn build_entries_groups_typed_and_notepad() {
+        use xai_grok_shell::extensions::notification::MemoryFileInfo;
+
+        let files = vec![
+            MemoryFileInfo {
+                path: "/proj/.next-code/notepad/priority.md".into(),
+                source: "notepad".into(),
+                size_bytes: 10,
+                modified_epoch_secs: None,
+                memory_type: Some("priority".into()),
+            },
+            MemoryFileInfo {
+                path: "/proj/.next-code/memory/tip.md".into(),
+                source: "workspace".into(),
+                size_bytes: 20,
+                modified_epoch_secs: None,
+                memory_type: Some("feedback".into()),
+            },
+        ];
+        let entries = build_entries(files);
+        assert!(entries.iter().any(|e| e.is_header && e.label == "Notepad · Priority"));
+        assert!(entries.iter().any(|e| e.is_header && e.label == "Type · Feedback"));
+    }
+
+    #[test]
+    fn enter_opens_editor_for_selected_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("MEMORY.md");
+        std::fs::write(&path, "hello").unwrap();
+        let entries = vec![
+            MemoryFileEntry {
+                path: PathBuf::new(),
+                source: String::new(),
+                label: "Global".into(),
+                meta_display: String::new(),
+                is_header: true,
+            },
+            MemoryFileEntry {
+                path: path.clone(),
+                source: "global".into(),
+                label: "MEMORY.md".into(),
+                meta_display: "5B".into(),
+                is_header: false,
+            },
+        ];
+        let mut state = MemoryModalState::new(entries);
+        let key = crossterm::event::KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        let outcome = handle_memory_key(&mut state, &key);
+        match outcome {
+            InputOutcome::Action(Action::SuspendForEditor {
+                path: opened,
+                refresh_agents_modal: None,
+            }) => assert_eq!(opened, path),
+            other => panic!("expected SuspendForEditor, got {other:?}"),
+        }
     }
 
     #[test]
