@@ -12,7 +12,9 @@ use ratatui::text::Line;
 use ratatui::widgets::Widget;
 
 use super::actions::Action;
-use super::agent_view::{AgentView, active_contexts_for_pane, apply_settings_outcome};
+use super::agent_view::{
+    AgentView, active_contexts_for_pane, apply_experimental_outcome, apply_settings_outcome,
+};
 use super::app_view::InputOutcome;
 
 use crate::theme::Theme;
@@ -437,6 +439,29 @@ impl AgentView {
             }
         }
 
+        // Experimental features checklist (`/experimental`).
+        if let ActiveModal::ExperimentalFeatures { state } = modal {
+            let chrome_cfg = mw::ModalWindowConfig {
+                title: "",
+                tabs: None,
+                shortcuts: &[],
+                sizing: mw::ModalSizing::default(),
+                fold_info: None,
+            };
+            let chrome_outcome = mw::handle_modal_key(&mut state.window, key, &chrome_cfg);
+            match chrome_outcome {
+                ModalWindowOutcome::CloseRequested => {
+                    self.active_modal = None;
+                    return InputOutcome::Changed;
+                }
+                ModalWindowOutcome::Unhandled => {
+                    let out = crate::views::experimental_modal::handle_experimental_key(state, key);
+                    return apply_experimental_outcome(self, out);
+                }
+                _ => return InputOutcome::Changed,
+            }
+        }
+
         // ResetSettingsConfirm: y/n routing. Handled before generic
         // char-match so Esc/F2/Ctrl+, route to Cancel (not modal close).
         if let Some(ActiveModal::ResetSettingsConfirm { modal, .. }) = self.active_modal.as_ref() {
@@ -487,6 +512,7 @@ impl AgentView {
             | ActiveModal::ShortcutsHelp { .. }
             | ActiveModal::MemoryBrowser { .. }
             | ActiveModal::Settings { .. }
+            | ActiveModal::ExperimentalFeatures { .. }
             | ActiveModal::ResetSettingsConfirm { .. }
             | ActiveModal::RememberNoteReview { .. } => unreachable!(),
         }
@@ -1679,6 +1705,29 @@ impl AgentView {
             }
         }
 
+        // Experimental features checklist.
+        if let Some(ActiveModal::ExperimentalFeatures { state }) = &mut self.active_modal {
+            let outcome =
+                mw::handle_modal_mouse(&mut state.window, mouse.kind, mouse.column, mouse.row);
+            match outcome {
+                ModalWindowOutcome::CloseRequested => {
+                    self.active_modal = None;
+                    return InputOutcome::Changed;
+                }
+                ModalWindowOutcome::Handled => return InputOutcome::Changed,
+                ModalWindowOutcome::Unhandled => {
+                    let out = crate::views::experimental_modal::handle_experimental_mouse(
+                        state,
+                        mouse.kind,
+                        mouse.column,
+                        mouse.row,
+                    );
+                    return apply_experimental_outcome(self, out);
+                }
+                _ => return InputOutcome::Changed,
+            }
+        }
+
         // ResetSettingsConfirm: route mouse events through the
         // modal-window chrome.
         if let Some(ActiveModal::ResetSettingsConfirm { settings_state, .. }) =
@@ -2459,6 +2508,10 @@ impl AgentView {
                     settings_state,
                     compact,
                     None,
+                );
+            } else if let modal::ActiveModal::ExperimentalFeatures { state } = active_modal {
+                crate::views::experimental_modal::render_experimental_modal(
+                    buf, area, state, compact,
                 );
             } else if matches!(
                 active_modal,

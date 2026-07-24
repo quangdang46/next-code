@@ -459,7 +459,8 @@ impl App {
             autojudge_enabled,
             improve_mode,
             last_injected_memory_signature: None,
-            swarm_enabled: features.swarm,
+            swarm_enabled: crate::config::config()
+                .experiment_enabled(next_code_experiment_flags::ExperimentFlag::SwarmCoordination),
             debug_force_inline_gallery: false,
             swarm_panel_selected: 0,
             swarm_panel_focused: false,
@@ -916,7 +917,8 @@ impl App {
             autojudge_enabled,
             improve_mode,
             last_injected_memory_signature: None,
-            swarm_enabled: features.swarm,
+            swarm_enabled: crate::config::config()
+                .experiment_enabled(next_code_experiment_flags::ExperimentFlag::SwarmCoordination),
             debug_force_inline_gallery: false,
             swarm_panel_selected: 0,
             swarm_panel_focused: false,
