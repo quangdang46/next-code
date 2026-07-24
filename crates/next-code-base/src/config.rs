@@ -556,6 +556,10 @@ pub struct Config {
     #[serde(default)]
     pub notepad: crate::notepad::NotepadConfig,
 
+    /// Per-session Face `/goal` configuration
+    #[serde(default)]
+    pub goal: crate::session_goal::SessionGoalConfig,
+
     /// Magic keyword / mode workflow configuration
     #[serde(default)]
     pub keywords: KeywordsConfig,

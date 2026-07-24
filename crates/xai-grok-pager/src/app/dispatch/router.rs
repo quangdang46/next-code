@@ -22,6 +22,10 @@ use super::dashboard::{
     dispatch_dashboard_toggle_grouping, dispatch_dashboard_toggle_pin,
     dispatch_dashboard_toggle_worktree, dispatch_exit_dashboard, dispatch_open_dashboard,
 };
+use super::goal::{
+    dispatch_goal_clear, dispatch_goal_pause, dispatch_goal_resume, dispatch_goal_set,
+    dispatch_goal_show,
+};
 use super::import_claude::{
     dispatch_dismiss_claude_import, dispatch_import_claude, dispatch_import_claude_cancel,
     dispatch_import_claude_confirm,
@@ -1346,6 +1350,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             });
             vec![]
         }
+        Action::GoalShow => dispatch_goal_show(app),
+        Action::GoalPause => dispatch_goal_pause(app),
+        Action::GoalResume => dispatch_goal_resume(app),
+        Action::GoalClear => dispatch_goal_clear(app),
+        Action::GoalSet { objective } => dispatch_goal_set(app, objective),
         Action::Rewind => dispatch_rewind(app),
         Action::RewindShowPicker => dispatch_rewind_show_picker(app),
         Action::RewindPickerSelect(prompt_index) => {

@@ -225,7 +225,7 @@ mod tests {
         let input = json!({ "questions": questions });
 
         let handle = tokio::spawn(async move {
-            let req = rx.recv().await.expect("request");
+            let req: AskUserQuestionInputRequest = rx.recv().await.expect("request");
             let resp = AskUserQuestionExtResponse::Accepted {
                 answers: indexmap::IndexMap::from([(
                     "Which database?".to_string(),
@@ -257,7 +257,7 @@ mod tests {
         let input = json!({ "questions": sample_questions() });
 
         let handle = tokio::spawn(async move {
-            let req = rx.recv().await.expect("request");
+            let req: AskUserQuestionInputRequest = rx.recv().await.expect("request");
             let resp = AskUserQuestionExtResponse::Cancelled;
             let _ = req
                 .response_tx

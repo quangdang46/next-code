@@ -454,6 +454,13 @@ pub enum BusEvent {
     },
     /// Side panel pages were updated for a session
     SidePanelUpdated(SidePanelUpdated),
+    /// Per-session Face `/goal` was created, updated, or cleared.
+    /// `goal` is `None` after clear.
+    SessionGoalUpdated {
+        session_id: String,
+        goal: Option<crate::session_goal::SessionGoal>,
+        last_event: Option<String>,
+    },
     /// Deferred Mermaid rendering completed and cached content may now be visible
     MermaidRenderCompleted,
     /// Productivity report finished generating off the UI thread
