@@ -1,4 +1,4 @@
-//! Face ACP `x.ai/goal/*` — OMO-shaped session-goal store + GoalUpdated wire.
+//! Face ACP `x.ai/goal/*` — session-goal store + GoalUpdated wire.
 
 use serde_json::json;
 

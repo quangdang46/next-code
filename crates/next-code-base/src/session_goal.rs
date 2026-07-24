@@ -1,4 +1,4 @@
-//! OMO-shaped per-session goal store.
+//! Per-session goal store for Face `/goal`.
 //!
 //! Persists one active objective per session under
 //! `~/.next-code/session-goals/{urlencoded_session_id}.json`. Distinct from
@@ -280,7 +280,7 @@ pub fn build_set_prompt(objective: &str) -> String {
     )
 }
 
-/// OMO idle-continuation prompt.
+/// Idle-continuation prompt when a goal is still active.
 pub fn build_continuation_prompt(goal: &SessionGoal) -> String {
     format!(
         "Continue working toward the active thread goal.\n\n\
@@ -306,7 +306,7 @@ pub fn build_continuation_prompt(goal: &SessionGoal) -> String {
     )
 }
 
-/// OMO resume prompt.
+/// Resume prompt after `/goal resume`.
 pub fn build_resume_prompt(goal: &SessionGoal) -> String {
     format!(
         "A paused goal is being resumed.\n\n\

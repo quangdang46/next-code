@@ -1,4 +1,4 @@
-//! Face `/goal` dispatch — OMO-shaped session objective UX.
+//! Face `/goal` dispatch — session objective UX.
 //!
 //! Optimistically updates `AgentView::goal_state` for snappy chrome, then
 //! persists via ACP `x.ai/goal/*`. Set/resume also enqueue pursuit prompts

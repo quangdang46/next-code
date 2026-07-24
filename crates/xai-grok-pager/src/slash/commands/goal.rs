@@ -1,6 +1,6 @@
-//! `/goal` — persistent session objective (oh-my-openagent parity).
+//! `/goal` — persistent session objective.
 //!
-//! Argument grammar matches OMO `parseGoalCommand`:
+//! Argument grammar:
 //! - `` `/goal` `` / `` `/goal status` `` → show
 //! - `` `/goal pause` `` / `` `/goal resume` `` / `` `/goal clear` ``
 //! - anything else → set objective and start pursuing it
@@ -8,7 +8,7 @@
 use crate::app::actions::Action;
 use crate::slash::command::{AppCtx, ArgItem, CommandExecCtx, CommandResult, SlashCommand};
 
-/// Parsed `/goal` arguments — mirrors OMO `ParsedGoalCommand`.
+/// Parsed `/goal` arguments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParsedGoalCommand {
     Show,
@@ -18,7 +18,7 @@ pub enum ParsedGoalCommand {
     SetObjective(String),
 }
 
-/// Parse raw `/goal` args with OMO semantics.
+/// Parse raw `/goal` args.
 pub fn parse_goal_command(raw_args: &str) -> ParsedGoalCommand {
     let trimmed = raw_args.trim();
     if trimmed.is_empty() {

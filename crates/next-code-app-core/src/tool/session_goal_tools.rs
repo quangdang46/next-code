@@ -1,4 +1,4 @@
-//! OMO-shaped session-goal tools (`create_goal` / `update_goal` / `get_goal`).
+//! Session-goal tools (`create_goal` / `update_goal` / `get_goal`).
 //! Distinct from durable `initiative`.
 
 use super::{Tool, ToolContext, ToolOutput};

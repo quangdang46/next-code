@@ -454,7 +454,7 @@ pub enum BusEvent {
     },
     /// Side panel pages were updated for a session
     SidePanelUpdated(SidePanelUpdated),
-    /// OMO-shaped per-session Face `/goal` was created, updated, or cleared.
+    /// Per-session Face `/goal` was created, updated, or cleared.
     /// `goal` is `None` after clear.
     SessionGoalUpdated {
         session_id: String,

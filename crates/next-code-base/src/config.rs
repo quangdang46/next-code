@@ -556,7 +556,7 @@ pub struct Config {
     #[serde(default)]
     pub notepad: crate::notepad::NotepadConfig,
 
-    /// OMO-shaped per-session Face `/goal` configuration
+    /// Per-session Face `/goal` configuration
     #[serde(default)]
     pub goal: crate::session_goal::SessionGoalConfig,
 

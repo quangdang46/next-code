@@ -1,19 +1,18 @@
-# LOOK — Face `/goal` vs oh-my-openagent
+# LOOK — Face `/goal` session objective
 
 **Date:** 2026-07-24  
-**Branch / worktree:** `pr-face-goal` @ `next-code-worktrees/face-goal`  
-**Reference:** [code-yeongyu/oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) `packages/omo-opencode/src/hooks/goal/`
+**Branch / worktree:** `pr-face-goal` @ `next-code-worktrees/face-goal`
 
-**Status:** Full OMO-shaped session-goal parity **complete** (this PR). Durable initiatives (`initiative` / `/goals`) remain separate. Grok `goal_classifier` / multi-deliverable orchestrator deferred.
+**Status:** Per-session Face `/goal` **complete** (this PR). Durable initiatives (`initiative` / `/goals`) remain separate. Grok `goal_classifier` / multi-deliverable orchestrator deferred.
 
 ---
 
-## OMO `/goal` (source of truth for UX)
+## `/goal` UX
 
 | Piece | Behavior |
 |-------|----------|
 | Parse | `""` → show; `pause` / `resume` / `clear`; else → `setObjective` |
-| Persist | OMO: `.omo/goal/{sessionID}.json` — next-code: `~/.next-code/session-goals/{urlencoded}.json` |
+| Persist | `~/.next-code/session-goals/{urlencoded}.json` |
 | Idle | EndTurn → continuation prompt while status `active` (max 100) |
 | Tools | `create_goal` / `update_goal` / `get_goal` |
 | Face chrome | ACP `GoalUpdated` (`active`/`user_paused`/`complete`/`cleared`) |
@@ -37,7 +36,6 @@
 
 - Replacing `/goals` / `initiative` / ultragoal keyword skill
 - Implementing `goal_classifier` verifier / multi-deliverable planner
-- Persisting under `.omo/` (use `.next-code/session-goals/`)
 
 ---
 
