@@ -499,6 +499,33 @@ pub(super) fn dispatch_kill_subagent(app: &mut AppView, subagent_id: String) -> 
     }]
 }
 
+pub(super) fn dispatch_stop_swarm_member(
+    app: &mut AppView,
+    target_session_id: String,
+) -> Vec<Effect> {
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    let Some(session_id) = agent.session.session_id.clone() else {
+        return vec![];
+    };
+    if let Some(member) = agent.swarm_members.get_mut(&target_session_id) {
+        member.status = "cancelled".into();
+        member.detail = Some("stop requested from agent panel".into());
+        member.last_update = Instant::now();
+    }
+    if agent.agent_panel.soft_view_session.as_deref() == Some(target_session_id.as_str()) {
+        agent.agent_panel.soft_view_session = None;
+    }
+    vec![Effect::StopSwarmMember {
+        session_id,
+        target_session_id,
+    }]
+}
+
 pub(super) fn dispatch_demote_to_background(app: &mut AppView) -> Vec<Effect> {
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];

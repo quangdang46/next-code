@@ -324,31 +324,31 @@ Esc ΓåÆ back to lead (or interrupt if mid-turn, match CC rules)
 | Up/Down select roster | **Shift+Up/Down** (bare arrows remain scrollback) |
 | Ctrl+T tasks | **Ctrl+Shift+T** (Ctrl+T stays todo pane) |
 | Enter / Esc / x | Same while panel selecting |
-| Shift+Enter claim | Claim selected team task then SendPrompt |
+| Shift+Enter claim | Claim selected team task then SendPrompt (task strip open; no roster selecting required) |
+| (none) | **Shift+Left/Right** select team task |
 
 ### Shipped
 
-- Unified roster: lead + Grok `subagent_sessions` + local swarm mirrors (`agent_roster.rs`)
+- Unified roster: lead + Grok `subagent_sessions` + live swarm mirrors (`agent_roster.rs`)
 - Under-prompt agent panel + status chips + idle collapse (`views/agent_panel.rs`)
 - Enter opens Grok fullscreen (interactive prompt) or swarm soft transcript
 - Esc clears selection / exits soft / exits fullscreen
-- x kills Grok subagent; local-cancels swarm mirror
-- Message routing: Grok child via ACP `SendPrompt`; swarm soft DM to soft buffer + lead-forward prompt
-- Team task strip + claim (seeds from todo pane when swarm plan ACP absent)
+- x kills Grok subagent; swarm stop via daemon `CommStop` (`x.ai/swarm/stop`)
+- Message routing: Grok child via ACP `SendPrompt`; swarm DM via `x.ai/swarm/dm` (CommMessage, NotifySession fallback) + soft buffer echo
+- Live ACP: `x.ai/swarm/status` / `member_message` / `plan` from pager idle pump + prompt loop
+- Team task strip + claim (Shift+Left/Right; Shift+Enter without roster selecting; todo seed fallback)
 - Permission provenance label includes swarm teammates (`Teammate "name":`)
 
 ### Deferred (hard blockers / non-goals)
 
-- tmux / split-pane teammate layout
+- tmux / split-pane teammate layout (Claude click-into-pane path)
 - True multi-root / Agents Window / Cursor `/multitask`
-- Live ACP emit of daemon `SwarmStatus` / `SwarmMemberMessage` into Face (inject APIs exist; no Face daemon client emit path yet)
-- Real peer mailbox (`NotifySession` / `CommMessage`) â€” soft lead-forward only
-- Daemon-backed swarm kill (panel marks cancelled locally)
 - TeamView float stub left as-is (panel is the interactive surface)
 - `SubagentStart`/`Stop` hook wiring at swarm spawn sites
+- Mouse click-to-enter on in-process panel rows (Claude in-process uses Enter)
 
 ### Verify
 
 - Unit: `cargo test -p xai-grok-pager --lib agent_roster` / `agent_panel`
-- Check: `cargo check -p xai-grok-pager`
+- Check: `cargo check -p xai-grok-pager -p next-code --bins`
 

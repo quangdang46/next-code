@@ -383,13 +383,20 @@ pub(super) fn dispatch_send_prompt_inner(
         return vec![];
     }
 
-    // Agent-team panel: soft DM to a swarm member (no Face daemon client).
-    // Rewrites into a lead-forward prompt after echoing into the soft buffer.
-    let mut text = text;
+    // Agent-team panel: soft DM to a swarm member via daemon CommMessage.
+    // Echo into soft buffer, then short-circuit (do not send to lead).
     if !literal && !text.trim().starts_with('/') {
         use crate::app::agent_roster::MessageRoute;
         if let MessageRoute::SwarmMember { session_id } = agent.current_message_route() {
-            text = agent.soft_message_swarm_member(&session_id, text.trim());
+            let trimmed = text.trim().to_string();
+            if !trimmed.is_empty() {
+                agent.soft_message_swarm_member(&session_id, &trimmed);
+                let effects = agent.effects_message_swarm_member(session_id, trimmed);
+                if consume_input {
+                    agent.prompt.set_text("");
+                }
+                return effects;
+            }
         }
     }
 

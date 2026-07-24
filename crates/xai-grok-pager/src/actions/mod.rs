@@ -87,6 +87,8 @@ pub enum ActionId {
     ToggleTeamTasks,
     AgentPanelSelectPrev,
     AgentPanelSelectNext,
+    TeamTaskSelectPrev,
+    TeamTaskSelectNext,
     OpenSessions,
     OpenExtensions,
     SendToBackground,

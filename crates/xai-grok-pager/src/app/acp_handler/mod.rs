@@ -48,6 +48,7 @@ mod routing;
 mod session_notification;
 mod settings;
 mod subagent_activity;
+mod swarm;
 
 #[cfg(test)]
 use permissions::{MCP_ARGS_MAX_LINE_CHARS, MCP_ARGS_MAX_LINES, mcp_args_lines};
@@ -94,6 +95,7 @@ use settings::{
     handle_announcements_update, handle_models_update, handle_sessions_changed,
     handle_settings_update,
 };
+use swarm::{handle_swarm_member_message, handle_swarm_plan, handle_swarm_status};
 
 // Test-only bare-name surface for `tests/*` (`use super::*`).
 #[cfg(test)]
@@ -610,6 +612,9 @@ fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> b
             handle_mcp_server_status(notif, app)
         }
         "x.ai/mcp/servers_updated" => handle_mcp_servers_updated(notif, app),
+        "x.ai/swarm/status" => handle_swarm_status(notif, app),
+        "x.ai/swarm/member_message" => handle_swarm_member_message(notif, app),
+        "x.ai/swarm/plan" => handle_swarm_plan(notif, app),
         "next-code/token_usage" => handle_next_code_token_usage(notif, app),
         "next-code/provider_name" => handle_next_code_provider_name(notif, app),
         "next-code/memory_info" => handle_next_code_memory_info(notif, app),

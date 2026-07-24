@@ -1589,6 +1589,53 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::MessageSwarmMember {
+            session_id,
+            target_session_id,
+            message,
+        } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let params = serde_json::json!({
+                    "sessionId": session_id.0.to_string(),
+                    "targetSessionId": target_session_id,
+                    "message": message,
+                });
+                let req = acp::ExtRequest::new(
+                    "x.ai/swarm/dm",
+                    serde_json::value::to_raw_value(&params)
+                        .expect("serialize swarm dm params")
+                        .into(),
+                );
+                if let Err(e) = acp_send(req, &tx).await {
+                    tracing::warn!("Failed to DM swarm member: {e}");
+                }
+                TaskResult::CancelComplete
+            });
+        }
+        Effect::StopSwarmMember {
+            session_id,
+            target_session_id,
+        } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let params = serde_json::json!({
+                    "sessionId": session_id.0.to_string(),
+                    "targetSessionId": target_session_id,
+                    "force": true,
+                });
+                let req = acp::ExtRequest::new(
+                    "x.ai/swarm/stop",
+                    serde_json::value::to_raw_value(&params)
+                        .expect("serialize swarm stop params")
+                        .into(),
+                );
+                if let Err(e) = acp_send(req, &tx).await {
+                    tracing::warn!("Failed to stop swarm member: {e}");
+                }
+                TaskResult::CancelComplete
+            });
+        }
         Effect::DeleteScheduledTask { session_id, task_id } => {
             let tx = acp_tx.clone();
             tasks

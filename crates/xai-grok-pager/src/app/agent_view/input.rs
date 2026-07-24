@@ -388,6 +388,8 @@ impl AgentView {
                         action_id,
                         ActionId::AgentPanelSelectPrev
                             | ActionId::AgentPanelSelectNext
+                            | ActionId::TeamTaskSelectPrev
+                            | ActionId::TeamTaskSelectNext
                             | ActionId::ToggleTeamTasks
                     )
                 {
@@ -409,6 +411,20 @@ impl AgentView {
             self.agent_panel.soft_view_session = None;
             return InputOutcome::Changed;
         }
+        // Team-task claim: Shift+Enter while the task strip is open (no panel
+        // selecting required — Claude Ctrl+T strip is independent of roster).
+        if self.agent_panel.show_team_tasks
+            && !self.team_tasks.is_empty()
+            && let Event::Key(key) = ev
+            && key.kind != KeyEventKind::Release
+            && key.code == KeyCode::Enter
+            && key.modifiers.contains(KeyModifiers::SHIFT)
+        {
+            if let Some(claim_prompt) = self.agent_panel_claim_selected_task() {
+                return InputOutcome::Action(Action::SendPrompt(claim_prompt));
+            }
+            return InputOutcome::Changed;
+        }
         // Agent panel: Enter open / x kill / Esc clear selection (only while selecting).
         if self.agent_panel.selecting
             && let Event::Key(key) = ev
@@ -425,15 +441,6 @@ impl AgentView {
             if key!('x').matches(key) {
                 if let Some(action) = self.agent_panel_kill_selected() {
                     return InputOutcome::Action(action);
-                }
-                return InputOutcome::Changed;
-            }
-            if key.code == KeyCode::Enter
-                && key.modifiers.contains(KeyModifiers::SHIFT)
-                && self.agent_panel.show_team_tasks
-            {
-                if let Some(claim_prompt) = self.agent_panel_claim_selected_task() {
-                    return InputOutcome::Action(Action::SendPrompt(claim_prompt));
                 }
                 return InputOutcome::Changed;
             }
@@ -1281,6 +1288,34 @@ impl AgentView {
                     return InputOutcome::Unchanged;
                 }
                 self.agent_panel.select_next(n);
+                InputOutcome::Changed
+            }
+            ActionId::TeamTaskSelectPrev => {
+                if !self.agent_panel.show_team_tasks {
+                    self.agent_panel.show_team_tasks = true;
+                    if self.team_tasks.is_empty() {
+                        self.sync_team_tasks_from_todos();
+                    }
+                }
+                let n = self.team_tasks.len();
+                if n == 0 {
+                    return InputOutcome::Unchanged;
+                }
+                self.agent_panel.select_task_prev(n);
+                InputOutcome::Changed
+            }
+            ActionId::TeamTaskSelectNext => {
+                if !self.agent_panel.show_team_tasks {
+                    self.agent_panel.show_team_tasks = true;
+                    if self.team_tasks.is_empty() {
+                        self.sync_team_tasks_from_todos();
+                    }
+                }
+                let n = self.team_tasks.len();
+                if n == 0 {
+                    return InputOutcome::Unchanged;
+                }
+                self.agent_panel.select_task_next(n);
                 InputOutcome::Changed
             }
             ActionId::ToggleTeamTasks => {

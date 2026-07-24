@@ -198,6 +198,77 @@ async fn emit_models_update_via(
         .await;
 }
 
+/// Forward daemon swarm broadcasts to Face (agent-team panel).
+async fn emit_swarm_ext(
+    gateway: &AcpGatewaySender<acp::AgentSide>,
+    method: &str,
+    payload: serde_json::Value,
+) {
+    let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+        return;
+    };
+    let _ = gateway
+        .ext_notification(acp::ExtNotification::new(
+            method,
+            std::sync::Arc::from(raw),
+        ))
+        .await;
+}
+
+async fn forward_swarm_server_event(
+    gateway: &AcpGatewaySender<acp::AgentSide>,
+    lead_session_id: &str,
+    event: &ServerEvent,
+) -> bool {
+    match event {
+        ServerEvent::SwarmStatus { members } => {
+            emit_swarm_ext(
+                gateway,
+                "x.ai/swarm/status",
+                serde_json::json!({
+                    "sessionId": lead_session_id,
+                    "members": members,
+                }),
+            )
+            .await;
+            true
+        }
+        ServerEvent::SwarmMemberMessage { swarm_id, message } => {
+            emit_swarm_ext(
+                gateway,
+                "x.ai/swarm/member_message",
+                serde_json::json!({
+                    "sessionId": lead_session_id,
+                    "swarmId": swarm_id,
+                    "message": message,
+                }),
+            )
+            .await;
+            true
+        }
+        ServerEvent::SwarmPlan {
+            swarm_id,
+            version,
+            items,
+            ..
+        } => {
+            emit_swarm_ext(
+                gateway,
+                "x.ai/swarm/plan",
+                serde_json::json!({
+                    "sessionId": lead_session_id,
+                    "swarmId": swarm_id,
+                    "version": version,
+                    "items": items,
+                }),
+            )
+            .await;
+            true
+        }
+        _ => false,
+    }
+}
+
 async fn wait_for_done(session: &DaemonSession, request_id: u64) -> Result<()> {
     loop {
         match session.read_event().await? {
@@ -1570,9 +1641,15 @@ impl NextCodeFaceAgent {
                             session.set_last_model(Some(fallback)).await;
                         }
                     }
-                    // Idle path only keeps the Face model catalog warm; turn
-                    // events stay for prompt/set_model (re-queued above when busy).
-                    _ => {}
+                    // Agent-team panel: live swarm roster / soft transcript / plan.
+                    other => {
+                        let _ = forward_swarm_server_event(
+                            &gateway,
+                            &session.session_id,
+                            &other,
+                        )
+                        .await;
+                    }
                 }
             }
         });
@@ -1814,6 +1891,122 @@ impl acp::Agent for NextCodeFaceAgent {
                     }
                 }
                 serde_json::json!({ "result": { "ok": true } })
+            }
+            "x.ai/swarm/dm" => {
+                let from_session = params
+                    .get("sessionId")
+                    .or_else(|| params.get("fromSessionId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let to_session = params
+                    .get("targetSessionId")
+                    .or_else(|| params.get("toSessionId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let message = params
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                if from_session.is_empty() || to_session.is_empty() || message.is_empty() {
+                    serde_json::json!({
+                        "error": {
+                            "code": "invalid_params",
+                            "message": "sessionId, targetSessionId, and message are required",
+                        }
+                    })
+                } else if let Some(session) = self.sessions.borrow().get(from_session).cloned() {
+                    let id = session.next_id();
+                    // Prefer CommMessage DM (mailbox); fall back to NotifySession.
+                    let req = Request::CommMessage {
+                        id,
+                        from_session: from_session.to_string(),
+                        message: message.to_string(),
+                        to_session: Some(to_session.to_string()),
+                        channel: None,
+                        delivery: None,
+                        wake: Some(true),
+                        tldr: None,
+                    };
+                    match session.send(&req).await {
+                        Ok(()) => serde_json::json!({ "result": { "ok": true, "requestId": id } }),
+                        Err(err) => {
+                            let notify_id = session.next_id();
+                            let notify = Request::NotifySession {
+                                id: notify_id,
+                                session_id: to_session.to_string(),
+                                message: message.to_string(),
+                            };
+                            match session.send(&notify).await {
+                                Ok(()) => serde_json::json!({
+                                    "result": {
+                                        "ok": true,
+                                        "requestId": notify_id,
+                                        "fallback": "notify_session",
+                                    }
+                                }),
+                                Err(notify_err) => serde_json::json!({
+                                    "error": {
+                                        "code": "swarm_dm_failed",
+                                        "message": format!("{err}; notify fallback: {notify_err}"),
+                                    }
+                                }),
+                            }
+                        }
+                    }
+                } else {
+                    serde_json::json!({
+                        "error": {
+                            "code": "session_not_found",
+                            "message": format!("unknown lead session: {from_session}"),
+                        }
+                    })
+                }
+            }
+            "x.ai/swarm/stop" => {
+                let session_id = params
+                    .get("sessionId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let target_session = params
+                    .get("targetSessionId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let force = params
+                    .get("force")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+                if session_id.is_empty() || target_session.is_empty() {
+                    serde_json::json!({
+                        "error": {
+                            "code": "invalid_params",
+                            "message": "sessionId and targetSessionId are required",
+                        }
+                    })
+                } else if let Some(session) = self.sessions.borrow().get(session_id).cloned() {
+                    let id = session.next_id();
+                    let req = Request::CommStop {
+                        id,
+                        session_id: session_id.to_string(),
+                        target_session: target_session.to_string(),
+                        force: Some(force),
+                    };
+                    match session.send(&req).await {
+                        Ok(()) => serde_json::json!({ "result": { "ok": true, "requestId": id } }),
+                        Err(err) => serde_json::json!({
+                            "error": {
+                                "code": "swarm_stop_failed",
+                                "message": err.to_string(),
+                            }
+                        }),
+                    }
+                } else {
+                    serde_json::json!({
+                        "error": {
+                            "code": "session_not_found",
+                            "message": format!("unknown lead session: {session_id}"),
+                        }
+                    })
+                }
             }
             other => {
                 if let Some(payload) =
@@ -2196,7 +2389,9 @@ impl acp::Agent for NextCodeFaceAgent {
                         break acp::StopReason::EndTurn;
                     }
                 }
-                _ => {}
+                other => {
+                    let _ = forward_swarm_server_event(&self.gateway, &session_id, &other).await;
+                }
             }
         };
 

@@ -517,6 +517,36 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
                 "Moves selection in the under-prompt agent panel (lead + workers).\nEnter opens the selected worker transcript; Esc returns to the lead.",
             ),
         },
+        ActionDef {
+            id: ActionId::TeamTaskSelectPrev,
+            label: "prev team task",
+            description: "Select previous shared team task",
+            default_key: key!(Left, SHIFT),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: Some(43),
+            hint_key_display: Some("Shift+←"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Moves selection in the shared team task strip (Ctrl+Shift+T).\nShift+Enter claims the selected pending task.",
+            ),
+        },
+        ActionDef {
+            id: ActionId::TeamTaskSelectNext,
+            label: "next team task",
+            description: "Select next shared team task",
+            default_key: key!(Right, SHIFT),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: Some(44),
+            hint_key_display: Some("Shift+→"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Moves selection in the shared team task strip (Ctrl+Shift+T).\nShift+Enter claims the selected pending task.",
+            ),
+        },
         // Enter / x are handled locally in agent_view/input.rs only while
         // the panel is selecting — registering bare Enter/x at AgentScreen
         // would steal prompt submit and typing.

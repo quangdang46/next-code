@@ -2051,6 +2051,8 @@ fn resolve_action(action_id: Option<ActionId>) -> Option<InputOutcome> {
         | ActionId::ToggleTeamTasks
         | ActionId::AgentPanelSelectPrev
         | ActionId::AgentPanelSelectNext
+        | ActionId::TeamTaskSelectPrev
+        | ActionId::TeamTaskSelectNext
         | ActionId::ToggleTasks
         | ActionId::ToggleQueue
         | ActionId::OpenSessions

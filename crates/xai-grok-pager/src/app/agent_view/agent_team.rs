@@ -81,13 +81,8 @@ impl AgentView {
         }
     }
 
-    /// Soft-DM a swarm member: echo into soft buffer and ask the lead to forward.
-    pub fn soft_message_swarm_member(&mut self, session_id: &str, text: &str) -> String {
-        let name = self
-            .swarm_members
-            .get(session_id)
-            .map(|m| m.display_name())
-            .unwrap_or_else(|| session_id.to_string());
+    /// Soft-DM a swarm member: echo into soft buffer (daemon DM is a separate Effect).
+    pub fn soft_message_swarm_member(&mut self, session_id: &str, text: &str) {
         let msg_id = format!("soft-{}", uuid::Uuid::new_v4());
         self.upsert_swarm_soft_line(
             SoftTranscriptLine {
@@ -100,11 +95,8 @@ impl AgentView {
         );
         if let Some(member) = self.swarm_members.get_mut(session_id) {
             member.last_update = Instant::now();
-            member.detail = Some("user message pending lead forward".into());
+            member.detail = Some("user message sent".into());
         }
-        format!(
-            "Send this message to teammate @{name} (session `{session_id}`) via swarm/DM tools if available:\n\n{text}"
-        )
     }
 
     /// Mirror Grok todo pane items into the team task strip when swarm plan
@@ -115,16 +107,28 @@ impl AgentView {
             .todo
             .todos()
             .iter()
-            .enumerate()
-            .map(|(i, t)| {
+            .map(|t| {
                 let status = match t.status {
                     TodoStatus::Pending => "pending",
                     TodoStatus::InProgress => "in_progress",
                     TodoStatus::Completed => "completed",
                     TodoStatus::Cancelled => "cancelled",
                 };
+                // Prefer stable content hash over list index so reorder doesn't
+                // retarget claim prompts.
+                let id = format!(
+                    "todo-{:x}",
+                    {
+                        let mut h: u64 = 0xcbf29ce484222325;
+                        for b in t.content.as_bytes() {
+                            h ^= u64::from(*b);
+                            h = h.wrapping_mul(0x100000001b3);
+                        }
+                        h
+                    }
+                );
                 TeamTaskItem {
-                    id: format!("todo-{i}"),
+                    id,
                     content: t.content.clone(),
                     status: status.into(),
                     assigned_to: None,
@@ -174,16 +178,8 @@ impl AgentView {
         if let Some(ref sid) = row.kill_subagent_id {
             return Some(Action::KillSubagent(sid.clone()));
         }
-        // Swarm-only: mark cancelled locally; daemon stop is a later bridge.
-        if let Some(member) = self.swarm_members.get_mut(&row.id) {
-            member.status = "cancelled".into();
-            member.detail = Some("stopped from agent panel".into());
-            member.last_update = Instant::now();
-        }
-        if self.agent_panel.soft_view_session.as_deref() == Some(row.id.as_str()) {
-            self.agent_panel.soft_view_session = None;
-        }
-        None
+        // Swarm teammate: optimistic local cancel + daemon CommStop.
+        Some(Action::StopSwarmMember(row.id.clone()))
     }
 
     pub fn apply_swarm_status_members(&mut self, members: Vec<SwarmMemberMirror>) {
@@ -229,19 +225,22 @@ impl AgentView {
         let content = task.content.clone();
         task.assigned_to = Some("lead".into());
         task.status = "in_progress".into();
-        Some(format!(
-            "Claim team task `{id}`: {content}"
-        ))
+        Some(format!("Claim team task `{id}`: {content}"))
     }
 
-    /// Effects to message a swarm member (ACP notify extension when available).
+    /// Daemon DM effect for a swarm member (CommMessage via `x.ai/swarm/dm`).
     pub fn effects_message_swarm_member(
         &self,
-        _session_id: String,
-        _text: String,
+        target_session_id: String,
+        text: String,
     ) -> Vec<crate::app::actions::Effect> {
-        // Face has no next-code daemon client; soft_message_swarm_member
-        // rewrites into a lead-forward prompt instead.
-        vec![]
+        let Some(session_id) = self.session.session_id.clone() else {
+            return vec![];
+        };
+        vec![crate::app::actions::Effect::MessageSwarmMember {
+            session_id,
+            target_session_id,
+            message: text,
+        }]
     }
 }

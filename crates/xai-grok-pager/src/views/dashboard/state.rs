@@ -4690,6 +4690,8 @@ fn dashboard_action_for_id(
         | ActionId::ToggleTeamTasks
         | ActionId::AgentPanelSelectPrev
         | ActionId::AgentPanelSelectNext
+        | ActionId::TeamTaskSelectPrev
+        | ActionId::TeamTaskSelectNext
         | ActionId::ToggleTasks
         | ActionId::ToggleQueue
         | ActionId::OpenSessions
