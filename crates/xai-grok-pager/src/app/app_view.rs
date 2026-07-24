@@ -796,6 +796,8 @@ pub struct AppView {
     pub pending_editor_path: Option<std::path::PathBuf>,
     /// After `$EDITOR` exits, refresh the agents modal tab list if still open.
     pub pending_agents_modal_refresh: Option<crate::views::agents_modal::AgentsTab>,
+    /// After `$EDITOR` exits, reload Face keybindings from disk.
+    pub pending_keybindings_reload: bool,
     /// Path to open in `$PAGER` (default `less`) after the current event cycle.
     /// Set by `Action::OpenTranscriptPager` (`/transcript`); consumed by the
     /// event loop which suspends the inline TUI, spawns the pager, then restores
@@ -1291,6 +1293,7 @@ impl AppView {
             pending_effects: Vec::new(),
             pending_editor_path: None,
             pending_agents_modal_refresh: None,
+            pending_keybindings_reload: false,
             pending_pager_path: None,
             pending_pager_ansi: false,
             minimal_state: crate::minimal_api::MinimalState::default(),
@@ -5473,6 +5476,7 @@ pub(crate) mod tests {
             pending_effects: Vec::new(),
             pending_editor_path: None,
             pending_agents_modal_refresh: None,
+            pending_keybindings_reload: false,
             pending_pager_path: None,
             pending_pager_ansi: false,
             minimal_state: crate::minimal_api::MinimalState::default(),

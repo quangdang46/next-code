@@ -714,6 +714,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "keys",
                 "keybindings",
                 "scroll",
+                "/keybindings",
             ],
             kind: SettingKind::Bool {
                 default: ui_default.vim_mode.unwrap_or(false),

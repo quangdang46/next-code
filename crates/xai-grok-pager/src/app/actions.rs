@@ -977,7 +977,11 @@ pub enum Action {
         path: std::path::PathBuf,
         /// Reload `/config-agents` list after the editor exits (when set).
         refresh_agents_modal: Option<crate::views::agents_modal::AgentsTab>,
+        /// Reload Face `ActionRegistry` from `keybindings.json` after the editor exits.
+        reload_keybindings: bool,
     },
+    /// Rebuild `ActionRegistry` from defaults + `~/.next-code/keybindings.json`.
+    ReloadKeybindings,
     /// Toggle the expanded goal detail overlay.
     ToggleGoalDetail,
     Rewind,

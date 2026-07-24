@@ -33,6 +33,7 @@ pub mod imagine;
 pub mod imagine_video;
 pub mod import_claude;
 pub mod jump;
+pub mod keybindings;
 pub mod login;
 pub mod logout;
 pub mod loop_cmd;
@@ -99,6 +100,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(multiline::MultilineCommand),
         Arc::new(compact_mode::CompactModeCommand),
         Arc::new(vim_mode::VimModeCommand),
+        Arc::new(keybindings::KeybindingsCommand),
         Arc::new(plugin::HooksCommand),
         Arc::new(plugin::PluginsCommand),
         Arc::new(plugin::MarketplaceCommand),
