@@ -1,17 +1,17 @@
 # LOOK — Can `mermaid-rs-renderer` replace Face’s Mermaid stack?
 
 Date: 2026-07-24  
-Status: **Implemented** (Face default engine = mmdr; P2 dialect/fixture parity deferred)  
+Status: **Implemented** (Face default engine = mmdr; legacy dagre stack deleted; transcript inline PNG paint landed)  
 Repo under eval: `quangdang46/mermaid-rs-renderer` (merge `baad3f06`, package `0.3.2`)  
-Face stack: `xai-grok-mermaid` → **`MmdrEngine`** (`render_png_bytes`) + pager `mermaid_worker`; legacy `PureRustEngine` / `third_party/mermaid-to-svg` gated behind feature `legacy-mermaid-to-svg`
+Face stack: `xai-grok-mermaid` → **`MmdrEngine`** (`render_png_bytes`) + pager `mermaid_worker` + terminal-tier inline Kitty/iTerm paint
 
 ---
 
 ## Verdict
 
-**Implemented for Face Open/Copy.** mmdr’s Face embed API landed (PR [quangdang46/mermaid-rs-renderer#13](https://github.com/quangdang46/mermaid-rs-renderer/pull/13)): `render_png_bytes`, secure raster, `PngRenderParams`, `RenderError`, `Theme::face_light` / `face_dark`. Face now defaults to `MmdrEngine`; keep pager glue (`mermaid_worker`, `__mermaid-render`, timeout, cache, Open/Copy).
+**Implemented for Face Open/Copy and transcript inline paint.** mmdr’s Face embed API landed (PR [quangdang46/mermaid-rs-renderer#13](https://github.com/quangdang46/mermaid-rs-renderer/pull/13)): `render_png_bytes`, secure raster, `PngRenderParams`, `RenderError`, `Theme::face_light` / `face_dark`. Face defaults to `MmdrEngine` only (no `legacy-mermaid-to-svg` / `third_party/mermaid-to-svg`). Pager glue (`mermaid_worker`, `__mermaid-render`, timeout, cache, Open/Copy) plus terminal-tier PNG → scrollback `InlineMediaPlacement` (Kitty/iTerm) when overlays are active.
 
-**P2 still deferred:** visual/fixture parity for exotic dialects vs `mermaid-to-svg`; delete `third_party/mermaid-to-svg` (+ dagre stack) once parity is acceptable. Optional A/B via `--features legacy-mermaid-to-svg`. Diagrams float image paint remains a separate Face UI follow-on.
+**Still deferred:** Diagrams *info float* image paint (`legacy_deferred.rs` TODO) — separate float UI, not transcript.
 
 ---
 
@@ -25,7 +25,7 @@ Face stack: `xai-grok-mermaid` → **`MmdrEngine`** (`render_png_bytes`) + pager
 | Source-size limit + typed errors | Face `render_checked` + mmdr `RenderError` mapped |
 | Crash isolation under `panic = "abort"` | Unchanged: `mermaid_worker` + `run_with_timeout` |
 | Hardened SVG→PNG | mmdr secure raster (bundled Roboto, no remote/file fetch, 32 MP / 16k) |
-| Lazy Open / Copy path / Copy source affordances | Unchanged pager UI |
+| Lazy Open / Copy / inline transcript paint | Open tier for OS viewer; Terminal tier + `remember_inline_png` for Kitty/iTerm |
 
 ---
 
@@ -39,16 +39,17 @@ Face stack: `xai-grok-mermaid` → **`MmdrEngine`** (`render_png_bytes`) + pager
 | P1 sizing knobs | **Done** (`PngRenderParams`) |
 | P1 Face light/dark surfaces | **Done** |
 | P1 typed `RenderError` | **Done** (mapped in `MmdrEngine`) |
-| P2 fixture/dialect parity | **Deferred** |
-| Delete `third_party/mermaid-to-svg` | **Follow-up** (feature-gated for now) |
+| Transcript inline PNG paint | **Done** (Terminal quality + existing media escapes) |
+| Delete `third_party/mermaid-to-svg` (+ dagre stack) | **Done** |
+| Diagrams info-float image paint | **Deferred** (float UI follow-on) |
 
 ---
 
 ## Integration (landed)
 
 1. Pin `quangdang46/mermaid-rs-renderer` git rev `baad3f0695ca2a3a5cf613ff723576ea55fd8ec7` (`default-features = false`, `features = ["png"]`).
-2. `MmdrEngine: MermaidEngine` in `xai-grok-mermaid`; `default_engine()` → `MmdrEngine`.
-3. Keep `mermaid_worker` / `__mermaid-render` / timeout / cache / Open+Copy.
-4. Legacy `PureRustEngine` behind `legacy-mermaid-to-svg`.
+2. `MmdrEngine: MermaidEngine` in `xai-grok-mermaid`; `default_engine()` → `MmdrEngine` only.
+3. Keep `mermaid_worker` / `__mermaid-render` / timeout / cache / Open+Copy; add Terminal-tier `ensure_mermaid_inline` → cache → `AnchoredMedia` / Kitty paint.
+4. Removed `PureRustEngine`, feature `legacy-mermaid-to-svg`, and vendored dagre stack.
 
-**Update (2026-07-24):** Face migration PR wires mmdr as default; LOOK closed for P0/P1.
+**Update (2026-07-24):** Face migration PR wires mmdr as default; inline paint + legacy removal landed in follow-on.

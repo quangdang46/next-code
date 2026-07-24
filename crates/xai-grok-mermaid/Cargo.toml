@@ -3,16 +3,10 @@ name = "xai-grok-mermaid"
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
-description = "Mermaid → PNG for Face — default MmdrEngine (mermaid-rs-renderer); optional legacy PureRustEngine"
-
-[features]
-default = []
-# Optional dagre-based layout stack (third_party/mermaid-to-svg). Kept for
-# fixture/dialect A/B until P2 parity is closed; not selected by default_engine.
-legacy-mermaid-to-svg = ["dep:mermaid-to-svg"]
+description = "Mermaid → PNG for Face via MmdrEngine (mermaid-rs-renderer)"
 
 [dependencies]
-# SVG -> PNG rasterization for MmdcEngine / legacy PureRustEngine.
+# SVG -> PNG rasterization for MmdcEngine.
 # `resvg` re-exports the matching `usvg` (0.47) and `tiny_skia`.
 resvg = { version = "0.47", default-features = false, features = ["text"] }
 tiny-skia = "0.12"
@@ -28,8 +22,6 @@ tempfile = "3"
 # Default Face engine: quangdang46/mermaid-rs-renderer @ Face PNG API (0.3.2+).
 # Pin style matches next-code-tui-mermaid (git + rev/tag); rev has render_png_bytes.
 mermaid-rs-renderer = { git = "https://github.com/quangdang46/mermaid-rs-renderer.git", rev = "baad3f0695ca2a3a5cf613ff723576ea55fd8ec7", default-features = false, features = ["png"] }
-# Vendored dagre-based Mermaid -> SVG engine (optional legacy path).
-mermaid-to-svg = { path = "../../third_party/mermaid-to-svg", optional = true }
 
 # Subprocess process-group reaping (killpg) for the sync subprocess path, since
 # xai-tty-utils' ProcessGroup only wraps tokio children.

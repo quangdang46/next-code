@@ -1,18 +1,17 @@
 //! Off-draw-thread Mermaid render worker, per-session disk cache, and the
-//! [`AgentView`] lazy render-on-click glue (both `[Open]` and `[Copy path]`).
+//! [`AgentView`] lazy render glue (`[Open]` / `[Copy path]` / terminal-tier
+//! inline paint).
 //!
 //! Mirrors the existing inline-video worker model (`std::thread::spawn` +
 //! `std::sync::mpsc`, polled each tick via `try_recv`) rather than tokio. A
 //! single worker thread renders a requested diagram (in a short-lived child
 //! process — see below), writes the PNG to the session's `mermaid/` dir, and
-//! reports back only the on-disk path. Diagrams are never displayed inline; the
-//! path is what the affordance row's `[Open]`/`[Copy path]` actions target.
+//! reports back the on-disk path. Open/Copy use the open quality tier; scrollback
+//! inline paint uses the terminal tier and the shared Kitty/iTerm media path.
 //!
-//! Rendering is **lazy**: nothing renders until the user clicks `[Open]` or
-//! `[Copy path]`, which renders the diagram at the *live* theme/width (so it
-//! always matches the current theme, including auto day/night) and then runs the
-//! requested action. A small lock-free [`PendingMermaidAction`] list records what
-//! the user asked for so the tick can complete it when the matching render result
+//! Rendering is **lazy**: Open/Copy wait for a click; inline paint is requested
+//! when an affordance row is drawn on a graphics-capable terminal. A small
+//! lock-free pending list records what to do when the matching render result
 //! arrives — mirroring how inline video loads via `mpsc` + poll.
 //!
 //! # Crash isolation under `panic = "abort"` — out of process
@@ -56,7 +55,7 @@ use xai_grok_mermaid::{
 
 use crate::app::agent_view::AgentView;
 use crate::scrollback::blocks::mermaid_content::{
-    MermaidCacheKey, MermaidRenderQuality, theme_is_dark,
+    MermaidCacheKey, MermaidRenderQuality, ReadyInlinePng, remember_inline_png, theme_is_dark,
 };
 use crate::theme::ThemeKind;
 
@@ -105,8 +104,7 @@ const RENDER_TIMEOUT: Duration = Duration::from_millis(3000);
 /// (complements the at-load sweep). Runs on the worker thread, off the draw path.
 const SWEEP_EVERY_N_WRITES: u32 = 8;
 
-/// What a finished on-click render should do with the rendered PNG. `[Copy
-/// source]` needs no render, so it is not represented here.
+/// What a finished render should do with the rendered PNG.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MermaidClickAction {
     /// Open the rendered PNG in the OS default app.
@@ -124,17 +122,20 @@ impl MermaidClickAction {
     }
 }
 
-/// An on-click render the user requested whose worker result hasn't arrived yet.
-///
-/// Recorded when a click misses the disk cache and dispatches a render; the tick
-/// completes the `action` when a result for `key` arrives (mirrors the inline
-/// video `mpsc` + poll pattern). The painter also consults the keys to show the
-/// transient `rendering…` hint on the matching diagram's row.
+/// Why a render was requested — click action vs terminal-tier inline paint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MermaidPendingKind {
+    Click(MermaidClickAction),
+    /// Terminal-tier PNG for scrollback Kitty/iTerm paint.
+    Inline,
+}
+
+/// An in-flight render whose worker result hasn't arrived yet.
 struct PendingMermaidAction {
     /// Cache key of the in-flight render (matched against the worker result).
     key: MermaidCacheKey,
     /// What to do once the render lands.
-    action: MermaidClickAction,
+    kind: MermaidPendingKind,
 }
 
 /// A unit of work for the render worker.
@@ -912,12 +913,16 @@ impl MermaidRuntime {
         }
     }
 
-    /// Whether an on-click render for `key` + `action` is already outstanding, so
-    /// a repeat click neither re-dispatches nor double-records it.
-    fn has_pending(&self, key: &MermaidCacheKey, action: MermaidClickAction) -> bool {
+    /// Whether an on-click/inline render for `key` + `kind` is already outstanding.
+    fn has_pending(&self, key: &MermaidCacheKey, kind: MermaidPendingKind) -> bool {
         self.pending
             .iter()
-            .any(|p| p.key == *key && p.action == action)
+            .any(|p| p.key == *key && p.kind == kind)
+    }
+
+    /// Whether any pending entry targets `key` (coalesced worker job covers all).
+    fn has_pending_key(&self, key: &MermaidCacheKey) -> bool {
+        self.pending.iter().any(|p| p.key == *key)
     }
 }
 
@@ -939,17 +944,15 @@ fn target_width_px(content_cols: u16) -> u32 {
         .clamp(MIN_TARGET_WIDTH_PX, MAX_TARGET_WIDTH_PX)
 }
 
-/// Remove and return every pending action awaiting `key` (usually one, but the
-/// same diagram can have both an `[Open]` and a `[Copy path]` queued). Pure so
-/// the result → action matching is unit-testable without an [`AgentView`].
+/// Remove and return every pending kind awaiting `key`.
 fn take_pending_for(
     pending: &mut Vec<PendingMermaidAction>,
     key: &MermaidCacheKey,
-) -> Vec<MermaidClickAction> {
+) -> Vec<MermaidPendingKind> {
     let mut taken = Vec::new();
     pending.retain(|p| {
         if p.key == *key {
-            taken.push(p.action);
+            taken.push(p.kind);
             false
         } else {
             true
@@ -1074,6 +1077,113 @@ impl AgentView {
         }
     }
 
+    /// Promote an on-disk terminal-tier PNG into the inline-ready cache.
+    fn remember_terminal_png(&mut self, key: MermaidCacheKey, path: PathBuf) -> bool {
+        let Ok(bytes) = std::fs::read(&path) else {
+            return false;
+        };
+        let Some((width, height)) = crate::prompt_images::decode_image_dimensions(&bytes) else {
+            return false;
+        };
+        remember_inline_png(
+            key,
+            ReadyInlinePng {
+                path,
+                width,
+                height,
+            },
+        );
+        true
+    }
+
+    /// Ensure a terminal-tier PNG exists for inline Kitty/iTerm paint.
+    ///
+    /// No-op without scrollback graphics overlays. Disk hit → remember +
+    /// invalidate heights; miss → dispatch the same worker path as Open Image
+    /// (Terminal quality). Failures keep ASCII art and toast like Open Image.
+    pub(crate) fn ensure_mermaid_inline(&mut self, source: String) {
+        if !crate::terminal::image::scrollback_inline_overlay_active() {
+            return;
+        }
+        let theme = crate::theme::cache::current_kind();
+        let cols = self.mermaid_content_cols();
+        let quality = MermaidRenderQuality::Terminal;
+        let Some((key, out_path)) = self.mermaid_render_target(&source, theme, cols, quality)
+        else {
+            return;
+        };
+
+        if crate::scrollback::blocks::mermaid_content::lookup_inline_png(&key).is_some() {
+            return;
+        }
+
+        if self
+            .mermaid
+            .as_ref()
+            .is_some_and(|rt| rt.has_pending(&key, MermaidPendingKind::Inline))
+        {
+            return;
+        }
+
+        if read_cached_png(&out_path) {
+            if self.remember_terminal_png(key, out_path) {
+                self.scrollback.invalidate_heights();
+            }
+            return;
+        }
+
+        // Another pending kind for this key already dispatched the job.
+        if self
+            .mermaid
+            .as_ref()
+            .is_some_and(|rt| rt.has_pending_key(&key))
+        {
+            if let Some(rt) = self.mermaid.as_mut() {
+                rt.pending.push(PendingMermaidAction {
+                    key,
+                    kind: MermaidPendingKind::Inline,
+                });
+            }
+            return;
+        }
+
+        self.ensure_mermaid_runtime();
+        self.maybe_sweep_session_cache(&out_path);
+        let job = MermaidJob {
+            key: key.clone(),
+            source,
+            out_path,
+            theme_dark: theme_is_dark(theme),
+            target_width_px: target_width_px(cols),
+            quality,
+        };
+        tracing::debug!(
+            target: MERMAID_TRACING_TARGET,
+            source_len = job.source.len(),
+            theme_kind = ?theme,
+            target_px = job.target_width_px,
+            ?quality,
+            "mermaid inline render dispatched",
+        );
+        let sent = self
+            .mermaid
+            .as_ref()
+            .is_some_and(|rt| rt.tx.send(job).is_ok());
+        if sent {
+            if let Some(rt) = self.mermaid.as_mut() {
+                rt.pending.push(PendingMermaidAction {
+                    key,
+                    kind: MermaidPendingKind::Inline,
+                });
+            }
+        } else {
+            tracing::warn!(
+                target: MERMAID_TRACING_TARGET,
+                "mermaid worker unavailable; cannot render inline",
+            );
+        }
+    }
+
     /// Handle a click on a Mermaid `[Open]`/`[Copy path]` button: render the
     /// diagram at the *live* theme and open-tier auto-scale (sharp OS viewer
     /// PNGs, independent of terminal width) if it isn't cached, then run
@@ -1102,14 +1212,15 @@ impl AgentView {
             return;
         };
 
-        // A render for this exact key+action is already in flight → just wait
+        let kind = MermaidPendingKind::Click(action);
+        // A render for this exact key+kind is already in flight → just wait
         // for it. Checked BEFORE the disk-cache fast path so a second click that
         // lands after the worker writes the PNG (but before the tick polls the
         // result) doesn't also take the disk-hit path and run the action twice.
         if self
             .mermaid
             .as_ref()
-            .is_some_and(|rt| rt.has_pending(&key, action))
+            .is_some_and(|rt| rt.has_pending(&key, kind))
         {
             self.show_toast("Rendering diagram\u{2026}");
             return;
@@ -1147,7 +1258,7 @@ impl AgentView {
             .is_some_and(|rt| rt.tx.send(job).is_ok());
         if sent {
             if let Some(rt) = self.mermaid.as_mut() {
-                rt.pending.push(PendingMermaidAction { key, action });
+                rt.pending.push(PendingMermaidAction { key, kind });
             }
             self.show_toast("Rendering diagram\u{2026}");
         } else {
@@ -1164,10 +1275,9 @@ impl AgentView {
         }
     }
 
-    /// Drain finished renders from the worker and run each one's requesting
-    /// action(s): `[Open]` opens the PNG, `[Copy path]` copies its path, and a
-    /// failed render shows an error toast. Returns `true` if any action ran (so
-    /// the transient `rendering…` hint clears and the toast shows).
+    /// Drain finished renders from the worker and run each pending kind:
+    /// click actions open/copy; inline remembers the PNG and invalidates
+    /// scrollback heights; failures toast (ASCII art stays).
     fn poll_mermaid_results(&mut self) -> bool {
         let mut results = Vec::new();
         if let Some(rt) = self.mermaid.as_ref() {
@@ -1180,17 +1290,24 @@ impl AgentView {
         }
 
         let mut changed = false;
+        let mut inline_ready = false;
         for MermaidResult { key, outcome } in results {
-            // Take every pending action that asked for this key (usually one).
-            let actions = match self.mermaid.as_mut() {
+            let kinds = match self.mermaid.as_mut() {
                 Some(rt) => take_pending_for(&mut rt.pending, &key),
                 None => Vec::new(),
             };
-            for action in actions {
+            for kind in kinds {
                 changed = true;
-                match &outcome {
-                    MermaidOutcome::Ready { path } => self.complete_mermaid_action(action, path),
-                    MermaidOutcome::Failed => {
+                match (&outcome, kind) {
+                    (MermaidOutcome::Ready { path }, MermaidPendingKind::Click(action)) => {
+                        self.complete_mermaid_action(action, path);
+                    }
+                    (MermaidOutcome::Ready { path }, MermaidPendingKind::Inline) => {
+                        if self.remember_terminal_png(key.clone(), path.clone()) {
+                            inline_ready = true;
+                        }
+                    }
+                    (MermaidOutcome::Failed, MermaidPendingKind::Click(action)) => {
                         crate::unified_log::warn(
                             "mermaid.render.failed",
                             self.session.session_id.as_ref().map(|s| s.0.as_ref()),
@@ -1198,8 +1315,19 @@ impl AgentView {
                         );
                         self.show_toast("Could not render diagram");
                     }
+                    (MermaidOutcome::Failed, MermaidPendingKind::Inline) => {
+                        crate::unified_log::warn(
+                            "mermaid.render.failed",
+                            self.session.session_id.as_ref().map(|s| s.0.as_ref()),
+                            Some(serde_json::json!({ "action": "inline" })),
+                        );
+                        self.show_toast("Could not render diagram");
+                    }
                 }
             }
+        }
+        if inline_ready {
+            self.scrollback.invalidate_heights();
         }
         changed
     }
@@ -1281,22 +1409,25 @@ mod tests {
         let mut pending = vec![
             PendingMermaidAction {
                 key: k1.clone(),
-                action: MermaidClickAction::Open,
+                kind: MermaidPendingKind::Click(MermaidClickAction::Open),
             },
             PendingMermaidAction {
                 key: k2.clone(),
-                action: MermaidClickAction::Open,
+                kind: MermaidPendingKind::Click(MermaidClickAction::Open),
             },
             PendingMermaidAction {
                 key: k1.clone(),
-                action: MermaidClickAction::CopyPath,
+                kind: MermaidPendingKind::Click(MermaidClickAction::CopyPath),
             },
         ];
         // Both actions awaiting k1 (an Open and a CopyPath) are taken; k2 stays.
         let taken = take_pending_for(&mut pending, &k1);
         assert_eq!(
             taken,
-            vec![MermaidClickAction::Open, MermaidClickAction::CopyPath]
+            vec![
+                MermaidPendingKind::Click(MermaidClickAction::Open),
+                MermaidPendingKind::Click(MermaidClickAction::CopyPath),
+            ]
         );
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].key, k2);
@@ -1309,16 +1440,16 @@ mod tests {
     fn runtime_has_pending_dedupes_by_key_and_action() {
         let mut rt = MermaidRuntime::new();
         let k = key("d");
-        assert!(!rt.has_pending(&k, MermaidClickAction::Open));
+        assert!(!rt.has_pending(&k, MermaidPendingKind::Click(MermaidClickAction::Open)));
         rt.pending.push(PendingMermaidAction {
             key: k.clone(),
-            action: MermaidClickAction::Open,
+            kind: MermaidPendingKind::Click(MermaidClickAction::Open),
         });
-        assert!(rt.has_pending(&k, MermaidClickAction::Open));
+        assert!(rt.has_pending(&k, MermaidPendingKind::Click(MermaidClickAction::Open)));
         // Same key, different action → not a duplicate (both can be queued).
-        assert!(!rt.has_pending(&k, MermaidClickAction::CopyPath));
+        assert!(!rt.has_pending(&k, MermaidPendingKind::Click(MermaidClickAction::CopyPath)));
         // Different key → not pending.
-        assert!(!rt.has_pending(&key("other"), MermaidClickAction::Open));
+        assert!(!rt.has_pending(&key("other"), MermaidPendingKind::Click(MermaidClickAction::Open)));
     }
 
     #[test]
@@ -2310,7 +2441,7 @@ mod tests {
         let mut rt = MermaidRuntime::new();
         rt.pending.push(PendingMermaidAction {
             key: click_key.clone(),
-            action: MermaidClickAction::Open,
+            kind: MermaidPendingKind::Click(MermaidClickAction::Open),
         });
         agent.mermaid = Some(rt);
 

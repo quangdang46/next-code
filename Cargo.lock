@@ -2118,14 +2118,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dagre_rust"
-version = "0.0.5"
-dependencies = [
- "graphlib_rust",
- "ordered_hashmap",
-]
-
-[[package]]
 name = "dark-light"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4474,13 +4466,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "graphlib_rust"
-version = "0.0.2"
-dependencies = [
- "ordered_hashmap",
-]
-
-[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6118,18 +6103,6 @@ dependencies = [
  "thiserror 2.0.19",
  "ttf-parser",
  "usvg 0.47.0",
-]
-
-[[package]]
-name = "mermaid-to-svg"
-version = "0.1.0"
-dependencies = [
- "dagre_rust",
- "graphlib_rust",
- "serde_yaml",
- "thiserror 2.0.19",
- "unicode-segmentation",
- "unicode-width 0.2.2",
 ]
 
 [[package]]
@@ -8377,10 +8350,6 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
 ]
-
-[[package]]
-name = "ordered_hashmap"
-version = "0.0.3"
 
 [[package]]
 name = "os_pipe"
@@ -13727,7 +13696,6 @@ dependencies = [
  "image",
  "libc",
  "mermaid-rs-renderer 0.3.2",
- "mermaid-to-svg",
  "resvg 0.47.0",
  "tempfile",
  "thiserror 1.0.69",
