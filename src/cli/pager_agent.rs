@@ -934,6 +934,107 @@ impl NextCodeFaceAgent {
         parts.join("\n")
     }
 
+    /// Run Face `!` bash mode: shell locally, emit execute tool with `bash_mode`,
+    /// end turn without a model completion.
+    async fn handle_bash_mode_prompt(
+        &self,
+        session_id: &str,
+        command: &str,
+        working_dir: Option<&std::path::Path>,
+    ) -> acp::PromptResponse {
+        let tool_id = format!("bash-mode-{}", uuid::Uuid::new_v4());
+        let cwd_display = working_dir
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let raw_input = crate::cli::face_bash::bash_mode_raw_input(command);
+        let meta = crate::cli::face_bash::bash_mode_tool_meta();
+
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new(ToolCallId::new(tool_id.as_str()), command)
+                        .status(ToolCallStatus::Pending)
+                        .kind(acp::ToolKind::Execute)
+                        .raw_input(raw_input.clone())
+                        .meta(Some(meta.clone())),
+                ),
+            ))
+            .await;
+
+        let in_progress = ToolCallUpdateFields::new()
+            .status(ToolCallStatus::InProgress)
+            .title(command.to_string())
+            .kind(acp::ToolKind::Execute)
+            .raw_input(raw_input.clone());
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCallUpdate(
+                    ToolCallUpdate::new(ToolCallId::new(tool_id.as_str()), in_progress)
+                        .meta(Some(meta.clone())),
+                ),
+            ))
+            .await;
+
+        let result = if command.trim().is_empty() {
+            crate::cli::face_bash::BashRunResult {
+                output: String::new(),
+                exit_code: 0,
+                timed_out: false,
+            }
+        } else {
+            crate::cli::face_bash::run_shell_command(
+                command,
+                working_dir,
+                crate::cli::face_bash::BASH_MODE_TIMEOUT,
+            )
+            .await
+        };
+
+        let failed = result.exit_code != 0 || result.timed_out;
+        let status = if failed {
+            ToolCallStatus::Failed
+        } else {
+            ToolCallStatus::Completed
+        };
+        let display_output = if result.output.is_empty() && !failed {
+            "Command completed successfully (no output)".to_string()
+        } else {
+            result.output.clone()
+        };
+        let raw_output = crate::cli::face_bash::bash_mode_raw_output(
+            command,
+            &result.output,
+            result.exit_code,
+            result.timed_out,
+            &cwd_display,
+        );
+        let done_fields = ToolCallUpdateFields::new()
+            .status(status)
+            .title(command.to_string())
+            .kind(acp::ToolKind::Execute)
+            .content(Some(vec![
+                acp::ContentBlock::Text(acp::TextContent::new(display_output)).into(),
+            ]))
+            .raw_input(raw_input)
+            .raw_output(raw_output);
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCallUpdate(
+                    ToolCallUpdate::new(ToolCallId::new(tool_id.as_str()), done_fields)
+                        .meta(Some(meta)),
+                ),
+            ))
+            .await;
+
+        acp::PromptResponse::new(acp::StopReason::EndTurn)
+    }
+
     /// Load initial ACP commands (skills) for the `InitializeResponse` meta.
     /// Called once at Face connection time so the welcome prompt slash
     /// completions include skills immediately.
@@ -1890,6 +1991,21 @@ impl acp::Agent for NextCodeFaceAgent {
         {
             return Err(acp::Error::internal_error()
                 .data(format!("Session {session_id} already processing a prompt")));
+        }
+
+        // Face `!` bash mode: PromptBlockMeta.bash_command → local shell →
+        // execute tool with bash_mode meta. No model turn.
+        if let Some(bash_cmd) = crate::cli::face_bash::bash_command_from_prompt(&args) {
+            let working_dir = session.working_dir.clone();
+            let response = self
+                .handle_bash_mode_prompt(
+                    &session_id,
+                    &bash_cmd,
+                    working_dir.as_deref(),
+                )
+                .await;
+            session.prompt_running.store(false, Ordering::SeqCst);
+            return Ok(response);
         }
 
         let text = Self::prompt_text(&args);
