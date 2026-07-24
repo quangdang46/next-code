@@ -41,6 +41,21 @@ pub struct AskUserQuestionInputRequest {
     pub response_tx: tokio::sync::oneshot::Sender<Result<Value, String>>,
 }
 
+/// Blocking Best-of-N winner pick (`mode=show`) → Face ACP reverse request.
+///
+/// `candidates` is JSON matching `Vec<BestOfNCandidateUi>`. `response` matches
+/// `BestOfNPickExtResponse`.
+pub struct BestOfNPickInputRequest {
+    pub request_id: String,
+    pub session_id: String,
+    pub run_id: String,
+    pub tool_call_id: String,
+    pub recommended_index: usize,
+    pub selection_reason: String,
+    pub candidates: Value,
+    pub response_tx: tokio::sync::oneshot::Sender<Result<Value, String>>,
+}
+
 #[derive(Clone)]
 pub struct ToolContext {
     pub session_id: String,
@@ -50,6 +65,7 @@ pub struct ToolContext {
     pub stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<StdinInputRequest>>,
     pub ask_user_question_tx:
         Option<tokio::sync::mpsc::UnboundedSender<AskUserQuestionInputRequest>>,
+    pub best_of_n_pick_tx: Option<tokio::sync::mpsc::UnboundedSender<BestOfNPickInputRequest>>,
     pub graceful_shutdown_signal: Option<InterruptSignal>,
     pub execution_mode: ToolExecutionMode,
     /// Best-of-N run ID, set by the orchestrator before spawning
@@ -78,6 +94,7 @@ impl Default for ToolContext {
             working_dir: None,
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            best_of_n_pick_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: ToolExecutionMode::AgentTurn,
             best_of_n_run_id: None,
@@ -95,6 +112,7 @@ impl ToolContext {
             working_dir: self.working_dir.clone(),
             stdin_request_tx: self.stdin_request_tx.clone(),
             ask_user_question_tx: self.ask_user_question_tx.clone(),
+            best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
             graceful_shutdown_signal: self.graceful_shutdown_signal.clone(),
             execution_mode: self.execution_mode,
             best_of_n_run_id: self.best_of_n_run_id.clone(),

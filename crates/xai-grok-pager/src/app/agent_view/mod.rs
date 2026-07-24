@@ -1219,6 +1219,8 @@ pub struct AgentView {
     /// Active question view (from `AskUserQuestion` tool). When `Some`, the
     /// prompt area shows a structured question UI and input is modal.
     pub(crate) question_view: Option<QuestionViewState>,
+    /// Live Best-of-N progress card (scrollback system block + phase).
+    pub(crate) best_of_n: Option<crate::views::best_of_n_view::BestOfNUiState>,
     /// Scrollbar hit area for the question view (set during render).
     pub(crate) hit_question_scrollbar: HitArea,
     /// Hovered question item index (visual highlight only).

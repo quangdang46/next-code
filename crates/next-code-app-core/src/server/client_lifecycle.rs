@@ -1,8 +1,9 @@
 use super::client_actions::{
     AgentTaskContext, NotifySessionContext, handle_agent_task, handle_ask_user_question_response,
-    handle_compact, handle_input_shell, handle_notify_session, handle_permission_response,
-    handle_rename_session, handle_run_subagent, handle_set_feature, handle_set_subagent_model,
-    handle_split, handle_stdin_response, handle_transfer, handle_trigger_memory_extraction,
+    handle_best_of_n_pick_response, handle_compact, handle_input_shell, handle_notify_session,
+    handle_permission_response, handle_rename_session, handle_run_subagent, handle_set_feature,
+    handle_set_subagent_model, handle_split, handle_stdin_response, handle_transfer,
+    handle_trigger_memory_extraction,
 };
 use super::client_comm::{
     handle_comm_channel_members, handle_comm_list, handle_comm_list_channels, handle_comm_message,
@@ -636,6 +637,14 @@ pub(super) async fn handle_client(
             >,
         >,
     > = Arc::new(Mutex::new(HashMap::new()));
+    let best_of_n_pick_responses: Arc<
+        Mutex<
+            HashMap<
+                String,
+                tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+            >,
+        >,
+    > = Arc::new(Mutex::new(HashMap::new()));
 
     // Subscribe to bus events so we can forward ModelsUpdated to this client
     // (e.g. when Copilot finishes async init after the initial History was sent)
@@ -692,6 +701,36 @@ pub(super) async fn handle_client(
                     tool_call_id: req.tool_call_id,
                     questions: req.questions,
                     mode: req.mode,
+                });
+            }
+        })
+    };
+
+    // Best-of-N mode=show pick → Face ACP reverse request.
+    let (bon_pick_tx, mut bon_pick_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::tool::BestOfNPickInputRequest>();
+    {
+        let mut agent_guard = agent.lock().await;
+        agent_guard.set_best_of_n_pick_tx(bon_pick_tx);
+    }
+    let _best_of_n_pick_forwarder = {
+        let client_event_tx = client_event_tx.clone();
+        let best_of_n_pick_responses = best_of_n_pick_responses.clone();
+        tokio::spawn(async move {
+            while let Some(req) = bon_pick_rx.recv().await {
+                let request_id = req.request_id.clone();
+                best_of_n_pick_responses
+                    .lock()
+                    .await
+                    .insert(request_id.clone(), req.response_tx);
+                let _ = client_event_tx.send(ServerEvent::BestOfNPickRequest {
+                    request_id,
+                    session_id: req.session_id,
+                    run_id: req.run_id,
+                    tool_call_id: req.tool_call_id,
+                    recommended_index: req.recommended_index,
+                    selection_reason: req.selection_reason,
+                    candidates: req.candidates,
                 });
             }
         })
@@ -1969,6 +2008,23 @@ pub(super) async fn handle_client(
                     response,
                     error,
                     &ask_user_question_responses,
+                    &client_event_tx,
+                )
+                .await;
+            }
+
+            Request::BestOfNPickResponse {
+                id,
+                request_id,
+                response,
+                error,
+            } => {
+                handle_best_of_n_pick_response(
+                    id,
+                    request_id,
+                    response,
+                    error,
+                    &best_of_n_pick_responses,
                     &client_event_tx,
                 )
                 .await;

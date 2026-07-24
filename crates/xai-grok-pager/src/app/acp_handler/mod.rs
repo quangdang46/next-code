@@ -610,6 +610,7 @@ fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> b
             handle_mcp_server_status(notif, app)
         }
         "x.ai/mcp/servers_updated" => handle_mcp_servers_updated(notif, app),
+        "x.ai/best_of_n/progress" => handle_best_of_n_progress(notif, app),
         "next-code/token_usage" => handle_next_code_token_usage(notif, app),
         "next-code/provider_name" => handle_next_code_provider_name(notif, app),
         "next-code/memory_info" => handle_next_code_memory_info(notif, app),
@@ -882,6 +883,33 @@ fn handle_next_code_token_usage(notif: &acp::ExtNotification, app: &mut AppView)
             }
         }
     }
+    is_active
+}
+
+/// Handle `x.ai/best_of_n/progress` — live candidate cards during a BoN run.
+fn handle_best_of_n_progress(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
+    use crate::views::best_of_n_view::{BestOfNProgressNotification, apply_progress};
+
+    let Ok(parsed) = serde_json::from_str::<BestOfNProgressNotification>(notif.params.get()) else {
+        tracing::warn!("Failed to parse x.ai/best_of_n/progress");
+        return false;
+    };
+    let id = if let Some(session_id) = parsed.session_id.as_deref() {
+        match interaction_target_agent(app, session_id) {
+            Some(id) => id,
+            None => return false,
+        }
+    } else {
+        match app.active_view {
+            ActiveView::Agent(id) => id,
+            _ => return false,
+        }
+    };
+    let is_active = is_matched_agent_active(app, id);
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return false;
+    };
+    apply_progress(agent, parsed.payload);
     is_active
 }
 

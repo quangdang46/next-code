@@ -352,6 +352,7 @@ next-code-secrets = { path = "crates/next-code-secrets" }
 next-code-task-types = { path = "crates/next-code-task-types" }
 next-code-tool-core = { path = "crates/next-code-tool-core" }
 next-code-tool-types = { path = "crates/next-code-tool-types" }
+next-code-best-of-n = { path = "crates/next-code-best-of-n" }
 next-code-side-panel-types = { path = "crates/next-code-side-panel-types" }
 next-code-experiment-flags = { path = "crates/next-code-experiment-flags" }
 

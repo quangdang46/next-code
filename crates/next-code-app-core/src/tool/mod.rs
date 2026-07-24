@@ -75,7 +75,8 @@ use tokio::sync::RwLock;
 
 pub(crate) use next_code_tool_core::intent_schema_property;
 pub use next_code_tool_core::{
-    AskUserQuestionInputRequest, StdinInputRequest, Tool, ToolContext, ToolExecutionMode,
+    AskUserQuestionInputRequest, BestOfNPickInputRequest, StdinInputRequest, Tool, ToolContext,
+    ToolExecutionMode,
 };
 pub use next_code_tool_types::{ToolImage, ToolOutput};
 pub(crate) use session_search::spawn_recent_index_warmup;

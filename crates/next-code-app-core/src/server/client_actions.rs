@@ -322,6 +322,7 @@ pub(super) fn handle_run_subagent(
             working_dir,
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            best_of_n_pick_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
             best_of_n_run_id: None,
@@ -1094,6 +1095,26 @@ pub(super) async fn handle_ask_user_question_response(
     client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
 ) {
     if let Some(tx) = ask_responses.lock().await.remove(&request_id) {
+        let payload = match error {
+            Some(err) => Err(err),
+            None => Ok(response),
+        };
+        let _ = tx.send(payload);
+    }
+    let _ = client_event_tx.send(ServerEvent::Done { id });
+}
+
+pub(super) async fn handle_best_of_n_pick_response(
+    id: u64,
+    request_id: String,
+    response: serde_json::Value,
+    error: Option<String>,
+    bon_responses: &Arc<
+        Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>>>,
+    >,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+) {
+    if let Some(tx) = bon_responses.lock().await.remove(&request_id) {
         let payload = match error {
             Some(err) => Err(err),
             None => Ok(response),

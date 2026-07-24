@@ -104,45 +104,11 @@ impl Agent {
             cfg.mode.as_str()
         ));
 
-        // show mode: still run auto-select for now, but label the result so the
-        // user knows interactive picker is not implemented yet.
-        let show_note = if matches!(cfg.mode, next_code_best_of_n::BestOfNMode::Show) {
-            "\n(Note: mode=show picker UI is not implemented yet; auto-applied best candidate.)\n"
-        } else {
-            ""
-        };
-
+        // show mode: Face picker selects winner (or cancel); auto is silent apply.
         match crate::agent::best_of_n_orchestrator::run_best_of_n(self, user_message, &[]).await {
-            Ok(result) => {
-                let winner = result
-                    .candidates
-                    .get(result.winner_index)
-                    .map(|c| c.strategy.label.as_str())
-                    .unwrap_or("unknown");
-                let files = if result.files_applied.is_empty() {
-                    "  (none)".to_string()
-                } else {
-                    result
-                        .files_applied
-                        .iter()
-                        .map(|f| format!("  - {f}"))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                };
-                Ok(Some(format!(
-                    "BEST-OF-N MODE ENABLED!\n\
-                     {show_note}\
-                     Candidates: {}\n\
-                     Winner: #{} ({})\n\
-                     Reason: {}\n\
-                     Files applied:\n{}",
-                    result.candidates.len(),
-                    result.winner_index,
-                    winner,
-                    result.selection_reason,
-                    files,
-                )))
-            }
+            Ok(result) => Ok(Some(
+                crate::agent::best_of_n_orchestrator::format_run_summary(&result),
+            )),
             Err(e) => {
                 crate::logging::warn(&format!("[best-of-n] auto-run failed: {e}"));
                 // Fall through to normal turn on failure.
@@ -185,30 +151,9 @@ impl Agent {
         )
         .await
         {
-            Ok(r) => {
-                let winner = r
-                    .candidates
-                    .get(r.winner_index)
-                    .map(|c| c.strategy.label.as_str())
-                    .unwrap_or("?");
-                let files = if r.files_applied.is_empty() {
-                    "  (none)".to_string()
-                } else {
-                    r.files_applied
-                        .iter()
-                        .map(|f| format!("  - {f}"))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                };
-                Ok(Some(format!(
-                    "BEST-OF-N MODE ENABLED!\nCandidates: {}\nWinner: #{} ({})\nReason: {}\nFiles:\n{}",
-                    r.candidates.len(),
-                    r.winner_index,
-                    winner,
-                    r.selection_reason,
-                    files,
-                )))
-            }
+            Ok(r) => Ok(Some(
+                crate::agent::best_of_n_orchestrator::format_run_summary(&r),
+            )),
             Err(e) => {
                 crate::logging::warn(&format!("[best-of-n] auto-run streaming failed: {e}"));
                 Ok(None)
@@ -731,6 +676,14 @@ impl Agent {
         self.ask_user_question_tx = Some(tx);
     }
 
+    /// Set the Best-of-N pick channel for Face ACP reverse requests (`mode=show`).
+    pub fn set_best_of_n_pick_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::BestOfNPickInputRequest>,
+    ) {
+        self.best_of_n_pick_tx = Some(tx);
+    }
+
     pub(super) async fn tool_definitions(&mut self) -> Vec<ToolDefinition> {
         if self.session.is_canary {
             self.registry.register_selfdev_tools().await;
@@ -873,6 +826,7 @@ impl Agent {
             working_dir: self.working_dir().map(PathBuf::from),
             stdin_request_tx: self.stdin_request_tx.clone(),
             ask_user_question_tx: self.ask_user_question_tx.clone(),
+            best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             execution_mode: ToolExecutionMode::Direct,
             best_of_n_run_id: self.best_of_n_run_id.clone(),
