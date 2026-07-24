@@ -219,7 +219,8 @@ mod tests {
 
     #[tokio::test]
     async fn accepted_path_formats_answers() {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<crate::tool::AskUserQuestionInputRequest>();
         let tool = AskUserQuestionTool::new();
         let questions = sample_questions();
         let input = json!({ "questions": questions });
@@ -252,7 +253,8 @@ mod tests {
 
     #[tokio::test]
     async fn cancelled_path_is_not_tool_error() {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<crate::tool::AskUserQuestionInputRequest>();
         let tool = AskUserQuestionTool::new();
         let input = json!({ "questions": sample_questions() });
 

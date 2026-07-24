@@ -2248,7 +2248,10 @@ fn is_goal_tool(tc: &acp::ToolCall) -> bool {
 /// SubagentSpawned notification) provides better visibility. Covers the
 /// `task` / `Task` / `spawn_subagent` ids and Task-family variant tags.
 fn is_task_tool(tc: &acp::ToolCall) -> bool {
-    matches!(tc.title.as_str(), "task" | "Task" | "spawn_subagent")
+    matches!(
+        tc.title.as_str(),
+        "task" | "Task" | "spawn_subagent" | "Agent"
+    )
         || is_task_variant(extract_variant(tc))
 }
 /// Check if a tool call is a scheduler tool (scheduler_create/delete/list).
