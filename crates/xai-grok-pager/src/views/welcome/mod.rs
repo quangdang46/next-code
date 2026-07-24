@@ -1530,10 +1530,10 @@ fn render_welcome_authenticating(
 
     match mode {
         AuthMode::Loopback => {
-            // Manual token paste: show copy prompt + input box
-            let h_pad: u16 = content_area.width / 6;
-            let inner_width = content_area.width.saturating_sub(h_pad * 2).max(1);
-
+            // OpenCode DialogPrompt parity: compact centered overlay
+            // (`.tmp-research-plugins/opencode/packages/tui/src/ui/dialog.tsx`
+            // medium width = 60; DialogPrompt title + field + hints), not the
+            // fullscreen logo + full-width paste chrome.
             if show_raw_url {
                 return render_raw_url_mode(
                     content_area,
@@ -1544,91 +1544,15 @@ fn render_welcome_authenticating(
                     auth_url,
                 );
             }
-
-            let msg_height = if auth_url.is_some() {
-                let header_rows = (AUTH_HEADER.len() as u16).div_ceil(inner_width);
-                header_rows + auth_copy_block_rows(inner_width)
-            } else {
-                1u16
-            };
-            let [_, logo_area, _, msg_area, _, prompt_area, _, hint_area, _] = Layout::vertical([
-                Constraint::Length(top_pad),
-                Constraint::Length(logo_line_count),
-                Constraint::Length(1),          // gap
-                Constraint::Length(msg_height), // instruction + copy prompt
-                Constraint::Min(1),             // gap
-                Constraint::Length(5),          // prompt box
-                Constraint::Length(1),          // gap
-                Constraint::Length(1),          // hints
-                Constraint::Min(0),
-            ])
-            .areas(content_area);
-
-            render_logo(logo_area, buf, theme, content_area.height);
-
-            // Instruction text
-            let mut lines: Vec<Line> = Vec::new();
-            if auth_url.is_some() {
-                lines.push(
-                    Line::from(Span::styled(
-                        AUTH_HEADER,
-                        Style::default().fg(theme.gray_bright),
-                    ))
-                    .alignment(Alignment::Center),
-                );
-                push_auth_copy_block(&mut lines, theme, clipboard_delivery);
-            } else {
-                lines.push(
-                    Line::from(Span::styled(
-                        "Waiting for auth URL...",
-                        Style::default().fg(theme.gray),
-                    ))
-                    .alignment(Alignment::Center),
-                );
-            }
-            Paragraph::new(lines)
-                .wrap(Wrap { trim: false })
-                .block(Block::default().padding(Padding::horizontal(h_pad)))
-                .render(msg_area, buf);
-
-            let (click_rect, fallback_rect) = if auth_url.is_some() {
-                auth_hit_rects(msg_area, h_pad, inner_width, AUTH_HEADER, 0)
-            } else {
-                (None, None)
-            };
-
-            // Prompt box with token input
-            let prompt_width = content_area.width;
-            let [_, prompt_centered, _] = Layout::horizontal([
-                Constraint::Min(0),
-                Constraint::Length(prompt_width),
-                Constraint::Min(0),
-            ])
-            .flex(Flex::Center)
-            .areas(prompt_area);
-            render_auth_input_box(
-                prompt_centered,
+            render_loopback_paste_dialog(
+                content_area,
                 buf,
                 theme,
+                auth_url,
                 auth_code_input,
                 auth_code_cursor_byte,
-            );
-
-            // Hints
-            let mut hint_spans = vec![
-                Span::styled(
-                    "enter",
-                    Style::default()
-                        .fg(theme.accent_user)
-                        .add_modifier(Modifier::BOLD),
-                ),
-                Span::styled("  submit    ", Style::default().fg(theme.gray)),
-            ];
-            hint_spans.extend(quit_hint_spans(theme));
-            let hints = Line::from(hint_spans).alignment(Alignment::Center);
-            Paragraph::new(hints).render(hint_area, buf);
-
-            (click_rect, fallback_rect)
+                clipboard_delivery,
+            )
         }
 
         AuthMode::Command => render_browser_status_arm(
@@ -2643,6 +2567,199 @@ pub(crate) fn render_session_picker(
         &config,
         ctx.loading,
     )
+}
+
+/// OpenCode `Dialog` medium width (see dialog.tsx `return 60`).
+const LOOPBACK_DIALOG_WIDTH: u16 = 60;
+/// Title + desc + URL + input(3) + hints — compact like DialogPrompt.
+const LOOPBACK_DIALOG_HEIGHT: u16 = 11;
+
+/// Title for loopback paste — mirrors OpenCode `ApiMethod` / `CodeMethod`
+/// placeholders in `dialog-provider.tsx` (`"API key"` vs `"Authorization code"`).
+fn loopback_paste_title(auth_url: Option<&str>) -> &'static str {
+    match auth_url {
+        Some(u)
+            if u.contains("/oauth")
+                || u.contains("authorize")
+                || u.contains("auth/callback")
+                || u.contains("openid") =>
+        {
+            "Authorization code"
+        }
+        Some(_) => "API key",
+        None => "Paste credential",
+    }
+}
+
+/// Compact centered paste dialog (OpenCode DialogPrompt layout parity).
+///
+/// Dims the full area, then paints a ~60-col panel with title, short help,
+/// optional setup/auth URL, single-line input, and enter/esc hints — not the
+/// fullscreen welcome logo chrome.
+fn render_loopback_paste_dialog(
+    content_area: Rect,
+    buf: &mut Buffer,
+    theme: &Theme,
+    auth_url: Option<&str>,
+    auth_code_input: &str,
+    auth_code_cursor_byte: usize,
+    clipboard_delivery: Option<crate::clipboard::ClipboardDelivery>,
+) -> (Option<Rect>, Option<Rect>) {
+    // Soft dim backdrop (OpenCode Dialog uses RGBA(0,0,0,150) over the terminal).
+    let dim = Style::default().fg(theme.gray_dim).bg(theme.bg_base);
+    for y in content_area.y..content_area.y.saturating_add(content_area.height) {
+        for x in content_area.x..content_area.x.saturating_add(content_area.width) {
+            if let Some(cell) = buf.cell_mut((x, y)) {
+                cell.set_style(dim);
+            }
+        }
+    }
+
+    let dialog_w = LOOPBACK_DIALOG_WIDTH
+        .min(content_area.width.saturating_sub(2))
+        .max(24.min(content_area.width));
+    let dialog_h = LOOPBACK_DIALOG_HEIGHT.min(content_area.height.max(1));
+
+    if content_area.width < 20 || content_area.height < 5 {
+        let hint = Line::from(Span::styled(
+            "[Esc] to cancel",
+            Style::default().fg(theme.gray_dim),
+        ));
+        hint.render(
+            Rect::new(content_area.x, content_area.y, content_area.width.min(16), 1),
+            buf,
+        );
+        return (None, None);
+    }
+
+    let [_, dialog_h_band, _] = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(dialog_w),
+        Constraint::Min(0),
+    ])
+    .flex(Flex::Center)
+    .areas(content_area);
+
+    // OpenCode pads ~height/4 from the top; Flex::Center is close enough and
+    // stays usable on short terminals.
+    let [_, dialog, _] = Layout::vertical([
+        Constraint::Min(0),
+        Constraint::Length(dialog_h),
+        Constraint::Min(0),
+    ])
+    .flex(Flex::Center)
+    .areas(dialog_h_band);
+
+    let panel = Block::default()
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(theme.gray_dim).bg(theme.bg_dark))
+        .style(Style::default().bg(theme.bg_dark))
+        .title(Span::styled(
+            format!(" {} ", loopback_paste_title(auth_url)),
+            Style::default()
+                .fg(theme.text_primary)
+                .add_modifier(Modifier::BOLD)
+                .bg(theme.bg_dark),
+        ));
+    let inner = panel.inner(dialog);
+    panel.render(dialog, buf);
+
+    let [desc_area, url_area, input_area, hints_area] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(2),
+        Constraint::Length(3),
+        Constraint::Min(1),
+    ])
+    .areas(inner);
+    let desc = if auth_url.is_some() {
+        match loopback_paste_title(auth_url) {
+            "API key" => "Paste your API key, then press enter.",
+            _ => "Paste the authorization code, then press enter.",
+        }
+    } else {
+        "Waiting for auth URL..."
+    };
+    Paragraph::new(Line::from(Span::styled(
+        desc,
+        Style::default().fg(theme.gray_bright),
+    )))
+    .wrap(Wrap { trim: true })
+    .render(desc_area, buf);
+
+    let mut copy_rect = None;
+    let mut fallback_rect = None;
+    if let Some(url) = auth_url {
+        let url_display = if url.width() as u16 > url_area.width.saturating_sub(2) {
+            let keep = url_area.width.saturating_sub(3) as usize;
+            let mut cut = String::new();
+            for g in url.graphemes(true) {
+                if cut.width() + g.width() > keep {
+                    break;
+                }
+                cut.push_str(g);
+            }
+            format!("{cut}…")
+        } else {
+            url.to_string()
+        };
+        let url_line = Line::from(Span::styled(
+            url_display,
+            Style::default()
+                .fg(theme.accent_user)
+                .add_modifier(Modifier::UNDERLINED),
+        ));
+        Paragraph::new(url_line).render(url_area, buf);
+        copy_rect = Some(url_area);
+
+        // Feedback / fallback on the second URL row when height allows.
+        if url_area.height >= 2 {
+            let fb_y = url_area.y + 1;
+            let fb_text = match clipboard_delivery {
+                Some(crate::clipboard::ClipboardDelivery::Confirmed) => "copied!",
+                Some(crate::clipboard::ClipboardDelivery::Unverified) => "copy sent—verify paste",
+                Some(crate::clipboard::ClipboardDelivery::Failed) => "copy failed",
+                None => "click URL to copy · ctrl+q show full URL",
+            };
+            let fb = Line::from(Span::styled(fb_text, Style::default().fg(theme.gray)));
+            fb.render(Rect::new(url_area.x, fb_y, url_area.width, 1), buf);
+            fallback_rect = Some(Rect::new(url_area.x, fb_y, url_area.width, 1));
+        }
+    } else {
+        Paragraph::new(Line::from(Span::styled(
+            "…",
+            Style::default().fg(theme.gray),
+        )))
+        .render(url_area, buf);
+    }
+
+    render_auth_input_box(
+        input_area,
+        buf,
+        theme,
+        auth_code_input,
+        auth_code_cursor_byte,
+    );
+
+    let mut hint_spans = vec![
+        Span::styled(
+            "enter",
+            Style::default()
+                .fg(theme.accent_user)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" submit   ", Style::default().fg(theme.gray)),
+        Span::styled(
+            "esc",
+            Style::default()
+                .fg(theme.accent_user)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" cancel   ", Style::default().fg(theme.gray)),
+    ];
+    hint_spans.extend(quit_hint_spans(theme));
+    Paragraph::new(Line::from(hint_spans)).render(hints_area, buf);
+
+    (copy_rect, fallback_rect)
 }
 
 /// Render the auth token input box (loopback mode).
@@ -3825,6 +3942,77 @@ mod tests {
         assert_eq!(extract_user_code("https://x.ai/oauth2/device"), None);
         assert_eq!(extract_user_code("https://x.ai/d?user_code="), None);
         assert_eq!(extract_user_code("https://x.ai/d?user_code=AB%20CD"), None);
+    }
+
+    #[test]
+    fn loopback_auth_arm_renders_compact_dialog_not_fullscreen_logo() {
+        let area = Rect::new(0, 0, 100, 40);
+        let mut buf = Buffer::empty(area);
+        let theme = Theme::current();
+        let url = "https://opencode.ai/go";
+
+        let (copy_rect, _) = render_welcome_authenticating(
+            area,
+            &mut buf,
+            &theme,
+            logo_line_count(area.height),
+            Some(url),
+            AuthMode::Loopback,
+            "",
+            0,
+            None,
+            false,
+        );
+
+        let text = buffer_text(&buf);
+        assert!(
+            text.contains("API key"),
+            "loopback API setup URL must title the dialog 'API key', got:\n{text}"
+        );
+        assert!(
+            text.contains("Paste your API key"),
+            "compact dialog must show short paste instructions, got:\n{text}"
+        );
+        assert!(
+            text.contains("opencode.ai/go") || text.contains("opencode.ai"),
+            "dialog must show setup URL, got:\n{text}"
+        );
+        assert!(
+            text.contains("Paste your token here") || text.contains("submit"),
+            "dialog must show input/submit affordance, got:\n{text}"
+        );
+        // Must NOT use the old fullscreen "browser will open" chrome.
+        assert!(
+            !text.contains("A browser window will open for authentication"),
+            "loopback paste must not use fullscreen OAuth header, got:\n{text}"
+        );
+        assert!(
+            copy_rect.is_some(),
+            "URL row should remain clickable for copy"
+        );
+
+        // Dialog is compact: content should not fill the full 40-row area the way
+        // the old logo + large vertical layout did. Spot-check that top rows are
+        // mostly empty/dim (backdrop) rather than logo art.
+        let top_row: String = (0..area.width)
+            .map(|x| buf[(x, area.y)].symbol().to_string())
+            .collect();
+        assert!(
+            !top_row.contains("nextcode") && !top_row.contains("GROK"),
+            "compact dialog must not paint the welcome logo at the top row"
+        );
+    }
+
+    #[test]
+    fn loopback_oauth_url_titles_authorization_code() {
+        assert_eq!(
+            loopback_paste_title(Some("https://accounts.google.com/o/oauth2/v2/auth?x=1")),
+            "Authorization code"
+        );
+        assert_eq!(
+            loopback_paste_title(Some("https://opencode.ai/go")),
+            "API key"
+        );
     }
 
     #[test]

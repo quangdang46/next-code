@@ -305,6 +305,9 @@ pub(super) fn dispatch_submit_auth_code(app: &mut AppView, code: String) -> Vec<
         _ => return vec![],
     };
 
+    // Drop any leftover input so a follow-up Enter is a no-op even if the
+    // welcome handler did not clear (e.g. Action dispatched from elsewhere).
+    app.auth_code_input.reset();
     vec![Effect::SubmitAuthCode { request_seq, code }]
 }
 

@@ -3352,6 +3352,10 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
                 if key!(Enter).matches(key) {
                     let trimmed = ctx.auth_code_input.text().trim().to_string();
                     if !trimmed.is_empty() {
+                        // Clear immediately so Enter repeat / paste-trailing-newline
+                        // cannot dispatch a second SubmitAuthCode while the first
+                        // oneshot is already consumed (daemon would otherwise race).
+                        ctx.auth_code_input.reset();
                         return InputOutcome::Action(Action::SubmitAuthCode(trimmed));
                     }
                     return InputOutcome::Unchanged;
@@ -8838,6 +8842,28 @@ pub(crate) mod tests {
             }
             other => panic!("expected SubmitAuthCode, got {:?}", other),
         }
+        // Cleared so Enter-repeat / paste-trailing-newline cannot double-submit.
+        assert!(app.auth_code_input.text().is_empty());
+        let second = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(
+            matches!(second, InputOutcome::Unchanged),
+            "second Enter must be a no-op after submit cleared the input"
+        );
+    }
+
+    #[test]
+    fn authenticating_loopback_paste_does_not_submit() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Authenticating {
+            request_seq: 1,
+            handle: None,
+            auth_url: Some("https://opencode.ai/go".into()),
+            mode: AuthMode::Loopback,
+        };
+        let outcome = app.handle_input(&Event::Paste("sk-test-key\n".into()));
+        assert!(matches!(outcome, InputOutcome::Changed));
+        assert_eq!(app.auth_code_input.text(), "sk-test-key");
+        // Paste alone must not emit SubmitAuthCode (Enter submits).
     }
     #[test]
     fn moved_with_button_held_promotes_pending_scrollback_drag() {
