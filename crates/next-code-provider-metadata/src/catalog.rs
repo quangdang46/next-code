@@ -9,7 +9,8 @@ pub const OPENCODE_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
     api_base: "https://opencode.ai/zen/v1",
     api_key_env: "OPENCODE_API_KEY",
     env_file: "opencode.env",
-    setup_url: "https://github.com/quangdang46/next-code#openai-compatible-providers",
+    // OpenCode DialogProvider ApiMethod link (Zen).
+    setup_url: "https://opencode.ai/zen",
     default_model: Some("minimax-m2.7"),
     requires_api_key: true,
 };
@@ -20,8 +21,33 @@ pub const OPENCODE_GO_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile
     api_base: "https://opencode.ai/zen/go/v1",
     api_key_env: "OPENCODE_GO_API_KEY",
     env_file: "opencode-go.env",
-    setup_url: "https://github.com/quangdang46/next-code#openai-compatible-providers",
+    // OpenCode DialogProvider ApiMethod link (Go subscription).
+    setup_url: "https://opencode.ai/go",
     default_model: Some("kimi-k2.5"),
+    requires_api_key: true,
+};
+
+/// OpenCode "Other" / models.dev `stepfun-ai` (Step Plan China endpoint).
+pub const STEPFUN_STEP_PLAN_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
+    id: "stepfun-ai",
+    display_name: "StepFun Step Plan (China)",
+    api_base: "https://api.stepfun.ai/step_plan/v1",
+    api_key_env: "STEPFUN_API_KEY",
+    env_file: "stepfun-ai.env",
+    setup_url: "https://platform.stepfun.ai/docs/en/step-plan/integrations/open-code",
+    default_model: Some("step-3.7-flash"),
+    requires_api_key: true,
+};
+
+/// OpenCode "Other" / models.dev `mixlayer`.
+pub const MIXLAYER_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfile {
+    id: "mixlayer",
+    display_name: "Mixlayer",
+    api_base: "https://models.mixlayer.ai/v1",
+    api_key_env: "MIXLAYER_API_KEY",
+    env_file: "mixlayer.env",
+    setup_url: "https://mixlayer.ai",
+    default_model: None,
     requires_api_key: true,
 };
 
@@ -419,9 +445,11 @@ pub const OPENAI_COMPAT_PROFILE: OpenAiCompatibleProfile = OpenAiCompatibleProfi
     requires_api_key: true,
 };
 
-pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 36] = [
+pub(crate) const OPENAI_COMPAT_PROFILES: [OpenAiCompatibleProfile; 38] = [
     OPENCODE_PROFILE,
     OPENCODE_GO_PROFILE,
+    STEPFUN_STEP_PLAN_PROFILE,
+    MIXLAYER_PROFILE,
     ZAI_PROFILE,
     KIMI_PROFILE,
     CHUTES_PROFILE,
@@ -574,7 +602,7 @@ pub const OPENCODE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescri
     auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
     auth_status_method: "API key",
     aliases: &["opencode-zen", "zen"],
-    menu_detail: "API key",
+    menu_detail: "(Recommended)",
     recommended: false,
     target: LoginProviderTarget::OpenAiCompatible(OPENCODE_PROFILE),
     order: LoginProviderSurfaceOrder::new(Some(5), Some(4), Some(5), Some(4), Some(4)),
@@ -587,10 +615,36 @@ pub const OPENCODE_GO_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDes
     auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
     auth_status_method: "API key",
     aliases: &["opencodego"],
-    menu_detail: "API key",
+    menu_detail: "Low cost subscription for everyone",
     recommended: false,
     target: LoginProviderTarget::OpenAiCompatible(OPENCODE_GO_PROFILE),
     order: LoginProviderSurfaceOrder::new(Some(6), Some(5), Some(6), Some(5), Some(5)),
+};
+
+pub const STEPFUN_STEP_PLAN_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+    id: "stepfun-ai",
+    display_name: "StepFun Step Plan (China)",
+    auth_kind: LoginProviderAuthKind::ApiKey,
+    auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
+    auth_status_method: "API key",
+    aliases: &["stepfun", "step-plan", "stepfun-step-plan"],
+    menu_detail: "API key",
+    recommended: false,
+    target: LoginProviderTarget::OpenAiCompatible(STEPFUN_STEP_PLAN_PROFILE),
+    order: LoginProviderSurfaceOrder::new(Some(39), Some(39), Some(39), Some(39), Some(39)),
+};
+
+pub const MIXLAYER_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
+    id: "mixlayer",
+    display_name: "Mixlayer",
+    auth_kind: LoginProviderAuthKind::ApiKey,
+    auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
+    auth_status_method: "API key",
+    aliases: &[],
+    menu_detail: "API key",
+    recommended: false,
+    target: LoginProviderTarget::OpenAiCompatible(MIXLAYER_PROFILE),
+    order: LoginProviderSurfaceOrder::new(Some(40), Some(40), Some(40), Some(40), Some(40)),
 };
 
 pub const ZAI_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescriptor {
@@ -995,7 +1049,7 @@ pub const COPILOT_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescrip
     auth_kind: LoginProviderAuthKind::DeviceCode,
     auth_state_key: LoginProviderAuthStateKey::Copilot,
     auth_status_method: "device code",
-    aliases: &[],
+    aliases: &["github-copilot", "github_copilot"],
     menu_detail: "GitHub device flow",
     recommended: false,
     target: LoginProviderTarget::Copilot,
@@ -1072,7 +1126,7 @@ pub const GOOGLE_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDescript
     order: LoginProviderSurfaceOrder::new(Some(13), None, None, None, None),
 };
 
-pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 46] = [
+pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 48] = [
     AUTO_IMPORT_LOGIN_PROVIDER,
     CLAUDE_LOGIN_PROVIDER,
     ANTHROPIC_API_LOGIN_PROVIDER,
@@ -1083,6 +1137,8 @@ pub(crate) const LOGIN_PROVIDERS: [LoginProviderDescriptor; 46] = [
     AZURE_LOGIN_PROVIDER,
     OPENCODE_LOGIN_PROVIDER,
     OPENCODE_GO_LOGIN_PROVIDER,
+    STEPFUN_STEP_PLAN_LOGIN_PROVIDER,
+    MIXLAYER_LOGIN_PROVIDER,
     ZAI_LOGIN_PROVIDER,
     KIMI_LOGIN_PROVIDER,
     CHUTES_LOGIN_PROVIDER,

@@ -6,8 +6,8 @@ pub mod unified_auth;
 pub use unified_auth::{
     MigrateReport, auth_json_path, canonical_provider_id_for_env_key, known_legacy_api_key_files,
     load_api_key_from_unified_auth, migrate_all_known_legacy_api_keys,
-    migrate_legacy_env_file_into_unified, provider_ids_for_env_key, save_api_key_to_unified_auth,
-    unified_auth_has_api_key,
+    migrate_legacy_env_file_into_unified, provider_ids_for_env_key, save_api_key_for_provider_id,
+    save_api_key_to_unified_auth, unified_auth_has_api_key,
 };
 
 /// Fallback resolvers consulted by [`load_api_key_from_env_or_config`] after the

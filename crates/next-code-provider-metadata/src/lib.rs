@@ -1,3 +1,12 @@
+mod catalog;
+mod connect_catalog;
+
+pub use connect_catalog::{
+    CUSTOM_PROVIDER_SENTINEL, ModelsDevProvider, POPULAR_MODELS_DEV_IDS, face_auth_id_for_models_dev,
+    face_auth_id_needs_method_picker, is_valid_custom_provider_id, models_dev_connect_providers,
+    normalize_custom_provider_id, parse_models_dev_providers_json,
+};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoginProviderAuthKind {
     OAuth,
@@ -137,8 +146,6 @@ pub struct ResolvedOpenAiCompatibleProfile {
     pub default_model: Option<String>,
     pub requires_api_key: bool,
 }
-
-mod catalog;
 
 pub use catalog::*;
 use catalog::{LOGIN_PROVIDERS, OPENAI_COMPAT_PROFILES};

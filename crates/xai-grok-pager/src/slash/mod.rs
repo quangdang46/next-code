@@ -51,11 +51,11 @@ pub struct SuggestionRow {
 impl SuggestionRow {
     fn from_command(trigger: &CommandTrigger) -> Self {
         let mut insert_text = trigger.display.clone();
-        // `/model` opens the centered Select-model ArgPicker on Enter. A
-        // trailing space would "chain" into the inline slash arg dropdown
-        // (provider headers like "OpenCode Go" + ghost `<model> [effort]`),
-        // which steals that path. Typed `/model <name>` still works when the
-        // user adds a space themselves.
+        // Centered-picker commands (`/model`, `/connect`, embed `/login`) open
+        // an ArgPicker on Enter. A trailing space would "chain" into the inline
+        // slash arg dropdown (ghost placeholder / first arg row), which steals
+        // that path. Typed `/model <name>` / `/connect <id>` still work when
+        // the user adds a space themselves.
         if trigger.takes_args && !command_opens_centered_arg_picker(&trigger.canonical) {
             insert_text.push(' ');
         }
@@ -496,7 +496,7 @@ impl SlashController {
         } else if input.args_range.is_some() {
             let matches = self.arg_suggestions_for_input(text, &input, models);
             snapshot.selected = Self::carry_selection(&previous, &matches, false, &input);
-            // Bare `/model ` opens the centered Select-model palette on Enter —
+            // Bare `/model ` / `/connect ` open a centered ArgPicker on Enter —
             // do not steal that path with the inline arg dropdown + ghost.
             let suppress_empty_inline = args_text_empty
                 && command_opens_centered_arg_picker(input.query.as_str());
@@ -1215,10 +1215,26 @@ pub fn parse_invocation(line: &str) -> Option<SlashInvocation<'_>> {
 // ---------------------------------------------------------------------------
 
 /// Commands whose bare form opens a centered ArgPicker (not the inline
-/// slash arg dropdown). Keep in sync with `ModelCommand` / palette special
-/// cases (`"model" | "m"`).
+/// slash arg dropdown). Keep in sync with Enter special-cases in
+/// `agent_view/prompt.rs` and `dashboard/state.rs`.
 pub(crate) fn command_opens_centered_arg_picker(name_or_alias: &str) -> bool {
-    matches!(name_or_alias, "model" | "m")
+    centered_arg_picker_action(name_or_alias).is_some()
+}
+
+/// Action to open when Enter is pressed on a bare centered-picker command
+/// (`/model`, `/connect`, embed `/login`) with empty args.
+pub(crate) fn centered_arg_picker_action(
+    name_or_alias: &str,
+) -> Option<crate::app::actions::Action> {
+    use crate::app::actions::Action;
+    match name_or_alias {
+        "model" | "m" => Some(Action::OpenModelPicker),
+        "connect" => Some(Action::OpenConnectPicker),
+        "login" if crate::product_welcome::is_nextcode_embed() => {
+            Some(Action::OpenConnectPicker)
+        }
+        _ => None,
+    }
 }
 
 /// Check if a slash command line is complete (ready to execute on Enter).
@@ -1498,6 +1514,49 @@ mod tests {
         assert!(is_command_complete("/model", &reg));
         assert!(is_command_complete("/model ", &reg));
         assert!(is_command_complete("/model grok-4", &reg));
+    }
+
+    #[test]
+    fn connect_is_centered_picker_command() {
+        assert!(command_opens_centered_arg_picker("connect"));
+        assert!(matches!(
+            centered_arg_picker_action("connect"),
+            Some(crate::app::actions::Action::OpenConnectPicker)
+        ));
+        assert!(matches!(
+            centered_arg_picker_action("model"),
+            Some(crate::app::actions::Action::OpenModelPicker)
+        ));
+    }
+
+    #[test]
+    fn connect_command_row_has_no_trailing_space() {
+        // Regression: trailing space chained into inline `provider` ghost and
+        // stole Enter on bare `/connect`.
+        let mut ctrl = SlashController::with_builtins(std::path::PathBuf::from("."));
+        let state = SlashState::default();
+        let models = ModelState::default();
+        let text = "/connect";
+        ctrl.refresh(&state, text, text.len(), &models);
+        let snap = state.snapshot();
+        let row = snap
+            .matches
+            .iter()
+            .find(|r| r.display == "/connect" || r.command_name() == "connect")
+            .expect("connect row");
+        assert!(
+            !row.insert_text.ends_with(' '),
+            "connect must not chain into inline args, got {:?}",
+            row.insert_text
+        );
+        // Bare `/connect ` suppresses the inline provider dump.
+        ctrl.refresh(&state, "/connect ", 9, &models);
+        let snap = state.snapshot();
+        assert!(
+            !snap.open || snap.matches.is_empty(),
+            "empty-args connect must not open inline arg dropdown"
+        );
+        assert!(snap.args_placeholder.is_none());
     }
 
     #[test]

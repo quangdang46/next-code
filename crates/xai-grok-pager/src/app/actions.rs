@@ -518,6 +518,8 @@ pub enum Action {
     SetScreenMode(String),
     /// Set `/btw` output surface (`inline` | `sidebar`). Live-applies to the next `/btw`.
     SetBtwOutputMode(String),
+    /// Persist `/btw` side-panel width (columns) after drag or `[`/`]` resize.
+    SetBtwSidebarWidth(u16),
     /// Set the voice capture mode (`toggle` | `hold`). SHELL-owned; persisted to
     /// `[ui].voice_capture_mode`. Takes effect for the next Ctrl+Space press.
     SetVoiceCaptureMode(String),
