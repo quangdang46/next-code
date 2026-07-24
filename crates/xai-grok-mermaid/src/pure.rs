@@ -1,14 +1,18 @@
-//! Pure-Rust engine: Mermaid source -> SVG via the vendored `mermaid-to-svg`
-//! (a dagre layout port), then [`crate::rasterize`] to PNG.
+//! Legacy Pure-Rust engine: Mermaid source -> SVG via the vendored
+//! `mermaid-to-svg` (a dagre layout port), then [`crate::rasterize`] to PNG.
+//!
+//! Enabled only with feature `legacy-mermaid-to-svg`. Default Face path is
+//! [`crate::MmdrEngine`].
 
 use mermaid_to_svg::{MermaidTheme as EngineTheme, render_mermaid_to_svg};
 
 use crate::{MermaidEngine, MermaidError, MermaidTheme, RenderParams, RenderedDiagram};
 
-/// The default, offline, pure-Rust engine.
+/// Legacy offline pure-Rust engine (`legacy-mermaid-to-svg` feature).
 ///
 /// Uses the vendored dagre-based layout engine to produce an SVG, then
 /// rasterizes it with the crate's hardened [`crate::rasterize`] pipeline.
+/// Prefer [`crate::MmdrEngine`] (the default) unless A/B testing dialects.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct PureRustEngine;
 

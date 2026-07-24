@@ -9,12 +9,14 @@
 //!
 //! # Pipeline
 //!
-//! 1. A [`MermaidEngine`] turns Mermaid source into an SVG and rasterizes it.
-//!    The default engine ([`PureRustEngine`]) uses the vendored, dagre-based
-//!    `mermaid-to-svg` for layout, then [`rasterize`].
-//! 2. [`rasterize`] converts SVG to PNG with `resvg`/`usvg`/`tiny-skia`,
-//!    configured with **no remote/file resolvers** and a **bundled font** so it
-//!    is safe over untrusted input and deterministic across machines.
+//! 1. A [`MermaidEngine`] turns Mermaid source into a PNG. The default engine
+//!    ([`MmdrEngine`]) calls `mermaid-rs-renderer`'s Face embed API
+//!    (`render_png_bytes` + `Theme::face_light` / `face_dark`, hardened
+//!    bundled-font raster, megapixel/axis caps).
+//! 2. Optional legacy [`PureRustEngine`] (feature `legacy-mermaid-to-svg`) uses
+//!    vendored `mermaid-to-svg` + [`rasterize`] for A/B / dialect parity work.
+//! 3. [`rasterize`] remains available for SVG→PNG (Mmdc / legacy) with **no
+//!    remote/file resolvers** and a **bundled font**.
 //!
 //! # Untrusted input and crash isolation
 //!
@@ -45,13 +47,17 @@
 #![warn(missing_docs)]
 
 mod engine;
+mod mmdr;
 mod mmdc;
+#[cfg(feature = "legacy-mermaid-to-svg")]
 mod pure;
 mod raster;
 mod subprocess;
 
 pub use engine::{MermaidEngine, MermaidError, RenderLimits, render_checked};
+pub use mmdr::MmdrEngine;
 pub use mmdc::{MmdcEngine, detect_mmdc};
+#[cfg(feature = "legacy-mermaid-to-svg")]
 pub use pure::PureRustEngine;
 pub use raster::{MAX_OUTPUT_MEGAPIXELS, rasterize};
 pub use subprocess::{SubprocessError, run_with_timeout};
@@ -194,12 +200,12 @@ pub struct RenderedDiagram {
     pub height_px: u32,
 }
 
-/// Construct the default engine: the offline, pure-Rust [`PureRustEngine`].
+/// Construct the default engine: offline [`MmdrEngine`] (`mermaid-rs-renderer`).
 ///
-/// `mmdc` is never selected automatically — construct [`MmdcEngine`] explicitly
-/// to opt in.
+/// `mmdc` and legacy [`PureRustEngine`] (feature `legacy-mermaid-to-svg`) are
+/// never selected automatically — construct them explicitly to opt in.
 pub fn default_engine() -> Arc<dyn MermaidEngine> {
-    Arc::new(PureRustEngine::new())
+    Arc::new(MmdrEngine::new())
 }
 
 #[cfg(test)]
