@@ -185,6 +185,7 @@ mod tests {
                 id: None,
             }],
             multi_select: None,
+            header: None,
             id: None,
         }]
     }

@@ -150,6 +150,7 @@ fn open_fork_question(app: &mut AppView, directive: Option<String>) -> Vec<Effec
         id: None,
         options,
         multi_select: Some(false),
+    header: None,
     };
     let agent = app.agents.get_mut(&id).expect("agent present (re-borrow)");
     let stashed = agent.prompt.stash();

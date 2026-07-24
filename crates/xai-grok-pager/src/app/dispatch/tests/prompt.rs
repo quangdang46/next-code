@@ -2226,6 +2226,7 @@ fn submit_question_answers_cancel_clears_local_modal_and_restores_prompt() {
             })
             .collect(),
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     app.agents.get_mut(&id).unwrap().question_view = Some(

@@ -2449,16 +2449,20 @@ impl AgentView {
                 }
             }
             if let Some(ref qv) = self.question_view {
-                let render_result = crate::views::question_view::render_question_view(
+                let render_result = crate::views::question_view::render_question_view_with_hover(
                     buf,
                     question_area,
                     qv,
                     self.hovered_question_item,
+                    self.hovered_question_tab,
                     &theme,
                     prompt_focused,
                 );
                 self.question_scroll_region =
                     Some((render_result.options_start_y, render_result.options_end_y));
+                self.question_tab_chips = render_result.tab_chip_hits;
+            } else {
+                self.question_tab_chips.clear();
             }
             if is_input_mode && inline_prompt_h > 0 {
                 let row_y = question_area.y + question_area.height;

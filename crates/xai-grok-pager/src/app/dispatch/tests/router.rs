@@ -1420,6 +1420,7 @@ fn translate_local_submit_skipped_returns_changed_with_no_action() {
             id: None,
         }],
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let state = QuestionViewState::new(
@@ -1453,6 +1454,7 @@ fn translate_local_submit_no_selection_returns_changed_no_action() {
             })
             .collect(),
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let state = QuestionViewState::new(
@@ -1484,6 +1486,7 @@ fn translate_local_submit_out_of_range_index_returns_changed_no_action() {
             })
             .collect(),
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let mut state = QuestionViewState::new(
@@ -1517,6 +1520,7 @@ fn handle_ask_user_question_does_not_push_system_block_when_displaced_acp_modal(
             id: None,
         }],
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     app.agents.get_mut(&id).unwrap().question_view =

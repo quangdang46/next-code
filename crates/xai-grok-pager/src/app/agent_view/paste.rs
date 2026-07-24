@@ -1219,6 +1219,7 @@ pub(super) mod paste_key_tests {
                 : None, id : None, },
             ],
                 multi_select: Some(false),
+                header: None,
                 id: None,
             };
         let mut state = crate::views::question_view::QuestionViewState::new(
