@@ -83,6 +83,7 @@ async fn main() -> Result<()> {
         working_dir: Some(workspace.clone()),
         stdin_request_tx: None,
         ask_user_question_tx: None,
+            exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,

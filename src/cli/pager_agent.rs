@@ -2151,6 +2151,29 @@ impl acp::Agent for NextCodeFaceAgent {
                         .await;
                     }
                 }
+                ServerEvent::ExitPlanMode {
+                    request_id,
+                    session_id: plan_session_id,
+                    tool_call_id,
+                    plan_content,
+                } => {
+                    if let Err(err) = crate::cli::face_exit_plan::bridge_exit_plan_mode(
+                        &self.gateway,
+                        session.as_ref(),
+                        request_id,
+                        plan_session_id,
+                        tool_call_id,
+                        plan_content,
+                    )
+                    .await
+                    {
+                        self.emit_text(
+                            &session_id,
+                            format!("ExitPlanMode bridge error: {err}"),
+                        )
+                        .await;
+                    }
+                }
                 ServerEvent::Done { id } if id == prompt_id => {
                     // Refresh Plan in case compaction / other paths mutated todos
                     // without a `todo` ToolDone this turn.
@@ -2330,6 +2353,60 @@ impl acp::Agent for NextCodeFaceAgent {
             session.prompt_running.store(false, Ordering::SeqCst);
         }
         result
+    }
+
+    async fn set_session_mode(
+        &self,
+        args: acp::SetSessionModeRequest,
+    ) -> acp::Result<acp::SetSessionModeResponse> {
+        let session_id = args.session_id.to_string();
+        let mode_id = args.mode_id.0.as_ref().to_string();
+        let session = self.sessions.borrow().get(&session_id).cloned();
+        let Some(session) = session else {
+            return Err(
+                acp::Error::invalid_params().data(format!("Unknown session: {session_id}"))
+            );
+        };
+
+        let permission = match mode_id.as_str() {
+            "plan" => "plan",
+            "ask" => "ask",
+            // Face SessionMode::Default and any unknown → default permission mode
+            _ => "default",
+        };
+
+        let req_id = session.next_id();
+        session
+            .send(&Request::SetPermissionMode {
+                id: req_id,
+                mode: permission.to_string(),
+            })
+            .await
+            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+
+        // Wait for Done so daemon mode is applied before we confirm to Face.
+        loop {
+            match session.read_event().await {
+                Ok(ServerEvent::Done { id }) if id == req_id => break,
+                Ok(ServerEvent::Error { id, message, .. }) if id == req_id => {
+                    return Err(acp::Error::internal_error().data(message));
+                }
+                Ok(_) => continue,
+                Err(e) => return Err(acp::Error::internal_error().data(e.to_string())),
+            }
+        }
+
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                acp::SessionId::new(session_id),
+                acp::SessionUpdate::CurrentModeUpdate(acp::CurrentModeUpdate::new(
+                    acp::SessionModeId::new(mode_id),
+                )),
+            ))
+            .await;
+
+        Ok(acp::SetSessionModeResponse::new())
     }
 }
 

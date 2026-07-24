@@ -184,6 +184,7 @@ fn format_members_includes_status_and_detail() {
         working_dir: None,
         stdin_request_tx: None,
         ask_user_question_tx: None,
+            exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,

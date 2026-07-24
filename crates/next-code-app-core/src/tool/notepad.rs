@@ -377,6 +377,7 @@ mod tests {
             working_dir: Some(dir.to_path_buf()),
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            exit_plan_mode_tx: None,
             graceful_shutdown_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
             best_of_n_run_id: None,

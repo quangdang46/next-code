@@ -36,11 +36,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
-use dcg_core::{Decision, Effect, Engine, EngineConfig, Mode, Session, ToolCall};
+use dcg_core::{Decision, Effect, Engine, EngineConfig, Session, ToolCall};
 use next_code_agent_runtime::PermissionMode;
 use next_code_hooks::{DispatchConfig, HookContext, HookEvent, HookInputBuilder, HookRegistry};
 
 pub use crate::yolo_classifier::YoloClassifier;
+pub use dcg_core::Mode;
 
 /// Globally configured permission mode. Set once during CLI startup, read
 /// from every `SafetySystem::classify` call.

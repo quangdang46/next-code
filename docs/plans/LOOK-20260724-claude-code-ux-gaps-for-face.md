@@ -26,7 +26,7 @@ Top picks beyond #82–#86. “Why” is one line each.
 
 1. **Permission-mode cycle as first-class chrome (Shift+Tab / Alt+M)** — Claude cycles `default` ↔ `acceptEdits` ↔ `plan` ↔ `bypassPermissions` with visible mode in the prompt chrome (`src/types/permissions.ts`, `PromptInput` → `cyclePermissionMode`). Face has ask / always-approve / auto / `/plan`, but not Claude’s one-key cycle + `acceptEdits` “edits free, shell still asks” muscle memory.
 
-2. **Plan → execute gate (ExitPlanMode + plan artifact)** — Claude writes a plan file, `/plan` shows/edits it (`src/commands/plan/plan.tsx`), ExitPlanMode prompts before leaving plan; hooks can auto-approve that dialog ([hooks guide](https://code.claude.com/docs/en/hooks-guide)). Face `/plan` enters mode (`slash/commands/plan.rs`); ExitPlanMode review / restore-prePlanMode / “open in editor” still thin (also noted in `permission-improvement.md` Gap 6).
+2. **Plan → execute gate (ExitPlanMode + plan artifact)** — **Shipped** in `PLAN-20260724-face-plan-execute-gate.md` / this PR: ExitPlanMode bridge + PlanApprovalView gate, plan.md write exception under DCG Plan, prePlanMode stash/restore, `/plan open` editor. Session **`/diff`** review remains a follow-on.
 
 3. **Tool-specific permission cards** — Claude ships per-tool UIs (bash cwd/sandbox, file-edit diffs, etc. under `src/components/permissions/`). Face `permission_view` is generic Approve/Always/Reject — fine after ACP wire lands, still far from Claude’s contextual cards (`permission-improvement.md` Gap 1).
 
@@ -81,7 +81,7 @@ Top picks beyond #82–#86. “Why” is one line each.
 ## Suggested next 3 picks (after #82–#86 land)
 
 1. **Permission-mode cycle + `acceptEdits` chrome** — Shift+Tab-class cycle, status glyph, and map Face modes cleanly onto next-code DCG (`default` / `acceptEdits` / `plan` / `bypass`). Unlocks muscle memory; pairs with permission-confirm wire already planned.
-2. **Plan exit / review gate** — ExitPlanMode dialog + durable plan artifact + optional `/plan open` / editor; then session **`/diff`** review. Completes “think then act” without waiting on agent-team polish.
+2. **Plan exit / review gate** — **Shipped** via `PLAN-20260724-face-plan-execute-gate.md` (ExitPlanMode + approve/revise/abandon + `/plan open` + prePlanMode). Session **`/diff`** review still follow-on.
 3. **Statusline v1 for Face** — persistent idle segments (mode · model · context%) + `/statusline` setup; borrow Claude/Codex drafts but implement on Face footer, not legacy TUI.
 
 **Runners-up if those three slip:** `/context` API-true viz · `!` bash mode · sticky prompt header · remappable keybindings file.

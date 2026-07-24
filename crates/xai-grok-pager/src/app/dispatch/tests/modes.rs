@@ -2322,3 +2322,34 @@ fn set_plan_mode_idempotency_uses_pending_over_active() {
         "OFF transition must set optimistic pending to Some(false)"
     );
 }
+
+/// Approve path: pending already false but plan_mode_active still true
+/// must still emit SetSessionMode(Off) — the tightened idempotent guard
+/// must not short-circuit this case.
+#[test]
+fn set_plan_mode_off_emits_when_pending_false_but_active_true() {
+    let mut app = test_app_with_agent();
+    {
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        agent.plan_mode_active = true;
+        agent.plan_mode_pending = Some(false);
+        agent.pre_plan_mode = Some(xai_grok_tools::types::SessionMode::Ask);
+    }
+
+    let effects = dispatch(
+        Action::SetPlanMode(crate::app::actions::PlanModeKind::Off),
+        &mut app,
+    );
+    assert_eq!(
+        effects.len(),
+        1,
+        "approve-style OFF (pending=false, active=true) must emit Effect"
+    );
+    assert!(
+        matches!(&effects[0], Effect::SetSessionMode { mode_id, .. } if &*mode_id.0 == "ask"),
+        "must restore prePlanMode Ask: {effects:?}"
+    );
+    let agent = app.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(agent.plan_mode_pending, Some(false));
+    assert!(agent.pre_plan_mode.is_none(), "pre_plan_mode consumed on exit");
+}

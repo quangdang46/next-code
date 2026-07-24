@@ -623,6 +623,7 @@ impl Request {
             Request::SwitchOpenAiAccount { id, .. } => *id,
             Request::StdinResponse { id, .. } => *id,
             Request::AskUserQuestionResponse { id, .. } => *id,
+            Request::ExitPlanModeResponse { id, .. } => *id,
             Request::PermissionResponse { id, .. } => *id,
             Request::SetPermissionMode { id, .. } => *id,
             Request::AgentRegister { id, .. } => *id,
