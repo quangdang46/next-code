@@ -2833,16 +2833,7 @@ pub(super) async fn handle_client(
                 handle_client_debug_command(id, &client_event_tx).await;
             }
             Request::SetPermissionMode { id, mode } => {
-                let dcg_mode = match mode.as_str() {
-                    "plan" => Some(crate::dcg_bridge::Mode::Plan),
-                    "default" => Some(crate::dcg_bridge::Mode::Default),
-                    "accept-edits" => Some(crate::dcg_bridge::Mode::AcceptEdits),
-                    "auto" => Some(crate::dcg_bridge::Mode::Auto),
-                    "dont-ask" | "ask" => Some(crate::dcg_bridge::Mode::DontAsk),
-                    "bypass-permissions" => Some(crate::dcg_bridge::Mode::BypassPermissions),
-                    _ => None,
-                };
-                if let Some(dcg_mode) = dcg_mode {
+                if let Some(dcg_mode) = crate::dcg_bridge::parse_permission_mode_str(&mode) {
                     let session_id = {
                         let agent_guard = agent.lock().await;
                         agent_guard.session_id().to_string()

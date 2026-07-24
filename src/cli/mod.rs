@@ -12,6 +12,7 @@ pub mod face_ask_user;
 pub mod face_exit_plan;
 pub mod face_ext;
 pub mod face_permission;
+pub mod face_permission_mode;
 pub mod face_plugins;
 pub mod face_welcome_status;
 pub mod pager_agent;

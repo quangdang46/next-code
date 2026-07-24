@@ -244,6 +244,10 @@ mod tests {
                 .send(Ok(serde_json::to_value(resp).unwrap()));
         });
 
+        // Reset global mode so parallel tests that call set_mode_from_str
+        // cannot poison the pre-plan stash (restore must be Default).
+        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Default);
+        crate::dcg_bridge::clear_session_mode("sess-exit-abandon");
         crate::dcg_bridge::enter_plan_mode_for_session("sess-exit-abandon");
 
         let ctx = ToolContext {

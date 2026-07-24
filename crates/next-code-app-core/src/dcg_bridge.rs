@@ -382,17 +382,30 @@ pub fn cycle_mode() -> Mode {
     next
 }
 
+/// Parse a Face chrome or DCG wire permission-mode string into [`Mode`].
+///
+/// Accepts Face aliases (`ask`, `always-approve`, `yolo`) in addition to DCG
+/// ids. Face `ask` maps to [`Mode::Default`] (prompt), not [`Mode::DontAsk`].
+#[must_use]
+pub fn parse_permission_mode_str(s: &str) -> Option<Mode> {
+    match s.trim().to_ascii_lowercase().as_str() {
+        "default" | "ask" => Some(Mode::Default),
+        "accept-edits" => Some(Mode::AcceptEdits),
+        "plan" => Some(Mode::Plan),
+        "auto" => Some(Mode::Auto),
+        "dont-ask" => Some(Mode::DontAsk),
+        "bypass-permissions" | "always-approve" | "yolo" | "bypass" => {
+            Some(Mode::BypassPermissions)
+        }
+        _ => None,
+    }
+}
+
 /// Set permission mode from a string (e.g., from CLI args or config).
 /// Returns true if the string was a valid mode and the mode was changed.
 pub fn set_mode_from_str(s: &str) -> bool {
-    let mode = match s.trim().to_ascii_lowercase().as_str() {
-        "default" => Mode::Default,
-        "accept-edits" => Mode::AcceptEdits,
-        "plan" => Mode::Plan,
-        "auto" => Mode::Auto,
-        "dont-ask" => Mode::DontAsk,
-        "bypass-permissions" => Mode::BypassPermissions,
-        _ => return false,
+    let Some(mode) = parse_permission_mode_str(s) else {
+        return false;
     };
     set_mode(mode);
     true
@@ -1303,10 +1316,28 @@ mod tests {
         assert!(set_mode_from_str("bypass-permissions"));
         assert!(set_mode_from_str("Default"));
         assert!(set_mode_from_str("BYPASS-PERMISSIONS"));
+        // Face chrome aliases
+        assert!(set_mode_from_str("ask"));
+        assert!(set_mode_from_str("always-approve"));
+        assert!(set_mode_from_str("yolo"));
         // Invalid strings are rejected
         assert!(!set_mode_from_str(""));
         assert!(!set_mode_from_str("nonsense"));
         assert!(!set_mode_from_str("accept_edits"));
+    }
+
+    #[test]
+    fn face_ask_is_default_not_dont_ask() {
+        assert_eq!(parse_permission_mode_str("ask"), Some(Mode::Default));
+        assert_eq!(parse_permission_mode_str("dont-ask"), Some(Mode::DontAsk));
+        assert_eq!(
+            parse_permission_mode_str("always-approve"),
+            Some(Mode::BypassPermissions)
+        );
+        assert_eq!(
+            parse_permission_mode_str("yolo"),
+            Some(Mode::BypassPermissions)
+        );
     }
 
     #[test]
