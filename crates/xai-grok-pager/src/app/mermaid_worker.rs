@@ -779,7 +779,7 @@ fn render_job(render: &RenderFn, job: &MermaidJob, timeout: Duration) -> (Mermai
                 target_px = job.target_width_px,
                 duration_ms = started.elapsed().as_millis() as u64,
                 cache_hit = false,
-                engine = "mermaid-to-svg",
+                engine = "mmdr",
                 "mermaid render completed",
             );
             (
