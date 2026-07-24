@@ -385,6 +385,31 @@ pub(in crate::app::dispatch) fn dispatch_open_settings(app: &mut AppView) -> Vec
     vec![]
 }
 
+/// Open Face `/experimental` checklist (Codex-parity experiment mode).
+pub(in crate::app::dispatch) fn dispatch_open_experimental(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::experimental_modal::ExperimentalModalState;
+    use crate::views::modal::ActiveModal;
+
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+
+    if matches!(
+        &agent.active_modal,
+        Some(ActiveModal::ExperimentalFeatures { .. })
+    ) {
+        agent.active_modal = None;
+        return vec![];
+    }
+
+    let state = Box::new(ExperimentalModalState::load_from_config());
+    agent.active_modal = Some(ActiveModal::ExperimentalFeatures { state });
+    vec![]
+}
+
 /// Open the reset-settings confirmation modal.
 ///
 /// **Modal stack contract.** The current `ActiveModal::Settings`

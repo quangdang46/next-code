@@ -159,10 +159,6 @@ const REGISTERED_COMMANDS: &[RegisteredCommand] = &[
     RegisteredCommand::public("/exit", "Exit next-code (opencode TUI slash)"),
     RegisteredCommand::public("/quit", "Alias for /exit"),
     RegisteredCommand::public(
-        "/experiment",
-        "List/show/enable/disable experimental feature flags",
-    ),
-    RegisteredCommand::public(
         "/permissions",
         "Show DCG permission mode and recent decisions",
     ),
@@ -1047,22 +1043,6 @@ impl App {
                 }
             }
             return self.rank_suggestions(input, suggestions);
-        }
-
-        if prefix.starts_with("/experiment ") {
-            return self.rank_suggestions(
-                input,
-                vec![
-                    (
-                        "/experiment list".into(),
-                        "List all experimental feature flags and their state",
-                    ),
-                    (
-                        "/experiment".into(),
-                        "Open interactive experimental features popup",
-                    ),
-                ],
-            );
         }
 
         if prefix.starts_with("/permissions ") {

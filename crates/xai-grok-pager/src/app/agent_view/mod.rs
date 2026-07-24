@@ -1960,6 +1960,43 @@ pub(super) fn apply_settings_outcome(
         SettingsKeyOutcome::Unchanged => InputOutcome::Unchanged,
     }
 }
+
+/// Translate experimental modal outcome: persist on save, toast, close.
+pub(super) fn apply_experimental_outcome(
+    agent: &mut AgentView,
+    outcome: crate::views::experimental_modal::ExperimentalModalOutcome,
+) -> InputOutcome {
+    use crate::views::experimental_modal::{
+        ExperimentalModalOutcome, persist_experiment_overrides,
+    };
+    use crate::views::modal::ActiveModal;
+
+    match outcome {
+        ExperimentalModalOutcome::Changed => InputOutcome::Changed,
+        ExperimentalModalOutcome::Unchanged => InputOutcome::Unchanged,
+        ExperimentalModalOutcome::Cancel => {
+            agent.active_modal = None;
+            InputOutcome::Changed
+        }
+        ExperimentalModalOutcome::SaveAndClose => {
+            let updates = match agent.active_modal.as_ref() {
+                Some(ActiveModal::ExperimentalFeatures { state }) => state.overrides(),
+                _ => Vec::new(),
+            };
+            agent.active_modal = None;
+            match persist_experiment_overrides(&updates) {
+                Ok(()) => {
+                    agent.show_toast("Experimental features saved for next conversation");
+                }
+                Err(err) => {
+                    let msg = format!("Failed to save experiments: {err}");
+                    agent.show_toast(&msg);
+                }
+            }
+            InputOutcome::Changed
+        }
+    }
+}
 /// Whether this key event represents `#` (hash).
 ///
 /// Most terminals report `KeyCode::Char('#')` directly. Under the Kitty

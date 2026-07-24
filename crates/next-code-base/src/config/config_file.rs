@@ -12,6 +12,7 @@ impl Config {
     pub fn load() -> Self {
         let mut config = Self::load_from_file().unwrap_or_default();
         config.apply_env_overrides();
+        config.finalize_experiments();
         config
     }
 
@@ -22,7 +23,55 @@ impl Config {
     pub fn load_strict() -> anyhow::Result<Self> {
         let mut config = Self::load_from_file_strict()?.unwrap_or_default();
         config.apply_env_overrides();
+        config.finalize_experiments();
         Ok(config)
+    }
+
+    /// Migrate legacy `[features]` overrides into `[experiments]` and expose
+    /// [`Self::experiment_enabled`] as the runtime gate.
+    fn finalize_experiments(&mut self) {
+        next_code_experiment_flags::migrate_feature_legacy_into(
+            &mut self.experiments.entries,
+            None,
+            Some(self.features.swarm),
+            Some(self.features.persist_memory_injections),
+        );
+    }
+
+    /// Materialize runtime experiment enablement from `[experiments]`.
+    pub fn experiments_runtime(&self) -> next_code_experiment_flags::Experiments {
+        next_code_experiment_flags::Experiments::from_config(&self.experiments.entries)
+    }
+
+    /// Gate a registered experiment flag (`Experiments::check`).
+    pub fn experiment_enabled(&self, flag: next_code_experiment_flags::ExperimentFlag) -> bool {
+        self.experiments_runtime().check(flag)
+    }
+
+    /// Persist one experiment key into `[experiments]` and refresh the cache.
+    pub fn set_experiment_flag(key: &str, enabled: bool) -> anyhow::Result<()> {
+        if next_code_experiment_flags::Experiments::resolve_key(key).is_none() {
+            anyhow::bail!("Unknown experiment flag '{key}'");
+        }
+        let mut cfg = Self::load();
+        cfg.experiments.entries.insert(key.to_string(), enabled);
+        cfg.save()?;
+        Ok(())
+    }
+
+    /// Persist a batch of experiment overrides (Face `/experimental` save).
+    pub fn set_experiment_flags(updates: &[(String, bool)]) -> anyhow::Result<()> {
+        let mut cfg = Self::load();
+        for (key, enabled) in updates {
+            if next_code_experiment_flags::Experiments::resolve_key(key).is_none() {
+                anyhow::bail!("Unknown experiment flag '{key}'");
+            }
+            cfg.experiments
+                .entries
+                .insert(key.clone(), *enabled);
+        }
+        cfg.save()?;
+        Ok(())
     }
 
     /// Load config from file only (no env overrides)

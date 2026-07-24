@@ -19,6 +19,7 @@ ratatui = { version = "0.28", features = ["crossterm", "unstable-widget-ref"] }
 # next-code animated welcome logo (donut / orbit) — pure math, no ratatui dep.
 next-code-tui-anim = { path = "../next-code-tui-anim" }
 next-code-provider-metadata = { path = "../next-code-provider-metadata" }
+next-code-experiment-flags = { path = "../next-code-experiment-flags" }
 xai-grok-announcements = { path = "../xai-grok-announcements" }
 crossterm = { version = "0.28", features = ["event-stream", "bracketed-paste"] }
 textwrap = "0.16"
