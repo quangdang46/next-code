@@ -181,6 +181,11 @@ pub struct BackgroundInfo {
     pub running_count: usize,
     pub running_tasks: Vec<String>,
     pub progress_detail: Option<String>,
+    /// Claude-style typed counts for the float header (shells / monitors / …).
+    pub shells: usize,
+    pub monitors: usize,
+    pub loops: usize,
+    pub subagents: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -558,9 +563,20 @@ pub fn render_background_lines(info: &BackgroundInfo, width: usize) -> Vec<Line<
     if info.running_count == 0 {
         return Vec::new();
     }
-    let summary = format!("Background · {} running", info.running_count);
+    let pill = crate::views::turn_status::pill_label(crate::views::turn_status::Watchers {
+        commands: info.shells,
+        monitors: info.monitors,
+        loops: info.loops,
+        subagents: info.subagents,
+        unread_completed: 0,
+    });
+    let summary = if pill.starts_with(|c: char| c.is_ascii_digit()) {
+        format!("Background \u{00b7} {pill}")
+    } else {
+        format!("Background \u{00b7} {} running \u{00b7} Ctrl+B", info.running_count)
+    };
     let mut lines = vec![Line::from(vec![
-        Span::styled("⏳ ", Style::default().fg(rgb(180, 140, 255))),
+        Span::styled("\u{23F3} ", Style::default().fg(rgb(180, 140, 255))),
         Span::styled(summary, Style::default().fg(rgb(160, 160, 170))),
     ])];
 
@@ -572,12 +588,12 @@ pub fn render_background_lines(info: &BackgroundInfo, width: usize) -> Vec<Line<
             None
         };
         let row_text = if let Some(detail) = detail {
-            truncate_smart(&format!("{task} · {detail}"), row_width)
+            truncate_smart(&format!("{task} \u{00b7} {detail}"), row_width)
         } else {
             truncate_smart(task, row_width)
         };
         lines.push(Line::from(vec![
-            Span::styled("  • ", Style::default().fg(rgb(120, 120, 130))),
+            Span::styled("  \u{2022} ", Style::default().fg(rgb(120, 120, 130))),
             Span::styled(row_text, Style::default().fg(rgb(180, 180, 190))),
         ]));
     }
@@ -853,9 +869,17 @@ mod tests {
             running_count: 2,
             running_tasks: vec!["bash".into(), "task".into()],
             progress_detail: Some("compiling".into()),
+            shells: 2,
+            monitors: 0,
+            loops: 0,
+            subagents: 0,
         };
         let lines = render_background_lines(&info, 40);
-        assert!(line_text(&lines[0]).contains("2 running"));
+        let header = line_text(&lines[0]);
+        assert!(
+            header.contains("2 shells") && header.contains("Ctrl+B"),
+            "got: {header:?}"
+        );
     }
 
     #[test]

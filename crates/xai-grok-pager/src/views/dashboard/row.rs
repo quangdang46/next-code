@@ -400,47 +400,16 @@ pub fn has_background_work(agent: &AgentView) -> bool {
         .any(|t| t.status == crate::app::agent::BgTaskStatus::Running)
         || !agent.session.scheduled_tasks.is_empty()
 }
-/// Compact `"watching · …"` label summarising a turn-idle agent's live
-/// background work, listing only the non-zero kinds with singular/plural
-/// nouns — e.g. `"watching · 1 monitor · 2 loops"` or
-/// `"watching · 1 task"`. `None` when there's no background work (the
-/// caller then falls back to a bare `"Working"`). Mirrors the agent
-/// view's idle "watching" cue (`turn_status::watching_label`) so the
-/// dashboard and the agent view speak the same language; the counting
-/// matches [`has_background_work`].
+/// Compact Claude-style ambient pill summarising a turn-idle agent's live
+/// background work — e.g. `"1 shell · 2 monitors · Ctrl+B"`. `None` when
+/// there's no background work (the caller then falls back to a bare
+/// `"Working"`). Mirrors [`crate::views::turn_status::pill_label`].
 fn background_work_label(agent: &AgentView) -> Option<String> {
-    use std::fmt::Write as _;
-    let mut monitors = 0usize;
-    let mut tasks = 0usize;
-    for t in agent.session.bg_tasks.values() {
-        if t.status != crate::app::agent::BgTaskStatus::Running {
-            continue;
-        }
-        if t.is_monitor {
-            monitors += 1;
-        } else {
-            tasks += 1;
-        }
-    }
-    let loops = agent.session.scheduled_tasks.len();
-    if monitors + tasks + loops == 0 {
+    let watchers = agent.watchers();
+    if watchers.total() == 0 {
         return None;
     }
-    let mut label = String::with_capacity(24);
-    label.push_str("watching");
-    if monitors > 0 {
-        let noun = if monitors == 1 { "monitor" } else { "monitors" };
-        let _ = write!(label, " \u{00b7} {monitors} {noun}");
-    }
-    if loops > 0 {
-        let noun = if loops == 1 { "loop" } else { "loops" };
-        let _ = write!(label, " \u{00b7} {loops} {noun}");
-    }
-    if tasks > 0 {
-        let noun = if tasks == 1 { "task" } else { "tasks" };
-        let _ = write!(label, " \u{00b7} {tasks} {noun}");
-    }
-    Some(label)
+    Some(crate::views::turn_status::pill_label(watchers))
 }
 /// Classify a subagent.
 ///
@@ -1921,7 +1890,7 @@ mod tests {
             .insert("m1".into(), running_bg_task("m1", true));
         assert_eq!(classify_top_level(&agent), RowState::Working);
         let row = top_level_row(AgentId(0), &agent, false, false, None);
-        assert_eq!(row.activity.as_deref(), Some("watching · 1 monitor"));
+        assert_eq!(row.activity.as_deref(), Some("1 monitor \u{00b7} Ctrl+B"));
     }
     /// An active scheduled `/loop` keeps the agent `Working` even with a
     /// fully idle turn, labelled as a loop.
@@ -1934,10 +1903,10 @@ mod tests {
             .insert("l1".into(), scheduled_loop("l1"));
         assert_eq!(classify_top_level(&agent), RowState::Working);
         let row = top_level_row(AgentId(0), &agent, false, false, None);
-        assert_eq!(row.activity.as_deref(), Some("watching · 1 loop"));
+        assert_eq!(row.activity.as_deref(), Some("1 loop \u{00b7} Ctrl+B"));
     }
-    /// The background-work label lists every non-zero kind (monitors,
-    /// then loops, then plain tasks) with correct singular/plural nouns.
+    /// The background-work label lists every non-zero kind (shells,
+    /// monitors, loops) with Claude pill grammar + hub hint.
     #[test]
     fn background_work_label_lists_all_kinds() {
         let mut agent = make_idle_agent_with_model(None);
@@ -1961,12 +1930,12 @@ mod tests {
         let row = top_level_row(AgentId(0), &agent, false, false, None);
         assert_eq!(
             row.activity.as_deref(),
-            Some("watching · 1 monitor · 1 loop · 2 tasks"),
+            Some("2 shells \u{00b7} 1 monitor \u{00b7} 1 loop \u{00b7} Ctrl+B"),
         );
     }
     /// The background-work label is the LAST activity fallback: a more
     /// specific Working signal (here, replay loading) still wins over
-    /// "watching · …", so a real turn is never masked by it.
+    /// the Claude pill, so a real turn is never masked by it.
     #[test]
     fn specific_working_activity_wins_over_background_label() {
         let mut agent = make_idle_agent_with_model(None);

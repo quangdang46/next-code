@@ -107,6 +107,9 @@ pub struct Watchers {
     /// subagent is a background one — a foreground subagent would keep the
     /// parent in `TurnRunning`.
     pub subagents: usize,
+    /// Finished tasks not yet opened in the hub/detail viewer. Drives the
+    /// quiet attention marker on the ambient pill (`· !`).
+    pub unread_completed: usize,
 }
 
 impl Watchers {
@@ -123,43 +126,41 @@ impl Watchers {
     }
 }
 
-/// Build the "watching · …" label for the idle watcher cue, listing only the
-/// non-zero kinds with correct singular/plural nouns — e.g.
-/// `"watching · 1 command · 2 monitors · 1 loop · 1 subagent"`. Assumes
-/// `watchers.total() > 0`.
-fn watching_label(watchers: Watchers) -> String {
+/// Claude-style ambient footer pill for background work.
+///
+/// Lists only non-zero kinds with Claude vocabulary (`shell` not `command`),
+/// then a hub open hint — e.g. `"1 shell · 2 monitors · Ctrl+B"`. Assumes
+/// `watchers.total() > 0`. When `unread_completed > 0`, appends a quiet
+/// attention marker so the pill differs from plain running.
+pub fn pill_label(watchers: Watchers) -> String {
     use std::fmt::Write as _;
-    let mut label = String::with_capacity(32);
-    label.push_str("watching");
-    if watchers.commands > 0 {
-        let noun = if watchers.commands == 1 {
-            "command"
-        } else {
-            "commands"
-        };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.commands);
-    }
-    if watchers.monitors > 0 {
-        let noun = if watchers.monitors == 1 {
-            "monitor"
-        } else {
-            "monitors"
-        };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.monitors);
-    }
-    if watchers.loops > 0 {
-        let noun = if watchers.loops == 1 { "loop" } else { "loops" };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.loops);
-    }
-    if watchers.subagents > 0 {
-        let noun = if watchers.subagents == 1 {
-            "subagent"
-        } else {
-            "subagents"
-        };
-        let _ = write!(label, " \u{00b7} {} {noun}", watchers.subagents);
+    let mut label = String::with_capacity(40);
+    let mut first = true;
+    let mut push_part = |n: usize, one: &str, many: &str| {
+        if n == 0 {
+            return;
+        }
+        if !first {
+            let _ = write!(label, " \u{00b7} ");
+        }
+        first = false;
+        let noun = if n == 1 { one } else { many };
+        let _ = write!(label, "{n} {noun}");
+    };
+    push_part(watchers.commands, "shell", "shells");
+    push_part(watchers.monitors, "monitor", "monitors");
+    push_part(watchers.loops, "loop", "loops");
+    push_part(watchers.subagents, "subagent", "subagents");
+    let _ = write!(label, " \u{00b7} Ctrl+B");
+    if watchers.unread_completed > 0 {
+        let _ = write!(label, " \u{00b7} !");
     }
     label
+}
+
+/// Idle/parked watching cue label (Claude pill grammar + hub hint).
+fn watching_label(watchers: Watchers) -> String {
+    pill_label(watchers)
 }
 
 /// Whether the turn is blocked in a wait the shell aborts as soon as the
@@ -1237,7 +1238,7 @@ mod tests {
     fn idle_with_monitors_renders_watching_line() {
         let text = render_idle_with_monitors(2);
         assert!(
-            text.contains("watching") && text.contains("2 monitors"),
+            text.contains("2 monitors") && text.contains("Ctrl+B"),
             "idle with monitors must render the watching cue, got: {text:?}"
         );
     }
@@ -1246,7 +1247,7 @@ mod tests {
     fn idle_with_one_monitor_uses_singular() {
         let text = render_idle_with_monitors(1);
         assert!(
-            text.contains("watching \u{00b7} 1 monitor") && !text.contains("monitors"),
+            text.contains("1 monitor \u{00b7} Ctrl+B") && !text.contains("monitors"),
             "single monitor must use the singular noun, got: {text:?}"
         );
     }
@@ -1267,8 +1268,8 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching") && text.contains("2 loops"),
-            "idle with loops must render the watching cue, got: {text:?}"
+            text.contains("2 loops") && text.contains("Ctrl+B"),
+            "idle with loops must render the pill cue, got: {text:?}"
         );
     }
 
@@ -1279,7 +1280,7 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 loop") && !text.contains("loops"),
+            text.contains("1 loop \u{00b7} Ctrl+B") && !text.contains("loops"),
             "single loop must use the singular noun, got: {text:?}"
         );
     }
@@ -1291,8 +1292,8 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching") && text.contains("2 subagents"),
-            "idle with subagents must render the watching cue, got: {text:?}"
+            text.contains("2 subagents") && text.contains("Ctrl+B"),
+            "idle with subagents must render the pill cue, got: {text:?}"
         );
     }
 
@@ -1303,7 +1304,7 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 subagent") && !text.contains("subagents"),
+            text.contains("1 subagent \u{00b7} Ctrl+B") && !text.contains("subagents"),
             "single subagent must use the singular noun, got: {text:?}"
         );
     }
@@ -1318,7 +1319,7 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 monitor \u{00b7} 2 loops"),
+            text.contains("1 monitor \u{00b7} 2 loops \u{00b7} Ctrl+B"),
             "both kinds must be listed in one cue, got: {text:?}"
         );
     }
@@ -1332,10 +1333,11 @@ mod tests {
             monitors: 2,
             loops: 1,
             subagents: 3,
+            ..Watchers::default()
         });
         assert!(
             text.contains(
-                "watching \u{00b7} 1 command \u{00b7} 2 monitors \u{00b7} 1 loop \u{00b7} 3 subagents"
+                "1 shell \u{00b7} 2 monitors \u{00b7} 1 loop \u{00b7} 3 subagents \u{00b7} Ctrl+B"
             ),
             "all kinds must be listed in one cue, got: {text:?}"
         );
@@ -1350,16 +1352,16 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 2 commands"),
-            "idle with bg commands must render the watching cue, got: {text:?}"
+            text.contains("2 shells \u{00b7} Ctrl+B"),
+            "idle with bg shells must render the pill cue, got: {text:?}"
         );
         let text = render_idle_with_watchers(Watchers {
             commands: 1,
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 1 command") && !text.contains("commands"),
-            "single command must use the singular noun, got: {text:?}"
+            text.contains("1 shell \u{00b7} Ctrl+B") && !text.contains("shells"),
+            "single shell must use the singular noun, got: {text:?}"
         );
     }
 
@@ -1373,8 +1375,8 @@ mod tests {
             ..Watchers::default()
         });
         assert!(
-            text.contains("watching \u{00b7} 2 commands"),
-            "parked with bg work must render the watching cue, got: {text:?}"
+            text.contains("2 shells \u{00b7} Ctrl+B"),
+            "parked with bg work must render the pill cue, got: {text:?}"
         );
         assert!(
             !text.contains("Waiting") && !text.contains("[stop]"),
@@ -1440,28 +1442,28 @@ mod tests {
                 commands: 2,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 2 commands"
+            "2 shells \u{00b7} Ctrl+B"
         );
         assert_eq!(
             watching_label(Watchers {
                 monitors: 2,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 2 monitors"
+            "2 monitors \u{00b7} Ctrl+B"
         );
         assert_eq!(
             watching_label(Watchers {
                 loops: 1,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 1 loop"
+            "1 loop \u{00b7} Ctrl+B"
         );
         assert_eq!(
             watching_label(Watchers {
                 subagents: 1,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 1 subagent"
+            "1 subagent \u{00b7} Ctrl+B"
         );
         assert_eq!(
             watching_label(Watchers {
@@ -1469,7 +1471,7 @@ mod tests {
                 loops: 2,
                 ..Watchers::default()
             }),
-            "watching \u{00b7} 1 monitor \u{00b7} 2 loops"
+            "1 monitor \u{00b7} 2 loops \u{00b7} Ctrl+B"
         );
         assert_eq!(
             watching_label(Watchers {
@@ -1477,8 +1479,21 @@ mod tests {
                 monitors: 1,
                 loops: 1,
                 subagents: 2,
+                ..Watchers::default()
             }),
-            "watching \u{00b7} 1 command \u{00b7} 1 monitor \u{00b7} 1 loop \u{00b7} 2 subagents"
+            "1 shell \u{00b7} 1 monitor \u{00b7} 1 loop \u{00b7} 2 subagents \u{00b7} Ctrl+B"
+        );
+    }
+
+    #[test]
+    fn pill_label_marks_attention() {
+        assert_eq!(
+            pill_label(Watchers {
+                commands: 1,
+                unread_completed: 1,
+                ..Watchers::default()
+            }),
+            "1 shell \u{00b7} Ctrl+B \u{00b7} !"
         );
     }
 
