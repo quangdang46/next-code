@@ -7,7 +7,7 @@
 //! # Architecture
 //!
 //! ```text
-//! User types "$ultrawork fix the bug"
+//! User types "$ultrawork fix the bug" or bare "ultrawork fix the bug"
 //!     ↓
 //! detector::detect_keywords_with(Strict) → DetectedKeyword
 //!     ↓

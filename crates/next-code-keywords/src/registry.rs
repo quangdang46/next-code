@@ -67,7 +67,8 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
         let mut entries: Vec<KeywordEntry> = vec![
             KeywordEntry {
                 keyword: "$ralplan",
-                aliases: &["ralplan"],
+                // hyperplan/hpp: oh-my-openagent; ultraplan: Claude Code.
+                aliases: &["ralplan", "hyperplan", "hpp", "ultraplan"],
                 phrase_aliases: &["consensus plan"],
                 priority: 11,
                 workflow: WorkflowKind::Ralplan,
@@ -75,9 +76,10 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
             },
             KeywordEntry {
                 keyword: "$ultrawork",
+                // Bare `ultrawork` also matches via detector `$`-strip (omo/Claude parity).
                 aliases: &["ulw", "uw"],
-                phrase_aliases: &["work on", "dont stop", "must complete", "dont stop"],
-                // Note: "parallel", "ultra" intentionally NOT included (too broad).
+                phrase_aliases: &["work on", "dont stop", "must complete", "team mode"],
+                // Note: "parallel", "ultra", bare "think" intentionally NOT included (too broad).
                 priority: 10,
                 workflow: WorkflowKind::Ultrawork,
                 description: "Parallel execution — break down work and coordinate subtasks",
@@ -116,6 +118,7 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
             },
             KeywordEntry {
                 keyword: "$ultrathink",
+                // Bare `ultrathink` via `$`-strip; do not alias bare `think` (too noisy).
                 aliases: &["ultrathink"],
                 phrase_aliases: &["think hard", "think deeply"],
                 priority: 7,
@@ -140,7 +143,8 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
             },
             KeywordEntry {
                 keyword: "$code-review",
-                aliases: &[],
+                // ultrareview: Claude Code rainbow keyword.
+                aliases: &["ultrareview"],
                 phrase_aliases: &["code review", "review code"],
                 priority: 6,
                 workflow: WorkflowKind::CodeReview,
@@ -156,7 +160,7 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
             },
             KeywordEntry {
                 keyword: "$analyze",
-                aliases: &["deep-analyze"],
+                aliases: &["analyze", "deep-analyze"],
                 phrase_aliases: &["deep analysis"],
                 priority: 6,
                 workflow: WorkflowKind::Analyze,
@@ -185,6 +189,16 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
                 priority: 6,
                 workflow: WorkflowKind::BestOfN,
                 description: "Best-of-N editing — spawn parallel candidates, pick best",
+            },
+            // oh-my-openagent `team mode` / `team-mode` / `team_mode` / `teammode`
+            // — no separate Team workflow; activate Ultrawork orchestration.
+            KeywordEntry {
+                keyword: "teammode",
+                aliases: &["team-mode", "team_mode"],
+                phrase_aliases: &[],
+                priority: 10,
+                workflow: WorkflowKind::Ultrawork,
+                description: "Team mode (oh-my-openagent) — orchestration via ultrawork",
             },
         ];
 
@@ -226,6 +240,36 @@ mod tests {
         let kinds: std::collections::HashSet<WorkflowKind> =
             registry.iter().map(|e| e.workflow).collect();
         assert_eq!(kinds.len(), 15);
+    }
+
+    #[test]
+    fn omo_and_claude_token_aliases_present() {
+        let registry = build_registry();
+        let has_alias = |needle: &str| {
+            registry.iter().any(|e| {
+                e.keyword.eq_ignore_ascii_case(needle)
+                    || e.aliases.iter().any(|a| a.eq_ignore_ascii_case(needle))
+                    || e.keyword
+                        .strip_prefix('$')
+                        .is_some_and(|b| b.eq_ignore_ascii_case(needle))
+            })
+        };
+        // oh-my-openagent
+        for tok in [
+            "ultrawork",
+            "ulw",
+            "hyperplan",
+            "hpp",
+            "teammode",
+            "team-mode",
+            "ultrathink",
+        ] {
+            assert!(has_alias(tok), "missing omo/claude token {tok}");
+        }
+        // Claude Code
+        for tok in ["ultraplan", "ultrareview"] {
+            assert!(has_alias(tok), "missing claude token {tok}");
+        }
     }
 
     #[test]

@@ -2834,6 +2834,62 @@ fn paint_slash_token_highlight(
     }
 }
 
+/// Claude Code / oh-my-openagent style rainbow palette for magic keywords.
+const KEYWORD_RAINBOW: [(u8, u8, u8); 7] = [
+    (0xFF, 0x6B, 0x6B), // red
+    (0xFF, 0xA5, 0x4F), // orange
+    (0xFF, 0xD9, 0x3D), // yellow
+    (0x6B, 0xCB, 0x3C), // green
+    (0x4E, 0xCD, 0xC4), // blue-cyan
+    (0x54, 0xA0, 0xFF), // blue
+    (0xA5, 0x5E, 0xEA), // violet
+];
+
+/// Paint magic-keyword spans (ultrawork, ultrathink, …) with per-character
+/// rainbow coloring, matching Claude Code PromptInput + TUI keyword highlights.
+fn paint_magic_keyword_highlights(
+    textarea: &TextArea,
+    state: TextAreaState,
+    ta_area: Rect,
+    buf: &mut Buffer,
+) {
+    let text = textarea.text();
+    if text.is_empty() {
+        return;
+    }
+    // Slash drafts (`/…`) and bash mode are not keyword prompts.
+    let trimmed = text.trim_start();
+    if trimmed.starts_with('/') || trimmed.starts_with('!') {
+        return;
+    }
+    let highlights = next_code_keywords::compute_highlights(text);
+    for hl in &highlights {
+        let mut char_i = 0usize;
+        let mut byte = hl.start;
+        while byte < hl.end && byte < text.len() {
+            let ch = text[byte..].chars().next().unwrap_or('\0');
+            let ch_len = ch.len_utf8();
+            let next = byte + ch_len;
+            if next > hl.end {
+                break;
+            }
+            if !ch.is_whitespace() {
+                let (r, g, b) = KEYWORD_RAINBOW[char_i % KEYWORD_RAINBOW.len()];
+                paint_slash_token_highlight(
+                    textarea,
+                    state,
+                    ta_area,
+                    buf,
+                    byte..next,
+                    ratatui::style::Color::Rgb(r, g, b),
+                );
+                char_i += 1;
+            }
+            byte = next;
+        }
+    }
+}
+
 impl PromptWidget {
     /// Render the prompt widget.
     ///
@@ -2987,6 +3043,11 @@ impl PromptWidget {
         self.textarea_area = ta_area;
 
         (&self.textarea).render_ref(ta_area, buf, &mut self.textarea_state);
+
+        // Magic keywords (ultrawork / ultrathink / …) — Claude + oh-my-openagent
+        // active highlight. Painted before slash overlays so `/command` teal wins
+        // on any accidental overlap.
+        paint_magic_keyword_highlights(&self.textarea, self.textarea_state, ta_area, buf);
 
         // Slash overlays: teal command name + args ghost text. Both use the
         // same snapshot, so clone once. Capture flags for later ghost text

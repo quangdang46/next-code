@@ -29,10 +29,7 @@ pub fn compute_highlights_with(input: &str, opts: &DetectOptions) -> Vec<Keyword
     let mut results: Vec<KeywordHighlight> = Vec::with_capacity(detections.len());
     let mut cursor = 0usize;
     for (i, det) in detections.into_iter().enumerate() {
-        // Use sanitized positions when input is clean; acceptable cosmetic
-        // drift when ANSI/whitespace differs.
-        let start = det.position.0.min(input.len());
-        let end = det.position.1.min(input.len());
+        let (start, end) = remap_to_raw_span(input, &det.matched_text, det.position);
 
         // Skip highlights that start before the current cursor (overlap with
         // a previous, higher-priority match).
@@ -51,6 +48,30 @@ pub fn compute_highlights_with(input: &str, opts: &DetectOptions) -> Vec<Keyword
         cursor = end;
     }
     results
+}
+
+/// Map a sanitized detection span back onto the raw input when whitespace /
+/// ANSI sanitization shifted offsets. Falls back to the sanitized span.
+fn remap_to_raw_span(raw: &str, matched: &str, sanitized_pos: (usize, usize)) -> (usize, usize) {
+    let sanitized = crate::sanitizer::sanitize(raw);
+    if sanitized.as_str() == raw {
+        let start = sanitized_pos.0.min(raw.len());
+        let end = sanitized_pos.1.min(raw.len());
+        return (start, end);
+    }
+    let lower = crate::sanitizer::to_lower(raw);
+    let needle = matched.to_lowercase();
+    if let Some(pos) = crate::detector::find_word_boundary(&lower, &needle) {
+        // Prefer the raw slice length so multi-byte / case fold stays aligned.
+        let end = pos + matched.len();
+        if end <= raw.len() {
+            return (pos, end);
+        }
+    }
+    (
+        sanitized_pos.0.min(raw.len()),
+        sanitized_pos.1.min(raw.len()),
+    )
 }
 
 /// Generate a rainbow RGB color based on index and priority.
@@ -116,6 +137,45 @@ mod tests {
         let highlights = compute_highlights("$ultrawork fix the bug");
         assert_eq!(highlights.len(), 1);
         assert_eq!(highlights[0].label, "$ultrawork");
+    }
+
+    #[test]
+    fn compute_highlights_bare_ultrawork() {
+        let highlights = compute_highlights("ultrawork fix the bug");
+        assert_eq!(highlights.len(), 1);
+        assert_eq!(highlights[0].label, "ultrawork");
+        assert_eq!(highlights[0].start, 0);
+        assert_eq!(highlights[0].end, "ultrawork".len());
+    }
+
+    #[test]
+    fn compute_highlights_bare_set_smoke() {
+        for token in [
+            "ultrawork",
+            "ultrathink",
+            "ultragoal",
+            "ultraqa",
+            "ralplan",
+            "hyperplan",
+            "ultraplan",
+            "tdd",
+            "deepsearch",
+            "analyze",
+            "code-review",
+            "ultrareview",
+            "security-review",
+            "bestofn",
+            "teammode",
+            "team-mode",
+        ] {
+            let highlights = compute_highlights(token);
+            assert_eq!(
+                highlights.len(),
+                1,
+                "expected highlight for bare token {token}"
+            );
+            assert_eq!(highlights[0].label.to_lowercase(), token.to_lowercase());
+        }
     }
 
     #[test]
