@@ -1082,8 +1082,22 @@ impl AgentView {
             self.btw_sidebar && self.btw_sidebar_visible && self.btw_state.is_some();
         let inline_btw_height =
             crate::views::btw_overlay::btw_panel_height(self.btw_state.as_ref(), inner_width);
-        let mut btw_height = if btw_hidden || prefer_btw_sidebar {
+        // Legacy TUI parity: split the full agent frame horizontally first so the
+        // `/btw` column spans status → shortcuts (not a content-sized mid float).
+        let (compute_area, pre_split_sidebar) = if prefer_btw_sidebar {
+            match AgentViewLayout::split_btw_sidebar_column(area, self.btw_sidebar_width) {
+                Some((main, side)) => (main, Some(side)),
+                None => (area, None),
+            }
+        } else {
+            (area, None)
+        };
+        let sidebar_placed = pre_split_sidebar.is_some();
+        let mut btw_height = if btw_hidden || sidebar_placed {
             0
+        } else if prefer_btw_sidebar {
+            // Preferred sidebar but frame too narrow — fall back to overlay strip.
+            inline_btw_height
         } else {
             inline_btw_height
         };
@@ -1096,11 +1110,11 @@ impl AgentView {
         let timeline_width = crate::views::timeline::rail_width(
             appearance.show_timeline,
             self.is_subagent_view,
-            area.width,
+            compute_area.width,
             self.scrollback.turn_count(),
         );
         let mut layout = AgentViewLayout::compute(
-            area,
+            compute_area,
             layout_cfg,
             scrollbar_cfg,
             timeline_width,
@@ -1120,32 +1134,25 @@ impl AgentView {
             1,
             compact,
         );
-        if prefer_btw_sidebar
-            && !layout.apply_btw_sidebar(AgentViewLayout::BTW_SIDEBAR_PREFERRED_WIDTH)
-        {
-            // Too narrow after scrollbar/timeline gutters — fall back to overlay.
-            btw_height = inline_btw_height;
-            layout = AgentViewLayout::compute(
-                area,
-                layout_cfg,
-                scrollbar_cfg,
-                timeline_width,
-                prompt_height,
-                tasks_height,
-                catalog_height,
-                todo_height,
-                queue_height,
-                btw_height,
-                turn_status_height,
-                banner_height,
-                cta_height,
-                follow_ups_height,
-                0,
-                prompt_gap,
-                voice_recording_height,
-                1,
-                compact,
-            );
+        if let Some(side) = pre_split_sidebar {
+            layout.btw = side;
+            self.last_btw_divider_x = Some(side.x.saturating_sub(1));
+            self.last_btw_frame_width = Some(area.width);
+        } else {
+            self.last_btw_divider_x = None;
+            self.last_btw_frame_width = None;
+            if prefer_btw_sidebar && !layout.apply_btw_sidebar(self.btw_sidebar_width) {
+                // Post-compute carve also failed — keep overlay fallback already set.
+            } else if prefer_btw_sidebar && layout.btw.width > 0 {
+                self.last_btw_divider_x = Some(layout.btw.x.saturating_sub(1));
+                self.last_btw_frame_width = Some(
+                    layout
+                        .status_bar
+                        .width
+                        .saturating_add(layout.btw.width)
+                        .saturating_add(AgentViewLayout::BTW_SIDEBAR_GAP),
+                );
+            }
         }
         let search_active =
             self.scrollback_search.is_some() && self.active_pane == AgentPane::Scrollback;
@@ -1203,7 +1210,7 @@ impl AgentView {
                     self.timeline_hover = None;
                     self.timeline_hover_preview = None;
                     layout = AgentViewLayout::compute(
-                        area,
+                        compute_area,
                         layout_cfg,
                         scrollbar_cfg,
                         0,
@@ -1223,13 +1230,16 @@ impl AgentView {
                         1,
                         compact,
                     );
-                    if prefer_btw_sidebar
-                        && !layout
-                            .apply_btw_sidebar(AgentViewLayout::BTW_SIDEBAR_PREFERRED_WIDTH)
+                    if let Some(side) = pre_split_sidebar {
+                        layout.btw = side;
+                        self.last_btw_divider_x = Some(side.x.saturating_sub(1));
+                        self.last_btw_frame_width = Some(area.width);
+                    } else if prefer_btw_sidebar
+                        && !layout.apply_btw_sidebar(self.btw_sidebar_width)
                     {
                         btw_height = inline_btw_height;
                         layout = AgentViewLayout::compute(
-                            area,
+                            compute_area,
                             layout_cfg,
                             scrollbar_cfg,
                             0,
@@ -1249,6 +1259,11 @@ impl AgentView {
                             1,
                             compact,
                         );
+                        self.last_btw_divider_x = None;
+                        self.last_btw_frame_width = None;
+                    } else if prefer_btw_sidebar && layout.btw.width > 0 {
+                        self.last_btw_divider_x = Some(layout.btw.x.saturating_sub(1));
+                        self.last_btw_frame_width = Some(area.width);
                     }
                     if search_reserved_rows > 0 {
                         layout.scrollback.height -= search_reserved_rows;
