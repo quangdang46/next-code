@@ -948,6 +948,19 @@ impl AgentView {
             .entry(idx)
             .is_some_and(|e| e.block.is_user_prompt());
 
+        // Claude-style sticky chrome: single-click the pinned prompt → jump to it.
+        if click_count == 1
+            && is_prompt
+            && self.scrollback.appearance().scrollback.display.sticky_chrome
+            && self
+                .scrollback
+                .sticky_layout()
+                .is_some_and(|s| s.header_entry_idx() == Some(idx))
+        {
+            self.scrollback.scroll_to_entry_top(idx);
+            return (None, false);
+        }
+
         // Single-click on plan mode tool call → show plan preview/toast.
         let is_plan_tool = self
             .scrollback

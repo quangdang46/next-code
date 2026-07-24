@@ -30,7 +30,10 @@ use super::blocks::tool::{EditToolCallBlock, ToolCallBlock};
 use super::entry::{EntryId, ScrollbackEntry};
 use super::layout::HorizontalLayout;
 use super::selection::SelectionBox;
-use super::sticky::{PromptDescriptor, StickyHeaderLayout, compute_sticky_layout};
+use super::sticky::{
+    PromptDescriptor, StickyHeaderLayout, compute_sticky_layout, sticky_header_screen_rows,
+    to_chrome_layout,
+};
 use super::types::DisplayMode;
 use super::wrappers::EntryRenderer;
 use crate::appearance::AppearanceConfig;

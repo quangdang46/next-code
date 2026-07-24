@@ -156,6 +156,12 @@ pub struct ScrollbackDisplayConfig {
     /// Pin user prompts as sticky headers when scrolled past.
     /// Default: true.
     pub sticky_headers: bool,
+    /// Claude Code–style fixed 1-row sticky prompt chrome when scrolled.
+    ///
+    /// When true (default), sticky headers render as a compact `❯ preview`
+    /// breadcrumb instead of Face's multi-row section pin. Set false to keep
+    /// the classic Face sticky header block.
+    pub sticky_chrome: bool,
     /// Number of spaces to use when expanding tab characters (\t) in content.
     /// Tabs in model output are replaced with this many spaces before rendering.
     /// Default: 4. Set to 0 to pass through tabs unchanged.
@@ -180,6 +186,7 @@ impl Default for ScrollbackDisplayConfig {
             expandable_indicator_char: "›".to_string(),
             selection_buttons: false,
             sticky_headers: true,
+            sticky_chrome: true,
             tab_width: 4,
             group_max_visible: 10,
         }
@@ -869,6 +876,8 @@ pub struct RawScrollbackDisplayConfig {
     pub selection_buttons: Option<bool>,
     /// Pin user prompts as sticky headers when scrolled past. Default: true.
     pub sticky_headers: Option<bool>,
+    /// Claude-style 1-row sticky prompt chrome when scrolled. Default: true.
+    pub sticky_chrome: Option<bool>,
     /// Number of spaces to use when expanding tab characters (\t) in content.
     /// Tabs in model output are replaced with this many spaces before rendering.
     /// Default: 4. Set to 0 to pass through tabs unchanged.
@@ -891,6 +900,7 @@ impl Default for RawScrollbackDisplayConfig {
             expandable_indicator_char: Some("›".to_string()),
             selection_buttons: Some(false),
             sticky_headers: Some(true),
+            sticky_chrome: Some(true),
             tab_width: Some(4),
             group_max_visible: Some(10),
         }
@@ -1418,6 +1428,7 @@ impl From<RawAppearanceConfig> for AppearanceConfig {
                         .unwrap_or_else(|| "›".to_string()),
                     selection_buttons: raw.scrollback.display.selection_buttons.unwrap_or(false),
                     sticky_headers: raw.scrollback.display.sticky_headers.unwrap_or(true),
+                    sticky_chrome: raw.scrollback.display.sticky_chrome.unwrap_or(true),
                     tab_width: raw.scrollback.display.tab_width.unwrap_or(4),
                     group_max_visible: raw.scrollback.display.group_max_visible.unwrap_or(10),
                 },
