@@ -39,3 +39,5 @@ libnext_code_base.rlib
 data/
 # Local upstream mirror only — never commit (avoid mode-160000 gitlink).
 /grok-build/
+# Local research clones (openai/codex, etc.) — never commit.
+.tmp-research-plugins/
