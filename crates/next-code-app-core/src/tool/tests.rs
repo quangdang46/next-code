@@ -190,6 +190,10 @@ fn test_resolve_tool_name_oauth_aliases() {
     assert_eq!(Registry::resolve_tool_name("todo_write"), "todo");
     assert_eq!(Registry::resolve_tool_name("todoread"), "todo");
     assert_eq!(Registry::resolve_tool_name("todowrite"), "todo");
+    assert_eq!(Registry::resolve_tool_name("task_create"), "TaskCreate");
+    assert_eq!(Registry::resolve_tool_name("task_get"), "TaskGet");
+    assert_eq!(Registry::resolve_tool_name("task_list"), "TaskList");
+    assert_eq!(Registry::resolve_tool_name("task_update"), "TaskUpdate");
     assert_eq!(Registry::resolve_tool_name("bash"), "bash");
     assert_eq!(Registry::resolve_tool_name("grep"), "grep");
     assert_eq!(Registry::resolve_tool_name("functions.bash"), "bash");
