@@ -14,6 +14,8 @@ mod conversation_search;
 mod dcp_compress;
 mod debug_socket;
 mod edit;
+mod enter_plan_mode;
+mod exit_plan_mode;
 mod ffs_engine_tools;
 mod ffs_glob;
 mod ffs_grep;
@@ -75,7 +77,8 @@ use tokio::sync::RwLock;
 
 pub(crate) use next_code_tool_core::intent_schema_property;
 pub use next_code_tool_core::{
-    AskUserQuestionInputRequest, StdinInputRequest, Tool, ToolContext, ToolExecutionMode,
+    AskUserQuestionInputRequest, ExitPlanModeInputRequest, StdinInputRequest, Tool, ToolContext,
+    ToolExecutionMode,
 };
 pub use next_code_tool_types::{ToolImage, ToolOutput};
 pub(crate) use session_search::spawn_recent_index_warmup;
@@ -469,6 +472,18 @@ impl Registry {
                 &mut timings,
                 "AskUserQuestion",
                 ask_user_question::AskUserQuestionTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "EnterPlanMode",
+                enter_plan_mode::EnterPlanModeTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "ExitPlanMode",
+                exit_plan_mode::ExitPlanModeTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "bg", bg::BgTool::new);
             Self::insert_tool_timed(
