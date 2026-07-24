@@ -99,6 +99,9 @@ pub(super) fn dispatch_switch_account(app: &mut AppView) -> Vec<Effect> {
     let request_seq = app.next_auth_request_seq;
     app.next_auth_request_seq += 1;
     app.auth_code_input.reset();
+    // Auth UI replaces the welcome prompt; clear focus so leftover state cannot
+    // steal loopback token keystrokes (see handle_welcome_input).
+    app.welcome_prompt_focused = false;
     app.auth_state = AuthState::Authenticating {
         request_seq,
         handle: None,
@@ -231,6 +234,9 @@ pub(super) fn dispatch_login(app: &mut AppView) -> Vec<Effect> {
     let request_seq = app.next_auth_request_seq;
     app.next_auth_request_seq += 1;
     app.auth_code_input.reset();
+    // Auth UI replaces the welcome prompt; clear focus so leftover state from
+    // a prior welcome visit cannot steal loopback token keystrokes.
+    app.welcome_prompt_focused = false;
     app.auth_state = AuthState::Authenticating {
         request_seq,
         handle: None,
