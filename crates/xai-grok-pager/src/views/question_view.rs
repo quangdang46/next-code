@@ -26,6 +26,7 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::render::line_utils::{byte_offset_at_width, truncate_line, truncate_str};
 use crate::render::wrapping::word_wrap_lines_with_joiners;
+use crate::render::SafeBuf;
 use crate::syntax::get_syntect;
 use crate::theme::Theme;
 use crate::theme::md_style;
@@ -40,6 +41,9 @@ const DEFAULT_MAX_CHROME_PREVIEW_LINES: u16 = 6;
 /// Minimum number of option rows that must be visible before dynamic cap
 /// reduction kicks in. Ensures the user always sees at least a few options.
 const MIN_VISIBLE_OPTION_ROWS: u16 = 3;
+
+/// Rows reserved for the multi-question chip tab bar (chip row + gap below).
+pub const QUESTION_TAB_CHIP_ROWS: u16 = 2;
 
 fn hovered_bg(theme: &Theme) -> ratatui::style::Color {
     theme.bg_hover
@@ -941,6 +945,49 @@ impl QuestionViewState {
     pub fn prev_question(&mut self) {
         self.active_tab = self.active_tab.saturating_sub(1);
     }
+
+    /// Jump to a specific question tab (clamped).
+    pub fn goto_question(&mut self, idx: usize) {
+        if self.questions.is_empty() {
+            self.active_tab = 0;
+            return;
+        }
+        self.active_tab = idx.min(self.questions.len() - 1);
+    }
+
+    /// Whether question `idx` has any answer (option and/or freeform).
+    pub fn tab_is_answered(&self, idx: usize) -> bool {
+        if !self.selected_labels(idx).is_empty() {
+            return true;
+        }
+        let freeform_selected = self
+            .per_question_freeform_selected
+            .get(idx)
+            .copied()
+            .unwrap_or(false);
+        let has_text = self
+            .per_question_freeform
+            .get(idx)
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+        freeform_selected && has_text
+    }
+
+    /// Extra height for the Claude-style chip tab bar when there are 2+ questions.
+    pub fn tab_chip_bar_height(&self) -> u16 {
+        if self.questions.len() > 1 {
+            QUESTION_TAB_CHIP_ROWS
+        } else {
+            0
+        }
+    }
+}
+
+/// Build display text for one chip (checkbox + truncated header).
+pub fn question_tab_chip_text(question: &Question, index: usize, answered: bool) -> String {
+    let mark = if answered { "[x]" } else { "[ ]" };
+    let label = question.chip_label(index);
+    format!(" {mark} {label} ")
 }
 
 // ── Rendering ──────────────────────────────────────────────────────────
@@ -983,7 +1030,9 @@ pub fn question_view_height(state: &mut QuestionViewState, screen_h: u16, conten
             u16::MAX,
             u16::MAX,
         );
-        let total = chrome_h
+        let chip_h = state.tab_chip_bar_height();
+        let total = chip_h
+            + chrome_h
             + total_options_height(question, content_w, state.cursor())
                 .saturating_sub(phantom_freeform);
         state.cached_desc_cap = u16::MAX;
@@ -991,6 +1040,7 @@ pub fn question_view_height(state: &mut QuestionViewState, screen_h: u16, conten
         return total.min(screen_h);
     }
 
+    let chip_h = state.tab_chip_bar_height();
     let cap = (screen_h as u32 * 33 / 100)
         .max(8)
         .min(screen_h as u32 * 80 / 100) as u16;
@@ -1006,14 +1056,14 @@ pub fn question_view_height(state: &mut QuestionViewState, screen_h: u16, conten
         effective_preview_cap,
     );
 
-    if chrome_h + min_options_space > cap {
-        // Compute fixed overhead (vpad + label + gaps).
+    if chrome_h + chip_h + min_options_space > cap {
+        // Compute fixed overhead (vpad + label + gaps + optional chip bar).
         let (label, desc) = split_question_label_desc(&question.question);
         let raw_line = Line::from(vec![Span::raw(label.to_string())]);
         let label_lines = crate::render::wrapping::word_wrap_line(&raw_line, content_w.max(1))
             .len()
             .max(1) as u16;
-        let fixed_overhead = 1 + label_lines + 1 + 1; // vpad + label + blank + bottom gap
+        let fixed_overhead = chip_h + 1 + label_lines + 1 + 1; // chips + vpad + label + blank + bottom gap
 
         // Compute actual description line count so unused desc budget can
         // be reallocated to preview instead of being wasted.
@@ -1063,7 +1113,8 @@ pub fn question_view_height(state: &mut QuestionViewState, screen_h: u16, conten
     state.cached_desc_cap = effective_desc_cap;
     state.cached_preview_cap = effective_preview_cap;
 
-    let total = chrome_h
+    let total = chip_h
+        + chrome_h
         + total_options_height(question, content_w, state.cursor())
             .saturating_sub(phantom_freeform);
     total.min(cap)
@@ -1581,6 +1632,66 @@ pub struct QuestionViewRenderResult {
     pub options_start_y: u16,
     /// Y coordinate where the scrollable options area ends (before freeform/inline prompt).
     pub options_end_y: u16,
+    /// Clickable chip tab hit-rects (question index → screen rect). Empty when
+    /// there is only one question.
+    pub tab_chip_hits: Vec<(usize, Rect)>,
+}
+
+/// Paint the Claude-style question chip tab bar. Returns hit-rects for mouse.
+pub fn render_question_tab_chips(
+    buf: &mut Buffer,
+    content_x: u16,
+    y: u16,
+    content_width: u16,
+    state: &QuestionViewState,
+    theme: &Theme,
+    hovered_tab: Option<usize>,
+) -> Vec<(usize, Rect)> {
+    let mut hits = Vec::new();
+    if state.questions.len() <= 1 || content_width == 0 {
+        return hits;
+    }
+
+    let inactive = Style::default().fg(theme.gray).bg(theme.bg_light);
+    let active = Style::default()
+        .fg(theme.text_primary)
+        .bg(theme.bg_visual)
+        .add_modifier(Modifier::BOLD);
+    let hover = Style::default().fg(theme.text_primary).bg(hovered_bg(theme));
+
+    let mut x = content_x;
+    let end_x = content_x.saturating_add(content_width);
+    for (i, q) in state.questions.iter().enumerate() {
+        let answered = state.tab_is_answered(i);
+        let text = question_tab_chip_text(q, i, answered);
+        let w = UnicodeWidthStr::width(text.as_str()) as u16;
+        if w == 0 || x.saturating_add(w) > end_x {
+            // Prefer showing the active tab when space runs out.
+            if i < state.active_tab {
+                continue;
+            }
+            break;
+        }
+        let style = if i == state.active_tab {
+            active
+        } else if hovered_tab == Some(i) {
+            hover
+        } else {
+            inactive
+        };
+        buf.set_span_safe(x, y, &Span::styled(text, style), w);
+        hits.push((
+            i,
+            Rect {
+                x,
+                y,
+                width: w,
+                height: 1,
+            },
+        ));
+        x = x.saturating_add(w);
+    }
+    hits
 }
 
 pub fn render_question_view(
@@ -1591,10 +1702,24 @@ pub fn render_question_view(
     theme: &Theme,
     focused: bool,
 ) -> QuestionViewRenderResult {
+    render_question_view_with_hover(buf, area, state, hovered_item, None, theme, focused)
+}
+
+/// Like [`render_question_view`], with optional hovered chip-tab highlight.
+pub fn render_question_view_with_hover(
+    buf: &mut Buffer,
+    area: Rect,
+    state: &QuestionViewState,
+    hovered_item: Option<usize>,
+    hovered_tab: Option<usize>,
+    theme: &Theme,
+    focused: bool,
+) -> QuestionViewRenderResult {
     if area.height == 0 || area.width == 0 {
         return QuestionViewRenderResult {
             options_start_y: area.y,
             options_end_y: area.y,
+            tab_chip_hits: Vec::new(),
         };
     }
 
@@ -1603,6 +1728,7 @@ pub fn render_question_view(
         return QuestionViewRenderResult {
             options_start_y: area.y,
             options_end_y: area.y,
+            tab_chip_hits: Vec::new(),
         };
     };
 
@@ -1628,6 +1754,20 @@ pub fn render_question_view(
 
     // Vertical padding at the top.
     y += 1;
+
+    // ── Multi-question chip tab bar (Claude QuestionNavigationBar parity) ──
+    let tab_chip_hits = if state.questions.len() > 1 && y < area.y + area.height {
+        let hits =
+            render_question_tab_chips(buf, content_x, y, content_width, state, theme, hovered_tab);
+        y = y.saturating_add(1);
+        // Gap under chips (second reserved chip row).
+        if y < area.y + area.height {
+            y = y.saturating_add(1);
+        }
+        hits
+    } else {
+        Vec::new()
+    };
 
     // ── Question chrome (label + counter + description) ──
     // Clip to the panel bottom: when the accounted height disagrees with the
@@ -1745,6 +1885,7 @@ pub fn render_question_view(
     QuestionViewRenderResult {
         options_start_y,
         options_end_y,
+        tab_chip_hits,
     }
 }
 
@@ -2015,6 +2156,7 @@ mod tests {
                 },
             ],
             multi_select: None,
+            header: None,
             id: None,
         }
     }
@@ -2112,6 +2254,7 @@ mod tests {
                 })
                 .collect(),
             multi_select: Some(multi),
+            header: None,
             id: None,
         }
     }
@@ -2349,6 +2492,131 @@ mod tests {
         assert_eq!(state.active_tab, 0);
         state.prev_question();
         assert_eq!(state.active_tab, 0); // clamped at start
+    }
+
+    #[test]
+    fn goto_question_and_chip_labels() {
+        let questions = vec![
+            Question {
+                question: "Format?".into(),
+                options: vec![
+                    QuestionOption {
+                        label: "Summary".into(),
+                        description: "Brief".into(),
+                        preview: None,
+                        id: None,
+                    },
+                    QuestionOption {
+                        label: "Detailed".into(),
+                        description: "Full".into(),
+                        preview: None,
+                        id: None,
+                    },
+                ],
+                multi_select: Some(false),
+                header: Some("Format".into()),
+                id: None,
+            },
+            Question {
+                question: "Sections?".into(),
+                options: vec![
+                    QuestionOption {
+                        label: "Intro".into(),
+                        description: "i".into(),
+                        preview: None,
+                        id: None,
+                    },
+                    QuestionOption {
+                        label: "Body".into(),
+                        description: "b".into(),
+                        preview: None,
+                        id: None,
+                    },
+                ],
+                multi_select: Some(true),
+                header: Some("Sections".into()),
+                id: None,
+            },
+            make_question("No header?", &["A", "B"], false),
+        ];
+        let mut state =
+            QuestionViewState::new("tc".into(), questions, StashedPrompt::default());
+        assert_eq!(state.tab_chip_bar_height(), QUESTION_TAB_CHIP_ROWS);
+        assert_eq!(state.questions[0].chip_label(0), "Format");
+        assert_eq!(state.questions[2].chip_label(2), "Q3");
+        assert!(!state.tab_is_answered(0));
+        state.select_option(0, 0);
+        assert!(state.tab_is_answered(0));
+        assert_eq!(
+            question_tab_chip_text(&state.questions[0], 0, true),
+            " [x] Format "
+        );
+        state.goto_question(2);
+        assert_eq!(state.active_tab, 2);
+        state.goto_question(99);
+        assert_eq!(state.active_tab, 2);
+    }
+
+    #[test]
+    fn render_multi_question_emits_chip_hits() {
+        let theme = Theme::default();
+        let questions = vec![
+            Question {
+                question: "One?".into(),
+                options: vec![
+                    QuestionOption {
+                        label: "A".into(),
+                        description: "a".into(),
+                        preview: None,
+                        id: None,
+                    },
+                    QuestionOption {
+                        label: "B".into(),
+                        description: "b".into(),
+                        preview: None,
+                        id: None,
+                    },
+                ],
+                multi_select: Some(false),
+                header: Some("One".into()),
+                id: None,
+            },
+            Question {
+                question: "Two?".into(),
+                options: vec![
+                    QuestionOption {
+                        label: "C".into(),
+                        description: "c".into(),
+                        preview: None,
+                        id: None,
+                    },
+                    QuestionOption {
+                        label: "D".into(),
+                        description: "d".into(),
+                        preview: None,
+                        id: None,
+                    },
+                ],
+                multi_select: Some(true),
+                header: Some("Two".into()),
+                id: None,
+            },
+        ];
+        let state = QuestionViewState::new("tc".into(), questions, StashedPrompt::default());
+        let area = Rect::new(0, 0, 80, 24);
+        let mut buf = Buffer::empty(area);
+        let result = render_question_view(&mut buf, area, &state, None, &theme, true);
+        assert_eq!(result.tab_chip_hits.len(), 2);
+        assert_eq!(result.tab_chip_hits[0].0, 0);
+        assert_eq!(result.tab_chip_hits[1].0, 1);
+        // Active chip text should appear in the buffer.
+        let row = result.tab_chip_hits[0].1.y;
+        let mut line = String::new();
+        for x in 0..area.width {
+            line.push_str(buf.cell((x, row)).map(|c| c.symbol()).unwrap_or(" "));
+        }
+        assert!(line.contains("One"), "chip row missing header: {line:?}");
+        assert!(line.contains("Two"), "chip row missing header: {line:?}");
     }
 
     // ── compute_max_label_w ────────────────────────────────────────────
@@ -2899,6 +3167,7 @@ mod tests {
                 },
             ],
             multi_select: Some(false),
+            header: None,
             id: None,
         };
         let mut state = QuestionViewState::new("tc".into(), vec![q], StashedPrompt::default());
@@ -2949,6 +3218,7 @@ mod tests {
                 },
             ],
             multi_select: Some(true),
+            header: None,
             id: None,
         };
 
@@ -3181,6 +3451,7 @@ mod tests {
                 },
             ],
             multi_select: Some(false),
+            header: None,
             id: None,
         };
         let content_w = 30;
@@ -3216,6 +3487,7 @@ mod tests {
                 id: None,
             }],
             multi_select: Some(false),
+            header: None,
             id: None,
         };
         let theme = Theme::default();
@@ -3304,6 +3576,7 @@ mod tests {
                 },
             ],
             multi_select: Some(false),
+            header: None,
             id: None,
         };
         let content_w = 30;

@@ -243,6 +243,8 @@ impl AgentView {
             inline_prompt_area: None,
             question_nav_buttons: Vec::new(),
             hovered_question_button: None,
+            question_tab_chips: Vec::new(),
+            hovered_question_tab: None,
             question_scroll_region: None,
             plan_mode_active: false,
             plan_mode_pending: None,

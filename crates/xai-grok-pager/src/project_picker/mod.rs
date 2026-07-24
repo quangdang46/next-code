@@ -84,6 +84,7 @@ pub fn build_project_question(
             id: None,
             options,
             multi_select: Some(false),
+        header: None,
         },
         resolved_paths,
         dont_ask_index,

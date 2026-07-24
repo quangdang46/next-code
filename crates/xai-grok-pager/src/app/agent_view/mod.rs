@@ -1235,6 +1235,10 @@ pub struct AgentView {
     pub(crate) question_nav_buttons: Vec<(char, Rect)>,
     /// Currently hovered question nav button key (for highlight).
     pub(crate) hovered_question_button: Option<char>,
+    /// Clickable multi-question chip tabs (question index → rect).
+    pub(crate) question_tab_chips: Vec<(usize, Rect)>,
+    /// Currently hovered question chip tab index.
+    pub(crate) hovered_question_tab: Option<usize>,
     /// Y-range of the scrollable options area (set during render).
     /// Scroll events outside this range are ignored.
     pub(crate) question_scroll_region: Option<(u16, u16)>,

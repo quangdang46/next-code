@@ -603,7 +603,7 @@ fn make_ask_user_question_args(
         questions: vec![
             Question { question : "ACP-driven question".into(), options :
             vec![QuestionOption { label : "ok".into(), description : "ok".into(), preview
-            : None, id : None, }], multi_select : Some(false), id : None, }
+            : None, id : None, }], multi_select : Some(false), header : None, id : None, }
         ],
     };
     let (tx, rx) = tokio::sync::oneshot::channel();
