@@ -507,6 +507,9 @@ impl AgentView {
         {
             return self.dismiss_btw_panel();
         }
+        if let Some(outcome) = self.handle_btw_sidebar_resize(ev) {
+            return outcome;
+        }
         if self.btw_state.is_some()
             && let Event::Mouse(mouse) = ev
             && matches!(mouse.kind, MouseEventKind::Moved)
@@ -1025,6 +1028,25 @@ impl AgentView {
         }
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
+            && key.modifiers.is_empty()
+            && self.btw_sidebar
+            && self.btw_sidebar_visible
+            && self.btw_state.is_some()
+            && self.btw_focused
+            && matches!(key.code, KeyCode::Char('[') | KeyCode::Char(']'))
+        {
+            let delta: i16 = if key.code == KeyCode::Char('[') {
+                -2
+            } else {
+                2
+            };
+            if let Some(action) = self.adjust_btw_sidebar_width(delta) {
+                return InputOutcome::Action(action);
+            }
+            return InputOutcome::Changed;
+        }
+        if let Event::Key(key) = ev
+            && key.kind != KeyEventKind::Release
             && key!('b', CONTROL).matches(key)
         {
             self.tasks.overlay.toggle();
@@ -1276,6 +1298,89 @@ impl AgentView {
     #[cfg(test)]
     pub(crate) fn is_simple_mode(&self) -> bool {
         self.input_mode == InputMode::Simple
+    }
+
+    /// Mouse drag / release on the `/btw` sidebar divider, and live width updates.
+    ///
+    /// Ratatui itself has no built-in split widget — apps handle
+    /// `MouseEventKind::Drag` from crossterm (same pattern as legacy TUI diagram
+    /// pane resize). Returns `Some` when the event was consumed.
+    fn handle_btw_sidebar_resize(&mut self, ev: &Event) -> Option<InputOutcome> {
+        if !(self.btw_sidebar && self.btw_sidebar_visible && self.btw_state.is_some()) {
+            if self.btw_sidebar_dragging {
+                self.btw_sidebar_dragging = false;
+            }
+            return None;
+        }
+        let Event::Mouse(mouse) = ev else {
+            return None;
+        };
+        let divider_x = self.last_btw_divider_x.or_else(|| {
+            (self.last_btw_area.width > 0).then(|| self.last_btw_area.x.saturating_sub(1))
+        })?;
+        let on_divider = mouse.column >= divider_x.saturating_sub(1)
+            && mouse.column <= divider_x.saturating_add(1)
+            && self.last_btw_area.height > 0
+            && mouse.row >= self.last_btw_area.y
+            && mouse.row < self.last_btw_area.y.saturating_add(self.last_btw_area.height);
+
+        match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) if on_divider => {
+                self.btw_sidebar_dragging = true;
+                Some(InputOutcome::Changed)
+            }
+            MouseEventKind::Drag(MouseButton::Left) if self.btw_sidebar_dragging => {
+                let right = self
+                    .last_btw_area
+                    .x
+                    .saturating_add(self.last_btw_area.width);
+                let desired = right.saturating_sub(mouse.column);
+                let frame_width = self.last_btw_frame_width.unwrap_or_else(|| {
+                    self.btw_sidebar_width
+                        .saturating_add(
+                            crate::views::agent::AgentViewLayout::BTW_SIDEBAR_MIN_MAIN_WIDTH,
+                        )
+                        .saturating_add(crate::views::agent::AgentViewLayout::BTW_SIDEBAR_GAP)
+                });
+                let clamped = crate::views::agent::AgentViewLayout::clamp_btw_sidebar_width(
+                    frame_width,
+                    desired,
+                );
+                if clamped != self.btw_sidebar_width {
+                    self.btw_sidebar_width = clamped;
+                }
+                Some(InputOutcome::Changed)
+            }
+            MouseEventKind::Up(MouseButton::Left) if self.btw_sidebar_dragging => {
+                self.btw_sidebar_dragging = false;
+                Some(InputOutcome::Action(
+                    crate::app::actions::Action::SetBtwSidebarWidth(self.btw_sidebar_width),
+                ))
+            }
+            _ => None,
+        }
+    }
+
+    /// Grow/shrink the `/btw` sidebar by `delta` columns. Returns a persist
+    /// action when the width changed.
+    fn adjust_btw_sidebar_width(&mut self, delta: i16) -> Option<crate::app::actions::Action> {
+        let frame_width = self.last_btw_frame_width.unwrap_or_else(|| {
+            self.btw_sidebar_width
+                .saturating_add(
+                    crate::views::agent::AgentViewLayout::BTW_SIDEBAR_MIN_MAIN_WIDTH,
+                )
+                .saturating_add(crate::views::agent::AgentViewLayout::BTW_SIDEBAR_GAP)
+        });
+        let next = {
+            let cur = self.btw_sidebar_width as i16;
+            let raw = cur.saturating_add(delta).max(0) as u16;
+            crate::views::agent::AgentViewLayout::clamp_btw_sidebar_width(frame_width, raw)
+        };
+        if next == self.btw_sidebar_width {
+            return None;
+        }
+        self.btw_sidebar_width = next;
+        Some(crate::app::actions::Action::SetBtwSidebarWidth(next))
     }
 }
 #[cfg(test)]
