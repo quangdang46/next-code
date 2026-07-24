@@ -2847,8 +2847,7 @@ pub(super) async fn handle_client(
                         let agent_guard = agent.lock().await;
                         agent_guard.session_id().to_string()
                     };
-                    crate::dcg_bridge::set_session_mode(&session_id, dcg_mode);
-                    crate::dcg_bridge::set_mode(dcg_mode);
+                    crate::dcg_bridge::apply_session_permission_mode(&session_id, dcg_mode);
                 } else {
                     crate::logging::warn(&format!(
                         "SetPermissionMode: unknown mode '{mode}', ignoring"

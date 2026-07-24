@@ -46,11 +46,11 @@ plan, then call ExitPlanMode for user approval before implementing."#
     }
 
     async fn execute(&self, _input: Value, ctx: ToolContext) -> Result<ToolOutput> {
-        crate::dcg_bridge::set_session_mode(&ctx.session_id, crate::dcg_bridge::Mode::Plan);
-        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Plan);
+        crate::dcg_bridge::enter_plan_mode_for_session(&ctx.session_id);
         Ok(ToolOutput::new(concat!(
-            "Entered plan mode. Explore and write plan.md. Mutating tools are blocked ",
-            "except plan.md. Call ExitPlanMode when the plan is ready for review."
+            "Entered plan mode. Explore the codebase and design an approach. ",
+            "DO NOT write or edit any files except plan.md. When ready, call ",
+            "ExitPlanMode to present the plan for approval."
         )))
     }
 }
@@ -60,7 +60,13 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn sets_plan_mode_for_session() {
+    async fn sets_plan_mode_and_stashes_pre_plan() {
+        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::AcceptEdits);
+        crate::dcg_bridge::set_session_mode(
+            "sess-enter-plan",
+            crate::dcg_bridge::Mode::AcceptEdits,
+        );
+
         let tool = EnterPlanModeTool::new();
         let ctx = ToolContext {
             session_id: "sess-enter-plan".into(),
@@ -72,7 +78,13 @@ mod tests {
             crate::dcg_bridge::session_mode("sess-enter-plan"),
             Some(crate::dcg_bridge::Mode::Plan)
         );
-        assert_eq!(crate::dcg_bridge::current_mode(), crate::dcg_bridge::Mode::Plan);
+        assert_eq!(
+            crate::dcg_bridge::current_mode(),
+            crate::dcg_bridge::Mode::Plan
+        );
+
+        let restored = crate::dcg_bridge::leave_plan_mode_for_session("sess-enter-plan");
+        assert_eq!(restored, crate::dcg_bridge::Mode::AcceptEdits);
         crate::dcg_bridge::clear_session_mode("sess-enter-plan");
         crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Default);
     }

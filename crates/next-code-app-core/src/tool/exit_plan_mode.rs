@@ -77,6 +77,11 @@ remain blocked until the user approves."#
             plan_content: None,
         });
 
+        let plan_content = params
+            .plan_content
+            .filter(|s| !s.trim().is_empty())
+            .or_else(|| read_plan_md(&ctx));
+
         let Some(tx) = ctx.exit_plan_mode_tx.as_ref() else {
             return Ok(ToolOutput::new(CANCEL_STAY_IN_PLAN));
         };
@@ -88,7 +93,7 @@ remain blocked until the user approves."#
                 request_id,
                 session_id: ctx.session_id.clone(),
                 tool_call_id: ctx.tool_call_id.clone(),
-                plan_content: params.plan_content,
+                plan_content,
                 response_tx,
             })
             .is_err()
@@ -115,22 +120,19 @@ remain blocked until the user approves."#
 
         let message = match ext.outcome.as_str() {
             "approved" => {
-                leave_plan_mode(&ctx.session_id);
+                crate::dcg_bridge::leave_plan_mode_for_session(&ctx.session_id);
                 APPROVED_MSG.to_string()
             }
             "abandoned" => {
-                leave_plan_mode(&ctx.session_id);
+                crate::dcg_bridge::leave_plan_mode_for_session(&ctx.session_id);
                 ABANDONED_MSG.to_string()
             }
-            "cancelled" => {
-                // Stay in plan mode; surface optional feedback.
-                match ext.feedback.filter(|f| !f.trim().is_empty()) {
-                    Some(feedback) => format!(
-                        "{CANCEL_STAY_IN_PLAN}\n\nUser feedback:\n{feedback}"
-                    ),
-                    None => CANCEL_STAY_IN_PLAN.to_string(),
+            "cancelled" => match ext.feedback.filter(|f| !f.trim().is_empty()) {
+                Some(feedback) => {
+                    format!("{CANCEL_STAY_IN_PLAN}\n\nUser feedback:\n{feedback}")
                 }
-            }
+                None => CANCEL_STAY_IN_PLAN.to_string(),
+            },
             other => {
                 return Err(anyhow!("Unknown ExitPlanMode outcome: {other}"));
             }
@@ -140,20 +142,26 @@ remain blocked until the user approves."#
     }
 }
 
-fn leave_plan_mode(session_id: &str) {
-    crate::dcg_bridge::set_session_mode(session_id, crate::dcg_bridge::Mode::Default);
-    crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Default);
+fn read_plan_md(ctx: &ToolContext) -> Option<String> {
+    let base = ctx
+        .working_dir
+        .clone()
+        .or_else(|| std::env::current_dir().ok())?;
+    let path = base.join("plan.md");
+    std::fs::read_to_string(path)
+        .ok()
+        .filter(|s| !s.trim().is_empty())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::io::Write;
 
     #[tokio::test]
-    async fn approved_leaves_plan_and_formats_message() {
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<ExitPlanModeInputRequest>();
+    async fn approved_restores_pre_plan_mode() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ExitPlanModeInputRequest>();
         let tool = ExitPlanModeTool::new();
         let handle = tokio::spawn(async move {
             let req = rx.recv().await.expect("request");
@@ -166,8 +174,8 @@ mod tests {
                 .send(Ok(serde_json::to_value(resp).unwrap()));
         });
 
-        crate::dcg_bridge::set_session_mode("sess-exit-ok", crate::dcg_bridge::Mode::Plan);
-        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Plan);
+        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::AcceptEdits);
+        crate::dcg_bridge::enter_plan_mode_for_session("sess-exit-ok");
 
         let ctx = ToolContext {
             session_id: "sess-exit-ok".into(),
@@ -179,16 +187,16 @@ mod tests {
         assert!(out.output.contains("approved"));
         assert_eq!(
             crate::dcg_bridge::session_mode("sess-exit-ok"),
-            Some(crate::dcg_bridge::Mode::Default)
+            Some(crate::dcg_bridge::Mode::AcceptEdits)
         );
         handle.await.unwrap();
         crate::dcg_bridge::clear_session_mode("sess-exit-ok");
+        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Default);
     }
 
     #[tokio::test]
     async fn cancelled_stays_in_plan_with_feedback() {
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<ExitPlanModeInputRequest>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ExitPlanModeInputRequest>();
         let tool = ExitPlanModeTool::new();
         let handle = tokio::spawn(async move {
             let req = rx.recv().await.expect("request");
@@ -201,8 +209,7 @@ mod tests {
                 .send(Ok(serde_json::to_value(resp).unwrap()));
         });
 
-        crate::dcg_bridge::set_session_mode("sess-exit-cancel", crate::dcg_bridge::Mode::Plan);
-        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Plan);
+        crate::dcg_bridge::enter_plan_mode_for_session("sess-exit-cancel");
 
         let ctx = ToolContext {
             session_id: "sess-exit-cancel".into(),
@@ -219,12 +226,12 @@ mod tests {
         );
         handle.await.unwrap();
         crate::dcg_bridge::clear_session_mode("sess-exit-cancel");
+        crate::dcg_bridge::set_mode(crate::dcg_bridge::Mode::Default);
     }
 
     #[tokio::test]
     async fn abandoned_leaves_plan() {
-        let (tx, mut rx) =
-            tokio::sync::mpsc::unbounded_channel::<ExitPlanModeInputRequest>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ExitPlanModeInputRequest>();
         let tool = ExitPlanModeTool::new();
         let handle = tokio::spawn(async move {
             let req = rx.recv().await.expect("request");
@@ -237,7 +244,7 @@ mod tests {
                 .send(Ok(serde_json::to_value(resp).unwrap()));
         });
 
-        crate::dcg_bridge::set_session_mode("sess-exit-abandon", crate::dcg_bridge::Mode::Plan);
+        crate::dcg_bridge::enter_plan_mode_for_session("sess-exit-abandon");
 
         let ctx = ToolContext {
             session_id: "sess-exit-abandon".into(),
@@ -263,5 +270,45 @@ mod tests {
             .await
             .unwrap();
         assert!(out.output.contains("Stay in plan mode") || out.output.contains("cancelled"));
+    }
+
+    #[tokio::test]
+    async fn loads_plan_md_when_content_omitted() {
+        let dir = tempfile::tempdir().unwrap();
+        let plan_path = dir.path().join("plan.md");
+        {
+            let mut f = std::fs::File::create(&plan_path).unwrap();
+            writeln!(f, "# Ship it").unwrap();
+        }
+
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<ExitPlanModeInputRequest>();
+        let tool = ExitPlanModeTool::new();
+        let handle = tokio::spawn(async move {
+            let req = rx.recv().await.expect("request");
+            assert!(
+                req.plan_content
+                    .as_deref()
+                    .is_some_and(|c| c.contains("Ship it")),
+                "expected plan.md body, got {:?}",
+                req.plan_content
+            );
+            let resp = ExitPlanModeExtResponse {
+                outcome: "cancelled".into(),
+                feedback: None,
+            };
+            let _ = req
+                .response_tx
+                .send(Ok(serde_json::to_value(resp).unwrap()));
+        });
+
+        let ctx = ToolContext {
+            session_id: "sess-exit-planfile".into(),
+            tool_call_id: "tc-4".into(),
+            working_dir: Some(dir.path().to_path_buf()),
+            exit_plan_mode_tx: Some(tx),
+            ..Default::default()
+        };
+        let _ = tool.execute(json!({}), ctx).await.unwrap();
+        handle.await.unwrap();
     }
 }

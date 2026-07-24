@@ -1,7 +1,7 @@
 # PLAN — Face Plan → execute gate
 
 **Date:** 2026-07-24  
-**Branch:** `pr-face-plan-execute-gate`  
+**Branch:** `pr-face-plan-mode-tools`  
 **LOOK:** `LOOK-20260724-claude-code-ux-gaps-for-face.md` gap #2  
 **Status:** done
 
