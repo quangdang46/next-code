@@ -982,6 +982,18 @@ pub enum Action {
     },
     /// Toggle the expanded goal detail overlay.
     ToggleGoalDetail,
+    /// `/goal` with no args / `status` — show active goal overlay or usage.
+    GoalShow,
+    /// `/goal pause` — pause pursuit (and cancel the in-flight turn if any).
+    GoalPause,
+    /// `/goal resume` — resume a paused goal and continue working.
+    GoalResume,
+    /// `/goal clear` — drop the active goal from Face state.
+    GoalClear,
+    /// `/goal <objective>` — set a new session goal and start a turn.
+    GoalSet {
+        objective: String,
+    },
     Rewind,
     RewindShowPicker,
     RewindPickerSelect(usize),
@@ -1676,6 +1688,32 @@ pub enum Effect {
         expected_version: u64,
         new_text: Option<String>,
     },
+    /// Persist Face `/goal` via `x.ai/goal/set`.
+    GoalSet {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+        objective: String,
+    },
+    /// Persist Face `/goal pause` via `x.ai/goal/pause`.
+    GoalPause {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+    },
+    /// Persist Face `/goal resume` via `x.ai/goal/resume`.
+    GoalResume {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+    },
+    /// Persist Face `/goal clear` via `x.ai/goal/clear`.
+    GoalClear {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+    },
+    /// Fetch Face `/goal` status via `x.ai/goal/status`.
+    GoalStatus {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+    },
     /// Set the session mode via ACP `session/set_mode`.
     SetSessionMode {
         session_id: acp::SessionId,
@@ -2316,6 +2354,17 @@ pub enum TaskResult {
     /// Cancel notification was sent (fire-and-forget).
     /// The real turn end comes via PromptResponse.
     CancelComplete,
+    /// Face `/goal` status ACP response.
+    GoalStatusComplete {
+        agent_id: AgentId,
+        toast: String,
+        open_detail: bool,
+    },
+    /// Face `/goal` mutation ACP failed.
+    GoalMutationFailed {
+        agent_id: AgentId,
+        message: String,
+    },
     /// Response to `x.ai/subagent/cancel`; see [`SubagentKillOutcome`].
     KillSubagentComplete {
         session_id: acp::SessionId,

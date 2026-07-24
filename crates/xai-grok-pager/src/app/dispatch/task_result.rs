@@ -454,6 +454,25 @@ pub(super) fn dispatch_task_result(result: TaskResult, app: &mut AppView) -> Vec
             tracing::trace!("Cancel notification sent successfully");
             vec![]
         }
+        TaskResult::GoalStatusComplete {
+            agent_id,
+            toast,
+            open_detail,
+        } => {
+            if let Some(agent) = app.agents.get_mut(&agent_id) {
+                agent.show_toast(&toast);
+                if open_detail {
+                    agent.show_goal_detail = true;
+                }
+            }
+            vec![]
+        }
+        TaskResult::GoalMutationFailed { agent_id, message } => {
+            if let Some(agent) = app.agents.get_mut(&agent_id) {
+                agent.show_toast(&message);
+            }
+            vec![]
+        }
         TaskResult::KillSubagentComplete {
             session_id,
             subagent_id,

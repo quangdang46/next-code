@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use agent_client_protocol as acp;
 use agent_client_protocol::{
-    Client as _, SessionId, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
+    Agent as _, Client as _, SessionId, ToolCallId, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -663,6 +664,73 @@ impl NextCodeFaceAgent {
                 std::sync::Arc::from(raw),
             ))
             .await;
+    }
+
+    async fn emit_goal_update(
+        &self,
+        session_id: &str,
+        update: xai_grok_shell::extensions::notification::SessionUpdate,
+    ) {
+        self.emit_session_recap_update(session_id, update).await;
+    }
+
+    async fn apply_goal_mutation(&self, mutation: crate::cli::face_goal::GoalMutation) {
+        if let Some(emit) = mutation.emit.as_ref() {
+            let update = crate::cli::face_goal::emit_to_update(emit);
+            self.emit_goal_update(&mutation.session_id, update).await;
+        }
+    }
+
+    async fn emit_goal_from_store(&self, session_id: &str, last_event: Option<&str>) {
+        let Ok(Some(goal)) = crate::session_goal::get(session_id) else {
+            return;
+        };
+        let update = crate::cli::face_goal::goal_updated_update(&goal, last_event, None, None);
+        self.emit_goal_update(session_id, update).await;
+    }
+
+    /// After EndTurn: account usage and optionally continue the active session goal.
+    async fn maybe_continue_session_goal(
+        &self,
+        session_id: &str,
+        stop: acp::StopReason,
+        token_delta: u64,
+        elapsed_seconds: u64,
+    ) -> acp::Result<acp::PromptResponse> {
+        if !matches!(stop, acp::StopReason::EndTurn) {
+            return Ok(acp::PromptResponse::new(stop));
+        }
+        match crate::cli::face_goal::decide_continuation(session_id, token_delta, elapsed_seconds)
+        {
+            crate::cli::face_goal::ContinuationDecision::None => {
+                Ok(acp::PromptResponse::new(stop))
+            }
+            crate::cli::face_goal::ContinuationDecision::MaxReached { goal } => {
+                let update = crate::cli::face_goal::goal_updated_update(
+                    &goal,
+                    Some("max_continuations"),
+                    Some("limit"),
+                    Some("Paused: max goal continuations reached"),
+                );
+                self.emit_goal_update(session_id, update).await;
+                Ok(acp::PromptResponse::new(stop))
+            }
+            crate::cli::face_goal::ContinuationDecision::Continue { prompt, goal } => {
+                let update = crate::cli::face_goal::goal_updated_update(
+                    &goal,
+                    Some("goal_continuation"),
+                    None,
+                    None,
+                );
+                self.emit_goal_update(session_id, update).await;
+                // Stay inside the original ACP prompt() until pursuit pauses/completes.
+                let req = acp::PromptRequest::new(
+                    acp::SessionId::new(session_id),
+                    vec![acp::ContentBlock::Text(acp::TextContent::new(prompt))],
+                );
+                self.prompt(req).await
+            }
+        }
     }
 
     /// Visible Face scrollback notice when provider/model failover changes the active model.
@@ -1815,6 +1883,31 @@ impl acp::Agent for NextCodeFaceAgent {
                 }
                 serde_json::json!({ "result": { "ok": true } })
             }
+            "x.ai/goal/set" => {
+                let mutation = crate::cli::face_goal::handle_goal_set(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/pause" => {
+                let mutation = crate::cli::face_goal::handle_goal_pause(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/resume" => {
+                let mutation = crate::cli::face_goal::handle_goal_resume(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/clear" => {
+                let mutation = crate::cli::face_goal::handle_goal_clear(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/status" => crate::cli::face_goal::handle_goal_status(&params),
             other => {
                 if let Some(payload) =
                     crate::cli::face_ext::handle_ext_method(other, &params).await
@@ -1928,6 +2021,8 @@ impl acp::Agent for NextCodeFaceAgent {
             return Err(acp::Error::internal_error().data(err.to_string()));
         }
 
+        let mut turn_tokens: u64 = 0;
+        let turn_started = std::time::Instant::now();
         let stop = loop {
             let event = match session.read_event().await {
                 Ok(e) => e,
@@ -2001,6 +2096,16 @@ impl acp::Agent for NextCodeFaceAgent {
                     if name.eq_ignore_ascii_case("memory") {
                         self.emit_memory_info(&session_id).await;
                     }
+                    if name.eq_ignore_ascii_case("create_goal")
+                        || name.eq_ignore_ascii_case("update_goal")
+                    {
+                        let last_event = if name.eq_ignore_ascii_case("create_goal") {
+                            Some("goal_set")
+                        } else {
+                            Some("goal_updated")
+                        };
+                        self.emit_goal_from_store(&session_id, last_event).await;
+                    }
                 }
                 ServerEvent::GeneratedImage {
                     id,
@@ -2037,6 +2142,9 @@ impl acp::Agent for NextCodeFaceAgent {
                     cache_read_input,
                     cache_creation_input,
                 } => {
+                    turn_tokens = turn_tokens
+                        .saturating_add(input)
+                        .saturating_add(output);
                     self.emit_token_usage(
                         &session_id,
                         input,
@@ -2201,7 +2309,9 @@ impl acp::Agent for NextCodeFaceAgent {
         };
 
         session.prompt_running.store(false, Ordering::SeqCst);
-        Ok(acp::PromptResponse::new(stop))
+        let elapsed_seconds = turn_started.elapsed().as_secs().max(1);
+        self.maybe_continue_session_goal(&session_id, stop, turn_tokens, elapsed_seconds)
+            .await
     }
 
     async fn cancel(&self, args: acp::CancelNotification) -> acp::Result<()> {

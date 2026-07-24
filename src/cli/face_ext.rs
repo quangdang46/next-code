@@ -573,6 +573,7 @@ pub fn session_delete_payload(session_id: &str) -> serde_json::Value {
     if let Ok(journal) = crate::session::session_journal_path(sid) {
         let _ = std::fs::remove_file(journal);
     }
+    let _ = crate::session_goal::clear(sid);
     crate::tui::session_picker::invalidate_session_list_cache();
     json!({ "result": { "ok": true, "sessionId": sid } })
 }

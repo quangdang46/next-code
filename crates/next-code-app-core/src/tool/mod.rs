@@ -24,6 +24,7 @@ mod ffs_symbol;
 mod gmail;
 
 mod goal;
+mod session_goal_tools;
 mod hashline_edit;
 mod hashline_loop_guard;
 pub mod hashline_snapshots;
@@ -196,6 +197,7 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "notepad_read_working"
             | "notepad_read_manual"
             | "notepad_stats"
+            | "get_goal"
             | "beads_list"
             | "memory"
             | "lsp"
@@ -222,6 +224,8 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "notepad_write_working"
             | "notepad_write_manual"
             | "notepad_prune"
+            | "create_goal"
+            | "update_goal"
     ) {
         return ToolTier::Write;
     }
@@ -489,6 +493,26 @@ impl Registry {
                 "initiative",
                 goal::InitiativeTool::new,
             );
+            if crate::config::config().goal.enabled {
+                Self::insert_tool_timed(
+                    &mut m,
+                    &mut timings,
+                    "create_goal",
+                    session_goal_tools::CreateGoalTool::new,
+                );
+                Self::insert_tool_timed(
+                    &mut m,
+                    &mut timings,
+                    "update_goal",
+                    session_goal_tools::UpdateGoalTool::new,
+                );
+                Self::insert_tool_timed(
+                    &mut m,
+                    &mut timings,
+                    "get_goal",
+                    session_goal_tools::GetGoalTool::new,
+                );
+            }
             Self::insert_tool_timed(&mut m, &mut timings, "gmail", gmail::GmailTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "memory", memory::MemoryTool::new);
             // Single model-facing `edit` tool; backend selected by tools.edit_mode

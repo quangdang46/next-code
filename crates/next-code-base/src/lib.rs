@@ -70,6 +70,7 @@ pub mod runtime_memory_log;
 pub mod safety;
 pub mod secret_input;
 pub mod session;
+pub mod session_goal;
 pub mod session_list_cache;
 pub mod session_metrics;
 pub mod side_panel;

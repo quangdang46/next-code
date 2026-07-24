@@ -474,13 +474,15 @@ pub struct GoalDisplayState {
     pub elapsed_floor_ms: u64,
 }
 impl GoalDisplayState {
-    /// Minimal state for tests that only need a present goal (e.g. occluder
-    /// gating); field values are representative, not load-bearing.
-    #[cfg(test)]
-    pub(crate) fn test_stub() -> Self {
+    /// Local Face `/goal` session objective (no shell `GoalUpdated` yet).
+    pub(crate) fn from_objective(objective: String) -> Self {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
         Self {
-            goal_id: "g-test".into(),
-            objective: "test goal".into(),
+            goal_id: format!("face-{nanos:x}"),
+            objective,
             status: GoalDisplayStatus::Active,
             phase: GoalDisplayPhase::Executing,
             token_budget: None,
@@ -498,7 +500,7 @@ impl GoalDisplayState {
             live_context_pct: None,
             live_turn_count: None,
             live_tool_call_count: None,
-            last_event: None,
+            last_event: Some("goal_set".into()),
             last_event_detail: None,
             last_event_timestamp: None,
             token_baseline: 0,
@@ -515,6 +517,13 @@ impl GoalDisplayState {
             received_at: std::time::Instant::now(),
             elapsed_floor_ms: 0,
         }
+    }
+
+    /// Minimal state for tests that only need a present goal (e.g. occluder
+    /// gating); field values are representative, not load-bearing.
+    #[cfg(test)]
+    pub(crate) fn test_stub() -> Self {
+        Self::from_objective("test goal".into())
     }
     /// Return real-time token usage by combining the pager's context state
     /// (which updates on every streamed chunk) with the goal baseline and
