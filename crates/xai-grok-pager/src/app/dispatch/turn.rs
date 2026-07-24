@@ -524,6 +524,8 @@ pub(super) fn dispatch_demote_to_background(app: &mut AppView) -> Vec<Effect> {
 
     tracing::info!(tool_call_id = %tool_call_id, "Demoting execute tool to background");
 
+    agent.show_toast("Running in background \u{00b7} Ctrl+B tasks");
+
     vec![Effect::DemoteToBackground {
         session_id,
         tool_call_id,

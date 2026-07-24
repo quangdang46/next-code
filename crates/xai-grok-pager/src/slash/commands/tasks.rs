@@ -1,15 +1,13 @@
-//! `/tasks` -- list background tasks, subagents, and scheduled tasks.
+//! `/tasks` -- open the interactive background-task hub (or dump in minimal).
 //!
-//! Minimal mode has no interactive `TasksPane`, so `/tasks` is the way
-//! to snapshot what's running in the background. It works in every render mode.
-//! The dispatcher (`dispatch_show_tasks`) reads the three task sources and
-//! commits a read-only list; killing/attaching is out of scope here (use the
-//! tasks pane in the full TUI).
+//! Full Face: opens the same `TasksPane` hub as Ctrl+B (list → Enter detail →
+//! Stop). Minimal mode has no overlay, so `/tasks` commits a read-only snapshot
+//! plus a hub CTA. Alias `/bashes` matches Claude Code muscle memory.
 
 use crate::app::actions::Action;
 use crate::slash::command::{CommandExecCtx, CommandResult, SlashCommand};
 
-/// List background tasks, subagents, and scheduled tasks.
+/// List / manage background tasks, subagents, and scheduled tasks.
 pub struct TasksCommand;
 
 impl SlashCommand for TasksCommand {
@@ -17,8 +15,12 @@ impl SlashCommand for TasksCommand {
         "tasks"
     }
 
+    fn aliases(&self) -> &[&str] {
+        &["bashes"]
+    }
+
     fn description(&self) -> &str {
-        "List background tasks, subagents, and scheduled tasks"
+        "Open background tasks hub (shells, monitors, loops, subagents)"
     }
 
     fn session_scoped(&self) -> bool {
@@ -87,5 +89,10 @@ mod tests {
     #[test]
     fn available_in_minimal_by_default() {
         assert!(TasksCommand.available_in_minimal());
+    }
+
+    #[test]
+    fn bashes_alias_registered() {
+        assert!(TasksCommand.aliases().contains(&"bashes"));
     }
 }

@@ -1080,7 +1080,11 @@ impl BlockViewerPane {
             ViewerKind::Grep => {
                 hints.push(HintItem::new(crate::key!('Y'), "copy pattern"));
             }
-            ViewerKind::BgTask => {}
+            ViewerKind::BgTask => {
+                if self.was_running {
+                    hints.push(HintItem::new(crate::key!('x'), "stop"));
+                }
+            }
             ViewerKind::IntegrationSearch | ViewerKind::UseTool | ViewerKind::PlainText => {}
         }
         hints
