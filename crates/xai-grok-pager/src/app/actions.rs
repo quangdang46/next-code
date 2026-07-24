@@ -593,6 +593,16 @@ pub enum Action {
     SetShowFloatTodos(bool),
     SetShowFloatWorkspaceMap(bool),
     SetShowFloatDiagrams(bool),
+    /// Prompt statusline master switch / segments (`[ui.status_line]`).
+    SetStatusLineEnabled(bool),
+    SetStatusLineMode(bool),
+    SetStatusLineModel(bool),
+    SetStatusLineContext(bool),
+    SetStatusLineCwd(bool),
+    SetStatusLineGit(bool),
+    SetStatusLineOrder(String),
+    ToggleStatusLineSegment(xai_grok_shell::agent::config::StatusLineSegment),
+    ResetStatusLine,
     /// Commit `[ui.display_refresh].auto_cadence_enabled`. Restart-required —
     /// cadence is pinned once at startup.
     SetDisplayRefreshAutoCadence(bool),

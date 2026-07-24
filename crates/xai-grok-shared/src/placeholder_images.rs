@@ -1033,7 +1033,13 @@ mod tests {
     fn load_placeholder_image_rejects_path_traversal_via_dotdot() {
         let allowed_dir = tempfile::tempdir().unwrap();
         let outside_dir = tempfile::tempdir().unwrap();
-        let unique = format!("ph-traversal-{}.png", uuid::Uuid::new_v4());
+        let unique = format!(
+            "ph-traversal-{}.png",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        );
         let outside = outside_dir.path().join(&unique);
         std::fs::write(&outside, PNG_BYTES).unwrap();
 

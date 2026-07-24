@@ -12,7 +12,8 @@ use super::setters::{
     set_respect_manual_folds_inner, set_btw_output_mode_inner, set_screen_mode_inner,
     set_scroll_lines_inner,
     set_scroll_mode_inner, set_scroll_speed_inner, set_show_thinking_blocks_inner,
-    set_show_tips_inner, set_simple_mode_inner, set_theme_inner, set_timeline_inner,
+    set_show_tips_inner, set_simple_mode_inner, set_status_line_bool_inner,
+    set_status_line_order_inner, set_theme_inner, set_timeline_inner,
     set_timestamps, set_timestamps_inner, set_vim_mode_inner, set_voice_capture_mode_inner,
     set_voice_stt_language_inner,
 };
@@ -895,6 +896,15 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("info_float.todos", SettingValue::Bool(b)) => Some(Action::SetShowFloatTodos(*b)),
         ("info_float.workspace_map", SettingValue::Bool(b)) => Some(Action::SetShowFloatWorkspaceMap(*b)),
         ("info_float.diagrams", SettingValue::Bool(b)) => Some(Action::SetShowFloatDiagrams(*b)),
+        ("status_line.enabled", SettingValue::Bool(b)) => Some(Action::SetStatusLineEnabled(*b)),
+        ("status_line.mode", SettingValue::Bool(b)) => Some(Action::SetStatusLineMode(*b)),
+        ("status_line.model", SettingValue::Bool(b)) => Some(Action::SetStatusLineModel(*b)),
+        ("status_line.context", SettingValue::Bool(b)) => Some(Action::SetStatusLineContext(*b)),
+        ("status_line.cwd", SettingValue::Bool(b)) => Some(Action::SetStatusLineCwd(*b)),
+        ("status_line.git", SettingValue::Bool(b)) => Some(Action::SetStatusLineGit(*b)),
+        ("status_line.order", SettingValue::String(s)) => {
+            Some(Action::SetStatusLineOrder(s.clone()))
+        }
         ("multiline_mode", SettingValue::Bool(b)) => Some(Action::SetMultilineMode(*b)),
         ("render_mermaid", SettingValue::Enum(s)) => {
             crate::appearance::RenderMermaid::from_canonical(s).map(Action::SetRenderMermaid)
@@ -1127,6 +1137,25 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         ("info_float.diagrams", SettingValue::Bool(b)) => {
             set_info_float_inner(app, |f, v| f.diagrams = v, *b)
         }
+        ("status_line.enabled", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.enabled = v, *b)
+        }
+        ("status_line.mode", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.mode = v, *b)
+        }
+        ("status_line.model", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.model = v, *b)
+        }
+        ("status_line.context", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.context = v, *b)
+        }
+        ("status_line.cwd", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.cwd = v, *b)
+        }
+        ("status_line.git", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.git = v, *b)
+        }
+        ("status_line.order", SettingValue::String(s)) => set_status_line_order_inner(app, s),
         ("respect_manual_folds", SettingValue::Bool(b)) => set_respect_manual_folds_inner(app, *b),
         ("theme", SettingValue::Enum(s)) => set_theme_inner(app, s),
         ("default_selected_permission", SettingValue::Enum(s)) => {

@@ -863,6 +863,7 @@ pub fn render_welcome(
             let info = PromptInfo {
                 model_name: params.model_name,
                 flags: params.flags,
+                status_segments: None,
                 multiline: false,
                 usage_warning: None,
                 usage_warning_critical: false,
@@ -2344,6 +2345,7 @@ fn render_welcome_done(
         let usage_info = PromptInfo {
             model_name: p.model_name,
             flags: p.flags,
+            status_segments: None,
             multiline: false,
             usage_warning: usage_warning_text.as_deref(),
             usage_warning_critical,

@@ -203,6 +203,9 @@ pub struct UiConfig {
     /// Skipped when untouched so the section only appears once a user toggles a float.
     #[serde(default, skip_serializing_if = "InfoFloatsConfig::is_default")]
     pub info_floats: InfoFloatsConfig,
+    /// Prompt statusline segments (`[ui.status_line]`). Skipped when untouched.
+    #[serde(default, skip_serializing_if = "crate::status_line::StatusLineConfig::is_default")]
+    pub status_line: crate::status_line::StatusLineConfig,
 }
 
 /// User-config opt-outs for the per-tip contextual hints, serialized as
@@ -364,6 +367,7 @@ impl Default for UiConfig {
             contextual_hints: ContextualHints::default(),
             display_refresh: DisplayRefreshSettings::default(),
             info_floats: InfoFloatsConfig::default(),
+            status_line: crate::status_line::StatusLineConfig::default(),
         }
     }
 }

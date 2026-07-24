@@ -1254,6 +1254,63 @@ fn move_setting_away_from_default(app: &mut AppView, key: crate::settings::Setti
         "contextual_hints.ssh_wrap" => {
             let _ = dispatch(Action::SetContextualHintSshWrap(false), app);
         }
+        "info_float.model_info" => {
+            let _ = dispatch(Action::SetShowFloatModelInfo(false), app);
+        }
+        "info_float.context_usage" => {
+            let _ = dispatch(Action::SetShowFloatContextUsage(false), app);
+        }
+        "info_float.kv_cache" => {
+            let _ = dispatch(Action::SetShowFloatKvCache(false), app);
+        }
+        "info_float.memory_activity" => {
+            let _ = dispatch(Action::SetShowFloatMemoryActivity(false), app);
+        }
+        "info_float.usage_limits" => {
+            let _ = dispatch(Action::SetShowFloatUsageLimits(false), app);
+        }
+        "info_float.git_status" => {
+            let _ = dispatch(Action::SetShowFloatGitStatus(false), app);
+        }
+        "info_float.background_tasks" => {
+            let _ = dispatch(Action::SetShowFloatBackgroundTasks(false), app);
+        }
+        "info_float.compaction" => {
+            let _ = dispatch(Action::SetShowFloatCompaction(false), app);
+        }
+        "info_float.swarm_status" => {
+            let _ = dispatch(Action::SetShowFloatSwarmStatus(false), app);
+        }
+        "info_float.todos" => {
+            let _ = dispatch(Action::SetShowFloatTodos(false), app);
+        }
+        "info_float.workspace_map" => {
+            let _ = dispatch(Action::SetShowFloatWorkspaceMap(false), app);
+        }
+        "info_float.diagrams" => {
+            let _ = dispatch(Action::SetShowFloatDiagrams(false), app);
+        }
+        "status_line.enabled" => {
+            let _ = dispatch(Action::SetStatusLineEnabled(false), app);
+        }
+        "status_line.mode" => {
+            let _ = dispatch(Action::SetStatusLineMode(false), app);
+        }
+        "status_line.model" => {
+            let _ = dispatch(Action::SetStatusLineModel(false), app);
+        }
+        "status_line.context" => {
+            let _ = dispatch(Action::SetStatusLineContext(false), app);
+        }
+        "status_line.cwd" => {
+            let _ = dispatch(Action::SetStatusLineCwd(true), app);
+        }
+        "status_line.git" => {
+            let _ = dispatch(Action::SetStatusLineGit(true), app);
+        }
+        "status_line.order" => {
+            let _ = dispatch(Action::SetStatusLineOrder("model,mode,context".into()), app);
+        }
         "multiline_mode" => {
             let _ = dispatch(Action::SetMultilineMode(true), app);
         }

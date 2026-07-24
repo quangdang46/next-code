@@ -4271,6 +4271,7 @@ impl AppView {
                                 crate::views::info_floats::InfoFloatVisibility::from(
                                     &self.current_ui.info_floats,
                                 );
+                            agent.status_line_config = self.current_ui.status_line.clone();
                             if agent.info_float_provider.is_none() {
                                 agent.info_float_provider = self
                                     .login_method_id
@@ -4393,6 +4394,8 @@ impl AppView {
                                                         crate::views::info_floats::InfoFloatVisibility::from(
                                                             &self.current_ui.info_floats,
                                                         );
+                                                    agent.status_line_config =
+                                                        self.current_ui.status_line.clone();
                                                     agent.draw(
                                                         inner,
                                                         buf,

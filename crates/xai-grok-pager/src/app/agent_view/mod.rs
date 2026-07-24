@@ -845,6 +845,8 @@ pub struct AgentView {
     /// Per-float-kind visibility flags, synced from `AppView::current_ui.info_floats`
     /// before every draw call. Default all-true.
     pub info_float_visibility: crate::views::info_floats::InfoFloatVisibility,
+    /// Prompt statusline segment config, synced from `AppView::current_ui.status_line`.
+    pub status_line_config: xai_grok_shell::agent::config::StatusLineConfig,
     /// Gateway light-frontend session (`kind: "chat"` / `--chat` / conversation
     /// resume). Suppresses Build credits / local sampler context telemetry so the
     /// status bar and prompt never imply remote usage from wrong metrics.
