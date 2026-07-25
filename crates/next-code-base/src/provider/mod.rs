@@ -828,10 +828,13 @@ impl MultiProvider {
         }
     }
 
+    /// Parse an `<alias>:<model>` or `<alias>/<model>` spec whose prefix matches
+    /// a known OpenAI-compatible profile id or alias.
     fn openai_compatible_model_prefix(
         model: &str,
     ) -> Option<(crate::provider_catalog::OpenAiCompatibleProfile, &str)> {
-        let (prefix, rest) = model.split_once(':')?;
+        let (prefix, rest) = model.split_once(':')
+            .or_else(|| model.split_once('/'))?;
         if explicit_model_provider_prefix(model).is_some() {
             return None;
         }
@@ -840,7 +843,10 @@ impl MultiProvider {
             return None;
         }
 
-        let profile = crate::provider_catalog::openai_compatible_profile_by_id(prefix)?;
+        // Try exact profile id first, then loose alias resolution
+        // (e.g. `ocg` → `opencode-go`).
+        let profile = crate::provider_catalog::openai_compatible_profile_by_id(prefix)
+            .or_else(|| crate::provider_catalog::resolve_openai_compatible_profile_selection(prefix))?;
         Some((profile, rest))
     }
 
