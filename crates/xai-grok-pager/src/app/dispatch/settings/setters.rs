@@ -88,6 +88,38 @@ pub(in crate::app::dispatch) fn set_render_mermaid(
     }]
 }
 
+/// Where rendered Mermaid diagrams appear: inline / sidebar / both.
+/// Persisted to `[ui].render_mermaid_target`.
+pub(in crate::app::dispatch) fn set_render_mermaid_target(
+    app: &mut AppView,
+    value: String,
+) -> Vec<Effect> {
+    let canonical = crate::settings::canonical_render_mermaid_target(Some(&value));
+    let prev = crate::settings::canonical_render_mermaid_target(app.current_ui.render_mermaid_target.as_deref());
+    if prev == canonical {
+        return vec![];
+    }
+    app.current_ui.render_mermaid_target = Some(canonical.to_string());
+    refresh_open_settings_modals(app);
+    tracing::info!(
+        target: "settings",
+        key = "render_mermaid_target",
+        value = canonical,
+        "setting changed",
+    );
+    let label = match canonical {
+        "sidebar" => "Side panel",
+        "both" => "Inline + Side panel",
+        _ => "Inline",
+    };
+    app.show_toast(&format!("\u{2713} Mermaid target: {label}"));
+    vec![Effect::PersistSetting {
+        key: "render_mermaid_target",
+        value: crate::settings::SettingValue::Enum(canonical),
+        rollback_value: crate::settings::SettingValue::Enum(prev),
+    }]
+}
+
 /// Mirror the canonical mode into `app.current_ui` so `current_value_for` stays
 /// in sync. Called by the commit path AND by [`apply_setting_rollback`](super::ui::apply_setting_rollback).
 pub(super) fn set_hunk_tracker_mode_inner(app: &mut AppView, canonical: &str) {
@@ -98,8 +130,8 @@ pub(super) fn set_screen_mode_inner(app: &mut AppView, canonical: &str) {
     app.current_ui.screen_mode = Some(canonical.to_string());
 }
 
-pub(super) fn set_btw_output_mode_inner(app: &mut AppView, canonical: &str) {
-    app.current_ui.btw_output_mode = Some(canonical.to_string());
+pub(super) fn set_side_panel_output_mode_inner(app: &mut AppView, canonical: &str) {
+    app.current_ui.side_panel_output_mode = Some(canonical.to_string());
 }
 
 /// Persist `[ui].screen_mode` (`fullscreen` | `minimal`). Restart-required.
@@ -127,21 +159,21 @@ pub(in crate::app::dispatch) fn set_screen_mode(app: &mut AppView, value: String
     }]
 }
 
-/// Persist `[ui].btw_output_mode` (`inline` | `sidebar`). Live-applies to the next `/btw`.
-pub(in crate::app::dispatch) fn set_btw_output_mode(
+/// Persist `[ui].side_panel_output_mode` (`inline` | `sidebar`). Live-applies to the next `/btw`.
+pub(in crate::app::dispatch) fn set_side_panel_output_mode(
     app: &mut AppView,
     value: String,
 ) -> Vec<Effect> {
-    let canonical = crate::settings::canonical_btw_output_mode(Some(&value));
-    let prev = crate::settings::canonical_btw_output_mode(app.current_ui.btw_output_mode.as_deref());
+    let canonical = crate::settings::canonical_side_panel_output_mode(Some(&value));
+    let prev = crate::settings::canonical_side_panel_output_mode(app.current_ui.side_panel_output_mode.as_deref());
     if prev == canonical {
         return vec![];
     }
-    set_btw_output_mode_inner(app, canonical);
+    set_side_panel_output_mode_inner(app, canonical);
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",
-        key = "btw_output_mode",
+        key = "side_panel_output_mode",
         value = canonical,
         "setting changed",
     );
@@ -152,38 +184,38 @@ pub(in crate::app::dispatch) fn set_btw_output_mode(
     };
     app.show_toast(&format!("\u{2713} /btw output: {label}"));
     vec![Effect::PersistSetting {
-        key: "btw_output_mode",
+        key: "side_panel_output_mode",
         value: crate::settings::SettingValue::Enum(canonical),
         rollback_value: crate::settings::SettingValue::Enum(prev),
     }]
 }
 
-/// Persist `[ui].btw_sidebar_width` after a drag or `[`/`]` resize. Live-applies
+/// Persist `[ui].side_panel_width` after a drag or `[`/`]` resize. Live-applies
 /// to every open agent so the next frame uses the new width.
-pub(in crate::app::dispatch) fn set_btw_sidebar_width(
+pub(in crate::app::dispatch) fn set_side_panel_width(
     app: &mut AppView,
     width: u16,
 ) -> Vec<Effect> {
-    let width = width.max(crate::views::agent::AgentViewLayout::BTW_SIDEBAR_MIN_WIDTH);
-    let prev = app.current_ui.btw_sidebar_width_or_default();
+    let width = width.max(crate::views::agent::AgentViewLayout::SIDE_PANEL_MIN_WIDTH);
+    let prev = app.current_ui.side_panel_width_or_default();
     if prev == width {
         for agent in app.agents.values_mut() {
-            agent.btw_sidebar_width = width;
+            agent.side_panel_width = width;
         }
         return vec![];
     }
-    app.current_ui.btw_sidebar_width = Some(width);
+    app.current_ui.side_panel_width = Some(width);
     for agent in app.agents.values_mut() {
-        agent.btw_sidebar_width = width;
+        agent.side_panel_width = width;
     }
     tracing::info!(
         target: "settings",
-        key = "btw_sidebar_width",
+        key = "side_panel_width",
         value = width,
         "setting changed",
     );
     vec![Effect::PersistSetting {
-        key: "btw_sidebar_width",
+        key: "side_panel_width",
         value: crate::settings::SettingValue::Int(width as i64),
         rollback_value: crate::settings::SettingValue::Int(prev as i64),
     }]

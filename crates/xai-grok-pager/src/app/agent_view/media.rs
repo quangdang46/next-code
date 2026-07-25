@@ -186,6 +186,11 @@ impl AgentView {
             } = aff;
             // Kick terminal-tier render for inline paint (no-op without graphics).
             self.ensure_mermaid_inline(source.clone());
+            // Kick sidebar render when target is sidebar or both.
+            let target = crate::appearance::cache::load_render_mermaid_target();
+            if target == "sidebar" || target == "both" {
+                self.request_mermaid_sidebar_render(source.clone());
+            }
             // The transient `rendering…` hint shows only while an on-click render
             // for this diagram is in flight.
             let rendering = self.diagram_is_rendering(&source);
@@ -527,6 +532,9 @@ impl AgentView {
     /// source (no render); `[Open]`/`[Copy path]` render it lazily at the live
     /// theme/width and then open the PNG / copy its path. `source` is moved into
     /// the renderer, never cloned. `copy_to_clipboard` owns the copy toast.
+    ///
+    /// When `render_mermaid_target` is `sidebar` or `both`, also dispatches a
+    /// sidebar render so the diagram appears in the side panel.
     fn on_mermaid_affordance_click(
         &mut self,
         kind: crate::scrollback::blocks::mermaid_content::AffordanceKind,
@@ -544,12 +552,28 @@ impl AgentView {
                 }
             }
             AffordanceKind::Open | AffordanceKind::CopyPath => {
-                let action = if matches!(kind, AffordanceKind::Open) {
-                    crate::app::mermaid_worker::MermaidClickAction::Open
+                let target = crate::appearance::cache::load_render_mermaid_target();
+                if target == "sidebar" {
+                    // Sidebar-only: render to side panel, don't open file.
+                    self.request_mermaid_sidebar_render(source);
+                } else if target == "both" {
+                    // Both: open file AND render to side panel.
+                    let action = if matches!(kind, AffordanceKind::Open) {
+                        crate::app::mermaid_worker::MermaidClickAction::Open
+                    } else {
+                        crate::app::mermaid_worker::MermaidClickAction::CopyPath
+                    };
+                    self.request_mermaid_render(source.clone(), action);
+                    self.request_mermaid_sidebar_render(source);
                 } else {
-                    crate::app::mermaid_worker::MermaidClickAction::CopyPath
-                };
-                self.request_mermaid_render(source, action);
+                    // Inline (default): open file as before.
+                    let action = if matches!(kind, AffordanceKind::Open) {
+                        crate::app::mermaid_worker::MermaidClickAction::Open
+                    } else {
+                        crate::app::mermaid_worker::MermaidClickAction::CopyPath
+                    };
+                    self.request_mermaid_render(source, action);
+                }
             }
         }
     }

@@ -1,0 +1,10 @@
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Rendering: ensure_mermaid_inline
+    Rendering --> Cached: render_job success (disk hit)
+    Rendering --> Cached: worker result Ready
+    Rendering --> Failed: worker result Failed
+    Failed --> Rendering: retry / new request
+    Cached --> [*] : sweep eviction
+    Cached --> Displayed: show_diagram_in_side_panel
+    Displayed --> Cached: side panel closed

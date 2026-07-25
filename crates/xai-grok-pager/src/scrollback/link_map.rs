@@ -554,7 +554,7 @@ mod tests {
         map.rebuild(1, &scrollback, vec![]);
         assert_eq!(map.len(), 1);
 
-        let btw = make_overlay(vec![(5, 0, 10, "https://btw.com", Some(0))]);
+        let side_panel = make_overlay(vec![(5, 0, 10, "https://btw.com", Some(0))]);
         map.append_from_overlay(&btw);
         assert_eq!(
             map.len(),
@@ -581,7 +581,7 @@ mod tests {
     fn append_merges_wrapped_segments_within_batch() {
         let mut map = VisibleLinkMap::default();
         map.rebuild(1, &make_overlay(vec![]), vec![]);
-        let btw = make_overlay(vec![
+        let side_panel = make_overlay(vec![
             (3, 10, 30, "https://wrapped.com", Some(7)),
             (4, 0, 15, "https://wrapped.com", Some(7)),
         ]);

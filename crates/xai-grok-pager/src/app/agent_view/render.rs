@@ -17,7 +17,7 @@ use crate::scrollback::text_selection::{
     render_block_drag_overlay, render_persistent_selection_overlay,
 };
 use crate::theme::Theme;
-use crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX;
+use crate::views::side_panel::SIDE_PANEL_ENTRY_IDX;
 use crate::views::modal;
 use crate::views::plan_approval_view::PlanApprovalFocus;
 use crate::views::prompt_widget::{PromptFlag, PromptInfo, PromptStyle};
@@ -693,7 +693,7 @@ impl AgentView {
                 || self.block_viewer.is_some()
                 || self.extensions_modal.is_some()
                 || self.agents_modal.is_some()
-                || self.btw_state.is_some()
+                || self.side_panel_state.is_some()
                 || self.line_viewer.is_some()
                 || self.active_modal.is_some())
         {
@@ -1077,25 +1077,25 @@ impl AgentView {
         };
         let voice_recording_height = if voice_listening { 1 } else { 0 };
         let _tool_usage_height = 0u16;
-        let btw_hidden = self.btw_sidebar && !self.btw_sidebar_visible;
-        let prefer_btw_sidebar =
-            self.btw_sidebar && self.btw_sidebar_visible && self.btw_state.is_some();
+        let side_panel_hidden = self.side_panel && !self.side_panel_visible;
+        let prefer_side_panel =
+            self.side_panel && self.side_panel_visible && self.side_panel_state.is_some();
         let inline_btw_height =
-            crate::views::btw_overlay::btw_panel_height(self.btw_state.as_ref(), inner_width);
+            crate::views::side_panel::side_panel_height(self.side_panel_state.as_ref(), inner_width);
         // Legacy TUI parity: split the full agent frame horizontally first so the
         // `/btw` column spans status → shortcuts (not a content-sized mid float).
-        let (compute_area, pre_split_sidebar) = if prefer_btw_sidebar {
-            match AgentViewLayout::split_btw_sidebar_column(area, self.btw_sidebar_width) {
+        let (compute_area, pre_split_side_panel) = if prefer_side_panel {
+            match AgentViewLayout::split_side_panel_column(area, self.side_panel_width) {
                 Some((main, side)) => (main, Some(side)),
                 None => (area, None),
             }
         } else {
             (area, None)
         };
-        let sidebar_placed = pre_split_sidebar.is_some();
-        let mut btw_height = if btw_hidden || sidebar_placed {
+        let side_panel_placed = pre_split_side_panel.is_some();
+        let mut btw_height = if side_panel_hidden || side_panel_placed {
             0
-        } else if prefer_btw_sidebar {
+        } else if prefer_side_panel {
             // Preferred sidebar but frame too narrow — fall back to overlay strip.
             inline_btw_height
         } else {
@@ -1134,23 +1134,23 @@ impl AgentView {
             1,
             compact,
         );
-        if let Some(side) = pre_split_sidebar {
-            layout.btw = side;
-            self.last_btw_divider_x = Some(side.x.saturating_sub(1));
+        if let Some(side) = pre_split_side_panel {
+            layout.side_panel = side;
+            self.last_side_panel_divider_x = Some(side.x.saturating_sub(1));
             self.last_btw_frame_width = Some(area.width);
         } else {
-            self.last_btw_divider_x = None;
+            self.last_side_panel_divider_x = None;
             self.last_btw_frame_width = None;
-            if prefer_btw_sidebar && !layout.apply_btw_sidebar(self.btw_sidebar_width) {
+            if prefer_side_panel && !layout.apply_side_panel(self.side_panel_width) {
                 // Post-compute carve also failed — keep overlay fallback already set.
-            } else if prefer_btw_sidebar && layout.btw.width > 0 {
-                self.last_btw_divider_x = Some(layout.btw.x.saturating_sub(1));
+            } else if prefer_side_panel && layout.side_panel.width > 0 {
+                self.last_side_panel_divider_x = Some(layout.side_panel.x.saturating_sub(1));
                 self.last_btw_frame_width = Some(
                     layout
                         .status_bar
                         .width
-                        .saturating_add(layout.btw.width)
-                        .saturating_add(AgentViewLayout::BTW_SIDEBAR_GAP),
+                        .saturating_add(layout.side_panel.width)
+                        .saturating_add(AgentViewLayout::SIDE_PANEL_GAP),
                 );
             }
         }
@@ -1230,12 +1230,12 @@ impl AgentView {
                         1,
                         compact,
                     );
-                    if let Some(side) = pre_split_sidebar {
-                        layout.btw = side;
-                        self.last_btw_divider_x = Some(side.x.saturating_sub(1));
+                    if let Some(side) = pre_split_side_panel {
+                        layout.side_panel = side;
+                        self.last_side_panel_divider_x = Some(side.x.saturating_sub(1));
                         self.last_btw_frame_width = Some(area.width);
-                    } else if prefer_btw_sidebar
-                        && !layout.apply_btw_sidebar(self.btw_sidebar_width)
+                    } else if prefer_side_panel
+                        && !layout.apply_side_panel(self.side_panel_width)
                     {
                         btw_height = inline_btw_height;
                         layout = AgentViewLayout::compute(
@@ -1259,10 +1259,10 @@ impl AgentView {
                             1,
                             compact,
                         );
-                        self.last_btw_divider_x = None;
+                        self.last_side_panel_divider_x = None;
                         self.last_btw_frame_width = None;
-                    } else if prefer_btw_sidebar && layout.btw.width > 0 {
-                        self.last_btw_divider_x = Some(layout.btw.x.saturating_sub(1));
+                    } else if prefer_side_panel && layout.side_panel.width > 0 {
+                        self.last_side_panel_divider_x = Some(layout.side_panel.x.saturating_sub(1));
                         self.last_btw_frame_width = Some(area.width);
                     }
                     if search_reserved_rows > 0 {
@@ -1664,7 +1664,7 @@ impl AgentView {
                 &theme,
             );
             if let Some(ref drag) = self.drag_selection
-                && drag.anchor.entry_idx != BTW_OVERLAY_ENTRY_IDX
+                && drag.anchor.entry_idx != SIDE_PANEL_ENTRY_IDX
             {
                 render_active_selection_overlay(
                     &self.last_scrollback_selection_model,
@@ -1675,7 +1675,7 @@ impl AgentView {
             } else if let Some(ref block_drag) = self.block_drag_selection {
                 render_block_drag_overlay(&self.last_scrollback_selection_model, block_drag, buf);
             } else if let Some(ref sel) = self.persistent_text_selection
-                && sel.entry_idx != BTW_OVERLAY_ENTRY_IDX
+                && sel.entry_idx != SIDE_PANEL_ENTRY_IDX
             {
                 render_persistent_selection_overlay(
                     &self.last_scrollback_selection_model,
@@ -1927,27 +1927,29 @@ impl AgentView {
         } else {
             self.hit_queue_close.clear();
         }
-        self.last_btw_selection_model = ResolvedSelectionModel::default();
-        self.last_btw_area = Rect::default();
-        let paint_btw = layout.btw.width >= 12 && layout.btw.height >= 3;
-        if paint_btw
-            && let Some(ref btw) = self.btw_state
+        self.last_panel_selection_model = ResolvedSelectionModel::default();
+        self.last_side_panel_area = Rect::default();
+        let paint_side_panel = layout.side_panel.width >= 12 && layout.side_panel.height >= 3;
+        let mut side_panel_image_escapes = String::new();
+        if paint_side_panel
+            && let Some(ref panel) = self.side_panel_state
         {
             let tick = self.scrollback.animation_tick();
             let mut btw_links = crate::render::osc8::LinkOverlay::new();
-            crate::views::btw_overlay::render_btw_panel(
+            crate::views::side_panel::render_side_panel(
                 buf,
-                btw,
-                layout.btw,
+                panel,
+                layout.side_panel,
                 tick,
-                self.btw_focused && self.active_pane == AgentPane::Prompt,
-                Some(&mut self.hit_btw_close),
-                &mut self.last_btw_selection_model,
+                self.side_panel_focused && self.active_pane == AgentPane::Prompt,
+                Some(&mut self.hit_side_panel_close),
+                &mut self.last_panel_selection_model,
                 Some(&mut btw_links),
                 &self.media_link_paths,
-                self.btw_sidebar,
+                self.side_panel,
+                &mut side_panel_image_escapes,
             );
-            self.last_btw_area = layout.btw;
+            self.last_side_panel_area = layout.side_panel;
             if !btw_links.is_empty() {
                 self.last_link_overlay.extend_from(&btw_links);
                 self.visible_link_map.append_from_overlay(&btw_links);
@@ -1957,16 +1959,16 @@ impl AgentView {
             self.paint_link_highlights(buf, link_active_style, sb_n..total_links);
             self.reclamp_drag_head_post_render(true);
             if let Some(ref drag) = self.drag_selection
-                && drag.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX
+                && drag.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX
             {
-                render_active_selection_overlay(&self.last_btw_selection_model, drag, None, buf);
+                render_active_selection_overlay(&self.last_panel_selection_model, drag, None, buf);
             } else if let Some(ref sel) = self.persistent_text_selection
-                && sel.entry_idx == BTW_OVERLAY_ENTRY_IDX
+                && sel.entry_idx == SIDE_PANEL_ENTRY_IDX
             {
-                render_persistent_selection_overlay(&self.last_btw_selection_model, sel, None, buf);
+                render_persistent_selection_overlay(&self.last_panel_selection_model, sel, None, buf);
             }
         } else {
-            self.hit_btw_close.clear();
+            self.hit_side_panel_close.clear();
         }
         if let Some(idx) = self.highlighted_link_idx {
             if self.visible_link_map.is_empty() {
@@ -4300,6 +4302,16 @@ impl AgentView {
                 Some(ref mut existing) => existing.append_plain(&seq),
                 None => {
                     prompt_post_flush = Some(crate::terminal::overlay::PostFlush::plain(seq));
+                }
+            }
+        }
+        // Append side panel Kitty image escapes to the post-flush.
+        if !side_panel_image_escapes.is_empty() {
+            match prompt_post_flush.as_mut() {
+                Some(existing) => existing.append_plain(&side_panel_image_escapes),
+                None => {
+                    prompt_post_flush =
+                        Some(crate::terminal::overlay::PostFlush::plain(side_panel_image_escapes));
                 }
             }
         }

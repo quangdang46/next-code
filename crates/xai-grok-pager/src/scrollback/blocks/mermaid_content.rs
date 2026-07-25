@@ -351,6 +351,30 @@ pub fn mermaid_display(setting: RenderMermaid) -> MermaidDisplay {
 /// which minimal never runs — so it would commit as a blank reserved line and
 /// its buttons would be inert. Suppressing it keeps the inline diagram art (the
 /// source stays natively selectable) without the dead row.
+/// Where rendered Mermaid diagram PNGs are targeted — inline scrollback, side
+/// panel, or both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum MermaidRenderTarget {
+    /// Render PNG below the code block in scrollback (default).
+    #[default]
+    Inline,
+    /// Render PNG in the right-hand side panel.
+    Sidebar,
+    /// Render PNG both inline and in the side panel.
+    Both,
+}
+
+/// Resolve the user's `render_mermaid_target` setting to a [`MermaidRenderTarget`].
+///
+/// Reads from `app.current_ui.render_mermaid_target`, defaulting to [`Inline`].
+pub fn mermaid_render_target(value: Option<&str>) -> MermaidRenderTarget {
+    match crate::settings::canonical_render_mermaid_target(value) {
+        "sidebar" => MermaidRenderTarget::Sidebar,
+        "both" => MermaidRenderTarget::Both,
+        _ => MermaidRenderTarget::Inline,
+    }
+}
+
 pub fn mermaid_display_static(setting: RenderMermaid, static_commit: bool) -> MermaidDisplay {
     if static_commit {
         MermaidDisplay::SourceOnly

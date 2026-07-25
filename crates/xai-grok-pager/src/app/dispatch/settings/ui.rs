@@ -9,7 +9,7 @@ use super::setters::{
     set_info_float_inner, set_invert_scroll_inner, set_keep_text_selection_inner,
     set_max_thoughts_width_inner, set_multiline_mode, set_page_flip_on_send_inner,
     set_prompt_suggestions_inner, set_remember_tool_approvals_inner, set_render_mermaid_inner,
-    set_respect_manual_folds_inner, set_btw_output_mode_inner, set_screen_mode_inner,
+    set_respect_manual_folds_inner, set_side_panel_output_mode_inner, set_screen_mode_inner,
     set_scroll_lines_inner,
     set_scroll_mode_inner, set_scroll_speed_inner, set_show_thinking_blocks_inner,
     set_show_tips_inner, set_simple_mode_inner, set_theme_inner, set_timeline_inner,
@@ -899,6 +899,9 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("render_mermaid", SettingValue::Enum(s)) => {
             crate::appearance::RenderMermaid::from_canonical(s).map(Action::SetRenderMermaid)
         }
+        ("render_mermaid_target", SettingValue::Enum(s)) => {
+            Some(Action::SetRenderMermaidTarget(s.to_string()))
+        }
         ("vim_mode", SettingValue::Bool(b)) => Some(Action::SetVimMode(*b)),
         ("remember_tool_approvals", SettingValue::Bool(b)) => {
             Some(Action::SetRememberToolApprovals(*b))
@@ -1016,8 +1019,8 @@ pub(in crate::app::dispatch) fn action_for_reset(
             Some(Action::SetHunkTrackerMode((*s).to_string()))
         }
         ("screen_mode", SettingValue::Enum(s)) => Some(Action::SetScreenMode((*s).to_string())),
-        ("btw_output_mode", SettingValue::Enum(s)) => {
-            Some(Action::SetBtwOutputMode((*s).to_string()))
+        ("side_panel_output_mode", SettingValue::Enum(s)) => {
+            Some(Action::SetSidePanelOutputMode((*s).to_string()))
         }
         ("voice_capture_mode", SettingValue::Enum(s)) => {
             Some(Action::SetVoiceCaptureMode((*s).to_string()))
@@ -1313,10 +1316,10 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         ("screen_mode", SettingValue::Enum(s)) => {
             set_screen_mode_inner(app, crate::settings::canonical_screen_mode(Some(s)));
         }
-        ("btw_output_mode", SettingValue::Enum(s)) => {
-            set_btw_output_mode_inner(
+        ("side_panel_output_mode", SettingValue::Enum(s)) => {
+            set_side_panel_output_mode_inner(
                 app,
-                crate::settings::canonical_btw_output_mode(Some(s)),
+                crate::settings::canonical_side_panel_output_mode(Some(s)),
             );
         }
         ("voice_capture_mode", SettingValue::Enum(s)) => {

@@ -241,6 +241,26 @@ const RENDER_MERMAID_CHOICES: &[EnumChoice] = &[
     },
 ];
 
+// Where rendered Mermaid diagram PNGs appear. Shared-owned, persisted to
+// `[ui].render_mermaid_target`.
+const RENDER_MERMAID_TARGET_CHOICES: &[EnumChoice] = &[
+    EnumChoice {
+        canonical: "inline",
+        display: "Inline",
+        description: "Render diagram PNG directly below the code block in scrollback.",
+    },
+    EnumChoice {
+        canonical: "sidebar",
+        display: "Side panel",
+        description: "Render diagram PNG in the side panel (Alt+M hides).",
+    },
+    EnumChoice {
+        canonical: "both",
+        display: "Both",
+        description: "Render inline and also show in the side panel.",
+    },
+];
+
 // Scroll-input catalog. SHELL-owned, persisted to `[ui].scroll_mode`.
 // Canonical strings match `ScrollMode::as_canonical` (pinned by test).
 const SCROLL_MODE_CHOICES: &[EnumChoice] = &[
@@ -596,15 +616,15 @@ pub fn default_settings() -> Vec<SettingMeta> {
             hidden_in_minimal: false,
         },
         SettingMeta {
-            key: "btw_output_mode",
+            key: "side_panel_output_mode",
             category: SettingCategory::Appearance,
             owner: SettingOwner::Shared,
             label: "/btw output",
             description: "Where /btw answers appear: Overlay above the prompt (Face / Grok \
                           default) or a right-hand side panel (legacy TUI parity). Live-applies \
-                          to the next /btw. Writes [ui] btw_output_mode in config.toml.",
+                          to the next /btw. Writes [ui] side_panel_output_mode in config.toml.",
             keywords: &[
-                "btw",
+                "side_panel",
                 "sidebar",
                 "side",
                 "panel",
@@ -800,6 +820,32 @@ pub fn default_settings() -> Vec<SettingMeta> {
             kind: SettingKind::Enum {
                 default: "auto",
                 choices: RENDER_MERMAID_CHOICES,
+                supports_preview: false,
+            },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "render_mermaid_target",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Mermaid diagram target",
+            description: "Where rendered Mermaid diagram PNGs appear: inline (below the \
+                          code block), side panel (right-hand side panel), or both.",
+            keywords: &[
+                "mermaid",
+                "diagram",
+                "diagrams",
+                "render",
+                "target",
+                "inline",
+                "sidebar",
+                "side",
+                "panel",
+            ],
+            kind: SettingKind::Enum {
+                default: "inline",
+                choices: RENDER_MERMAID_TARGET_CHOICES,
                 supports_preview: false,
             },
             restart_required: false,

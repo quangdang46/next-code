@@ -7,7 +7,7 @@ use crate::key;
 use crate::scrollback::selection::SelectionBox;
 use crate::scrollback::types::DisplayMode;
 use crate::theme::Theme;
-use crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX;
+use crate::views::side_panel::SIDE_PANEL_ENTRY_IDX;
 use crate::views::file_search::line_viewer::LineViewerState;
 use crate::views::list_pane::ListItem;
 use crate::views::plan_approval_view::PlanApprovalFocus;
@@ -330,37 +330,37 @@ impl AgentView {
     }
 
     /// Dismiss the /btw panel. If Done, flush response to scrollback first.
-    pub(super) fn dismiss_btw_panel(&mut self) -> InputOutcome {
+    pub(super) fn dismiss_side_panel(&mut self) -> InputOutcome {
         use crate::scrollback::block::RenderBlock;
         use crate::scrollback::blocks::BtwBlock;
-        use crate::views::btw_overlay::BtwOverlayState;
-        if let Some(BtwOverlayState::Done {
-            question, content, ..
-        }) = self.btw_state.take()
-        {
-            self.scrollback
-                .push_block(RenderBlock::Btw(BtwBlock::new(question, content.text())));
-        } else {
-            self.btw_state = None;
+        use crate::views::side_panel::SidePanelState;
+        match self.side_panel_state.take() {
+            Some(SidePanelState::Done {
+                question, content, ..
+            }) => {
+                self.scrollback
+                    .push_block(RenderBlock::Btw(BtwBlock::new(question, content.text())));
+            }
+            _ => {} // Diagram, Loading, Error: just dismiss
         }
-        self.minimal_btw_lifecycle = None;
-        self.btw_focused = false;
-        self.btw_sidebar = false;
-        self.btw_sidebar_visible = true;
-        self.btw_sidebar_dragging = false;
-        self.clear_btw_drag_state();
+        self.minimal_side_panel_lifecycle = None;
+        self.side_panel_focused = false;
+        self.side_panel = false;
+        self.side_panel_visible = true;
+        self.side_panel_dragging = false;
+        self.clear_side_panel_drag_state();
         InputOutcome::Changed
     }
 
-    pub(super) fn clear_btw_drag_state(&mut self) {
-        let is_btw = self
+    pub(super) fn clear_side_panel_drag_state(&mut self) {
+        let is_side_panel = self
             .pending_text_drag
-            .is_some_and(|p| p.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX)
+            .is_some_and(|p| p.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX)
             || self
                 .drag_selection
                 .as_ref()
-                .is_some_and(|d| d.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX);
-        if is_btw {
+                .is_some_and(|d| d.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX);
+        if is_side_panel {
             self.pending_text_drag = None;
             self.drag_selection = None;
             self.drag_autoscroll = None;

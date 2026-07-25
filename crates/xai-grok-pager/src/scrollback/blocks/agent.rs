@@ -206,6 +206,11 @@ impl BlockContent for AgentMessageBlock {
         {
             return Vec::new();
         }
+        // When target is sidebar-only, suppress inline PNG placements
+        // (they go to the side panel on click instead).
+        if crate::appearance::cache::load_render_mermaid_target() == "sidebar" {
+            return Vec::new();
+        }
         self.rendered_output(ctx)
             .2
             .into_iter()
