@@ -347,6 +347,7 @@ impl AgentView {
         self.btw_focused = false;
         self.btw_sidebar = false;
         self.btw_sidebar_visible = true;
+        self.btw_sidebar_dragging = false;
         self.clear_btw_drag_state();
         InputOutcome::Changed
     }

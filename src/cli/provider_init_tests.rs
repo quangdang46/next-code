@@ -25,10 +25,6 @@ fn lock_env() -> std::sync::MutexGuard<'static, ()> {
 fn test_provider_choice_arg_values() {
     assert_eq!(ProviderChoice::Claude.as_arg_value(), "claude");
     assert_eq!(ProviderChoice::AnthropicApi.as_arg_value(), "anthropic-api");
-    assert_eq!(
-        ProviderChoice::ClaudeSubprocess.as_arg_value(),
-        "claude-subprocess"
-    );
     assert_eq!(ProviderChoice::Openai.as_arg_value(), "openai");
     assert_eq!(ProviderChoice::OpenaiApi.as_arg_value(), "openai-api");
     assert_eq!(ProviderChoice::Openrouter.as_arg_value(), "openrouter");
@@ -47,7 +43,6 @@ fn test_provider_choice_arg_values() {
     assert_eq!(ProviderChoice::Xai.as_arg_value(), "xai");
     assert_eq!(ProviderChoice::XiaomiMimo.as_arg_value(), "xiaomi-mimo");
     assert_eq!(ProviderChoice::Lmstudio.as_arg_value(), "lmstudio");
-    assert_eq!(ProviderChoice::Ollama.as_arg_value(), "ollama");
     assert_eq!(ProviderChoice::Chutes.as_arg_value(), "chutes");
     assert_eq!(ProviderChoice::Cerebras.as_arg_value(), "cerebras");
     assert_eq!(
@@ -597,9 +592,9 @@ async fn init_provider_for_ollama_reapplies_local_compat_runtime_env_after_disab
 
     crate::env::set_var("NEXT_CODE_HOME", dir.path());
 
-    let provider = init_provider_for_validation(&ProviderChoice::Ollama, Some("llama3.2"))
+    let provider = init_provider_for_validation(&ProviderChoice::Lmstudio, Some("lmstudio-ai"))
         .await
-        .expect("init ollama provider");
+        .expect("init lmstudio provider");
 
     assert_eq!(
         std::env::var("NEXT_CODE_OPENROUTER_API_BASE").ok().as_deref(),

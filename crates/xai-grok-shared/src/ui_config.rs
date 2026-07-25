@@ -183,6 +183,10 @@ pub struct UiConfig {
     /// `"sidebar"` (legacy TUI-style right-hand panel). Unset → `inline`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub btw_output_mode: Option<String>,
+    /// Preferred column width for Face `/btw` side panel mode. Unset → 36.
+    /// Adjusted by dragging the divider or `[` / `]` while the panel is focused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub btw_sidebar_width: Option<u16>,
     /// Retired hidden opt-in for terminal-like double/triple-click word/line
     /// selection. Superseded by `keep_text_selection = "word_select"`. Still
     /// read only when `keep_text_selection` is unset; Settings clears this on
@@ -360,6 +364,7 @@ impl Default for UiConfig {
             cursor_blink: None,
             screen_mode: None,
             btw_output_mode: None,
+            btw_sidebar_width: None,
             double_click_action: None,
             contextual_hints: ContextualHints::default(),
             display_refresh: DisplayRefreshSettings::default(),
@@ -393,6 +398,15 @@ impl UiConfig {
     pub fn page_flip_on_send_enabled(&self) -> bool {
         self.page_flip_on_send
             .unwrap_or(Self::PAGE_FLIP_ON_SEND_DEFAULT)
+    }
+
+    /// Default `/btw` side-panel width when `[ui].btw_sidebar_width` is unset.
+    pub const BTW_SIDEBAR_WIDTH_DEFAULT: u16 = 36;
+
+    pub fn btw_sidebar_width_or_default(&self) -> u16 {
+        self.btw_sidebar_width
+            .unwrap_or(Self::BTW_SIDEBAR_WIDTH_DEFAULT)
+            .max(20)
     }
 
     /// True when the highlight should not timer-dismiss (`hold` / `word_select`,

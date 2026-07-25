@@ -184,6 +184,8 @@ impl AgentView {
                 screen_rect: rect,
                 source,
             } = aff;
+            // Kick terminal-tier render for inline paint (no-op without graphics).
+            self.ensure_mermaid_inline(source.clone());
             // The transient `rendering…` hint shows only while an on-click render
             // for this diagram is in flight.
             let rendering = self.diagram_is_rendering(&source);

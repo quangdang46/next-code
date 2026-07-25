@@ -1228,6 +1228,15 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "btw_sidebar_width" => {
+            let SettingValue::Int(i) = value else {
+                return Err(kind_mismatch("btw_sidebar_width", "Int", &value));
+            };
+            let width = u16::try_from(i).unwrap_or(36).max(20);
+            xai_grok_shell::util::config::set_btw_sidebar_width(width)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "voice_capture_mode" => {
             let SettingValue::Enum(s) = value else {
                 return Err(kind_mismatch("voice_capture_mode", "Enum", &value));

@@ -26,10 +26,9 @@ use super::types::{
 
 /// The trailing inline image anchored within a block's rendered output.
 ///
-/// Built by the default [`inline_media_placements`](BlockContent::inline_media_placements)
-/// for a block's single [`inline_media`](BlockContent::inline_media) image (tool
-/// media, e.g. an `OtherToolCallBlock`). Mermaid diagrams do not use this path —
-/// they render as a code block plus a text affordance row instead.
+/// Built by [`inline_media_placements`](BlockContent::inline_media_placements)
+/// for tool media (`OtherToolCallBlock`) and for ready Mermaid terminal-tier
+/// PNGs on agent messages.
 #[derive(Debug, Clone)]
 pub struct AnchoredMedia {
     /// Media metadata (path, raster dimensions, type).
@@ -40,6 +39,10 @@ pub struct AnchoredMedia {
     pub row_offset: u16,
     /// Height of the image area in rows (the crop region).
     pub rows: u16,
+    /// Whether the draw loop should paint a trailing `[Open]`/`[Copy]` button
+    /// row under the image. Tool media uses `true`; Mermaid keeps Open/Copy on
+    /// its affordance row, so `false`.
+    pub has_button_row: bool,
 }
 
 /// Trait for block content description.
@@ -222,6 +225,7 @@ pub trait BlockContent {
             info,
             row_offset: content_lines + 1,
             rows,
+            has_button_row: true,
         }]
     }
 
@@ -1279,6 +1283,7 @@ mod tests {
             "image trails the 2 text lines + 1 padding row"
         );
         assert!(p.rows >= 2, "image area reserves the fitted rows");
+        assert!(p.has_button_row, "tool media keeps the Open/Copy button row");
         assert_eq!(p.info.path, std::path::PathBuf::from("/tmp/img.png"));
     }
 

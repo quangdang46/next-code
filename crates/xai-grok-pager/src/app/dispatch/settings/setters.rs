@@ -158,6 +158,37 @@ pub(in crate::app::dispatch) fn set_btw_output_mode(
     }]
 }
 
+/// Persist `[ui].btw_sidebar_width` after a drag or `[`/`]` resize. Live-applies
+/// to every open agent so the next frame uses the new width.
+pub(in crate::app::dispatch) fn set_btw_sidebar_width(
+    app: &mut AppView,
+    width: u16,
+) -> Vec<Effect> {
+    let width = width.max(crate::views::agent::AgentViewLayout::BTW_SIDEBAR_MIN_WIDTH);
+    let prev = app.current_ui.btw_sidebar_width_or_default();
+    if prev == width {
+        for agent in app.agents.values_mut() {
+            agent.btw_sidebar_width = width;
+        }
+        return vec![];
+    }
+    app.current_ui.btw_sidebar_width = Some(width);
+    for agent in app.agents.values_mut() {
+        agent.btw_sidebar_width = width;
+    }
+    tracing::info!(
+        target: "settings",
+        key = "btw_sidebar_width",
+        value = width,
+        "setting changed",
+    );
+    vec![Effect::PersistSetting {
+        key: "btw_sidebar_width",
+        value: crate::settings::SettingValue::Int(width as i64),
+        rollback_value: crate::settings::SettingValue::Int(prev as i64),
+    }]
+}
+
 fn screen_mode_raw_matches_canonical(raw: Option<&str>, canonical: &str) -> bool {
     let Some(raw) = raw.map(str::trim).filter(|s| !s.is_empty()) else {
         return false;

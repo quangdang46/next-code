@@ -1160,6 +1160,17 @@ pub struct AgentView {
     /// Side-panel visibility while `btw_sidebar` is active. Alt+M toggles;
     /// Esc still dismisses the whole `/btw` session.
     pub(crate) btw_sidebar_visible: bool,
+    /// Preferred `/btw` side-panel width in columns (persisted as
+    /// `[ui].btw_sidebar_width`). Drag the divider or press `[` / `]` while the
+    /// panel is focused to adjust.
+    pub(crate) btw_sidebar_width: u16,
+    /// True while the user is dragging the `/btw` sidebar divider.
+    pub(crate) btw_sidebar_dragging: bool,
+    /// Last painted divider column (`sidebar.x - 1`) for mouse hit-testing.
+    pub(crate) last_btw_divider_x: Option<u16>,
+    /// Full agent-frame width used for the last `/btw` sidebar split (main + gap
+    /// + side). Used to clamp drag / keyboard resize.
+    pub(crate) last_btw_frame_width: Option<u16>,
     /// Whether the /btw panel holds keyboard focus. The panel is non-blocking,
     /// so Up/Down/PgUp/PgDn scroll it when focused and otherwise reach the
     /// prompt. Set on a `Done` answer; cleared when the user types in or clicks

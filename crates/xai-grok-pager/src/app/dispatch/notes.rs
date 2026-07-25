@@ -295,6 +295,7 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
     let minimal = app.screen_mode.is_minimal();
     let sidebar = crate::settings::canonical_btw_output_mode(app.current_ui.btw_output_mode.as_deref())
         == "sidebar";
+    let sidebar_width = app.current_ui.btw_sidebar_width_or_default();
     let (session_id, minimal_request_id) = {
         let Some(agent) = app.agents.get_mut(&id) else {
             return vec![];
@@ -313,6 +314,7 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
         };
 
         agent.prompt.set_text("");
+        agent.btw_sidebar_width = sidebar_width;
         let minimal_request_id = if minimal {
             // Minimal hosts /btw in the live region — always the overlay path.
             agent.btw_sidebar = false;
@@ -330,7 +332,9 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
             // Prompt keeps focus while the answer is in flight (panel focuses on Done).
             agent.btw_focused = false;
             if sidebar {
-                agent.show_toast("Running /btw - answer will appear in the side panel.");
+                agent.show_toast(
+                    "Running /btw — side panel. Drag divider or press [ / ] (focused) to resize.",
+                );
             }
             None
         };

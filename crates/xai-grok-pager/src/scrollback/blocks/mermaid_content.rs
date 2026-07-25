@@ -1,17 +1,22 @@
-//! Mermaid diagram detection and the on-screen affordance row.
+//! Mermaid diagram detection, affordance row, and terminal-tier inline PNG paint.
 //!
 //! The markdown renderer draws ` ```mermaid ` blocks inline as Unicode
 //! box-drawing art. This module detects those blocks in an agent message (via
 //! the generic [`CodeBlockSpan`](xai_grok_markdown::CodeBlockSpan) API) and
-//! exposes each diagram's clean source so a full-fidelity PNG can be rendered on
-//! demand. It never renders and tracks no per-diagram render state (rendering is
-//! lazy, driven by the affordance row on click). For `auto`/`on` a clickable
-//! affordance row (`◇ mermaid [Open Image] [Copy Image Path] [Copy Source]`) is
-//! placed beneath the inline art; for `off` only the inline art is shown. The
-//! rendered PNG is never drawn inline — it is reached only through the affordance
-//! row's actions.
+//! exposes each diagram's clean source so a full-fidelity PNG can be rendered
+//! lazily (worker + disk cache). For `auto`/`on` a clickable affordance row
+//! (`◇ mermaid [Open Image] [Copy Image Path] [Copy Source]`) is placed beneath
+//! the art; for `off` only the art is shown.
+//!
+//! When the terminal supports scrollback inline graphics and a
+//! [`MermaidRenderQuality::Terminal`] PNG is ready, blank image rows are
+//! reserved under the art and the draw loop paints the PNG via the shared
+//! Kitty/iTerm path (`InlineMediaPlacement`). Open/Copy still use the open tier.
 
+use std::collections::HashMap;
 use std::ops::Range;
+use std::path::PathBuf;
+use std::sync::{LazyLock, Mutex};
 
 use ratatui::text::Line;
 use unicode_width::UnicodeWidthStr;
@@ -62,16 +67,70 @@ fn width_bucket(target_width_cols: u16) -> u16 {
 /// Output quality tier for a rendered Mermaid PNG.
 ///
 /// `[Open Image]` / `[Copy Image Path]` use [`Open`] so the PNG is sharp in an
-/// OS image viewer; a future terminal-budget path can use [`Terminal`] without
-/// sharing cache files with the open tier.
+/// OS image viewer. Scrollback inline paint uses [`Terminal`] (bucketed width)
+/// and does not share cache files with the open tier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum MermaidRenderQuality {
     /// Sized from the terminal content width (HiDPI oversample + modest caps).
+    /// Used for Kitty/iTerm inline paint in the transcript.
     #[default]
     Terminal,
     /// Auto-scaled for OS viewers: prefer ≥2× intrinsic SVG size and a
     /// minimum pixel width, with higher height/area headroom.
     Open,
+}
+
+/// A terminal-tier PNG ready for scrollback inline paint.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReadyInlinePng {
+    /// On-disk PNG path (session `mermaid/` cache).
+    pub path: PathBuf,
+    /// Raster width in pixels.
+    pub width: u32,
+    /// Raster height in pixels.
+    pub height: u32,
+}
+
+/// Block-relative placement for a ready inline Mermaid PNG (image rows only;
+/// Open/Copy stay on the affordance row, so no tool-media button padding).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagramInlinePlacement {
+    /// PNG path + pixel dimensions for [`crate::prompt_images::InlineMediaInfo`].
+    pub png: ReadyInlinePng,
+    /// Post-wrap row offset of the image's top edge within the block output.
+    pub row_offset: u16,
+    /// Image area height in rows.
+    pub rows: u16,
+}
+
+/// Process-local map of terminal-tier keys → ready PNGs. Filled when the worker
+/// finishes (or a disk hit is promoted); consulted while laying out agent blocks.
+fn inline_png_cache() -> &'static Mutex<HashMap<MermaidCacheKey, ReadyInlinePng>> {
+    static CACHE: LazyLock<Mutex<HashMap<MermaidCacheKey, ReadyInlinePng>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+    &CACHE
+}
+
+/// Remember a terminal-tier PNG for inline paint (and layout reservation).
+pub fn remember_inline_png(key: MermaidCacheKey, png: ReadyInlinePng) {
+    if let Ok(mut guard) = inline_png_cache().lock() {
+        guard.insert(key, png);
+    }
+}
+
+/// Look up a ready terminal-tier PNG for `key`.
+pub fn lookup_inline_png(key: &MermaidCacheKey) -> Option<ReadyInlinePng> {
+    inline_png_cache().lock().ok()?.get(key).cloned()
+}
+
+/// Image-area row count for an inline Mermaid PNG (no tool-media button pad).
+pub fn mermaid_inline_image_rows(width_px: u32, height_px: u32, content_width: u16) -> u16 {
+    use crate::terminal::image::fit_image_to_cells;
+    let max_cols = content_width.saturating_sub(2);
+    let max_rows = (content_width / 2).clamp(4, 20);
+    fit_image_to_cells(width_px, height_px, max_cols, max_rows)
+        .1
+        .max(1)
 }
 
 /// Content hash of a diagram source — the theme/width-independent component of a
@@ -260,8 +319,9 @@ impl MermaidContent {
 }
 
 /// How a detected Mermaid block's affordance row is presented. The diagram
-/// itself is always drawn inline as Unicode art by the markdown renderer; the
-/// rendered PNG is never inline (it is reached only through the affordance row).
+/// art is always drawn by the markdown renderer; when a terminal-tier PNG is
+/// ready and graphics overlays are active, image rows are reserved beneath it
+/// for Kitty/iTerm paint. Open/Copy still go through the affordance row.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MermaidDisplay {
     /// The inline diagram art alone, with no affordance row
@@ -276,9 +336,8 @@ pub enum MermaidDisplay {
 ///
 /// `off` shows the inline art alone; `auto`/`on` add the clickable affordance
 /// row. The render engine is always compiled in, so engine availability is not a
-/// factor. Terminal graphics capability is intentionally not consulted either:
-/// the affordance row is text plus mouse hit-rects, so it works in every
-/// terminal (the rendered PNG opens in the OS viewer, never inline).
+/// factor. Terminal graphics capability is consulted separately for inline PNG
+/// paint (affordance buttons still work without graphics — they open the OS viewer).
 pub fn mermaid_display(setting: RenderMermaid) -> MermaidDisplay {
     match setting {
         RenderMermaid::Off => MermaidDisplay::SourceOnly,
@@ -435,36 +494,80 @@ fn continuation_row(line: Line<'static>) -> BlockLine {
     BlockLine::separator(line).with_joiner(Some(String::new()))
 }
 
-/// Insert a blank, non-selectable affordance row beneath each detected diagram
-/// and return one [`DiagramAffordance`] per inserted row (document order).
+/// Insert blank image rows (when a terminal-tier PNG is ready) and a blank
+/// affordance row beneath each detected diagram; return affordance + optional
+/// inline placements (document order).
 ///
-/// The blank row reserves the vertical space the draw loop paints the
-/// `◇ mermaid [Open Image] [Copy Image Path] [Copy Source]` row into; it is a
-/// joiner-continuation of the diagram's last body line (so it neither shifts
-/// pre-wrap line indices nor reaches the clipboard), exactly like the fallback
-/// caption. Each returned `row_offset` is the row's final post-wrap index,
-/// accounting for the rows inserted above it. `source_for` is invoked once per
-/// non-empty diagram to supply its Mermaid source.
-pub(crate) fn apply_affordance_rows(
+/// Image rows are reserved only when `inline_png_for` returns a ready PNG and
+/// scrollback overlays are active (caller gates that). Affordance rows are
+/// always inserted for `Affordances` mode. Offsets are final post-wrap indices
+/// after all insertions.
+pub(crate) fn apply_diagram_layout(
     output: &mut BlockOutput,
     prewrap_ranges: &[Range<usize>],
     mut source_for: impl FnMut(usize) -> String,
-) -> Vec<DiagramAffordance> {
+    mut inline_png_for: impl FnMut(&str) -> Option<ReadyInlinePng>,
+    content_width: u16,
+) -> (Vec<DiagramAffordance>, Vec<DiagramInlinePlacement>) {
     let inserts = diagram_insert_rows(&output.lines, prewrap_ranges);
-    let affordances: Vec<DiagramAffordance> = inserts
-        .iter()
-        .enumerate()
-        .map(|(k, &(insert_at, idx))| DiagramAffordance {
-            row_offset: (insert_at + k) as u16,
-            source: source_for(idx),
-        })
-        .collect();
-    for &(insert_at, _) in inserts.iter().rev() {
+    let mut plans: Vec<(usize, String, Option<(ReadyInlinePng, u16)>)> =
+        Vec::with_capacity(inserts.len());
+    for &(insert_at, idx) in &inserts {
+        let source = source_for(idx);
+        let inline = inline_png_for(&source).map(|png| {
+            let rows = mermaid_inline_image_rows(png.width, png.height, content_width);
+            (png, rows)
+        });
+        plans.push((insert_at, source, inline));
+    }
+
+    // Final offsets: each earlier diagram contributes image_rows + 1 affordance.
+    let mut cumulative = 0usize;
+    let mut affordances = Vec::with_capacity(plans.len());
+    let mut media = Vec::new();
+    for (insert_at, source, inline) in &plans {
+        let image_rows = inline.as_ref().map(|(_, r)| *r as usize).unwrap_or(0);
+        if let Some((png, rows)) = inline {
+            media.push(DiagramInlinePlacement {
+                png: png.clone(),
+                row_offset: (*insert_at + cumulative) as u16,
+                rows: *rows,
+            });
+        }
+        affordances.push(DiagramAffordance {
+            row_offset: (*insert_at + cumulative + image_rows) as u16,
+            source: source.clone(),
+        });
+        cumulative += image_rows + 1;
+    }
+
+    // Insert back-to-front so earlier insert_at values stay valid.
+    for (insert_at, _, inline) in plans.iter().rev() {
+        let image_rows = inline.as_ref().map(|(_, r)| *r).unwrap_or(0);
+        // Affordance blank first, then image rows at the same index (pushing it down).
         output
             .lines
-            .insert(insert_at, continuation_row(Line::from(String::new())));
+            .insert(*insert_at, continuation_row(Line::from(String::new())));
+        for _ in 0..image_rows {
+            output
+                .lines
+                .insert(*insert_at, continuation_row(Line::from(String::new())));
+        }
     }
-    affordances
+
+    (affordances, media)
+}
+
+/// Insert a blank, non-selectable affordance row beneath each detected diagram
+/// and return one [`DiagramAffordance`] per inserted row (document order).
+///
+/// Convenience wrapper around [`apply_diagram_layout`] with no inline PNGs.
+pub(crate) fn apply_affordance_rows(
+    output: &mut BlockOutput,
+    prewrap_ranges: &[Range<usize>],
+    source_for: impl FnMut(usize) -> String,
+) -> Vec<DiagramAffordance> {
+    apply_diagram_layout(output, prewrap_ranges, source_for, |_| None, 80).0
 }
 
 #[cfg(test)]

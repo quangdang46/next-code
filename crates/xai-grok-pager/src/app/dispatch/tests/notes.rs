@@ -467,7 +467,7 @@ fn send_btw_sidebar_mode_stamps_agent_and_toasts() {
     ));
     assert_eq!(
         agent.toast.as_ref().map(|(s, _)| s.as_str()),
-        Some("Running /btw - answer will appear in the side panel.")
+        Some("Running /btw — side panel. Drag divider or press [ / ] (focused) to resize.")
     );
 }
 
