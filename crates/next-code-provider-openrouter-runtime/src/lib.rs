@@ -26,6 +26,7 @@ use next_code_base::provider_catalog::{
     openai_compatible_profile_by_id, openai_compatible_profile_id_for_api_base,
     openai_compatible_profile_static_context_limits, openai_compatible_profile_static_models,
     openai_compatible_profiles, resolve_openai_compatible_profile,
+    resolve_openai_compatible_profile_selection,
 };
 use next_code_message_types::{CacheControl, ContentBlock, Message, Role, StreamEvent, ToolDefinition};
 use next_code_provider_core::{EventStream, Provider};
@@ -1415,33 +1416,61 @@ impl OpenRouterProvider {
     /// left intact so switching the active provider from a saved session still
     /// round-trips verbatim.
     fn strip_session_profile_prefix<'a>(&self, model: &'a str) -> &'a str {
-        let Some((prefix, rest)) = model.split_once(':') else {
-            return model;
-        };
-        if next_code_provider_core::explicit_model_provider_prefix(model).is_some() {
-            return model;
+        // Check `:` separator first (canonical form).
+        if let Some((prefix, rest)) = model.split_once(':') {
+            if next_code_provider_core::explicit_model_provider_prefix(model).is_some() {
+                return model;
+            }
+            let rest = rest.trim();
+            if !rest.is_empty() {
+                let prefix = prefix.trim();
+                if self.matches_known_profile_or_alias(prefix) {
+                    return rest;
+                }
+            }
         }
-        let rest = rest.trim();
-        if rest.is_empty() {
-            return model;
+
+        // Also accept `/` separator for alias short-forms (e.g. `ocg/model`
+        // stored from a prior Face config that persisted the display name).
+        if let Some((prefix, rest)) = model.split_once('/') {
+            let rest = rest.trim();
+            if !rest.is_empty() {
+                let prefix = prefix.trim();
+                if self.matches_known_profile_or_alias(prefix) {
+                    return rest;
+                }
+            }
         }
-        let prefix = prefix.trim();
-        let matches_known_profile = self
+
+        model
+    }
+
+    /// Check whether `prefix` matches this provider's profile id, a known
+    /// OpenAI-compatible profile id or alias, or a user-defined named profile.
+    fn matches_known_profile_or_alias(&self, prefix: &str) -> bool {
+        if prefix.is_empty() {
+            return false;
+        }
+        if self
             .profile_id
             .as_deref()
             .is_some_and(|id| id.eq_ignore_ascii_case(prefix))
-            || openai_compatible_profile_by_id(prefix).is_some()
-            // A user-defined named provider profile (`[providers.<name>]` in
-            // config.toml) is also a valid session-routing prefix. The shared
-            // server may boot via the deferred-auth path without binding this
-            // provider's `profile_id`, so without this check a `<name>:` prefix
-            // (e.g. `cline:`) would leak verbatim to the upstream API and be
-            // rejected with a 404 model_not_found.
-            || next_code_base::config::config()
-                .providers
-                .keys()
-                .any(|id| id.eq_ignore_ascii_case(prefix));
-        if matches_known_profile { rest } else { model }
+        {
+            return true;
+        }
+        if openai_compatible_profile_by_id(prefix).is_some() {
+            return true;
+        }
+        // Also check aliases via profile selection — `ocg` resolves to
+        // opencode-go through the catalog alias table.
+        if resolve_openai_compatible_profile_selection(prefix).is_some() {
+            return true;
+        }
+        // A user-defined named provider profile (`[providers.<name>]`).
+        next_code_base::config::config()
+            .providers
+            .keys()
+            .any(|id| id.eq_ignore_ascii_case(prefix))
     }
 
     /// Return true when this request targets Moonshot's dedicated Kimi coding

@@ -614,7 +614,7 @@ pub const OPENCODE_GO_LOGIN_PROVIDER: LoginProviderDescriptor = LoginProviderDes
     auth_kind: LoginProviderAuthKind::ApiKey,
     auth_state_key: LoginProviderAuthStateKey::OpenRouterLike,
     auth_status_method: "API key",
-    aliases: &["opencodego"],
+    aliases: &["opencodego", "ocg"],
     menu_detail: "Low cost subscription for everyone",
     recommended: false,
     target: LoginProviderTarget::OpenAiCompatible(OPENCODE_GO_PROFILE),
