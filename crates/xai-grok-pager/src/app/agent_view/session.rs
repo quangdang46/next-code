@@ -839,13 +839,14 @@ impl AgentView {
         };
 
         let background_info = {
+            let watchers = self.watchers();
             let running: Vec<_> = self
                 .session
                 .bg_tasks
                 .values()
                 .filter(|t| matches!(t.status, BgTaskStatus::Running) && !t.pending_kill)
                 .collect();
-            (!running.is_empty()).then(|| {
+            (watchers.total() > 0).then(|| {
                 let running_tasks: Vec<String> = running
                     .iter()
                     .map(|t| {
@@ -856,9 +857,13 @@ impl AgentView {
                     })
                     .collect();
                 BackgroundInfo {
-                    running_count: running.len(),
+                    running_count: watchers.total(),
                     progress_detail: None,
                     running_tasks,
+                    shells: watchers.commands,
+                    monitors: watchers.monitors,
+                    loops: watchers.loops,
+                    subagents: watchers.subagents,
                 }
             })
         };
