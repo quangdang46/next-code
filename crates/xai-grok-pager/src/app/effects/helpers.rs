@@ -1087,6 +1087,62 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "status_line.enabled" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.enabled", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_enabled(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.mode" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.mode", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_mode(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.model" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.model", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_model(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.context" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.context", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_context(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.cwd" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.cwd", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_cwd(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.git" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.git", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_git(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.order" => {
+            let SettingValue::String(s) = value else {
+                return Err(kind_mismatch("status_line.order", "String", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_order(s)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "scroll_lines" => {
             let SettingValue::Int(i) = value else {
                 return Err(kind_mismatch("scroll_lines", "Int", &value));

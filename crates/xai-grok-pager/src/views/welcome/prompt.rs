@@ -78,6 +78,7 @@ mod tests {
         let info = PromptInfo {
             model_name: "test",
             flags: &[],
+            status_segments: None,
             multiline: false,
             usage_warning: None,
             usage_warning_critical: false,

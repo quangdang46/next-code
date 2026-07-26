@@ -560,6 +560,30 @@ pub fn current_value_for(
         "info_float.diagrams" => Some(SettingValue::Bool(
             ui.info_floats.diagrams.unwrap_or(true),
         )),
+        "status_line" => Some(SettingValue::Bool(true)),
+        "status_line.enabled" => Some(SettingValue::Bool(ui.status_line.enabled())),
+        "status_line.mode" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Mode),
+        )),
+        "status_line.model" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Model),
+        )),
+        "status_line.context" => Some(SettingValue::Bool(
+            ui.status_line
+                .segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Context),
+        )),
+        "status_line.cwd" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Cwd),
+        )),
+        "status_line.git" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Git),
+        )),
+        "status_line.order" => Some(SettingValue::String({
+            ui.status_line
+                .order
+                .clone()
+                .unwrap_or_else(|| "mode,model,context".to_string())
+        })),
         "keep_text_selection" => Some(SettingValue::Enum(
             crate::appearance::cache::load_keep_text_selection().as_canonical(),
         )),
@@ -903,6 +927,65 @@ mod tests {
                         *default,
                         ui.info_floats.diagrams.unwrap_or(true),
                         "info_float.diagrams default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.enabled", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.enabled(),
+                        "status_line.enabled default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.mode", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Mode
+                        ),
+                        "status_line.mode default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.model", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Model
+                        ),
+                        "status_line.model default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.context", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Context
+                        ),
+                        "status_line.context default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.cwd", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Cwd
+                        ),
+                        "status_line.cwd default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.git", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Git
+                        ),
+                        "status_line.git default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.order", SettingKind::String { default, .. }) => {
+                    assert_eq!(
+                        *default,
+                        "mode,model,context",
+                        "status_line.order default drifts"
                     );
                 }
                 ("show_timestamps", SettingKind::Bool { default }) => {

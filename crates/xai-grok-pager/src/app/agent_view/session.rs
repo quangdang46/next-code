@@ -107,6 +107,7 @@ impl AgentView {
             info_float_git: None,
             info_float_compaction: None,
             info_float_visibility: crate::views::info_floats::InfoFloatVisibility::default(),
+            status_line_config: xai_grok_shell::agent::config::StatusLineConfig::default(),
             chat_kind: false,
             app_chat_mode: false,
             credit_balance: None,

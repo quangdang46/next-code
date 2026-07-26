@@ -1011,6 +1011,27 @@ pub async fn set_info_float_workspace_map(v: impl serde::Serialize) -> anyhow::R
 pub async fn set_info_float_diagrams(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_nested("info_floats", "diagrams", v).await
 }
+pub async fn set_status_line_enabled(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "enabled", v).await
+}
+pub async fn set_status_line_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "mode", v).await
+}
+pub async fn set_status_line_model(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "model", v).await
+}
+pub async fn set_status_line_context(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "context", v).await
+}
+pub async fn set_status_line_cwd(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "cwd", v).await
+}
+pub async fn set_status_line_git(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "git", v).await
+}
+pub async fn set_status_line_order(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "order", v).await
+}
 pub async fn set_default_model(v: impl serde::Serialize) -> anyhow::Result<()> {
     // Shared with next-code brain: `[provider].default_model` (+ optional provider).
     // Prefer [`set_default_model_and_provider`] when the provider pin is known.
