@@ -744,6 +744,7 @@ fn launch_manual_subagent(app: &mut App, spec: ManualSubagentSpec) {
             stdin_request_tx: None,
             ask_user_question_tx: None,
             graceful_shutdown_signal: None,
+            background_tool_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
             best_of_n_run_id: bon.as_ref().map(|h| h.run_id.clone()),
             best_of_n_candidate_id: bon.as_ref().and_then(|h| {
