@@ -4,14 +4,12 @@ use crate::tool::hashline_loop_guard::NoopGuard;
 use crate::tool::hashline_snapshots;
 use anyhow::Result;
 use async_trait::async_trait;
-use hashline::types::FileOp as HashlineFileOp;
-use hashline::{anchor, document::FileContent, hash as hashline_hash};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::path::Path;
 use std::sync::LazyLock;
 
-static NOOP_GUARD: LazyLock<NoopGuard> = LazyLock::new(NoopGuard::new);
+use hashline::{anchor, document::FileContent, hash as hashline_hash};
 
 pub struct HashlineEditTool;
 
