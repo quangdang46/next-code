@@ -4583,7 +4583,7 @@ dependencies = [
 [[package]]
 name = "hashline"
 version = "0.8.7"
-source = "git+https://github.com/quangdang46/hashline.git?rev=752be8a0#752be8a0c5d857075e42d3d30a0131767d3d9d67"
+source = "git+https://github.com/quangdang46/hashline.git?rev=17be1e5#17be1e5a9c653de2cbb63b89a6f84c9c1a5fb4b7"
 dependencies = [
  "clap",
  "libc",
