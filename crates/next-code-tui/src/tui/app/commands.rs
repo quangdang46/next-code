@@ -1355,7 +1355,7 @@ Question: {}",
     )
 }
 
-fn handle_btw_command(app: &mut App, trimmed: &str) -> bool {
+fn handle_side_panel_command(app: &mut App, trimmed: &str) -> bool {
     if !trimmed.starts_with("/btw") {
         return false;
     }
@@ -1693,7 +1693,7 @@ pub(super) fn handle_session_command(app: &mut App, trimmed: &str) -> bool {
         || handle_todos_view_command(app, trimmed)
         || super::commands_overnight::handle_overnight_command(app, trimmed)
         || super::split_view::handle_split_view_command(app, trimmed)
-        || handle_btw_command(app, trimmed)
+        || handle_side_panel_command(app, trimmed)
         || handle_transcript_command(app, trimmed)
         || handle_git_command(app, trimmed)
         || handle_catchup_command(app, trimmed)

@@ -1260,6 +1260,14 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "render_mermaid_target" => {
+            let SettingValue::Enum(s) = value else {
+                return Err(kind_mismatch("render_mermaid_target", "Enum", &value));
+            };
+            xai_grok_shell::util::config::set_render_mermaid_target(s.to_string())
+                .await
+                .map_err(|e| e.to_string())
+        }
         "hunk_tracker_mode" => {
             let SettingValue::Enum(s) = value else {
                 return Err(kind_mismatch("hunk_tracker_mode", "Enum", &value));
@@ -1276,20 +1284,20 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
-        "btw_output_mode" => {
+        "side_panel_output_mode" => {
             let SettingValue::Enum(s) = value else {
-                return Err(kind_mismatch("btw_output_mode", "Enum", &value));
+                return Err(kind_mismatch("side_panel_output_mode", "Enum", &value));
             };
-            xai_grok_shell::util::config::set_btw_output_mode(s.to_string())
+            xai_grok_shell::util::config::set_side_panel_output_mode(s.to_string())
                 .await
                 .map_err(|e| e.to_string())
         }
-        "btw_sidebar_width" => {
+        "side_panel_width" => {
             let SettingValue::Int(i) = value else {
-                return Err(kind_mismatch("btw_sidebar_width", "Int", &value));
+                return Err(kind_mismatch("side_panel_width", "Int", &value));
             };
             let width = u16::try_from(i).unwrap_or(36).max(20);
-            xai_grok_shell::util::config::set_btw_sidebar_width(width)
+            xai_grok_shell::util::config::set_side_panel_width(width)
                 .await
                 .map_err(|e| e.to_string())
         }

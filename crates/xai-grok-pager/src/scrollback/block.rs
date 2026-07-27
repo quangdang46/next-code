@@ -1542,7 +1542,7 @@ mod searchable_text_tests {
     #[test]
     fn btw_indexes_question_and_rendered_response() {
         let block = RenderBlock::Btw(BtwBlock::new("what is rust", "a **systems** language"));
-        let text = block.searchable_text().expect("btw text");
+        let text = block.searchable_text().expect("side_panel text");
         assert!(text.contains("what is rust"), "got: {text:?}");
         // Rendered plain text is indexed (markers stripped), so a query that
         // spans the emphasis — "a systems language" — matches the index just

@@ -122,12 +122,15 @@ impl MermaidClickAction {
     }
 }
 
-/// Why a render was requested — click action vs terminal-tier inline paint.
+/// Why a render was requested — click action vs terminal-tier inline paint
+/// vs side-panel display.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MermaidPendingKind {
     Click(MermaidClickAction),
     /// Terminal-tier PNG for scrollback Kitty/iTerm paint.
     Inline,
+    /// PNG targeted at the side panel (Alt+M).
+    Sidebar,
 }
 
 /// An in-flight render whose worker result hasn't arrived yet.
@@ -1096,6 +1099,40 @@ impl AgentView {
         true
     }
 
+    /// Show a rendered diagram PNG in the side panel.
+    ///
+    /// Reads the PNG dimensions from disk and pushes a `SidePanelState::Diagram`
+    /// entry so the side panel overlay renders the image on the next frame.
+    fn show_diagram_in_side_panel(&mut self, key: &MermaidCacheKey, path: &Path) {
+        let Ok(bytes) = std::fs::read(&path) else {
+            return;
+        };
+        let Some((width, height)) = crate::prompt_images::decode_image_dimensions(&bytes) else {
+            return;
+        };
+        // Derive a human-readable label from the source hash (first 12 hex chars).
+        let label = format!(
+            "diagram-{}",
+            key.source_hash.iter().take(6).map(|b| format!("{b:02x}")).collect::<String>()
+        );
+        // Preserve existing scroll_offset if already showing the same diagram.
+        let prev_offset = match self.side_panel_state.as_ref() {
+            Some(crate::views::side_panel::SidePanelState::Diagram { scroll_offset, .. }) => *scroll_offset,
+            _ => 0,
+        };
+        self.side_panel_state = Some(crate::views::side_panel::SidePanelState::Diagram {
+            label,
+            path: path.to_path_buf(),
+            width,
+            height,
+            scroll_offset: prev_offset,
+        });
+        // Force the right-hand column (legacy TUI /btw sidebar parity) and focus it.
+        self.side_panel = true;
+        self.side_panel_visible = true;
+        self.side_panel_focused = true;
+    }
+
     /// Ensure a terminal-tier PNG exists for inline Kitty/iTerm paint.
     ///
     /// No-op without scrollback graphics overlays. Disk hit → remember +
@@ -1275,6 +1312,28 @@ impl AgentView {
         }
     }
 
+    /// Dispatch a sidebar render for the given Mermaid source.
+    ///
+    /// Renders the mermaid source as inline diagram text in the side panel
+    /// via the markdown renderer (same rendering as inline scrollback).
+    /// Wraps the source in a fenced code block so the markdown pipeline detects
+    /// and renders it as Unicode box-drawing art.
+    pub(crate) fn request_mermaid_sidebar_render(&mut self, source: String) {
+        // Guard: user explicitly dismissed the sidebar, don't force it open.
+        if self.mermaid_sidebar_dismissed {
+            return;
+        }
+        let markdown = format!("```mermaid\n{}\n```", source);
+        self.side_panel_state = Some(crate::views::side_panel::SidePanelState::done(
+            "mermaid".to_string(),
+            markdown,
+        ));
+        // Force the right-hand column (legacy TUI /btw sidebar parity) and focus it.
+        self.side_panel = true;
+        self.side_panel_visible = true;
+        self.side_panel_focused = true;
+    }
+
     /// Drain finished renders from the worker and run each pending kind:
     /// click actions open/copy; inline remembers the PNG and invalidates
     /// scrollback heights; failures toast (ASCII art stays).
@@ -1320,6 +1379,17 @@ impl AgentView {
                             "mermaid.render.failed",
                             self.session.session_id.as_ref().map(|s| s.0.as_ref()),
                             Some(serde_json::json!({ "action": "inline" })),
+                        );
+                        self.show_toast("Could not render diagram");
+                    }
+                    (MermaidOutcome::Ready { path }, MermaidPendingKind::Sidebar) => {
+                        self.show_diagram_in_side_panel(&key, path);
+                    }
+                    (MermaidOutcome::Failed, MermaidPendingKind::Sidebar) => {
+                        crate::unified_log::warn(
+                            "mermaid.render.failed",
+                            self.session.session_id.as_ref().map(|s| s.0.as_ref()),
+                            Some(serde_json::json!({ "action": "sidebar" })),
                         );
                         self.show_toast("Could not render diagram");
                     }

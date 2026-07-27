@@ -13,8 +13,7 @@
 //!    ([`MmdrEngine`]) calls `mermaid-rs-renderer`'s Face embed API
 //!    (`render_png_bytes` + `Theme::face_light` / `face_dark`, hardened
 //!    bundled-font raster, megapixel/axis caps).
-//! 2. [`rasterize`] remains available for SVG→PNG ([`MmdcEngine`]) with **no
-//!    remote/file resolvers** and a **bundled font**.
+//! 2. [`rasterize`] remains available for SVG→PNG.
 //!
 //! # Untrusted input and crash isolation
 //!
@@ -46,13 +45,11 @@
 
 mod engine;
 mod mmdr;
-mod mmdc;
 mod raster;
 mod subprocess;
 
 pub use engine::{MermaidEngine, MermaidError, RenderLimits, render_checked};
 pub use mmdr::MmdrEngine;
-pub use mmdc::{MmdcEngine, detect_mmdc};
 pub use raster::{MAX_OUTPUT_MEGAPIXELS, rasterize};
 pub use subprocess::{SubprocessError, run_with_timeout};
 
@@ -194,9 +191,6 @@ pub struct RenderedDiagram {
 }
 
 /// Construct the default engine: offline [`MmdrEngine`] (`mermaid-rs-renderer`).
-///
-/// Optional [`MmdcEngine`] is never selected automatically — construct it
-/// explicitly to opt in.
 pub fn default_engine() -> Arc<dyn MermaidEngine> {
     Arc::new(MmdrEngine::new())
 }
