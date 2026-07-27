@@ -293,8 +293,9 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
         return vec![];
     };
     let minimal = app.screen_mode.is_minimal();
-    let sidebar = crate::settings::canonical_btw_output_mode(app.current_ui.btw_output_mode.as_deref())
+    let sidebar = crate::settings::canonical_side_panel_output_mode(app.current_ui.side_panel_output_mode.as_deref())
         == "sidebar";
+    let sidebar_width = app.current_ui.side_panel_width_or_default();
     let (session_id, minimal_request_id) = {
         let Some(agent) = app.agents.get_mut(&id) else {
             return vec![];
@@ -313,24 +314,27 @@ pub(super) fn dispatch_send_btw(app: &mut AppView, question: String) -> Vec<Effe
         };
 
         agent.prompt.set_text("");
+        agent.side_panel_width = sidebar_width;
         let minimal_request_id = if minimal {
             // Minimal hosts /btw in the live region — always the overlay path.
-            agent.btw_sidebar = false;
-            agent.btw_sidebar_visible = true;
-            Some(crate::minimal_api::start_minimal_btw(
+            agent.side_panel = false;
+            agent.side_panel_visible = true;
+            Some(crate::minimal_api::start_minimal_side_panel(
                 agent,
                 question.clone(),
             ))
         } else {
-            agent.btw_sidebar = sidebar;
-            agent.btw_sidebar_visible = true;
-            agent.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::Loading {
+            agent.side_panel = sidebar;
+            agent.side_panel_visible = true;
+            agent.side_panel_state = Some(crate::views::side_panel::SidePanelState::Loading {
                 question: question.clone(),
             });
             // Prompt keeps focus while the answer is in flight (panel focuses on Done).
-            agent.btw_focused = false;
+            agent.side_panel_focused = false;
             if sidebar {
-                agent.show_toast("Running /btw - answer will appear in the side panel.");
+                agent.show_toast(
+                    "Running /btw — side panel. Drag divider or press [ / ] (focused) to resize.",
+                );
             }
             None
         };
@@ -484,26 +488,26 @@ pub(super) fn handle_btw_response(
     minimal_request_id: Option<uuid::Uuid>,
 ) -> Vec<Effect> {
     if let Some(agent) = app.agents.get_mut(&agent_id) {
-        use crate::views::btw_overlay::BtwOverlayState;
+        use crate::views::side_panel::SidePanelState;
         if let Some(request_id) = minimal_request_id {
-            crate::minimal_api::finish_minimal_btw(agent, request_id, result);
+            crate::minimal_api::finish_minimal_side_panel(agent, request_id, result);
             return vec![];
         }
-        let question = match &agent.btw_state {
-            Some(BtwOverlayState::Loading { question }) => question.clone(),
+        let question = match &agent.side_panel_state {
+            Some(SidePanelState::Loading { question }) => question.clone(),
             _ => String::new(),
         };
         match result {
             Ok(response) => {
                 // Answer arrived: show it (until Esc) and focus the panel
                 // so Up/Down scroll it until the user returns to the prompt.
-                agent.btw_state = Some(BtwOverlayState::done(question, response));
-                agent.btw_focused = true;
+                agent.side_panel_state = Some(SidePanelState::done(question, response));
+                agent.side_panel_focused = true;
             }
             Err(error) => {
                 // Error stays until Esc; nothing to scroll, keep prompt focus.
-                agent.btw_state = Some(BtwOverlayState::Error { question, error });
-                agent.btw_focused = false;
+                agent.side_panel_state = Some(SidePanelState::Error { question, error });
+                agent.side_panel_focused = false;
             }
         }
     }

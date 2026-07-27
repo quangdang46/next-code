@@ -872,59 +872,112 @@ Alternatives: {}",
                 Ok(ToolOutput::new(output).with_title(title_for_work))
             });
 
-        match tokio::time::timeout(timeout_duration, &mut work_handle).await {
-            Ok(join_result) => match join_result {
-                Ok(Ok(output)) => Ok(output),
-                Ok(Err(e)) => Err(anyhow::anyhow!("Command failed: {}", e)),
-                Err(join_err) => Err(anyhow::anyhow!("Command task panicked: {}", join_err)),
-            },
-            Err(_) => {
-                // Timed out, but the command is still running. Instead of killing
-                // it, promote it to a background task so it keeps running, renders
-                // as a background-task card, and the agent is told where to find it.
-                let display_name =
-                    summarize_background_command(params.intent.as_deref(), &params.command);
-                let info = crate::background::global()
-                    .adopt_with_options(
-                        "bash",
-                        Some(display_name.clone()),
-                        &ctx.session_id,
-                        params.notify,
-                        params.wake,
-                        work_handle,
-                    )
-                    .await;
+        // Helper closure reused by both the timeout branch and the user
+        // Alt+B background-signal branch. Takes owned handles so it can
+        // be called asynchronously without borrow conflicts.
+        async fn adopt_and_format(
+            work_handle: tokio::task::JoinHandle<Result<ToolOutput>>,
+            bg_reason: &'static str,
+            intent: Option<String>,
+            command: String,
+            session_id: String,
+            notify: bool,
+            wake: bool,
+            title: String,
+            timeout_ms: u64,
+        ) -> Result<ToolOutput> {
+            let display_name = summarize_background_command(intent.as_deref(), &command);
+            let info = crate::background::global()
+                .adopt_with_options(
+                    "bash",
+                    Some(display_name.clone()),
+                    &session_id,
+                    notify,
+                    wake,
+                    work_handle,
+                )
+                .await;
 
-                let output = format!(
-                    "Command exceeded the foreground timeout after {:.1}s and is continuing in background (not killed).\n\n\
-                     Task ID: {}\n\
-                     Name: {}\n\
-                     Output file: {}\n\
-                     Status file: {}\n\n\
-                     The command is still running; do not rerun it unless you intentionally want a second copy.\n\
-                     Use `bg` with action=\"wait\" and task_id=\"{}\" to wait for completion or the next progress checkpoint.\n\
-                     Use `bg` with action=\"output\" and task_id=\"{}\" to inspect output.\n\
-                     If you expected it to finish quickly and it did not, the `timeout` parameter is in MILLISECONDS; pass a larger value or omit it.",
-                    timeout_ms as f64 / 1000.0,
-                    info.task_id,
-                    display_name,
-                    info.output_file.display(),
-                    info.status_file.display(),
-                    info.task_id,
-                    info.task_id,
-                );
+            let output = format!(
+                "Command {} after {:.1}s and is continuing in background (not killed).\n\n\
+                 Task ID: {}\n\
+                 Name: {}\n\
+                 Output file: {}\n\
+                 Status file: {}\n\n\
+                 The command is still running; do not rerun it unless you intentionally want a second copy.\n\
+                 Use `bg` with action=\"wait\" and task_id=\"{}\" to wait for completion or the next progress checkpoint.\n\
+                 Use `bg` with action=\"output\" and task_id=\"{}\" to inspect output.\n\
+                 If you expected it to finish quickly and it did not, the `timeout` parameter is in MILLISECONDS; pass a larger value or omit it.",
+                if bg_reason == "timeout" {
+                    format_args!("exceeded the foreground timeout")
+                } else {
+                    format_args!("was moved to background by the user")
+                },
+                timeout_ms as f64 / 1000.0,
+                info.task_id,
+                display_name,
+                info.output_file.display(),
+                info.status_file.display(),
+                info.task_id,
+                info.task_id,
+            );
 
-                Ok(ToolOutput::new(output)
-                    .with_title(title)
-                    .with_metadata(json!({
-                        "background": true,
-                        "task_id": info.task_id,
-                        "display_name": display_name,
-                        "output_file": info.output_file.to_string_lossy(),
-                        "status_file": info.status_file.to_string_lossy(),
-                        "timeout_promoted": true,
-                        "foreground_timeout_ms": timeout_ms,
-                    })))
+            Ok(ToolOutput::new(output)
+                .with_title(title)
+                .with_metadata(json!({
+                    "background": true,
+                    "task_id": info.task_id,
+                    "display_name": display_name,
+                    "output_file": info.output_file.to_string_lossy(),
+                    "status_file": info.status_file.to_string_lossy(),
+                    "reason": bg_reason,
+                    "foreground_timeout_ms": timeout_ms,
+                })))
+        };
+
+        let bg_signal = ctx.background_tool_signal.clone();
+        tokio::select! {
+            biased;
+            res = tokio::time::timeout(timeout_duration, &mut work_handle) => {
+                match res {
+                    Ok(join_result) => match join_result {
+                        Ok(Ok(output)) => Ok(output),
+                        Ok(Err(e)) => Err(anyhow::anyhow!("Command failed: {}", e)),
+                        Err(join_err) => Err(anyhow::anyhow!("Command task panicked: {}", join_err)),
+                    },
+                    Err(_) => {
+                        // Timed out → adopt
+                        Box::pin(adopt_and_format(
+                            work_handle, "timeout",
+                            params.intent.clone(),
+                            params.command.clone(),
+                            ctx.session_id.clone(),
+                            params.notify,
+                            params.wake,
+                            title.clone(),
+                            timeout_ms,
+                        )).await
+                    }
+                }
+            }
+            _ = async {
+                if let Some(signal) = &bg_signal {
+                    signal.notified().await;
+                } else {
+                    std::future::pending::<()>().await;
+                }
+            } => {
+                // User pressed Alt+B → adopt
+                Box::pin(adopt_and_format(
+                    work_handle, "user_background",
+                    params.intent.clone(),
+                    params.command.clone(),
+                    ctx.session_id.clone(),
+                    params.notify,
+                    params.wake,
+                    title.clone(),
+                    timeout_ms,
+                )).await
             }
         }
     }

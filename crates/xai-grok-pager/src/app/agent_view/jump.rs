@@ -40,7 +40,7 @@ impl AgentView {
     pub(crate) fn jump_slot_taken(&self) -> bool {
         self.rewind_state.is_some()
             || self.inline_edit.is_some()
-            || self.btw_state.is_some()
+            || self.side_panel_state.is_some()
             || !self.no_input_overlay_pending()
     }
 

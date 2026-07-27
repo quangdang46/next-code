@@ -351,10 +351,23 @@ pub fn canonical_screen_mode(value: Option<&str>) -> &'static str {
 }
 
 /// `sidebar` stays; everything else (including unset) → `inline` (Face/Grok default).
-pub fn canonical_btw_output_mode(value: Option<&str>) -> &'static str {
+pub fn canonical_side_panel_output_mode(value: Option<&str>) -> &'static str {
     let raw = value.unwrap_or_default().trim();
     if raw.eq_ignore_ascii_case("sidebar") || raw.eq_ignore_ascii_case("side") {
         "sidebar"
+    } else {
+        "inline"
+    }
+}
+
+/// Resolve a `[ui].render_mermaid_target` value to one of the three canonical
+/// strings: `"inline"`, `"sidebar"`, or `"both"`. Defaults to `"inline"`.
+pub fn canonical_render_mermaid_target(value: Option<&str>) -> &'static str {
+    let raw = value.unwrap_or_default().trim();
+    if raw.eq_ignore_ascii_case("sidebar") || raw.eq_ignore_ascii_case("side") {
+        "sidebar"
+    } else if raw.eq_ignore_ascii_case("both") {
+        "both"
     } else {
         "inline"
     }
@@ -560,6 +573,30 @@ pub fn current_value_for(
         "info_float.diagrams" => Some(SettingValue::Bool(
             ui.info_floats.diagrams.unwrap_or(true),
         )),
+        "status_line" => Some(SettingValue::Bool(true)),
+        "status_line.enabled" => Some(SettingValue::Bool(ui.status_line.enabled())),
+        "status_line.mode" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Mode),
+        )),
+        "status_line.model" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Model),
+        )),
+        "status_line.context" => Some(SettingValue::Bool(
+            ui.status_line
+                .segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Context),
+        )),
+        "status_line.cwd" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Cwd),
+        )),
+        "status_line.git" => Some(SettingValue::Bool(
+            ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Git),
+        )),
+        "status_line.order" => Some(SettingValue::String({
+            ui.status_line
+                .order
+                .clone()
+                .unwrap_or_else(|| "mode,model,context".to_string())
+        })),
         "keep_text_selection" => Some(SettingValue::Enum(
             crate::appearance::cache::load_keep_text_selection().as_canonical(),
         )),
@@ -610,8 +647,8 @@ pub fn current_value_for(
         "screen_mode" => Some(SettingValue::Enum(canonical_screen_mode(
             ui.screen_mode.as_deref(),
         ))),
-        "btw_output_mode" => Some(SettingValue::Enum(canonical_btw_output_mode(
-            ui.btw_output_mode.as_deref(),
+        "side_panel_output_mode" => Some(SettingValue::Enum(canonical_side_panel_output_mode(
+            ui.side_panel_output_mode.as_deref(),
         ))),
         // SHELL — canonicalized from `[ui].voice_capture_mode`; None → "hold".
         "voice_capture_mode" => Some(SettingValue::Enum(canonical_voice_capture_mode(
@@ -654,6 +691,10 @@ pub fn current_value_for(
         // role for its setting.
         "render_mermaid" => Some(SettingValue::Enum(
             crate::appearance::cache::load_render_mermaid().as_canonical(),
+        )),
+        // render_mermaid_target: shared-owned (persisted to `[ui].render_mermaid_target`).
+        "render_mermaid_target" => Some(SettingValue::Enum(
+            canonical_render_mermaid_target(ui.render_mermaid_target.as_deref()),
         )),
         // permission_mode: live snapshot wins over on-disk value.
         // yolo=true → "always-approve"; else honor ui ("auto" / "default" / "ask").
@@ -905,6 +946,65 @@ mod tests {
                         "info_float.diagrams default drifts from UiConfig::default()"
                     );
                 }
+                ("status_line.enabled", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.enabled(),
+                        "status_line.enabled default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.mode", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Mode
+                        ),
+                        "status_line.mode default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.model", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Model
+                        ),
+                        "status_line.model default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.context", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Context
+                        ),
+                        "status_line.context default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.cwd", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Cwd
+                        ),
+                        "status_line.cwd default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.git", SettingKind::Bool { default }) => {
+                    assert_eq!(
+                        *default,
+                        ui.status_line.segment_visible(
+                            xai_grok_shell::agent::config::StatusLineSegment::Git
+                        ),
+                        "status_line.git default drifts from UiConfig::default()"
+                    );
+                }
+                ("status_line.order", SettingKind::String { default, .. }) => {
+                    assert_eq!(
+                        *default,
+                        "mode,model,context",
+                        "status_line.order default drifts"
+                    );
+                }
                 ("show_timestamps", SettingKind::Bool { default }) => {
                     assert_eq!(
                         *default,
@@ -1152,15 +1252,15 @@ mod tests {
                     );
                     assert_eq!(*default, "fullscreen");
                 }
-                ("btw_output_mode", SettingKind::Enum { default, .. }) => {
+                ("side_panel_output_mode", SettingKind::Enum { default, .. }) => {
                     assert_eq!(
-                        ui.btw_output_mode, None,
-                        "test assumes UiConfig::default().btw_output_mode is None",
+                        ui.side_panel_output_mode, None,
+                        "test assumes UiConfig::default().side_panel_output_mode is None",
                     );
                     assert_eq!(
                         *default,
-                        canonical_btw_output_mode(ui.btw_output_mode.as_deref()),
-                        "btw_output_mode default drifts from UiConfig::default()",
+                        canonical_side_panel_output_mode(ui.side_panel_output_mode.as_deref()),
+                        "side_panel_output_mode default drifts from UiConfig::default()",
                     );
                     assert_eq!(*default, "inline");
                 }
@@ -1495,15 +1595,15 @@ mod tests {
     }
 
     #[test]
-    fn canonical_btw_output_mode_maps_aliases_and_unknowns() {
-        assert_eq!(canonical_btw_output_mode(Some("sidebar")), "sidebar");
-        assert_eq!(canonical_btw_output_mode(Some("side")), "sidebar");
-        assert_eq!(canonical_btw_output_mode(Some("  SIDEBAR ")), "sidebar");
-        assert_eq!(canonical_btw_output_mode(Some("inline")), "inline");
-        assert_eq!(canonical_btw_output_mode(Some("overlay")), "inline");
-        assert_eq!(canonical_btw_output_mode(Some("bogus")), "inline");
-        assert_eq!(canonical_btw_output_mode(Some("")), "inline");
-        assert_eq!(canonical_btw_output_mode(None), "inline");
+    fn canonical_side_panel_output_mode_maps_aliases_and_unknowns() {
+        assert_eq!(canonical_side_panel_output_mode(Some("sidebar")), "sidebar");
+        assert_eq!(canonical_side_panel_output_mode(Some("side")), "sidebar");
+        assert_eq!(canonical_side_panel_output_mode(Some("  SIDEBAR ")), "sidebar");
+        assert_eq!(canonical_side_panel_output_mode(Some("inline")), "inline");
+        assert_eq!(canonical_side_panel_output_mode(Some("overlay")), "inline");
+        assert_eq!(canonical_side_panel_output_mode(Some("bogus")), "inline");
+        assert_eq!(canonical_side_panel_output_mode(Some("")), "inline");
+        assert_eq!(canonical_side_panel_output_mode(None), "inline");
     }
 
     /// Corrupted `auto_dark_theme = "auto"` (would cause circular ref)

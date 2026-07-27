@@ -845,6 +845,8 @@ pub struct AgentView {
     /// Per-float-kind visibility flags, synced from `AppView::current_ui.info_floats`
     /// before every draw call. Default all-true.
     pub info_float_visibility: crate::views::info_floats::InfoFloatVisibility,
+    /// Prompt statusline segment config, synced from `AppView::current_ui.status_line`.
+    pub status_line_config: xai_grok_shell::agent::config::StatusLineConfig,
     /// Gateway light-frontend session (`kind: "chat"` / `--chat` / conversation
     /// resume). Suppresses Build credits / local sampler context telemetry so the
     /// status bar and prompt never imply remote usage from wrong metrics.
@@ -997,9 +999,9 @@ pub struct AgentView {
     /// Last emitted OSC 22 pointer state (avoids re-emitting every frame).
     pub last_pointer_on_link: bool,
     /// Selection model for the /btw overlay panel (populated each frame).
-    pub last_btw_selection_model: ResolvedSelectionModel,
+    pub last_panel_selection_model: ResolvedSelectionModel,
     /// Cached screen rect of the /btw overlay panel from the last render.
-    pub last_btw_area: Rect,
+    pub last_side_panel_area: Rect,
     /// Pending plain scrollback click that should dispatch on mouse-up if no drag starts.
     pub pending_scrollback_click: Option<(u16, u16)>,
     /// Pending link click: (col, row, target). Set on Down(Left) when a link is hit,
@@ -1150,23 +1152,37 @@ pub struct AgentView {
     pub(crate) persona_detail: Option<crate::views::persona_detail::PersonaDetailState>,
     /// Active /btw side question overlay. When `Some`, renders as a dismissible
     /// overlay and captures keyboard input (Esc/Enter/Space to dismiss).
-    pub btw_state: Option<crate::views::btw_overlay::BtwOverlayState>,
-    /// Minimal-only ownership/correlation for `btw_state`; absent in fullscreen.
-    pub(crate) minimal_btw_lifecycle: Option<crate::minimal_api::MinimalBtwLifecycle>,
+    pub side_panel_state: Option<crate::views::side_panel::SidePanelState>,
+    /// Minimal-only ownership/correlation for `side_panel_state`; absent in fullscreen.
+    pub(crate) minimal_side_panel_lifecycle: Option<crate::minimal_api::MinimalSidePanelLifecycle>,
     /// When true, this `/btw` session uses the right-hand side panel (legacy TUI
     /// parity) instead of the Face/Grok overlay above the prompt. Stamped at
-    /// send time from `[ui].btw_output_mode`.
-    pub(crate) btw_sidebar: bool,
-    /// Side-panel visibility while `btw_sidebar` is active. Alt+M toggles;
+    /// send time from `[ui].side_panel_output_mode`.
+    pub(crate) side_panel: bool,
+    /// Side-panel visibility while `side_panel` is active. Alt+M toggles;
     /// Esc still dismisses the whole `/btw` session.
-    pub(crate) btw_sidebar_visible: bool,
+    pub(crate) side_panel_visible: bool,
+    /// Preferred `/btw` side-panel width in columns (persisted as
+    /// `[ui].side_panel_width`). Drag the divider or press `[` / `]` while the
+    /// panel is focused to adjust.
+    pub(crate) side_panel_width: u16,
+    /// Track when the user has explicitly dismissed the mermaid sidebar panel so
+    /// per-frame affordance paint doesn't force it back open.
+    pub(crate) mermaid_sidebar_dismissed: bool,
+    /// True while the user is dragging the `/btw` sidebar divider.
+    pub(crate) side_panel_dragging: bool,
+    /// Last painted divider column (`sidebar.x - 1`) for mouse hit-testing.
+    pub(crate) last_side_panel_divider_x: Option<u16>,
+    /// Full agent-frame width used for the last `/btw` sidebar split (main + gap
+    /// + side). Used to clamp drag / keyboard resize.
+    pub(crate) last_btw_frame_width: Option<u16>,
     /// Whether the /btw panel holds keyboard focus. The panel is non-blocking,
     /// so Up/Down/PgUp/PgDn scroll it when focused and otherwise reach the
     /// prompt. Set on a `Done` answer; cleared when the user types in or clicks
     /// the prompt.
-    pub(crate) btw_focused: bool,
+    pub(crate) side_panel_focused: bool,
     /// Hit area for the [Esc] close button in the /btw panel title.
-    pub(crate) hit_btw_close: HitArea,
+    pub(crate) hit_side_panel_close: HitArea,
     /// Toast message to display briefly (e.g., "Copied!" after y).
     /// Tuple of (message, remaining_ticks). Decremented each tick, removed at 0.
     /// Does **not** carry sticky status banners — see [`Self::sticky_toast`].
