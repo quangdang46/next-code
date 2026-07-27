@@ -575,7 +575,7 @@ pub struct Config {
 pub struct KeywordsConfig {
     /// Master switch. When false, no detection, sticky inject, or chips.
     pub enabled: bool,
-    /// `strict` (default): `$keyword` + token aliases only.
+    /// `strict` (default): `$keyword`, bare `$`-stripped form, + token aliases.
     /// `loose`: also multi-word phrase aliases (+ optional fuzzy).
     pub match_mode: String,
     /// Sticky turn budget for newly activated modes.
