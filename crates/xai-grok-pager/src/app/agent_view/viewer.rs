@@ -341,7 +341,19 @@ impl AgentView {
                 self.scrollback
                     .push_block(RenderBlock::Btw(BtwBlock::new(question, content.text())));
             }
-            _ => {} // Diagram, Loading, Error: just dismiss
+            Some(SidePanelState::Diagram { .. }) => {
+                // Drop the Kitty/iTerm placement so the next frame doesn't leave
+                // a ghost image over the main column (origin clears on unmount).
+                let clear = crate::views::side_panel::clear_side_panel_diagram_image();
+                if !clear.is_empty() {
+                    xai_grok_shell::util::with_locked_stderr(|stderr| {
+                        let flush =
+                            crate::terminal::overlay::PostFlush::plain(clear);
+                        let _ = flush.write_to(stderr);
+                    });
+                }
+            }
+            _ => {} // Loading, Error: just dismiss
         }
         self.minimal_side_panel_lifecycle = None;
         self.side_panel_focused = false;

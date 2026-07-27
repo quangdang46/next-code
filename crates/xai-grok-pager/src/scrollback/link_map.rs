@@ -555,7 +555,7 @@ mod tests {
         assert_eq!(map.len(), 1);
 
         let side_panel = make_overlay(vec![(5, 0, 10, "https://btw.com", Some(0))]);
-        map.append_from_overlay(&btw);
+        map.append_from_overlay(&side_panel);
         assert_eq!(
             map.len(),
             2,
@@ -585,7 +585,7 @@ mod tests {
             (3, 10, 30, "https://wrapped.com", Some(7)),
             (4, 0, 15, "https://wrapped.com", Some(7)),
         ]);
-        map.append_from_overlay(&btw);
+        map.append_from_overlay(&side_panel);
         assert_eq!(map.len(), 1);
         assert_eq!(map.links()[0].rects.len(), 2);
         assert!(map.link_at(12, 3).is_some());

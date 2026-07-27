@@ -543,12 +543,23 @@ impl AgentView {
             return;
         }
         if let Some(ref mut panel) = self.side_panel_state
-            && matches!(panel, crate::views::side_panel::SidePanelState::Done { .. })
+            && matches!(
+                panel,
+                crate::views::side_panel::SidePanelState::Done { .. }
+                    | crate::views::side_panel::SidePanelState::Diagram { .. }
+            )
             && self.last_side_panel_area.area() > 0
             && self.last_side_panel_area.contains((col, row).into())
         {
-            use crate::views::side_panel::SIDE_PANEL_MAX_BODY_LINES;
-            let max_body = SIDE_PANEL_MAX_BODY_LINES as usize;
+            let chrome = match panel {
+                crate::views::side_panel::SidePanelState::Diagram { .. } => 3,
+                _ => 2,
+            };
+            let max_body = self
+                .last_side_panel_area
+                .height
+                .saturating_sub(chrome)
+                .max(1) as usize;
             let content_width = self.last_side_panel_area.width.saturating_sub(4) as usize;
             let max_off = panel.max_scroll_offset(content_width, max_body);
             if lines > 0 {

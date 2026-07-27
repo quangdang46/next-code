@@ -116,10 +116,17 @@ impl SidePanelState {
                 let total = content.with_wrapped_lines(content_width, |w| w.lines.len());
                 total.saturating_sub(max_body_lines)
             }
-            Self::Diagram { height, .. } => {
-                // Rough estimate: diagram info takes 2 rows, image ~height/20 rows.
-                let total = 2 + (height / 20) as usize;
-                total.saturating_sub(max_body_lines)
+            Self::Diagram { width, height, .. } => {
+                // Image body only (label is chrome). Caller passes max_body as the
+                // image viewport rows (panel height − borders − label).
+                let panel_w = (content_width as u16).max(1);
+                let (_, fit_rows) = crate::terminal::image::fit_image_to_cells(
+                    *width,
+                    *height,
+                    panel_w,
+                    u16::MAX,
+                );
+                (fit_rows.max(1) as usize).saturating_sub(max_body_lines)
             }
             _ => 0,
         }
@@ -164,6 +171,56 @@ const SPINNER_DIVISOR: u64 = 4;
 /// Maximum body lines shown for a Done response.
 pub const SIDE_PANEL_MAX_BODY_LINES: u16 = 12;
 
+/// Kitty/iTerm image id reserved for the mermaid side-panel Diagram paint.
+/// Kept out of the modal (`KITTY_PLACEMENT_ID = 1`) and AgentView inline pool.
+pub const SIDE_PANEL_DIAGRAM_IMAGE_ID: u32 = 0x4D_53_44_31; // "MSD1"
+
+/// Clear the side-panel Diagram Kitty placement (call on dismiss).
+pub fn clear_side_panel_diagram_image() -> String {
+    crate::terminal::image::clear_kitty_image(SIDE_PANEL_DIAGRAM_IMAGE_ID)
+}
+
+/// Build CUP + transmit/place escapes for a Diagram PNG in `img_area`.
+///
+/// Copies Face inline media (`place_inline_image`) and origin side-panel fit:
+/// cursor-address into the panel rect, `fit_image_to_cells` for aspect, optional
+/// top-crop when `scroll_offset` scrolls a tall diagram.
+fn paint_side_panel_diagram_escapes(
+    path: &std::path::Path,
+    width: u32,
+    height: u32,
+    img_area: Rect,
+    scroll_offset: usize,
+) -> Option<String> {
+    use crate::terminal::image::{
+        detect_graphics_protocol, place_inline_image, prepare_overlay_image_bytes,
+        transmit_inline_image, GraphicsProtocol,
+    };
+
+    if detect_graphics_protocol() == GraphicsProtocol::None {
+        return None;
+    }
+    let raw = std::fs::read(path).ok()?;
+    let prepared = prepare_overlay_image_bytes(&raw)?;
+    let (fit_cols, fit_rows) =
+        crate::terminal::image::fit_image_to_cells(width, height, img_area.width, u16::MAX);
+    let _ = fit_cols;
+    let full_rows = fit_rows.max(1);
+    let top_crop = (scroll_offset as u16).min(full_rows.saturating_sub(img_area.height));
+    let transmit = transmit_inline_image(&prepared, SIDE_PANEL_DIAGRAM_IMAGE_ID)?;
+    let place = place_inline_image(
+        &prepared,
+        width,
+        height,
+        img_area,
+        full_rows,
+        top_crop,
+        SIDE_PANEL_DIAGRAM_IMAGE_ID,
+        true,
+    )?;
+    Some(format!("{transmit}{place}"))
+}
+
 /// Concatenate a line's span contents into plain text (styles stripped).
 ///
 /// Used to build the selection model from rendered markdown lines.
@@ -194,12 +251,12 @@ pub fn side_panel_height(state: Option<&SidePanelState>, content_width: u16) -> 
             2 + body // top border + body + bottom border
         }
         Some(SidePanelState::Diagram { width, height, .. }) => {
-            // Estimate image rows: scale to panel width, ~2 char rows per 40px.
-            let panel_w = content_width.saturating_sub(4).max(1) as u32;
-            let aspect = *height as f64 / *width as f64;
-            let img_rows = (panel_w as f64 * aspect / 20.0).ceil() as u16;
-            let img_rows = img_rows.clamp(3, 60);
-            2 + img_rows // border + image + border
+            // Origin / Face-inline parity: size from fit_image_to_cells (cell aspect).
+            let panel_w = content_width.saturating_sub(4).max(1);
+            let (_, fit_rows) =
+                crate::terminal::image::fit_image_to_cells(*width, *height, panel_w, u16::MAX);
+            let img_rows = fit_rows.clamp(3, 60);
+            2 + img_rows // borders + image body
         }
     }
 }
@@ -246,8 +303,13 @@ pub fn render_side_panel(
     }
 
     // Only show focus (accent ring + ↑↓ hint) when there's actually something to
-    // scroll; `max_scroll_offset` is 0 for non-Done states and answers that fit.
-    let max_body = area.height.saturating_sub(2) as usize;
+    // scroll; `max_scroll_offset` is 0 for non-Done/Diagram states and content
+    // that fits. Diagram reserves one label row above the image body.
+    let chrome = match state {
+        SidePanelState::Diagram { .. } => 3,
+        _ => 2,
+    };
+    let max_body = area.height.saturating_sub(chrome) as usize;
     let focus_active = focused && state.max_scroll_offset(content_width, max_body) > 0;
 
     let border_color = if focus_active {
@@ -280,7 +342,33 @@ pub fn render_side_panel(
     };
     let hint = match state {
         SidePanelState::Loading { .. } | SidePanelState::Error { .. } => dismiss.to_string(),
-        SidePanelState::Diagram { .. } => dismiss.to_string(),
+        SidePanelState::Diagram {
+            width,
+            height,
+            scroll_offset,
+            ..
+        } => {
+            let (_, fit_rows) = crate::terminal::image::fit_image_to_cells(
+                *width,
+                *height,
+                content_width as u16,
+                u16::MAX,
+            );
+            let image_rows = fit_rows.max(1) as usize;
+            let body_rows = area.height.saturating_sub(3) as usize;
+            if image_rows > body_rows && body_rows > 0 {
+                let offset = (*scroll_offset).min(image_rows.saturating_sub(body_rows));
+                let pos = offset + 1;
+                let end = (offset + body_rows).min(image_rows);
+                if focus_active {
+                    format!("{pos}-{end}/{image_rows}  \u{2191}\u{2193}  {dismiss}")
+                } else {
+                    format!("{pos}-{end}/{image_rows}  {dismiss}")
+                }
+            } else {
+                dismiss.to_string()
+            }
+        }
         SidePanelState::Done {
             content,
             scroll_offset,
@@ -483,9 +571,14 @@ pub fn render_side_panel(
             }
         }
         SidePanelState::Diagram {
-            path, width, height, ..
+            path,
+            width,
+            height,
+            scroll_offset,
+            ..
         } => {
-            // Show diagram info label.
+            // Label row — image paints into the body below (origin side-panel
+            // + Face inline media: CUP to a Rect, fit_image_to_cells).
             let info_style = Style::default().fg(theme.text_primary).bg(bg);
             let line = Line::from(Span::styled(
                 format!("\u{1F5BC} Diagram ({}x{} px)", width, height),
@@ -493,21 +586,24 @@ pub fn render_side_panel(
             ));
             buf.set_line(content_x, body_y, &line, content_width as u16);
 
-            // Render the PNG as a Kitty protocol image overlay over the panel
-            // area (rows after the label). Only when we have a graphics protocol.
-            let proto = crate::terminal::image::detect_graphics_protocol();
-            if proto.supports_images() && image_escapes.is_empty() {
-                if let Ok(png_bytes) = std::fs::read(path) {
-                    let panel_cols = area.width.saturating_sub(2).max(2);
-                    let panel_rows = area.height.saturating_sub(4).max(2);
-                    let esc = crate::terminal::image::render_kitty_image(
-                        &png_bytes,
-                        crate::terminal::image::KittyImageFormat::Png,
-                        panel_cols,
-                        panel_rows,
-                    );
-                    image_escapes.push_str(&esc);
-                }
+            let img_area = Rect {
+                x: content_x,
+                y: body_y.saturating_add(1),
+                width: content_width as u16,
+                height: area.height.saturating_sub(3).max(1),
+            };
+            if img_area.width > 0
+                && img_area.height > 0
+                && image_escapes.is_empty()
+                && let Some(esc) = paint_side_panel_diagram_escapes(
+                    path,
+                    *width,
+                    *height,
+                    img_area,
+                    *scroll_offset,
+                )
+            {
+                image_escapes.push_str(&esc);
             }
         }
         SidePanelState::Error { error, .. } => {
@@ -547,7 +643,20 @@ mod tests {
         let area = Rect::new(0, 0, width, height);
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
-        render_side_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[], false);
+        let mut image_escapes = String::new();
+        render_side_panel(
+            &mut buf,
+            state,
+            area,
+            0,
+            false,
+            None,
+            &mut model,
+            None,
+            &[],
+            false,
+            &mut image_escapes,
+        );
         model
     }
 
@@ -556,7 +665,20 @@ mod tests {
         let area = Rect::new(0, 0, width, height);
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
-        render_side_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[], false);
+        let mut image_escapes = String::new();
+        render_side_panel(
+            &mut buf,
+            state,
+            area,
+            0,
+            false,
+            None,
+            &mut model,
+            None,
+            &[],
+            false,
+            &mut image_escapes,
+        );
         buf
     }
 
@@ -576,6 +698,7 @@ mod tests {
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
         let mut links = LinkOverlay::new();
+        let mut image_escapes = String::new();
         render_side_panel(
             &mut buf,
             state,
@@ -587,6 +710,7 @@ mod tests {
             Some(&mut links),
             &[],
             false,
+            &mut image_escapes,
         );
         (model, links)
     }
@@ -954,6 +1078,7 @@ mod tests {
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
         let mut hit = crate::app::agent_view::HitArea::default();
+        let mut image_escapes = String::new();
         render_side_panel(
             &mut buf,
             &state,
@@ -965,6 +1090,7 @@ mod tests {
             None,
             &[],
             false,
+            &mut image_escapes,
         );
         let rect = hit
             .rect
@@ -975,6 +1101,29 @@ mod tests {
         assert!(
             rect.x + rect.width <= area.width,
             "hit area must be within the panel: {rect:?}"
+        );
+    }
+
+    #[test]
+    fn diagram_height_and_scroll_use_fit_image_to_cells() {
+        // Tall diagram: fit rows exceed a short viewport → scrollable.
+        let state = SidePanelState::Diagram {
+            label: "d".into(),
+            path: std::path::PathBuf::from("/tmp/unused.png"),
+            width: 800,
+            height: 1600,
+            scroll_offset: 0,
+        };
+        let content_w = 36u16;
+        let h = side_panel_height(Some(&state), content_w + 4);
+        assert!(h >= 5, "diagram panel must reserve image rows, got {h}");
+        let (_, fit_rows) =
+            crate::terminal::image::fit_image_to_cells(800, 1600, content_w, u16::MAX);
+        let max = state.max_scroll_offset(content_w as usize, 10);
+        assert_eq!(
+            max,
+            (fit_rows.max(1) as usize).saturating_sub(10),
+            "scroll range must match fit_image_to_cells rows"
         );
     }
 }

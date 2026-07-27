@@ -1127,8 +1127,10 @@ impl AgentView {
             height,
             scroll_offset: prev_offset,
         });
-        // Ensure the panel is visible.
+        // Force the right-hand column (legacy TUI /btw sidebar parity) and focus it.
         self.side_panel = true;
+        self.side_panel_visible = true;
+        self.side_panel_focused = true;
     }
 
     /// Ensure a terminal-tier PNG exists for inline Kitty/iTerm paint.
@@ -1317,7 +1319,14 @@ impl AgentView {
     /// sized for the side-panel column width.
     pub(crate) fn request_mermaid_sidebar_render(&mut self, source: String) {
         let theme = crate::theme::cache::current_kind();
-        let cols = self.mermaid_content_cols().min(36); // side panel ~36 cols
+        // Size for the live side-panel column (origin paints into the pane
+        // width), not a hardcoded 36 — user may have resized via drag / [].
+        let cols = self
+            .last_side_panel_area
+            .width
+            .saturating_sub(4)
+            .max(self.side_panel_width.saturating_sub(4))
+            .max(12);
         let quality = MermaidRenderQuality::Terminal;
         let Some((key, out_path)) = self.mermaid_render_target(&source, theme, cols, quality)
         else {

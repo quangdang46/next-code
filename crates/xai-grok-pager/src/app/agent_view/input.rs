@@ -285,9 +285,19 @@ impl AgentView {
             return Delegate;
         }
         let Some(panel_scroll_max) = self.side_panel_state.as_ref().and_then(|panel| {
-            matches!(panel, crate::views::side_panel::SidePanelState::Done { .. }).then(|| {
+            matches!(
+                panel,
+                crate::views::side_panel::SidePanelState::Done { .. }
+                    | crate::views::side_panel::SidePanelState::Diagram { .. }
+            )
+            .then(|| {
                 let content_width = self.last_side_panel_area.width.saturating_sub(4) as usize;
-                let max_body = self.last_side_panel_area.height.saturating_sub(2) as usize;
+                // Diagram reserves one label row above the image body.
+                let chrome = match panel {
+                    crate::views::side_panel::SidePanelState::Diagram { .. } => 3,
+                    _ => 2,
+                };
+                let max_body = self.last_side_panel_area.height.saturating_sub(chrome) as usize;
                 panel.max_scroll_offset(content_width, max_body)
             })
         }) else {
@@ -520,10 +530,18 @@ impl AgentView {
         let panel_scroll_max = if self.active_pane == AgentPane::Prompt
             && self.side_panel_focused
             && let Some(panel) = self.side_panel_state.as_ref()
-            && matches!(panel, crate::views::side_panel::SidePanelState::Done { .. })
+            && matches!(
+                panel,
+                crate::views::side_panel::SidePanelState::Done { .. }
+                    | crate::views::side_panel::SidePanelState::Diagram { .. }
+            )
         {
             let content_width = self.last_side_panel_area.width.saturating_sub(4) as usize;
-            let max_body = self.last_side_panel_area.height.saturating_sub(2) as usize;
+            let chrome = match panel {
+                crate::views::side_panel::SidePanelState::Diagram { .. } => 3,
+                _ => 2,
+            };
+            let max_body = self.last_side_panel_area.height.saturating_sub(chrome) as usize;
             panel.max_scroll_offset(content_width, max_body)
         } else {
             0
