@@ -130,11 +130,8 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(timeline::TimelineCommand),
         Arc::new(toggle_mouse_reporting::ToggleMouseReportingCommand),
         Arc::new(settings_cmd::SettingsCommand),
-<<<<<<< HEAD
         Arc::new(experimental::ExperimentalCommand),
-=======
         Arc::new(statusline::StatuslineCommand),
->>>>>>> dev
         Arc::new(privacy::PrivacyCommand),
         Arc::new(rewind::RewindCommand),
         Arc::new(jump::JumpCommand),
