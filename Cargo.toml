@@ -138,8 +138,8 @@ members = [
 ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "a0bda22d16cff8637d162a700dc8f1cbd41d957b" }
 ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", rev = "a0bda22d16cff8637d162a700dc8f1cbd41d957b" }
 ffs-symbol = { git = "https://github.com/quangdang46/fast_file_search", rev = "a0bda22d16cff8637d162a700dc8f1cbd41d957b" }
-# Pin hashline to main tip (Editor API with injectable SnapshotStore/BlockResolver).
-hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "17be1e5" }
+# Pin hashline to main tip (Editor API + apply_edits).
+hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "edbea75" }
 strum = { version = "0.26", features = ["derive"] }
 regex = "1"
 
