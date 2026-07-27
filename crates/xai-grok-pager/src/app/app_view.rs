@@ -4820,8 +4820,8 @@ impl AppView {
                 .is_some_and(McpInitProgress::is_visible)
                 && spinner_frame_tick;
             needs_redraw |= matches!(
-                agent.btw_state,
-                Some(crate::views::btw_overlay::BtwOverlayState::Loading { .. })
+                agent.side_panel_state,
+                Some(crate::views::side_panel::SidePanelState::Loading { .. })
             ) && spinner_frame_tick;
             needs_redraw |= agent.drain_blocked();
             if agent.acp_synced_generation != agent.session.available_commands_generation {
@@ -5102,8 +5102,8 @@ impl AppView {
                         .is_some_and(McpInitProgress::is_visible)
                     || agent.plugin_cta.phase.is_spinner()
                     || matches!(
-                        agent.btw_state,
-                        Some(crate::views::btw_overlay::BtwOverlayState::Loading { .. })
+                        agent.side_panel_state,
+                        Some(crate::views::side_panel::SidePanelState::Loading { .. })
                     )
                     || agent.drain_blocked()
                     || agent.prompt.file_search.context().is_some()
@@ -6331,12 +6331,12 @@ pub(crate) mod tests {
     }
     #[test]
     fn needs_animation_gates_btw_loading_spinner() {
-        use crate::views::btw_overlay::BtwOverlayState;
+        use crate::views::side_panel::SidePanelState;
         use crate::views::turn_status::SPINNER_DIVISOR;
         let mut app = test_app_with_agent();
         let id = super::super::agent::AgentId(0);
         assert!(!app.needs_animation());
-        app.agents.get_mut(&id).unwrap().btw_state = Some(BtwOverlayState::Loading {
+        app.agents.get_mut(&id).unwrap().side_panel_state = Some(SidePanelState::Loading {
             question: "what is X?".into(),
         });
         assert!(app.needs_animation());
@@ -6345,10 +6345,10 @@ pub(crate) mod tests {
             saw_redraw,
             "Loading must redraw at spinner cadence while idle"
         );
-        app.agents.get_mut(&id).unwrap().btw_state =
-            Some(BtwOverlayState::done("what is X?".into(), "X is …".into()));
+        app.agents.get_mut(&id).unwrap().side_panel_state =
+            Some(SidePanelState::done("what is X?".into(), "X is …".into()));
         assert!(!app.needs_animation());
-        app.agents.get_mut(&id).unwrap().btw_state = Some(BtwOverlayState::Error {
+        app.agents.get_mut(&id).unwrap().side_panel_state = Some(SidePanelState::Error {
             question: "what is X?".into(),
             error: "boom".into(),
         });
@@ -9588,7 +9588,7 @@ pub(crate) mod tests {
         }
         let agent = app.agents.get_mut(&id).unwrap();
         agent.active_pane = crate::app::agent_view::AgentPane::Prompt;
-        agent.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::done(
+        agent.side_panel_state = Some(crate::views::side_panel::SidePanelState::done(
             "side question".into(),
             "side answer".into(),
         ));
@@ -9597,7 +9597,7 @@ pub(crate) mod tests {
             !matches!(first, InputOutcome::Action(Action::DashboardOverlayExit)),
             "Esc with open /btw must not exit the overlay, got {first:?}",
         );
-        assert!(app.agents.get(&id).unwrap().btw_state.is_none());
+        assert!(app.agents.get(&id).unwrap().side_panel_state.is_none());
         let second = app.handle_input(&key_event(KeyCode::Esc, KeyModifiers::NONE));
         assert!(
             matches!(second, InputOutcome::Action(Action::DashboardOverlayExit)),

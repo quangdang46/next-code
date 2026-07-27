@@ -932,11 +932,14 @@ pub(super) fn action_for_enum_commit(key: SettingKey, choice: &'static str) -> O
         },
         "hunk_tracker_mode" => Some(Action::SetHunkTrackerMode(choice.to_string())),
         "screen_mode" => Some(Action::SetScreenMode(choice.to_string())),
-        "btw_output_mode" => Some(Action::SetBtwOutputMode(choice.to_string())),
+        "side_panel_output_mode" => Some(Action::SetSidePanelOutputMode(choice.to_string())),
         "voice_capture_mode" => Some(Action::SetVoiceCaptureMode(choice.to_string())),
         "voice_stt_language" => Some(Action::SetVoiceSttLanguage(choice.to_string())),
         "render_mermaid" => {
             crate::appearance::RenderMermaid::from_canonical(choice).map(Action::SetRenderMermaid)
+        }
+        "render_mermaid_target" => {
+            Some(Action::SetRenderMermaidTarget(choice.to_string()))
         }
         "keep_text_selection" => crate::appearance::TextSelection::from_canonical(choice)
             .map(Action::SetKeepTextSelection),

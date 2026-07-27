@@ -105,6 +105,7 @@ pub struct UiConfig {
     /// Written by the pager's settings modal.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub render_mermaid: Option<String>,
+    pub render_mermaid_target: Option<String>,
     /// Hunk-tracker mode the pager advertises to the agent (`agent_only` |
     /// `all_dirty` | `off`). Written by the pager's settings modal; read at
     /// connect time (CLI `--hunk-tracker-mode` / `GROK_HUNK_TRACKER` override
@@ -182,11 +183,11 @@ pub struct UiConfig {
     /// Face `/btw` answer surface: `"inline"` (overlay above prompt, default) or
     /// `"sidebar"` (legacy TUI-style right-hand panel). Unset → `inline`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub btw_output_mode: Option<String>,
+    pub side_panel_output_mode: Option<String>,
     /// Preferred column width for Face `/btw` side panel mode. Unset → 36.
     /// Adjusted by dragging the divider or `[` / `]` while the panel is focused.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub btw_sidebar_width: Option<u16>,
+    pub side_panel_width: Option<u16>,
     /// Retired hidden opt-in for terminal-like double/triple-click word/line
     /// selection. Superseded by `keep_text_selection = "word_select"`. Still
     /// read only when `keep_text_selection` is unset; Settings clears this on
@@ -349,6 +350,7 @@ impl Default for UiConfig {
             scroll_lines: None,
             vim_mode: None,
             render_mermaid: None,
+            render_mermaid_target: None,
             hunk_tracker_mode: None,
             voice_capture_mode: None,
             voice_stt_language: None,
@@ -363,8 +365,8 @@ impl Default for UiConfig {
             prompt_suggestions: None,
             cursor_blink: None,
             screen_mode: None,
-            btw_output_mode: None,
-            btw_sidebar_width: None,
+            side_panel_output_mode: None,
+            side_panel_width: None,
             double_click_action: None,
             contextual_hints: ContextualHints::default(),
             display_refresh: DisplayRefreshSettings::default(),
@@ -403,8 +405,8 @@ impl UiConfig {
     /// Default `/btw` side-panel width when `[ui].btw_sidebar_width` is unset.
     pub const BTW_SIDEBAR_WIDTH_DEFAULT: u16 = 36;
 
-    pub fn btw_sidebar_width_or_default(&self) -> u16 {
-        self.btw_sidebar_width
+    pub fn side_panel_width_or_default(&self) -> u16 {
+        self.side_panel_width
             .unwrap_or(Self::BTW_SIDEBAR_WIDTH_DEFAULT)
             .max(20)
     }

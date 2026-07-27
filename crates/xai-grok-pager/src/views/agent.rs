@@ -110,7 +110,7 @@ pub struct AgentViewLayout {
     pub todo: Rect,
     pub queue: Rect,
     /// Inline /btw side question panel (above queue / turn status / prompt).
-    pub btw: Rect,
+    pub side_panel: Rect,
     pub turn_status: Rect,
     /// Banner rect above the prompt (mode-switch banner, ephemeral tips).
     pub banner: Rect,
@@ -294,7 +294,7 @@ impl AgentViewLayout {
         i += 1;
         let scrollback = chunks[i];
         i += 1;
-        let btw = if btw_height > 0 {
+        let side_panel = if btw_height > 0 {
             i += 1;
             let r = chunks[i];
             i += 1;
@@ -387,7 +387,7 @@ impl AgentViewLayout {
             scrollback,
             todo,
             queue,
-            btw,
+            side_panel,
             turn_status,
             banner,
             plugin_cta,
@@ -403,39 +403,39 @@ impl AgentViewLayout {
     }
 
     /// Preferred width for the `/btw` right-hand side panel (legacy TUI parity).
-    pub const BTW_SIDEBAR_PREFERRED_WIDTH: u16 = 36;
+    pub const SIDE_PANEL_PREFERRED_WIDTH: u16 = 36;
     /// Hard floor for a `/btw` side column (drag / keyboard resize clamp).
-    pub const BTW_SIDEBAR_MIN_WIDTH: u16 = 20;
+    pub const SIDE_PANEL_MIN_WIDTH: u16 = 20;
     /// Minimum main column width that must remain after carving a sidebar.
     pub const BTW_SIDEBAR_MIN_MAIN_WIDTH: u16 = 28;
     /// Gap columns between the main agent column and the `/btw` side panel
     /// (also the mouse drag hit target).
-    pub const BTW_SIDEBAR_GAP: u16 = 1;
+    pub const SIDE_PANEL_GAP: u16 = 1;
 
     /// Horizontally split `area` into `(main, sidebar)` for a full-height
     /// right-hand `/btw` column (legacy TUI parity).
     ///
     /// Callers run [`Self::compute`] on `main` with `btw_height = 0`, then assign
-    /// `layout.btw = sidebar`. Returns `None` when the frame is too narrow.
-    pub fn split_btw_sidebar_column(area: Rect, preferred_width: u16) -> Option<(Rect, Rect)> {
-        let min_total = Self::BTW_SIDEBAR_MIN_WIDTH
-            .saturating_add(Self::BTW_SIDEBAR_GAP)
+    /// `layout.side_panel = sidebar`. Returns `None` when the frame is too narrow.
+    pub fn split_side_panel_column(area: Rect, preferred_width: u16) -> Option<(Rect, Rect)> {
+        let min_total = Self::SIDE_PANEL_MIN_WIDTH
+            .saturating_add(Self::SIDE_PANEL_GAP)
             .saturating_add(Self::BTW_SIDEBAR_MIN_MAIN_WIDTH);
         if area.width < min_total || area.height < 3 {
             return None;
         }
         let max_side = area
             .width
-            .saturating_sub(Self::BTW_SIDEBAR_GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH);
+            .saturating_sub(Self::SIDE_PANEL_GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH);
         let side_w = preferred_width
-            .clamp(Self::BTW_SIDEBAR_MIN_WIDTH, max_side)
+            .clamp(Self::SIDE_PANEL_MIN_WIDTH, max_side)
             .min(max_side);
-        if side_w < Self::BTW_SIDEBAR_MIN_WIDTH {
+        if side_w < Self::SIDE_PANEL_MIN_WIDTH {
             return None;
         }
         let main_w = area
             .width
-            .saturating_sub(side_w.saturating_add(Self::BTW_SIDEBAR_GAP));
+            .saturating_sub(side_w.saturating_add(Self::SIDE_PANEL_GAP));
         if main_w < Self::BTW_SIDEBAR_MIN_MAIN_WIDTH {
             return None;
         }
@@ -446,7 +446,7 @@ impl AgentViewLayout {
             height: area.height,
         };
         let sidebar = Rect {
-            x: area.x + main_w + Self::BTW_SIDEBAR_GAP,
+            x: area.x + main_w + Self::SIDE_PANEL_GAP,
             y: area.y,
             width: side_w,
             height: area.height,
@@ -455,25 +455,25 @@ impl AgentViewLayout {
     }
 
     /// Clamp a desired `/btw` sidebar width for the given frame width.
-    pub fn clamp_btw_sidebar_width(frame_width: u16, desired: u16) -> u16 {
+    pub fn clamp_side_panel_width(frame_width: u16, desired: u16) -> u16 {
         let max_side = frame_width.saturating_sub(
-            Self::BTW_SIDEBAR_GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH,
+            Self::SIDE_PANEL_GAP + Self::BTW_SIDEBAR_MIN_MAIN_WIDTH,
         );
-        if max_side < Self::BTW_SIDEBAR_MIN_WIDTH {
-            return Self::BTW_SIDEBAR_MIN_WIDTH;
+        if max_side < Self::SIDE_PANEL_MIN_WIDTH {
+            return Self::SIDE_PANEL_MIN_WIDTH;
         }
-        desired.clamp(Self::BTW_SIDEBAR_MIN_WIDTH, max_side)
+        desired.clamp(Self::SIDE_PANEL_MIN_WIDTH, max_side)
     }
 
     /// Carve a right-hand `/btw` column spanning the full agent frame height
     /// (status through shortcuts), matching legacy TUI side-panel geometry.
     ///
-    /// Prefer [`Self::split_btw_sidebar_column`] + compute-on-main for new
+    /// Prefer [`Self::split_side_panel_column`] + compute-on-main for new
     /// call sites; this post-process path remains for narrow fallbacks and tests.
     ///
     /// Returns `true` when the sidebar was placed. Callers pass `btw_height = 0`
     /// into [`Self::compute`] first so the vertical overlay strip is omitted.
-    pub fn apply_btw_sidebar(&mut self, preferred_width: u16) -> bool {
+    pub fn apply_side_panel(&mut self, preferred_width: u16) -> bool {
         let frame_x = self.status_bar.x;
         let frame_y = self.status_bar.y;
         let frame_bottom = if self.shortcuts.height > 0 {
@@ -485,7 +485,7 @@ impl AgentViewLayout {
         };
         let frame_h = frame_bottom.saturating_sub(frame_y);
         let frame_w = self.status_bar.width;
-        let Some((main, sidebar)) = Self::split_btw_sidebar_column(
+        let Some((main, sidebar)) = Self::split_side_panel_column(
             Rect {
                 x: frame_x,
                 y: frame_y,
@@ -537,7 +537,7 @@ impl AgentViewLayout {
                 .saturating_add(1)
                 .saturating_sub(self.timeline_width);
         }
-        self.btw = sidebar;
+        self.side_panel = sidebar;
         true
     }
 
@@ -1950,9 +1950,9 @@ mod tests {
         )
     }
     #[test]
-    fn split_btw_sidebar_column_is_full_frame_height() {
+    fn split_side_panel_column_is_full_frame_height() {
         let area = Rect::new(2, 1, 100, 40);
-        let (main, side) = AgentViewLayout::split_btw_sidebar_column(area, 36)
+        let (main, side) = AgentViewLayout::split_side_panel_column(area, 36)
             .expect("wide frame should split");
         assert_eq!(side.height, area.height, "sidebar must span full frame height");
         assert_eq!(main.height, area.height);
@@ -1960,14 +1960,14 @@ mod tests {
         assert_eq!(main.y, area.y);
         assert_eq!(side.width, 36);
         assert_eq!(
-            main.width + AgentViewLayout::BTW_SIDEBAR_GAP + side.width,
+            main.width + AgentViewLayout::SIDE_PANEL_GAP + side.width,
             area.width
         );
-        assert_eq!(side.x, main.x + main.width + AgentViewLayout::BTW_SIDEBAR_GAP);
+        assert_eq!(side.x, main.x + main.width + AgentViewLayout::SIDE_PANEL_GAP);
     }
 
     #[test]
-    fn apply_btw_sidebar_spans_status_through_shortcuts() {
+    fn apply_side_panel_spans_status_through_shortcuts() {
         let area = Rect::new(0, 0, 100, 40);
         let mut layout = layout_with_rows(area, 0, 0, 0);
         let before_w = layout.status_bar.width;
@@ -1976,31 +1976,31 @@ mod tests {
             .shortcuts
             .y
             .saturating_add(layout.shortcuts.height);
-        assert!(layout.apply_btw_sidebar(36));
-        assert_eq!(layout.btw.y, top);
-        assert_eq!(layout.btw.y + layout.btw.height, bottom);
+        assert!(layout.apply_side_panel(36));
+        assert_eq!(layout.side_panel.y, top);
+        assert_eq!(layout.side_panel.y + layout.side_panel.height, bottom);
         assert!(
-            layout.btw.height > layout.scrollback.height,
+            layout.side_panel.height > layout.scrollback.height,
             "sidebar must be taller than scrollback alone"
         );
         assert_eq!(
-            layout.status_bar.width + AgentViewLayout::BTW_SIDEBAR_GAP + layout.btw.width,
+            layout.status_bar.width + AgentViewLayout::SIDE_PANEL_GAP + layout.side_panel.width,
             before_w
         );
         assert_eq!(layout.prompt.width, layout.status_bar.width);
     }
 
     #[test]
-    fn clamp_btw_sidebar_width_respects_min_main() {
+    fn clamp_side_panel_width_respects_min_main() {
         assert_eq!(
-            AgentViewLayout::clamp_btw_sidebar_width(80, 10),
-            AgentViewLayout::BTW_SIDEBAR_MIN_WIDTH
+            AgentViewLayout::clamp_side_panel_width(80, 10),
+            AgentViewLayout::SIDE_PANEL_MIN_WIDTH
         );
-        assert_eq!(AgentViewLayout::clamp_btw_sidebar_width(80, 36), 36);
+        assert_eq!(AgentViewLayout::clamp_side_panel_width(80, 36), 36);
         let max = 80
-            - AgentViewLayout::BTW_SIDEBAR_GAP
+            - AgentViewLayout::SIDE_PANEL_GAP
             - AgentViewLayout::BTW_SIDEBAR_MIN_MAIN_WIDTH;
-        assert_eq!(AgentViewLayout::clamp_btw_sidebar_width(80, 200), max);
+        assert_eq!(AgentViewLayout::clamp_side_panel_width(80, 200), max);
     }
 
     #[test]

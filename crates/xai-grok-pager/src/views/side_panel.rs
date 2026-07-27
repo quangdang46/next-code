@@ -22,12 +22,12 @@ use crate::scrollback::text_selection::{
 use crate::theme::Theme;
 
 /// Synthetic entry index for btw overlay selection (never collides with real scrollback).
-pub const BTW_OVERLAY_ENTRY_IDX: usize = usize::MAX;
+pub const SIDE_PANEL_ENTRY_IDX: usize = usize::MAX;
 const BTW_OVERLAY_RANGE_ID: u16 = 0;
 
-/// State of the /btw inline panel.
+/// State of the side panel (BTW answers, Mermaid diagrams, etc.).
 #[derive(Debug, Clone)]
-pub enum BtwOverlayState {
+pub enum SidePanelState {
     /// Waiting for the shell to respond.
     Loading { question: String },
     /// Response received — stays on screen until Esc.
@@ -39,11 +39,24 @@ pub enum BtwOverlayState {
         /// Line offset for scrolling through long responses.
         scroll_offset: usize,
     },
+    /// Rendered diagram image ready for display.
+    Diagram {
+        /// Label / file name shown as the title.
+        label: String,
+        /// Absolute path to the rendered PNG on disk.
+        path: std::path::PathBuf,
+        /// Raster width in pixels.
+        width: u32,
+        /// Raster height in pixels.
+        height: u32,
+        /// Scroll offset for tall images.
+        scroll_offset: usize,
+    },
     /// Request failed (shown until user presses Esc).
     Error { question: String, error: String },
 }
 
-impl BtwOverlayState {
+impl SidePanelState {
     /// Build a `Done` state, rendering `response` as markdown via the same
     /// [`MarkdownContent`] renderer used for regular agent messages so the
     /// inline panel shows formatted tables, headings, lists, etc.
@@ -60,27 +73,34 @@ impl BtwOverlayState {
             Self::Loading { question }
             | Self::Done { question, .. }
             | Self::Error { question, .. } => question,
+            Self::Diagram { label, .. } => label,
         }
     }
 
     /// Scroll the Done response up by `n` lines. No-op for other states.
     pub fn scroll_up(&mut self, n: usize) {
-        if let Self::Done { scroll_offset, .. } = self {
-            *scroll_offset = scroll_offset.saturating_sub(n);
+        match self {
+            Self::Done { scroll_offset, .. } | Self::Diagram { scroll_offset, .. } => {
+                *scroll_offset = scroll_offset.saturating_sub(n);
+            }
+            _ => {}
         }
     }
 
-    /// Scroll the Done response down by `n` lines, clamped to `max_offset`.
+    /// Scroll the Done/Diagram response down by `n` lines, clamped to `max_offset`.
     pub fn scroll_down(&mut self, n: usize, max_offset: usize) {
-        if let Self::Done { scroll_offset, .. } = self {
-            *scroll_offset = (*scroll_offset + n).min(max_offset);
+        match self {
+            Self::Done { scroll_offset, .. } | Self::Diagram { scroll_offset, .. } => {
+                *scroll_offset = (*scroll_offset + n).min(max_offset);
+            }
+            _ => {}
         }
     }
 
-    /// Current scroll offset (0 for non-Done states).
+    /// Current scroll offset (0 for non-Done/Diagram states).
     pub fn scroll_offset(&self) -> usize {
         match self {
-            Self::Done { scroll_offset, .. } => *scroll_offset,
+            Self::Done { scroll_offset, .. } | Self::Diagram { scroll_offset, .. } => *scroll_offset,
             _ => 0,
         }
     }
@@ -95,6 +115,18 @@ impl BtwOverlayState {
                 }
                 let total = content.with_wrapped_lines(content_width, |w| w.lines.len());
                 total.saturating_sub(max_body_lines)
+            }
+            Self::Diagram { width, height, .. } => {
+                // Image body only (label is chrome). Caller passes max_body as the
+                // image viewport rows (panel height − borders − label).
+                let panel_w = (content_width as u16).max(1);
+                let (_, fit_rows) = crate::terminal::image::fit_image_to_cells(
+                    *width,
+                    *height,
+                    panel_w,
+                    u16::MAX,
+                );
+                (fit_rows.max(1) as usize).saturating_sub(max_body_lines)
             }
             _ => 0,
         }
@@ -118,7 +150,7 @@ impl BtwOverlayState {
                 // `Some(" ")` for soft-wrapped continuations.
                 let joiner_to_previous = if idx == 0 { None } else { joiner.clone() };
                 model.push_line(ResolvedSelectableLine {
-                    entry_idx: BTW_OVERLAY_ENTRY_IDX,
+                    entry_idx: SIDE_PANEL_ENTRY_IDX,
                     range_id: BTW_OVERLAY_RANGE_ID,
                     block_line_idx: idx,
                     screen_y: 0,
@@ -137,7 +169,57 @@ impl BtwOverlayState {
 const SPINNER_DIVISOR: u64 = 4;
 
 /// Maximum body lines shown for a Done response.
-pub const DONE_MAX_BODY_LINES: u16 = 12;
+pub const SIDE_PANEL_MAX_BODY_LINES: u16 = 12;
+
+/// Kitty/iTerm image id reserved for the mermaid side-panel Diagram paint.
+/// Kept out of the modal (`KITTY_PLACEMENT_ID = 1`) and AgentView inline pool.
+pub const SIDE_PANEL_DIAGRAM_IMAGE_ID: u32 = 0x4D_53_44_31; // "MSD1"
+
+/// Clear the side-panel Diagram Kitty placement (call on dismiss).
+pub fn clear_side_panel_diagram_image() -> String {
+    crate::terminal::image::clear_kitty_image(SIDE_PANEL_DIAGRAM_IMAGE_ID)
+}
+
+/// Build CUP + transmit/place escapes for a Diagram PNG in `img_area`.
+///
+/// Copies Face inline media (`place_inline_image`) and origin side-panel fit:
+/// cursor-address into the panel rect, `fit_image_to_cells` for aspect, optional
+/// top-crop when `scroll_offset` scrolls a tall diagram.
+fn paint_side_panel_diagram_escapes(
+    path: &std::path::Path,
+    width: u32,
+    height: u32,
+    img_area: Rect,
+    scroll_offset: usize,
+) -> Option<String> {
+    use crate::terminal::image::{
+        detect_graphics_protocol, place_inline_image, prepare_overlay_image_bytes,
+        transmit_inline_image, GraphicsProtocol,
+    };
+
+    if detect_graphics_protocol() == GraphicsProtocol::None {
+        return None;
+    }
+    let raw = std::fs::read(path).ok()?;
+    let prepared = prepare_overlay_image_bytes(&raw)?;
+    let (fit_cols, fit_rows) =
+        crate::terminal::image::fit_image_to_cells(width, height, img_area.width, u16::MAX);
+    let _ = fit_cols;
+    let full_rows = fit_rows.max(1);
+    let top_crop = (scroll_offset as u16).min(full_rows.saturating_sub(img_area.height));
+    let transmit = transmit_inline_image(&prepared, SIDE_PANEL_DIAGRAM_IMAGE_ID)?;
+    let place = place_inline_image(
+        &prepared,
+        width,
+        height,
+        img_area,
+        full_rows,
+        top_crop,
+        SIDE_PANEL_DIAGRAM_IMAGE_ID,
+        true,
+    )?;
+    Some(format!("{transmit}{place}"))
+}
 
 /// Concatenate a line's span contents into plain text (styles stripped).
 ///
@@ -150,23 +232,31 @@ fn line_plain_text(line: &Line<'_>) -> String {
 ///
 /// Returns 0 when there is nothing to show (state is `None`).
 /// Loading / Error = 3 rows (top border + 1 body + bottom border).
-/// Done = 2 (borders) + min(wrapped response lines, DONE_MAX_BODY_LINES).
+/// Done = 2 (borders) + min(wrapped response lines, SIDE_PANEL_MAX_BODY_LINES).
 ///
 /// `content_width` is the available width for body text (panel width minus
 /// border and padding — typically `inner_width - 4`).
-pub fn btw_panel_height(state: Option<&BtwOverlayState>, content_width: u16) -> u16 {
+pub fn side_panel_height(state: Option<&SidePanelState>, content_width: u16) -> u16 {
     match state {
         None => 0,
-        Some(BtwOverlayState::Loading { .. } | BtwOverlayState::Error { .. }) => 3,
-        Some(BtwOverlayState::Done { content, .. }) => {
+        Some(SidePanelState::Loading { .. } | SidePanelState::Error { .. }) => 3,
+        Some(SidePanelState::Done { content, .. }) => {
             let cw = content_width.saturating_sub(4) as usize; // border + pad
             let total = if cw > 0 {
                 content.with_wrapped_lines(cw, |w| w.lines.len())
             } else {
                 1
             };
-            let body = total.clamp(1, DONE_MAX_BODY_LINES as usize) as u16;
+            let body = total.clamp(1, SIDE_PANEL_MAX_BODY_LINES as usize) as u16;
             2 + body // top border + body + bottom border
+        }
+        Some(SidePanelState::Diagram { width, height, .. }) => {
+            // Origin / Face-inline parity: size from fit_image_to_cells (cell aspect).
+            let panel_w = content_width.saturating_sub(4).max(1);
+            let (_, fit_rows) =
+                crate::terminal::image::fit_image_to_cells(*width, *height, panel_w, u16::MAX);
+            let img_rows = fit_rows.clamp(3, 60);
+            2 + img_rows // borders + image body
         }
     }
 }
@@ -181,10 +271,14 @@ pub fn btw_panel_height(state: Option<&BtwOverlayState>, content_width: u16) -> 
 /// When `link_overlay` is `Some`, markdown hyperlinks in the Done body are
 /// mapped into screen-space overlay links (same path as scrollback) so OSC 8
 /// and click-to-open work inside the panel.
+///
+/// `image_escapes` collects Kitty protocol image escapes for Diagram state;
+/// the caller appends these to PostFlush to render the PNG after the buffer
+/// flush.
 #[allow(clippy::too_many_arguments)]
-pub fn render_btw_panel(
+pub fn render_side_panel(
     buf: &mut Buffer,
-    state: &BtwOverlayState,
+    state: &SidePanelState,
     area: Rect,
     tick: u64,
     focused: bool,
@@ -194,6 +288,7 @@ pub fn render_btw_panel(
     // Generated-media paths for resolving relative file-path link targets.
     media_paths: &[std::path::PathBuf],
     sidebar: bool,
+    image_escapes: &mut String,
 ) {
     if area.width < 12 || area.height < 3 {
         return;
@@ -208,8 +303,13 @@ pub fn render_btw_panel(
     }
 
     // Only show focus (accent ring + ↑↓ hint) when there's actually something to
-    // scroll; `max_scroll_offset` is 0 for non-Done states and answers that fit.
-    let max_body = area.height.saturating_sub(2) as usize;
+    // scroll; `max_scroll_offset` is 0 for non-Done/Diagram states and content
+    // that fits. Diagram reserves one label row above the image body.
+    let chrome = match state {
+        SidePanelState::Diagram { .. } => 3,
+        _ => 2,
+    };
+    let max_body = area.height.saturating_sub(chrome) as usize;
     let focus_active = focused && state.max_scroll_offset(content_width, max_body) > 0;
 
     let border_color = if focus_active {
@@ -241,8 +341,35 @@ pub fn render_btw_panel(
         "[Esc]"
     };
     let hint = match state {
-        BtwOverlayState::Loading { .. } | BtwOverlayState::Error { .. } => dismiss.to_string(),
-        BtwOverlayState::Done {
+        SidePanelState::Loading { .. } | SidePanelState::Error { .. } => dismiss.to_string(),
+        SidePanelState::Diagram {
+            width,
+            height,
+            scroll_offset,
+            ..
+        } => {
+            let (_, fit_rows) = crate::terminal::image::fit_image_to_cells(
+                *width,
+                *height,
+                content_width as u16,
+                u16::MAX,
+            );
+            let image_rows = fit_rows.max(1) as usize;
+            let body_rows = area.height.saturating_sub(3) as usize;
+            if image_rows > body_rows && body_rows > 0 {
+                let offset = (*scroll_offset).min(image_rows.saturating_sub(body_rows));
+                let pos = offset + 1;
+                let end = (offset + body_rows).min(image_rows);
+                if focus_active {
+                    format!("{pos}-{end}/{image_rows}  \u{2191}\u{2193}  {dismiss}")
+                } else {
+                    format!("{pos}-{end}/{image_rows}  {dismiss}")
+                }
+            } else {
+                dismiss.to_string()
+            }
+        }
+        SidePanelState::Done {
             content,
             scroll_offset,
             ..
@@ -346,7 +473,7 @@ pub fn render_btw_panel(
     // ── Body (between borders) ──
     let body_y = area.y + 1;
     match state {
-        BtwOverlayState::Loading { .. } => {
+        SidePanelState::Loading { .. } => {
             let frames = crate::glyphs::braille_spinner_frames();
             let frame_idx = ((tick / SPINNER_DIVISOR) % frames.len() as u64) as usize;
             let spinner = frames[frame_idx];
@@ -357,7 +484,7 @@ pub fn render_btw_panel(
             ]);
             buf.set_line(content_x, body_y, &line, content_width as u16);
         }
-        BtwOverlayState::Done {
+        SidePanelState::Done {
             content,
             scroll_offset,
             ..
@@ -380,7 +507,7 @@ pub fn render_btw_panel(
                 let text = line_plain_text(&bl.content);
                 let joiner_to_previous = if idx == 0 { None } else { bl.joiner.clone() };
                 selection_model.push_line(ResolvedSelectableLine {
-                    entry_idx: BTW_OVERLAY_ENTRY_IDX,
+                    entry_idx: SIDE_PANEL_ENTRY_IDX,
                     range_id: BTW_OVERLAY_RANGE_ID,
                     block_line_idx: idx,
                     screen_y: body_y + row as u16,
@@ -399,7 +526,7 @@ pub fn render_btw_panel(
                 };
                 selection_model.content_area = body_area;
                 selection_model.visible_blocks.push(VisibleBlockGeometry {
-                    entry_idx: BTW_OVERLAY_ENTRY_IDX,
+                    entry_idx: SIDE_PANEL_ENTRY_IDX,
                     area: body_area,
                     content_area: body_area,
                     selection_area: body_area,
@@ -443,7 +570,43 @@ pub fn render_btw_panel(
                 scan_lines_for_url_overlays(visible_lines, content_x, media_paths, overlay);
             }
         }
-        BtwOverlayState::Error { error, .. } => {
+        SidePanelState::Diagram {
+            path,
+            width,
+            height,
+            scroll_offset,
+            ..
+        } => {
+            // Label row — image paints into the body below (origin side-panel
+            // + Face inline media: CUP to a Rect, fit_image_to_cells).
+            let info_style = Style::default().fg(theme.text_primary).bg(bg);
+            let line = Line::from(Span::styled(
+                format!("\u{1F5BC} Diagram ({}x{} px)", width, height),
+                info_style,
+            ));
+            buf.set_line(content_x, body_y, &line, content_width as u16);
+
+            let img_area = Rect {
+                x: content_x,
+                y: body_y.saturating_add(1),
+                width: content_width as u16,
+                height: area.height.saturating_sub(3).max(1),
+            };
+            if img_area.width > 0
+                && img_area.height > 0
+                && image_escapes.is_empty()
+                && let Some(esc) = paint_side_panel_diagram_escapes(
+                    path,
+                    *width,
+                    *height,
+                    img_area,
+                    *scroll_offset,
+                )
+            {
+                image_escapes.push_str(&esc);
+            }
+        }
+        SidePanelState::Error { error, .. } => {
             let error_style = Style::default().fg(theme.accent_error).bg(bg);
             let msg = if error.width() > content_width {
                 let mut s = String::new();
@@ -473,23 +636,49 @@ mod tests {
     use crate::render::osc8::resolve_link_target;
 
     fn render_with_model(
-        state: &BtwOverlayState,
+        state: &SidePanelState,
         width: u16,
         height: u16,
     ) -> ResolvedSelectionModel {
         let area = Rect::new(0, 0, width, height);
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
-        render_btw_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[], false);
+        let mut image_escapes = String::new();
+        render_side_panel(
+            &mut buf,
+            state,
+            area,
+            0,
+            false,
+            None,
+            &mut model,
+            None,
+            &[],
+            false,
+            &mut image_escapes,
+        );
         model
     }
 
     /// Render the panel and return the raw buffer for cell inspection.
-    fn render_to_buffer(state: &BtwOverlayState, width: u16, height: u16) -> Buffer {
+    fn render_to_buffer(state: &SidePanelState, width: u16, height: u16) -> Buffer {
         let area = Rect::new(0, 0, width, height);
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
-        render_btw_panel(&mut buf, state, area, 0, false, None, &mut model, None, &[], false);
+        let mut image_escapes = String::new();
+        render_side_panel(
+            &mut buf,
+            state,
+            area,
+            0,
+            false,
+            None,
+            &mut model,
+            None,
+            &[],
+            false,
+            &mut image_escapes,
+        );
         buf
     }
 
@@ -501,7 +690,7 @@ mod tests {
     }
 
     fn render_with_links(
-        state: &BtwOverlayState,
+        state: &SidePanelState,
         width: u16,
         height: u16,
     ) -> (ResolvedSelectionModel, LinkOverlay) {
@@ -509,7 +698,8 @@ mod tests {
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
         let mut links = LinkOverlay::new();
-        render_btw_panel(
+        let mut image_escapes = String::new();
+        render_side_panel(
             &mut buf,
             state,
             area,
@@ -520,14 +710,15 @@ mod tests {
             Some(&mut links),
             &[],
             false,
+            &mut image_escapes,
         );
         (model, links)
     }
 
     /// Build a Done state with an explicit scroll offset.
-    fn done_with_scroll(response: &str, scroll_offset: usize) -> BtwOverlayState {
-        let mut state = BtwOverlayState::done("q".to_string(), response.to_string());
-        if let BtwOverlayState::Done {
+    fn done_with_scroll(response: &str, scroll_offset: usize) -> SidePanelState {
+        let mut state = SidePanelState::done("q".to_string(), response.to_string());
+        if let SidePanelState::Done {
             scroll_offset: so, ..
         } = &mut state
         {
@@ -547,14 +738,14 @@ mod tests {
 
     #[test]
     fn done_state_populates_selection_model() {
-        let state = BtwOverlayState::done(
+        let state = SidePanelState::done(
             "test".to_string(),
             "line one and line two and line three".to_string(),
         );
         let model = render_with_model(&state, 40, 8);
         assert!(!model.ranges.is_empty(), "should have selectable ranges");
         let range = &model.ranges[0];
-        assert_eq!(range.entry_idx, BTW_OVERLAY_ENTRY_IDX);
+        assert_eq!(range.entry_idx, SIDE_PANEL_ENTRY_IDX);
         assert_eq!(range.range_id, BTW_OVERLAY_RANGE_ID);
         assert!(!range.lines.is_empty());
         for (i, line) in range.lines.iter().enumerate() {
@@ -569,7 +760,7 @@ mod tests {
 
     #[test]
     fn loading_state_does_not_populate_selection_model() {
-        let state = BtwOverlayState::Loading {
+        let state = SidePanelState::Loading {
             question: "q".to_string(),
         };
         let model = render_with_model(&state, 40, 4);
@@ -579,7 +770,7 @@ mod tests {
 
     #[test]
     fn error_state_does_not_populate_selection_model() {
-        let state = BtwOverlayState::Error {
+        let state = SidePanelState::Error {
             question: "q".to_string(),
             error: "something went wrong".to_string(),
         };
@@ -625,13 +816,13 @@ mod tests {
         let full_model = state.full_selection_model(40);
         let drag = ActiveTextDrag {
             anchor: RangeHit {
-                entry_idx: BTW_OVERLAY_ENTRY_IDX,
+                entry_idx: SIDE_PANEL_ENTRY_IDX,
                 range_id: BTW_OVERLAY_RANGE_ID,
                 block_line_idx: 2,
                 col_within_range: 0,
             },
             head: RangeHit {
-                entry_idx: BTW_OVERLAY_ENTRY_IDX,
+                entry_idx: SIDE_PANEL_ENTRY_IDX,
                 range_id: BTW_OVERLAY_RANGE_ID,
                 block_line_idx: 14,
                 col_within_range: 5,
@@ -653,7 +844,7 @@ mod tests {
     fn done_state_renders_markdown_not_raw_source() {
         let response =
             "**Bold intro**\n\n### Heading\n\n| Item | Qty |\n|------|-----|\n| Bow | 1 |";
-        let state = BtwOverlayState::done("q".to_string(), response.to_string());
+        let state = SidePanelState::done("q".to_string(), response.to_string());
         // Wide + tall enough to render the whole response without scrolling.
         let model = render_with_model(&state, 60, 16);
         let rendered: String = model
@@ -696,7 +887,7 @@ mod tests {
     fn done_state_maps_markdown_links_to_overlay() {
         let url = "https://example.com/btw-link";
         let response = format!("See [docs]({url}) for details.");
-        let state = BtwOverlayState::done("q".to_string(), response);
+        let state = SidePanelState::done("q".to_string(), response);
         let (_model, overlay) = render_with_links(&state, 60, 8);
         assert!(
             !overlay.is_empty(),
@@ -734,7 +925,7 @@ mod tests {
     #[test]
     fn done_state_maps_plain_url_autolinks() {
         let url = "https://example.com/plain";
-        let state = BtwOverlayState::done("q".to_string(), format!("Visit {url} please."));
+        let state = SidePanelState::done("q".to_string(), format!("Visit {url} please."));
         let (_model, overlay) = render_with_links(&state, 60, 8);
         assert!(
             overlay
@@ -761,7 +952,7 @@ mod tests {
         // Absolute path text (not a markdown hyperlink) should still become a
         // file:// overlay via scan_lines_for_url_overlays.
         let path = "/Users/test/project/src/main.rs";
-        let state = BtwOverlayState::done("q".to_string(), format!("See {path} for details."));
+        let state = SidePanelState::done("q".to_string(), format!("See {path} for details."));
         let (_model, overlay) = render_with_links(&state, 80, 8);
         let urls: Vec<_> = overlay
             .links()
@@ -783,8 +974,8 @@ mod tests {
         let url = "https://example.com/scrolled";
         lines.push(format!("[end]({url})"));
         let response = lines.join("  \n");
-        let mut state = BtwOverlayState::done("q".to_string(), response);
-        if let BtwOverlayState::Done {
+        let mut state = SidePanelState::done("q".to_string(), response);
+        if let SidePanelState::Done {
             scroll_offset: so, ..
         } = &mut state
         {
@@ -819,7 +1010,7 @@ mod tests {
     fn long_question_truncates_title_but_keeps_esc_hint() {
         let long_q = "please also double-check the error handling and the retry \
                       logic across every single call site in the whole module";
-        let state = BtwOverlayState::Loading {
+        let state = SidePanelState::Loading {
             question: long_q.to_string(),
         };
         let width = 40;
@@ -839,7 +1030,7 @@ mod tests {
     /// to the common case).
     #[test]
     fn short_question_shows_full_title_and_esc_hint() {
-        let state = BtwOverlayState::Loading {
+        let state = SidePanelState::Loading {
             question: "hi".to_string(),
         };
         let width = 40;
@@ -880,14 +1071,15 @@ mod tests {
     /// is long enough to force truncation.
     #[test]
     fn long_question_still_registers_esc_hit_area() {
-        let state = BtwOverlayState::Loading {
+        let state = SidePanelState::Loading {
             question: "x".repeat(200),
         };
         let area = Rect::new(0, 0, 40, 4);
         let mut buf = Buffer::empty(area);
         let mut model = ResolvedSelectionModel::default();
         let mut hit = crate::app::agent_view::HitArea::default();
-        render_btw_panel(
+        let mut image_escapes = String::new();
+        render_side_panel(
             &mut buf,
             &state,
             area,
@@ -898,6 +1090,7 @@ mod tests {
             None,
             &[],
             false,
+            &mut image_escapes,
         );
         let rect = hit
             .rect
@@ -908,6 +1101,29 @@ mod tests {
         assert!(
             rect.x + rect.width <= area.width,
             "hit area must be within the panel: {rect:?}"
+        );
+    }
+
+    #[test]
+    fn diagram_height_and_scroll_use_fit_image_to_cells() {
+        // Tall diagram: fit rows exceed a short viewport → scrollable.
+        let state = SidePanelState::Diagram {
+            label: "d".into(),
+            path: std::path::PathBuf::from("/tmp/unused.png"),
+            width: 800,
+            height: 1600,
+            scroll_offset: 0,
+        };
+        let content_w = 36u16;
+        let h = side_panel_height(Some(&state), content_w + 4);
+        assert!(h >= 5, "diagram panel must reserve image rows, got {h}");
+        let (_, fit_rows) =
+            crate::terminal::image::fit_image_to_cells(800, 1600, content_w, u16::MAX);
+        let max = state.max_scroll_offset(content_w as usize, 10);
+        assert_eq!(
+            max,
+            (fit_rows.max(1) as usize).saturating_sub(10),
+            "scroll range must match fit_image_to_cells rows"
         );
     }
 }

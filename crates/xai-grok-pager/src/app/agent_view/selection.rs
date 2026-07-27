@@ -16,7 +16,7 @@ use crate::scrollback::text_selection::{
     reconstruct_table_selection_text, resolve_table_drag_kind, url_range_at_col,
     word_boundaries_at_col,
 };
-use crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX;
+use crate::views::side_panel::SIDE_PANEL_ENTRY_IDX;
 use crossterm::event::MouseEvent;
 use std::time::{Duration, Instant};
 
@@ -118,7 +118,7 @@ impl AgentView {
     /// Pre-gated on the anchor line having a box-drawing glyph: prose drags
     /// must not touch `effective_output`, which thrashes the render cache.
     fn compute_drag_table_geometry(&self, anchor: &RangeHit) -> Option<TableGeometry> {
-        if anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX {
+        if anchor.entry_idx == SIDE_PANEL_ENTRY_IDX {
             return None;
         }
         if let Some(line) = self.last_scrollback_selection_model.line_for_hit(anchor)
@@ -188,7 +188,7 @@ impl AgentView {
         // Skip for btw-anchored drags — they don't autoscroll the scrollback.
         if let Some((col, row)) = self.last_drag_mouse
             && let Some(drag) = self.drag_selection
-            && drag.anchor.entry_idx != BTW_OVERLAY_ENTRY_IDX
+            && drag.anchor.entry_idx != SIDE_PANEL_ENTRY_IDX
         {
             let head = self
                 .last_scrollback_selection_model
@@ -246,18 +246,18 @@ impl AgentView {
     /// frame's model, which scrolling/streaming/resizing make stale.
     /// `draw` calls this right after each model rebuild and before the
     /// corresponding overlay paints, so the head re-resolves from the held
-    /// pointer position with at most one frame of lag. `btw_rebuilt` names
+    /// pointer position with at most one frame of lag. `panel_rebuilt` names
     /// the surface that was just rebuilt: a drag anchored on the other
     /// surface is left alone (its model is still last frame's). Keeps the
     /// previous head when the anchor's range has no lines in the fresh model.
-    pub(in crate::app) fn reclamp_drag_head_post_render(&mut self, btw_rebuilt: bool) {
+    pub(in crate::app) fn reclamp_drag_head_post_render(&mut self, panel_rebuilt: bool) {
         let Some((col, row)) = self.last_drag_mouse else {
             return;
         };
         let Some(drag) = self.drag_selection else {
             return;
         };
-        if (drag.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX) != btw_rebuilt {
+        if (drag.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX) != panel_rebuilt {
             return;
         }
         let model = self.selection_model_for_hit(&drag.anchor);
@@ -339,13 +339,13 @@ impl AgentView {
         self.begin_pending_text_drag_on(mouse, false)
     }
 
-    pub(in crate::app) fn begin_pending_btw_text_drag(&mut self, mouse: &MouseEvent) -> bool {
+    pub(in crate::app) fn begin_pending_side_panel_text_drag(&mut self, mouse: &MouseEvent) -> bool {
         self.begin_pending_text_drag_on(mouse, true)
     }
 
-    fn begin_pending_text_drag_on(&mut self, mouse: &MouseEvent, btw: bool) -> bool {
-        let model = if btw {
-            &self.last_btw_selection_model
+    fn begin_pending_text_drag_on(&mut self, mouse: &MouseEvent, side_panel: bool) -> bool {
+        let model = if side_panel {
+            &self.last_panel_selection_model
         } else {
             &self.last_scrollback_selection_model
         };
@@ -354,7 +354,7 @@ impl AgentView {
             event = "begin_pending_text_drag",
             col = mouse.column,
             row = mouse.row,
-            btw,
+            side_panel,
             hit = ?hit,
             "drag start hit-test"
         );
@@ -376,15 +376,15 @@ impl AgentView {
     }
 
     fn drag_model(&self) -> &ResolvedSelectionModel {
-        let is_btw = self
+        let is_side_panel = self
             .pending_text_drag
-            .is_some_and(|p| p.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX)
+            .is_some_and(|p| p.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX)
             || self
                 .drag_selection
                 .as_ref()
-                .is_some_and(|d| d.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX);
-        if is_btw {
-            &self.last_btw_selection_model
+                .is_some_and(|d| d.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX);
+        if is_side_panel {
+            &self.last_panel_selection_model
         } else {
             &self.last_scrollback_selection_model
         }
@@ -432,7 +432,7 @@ impl AgentView {
         head: RangeHit,
         anchor_content_width: Option<u16>,
     ) {
-        if anchor.entry_idx != BTW_OVERLAY_ENTRY_IDX {
+        if anchor.entry_idx != SIDE_PANEL_ENTRY_IDX {
             self.table_selection_geometry =
                 self.compute_drag_table_geometry(&anchor)
                     .map(|geometry| TableSelectionGeometry {
@@ -496,7 +496,7 @@ impl AgentView {
         let Some(drag) = self.drag_selection else {
             return false;
         };
-        let is_btw = drag.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX;
+        let is_side_panel = drag.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX;
         let head = self
             .selection_model_for_hit(&drag.anchor)
             .hit_test_nearest_in_range(drag.anchor, mouse.column, mouse.row)
@@ -509,7 +509,7 @@ impl AgentView {
         }
         self.last_drag_mouse = Some((mouse.column, mouse.row));
         // Btw drags don't scroll the scrollback pane.
-        self.drag_autoscroll = if is_btw {
+        self.drag_autoscroll = if is_side_panel {
             None
         } else {
             compute_autoscroll(mouse.row, self.pane_areas.scrollback)
@@ -589,21 +589,21 @@ impl AgentView {
     /// produced it — `Linear` when a table copy fell through — so the
     /// persisted highlight mirrors what reached the clipboard.
     fn reconstruct_drag_copy(&self, drag: &ActiveTextDrag) -> Option<(String, SelectionKind)> {
-        if drag.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX {
+        if drag.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX {
             // Same width rule as scrollback anchors: the drag-start snapshot
             // matches the wrap the drag's block_line_idx values came from,
             // with the current panel width as fallback.
             let content_width = drag
                 .anchor_content_width
                 .map(usize::from)
-                .unwrap_or_else(|| self.last_btw_area.width.saturating_sub(4) as usize);
-            if let Some(ref btw) = self.btw_state {
-                let full_model = btw.full_selection_model(content_width);
+                .unwrap_or_else(|| self.last_side_panel_area.width.saturating_sub(4) as usize);
+            if let Some(ref panel) = self.side_panel_state {
+                let full_model = panel.full_selection_model(content_width);
                 if let Some(text) = reconstruct_selection_text(&full_model, drag) {
                     return Some((text, SelectionKind::Linear));
                 }
             }
-            return reconstruct_selection_text(&self.last_btw_selection_model, drag)
+            return reconstruct_selection_text(&self.last_panel_selection_model, drag)
                 .map(|text| (text, SelectionKind::Linear));
         }
         if drag.kind != SelectionKind::Linear
@@ -1038,8 +1038,8 @@ impl AgentView {
     /// Return the correct selection model for a hit, accounting for the
     /// /btw overlay panel which has its own model.
     fn selection_model_for_hit(&self, hit: &RangeHit) -> &ResolvedSelectionModel {
-        if hit.entry_idx == BTW_OVERLAY_ENTRY_IDX {
-            &self.last_btw_selection_model
+        if hit.entry_idx == SIDE_PANEL_ENTRY_IDX {
+            &self.last_panel_selection_model
         } else {
             &self.last_scrollback_selection_model
         }
@@ -1088,7 +1088,7 @@ impl AgentView {
             self.copy_to_clipboard_debounced(&clipboard_text);
         }
 
-        if hit.entry_idx != BTW_OVERLAY_ENTRY_IDX {
+        if hit.entry_idx != SIDE_PANEL_ENTRY_IDX {
             self.scrollback.set_selected(Some(hit.entry_idx));
         }
     }
@@ -1096,7 +1096,7 @@ impl AgentView {
     fn selection_text_for_full_line(&self, hit: &RangeHit) -> Option<String> {
         let model = self.selection_model_for_hit(hit);
         let line = model.line_for_hit(hit)?;
-        let boundary = if hit.entry_idx == BTW_OVERLAY_ENTRY_IDX {
+        let boundary = if hit.entry_idx == SIDE_PANEL_ENTRY_IDX {
             None
         } else {
             self.last_scrollback_selection_boundaries
@@ -1149,7 +1149,7 @@ impl AgentView {
             self.copy_to_clipboard_debounced(&clipboard_text);
         }
 
-        if hit.entry_idx != BTW_OVERLAY_ENTRY_IDX {
+        if hit.entry_idx != SIDE_PANEL_ENTRY_IDX {
             self.scrollback.set_selected(Some(hit.entry_idx));
         }
     }
@@ -1913,52 +1913,52 @@ mod tests {
     /// under the pointer never capture its head, and a btw model miss keeps
     /// the previous head.
     #[test]
-    fn reclamp_btw_drag_gated_to_btw_rebuild_and_model() {
+    fn reclamp_panel_drag_gated_to_btw_rebuild_and_model() {
         let mut agent = make_agent();
-        let btw_anchor = RangeHit {
-            entry_idx: crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX,
+        let side_panel_anchor = RangeHit {
+            entry_idx: crate::views::side_panel::SIDE_PANEL_ENTRY_IDX,
             range_id: 0,
             block_line_idx: 0,
             col_within_range: 0,
         };
         agent.drag_selection = Some(ActiveTextDrag {
-            anchor: btw_anchor,
-            head: btw_anchor,
+            anchor: side_panel_anchor,
+            head: side_panel_anchor,
             kind: SelectionKind::Linear,
             anchor_content_width: None,
         });
         agent.last_drag_mouse = Some((10, 6));
         // Scrollback model has a hit under the pointer; btw model is empty.
         agent.last_scrollback_selection_model = stacked_lines_model(0, 5, 3);
-        agent.last_btw_selection_model = ResolvedSelectionModel::default();
+        agent.last_panel_selection_model = ResolvedSelectionModel::default();
 
         agent.reclamp_drag_head_post_render(false);
         agent.reclamp_drag_head_post_render(true);
 
         let drag = agent.drag_selection.expect("drag still active");
-        assert_eq!(drag.head, btw_anchor, "btw head must not follow scrollback");
+        assert_eq!(drag.head, side_panel_anchor, "btw head must not follow scrollback");
 
         // Once the btw model has lines, only the btw rebuild moves the head.
         let mut btw_model = ResolvedSelectionModel::default();
         btw_model.push_line(ResolvedSelectableLine {
-            entry_idx: BTW_OVERLAY_ENTRY_IDX,
+            entry_idx: SIDE_PANEL_ENTRY_IDX,
             range_id: 0,
             block_line_idx: 3,
             screen_y: 6,
             screen_x: 0,
             selectable_cols: 0..40,
-            text: "btw line".to_string(),
+            text: "side_panel line".to_string(),
             joiner_to_previous: None,
         });
-        agent.last_btw_selection_model = btw_model;
+        agent.last_panel_selection_model = btw_model;
 
         agent.reclamp_drag_head_post_render(false);
         let drag = agent.drag_selection.expect("drag still active");
-        assert_eq!(drag.head, btw_anchor, "scrollback rebuild is gated off");
+        assert_eq!(drag.head, side_panel_anchor, "scrollback rebuild is gated off");
 
         agent.reclamp_drag_head_post_render(true);
         let drag = agent.drag_selection.expect("drag still active");
-        assert_eq!(drag.head.block_line_idx, 3, "btw rebuild moves the head");
+        assert_eq!(drag.head.block_line_idx, 3, "side_panel rebuild moves the head");
     }
 
     // -----------------------------------------------------------------------
@@ -2176,13 +2176,13 @@ mod tests {
     #[test]
     fn btw_copy_prefers_width_snapshot_over_panel_fallback() {
         let mut agent = make_agent();
-        agent.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::done(
+        agent.side_panel_state = Some(crate::views::side_panel::SidePanelState::done(
             "q".to_string(),
             "BTWSNAP alpha beta".to_string(),
         ));
 
         let anchor = RangeHit {
-            entry_idx: BTW_OVERLAY_ENTRY_IDX,
+            entry_idx: SIDE_PANEL_ENTRY_IDX,
             range_id: 0,
             block_line_idx: 0,
             col_within_range: 0,
@@ -2199,7 +2199,7 @@ mod tests {
 
         let (text, kind) = agent
             .reconstruct_drag_copy(&drag)
-            .expect("snapshot width must reach the btw full model");
+            .expect("snapshot width must reach the side_panel full model");
         assert_eq!(text, "BTWSNAP");
         assert_eq!(kind, SelectionKind::Linear);
 
@@ -2966,11 +2966,11 @@ mod tests {
     fn btw_press_does_not_arm_deferred_latch() {
         let mut agent = make_agent();
         let reg = ActionRegistry::defaults();
-        agent.last_btw_area = Rect::new(10, 10, 30, 6);
+        agent.last_side_panel_area = Rect::new(10, 10, 30, 6);
 
         let _ = agent.handle_input(&Event::Mouse(mouse_down(12, 12)), &reg);
 
-        assert!(agent.deferred_text_press.is_none(), "btw stays exact-only");
+        assert!(agent.deferred_text_press.is_none(), "side_panel stays exact-only");
         assert!(agent.pending_block_drag.is_none());
         assert!(agent.pending_text_drag.is_none());
     }
