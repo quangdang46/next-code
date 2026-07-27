@@ -11,6 +11,12 @@ use std::sync::LazyLock;
 
 use hashline::{anchor, document::FileContent, hash as hashline_hash};
 
+static IN_MEMORY_EDITOR: LazyLock<std::sync::Mutex<hashline::Editor>> = LazyLock::new(|| {
+    std::sync::Mutex::new(
+        hashline::Editor::without_snapshots().with_builtin_resolver(),
+    )
+});
+
 pub struct HashlineEditTool;
 
 impl Default for HashlineEditTool {
@@ -470,33 +476,14 @@ fn apply_edits_to_text(
     text: &str,
     edits: &[hashline::types::Edit],
 ) -> std::result::Result<hashline::types::ApplyResult, String> {
-    let p = std::path::Path::new("");
-    let pstr = p.to_string_lossy();
-    let edits = hashline::block::resolve_block_edits(edits, text, &pstr, None)
+    let mut ed = IN_MEMORY_EDITOR.lock().expect("IN_MEMORY_EDITOR lock poisoned");
+    let path = "";
+    let result = ed.apply_edits(text, edits, path)
         .map_err(|e| e.to_string())?;
-    let fc = FileContent {
-        path: std::path::PathBuf::from(""),
-        raw: text.to_string(),
-        normalized: text.to_string(),
-        newline: hashline::document::NewlineStyle::Lf,
-        trailing_newline: text.ends_with('\n'),
-        hash: "0000".into(),
-    };
-    let entries = fc.lines_with_hashes();
-    let mut lines: Vec<String> = text.split('\n').map(String::from).collect();
-    if text.ends_with('\n') && lines.last().map(|s| s.as_str()) == Some("") {
-        lines.pop();
-    }
-    hashline::commands::patch::apply_edits(&mut lines, &entries, p, &edits)
-        .map_err(|e| e.to_string())?;
-    let nt = if text.ends_with('\n') {
-        lines.join("\n") + "\n"
-    } else {
-        lines.join("\n")
-    };
-    let changed = if nt == text { None } else { Some(1) };
+    drop(ed);
+    let changed = if result.text == text { None } else { Some(1) };
     Ok(hashline::types::ApplyResult {
-        text: nt,
+        text: result.text,
         first_changed_line: changed,
         warnings: Vec::new(),
         block_resolutions: Vec::new(),
