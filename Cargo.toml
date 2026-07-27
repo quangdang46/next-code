@@ -126,10 +126,6 @@ members = [
     "crates/xai-grok-update",
     "crates/xai-fast-worktree",
     "crates/xai-grok-pager",
-    "third_party/ordered_hashmap",
-    "third_party/graphlib_rust",
-    "third_party/dagre_rust",
-    "third_party/mermaid-to-svg",
     "evals/jbench",
     "evals/next-code-edit-bench",
 

@@ -987,6 +987,7 @@ impl App {
                                             ask_user_question_tx: None,
                                             best_of_n_pick_tx: None,
                                             graceful_shutdown_signal: None,
+            background_tool_signal: None,
                                             execution_mode: crate::tool::ToolExecutionMode::AgentTurn,
                                             best_of_n_run_id: bon.as_ref().map(|h| h.run_id.clone()),
                                             best_of_n_candidate_id: bon.as_ref().and_then(|h| {
@@ -1279,6 +1280,7 @@ impl App {
                     ask_user_question_tx: None,
                     best_of_n_pick_tx: None,
                     graceful_shutdown_signal: None,
+            background_tool_signal: None,
                     execution_mode: crate::tool::ToolExecutionMode::AgentTurn,
                     best_of_n_run_id: bon.as_ref().map(|h| h.run_id.clone()),
                     best_of_n_candidate_id: bon.as_ref().and_then(|h| {

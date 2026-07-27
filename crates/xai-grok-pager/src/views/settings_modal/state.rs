@@ -870,6 +870,12 @@ pub(super) fn action_for_bool(key: SettingKey, new: bool) -> Option<Action> {
         "info_float.todos" => Some(Action::SetShowFloatTodos(new)),
         "info_float.workspace_map" => Some(Action::SetShowFloatWorkspaceMap(new)),
         "info_float.diagrams" => Some(Action::SetShowFloatDiagrams(new)),
+        "status_line.enabled" => Some(Action::SetStatusLineEnabled(new)),
+        "status_line.mode" => Some(Action::SetStatusLineMode(new)),
+        "status_line.model" => Some(Action::SetStatusLineModel(new)),
+        "status_line.context" => Some(Action::SetStatusLineContext(new)),
+        "status_line.cwd" => Some(Action::SetStatusLineCwd(new)),
+        "status_line.git" => Some(Action::SetStatusLineGit(new)),
         _ => None,
     }
 }
@@ -932,11 +938,14 @@ pub(super) fn action_for_enum_commit(key: SettingKey, choice: &'static str) -> O
         },
         "hunk_tracker_mode" => Some(Action::SetHunkTrackerMode(choice.to_string())),
         "screen_mode" => Some(Action::SetScreenMode(choice.to_string())),
-        "btw_output_mode" => Some(Action::SetBtwOutputMode(choice.to_string())),
+        "side_panel_output_mode" => Some(Action::SetSidePanelOutputMode(choice.to_string())),
         "voice_capture_mode" => Some(Action::SetVoiceCaptureMode(choice.to_string())),
         "voice_stt_language" => Some(Action::SetVoiceSttLanguage(choice.to_string())),
         "render_mermaid" => {
             crate::appearance::RenderMermaid::from_canonical(choice).map(Action::SetRenderMermaid)
+        }
+        "render_mermaid_target" => {
+            Some(Action::SetRenderMermaidTarget(choice.to_string()))
         }
         "keep_text_selection" => crate::appearance::TextSelection::from_canonical(choice)
             .map(Action::SetKeepTextSelection),
@@ -978,6 +987,7 @@ pub(super) fn action_for_string(
                     .map(Action::SetForkSecondaryModel)
             }
         }
+        "status_line.order" => Some(Action::SetStatusLineOrder(value)),
 
         _ => {
             let _ = value;

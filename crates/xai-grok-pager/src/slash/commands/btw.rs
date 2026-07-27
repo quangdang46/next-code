@@ -10,7 +10,7 @@ pub struct BtwCommand;
 
 impl SlashCommand for BtwCommand {
     fn name(&self) -> &str {
-        "btw"
+        "side_panel"
     }
 
     fn description(&self) -> &str {

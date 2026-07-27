@@ -528,6 +528,8 @@ pub fn set_scroll_lines(lines: u8) {
 thread_local! {
     static RENDER_MERMAID_CURRENT: Cell<RenderMermaid> = const { Cell::new(RenderMermaid::Auto) };
     static RENDER_MERMAID_LOADED: Cell<bool> = const { Cell::new(false) };
+    static RENDER_MERMAID_TARGET_CURRENT: Cell<&'static str> = const { Cell::new("inline") };
+    static RENDER_MERMAID_TARGET_LOADED: Cell<bool> = const { Cell::new(false) };
 }
 
 /// Read the cached `render_mermaid` preference, seeding from
@@ -558,6 +560,36 @@ fn render_mermaid_from_config_str(value: Option<&str>) -> RenderMermaid {
     value
         .and_then(RenderMermaid::from_canonical)
         .unwrap_or_default()
+}
+
+/// Read the cached `render_mermaid_target` preference (`inline` / `sidebar` / `both`),
+/// seeding from `[ui].render_mermaid_target` on first call.
+pub fn load_render_mermaid_target() -> &'static str {
+    RENDER_MERMAID_TARGET_LOADED.with(|loaded| {
+        if !loaded.get() {
+            let value = render_mermaid_target_from_config_str(
+                load_str_from_effective_config("render_mermaid_target").as_deref(),
+            );
+            RENDER_MERMAID_TARGET_CURRENT.with(|c| c.set(value));
+            loaded.set(true);
+        }
+    });
+    RENDER_MERMAID_TARGET_CURRENT.with(|c| c.get())
+}
+
+/// Parse a `[ui].render_mermaid_target` config value, defaulting to `"inline"`.
+fn render_mermaid_target_from_config_str(value: Option<&str>) -> &'static str {
+    match value.and_then(|v| v.trim().split_whitespace().next()) {
+        Some("sidebar") => "sidebar",
+        Some("both") => "both",
+        _ => "inline",
+    }
+}
+
+/// Replace cached `render_mermaid_target` (optimistic update from the settings modal).
+pub fn set_render_mermaid_target(value: &'static str) {
+    RENDER_MERMAID_TARGET_CURRENT.with(|c| c.set(value));
+    RENDER_MERMAID_TARGET_LOADED.with(|l| l.set(true));
 }
 
 /// Replace cached `render_mermaid` (optimistic update from the settings modal).

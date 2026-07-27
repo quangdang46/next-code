@@ -10,6 +10,7 @@ fn make_ctx() -> ToolContext {
         ask_user_question_tx: None,
         best_of_n_pick_tx: None,
         graceful_shutdown_signal: None,
+            background_tool_signal: None,
         execution_mode: crate::tool::ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,

@@ -828,6 +828,7 @@ impl Agent {
             ask_user_question_tx: self.ask_user_question_tx.clone(),
             best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
+            background_tool_signal: Some(self.background_tool_signal.clone()),
             execution_mode: ToolExecutionMode::Direct,
             best_of_n_run_id: self.best_of_n_run_id.clone(),
             best_of_n_candidate_id: self.best_of_n_candidate_id.clone(),

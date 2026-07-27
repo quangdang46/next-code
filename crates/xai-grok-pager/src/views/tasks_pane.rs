@@ -12,7 +12,7 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::StatefulWidget;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::time::{Instant, SystemTime};
 use unicode_width::UnicodeWidthStr;
@@ -138,6 +138,32 @@ fn dim_spans(spans: &[Span<'static>], blend_factor: f32) -> Vec<Span<'static>> {
 /// - `<1M`:     `(10k)`, `(999k)`      — whole thousands
 /// - `<10M`:    `(1.0M)`, `(9.9M)`     — one decimal
 /// - `≥10M`:    `(10M)`, `(999M)`      — whole millions
+/// Claude-aligned status vocabulary for a background task row
+/// (`(running)` / `(done)` / `(error)` / `(stopped)`).
+fn bg_task_status_label(task: &BgTaskState) -> &'static str {
+    if task.pending_kill {
+        return "stopping";
+    }
+    match task.status {
+        BgTaskStatus::Running => "running",
+        BgTaskStatus::Done => "done",
+        BgTaskStatus::Failed => {
+            if task.signal.as_deref().is_some_and(|s| {
+                let s = s.to_ascii_uppercase();
+                s.contains("TERM")
+                    || s.contains("KILL")
+                    || s.contains("INT")
+                    || s == "STOPPED"
+                    || s == "KILLED"
+            }) {
+                "stopped"
+            } else {
+                "error"
+            }
+        }
+    }
+}
+
 fn format_line_count_badge(count: usize, truncated: bool) -> String {
     if count == 0 {
         return String::new();
@@ -693,6 +719,10 @@ pub struct TasksPane {
     opened_by_auto: bool,
     highlight_cache: HashMap<String, Vec<Span<'static>>>,
     last_theme: ThemeKind,
+    /// Task IDs that finished while the hub was closed / detail not opened.
+    /// Clears when the user opens that task's detail (or the hub while empty
+    /// attention-only — see [`Self::mark_viewed`]).
+    unread_completed: HashSet<String>,
 }
 
 impl Default for TasksPane {
@@ -783,7 +813,7 @@ impl TasksPane {
             collapsed_groups: std::collections::HashSet::new(),
             list_state,
             list_style,
-            show_done: false,
+            show_done: true,
             overlay: OverlayState::hidden(),
             tick: 0,
             kill_button_rects: Vec::new(),
@@ -794,7 +824,30 @@ impl TasksPane {
             opened_by_auto: false,
             highlight_cache: HashMap::new(),
             last_theme: Theme::current_kind(),
+            unread_completed: HashSet::new(),
         }
+    }
+
+    /// Count of finished tasks awaiting user attention in the hub.
+    pub fn unread_completed_count(&self) -> usize {
+        self.unread_completed.len()
+    }
+
+    /// Mark a task as needing attention (completion chip / pill `!`).
+    pub fn mark_unread(&mut self, task_id: impl Into<String>) {
+        self.unread_completed.insert(task_id.into());
+    }
+
+    /// Clear attention for a task after the user opens its detail.
+    pub fn mark_viewed(&mut self, task_id: &str) {
+        self.unread_completed.remove(task_id);
+    }
+
+    /// Open and focus the interactive tasks hub (same surface as Ctrl+B).
+    pub fn open_hub(&mut self) {
+        self.overlay.visible = true;
+        self.overlay.focused = true;
+        self.on_state_change();
     }
 
     // -- Data sync -----------------------------------------------------------
@@ -1375,7 +1428,7 @@ impl TasksPane {
             (
                 frames[frame_idx],
                 Style::default().fg(theme.accent_error),
-                "killing\u{2026} ".to_string(),
+                format!("({}) killing\u{2026} ", bg_task_status_label(task)),
                 Style::default().fg(theme.accent_error),
             )
         } else {
@@ -1387,7 +1440,7 @@ impl TasksPane {
                     (
                         frames[frame_idx],
                         Style::default().fg(theme.accent_running),
-                        format!("{elapsed} "),
+                        format!("({}) {elapsed} ", bg_task_status_label(task)),
                         Style::default().fg(theme.gray),
                     )
                 }
@@ -1396,17 +1449,23 @@ impl TasksPane {
                     (
                         crate::glyphs::check_mark(),
                         Style::default().fg(theme.accent_success),
-                        format!("{elapsed} "),
-                        Style::default().fg(theme.gray),
+                        format!("({}) {elapsed} ", bg_task_status_label(task)),
+                        Style::default().fg(theme.accent_success),
                     )
                 }
                 BgTaskStatus::Failed => {
                     let elapsed = format_duration(task.elapsed());
+                    let label = bg_task_status_label(task);
+                    let color = if label == "stopped" {
+                        theme.gray_bright
+                    } else {
+                        theme.accent_error
+                    };
                     (
                         crate::glyphs::ballot_x(),
-                        Style::default().fg(theme.accent_error),
-                        format!("{elapsed} "),
-                        Style::default().fg(theme.gray),
+                        Style::default().fg(color),
+                        format!("({label}) {elapsed} "),
+                        Style::default().fg(color),
                     )
                 }
             }
@@ -1808,6 +1867,57 @@ mod tests {
         assert_eq!(format_line_count_badge(0, false), "");
         // `truncated` doesn't conjure a badge out of an empty buffer.
         assert_eq!(format_line_count_badge(0, true), "");
+    }
+
+    #[test]
+    fn open_hub_focuses_overlay() {
+        let mut pane = TasksPane::default();
+        assert!(!pane.overlay.visible);
+        pane.open_hub();
+        assert!(pane.overlay.visible);
+        assert!(pane.overlay.focused);
+    }
+
+    #[test]
+    fn unread_completed_tracks_mark_and_view() {
+        let mut pane = TasksPane::default();
+        assert_eq!(pane.unread_completed_count(), 0);
+        pane.mark_unread("t1");
+        pane.mark_unread("t2");
+        assert_eq!(pane.unread_completed_count(), 2);
+        pane.mark_viewed("t1");
+        assert_eq!(pane.unread_completed_count(), 1);
+        pane.mark_viewed("t2");
+        assert_eq!(pane.unread_completed_count(), 0);
+    }
+
+    #[test]
+    fn bg_task_status_label_vocab() {
+        let running = make_bg_task("r", "sleep 1", BgTaskStatus::Running);
+        assert_eq!(bg_task_status_label(&running), "running");
+
+        let done = make_bg_task("d", "echo ok", BgTaskStatus::Done);
+        assert_eq!(bg_task_status_label(&done), "done");
+
+        let err = make_bg_task("e", "false", BgTaskStatus::Failed);
+        assert_eq!(bg_task_status_label(&err), "error");
+
+        let mut stopped = make_bg_task("s", "sleep 9", BgTaskStatus::Failed);
+        stopped.signal = Some("SIGTERM".into());
+        assert_eq!(bg_task_status_label(&stopped), "stopped");
+
+        let mut killing = make_bg_task("k", "sleep 9", BgTaskStatus::Running);
+        killing.pending_kill = true;
+        assert_eq!(bg_task_status_label(&killing), "stopping");
+    }
+
+    #[test]
+    fn show_done_defaults_true_for_hub() {
+        let pane = TasksPane::default();
+        assert!(
+            pane.show_done(),
+            "hub should list finished tasks by default (Claude parity)"
+        );
     }
 
     #[test]
@@ -2338,8 +2448,10 @@ mod tests {
             &scheduled,
         );
 
-        // Locate the `✗` kill glyph; every cell past the closing `]` must be
-        // blank (no scrollbar when not scrollable, no leaked label text).
+        // Locate the kill glyph (`✗` or ASCII fallback); every cell past the
+        // closing `]` must be blank (no scrollbar when not scrollable, no
+        // leaked label text).
+        let kill_glyph = crate::glyphs::ballot_x();
         let mut found = false;
         for y in 0..area.height {
             let row: Vec<String> = (0..area.width)
@@ -2349,17 +2461,17 @@ mod tests {
                         .unwrap_or_default()
                 })
                 .collect();
-            if let Some(x) = row.iter().position(|s| s == "\u{2717}") {
+            if let Some(x) = row.iter().position(|s| s == kill_glyph) {
                 found = true;
                 for cell in &row[x + 2..] {
                     assert!(
                         cell.trim().is_empty(),
-                        "non-blank cell after `[✗]` on loop row: {row:?}",
+                        "non-blank cell after kill button on loop row: {row:?}",
                     );
                 }
             }
         }
-        assert!(found, "expected a `✗` kill button on the loop row");
+        assert!(found, "expected a kill button on the loop row");
     }
 
     #[test]
@@ -2602,8 +2714,9 @@ mod tests {
     }
 
     #[test]
-    fn sync_hides_done_by_default() {
+    fn sync_shows_done_by_default() {
         let mut pane = TasksPane::new();
+        assert!(pane.show_done(), "Claude-style hub lists finished tasks");
 
         let mut bg_tasks = std::collections::BTreeMap::new();
         bg_tasks.insert(
@@ -2623,7 +2736,23 @@ mod tests {
             &HashSet::new(),
         );
 
-        assert_eq!(pane.items.len(), 1, "only running tasks shown by default");
+        assert_eq!(
+            pane.items.len(),
+            2,
+            "running and done tasks both shown by default"
+        );
+        assert!(pane.items.iter().any(|i| i.is_running()));
+        assert!(pane.items.iter().any(|i| !i.is_running()));
+
+        pane.show_done = false;
+        pane.sync(
+            &bg_tasks,
+            &HashMap::new(),
+            &HashMap::new(),
+            None,
+            &HashSet::new(),
+        );
+        assert_eq!(pane.items.len(), 1, "toggle off hides done");
         assert!(pane.items[0].is_running());
     }
 

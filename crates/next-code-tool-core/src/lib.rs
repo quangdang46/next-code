@@ -67,6 +67,7 @@ pub struct ToolContext {
         Option<tokio::sync::mpsc::UnboundedSender<AskUserQuestionInputRequest>>,
     pub best_of_n_pick_tx: Option<tokio::sync::mpsc::UnboundedSender<BestOfNPickInputRequest>>,
     pub graceful_shutdown_signal: Option<InterruptSignal>,
+    pub background_tool_signal: Option<InterruptSignal>,
     pub execution_mode: ToolExecutionMode,
     /// Best-of-N run ID, set by the orchestrator before spawning
     /// candidate subagents. Used by propose_* tools to attribute
@@ -96,6 +97,7 @@ impl Default for ToolContext {
             ask_user_question_tx: None,
             best_of_n_pick_tx: None,
             graceful_shutdown_signal: None,
+            background_tool_signal: None,
             execution_mode: ToolExecutionMode::AgentTurn,
             best_of_n_run_id: None,
             best_of_n_candidate_id: None,
@@ -114,6 +116,7 @@ impl ToolContext {
             ask_user_question_tx: self.ask_user_question_tx.clone(),
             best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
             graceful_shutdown_signal: self.graceful_shutdown_signal.clone(),
+            background_tool_signal: self.background_tool_signal.clone(),
             execution_mode: self.execution_mode,
             best_of_n_run_id: self.best_of_n_run_id.clone(),
             best_of_n_candidate_id: self.best_of_n_candidate_id.clone(),

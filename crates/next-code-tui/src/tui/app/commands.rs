@@ -745,6 +745,7 @@ fn launch_manual_subagent(app: &mut App, spec: ManualSubagentSpec) {
             ask_user_question_tx: None,
             best_of_n_pick_tx: None,
             graceful_shutdown_signal: None,
+            background_tool_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
             best_of_n_run_id: bon.as_ref().map(|h| h.run_id.clone()),
             best_of_n_candidate_id: bon.as_ref().and_then(|h| {
@@ -1355,7 +1356,7 @@ Question: {}",
     )
 }
 
-fn handle_btw_command(app: &mut App, trimmed: &str) -> bool {
+fn handle_side_panel_command(app: &mut App, trimmed: &str) -> bool {
     if !trimmed.starts_with("/btw") {
         return false;
     }
@@ -1693,7 +1694,7 @@ pub(super) fn handle_session_command(app: &mut App, trimmed: &str) -> bool {
         || handle_todos_view_command(app, trimmed)
         || super::commands_overnight::handle_overnight_command(app, trimmed)
         || super::split_view::handle_split_view_command(app, trimmed)
-        || handle_btw_command(app, trimmed)
+        || handle_side_panel_command(app, trimmed)
         || handle_transcript_command(app, trimmed)
         || handle_git_command(app, trimmed)
         || handle_catchup_command(app, trimmed)

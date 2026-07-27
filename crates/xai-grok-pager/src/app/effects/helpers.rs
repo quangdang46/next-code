@@ -1087,6 +1087,62 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "status_line.enabled" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.enabled", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_enabled(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.mode" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.mode", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_mode(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.model" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.model", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_model(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.context" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.context", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_context(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.cwd" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.cwd", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_cwd(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.git" => {
+            let SettingValue::Bool(b) = value else {
+                return Err(kind_mismatch("status_line.git", "Bool", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_git(b)
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "status_line.order" => {
+            let SettingValue::String(s) = value else {
+                return Err(kind_mismatch("status_line.order", "String", &value));
+            };
+            xai_grok_shell::util::config::set_status_line_order(s)
+                .await
+                .map_err(|e| e.to_string())
+        }
         "scroll_lines" => {
             let SettingValue::Int(i) = value else {
                 return Err(kind_mismatch("scroll_lines", "Int", &value));
@@ -1204,6 +1260,14 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
+        "render_mermaid_target" => {
+            let SettingValue::Enum(s) = value else {
+                return Err(kind_mismatch("render_mermaid_target", "Enum", &value));
+            };
+            xai_grok_shell::util::config::set_render_mermaid_target(s.to_string())
+                .await
+                .map_err(|e| e.to_string())
+        }
         "hunk_tracker_mode" => {
             let SettingValue::Enum(s) = value else {
                 return Err(kind_mismatch("hunk_tracker_mode", "Enum", &value));
@@ -1220,11 +1284,20 @@ pub(crate) async fn persist_setting(
                 .await
                 .map_err(|e| e.to_string())
         }
-        "btw_output_mode" => {
+        "side_panel_output_mode" => {
             let SettingValue::Enum(s) = value else {
-                return Err(kind_mismatch("btw_output_mode", "Enum", &value));
+                return Err(kind_mismatch("side_panel_output_mode", "Enum", &value));
             };
-            xai_grok_shell::util::config::set_btw_output_mode(s.to_string())
+            xai_grok_shell::util::config::set_side_panel_output_mode(s.to_string())
+                .await
+                .map_err(|e| e.to_string())
+        }
+        "side_panel_width" => {
+            let SettingValue::Int(i) = value else {
+                return Err(kind_mismatch("side_panel_width", "Int", &value));
+            };
+            let width = u16::try_from(i).unwrap_or(36).max(20);
+            xai_grok_shell::util::config::set_side_panel_width(width)
                 .await
                 .map_err(|e| e.to_string())
         }

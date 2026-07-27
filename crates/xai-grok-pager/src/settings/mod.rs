@@ -29,7 +29,8 @@ pub mod registry;
 pub use registry::{
     DynamicEnumSource, EnumChoice, OwnedEnumChoice, PagerLocalSnapshot, SettingCategory,
     SettingKey, SettingKind, SettingMeta, SettingOwner, SettingValue, SettingsRegistry,
-    StringValidator, canonical_btw_output_mode, canonical_hunk_tracker_mode, canonical_screen_mode,
+    StringValidator, canonical_render_mermaid_target, canonical_side_panel_output_mode,
+    canonical_hunk_tracker_mode, canonical_screen_mode,
     canonical_voice_capture_mode, canonical_voice_stt_language, current_value_for,
     default_value_for, dynamic_enum_choices,
 };

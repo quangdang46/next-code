@@ -408,6 +408,7 @@ impl AgentView {
             .values()
             .filter(|s| s.is_running())
             .count();
+        watchers.unread_completed = self.tasks.unread_completed_count();
         watchers
     }
 
@@ -1785,6 +1786,7 @@ mod watcher_tests {
                 monitors: 1,
                 loops: 0,
                 subagents: 0,
+                unread_completed: 0,
             }
         );
     }

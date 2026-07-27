@@ -2118,14 +2118,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dagre_rust"
-version = "0.0.5"
-dependencies = [
- "graphlib_rust",
- "ordered_hashmap",
-]
-
-[[package]]
 name = "dark-light"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2934,12 +2926,6 @@ dependencies = [
  "quote",
  "syn 2.0.119",
 ]
-
-[[package]]
-name = "env_home"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f84e12ccf0a7ddc17a6c41c93326024c42920d7ee630d04950e6926645c0fe"
 
 [[package]]
 name = "equivalent"
@@ -4471,13 +4457,6 @@ dependencies = [
  "futures-core",
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "graphlib_rust"
-version = "0.0.2"
-dependencies = [
- "ordered_hashmap",
 ]
 
 [[package]]
@@ -6103,15 +6082,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "mermaid-to-svg"
-version = "0.1.0"
+name = "mermaid-rs-renderer"
+version = "0.3.2"
+source = "git+https://github.com/quangdang46/mermaid-rs-renderer.git?rev=baad3f0695ca2a3a5cf613ff723576ea55fd8ec7#baad3f0695ca2a3a5cf613ff723576ea55fd8ec7"
 dependencies = [
- "dagre_rust",
- "graphlib_rust",
- "serde_yaml",
+ "anyhow",
+ "fontdb",
+ "json5 1.3.1",
+ "once_cell",
+ "regex",
+ "resvg 0.47.0",
+ "serde",
+ "serde_json",
  "thiserror 2.0.19",
- "unicode-segmentation",
- "unicode-width 0.2.2",
+ "ttf-parser",
+ "usvg 0.47.0",
 ]
 
 [[package]]
@@ -7651,7 +7636,7 @@ dependencies = [
  "crossterm 0.29.0",
  "dirs 5.0.1",
  "image",
- "mermaid-rs-renderer",
+ "mermaid-rs-renderer 0.3.1",
  "next-code-plan",
  "next-code-tui-workspace",
  "ratatui 0.30.2",
@@ -8360,10 +8345,6 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
 ]
-
-[[package]]
-name = "ordered_hashmap"
-version = "0.0.3"
 
 [[package]]
 name = "os_pipe"
@@ -9832,7 +9813,7 @@ dependencies = [
  "toml 0.8.23",
  "ureq",
  "walkdir",
- "which 8.0.5",
+ "which",
 ]
 
 [[package]]
@@ -12967,18 +12948,6 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "7.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d643ce3fd3e5b54854602a080f34fb10ab75e0b813ee32d00ca2b44fa74762"
-dependencies = [
- "either",
- "env_home",
- "rustix 1.1.4",
- "winsafe",
-]
-
-[[package]]
-name = "which"
 version = "8.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f3ef584124b911bcc3875c2f1472e80f24361ceb789bd1c62b3e9a3df9ff43c"
@@ -13529,12 +13498,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "winsafe"
-version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
-
-[[package]]
 name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13709,14 +13672,13 @@ dependencies = [
  "fontdb",
  "image",
  "libc",
- "mermaid-to-svg",
+ "mermaid-rs-renderer 0.3.2",
  "resvg 0.47.0",
  "tempfile",
  "thiserror 1.0.69",
  "tiny-skia 0.12.0",
  "tracing",
  "wait-timeout",
- "which 7.0.3",
  "xai-tty-utils",
 ]
 
