@@ -1164,6 +1164,9 @@ pub struct AgentView {
     /// `[ui].side_panel_width`). Drag the divider or press `[` / `]` while the
     /// panel is focused to adjust.
     pub(crate) side_panel_width: u16,
+    /// Track when the user has explicitly dismissed the mermaid sidebar panel so
+    /// per-frame affordance paint doesn't force it back open.
+    pub(crate) mermaid_sidebar_dismissed: bool,
     /// True while the user is dragging the `/btw` sidebar divider.
     pub(crate) side_panel_dragging: bool,
     /// Last painted divider column (`sidebar.x - 1`) for mouse hit-testing.

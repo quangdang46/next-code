@@ -191,14 +191,15 @@ impl AgentView {
             if target == "sidebar" || target == "both" {
                 self.request_mermaid_sidebar_render(source.clone());
             }
-            // Sidebar-only: skip visual affordance row (diagram is in side panel).
-            if target == "sidebar" {
-                continue;
-            }
-            // The transient `rendering…` hint shows only while an on-click render
-            // for this diagram is in flight.
-            let rendering = self.diagram_is_rendering(&source);
-            let row = affordance_row(rendering);
+            // Sidebar-only: paint simplified affordance row with [Sidebar] button
+            // instead of the regular [Open Image] / [Copy Image Path] / [Copy Source].
+            let sidebar_only = target == "sidebar";
+            let row = if sidebar_only {
+                crate::scrollback::blocks::mermaid_content::affordance_row_sidebar()
+            } else {
+                let rendering = self.diagram_is_rendering(&source);
+                affordance_row(rendering)
+            };
             // A segment is drawn only if it fits wholly within the row width
             // (which already excludes the timestamp reserve), so labels never
             // spill past the content area and hit-rects stay inside the row.
@@ -554,6 +555,11 @@ impl AgentView {
                         Some(serde_json::json!({ "source_len": source.len() })),
                     );
                 }
+            }
+            AffordanceKind::Sidebar => {
+                // Reset dismissed flag so the sidebar opens.
+                self.mermaid_sidebar_dismissed = false;
+                self.request_mermaid_sidebar_render(source);
             }
             AffordanceKind::Open | AffordanceKind::CopyPath => {
                 let target = crate::appearance::cache::load_render_mermaid_target();

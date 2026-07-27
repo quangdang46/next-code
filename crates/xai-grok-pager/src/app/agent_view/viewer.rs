@@ -360,6 +360,9 @@ impl AgentView {
         self.side_panel = false;
         self.side_panel_visible = true;
         self.side_panel_dragging = false;
+        // Mark mermaid sidebar as dismissed so per-frame affordance paint
+        // doesn't force it back open.
+        self.mermaid_sidebar_dismissed = true;
         self.clear_side_panel_drag_state();
         InputOutcome::Changed
     }

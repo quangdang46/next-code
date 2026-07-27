@@ -182,6 +182,11 @@ impl BlockContent for AgentMessageBlock {
         if ctx.raw || self.mermaid.is_empty() {
             return self.content.output(ctx.width as usize);
         }
+        // When target is sidebar-only, suppress inline diagram art
+        // (diagram renders as text in the side panel instead).
+        if crate::appearance::cache::load_render_mermaid_target() == "sidebar" {
+            return self.content.output(ctx.width as usize);
+        }
         self.rendered_output(ctx).0
     }
 

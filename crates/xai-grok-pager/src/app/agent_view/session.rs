@@ -218,6 +218,7 @@ impl AgentView {
             persona_detail: None,
             side_panel_state: None,
             minimal_side_panel_lifecycle: None,
+            mermaid_sidebar_dismissed: false,
             side_panel: false,
             side_panel_visible: true,
             side_panel_width: crate::views::agent::AgentViewLayout::SIDE_PANEL_PREFERRED_WIDTH,

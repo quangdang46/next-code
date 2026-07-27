@@ -1319,6 +1319,10 @@ impl AgentView {
     /// Wraps the source in a fenced code block so the markdown pipeline detects
     /// and renders it as Unicode box-drawing art.
     pub(crate) fn request_mermaid_sidebar_render(&mut self, source: String) {
+        // Guard: user explicitly dismissed the sidebar, don't force it open.
+        if self.mermaid_sidebar_dismissed {
+            return;
+        }
         let markdown = format!("```mermaid\n{}\n```", source);
         self.side_panel_state = Some(crate::views::side_panel::SidePanelState::done(
             "mermaid".to_string(),

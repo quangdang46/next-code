@@ -393,6 +393,8 @@ pub(crate) enum AffordanceKind {
     CopyPath,
     /// Copy the diagram's Mermaid source (no render needed).
     CopySource,
+    /// Open the diagram in the side panel (text rendering).
+    Sidebar,
 }
 
 /// One button in a diagram's affordance row, with its start column so the
@@ -440,6 +442,21 @@ fn affordance_buttons(start_col: u16) -> [AffordanceButton; 3] {
     })
 }
 
+/// Sidebar-only button label.
+const AFFORDANCE_OPEN_SIDEBAR: &str = "[Open Sidebar]";
+
+/// Single `[Open Sidebar]` button for sidebar-only affordance row.
+fn affordance_buttons_sidebar(start_col: u16) -> [AffordanceButton; 3] {
+    let btn = AffordanceButton {
+        label: AFFORDANCE_OPEN_SIDEBAR,
+        kind: AffordanceKind::Sidebar,
+        col: start_col,
+    };
+    // Place dummy buttons far off-screen so they never pass the `fits` check.
+    let dummy = AffordanceButton { label: "", kind: AffordanceKind::Sidebar, col: u16::MAX };
+    [btn, dummy, dummy]
+}
+
 /// The whole affordance-row layout for a diagram: the leading `◇ mermaid` label,
 /// the three (always-clickable) buttons shifted past it, and the trailing
 /// `rendering…` hint when `rendering` is true. One source of truth shared by the
@@ -456,6 +473,17 @@ pub(crate) fn affordance_row(rendering: bool) -> AffordanceRow {
         label: (0, MERMAID_LABEL),
         buttons,
         status,
+    }
+}
+
+/// Affordance row for sidebar-only mode: `◇ mermaid [Sidebar]`.
+pub(crate) fn affordance_row_sidebar() -> AffordanceRow {
+    let buttons_start = UnicodeWidthStr::width(MERMAID_LABEL) as u16 + AFFORDANCE_GAP;
+    let buttons = affordance_buttons_sidebar(buttons_start);
+    AffordanceRow {
+        label: (0, MERMAID_LABEL),
+        buttons,
+        status: None,
     }
 }
 
