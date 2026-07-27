@@ -4,13 +4,13 @@
 //! (`x.ai/ask_user_question`). This module owns live candidate-card progress
 //! while a run is generating / awaiting pick / applying.
 
-use next_code_best_of_n::{BestOfNPhase, BestOfNProgressPayload, format_progress_cards};
-use serde::Deserialize;
+use crate::scrollback::block::RenderBlock;
+use crate::scrollback::blocks::BestOfNBlock;
+use next_code_best_of_n::{BestOfNPhase, BestOfNProgressPayload};
 
 use crate::app::agent_view::AgentView;
-use crate::scrollback::block::RenderBlock;
-use crate::scrollback::blocks::SystemMessageBlock;
 use crate::scrollback::entry::EntryId;
+use serde::Deserialize;
 
 /// Live BoN progress chrome attached to an [`AgentView`].
 #[derive(Debug, Clone)]
@@ -18,7 +18,6 @@ pub struct BestOfNUiState {
     pub run_id: String,
     pub phase: BestOfNPhase,
     pub entry_id: Option<EntryId>,
-    pub last_text: String,
 }
 
 /// Notification envelope (`sessionId` optional for routing).
@@ -31,9 +30,8 @@ pub struct BestOfNProgressNotification {
     pub payload: BestOfNProgressPayload,
 }
 
-/// Apply a progress payload: upsert a system scrollback block with candidate cards.
+/// Apply a progress payload: upsert a BestOfN scrollback block with candidate cards.
 pub fn apply_progress(agent: &mut AgentView, payload: BestOfNProgressPayload) -> bool {
-    let text = format_progress_cards(&payload);
     let run_id = payload.run_id.clone();
     let phase = payload.phase;
 
@@ -41,13 +39,12 @@ pub fn apply_progress(agent: &mut AgentView, payload: BestOfNProgressPayload) ->
         && state.run_id == run_id
         && let Some(id) = state.entry_id
         && let Some(entry) = agent.scrollback.get_by_id_mut(id)
-        && let RenderBlock::System(sys) = &mut entry.block
+        && let RenderBlock::BestOfN(block) = &mut entry.block
     {
-        sys.text = text.clone();
+        block.update(&payload);
         entry.invalidate_cache();
         agent.scrollback.mark_height_dirty(id);
         state.phase = phase;
-        state.last_text = text;
         if matches!(phase, BestOfNPhase::Done | BestOfNPhase::Cancelled) {
             agent.best_of_n = None;
         }
@@ -56,7 +53,7 @@ pub fn apply_progress(agent: &mut AgentView, payload: BestOfNProgressPayload) ->
 
     let entry_id = agent
         .scrollback
-        .push_block(RenderBlock::System(SystemMessageBlock::new(text.clone())));
+        .push_block(RenderBlock::BestOfN(BestOfNBlock::new(&payload)));
     if matches!(phase, BestOfNPhase::Done | BestOfNPhase::Cancelled) {
         agent.best_of_n = None;
     } else {
@@ -64,7 +61,6 @@ pub fn apply_progress(agent: &mut AgentView, payload: BestOfNProgressPayload) ->
             run_id,
             phase,
             entry_id: Some(entry_id),
-            last_text: text,
         });
     }
     true
@@ -98,11 +94,8 @@ mod tests {
     }
 
     #[test]
-    fn format_cards_changes_with_phase() {
-        let a = format_progress_cards(&payload(BestOfNPhase::Generating));
-        let b = format_progress_cards(&payload(BestOfNPhase::AwaitingPick));
-        assert!(a.contains("generating"));
-        assert!(b.contains("awaiting_pick"));
-        assert!(a.contains("#0 temp-0"));
+    fn payload_round_trips() {
+        let a = payload(BestOfNPhase::Generating);
+        assert_eq!(a.phase, BestOfNPhase::Generating);
     }
 }
