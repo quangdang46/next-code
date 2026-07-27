@@ -1314,64 +1314,20 @@ impl AgentView {
 
     /// Dispatch a sidebar render for the given Mermaid source.
     ///
-    /// Similar to `request_mermaid_render` but targets the side panel instead
-    /// of Open/Copy actions. Uses the terminal-tier quality so the image is
-    /// sized for the side-panel column width.
+    /// Renders the mermaid source as inline diagram text in the side panel
+    /// via the markdown renderer (same rendering as inline scrollback).
+    /// Wraps the source in a fenced code block so the markdown pipeline detects
+    /// and renders it as Unicode box-drawing art.
     pub(crate) fn request_mermaid_sidebar_render(&mut self, source: String) {
-        let theme = crate::theme::cache::current_kind();
-        // Size for the live side-panel column (origin paints into the pane
-        // width), not a hardcoded 36 — user may have resized via drag / [].
-        let cols = self
-            .last_side_panel_area
-            .width
-            .saturating_sub(4)
-            .max(self.side_panel_width.saturating_sub(4))
-            .max(12);
-        let quality = MermaidRenderQuality::Terminal;
-        let Some((key, out_path)) = self.mermaid_render_target(&source, theme, cols, quality)
-        else {
-            return;
-        };
-        let kind = MermaidPendingKind::Sidebar;
-
-        if self
-            .mermaid
-            .as_ref()
-            .is_some_and(|rt| rt.has_pending_key(&key))
-        {
-            // A render for this diagram is already in flight for some purpose
-            // (inline/click); the pending key covers all.
-            return;
-        }
-
-        // Disk hit → show in panel immediately.
-        if read_cached_png(&out_path) {
-            self.show_diagram_in_side_panel(&key, &out_path);
-            return;
-        }
-
-        self.ensure_mermaid_runtime();
-        self.maybe_sweep_session_cache(&out_path);
-        let job = MermaidJob {
-            key: key.clone(),
-            source,
-            out_path,
-            theme_dark: theme_is_dark(theme),
-            target_width_px: target_width_px(cols),
-            quality,
-        };
-        let sent = self
-            .mermaid
-            .as_mut()
-            .and_then(|rt| rt.tx.send(job).ok())
-            .is_some();
-        if sent {
-            if let Some(rt) = self.mermaid.as_mut() {
-                rt.pending.push(PendingMermaidAction { key, kind });
-            }
-        } else {
-            self.show_toast("Could not render diagram");
-        }
+        let markdown = format!("```mermaid\n{}\n```", source);
+        self.side_panel_state = Some(crate::views::side_panel::SidePanelState::done(
+            "mermaid".to_string(),
+            markdown,
+        ));
+        // Force the right-hand column (legacy TUI /btw sidebar parity) and focus it.
+        self.side_panel = true;
+        self.side_panel_visible = true;
+        self.side_panel_focused = true;
     }
 
     /// Drain finished renders from the worker and run each pending kind:

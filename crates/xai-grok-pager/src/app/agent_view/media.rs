@@ -191,6 +191,10 @@ impl AgentView {
             if target == "sidebar" || target == "both" {
                 self.request_mermaid_sidebar_render(source.clone());
             }
+            // Sidebar-only: skip visual affordance row (diagram is in side panel).
+            if target == "sidebar" {
+                continue;
+            }
             // The transient `rendering…` hint shows only while an on-click render
             // for this diagram is in flight.
             let rendering = self.diagram_is_rendering(&source);
