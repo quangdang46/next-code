@@ -319,17 +319,24 @@ pub(super) fn dispatch_show_queue(app: &mut AppView) -> Vec<Effect> {
     vec![]
 }
 
-/// `/tasks` — commit a read-only list of background tasks, subagents, and
-/// scheduled (`/loop`) tasks as a system block. The text is built by
-/// [`crate::app::status_blocks::tasks_block_text`]; this just resolves the
-/// active agent and pushes it. Works in every render mode; the primary snapshot
-/// surface in minimal, which has no interactive `TasksPane`.
+/// `/tasks` — open the interactive tasks hub when the overlay is available
+/// (full Face / inline / fullscreen). In minimal mode there is no `TasksPane`,
+/// so fall back to a read-only system-block dump plus a hub CTA.
 pub(super) fn dispatch_show_tasks(app: &mut AppView) -> Vec<Effect> {
     if let ActiveView::Agent(id) = app.active_view
         && let Some(agent) = app.agents.get_mut(&id)
     {
-        let text = crate::app::status_blocks::tasks_block_text(agent);
-        agent.scrollback.push_block(RenderBlock::system(text));
+        if !app.screen_mode.is_minimal() {
+            agent.tasks.open_hub();
+            agent.set_active_pane(crate::app::agent_view::AgentPane::Tasks, false);
+        } else {
+            let text = crate::app::status_blocks::tasks_block_text(agent);
+            let body = format!(
+                "{text}\n\nTip: interactive hub is Ctrl+B / `/tasks` in full Face \
+                 (list \u{2192} Enter detail \u{2192} x Stop)."
+            );
+            agent.scrollback.push_block(RenderBlock::system(body));
+        }
     }
     vec![]
 }

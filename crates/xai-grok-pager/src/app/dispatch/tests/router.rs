@@ -1759,21 +1759,41 @@ fn switch_to_agent_reanchors_stale_global_auto() {
     assert!(!app.agents[&id2].session.is_auto());
 }
 #[test]
+fn show_tasks_opens_hub_when_not_minimal() {
+    let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Inline;
+    let before = agent_scrollback_len(&app);
+    let effects = dispatch(Action::ShowTasks, &mut app);
+    assert!(effects.is_empty(), "got: {effects:?}");
+    assert_eq!(
+        agent_scrollback_len(&app),
+        before,
+        "hub open must not dump a system block"
+    );
+    let agent = app.agents.get(&AgentId(0)).unwrap();
+    assert!(agent.tasks.overlay.visible);
+    assert!(agent.tasks.overlay.focused);
+}
+#[test]
 fn show_tasks_empty_commits_empty_message() {
     let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     let before = agent_scrollback_len(&app);
     let effects = dispatch(Action::ShowTasks, &mut app);
     assert!(effects.is_empty(), "got: {effects:?}");
     assert_eq!(agent_scrollback_len(&app), before + 1);
-    assert_eq!(
-        last_system_text(&app, AgentId(0)),
-        "No background tasks or subagents."
+    let text = last_system_text(&app, AgentId(0));
+    assert!(
+        text.contains("No background tasks or subagents."),
+        "got: {text:?}"
     );
+    assert!(text.contains("Ctrl+B"), "minimal dump should CTA the hub: {text:?}");
 }
 #[test]
 fn show_tasks_lists_a_scheduled_task() {
     use crate::app::agent::ScheduledTaskInfo;
     let mut app = test_app_with_agent();
+    app.screen_mode = crate::app::ScreenMode::Minimal;
     {
         let agent = app.agents.get_mut(&AgentId(0)).unwrap();
         agent.session.scheduled_tasks.insert(
@@ -1804,6 +1824,57 @@ fn show_tasks_no_active_agent_is_noop() {
     let mut app = test_app();
     let effects = dispatch(Action::ShowTasks, &mut app);
     assert!(effects.is_empty(), "ShowTasks without an agent is a no-op");
+}
+#[test]
+fn demote_to_background_toasts_hub_cta() {
+    let mut app = test_app_with_agent();
+    {
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        agent.session.state = crate::app::agent::AgentState::TurnRunning;
+        let meta = crate::acp::meta::NotificationMeta::default();
+        let tc_id = "tc-demote-1";
+        let tc = agent_client_protocol::SessionUpdate::ToolCall(
+            agent_client_protocol::ToolCall::new(
+                    agent_client_protocol::ToolCallId::new(std::sync::Arc::from(tc_id)),
+                    "Execute `sleep 9999`".to_string(),
+                )
+                .kind(agent_client_protocol::ToolKind::Execute)
+                .status(agent_client_protocol::ToolCallStatus::Pending)
+                .content(vec![])
+                .locations(vec![]),
+        );
+        agent
+            .session
+            .tracker
+            .handle_update(tc, &meta, &mut agent.scrollback);
+        let update = agent_client_protocol::SessionUpdate::ToolCallUpdate(
+            agent_client_protocol::ToolCallUpdate::new(
+                agent_client_protocol::ToolCallId::new(std::sync::Arc::from(tc_id)),
+                agent_client_protocol::ToolCallUpdateFields::new()
+                    .status(Some(agent_client_protocol::ToolCallStatus::InProgress)),
+            ),
+        );
+        agent
+            .session
+            .tracker
+            .handle_update(update, &meta, &mut agent.scrollback);
+    }
+    let effects = dispatch(Action::DemoteToBackground, &mut app);
+    assert_eq!(effects.len(), 1, "got: {effects:?}");
+    let agent = app.agents.get(&AgentId(0)).unwrap();
+    let toast = agent
+        .toast
+        .as_ref()
+        .map(|(msg, _)| msg.as_str())
+        .unwrap_or("");
+    assert!(
+        toast.contains("Ctrl+B"),
+        "demote should CTA the tasks hub, got: {toast:?}"
+    );
+    assert!(
+        toast.contains("Running in background"),
+        "got: {toast:?}"
+    );
 }
 /// classify_top_level decision matrix.
 #[test]

@@ -354,6 +354,7 @@ impl AgentView {
                             .scrollback_entry_id
                             .unwrap_or_else(|| crate::scrollback::entry::EntryId::new(0));
                         let is_running = task.status == crate::app::agent::BgTaskStatus::Running;
+                        self.tasks.mark_viewed(&task_id);
                         self.block_viewer =
                             Some(crate::views::block_viewer::BlockViewerPane::for_bg_task(
                                 entry_id,

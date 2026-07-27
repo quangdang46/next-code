@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+pub use xai_grok_shared::status_line::{StatusLineConfig, StatusLineSegment};
 pub use xai_grok_shared::ui_config::{ContextualHints, InfoFloatsConfig, UiConfig};
 
 use crate::auth::GrokComConfig;
