@@ -457,6 +457,9 @@ pub enum Action {
     /// SHELL-owned: updates the process-wide cache mirror and persists to
     /// `[ui].render_mermaid` in config.toml via `Effect::PersistSetting`.
     SetRenderMermaid(crate::appearance::RenderMermaid),
+    /// Where rendered Mermaid diagrams appear: inline / sidebar / both.
+    /// Persisted to `[ui].render_mermaid_target`.
+    SetRenderMermaidTarget(String),
     /// Toggle vim-style scrollback keybindings (j/k, h/l, g/G, y/Y, etc.).
     /// Delegates to `set_vim_mode` so the new value is persisted to
     /// `[ui].vim_mode` in config.toml — same path as the settings modal.
@@ -517,9 +520,9 @@ pub enum Action {
     /// Set default screen mode (`fullscreen` | `minimal`); restart-required.
     SetScreenMode(String),
     /// Set `/btw` output surface (`inline` | `sidebar`). Live-applies to the next `/btw`.
-    SetBtwOutputMode(String),
+    SetSidePanelOutputMode(String),
     /// Persist `/btw` side-panel width (columns) after drag or `[`/`]` resize.
-    SetBtwSidebarWidth(u16),
+    SetSidePanelWidth(u16),
     /// Set the voice capture mode (`toggle` | `hold`). SHELL-owned; persisted to
     /// `[ui].voice_capture_mode`. Takes effect for the next Ctrl+Space press.
     SetVoiceCaptureMode(String),
@@ -595,6 +598,16 @@ pub enum Action {
     SetShowFloatTodos(bool),
     SetShowFloatWorkspaceMap(bool),
     SetShowFloatDiagrams(bool),
+    /// Prompt statusline master switch / segments (`[ui.status_line]`).
+    SetStatusLineEnabled(bool),
+    SetStatusLineMode(bool),
+    SetStatusLineModel(bool),
+    SetStatusLineContext(bool),
+    SetStatusLineCwd(bool),
+    SetStatusLineGit(bool),
+    SetStatusLineOrder(String),
+    ToggleStatusLineSegment(xai_grok_shell::agent::config::StatusLineSegment),
+    ResetStatusLine,
     /// Commit `[ui.display_refresh].auto_cadence_enabled`. Restart-required —
     /// cadence is pinned once at startup.
     SetDisplayRefreshAutoCadence(bool),

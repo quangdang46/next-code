@@ -1,0 +1,33 @@
+classDiagram
+    class AgentView {
+        +session: Session
+        +scrollback: ScrollbackState
+        +side_panel: bool
+        +mermaid: Option~MermaidRuntime~
+        +request_mermaid_render(source, action)
+        +ensure_mermaid_inline(source)
+        +request_mermaid_sidebar_render(source)
+    }
+    class MermaidRuntime {
+        -tx: Sender~MermaidJob~
+        -rx: Receiver~MermaidResult~
+        -pending: Vec~PendingMermaidAction~
+        +has_pending(key, kind)
+    }
+    class MermaidCacheKey {
+        +source_hash: [u8; 32]
+        +theme: ThemeKind
+        +width_bucket: u16
+        +quality: MermaidRenderQuality
+        +derive(source, theme, cols, quality)
+    }
+    class MermaidJob {
+        +key: MermaidCacheKey
+        +source: String
+        +out_path: PathBuf
+        +theme_dark: bool
+        +quality: MermaidRenderQuality
+    }
+    AgentView "1" --> "0..1" MermaidRuntime : owns
+    MermaidRuntime --> MermaidCacheKey : keyed by
+    MermaidRuntime --> MermaidJob : sends

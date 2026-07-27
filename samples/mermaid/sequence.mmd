@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant C as Client
+    participant G as Gateway
+    participant A as Auth Service
+    participant D as Database
+
+    C->>G: POST /api/login
+    G->>A: validate credentials
+    A->>D: query user
+    D-->>A: user row
+    A->>A: verify password hash
+    alt valid credentials
+        A-->>G: JWT token
+        G-->>C: 200 + token
+    else invalid
+        A-->>G: 401 Unauthorized
+        G-->>C: 401 error
+    end

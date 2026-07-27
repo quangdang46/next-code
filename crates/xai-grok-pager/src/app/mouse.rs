@@ -14,7 +14,7 @@ use super::agent_view::{
 };
 use super::app_view::InputOutcome;
 use crate::scrollback::block::BlockContent;
-use crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX;
+use crate::views::side_panel::SIDE_PANEL_ENTRY_IDX;
 use crate::views::prompt_widget::PromptEvent;
 use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
 use std::time::Instant;
@@ -356,14 +356,14 @@ impl AgentView {
                 if self.hit_sb_view.contains(mouse.column, mouse.row) {
                     return InputOutcome::Action(Action::OpenBlockViewer);
                 }
-                if self.last_btw_area.area() > 0
+                if self.last_side_panel_area.area() > 0
                     && self
-                        .last_btw_area
+                        .last_side_panel_area
                         .contains((mouse.column, mouse.row).into())
-                    && !self.hit_btw_close.contains(mouse.column, mouse.row)
+                    && !self.hit_side_panel_close.contains(mouse.column, mouse.row)
                 {
                     self.set_active_pane(AgentPane::Prompt, false);
-                    self.btw_focused = true;
+                    self.side_panel_focused = true;
                     if !has_native_link_hover()
                         && is_link_modifier_held(mouse.modifiers)
                         && !self.pos_occluded(mouse.column, mouse.row)
@@ -375,7 +375,7 @@ impl AgentView {
                         return InputOutcome::Changed;
                     }
                     self.pending_link_click = None;
-                    if self.begin_pending_btw_text_drag(mouse) {
+                    if self.begin_pending_side_panel_text_drag(mouse) {
                         return InputOutcome::Changed;
                     }
                     return InputOutcome::Unchanged;
@@ -442,7 +442,7 @@ impl AgentView {
                         let was_collapsed = self.active_pane != AgentPane::Prompt
                             && self.scrollback.appearance().prompt.collapse_unfocused;
                         self.set_active_pane(AgentPane::Prompt, false);
-                        self.btw_focused = false;
+                        self.side_panel_focused = false;
                         if !was_collapsed {
                             if matches!(self.prompt.handle_mouse(mouse), PromptEvent::Edited) {
                                 self.prompt.refresh_slash(&self.session.models);
@@ -733,7 +733,7 @@ impl AgentView {
                                         self.persistent_text_selection = None;
                                         self.table_selection_geometry = None;
                                         self.selection_created_at = None;
-                                        if hit.entry_idx != BTW_OVERLAY_ENTRY_IDX {
+                                        if hit.entry_idx != SIDE_PANEL_ENTRY_IDX {
                                             self.scrollback.set_selected(Some(hit.entry_idx));
                                         }
                                         true

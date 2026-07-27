@@ -37,7 +37,7 @@ impl AgentView {
             && self.video_viewer.is_none()
             && self.gboom.is_none()
             && self.extensions_modal.is_none()
-            && self.btw_state.is_none()
+            && self.side_panel_state.is_none()
             && self.scrollback_search.is_none()
     }
     /// Whether no input-demanding overlay (permission / plan / cancel-turn /
@@ -108,7 +108,7 @@ impl AgentView {
             && self.highlighted_link_idx.is_none()
             && !self.show_goal_detail
             && self.rewind_state.is_none()
-            && self.btw_state.is_none()
+            && self.side_panel_state.is_none()
             && self.jump_state.is_none()
     }
     /// Esc on the prompt pane in a dashboard overlay backs out to the dashboard
@@ -242,11 +242,11 @@ impl AgentView {
         ev: &Event,
         registry: &ActionRegistry,
     ) -> InputOutcome {
-        match self.handle_minimal_btw_input(ev) {
-            crate::minimal_api::MinimalBtwInput::Handled(outcome) => *outcome,
-            crate::minimal_api::MinimalBtwInput::Occluded => {
+        match self.handle_minimal_side_panel_input(ev) {
+            crate::minimal_api::MinimalSidePanelInput::Handled(outcome) => *outcome,
+            crate::minimal_api::MinimalSidePanelInput::Occluded => {
                 let jump_dismissed = self.dismiss_jump_picker_if_suppressed();
-                let suspended = crate::minimal_api::suspend_minimal_btw(self);
+                let suspended = crate::minimal_api::suspend_minimal_side_panel(self);
                 let outcome = if jump_dismissed
                     && matches!(
                         ev, Event::Key(key) if key.kind != KeyEventKind::Release && key
@@ -257,43 +257,53 @@ impl AgentView {
                     self.handle_input(ev, registry)
                 };
                 if let Some(suspended) = suspended {
-                    crate::minimal_api::restore_minimal_btw(self, suspended);
+                    crate::minimal_api::restore_minimal_side_panel(self, suspended);
                 }
                 outcome
             }
-            crate::minimal_api::MinimalBtwInput::Delegate => self.handle_input(ev, registry),
+            crate::minimal_api::MinimalSidePanelInput::Delegate => self.handle_input(ev, registry),
         }
     }
     /// Handle only minimal `/btw` dismissal and keyboard scrolling.
-    fn handle_minimal_btw_input(&mut self, ev: &Event) -> crate::minimal_api::MinimalBtwInput {
-        use crate::minimal_api::MinimalBtwInput::{Delegate, Handled, Occluded};
-        if !crate::minimal_api::minimal_btw_surface_available(self) {
+    fn handle_minimal_side_panel_input(&mut self, ev: &Event) -> crate::minimal_api::MinimalSidePanelInput {
+        use crate::minimal_api::MinimalSidePanelInput::{Delegate, Handled, Occluded};
+        if !crate::minimal_api::minimal_side_panel_surface_available(self) {
             return Occluded;
         }
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
             && key.code == KeyCode::Esc
             && key.modifiers.is_empty()
-            && self.btw_state.is_some()
+            && self.side_panel_state.is_some()
         {
-            return Handled(Box::new(self.dismiss_btw_panel()));
+            return Handled(Box::new(self.dismiss_side_panel()));
         }
         if self.active_pane != AgentPane::Prompt
-            || !self.btw_focused
-            || !crate::minimal_api::minimal_btw_geometry_is_paintable(self.last_btw_area)
+            || !self.side_panel_focused
+            || !crate::minimal_api::minimal_side_panel_geometry_is_paintable(self.last_side_panel_area)
         {
             return Delegate;
         }
-        let Some(btw_scroll_max) = self.btw_state.as_ref().and_then(|btw| {
-            matches!(btw, crate::views::btw_overlay::BtwOverlayState::Done { .. }).then(|| {
-                let content_width = self.last_btw_area.width.saturating_sub(4) as usize;
-                let max_body = self.last_btw_area.height.saturating_sub(2) as usize;
-                btw.max_scroll_offset(content_width, max_body)
+        let Some(panel_scroll_max) = self.side_panel_state.as_ref().and_then(|panel| {
+            matches!(
+                panel,
+                crate::views::side_panel::SidePanelState::Done { .. }
+                    | crate::views::side_panel::SidePanelState::Diagram { .. }
+            )
+            .then(|| {
+                let content_width = self.last_side_panel_area.width.saturating_sub(4) as usize;
+                // Diagram reserves one label row above the image body.
+                let chrome = match panel {
+                    crate::views::side_panel::SidePanelState::Diagram { .. } => 3,
+                    _ => 2,
+                };
+                let max_body = self.last_side_panel_area.height.saturating_sub(chrome) as usize;
+                panel.max_scroll_offset(content_width, max_body)
             })
         }) else {
             return Delegate;
         };
-        if btw_scroll_max == 0 {
+        if panel_scroll_max == 0 {
             return Delegate;
         }
         let Event::Key(key) = ev else {
@@ -302,18 +312,18 @@ impl AgentView {
         if key.kind == KeyEventKind::Release || !key.modifiers.is_empty() {
             return Delegate;
         }
-        let page = self.last_btw_area.height.saturating_sub(2).max(1) as usize;
-        let Some(btw) = self.btw_state.as_mut() else {
+        let page = self.last_side_panel_area.height.saturating_sub(2).max(1) as usize;
+        let Some(panel) = self.side_panel_state.as_mut() else {
             return Delegate;
         };
         match key.code {
-            KeyCode::Up => btw.scroll_up(1),
-            KeyCode::Down => btw.scroll_down(1, btw_scroll_max),
-            KeyCode::PageUp => btw.scroll_up(page),
-            KeyCode::PageDown => btw.scroll_down(page, btw_scroll_max),
+            KeyCode::Up => panel.scroll_up(1),
+            KeyCode::Down => panel.scroll_down(1, panel_scroll_max),
+            KeyCode::PageUp => panel.scroll_up(page),
+            KeyCode::PageDown => panel.scroll_down(page, panel_scroll_max),
             _ => return Delegate,
         }
-        self.clear_btw_drag_state();
+        self.clear_side_panel_drag_state();
         Handled(Box::new(InputOutcome::Changed))
     }
     fn handle_input_inner(
@@ -492,68 +502,76 @@ impl AgentView {
                 return InputOutcome::Changed;
             }
         }
-        if self.btw_state.is_some()
+        if self.side_panel_state.is_some()
             && let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
             && key.code == KeyCode::Esc
             && key.modifiers.is_empty()
         {
-            return self.dismiss_btw_panel();
+            return self.dismiss_side_panel();
         }
-        if self.btw_state.is_some()
+        if self.side_panel_state.is_some()
             && let Event::Mouse(mouse) = ev
             && matches!(mouse.kind, MouseEventKind::Down(MouseButton::Left))
-            && self.hit_btw_close.contains(mouse.column, mouse.row)
+            && self.hit_side_panel_close.contains(mouse.column, mouse.row)
         {
-            return self.dismiss_btw_panel();
+            return self.dismiss_side_panel();
         }
-        if let Some(outcome) = self.handle_btw_sidebar_resize(ev) {
+        if let Some(outcome) = self.handle_side_panel_resize(ev) {
             return outcome;
         }
-        if self.btw_state.is_some()
+        if self.side_panel_state.is_some()
             && let Event::Mouse(mouse) = ev
             && matches!(mouse.kind, MouseEventKind::Moved)
-            && self.hit_btw_close.update_hover(mouse.column, mouse.row)
+            && self.hit_side_panel_close.update_hover(mouse.column, mouse.row)
         {
             return InputOutcome::Changed;
         }
-        let btw_scroll_max = if self.active_pane == AgentPane::Prompt
-            && self.btw_focused
-            && let Some(btw) = self.btw_state.as_ref()
-            && matches!(btw, crate::views::btw_overlay::BtwOverlayState::Done { .. })
+        let panel_scroll_max = if self.active_pane == AgentPane::Prompt
+            && self.side_panel_focused
+            && let Some(panel) = self.side_panel_state.as_ref()
+            && matches!(
+                panel,
+                crate::views::side_panel::SidePanelState::Done { .. }
+                    | crate::views::side_panel::SidePanelState::Diagram { .. }
+            )
         {
-            let content_width = self.last_btw_area.width.saturating_sub(4) as usize;
-            let max_body = self.last_btw_area.height.saturating_sub(2) as usize;
-            btw.max_scroll_offset(content_width, max_body)
+            let content_width = self.last_side_panel_area.width.saturating_sub(4) as usize;
+            let chrome = match panel {
+                crate::views::side_panel::SidePanelState::Diagram { .. } => 3,
+                _ => 2,
+            };
+            let max_body = self.last_side_panel_area.height.saturating_sub(chrome) as usize;
+            panel.max_scroll_offset(content_width, max_body)
         } else {
             0
         };
-        if btw_scroll_max > 0
+        if panel_scroll_max > 0
             && let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
             && key.modifiers.is_empty()
-            && let Some(btw) = self.btw_state.as_mut()
+            && let Some(panel) = self.side_panel_state.as_mut()
         {
-            let page = self.last_btw_area.height.saturating_sub(2).max(1) as usize;
+            let page = self.last_side_panel_area.height.saturating_sub(2).max(1) as usize;
             match key.code {
                 KeyCode::Up => {
-                    btw.scroll_up(1);
-                    self.clear_btw_drag_state();
+                    panel.scroll_up(1);
+                    self.clear_side_panel_drag_state();
                     return InputOutcome::Changed;
                 }
                 KeyCode::Down => {
-                    btw.scroll_down(1, btw_scroll_max);
-                    self.clear_btw_drag_state();
+                    panel.scroll_down(1, panel_scroll_max);
+                    self.clear_side_panel_drag_state();
                     return InputOutcome::Changed;
                 }
                 KeyCode::PageUp => {
-                    btw.scroll_up(page);
-                    self.clear_btw_drag_state();
+                    panel.scroll_up(page);
+                    self.clear_side_panel_drag_state();
                     return InputOutcome::Changed;
                 }
                 KeyCode::PageDown => {
-                    btw.scroll_down(page, btw_scroll_max);
-                    self.clear_btw_drag_state();
+                    panel.scroll_down(page, panel_scroll_max);
+                    self.clear_side_panel_drag_state();
                     return InputOutcome::Changed;
                 }
                 _ => {}
@@ -952,7 +970,7 @@ impl AgentView {
                 if self.active_pane == AgentPane::Prompt {
                     self.ephemeral_tip
                         .clear(crate::tips::clipboard_focus::CLIPBOARD_IMAGE_TIP_KEY);
-                    self.btw_focused = false;
+                    self.side_panel_focused = false;
                     if let Some((outcome, _)) = self.try_handle_dropped_paths_paste(text) {
                         return outcome;
                     }
@@ -1014,14 +1032,14 @@ impl AgentView {
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
             && key!('m', ALT).matches(key)
-            && self.btw_sidebar
-            && self.btw_state.is_some()
+            && self.side_panel
+            && self.side_panel_state.is_some()
         {
-            self.btw_sidebar_visible = !self.btw_sidebar_visible;
-            if self.btw_sidebar_visible {
+            self.side_panel_visible = !self.side_panel_visible;
+            if self.side_panel_visible {
                 self.show_toast("Side panel shown");
             } else {
-                self.btw_focused = false;
+                self.side_panel_focused = false;
                 self.show_toast("Side panel hidden (Alt+M to show)");
             }
             return InputOutcome::Changed;
@@ -1029,10 +1047,10 @@ impl AgentView {
         if let Event::Key(key) = ev
             && key.kind != KeyEventKind::Release
             && key.modifiers.is_empty()
-            && self.btw_sidebar
-            && self.btw_sidebar_visible
-            && self.btw_state.is_some()
-            && self.btw_focused
+            && self.side_panel
+            && self.side_panel_visible
+            && self.side_panel_state.is_some()
+            && self.side_panel_focused
             && matches!(key.code, KeyCode::Char('[') | KeyCode::Char(']'))
         {
             let delta: i16 = if key.code == KeyCode::Char('[') {
@@ -1040,7 +1058,7 @@ impl AgentView {
             } else {
                 2
             };
-            if let Some(action) = self.adjust_btw_sidebar_width(delta) {
+            if let Some(action) = self.adjust_side_panel_width(delta) {
                 return InputOutcome::Action(action);
             }
             return InputOutcome::Changed;
@@ -1305,56 +1323,56 @@ impl AgentView {
     /// Ratatui itself has no built-in split widget — apps handle
     /// `MouseEventKind::Drag` from crossterm (same pattern as legacy TUI diagram
     /// pane resize). Returns `Some` when the event was consumed.
-    fn handle_btw_sidebar_resize(&mut self, ev: &Event) -> Option<InputOutcome> {
-        if !(self.btw_sidebar && self.btw_sidebar_visible && self.btw_state.is_some()) {
-            if self.btw_sidebar_dragging {
-                self.btw_sidebar_dragging = false;
+    fn handle_side_panel_resize(&mut self, ev: &Event) -> Option<InputOutcome> {
+        if !(self.side_panel && self.side_panel_visible && self.side_panel_state.is_some()) {
+            if self.side_panel_dragging {
+                self.side_panel_dragging = false;
             }
             return None;
         }
         let Event::Mouse(mouse) = ev else {
             return None;
         };
-        let divider_x = self.last_btw_divider_x.or_else(|| {
-            (self.last_btw_area.width > 0).then(|| self.last_btw_area.x.saturating_sub(1))
+        let divider_x = self.last_side_panel_divider_x.or_else(|| {
+            (self.last_side_panel_area.width > 0).then(|| self.last_side_panel_area.x.saturating_sub(1))
         })?;
         let on_divider = mouse.column >= divider_x.saturating_sub(1)
             && mouse.column <= divider_x.saturating_add(1)
-            && self.last_btw_area.height > 0
-            && mouse.row >= self.last_btw_area.y
-            && mouse.row < self.last_btw_area.y.saturating_add(self.last_btw_area.height);
+            && self.last_side_panel_area.height > 0
+            && mouse.row >= self.last_side_panel_area.y
+            && mouse.row < self.last_side_panel_area.y.saturating_add(self.last_side_panel_area.height);
 
         match mouse.kind {
             MouseEventKind::Down(MouseButton::Left) if on_divider => {
-                self.btw_sidebar_dragging = true;
+                self.side_panel_dragging = true;
                 Some(InputOutcome::Changed)
             }
-            MouseEventKind::Drag(MouseButton::Left) if self.btw_sidebar_dragging => {
+            MouseEventKind::Drag(MouseButton::Left) if self.side_panel_dragging => {
                 let right = self
-                    .last_btw_area
+                    .last_side_panel_area
                     .x
-                    .saturating_add(self.last_btw_area.width);
+                    .saturating_add(self.last_side_panel_area.width);
                 let desired = right.saturating_sub(mouse.column);
                 let frame_width = self.last_btw_frame_width.unwrap_or_else(|| {
-                    self.btw_sidebar_width
+                    self.side_panel_width
                         .saturating_add(
                             crate::views::agent::AgentViewLayout::BTW_SIDEBAR_MIN_MAIN_WIDTH,
                         )
-                        .saturating_add(crate::views::agent::AgentViewLayout::BTW_SIDEBAR_GAP)
+                        .saturating_add(crate::views::agent::AgentViewLayout::SIDE_PANEL_GAP)
                 });
-                let clamped = crate::views::agent::AgentViewLayout::clamp_btw_sidebar_width(
+                let clamped = crate::views::agent::AgentViewLayout::clamp_side_panel_width(
                     frame_width,
                     desired,
                 );
-                if clamped != self.btw_sidebar_width {
-                    self.btw_sidebar_width = clamped;
+                if clamped != self.side_panel_width {
+                    self.side_panel_width = clamped;
                 }
                 Some(InputOutcome::Changed)
             }
-            MouseEventKind::Up(MouseButton::Left) if self.btw_sidebar_dragging => {
-                self.btw_sidebar_dragging = false;
+            MouseEventKind::Up(MouseButton::Left) if self.side_panel_dragging => {
+                self.side_panel_dragging = false;
                 Some(InputOutcome::Action(
-                    crate::app::actions::Action::SetBtwSidebarWidth(self.btw_sidebar_width),
+                    crate::app::actions::Action::SetSidePanelWidth(self.side_panel_width),
                 ))
             }
             _ => None,
@@ -1363,24 +1381,24 @@ impl AgentView {
 
     /// Grow/shrink the `/btw` sidebar by `delta` columns. Returns a persist
     /// action when the width changed.
-    fn adjust_btw_sidebar_width(&mut self, delta: i16) -> Option<crate::app::actions::Action> {
+    fn adjust_side_panel_width(&mut self, delta: i16) -> Option<crate::app::actions::Action> {
         let frame_width = self.last_btw_frame_width.unwrap_or_else(|| {
-            self.btw_sidebar_width
+            self.side_panel_width
                 .saturating_add(
                     crate::views::agent::AgentViewLayout::BTW_SIDEBAR_MIN_MAIN_WIDTH,
                 )
-                .saturating_add(crate::views::agent::AgentViewLayout::BTW_SIDEBAR_GAP)
+                .saturating_add(crate::views::agent::AgentViewLayout::SIDE_PANEL_GAP)
         });
         let next = {
-            let cur = self.btw_sidebar_width as i16;
+            let cur = self.side_panel_width as i16;
             let raw = cur.saturating_add(delta).max(0) as u16;
-            crate::views::agent::AgentViewLayout::clamp_btw_sidebar_width(frame_width, raw)
+            crate::views::agent::AgentViewLayout::clamp_side_panel_width(frame_width, raw)
         };
-        if next == self.btw_sidebar_width {
+        if next == self.side_panel_width {
             return None;
         }
-        self.btw_sidebar_width = next;
-        Some(crate::app::actions::Action::SetBtwSidebarWidth(next))
+        self.side_panel_width = next;
+        Some(crate::app::actions::Action::SetSidePanelWidth(next))
     }
 }
 #[cfg(test)]
@@ -1410,7 +1428,7 @@ mod btw_focus_tests {
     use super::{AgentPane, AgentView};
     use crate::actions::ActionRegistry;
     use crate::app::app_view::InputOutcome;
-    use crate::views::btw_overlay::BtwOverlayState;
+    use crate::views::side_panel::SidePanelState;
     use crate::views::jump::{JumpRestore, JumpState};
     use crossterm::event::{
         Event, KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
@@ -1418,12 +1436,12 @@ mod btw_focus_tests {
     use ratatui::layout::Rect;
     /// Idle agent focused on the prompt (the realistic state while `/btw` is
     /// open). `make_agent` starts in scrollback focus (vim default), and these
-    /// tests don't render, so we focus the prompt and seed `last_btw_area`
+    /// tests don't render, so we focus the prompt and seed `last_side_panel_area`
     /// (keyboard scrollability reads from it). 80x14 → 76-col body, 12 rows.
     fn prompt_focused_agent() -> AgentView {
         let mut agent = make_agent();
         agent.set_active_pane(AgentPane::Prompt, true);
-        agent.last_btw_area = Rect::new(0, 0, 80, 14);
+        agent.last_side_panel_area = Rect::new(0, 0, 80, 14);
         agent
     }
     /// A `/btw` answer with far more lines than the panel can show, so it is
@@ -1439,30 +1457,30 @@ mod btw_focus_tests {
     }
     fn done_scroll_offset(agent: &AgentView) -> usize {
         agent
-            .btw_state
+            .side_panel_state
             .as_ref()
-            .expect("btw panel present")
+            .expect("side panel present")
             .scroll_offset()
     }
-    fn minimal_btw_agent() -> AgentView {
+    fn minimal_side_panel_agent() -> AgentView {
         let mut agent = prompt_focused_agent();
-        let request_id = crate::minimal_api::start_minimal_btw(&mut agent, "q".into());
-        assert!(crate::minimal_api::finish_minimal_btw(
+        let request_id = crate::minimal_api::start_minimal_side_panel(&mut agent, "q".into());
+        assert!(crate::minimal_api::finish_minimal_side_panel(
             &mut agent,
             request_id,
             Ok(long_btw_answer())
         ));
         agent
     }
-    fn assert_minimal_btw_active(agent: &AgentView, surface: &str) {
+    fn assert_minimal_side_panel_active(agent: &AgentView, surface: &str) {
         assert!(
-            agent.btw_state.is_some(),
+            agent.side_panel_state.is_some(),
             "{surface} Esc must leave the latent /btw panel intact"
         );
         assert!(
             matches!(
-                agent.minimal_btw_lifecycle,
-                Some(crate::minimal_api::MinimalBtwLifecycle::Active { .. })
+                agent.minimal_side_panel_lifecycle,
+                Some(crate::minimal_api::MinimalSidePanelLifecycle::Active { .. })
             ),
             "{surface} Esc must restore the complete minimal /btw lifecycle"
         );
@@ -1471,8 +1489,8 @@ mod btw_focus_tests {
     fn focused_panel_scrolls_with_arrows() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = true;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = true;
         assert!(matches!(
             agent.handle_input(&key(KeyCode::Down), &reg),
             InputOutcome::Changed
@@ -1482,14 +1500,14 @@ mod btw_focus_tests {
         assert_eq!(done_scroll_offset(&agent), 2);
         agent.handle_input(&key(KeyCode::Up), &reg);
         assert_eq!(done_scroll_offset(&agent), 1);
-        assert!(agent.btw_focused);
+        assert!(agent.side_panel_focused);
     }
     #[test]
     fn focused_panel_owns_page_keys_before_prompt_paging() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = true;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = true;
         let outcome = agent.handle_input_with_prompt_paging(&key(KeyCode::PageDown), &reg);
         assert!(matches!(outcome, InputOutcome::Changed));
         let after_down = done_scroll_offset(&agent);
@@ -1497,14 +1515,14 @@ mod btw_focus_tests {
         let outcome = agent.handle_input_with_prompt_paging(&key(KeyCode::PageUp), &reg);
         assert!(matches!(outcome, InputOutcome::Changed));
         assert!(done_scroll_offset(&agent) < after_down);
-        assert!(agent.btw_focused);
+        assert!(agent.side_panel_focused);
     }
     #[test]
     fn visible_unfocused_panel_allows_prompt_paging() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = false;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = false;
         let outcome = agent.handle_input_with_prompt_paging(&key(KeyCode::PageDown), &reg);
         assert!(
             matches!(
@@ -1519,11 +1537,11 @@ mod btw_focus_tests {
     fn typing_returns_focus_to_prompt() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = true;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = true;
         agent.handle_input(&key(KeyCode::Char('h')), &reg);
         assert!(
-            !agent.btw_focused,
+            !agent.side_panel_focused,
             "typing should return focus to the prompt"
         );
         assert_eq!(done_scroll_offset(&agent), 0);
@@ -1535,8 +1553,8 @@ mod btw_focus_tests {
         let reg = ActionRegistry::defaults();
         agent.prompt.set_text("line one\nline two");
         agent.prompt.set_cursor(0);
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = false;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = false;
         let out = agent.handle_input(&key(KeyCode::Down), &reg);
         assert!(matches!(out, InputOutcome::Changed));
         assert!(
@@ -1555,11 +1573,11 @@ mod btw_focus_tests {
         let reg = ActionRegistry::defaults();
         agent.prompt.set_text("hello");
         agent.prompt.set_cursor(0);
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), "short".into()));
-        agent.btw_focused = true;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), "short".into()));
+        agent.side_panel_focused = true;
         agent.handle_input(&key(KeyCode::Down), &reg);
         assert!(
-            !agent.btw_focused,
+            !agent.side_panel_focused,
             "a non-scrollable panel hands the arrows back to the prompt"
         );
         assert_eq!(done_scroll_offset(&agent), 0);
@@ -1569,8 +1587,8 @@ mod btw_focus_tests {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
         agent.set_active_pane(AgentPane::Scrollback, true);
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = true;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = true;
         agent.handle_input(&key(KeyCode::Down), &reg);
         assert_eq!(
             done_scroll_offset(&agent),
@@ -1582,21 +1600,21 @@ mod btw_focus_tests {
     fn esc_dismisses_panel_and_clears_focus() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = true;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = true;
         agent.handle_input(&key(KeyCode::Esc), &reg);
-        assert!(agent.btw_state.is_none(), "Esc dismisses the /btw panel");
-        assert!(!agent.btw_focused, "dismissing the panel clears its focus");
+        assert!(agent.side_panel_state.is_none(), "Esc dismisses the /btw panel");
+        assert!(!agent.side_panel_focused, "dismissing the panel clears its focus");
     }
     #[test]
     fn minimal_permission_owns_esc_over_hidden_btw() {
-        let mut agent = minimal_btw_agent();
+        let mut agent = minimal_side_panel_agent();
         let reg = ActionRegistry::defaults();
         agent
             .permission_queue
             .push_back(super::paste_key_tests::make_followup_permission_state());
         agent.handle_minimal_input(&key(KeyCode::Esc), &reg);
-        assert_minimal_btw_active(&agent, "permission");
+        assert_minimal_side_panel_active(&agent, "permission");
         assert_eq!(
             agent.permission_queue.len(),
             1,
@@ -1614,7 +1632,7 @@ mod btw_focus_tests {
     #[test]
     fn minimal_modal_and_viewers_own_esc_over_hidden_btw() {
         let reg = ActionRegistry::defaults();
-        let mut agents = minimal_btw_agent();
+        let mut agents = minimal_side_panel_agent();
         agents.agents_modal = Some(crate::views::agents_modal::AgentsModalState::new(
             std::path::Path::new("/nonexistent"),
             &std::collections::HashMap::new(),
@@ -1624,64 +1642,64 @@ mod btw_focus_tests {
         ));
         agents.handle_minimal_input(&key(KeyCode::Esc), &reg);
         assert!(agents.agents_modal.is_none(), "agents modal handled Esc");
-        assert_minimal_btw_active(&agents, "agents modal");
-        let mut block = minimal_btw_agent();
+        assert_minimal_side_panel_active(&agents, "agents modal");
+        let mut block = minimal_side_panel_agent();
         block.block_viewer = Some(crate::views::block_viewer::BlockViewerPane::for_plain_text(
             "t", "content",
         ));
         block.handle_minimal_input(&key(KeyCode::Esc), &reg);
         assert!(block.block_viewer.is_none(), "block viewer handled Esc");
-        assert_minimal_btw_active(&block, "block viewer");
-        let mut video = minimal_btw_agent();
+        assert_minimal_side_panel_active(&block, "block viewer");
+        let mut video = minimal_side_panel_agent();
         video.video_viewer = Some(crate::prompt_images::VideoViewerState::test_stub());
         video.handle_minimal_input(&key(KeyCode::Esc), &reg);
         assert!(video.video_viewer.is_none(), "video viewer handled Esc");
-        assert_minimal_btw_active(&video, "video viewer");
-        let mut goal = minimal_btw_agent();
+        assert_minimal_side_panel_active(&video, "video viewer");
+        let mut goal = minimal_side_panel_agent();
         goal.goal_state = Some(crate::app::agent::GoalDisplayState::test_stub());
         goal.show_goal_detail = true;
         goal.handle_minimal_input(&key(KeyCode::Esc), &reg);
         assert!(!goal.show_goal_detail, "goal detail handled Esc");
-        assert_minimal_btw_active(&goal, "goal detail");
+        assert_minimal_side_panel_active(&goal, "goal detail");
     }
     #[test]
-    fn minimal_btw_surface_owner_covers_shared_modal_cascade() {
-        let mut agent = minimal_btw_agent();
-        assert!(crate::minimal_api::minimal_btw_surface_available(&agent));
+    fn minimal_side_panel_surface_owner_covers_shared_modal_cascade() {
+        let mut agent = minimal_side_panel_agent();
+        assert!(crate::minimal_api::minimal_side_panel_surface_available(&agent));
         agent.image_viewer = Some(
             crate::prompt_images::ImageViewerState::open_from_path_deferred(std::path::Path::new(
                 "x.png",
             )),
         );
-        assert!(!crate::minimal_api::minimal_btw_surface_available(&agent));
+        assert!(!crate::minimal_api::minimal_side_panel_surface_available(&agent));
         agent.image_viewer = None;
         agent.gboom = Some(crate::gboom::GboomState::new());
-        assert!(!crate::minimal_api::minimal_btw_surface_available(&agent));
+        assert!(!crate::minimal_api::minimal_side_panel_surface_available(&agent));
         agent.gboom = None;
         agent.block_viewer = Some(crate::views::block_viewer::BlockViewerPane::for_plain_text(
             "t", "content",
         ));
-        assert!(!crate::minimal_api::minimal_btw_surface_available(&agent));
+        assert!(!crate::minimal_api::minimal_side_panel_surface_available(&agent));
     }
     #[test]
     fn fullscreen_keeps_btw_first_esc_precedence() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
         agent
             .permission_queue
             .push_back(super::paste_key_tests::make_followup_permission_state());
         agent.handle_input(&key(KeyCode::Esc), &reg);
-        assert!(agent.btw_state.is_none());
+        assert!(agent.side_panel_state.is_none());
         assert!(!agent.permission_queue.is_empty());
     }
     #[test]
     fn minimal_does_not_scroll_unpainted_btw_geometry() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = true;
-        agent.last_btw_area = Rect::default();
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = true;
+        agent.last_side_panel_area = Rect::default();
         agent.handle_minimal_input(&key(KeyCode::Down), &reg);
         assert_eq!(done_scroll_offset(&agent), 0);
     }
@@ -1692,7 +1710,7 @@ mod btw_focus_tests {
     fn esc_over_shadowed_jump_picker_spares_btw_panel() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
         agent.jump_state = Some(JumpState {
             entries: Vec::new(),
             selected: 0,
@@ -1708,12 +1726,12 @@ mod btw_focus_tests {
             "first Esc drops the shadowed picker"
         );
         assert!(
-            agent.btw_state.is_some(),
+            agent.side_panel_state.is_some(),
             "the /btw panel survives the picker-dismissing Esc"
         );
         agent.handle_input(&key(KeyCode::Esc), &reg);
         assert!(
-            agent.btw_state.is_none(),
+            agent.side_panel_state.is_none(),
             "a second Esc dismisses the /btw panel"
         );
     }
@@ -1721,8 +1739,8 @@ mod btw_focus_tests {
     fn clicking_panel_refocuses_it() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = false;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = false;
         agent.set_active_pane(AgentPane::Scrollback, true);
         let click = MouseEvent {
             kind: MouseEventKind::Down(MouseButton::Left),
@@ -1731,7 +1749,7 @@ mod btw_focus_tests {
             modifiers: KeyModifiers::NONE,
         };
         agent.handle_mouse(&click);
-        assert!(agent.btw_focused, "clicking the panel refocuses it");
+        assert!(agent.side_panel_focused, "clicking the panel refocuses it");
         assert_eq!(agent.active_pane, AgentPane::Prompt);
         agent.handle_input(&key(KeyCode::Down), &reg);
         assert_eq!(done_scroll_offset(&agent), 1);
@@ -1740,10 +1758,10 @@ mod btw_focus_tests {
     fn pasting_into_prompt_returns_focus() {
         let mut agent = prompt_focused_agent();
         let reg = ActionRegistry::defaults();
-        agent.btw_state = Some(BtwOverlayState::done("q".into(), long_btw_answer()));
-        agent.btw_focused = true;
+        agent.side_panel_state = Some(SidePanelState::done("q".into(), long_btw_answer()));
+        agent.side_panel_focused = true;
         agent.handle_input(&Event::Paste("a".repeat(5000)), &reg);
-        assert!(!agent.btw_focused, "pasting into the prompt returns focus");
+        assert!(!agent.side_panel_focused, "pasting into the prompt returns focus");
     }
 }
 #[cfg(test)]

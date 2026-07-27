@@ -26,10 +26,6 @@ use crate::external_auth::{
 pub enum ProviderChoice {
     Claude,
     AnthropicApi,
-    #[deprecated(
-        note = "Claude Code CLI subprocess transport is deprecated; use ProviderChoice::Claude for native Anthropic OAuth/API transport"
-    )]
-    ClaudeSubprocess,
     Openai,
     OpenaiApi,
     Openrouter,
@@ -62,7 +58,6 @@ pub enum ProviderChoice {
     NvidiaNim,
     XiaomiMimo,
     Lmstudio,
-    Ollama,
     Chutes,
     Cerebras,
     AlibabaCodingPlan,
@@ -77,12 +72,10 @@ pub enum ProviderChoice {
 }
 
 impl ProviderChoice {
-    #[allow(deprecated)]
     pub fn as_arg_value(&self) -> &'static str {
         match self {
             Self::Claude => "claude",
             Self::AnthropicApi => "anthropic-api",
-            Self::ClaudeSubprocess => "claude-subprocess",
             Self::Openai => "openai",
             Self::OpenaiApi => "openai-api",
             Self::Openrouter => "openrouter",
@@ -115,7 +108,6 @@ impl ProviderChoice {
             Self::NvidiaNim => "nvidia-nim",
             Self::XiaomiMimo => "xiaomi-mimo",
             Self::Lmstudio => "lmstudio",
-            Self::Ollama => "ollama",
             Self::Chutes => "chutes",
             Self::Cerebras => "cerebras",
             Self::AlibabaCodingPlan => "alibaba-coding-plan",
@@ -137,7 +129,6 @@ impl ProviderChoice {
         Some(match s {
             "claude" => Self::Claude,
             "anthropic-api" | "claude-api" | "anthropic-key" | "claude-key" => Self::AnthropicApi,
-            "claude-subprocess" => Self::Claude,
             "openai" => Self::Openai,
             "openai-api" | "openai-key" | "openai-apikey" | "openai-platform" => Self::OpenaiApi,
             "openrouter" => Self::Openrouter,
@@ -171,7 +162,6 @@ impl ProviderChoice {
             "nvidia-nim" | "nvidia" | "nim" => Self::NvidiaNim,
             "xiaomi-mimo" | "xiaomi" | "mimo" | "xiaomi-mimo-api" => Self::XiaomiMimo,
             "lmstudio" | "lm-studio" => Self::Lmstudio,
-            "ollama" => Self::Ollama,
             "chutes" => Self::Chutes,
             "cerebras" | "cerebrascode" | "cerberascode" => Self::Cerebras,
             "alibaba-coding-plan"
@@ -207,7 +197,6 @@ impl std::str::FromStr for ProviderChoice {
     }
 }
 
-#[allow(deprecated)]
 const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescriptor)] = &[
     (
         ProviderChoice::Claude,
@@ -216,10 +205,6 @@ const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescripto
     (
         ProviderChoice::AnthropicApi,
         crate::provider_catalog::ANTHROPIC_API_LOGIN_PROVIDER,
-    ),
-    (
-        ProviderChoice::ClaudeSubprocess,
-        crate::provider_catalog::CLAUDE_LOGIN_PROVIDER,
     ),
     (
         ProviderChoice::Openai,
@@ -350,10 +335,6 @@ const PROVIDER_CHOICE_LOGIN_PROVIDERS: &[(ProviderChoice, LoginProviderDescripto
         crate::provider_catalog::LMSTUDIO_LOGIN_PROVIDER,
     ),
     (
-        ProviderChoice::Ollama,
-        crate::provider_catalog::OLLAMA_LOGIN_PROVIDER,
-    ),
-    (
         ProviderChoice::Chutes,
         crate::provider_catalog::CHUTES_LOGIN_PROVIDER,
     ),
@@ -406,7 +387,6 @@ pub fn profile_for_choice(choice: &ProviderChoice) -> Option<OpenAiCompatiblePro
     }
 }
 
-#[allow(deprecated)]
 pub fn login_provider_for_choice(choice: &ProviderChoice) -> Option<LoginProviderDescriptor> {
     PROVIDER_CHOICE_LOGIN_PROVIDERS
         .iter()
@@ -414,12 +394,11 @@ pub fn login_provider_for_choice(choice: &ProviderChoice) -> Option<LoginProvide
         .map(|(_, provider)| *provider)
 }
 
-#[allow(deprecated)]
 pub fn choice_for_login_provider(provider: LoginProviderDescriptor) -> Option<ProviderChoice> {
     PROVIDER_CHOICE_LOGIN_PROVIDERS
         .iter()
         .find(|(choice, candidate)| {
-            candidate.id == provider.id && !matches!(choice, ProviderChoice::ClaudeSubprocess)
+            candidate.id == provider.id
         })
         .map(|(choice, _)| *choice)
 }
@@ -1396,7 +1375,6 @@ pub async fn init_provider_for_validation(
     init_provider_with_options(choice, model, false, false).await
 }
 
-#[allow(deprecated)]
 async fn init_provider_with_options(
     choice: &ProviderChoice,
     model: Option<&str>,
@@ -1447,19 +1425,6 @@ async fn init_provider_with_options(
             disable_subscription_runtime_mode();
             ensure_external_api_key_auth_allowed_for_explicit_choice("ANTHROPIC_API_KEY")?;
             init_notice("Using Anthropic API key provider (provider locked)");
-            lock_model_provider("claude");
-            Arc::new(provider::MultiProvider::with_preference_fast(false))
-        }
-        ProviderChoice::ClaudeSubprocess => {
-            disable_subscription_runtime_mode();
-            ensure_claude_auth_allowed_for_explicit_choice()?;
-            crate::logging::warn(
-                "Using --provider claude-subprocess is deprecated and will be removed. Prefer `--provider claude`.",
-            );
-            crate::env::set_var("NEXT_CODE_USE_CLAUDE_CLI", "1");
-            init_notice(
-                "Using deprecated Claude subprocess transport (legacy compatibility mode; provider locked)",
-            );
             lock_model_provider("claude");
             Arc::new(provider::MultiProvider::with_preference_fast(false))
         }
@@ -1556,7 +1521,6 @@ async fn init_provider_with_options(
         | ProviderChoice::NvidiaNim
         | ProviderChoice::XiaomiMimo
         | ProviderChoice::Lmstudio
-        | ProviderChoice::Ollama
         | ProviderChoice::Chutes
         | ProviderChoice::Cerebras
         | ProviderChoice::AlibabaCodingPlan

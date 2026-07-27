@@ -108,7 +108,7 @@ impl AgentView {
 
         // Any key reaching the prompt is the user interacting with it, so hand
         // focus back from the /btw panel (its scroll keys are consumed earlier).
-        self.btw_focused = false;
+        self.side_panel_focused = false;
 
         // ── History panel intercept (modal) ─────────────────────────────
         // Must run before the file-search / slash intercepts: a populated
