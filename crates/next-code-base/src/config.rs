@@ -468,6 +468,13 @@ pub struct Config {
     /// Feature toggles
     pub features: FeatureConfig,
 
+    /// Experiment flags (`[experiments]` in config.toml).
+    ///
+    /// Source of truth for staged flags in `next-code-experiment-flags`.
+    /// Face `/experimental` reads and writes this section.
+    #[serde(default)]
+    pub experiments: next_code_experiment_flags::ExperimentsToml,
+
     /// Web search tool configuration
     pub websearch: WebSearchConfig,
 
@@ -575,7 +582,7 @@ pub struct Config {
 pub struct KeywordsConfig {
     /// Master switch. When false, no detection, sticky inject, or chips.
     pub enabled: bool,
-    /// `strict` (default): `$keyword` + token aliases only.
+    /// `strict` (default): `$keyword`, bare `$`-stripped form, + token aliases.
     /// `loose`: also multi-word phrase aliases (+ optional fuzzy).
     pub match_mode: String,
     /// Sticky turn budget for newly activated modes.

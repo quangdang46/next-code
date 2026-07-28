@@ -17,7 +17,7 @@ use crate::scrollback::text_selection::{
     render_block_drag_overlay, render_persistent_selection_overlay,
 };
 use crate::theme::Theme;
-use crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX;
+use crate::views::side_panel::SIDE_PANEL_ENTRY_IDX;
 use crate::views::modal;
 use crate::views::plan_approval_view::PlanApprovalFocus;
 use crate::views::prompt_widget::{PromptFlag, PromptInfo, PromptStyle};
@@ -693,7 +693,7 @@ impl AgentView {
                 || self.block_viewer.is_some()
                 || self.extensions_modal.is_some()
                 || self.agents_modal.is_some()
-                || self.btw_state.is_some()
+                || self.side_panel_state.is_some()
                 || self.line_viewer.is_some()
                 || self.active_modal.is_some())
         {
@@ -1077,13 +1077,27 @@ impl AgentView {
         };
         let voice_recording_height = if voice_listening { 1 } else { 0 };
         let _tool_usage_height = 0u16;
-        let btw_hidden = self.btw_sidebar && !self.btw_sidebar_visible;
-        let prefer_btw_sidebar =
-            self.btw_sidebar && self.btw_sidebar_visible && self.btw_state.is_some();
+        let side_panel_hidden = self.side_panel && !self.side_panel_visible;
+        let prefer_side_panel =
+            self.side_panel && self.side_panel_visible && self.side_panel_state.is_some();
         let inline_btw_height =
-            crate::views::btw_overlay::btw_panel_height(self.btw_state.as_ref(), inner_width);
-        let mut btw_height = if btw_hidden || prefer_btw_sidebar {
+            crate::views::side_panel::side_panel_height(self.side_panel_state.as_ref(), inner_width);
+        // Legacy TUI parity: split the full agent frame horizontally first so the
+        // `/btw` column spans status → shortcuts (not a content-sized mid float).
+        let (compute_area, pre_split_side_panel) = if prefer_side_panel {
+            match AgentViewLayout::split_side_panel_column(area, self.side_panel_width) {
+                Some((main, side)) => (main, Some(side)),
+                None => (area, None),
+            }
+        } else {
+            (area, None)
+        };
+        let side_panel_placed = pre_split_side_panel.is_some();
+        let mut btw_height = if side_panel_hidden || side_panel_placed {
             0
+        } else if prefer_side_panel {
+            // Preferred sidebar but frame too narrow — fall back to overlay strip.
+            inline_btw_height
         } else {
             inline_btw_height
         };
@@ -1096,11 +1110,11 @@ impl AgentView {
         let timeline_width = crate::views::timeline::rail_width(
             appearance.show_timeline,
             self.is_subagent_view,
-            area.width,
+            compute_area.width,
             self.scrollback.turn_count(),
         );
         let mut layout = AgentViewLayout::compute(
-            area,
+            compute_area,
             layout_cfg,
             scrollbar_cfg,
             timeline_width,
@@ -1120,32 +1134,25 @@ impl AgentView {
             1,
             compact,
         );
-        if prefer_btw_sidebar
-            && !layout.apply_btw_sidebar(AgentViewLayout::BTW_SIDEBAR_PREFERRED_WIDTH)
-        {
-            // Too narrow after scrollbar/timeline gutters — fall back to overlay.
-            btw_height = inline_btw_height;
-            layout = AgentViewLayout::compute(
-                area,
-                layout_cfg,
-                scrollbar_cfg,
-                timeline_width,
-                prompt_height,
-                tasks_height,
-                catalog_height,
-                todo_height,
-                queue_height,
-                btw_height,
-                turn_status_height,
-                banner_height,
-                cta_height,
-                follow_ups_height,
-                0,
-                prompt_gap,
-                voice_recording_height,
-                1,
-                compact,
-            );
+        if let Some(side) = pre_split_side_panel {
+            layout.side_panel = side;
+            self.last_side_panel_divider_x = Some(side.x.saturating_sub(1));
+            self.last_btw_frame_width = Some(area.width);
+        } else {
+            self.last_side_panel_divider_x = None;
+            self.last_btw_frame_width = None;
+            if prefer_side_panel && !layout.apply_side_panel(self.side_panel_width) {
+                // Post-compute carve also failed — keep overlay fallback already set.
+            } else if prefer_side_panel && layout.side_panel.width > 0 {
+                self.last_side_panel_divider_x = Some(layout.side_panel.x.saturating_sub(1));
+                self.last_btw_frame_width = Some(
+                    layout
+                        .status_bar
+                        .width
+                        .saturating_add(layout.side_panel.width)
+                        .saturating_add(AgentViewLayout::SIDE_PANEL_GAP),
+                );
+            }
         }
         let search_active =
             self.scrollback_search.is_some() && self.active_pane == AgentPane::Scrollback;
@@ -1203,7 +1210,7 @@ impl AgentView {
                     self.timeline_hover = None;
                     self.timeline_hover_preview = None;
                     layout = AgentViewLayout::compute(
-                        area,
+                        compute_area,
                         layout_cfg,
                         scrollbar_cfg,
                         0,
@@ -1223,13 +1230,16 @@ impl AgentView {
                         1,
                         compact,
                     );
-                    if prefer_btw_sidebar
-                        && !layout
-                            .apply_btw_sidebar(AgentViewLayout::BTW_SIDEBAR_PREFERRED_WIDTH)
+                    if let Some(side) = pre_split_side_panel {
+                        layout.side_panel = side;
+                        self.last_side_panel_divider_x = Some(side.x.saturating_sub(1));
+                        self.last_btw_frame_width = Some(area.width);
+                    } else if prefer_side_panel
+                        && !layout.apply_side_panel(self.side_panel_width)
                     {
                         btw_height = inline_btw_height;
                         layout = AgentViewLayout::compute(
-                            area,
+                            compute_area,
                             layout_cfg,
                             scrollbar_cfg,
                             0,
@@ -1249,6 +1259,11 @@ impl AgentView {
                             1,
                             compact,
                         );
+                        self.last_side_panel_divider_x = None;
+                        self.last_btw_frame_width = None;
+                    } else if prefer_side_panel && layout.side_panel.width > 0 {
+                        self.last_side_panel_divider_x = Some(layout.side_panel.x.saturating_sub(1));
+                        self.last_btw_frame_width = Some(area.width);
                     }
                     if search_reserved_rows > 0 {
                         layout.scrollback.height -= search_reserved_rows;
@@ -1649,7 +1664,7 @@ impl AgentView {
                 &theme,
             );
             if let Some(ref drag) = self.drag_selection
-                && drag.anchor.entry_idx != BTW_OVERLAY_ENTRY_IDX
+                && drag.anchor.entry_idx != SIDE_PANEL_ENTRY_IDX
             {
                 render_active_selection_overlay(
                     &self.last_scrollback_selection_model,
@@ -1660,7 +1675,7 @@ impl AgentView {
             } else if let Some(ref block_drag) = self.block_drag_selection {
                 render_block_drag_overlay(&self.last_scrollback_selection_model, block_drag, buf);
             } else if let Some(ref sel) = self.persistent_text_selection
-                && sel.entry_idx != BTW_OVERLAY_ENTRY_IDX
+                && sel.entry_idx != SIDE_PANEL_ENTRY_IDX
             {
                 render_persistent_selection_overlay(
                     &self.last_scrollback_selection_model,
@@ -1912,27 +1927,29 @@ impl AgentView {
         } else {
             self.hit_queue_close.clear();
         }
-        self.last_btw_selection_model = ResolvedSelectionModel::default();
-        self.last_btw_area = Rect::default();
-        let paint_btw = layout.btw.width >= 12 && layout.btw.height >= 3;
-        if paint_btw
-            && let Some(ref btw) = self.btw_state
+        self.last_panel_selection_model = ResolvedSelectionModel::default();
+        self.last_side_panel_area = Rect::default();
+        let paint_side_panel = layout.side_panel.width >= 12 && layout.side_panel.height >= 3;
+        let mut side_panel_image_escapes = String::new();
+        if paint_side_panel
+            && let Some(ref panel) = self.side_panel_state
         {
             let tick = self.scrollback.animation_tick();
             let mut btw_links = crate::render::osc8::LinkOverlay::new();
-            crate::views::btw_overlay::render_btw_panel(
+            crate::views::side_panel::render_side_panel(
                 buf,
-                btw,
-                layout.btw,
+                panel,
+                layout.side_panel,
                 tick,
-                self.btw_focused && self.active_pane == AgentPane::Prompt,
-                Some(&mut self.hit_btw_close),
-                &mut self.last_btw_selection_model,
+                self.side_panel_focused && self.active_pane == AgentPane::Prompt,
+                Some(&mut self.hit_side_panel_close),
+                &mut self.last_panel_selection_model,
                 Some(&mut btw_links),
                 &self.media_link_paths,
-                self.btw_sidebar,
+                self.side_panel,
+                &mut side_panel_image_escapes,
             );
-            self.last_btw_area = layout.btw;
+            self.last_side_panel_area = layout.side_panel;
             if !btw_links.is_empty() {
                 self.last_link_overlay.extend_from(&btw_links);
                 self.visible_link_map.append_from_overlay(&btw_links);
@@ -1942,16 +1959,16 @@ impl AgentView {
             self.paint_link_highlights(buf, link_active_style, sb_n..total_links);
             self.reclamp_drag_head_post_render(true);
             if let Some(ref drag) = self.drag_selection
-                && drag.anchor.entry_idx == BTW_OVERLAY_ENTRY_IDX
+                && drag.anchor.entry_idx == SIDE_PANEL_ENTRY_IDX
             {
-                render_active_selection_overlay(&self.last_btw_selection_model, drag, None, buf);
+                render_active_selection_overlay(&self.last_panel_selection_model, drag, None, buf);
             } else if let Some(ref sel) = self.persistent_text_selection
-                && sel.entry_idx == BTW_OVERLAY_ENTRY_IDX
+                && sel.entry_idx == SIDE_PANEL_ENTRY_IDX
             {
-                render_persistent_selection_overlay(&self.last_btw_selection_model, sel, None, buf);
+                render_persistent_selection_overlay(&self.last_panel_selection_model, sel, None, buf);
             }
         } else {
-            self.hit_btw_close.clear();
+            self.hit_side_panel_close.clear();
         }
         if let Some(idx) = self.highlighted_link_idx {
             if self.visible_link_map.is_empty() {
@@ -2294,10 +2311,75 @@ impl AgentView {
             Some(eff) => format!("{model_id} ({eff})"),
             None => model_id,
         };
+        let cwd_basename = self
+            .session
+            .cwd
+            .file_name()
+            .map(|s| s.to_string_lossy().into_owned())
+            .filter(|s| !s.is_empty());
+        let git_branch = self.current_branch.clone().or_else(|| {
+            crate::git_info::cwd_git_info_lazy(&self.session.cwd).and_then(|info| info.branch)
+        });
+        let context_pct = self.context_state.as_ref().map(|c| c.usage_pct);
+        let context_pct_label = context_pct.map(|pct| format!("{pct}%"));
+        let status_seg_owned: Vec<(String, bool, Option<ratatui::style::Color>)> = {
+            use xai_grok_shell::agent::config::StatusLineSegment;
+            let mut out = Vec::new();
+            for segment in self.status_line_config.selected_segments() {
+                match segment {
+                    StatusLineSegment::Mode => {
+                        for flag in &mode_flags_vec {
+                            if !flag.text.is_empty() {
+                                out.push((flag.text.to_string(), false, flag.color));
+                            }
+                        }
+                    }
+                    StatusLineSegment::Model => {
+                        if !model_label.is_empty() {
+                            out.push((model_label.clone(), true, None));
+                        }
+                    }
+                    StatusLineSegment::Context => {
+                        if let Some(label) = context_pct_label.as_ref() {
+                            let color = match context_pct {
+                                Some(pct) if pct >= 90 => Some(theme.accent_error),
+                                Some(pct) if pct >= 70 => Some(theme.warning),
+                                _ => None,
+                            };
+                            out.push((label.clone(), false, color));
+                        }
+                    }
+                    StatusLineSegment::Cwd => {
+                        if let Some(cwd) = cwd_basename.as_ref() {
+                            out.push((cwd.clone(), false, None));
+                        }
+                    }
+                    StatusLineSegment::Git => {
+                        if let Some(branch) = git_branch.as_ref() {
+                            out.push((branch.clone(), false, None));
+                        }
+                    }
+                }
+            }
+            out
+        };
+        let status_segments: Vec<crate::views::prompt_widget::PromptStatusSegment<'_>> =
+            status_seg_owned
+                .iter()
+                .map(|(text, model_style, color)| {
+                    crate::views::prompt_widget::PromptStatusSegment {
+                        text: text.as_str(),
+                        color: *color,
+                        bold: false,
+                        model_style: *model_style,
+                    }
+                })
+                .collect();
         let info = match &self.prompt_mode {
             PromptMode::Normal => PromptInfo {
                 model_name: &model_label,
                 flags: mode_flags,
+                status_segments: Some(status_segments.as_slice()),
                 multiline,
                 usage_warning,
                 usage_warning_critical,
@@ -2308,6 +2390,7 @@ impl AgentView {
                 PromptInfo {
                     model_name: &editing_label,
                     flags: mode_flags,
+                    status_segments: None,
                     multiline,
                     usage_warning,
                     usage_warning_critical,
@@ -2318,6 +2401,7 @@ impl AgentView {
             PromptInfo {
                 model_name: label,
                 flags: &[],
+                status_segments: None,
                 multiline: false,
                 usage_warning,
                 usage_warning_critical,
@@ -4285,6 +4369,16 @@ impl AgentView {
                 Some(ref mut existing) => existing.append_plain(&seq),
                 None => {
                     prompt_post_flush = Some(crate::terminal::overlay::PostFlush::plain(seq));
+                }
+            }
+        }
+        // Append side panel Kitty image escapes to the post-flush.
+        if !side_panel_image_escapes.is_empty() {
+            match prompt_post_flush.as_mut() {
+                Some(existing) => existing.append_plain(&side_panel_image_escapes),
+                None => {
+                    prompt_post_flush =
+                        Some(crate::terminal::overlay::PostFlush::plain(side_panel_image_escapes));
                 }
             }
         }

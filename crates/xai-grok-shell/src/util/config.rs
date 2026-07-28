@@ -1011,6 +1011,27 @@ pub async fn set_info_float_workspace_map(v: impl serde::Serialize) -> anyhow::R
 pub async fn set_info_float_diagrams(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_nested("info_floats", "diagrams", v).await
 }
+pub async fn set_status_line_enabled(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "enabled", v).await
+}
+pub async fn set_status_line_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "mode", v).await
+}
+pub async fn set_status_line_model(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "model", v).await
+}
+pub async fn set_status_line_context(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "context", v).await
+}
+pub async fn set_status_line_cwd(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "cwd", v).await
+}
+pub async fn set_status_line_git(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "git", v).await
+}
+pub async fn set_status_line_order(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_nested("status_line", "order", v).await
+}
 pub async fn set_default_model(v: impl serde::Serialize) -> anyhow::Result<()> {
     // Shared with next-code brain: `[provider].default_model` (+ optional provider).
     // Prefer [`set_default_model_and_provider`] when the provider pin is known.
@@ -1070,11 +1091,17 @@ pub async fn set_remember_tool_approvals(v: impl serde::Serialize) -> anyhow::Re
 pub async fn set_render_mermaid(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_key("render_mermaid", v).await
 }
+pub async fn set_render_mermaid_target(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("render_mermaid_target", v).await
+}
 pub async fn set_screen_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_key("screen_mode", v).await
 }
-pub async fn set_btw_output_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
-    set_ui_key("btw_output_mode", v).await
+pub async fn set_side_panel_output_mode(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("side_panel_output_mode", v).await
+}
+pub async fn set_side_panel_width(v: impl serde::Serialize) -> anyhow::Result<()> {
+    set_ui_key("side_panel_width", v).await
 }
 pub async fn set_scroll_lines(v: impl serde::Serialize) -> anyhow::Result<()> {
     set_ui_key("scroll_lines", v).await

@@ -53,7 +53,17 @@ In the interactive TUI, press `Ctrl+G` to send the running foreground command to
 - You want to ask the agent something else while a command runs.
 - You realize a process is long-running after it has started.
 
-The task keeps running, and you receive a notification when it completes.
+The task keeps running. A toast points you at the tasks hub (`Ctrl+B`), and you receive a notification when it completes.
+
+**Chord map (Face defaults — not Claude Code):**
+
+| Chord | Face | Claude Code (reference) |
+| ----- | ---- | ----------------------- |
+| `Ctrl+B` | Open / focus tasks hub | Demote foreground Bash |
+| `Ctrl+G` | Demote foreground command | (n/a — Claude uses `Ctrl+B`) |
+| `Ctrl+T` | Todo checklist | Todo checklist |
+
+Do not confuse the tasks hub with the todo checklist.
 
 ---
 
@@ -175,12 +185,14 @@ Cancel a scheduled task by ID. Returns success if the task was found and removed
 
 ## The Tasks Pane
 
-In the interactive TUI, press `Ctrl+B` to toggle the tasks pane. This pane lists, in a single view:
+In the interactive TUI, press `Ctrl+B` (or run `/tasks`, alias `/bashes`) to open the interactive tasks hub. The hub lists, in a single view:
 
 - Running subagents and their progress
-- Active background tasks and their status
+- Active and finished background shells with Claude-style status (`running` / `done` / `error` / `stopped`)
 - Monitor and `/loop` tasks, each with a live line-count badge
 - The task ID for each entry
+
+Navigate with arrows, press Enter for detail (command, runtime, output tail), and `x` to Stop a running shell. The chat prompt stays free while tasks run.
 
 To toggle the prompt queue instead, press `Ctrl+;`.
 
@@ -188,13 +200,13 @@ To toggle the prompt queue instead, press `Ctrl+;`.
 
 ## The Watching Status Line
 
-Whenever background work is still running while the agent looks idle — between turns, or while a turn is blocked on a user-interruptible wait — a persistent status line appears above the prompt:
+Whenever background work is still running while the agent looks idle — between turns, or while a turn is blocked on a user-interruptible wait — a persistent Claude-style pill appears above the prompt:
 
 ```
-◎ watching · 1 command · 2 monitors · 1 loop · 1 subagent
+1 shell · 2 monitors · 1 loop · 1 subagent · Ctrl+B
 ```
 
-It counts running background commands, monitors, scheduled `/loop` tasks, and background subagents, and updates live as each finishes. Any of them can wake the agent for a new turn (commands and subagents on completion, monitors on events, loops on their timer), so the cue stays up until nothing is left. Completions land in the transcript as a single "Task completed" chip — the transcript never repeats "N commands still running" lines.
+It lists only non-zero kinds (`shell` / `monitor` / `loop` / `subagent`), then a hub hint. Unread completed tasks append `· !`. Completions land in the transcript as a single "Task completed" chip — the transcript never repeats "N commands still running" lines.
 
 ---
 

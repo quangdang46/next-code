@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub enum Stage {
     /// Internal-only, not stable enough for users. Emits warning when enabled.
     UnderDevelopment,
-    /// Ready for early adopters. Visible in `next-code experiment list` and TUI popup.
+    /// Ready for early adopters. Visible in Face `/experimental` and experiment menus.
     Experimental {
         name: &'static str,
         menu_description: &'static str,
@@ -27,6 +27,43 @@ pub enum Stage {
     },
     /// Removed. Flag still parsed for config backwards compat but always evaluates to false.
     Removed,
+}
+
+impl Stage {
+    /// Display name for the `/experimental` menu (Codex parity).
+    pub fn experimental_menu_name(self) -> Option<&'static str> {
+        match self {
+            Stage::Experimental { name, .. } => Some(name),
+            Stage::UnderDevelopment
+            | Stage::Stable
+            | Stage::Deprecated { .. }
+            | Stage::Removed => None,
+        }
+    }
+
+    /// Description for the `/experimental` menu (Codex parity).
+    pub fn experimental_menu_description(self) -> Option<&'static str> {
+        match self {
+            Stage::Experimental {
+                menu_description, ..
+            } => Some(menu_description),
+            Stage::UnderDevelopment
+            | Stage::Stable
+            | Stage::Deprecated { .. }
+            | Stage::Removed => None,
+        }
+    }
+
+    /// Optional tip/announcement when a flag is Experimental.
+    pub fn experimental_announcement(self) -> Option<&'static str> {
+        match self {
+            Stage::Experimental {
+                announcement: Some(text),
+                ..
+            } if !text.is_empty() => Some(text),
+            _ => None,
+        }
+    }
 }
 
 // ============================================================================
@@ -341,6 +378,55 @@ pub struct ExperimentFlagInfo {
     pub enabled: bool,
 }
 
+/// One row for the Face `/experimental` checklist (Experimental-stage only).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExperimentalMenuItem {
+    pub flag: ExperimentFlag,
+    pub key: &'static str,
+    pub name: &'static str,
+    pub description: &'static str,
+    pub enabled: bool,
+    pub default_enabled: bool,
+}
+
+impl Experiments {
+    /// Rows shown in Face `/experimental` — only `Stage::Experimental`.
+    ///
+    /// Register recipe: add `ExperimentFlag` + `FeatureSpec` with
+    /// `stage: Stage::Experimental { name, menu_description, announcement }`
+    /// to [`EXPERIMENT_FLAGS`]; the menu picks it up automatically.
+    pub fn experimental_menu_items(&self) -> Vec<ExperimentalMenuItem> {
+        EXPERIMENT_FLAGS
+            .iter()
+            .filter_map(|spec| {
+                let name = spec.stage.experimental_menu_name()?;
+                let description = spec.stage.experimental_menu_description()?;
+                Some(ExperimentalMenuItem {
+                    flag: spec.id,
+                    key: spec.key,
+                    name,
+                    description,
+                    enabled: self.check(spec.id),
+                    default_enabled: spec.default_enabled,
+                })
+            })
+            .collect()
+    }
+
+    /// Serialize current enablement as `[experiments]` TOML key/value overrides.
+    ///
+    /// Writes every Experimental-stage flag (including defaults) so a toggle
+    /// that returns to the default still persists explicitly when the user
+    /// saved from the menu.
+    pub fn experimental_menu_overrides(&self) -> BTreeMap<String, bool> {
+        let mut map = BTreeMap::new();
+        for item in self.experimental_menu_items() {
+            map.insert(item.key.to_string(), item.enabled);
+        }
+        map
+    }
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -503,6 +589,68 @@ mod tests {
             "dynamic_context_pruning"
         );
         assert_eq!(ExperimentFlag::HooksV2.to_string(), "hooks_v2");
+    }
+
+    #[test]
+    fn experimental_menu_lists_only_experimental_stage() {
+        let ex = Experiments::with_defaults();
+        let items = ex.experimental_menu_items();
+        assert!(
+            !items.is_empty(),
+            "registry should expose at least one Experimental flag"
+        );
+        for item in &items {
+            let spec = EXPERIMENT_FLAGS
+                .iter()
+                .find(|s| s.id == item.flag)
+                .expect("menu item must map to registry");
+            assert!(
+                matches!(spec.stage, Stage::Experimental { .. }),
+                "menu must exclude non-Experimental stages (got {:?})",
+                spec.stage
+            );
+        }
+        assert!(
+            items.iter().any(|i| i.key == "js_plugins"),
+            "js_plugins is Experimental and must appear"
+        );
+        assert!(
+            items.iter().all(|i| i.key != "hooks_v2"),
+            "Stable hooks_v2 must not appear in /experimental"
+        );
+    }
+
+    #[test]
+    fn under_development_stage_excluded_from_menu() {
+        // Codex parity: UnderDevelopment has no menu name.
+        assert_eq!(Stage::UnderDevelopment.experimental_menu_name(), None);
+        assert_eq!(
+            Stage::UnderDevelopment.experimental_menu_description(),
+            None
+        );
+        assert_eq!(Stage::Stable.experimental_menu_name(), None);
+    }
+
+    #[test]
+    fn toggle_persist_roundtrip_via_overrides() {
+        let mut ex = Experiments::with_defaults();
+        assert!(ex.check(ExperimentFlag::JsPlugins));
+        ex.disable(ExperimentFlag::JsPlugins);
+        let overrides = ex.experimental_menu_overrides();
+        assert_eq!(overrides.get("js_plugins"), Some(&false));
+
+        let reloaded = Experiments::from_config(&overrides);
+        assert!(!reloaded.check(ExperimentFlag::JsPlugins));
+        assert!(reloaded.check(ExperimentFlag::HooksV2)); // Stable default still on
+    }
+
+    #[test]
+    fn gate_check_honors_config_map() {
+        let mut map = BTreeMap::new();
+        map.insert("js_plugins".to_string(), false);
+        let ex = Experiments::from_config(&map);
+        assert!(!ex.check(ExperimentFlag::JsPlugins));
+        assert!(ex.check(ExperimentFlag::SwarmCoordination));
     }
 }
 

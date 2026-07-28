@@ -36,7 +36,8 @@ const WRAP_WIDTH: usize = 24;
 const MAX_LINES: usize = 4;
 /// Identifier-boundary characters preferred as break points when a single word
 /// is too wide to fit, so it is not sliced mid-segment.
-/// Mirrors `TOKEN_BREAK_CHARS` in `third_party/mermaid-to-svg/src/text_wrap.rs`;
+/// Mirrors prior Face Unicode art wrap breaks; kept local so markdown does not
+/// depend on a Mermaid layout crate.
 /// the two renderers are deliberately independent, so keep these two in sync.
 const LABEL_BREAK_CHARS: [char; 4] = ['_', '-', '.', '/'];
 /// Sentinel marking the trailing column of a wide glyph (never emitted).

@@ -3,7 +3,7 @@
 use super::*;
 use crate::app::dispatch::{recap_unavailable_toast, scrollback_has_user_messages};
 
-fn send_minimal_btw(app: &mut AppView, question: &str) -> uuid::Uuid {
+fn send_minimal_side_panel(app: &mut AppView, question: &str) -> uuid::Uuid {
     match dispatch(Action::SendBtw(question.into()), app).as_slice() {
         [
             Effect::SendBtw {
@@ -214,15 +214,15 @@ fn recap_request_transport_failure_with_turns_uses_generic_toast() {
 }
 
 #[test]
-fn minimal_btw_response_after_esc_is_ignored() {
+fn minimal_side_panel_response_after_esc_is_ignored() {
     let mut app = test_app_with_agent();
     app.screen_mode = crate::app::ScreenMode::Minimal;
     let id = AgentId(0);
     app.agents.get_mut(&id).unwrap().active_pane = crate::app::agent_view::AgentPane::Prompt;
-    let request_id = send_minimal_btw(&mut app, "side question");
+    let request_id = send_minimal_side_panel(&mut app, "side question");
 
     let _ = app.handle_input(&esc());
-    assert!(app.agents[&id].btw_state.is_none());
+    assert!(app.agents[&id].side_panel_state.is_none());
 
     dispatch(
         Action::TaskComplete(TaskResult::BtwResponse {
@@ -233,7 +233,7 @@ fn minimal_btw_response_after_esc_is_ignored() {
         &mut app,
     );
 
-    assert!(app.agents[&id].btw_state.is_none());
+    assert!(app.agents[&id].side_panel_state.is_none());
 }
 
 #[test]
@@ -242,7 +242,7 @@ fn minimal_done_dismisses_to_exactly_one_btw_block() {
     app.screen_mode = crate::app::ScreenMode::Minimal;
     let id = AgentId(0);
     app.agents.get_mut(&id).unwrap().active_pane = ActivePane::Prompt;
-    let request_id = send_minimal_btw(&mut app, "original question");
+    let request_id = send_minimal_side_panel(&mut app, "original question");
     dispatch(
         Action::TaskComplete(TaskResult::BtwResponse {
             agent_id: id,
@@ -268,18 +268,18 @@ fn minimal_done_dismisses_to_exactly_one_btw_block() {
 }
 
 #[test]
-fn minimal_btw_requests_stay_independent_across_two_agents() {
+fn minimal_side_panel_requests_stay_independent_across_two_agents() {
     let mut app = test_app_with_agent();
     app.screen_mode = crate::app::ScreenMode::Minimal;
     let first = AgentId(0);
     let second = AgentId(1);
     insert_placeholder_agent(&mut app, second);
 
-    let first_old = send_minimal_btw(&mut app, "first old");
-    let first_current = send_minimal_btw(&mut app, "first new");
+    let first_old = send_minimal_side_panel(&mut app, "first old");
+    let first_current = send_minimal_side_panel(&mut app, "first new");
 
     switch_to_agent(&mut app, second, SwitchCause::Picker);
-    let second_request = send_minimal_btw(&mut app, "second");
+    let second_request = send_minimal_side_panel(&mut app, "second");
 
     // Deliver the background first-agent responses while the second agent is active.
     dispatch(
@@ -291,8 +291,8 @@ fn minimal_btw_requests_stay_independent_across_two_agents() {
         &mut app,
     );
     assert!(matches!(
-        app.agents[&first].btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Loading { ref question })
+        app.agents[&first].side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Loading { ref question })
             if question == "first new"
     ));
     dispatch(
@@ -304,13 +304,13 @@ fn minimal_btw_requests_stay_independent_across_two_agents() {
         &mut app,
     );
     assert!(matches!(
-        app.agents[&first].btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Done { ref question, .. })
+        app.agents[&first].side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Done { ref question, .. })
             if question == "first new"
     ));
     assert!(matches!(
-        app.agents[&second].btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Loading { ref question })
+        app.agents[&second].side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Loading { ref question })
             if question == "second"
     ));
 
@@ -325,20 +325,20 @@ fn minimal_btw_requests_stay_independent_across_two_agents() {
         }),
         &mut app,
     );
-    assert!(app.agents[&second].btw_state.is_none());
-    assert!(app.agents[&second].minimal_btw_lifecycle.is_none());
+    assert!(app.agents[&second].side_panel_state.is_none());
+    assert!(app.agents[&second].minimal_side_panel_lifecycle.is_none());
     assert!(matches!(
-        app.agents[&first].btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Done { ref question, .. })
+        app.agents[&first].side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Done { ref question, .. })
             if question == "first new"
     ));
 
     // Reverse delivery order on fresh requests: active second completes first,
     // then the background first response still resolves only the first panel.
     switch_to_agent(&mut app, first, SwitchCause::Picker);
-    let first_request = send_minimal_btw(&mut app, "first reverse");
+    let first_request = send_minimal_side_panel(&mut app, "first reverse");
     switch_to_agent(&mut app, second, SwitchCause::Picker);
-    let second_request = send_minimal_btw(&mut app, "second reverse");
+    let second_request = send_minimal_side_panel(&mut app, "second reverse");
     dispatch(
         Action::TaskComplete(TaskResult::BtwResponse {
             agent_id: second,
@@ -356,13 +356,13 @@ fn minimal_btw_requests_stay_independent_across_two_agents() {
         &mut app,
     );
     assert!(matches!(
-        app.agents[&second].btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Done { ref question, .. })
+        app.agents[&second].side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Done { ref question, .. })
             if question == "second reverse"
     ));
     assert!(matches!(
-        app.agents[&first].btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Done { ref question, .. })
+        app.agents[&first].side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Done { ref question, .. })
             if question == "first reverse"
     ));
 }
@@ -379,7 +379,7 @@ fn fullscreen_btw_response_after_dismiss_keeps_existing_behavior() {
             ..
         }]
     ));
-    app.agents.get_mut(&id).unwrap().btw_state = None;
+    app.agents.get_mut(&id).unwrap().side_panel_state = None;
 
     dispatch(
         Action::TaskComplete(TaskResult::BtwResponse {
@@ -391,8 +391,8 @@ fn fullscreen_btw_response_after_dismiss_keeps_existing_behavior() {
     );
 
     assert!(matches!(
-        app.agents[&id].btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Done { ref question, .. })
+        app.agents[&id].side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Done { ref question, .. })
             if question.is_empty()
     ));
 }
@@ -434,20 +434,20 @@ fn send_btw_default_is_inline_overlay() {
         }]
     ));
     let agent = &app.agents[&id];
-    assert!(!agent.btw_sidebar);
-    assert!(agent.btw_sidebar_visible);
+    assert!(!agent.side_panel);
+    assert!(agent.side_panel_visible);
     assert!(matches!(
-        agent.btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Loading { ref question })
+        agent.side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Loading { ref question })
             if question == "side question"
     ));
     assert!(agent.toast.is_none());
 }
 
 #[test]
-fn send_btw_sidebar_mode_stamps_agent_and_toasts() {
+fn send_side_panel_mode_stamps_agent_and_toasts() {
     let mut app = test_app_with_agent();
-    app.current_ui.btw_output_mode = Some("sidebar".into());
+    app.current_ui.side_panel_output_mode = Some("sidebar".into());
     let id = AgentId(0);
     let effects = dispatch(Action::SendBtw("side question".into()), &mut app);
     assert!(matches!(
@@ -458,39 +458,39 @@ fn send_btw_sidebar_mode_stamps_agent_and_toasts() {
         }]
     ));
     let agent = &app.agents[&id];
-    assert!(agent.btw_sidebar);
-    assert!(agent.btw_sidebar_visible);
+    assert!(agent.side_panel);
+    assert!(agent.side_panel_visible);
     assert!(matches!(
-        agent.btw_state,
-        Some(crate::views::btw_overlay::BtwOverlayState::Loading { ref question })
+        agent.side_panel_state,
+        Some(crate::views::side_panel::SidePanelState::Loading { ref question })
             if question == "side question"
     ));
     assert_eq!(
         agent.toast.as_ref().map(|(s, _)| s.as_str()),
-        Some("Running /btw - answer will appear in the side panel.")
+        Some("Running /btw — side panel. Drag divider or press [ / ] (focused) to resize.")
     );
 }
 
 #[test]
-fn set_btw_output_mode_live_applies_cache() {
+fn set_side_panel_output_mode_live_applies_cache() {
     let mut app = test_app_with_agent();
-    assert!(app.current_ui.btw_output_mode.is_none());
-    let effects = dispatch(Action::SetBtwOutputMode("sidebar".into()), &mut app);
-    assert_eq!(app.current_ui.btw_output_mode.as_deref(), Some("sidebar"));
+    assert!(app.current_ui.side_panel_output_mode.is_none());
+    let effects = dispatch(Action::SetSidePanelOutputMode("sidebar".into()), &mut app);
+    assert_eq!(app.current_ui.side_panel_output_mode.as_deref(), Some("sidebar"));
     assert!(matches!(
         effects.as_slice(),
         [Effect::PersistSetting {
-            key: "btw_output_mode",
+            key: "side_panel_output_mode",
             value: crate::settings::SettingValue::Enum("sidebar"),
             rollback_value: crate::settings::SettingValue::Enum("inline"),
         }]
     ));
-    let effects = dispatch(Action::SetBtwOutputMode("inline".into()), &mut app);
-    assert_eq!(app.current_ui.btw_output_mode.as_deref(), Some("inline"));
+    let effects = dispatch(Action::SetSidePanelOutputMode("inline".into()), &mut app);
+    assert_eq!(app.current_ui.side_panel_output_mode.as_deref(), Some("inline"));
     assert!(matches!(
         effects.as_slice(),
         [Effect::PersistSetting {
-            key: "btw_output_mode",
+            key: "side_panel_output_mode",
             value: crate::settings::SettingValue::Enum("inline"),
             ..
         }]

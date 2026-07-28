@@ -874,6 +874,7 @@ impl Agent {
             stdin_request_tx: self.stdin_request_tx.clone(),
             ask_user_question_tx: self.ask_user_question_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
+            background_tool_signal: Some(self.background_tool_signal.clone()),
             execution_mode: ToolExecutionMode::Direct,
             best_of_n_run_id: self.best_of_n_run_id.clone(),
             best_of_n_candidate_id: self.best_of_n_candidate_id.clone(),
