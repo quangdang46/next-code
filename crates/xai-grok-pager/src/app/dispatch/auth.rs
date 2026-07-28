@@ -234,6 +234,7 @@ pub(super) fn dispatch_login(app: &mut AppView) -> Vec<Effect> {
     let request_seq = app.next_auth_request_seq;
     app.next_auth_request_seq += 1;
     app.auth_code_input.reset();
+    app.auth_input_at = None;
     // Auth UI replaces the welcome prompt; clear focus so leftover state from
     // a prior welcome visit cannot steal loopback token keystrokes.
     app.welcome_prompt_focused = false;
@@ -305,6 +306,9 @@ pub(super) fn dispatch_submit_auth_code(app: &mut AppView, code: String) -> Vec<
         _ => return vec![],
     };
 
+    // Drop any leftover input so a follow-up Enter is a no-op even if the
+    // welcome handler did not clear (e.g. Action dispatched from elsewhere).
+    app.auth_code_input.reset();
     vec![Effect::SubmitAuthCode { request_seq, code }]
 }
 
@@ -415,6 +419,17 @@ pub(super) fn handle_auth_complete(
         // whichever gate resolves last.
         if app.session_startup_allowed() {
             effects.extend(drain_startup_actions(app));
+        }
+        // Fresh auth with no deferred startup action (resume / worktree /
+        // initial-prompt): auto-create a new session so the user lands in
+        // the prompt instead of a blank/black welcome screen. Mirrors the
+        // minimal-mode fallback in `event_loop.rs::run`.
+        if !app.is_zdr_blocked()
+            && app.has_access()
+            && matches!(app.active_view, ActiveView::Welcome)
+            && app.deferred_startup.is_empty()
+        {
+            effects.extend(super::dispatch(Action::NewSession, app));
         }
         maybe_open_model_picker_after_connect(app, &mut effects);
         return effects;

@@ -1022,6 +1022,10 @@ pub struct AppView {
     pub auth_start_mode: AuthMode,
     /// Text buffer for manual auth token paste (loopback mode).
     pub(crate) auth_code_input: LineEditor,
+    /// When the last auth-input character or paste was observed (monotonic).
+    /// Enter arriving within 150ms of this is likely a paste-trailing \r\n
+    /// from Windows Terminal, not an intentional submit.
+    pub(crate) auth_input_at: Option<std::time::Instant>,
     /// Monotonically increasing sequence number for auth requests.
     pub next_auth_request_seq: u64,
     /// Abort handle for the in-flight `PollAuthUrl` task (with its request_seq).
@@ -1367,6 +1371,7 @@ impl AppView {
             login_method_id: None,
             auth_start_mode: AuthMode::Pending,
             auth_code_input: LineEditor::default(),
+            auth_input_at: None,
             next_auth_request_seq: 1,
             auth_url_poll_handle: None,
             deferred_startup: Default::default(),
@@ -2243,6 +2248,7 @@ impl AppView {
                     cwd: &self.cwd,
                     mid_session_login: self.auth_return_view.is_some(),
                     auth_code_input: &mut self.auth_code_input,
+                    auth_paste_guard: &mut self.auth_input_at,
                     prompt: &mut self.welcome_prompt,
                     prompt_focused: &mut self.welcome_prompt_focused,
                     new_worktree_dialog: &mut self.new_worktree_dialog,
@@ -2813,6 +2819,10 @@ struct WelcomeInputCtx<'a> {
     /// login and return to the session rather than quitting the app.
     mid_session_login: bool,
     auth_code_input: &'a mut LineEditor,
+    /// Tracks last character-typed instant to detect paste-trailing Enters.
+    /// Monotonic instant of the last auth-input change (paste or keystroke).
+    /// Enter arriving within 150ms is Windows Terminal paste-trailing noise.
+    auth_paste_guard: &'a mut Option<std::time::Instant>,
     prompt: &'a mut PromptWidget,
     prompt_focused: &'a mut bool,
     new_worktree_dialog: &'a mut Option<NewWorktreeDialogState>,
@@ -3350,8 +3360,22 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
                     return InputOutcome::Action(Action::QuitConfirmed);
                 }
                 if key!(Enter).matches(key) {
+                    // Windows Terminal intercepts Ctrl+V and delivers each
+                    // clipboard character as a KeyEvent, then a trailing
+                    // \r\n as Enter key events. Swallow Enter when the last
+                    // text input arrived <150ms ago (paste burst, not intent).
+                    if let Some(t) = ctx.auth_paste_guard {
+                        if t.elapsed() < std::time::Duration::from_millis(150) {
+                            *ctx.auth_paste_guard = None;
+                            return InputOutcome::Changed;
+                        }
+                    }
                     let trimmed = ctx.auth_code_input.text().trim().to_string();
                     if !trimmed.is_empty() {
+                        // Clear immediately so Enter repeat / paste-trailing-newline
+                        // cannot dispatch a second SubmitAuthCode while the first
+                        // oneshot is already consumed (daemon would otherwise race).
+                        ctx.auth_code_input.reset();
                         return InputOutcome::Action(Action::SubmitAuthCode(trimmed));
                     }
                     return InputOutcome::Unchanged;
@@ -3360,7 +3384,13 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
                     let Some(text) = crate::clipboard::system_clipboard_get() else {
                         return InputOutcome::Unchanged;
                     };
-                    ctx.auth_code_input.insert_paste(&text)
+                    // Strip trailing newlines so Windows Terminal doesn't
+                    // translate the paste's trailing \r/\n into an Enter
+                    // keypress that auto-submits before the user can review.
+                    let stripped = text.trim_end_matches(['\r', '\n']);
+                    let outcome = ctx.auth_code_input.insert_paste(stripped);
+                    *ctx.auth_paste_guard = Some(std::time::Instant::now());
+                    outcome
                 } else if key.modifiers.intersects(
                     crossterm::event::KeyModifiers::CONTROL
                         | crossterm::event::KeyModifiers::ALT
@@ -3369,8 +3399,16 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
                 {
                     return InputOutcome::Changed;
                 } else {
-                    ctx.auth_code_input
-                        .handle_key_with_insert_policy(key, |character| !character.is_control())
+                    let char_outcome = ctx
+                        .auth_code_input
+                        .handle_key_with_insert_policy(key, |character| !character.is_control());
+                    // Windows Terminal delivers Ctrl+V clipboard content as
+                    // individual KeyEvent chars + Enter (\r\n). Track arrival
+                    // time so the Enter handler can swallow paste noise.
+                    if matches!(char_outcome, LineEditOutcome::TextChanged) {
+                        *ctx.auth_paste_guard = Some(std::time::Instant::now());
+                    }
+                    char_outcome
                 };
                 return match outcome {
                     LineEditOutcome::TextChanged
@@ -3404,7 +3442,12 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
                 mode: AuthMode::Loopback,
                 ..
             } => {
-                let _ = ctx.auth_code_input.insert_paste(text);
+                // Strip trailing newlines so bracketed paste content
+                // doesn't auto-submit when the terminal translates
+                // the trailing \r/\n into an Enter keypress.
+                let stripped = text.trim_end_matches(['\r', '\n']);
+                let _ = ctx.auth_code_input.insert_paste(stripped);
+                *ctx.auth_paste_guard = Some(std::time::Instant::now());
                 return InputOutcome::Changed;
             }
             _ => {}
@@ -4271,6 +4314,7 @@ impl AppView {
                                 crate::views::info_floats::InfoFloatVisibility::from(
                                     &self.current_ui.info_floats,
                                 );
+                            agent.status_line_config = self.current_ui.status_line.clone();
                             if agent.info_float_provider.is_none() {
                                 agent.info_float_provider = self
                                     .login_method_id
@@ -4393,6 +4437,8 @@ impl AppView {
                                                         crate::views::info_floats::InfoFloatVisibility::from(
                                                             &self.current_ui.info_floats,
                                                         );
+                                                    agent.status_line_config =
+                                                        self.current_ui.status_line.clone();
                                                     agent.draw(
                                                         inner,
                                                         buf,
@@ -4820,8 +4866,8 @@ impl AppView {
                 .is_some_and(McpInitProgress::is_visible)
                 && spinner_frame_tick;
             needs_redraw |= matches!(
-                agent.btw_state,
-                Some(crate::views::btw_overlay::BtwOverlayState::Loading { .. })
+                agent.side_panel_state,
+                Some(crate::views::side_panel::SidePanelState::Loading { .. })
             ) && spinner_frame_tick;
             needs_redraw |= agent.drain_blocked();
             if agent.acp_synced_generation != agent.session.available_commands_generation {
@@ -5102,8 +5148,8 @@ impl AppView {
                         .is_some_and(McpInitProgress::is_visible)
                     || agent.plugin_cta.phase.is_spinner()
                     || matches!(
-                        agent.btw_state,
-                        Some(crate::views::btw_overlay::BtwOverlayState::Loading { .. })
+                        agent.side_panel_state,
+                        Some(crate::views::side_panel::SidePanelState::Loading { .. })
                     )
                     || agent.drain_blocked()
                     || agent.prompt.file_search.context().is_some()
@@ -5386,6 +5432,7 @@ pub(crate) mod tests {
             login_method_id: None,
             auth_start_mode: AuthMode::Pending,
             auth_code_input: LineEditor::default(),
+            auth_input_at: None,
             next_auth_request_seq: 1,
             auth_url_poll_handle: None,
             deferred_startup: Default::default(),
@@ -6331,12 +6378,12 @@ pub(crate) mod tests {
     }
     #[test]
     fn needs_animation_gates_btw_loading_spinner() {
-        use crate::views::btw_overlay::BtwOverlayState;
+        use crate::views::side_panel::SidePanelState;
         use crate::views::turn_status::SPINNER_DIVISOR;
         let mut app = test_app_with_agent();
         let id = super::super::agent::AgentId(0);
         assert!(!app.needs_animation());
-        app.agents.get_mut(&id).unwrap().btw_state = Some(BtwOverlayState::Loading {
+        app.agents.get_mut(&id).unwrap().side_panel_state = Some(SidePanelState::Loading {
             question: "what is X?".into(),
         });
         assert!(app.needs_animation());
@@ -6345,10 +6392,10 @@ pub(crate) mod tests {
             saw_redraw,
             "Loading must redraw at spinner cadence while idle"
         );
-        app.agents.get_mut(&id).unwrap().btw_state =
-            Some(BtwOverlayState::done("what is X?".into(), "X is …".into()));
+        app.agents.get_mut(&id).unwrap().side_panel_state =
+            Some(SidePanelState::done("what is X?".into(), "X is …".into()));
         assert!(!app.needs_animation());
-        app.agents.get_mut(&id).unwrap().btw_state = Some(BtwOverlayState::Error {
+        app.agents.get_mut(&id).unwrap().side_panel_state = Some(SidePanelState::Error {
             question: "what is X?".into(),
             error: "boom".into(),
         });
@@ -8838,6 +8885,28 @@ pub(crate) mod tests {
             }
             other => panic!("expected SubmitAuthCode, got {:?}", other),
         }
+        // Cleared so Enter-repeat / paste-trailing-newline cannot double-submit.
+        assert!(app.auth_code_input.text().is_empty());
+        let second = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(
+            matches!(second, InputOutcome::Unchanged),
+            "second Enter must be a no-op after submit cleared the input"
+        );
+    }
+
+    #[test]
+    fn authenticating_loopback_paste_does_not_submit() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Authenticating {
+            request_seq: 1,
+            handle: None,
+            auth_url: Some("https://opencode.ai/go".into()),
+            mode: AuthMode::Loopback,
+        };
+        let outcome = app.handle_input(&Event::Paste("sk-test-key\n".into()));
+        assert!(matches!(outcome, InputOutcome::Changed));
+        assert_eq!(app.auth_code_input.text(), "sk-test-key");
+        // Paste alone must not emit SubmitAuthCode (Enter submits).
     }
     #[test]
     fn moved_with_button_held_promotes_pending_scrollback_drag() {
@@ -9588,7 +9657,7 @@ pub(crate) mod tests {
         }
         let agent = app.agents.get_mut(&id).unwrap();
         agent.active_pane = crate::app::agent_view::AgentPane::Prompt;
-        agent.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::done(
+        agent.side_panel_state = Some(crate::views::side_panel::SidePanelState::done(
             "side question".into(),
             "side answer".into(),
         ));
@@ -9597,7 +9666,7 @@ pub(crate) mod tests {
             !matches!(first, InputOutcome::Action(Action::DashboardOverlayExit)),
             "Esc with open /btw must not exit the overlay, got {first:?}",
         );
-        assert!(app.agents.get(&id).unwrap().btw_state.is_none());
+        assert!(app.agents.get(&id).unwrap().side_panel_state.is_none());
         let second = app.handle_input(&key_event(KeyCode::Esc, KeyModifiers::NONE));
         assert!(
             matches!(second, InputOutcome::Action(Action::DashboardOverlayExit)),

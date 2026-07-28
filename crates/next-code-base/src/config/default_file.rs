@@ -205,6 +205,12 @@ kv_cache_miss_notices = true
 # Set to "main" for bleeding edge updates every time code is pushed
 update_channel = "stable"
 
+# Experiment flags (Face `/experimental`). Only Experimental-stage keys appear
+# in the menu. Register a flag in crates/next-code-experiment-flags EXPERIMENT_FLAGS
+# with Stage::Experimental { name, menu_description, announcement }.
+# [experiments]
+# js_plugins = true
+
 [websearch]
 # Preferred websearch engine: "duckduckgo", "bing", or "searxng".
 engine = "duckduckgo"
