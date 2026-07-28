@@ -470,7 +470,8 @@ pub(super) async fn handle_client(
     let registry = Registry::new(provider.clone()).await;
     let registry_ms = t0.elapsed().as_millis();
 
-    let mut swarm_enabled = crate::config::config().features.swarm;
+    let mut swarm_enabled = crate::config::config()
+        .experiment_enabled(next_code_experiment_flags::ExperimentFlag::SwarmCoordination);
     let mut last_available_models_snapshot: Option<String> = None;
     const MAX_LIVE_AVAILABLE_MODELS_UPDATE_BYTES: usize = 64 * 1024;
 

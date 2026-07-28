@@ -45,6 +45,25 @@ pub fn detect_keywords_with(input: &str, opts: &DetectOptions) -> Vec<DetectedKe
             continue;
         }
 
+        // 1b) Bare form of `$keyword` — oh-my-openagent / Claude parity.
+        // Users type `ultrawork` / `ultrathink` without a `$` prefix; treat the
+        // bare token as an exact trigger (same confidence as the canonical form).
+        if let Some(bare) = entry.keyword.strip_prefix('$')
+            && !bare.is_empty()
+        {
+            let bare_lower = bare.to_lowercase();
+            if let Some(pos) = find_word_boundary(&lower, &bare_lower) {
+                let end = pos + bare_lower.len();
+                results.push(DetectedKeyword {
+                    entry,
+                    matched_text: sanitized[pos..end].to_string(),
+                    position: (pos, end),
+                    confidence: 1.0,
+                });
+                continue;
+            }
+        }
+
         // 2) Token aliases (Strict + Loose): word-boundary exact.
         let mut matched = false;
         for alias in entry.aliases {
@@ -133,7 +152,7 @@ pub fn detect_keywords_with(input: &str, opts: &DetectOptions) -> Vec<DetectedKe
 }
 
 /// Find exact `needle` with word boundaries. Returns byte offset.
-fn find_word_boundary(haystack: &str, needle: &str) -> Option<usize> {
+pub(crate) fn find_word_boundary(haystack: &str, needle: &str) -> Option<usize> {
     if needle.is_empty() {
         return None;
     }
@@ -246,10 +265,63 @@ mod tests {
     }
 
     #[test]
+    fn detect_bare_ultrawork_without_dollar() {
+        // oh-my-openagent: /\b(ultrawork|ulw)\b/i — bare form must activate.
+        let results = strict("ultrawork fix the bug");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].entry.workflow, WorkflowKind::Ultrawork);
+        assert_eq!(results[0].matched_text, "ultrawork");
+        assert_eq!(results[0].confidence, 1.0);
+    }
+
+    #[test]
+    fn detect_bare_forms_for_all_dollar_keywords() {
+        for entry in crate::registry::build_registry() {
+            let Some(bare) = entry.keyword.strip_prefix('$') else {
+                continue;
+            };
+            let results = strict(bare);
+            assert_eq!(
+                results.len(),
+                1,
+                "bare form {bare:?} must detect for {}",
+                entry.keyword
+            );
+            assert_eq!(results[0].entry.workflow, entry.workflow);
+        }
+    }
+
+    #[test]
     fn detect_token_alias_ulw() {
         let results = strict("please run ulw on this");
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].entry.workflow, WorkflowKind::Ultrawork);
+    }
+
+    #[test]
+    fn detect_omo_hyperplan_and_teammode() {
+        let hp = strict("hyperplan the feature");
+        assert_eq!(hp.len(), 1);
+        assert_eq!(hp[0].entry.workflow, WorkflowKind::Ralplan);
+
+        let team = strict("teammode");
+        assert_eq!(team.len(), 1);
+        assert_eq!(team[0].entry.workflow, WorkflowKind::Ultrawork);
+
+        let team_dash = strict("please team-mode this");
+        assert_eq!(team_dash.len(), 1);
+        assert_eq!(team_dash[0].entry.workflow, WorkflowKind::Ultrawork);
+    }
+
+    #[test]
+    fn detect_claude_ultraplan_ultrareview() {
+        let plan = strict("ultraplan this change");
+        assert_eq!(plan.len(), 1);
+        assert_eq!(plan[0].entry.workflow, WorkflowKind::Ralplan);
+
+        let review = strict("ultrareview the PR");
+        assert_eq!(review.len(), 1);
+        assert_eq!(review[0].entry.workflow, WorkflowKind::CodeReview);
     }
 
     #[test]
