@@ -46,6 +46,10 @@ enum PendingKind {
 }
 
 static PENDING: Mutex<Option<PendingFaceLogin>> = Mutex::new(None);
+/// Paste/Enter that arrived before `face_prompt_paste` armed `code_tx`.
+/// Consumed when the waiter starts so premature submit is not lost and does
+/// not surface as an Internal error.
+static EARLY_AUTH_CODE: Mutex<Option<String>> = Mutex::new(None);
 /// Last successful Face `/connect` credential path (one-line toast / status).
 static LAST_CONNECT_CREDENTIAL_PATH: Mutex<Option<String>> = Mutex::new(None);
 
@@ -93,6 +97,19 @@ pub fn clear_pending() {
     if let Ok(mut g) = PENDING.lock() {
         *g = None;
     }
+    if let Ok(mut g) = EARLY_AUTH_CODE.lock() {
+        *g = None;
+    }
+}
+
+fn take_early_auth_code() -> Option<String> {
+    EARLY_AUTH_CODE.lock().ok().and_then(|mut g| g.take())
+}
+
+fn store_early_auth_code(code: String) {
+    if let Ok(mut g) = EARLY_AUTH_CODE.lock() {
+        *g = Some(code);
+    }
 }
 
 pub fn get_auth_url_payload() -> serde_json::Value {
@@ -103,12 +120,20 @@ pub fn get_auth_url_payload() -> serde_json::Value {
         .ok()
         .and_then(|guard| guard.clone());
     match pending {
-        Some(p) => serde_json::json!({
-            "auth_url": p.auth_url,
-            "mode": p.mode,
-            "external_provider": true,
-            "credential_path": credential_path,
-        }),
+        Some(p) => {
+            let prompt = match p.kind {
+                PendingKind::ApiKeyPaste => "api_key",
+                PendingKind::ScriptableOAuth => "auth_code",
+                PendingKind::ScriptableComplete => "device",
+            };
+            serde_json::json!({
+                "auth_url": p.auth_url,
+                "mode": p.mode,
+                "prompt": prompt,
+                "external_provider": true,
+                "credential_path": credential_path,
+            })
+        }
         None => serde_json::json!({
             "credential_path": credential_path,
         }),
@@ -167,19 +192,37 @@ pub async fn authenticate_method(method_id: &str) -> Result<()> {
 }
 
 pub async fn submit_auth_code(code: &str) -> Result<()> {
+    let code = code.trim().to_string();
+    if code.is_empty() {
+        // Empty submit is a no-op (Face already gates empty Enter).
+        return Ok(());
+    }
+
     let tx = {
         let mut g = PENDING
             .lock()
             .map_err(|_| anyhow!("auth lock poisoned"))?;
-        let pending = g
-            .as_mut()
-            .ok_or_else(|| anyhow!("No in-progress Face login"))?;
-        pending
-            .code_tx
-            .take()
-            .ok_or_else(|| anyhow!("Login is not waiting for a code"))?
+        match g.as_mut() {
+            None => {
+                // Premature submit (Enter/paste-trailing-newline before the
+                // authenticate RPC armed the waiter). Buffer for face_prompt_paste
+                // instead of Internal error → AuthFailed toast.
+                drop(g);
+                store_early_auth_code(code);
+                return Ok(());
+            }
+            Some(pending) => match pending.code_tx.take() {
+                Some(tx) => tx,
+                None => {
+                    // Duplicate submit after the oneshot was already consumed
+                    // (Enter repeat / second SubmitAuthCode). Ignore — do not
+                    // fail the in-flight authenticate that already got the code.
+                    return Ok(());
+                }
+            },
+        }
     };
-    let _ = tx.send(code.trim().to_string());
+    let _ = tx.send(code);
     Ok(())
 }
 
@@ -370,6 +413,22 @@ async fn run_models_dev_api_key_face_login(provider_id: &str) -> Result<()> {
 
 /// Show Face welcome paste chrome and wait for submit_auth_code.
 async fn face_prompt_paste(provider_id: &str, auth_url: &str) -> Result<String> {
+    // Honor a submit that raced ahead of this waiter (Ctrl+V + trailing
+    // newline → Enter before PENDING was armed).
+    if let Some(early) = take_early_auth_code() {
+        {
+            let mut g = PENDING.lock().map_err(|_| anyhow!("auth lock poisoned"))?;
+            *g = Some(PendingFaceLogin {
+                provider_id: provider_id.to_string(),
+                auth_url: Some(auth_url.to_string()),
+                mode: "loopback".into(),
+                kind: PendingKind::ApiKeyPaste,
+                code_tx: None,
+            });
+        }
+        return Ok(early);
+    }
+
     let (tx, rx) = oneshot::channel();
     {
         let mut g = PENDING.lock().map_err(|_| anyhow!("auth lock poisoned"))?;
@@ -382,10 +441,27 @@ async fn face_prompt_paste(provider_id: &str, auth_url: &str) -> Result<String> 
         });
     }
 
-    tokio::time::timeout(Duration::from_secs(15 * 60), rx)
-        .await
-        .map_err(|_| anyhow!("Timed out waiting for paste"))?
-        .map_err(|_| anyhow!("Login cancelled"))
+    // Re-check after arming: a submit may have buffered between the early
+    // take and the lock above.
+    if let Some(early) = take_early_auth_code() {
+        let mut g = PENDING.lock().map_err(|_| anyhow!("auth lock poisoned"))?;
+        if let Some(pending) = g.as_mut() {
+            pending.code_tx = None;
+        }
+        return Ok(early);
+    }
+
+    match tokio::time::timeout(Duration::from_secs(15 * 60), rx).await {
+        Ok(Ok(code)) => Ok(code),
+        Ok(Err(_)) => {
+            clear_pending();
+            Err(anyhow!("Login cancelled"))
+        }
+        Err(_) => {
+            clear_pending();
+            Err(anyhow!("Timed out waiting for paste"))
+        }
+    }
 }
 
 fn save_face_env_vars(env_file: &str, vars: &[(&str, String)]) -> Result<()> {
@@ -420,24 +496,33 @@ async fn run_oauth_face_login(provider: LoginProviderDescriptor) -> Result<()> {
         .await
         .context("starting OAuth login")?;
 
-    let (tx, rx) = oneshot::channel();
     let kind = if start.complete_only {
         PendingKind::ScriptableComplete
     } else {
         PendingKind::ScriptableOAuth
+    };
+    let mode = if start.complete_only {
+        "device".to_string()
+    } else {
+        "loopback".to_string()
+    };
+
+    // Honor submit that raced ahead while begin_scriptable was in flight.
+    let early = take_early_auth_code();
+    let (code_tx, rx) = if early.is_some() {
+        (None, None)
+    } else {
+        let (tx, rx) = oneshot::channel();
+        (Some(tx), Some(rx))
     };
     {
         let mut g = PENDING.lock().map_err(|_| anyhow!("auth lock poisoned"))?;
         *g = Some(PendingFaceLogin {
             provider_id: provider.id.to_string(),
             auth_url: Some(start.auth_url.clone()),
-            mode: if start.complete_only {
-                "device".into()
-            } else {
-                "loopback".into()
-            },
+            mode,
             kind,
-            code_tx: Some(tx),
+            code_tx,
         });
     }
 
@@ -445,11 +530,19 @@ async fn run_oauth_face_login(provider: LoginProviderDescriptor) -> Result<()> {
     let _ = open::that_detached(&start.auth_url);
 
     if start.complete_only {
-        // Copilot: wait for user to press Enter in Face (any submit) then --complete.
-        let _ = tokio::time::timeout(Duration::from_secs(15 * 60), rx)
-            .await
-            .map_err(|_| anyhow!("Timed out waiting for device login"))?
-            .map_err(|_| anyhow!("Login cancelled"))?;
+        if let Some(rx) = rx {
+            match tokio::time::timeout(Duration::from_secs(15 * 60), rx).await {
+                Ok(Ok(_)) => {}
+                Ok(Err(_)) => {
+                    clear_pending();
+                    anyhow::bail!("Login cancelled");
+                }
+                Err(_) => {
+                    clear_pending();
+                    anyhow::bail!("Timed out waiting for device login");
+                }
+            }
+        }
         clear_pending();
         super::login::face_complete_scriptable(
             provider,
@@ -460,10 +553,26 @@ async fn run_oauth_face_login(provider: LoginProviderDescriptor) -> Result<()> {
         )
         .await?;
     } else {
-        let pasted = tokio::time::timeout(Duration::from_secs(15 * 60), rx)
-            .await
-            .map_err(|_| anyhow!("Timed out waiting for OAuth callback / code"))?
-            .map_err(|_| anyhow!("Login cancelled"))?;
+        let pasted = if let Some(code) = early.or_else(take_early_auth_code) {
+            let mut g = PENDING.lock().map_err(|_| anyhow!("auth lock poisoned"))?;
+            if let Some(pending) = g.as_mut() {
+                pending.code_tx = None;
+            }
+            code
+        } else {
+            let rx = rx.expect("oauth waiter armed without early code");
+            match tokio::time::timeout(Duration::from_secs(15 * 60), rx).await {
+                Ok(Ok(code)) => code,
+                Ok(Err(_)) => {
+                    clear_pending();
+                    anyhow::bail!("Login cancelled");
+                }
+                Err(_) => {
+                    clear_pending();
+                    anyhow::bail!("Timed out waiting for OAuth callback / code");
+                }
+            }
+        };
         clear_pending();
         if pasted.is_empty() {
             anyhow::bail!("No auth code / callback URL pasted");
@@ -873,6 +982,10 @@ pub fn list_nextcode_sessions(limit: usize) -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Face auth pending state is process-global; serialize tests that touch it.
+    static AUTH_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     fn list_mcps_sync(cwd: Option<&Path>) -> serde_json::Value {
         tokio::runtime::Builder::new_current_thread()
@@ -888,6 +1001,53 @@ mod tests {
         assert_eq!(provider_id_from_method("nextcode.openrouter"), Some("openrouter"));
         assert!(is_nextcode_auth_method("nextcode.claude"));
         assert!(!is_nextcode_auth_method("xai.api_key"));
+    }
+
+    #[test]
+    fn submit_auth_code_buffers_when_not_waiting() {
+        let _guard = AUTH_TEST_LOCK.lock().expect("auth test lock");
+        clear_pending();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        // Premature submit must not Internal-error; it buffers for face_prompt_paste.
+        rt.block_on(async {
+            submit_auth_code("sk-early-key")
+                .await
+                .expect("premature submit should Ok");
+        });
+        assert_eq!(take_early_auth_code().as_deref(), Some("sk-early-key"));
+        clear_pending();
+    }
+
+    #[test]
+    fn submit_auth_code_duplicate_after_take_is_noop() {
+        let _guard = AUTH_TEST_LOCK.lock().expect("auth test lock");
+        clear_pending();
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("runtime");
+        rt.block_on(async {
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            {
+                let mut g = PENDING.lock().expect("lock");
+                *g = Some(PendingFaceLogin {
+                    provider_id: "opencode-go".into(),
+                    auth_url: Some("https://opencode.ai/go".into()),
+                    mode: "loopback".into(),
+                    kind: PendingKind::ApiKeyPaste,
+                    code_tx: Some(tx),
+                });
+            }
+            submit_auth_code("sk-first").await.expect("first");
+            let got = rx.await.expect("oneshot value");
+            assert_eq!(got, "sk-first");
+            // Second submit after oneshot consumed — must Ok, not "not waiting".
+            submit_auth_code("sk-second").await.expect("duplicate");
+            clear_pending();
+        });
     }
 
     #[test]

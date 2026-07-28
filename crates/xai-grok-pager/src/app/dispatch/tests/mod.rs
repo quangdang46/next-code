@@ -145,6 +145,7 @@ fn test_app() -> AppView {
         login_method_id: None,
         auth_start_mode: AuthMode::Pending,
         auth_code_input: Default::default(),
+        auth_input_at: None,
         next_auth_request_seq: 1,
         auth_url_poll_handle: None,
         deferred_startup: Default::default(),
