@@ -126,10 +126,6 @@ members = [
     "crates/xai-grok-update",
     "crates/xai-fast-worktree",
     "crates/xai-grok-pager",
-    "third_party/ordered_hashmap",
-    "third_party/graphlib_rust",
-    "third_party/dagre_rust",
-    "third_party/mermaid-to-svg",
     "evals/jbench",
     "evals/next-code-edit-bench",
 
@@ -142,8 +138,8 @@ members = [
 ffs-search = { git = "https://github.com/quangdang46/fast_file_search", rev = "a0bda22d16cff8637d162a700dc8f1cbd41d957b" }
 ffs-engine = { git = "https://github.com/quangdang46/fast_file_search", rev = "a0bda22d16cff8637d162a700dc8f1cbd41d957b" }
 ffs-symbol = { git = "https://github.com/quangdang46/fast_file_search", rev = "a0bda22d16cff8637d162a700dc8f1cbd41d957b" }
-# Pin hashline to latest v0.8.6 (UTF-8-safe truncation + INS N: shorthand).
-hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "d0f836789" }
+# Pin hashline to main tip (Editor API + apply_edits).
+hashline = { git = "https://github.com/quangdang46/hashline.git", rev = "edbea75" }
 strum = { version = "0.26", features = ["derive"] }
 regex = "1"
 

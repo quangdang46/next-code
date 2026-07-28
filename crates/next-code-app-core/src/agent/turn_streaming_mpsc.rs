@@ -760,6 +760,7 @@ impl Agent {
                             stdin_request_tx: self.stdin_request_tx.clone(),
                             ask_user_question_tx: self.ask_user_question_tx.clone(),
                             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
+                            background_tool_signal: Some(self.background_tool_signal.clone()),
                             execution_mode: ToolExecutionMode::AgentTurn,
                             best_of_n_run_id: self.best_of_n_run_id.clone(),
                             best_of_n_candidate_id: self.best_of_n_candidate_id.clone(),
@@ -1219,6 +1220,7 @@ impl Agent {
                     stdin_request_tx: self.stdin_request_tx.clone(),
                     ask_user_question_tx: self.ask_user_question_tx.clone(),
                     graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
+                    background_tool_signal: Some(self.background_tool_signal.clone()),
                     execution_mode: ToolExecutionMode::AgentTurn,
                     best_of_n_run_id: self.best_of_n_run_id.clone(),
                     best_of_n_candidate_id: self.best_of_n_candidate_id.clone(),
@@ -1266,6 +1268,21 @@ impl Agent {
                         }
                     } => {
                         if self.is_graceful_shutdown() && allow_reload_handoff {
+                            tool_result = match tokio::time::timeout(
+                                Duration::from_millis(750),
+                                &mut tool_handle,
+                            )
+                            .await
+                            {
+                                Ok(res) => Some(match res {
+                                    Ok(r) => r,
+                                    Err(e) => Err(anyhow::anyhow!("Tool task panicked: {}", e)),
+                                }),
+                                Err(_) => None,
+                            };
+                        } else if allow_reload_handoff {
+                            // bash saw the bg signal via ToolContext and adopted
+                            // work_handle inline. Wait briefly for it to finish.
                             tool_result = match tokio::time::timeout(
                                 Duration::from_millis(750),
                                 &mut tool_handle,
@@ -1443,15 +1460,29 @@ impl Agent {
                     self.session.save()?;
                     return Ok(());
                 } else {
-                    // User pressed Alt+B — move tool to background
+                    // User pressed Alt+B — move tool to background.
+                    // For bash, this is a fallback (bash already handles inline
+                    // via ToolContext.background_tool_signal). Non-bash tools
+                    // reach this path.
                     logging::info(&format!(
                         "Tool '{}' moved to background after {:.1}s",
                         tc.name,
                         tool_elapsed.as_secs_f64()
                     ));
 
+                    let display_name = tc.input.get("intent")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or(&tc.name)
+                        .to_string();
                     let bg_info = crate::background::global()
-                        .adopt(&tc.name, &self.session.id, tool_handle)
+                        .adopt_with_options(
+                            &tc.name,
+                            Some(display_name),
+                            &self.session.id,
+                            true,   // notify
+                            false,  // wake
+                            tool_handle,
+                        )
                         .await;
 
                     let bg_msg = format!(

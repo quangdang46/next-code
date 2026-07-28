@@ -30,14 +30,14 @@ impl AgentView {
             self.last_seen_event_id = None;
             self.last_applied_event_seq = None;
             self.last_applied_xai_event_seq = None;
-            self.clear_minimal_btw_lifecycle();
+            self.clear_minimal_side_panel_lifecycle();
         }
         self.session.session_id = Some(session_id);
     }
     /// Unbind this view from its current session identity.
     pub(crate) fn unbind_session_id(&mut self) {
         if self.session.session_id.take().is_some() {
-            self.clear_minimal_btw_lifecycle();
+            self.clear_minimal_side_panel_lifecycle();
         }
     }
     /// Record a prompt id this client originated (sent to the agent as the turn
@@ -107,6 +107,7 @@ impl AgentView {
             info_float_git: None,
             info_float_compaction: None,
             info_float_visibility: crate::views::info_floats::InfoFloatVisibility::default(),
+            status_line_config: xai_grok_shell::agent::config::StatusLineConfig::default(),
             chat_kind: false,
             app_chat_mode: false,
             credit_balance: None,
@@ -151,8 +152,8 @@ impl AgentView {
             highlighted_link_idx: None,
             hovered_link_idx: None,
             last_pointer_on_link: false,
-            last_btw_selection_model: ResolvedSelectionModel::default(),
-            last_btw_area: Rect::default(),
+            last_panel_selection_model: ResolvedSelectionModel::default(),
+            last_side_panel_area: Rect::default(),
             pending_scrollback_click: None,
             pending_link_click: None,
             media_link_paths: Vec::new(),
@@ -216,12 +217,17 @@ impl AgentView {
             extensions_modal: None,
             agents_modal: None,
             persona_detail: None,
-            btw_state: None,
-            minimal_btw_lifecycle: None,
-            btw_sidebar: false,
-            btw_sidebar_visible: true,
-            btw_focused: false,
-            hit_btw_close: Default::default(),
+            side_panel_state: None,
+            minimal_side_panel_lifecycle: None,
+            mermaid_sidebar_dismissed: false,
+            side_panel: false,
+            side_panel_visible: true,
+            side_panel_width: crate::views::agent::AgentViewLayout::SIDE_PANEL_PREFERRED_WIDTH,
+            side_panel_dragging: false,
+            last_side_panel_divider_x: None,
+            last_btw_frame_width: None,
+            side_panel_focused: false,
+            hit_side_panel_close: Default::default(),
             toast: None,
             ephemeral_tip: Default::default(),
             word_select_tip_prompt_snapshot: None,
@@ -336,8 +342,8 @@ impl AgentView {
         self.turn_token_usage.take()
     }
     /// Invalidate and clear a minimal `/btw` lifecycle at a session boundary.
-    pub(crate) fn clear_minimal_btw_lifecycle(&mut self) {
-        crate::minimal_api::clear_minimal_btw(self);
+    pub(crate) fn clear_minimal_side_panel_lifecycle(&mut self) {
+        crate::minimal_api::clear_minimal_side_panel(self);
     }
     /// Enter a `session/load` replay window: flip `loading_replay` on and reset
     /// every field coupled to that transition together, so no site can drift
@@ -345,7 +351,7 @@ impl AgentView {
     /// replay-window entry: the fresh/restore load ctor paths and the
     /// reconnect/fork reuse paths.
     pub(crate) fn begin_replay_window(&mut self) {
-        self.clear_minimal_btw_lifecycle();
+        self.clear_minimal_side_panel_lifecycle();
         self.session.loading_replay = true;
         self.replayed_terminal_prompts.clear();
         self.unexpected_replay_drops = 0;
@@ -835,13 +841,14 @@ impl AgentView {
         };
 
         let background_info = {
+            let watchers = self.watchers();
             let running: Vec<_> = self
                 .session
                 .bg_tasks
                 .values()
                 .filter(|t| matches!(t.status, BgTaskStatus::Running) && !t.pending_kill)
                 .collect();
-            (!running.is_empty()).then(|| {
+            (watchers.total() > 0).then(|| {
                 let running_tasks: Vec<String> = running
                     .iter()
                     .map(|t| {
@@ -852,9 +859,13 @@ impl AgentView {
                     })
                     .collect();
                 BackgroundInfo {
-                    running_count: running.len(),
+                    running_count: watchers.total(),
                     progress_detail: None,
                     running_tasks,
+                    shells: watchers.commands,
+                    monitors: watchers.monitors,
+                    loops: watchers.loops,
+                    subagents: watchers.subagents,
                 }
             })
         };
@@ -1637,28 +1648,28 @@ mod status_window_tests {
         assert!(agent.session.state.is_turn_running());
     }
     #[test]
-    fn session_rebind_and_replay_invalidate_minimal_btw() {
+    fn session_rebind_and_replay_invalidate_minimal_side_panel() {
         let mut agent = test_agent_view(Some("s1"), std::path::PathBuf::from("/tmp"));
-        let old_request = crate::minimal_api::start_minimal_btw(&mut agent, "old question".into());
+        let old_request = crate::minimal_api::start_minimal_side_panel(&mut agent, "old question".into());
         agent.bind_session_id(agent_client_protocol::SessionId::new("s2"));
-        assert!(agent.btw_state.is_none());
-        assert!(agent.minimal_btw_lifecycle.is_none());
-        assert!(!crate::minimal_api::finish_minimal_btw(
+        assert!(agent.side_panel_state.is_none());
+        assert!(agent.minimal_side_panel_lifecycle.is_none());
+        assert!(!crate::minimal_api::finish_minimal_side_panel(
             &mut agent,
             old_request,
             Ok("old answer".into())
         ));
-        assert!(agent.btw_state.is_none());
+        assert!(agent.side_panel_state.is_none());
         let replay_request =
-            crate::minimal_api::start_minimal_btw(&mut agent, "pre-replay question".into());
+            crate::minimal_api::start_minimal_side_panel(&mut agent, "pre-replay question".into());
         agent.begin_replay_window();
-        assert!(agent.btw_state.is_none());
-        assert!(agent.minimal_btw_lifecycle.is_none());
-        assert!(!crate::minimal_api::finish_minimal_btw(
+        assert!(agent.side_panel_state.is_none());
+        assert!(agent.minimal_side_panel_lifecycle.is_none());
+        assert!(!crate::minimal_api::finish_minimal_side_panel(
             &mut agent,
             replay_request,
             Ok("pre-replay answer".into())
         ));
-        assert!(agent.btw_state.is_none());
+        assert!(agent.side_panel_state.is_none());
     }
 }

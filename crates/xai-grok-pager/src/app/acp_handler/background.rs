@@ -713,6 +713,7 @@ pub(super) fn handle_task_completed(notif: &acp::ExtNotification, app: &mut AppV
         && !matches!(matched, SessionMatch::Child(_))
         && let Some(agent) = app.agents.get_mut(&matched.agent_id())
     {
+        agent.tasks.mark_unread(task_id.to_string());
         agent.maybe_push_parked_marker();
     }
 

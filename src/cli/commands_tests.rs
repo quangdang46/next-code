@@ -755,8 +755,8 @@ fn auth_test_retryable_error_detection_rejects_schema_errors() {
 #[tokio::test]
 async fn auth_test_choice_plan_preserves_explicit_model_for_local_provider() {
     let plan = auth_test_choice_plan(
-        &super::super::provider_init::ProviderChoice::Ollama,
-        Some("llama3.2"),
+        &super::super::provider_init::ProviderChoice::Lmstudio,
+        Some("lmstudio-ai"),
     )
     .await
     .expect("choice plan");

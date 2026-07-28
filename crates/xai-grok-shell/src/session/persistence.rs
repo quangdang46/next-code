@@ -649,7 +649,7 @@ fn normalize_cwd(s: &str) -> String {
     }
     #[cfg(not(windows))]
     {
-        lossy.replace('\\', "/").into_owned()
+        lossy.replace('\\', "/")
     }
 }
 

@@ -56,18 +56,18 @@ pub const MINIMAL_BTW_MIN_WIDTH: u16 = 12;
 pub const MINIMAL_BTW_MIN_HEIGHT: u16 = 3;
 
 /// Whether minimal can paint and expose input geometry for this panel size.
-pub fn minimal_btw_size_is_paintable(width: u16, height: u16) -> bool {
+pub fn minimal_side_panel_size_is_paintable(width: u16, height: u16) -> bool {
     width >= MINIMAL_BTW_MIN_WIDTH && height >= MINIMAL_BTW_MIN_HEIGHT
 }
 
 /// Whether cached minimal input geometry represents a painted panel.
-pub fn minimal_btw_geometry_is_paintable(area: Rect) -> bool {
-    minimal_btw_size_is_paintable(area.width, area.height)
+pub fn minimal_side_panel_geometry_is_paintable(area: Rect) -> bool {
+    minimal_side_panel_size_is_paintable(area.width, area.height)
 }
 
 /// Clamp desired `/btw` rows to the available minimal live-region rows.
-pub fn minimal_btw_visible_height(desired: u16, width: u16, available: u16) -> u16 {
-    if desired == 0 || !minimal_btw_size_is_paintable(width, available) {
+pub fn minimal_side_panel_visible_height(desired: u16, width: u16, available: u16) -> u16 {
+    if desired == 0 || !minimal_side_panel_size_is_paintable(width, available) {
         0
     } else {
         desired.min(available)
@@ -76,7 +76,7 @@ pub fn minimal_btw_visible_height(desired: u16, width: u16, available: u16) -> u
 
 /// Typed result of the minimal-only `/btw` pre-router.
 #[derive(Debug)]
-pub enum MinimalBtwInput {
+pub enum MinimalSidePanelInput {
     /// Minimal consumed the event; the shared/fullscreen router must not run.
     Handled(Box<crate::app::app_view::InputOutcome>),
     /// Another minimal surface owns the event; delegate to its shared handler.
@@ -87,7 +87,7 @@ pub enum MinimalBtwInput {
 
 /// Per-agent ownership of a minimal `/btw` panel and its in-flight response.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum MinimalBtwLifecycle {
+pub(crate) enum MinimalSidePanelLifecycle {
     Active {
         request_id: Option<uuid::Uuid>,
         revision: uuid::Uuid,
@@ -98,8 +98,8 @@ pub(crate) enum MinimalBtwLifecycle {
 }
 
 /// Complete minimal lifecycle moved aside while a painted modal handles input.
-pub(crate) struct SuspendedMinimalBtwLifecycle {
-    state: crate::views::btw_overlay::BtwOverlayState,
+pub(crate) struct SuspendedMinimalSidePanelLifecycle {
+    state: crate::views::side_panel::SidePanelState,
     request_id: Option<uuid::Uuid>,
     revision: uuid::Uuid,
     focused: bool,
@@ -394,7 +394,7 @@ pub fn plan_approval_view(v: &AgentView) -> Option<&PlanApprovalViewState> {
 /// paints in place of the panel, takes precedence here. Keeping the complete
 /// owner predicate at the minimal facade gives paint and minimal input one
 /// canonical answer without changing the fullscreen router.
-pub fn minimal_btw_surface_available(v: &AgentView) -> bool {
+pub fn minimal_side_panel_surface_available(v: &AgentView) -> bool {
     v.active_subagent.is_none()
         && v.image_viewer.is_none()
         && v.video_viewer.is_none()
@@ -411,83 +411,83 @@ pub fn minimal_btw_surface_available(v: &AgentView) -> bool {
 }
 
 /// Start a correlated minimal `/btw` loading panel on this agent.
-pub fn start_minimal_btw(v: &mut AgentView, question: String) -> uuid::Uuid {
+pub fn start_minimal_side_panel(v: &mut AgentView, question: String) -> uuid::Uuid {
     let request_id = uuid::Uuid::new_v4();
-    v.minimal_btw_lifecycle = Some(MinimalBtwLifecycle::Active {
+    v.minimal_side_panel_lifecycle = Some(MinimalSidePanelLifecycle::Active {
         request_id: Some(request_id),
         revision: uuid::Uuid::new_v4(),
     });
-    v.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::Loading { question });
-    v.btw_focused = false;
+    v.side_panel_state = Some(crate::views::side_panel::SidePanelState::Loading { question });
+    v.side_panel_focused = false;
     request_id
 }
 
 /// Apply a minimal `/btw` response only when it still owns the loading panel.
-pub fn finish_minimal_btw(
+pub fn finish_minimal_side_panel(
     v: &mut AgentView,
     request_id: uuid::Uuid,
     result: Result<String, String>,
 ) -> bool {
-    let Some(MinimalBtwLifecycle::Active {
+    let Some(MinimalSidePanelLifecycle::Active {
         request_id: Some(active_id),
         ..
-    }) = v.minimal_btw_lifecycle
+    }) = v.minimal_side_panel_lifecycle
     else {
         return false;
     };
     if active_id != request_id {
         return false;
     }
-    let Some(crate::views::btw_overlay::BtwOverlayState::Loading { question }) = v.btw_state.take()
+    let Some(crate::views::side_panel::SidePanelState::Loading { question }) = v.side_panel_state.take()
     else {
         return false;
     };
-    v.minimal_btw_lifecycle = Some(MinimalBtwLifecycle::Active {
+    v.minimal_side_panel_lifecycle = Some(MinimalSidePanelLifecycle::Active {
         request_id: None,
         revision: uuid::Uuid::new_v4(),
     });
     match result {
         Ok(response) => {
-            v.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::done(
+            v.side_panel_state = Some(crate::views::side_panel::SidePanelState::done(
                 question, response,
             ));
-            v.btw_focused = true;
+            v.side_panel_focused = true;
         }
         Err(error) => {
-            v.btw_state =
-                Some(crate::views::btw_overlay::BtwOverlayState::Error { question, error });
-            v.btw_focused = false;
+            v.side_panel_state =
+                Some(crate::views::side_panel::SidePanelState::Error { question, error });
+            v.side_panel_focused = false;
         }
     }
     true
 }
 
 /// Invalidate and clear the complete minimal `/btw` lifecycle.
-pub fn clear_minimal_btw(v: &mut AgentView) {
-    if v.minimal_btw_lifecycle.is_none() {
+pub fn clear_minimal_side_panel(v: &mut AgentView) {
+    if v.minimal_side_panel_lifecycle.is_none() {
         return;
     }
-    v.minimal_btw_lifecycle = None;
-    v.btw_state = None;
-    v.btw_focused = false;
-    v.last_btw_area = Rect::default();
-    v.last_btw_selection_model = Default::default();
-    v.hit_btw_close.clear();
-    clear_btw_drag_state(v);
+    v.minimal_side_panel_lifecycle = None;
+    v.side_panel_state = None;
+    v.side_panel_focused = false;
+    v.last_side_panel_area = Rect::default();
+    v.last_panel_selection_model = Default::default();
+    v.hit_side_panel_close.clear();
+    clear_side_panel_drag_state(v);
 }
 
 /// Clear text-drag state only when it belongs to the minimal `/btw` surface.
 ///
 /// Kept in this facade rather than widening the viewer module's private helper:
 /// minimal already owns this lifecycle reset and is the only cross-module caller.
-fn clear_btw_drag_state(v: &mut AgentView) {
-    let is_btw = v
+fn clear_side_panel_drag_state(v: &mut AgentView) {
+    let is_side_panel = v
         .pending_text_drag
-        .is_some_and(|p| p.anchor.entry_idx == crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX)
+        .is_some_and(|p| p.anchor.entry_idx == crate::views::side_panel::SIDE_PANEL_ENTRY_IDX)
         || v.drag_selection.as_ref().is_some_and(|d| {
-            d.anchor.entry_idx == crate::views::btw_overlay::BTW_OVERLAY_ENTRY_IDX
+            d.anchor.entry_idx == crate::views::side_panel::SIDE_PANEL_ENTRY_IDX
         });
-    if is_btw {
+    if is_side_panel {
         v.pending_text_drag = None;
         v.drag_selection = None;
         v.drag_autoscroll = None;
@@ -496,18 +496,18 @@ fn clear_btw_drag_state(v: &mut AgentView) {
 }
 
 /// Atomically suspend the complete lifecycle while another surface handles input.
-pub(crate) fn suspend_minimal_btw(v: &mut AgentView) -> Option<SuspendedMinimalBtwLifecycle> {
-    let MinimalBtwLifecycle::Active {
+pub(crate) fn suspend_minimal_side_panel(v: &mut AgentView) -> Option<SuspendedMinimalSidePanelLifecycle> {
+    let MinimalSidePanelLifecycle::Active {
         request_id,
         revision,
-    } = v.minimal_btw_lifecycle?
+    } = v.minimal_side_panel_lifecycle?
     else {
         return None;
     };
-    let state = v.btw_state.take()?;
-    v.minimal_btw_lifecycle = Some(MinimalBtwLifecycle::Suspended { revision });
-    let focused = std::mem::replace(&mut v.btw_focused, false);
-    Some(SuspendedMinimalBtwLifecycle {
+    let state = v.side_panel_state.take()?;
+    v.minimal_side_panel_lifecycle = Some(MinimalSidePanelLifecycle::Suspended { revision });
+    let focused = std::mem::replace(&mut v.side_panel_focused, false);
+    Some(SuspendedMinimalSidePanelLifecycle {
         state,
         request_id,
         revision,
@@ -516,27 +516,27 @@ pub(crate) fn suspend_minimal_btw(v: &mut AgentView) -> Option<SuspendedMinimalB
 }
 
 /// Restore only if delegated handling left the same suspension marker intact.
-pub(crate) fn restore_minimal_btw(v: &mut AgentView, suspended: SuspendedMinimalBtwLifecycle) {
-    if v.minimal_btw_lifecycle
-        != Some(MinimalBtwLifecycle::Suspended {
+pub(crate) fn restore_minimal_side_panel(v: &mut AgentView, suspended: SuspendedMinimalSidePanelLifecycle) {
+    if v.minimal_side_panel_lifecycle
+        != Some(MinimalSidePanelLifecycle::Suspended {
             revision: suspended.revision,
         })
     {
         return;
     }
-    v.btw_state = Some(suspended.state);
-    v.btw_focused = suspended.focused;
-    v.minimal_btw_lifecycle = Some(MinimalBtwLifecycle::Active {
+    v.side_panel_state = Some(suspended.state);
+    v.side_panel_focused = suspended.focused;
+    v.minimal_side_panel_lifecycle = Some(MinimalSidePanelLifecycle::Active {
         request_id: suspended.request_id,
         revision: suspended.revision,
     });
 }
 
-/// `AgentView::btw_focused` — whether Up/Down/PgUp/PgDn scroll the `/btw`
+/// `AgentView::side_panel_focused` — whether Up/Down/PgUp/PgDn scroll the `/btw`
 /// panel (set when a Done answer arrives; cleared when the user returns to
 /// the prompt). Minimal paints the focus ring / ↑↓ hint from this flag.
-pub fn btw_focused(v: &AgentView) -> bool {
-    v.btw_focused
+pub fn side_panel_focused(v: &AgentView) -> bool {
+    v.side_panel_focused
 }
 
 /// `AgentView::cancel_turn_view`.

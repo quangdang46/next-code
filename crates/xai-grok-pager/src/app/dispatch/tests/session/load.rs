@@ -1032,7 +1032,7 @@ fn resume_conversation_does_not_focus_build_id_collision() {
     assert!(!app.agents[&agent_0].chat_kind);
 }
 #[test]
-fn duplicate_load_unbind_invalidates_old_minimal_btw_response() {
+fn duplicate_load_unbind_invalidates_old_minimal_side_panel_response() {
     let mut app = test_app();
     app.screen_mode = crate::app::ScreenMode::Minimal;
     dispatch(Action::NewSession, &mut app);
@@ -1059,8 +1059,8 @@ fn duplicate_load_unbind_invalidates_old_minimal_btw_response() {
         &mut app,
     );
     assert!(app.agents[&old_owner].session.session_id.is_none());
-    assert!(app.agents[&old_owner].btw_state.is_none());
-    assert!(app.agents[&old_owner].minimal_btw_lifecycle.is_none());
+    assert!(app.agents[&old_owner].side_panel_state.is_none());
+    assert!(app.agents[&old_owner].minimal_side_panel_lifecycle.is_none());
     dispatch(
         Action::TaskComplete(TaskResult::BtwResponse {
             agent_id: old_owner,
@@ -1069,8 +1069,8 @@ fn duplicate_load_unbind_invalidates_old_minimal_btw_response() {
         }),
         &mut app,
     );
-    assert!(app.agents[&old_owner].btw_state.is_none());
-    assert!(app.agents[&old_owner].minimal_btw_lifecycle.is_none());
+    assert!(app.agents[&old_owner].side_panel_state.is_none());
+    assert!(app.agents[&old_owner].minimal_side_panel_lifecycle.is_none());
 }
 /// Under sticky `--chat`, agents stamp `chat_kind=true` even for build loads;
 /// resume with conversation-entry false must still focus the open agent.

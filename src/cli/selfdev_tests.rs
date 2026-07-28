@@ -191,6 +191,7 @@ async fn test_selfdev_session_and_registry() {
         stdin_request_tx: None,
         ask_user_question_tx: None,
         graceful_shutdown_signal: None,
+        background_tool_signal: None,
         execution_mode: tool::ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,

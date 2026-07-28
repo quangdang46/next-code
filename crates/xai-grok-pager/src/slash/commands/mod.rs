@@ -21,6 +21,7 @@ pub mod effort;
 pub mod effort_levels;
 pub mod exit;
 pub mod expand;
+pub mod experimental;
 pub mod export;
 pub mod feedback;
 pub mod find;
@@ -55,6 +56,7 @@ pub mod screen_mode_switch;
 pub mod scroll_debug;
 pub mod session_info;
 pub mod settings_cmd;
+pub mod statusline;
 pub mod share;
 pub mod tasks;
 pub mod terminal_setup;
@@ -128,6 +130,8 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(timeline::TimelineCommand),
         Arc::new(toggle_mouse_reporting::ToggleMouseReportingCommand),
         Arc::new(settings_cmd::SettingsCommand),
+        Arc::new(experimental::ExperimentalCommand),
+        Arc::new(statusline::StatuslineCommand),
         Arc::new(privacy::PrivacyCommand),
         Arc::new(rewind::RewindCommand),
         Arc::new(jump::JumpCommand),

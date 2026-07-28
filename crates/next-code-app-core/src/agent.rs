@@ -753,7 +753,9 @@ impl Agent {
         memory: &crate::memory::PendingMemory,
     ) -> (Message, bool) {
         let message = Self::memory_injection_message(memory);
-        let persist = crate::config::config().features.persist_memory_injections;
+        let persist = crate::config::config().experiment_enabled(
+            next_code_experiment_flags::ExperimentFlag::PersistMemoryInjection,
+        );
         if persist {
             self.add_message_with_display_role(
                 Role::User,

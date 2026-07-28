@@ -181,7 +181,7 @@ impl AgentView {
     /// Whether macOS should keep ticking / polling Cmd for link hover.
     ///
     /// Covers scrollback (`hovered_entry`) **and** `/btw` panel links (map
-    /// entries under `last_btw_area` / existing hover index) — poll must not
+    /// entries under `last_side_panel_area` / existing hover index) — poll must not
     /// require scrollback-only `hovered_entry` or Cmd release over the panel
     /// leaves a stuck highlight.
     ///
@@ -211,9 +211,9 @@ impl AgentView {
         if self.hovered_entry.is_some() {
             return true;
         }
-        self.last_btw_area.area() > 0
+        self.last_side_panel_area.area() > 0
             && self
-                .last_btw_area
+                .last_side_panel_area
                 .contains((self.last_mouse_pos.0, self.last_mouse_pos.1).into())
     }
     /// Poll macOS modifier state for link hover. Returns `true` when
@@ -1330,9 +1330,9 @@ mod link_click_tests {
     #[test]
     fn btw_panel_pending_link_click_opens_on_up() {
         let mut agent = make_agent();
-        agent.last_btw_area = Rect::new(2, 18, 70, 6);
+        agent.last_side_panel_area = Rect::new(2, 18, 70, 6);
         agent.active_pane = AgentPane::Prompt;
-        agent.btw_focused = true;
+        agent.side_panel_focused = true;
         add_visible_link(&mut agent, 20, 4, 40, "https://example.com/btw");
         agent.pending_link_click = Some((
             10,
@@ -1348,7 +1348,7 @@ mod link_click_tests {
                     crate::render::osc8::LinkTarget::Url("https://example.com/btw".into())
                 );
             }
-            other => panic!("expected Action::OpenLink for btw link, got {other:?}"),
+            other => panic!("expected Action::OpenLink for side_panel link, got {other:?}"),
         }
     }
     /// On mouse-fallback terminals, Down on a `/btw` link with the link
@@ -1359,7 +1359,7 @@ mod link_click_tests {
             return;
         }
         let mut agent = make_agent();
-        agent.last_btw_area = Rect::new(2, 18, 70, 6);
+        agent.last_side_panel_area = Rect::new(2, 18, 70, 6);
         agent.active_pane = AgentPane::Prompt;
         add_visible_link(&mut agent, 20, 4, 40, "https://example.com/btw");
         let outcome = agent.handle_mouse(&mouse_down(10, 20));
@@ -1405,7 +1405,7 @@ mod link_click_tests {
             },
             vec![],
         );
-        agent.last_btw_area = Rect::new(2, 18, 70, 6);
+        agent.last_side_panel_area = Rect::new(2, 18, 70, 6);
         agent.last_mouse_pos = (10, 20);
         agent.last_mouse_moved_at = Some(Instant::now());
         agent.hovered_entry = None;
@@ -1900,7 +1900,7 @@ mod link_click_tests {
     #[test]
     fn router_slash_blocked_while_btw_panel_open() {
         let (mut agent, reg) = make_search_agent();
-        agent.btw_state = Some(crate::views::btw_overlay::BtwOverlayState::Loading {
+        agent.side_panel_state = Some(crate::views::side_panel::SidePanelState::Loading {
             question: "q".into(),
         });
         route_slash(&mut agent, &reg);
