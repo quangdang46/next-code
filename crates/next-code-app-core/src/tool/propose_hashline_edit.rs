@@ -1,13 +1,26 @@
 use super::{Tool, ToolContext, ToolOutput, get_best_of_n_handle};
 use crate::tool::hashline_snapshots;
+use crate::tool::hashline_snapshot_store::GlobalSnapshotStore;
+use crate::tool::hashline_block_resolver::NextCodeBlockResolver;
 use anyhow::Result;
 use async_trait::async_trait;
-use hashline::{anchor, document::FileContent, hash as hashline_hash};
 use next_code_best_of_n::ProposedContentStore;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use similar::{ChangeTag, TextDiff};
 use std::path::Path;
+
+use hashline::{Editor, anchor, document::FileContent, hash as hashline_hash};
+use std::sync::LazyLock;
+
+/// Global Editor backed by the file-based [`NextCodeSnapshotStore`]
+/// and next-code's syntactic [`NextCodeBlockResolver`].
+/// Snapshots persist to `~/.next-code/hashline/snapshots.db`.
+static SHARED_EDITOR: LazyLock<std::sync::Mutex<Editor>> =
+    LazyLock::new(|| std::sync::Mutex::new(
+        Editor::with_store(GlobalSnapshotStore)
+            .with_block_resolver(NextCodeBlockResolver),
+    ));
 
 pub struct ProposeHashlineEditTool;
 
@@ -140,22 +153,6 @@ async fn execute_propose_patch(
     let current_raw = tokio::fs::read_to_string(&path).await?;
     let content = hashline::normalize::normalize_to_lf(&current_raw);
 
-    let (edits, warnings, file_op, _has_block) = hashline::parser::parse_patch(&patch);
-    if let Some(op) = &file_op {
-        // Propose mode stores candidate content; REM/MV are not content patches.
-        return Err(anyhow::anyhow!(
-            "propose_hashline does not support file-level ops ({op:?}); use the live `edit` tool for REM/MV"
-        ));
-    }
-    if edits.is_empty() {
-        let msg = if warnings.is_empty() {
-            "hashline patch produced no edits".to_string()
-        } else {
-            format!("hashline patch produced no edits: {}", warnings.join("; "))
-        };
-        return Err(anyhow::anyhow!(msg));
-    }
-
     // Verify snapshot tag if present in patch
     if let Some(t) = extract_tag_from_patch(&patch) {
         if let Some(snap) = hashline_snapshots::by_hash(&path, t.as_str()) {
@@ -170,37 +167,18 @@ async fn execute_propose_patch(
         }
     }
 
-    let path_str = path.to_string_lossy().to_string();
-    let edits = hashline::block::resolve_block_edits(&edits, &content, &path_str, None)
-        .map_err(|e| anyhow::anyhow!("block resolution: {e}"))?;
+    // Use Editor::apply_to_text for in-memory patch application
+    let mut editor = SHARED_EDITOR
+        .lock()
+        .expect("SHARED_EDITOR lock poisoned");
+    let result = editor
+        .apply_to_text(&content, &patch, &path.to_string_lossy())
+        .map_err(|e| anyhow::anyhow!("hashline patch failed: {e}"))?;
+    drop(editor);
 
-    let fc = FileContent {
-        path: path.to_path_buf(),
-        raw: current_raw,
-        normalized: content.clone(),
-        newline: hashline::document::NewlineStyle::Lf,
-        trailing_newline: content.ends_with('\n'),
-        hash: "0000".into(),
-    };
-    let entries = fc.lines_with_hashes();
-    let mut lines: Vec<String> = content.split('\n').map(String::from).collect();
-    if content.ends_with('\n') && lines.last().map(|s| s.as_str()) == Some("") {
-        lines.pop();
-    }
-    hashline::commands::patch::apply_edits(&mut lines, &entries, &path, &edits)?;
-
-    let new_content = if content.ends_with('\n') {
-        lines.join("\n") + "\n"
-    } else {
-        lines.join("\n")
-    };
-
-    let line_ending = hashline::normalize::detect_line_ending(&fc.raw);
-    let final_text = if line_ending == hashline::normalize::LineEnding::Crlf {
-        hashline::normalize::restore_line_endings(&new_content, line_ending)
-    } else {
-        new_content
-    };
+    let final_text = result.text;
+    let warnings = result.warnings;
+    let edits_count = result.applied_edits;
 
     let diff = generate_diff(&content, &final_text, 1);
     let preview = build_file_touch_preview(&diff);
@@ -221,7 +199,7 @@ async fn execute_propose_patch(
     };
     Ok(ToolOutput::new(format!(
         "[PROPOSED] {file_path}: hashline patch, {} edits applied{warnings_text}\n{diff}\n\nProposal stored for candidate '{candidate_id}' in run '{run_id}' (not written to disk).",
-        edits.len(),
+        edits_count,
     ))
     .with_title(file_path.clone())
     .with_metadata(json!({
