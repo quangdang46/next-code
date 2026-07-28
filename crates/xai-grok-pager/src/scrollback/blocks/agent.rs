@@ -182,6 +182,11 @@ impl BlockContent for AgentMessageBlock {
         if ctx.raw || self.mermaid.is_empty() {
             return self.content.output(ctx.width as usize);
         }
+        // When target is sidebar-only, suppress inline diagram art
+        // (diagram renders as text in the side panel instead).
+        if crate::appearance::cache::load_render_mermaid_target() == "sidebar" {
+            return self.content.output(ctx.width as usize);
+        }
         self.rendered_output(ctx).0
     }
 
@@ -204,6 +209,11 @@ impl BlockContent for AgentMessageBlock {
             || self.mermaid_display_mode() != mermaid_content::MermaidDisplay::Affordances
             || !crate::terminal::image::scrollback_inline_overlay_active()
         {
+            return Vec::new();
+        }
+        // When target is sidebar-only, suppress inline PNG placements
+        // (they go to the side panel on click instead).
+        if crate::appearance::cache::load_render_mermaid_target() == "sidebar" {
             return Vec::new();
         }
         self.rendered_output(ctx)

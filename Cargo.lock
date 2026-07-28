@@ -2937,12 +2937,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "env_home"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f84e12ccf0a7ddc17a6c41c93326024c42920d7ee630d04950e6926645c0fe"
-
-[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6551,6 +6545,7 @@ dependencies = [
  "next-code-config-types",
  "next-code-core",
  "next-code-embedding",
+ "next-code-experiment-flags",
  "next-code-gateway-types",
  "next-code-import-core",
  "next-code-logging",
@@ -7555,6 +7550,7 @@ dependencies = [
  "next-code-build-meta",
  "next-code-config-types",
  "next-code-core",
+ "next-code-experiment-flags",
  "next-code-fuzzy",
  "next-code-keywords",
  "next-code-logging",
@@ -9817,7 +9813,7 @@ dependencies = [
  "toml 0.8.23",
  "ureq",
  "walkdir",
- "which 8.0.5",
+ "which",
 ]
 
 [[package]]
@@ -12964,18 +12960,6 @@ dependencies = [
 
 [[package]]
 name = "which"
-version = "7.0.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "24d643ce3fd3e5b54854602a080f34fb10ab75e0b813ee32d00ca2b44fa74762"
-dependencies = [
- "either",
- "env_home",
- "rustix 1.1.4",
- "winsafe",
-]
-
-[[package]]
-name = "which"
 version = "8.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f3ef584124b911bcc3875c2f1472e80f24361ceb789bd1c62b3e9a3df9ff43c"
@@ -13526,12 +13510,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "winsafe"
-version = "0.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d135d17ab770252ad95e9a872d365cf3090e3be864a34ab46f48555993efc904"
-
-[[package]]
 name = "wit-bindgen"
 version = "0.57.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13713,7 +13691,6 @@ dependencies = [
  "tiny-skia 0.12.0",
  "tracing",
  "wait-timeout",
- "which 7.0.3",
  "xai-tty-utils",
 ]
 
@@ -13743,6 +13720,8 @@ dependencies = [
  "indexmap",
  "insta",
  "libc",
+ "next-code-experiment-flags",
+ "next-code-keywords"
  "next-code-provider-metadata",
  "next-code-ratatui-inline",
  "next-code-ratatui-textarea",

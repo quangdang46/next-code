@@ -4079,6 +4079,104 @@
         );
     }
 
+    // --- paint_magic_keyword_highlights ---
+
+    fn keyword_painted_buf(text: &str, area: Rect) -> Buffer {
+        let mut ta = TextArea::new();
+        ta.insert_str(text);
+        ta.show_scrollbar = false;
+        let mut state = TextAreaState::default();
+        let mut buf = Buffer::empty(area);
+        StatefulWidgetRef::render_ref(&(&ta), area, &mut buf, &mut state);
+        paint_magic_keyword_highlights(&ta, state, area, &mut buf);
+        buf
+    }
+
+    fn is_keyword_rainbow(fg: ratatui::style::Color) -> bool {
+        match fg {
+            ratatui::style::Color::Rgb(r, g, b) => {
+                KEYWORD_RAINBOW.iter().any(|&c| c == (r, g, b))
+            }
+            _ => false,
+        }
+    }
+
+    #[test]
+    fn magic_keyword_ultrawork_paints_rainbow() {
+        let area = Rect::new(0, 0, 24, 2);
+        let token = "ultrawork";
+        let buf = keyword_painted_buf(token, area);
+        let mut painted = 0usize;
+        let mut colors = std::collections::HashSet::new();
+        for x in area.x..area.x + area.width {
+            let cell = buf.cell((x, area.y)).unwrap();
+            if cell.symbol().trim().is_empty() {
+                continue;
+            }
+            assert!(
+                is_keyword_rainbow(cell.fg),
+                "expected keyword rainbow, got {:?}",
+                cell.fg
+            );
+            if let ratatui::style::Color::Rgb(r, g, b) = cell.fg {
+                painted += 1;
+                colors.insert((r, g, b));
+            }
+        }
+        assert_eq!(painted, token.len());
+        assert!(
+            colors.len() >= 2,
+            "ultrawork must use multi-color rainbow, got {colors:?}"
+        );
+    }
+
+    #[test]
+    fn magic_keyword_set_paints_active() {
+        let area = Rect::new(0, 0, 32, 2);
+        for token in [
+            "ultrawork",
+            "ultrathink",
+            "hyperplan",
+            "ultraplan",
+            "ultrareview",
+            "teammode",
+            "$tdd",
+        ] {
+            let buf = keyword_painted_buf(token, area);
+            let mut painted = 0usize;
+            for x in area.x..area.x + area.width {
+                let cell = buf.cell((x, area.y)).unwrap();
+                if cell.symbol().trim().is_empty() {
+                    continue;
+                }
+                if is_keyword_rainbow(cell.fg) {
+                    painted += 1;
+                }
+            }
+            let expected = token.chars().filter(|c| !c.is_whitespace()).count();
+            assert!(
+                painted >= expected.min(3),
+                "token {token:?} must paint as active keyword (painted={painted})"
+            );
+        }
+    }
+
+    #[test]
+    fn magic_keyword_ignores_slash_drafts() {
+        let area = Rect::new(0, 0, 24, 2);
+        let buf = keyword_painted_buf("/ultrawork", area);
+        for x in area.x..area.x + area.width {
+            let cell = buf.cell((x, area.y)).unwrap();
+            if cell.symbol().trim().is_empty() {
+                continue;
+            }
+            assert!(
+                !is_keyword_rainbow(cell.fg),
+                "slash drafts must not get magic-keyword rainbow"
+            );
+        }
+    }
+
     #[test]
     fn slash_highlight_leaves_body_cells_unpainted() {
         // "xx"/"yy" share no characters with the token, so cells classify by

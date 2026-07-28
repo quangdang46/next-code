@@ -198,8 +198,8 @@ fn show_picker_refused_while_btw_open() {
     let mut app = test_app_with_agent();
     let id = AgentId(0);
     push_turns(&mut app, id, 3);
-    app.agents.get_mut(&id).unwrap().btw_state = Some(
-        crate::views::btw_overlay::BtwOverlayState::done("q".into(), "a".into()),
+    app.agents.get_mut(&id).unwrap().side_panel_state = Some(
+        crate::views::side_panel::SidePanelState::done("q".into(), "a".into()),
     );
 
     dispatch(Action::JumpShowPicker, &mut app);

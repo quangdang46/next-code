@@ -103,7 +103,7 @@ impl AgentView {
         if self.vim_mode
             && key!('/').matches(key)
             && self.no_input_overlay_pending()
-            && self.btw_state.is_none()
+            && self.side_panel_state.is_none()
         {
             if self.scrollback.is_empty() {
                 return InputOutcome::ActionThenForward(Action::FocusPrompt);
@@ -543,19 +543,30 @@ impl AgentView {
             }
             return;
         }
-        if let Some(ref mut btw) = self.btw_state
-            && matches!(btw, crate::views::btw_overlay::BtwOverlayState::Done { .. })
-            && self.last_btw_area.area() > 0
-            && self.last_btw_area.contains((col, row).into())
+        if let Some(ref mut panel) = self.side_panel_state
+            && matches!(
+                panel,
+                crate::views::side_panel::SidePanelState::Done { .. }
+                    | crate::views::side_panel::SidePanelState::Diagram { .. }
+            )
+            && self.last_side_panel_area.area() > 0
+            && self.last_side_panel_area.contains((col, row).into())
         {
-            use crate::views::btw_overlay::DONE_MAX_BODY_LINES;
-            let max_body = DONE_MAX_BODY_LINES as usize;
-            let content_width = self.last_btw_area.width.saturating_sub(4) as usize;
-            let max_off = btw.max_scroll_offset(content_width, max_body);
+            let chrome = match panel {
+                crate::views::side_panel::SidePanelState::Diagram { .. } => 3,
+                _ => 2,
+            };
+            let max_body = self
+                .last_side_panel_area
+                .height
+                .saturating_sub(chrome)
+                .max(1) as usize;
+            let content_width = self.last_side_panel_area.width.saturating_sub(4) as usize;
+            let max_off = panel.max_scroll_offset(content_width, max_body);
             if lines > 0 {
-                btw.scroll_down(lines as usize, max_off);
+                panel.scroll_down(lines as usize, max_off);
             } else {
-                btw.scroll_up((-lines) as usize);
+                panel.scroll_up((-lines) as usize);
             }
             return;
         }

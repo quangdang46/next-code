@@ -3338,7 +3338,7 @@ pub(crate) fn execute(
                                     question, }
                                 ),
                             )
-                            .expect("serialize btw params")
+                            .expect("serialize side_panel params")
                             .into(),
                     );
                     match acp_send(request, &tx).await {

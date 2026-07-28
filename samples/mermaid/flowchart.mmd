@@ -1,0 +1,13 @@
+flowchart TD
+    Start([User visits login page]) --> Enter[Enter username & password]
+    Enter --> Submit[Submit credentials]
+    Submit --> Validate{Credentials valid?}
+    Validate -->|No| Fail[Show error message]
+    Fail --> Attempts{Too many failed attempts?}
+    Attempts -->|Yes| Lock[Lock account]
+    Attempts -->|No| Enter
+    Validate -->|Yes| Session[Create session]
+    Session --> Perms{Check permissions}
+    Perms -->|Admin| AdminDash[Admin Dashboard]
+    Perms -->|User| UserDash[User Dashboard]
+    Perms -->|Read-only| Readonly[Read-only view]

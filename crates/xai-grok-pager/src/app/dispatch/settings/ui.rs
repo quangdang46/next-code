@@ -9,7 +9,7 @@ use super::setters::{
     set_info_float_inner, set_invert_scroll_inner, set_keep_text_selection_inner,
     set_max_thoughts_width_inner, set_multiline_mode, set_page_flip_on_send_inner,
     set_prompt_suggestions_inner, set_remember_tool_approvals_inner, set_render_mermaid_inner,
-    set_respect_manual_folds_inner, set_btw_output_mode_inner, set_screen_mode_inner,
+    set_respect_manual_folds_inner, set_side_panel_output_mode_inner, set_screen_mode_inner,
     set_scroll_lines_inner,
     set_scroll_mode_inner, set_scroll_speed_inner, set_show_thinking_blocks_inner,
     set_show_tips_inner, set_simple_mode_inner, set_status_line_bool_inner,
@@ -383,6 +383,31 @@ pub(in crate::app::dispatch) fn dispatch_open_settings(app: &mut AppView) -> Vec
         pager_snapshot,
     ));
     agent.active_modal = Some(ActiveModal::Settings { state });
+    vec![]
+}
+
+/// Open Face `/experimental` checklist (Codex-parity experiment mode).
+pub(in crate::app::dispatch) fn dispatch_open_experimental(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::experimental_modal::ExperimentalModalState;
+    use crate::views::modal::ActiveModal;
+
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+
+    if matches!(
+        &agent.active_modal,
+        Some(ActiveModal::ExperimentalFeatures { .. })
+    ) {
+        agent.active_modal = None;
+        return vec![];
+    }
+
+    let state = Box::new(ExperimentalModalState::load_from_config());
+    agent.active_modal = Some(ActiveModal::ExperimentalFeatures { state });
     vec![]
 }
 
@@ -909,6 +934,9 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("render_mermaid", SettingValue::Enum(s)) => {
             crate::appearance::RenderMermaid::from_canonical(s).map(Action::SetRenderMermaid)
         }
+        ("render_mermaid_target", SettingValue::Enum(s)) => {
+            Some(Action::SetRenderMermaidTarget(s.to_string()))
+        }
         ("vim_mode", SettingValue::Bool(b)) => Some(Action::SetVimMode(*b)),
         ("remember_tool_approvals", SettingValue::Bool(b)) => {
             Some(Action::SetRememberToolApprovals(*b))
@@ -1026,8 +1054,8 @@ pub(in crate::app::dispatch) fn action_for_reset(
             Some(Action::SetHunkTrackerMode((*s).to_string()))
         }
         ("screen_mode", SettingValue::Enum(s)) => Some(Action::SetScreenMode((*s).to_string())),
-        ("btw_output_mode", SettingValue::Enum(s)) => {
-            Some(Action::SetBtwOutputMode((*s).to_string()))
+        ("side_panel_output_mode", SettingValue::Enum(s)) => {
+            Some(Action::SetSidePanelOutputMode((*s).to_string()))
         }
         ("voice_capture_mode", SettingValue::Enum(s)) => {
             Some(Action::SetVoiceCaptureMode((*s).to_string()))
@@ -1342,10 +1370,10 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         ("screen_mode", SettingValue::Enum(s)) => {
             set_screen_mode_inner(app, crate::settings::canonical_screen_mode(Some(s)));
         }
-        ("btw_output_mode", SettingValue::Enum(s)) => {
-            set_btw_output_mode_inner(
+        ("side_panel_output_mode", SettingValue::Enum(s)) => {
+            set_side_panel_output_mode_inner(
                 app,
-                crate::settings::canonical_btw_output_mode(Some(s)),
+                crate::settings::canonical_side_panel_output_mode(Some(s)),
             );
         }
         ("voice_capture_mode", SettingValue::Enum(s)) => {
