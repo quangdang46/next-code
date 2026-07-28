@@ -22,6 +22,7 @@ path = "src/lib.rs"
 # Re-exported via `pub use next_code_app_core::*` in lib.rs. default-features=false
 # so this crate (and ultimately the root crate) controls app-core's features.
 next-code-config-types = { path = "../next-code-config-types" }
+next-code-experiment-flags = { path = "../next-code-experiment-flags" }
 next-code-app-core = { path = "../next-code-app-core", default-features = false }
 next-code-agent-runtime = { path = "../next-code-agent-runtime" }
 next-code-keywords = { path = "../next-code-keywords" }

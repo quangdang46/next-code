@@ -21,6 +21,7 @@ pub mod effort;
 pub mod effort_levels;
 pub mod exit;
 pub mod expand;
+pub mod experimental;
 pub mod export;
 pub mod feedback;
 pub mod find;
@@ -129,6 +130,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(timeline::TimelineCommand),
         Arc::new(toggle_mouse_reporting::ToggleMouseReportingCommand),
         Arc::new(settings_cmd::SettingsCommand),
+        Arc::new(experimental::ExperimentalCommand),
         Arc::new(statusline::StatuslineCommand),
         Arc::new(privacy::PrivacyCommand),
         Arc::new(rewind::RewindCommand),

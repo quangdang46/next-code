@@ -12,6 +12,7 @@ pub mod info_floats;
 pub mod dashboard;
 pub mod debug_style;
 pub mod extensions_modal;
+pub mod experimental_modal;
 pub mod file_search;
 pub mod fps_hud;
 pub mod goal_detail;

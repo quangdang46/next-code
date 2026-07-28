@@ -100,6 +100,7 @@ next-code-batch-types = { path = "../next-code-batch-types" }
 next-code-build-meta = { path = "../next-code-build-meta" }
 next-code-compaction-core = { path = "../next-code-compaction-core" }
 next-code-config-types = { path = "../next-code-config-types" }
+next-code-experiment-flags = { path = "../next-code-experiment-flags" }
 next-code-core = { path = "../next-code-core" }
 next-code-memory-types = { path = "../next-code-memory-types" }
 next-code-message-types = { path = "../next-code-message-types" }
