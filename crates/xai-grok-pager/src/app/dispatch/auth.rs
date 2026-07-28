@@ -234,6 +234,7 @@ pub(super) fn dispatch_login(app: &mut AppView) -> Vec<Effect> {
     let request_seq = app.next_auth_request_seq;
     app.next_auth_request_seq += 1;
     app.auth_code_input.reset();
+    app.auth_input_at = None;
     // Auth UI replaces the welcome prompt; clear focus so leftover state from
     // a prior welcome visit cannot steal loopback token keystrokes.
     app.welcome_prompt_focused = false;
