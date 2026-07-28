@@ -419,6 +419,17 @@ pub(super) fn handle_auth_complete(
         if app.session_startup_allowed() {
             effects.extend(drain_startup_actions(app));
         }
+        // Fresh auth with no deferred startup action (resume / worktree /
+        // initial-prompt): auto-create a new session so the user lands in
+        // the prompt instead of a blank/black welcome screen. Mirrors the
+        // minimal-mode fallback in `event_loop.rs::run`.
+        if !app.is_zdr_blocked()
+            && app.has_access()
+            && matches!(app.active_view, ActiveView::Welcome)
+            && app.deferred_startup.is_empty()
+        {
+            effects.extend(super::dispatch(Action::NewSession, app));
+        }
         maybe_open_model_picker_after_connect(app, &mut effects);
         return effects;
     }
