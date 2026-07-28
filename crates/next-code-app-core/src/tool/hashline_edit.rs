@@ -1,7 +1,9 @@
 use super::{Tool, ToolContext, ToolOutput};
 use crate::bus::{Bus, BusEvent, FileOp, FileTouch};
 use crate::tool::hashline_loop_guard::NoopGuard;
+use crate::tool::hashline_snapshot_store::GlobalSnapshotStore;
 use crate::tool::hashline_snapshots;
+use crate::tool::hashline_block_resolver::NextCodeBlockResolver;
 use anyhow::Result;
 use async_trait::async_trait;
 use serde::Deserialize;
@@ -9,11 +11,18 @@ use serde_json::{Value, json};
 use std::path::Path;
 use std::sync::LazyLock;
 
-use hashline::{anchor, document::FileContent, hash as hashline_hash};
+use hashline::{anchor, document::FileContent, hash as hashline_hash, types::FileOp as HashlineFileOp};
 
-static IN_MEMORY_EDITOR: LazyLock<std::sync::Mutex<hashline::Editor>> = LazyLock::new(|| {
+static NOOP_GUARD: LazyLock<crate::tool::hashline_loop_guard::NoopGuard> =
+    LazyLock::new(crate::tool::hashline_loop_guard::NoopGuard::new);
+
+/// Global Editor backed by the file-based [`NextCodeSnapshotStore`]
+/// and next-code's syntactic [`NextCodeBlockResolver`].
+/// Snapshots persist to `~/.next-code/hashline/snapshots.db`.
+static SHARED_EDITOR: LazyLock<std::sync::Mutex<hashline::Editor>> = LazyLock::new(|| {
     std::sync::Mutex::new(
-        hashline::Editor::without_snapshots().with_builtin_resolver(),
+        hashline::Editor::with_store(GlobalSnapshotStore)
+            .with_block_resolver(NextCodeBlockResolver),
     )
 });
 
@@ -476,7 +485,7 @@ fn apply_edits_to_text(
     text: &str,
     edits: &[hashline::types::Edit],
 ) -> std::result::Result<hashline::types::ApplyResult, String> {
-    let mut ed = IN_MEMORY_EDITOR.lock().expect("IN_MEMORY_EDITOR lock poisoned");
+    let mut ed = SHARED_EDITOR.lock().expect("SHARED_EDITOR lock poisoned");
     let path = "";
     let result = ed.apply_edits(text, edits, path)
         .map_err(|e| e.to_string())?;

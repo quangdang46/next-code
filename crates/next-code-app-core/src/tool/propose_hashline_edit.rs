@@ -1,5 +1,7 @@
 use super::{Tool, ToolContext, ToolOutput, get_best_of_n_handle};
 use crate::tool::hashline_snapshots;
+use crate::tool::hashline_snapshot_store::GlobalSnapshotStore;
+use crate::tool::hashline_block_resolver::NextCodeBlockResolver;
 use anyhow::Result;
 use async_trait::async_trait;
 use next_code_best_of_n::ProposedContentStore;
@@ -11,9 +13,14 @@ use std::path::Path;
 use hashline::{Editor, anchor, document::FileContent, hash as hashline_hash};
 use std::sync::LazyLock;
 
-/// Global Editor for in-memory patch application (no disk, no snapshot).
-static IN_MEMORY_EDITOR: LazyLock<std::sync::Mutex<Editor>> =
-    LazyLock::new(|| std::sync::Mutex::new(Editor::without_snapshots().with_builtin_resolver()));
+/// Global Editor backed by the file-based [`NextCodeSnapshotStore`]
+/// and next-code's syntactic [`NextCodeBlockResolver`].
+/// Snapshots persist to `~/.next-code/hashline/snapshots.db`.
+static SHARED_EDITOR: LazyLock<std::sync::Mutex<Editor>> =
+    LazyLock::new(|| std::sync::Mutex::new(
+        Editor::with_store(GlobalSnapshotStore)
+            .with_block_resolver(NextCodeBlockResolver),
+    ));
 
 pub struct ProposeHashlineEditTool;
 
@@ -161,9 +168,9 @@ async fn execute_propose_patch(
     }
 
     // Use Editor::apply_to_text for in-memory patch application
-    let mut editor = IN_MEMORY_EDITOR
+    let mut editor = SHARED_EDITOR
         .lock()
-        .expect("IN_MEMORY_EDITOR lock poisoned");
+        .expect("SHARED_EDITOR lock poisoned");
     let result = editor
         .apply_to_text(&content, &patch, &path.to_string_lossy())
         .map_err(|e| anyhow::anyhow!("hashline patch failed: {e}"))?;

@@ -2247,7 +2247,7 @@ checksum = "be1e0bca6c3637f992fc1cc7cbc52a78c1ef6db076dbf1059c4323d6a2048376"
 [[package]]
 name = "dcg-core"
 version = "0.1.0"
-source = "git+https://github.com/quangdang46/destructive_command_guard?branch=main#67c1a6ec58548376cc13577bae09433b311e667a"
+source = "git+https://github.com/quangdang46/destructive_command_guard?branch=main#a12d6d19cc9c45981a4f6015357857deda787632"
 dependencies = [
  "aho-corasick",
  "chrono",
@@ -13721,7 +13721,7 @@ dependencies = [
  "insta",
  "libc",
  "next-code-experiment-flags",
- "next-code-keywords"
+ "next-code-keywords",
  "next-code-provider-metadata",
  "next-code-ratatui-inline",
  "next-code-ratatui-textarea",
