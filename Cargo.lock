@@ -13710,6 +13710,7 @@ dependencies = [
  "insta",
  "libc",
  "next-code-experiment-flags",
+ "next-code-keywords"
  "next-code-provider-metadata",
  "next-code-ratatui-inline",
  "next-code-ratatui-textarea",
