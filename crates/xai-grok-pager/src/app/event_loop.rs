@@ -244,10 +244,14 @@ fn park_input_reader(
 /// the request pending and retries it later.
 fn suspend_for_child(
     screen_mode: crate::app::ScreenMode,
-    terminal: &mut PagerTerminal,
+    _terminal: &mut PagerTerminal,
     input_paused: &std::sync::atomic::AtomicBool,
     reader_parked: &std::sync::atomic::AtomicBool,
     input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<TimedInputEvent>,
+    // Terminal editors need the main buffer; GUI editors must keep the
+    // alternate screen so Face does not flash/stick on a black main screen
+    // (Claude `promptEditor.ts` `useAlternateScreen = !isGuiEditor`).
+    leave_alt_screen: bool,
     run_child: impl FnOnce(),
 ) -> std::io::Result<Option<(u16, u16)>> {
     use std::sync::atomic::Ordering;
@@ -282,7 +286,8 @@ fn suspend_for_child(
         .is_minimal()
         .then(|| crossterm::cursor::position().ok())
         .flatten();
-    if screen_mode.is_fullscreen() {
+    let leave_alt = leave_alt_screen && screen_mode.is_fullscreen();
+    if leave_alt {
         xai_grok_shell::util::with_locked_stderr(|stderr| {
             let _ = crossterm::execute!(stderr, crossterm::terminal::LeaveAlternateScreen);
         });
@@ -290,7 +295,7 @@ fn suspend_for_child(
     let _ = crossterm::terminal::disable_raw_mode();
     run_child();
     let _ = crossterm::terminal::enable_raw_mode();
-    if screen_mode.is_fullscreen() {
+    if leave_alt {
         xai_grok_shell::util::with_locked_stderr(|stderr| {
             let _ = crossterm::execute!(stderr, crossterm::terminal::EnterAlternateScreen);
         });
@@ -563,20 +568,27 @@ fn run_pending_suspends(
     }
     *suspend_retry_after = None;
 
-    // $EDITOR suspend: leave alt screen, disable raw mode, spawn
-    // editor, wait for exit, then restore.
+    // $EDITOR suspend: park input, optionally leave alt screen (terminal
+    // editors only), spawn editor with Claude-parity wait/shell handling,
+    // wait for exit, then restore.
     if let Some(path) = app.pending_editor_path.take() {
-        let editor = std::env::var("VISUAL")
-            .or_else(|_| std::env::var("EDITOR"))
-            .unwrap_or_else(|_| "vi".to_string());
+        let editor = crate::external_editor::resolve_editor();
+        let leave_alt = !crate::external_editor::is_gui_editor(&editor);
         let moved_cursor = match suspend_for_child(
             app.screen_mode,
             terminal,
             input_paused,
             reader_parked,
             input_rx,
+            leave_alt,
             || {
-                let _ = std::process::Command::new(&editor).arg(&path).status();
+                if let Err(err) = crate::external_editor::spawn_editor_blocking(&path) {
+                    tracing::warn!(
+                        error = %err,
+                        path = %path.display(),
+                        "external editor spawn failed"
+                    );
+                }
             },
         ) {
             Ok(moved_cursor) => moved_cursor,
@@ -633,6 +645,7 @@ fn run_pending_suspends(
             input_paused,
             reader_parked,
             input_rx,
+            /* leave_alt_screen */ true,
             || {
                 // $PAGER may carry flags (e.g. "less -R"); split on
                 // whitespace so program + args are both honored.
