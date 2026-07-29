@@ -581,6 +581,14 @@ pub fn current_value_for(
         "status_line.model" => Some(SettingValue::Bool(
             ui.status_line.segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Model),
         )),
+        "status_line.reasoning" => Some(SettingValue::Bool(
+            ui.status_line
+                .segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Reasoning),
+        )),
+        "status_line.run_state" => Some(SettingValue::Bool(
+            ui.status_line
+                .segment_visible(xai_grok_shell::agent::config::StatusLineSegment::RunState),
+        )),
         "status_line.context" => Some(SettingValue::Bool(
             ui.status_line
                 .segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Context),

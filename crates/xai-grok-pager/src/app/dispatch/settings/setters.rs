@@ -1390,6 +1390,8 @@ macro_rules! define_status_line_bool_setter {
 define_status_line_bool_setter!(set_status_line_enabled, "status_line.enabled", "Status line", enabled, true);
 define_status_line_bool_setter!(set_status_line_mode, "status_line.mode", "Status mode", mode, true);
 define_status_line_bool_setter!(set_status_line_model, "status_line.model", "Status model", model, true);
+define_status_line_bool_setter!(set_status_line_reasoning, "status_line.reasoning", "Status reasoning", reasoning, true);
+define_status_line_bool_setter!(set_status_line_run_state, "status_line.run_state", "Status run state", run_state, true);
 define_status_line_bool_setter!(set_status_line_context, "status_line.context", "Status context %", context, true);
 define_status_line_bool_setter!(set_status_line_cwd, "status_line.cwd", "Status directory", cwd, false);
 define_status_line_bool_setter!(set_status_line_git, "status_line.git", "Status git", git, false);
@@ -1449,6 +1451,12 @@ pub(in crate::app::dispatch) fn toggle_status_line_segment(
     match segment {
         xai_grok_shell::agent::config::StatusLineSegment::Mode => set_status_line_mode(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Model => set_status_line_model(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::Reasoning => {
+            set_status_line_reasoning(app, on)
+        }
+        xai_grok_shell::agent::config::StatusLineSegment::RunState => {
+            set_status_line_run_state(app, on)
+        }
         xai_grok_shell::agent::config::StatusLineSegment::Context => set_status_line_context(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Cwd => set_status_line_cwd(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Git => set_status_line_git(app, on),

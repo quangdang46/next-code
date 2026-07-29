@@ -609,6 +609,8 @@ pub enum Action {
     SetStatusLineEnabled(bool),
     SetStatusLineMode(bool),
     SetStatusLineModel(bool),
+    SetStatusLineReasoning(bool),
+    SetStatusLineRunState(bool),
     SetStatusLineContext(bool),
     SetStatusLineCwd(bool),
     SetStatusLineGit(bool),

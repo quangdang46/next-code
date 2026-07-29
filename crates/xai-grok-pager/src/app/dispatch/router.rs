@@ -97,6 +97,7 @@ use super::settings::setters::{
     set_show_float_usage_limits, set_show_float_workspace_map, set_show_thinking_blocks, set_show_tips,
     set_simple_mode, set_status_line_context, set_status_line_cwd, set_status_line_enabled,
     set_status_line_git, set_status_line_mode, set_status_line_model, set_status_line_order,
+    set_status_line_reasoning, set_status_line_run_state,
     set_theme, set_timeline, set_timestamps, set_vim_mode, set_voice_capture_mode,
     set_voice_stt_language, reset_status_line, toggle_status_line_segment,
 };
@@ -1045,6 +1046,8 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::SetStatusLineEnabled(v) => set_status_line_enabled(app, v),
         Action::SetStatusLineMode(v) => set_status_line_mode(app, v),
         Action::SetStatusLineModel(v) => set_status_line_model(app, v),
+        Action::SetStatusLineReasoning(v) => set_status_line_reasoning(app, v),
+        Action::SetStatusLineRunState(v) => set_status_line_run_state(app, v),
         Action::SetStatusLineContext(v) => set_status_line_context(app, v),
         Action::SetStatusLineCwd(v) => set_status_line_cwd(app, v),
         Action::SetStatusLineGit(v) => set_status_line_git(app, v),
