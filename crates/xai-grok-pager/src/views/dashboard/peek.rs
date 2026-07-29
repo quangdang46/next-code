@@ -512,6 +512,9 @@ fn paint_peek_config_badge(
         usage_warning: None,
         usage_warning_critical: false,
         tasks_pill: None,
+        tasks_pill_hovered: false,
+        agent_pills: None,
+        agent_expand_hint: None,
     };
     // Bottom border row, inside the corners — the same content rect the
     // chat prompt and dispatch box use for their info line.
@@ -521,7 +524,7 @@ fn paint_peek_config_badge(
         width: area.width.saturating_sub(2),
         height: 1,
     };
-    reply.render_info_line(buf, info_rect, &info, theme.bg_base, theme, panel.focused);
+    let _ = reply.render_info_line(buf, info_rect, &info, theme.bg_base, theme, panel.focused);
 }
 
 /// Render the peek panel inline in place of the dispatch input.

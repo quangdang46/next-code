@@ -49,6 +49,9 @@ pub fn desired_height(
 }
 
 /// Render the agent panel into `area`.
+///
+/// Returns `(roster_id, hit_rect)` for each painted roster chip so mouse
+/// can enter teammate view (Claude G-CLICK parity).
 pub fn render(
     area: Rect,
     buf: &mut Buffer,
@@ -57,13 +60,13 @@ pub fn render(
     panel: &AgentPanelState,
     team_tasks: &[TeamTaskItem],
     viewing_label: Option<&str>,
-) {
+) -> Vec<(String, Rect)> {
     if area.height == 0 || area.width == 0 {
-        return;
+        return Vec::new();
     }
 
     let mut y = area.y;
-    render_roster_strip(area.x, y, area.width, buf, theme, rows, panel, viewing_label);
+    let hits = render_roster_strip(area.x, y, area.width, buf, theme, rows, panel, viewing_label);
     y = y.saturating_add(1);
 
     if panel.show_team_tasks && y < area.y.saturating_add(area.height) {
@@ -78,6 +81,7 @@ pub fn render(
             panel.task_selected,
         );
     }
+    hits
 }
 
 fn render_roster_strip(
@@ -89,7 +93,8 @@ fn render_roster_strip(
     rows: &[AgentRosterRow],
     panel: &AgentPanelState,
     viewing_label: Option<&str>,
-) {
+) -> Vec<(String, Rect)> {
+    let mut hits: Vec<(String, Rect)> = Vec::new();
     let mut spans: Vec<Span<'_>> = Vec::new();
     if let Some(name) = viewing_label {
         spans.push(Span::styled(
@@ -145,6 +150,15 @@ fn render_roster_strip(
         } else {
             Style::default().fg(color)
         };
+        hits.push((
+            row.id.clone(),
+            Rect {
+                x: x.saturating_add(used as u16),
+                y,
+                width: piece_w as u16,
+                height: 1,
+            },
+        ));
         spans.push(Span::styled(piece, style));
         used += piece_w;
     }
@@ -158,6 +172,7 @@ fn render_roster_strip(
 
     let line = Line::from(spans);
     buf.set_line(x, y, &line, width);
+    hits
 }
 
 fn render_task_strip(
@@ -329,7 +344,7 @@ pub struct AgentPanelWidget<'a> {
 
 impl Widget for AgentPanelWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        render(
+        let _ = render(
             area,
             buf,
             self.theme,
@@ -381,5 +396,23 @@ mod tests {
         let rows = vec![row("lead", true), row("w1", false)];
         assert!(desired_height(&rows, false, &[], 10) >= 1);
         assert!(desired_height(&rows, true, &[], 10) >= 1);
+    }
+
+    #[test]
+    fn render_returns_hit_rects_for_roster_chips() {
+        let rows = vec![row("lead", true), row("worker-a", false)];
+        let panel = AgentPanelState::default();
+        let area = Rect::new(0, 0, 80, 1);
+        let mut buf = Buffer::empty(area);
+        let theme = Theme::current();
+        let hits = render(area, &mut buf, &theme, &rows, &panel, &[], None);
+        assert!(
+            hits.len() >= 2,
+            "expected hit rects for lead + worker, got {hits:?}"
+        );
+        assert_eq!(hits[0].0, "lead");
+        assert_eq!(hits[1].0, "worker-a");
+        assert!(hits[0].1.width > 0);
+        assert!(hits[1].1.width > 0);
     }
 }

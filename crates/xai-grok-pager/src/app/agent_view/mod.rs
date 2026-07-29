@@ -1043,6 +1043,12 @@ pub struct AgentView {
     pub hit_subagent_close: HitArea,
     pub hit_catalog_close: HitArea,
     pub hit_bg_status: HitArea,
+    /// Prompt-footer SummaryPill (`tasks_pill`) — click opens Tasks hub.
+    pub hit_tasks_pill: HitArea,
+    /// Prompt-footer `@agent` pills — `(roster_id, hit)`.
+    pub hit_agent_pills: Vec<(String, HitArea)>,
+    /// Under-prompt agent panel roster strip hits — `(roster_id, rect)`.
+    pub hit_agent_panel_rows: Vec<(String, Rect)>,
     pub hit_goal_status: HitArea,
     pub hit_goal_close: HitArea,
     pub hit_bg_button: HitArea,
