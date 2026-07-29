@@ -1344,6 +1344,7 @@ impl NextCodeFaceAgent {
         output: &str,
         error: &Option<String>,
         raw_input: Option<serde_json::Value>,
+        metadata: Option<serde_json::Value>,
     ) {
         let status = if error.is_some() {
             ToolCallStatus::Failed
@@ -1368,13 +1369,24 @@ impl NextCodeFaceAgent {
             "output_delta": null,
             "was_bare_echo": false,
         }));
+        // Prefer ACP Diff content for edit/write/hashline so Face
+        // `extract_edit_hunks` can render +/- scrollback (grok-build path).
+        let mut content: Vec<acp::ToolCallContent> = Vec::new();
+        if error.is_none()
+            && let Some(diff) = crate::cli::face_edit_diff::build_edit_diff_content(
+                name,
+                raw_input.as_ref(),
+                metadata.as_ref(),
+            )
+        {
+            content.push(diff);
+        }
+        content.push(acp::ContentBlock::Text(acp::TextContent::new(output)).into());
         let fields = ToolCallUpdateFields::new()
             .status(status)
             .title(Self::tool_title(name, raw_input.as_ref()))
             .kind(Self::tool_kind(name))
-            .content(Some(vec![
-                acp::ContentBlock::Text(acp::TextContent::new(output)).into(),
-            ]))
+            .content(Some(content))
             .raw_output(raw_output);
         let fields = if let Some(input) = raw_input {
             fields.raw_input(input)
@@ -2041,16 +2053,25 @@ impl NextCodeFaceAgent {
         if name.eq_ignore_ascii_case("memory") {
             return Self::memory_search_title(raw_input);
         }
-        if name.starts_with("Bash") {
+        if name.eq_ignore_ascii_case("bash") || name.starts_with("Bash") {
             "Bash".to_string()
-        } else if name.starts_with("Read")
+        } else if name.eq_ignore_ascii_case("read")
+            || name.eq_ignore_ascii_case("glob")
+            || name.eq_ignore_ascii_case("grep")
+            || name.starts_with("Read")
             || name.starts_with("Glob")
             || name.starts_with("Grep")
         {
             "Read".to_string()
-        } else if name.starts_with("Edit") || name.starts_with("Write") {
+        } else if crate::cli::face_edit_diff::is_face_edit_tool(name)
+            || name.starts_with("Edit")
+            || name.starts_with("Write")
+        {
             "Edit".to_string()
-        } else if name.starts_with("Web") {
+        } else if name.starts_with("Web")
+            || name.eq_ignore_ascii_case("webfetch")
+            || name.eq_ignore_ascii_case("websearch")
+        {
             "Web".to_string()
         } else if name.starts_with("Search") {
             "Search".to_string()
@@ -2082,20 +2103,35 @@ impl NextCodeFaceAgent {
     /// tracker wins (a bare `ToolKind::Search` would become a grep Search
     /// block instead). ACP has no `ToolKind::MemorySearch`.
     fn tool_kind(name: &str) -> acp::ToolKind {
-        if name.starts_with("Bash") {
-            acp::ToolKind::Execute
-        } else if name.starts_with("Read")
+        // Memory stays Other so Face title-based MemorySearch wins.
+        if name.eq_ignore_ascii_case("memory") {
+            return acp::ToolKind::Other;
+        }
+        if crate::cli::face_edit_diff::is_face_edit_tool(name)
+            || name.starts_with("Edit")
+            || name.starts_with("Write")
+        {
+            return acp::ToolKind::Edit;
+        }
+        if name.eq_ignore_ascii_case("bash") || name.starts_with("Bash") {
+            return acp::ToolKind::Execute;
+        }
+        if name.eq_ignore_ascii_case("read")
+            || name.eq_ignore_ascii_case("glob")
+            || name.eq_ignore_ascii_case("grep")
+            || name.starts_with("Read")
             || name.starts_with("Glob")
             || name.starts_with("Grep")
         {
-            acp::ToolKind::Read
-        } else if name.starts_with("Edit") || name.starts_with("Write") {
-            acp::ToolKind::Edit
-        } else if name.starts_with("Web") {
-            acp::ToolKind::Fetch
-        } else {
-            acp::ToolKind::Other
+            return acp::ToolKind::Read;
         }
+        if name.starts_with("Web")
+            || name.eq_ignore_ascii_case("webfetch")
+            || name.eq_ignore_ascii_case("websearch")
+        {
+            return acp::ToolKind::Fetch;
+        }
+        acp::ToolKind::Other
     }
 }
 
@@ -2595,9 +2631,18 @@ impl acp::Agent for NextCodeFaceAgent {
                     name,
                     output,
                     error,
+                    metadata,
                 } => {
                     let raw_input = self.accumulated_raw_input(&id);
-                    self.emit_tool_done(&session_id, &id, &name, &output, &error, raw_input)
+                    self.emit_tool_done(
+                        &session_id,
+                        &id,
+                        &name,
+                        &output,
+                        &error,
+                        raw_input,
+                        metadata,
+                    )
                         .await;
                     self.tool_inputs.borrow_mut().remove(&id);
                     // `todo` tool persists via next-code store + BusEvent for TUI;
@@ -3071,6 +3116,19 @@ mod tests {
     #[test]
     fn test_tool_kind_edit() {
         assert_eq!(NextCodeFaceAgent::tool_kind("Edit"), acp::ToolKind::Edit);
+        assert_eq!(NextCodeFaceAgent::tool_kind("edit"), acp::ToolKind::Edit);
+        assert_eq!(NextCodeFaceAgent::tool_kind("write"), acp::ToolKind::Edit);
+        assert_eq!(
+            NextCodeFaceAgent::tool_kind("hashline_edit"),
+            acp::ToolKind::Edit
+        );
+    }
+
+    #[test]
+    fn test_tool_title_lowercase_edit_tools() {
+        assert_eq!(NextCodeFaceAgent::tool_title("edit", None), "Edit");
+        assert_eq!(NextCodeFaceAgent::tool_title("hashline_edit", None), "Edit");
+        assert_eq!(NextCodeFaceAgent::tool_title("bash", None), "Bash");
     }
 
     #[test]
