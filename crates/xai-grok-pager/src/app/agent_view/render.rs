@@ -1862,21 +1862,21 @@ impl AgentView {
                 }
             }
         }
-        // Toast stack overlay (right-aligned above scrollback bottom).
+        // Persistent stacked toasts: render over the scrollback area slightly
+        // above the single-slot toast so both are visible simultaneously.
         if !self.toast_stack.is_empty() {
             let sb = layout.scrollback;
-            let stack_area = Rect {
-                x: sb.x,
-                y: sb.bottom().saturating_sub(4).min(sb.y),
-                width: sb.width,
-                height: 3.min(sb.height),
-            };
-            crate::views::toast::ToastStack::render(
-                &self.toast_stack,
-                buf,
-                stack_area,
-                &theme,
-            );
+            if sb.width > 10 && sb.height > 2 {
+                // Render in the right side of the scrollback area, stacked
+                // upward from the row above the single-slot toast.
+                let stack_area = Rect {
+                    x: sb.x,
+                    y: sb.y,
+                    width: sb.width,
+                    height: sb.height.saturating_sub(1),
+                };
+                self.toast_stack.render(buf, stack_area, &theme);
+            }
         }
         if tasks_height > 0 {
             let bg_focused = self.active_pane == ActivePane::Tasks && !overlay_focused;

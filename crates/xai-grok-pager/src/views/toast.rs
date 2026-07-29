@@ -242,9 +242,7 @@ mod tests {
     fn empty_stack_renders_nothing() {
         let stack = ToastStack::new();
         let lines = render_lines(&stack, 40, 5);
-        // Render fills the area with space characters, so each line
-        // should contain only spaces.
-        assert!(lines.iter().all(|l| l.chars().all(|c| c == ' ')));
+        assert!(lines.iter().all(|l| l.is_empty()));
     }
 
     #[test]

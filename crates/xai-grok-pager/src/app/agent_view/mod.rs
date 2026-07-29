@@ -1200,8 +1200,10 @@ pub struct AgentView {
     /// Tuple of (message, remaining_ticks). Decremented each tick, removed at 0.
     /// Does **not** carry sticky status banners — see [`Self::sticky_toast`].
     pub(crate) toast: Option<(String, u8)>,
-    /// Persistent toast stack with auto-expiry and level-based styling.
-    pub toast_stack: crate::views::toast::ToastStack,
+    /// Persistent stacked toast notifications. Rendered alongside (and
+    /// independently of) the single-slot `toast` / `sticky_toast`. Pushed via
+    /// [`Self::push_toast_stack`]; auto-expired by TTL on `tick_toast_stack`.
+    pub(crate) toast_stack: crate::views::toast::ToastStack,
     /// Single-slot ephemeral tip shown in the banner rect above the prompt.
     /// Unlike `toast`, survives typing; cleared by TTL, any prompt-box
     /// submit (prompt/interject/bash/feedback/remember), or explicit clear.
