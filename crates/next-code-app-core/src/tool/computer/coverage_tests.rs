@@ -17,6 +17,7 @@ fn ctx() -> ToolContext {
         working_dir: None,
         stdin_request_tx: None,
         ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
         graceful_shutdown_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_candidate_id: None,

@@ -5,22 +5,23 @@
 //! via [`select_and_apply_from_store`].
 //!
 //! Full multi-agent spawn is available as [`run_best_of_n`] when a parent
-//! [`Agent`] is in hand (e.g. future keyword / turn-loop hook).
+//! [`Agent`] is in hand (e.g. keyword / turn-loop hook).
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
 use next_code_best_of_n::{
-    BestOfNConfig, CandidateDiff, CandidateId, CandidateStatus, CandidateStrategy, FileDiff,
-    ProposedContentStore, RunId, select_best_candidate,
+    BestOfNCandidateUi, BestOfNConfig, BestOfNMode, BestOfNPhase, BestOfNPickExtResponse,
+    BestOfNProgressPayload, CandidateDiff, CandidateId, CandidateStatus, CandidateStrategy,
+    FileDiff, ProposedContentStore, RunId, select_best_candidate,
 };
 
 use crate::agent::Agent;
 use crate::protocol::ServerEvent;
 use crate::provider::Provider;
 use crate::session::Session;
-use crate::tool::{BestOfNOrchestratorHandle, Registry};
+use crate::tool::{BestOfNOrchestratorHandle, BestOfNPickInputRequest, Registry};
 
 /// Result of a best-of-N run for tool/UI reporting.
 pub struct BestOfNRunResult {
@@ -29,6 +30,8 @@ pub struct BestOfNRunResult {
     pub candidates: Vec<CandidateDiff>,
     pub selection_reason: String,
     pub files_applied: Vec<String>,
+    /// True when the user cancelled in `mode=show` (no files applied).
+    pub cancelled: bool,
 }
 
 /// Select winner from proposals already in the store and apply to disk.
@@ -97,6 +100,7 @@ pub fn select_and_apply_from_store(
         candidates,
         selection_reason: selection.reason,
         files_applied,
+        cancelled: false,
     })
 }
 
@@ -109,9 +113,10 @@ pub async fn run_best_of_n(
     run_best_of_n_with_progress(parent, user_request, context_files, &None).await
 }
 
-/// Like [`run_best_of_n`] but emits progress via an optional event sender.
-/// When `event_tx` is provided, the caller (e.g. streaming path) can relay
-/// progress updates to the TUI client so the user sees activity.
+/// Like [`run_best_of_n`] but emits structured progress via an optional event sender.
+///
+/// When config `mode=show` and the parent has a Face pick channel, waits for the
+/// user to select a winner (or cancel) before applying.
 pub async fn run_best_of_n_with_progress(
     parent: &Agent,
     user_request: &str,
@@ -121,11 +126,10 @@ pub async fn run_best_of_n_with_progress(
     let cfg = crate::config::config().best_of_n.clone();
     if !cfg.enabled() {
         return Err(anyhow::anyhow!(
-            "Best-of-N is disabled. Set [best_of_n] mode = \"auto\"."
+            "Best-of-N is disabled. Set [best_of_n] mode = \"auto\" or \"show\"."
         ));
     }
 
-    // Capture parent's spawn parts once before parallel loops.
     let (parent_provider, parent_registry, parent_session) = parent.best_of_n_spawn_parts();
 
     let run_id = RunId::new();
@@ -142,9 +146,29 @@ pub async fn run_best_of_n_with_progress(
     });
 
     let context_block = load_context_files(context_files).await;
-    emit_progress(
+    emit_bon_progress(
         event_tx,
-        &format!("Best-of-N: generating {} candidates…", total),
+        BestOfNProgressPayload {
+            run_id: run_id.to_string(),
+            phase: BestOfNPhase::Generating,
+            message: format!("Generating {total} candidates…"),
+            completed: 0,
+            total,
+            candidates: (0..total)
+                .map(|i| BestOfNCandidateUi {
+                    index: i,
+                    candidate_id: CandidateId::new(i).to_string(),
+                    label: strategies[i].label.clone(),
+                    status: "running".to_string(),
+                    file_count: 0,
+                    files: Vec::new(),
+                    error: None,
+                    recommended: false,
+                })
+                .collect(),
+            recommended_index: None,
+            selection_reason: None,
+        },
     );
     crate::logging::info(&format!(
         "[best-of-n] spawning {}/{} candidates for run {}",
@@ -153,7 +177,6 @@ pub async fn run_best_of_n_with_progress(
         run_id
     ));
 
-    // Spawn all candidates in parallel with a per-candidate timeout.
     let mut handles = Vec::with_capacity(strategies.len());
     for (i, strategy) in strategies.iter().enumerate() {
         let candidate_id = CandidateId::new(i);
@@ -213,14 +236,9 @@ pub async fn run_best_of_n_with_progress(
         }));
     }
 
-    // Collect results with per-candidate progress.
     let mut candidates = Vec::with_capacity(handles.len());
     for (i, handle) in handles.into_iter().enumerate() {
         crate::logging::info(&format!("[best-of-n] candidate {}/{} done", i + 1, total));
-        emit_progress(
-            event_tx,
-            &format!("Best-of-N: candidate {}/{} complete…", i + 1, total),
-        );
         match handle.await {
             Ok(c) => candidates.push(c),
             Err(e) => {
@@ -235,25 +253,226 @@ pub async fn run_best_of_n_with_progress(
                 });
             }
         }
+        let ui_rows = candidates
+            .iter()
+            .enumerate()
+            .map(|(idx, c)| BestOfNCandidateUi::from_candidate(idx, c, false))
+            .chain((candidates.len()..total).map(|idx| BestOfNCandidateUi {
+                index: idx,
+                candidate_id: CandidateId::new(idx).to_string(),
+                label: strategies[idx].label.clone(),
+                status: "running".to_string(),
+                file_count: 0,
+                files: Vec::new(),
+                error: None,
+                recommended: false,
+            }))
+            .collect();
+        emit_bon_progress(
+            event_tx,
+            BestOfNProgressPayload {
+                run_id: run_id.to_string(),
+                phase: BestOfNPhase::CandidateDone,
+                message: format!("Candidate {}/{} complete…", i + 1, total),
+                completed: i + 1,
+                total,
+                candidates: ui_rows,
+                recommended_index: None,
+                selection_reason: None,
+            },
+        );
     }
 
-    emit_progress(event_tx, "Best-of-N: selecting best candidate…");
+    emit_bon_progress(
+        event_tx,
+        BestOfNProgressPayload {
+            run_id: run_id.to_string(),
+            phase: BestOfNPhase::Selecting,
+            message: "Selecting best candidate…".to_string(),
+            completed: total,
+            total,
+            candidates: candidates
+                .iter()
+                .enumerate()
+                .map(|(idx, c)| BestOfNCandidateUi::from_candidate(idx, c, false))
+                .collect(),
+            recommended_index: None,
+            selection_reason: None,
+        },
+    );
 
     let selection = select_best_candidate(&candidates, &cfg.selector);
-    let files_applied = apply_winner(&run_id, &candidates, selection.winner_index, &store);
+    let mut ui_candidates: Vec<BestOfNCandidateUi> = candidates
+        .iter()
+        .enumerate()
+        .map(|(idx, c)| {
+            BestOfNCandidateUi::from_candidate(idx, c, idx == selection.winner_index)
+        })
+        .collect();
+
+    let (winner_index, cancelled) = if matches!(cfg.mode, BestOfNMode::Show) {
+        emit_bon_progress(
+            event_tx,
+            BestOfNProgressPayload {
+                run_id: run_id.to_string(),
+                phase: BestOfNPhase::AwaitingPick,
+                message: format!(
+                    "Recommended #{} — pick a winner or cancel",
+                    selection.winner_index
+                ),
+                completed: total,
+                total,
+                candidates: ui_candidates.clone(),
+                recommended_index: Some(selection.winner_index),
+                selection_reason: Some(selection.reason.clone()),
+            },
+        );
+        match await_user_pick(
+            parent,
+            &run_id,
+            selection.winner_index,
+            &selection.reason,
+            &ui_candidates,
+            event_tx,
+        )
+        .await
+        {
+            Ok(Some(idx)) => (idx, false),
+            Ok(None) => {
+                crate::tool::clear_best_of_n_handle();
+                store.clear_run(&run_id);
+                emit_bon_progress(
+                    event_tx,
+                    BestOfNProgressPayload {
+                        run_id: run_id.to_string(),
+                        phase: BestOfNPhase::Cancelled,
+                        message: "Best-of-N cancelled — no files applied.".to_string(),
+                        completed: total,
+                        total,
+                        candidates: ui_candidates,
+                        recommended_index: Some(selection.winner_index),
+                        selection_reason: Some(selection.reason.clone()),
+                    },
+                );
+                return Ok(BestOfNRunResult {
+                    run_id: run_id.to_string(),
+                    winner_index: selection.winner_index,
+                    candidates,
+                    selection_reason: selection.reason,
+                    files_applied: Vec::new(),
+                    cancelled: true,
+                });
+            }
+            Err(e) => {
+                crate::logging::warn(&format!(
+                    "[best-of-n] pick UI unavailable ({e}); falling back to auto recommendation"
+                ));
+                (selection.winner_index, false)
+            }
+        }
+    } else {
+        (selection.winner_index, false)
+    };
+
+    for row in &mut ui_candidates {
+        row.recommended = row.index == winner_index;
+    }
+
+    emit_bon_progress(
+        event_tx,
+        BestOfNProgressPayload {
+            run_id: run_id.to_string(),
+            phase: BestOfNPhase::Applying,
+            message: format!("Applying candidate #{winner_index}…"),
+            completed: total,
+            total,
+            candidates: ui_candidates.clone(),
+            recommended_index: Some(winner_index),
+            selection_reason: Some(selection.reason.clone()),
+        },
+    );
+
+    let files_applied = apply_winner(&run_id, &candidates, winner_index, &store);
 
     crate::tool::clear_best_of_n_handle();
     store.clear_run(&run_id);
 
-    emit_progress(event_tx, "Best-of-N: done.");
+    emit_bon_progress(
+        event_tx,
+        BestOfNProgressPayload {
+            run_id: run_id.to_string(),
+            phase: BestOfNPhase::Done,
+            message: "Best-of-N done.".to_string(),
+            completed: total,
+            total,
+            candidates: ui_candidates,
+            recommended_index: Some(winner_index),
+            selection_reason: Some(selection.reason.clone()),
+        },
+    );
 
     Ok(BestOfNRunResult {
         run_id: run_id.to_string(),
-        winner_index: selection.winner_index,
+        winner_index,
         candidates,
         selection_reason: selection.reason,
         files_applied,
+        cancelled,
     })
+}
+
+/// Wait for Face pick. Returns `Ok(Some(index))`, `Ok(None)` on cancel,
+/// or `Err` when no Face bridge is wired.
+async fn await_user_pick(
+    parent: &Agent,
+    run_id: &RunId,
+    recommended_index: usize,
+    selection_reason: &str,
+    candidates: &[BestOfNCandidateUi],
+    event_tx: &Option<tokio::sync::mpsc::UnboundedSender<ServerEvent>>,
+) -> Result<Option<usize>> {
+    let Some(tx) = parent.best_of_n_pick_tx.clone() else {
+        return Err(anyhow::anyhow!("best_of_n_pick_tx not wired"));
+    };
+
+    let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+    let request_id = format!("bon-pick-{run_id}");
+    let candidates_json = serde_json::to_value(candidates)?;
+    if tx
+        .send(BestOfNPickInputRequest {
+            request_id: request_id.clone(),
+            session_id: parent.session.id.clone(),
+            run_id: run_id.to_string(),
+            tool_call_id: request_id,
+            recommended_index,
+            selection_reason: selection_reason.to_string(),
+            candidates: candidates_json,
+            response_tx,
+        })
+        .is_err()
+    {
+        return Err(anyhow::anyhow!("best_of_n pick channel closed"));
+    }
+
+    let _ = event_tx; // progress already emitted; pick goes via best_of_n_pick_tx only
+
+    let response_value = response_rx
+        .await
+        .map_err(|_| anyhow::anyhow!("best_of_n pick response dropped"))?
+        .map_err(|e| anyhow::anyhow!("best_of_n pick failed: {e}"))?;
+
+    let ext: BestOfNPickExtResponse = serde_json::from_value(response_value)
+        .map_err(|e| anyhow::anyhow!("invalid best_of_n pick response: {e}"))?;
+
+    match ext {
+        BestOfNPickExtResponse::Selected { index } => {
+            if index >= candidates.len() {
+                return Err(anyhow::anyhow!("pick index {index} out of range"));
+            }
+            Ok(Some(index))
+        }
+        BestOfNPickExtResponse::Cancelled => Ok(None),
+    }
 }
 
 async fn spawn_and_run_candidate(
@@ -427,11 +646,88 @@ impl Agent {
     }
 }
 
-/// Send a progress update through the event channel if present.
-fn emit_progress(event_tx: &Option<tokio::sync::mpsc::UnboundedSender<ServerEvent>>, text: &str) {
-    if let Some(tx) = event_tx {
-        let _ = tx.send(ServerEvent::TextDelta {
-            text: format!("[best-of-n] {text}\n"),
+fn emit_bon_progress(
+    event_tx: &Option<tokio::sync::mpsc::UnboundedSender<ServerEvent>>,
+    payload: BestOfNProgressPayload,
+) {
+    // Always log a human line for headless / TUI text consumers.
+    crate::logging::info(&format!("[best-of-n] {}", payload.message));
+    let Some(tx) = event_tx else {
+        return;
+    };
+    let json = serde_json::to_value(&payload).unwrap_or(serde_json::Value::Null);
+    let _ = tx.send(ServerEvent::BestOfNProgress { payload: json });
+    // Dual-write a short TextDelta so older clients still see activity.
+    let _ = tx.send(ServerEvent::TextDelta {
+        text: format!("[best-of-n] {}\n", payload.message),
+    });
+}
+
+/// Format a user-facing summary for session history.
+pub fn format_run_summary(result: &BestOfNRunResult) -> String {
+    if result.cancelled {
+        return format!(
+            "BEST-OF-N CANCELLED\n\
+             Candidates: {}\n\
+             Recommended (not applied): #{}\n\
+             Reason: {}\n",
+            result.candidates.len(),
+            result.winner_index,
+            result.selection_reason,
+        );
+    }
+    let winner = result
+        .candidates
+        .get(result.winner_index)
+        .map(|c| c.strategy.label.as_str())
+        .unwrap_or("unknown");
+    let files = if result.files_applied.is_empty() {
+        "  (none)".to_string()
+    } else {
+        result
+            .files_applied
+            .iter()
+            .map(|f| format!("  - {f}"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    format!(
+        "BEST-OF-N MODE ENABLED!\n\
+         Candidates: {}\n\
+         Winner: #{} ({})\n\
+         Reason: {}\n\
+         Files applied:\n{}",
+        result.candidates.len(),
+        result.winner_index,
+        winner,
+        result.selection_reason,
+        files,
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use next_code_best_of_n::BestOfNPickExtResponse;
+
+    #[test]
+    fn format_run_summary_cancelled() {
+        let summary = format_run_summary(&BestOfNRunResult {
+            run_id: "r1".into(),
+            winner_index: 1,
+            candidates: Vec::new(),
+            selection_reason: "focused".into(),
+            files_applied: Vec::new(),
+            cancelled: true,
         });
+        assert!(summary.contains("CANCELLED"));
+        assert!(summary.contains("not applied"));
+    }
+
+    #[test]
+    fn pick_ext_selected_parses() {
+        let v = serde_json::json!({ "outcome": "selected", "index": 2 });
+        let ext: BestOfNPickExtResponse = serde_json::from_value(v).unwrap();
+        assert_eq!(ext, BestOfNPickExtResponse::Selected { index: 2 });
     }
 }

@@ -258,6 +258,9 @@ pub struct Agent {
     /// Channel for AskUserQuestion tool → Face ACP reverse request
     ask_user_question_tx:
         Option<tokio::sync::mpsc::UnboundedSender<crate::tool::AskUserQuestionInputRequest>>,
+    /// Channel for Best-of-N `mode=show` pick → Face ACP reverse request
+    pub(crate) best_of_n_pick_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<crate::tool::BestOfNPickInputRequest>>,
     /// Canonical reducer-backed view of runtime provider/model selection.
     provider_runtime_state: ProviderRuntimeState,
     /// Hook registry for dispatching lifecycle hooks.
@@ -376,6 +379,7 @@ impl Agent {
             rewind_undo_snapshot: None,
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            best_of_n_pick_tx: None,
             provider_runtime_state: ProviderRuntimeState::observed(initial_provider_model),
             hook_registry: HookRegistry::default(),
             dispatch_config: DispatchConfig::default(),

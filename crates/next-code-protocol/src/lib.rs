@@ -624,6 +624,7 @@ impl Request {
             Request::StdinResponse { id, .. } => *id,
             Request::AskUserQuestionResponse { id, .. } => *id,
             Request::PermissionResponse { id, .. } => *id,
+            Request::BestOfNPickResponse { id, .. } => *id,
             Request::SetPermissionMode { id, .. } => *id,
             Request::AgentRegister { id, .. } => *id,
             Request::AgentTask { id, .. } => *id,

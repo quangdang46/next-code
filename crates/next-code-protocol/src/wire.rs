@@ -388,6 +388,18 @@ pub enum Request {
         allow_once_code: String,
     },
 
+    /// Reply to a blocking Best-of-N winner pick (`mode=show`).
+    #[serde(rename = "best_of_n_pick_response")]
+    BestOfNPickResponse {
+        id: u64,
+        /// Matches the request_id from BestOfNPickRequest
+        request_id: String,
+        /// `BestOfNPickExtResponse` JSON, or null + error
+        response: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+
     // === Agent-to-agent communication ===
     /// Register as an external agent
     #[serde(rename = "agent_register")]
@@ -1511,5 +1523,26 @@ pub enum ServerEvent {
         /// Best-effort tool call id for ACP ToolCallUpdate (may be empty).
         #[serde(default)]
         tool_call_id: String,
+    },
+
+    /// Best-of-N run progress (candidate cards / status strip).
+    /// Face renders via `x.ai/best_of_n/progress` session notification.
+    #[serde(rename = "best_of_n_progress")]
+    BestOfNProgress {
+        /// `BestOfNProgressPayload` JSON
+        payload: serde_json::Value,
+    },
+
+    /// Best-of-N `mode=show` winner picker (Face ACP `x.ai/best_of_n/pick`).
+    #[serde(rename = "best_of_n_pick_request")]
+    BestOfNPickRequest {
+        request_id: String,
+        session_id: String,
+        run_id: String,
+        tool_call_id: String,
+        recommended_index: usize,
+        selection_reason: String,
+        /// `Vec<BestOfNCandidateUi>` JSON
+        candidates: serde_json::Value,
     },
 }
