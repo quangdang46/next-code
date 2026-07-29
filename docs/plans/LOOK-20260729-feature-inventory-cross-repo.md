@@ -579,3 +579,35 @@ Do **not** claim â€œP0s doneâ€ until the P0 row below is honestly **Has
 - Prior shallow matrix: `docs/plans/LOOK-20260729-face-best-of-repos-matrix.md` â€” treat as superseded for â€œdoneâ€ claims.  
 - Earlier Claude gap look (2026-07-24): `LOOK-20260724-claude-code-ux-gaps-for-face.md` â€” many items shipped as Partial; this doc re-scores vs all repos.
 
+Honest inventory is on `review`; prior “P0s done” claims were too shallow. Two portable gaps shipped this session.
+
+### 1. Inventory + PR
+- **Doc:** [`docs/plans/LOOK-20260729-feature-inventory-cross-repo.md`](https://github.com/quangdang46/next-code/blob/review/docs/plans/LOOK-20260729-feature-inventory-cross-repo.md)
+- **PR:** https://github.com/quangdang46/next-code/pull/136 (merged)
+
+Covers all `.tmp` repos (claude-code, opencode, codex, crush, codebuff, grok-build, gajae, oh-my-pi, oh-my-openagent, pi, pi_agent_rust) with file pointers, comparison table, and Face **has / partial / missing** scoring.
+
+### 2. Top gaps (user-facing)
+| Priority | Gap | Best source |
+|----------|-----|-------------|
+| P0 | OpenCode **which-key** pending-key overlay | opencode `which-key.tsx` |
+| P0 | Prompt **vim Normal/Insert** (Face `/vim-mode` is scrollback-only) | gajae / Claude |
+| P0 | Multi-entry **prompt stash** dialog | OpenCode `dialog-stash` |
+| P0 | DiffReview **split \| unified** | Crush `diffview` |
+| P0 | **LSP diagnostics/symbols in chat** | Crush + oh-my lsp |
+| P1 | Session tags, timeline fork, workspace file-changes | OpenCode |
+| P1 | `/doctor`, toast stack, external-editor-for-prompt | Claude / Codex |
+| P1 | Effort ignition panel, memdir depth, `@Agent` chips | Codex / Claude / Codebuff |
+| … | Dozens more in the inventory (conversation tree, MCP elicitation, output-style, collab/tmux, …) | |
+
+`#124–#135` stay useful but many are still **Partial** vs best reference (e.g. `#133` was mouse-only until `#137`).
+
+### 3. Implemented this session
+| PR | What |
+|----|------|
+| [#136](https://github.com/quangdang46/next-code/pull/136) | Exhaustive inventory |
+| [#137](https://github.com/quangdang46/next-code/pull/137) | Claude **footer keyboard snag** (Down / arrows / Enter / Esc on tasks + `@agent` pills) |
+| [#138](https://github.com/quangdang46/next-code/pull/138) | Codex **reasoning + run-state** statusline segments (+ Settings / `/statusline`) |
+
+### 4. Remaining backlog
+Long by design — see inventory §3–§4. Next implement order still starts with **which-key → prompt stash → DiffReview split → prompt vim → LSP-in-chat**, then the P1 cluster. Not claiming “nothing left.”
