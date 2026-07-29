@@ -44,6 +44,13 @@ pub(super) fn handle_models_update(notif: &acp::ExtNotification, app: &mut AppVi
                 .models
                 .update_catalog(new_models.available.clone(), shell_fallback_current.clone());
         }
+        // Mid-session `/connect`: catalog arrives via models/update after the
+        // daemon NotifyAuthChanged refresh — open the deferred Select-model picker.
+        if app.open_model_picker_after_auth {
+            let mut effects = Vec::new();
+            crate::app::dispatch::maybe_open_model_picker_after_connect(app, &mut effects);
+            app.pending_effects.extend(effects);
+        }
         true
     } else {
         tracing::warn!("Failed to parse x.ai/models/update");

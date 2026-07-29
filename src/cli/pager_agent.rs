@@ -1461,6 +1461,160 @@ impl NextCodeFaceAgent {
         emit_models_update_via(&self.gateway, model, provider_name, available).await;
     }
 
+    /// Tell the daemon Face just wrote provider credentials (mirror classic TUI
+    /// `NotifyAuthChanged` after login). Prefer a live Face session socket so
+    /// `AvailableModelsUpdated` reaches the idle catalog pump; otherwise open a
+    /// short-lived Subscribe connection and wait until the catalog snapshot
+    /// lands so cold-start `NewSession` History is non-empty.
+    async fn notify_daemon_after_face_auth(&self, provider_key: Option<&str>) {
+        let provider_hint = provider_key.and_then(crate::cli::face_auth::auth_provider_hint_for_connect);
+        let auth = provider_key.and_then(crate::cli::face_auth::auth_changed_event_for_connect);
+
+        let live: Option<Rc<DaemonSession>> = self
+            .sessions
+            .borrow()
+            .values()
+            .next()
+            .cloned();
+
+        if let Some(session) = live {
+            let id = session.next_id();
+            if let Err(err) = session
+                .send(&Request::NotifyAuthChanged {
+                    id,
+                    provider: provider_hint.map(str::to_string),
+                    auth,
+                    prefer_strongest: false,
+                })
+                .await
+            {
+                let reason = err.to_string();
+                crate::logging::auth_event(
+                    "face_auth_changed_notify_failed",
+                    provider_hint.unwrap_or("auth"),
+                    &[("reason", reason.as_str())],
+                );
+                return;
+            }
+            crate::logging::auth_event(
+                "face_auth_changed_notify_sent",
+                provider_hint.unwrap_or("auth"),
+                &[("path", "live_session")],
+            );
+            // Idle catalog pump owns the socket reader — do not wait here.
+            return;
+        }
+
+        if let Err(err) = self
+            .notify_auth_via_temp_connection(provider_hint, auth)
+            .await
+        {
+            let reason = err.to_string();
+            crate::logging::auth_event(
+                "face_auth_changed_notify_failed",
+                provider_hint.unwrap_or("auth"),
+                &[("reason", reason.as_str()), ("path", "temp")],
+            );
+        }
+    }
+
+    async fn notify_auth_via_temp_connection(
+        &self,
+        provider_hint: Option<&'static str>,
+        auth: Option<crate::protocol::AuthChanged>,
+    ) -> Result<()> {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let (reader, writer) = Self::connect_halves().await?;
+        let session = DaemonSession::new(String::new(), reader, writer, 2, Some(cwd.clone()));
+        let subscribe_id = 1;
+        session
+            .send(&Request::Subscribe {
+                id: subscribe_id,
+                working_dir: Some(cwd.display().to_string()),
+                selfdev: None,
+                target_session_id: None,
+                client_instance_id: Some("face-auth-notify".to_string()),
+                client_has_local_history: false,
+                allow_session_takeover: false,
+                terminal_env: crate::terminal_launch::snapshot_client_terminal_env(),
+            })
+            .await?;
+        wait_for_done(&session, subscribe_id).await?;
+
+        let notify_id = session.next_id();
+        session
+            .send(&Request::NotifyAuthChanged {
+                id: notify_id,
+                provider: provider_hint.map(str::to_string),
+                auth,
+                prefer_strongest: false,
+            })
+            .await?;
+
+        // Done returns immediately; AvailableModelsUpdated arrives after the
+        // async auth refresh. Wait so subsequent NewSession History sees models.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        let mut saw_done = false;
+        let mut saw_models = false;
+        while tokio::time::Instant::now() < deadline && !(saw_done && saw_models) {
+            let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+            match tokio::time::timeout(remaining, session.read_event()).await {
+                Ok(Ok(ServerEvent::Done { id })) if id == notify_id => {
+                    saw_done = true;
+                }
+                Ok(Ok(ServerEvent::AvailableModelsUpdated {
+                    provider_name,
+                    provider_model,
+                    available_models,
+                    ..
+                })) => {
+                    saw_models = true;
+                    let current = provider_model
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|s| !s.is_empty())
+                        .map(str::to_string)
+                        .or_else(|| {
+                            available_models
+                                .iter()
+                                .map(|s| s.trim())
+                                .find(|s| !s.is_empty())
+                                .map(str::to_string)
+                        });
+                    if let Some(current) = current {
+                        emit_models_update_via(
+                            &self.gateway,
+                            &current,
+                            provider_name.as_deref(),
+                            &available_models,
+                        )
+                        .await;
+                    }
+                }
+                Ok(Ok(ServerEvent::Error {
+                    id,
+                    message,
+                    ..
+                })) if id == notify_id => {
+                    anyhow::bail!(message);
+                }
+                Ok(Ok(_)) => {}
+                Ok(Err(err)) => return Err(err),
+                Err(_) => break,
+            }
+        }
+        crate::logging::auth_event(
+            "face_auth_changed_notify_sent",
+            provider_hint.unwrap_or("auth"),
+            &[
+                ("path", "temp"),
+                ("saw_done", if saw_done { "1" } else { "0" }),
+                ("saw_models", if saw_models { "1" } else { "0" }),
+            ],
+        );
+        Ok(())
+    }
+
     /// Forward daemon `AvailableModelsUpdated` (and keep catalog cache warm).
     async fn apply_available_models_updated(
         &self,
@@ -1679,8 +1833,20 @@ impl acp::Agent for NextCodeFaceAgent {
         args: acp::AuthenticateRequest,
     ) -> acp::Result<acp::AuthenticateResponse> {
         let method_id = args.method_id.0.as_ref();
+        let provider_key = crate::cli::face_auth::provider_id_from_method(method_id)
+            .map(str::to_string);
         match crate::cli::face_auth::authenticate_method(method_id).await {
-            Ok(()) => Ok(acp::AuthenticateResponse::new()),
+            Ok(()) => {
+                // Classic TUI sends NotifyAuthChanged after login so the daemon
+                // reloads credentials and pushes AvailableModelsUpdated. Face
+                // previously only wrote auth.json — daemon stayed on a stale
+                // empty catalog → status `unknown` + Popular-providers picker.
+                if method_id != "xai.api_key" {
+                    self.notify_daemon_after_face_auth(provider_key.as_deref())
+                        .await;
+                }
+                Ok(acp::AuthenticateResponse::new())
+            }
             Err(err) => Err(acp::Error::internal_error().data(err.to_string())),
         }
     }

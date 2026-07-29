@@ -65,6 +65,64 @@ pub fn is_nextcode_auth_method(method_id: &str) -> bool {
     method_id.starts_with(METHOD_PREFIX)
 }
 
+/// Canonical auth provider id for `NotifyAuthChanged` after a Face `/connect`.
+///
+/// Mirrors classic TUI `auth_provider_hint_for_login_provider` so the daemon
+/// attributes the catalog refresh to the provider that just received credentials.
+pub(crate) fn auth_provider_hint_for_connect(provider: &str) -> Option<&'static str> {
+    let provider = provider.trim();
+    if provider.is_empty() || provider == "connect" || provider == CUSTOM_PROVIDER_SENTINEL {
+        return None;
+    }
+    if provider.eq_ignore_ascii_case("azure")
+        || provider.eq_ignore_ascii_case("azure-openai")
+        || provider.eq_ignore_ascii_case("azure openai")
+    {
+        return Some("azure-openai");
+    }
+
+    let descriptor = resolve_login_provider(provider)
+        .or_else(|| resolve_login_provider_loose(provider))?;
+    match descriptor.target {
+        LoginProviderTarget::Azure => Some("azure-openai"),
+        LoginProviderTarget::OpenAiCompatible(profile) => Some(profile.id),
+        LoginProviderTarget::AutoImport => None,
+        _ => Some(descriptor.id),
+    }
+}
+
+/// Typed `AuthChanged` payload for Face credential paste / OAuth complete.
+pub(crate) fn auth_changed_event_for_connect(
+    provider: &str,
+) -> Option<crate::protocol::AuthChanged> {
+    let provider_id = auth_provider_hint_for_connect(provider)?;
+    let mut auth = crate::protocol::AuthChanged::new(provider_id);
+    let api_key_login = resolve_login_provider(provider)
+        .or_else(|| resolve_login_provider_loose(provider))
+        .map(|descriptor| {
+            matches!(
+                descriptor.auth_kind,
+                LoginProviderAuthKind::ApiKey | LoginProviderAuthKind::Hybrid
+            )
+        })
+        .unwrap_or(true);
+    if api_key_login {
+        auth.auth_method = Some(crate::protocol::AuthMethod::RemoteTuiPasteApiKey);
+        auth.credential_source = Some(crate::protocol::AuthCredentialSource::ApiKeyFile);
+    }
+    if provider_id == "azure-openai" {
+        auth.expected_runtime = Some(crate::protocol::RuntimeProviderKey::new("azure-openai"));
+        auth.expected_catalog_namespace =
+            Some(crate::protocol::CatalogNamespace::new("azure-openai"));
+    } else if crate::provider_catalog::openai_compatible_profile_by_id(provider_id).is_some() {
+        auth.expected_runtime = Some(crate::protocol::RuntimeProviderKey::new(
+            "openai-compatible",
+        ));
+        auth.expected_catalog_namespace = Some(crate::protocol::CatalogNamespace::new(provider_id));
+    }
+    Some(auth)
+}
+
 pub fn last_connect_credential_path() -> Option<String> {
     LAST_CONNECT_CREDENTIAL_PATH
         .lock()

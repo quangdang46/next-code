@@ -440,28 +440,34 @@ pub(super) fn handle_auth_complete(
 /// After `/connect` auth succeeds, open the Select-model ArgPicker (OpenCode
 /// `dialog.replace(DialogModel)` parity). No-op when the flag is unset
 /// (plain `/login` / 401 re-auth) or when the active view cannot host a picker.
-fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: &mut Vec<Effect>) {
+///
+/// When the model catalog is still empty (daemon has not pushed History /
+/// `x.ai/models/update` yet), keep the flag set and return — callers reopen
+/// once models land (`SessionCreated` / models update). Opening early shows
+/// only Popular providers and leaves the status bar on `unknown`.
+pub(crate) fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: &mut Vec<Effect>) {
     if !app.open_model_picker_after_auth {
+        return;
+    }
+    if app.models.is_empty() {
         return;
     }
     app.open_model_picker_after_auth = false;
 
     // Prefer the shared catalog so the picker is populated when agents still
     // hold a stale/empty session ModelState (cold start / pre-refresh).
-    if !app.models.is_empty() {
-        match app.active_view {
-            ActiveView::Agent(id) => {
-                if let Some(agent) = app.agents.get_mut(&id) {
-                    agent.session.models = app.models.clone();
-                }
+    match app.active_view {
+        ActiveView::Agent(id) => {
+            if let Some(agent) = app.agents.get_mut(&id) {
+                agent.session.models = app.models.clone();
             }
-            ActiveView::AgentDashboard => {
-                if let Some(dashboard) = app.dashboard.as_mut() {
-                    dashboard.models = app.models.clone();
-                }
-            }
-            ActiveView::Welcome => {}
         }
+        ActiveView::AgentDashboard => {
+            if let Some(dashboard) = app.dashboard.as_mut() {
+                dashboard.models = app.models.clone();
+            }
+        }
+        ActiveView::Welcome => {}
     }
 
     app.show_toast("Connected — pick a model");

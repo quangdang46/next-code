@@ -809,7 +809,7 @@ pub(in crate::app::dispatch) fn handle_session_created(
     let agent_count = app.agents.len();
     let switch_hint =
         crate::views::dashboard::session_switch_hint_command(app.screen_mode.is_minimal());
-    if let Some(agent) = app.agents.get_mut(&agent_id) {
+    let mut effects = if let Some(agent) = app.agents.get_mut(&agent_id) {
         let session_id_clone = session_id.clone();
         if agent.session.created_via_new
             && agent_count > 1
@@ -897,9 +897,14 @@ pub(in crate::app::dispatch) fn handle_session_created(
         });
         notify_session_ready(&app.notification_service, agent);
         note_peek_page_flip(app, agent_id, drain.page_flip_entry);
-        return effects;
-    }
-    vec![]
+        effects
+    } else {
+        return vec![];
+    };
+    // Post-/connect: catalog often lands with SessionCreated — open picker now
+    // if AuthComplete deferred because models were still empty.
+    crate::app::dispatch::maybe_open_model_picker_after_connect(app, &mut effects);
+    effects
 }
 pub(in crate::app::dispatch) fn handle_worktree_session_created(
     app: &mut AppView,
