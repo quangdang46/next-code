@@ -637,6 +637,98 @@ pub(super) fn dispatch_toggle_yolo(app: &mut AppView) -> Vec<Effect> {
     set_yolo_mode(app, new)
 }
 
+/// Alt+T — Claude thinking-toggle muscle memory for Face's multi-level effort.
+///
+/// - Model offers `none`: toggle off (`none`) ↔ previous / default on level.
+/// - Otherwise: cycle the model's offered effort list (Grok menus omit `none`).
+pub(super) fn dispatch_toggle_thinking_effort(app: &mut AppView) -> Vec<Effect> {
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    let Some(model_id) = agent.session.models.current.clone() else {
+        agent.show_toast("No active model");
+        return vec![];
+    };
+    let options = agent.session.models.reasoning_effort_options();
+    let current = agent.session.models.reasoning_effort;
+    let Some((next, toast)) =
+        plan_thinking_effort_toggle(current, &options, &mut agent.thinking_effort_stash)
+    else {
+        agent.show_toast("This model does not support reasoning effort");
+        return vec![];
+    };
+    agent.show_toast(&toast);
+    if current == Some(next) {
+        return vec![];
+    }
+    let Some(session_id) = agent.session.session_id.clone() else {
+        agent.session.deferred_model_switch = Some((model_id, Some(next)));
+        return vec![];
+    };
+    let prev_model_id = agent.session.models.current.clone();
+    agent.session.model_switch_pending = true;
+    vec![Effect::SwitchModel {
+        agent_id: id,
+        session_id,
+        model_id,
+        effort: Some(next),
+        prev_model_id,
+    }]
+}
+
+/// Pure Alt+T planner. `None` means the model has no effort menu.
+pub(crate) fn plan_thinking_effort_toggle(
+    current: Option<xai_grok_shell::sampling::types::ReasoningEffort>,
+    options: &[xai_grok_shell::sampling::types::ReasoningEffortOption],
+    stash: &mut Option<xai_grok_shell::sampling::types::ReasoningEffort>,
+) -> Option<(xai_grok_shell::sampling::types::ReasoningEffort, String)> {
+    use xai_grok_shell::sampling::types::ReasoningEffort;
+
+    if options.is_empty() {
+        return None;
+    }
+    let offers_none = options.iter().any(|o| o.value == ReasoningEffort::None);
+    if offers_none {
+        let is_off = current == Some(ReasoningEffort::None);
+        if is_off {
+            let restore = stash
+                .take()
+                .filter(|e| *e != ReasoningEffort::None)
+                .filter(|e| options.iter().any(|o| o.value == *e))
+                .or_else(|| {
+                    options
+                        .iter()
+                        .find(|o| o.default && o.value != ReasoningEffort::None)
+                        .map(|o| o.value)
+                })
+                .or_else(|| {
+                    options
+                        .iter()
+                        .find(|o| o.value != ReasoningEffort::None)
+                        .map(|o| o.value)
+                })
+                .unwrap_or(ReasoningEffort::High);
+            return Some((restore, format!("Thinking on ({restore})")));
+        }
+        if let Some(c) = current.filter(|e| *e != ReasoningEffort::None) {
+            *stash = Some(c);
+        }
+        return Some((ReasoningEffort::None, "Thinking off".into()));
+    }
+
+    // No `none` in the menu (typical Grok fallback): cycle offered levels.
+    let levels: Vec<_> = options.iter().map(|o| o.value).collect();
+    let next = match current.and_then(|c| levels.iter().position(|&v| v == c)) {
+        Some(idx) => levels[(idx + 1) % levels.len()],
+        // Unknown / unset → land on the first offered level (not wrap from last).
+        None => levels[0],
+    };
+    Some((next, format!("Effort: {next}")))
+}
+
 /// Shift+Tab mode cycle from the agent chat view: the shared cycle body plus
 /// plan-nudge acceptance telemetry (the nudge advertises this chord). The
 /// dashboard peek calls [`dispatch_cycle_mode_and_sync`] instead, so a peeked
@@ -1135,5 +1227,118 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             }
             effects
         }
+    }
+}
+
+#[cfg(test)]
+mod thinking_effort_toggle_tests {
+    use super::plan_thinking_effort_toggle;
+    use xai_grok_shell::sampling::types::{ReasoningEffort, ReasoningEffortOption};
+
+    fn opt(value: ReasoningEffort, default: bool) -> ReasoningEffortOption {
+        ReasoningEffortOption {
+            id: value.as_str().to_string(),
+            value,
+            label: value.to_string(),
+            description: None,
+            default,
+        }
+    }
+
+    #[test]
+    fn empty_options_returns_none() {
+        let mut stash = None;
+        assert!(plan_thinking_effort_toggle(Some(ReasoningEffort::High), &[], &mut stash).is_none());
+    }
+
+    #[test]
+    fn none_menu_toggles_off_and_restores_stash() {
+        let options = vec![
+            opt(ReasoningEffort::None, false),
+            opt(ReasoningEffort::High, true),
+        ];
+        let mut stash = None;
+        let (off, toast_off) = plan_thinking_effort_toggle(
+            Some(ReasoningEffort::High),
+            &options,
+            &mut stash,
+        )
+        .unwrap();
+        assert_eq!(off, ReasoningEffort::None);
+        assert_eq!(toast_off, "Thinking off");
+        assert_eq!(stash, Some(ReasoningEffort::High));
+
+        let (on, toast_on) =
+            plan_thinking_effort_toggle(Some(ReasoningEffort::None), &options, &mut stash).unwrap();
+        assert_eq!(on, ReasoningEffort::High);
+        assert_eq!(toast_on, "Thinking on (high)");
+        assert!(stash.is_none());
+    }
+
+    #[test]
+    fn none_menu_restore_falls_back_to_default_when_stash_empty() {
+        let options = vec![
+            opt(ReasoningEffort::None, false),
+            opt(ReasoningEffort::Low, false),
+            opt(ReasoningEffort::Medium, true),
+        ];
+        let mut stash = None;
+        let (on, _) =
+            plan_thinking_effort_toggle(Some(ReasoningEffort::None), &options, &mut stash).unwrap();
+        assert_eq!(on, ReasoningEffort::Medium);
+    }
+
+    #[test]
+    fn cycle_menu_advances_and_wraps() {
+        let options = vec![
+            opt(ReasoningEffort::Low, false),
+            opt(ReasoningEffort::Medium, true),
+            opt(ReasoningEffort::High, false),
+        ];
+        let mut stash = None;
+        let (a, t) = plan_thinking_effort_toggle(
+            Some(ReasoningEffort::Low),
+            &options,
+            &mut stash,
+        )
+        .unwrap();
+        assert_eq!(a, ReasoningEffort::Medium);
+        assert_eq!(t, "Effort: medium");
+
+        let (b, _) = plan_thinking_effort_toggle(
+            Some(ReasoningEffort::High),
+            &options,
+            &mut stash,
+        )
+        .unwrap();
+        assert_eq!(b, ReasoningEffort::Low);
+
+        let (c, _) = plan_thinking_effort_toggle(None, &options, &mut stash).unwrap();
+        assert_eq!(c, ReasoningEffort::Low);
+        assert!(stash.is_none(), "cycle path must not touch stash");
+    }
+
+    #[test]
+    fn alt_t_and_dagger_bind_toggle_thinking_effort() {
+        use crate::actions::{ActionId, ActionRegistry, When};
+        use crate::key;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let reg = ActionRegistry::defaults();
+        let alt_t = key!('t', ALT).to_key_event();
+        assert_eq!(
+            reg.lookup(&alt_t, When::PromptFocused),
+            Some(ActionId::ToggleThinkingEffort)
+        );
+        let dagger = KeyEvent::new(KeyCode::Char('†'), KeyModifiers::NONE);
+        assert_eq!(
+            reg.lookup(&dagger, When::PromptFocused),
+            Some(ActionId::ToggleThinkingEffort)
+        );
+        // Distinct from Ctrl+E expand-all-thinking (display fold).
+        assert_ne!(
+            reg.lookup(&key!('e', CONTROL).to_key_event(), When::ScrollbackFocused),
+            Some(ActionId::ToggleThinkingEffort)
+        );
     }
 }

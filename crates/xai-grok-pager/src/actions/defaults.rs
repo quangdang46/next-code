@@ -486,6 +486,23 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
                 "Steps the session mode: Normal -> Plan -> Always-Approve -> Normal.\nPlan keeps the agent planning first and writes no files; Always-Approve runs every tool call without asking.\nCtrl+O toggles auto-approve directly.",
             ),
         },
+        ActionDef {
+            id: ActionId::ToggleThinkingEffort,
+            label: "thinking",
+            description: "Toggle reasoning effort (Alt+T)",
+            // Claude: meta+t / alt+t. Apple Terminal Option+T often arrives as †
+            // with no Alt modifier — bind that glyph so muscle memory still works.
+            default_key: key!('t', ALT),
+            alt_keys: vec![key!('†')],
+            category: Category::Input,
+            context: When::PromptFocused,
+            hint_priority: None,
+            hint_key_display: Some("Alt+T"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Toggles reasoning effort for the current model (Claude Alt+T / thinking-toggle parity).\nWhen the model offers `none`, switches between off and the previous level; otherwise cycles the model's offered effort list.\nUse /effort to pick a specific level.",
+            ),
+        },
     // ── Agent team panel (Claude-style) ─────────────────────────────
         ActionDef {
             id: ActionId::AgentPanelSelectPrev,

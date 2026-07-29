@@ -101,6 +101,8 @@ pub enum ActionId {
 
     // Prompt
     CycleMode,
+    /// Alt+T — toggle reasoning effort (Claude thinking-toggle muscle memory).
+    ToggleThinkingEffort,
     BashMode,
 
     // Scrollback (contextual)

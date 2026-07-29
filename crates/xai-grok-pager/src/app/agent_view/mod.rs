@@ -790,6 +790,9 @@ pub struct AgentView {
     /// Multiline input mode: swap Enter (insert newline) and Shift+Enter (send).
     /// Toggled by `Ctrl+M` or `/multiline`. Not persisted across sessions.
     pub multiline_mode: bool,
+    /// Last non-`none` reasoning effort before Alt+T turned thinking off.
+    /// Restored on the next Alt+T when the model menu offers `none`.
+    pub(crate) thinking_effort_stash: Option<xai_grok_shell::sampling::types::ReasoningEffort>,
     /// Vim-mode scrollback keybindings. When `false` (default), bare-letter
     /// and Shift+letter scrollback bindings (j/k, h/l, g/G, y/Y, o/O, r,
     /// x, e/E, L/H, plus the `i` FocusPrompt alt) are suppressed and the
@@ -2116,6 +2119,7 @@ fn resolve_action(action_id: Option<ActionId>) -> Option<InputOutcome> {
         ActionId::FocusScrollback => Action::FocusScrollback,
         ActionId::NextModel => Action::NextModel,
         ActionId::CycleMode => Action::CycleMode,
+        ActionId::ToggleThinkingEffort => Action::ToggleThinkingEffort,
         ActionId::CancelTurn
         | ActionId::Quit
         | ActionId::ExitSession

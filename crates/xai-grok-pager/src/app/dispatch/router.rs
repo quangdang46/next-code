@@ -34,7 +34,8 @@ use super::interject::dispatch_interject;
 use super::jump::{dispatch_jump_dismiss, dispatch_jump_picker_select, dispatch_jump_show_picker};
 use super::modes::{
     dispatch_cycle_mode, dispatch_enter_plan_mode, dispatch_open_plan_in_editor, dispatch_show_plan,
-    dispatch_toggle_yolo, set_permission_mode, set_plan_mode, set_yolo_mode,
+    dispatch_toggle_thinking_effort, dispatch_toggle_yolo, set_permission_mode, set_plan_mode,
+    set_yolo_mode,
 };
 use super::notes::{
     dispatch_enter_feedback_mode, dispatch_enter_remember_mode,
@@ -975,6 +976,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::ShowPrivacyInfo => dispatch_show_privacy_info(app),
         Action::SetCodingDataSharing { opted_in } => set_coding_data_sharing(app, opted_in),
         Action::ToggleYolo => dispatch_toggle_yolo(app),
+        Action::ToggleThinkingEffort => dispatch_toggle_thinking_effort(app),
         Action::ToggleMultiline => dispatch_toggle_multiline(app),
         Action::ToggleCompactMode => dispatch_toggle_compact_mode(app),
         Action::ToggleVimMode => dispatch_toggle_vim_mode(app),

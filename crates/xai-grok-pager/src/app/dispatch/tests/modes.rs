@@ -2470,3 +2470,56 @@ fn set_plan_mode_off_emits_when_pending_false_but_active_true() {
     assert_eq!(agent.plan_mode_pending, Some(false));
     assert!(agent.pre_plan_mode.is_none(), "pre_plan_mode consumed on exit");
 }
+
+#[test]
+fn toggle_thinking_effort_cycles_when_menu_omits_none() {
+    use std::sync::Arc;
+    use xai_grok_shell::sampling::types::ReasoningEffort;
+
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        let model_id = acp::ModelId::new(Arc::from("reasoning-x"));
+        let info = acp::ModelInfo::new(model_id.clone(), "Reasoning X".to_string()).meta(
+            serde_json::json!({ "supportsReasoningEffort": true })
+                .as_object()
+                .cloned(),
+        );
+        agent.session.models.available.insert(model_id.clone(), info);
+        agent.session.models.current = Some(model_id.clone());
+        agent.session.models.reasoning_effort = Some(ReasoningEffort::Low);
+    }
+
+    let effects = dispatch(Action::ToggleThinkingEffort, &mut app);
+    assert_eq!(effects.len(), 1);
+    assert!(
+        matches!(
+            &effects[0],
+            Effect::SwitchModel {
+                effort: Some(ReasoningEffort::Xhigh),
+                ..
+            }
+        ),
+        "legacy menu is xhigh|high|medium|low (strongest first); Low→Xhigh wrap: {effects:?}"
+    );
+    assert!(app.agents[&id].session.model_switch_pending);
+}
+
+#[test]
+fn toggle_thinking_effort_toasts_when_unsupported() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        let model_id = acp::ModelId::new(std::sync::Arc::from("plain"));
+        let info = acp::ModelInfo::new(model_id.clone(), "Plain".to_string());
+        agent.session.models.available.insert(model_id.clone(), info);
+        agent.session.models.current = Some(model_id);
+        agent.session.models.reasoning_effort = None;
+    }
+
+    let effects = dispatch(Action::ToggleThinkingEffort, &mut app);
+    assert!(effects.is_empty());
+    assert!(!app.agents[&id].session.model_switch_pending);
+}
