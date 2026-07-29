@@ -69,7 +69,6 @@ pub fn candidates_to_question(
         ),
         options,
         multi_select: Some(false),
-        header: Some("Best-of-N".into()),
         id: Some("best_of_n_pick".into()),
     }
 }
