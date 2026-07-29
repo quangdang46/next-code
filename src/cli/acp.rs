@@ -815,24 +815,47 @@ impl EventMapper {
                 name,
                 output,
                 error,
-            } => vec![json!({
-                "sessionUpdate": "tool_call_update",
-                "toolCallId": id,
-                "title": tool_title(&name),
-                "kind": tool_kind(&name),
-                "status": if error.is_some() { "failed" } else { "completed" },
-                "content": [{
+                metadata,
+            } => {
+                let raw_input = self.tool_inputs.get(&id).and_then(|s| parse_json_object(s));
+                let mut content = Vec::new();
+                if error.is_none()
+                    && let Some(diff) = crate::cli::face_edit_diff::build_edit_diff_content(
+                        &name,
+                        raw_input.as_ref(),
+                        metadata.as_ref(),
+                    )
+                {
+                    if let Ok(value) = serde_json::to_value(&diff) {
+                        content.push(value);
+                    }
+                }
+                content.push(json!({
                     "type": "content",
                     "content": {
                         "type": "text",
                         "text": output,
                     }
-                }],
-                "rawOutput": {
+                }));
+                let mut raw_output = json!({
                     "output": output,
                     "error": error,
+                });
+                if let Some(meta) = metadata
+                    && let Some(object) = raw_output.as_object_mut()
+                {
+                    object.insert("metadata".to_string(), meta);
                 }
-            })],
+                vec![json!({
+                    "sessionUpdate": "tool_call_update",
+                    "toolCallId": id,
+                    "title": tool_title(&name),
+                    "kind": tool_kind(&name),
+                    "status": if error.is_some() { "failed" } else { "completed" },
+                    "content": content,
+                    "rawOutput": raw_output,
+                })]
+            }
             ServerEvent::GeneratedImage {
                 id,
                 path,
@@ -1056,7 +1079,9 @@ fn tool_title(name: &str) -> String {
         "bash" => "Running shell command".to_string(),
         "read" => "Reading file".to_string(),
         "write" => "Writing file".to_string(),
-        "edit" | "multiedit" | "patch" | "apply_patch" => "Editing files".to_string(),
+        "edit" | "multiedit" | "patch" | "apply_patch" | "hashline_edit" | "propose_hashline" => {
+            "Editing files".to_string()
+        }
         "grep" | "ffs grep" | "glob" | "ls" => "Searching workspace".to_string(),
         "webfetch" | "websearch" => "Fetching web content".to_string(),
         other => other.replace('_', " "),
@@ -1064,9 +1089,11 @@ fn tool_title(name: &str) -> String {
 }
 
 pub(crate) fn tool_kind(name: &str) -> &'static str {
+    if next_code_tui_tool_display::is_edit_tool_name(name) {
+        return "edit";
+    }
     match name {
         "read" => "read",
-        "write" | "edit" | "multiedit" | "patch" | "apply_patch" => "edit",
         "bash" | "bg" | "selfdev" => "execute",
         "grep" | "ffs grep" | "glob" | "ls" | "session_search" | "conversation_search" => "search",
         "webfetch" | "websearch" | "codesearch" => "fetch",
@@ -1101,6 +1128,7 @@ mod tests {
     fn acp_tool_kind_maps_core_tools() {
         assert_eq!(tool_kind("read"), "read");
         assert_eq!(tool_kind("apply_patch"), "edit");
+        assert_eq!(tool_kind("hashline_edit"), "edit");
         assert_eq!(tool_kind("bash"), "execute");
         assert_eq!(tool_kind("ffs grep"), "search");
         assert_eq!(tool_kind("webfetch"), "fetch");
@@ -1172,9 +1200,34 @@ mod tests {
             name: "bash".to_string(),
             output: "ok".to_string(),
             error: None,
+            metadata: None,
         });
         assert_eq!(done[0]["status"], "completed");
         assert_eq!(done[0]["content"][0]["content"]["text"], "ok");
+    }
+
+    #[test]
+    fn event_mapper_emits_diff_for_edit_tools() {
+        let mut mapper = EventMapper::new("session1".to_string(), AcpProfile::Standard);
+        mapper.map_event(ServerEvent::ToolStart {
+            id: "e1".to_string(),
+            name: "edit".to_string(),
+        });
+        mapper.map_event(ServerEvent::ToolInput {
+            delta: r#"{"file_path":"a.rs","old_string":"a","new_string":"b"}"#.to_string(),
+        });
+        let done = mapper.map_event(ServerEvent::ToolDone {
+            id: "e1".to_string(),
+            name: "edit".to_string(),
+            output: "Edited a.rs".to_string(),
+            error: None,
+            metadata: None,
+        });
+        assert_eq!(done[0]["kind"], "edit");
+        assert_eq!(done[0]["content"][0]["type"], "diff");
+        assert_eq!(done[0]["content"][0]["path"], "a.rs");
+        assert_eq!(done[0]["content"][0]["oldText"], "a");
+        assert_eq!(done[0]["content"][0]["newText"], "b");
     }
 
     #[test]

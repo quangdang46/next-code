@@ -820,6 +820,9 @@ pub enum ServerEvent {
         output: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+        /// Optional structured tool metadata (e.g. Face edit Diff old/new text).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        metadata: Option<serde_json::Value>,
     },
 
     /// Rendered images produced during the live turn, including image-bearing

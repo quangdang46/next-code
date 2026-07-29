@@ -498,7 +498,8 @@ fn test_tool_ids_match_between_start_and_done() {
         _ => None,
     });
     let done_id = replay_events.iter().find_map(|(_, e)| match e {
-        ReplayEvent::Server(ServerEvent::ToolDone { id, .. }) => Some(id.clone()),
+        ReplayEvent::Server(                metadata: None,
+ServerEvent::ToolDone { id, .. }) => Some(id.clone()),
         _ => None,
     });
 
@@ -560,7 +561,8 @@ fn test_batch_tool_input_preserved() {
         _ => None,
     });
     let done_id = replay_events.iter().find_map(|(_, e)| match e {
-        ReplayEvent::Server(ServerEvent::ToolDone { id, .. }) => Some(id.clone()),
+        ReplayEvent::Server(                metadata: None,
+ServerEvent::ToolDone { id, .. }) => Some(id.clone()),
         _ => None,
     });
     assert_eq!(

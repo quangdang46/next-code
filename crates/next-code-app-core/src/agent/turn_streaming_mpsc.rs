@@ -568,6 +568,7 @@ impl Agent {
                             } else {
                                 None
                             },
+                            metadata: None,
                         });
                         sdk_tool_results.insert(tool_use_id, (content, is_error));
                     }
@@ -1153,6 +1154,7 @@ impl Agent {
                         name: tc.name.clone(),
                         output: error_msg.clone(),
                         error: Some(error_msg.clone()),
+                    metadata: None,
                     });
                     self.add_message(
                         Role::User,
@@ -1365,6 +1367,7 @@ impl Agent {
                                 name: tc.name.clone(),
                                 output: output.output.clone(),
                                 error: None,
+                                metadata: output.metadata.clone(),
                             });
 
                             let side_pane_images =
@@ -1397,6 +1400,7 @@ impl Agent {
                                 name: tc.name.clone(),
                                 output: error_msg.clone(),
                                 error: Some(error_msg.clone()),
+                            metadata: None,
                             });
 
                             self.add_message_with_duration(
@@ -1435,6 +1439,7 @@ impl Agent {
                         } else {
                             None
                         },
+                        metadata: None,
                     });
 
                     self.add_message_with_duration(
@@ -1499,6 +1504,7 @@ impl Agent {
                         name: tc.name.clone(),
                         output: bg_msg.clone(),
                         error: None,
+                    metadata: None,
                     });
 
                     self.add_message_with_duration(
