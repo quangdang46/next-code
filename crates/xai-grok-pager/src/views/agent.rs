@@ -1339,7 +1339,9 @@ pub fn build_hints(
         hints.push(def.hint());
     }
     if can_demote {
-        hints.push(HintItem::new(crate::key!('g', CONTROL), "send to bg"));
+        if let Some(def) = registry.find(ActionId::SendToBackground) {
+            hints.push(def.hint());
+        }
     }
     hints
 }

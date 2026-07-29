@@ -1230,6 +1230,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::SuspendForEditor {
             path,
             refresh_agents_modal,
+            reload_keybindings,
         } => {
             if let ActiveView::Agent(id) = app.active_view
                 && let Some(agent) = app.agents.get_mut(&id)
@@ -1238,6 +1239,15 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             }
             app.pending_editor_path = Some(path);
             app.pending_agents_modal_refresh = refresh_agents_modal;
+            app.pending_keybindings_reload = reload_keybindings;
+            vec![]
+        }
+        Action::ReloadKeybindings => {
+            let enabled = crate::app::MOUSE_REPORTING_TOGGLE_ENABLED
+                .load(std::sync::atomic::Ordering::Acquire);
+            app.registry = crate::actions::ActionRegistry::reload_with_config(enabled);
+            let display = crate::actions::keybindings_display_path();
+            app.show_toast(&format!("Reloaded keybindings from {display}"));
             vec![]
         }
         Action::OpenDashboard => dispatch_open_dashboard(app),

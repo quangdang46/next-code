@@ -602,6 +602,14 @@ fn run_pending_suspends(
         {
             modal.refresh_after_editor(tab);
         }
+        if app.pending_keybindings_reload {
+            app.pending_keybindings_reload = false;
+            let enabled = crate::app::MOUSE_REPORTING_TOGGLE_ENABLED
+                .load(std::sync::atomic::Ordering::Acquire);
+            app.registry = crate::actions::ActionRegistry::reload_with_config(enabled);
+            let display = crate::actions::keybindings_display_path();
+            app.show_toast(&format!("Reloaded keybindings from {display}"));
+        }
         // The child owned the screen; re-anchor if it printed inline, and
         // repaint the full viewport rather than diffing against a screen
         // state we can no longer vouch for.
@@ -1306,7 +1314,7 @@ pub(crate) async fn run(
         effective_config.as_ref(),
         &app.current_ui,
     );
-    app.registry = crate::actions::ActionRegistry::defaults_with_config(mouse_toggle.value);
+    app.registry = crate::actions::ActionRegistry::with_user_keybindings(mouse_toggle.value);
     // Cache the resolved flag so the `/toggle-mouse-reporting` slash command can
     // gate its visibility/execution without re-reading config on every keystroke.
     crate::app::MOUSE_REPORTING_TOGGLE_ENABLED

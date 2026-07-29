@@ -15,6 +15,7 @@
 //! The bubbling is explicit in code, not hidden in `context_matches`.
 
 mod defaults;
+mod user_bindings;
 
 use crossterm::event::KeyEvent;
 
@@ -22,6 +23,11 @@ use crate::input::key::KeyShortcut;
 use crate::views::shortcuts_bar::HintItem;
 
 pub use defaults::{ctrl_dot_unreliable, default_actions};
+pub use user_bindings::{
+    apply_overrides, apply_user_keybindings, ensure_keybindings_file, generate_keybindings_template,
+    keybindings_display_path, keybindings_path, load_keybindings_file, load_user_keybindings,
+    parse_keybindings_json, LoadResult, ParsedOverride, KEYBINDINGS_FILE_NAME,
+};
 
 /// Unique action identifier. Compile-time checked, no strings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -229,8 +235,30 @@ impl ActionRegistry {
     }
 
     /// Create the default registry, optionally including config-gated actions.
+    ///
+    /// Does **not** read the user keybindings file (keeps unit tests hermetic).
+    /// Prefer [`Self::with_user_keybindings`] at Face startup / reload.
     pub fn defaults_with_config(mouse_reporting_toggle_enabled: bool) -> Self {
         Self::new(default_actions(mouse_reporting_toggle_enabled))
+    }
+
+    /// Defaults + config gates + merge `~/.next-code/keybindings.json` when present.
+    pub fn with_user_keybindings(mouse_reporting_toggle_enabled: bool) -> Self {
+        let mut actions = default_actions(mouse_reporting_toggle_enabled);
+        let warnings = apply_user_keybindings(&mut actions);
+        for w in warnings {
+            crate::unified_log::warn(
+                "keybindings.user_override",
+                None,
+                Some(serde_json::json!({ "warning": w })),
+            );
+        }
+        Self::new(actions)
+    }
+
+    /// Rebuild from defaults + optional mouse toggle + user file (for `/keybindings reload`).
+    pub fn reload_with_config(mouse_reporting_toggle_enabled: bool) -> Self {
+        Self::with_user_keybindings(mouse_reporting_toggle_enabled)
     }
 
     /// Look up an action by key event and current context.
