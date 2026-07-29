@@ -213,6 +213,10 @@ fn resolve_subagent_label(agent: &AgentView, session_id: &acp::SessionId) -> Opt
             info.description, info.subagent_type
         ));
     }
+    // Tier 1b: swarm teammate mirrored into the agent panel roster.
+    if let Some(member) = agent.swarm_members.get(sid) {
+        return Some(format!("Teammate \"{}\":", member.display_name()));
+    }
     // Tier 2: non-root session with no tracked info.
     Some("Child session (untracked):".to_string())
 }
