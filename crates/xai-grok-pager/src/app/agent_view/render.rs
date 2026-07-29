@@ -1862,6 +1862,22 @@ impl AgentView {
                 }
             }
         }
+        // Toast stack overlay (right-aligned above scrollback bottom).
+        if !self.toast_stack.is_empty() {
+            let sb = layout.scrollback;
+            let stack_area = Rect {
+                x: sb.x,
+                y: sb.bottom().saturating_sub(4).min(sb.y),
+                width: sb.width,
+                height: 3.min(sb.height),
+            };
+            crate::views::toast::ToastStack::render(
+                &self.toast_stack,
+                buf,
+                stack_area,
+                &theme,
+            );
+        }
         if tasks_height > 0 {
             let bg_focused = self.active_pane == ActivePane::Tasks && !overlay_focused;
             self.tasks.render(
@@ -2473,6 +2489,14 @@ impl AgentView {
                         if let Some(branch) = git_branch.as_ref() {
                             out.push((branch.clone(), false, None));
                         }
+                    }
+                    StatusLineSegment::ContextRemaining
+                    | StatusLineSegment::ThreadTitle
+                    | StatusLineSegment::ApprovalMode => {
+                        // These are rendered via StatusLineSnapshot directly
+                        // in the select_status_line_parts function in
+                        // xai-grok-shared — the legacy prompt-chrome path
+                        // (PromptInfo/PromptFlag) doesn't support them yet.
                     }
                 }
             }

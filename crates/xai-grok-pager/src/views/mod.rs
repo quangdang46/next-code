@@ -53,6 +53,7 @@ pub mod slash_dropdown;
 pub mod which_key;
 pub mod stash;
 pub mod stash_modal;
+pub mod toast;
 pub mod status_bar;
 pub mod subagent_catalog_pane;
 pub mod suggestion_controller;

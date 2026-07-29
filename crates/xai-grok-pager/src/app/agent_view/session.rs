@@ -234,6 +234,7 @@ impl AgentView {
             side_panel_focused: false,
             hit_side_panel_close: Default::default(),
             toast: None,
+            toast_stack: crate::views::toast::ToastStack::new(),
             ephemeral_tip: Default::default(),
             word_select_tip_prompt_snapshot: None,
             last_word_select_probe: None,
