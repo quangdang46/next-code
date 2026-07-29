@@ -4861,6 +4861,7 @@ impl AppView {
             for child_view in agent.subagent_views.values_mut() {
                 needs_redraw |= child_view.scrollback.tick();
                 needs_redraw |= child_view.tick_toast();
+                needs_redraw |= child_view.tick_toast_stack();
                 needs_redraw |= child_view.tick_ephemeral_tip();
                 needs_redraw |= child_view.tick_mode_banner();
                 needs_redraw |= child_view.tick_selection_highlight();
@@ -4899,6 +4900,7 @@ impl AppView {
             needs_redraw |= agent.prompt.history_search.poll();
             needs_redraw |= agent.poll_scrollback_search();
             needs_redraw |= agent.tick_toast();
+            needs_redraw |= agent.tick_toast_stack();
             needs_redraw |= agent.tick_extensions_result_notice();
             needs_redraw |= agent.tick_ephemeral_tip();
             needs_redraw |= agent.tick_mode_banner();
@@ -5172,6 +5174,7 @@ impl AppView {
                     || agent.scrollback_search.is_some()
                     || agent.line_viewer.is_some()
                     || agent.toast.is_some()
+                    || !agent.toast_stack.is_empty()
                     || agent
                         .extensions_modal
                         .as_ref()
@@ -5192,6 +5195,7 @@ impl AppView {
                     || !agent.permission_queue.is_empty()
                     || agent.subagent_views.iter().any(|(sid, child)| {
                         child.toast.is_some()
+                            || !child.toast_stack.is_empty()
                             || child.ephemeral_tip_needs_tick()
                             || child.mode_switch_banner.is_some()
                             || child.has_drag_autoscroll()

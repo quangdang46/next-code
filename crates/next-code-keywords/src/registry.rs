@@ -184,7 +184,7 @@ pub fn build_registry() -> &'static [&'static KeywordEntry] {
             },
             KeywordEntry {
                 keyword: "$bestofn",
-                aliases: &["bestofn", "bon"],
+                aliases: &["bestofn"],
                 phrase_aliases: &[],
                 priority: 6,
                 workflow: WorkflowKind::BestOfN,

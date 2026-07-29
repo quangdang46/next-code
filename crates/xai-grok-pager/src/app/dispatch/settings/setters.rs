@@ -1395,6 +1395,9 @@ define_status_line_bool_setter!(set_status_line_run_state, "status_line.run_stat
 define_status_line_bool_setter!(set_status_line_context, "status_line.context", "Status context %", context, true);
 define_status_line_bool_setter!(set_status_line_cwd, "status_line.cwd", "Status directory", cwd, false);
 define_status_line_bool_setter!(set_status_line_git, "status_line.git", "Status git", git, false);
+define_status_line_bool_setter!(set_status_line_context_remaining, "status_line.context_remaining", "Status context remaining", context_remaining, false);
+define_status_line_bool_setter!(set_status_line_thread_title, "status_line.thread_title", "Status thread title", thread_title, false);
+define_status_line_bool_setter!(set_status_line_approval_mode, "status_line.approval_mode", "Status approval mode", approval_mode, false);
 
 pub(super) fn set_status_line_order_inner(app: &mut AppView, raw: &str) {
     use xai_grok_shell::agent::config::StatusLineConfig;
@@ -1460,6 +1463,15 @@ pub(in crate::app::dispatch) fn toggle_status_line_segment(
         xai_grok_shell::agent::config::StatusLineSegment::Context => set_status_line_context(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Cwd => set_status_line_cwd(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Git => set_status_line_git(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::ContextRemaining => {
+            set_status_line_context_remaining(app, on)
+        }
+        xai_grok_shell::agent::config::StatusLineSegment::ThreadTitle => {
+            set_status_line_thread_title(app, on)
+        }
+        xai_grok_shell::agent::config::StatusLineSegment::ApprovalMode => {
+            set_status_line_approval_mode(app, on)
+        }
     }
 }
 

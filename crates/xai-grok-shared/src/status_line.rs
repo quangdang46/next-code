@@ -18,8 +18,14 @@ pub enum StatusLineSegment {
     /// Compact turn/run state (`idle` / `running` / `cancelling` / …).
     RunState,
     Context,
+    /// Exact context usage (e.g. "45k/128k") instead of percentage.
+    ContextRemaining,
     Cwd,
     Git,
+    /// Current session/agent title.
+    ThreadTitle,
+    /// Plan-mode or auto-approve indicator badge.
+    ApprovalMode,
 }
 
 impl StatusLineSegment {
@@ -29,8 +35,11 @@ impl StatusLineSegment {
         Self::Reasoning,
         Self::RunState,
         Self::Context,
+        Self::ContextRemaining,
         Self::Cwd,
         Self::Git,
+        Self::ThreadTitle,
+        Self::ApprovalMode,
     ];
 
     pub fn as_str(self) -> &'static str {
@@ -40,8 +49,11 @@ impl StatusLineSegment {
             Self::Reasoning => "reasoning",
             Self::RunState => "run-state",
             Self::Context => "context",
+            Self::ContextRemaining => "context_remaining",
             Self::Cwd => "cwd",
             Self::Git => "git",
+            Self::ThreadTitle => "thread_title",
+            Self::ApprovalMode => "approval_mode",
         }
     }
 
@@ -53,6 +65,9 @@ impl StatusLineSegment {
             "run-state" | "run_state" | "status" | "state" => Some(Self::RunState),
             "context" | "context%" | "ctx" => Some(Self::Context),
             "cwd" | "dir" | "directory" | "pwd" => Some(Self::Cwd),
+            "context_remaining" | "ctx_remaining" | "ctx_used" | "used" => Some(Self::ContextRemaining),
+            "thread_title" | "title" | "session" | "session_title" => Some(Self::ThreadTitle),
+            "approval_mode" | "approval" | "plan" | "auto" => Some(Self::ApprovalMode),
             "git" | "branch" => Some(Self::Git),
             _ => None,
         }
@@ -93,6 +108,15 @@ pub struct StatusLineConfig {
     /// Show git branch. `None` → off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<bool>,
+    /// Show exact context usage (e.g. "45k/128k"). `None` → off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_remaining: Option<bool>,
+    /// Show session/agent thread title. `None` → off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_title: Option<bool>,
+    /// Show plan-mode or auto-approve indicator. `None` → off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_mode: Option<bool>,
     /// Optional comma-separated reorder (`"model,mode,context"`). Unknown ids ignored.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub order: Option<String>,
@@ -108,6 +132,9 @@ impl StatusLineConfig {
             && self.context.is_none()
             && self.cwd.is_none()
             && self.git.is_none()
+            && self.context_remaining.is_none()
+            && self.thread_title.is_none()
+            && self.approval_mode.is_none()
             && self.order.is_none()
     }
 
@@ -132,6 +159,9 @@ impl StatusLineConfig {
             StatusLineSegment::Context => self.context.unwrap_or(default_on),
             StatusLineSegment::Cwd => self.cwd.unwrap_or(default_on),
             StatusLineSegment::Git => self.git.unwrap_or(default_on),
+            StatusLineSegment::ContextRemaining => self.context_remaining.unwrap_or(default_on),
+            StatusLineSegment::ThreadTitle => self.thread_title.unwrap_or(default_on),
+            StatusLineSegment::ApprovalMode => self.approval_mode.unwrap_or(default_on),
         }
     }
 
@@ -144,6 +174,9 @@ impl StatusLineConfig {
             StatusLineSegment::Context => self.context = Some(on),
             StatusLineSegment::Cwd => self.cwd = Some(on),
             StatusLineSegment::Git => self.git = Some(on),
+            StatusLineSegment::ContextRemaining => self.context_remaining = Some(on),
+            StatusLineSegment::ThreadTitle => self.thread_title = Some(on),
+            StatusLineSegment::ApprovalMode => self.approval_mode = Some(on),
         }
     }
 
@@ -247,8 +280,14 @@ pub struct StatusLineSnapshot {
     /// Compact run/turn state (`idle`, `running`, …).
     pub run_state: Option<String>,
     pub context_pct: Option<u8>,
+    /// Exact token usage: `(used, total)` for context-remaining segment.
+    pub context_used: Option<(u64, u64)>,
     pub cwd_basename: Option<String>,
     pub git_branch: Option<String>,
+    /// Session/agent display title for thread-title segment.
+    pub thread_title: Option<String>,
+    /// Plan-mode or auto-approve badge label for approval-mode segment.
+    pub approval_mode_label: Option<String>,
     /// Pre-formatted mode flag texts (plan / always-approve / auto / …).
     pub mode_labels: Vec<String>,
 }
@@ -315,6 +354,28 @@ pub fn select_status_line_parts(
             StatusLineSegment::Git => {
                 if let Some(branch) = snap.git_branch.as_ref().filter(|s| !s.is_empty()) {
                     parts.push(StatusLinePart::Flag(branch.clone()));
+                }
+            }
+            StatusLineSegment::ContextRemaining => {
+                if let Some((used, total)) = snap.context_used {
+                    let used_k = used / 1000;
+                    let total_k = total / 1000;
+                    parts.push(StatusLinePart::Flag(format!("{used_k}k/{total_k}k")));
+                }
+            }
+            StatusLineSegment::ThreadTitle => {
+                if let Some(title) = snap.thread_title.as_ref().filter(|s| !s.is_empty()) {
+                    let display = if title.chars().count() > 22 {
+                        format!("{}…", title.chars().take(20).collect::<String>())
+                    } else {
+                        title.clone()
+                    };
+                    parts.push(StatusLinePart::Flag(display));
+                }
+            }
+            StatusLineSegment::ApprovalMode => {
+                if let Some(label) = snap.approval_mode_label.as_ref().filter(|s| !s.is_empty()) {
+                    parts.push(StatusLinePart::Flag(format!("[{label}]")));
                 }
             }
         }

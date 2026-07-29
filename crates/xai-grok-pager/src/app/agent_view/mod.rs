@@ -1200,6 +1200,10 @@ pub struct AgentView {
     /// Tuple of (message, remaining_ticks). Decremented each tick, removed at 0.
     /// Does **not** carry sticky status banners — see [`Self::sticky_toast`].
     pub(crate) toast: Option<(String, u8)>,
+    /// Persistent stacked toast notifications. Rendered alongside (and
+    /// independently of) the single-slot `toast` / `sticky_toast`. Pushed via
+    /// [`Self::push_toast_stack`]; auto-expired by TTL on `tick_toast_stack`.
+    pub(crate) toast_stack: crate::views::toast::ToastStack,
     /// Single-slot ephemeral tip shown in the banner rect above the prompt.
     /// Unlike `toast`, survives typing; cleared by TTL, any prompt-box
     /// submit (prompt/interject/bash/feedback/remember), or explicit clear.
@@ -1322,6 +1326,9 @@ pub struct AgentView {
     /// Active plan approval view (from `exit_plan_mode` ext_method). When `Some`,
     /// the prompt area shows the plan approval overlay and input is modal.
     pub(crate) plan_approval_view: Option<PlanApprovalViewState>,
+    /// Which-key overlay state. When `Some`, a compact binding preview overlay
+    /// is shown at the bottom of the screen (above the shortcuts bar).
+    pub which_key: Option<crate::views::which_key::WhichKeyState>,
     pub(crate) latest_inline_plan_content: Option<String>,
     pub(crate) plan_comments: Vec<PlanComment>,
     /// Monotonic counter for casual plan comment IDs.
@@ -1570,6 +1577,11 @@ pub struct AgentView {
         agent_client_protocol::SessionUpdate,
         crate::acp::meta::NotificationMeta,
     )>,
+    /// The multi-entry persistent prompt stash. Auto-stashed when the user
+    /// types while a turn is running; browsable via `/stash`.
+    pub prompt_stash: crate::views::stash::PromptStash,
+    /// The number of auto-stashed entries since the last turn ended.
+    pub unread_stash_count: usize,
 }
 /// Cap on [`AgentView::self_originated_prompt_ids`]. Only recent ids matter (a
 /// stale post-rewind chunk arrives right after its turn ends), so a small
@@ -2137,6 +2149,7 @@ fn resolve_action(action_id: Option<ActionId>) -> Option<InputOutcome> {
         ActionId::EnableVoiceMode => Action::EnableVoiceMode,
         ActionId::VoiceToggle => Action::VoiceToggle,
         ActionId::ShortcutsHelp => return None,
+        ActionId::WhichKey => return None,
         ActionId::OpenSettings => return None,
         ActionId::ToggleTodos
         | ActionId::ToggleTeamTasks

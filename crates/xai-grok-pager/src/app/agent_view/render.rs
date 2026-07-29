@@ -1862,6 +1862,22 @@ impl AgentView {
                 }
             }
         }
+        // Persistent stacked toasts: render over the scrollback area slightly
+        // above the single-slot toast so both are visible simultaneously.
+        if !self.toast_stack.is_empty() {
+            let sb = layout.scrollback;
+            if sb.width > 10 && sb.height > 2 {
+                // Render in the right side of the scrollback area, stacked
+                // upward from the row above the single-slot toast.
+                let stack_area = Rect {
+                    x: sb.x,
+                    y: sb.y,
+                    width: sb.width,
+                    height: sb.height.saturating_sub(1),
+                };
+                self.toast_stack.render(buf, stack_area, &theme);
+            }
+        }
         if tasks_height > 0 {
             let bg_focused = self.active_pane == ActivePane::Tasks && !overlay_focused;
             self.tasks.render(
@@ -2473,6 +2489,14 @@ impl AgentView {
                         if let Some(branch) = git_branch.as_ref() {
                             out.push((branch.clone(), false, None));
                         }
+                    }
+                    StatusLineSegment::ContextRemaining
+                    | StatusLineSegment::ThreadTitle
+                    | StatusLineSegment::ApprovalMode => {
+                        // These are rendered via StatusLineSnapshot directly
+                        // in the select_status_line_parts function in
+                        // xai-grok-shared — the legacy prompt-chrome path
+                        // (PromptInfo/PromptFlag) doesn't support them yet.
                     }
                 }
             }
@@ -3611,6 +3635,17 @@ impl AgentView {
                 .compact(5, help_hint)
                 .with_pending(pending_hint)
                 .render(layout.shortcuts, buf);
+        }
+        // Which-key overlay: rendered above the shortcuts bar.
+        if let Some(ref wk_state) = self.which_key {
+            let wk_height = crate::views::which_key::PANEL_HEIGHT;
+            let wk_area = Rect {
+                x: area.x,
+                y: layout.shortcuts.y.saturating_sub(wk_height),
+                width: area.width,
+                height: wk_height,
+            };
+            crate::views::which_key::render_which_key(buf, wk_area, wk_state, &theme);
         }
         let is_plan_viewer = self.is_plan_viewer();
         let has_plan_comments = !self.plan_comments.is_empty();

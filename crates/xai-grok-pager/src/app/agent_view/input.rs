@@ -925,6 +925,29 @@ impl AgentView {
                 _ => InputOutcome::Changed,
             };
         }
+        // Which-key overlay intercept: navigation keys resize/scroll the
+        // overlay; Esc and Ctrl+K close it. Non-navigation keys fall through
+        // to normal input handling so which-key is transparent to typing.
+        if self.which_key.is_some() {
+            use crate::views::which_key::WhichKeyOutcome;
+            if let Event::Key(key) = ev
+                && key.kind != KeyEventKind::Release
+            {
+                let mut state = self.which_key.as_mut().unwrap();
+                match crate::views::which_key::handle_input(key, &mut state) {
+                    WhichKeyOutcome::Close => {
+                        self.which_key = None;
+                        return InputOutcome::Changed;
+                    }
+                    WhichKeyOutcome::Changed => {
+                        return InputOutcome::Changed;
+                    }
+                    WhichKeyOutcome::Unchanged => {
+                        // Fall through — let normal input handling process this key.
+                    }
+                }
+            }
+        }
         if self.rewind_state.is_some() {
             return match ev {
                 Event::Key(key) if key.kind != crossterm::event::KeyEventKind::Release => {
@@ -1363,6 +1386,33 @@ impl AgentView {
                 // Seed team tasks from the todo pane when swarm plan ACP is absent.
                 if self.agent_panel.show_team_tasks && self.team_tasks.is_empty() {
                     self.sync_team_tasks_from_todos();
+                }
+                InputOutcome::Changed
+            }
+            ActionId::WhichKey => {
+                use crate::views::which_key;
+                if self.which_key.is_some() {
+                    // Toggle off.
+                    self.which_key = None;
+                } else {
+                    // Toggle on: build groups from the current context.
+                    let reg = crate::actions::ActionRegistry::defaults();
+                    let contexts = active_contexts_for_pane(self.active_pane);
+                    // The dashboard-overlay push mirrors the ShortcutsHelp path.
+                    let contexts = if self.in_dashboard_overlay {
+                        let mut c = contexts;
+                        c.push(crate::actions::When::DashboardOverlay);
+                        c
+                    } else {
+                        contexts
+                    };
+                    let groups =
+                        which_key::build_groups(&contexts, &reg, self.vim_mode);
+                    self.which_key = Some(crate::views::which_key::WhichKeyState {
+                        groups,
+                        active_group: 0,
+                        scroll: 0,
+                    });
                 }
                 InputOutcome::Changed
             }

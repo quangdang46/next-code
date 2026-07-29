@@ -39,6 +39,15 @@ pub enum DiffModalMode {
     FileDetail,
 }
 
+/// Which diff layout to render for file detail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffViewMode {
+    /// Traditional unified diff — additions and deletions interleaved.
+    Unified,
+    /// Side-by-side split view — old on left, new on right.
+    Split,
+}
+
 #[derive(Debug, Clone)]
 pub struct DiffFileEntry {
     pub path: String,
@@ -64,9 +73,10 @@ pub struct DiffModalState {
     pub selected_file: usize,
     pub list_scroll: usize,
     pub mode: DiffModalMode,
+    pub diff_view: DiffViewMode,
     pub detail_scroll: usize,
-    /// Cached rendered detail lines `(width, lines)` for the selected file.
-    detail_cache: Option<(u16, Vec<Line<'static>>)>,
+    /// Cached rendered detail lines `(width, lines, view_mode)` for the selected file.
+    detail_cache: Option<(u16, Vec<Line<'static>>, DiffViewMode)>,
     detail_total_lines: usize,
     list_area: Rect,
     detail_area: Rect,
@@ -83,6 +93,7 @@ impl DiffModalState {
             selected_file: 0,
             list_scroll: 0,
             mode: DiffModalMode::FileList,
+            diff_view: DiffViewMode::Unified,
             detail_scroll: 0,
             detail_cache: None,
             detail_total_lines: 0,
@@ -91,6 +102,15 @@ impl DiffModalState {
             list_scrollbar_area: None,
             detail_scrollbar_area: None,
         }
+    }
+
+    pub fn toggle_diff_view(&mut self) {
+        self.diff_view = match self.diff_view {
+            DiffViewMode::Unified => DiffViewMode::Split,
+            DiffViewMode::Split => DiffViewMode::Unified,
+        };
+        self.detail_cache = None;
+        self.detail_scroll = 0;
     }
 
     pub fn build(scrollback: &ScrollbackState, cwd: &Path) -> Self {
@@ -492,6 +512,10 @@ pub fn handle_diff_key(state: &mut DiffModalState, key: &KeyEvent) -> DiffModalO
                 state.switch_source(1);
                 return DiffModalOutcome::Changed;
             }
+            KeyCode::Char('z') if state.mode == DiffModalMode::FileDetail => {
+                state.toggle_diff_view();
+                return DiffModalOutcome::Changed;
+            }
             KeyCode::Down | KeyCode::Char('j') => {
                 if state.mode == DiffModalMode::FileList {
                     state.select_next_file();
@@ -593,10 +617,15 @@ pub fn render_diff_modal(
         .unwrap_or("Current");
     let title = match state.mode {
         DiffModalMode::FileList => format!("Diff · {source_label}"),
-        DiffModalMode::FileDetail => state
-            .selected_entry()
-            .map(|e| format!("Diff · {}", e.path))
-            .unwrap_or_else(|| "Diff".to_string()),
+        DiffModalMode::FileDetail => {
+            let view_label = match state.diff_view {
+                DiffViewMode::Unified => "Unified",
+                DiffViewMode::Split => "Split",
+            };
+            state.selected_entry()
+                .map(|e| format!("Diff · {} [{}]", e.path, view_label))
+                .unwrap_or_else(|| format!("Diff [{}]", view_label))
+        }
     };
 
     let shortcuts = build_shortcuts(&state.mode);
@@ -672,6 +701,11 @@ fn build_shortcuts(mode: &DiffModalMode) -> Vec<Shortcut<'static>> {
             },
             Shortcut {
                 label: "\u{2191}/\u{2193} scroll",
+                clickable: false,
+                id: 0,
+            },
+            Shortcut {
+                label: "z toggle view",
                 clickable: false,
                 id: 0,
             },
@@ -796,9 +830,13 @@ fn render_file_detail(buf: &mut Buffer, area: Rect, state: &mut DiffModalState, 
     let needs_rebuild = state
         .detail_cache
         .as_ref()
-        .is_none_or(|(w, _)| *w != width);
+        .is_none_or(|(w, _, view)| *w != width || *view != state.diff_view);
     if needs_rebuild {
-        state.detail_cache = Some((width, build_detail_lines(&file, width, theme)));
+        let lines = match state.diff_view {
+            DiffViewMode::Unified => build_detail_lines(&file, width, theme),
+            DiffViewMode::Split => build_split_detail_lines(&file, width, theme),
+        };
+        state.detail_cache = Some((width, lines, state.diff_view));
     }
 
     let lines = state.detail_cache.as_ref().unwrap().1.clone();
@@ -866,6 +904,178 @@ fn build_detail_lines(file: &DiffFileEntry, width: u16, theme: &Theme) -> Vec<Li
         "(No diff content)",
         Style::default().fg(theme.gray_dim),
     ))]
+}
+
+/// Build lines for side-by-side split diff view.
+/// Each line shows two columns separated by a "│" divider: old (removed) | new (added).
+fn build_split_detail_lines(file: &DiffFileEntry, width: u16, theme: &Theme) -> Vec<Line<'static>> {
+    let half = (width as usize).saturating_sub(3) / 2; // 1 char for divider, 2 margins
+    if half < 10 {
+        // Terminal too narrow — fall back to unified.
+        return build_detail_lines(file, width, theme);
+    }
+
+    // --- Tab bar: [Unified] [Split] at the top ---
+    let tab_bar = build_view_tab_bar("split", width, theme);
+
+    // First pass: separate the diff into old/removed and new/added, preserving order.
+    // We use a stateful walk: for each aligned pair of old/new lines, produce one row.
+    let mut split_lines: Vec<Line<'static>> = vec![tab_bar];
+
+    // For structured hunks (DiffHunk/ChangeTag), walk each hunk.
+    // For raw unified diffs, parse on the fly.
+    let use_split = file.hunks.is_empty() && file.raw_unified.is_some();
+
+    // Walk hunks to produce aligned pairs.
+    let mut old_lines: Vec<(usize, &str, Style)> = Vec::new();
+    let mut new_lines: Vec<(usize, &str, Style)> = Vec::new();
+
+    if !file.hunks.is_empty() {
+        // Build split pairs by iterating hunk lines.
+        for hunk in &file.hunks {
+            // Emit a context label for each hunk header.
+            split_lines.push(Line::from(Span::styled(
+                format!("@@ L{} - L{} @@", hunk.first().map(|l| l.lo).unwrap_or(0), hunk.first().map(|l| l.ln).unwrap_or(0)),
+                Style::default().fg(theme.accent_user).add_modifier(Modifier::BOLD),
+            )));
+
+            for line in hunk {
+                let text = line.text.trim_end_matches('\n');
+                match line.tag {
+                    ChangeTag::Equal | ChangeTag::Insert | ChangeTag::Delete => {}
+                }
+                // In split view: insert lines go to the new column, delete lines
+                // to the old column, context lines to both.
+                match line.tag {
+                    ChangeTag::Delete => {
+                        old_lines.push((line.lo, text, Style::default().fg(theme.diff_delete_fg)));
+                        new_lines.push((line.ln, "", Style::default()));
+                    }
+                    ChangeTag::Insert => {
+                        old_lines.push((line.lo, "", Style::default()));
+                        new_lines.push((line.ln, text, Style::default().fg(theme.diff_insert_fg)));
+                    }
+                    ChangeTag::Equal => {
+                        old_lines.push((line.lo, text, Style::default().fg(theme.text_primary)));
+                        new_lines.push((line.ln, text, Style::default().fg(theme.text_primary)));
+                    }
+                }
+            }
+        }
+
+        // Render the pairs.
+        let div_style = Style::default().fg(theme.gray_dim);
+        for (oi, ni) in old_lines.iter().zip(new_lines.iter()) {
+            let left = truncate_to(oi.1, half);
+            let right = truncate_to(ni.1, half);
+            let line = Line::from(vec![
+                Span::styled(format!("{:width$}", left, width = half), oi.2),
+                Span::styled(" │", div_style),
+                Span::styled(right.to_string(), ni.2),
+            ]);
+            split_lines.push(line);
+        }
+    } else if let Some(raw) = &file.raw_unified {
+        // Raw unified: add lines to old/new columns.
+        for line_text in raw.lines() {
+            if line_text.starts_with("---") || line_text.starts_with("+++")
+                || line_text.starts_with("diff ") || line_text.starts_with("index ")
+            {
+                continue;
+            }
+            if line_text.starts_with("@@") {
+                let padded = format!("{}", line_text);
+                split_lines.push(Line::from(Span::styled(padded,
+                    Style::default().fg(theme.accent_user).add_modifier(Modifier::BOLD),
+                )));
+                continue;
+            }
+            let body = if line_text.is_empty() { "" } else { &line_text[1..] };
+            match line_text.chars().next() {
+                Some('-') => {
+                    old_lines.push((0, body, Style::default().fg(theme.diff_delete_fg)));
+                    new_lines.push((0, "", Style::default()));
+                }
+                Some('+') => {
+                    old_lines.push((0, "", Style::default()));
+                    new_lines.push((0, body, Style::default().fg(theme.diff_insert_fg)));
+                }
+                _ => {
+                    old_lines.push((0, body, Style::default().fg(theme.text_primary)));
+                    new_lines.push((0, body, Style::default().fg(theme.text_primary)));
+                }
+            }
+        }
+        let div_style = Style::default().fg(theme.gray_dim);
+        for (oi, ni) in old_lines.iter().zip(new_lines.iter()) {
+            let left = truncate_to(oi.1, half);
+            let right = truncate_to(ni.1, half);
+            let line = Line::from(vec![
+                Span::styled(format!("{:width$}", left, width = half), oi.2),
+                Span::styled(" │", div_style),
+                Span::styled(right.to_string(), ni.2),
+            ]);
+            split_lines.push(line);
+        }
+    }
+
+    if split_lines.len() <= 1 {
+        split_lines.push(Line::from(Span::styled(
+            "(No diff content)",
+            Style::default().fg(theme.gray_dim),
+        )));
+    }
+
+    split_lines
+}
+
+/// Truncate a string to the given column width, appending "…" if truncated.
+fn truncate_to(text: &str, max_width: usize) -> String {
+    let w = text.width();
+    if w <= max_width {
+        return text.to_string();
+    }
+    let budget = max_width.saturating_sub(1);
+    let mut result = String::new();
+    let mut cur_w = 0;
+    for ch in text.chars() {
+        let cw = ch.width().unwrap_or(1);
+        if cur_w + cw > budget {
+            result.push('…');
+            break;
+        }
+        result.push(ch);
+        cur_w += cw;
+    }
+    result
+}
+
+/// Build the [Unified] [Split] tab bar for the top of the detail view.
+fn build_view_tab_bar(active: &str, _width: u16, theme: &Theme) -> Line<'static> {
+    let unified = Span::styled(
+        " [Unified] ",
+        if active == "unified" {
+            Style::default().fg(theme.accent_user).bg(theme.bg_visual)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(theme.gray)
+        },
+    );
+    let split = Span::styled(
+        " [Split] ",
+        if active == "split" {
+            Style::default().fg(theme.accent_user).bg(theme.bg_visual)
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(theme.gray)
+        },
+    );
+    Line::from(vec![
+        Span::styled(" View: ", Style::default().fg(theme.gray_dim)),
+        unified,
+        Span::styled(" ", ratatui::style::Style::new()),
+        split,
+    ])
 }
 
 fn sat_u16(v: usize) -> u16 {

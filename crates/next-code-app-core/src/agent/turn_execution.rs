@@ -70,6 +70,15 @@ impl Agent {
             return Ok(None);
         }
 
+        // Experiment gate: BestOfN only activates when user opts in via /experiment.
+        if !crate::config::config()
+            .experiments
+            .materialize()
+            .check(next_code_experiment_flags::ExperimentFlag::BestOfN)
+        {
+            return Ok(None);
+        }
+
         // Avoid recursion: child agents already have best_of_n context set.
         if self.best_of_n_run_id.is_some() {
             return Ok(None);
@@ -87,11 +96,9 @@ impl Agent {
             .iter()
             .any(|m| m.workflow == next_code_keywords::WorkflowKind::BestOfN && !m.is_expired());
 
-        // Only auto-run when user explicitly invoked $bestofn / sticky mode, or
-        // when mode is auto and the message looks like an edit request.
-        let should_run = keyword_triggered
-            || sticky
-            || (cfg.mode.is_auto() && looks_like_edit_request(user_message));
+        // Only trigger when user explicitly invoked $bestofn / sticky mode.
+        // No automatic heuristic — requires explicit keyword.
+        let should_run = keyword_triggered || sticky;
 
         if !should_run {
             return Ok(None);
@@ -127,6 +134,16 @@ impl Agent {
         if !cfg.enabled() || self.best_of_n_run_id.is_some() {
             return Ok(None);
         }
+
+        // Experiment gate: BestOfN only activates when user opts in via /experiment.
+        if !crate::config::config()
+            .experiments
+            .materialize()
+            .check(next_code_experiment_flags::ExperimentFlag::BestOfN)
+        {
+            return Ok(None);
+        }
+
         let detections = next_code_keywords::detect_keywords(user_message);
         let triggered = detections
             .iter()
@@ -138,7 +155,8 @@ impl Agent {
             .iter()
             .any(|m| m.workflow == next_code_keywords::WorkflowKind::BestOfN && !m.is_expired());
 
-        if !triggered && !sticky && !(cfg.mode.is_auto() && looks_like_edit_request(user_message)) {
+        // Only trigger on explicit keyword / sticky — no auto heuristic.
+        if !triggered && !sticky {
             return Ok(None);
         }
 
@@ -1450,37 +1468,6 @@ impl Agent {
     }
 }
 
-/// Heuristic: does this user message look like an edit/implement request?
-/// Used only when best-of-N mode is already `auto` and the user did not
-/// explicitly type `$bestofn` — keeps auto-trigger from firing on pure Q&A.
-fn looks_like_edit_request(msg: &str) -> bool {
-    let lower = msg.to_ascii_lowercase();
-    // Explicit keyword always handled elsewhere; skip pure cancels.
-    if lower.contains("cancelnext") || lower.contains("stopnext") {
-        return false;
-    }
-    const VERBS: &[&str] = &[
-        "fix",
-        "implement",
-        "refactor",
-        "rewrite",
-        "change",
-        "update",
-        "add ",
-        "remove ",
-        "delete ",
-        "edit ",
-        "patch",
-        "migrate",
-        "rename",
-        "extract",
-        "sửa",
-        "thêm",
-        "xóa",
-        "viết",
-    ];
-    VERBS.iter().any(|v| lower.contains(v))
-}
 
 /// Write-shaped tools that Plan mode normally blocks.
 pub(crate) fn is_shell_tool(name: &str) -> bool {

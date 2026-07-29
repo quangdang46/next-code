@@ -305,6 +305,48 @@ pub(crate) fn commit_minimal_update_notice(app: &mut AppView, latest_version: &s
     }
 }
 
+/// `/stash` — open the stash dialog to browse and restore previously stashed
+/// prompt drafts. The stash modal is attached to the active agent view so the
+/// user can browse entries, select one to restore into the composer, or delete
+/// entries. A no-op when no agent is active.
+pub(super) fn dispatch_show_stash(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::stash_modal::StashEntry;
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    // Flush in-memory stash to disk first so the modal re-reads the full set.
+    agent.prompt_stash.flush();
+    // Re-read from disk so the modal always shows the persisted view (in case
+    // another process or a previous session wrote entries).
+    agent.prompt_stash = crate::views::stash::PromptStash::load();
+    // Reset the unread indicator: the user has now seen the stash.
+    agent.unread_stash_count = 0;
+
+    let modal_entries: Vec<StashEntry> = agent
+        .prompt_stash
+        .list()
+        .iter()
+        .enumerate()
+        .map(|(i, entry)| {
+            let preview = entry.preview();
+            let line_count = entry.line_count() as u16;
+            StashEntry {
+                preview,
+                full_text: entry.input.clone(),
+                line_count,
+                index: i,
+            }
+        })
+        .collect();
+    agent.active_modal = Some(crate::views::modal::ActiveModal::StashBrowser {
+        state: crate::views::stash_modal::StashModalState::new(modal_entries),
+    });
+    vec![]
+}
+
 /// `/queue` — commit a read-only list of the queued prompts as a system block.
 /// The text is built by [`crate::app::status_blocks::queue_block_text`]; this
 /// just resolves the active agent and pushes it. Works in every render mode; the

@@ -234,6 +234,7 @@ impl AgentView {
             side_panel_focused: false,
             hit_side_panel_close: Default::default(),
             toast: None,
+            toast_stack: crate::views::toast::ToastStack::new(),
             ephemeral_tip: Default::default(),
             word_select_tip_prompt_snapshot: None,
             last_word_select_probe: None,
@@ -272,6 +273,7 @@ impl AgentView {
             next_perm_req_id: 0,
             permission_stashed_prompt: None,
             plan_approval_view: None,
+            which_key: None,
             latest_inline_plan_content: None,
             plan_comments: Vec::new(),
             plan_next_comment_id: 0,
@@ -328,6 +330,8 @@ impl AgentView {
             follow_up_pending: HashMap::new(),
             follow_up_pending_order: VecDeque::new(),
             pending_adoption_updates: Vec::new(),
+            prompt_stash: crate::views::stash::PromptStash::load(),
+            unread_stash_count: 0,
         };
         let mode = if crate::appearance::cache::load_simple_mode() {
             InputMode::Simple
@@ -348,6 +352,21 @@ impl AgentView {
         self.turn_paused_duration = std::time::Duration::ZERO;
         self.turn_token_usage = None;
         self.last_active_at = Some(Instant::now());
+
+        // Auto-restore the most recent stash entry if the prompt is empty.
+        if self.unread_stash_count > 0 && self.prompt.text().trim().is_empty() {
+            if let Some(entry) = self.prompt_stash.list().first() {
+                self.prompt.set_text(&entry.input);
+                let len = self.prompt.textarea.text().len();
+                self.prompt.textarea.set_cursor(len);
+            }
+            self.unread_stash_count = 0;
+        }
+
+        // Flush stash to disk so entries survive a crash.
+        if self.unread_stash_count > 0 {
+            self.prompt_stash.flush();
+        }
     }
 
     /// Snapshot and clear the in-flight next-code token sample for the footer.

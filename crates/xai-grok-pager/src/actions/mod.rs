@@ -123,6 +123,8 @@ pub enum ActionId {
 
     // Settings
     OpenSettings,
+    /// Toggle the which-key binding overlay (Ctrl+K).
+    WhichKey,
 
     // Agent Dashboard
     OpenDashboard,

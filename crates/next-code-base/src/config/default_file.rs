@@ -210,6 +210,7 @@ update_channel = "stable"
 # with Stage::Experimental { name, menu_description, announcement }.
 # [experiments]
 # js_plugins = true
+# best_of_n = true  # experimental: spawn N parallel candidates, select best edit
 
 [websearch]
 # Preferred websearch engine: "duckduckgo", "bing", or "searxng".
