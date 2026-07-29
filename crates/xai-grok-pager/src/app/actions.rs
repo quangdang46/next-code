@@ -729,6 +729,9 @@ pub enum Action {
     SaveRememberNoteFromModal,
     /// Send a /btw side question (bypasses queue, works while agent is busy).
     SendBtw(String),
+    /// Cursor-style `/multitask`: spawn parallel background workers from the
+    /// queue / inline prompts, or steer a running worker with `--to`.
+    Multitask(crate::slash::commands::multitask::MultitaskArgs),
     /// Request a session recap ("where was I" summary). `auto` is `true` for
     /// the automatic return-from-away recap, `false` for an explicit `/recap`.
     /// Bypasses the prompt queue (works while the agent is busy).
@@ -2010,6 +2013,11 @@ pub enum Effect {
         question: String,
         /// Correlates minimal responses; fullscreen leaves this unset.
         minimal_request_id: Option<uuid::Uuid>,
+    },
+    /// Spawn one headless multitask worker via `x.ai/multitask/spawn` (CommSpawn).
+    MultitaskSpawn {
+        session_id: acp::SessionId,
+        prompt: String,
     },
     /// Request a session recap via the x.ai/recap ext method. Fire-and-forget:
     /// the recap arrives later as a `SessionRecap` notification.

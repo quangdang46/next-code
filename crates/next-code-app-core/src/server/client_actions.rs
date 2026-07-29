@@ -265,15 +265,22 @@ pub(super) fn handle_run_subagent(
     tokio::spawn(async move {
         let description = derive_subagent_description(&prompt);
         let tool_call_id = crate::id::new_id("call");
-        let tool_name = "subagent".to_string();
-        let tool_input = serde_json::json!({
+        // Direct `subagent` tool was removed; route through the Claude-compatible
+        // Agent façade (swarm spawn / DM resume) so /subagent + Face multitask keep working.
+        let tool_name = "Agent".to_string();
+        let mut tool_input = serde_json::json!({
             "description": description,
             "prompt": prompt,
             "subagent_type": subagent_type,
-            "model": model,
-            "session_id": session_id,
-            "command": "/subagent",
+            "run_in_background": true,
         });
+        if let Some(model) = model.filter(|m| !m.trim().is_empty()) {
+            tool_input["model"] = serde_json::Value::String(model);
+        }
+        if let Some(resume) = session_id.filter(|s| !s.trim().is_empty()) {
+            // Continue / steer an existing worker via Agent resume → swarm DM.
+            tool_input["resume"] = serde_json::Value::String(resume);
+        }
 
         let message_id = {
             let mut agent_guard = agent.lock().await;
