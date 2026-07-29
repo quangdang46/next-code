@@ -23,7 +23,7 @@ impl AgentView {
             &self.swarm_members,
             &self.swarm_soft_transcripts,
             Instant::now(),
-            30,
+            10,
         )
     }
 

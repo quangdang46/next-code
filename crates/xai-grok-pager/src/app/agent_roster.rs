@@ -255,19 +255,19 @@ fn grok_status(info: &SubagentInfo) -> RosterStatus {
     }
 }
 
-/// Claude 2.1.199+ spirit: hide idle rows after `idle_hide_secs` when all workers idle.
+/// Hide idle rows after `idle_hide_secs` of inactivity.
+///
+/// Each subagent is evaluated independently — a finished subagent is
+/// hidden once its idle timer expires, regardless of whether other
+/// subagents are still running.
 fn should_collapse_idle(
     status: RosterStatus,
     last_progress: Instant,
     now: Instant,
     idle_hide_secs: u64,
-    subagents: &HashMap<String, SubagentInfo>,
+    _subagents: &HashMap<String, SubagentInfo>,
 ) -> bool {
     if idle_hide_secs == 0 || !status.is_terminal() {
-        return false;
-    }
-    let any_active = subagents.values().any(|i| !i.finished || i.pending_kill);
-    if any_active {
         return false;
     }
     now.duration_since(last_progress).as_secs() >= idle_hide_secs
@@ -278,15 +278,9 @@ fn should_collapse_idle_swarm(
     last_update: Instant,
     now: Instant,
     idle_hide_secs: u64,
-    members: &HashMap<String, SwarmMemberMirror>,
+    _members: &HashMap<String, SwarmMemberMirror>,
 ) -> bool {
     if idle_hide_secs == 0 || !status.is_terminal() {
-        return false;
-    }
-    let any_active = members
-        .values()
-        .any(|m| !m.roster_status().is_terminal());
-    if any_active {
         return false;
     }
     now.duration_since(last_update).as_secs() >= idle_hide_secs
