@@ -1322,6 +1322,9 @@ pub struct AgentView {
     /// Active plan approval view (from `exit_plan_mode` ext_method). When `Some`,
     /// the prompt area shows the plan approval overlay and input is modal.
     pub(crate) plan_approval_view: Option<PlanApprovalViewState>,
+    /// Which-key overlay state. When `Some`, a compact binding preview overlay
+    /// is shown at the bottom of the screen (above the shortcuts bar).
+    pub which_key: Option<crate::views::which_key::WhichKeyState>,
     pub(crate) latest_inline_plan_content: Option<String>,
     pub(crate) plan_comments: Vec<PlanComment>,
     /// Monotonic counter for casual plan comment IDs.
@@ -2137,6 +2140,7 @@ fn resolve_action(action_id: Option<ActionId>) -> Option<InputOutcome> {
         ActionId::EnableVoiceMode => Action::EnableVoiceMode,
         ActionId::VoiceToggle => Action::VoiceToggle,
         ActionId::ShortcutsHelp => return None,
+        ActionId::WhichKey => return None,
         ActionId::OpenSettings => return None,
         ActionId::ToggleTodos
         | ActionId::ToggleTeamTasks

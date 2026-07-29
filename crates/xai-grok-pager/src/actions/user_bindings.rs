@@ -160,6 +160,7 @@ impl ActionId {
             ActionId::DashboardToggleAutoApprove => "dashboard_toggle_auto_approve",
             ActionId::DashboardOpenLocationPicker => "dashboard_open_location_picker",
             ActionId::DashboardToggleWorktree => "dashboard_toggle_worktree",
+            ActionId::WhichKey => "which_key",
         }
     }
 
@@ -248,6 +249,7 @@ impl ActionId {
             ActionId::DashboardToggleAutoApprove,
             ActionId::DashboardOpenLocationPicker,
             ActionId::DashboardToggleWorktree,
+            ActionId::WhichKey,
         ];
         ALL.iter()
             .copied()

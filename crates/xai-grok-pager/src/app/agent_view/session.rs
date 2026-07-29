@@ -272,6 +272,7 @@ impl AgentView {
             next_perm_req_id: 0,
             permission_stashed_prompt: None,
             plan_approval_view: None,
+            which_key: None,
             latest_inline_plan_content: None,
             plan_comments: Vec::new(),
             plan_next_comment_id: 0,

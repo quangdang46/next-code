@@ -916,6 +916,24 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
             requires_confirmation: false,
             long_help: None,
         },
+        // Which-key overlay — compact binding preview distinct from the full
+        // ShortcutsHelp modal. Bound to Ctrl+K (Ctrl+O is ToggleYolo, Ctrl+L
+        // is Extensions/Interject). Ctrl+K is currently unbound everywhere.
+        ActionDef {
+            id: ActionId::WhichKey,
+            label: "which-key",
+            description: "Show key binding overview (which-key)",
+            default_key: key!('k', CONTROL),
+            alt_keys: vec![],
+            category: Category::GettingStarted,
+            context: When::AgentScreen,
+            hint_priority: None,
+            hint_key_display: Some("Ctrl+K"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Shows a compact overlay of active key bindings grouped by category.\nUse Left/Right to switch groups, Up/Down to scroll, Esc or Ctrl+K to close.\nOpenCode-style which-key for discovering bindings without leaving the current view.",
+            ),
+        },
     ];
 
     // Toggle terminal mouse reporting (mouse capture). Opt-in via

@@ -4721,6 +4721,7 @@ fn dashboard_action_for_id(
         | ActionId::DashboardOverlayNext
         | ActionId::DashboardOverlayStop => None,
         ActionId::ModelPicker => Some(InputOutcome::Action(Action::OpenModelPicker)),
+        ActionId::WhichKey => None,
     }
 }
 

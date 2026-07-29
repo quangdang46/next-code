@@ -50,6 +50,7 @@ pub mod settings_modal;
 pub mod shortcuts_bar;
 pub mod shortcuts_help;
 pub mod slash_dropdown;
+pub mod which_key;
 pub mod status_bar;
 pub mod subagent_catalog_pane;
 pub mod suggestion_controller;
