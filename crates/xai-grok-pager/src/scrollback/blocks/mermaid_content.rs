@@ -546,6 +546,53 @@ fn continuation_row(line: Line<'static>) -> BlockLine {
     BlockLine::separator(line).with_joiner(Some(String::new()))
 }
 
+/// Collapse each Mermaid diagram body to a single blank logical line.
+///
+/// Used when `render_mermaid_target = sidebar`: the ASCII/PNG art belongs in the
+/// side panel, so chat keeps only a placeholder line for the affordance row to
+/// hang under (origin Crop parity). Returns updated single-line pre-wrap ranges
+/// that remain valid against the mutated output (document order).
+pub(crate) fn crop_diagram_bodies(
+    output: &mut BlockOutput,
+    prewrap_ranges: &[Range<usize>],
+) -> Vec<Range<usize>> {
+    // (document_idx, display_row of kept placeholder) — back-to-front so earlier
+    // display indices stay stable while later bodies are drained.
+    let mut kept_rows: Vec<(usize, usize)> = Vec::with_capacity(prewrap_ranges.len());
+    for (doc_idx, range) in prewrap_ranges.iter().enumerate().rev() {
+        if range.is_empty() {
+            continue;
+        }
+        let index = crate::scrollback::types::prewrap_index_per_row(&output.lines);
+        let Some(first_row) = index
+            .iter()
+            .position(|&p| p >= range.start && p < range.end)
+        else {
+            continue;
+        };
+        let last_row = index
+            .iter()
+            .rposition(|&p| p >= range.start && p < range.end)
+            .unwrap_or(first_row);
+
+        // Blank the first body row; drop the rest of the diagram art.
+        output.lines[first_row] = BlockLine::text(String::new());
+        if last_row > first_row {
+            output.lines.drain(first_row + 1..=last_row);
+        }
+        kept_rows.push((doc_idx, first_row));
+    }
+
+    let index = crate::scrollback::types::prewrap_index_per_row(&output.lines);
+    let mut out_ranges = vec![0..0; prewrap_ranges.len()];
+    for (doc_idx, row) in kept_rows {
+        if let Some(&prewrap) = index.get(row) {
+            out_ranges[doc_idx] = prewrap..prewrap.saturating_add(1);
+        }
+    }
+    out_ranges
+}
+
 /// Insert blank image rows (when a terminal-tier PNG is ready) and a blank
 /// affordance row beneath each detected diagram; return affordance + optional
 /// inline placements (document order).

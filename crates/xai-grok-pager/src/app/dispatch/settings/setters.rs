@@ -88,18 +88,34 @@ pub(in crate::app::dispatch) fn set_render_mermaid(
     }]
 }
 
+/// State-only mutation for `render_mermaid_target`: update the process-wide
+/// appearance cache (render-path source of truth) and the in-memory `UiConfig`
+/// mirror. Disk write goes through `PersistSetting`.
+pub(super) fn set_render_mermaid_target_inner(app: &mut AppView, canonical: &'static str) {
+    crate::appearance::cache::set_render_mermaid_target(canonical);
+    app.current_ui.render_mermaid_target = Some(canonical.to_string());
+}
+
 /// Where rendered Mermaid diagrams appear: inline / sidebar / both.
 /// Persisted to `[ui].render_mermaid_target`.
+///
+/// SHELL-OWNED: same pattern as `render_mermaid` — cache is the render-path
+/// source of truth; modal commits update it optimistically.
 pub(in crate::app::dispatch) fn set_render_mermaid_target(
     app: &mut AppView,
     value: String,
 ) -> Vec<Effect> {
     let canonical = crate::settings::canonical_render_mermaid_target(Some(&value));
-    let prev = crate::settings::canonical_render_mermaid_target(app.current_ui.render_mermaid_target.as_deref());
+    let prev = crate::appearance::cache::load_render_mermaid_target();
     if prev == canonical {
+        // Keep UiConfig mirror aligned even if cache already matches (e.g. after
+        // a restart where current_ui was stale relative to the seeded cache).
+        if app.current_ui.render_mermaid_target.as_deref() != Some(canonical) {
+            app.current_ui.render_mermaid_target = Some(canonical.to_string());
+        }
         return vec![];
     }
-    app.current_ui.render_mermaid_target = Some(canonical.to_string());
+    set_render_mermaid_target_inner(app, canonical);
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",

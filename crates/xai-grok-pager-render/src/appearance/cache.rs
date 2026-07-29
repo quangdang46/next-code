@@ -617,6 +617,7 @@ pub fn prime(ui: &UiConfig) {
     let _ = load_invert_scroll();
     let _ = load_scroll_lines();
     let _ = load_render_mermaid();
+    let _ = load_render_mermaid_target();
     let _ = load_show_thinking_blocks();
     let _ = load_group_tool_verbs();
     let _ = load_collapsed_edit_blocks();
@@ -1135,6 +1136,20 @@ mod tests {
             };
             prime(&ui);
             assert_eq!(load_keep_text_selection(), TextSelection::WordSelect);
+        })
+        .join()
+        .unwrap();
+    }
+
+    #[test]
+    fn set_render_mermaid_target_updates_load_path() {
+        std::thread::spawn(|| {
+            set_render_mermaid_target("sidebar");
+            assert_eq!(load_render_mermaid_target(), "sidebar");
+            set_render_mermaid_target("both");
+            assert_eq!(load_render_mermaid_target(), "both");
+            set_render_mermaid_target("inline");
+            assert_eq!(load_render_mermaid_target(), "inline");
         })
         .join()
         .unwrap();
