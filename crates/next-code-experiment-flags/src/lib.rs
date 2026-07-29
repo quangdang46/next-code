@@ -88,6 +88,8 @@ pub enum ExperimentFlag {
     PersistMemoryInjection,
     /// Reasoning trace display in TUI
     ReasoningTrace,
+    /// Best-of-N parallel candidate editing
+    BestOfN,
 }
 
 // ============================================================================
@@ -140,6 +142,17 @@ pub static EXPERIMENT_FLAGS: &[FeatureSpec] = &[
             announcement: None,
         },
         default_enabled: true,
+        dependencies: &[],
+    },
+    FeatureSpec {
+        id: ExperimentFlag::BestOfN,
+        key: "best_of_n",
+        stage: Stage::Experimental {
+            name: "Best-of-N Editing",
+            menu_description: "Spawn N parallel candidates and select the best edit",
+            announcement: None,
+        },
+        default_enabled: false,
         dependencies: &[],
     },
     FeatureSpec {
@@ -617,6 +630,10 @@ mod tests {
         assert!(
             items.iter().all(|i| i.key != "hooks_v2"),
             "Stable hooks_v2 must not appear in /experimental"
+        );
+        assert!(
+            items.iter().any(|i| i.key == "best_of_n"),
+            "best_of_n is Experimental and must appear"
         );
     }
 
