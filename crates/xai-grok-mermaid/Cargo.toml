@@ -20,7 +20,7 @@ wait-timeout = "0.2"
 tempfile = "3"
 # Default Face engine: quangdang46/mermaid-rs-renderer @ Face PNG API (0.3.2+).
 # Pin style matches next-code-tui-mermaid (git + rev/tag); rev has render_png_bytes.
-mermaid-rs-renderer = { git = "https://github.com/quangdang46/mermaid-rs-renderer.git", rev = "d3e26397a0476c36ab7f446a8e94c71a4113b251", default-features = false, features = ["png"] }
+mermaid-rs-renderer = { git = "https://github.com/quangdang46/mermaid-rs-renderer.git", rev = "33855adc94a8e1a57baedd12d3bb80e5d6c5e8b5", default-features = false, features = ["png"] }
 
 # Subprocess process-group reaping (killpg) for the sync subprocess path, since
 # xai-tty-utils' ProcessGroup only wraps tokio children.
