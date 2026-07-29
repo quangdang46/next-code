@@ -273,22 +273,7 @@ mod tests {
             best_of_n_run_id: None,
             best_of_n_candidate_id: None,
         }
-    }ToolContext {
-            session_id: session_id.to_string(),
-            message_id: "msg1".to_string(),
-            tool_call_id: "tool1".to_string(),
-            working_dir: None,
-            stdin_request_tx: None,
-            ask_user_question_tx: None,
-        best_of_n_pick_tx: None,
-        exit_plan_mode_tx: None,
-            graceful_shutdown_signal: None,
-            background_tool_signal: None,
-            execution_mode: crate::tool::ToolExecutionMode::AgentTurn,
-            best_of_n_run_id: None,
-            best_of_n_candidate_id: None,
         }
-    }
     #[tokio::test]
     async fn create_update_get_complete_cycle() {
         let _guard = crate::storage::lock_test_env();

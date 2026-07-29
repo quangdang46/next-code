@@ -415,22 +415,7 @@ mod tests {
             best_of_n_run_id: None,
             best_of_n_candidate_id: None,
         }
-    }ToolContext {
-            session_id: "test-session".to_string(),
-            message_id: "test-message".to_string(),
-            tool_call_id: "test-tool-call".to_string(),
-            working_dir: None,
-            stdin_request_tx: None,
-            ask_user_question_tx: None,
-            best_of_n_pick_tx: None,
-            exit_plan_mode_tx: None,
-            graceful_shutdown_signal: None,
-            background_tool_signal: None,
-            execution_mode: crate::tool::ToolExecutionMode::Direct,
-            best_of_n_run_id: None,
-            best_of_n_candidate_id: None,
         }
-    }
     #[test]
     fn test_tool_name() {
         let tool = create_test_tool();
@@ -584,11 +569,7 @@ mod tests {
             working_dir: Some(dir.to_path_buf()),
             ..create_test_context()
         }
-    }ToolContext {
-            working_dir: Some(dir.to_path_buf()),
-            ..create_test_context()
         }
-    }
 
     fn write_project_skill(root: &std::path::Path, name: &str) {
         let skill_dir = root.join(".agents").join("skills").join(name);

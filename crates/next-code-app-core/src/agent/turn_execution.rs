@@ -682,12 +682,6 @@ impl Agent {
         tx: tokio::sync::mpsc::UnboundedSender<crate::tool::BestOfNPickInputRequest>,
     ) {
         self.best_of_n_pick_tx = Some(tx);
-    /// Set the ExitPlanMode channel for Face ACP reverse requests.
-    pub fn set_exit_plan_mode_tx(
-        &mut self,
-        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::ExitPlanModeInputRequest>,
-    ) {
-        self.exit_plan_mode_tx = Some(tx);
     }
 
     /// Set the ExitPlanMode channel for Face ACP reverse requests.
