@@ -3612,6 +3612,17 @@ impl AgentView {
                 .with_pending(pending_hint)
                 .render(layout.shortcuts, buf);
         }
+        // Which-key overlay: rendered above the shortcuts bar.
+        if let Some(ref wk_state) = self.which_key {
+            let wk_height = crate::views::which_key::PANEL_HEIGHT;
+            let wk_area = Rect {
+                x: area.x,
+                y: layout.shortcuts.y.saturating_sub(wk_height),
+                width: area.width,
+                height: wk_height,
+            };
+            crate::views::which_key::render_which_key(buf, wk_area, wk_state, &theme);
+        }
         let is_plan_viewer = self.is_plan_viewer();
         let has_plan_comments = !self.plan_comments.is_empty();
         let casual_commenting = self.is_casual_commenting();
