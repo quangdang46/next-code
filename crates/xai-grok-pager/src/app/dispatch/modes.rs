@@ -262,10 +262,15 @@ pub(super) fn inherit_auto_mode(app: &AppView) -> bool {
 /// "auto" indicator correct regardless of which seam applied the mode.
 pub(super) fn sync_active_auto_flag(app: &mut AppView) {
     let is_auto = app.current_ui.permission_mode.as_deref() == Some("auto");
+    let is_accept_edits =
+        app.current_ui.permission_mode.as_deref() == Some("accept-edits");
     if let ActiveView::Agent(id) = app.active_view
         && let Some(agent) = app.agents.get_mut(&id)
     {
-        agent.session.auto_mode = effective_auto(agent.session.is_yolo(), is_auto);
+        let yolo = agent.session.is_yolo();
+        agent.session.auto_mode = effective_auto(yolo, is_auto);
+        // Accept-edits is display-only and yields to yolo / auto.
+        agent.session.accept_edits_mode = !yolo && !is_auto && is_accept_edits;
     }
     // Keep `/auto` feature-gate visibility in lockstep across slash surfaces.
     app.sync_permission_mode_slash_gate();
@@ -355,6 +360,7 @@ fn capture_prev_permission_canonical(app: &AppView, prev_yolo: bool) -> &'static
         match app.current_ui.permission_mode.as_deref() {
             Some("default") => "default",
             Some("auto") => "auto",
+            Some("accept-edits") => "accept-edits",
             _ => "ask",
         }
     }
@@ -488,6 +494,9 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
     match kind {
         PermissionModeKind::AlwaysApprove => yolo_toast(true),
         PermissionModeKind::Auto => "\u{2713} Permission mode: Auto (classifier)".to_string(),
+        PermissionModeKind::AcceptEdits => {
+            "\u{2713} Permission mode: Accept edits (file edits auto-run)".to_string()
+        }
         PermissionModeKind::Ask => "\u{2713} Permission mode: Ask".to_string(),
         PermissionModeKind::Default => "\u{2713} Permission mode: Default".to_string(),
     }
@@ -627,7 +636,11 @@ pub(super) fn active_agent_plan_nudge_state(app: &AppView) -> (bool, bool) {
     }
 }
 
-/// Cycle session mode: Normal → Plan → Always-Approve → Normal.
+/// Cycle session mode: Normal → Accept-Edits → Plan → Auto → Always-Approve → Normal.
+///
+/// Matches Claude Code Shift+Tab order (`default → acceptEdits → plan → auto →
+/// bypassPermissions`), mapped onto Face labels. When the plan-mode nudge is
+/// showing, Normal jumps straight to Plan (one Shift+Tab promise).
 ///
 /// Uses `plan_mode_pending` (optimistic) when available, falling back to
 /// `plan_mode_active` (confirmed by ACP). This prevents double-sends when
@@ -641,35 +654,55 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
     // the live `&mut agent`. This is the same predicate (enabling = true here).
     let yolo_locked = app.yolo_policy_block;
     // Feature gate (default ON): when the auto permission mode is disabled, the
-    // Shift+Tab cycle skips Auto entirely (legacy Normal→Plan→Always-Approve→
+    // Shift+Tab cycle skips Auto entirely (legacy Normal→…→Always-Approve→
     // Normal), so Auto is never reachable from the cycle. Resolved once at
     // startup into `app.auto_mode_gate`.
     let auto_gate = app.auto_mode_gate;
+    let in_accept_edits =
+        app.current_ui.permission_mode.as_deref() == Some("accept-edits");
     let Some(agent) = app.agents.get_mut(&id) else {
         return vec![];
     };
     // Per-session (symmetric with the `in_yolo` reads below), not the global UI
     // mirror, so the cycle and the prompt "auto" indicator agree per agent.
     let in_auto = agent.session.is_auto();
+    let nudge_showing =
+        agent.ephemeral_tip.current_key() == Some(crate::tips::plan_nudge::PLAN_NUDGE_KEY);
     let Some(session_id) = agent.session.session_id.clone() else {
         // No session yet (Shift+Tab forwarded from the welcome screen or a
         // fresh tab): cycle the mode locally and stash the ACP push in
         // `deferred_session_mode` — consumed by the `SessionCreated`
         // handlers, same mechanism as the dashboard's staged plan mode.
-        // Cycle: Normal → Plan → Auto → Always-Approve → Normal (Auto skipped
-        // when always-approve is the only remaining arm under a yolo pin).
+        // Cycle: Normal → Accept-Edits → Plan → Auto → Always-Approve → Normal
+        // (Accept-Edits skipped when plan nudge is showing; Auto skipped when
+        // the auto gate is off).
         // Each arm yields the canonical permission mode to persist (`None`
-        // when it is untouched, i.e. Normal → Plan); see the push below.
+        // when it is untouched, i.e. Accept-Edits/Normal → Plan); see the push below.
         let in_plan = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
         let in_yolo = agent.session.is_yolo();
         let persist_canonical: Option<&'static str> = match (in_plan, in_auto, in_yolo) {
-            // Normal → Plan
+            // Normal → Accept-Edits (or Plan when nudge / already on accept-edits)
             (false, false, false) => {
-                agent.plan_mode_pending = Some(true);
-                agent.deferred_session_mode = Some(xai_grok_tools::types::SessionMode::Plan);
-                agent.show_mode_switch_banner("Plan");
-                tracing::info!("Mode cycle (pre-session): Normal → Plan");
-                None
+                if in_accept_edits || nudge_showing {
+                    agent.plan_mode_pending = Some(true);
+                    agent.deferred_session_mode = Some(xai_grok_tools::types::SessionMode::Plan);
+                    app.current_ui.permission_mode = Some("ask".into());
+                    agent.show_mode_switch_banner("Plan");
+                    tracing::info!(
+                        "Mode cycle (pre-session): {} → Plan",
+                        if in_accept_edits {
+                            "Accept-Edits"
+                        } else {
+                            "Normal (nudge)"
+                        }
+                    );
+                    Some("ask")
+                } else {
+                    app.current_ui.permission_mode = Some("accept-edits".into());
+                    agent.show_mode_switch_banner("Accept-Edits");
+                    tracing::info!("Mode cycle (pre-session): Normal → Accept-Edits");
+                    Some("accept-edits")
+                }
             }
             // Plan → Auto (or Plan → Always-Approve when the auto feature is
             // gated off, matching the legacy Normal→Plan→Always-Approve cycle).
@@ -778,16 +811,46 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
     let in_yolo = agent.session.is_yolo();
 
     match (in_plan, in_auto, in_yolo) {
-        // Normal → Plan
+        // Normal → Accept-Edits, or Accept-Edits/nudge → Plan
         (false, false, false) => {
-            agent.plan_mode_pending = Some(true);
-            agent.show_mode_switch_banner("Plan");
-            refresh_open_settings_modals(app);
-            tracing::info!("Mode cycle: Normal → Plan");
-            vec![Effect::SetSessionMode {
-                session_id,
-                mode_id: acp::SessionModeId::new(xai_grok_tools::types::SessionMode::Plan.as_id()),
-            }]
+            if in_accept_edits || nudge_showing {
+                agent.plan_mode_pending = Some(true);
+                app.current_ui.permission_mode = Some("ask".into());
+                agent.show_mode_switch_banner("Plan");
+                refresh_open_settings_modals(app);
+                tracing::info!(
+                    "Mode cycle: {} → Plan",
+                    if in_accept_edits {
+                        "Accept-Edits"
+                    } else {
+                        "Normal (nudge)"
+                    }
+                );
+                let mut effects = vec![Effect::SetSessionMode {
+                    session_id: session_id.clone(),
+                    mode_id: acp::SessionModeId::new(
+                        xai_grok_tools::types::SessionMode::Plan.as_id(),
+                    ),
+                }];
+                if in_accept_edits {
+                    effects.push(Effect::PersistPermissionMode {
+                        canonical: "ask",
+                        session_id: Some(session_id),
+                        persist: crate::app::actions::PermissionModePersist::BestEffort,
+                    });
+                }
+                effects
+            } else {
+                app.current_ui.permission_mode = Some("accept-edits".into());
+                agent.show_mode_switch_banner("Accept-Edits");
+                refresh_open_settings_modals(app);
+                tracing::info!("Mode cycle: Normal → Accept-Edits");
+                vec![Effect::PersistPermissionMode {
+                    canonical: "accept-edits",
+                    session_id: Some(session_id),
+                    persist: crate::app::actions::PermissionModePersist::BestEffort,
+                }]
+            }
         }
         // Plan → Auto (classifier mode; exit plan, not always-approve).
         // When the auto feature is gated off, Plan → Always-Approve (skip Auto),

@@ -91,9 +91,10 @@ const THEME_CHOICES: &[EnumChoice] = &[
 // it lives on its own `plan_mode` setting.
 // ---------------------------------------------------------------------------
 
-// Choice order: safe → classifier → unsafe (Default → Ask → Auto → Always approve).
+// Choice order: safe → edits-free → classifier → unsafe
+// (Default → Ask → Accept edits → Auto → Always approve).
 // "Always approve" at the end creates a speed bump against
-// accidental selection.
+// accidental selection. Accept edits mirrors Claude `acceptEdits`.
 const PERMISSION_MODE_CHOICES: &[EnumChoice] = &[
     // "default" = agent's default behavior. Same as "ask" at runtime;
     // distinct on disk and in the modal indicator.
@@ -106,6 +107,11 @@ const PERMISSION_MODE_CHOICES: &[EnumChoice] = &[
         canonical: "ask",
         display: "Ask",
         description: "Prompt for permission before tool actions.",
+    },
+    EnumChoice {
+        canonical: "accept-edits",
+        display: "Accept edits",
+        description: "Auto-allow file edits; still prompt for shell, network, and other tools.",
     },
     EnumChoice {
         canonical: "auto",

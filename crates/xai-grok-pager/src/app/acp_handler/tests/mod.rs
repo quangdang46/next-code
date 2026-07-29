@@ -27,6 +27,7 @@ pub(super) fn make_session(session_id: Option<&str>) -> AgentSession {
         next_queue_id: 0,
         yolo_mode: false,
         auto_mode: false,
+        accept_edits_mode: false,
         prompt_history: Vec::new(),
         prompt_history_loading: false,
         loading_replay: false,

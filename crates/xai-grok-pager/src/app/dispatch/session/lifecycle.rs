@@ -304,6 +304,8 @@ pub(in crate::app::dispatch) fn dispatch_new_session_inner_with_id(
             next_queue_id: 0,
             yolo_mode: app.default_yolo,
             auto_mode: inherit_auto_mode(app),
+            accept_edits_mode: app.current_ui.permission_mode.as_deref()
+                == Some("accept-edits"),
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,
@@ -635,6 +637,8 @@ pub(in crate::app::dispatch) fn dispatch_new_worktree_session(
             next_queue_id: 0,
             yolo_mode: app.default_yolo,
             auto_mode: inherit_auto_mode(app),
+            accept_edits_mode: app.current_ui.permission_mode.as_deref()
+                == Some("accept-edits"),
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,

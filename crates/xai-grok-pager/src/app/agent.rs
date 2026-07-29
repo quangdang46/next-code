@@ -636,6 +636,10 @@ pub struct AgentSession {
     /// Kept in sync wherever the pager applies the mode; mutually exclusive with
     /// `yolo_mode` (yolo wins).
     pub(crate) auto_mode: bool,
+    /// Whether Accept-Edits mode is active (file edits auto-allow; shell still
+    /// prompts). Display-only mirror of `ui.permission_mode == "accept-edits"`.
+    /// Cleared under yolo / auto / plan. Read via `is_accept_edits()`.
+    pub(crate) accept_edits_mode: bool,
     /// Prompt history for the current session, fetched from ACP
     /// (`x.ai/prompt_history` scoped via `filter_session_id`). Most-recent-first.
     /// Fetched on session create/load; prompts sent in this session are
@@ -766,6 +770,11 @@ impl AgentSession {
     pub fn is_auto(&self) -> bool {
         self.auto_mode
     }
+    /// Whether Accept-Edits mode is active. Prefer this over direct field
+    /// access. Cleared when yolo or auto is on.
+    pub fn is_accept_edits(&self) -> bool {
+        self.accept_edits_mode
+    }
     /// Test-only setter for `yolo_mode` (the field is private; production toggles
     /// it via the permission-mode facade). Available to sibling crates' test
     /// builds through the test-only helpers.
@@ -777,6 +786,11 @@ impl AgentSession {
     #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn set_auto_mode_for_test(&mut self, on: bool) {
         self.auto_mode = on;
+    }
+    /// Test-only setter for `accept_edits_mode`.
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) fn set_accept_edits_mode_for_test(&mut self, on: bool) {
+        self.accept_edits_mode = on;
     }
     /// Process an ACP session update. Returns true if scrollback was modified.
     pub fn handle_update(
@@ -1003,6 +1017,7 @@ mod tests {
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,

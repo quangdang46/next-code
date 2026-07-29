@@ -1058,6 +1058,8 @@ pub enum PermissionModePersist {
 /// `Default` and `Ask` both project onto `yolo_mode = false` at runtime
 /// but are distinct on disk — `Default` expresses "use the agent's
 /// default" while `Ask` is the explicit "prompt me every time".
+/// `AcceptEdits` auto-allows file edits (DCG) while still prompting for
+/// shell/network — Claude Shift+Tab muscle memory.
 /// `Auto` uses the LLM classifier (not full always-approve).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PermissionModeKind {
@@ -1065,6 +1067,8 @@ pub enum PermissionModeKind {
     Default,
     /// Explicit prompt-every-time. `yolo_mode = false`.
     Ask,
+    /// Auto-allow file edits; still prompt for bash/network. `yolo_mode = false`.
+    AcceptEdits,
     /// LLM classifier for non-fast-path tools. `yolo_mode = false`, `auto_mode = true`.
     Auto,
     /// Auto-approve all tool actions. `yolo_mode = true`.
@@ -1078,6 +1082,7 @@ impl PermissionModeKind {
         match self {
             Self::Default => "default",
             Self::Ask => "ask",
+            Self::AcceptEdits => "accept-edits",
             Self::Auto => "auto",
             Self::AlwaysApprove => "always-approve",
         }
@@ -1095,6 +1100,10 @@ impl PermissionModeKind {
     pub fn is_auto(self) -> bool {
         matches!(self, Self::Auto)
     }
+    /// File-edit auto-allow mode (distinct from always-approve / auto).
+    pub fn is_accept_edits(self) -> bool {
+        matches!(self, Self::AcceptEdits)
+    }
     /// Construct from a canonical string. Returns `None` for unknown
     /// strings. Used by `apply_setting_rollback("permission_mode", _)`
     /// to recover the typed kind from the `SettingValue::Enum(canonical)`
@@ -1103,6 +1112,7 @@ impl PermissionModeKind {
         match s {
             "default" => Some(Self::Default),
             "ask" => Some(Self::Ask),
+            "accept-edits" => Some(Self::AcceptEdits),
             "auto" => Some(Self::Auto),
             "always-approve" => Some(Self::AlwaysApprove),
             _ => None,
@@ -1128,8 +1138,20 @@ mod permission_mode_kind_tests {
         );
     }
     #[test]
+    fn accept_edits_is_distinct_from_always_approve() {
+        let ae = PermissionModeKind::AcceptEdits;
+        assert_eq!(ae.as_canonical(), "accept-edits");
+        assert!(!ae.is_always_approve());
+        assert!(!ae.is_auto());
+        assert!(ae.is_accept_edits());
+        assert_eq!(
+            PermissionModeKind::from_canonical("accept-edits"),
+            Some(PermissionModeKind::AcceptEdits)
+        );
+    }
+    #[test]
     fn permission_mode_choices_include_auto_in_catalog() {
-        for c in ["default", "ask", "auto", "always-approve"] {
+        for c in ["default", "ask", "accept-edits", "auto", "always-approve"] {
             assert!(
                 PermissionModeKind::from_canonical(c).is_some(),
                 "catalog canonical {c} must parse"

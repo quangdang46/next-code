@@ -1221,6 +1221,7 @@ pub enum PermissionMode {
     Ask,
     AlwaysApprove,
     Auto,
+    AcceptEdits,
     Default,
 }
 
@@ -1230,6 +1231,9 @@ impl PermissionMode {
     }
     pub fn is_auto(self) -> bool {
         matches!(self, Self::Auto)
+    }
+    pub fn is_accept_edits(self) -> bool {
+        matches!(self, Self::AcceptEdits)
     }
 }
 
@@ -1283,6 +1287,7 @@ pub fn clamped_display_permission_mode(mode: PermissionMode) -> &'static str {
         match mode {
             PermissionMode::Ask => "ask",
             PermissionMode::Default => "default",
+            PermissionMode::AcceptEdits => "accept-edits",
             PermissionMode::AlwaysApprove => "always-approve",
             PermissionMode::Auto => "auto",
         }
@@ -1293,6 +1298,7 @@ pub fn parse_permission_mode_canonical(s: &str) -> PermissionMode {
     match s.trim().to_ascii_lowercase().as_str() {
         "always-approve" | "yolo" | "bypasspermissions" => PermissionMode::AlwaysApprove,
         "auto" => PermissionMode::Auto,
+        "accept-edits" | "acceptedits" => PermissionMode::AcceptEdits,
         "default" => PermissionMode::Default,
         _ => PermissionMode::Ask,
     }
