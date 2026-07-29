@@ -86,7 +86,9 @@ pub fn resolve_tool_name(name: &str) -> &str {
 
     match name {
         "communicate" => "swarm",
-        "task" | "task_runner" => "subagent",
+        // Claude Code legacy `Task` / runners → unified Agent façade (not the
+        // removed direct `subagent` tool).
+        "task" | "task_runner" | "Task" => "Agent",
         "launch" => "open",
         "shell" => "bash",
         "shell_exec" => "bash",
@@ -118,7 +120,9 @@ mod tests {
     fn resolve_tool_name_strips_function_namespace_before_alias_resolution() {
         assert_eq!(resolve_tool_name("functions.bash"), "bash");
         assert_eq!(resolve_tool_name("functions.shell_exec"), "bash");
-        assert_eq!(resolve_tool_name("functions.file_grep"), "agentgrep");
+        assert_eq!(resolve_tool_name("functions.file_grep"), "ffs grep");
+        assert_eq!(resolve_tool_name("functions.Task"), "Agent");
+        assert_eq!(resolve_tool_name("task"), "Agent");
     }
 
     #[test]

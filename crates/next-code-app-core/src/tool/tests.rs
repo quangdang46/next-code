@@ -87,14 +87,15 @@ async fn test_discover_tools_not_registered_when_sponsors_disabled() {
 async fn subagent_tool_is_not_registered() {
     let provider: Arc<dyn Provider> = Arc::new(MockProvider);
     let registry = Registry::new(provider).await;
+    let names = registry.tool_names().await;
 
     assert!(
-        !registry
-            .tool_names()
-            .await
-            .iter()
-            .any(|name| name == "subagent"),
-        "the deprecated direct subagent tool must not be exposed; use swarm instead"
+        !names.iter().any(|name| name == "subagent"),
+        "the deprecated direct subagent tool must not be exposed; use swarm/Agent instead"
+    );
+    assert!(
+        names.iter().any(|name| name == "Agent"),
+        "Claude-compatible Agent façade must be registered"
     );
 }
 
@@ -171,11 +172,11 @@ async fn first_party_tool_definitions_include_optional_intent_explicitly() {
 
 #[test]
 fn test_resolve_tool_name_oauth_aliases() {
-    assert_eq!(Registry::resolve_tool_name("file_grep"), "grep");
+    assert_eq!(Registry::resolve_tool_name("file_grep"), "ffs grep");
     assert_eq!(Registry::resolve_tool_name("file_read"), "read");
     assert_eq!(Registry::resolve_tool_name("file_write"), "write");
     assert_eq!(Registry::resolve_tool_name("file_edit"), "edit");
-    assert_eq!(Registry::resolve_tool_name("file_glob"), "glob");
+    assert_eq!(Registry::resolve_tool_name("file_glob"), "ffs glob");
     assert_eq!(Registry::resolve_tool_name("shell_exec"), "bash");
     assert_eq!(Registry::resolve_tool_name("shell"), "bash");
     assert_eq!(Registry::resolve_tool_name("read_file"), "read");
@@ -183,8 +184,9 @@ fn test_resolve_tool_name_oauth_aliases() {
     assert_eq!(Registry::resolve_tool_name("edit_file"), "edit");
     assert_eq!(Registry::resolve_tool_name("hashline_edit"), "edit");
     assert_eq!(Registry::resolve_tool_name("apply_patch"), "edit");
-    assert_eq!(Registry::resolve_tool_name("task_runner"), "subagent");
-    assert_eq!(Registry::resolve_tool_name("task"), "subagent");
+    assert_eq!(Registry::resolve_tool_name("task_runner"), "Agent");
+    assert_eq!(Registry::resolve_tool_name("task"), "Agent");
+    assert_eq!(Registry::resolve_tool_name("Task"), "Agent");
     assert_eq!(Registry::resolve_tool_name("launch"), "open");
     assert_eq!(Registry::resolve_tool_name("todo_read"), "todo");
     assert_eq!(Registry::resolve_tool_name("todo_write"), "todo");

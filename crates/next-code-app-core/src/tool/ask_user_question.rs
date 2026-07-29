@@ -296,7 +296,12 @@ mod tests {
 
     #[tokio::test]
     async fn accepted_path_formats_answers() {
+<<<<<<< HEAD
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<AskUserQuestionInputRequest>();
+=======
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<crate::tool::AskUserQuestionInputRequest>();
+>>>>>>> origin/pr-face-agent-unified
         let tool = AskUserQuestionTool::new();
         let questions = sample_questions();
         let input = json!({ "questions": questions });
@@ -390,7 +395,12 @@ mod tests {
 
     #[tokio::test]
     async fn cancelled_path_is_not_tool_error() {
+<<<<<<< HEAD
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<AskUserQuestionInputRequest>();
+=======
+        let (tx, mut rx) =
+            tokio::sync::mpsc::unbounded_channel::<crate::tool::AskUserQuestionInputRequest>();
+>>>>>>> origin/pr-face-agent-unified
         let tool = AskUserQuestionTool::new();
         let input = json!({ "questions": sample_questions() });
 
