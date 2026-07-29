@@ -440,6 +440,11 @@ pub enum Action {
     CycleMode,
     /// Toggle YOLO mode (auto-approve all permissions). Ctrl+O.
     ToggleYolo,
+    /// Alt+T: toggle reasoning effort (None ↔ stash when the model offers
+    /// `none`; otherwise cycle the model's offered effort levels). Claude
+    /// `meta+t` / thinking-toggle muscle memory adapted to Face's multi-level
+    /// `/effort` surface.
+    ToggleThinkingEffort,
     /// Set YOLO (auto-approve / `always-approve`) mode.
     SetYoloMode(bool),
     /// Set the permission mode by canonical kind (`always-approve` /
