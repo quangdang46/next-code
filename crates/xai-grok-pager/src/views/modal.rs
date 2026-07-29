@@ -294,6 +294,10 @@ pub enum ActiveModal {
     ExperimentalFeatures {
         state: Box<crate::views::experimental_modal::ExperimentalModalState>,
     },
+    /// Session diff review (`/diff`) — git working tree + per-turn edits.
+    DiffReview {
+        state: Box<crate::views::diff_modal::DiffModalState>,
+    },
     /// Reset-settings confirmation, stacked above Settings.
     ///
     /// The underlying `SettingsModalState` is moved in/out so cancel
@@ -620,6 +624,7 @@ impl ActiveModal {
             | ActiveModal::MemoryBrowser { .. }
             | ActiveModal::Settings { .. }
             | ActiveModal::ExperimentalFeatures { .. }
+            | ActiveModal::DiffReview { .. }
             | ActiveModal::RememberNoteReview { .. } => vec![],
         }
     }
@@ -651,6 +656,7 @@ impl ActiveModal {
             ActiveModal::MemoryBrowser { .. } => "Memory",
             ActiveModal::Settings { .. } => crate::views::settings_modal::MODAL_TITLE,
             ActiveModal::ExperimentalFeatures { .. } => "Experimental features",
+            ActiveModal::DiffReview { .. } => "Diff",
             ActiveModal::ResetSettingsConfirm { .. } => "Reset setting?",
             ActiveModal::RememberNoteReview { .. } => "Memory Note",
         }

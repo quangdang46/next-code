@@ -626,6 +626,8 @@ pub enum Action {
     OpenSettings,
     /// Open Face `/experimental` checklist (toggle experiment flags).
     OpenExperimental,
+    /// Open Face `/diff` review modal (git HEAD + per-turn scrollback edits).
+    OpenDiffModal,
     /// Open the command palette (`/help`). The keybinding path (Ctrl+P) opens it
     /// directly in `handle_agent_action`; this lets a slash command reach the
     /// same modal through dispatch.
