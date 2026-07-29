@@ -2392,7 +2392,8 @@ impl AgentView {
             crate::git_info::cwd_git_info_lazy(&self.session.cwd).and_then(|info| info.branch)
         });
         let context_pct = self.context_state.as_ref().map(|c| c.usage_pct);
-        let context_pct_label = context_pct.map(|pct| format!("{pct}%"));
+        // Claude BuiltinStatusLine: "Context N%" (dim label + percent).
+        let context_pct_label = context_pct.map(|pct| format!("Context {pct}%"));
         let status_seg_owned: Vec<(String, bool, Option<ratatui::style::Color>)> = {
             use xai_grok_shell::agent::config::StatusLineSegment;
             let mut out = Vec::new();
@@ -2446,6 +2447,13 @@ impl AgentView {
                     }
                 })
                 .collect();
+        // Claude PromptInputFooterLeftSide hosts BackgroundTaskStatus on the
+        // prompt chrome so bg work stays visible while turn-status shows the
+        // spinner. Build before PromptInfo so the label lives long enough.
+        let tasks_pill_owned = watchers
+            .shows_ambient()
+            .then(|| turn_status::prompt_footer_pill_label(watchers));
+        let tasks_pill = tasks_pill_owned.as_deref();
         let info = match &self.prompt_mode {
             PromptMode::Normal => PromptInfo {
                 model_name: &model_label,
@@ -2454,6 +2462,7 @@ impl AgentView {
                 multiline,
                 usage_warning,
                 usage_warning_critical,
+                tasks_pill,
             },
             PromptMode::EditingQueued { id, .. } => {
                 let pos = self.session.queue_position(*id).map(|i| i + 1).unwrap_or(1);
@@ -2465,6 +2474,7 @@ impl AgentView {
                     multiline,
                     usage_warning,
                     usage_warning_critical,
+                    tasks_pill,
                 }
             }
         };
@@ -2476,6 +2486,7 @@ impl AgentView {
                 multiline: false,
                 usage_warning,
                 usage_warning_critical,
+                tasks_pill,
             }
         } else {
             info

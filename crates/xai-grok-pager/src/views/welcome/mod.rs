@@ -867,6 +867,7 @@ pub fn render_welcome(
                 multiline: false,
                 usage_warning: None,
                 usage_warning_critical: false,
+                tasks_pill: None,
             };
             let (menu_rects, post_flush_escapes) = render_welcome_blocked(
                 content_area,
@@ -2273,6 +2274,7 @@ fn render_welcome_done(
             multiline: false,
             usage_warning: usage_warning_text.as_deref(),
             usage_warning_critical,
+            tasks_pill: None,
         };
 
         // Tip already painted into tip_content (or update/resume above).

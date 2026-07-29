@@ -302,6 +302,12 @@ pub struct PromptInfo<'a> {
     /// When true the warning uses the yellow warning color (<=5% left);
     /// when false it uses dim grey text (5-10% left).
     pub usage_warning_critical: bool,
+    /// Optional Claude-style background-task pill (right side, inverse).
+    ///
+    /// Ref: Claude `BackgroundTaskStatus` / `SummaryPill` in prompt footer;
+    /// Face surfaces this on the prompt chrome so bg work stays visible while
+    /// the turn-status row shows spinner (not only when idle).
+    pub tasks_pill: Option<&'a str>,
 }
 
 /// Live voice-capture overlay state for the prompt.
@@ -3432,7 +3438,9 @@ impl PromptWidget {
                          color: Option<ratatui::style::Color>,
                          bold: bool,
                          use_model_style: bool| {
-            left_spans.push(Span::styled(" · ", sep_style));
+            // Claude BuiltinStatusLine uses ` │ ` between major status tokens;
+            // Face mode-flag clusters still use mid-dot when not on status_segments.
+            left_spans.push(Span::styled(" \u{2502} ", sep_style));
             let mut style = if use_model_style {
                 model_style
             } else if let Some(color) = color {
@@ -3495,9 +3503,20 @@ impl PromptWidget {
         // Trailing pad mirrors the leading pad above.
         left_spans.push(Span::styled(" ", pad_style));
 
-        // Build right-side spans: "multiline" indicator.
+        // Build right-side spans: bg-task pill (Claude footer) + multiline.
         let mut right_spans: Vec<Span<'static>> = Vec::new();
+        if let Some(pill) = info.tasks_pill.filter(|s| !s.is_empty()) {
+            // Inverse SummaryPill look (Claude BackgroundTaskStatus).
+            let pill_style = Style::default()
+                .fg(bg)
+                .bg(theme.text_primary)
+                .add_modifier(Modifier::BOLD);
+            right_spans.push(Span::styled(format!(" {pill} "), pill_style));
+        }
         if info.multiline {
+            if !right_spans.is_empty() {
+                right_spans.push(Span::styled(" ", pad_style));
+            }
             right_spans.push(Span::styled("multiline", flag_style));
         }
 

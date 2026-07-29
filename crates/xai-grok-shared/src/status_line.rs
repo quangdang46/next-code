@@ -250,7 +250,8 @@ pub fn select_status_line_parts(
             }
             StatusLineSegment::Context => {
                 if let Some(pct) = snap.context_pct {
-                    parts.push(StatusLinePart::Flag(format!("{pct}%")));
+                    // Claude BuiltinStatusLine: "Context N%"
+                    parts.push(StatusLinePart::Flag(format!("Context {pct}%")));
                 }
             }
             StatusLineSegment::Cwd => {
@@ -369,12 +370,12 @@ mod tests {
             vec![
                 StatusLinePart::Flag("always-approve".into()),
                 StatusLinePart::Model("grok-4".into()),
-                StatusLinePart::Flag("35%".into()),
+                StatusLinePart::Flag("Context 35%".into()),
             ]
         );
         let (model, flags) = split_prompt_info_parts(&parts);
         assert_eq!(model, "grok-4");
-        assert_eq!(flags, vec!["always-approve", "35%"]);
+        assert_eq!(flags, vec!["always-approve", "Context 35%"]);
     }
 
     #[test]

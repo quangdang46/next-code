@@ -1029,6 +1029,7 @@ fn handle_browse(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
                 return InputOutcome::Action(Action::SuspendForEditor {
                     path,
                     refresh_agents_modal: None,
+                    reload_keybindings: false,
                 });
             }
             InputOutcome::Unchanged
@@ -1339,6 +1340,7 @@ mod tests {
             InputOutcome::Action(Action::SuspendForEditor {
                 path: opened,
                 refresh_agents_modal: None,
+                reload_keybindings: false,
             }) => assert_eq!(opened, path),
             other => panic!("expected SuspendForEditor, got {other:?}"),
         }

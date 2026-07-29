@@ -511,6 +511,7 @@ fn paint_peek_config_badge(
         multiline,
         usage_warning: None,
         usage_warning_critical: false,
+        tasks_pill: None,
     };
     // Bottom border row, inside the corners — the same content rect the
     // chat prompt and dispatch box use for their info line.

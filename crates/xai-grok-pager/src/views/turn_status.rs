@@ -118,6 +118,14 @@ impl Watchers {
         self.commands + self.monitors + self.loops + self.subagents
     }
 
+    /// Whether ambient chrome should surface background work.
+    ///
+    /// Running watchers *or* unread completed tasks (Claude footer pill stays
+    /// visible for attention even after work finishes until the hub is opened).
+    pub fn shows_ambient(self) -> bool {
+        self.total() > 0 || self.unread_completed > 0
+    }
+
     /// Awaitable in-flight work — the kinds a blocking `wait_tasks` /
     /// `get_task_output` wait can resolve on (commands, monitors, subagents;
     /// scheduled `/loop` tasks are timers, not awaitable work).
@@ -129,9 +137,10 @@ impl Watchers {
 /// Claude-style ambient footer pill for background work.
 ///
 /// Lists only non-zero kinds with Claude vocabulary (`shell` not `command`),
-/// then a hub open hint — e.g. `"1 shell · 2 monitors · Ctrl+B"`. Assumes
-/// `watchers.total() > 0`. When `unread_completed > 0`, appends a quiet
-/// attention marker so the pill differs from plain running.
+/// then a hub open hint — e.g. `"1 shell · 2 monitors · Ctrl+B"`.
+/// When only unread completed work remains, uses mixed-type Claude grammar
+/// (`N background tasks`) plus attention. When `unread_completed > 0` alongside
+/// running work, appends a quiet `· !` marker.
 pub fn pill_label(watchers: Watchers) -> String {
     use std::fmt::Write as _;
     let mut label = String::with_capacity(40);
@@ -151,7 +160,54 @@ pub fn pill_label(watchers: Watchers) -> String {
     push_part(watchers.monitors, "monitor", "monitors");
     push_part(watchers.loops, "loop", "loops");
     push_part(watchers.subagents, "subagent", "subagents");
+    if first {
+        // Unread-only / attention-only: Claude falls back to mixed "N background tasks".
+        let n = watchers.unread_completed.max(1);
+        let _ = write!(
+            label,
+            "{n} background {}",
+            if n == 1 { "task" } else { "tasks" }
+        );
+    }
     let _ = write!(label, " \u{00b7} Ctrl+B");
+    if watchers.unread_completed > 0 {
+        let _ = write!(label, " \u{00b7} !");
+    }
+    label
+}
+
+/// Compact prompt-footer pill (Claude `SummaryPill` / OpenCode ambient count).
+///
+/// Omits the Ctrl+B hub hint — that lives on the turn-status watching row.
+/// Used on the prompt info line so background work stays visible while a
+/// turn is running (turn-status then shows spinner chrome, not the watching cue).
+pub fn prompt_footer_pill_label(watchers: Watchers) -> String {
+    use std::fmt::Write as _;
+    let mut label = String::with_capacity(32);
+    let mut first = true;
+    let mut push_part = |n: usize, one: &str, many: &str| {
+        if n == 0 {
+            return;
+        }
+        if !first {
+            let _ = write!(label, ", ");
+        }
+        first = false;
+        let noun = if n == 1 { one } else { many };
+        let _ = write!(label, "{n} {noun}");
+    };
+    push_part(watchers.commands, "shell", "shells");
+    push_part(watchers.monitors, "monitor", "monitors");
+    push_part(watchers.loops, "loop", "loops");
+    push_part(watchers.subagents, "subagent", "subagents");
+    if first {
+        let n = watchers.unread_completed.max(1);
+        let _ = write!(
+            label,
+            "{n} background {}",
+            if n == 1 { "task" } else { "tasks" }
+        );
+    }
     if watchers.unread_completed > 0 {
         let _ = write!(label, " \u{00b7} !");
     }
@@ -278,7 +334,7 @@ pub fn render_turn_status(
     // Idle or parked with watchers: persistent watching cue (not scrollback
     // — it must never scroll away). Lower priority than the starting-session
     // and drain-blocked cues above.
-    if (state.is_idle() || parked) && watchers.total() > 0 {
+    if (state.is_idle() || parked) && watchers.shows_ambient() {
         // Pulsing concentric circle (○ ◎ ◉ ◎) on a calm ambient cadence:
         // the agent is idle, so this "watching" breath runs slower than the
         // active turn spinner (see MONITOR_PULSE_DIVISOR).
@@ -774,12 +830,12 @@ pub fn should_show(
     parked: bool,
 ) -> bool {
     if parked {
-        return watchers.total() > 0;
+        return watchers.shows_ambient();
     }
     !state.is_idle()
         || drain_blocked
         || starting_session_visible(mcp_init_progress)
-        || watchers.total() > 0
+        || watchers.shows_ambient()
 }
 
 /// Format a duration for the turn/phase timer.
@@ -1494,6 +1550,36 @@ mod tests {
                 ..Watchers::default()
             }),
             "1 shell \u{00b7} Ctrl+B \u{00b7} !"
+        );
+    }
+
+    #[test]
+    fn pill_label_unread_only() {
+        assert_eq!(
+            pill_label(Watchers {
+                unread_completed: 2,
+                ..Watchers::default()
+            }),
+            "2 background tasks \u{00b7} Ctrl+B \u{00b7} !"
+        );
+    }
+
+    #[test]
+    fn prompt_footer_pill_omits_hub_hint() {
+        assert_eq!(
+            prompt_footer_pill_label(Watchers {
+                commands: 1,
+                monitors: 2,
+                ..Watchers::default()
+            }),
+            "1 shell, 2 monitors"
+        );
+        assert!(
+            Watchers {
+                unread_completed: 1,
+                ..Watchers::default()
+            }
+            .shows_ambient()
         );
     }
 
