@@ -20,7 +20,7 @@ impl SlashCommand for StatuslineCommand {
     }
 
     fn description(&self) -> &str {
-        "Configure prompt status line (mode, model, context%, cwd, git)"
+        "Configure prompt status line (mode, model, reasoning, run-state, context%, cwd, git)"
     }
 
     fn usage(&self) -> &str {
@@ -54,13 +54,13 @@ impl SlashCommand for StatuslineCommand {
                 let seg_raw = parts.next().unwrap_or("");
                 if seg_raw.is_empty() {
                     return CommandResult::Message(
-                        "Usage: /statusline toggle <segment> (mode|model|context|cwd|git)".into(),
+                        "Usage: /statusline toggle <segment> (mode|model|reasoning|run-state|context|cwd|git)".into(),
                     );
                 }
                 match StatusLineSegment::parse(seg_raw) {
                     Some(seg) => CommandResult::Action(Action::ToggleStatusLineSegment(seg)),
                     None => CommandResult::Message(format!(
-                        "Unknown segment '{seg_raw}'. Try mode, model, context, cwd, or git."
+                        "Unknown segment '{seg_raw}'. Try mode, model, reasoning, run-state, context, cwd, or git."
                     )),
                 }
             }

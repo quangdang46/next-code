@@ -5,10 +5,18 @@
 use serde::{Deserialize, Serialize};
 
 /// Known statusline segment ids (stable config / Settings / `/statusline` vocabulary).
+///
+/// Codex parity extras: `Reasoning` (effort) and `RunState` (idle/running/…).
+/// Ref: `.tmp/codex/codex-rs/tui/src/bottom_pane/status_line_setup.rs` `StatusLineItem`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StatusLineSegment {
     Mode,
     Model,
+    /// Reasoning effort alone (`high`, `low`, …). When on, Model drops the
+    /// embedded `(effort)` suffix so the chrome stays scannable.
+    Reasoning,
+    /// Compact turn/run state (`idle` / `running` / `cancelling` / …).
+    RunState,
     Context,
     Cwd,
     Git,
@@ -18,6 +26,8 @@ impl StatusLineSegment {
     pub const ALL: &'static [Self] = &[
         Self::Mode,
         Self::Model,
+        Self::Reasoning,
+        Self::RunState,
         Self::Context,
         Self::Cwd,
         Self::Git,
@@ -27,6 +37,8 @@ impl StatusLineSegment {
         match self {
             Self::Mode => "mode",
             Self::Model => "model",
+            Self::Reasoning => "reasoning",
+            Self::RunState => "run-state",
             Self::Context => "context",
             Self::Cwd => "cwd",
             Self::Git => "git",
@@ -37,6 +49,8 @@ impl StatusLineSegment {
         match raw.trim().to_ascii_lowercase().as_str() {
             "mode" | "permission" | "permissions" => Some(Self::Mode),
             "model" => Some(Self::Model),
+            "reasoning" | "effort" | "thinking" => Some(Self::Reasoning),
+            "run-state" | "run_state" | "status" | "state" => Some(Self::RunState),
             "context" | "context%" | "ctx" => Some(Self::Context),
             "cwd" | "dir" | "directory" | "pwd" => Some(Self::Cwd),
             "git" | "branch" => Some(Self::Git),
@@ -61,9 +75,15 @@ pub struct StatusLineConfig {
     /// Show permission/plan/auto mode flags. `None` → on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<bool>,
-    /// Show model (+ effort) label. `None` → on.
+    /// Show model label. `None` → on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<bool>,
+    /// Show reasoning effort as its own segment. `None` → on (Codex-like).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<bool>,
+    /// Show compact run/turn state. `None` → on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_state: Option<bool>,
     /// Show context usage percent. `None` → on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<bool>,
@@ -83,6 +103,8 @@ impl StatusLineConfig {
         self.enabled.is_none()
             && self.mode.is_none()
             && self.model.is_none()
+            && self.reasoning.is_none()
+            && self.run_state.is_none()
             && self.context.is_none()
             && self.cwd.is_none()
             && self.git.is_none()
@@ -96,11 +118,17 @@ impl StatusLineConfig {
     pub fn segment_visible(&self, segment: StatusLineSegment) -> bool {
         let default_on = matches!(
             segment,
-            StatusLineSegment::Mode | StatusLineSegment::Model | StatusLineSegment::Context
+            StatusLineSegment::Mode
+                | StatusLineSegment::Model
+                | StatusLineSegment::Reasoning
+                | StatusLineSegment::RunState
+                | StatusLineSegment::Context
         );
         match segment {
             StatusLineSegment::Mode => self.mode.unwrap_or(default_on),
             StatusLineSegment::Model => self.model.unwrap_or(default_on),
+            StatusLineSegment::Reasoning => self.reasoning.unwrap_or(default_on),
+            StatusLineSegment::RunState => self.run_state.unwrap_or(default_on),
             StatusLineSegment::Context => self.context.unwrap_or(default_on),
             StatusLineSegment::Cwd => self.cwd.unwrap_or(default_on),
             StatusLineSegment::Git => self.git.unwrap_or(default_on),
@@ -111,6 +139,8 @@ impl StatusLineConfig {
         match segment {
             StatusLineSegment::Mode => self.mode = Some(on),
             StatusLineSegment::Model => self.model = Some(on),
+            StatusLineSegment::Reasoning => self.reasoning = Some(on),
+            StatusLineSegment::RunState => self.run_state = Some(on),
             StatusLineSegment::Context => self.context = Some(on),
             StatusLineSegment::Cwd => self.cwd = Some(on),
             StatusLineSegment::Git => self.git = Some(on),
@@ -212,6 +242,10 @@ impl StatusLineConfig {
 #[derive(Debug, Clone, Default)]
 pub struct StatusLineSnapshot {
     pub model: String,
+    /// Reasoning effort label (`high`, `low`, …) when the model supports it.
+    pub reasoning: Option<String>,
+    /// Compact run/turn state (`idle`, `running`, …).
+    pub run_state: Option<String>,
     pub context_pct: Option<u8>,
     pub cwd_basename: Option<String>,
     pub git_branch: Option<String>,
@@ -245,7 +279,26 @@ pub fn select_status_line_parts(
             }
             StatusLineSegment::Model => {
                 if !snap.model.is_empty() {
-                    parts.push(StatusLinePart::Model(snap.model.clone()));
+                    // When Reasoning is its own segment, keep Model bare;
+                    // otherwise embed effort for backward-compatible density.
+                    let label = if cfg.segment_visible(StatusLineSegment::Reasoning) {
+                        snap.model.clone()
+                    } else if let Some(eff) = snap.reasoning.as_ref().filter(|s| !s.is_empty()) {
+                        format!("{} ({eff})", snap.model)
+                    } else {
+                        snap.model.clone()
+                    };
+                    parts.push(StatusLinePart::Model(label));
+                }
+            }
+            StatusLineSegment::Reasoning => {
+                if let Some(eff) = snap.reasoning.as_ref().filter(|s| !s.is_empty()) {
+                    parts.push(StatusLinePart::Flag(eff.clone()));
+                }
+            }
+            StatusLineSegment::RunState => {
+                if let Some(state) = snap.run_state.as_ref().filter(|s| !s.is_empty()) {
+                    parts.push(StatusLinePart::Flag(state.clone()));
                 }
             }
             StatusLineSegment::Context => {
@@ -292,7 +345,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_select_mode_model_context() {
+    fn defaults_select_mode_model_reasoning_run_state_context() {
         let cfg = StatusLineConfig::default();
         assert!(cfg.enabled());
         assert_eq!(
@@ -301,6 +354,8 @@ mod tests {
                 StatusLineSegment::Mode,
                 StatusLineSegment::Model,
                 StatusLineSegment::Context,
+                StatusLineSegment::Reasoning,
+                StatusLineSegment::RunState,
             ]
         );
     }
@@ -341,6 +396,8 @@ mod tests {
         let cfg = StatusLineConfig {
             context: Some(false),
             cwd: Some(true),
+            reasoning: Some(false),
+            run_state: Some(false),
             order: Some("model,cwd,mode,context".into()),
             ..Default::default()
         };
@@ -363,6 +420,7 @@ mod tests {
             mode_labels: vec!["always-approve".into()],
             cwd_basename: Some("next-code".into()),
             git_branch: Some("dev".into()),
+            ..Default::default()
         };
         let parts = select_status_line_parts(&cfg, &snap);
         assert_eq!(
@@ -392,6 +450,7 @@ mod tests {
             cwd_basename: None,
             git_branch: Some("main".into()),
             mode_labels: vec!["plan".into()],
+            ..Default::default()
         };
         let parts = select_status_line_parts(&cfg, &snap);
         assert_eq!(

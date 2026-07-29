@@ -2387,9 +2387,33 @@ impl AgentView {
         let usage_warning_text: Option<String> = warning.as_ref().map(|(t, _)| t.clone());
         let usage_warning = usage_warning_text.as_deref();
         let usage_warning_critical = warning.is_some_and(|(_, critical)| critical);
-        let model_label = match self.session.models.reasoning_effort {
-            Some(eff) => format!("{model_id} ({eff})"),
-            None => model_id,
+        let effort_label = self
+            .session
+            .models
+            .reasoning_effort
+            .map(|eff| eff.to_string());
+        // When Reasoning is its own segment, keep Model bare; else embed effort.
+        let model_label = if self
+            .status_line_config
+            .segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Reasoning)
+        {
+            model_id.clone()
+        } else {
+            match effort_label.as_ref() {
+                Some(eff) => format!("{model_id} ({eff})"),
+                None => model_id.clone(),
+            }
+        };
+        let run_state_label = {
+            use crate::app::agent::AgentState;
+            let label = match &self.session.state {
+                AgentState::Idle => "idle",
+                AgentState::TurnRunning => "running",
+                AgentState::TurnCancelling => "cancelling",
+                AgentState::CommandRunning { .. } => "command",
+                AgentState::CommandCancelling { .. } => "cancelling",
+            };
+            Some(label.to_string())
         };
         let cwd_basename = self
             .session
@@ -2418,6 +2442,16 @@ impl AgentView {
                     StatusLineSegment::Model => {
                         if !model_label.is_empty() {
                             out.push((model_label.clone(), true, None));
+                        }
+                    }
+                    StatusLineSegment::Reasoning => {
+                        if let Some(eff) = effort_label.as_ref() {
+                            out.push((eff.clone(), false, None));
+                        }
+                    }
+                    StatusLineSegment::RunState => {
+                        if let Some(state) = run_state_label.as_ref() {
+                            out.push((state.clone(), false, None));
                         }
                     }
                     StatusLineSegment::Context => {

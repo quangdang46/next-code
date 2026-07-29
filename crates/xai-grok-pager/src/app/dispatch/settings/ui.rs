@@ -954,6 +954,8 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("status_line.enabled", SettingValue::Bool(b)) => Some(Action::SetStatusLineEnabled(*b)),
         ("status_line.mode", SettingValue::Bool(b)) => Some(Action::SetStatusLineMode(*b)),
         ("status_line.model", SettingValue::Bool(b)) => Some(Action::SetStatusLineModel(*b)),
+        ("status_line.reasoning", SettingValue::Bool(b)) => Some(Action::SetStatusLineReasoning(*b)),
+        ("status_line.run_state", SettingValue::Bool(b)) => Some(Action::SetStatusLineRunState(*b)),
         ("status_line.context", SettingValue::Bool(b)) => Some(Action::SetStatusLineContext(*b)),
         ("status_line.cwd", SettingValue::Bool(b)) => Some(Action::SetStatusLineCwd(*b)),
         ("status_line.git", SettingValue::Bool(b)) => Some(Action::SetStatusLineGit(*b)),
@@ -1203,6 +1205,12 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         }
         ("status_line.model", SettingValue::Bool(b)) => {
             set_status_line_bool_inner(app, |c, v| c.model = v, *b)
+        }
+        ("status_line.reasoning", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.reasoning = v, *b)
+        }
+        ("status_line.run_state", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.run_state = v, *b)
         }
         ("status_line.context", SettingValue::Bool(b)) => {
             set_status_line_bool_inner(app, |c, v| c.context = v, *b)
