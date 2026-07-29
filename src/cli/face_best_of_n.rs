@@ -58,8 +58,14 @@ pub fn candidates_to_question(
         })
         .collect();
     Question {
+        header: Some("Best-of-N".into()),
         question: format!(
-            "Best-of-N: pick a winner to apply (recommended #{recommended_index}).\n{selection_reason}"
+            "{total} proposals complete • pick a winner to apply \
+(★ recommended: Proposal #{rec}).\n{selection_reason}\n\
+↑↓ / j k to navigate · Enter to apply · Esc to cancel",
+            total = candidates.len(),
+            rec = recommended_index + 1,
+            selection_reason = selection_reason,
         ),
         options,
         multi_select: Some(false),
@@ -170,6 +176,12 @@ mod tests {
                 status: "success".into(),
                 file_count: 1,
                 files: vec!["a.rs".into()],
+                file_stats: vec![next_code_best_of_n::BestOfNFileStat {
+                    path: "a.rs".into(),
+                    change_type: "M".into(),
+                    lines_added: 2,
+                    lines_removed: 1,
+                }],
                 error: None,
                 recommended: true,
             },
@@ -180,6 +192,7 @@ mod tests {
                 status: "success".into(),
                 file_count: 0,
                 files: vec![],
+                file_stats: vec![],
                 error: None,
                 recommended: false,
             },
@@ -199,9 +212,8 @@ mod tests {
             selection_reason: Some("focused".into()),
         };
         let text = progress_cards_text(&payload);
-        assert!(text.contains("awaiting_pick"));
+        assert!(text.contains("Proposal #1"));
         assert!(text.contains("★"));
-        assert!(text.contains("#0 temp-0"));
         assert!(text.contains("a.rs"));
     }
 
@@ -231,6 +243,7 @@ mod tests {
     fn candidates_to_question_has_options() {
         let q = candidates_to_question("reason", 0, &sample_candidates());
         assert_eq!(q.options.len(), 2);
-        assert!(q.question.contains("recommended #0"));
+        assert!(q.question.contains("Proposal #1"));
+        assert!(q.question.contains("Esc to cancel"));
     }
 }

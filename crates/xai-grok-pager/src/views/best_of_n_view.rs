@@ -85,6 +85,7 @@ mod tests {
                 status: "running".into(),
                 file_count: 0,
                 files: vec![],
+                file_stats: vec![],
                 error: None,
                 recommended: false,
             }],
