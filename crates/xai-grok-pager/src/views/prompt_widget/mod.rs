@@ -25,6 +25,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::StatefulWidgetRef;
+use unicode_width::UnicodeWidthStr;
 use xai_ratatui_textarea::{ElementId, ElementKind, TextArea, TextAreaState, TextElement};
 
 use crate::clipboard::{SystemClipboard, system_clipboard_get};
@@ -287,6 +288,30 @@ pub struct PromptStatusSegment<'a> {
     pub model_style: bool,
 }
 
+/// One Claude-style `@agent` footer pill (PromptInputFooter / BackgroundTaskStatus).
+#[derive(Debug, Clone, Copy)]
+pub struct AgentFooterPill<'a> {
+    /// Roster / session id used for click → enterTeammateView equivalent.
+    pub id: &'a str,
+    /// Display name without leading `@`.
+    pub name: &'a str,
+    /// Keyboard-selected or mouse-hovered.
+    pub selected: bool,
+    /// Currently viewed (soft or fullscreen teammate).
+    pub viewed: bool,
+    /// Idle teammate (dim).
+    pub idle: bool,
+    pub color: Option<ratatui::style::Color>,
+}
+
+/// Hit geometry from the prompt info line (tasks SummaryPill + @agent pills).
+#[derive(Debug, Clone, Default)]
+pub struct InfoLineHits {
+    pub tasks_pill: Option<Rect>,
+    /// `(roster_id, rect)` for each painted @agent pill.
+    pub agent_pills: Vec<(String, Rect)>,
+}
+
 /// Optional info line rendered below the prompt text.
 pub struct PromptInfo<'a> {
     /// Primary label to display on the info line (left side).
@@ -302,6 +327,18 @@ pub struct PromptInfo<'a> {
     /// When true the warning uses the yellow warning color (<=5% left);
     /// when false it uses dim grey text (5-10% left).
     pub usage_warning_critical: bool,
+    /// Optional Claude-style background-task pill (right side, inverse).
+    ///
+    /// Ref: Claude `BackgroundTaskStatus` / `SummaryPill` in prompt footer;
+    /// Face surfaces this on the prompt chrome so bg work stays visible while
+    /// the turn-status row shows spinner (not only when idle).
+    pub tasks_pill: Option<&'a str>,
+    /// When true, invert/bold the tasks pill (mouse hover).
+    pub tasks_pill_hovered: bool,
+    /// Claude `@main @worker` teammate pills on the footer chrome.
+    pub agent_pills: Option<&'a [AgentFooterPill<'a>]>,
+    /// Dim hint after agent pills (e.g. `Shift+↓ expand`).
+    pub agent_expand_hint: Option<&'a str>,
 }
 
 /// Live voice-capture overlay state for the prompt.
@@ -374,6 +411,8 @@ pub struct PromptRenderResult {
     /// Terminal escape sequences to write after the ratatui cell flush
     /// (e.g. Kitty/iTerm2 inline image rendering for the image preview).
     pub post_flush_escapes: Option<crate::terminal::overlay::Escapes>,
+    /// Clickable regions on the info-line chrome (tasks pill / @agent pills).
+    pub info_hits: InfoLineHits,
 }
 
 /// Prompt state saved while another input context owns the composer.
@@ -2920,6 +2959,7 @@ impl PromptWidget {
             return PromptRenderResult {
                 cursor_pos: None,
                 post_flush_escapes: None,
+                info_hits: InfoLineHits::default(),
             };
         }
 
@@ -3234,6 +3274,7 @@ impl PromptWidget {
         // Guard on actual allocated height, not requested `info_block`: during
         // resize the layout may squeeze the info block to 0 rows, leaving
         // chunks[2].y past the buffer boundary.
+        let mut info_hits = InfoLineHits::default();
         if info_block > 0 && style.chrome && style.show_borders && chunks[2].height > 0 {
             let div_y = chunks[2].y;
             let div_style = Style::default().fg(border_color).bg(bg);
@@ -3259,7 +3300,7 @@ impl PromptWidget {
                     width: content_area.width,
                     height: 1,
                 };
-                self.render_info_line(buf, info_rect, info, bg, &theme, style.focused);
+                info_hits = self.render_info_line(buf, info_rect, info, bg, &theme, style.focused);
             }
         }
 
@@ -3342,6 +3383,7 @@ impl PromptWidget {
                 return PromptRenderResult {
                     cursor_pos,
                     post_flush_escapes: None,
+                    info_hits,
                 };
             };
             post_flush_escapes = crate::render::render_image_overlay(
@@ -3362,6 +3404,7 @@ impl PromptWidget {
         PromptRenderResult {
             cursor_pos,
             post_flush_escapes,
+            info_hits,
         }
     }
 
@@ -3381,6 +3424,10 @@ impl PromptWidget {
     /// `pub(crate)` so the dashboard's dispatch box (which draws its own
     /// chrome) can paint an identical model + mode indicator on its bottom
     /// border. Does not read `self`.
+    ///
+    /// Returns hit rects for the tasks SummaryPill and any `@agent` pills so
+    /// mouse handlers can open the Tasks hub / enter teammate view (Claude
+    /// `BackgroundTaskStatus` / `enterTeammateView` parity).
     pub(crate) fn render_info_line(
         &self,
         buf: &mut Buffer,
@@ -3389,9 +3436,10 @@ impl PromptWidget {
         bg: ratatui::style::Color,
         theme: &Theme,
         focused: bool,
-    ) {
+    ) -> InfoLineHits {
+        let mut hits = InfoLineHits::default();
         if area.height == 0 {
-            return;
+            return hits;
         }
 
         // When the prompt is unfocused, fade info-line content further toward
@@ -3432,7 +3480,9 @@ impl PromptWidget {
                          color: Option<ratatui::style::Color>,
                          bold: bool,
                          use_model_style: bool| {
-            left_spans.push(Span::styled(" · ", sep_style));
+            // Claude BuiltinStatusLine uses ` │ ` between major status tokens;
+            // Face mode-flag clusters still use mid-dot when not on status_segments.
+            left_spans.push(Span::styled(" \u{2502} ", sep_style));
             let mut style = if use_model_style {
                 model_style
             } else if let Some(color) = color {
@@ -3492,12 +3542,72 @@ impl PromptWidget {
                 push_flag(&mut left_spans, flag.text, flag.color, flag.bold, false);
             }
         }
+
+        // Claude `@agent` teammate pills (BackgroundTaskStatus team mode).
+        // Track per-pill widths so we can emit hit rects after layout.
+        let mut agent_pill_meta: Vec<(String, u16)> = Vec::new();
+        if let Some(pills) = info.agent_pills.filter(|p| !p.is_empty()) {
+            left_spans.push(Span::styled(" \u{2502} ", sep_style));
+            for (i, pill) in pills.iter().enumerate() {
+                if i > 0 {
+                    left_spans.push(Span::styled(" ", pad_style));
+                }
+                let label = format!("@{}", pill.name);
+                let highlighted = pill.selected;
+                let mut style = if highlighted {
+                    if let Some(color) = pill.color {
+                        Style::default()
+                            .fg(bg)
+                            .bg(color)
+                            .add_modifier(Modifier::BOLD)
+                    } else {
+                        Style::default()
+                            .fg(bg)
+                            .bg(theme.text_primary)
+                            .add_modifier(Modifier::BOLD)
+                    }
+                } else if pill.idle {
+                    Style::default().fg(theme.gray_dim).bg(bg)
+                } else if let Some(color) = pill.color {
+                    Style::default().fg(color).bg(bg)
+                } else {
+                    flag_style
+                };
+                if pill.viewed && !highlighted {
+                    style = style.add_modifier(Modifier::BOLD);
+                }
+                let w = label.width() as u16;
+                agent_pill_meta.push((pill.id.to_string(), w));
+                left_spans.push(Span::styled(label, style));
+            }
+            if let Some(hint) = info.agent_expand_hint.filter(|s| !s.is_empty()) {
+                left_spans.push(Span::styled(format!(" · {hint}"), sep_style));
+            }
+        }
+
         // Trailing pad mirrors the leading pad above.
         left_spans.push(Span::styled(" ", pad_style));
 
-        // Build right-side spans: "multiline" indicator.
+        // Build right-side spans: bg-task pill (Claude footer) + multiline.
         let mut right_spans: Vec<Span<'static>> = Vec::new();
+        let mut tasks_pill_w: Option<u16> = None;
+        if let Some(pill) = info.tasks_pill.filter(|s| !s.is_empty()) {
+            // Inverse SummaryPill look (Claude BackgroundTaskStatus).
+            let mut pill_style = Style::default()
+                .fg(bg)
+                .bg(theme.text_primary)
+                .add_modifier(Modifier::BOLD);
+            if info.tasks_pill_hovered {
+                pill_style = pill_style.add_modifier(Modifier::UNDERLINED);
+            }
+            let text = format!(" {pill} ");
+            tasks_pill_w = Some(text.width() as u16);
+            right_spans.push(Span::styled(text, pill_style));
+        }
         if info.multiline {
+            if !right_spans.is_empty() {
+                right_spans.push(Span::styled(" ", pad_style));
+            }
             right_spans.push(Span::styled("multiline", flag_style));
         }
 
@@ -3514,12 +3624,58 @@ impl PromptWidget {
             buf.set_line_safe(x, area.y, &left_line, left_w);
             let rx = area.x + area.width.saturating_sub(right_w);
             buf.set_line_safe(rx, area.y, &right_line, right_w);
+            if let Some(pw) = tasks_pill_w {
+                // Pill is at the start of the right cluster (before multiline / pad).
+                hits.tasks_pill = Some(Rect {
+                    x: rx,
+                    y: area.y,
+                    width: pw.min(right_w),
+                    height: 1,
+                });
+            }
+            // Agent pills sit on the left cluster after status text.
+            Self::assign_agent_pill_hits(x, area.y, &left_line, &agent_pill_meta, &mut hits);
         } else {
             // Right-align: clamp to area width so text doesn't overflow borders.
             let line = Line::from(left_spans);
             let text_w = (line.width() as u16).min(area.width);
             let x = area.x + area.width.saturating_sub(text_w);
             buf.set_line_safe(x, area.y, &line, text_w);
+            Self::assign_agent_pill_hits(x, area.y, &line, &agent_pill_meta, &mut hits);
+        }
+        hits
+    }
+
+    /// Locate `@agent` pill spans inside a rendered left line and record hit rects.
+    fn assign_agent_pill_hits(
+        line_x: u16,
+        y: u16,
+        line: &Line<'_>,
+        meta: &[(String, u16)],
+        hits: &mut InfoLineHits,
+    ) {
+        if meta.is_empty() {
+            return;
+        }
+        // Walk spans looking for content that starts with '@' matching meta order.
+        let mut col: u16 = 0;
+        let mut meta_i = 0;
+        for span in &line.spans {
+            let w = span.content.width() as u16;
+            if meta_i < meta.len() && span.content.starts_with('@') {
+                let (id, _) = &meta[meta_i];
+                hits.agent_pills.push((
+                    id.clone(),
+                    Rect {
+                        x: line_x.saturating_add(col),
+                        y,
+                        width: w,
+                        height: 1,
+                    },
+                ));
+                meta_i += 1;
+            }
+            col = col.saturating_add(w);
         }
     }
 }

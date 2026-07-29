@@ -3,8 +3,10 @@ mod auth;
 mod billing;
 mod cta_e2e;
 mod dashboard;
+mod goal;
 mod jump;
 mod modes;
+mod multitask;
 mod notes;
 mod permissions;
 mod prompt;
@@ -232,6 +234,7 @@ fn test_app() -> AppView {
         pending_effects: Vec::new(),
         pending_editor_path: None,
         pending_agents_modal_refresh: None,
+        pending_keybindings_reload: false,
         pending_pager_path: None,
         pending_pager_ansi: false,
         minimal_state: crate::minimal_api::MinimalState::default(),
@@ -288,6 +291,7 @@ fn make_test_agent_session(app: &AppView, id: AgentId, sid: &str) -> AgentSessio
         next_queue_id: 0,
         yolo_mode: false,
         auto_mode: false,
+        accept_edits_mode: false,
         prompt_history: Vec::new(),
         prompt_history_loading: false,
         loading_replay: false,
@@ -533,6 +537,7 @@ fn insert_placeholder_agent(app: &mut AppView, id: AgentId) {
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,
@@ -604,7 +609,7 @@ fn make_ask_user_question_args(
         questions: vec![
             Question { question : "ACP-driven question".into(), options :
             vec![QuestionOption { label : "ok".into(), description : "ok".into(), preview
-            : None, id : None, }], multi_select : Some(false), id : None, }
+            : None, id : None, }], multi_select : Some(false), header : None, id : None, }
         ],
     };
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -671,6 +676,7 @@ fn two_agent_app_with_bg_task() -> AppView {
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,

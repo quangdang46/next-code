@@ -151,6 +151,15 @@ impl AgentMessageBlock {
         match self.mermaid_display_mode() {
             mermaid_content::MermaidDisplay::SourceOnly => (out, Vec::new(), Vec::new()),
             mermaid_content::MermaidDisplay::Affordances => {
+                // Sidebar-only: crop ASCII/PNG bodies out of chat (origin Crop
+                // parity); the diagram is rendered in the side panel instead.
+                let sidebar_only =
+                    crate::appearance::cache::load_render_mermaid_target() == "sidebar";
+                let ranges = if sidebar_only && !ranges.is_empty() {
+                    mermaid_content::crop_diagram_bodies(&mut out, &ranges)
+                } else {
+                    ranges
+                };
                 let theme = crate::theme::cache::current_kind();
                 let overlay = crate::terminal::image::scrollback_inline_overlay_active();
                 let (affordances, media) = mermaid_content::apply_diagram_layout(
@@ -158,7 +167,8 @@ impl AgentMessageBlock {
                     &ranges,
                     |idx| self.mermaid.source(idx).unwrap_or_default().to_string(),
                     |source| {
-                        if !overlay {
+                        // Sidebar-only never reserves inline PNG rows.
+                        if sidebar_only || !overlay {
                             return None;
                         }
                         let key = mermaid_content::MermaidCacheKey::derive(
@@ -180,11 +190,6 @@ impl AgentMessageBlock {
 impl BlockContent for AgentMessageBlock {
     fn output(&self, ctx: &BlockContext) -> BlockOutput {
         if ctx.raw || self.mermaid.is_empty() {
-            return self.content.output(ctx.width as usize);
-        }
-        // When target is sidebar-only, suppress inline diagram art
-        // (diagram renders as text in the side panel instead).
-        if crate::appearance::cache::load_render_mermaid_target() == "sidebar" {
             return self.content.output(ctx.width as usize);
         }
         self.rendered_output(ctx).0
@@ -245,7 +250,10 @@ impl BlockContent for AgentMessageBlock {
             return 0;
         }
         let mut extra = self.mermaid.len() as u16;
-        if crate::terminal::image::scrollback_inline_overlay_active() {
+        // Sidebar-only never paints inline PNGs — don't reserve their rows.
+        if crate::appearance::cache::load_render_mermaid_target() != "sidebar"
+            && crate::terminal::image::scrollback_inline_overlay_active()
+        {
             let theme = crate::theme::cache::current_kind();
             const EST_COLS: u16 = 80;
             for i in 0..self.mermaid.len() {
@@ -369,6 +377,8 @@ mod tests {
                 .filter(|l| matches!(l.selectable, Selectable::None))
                 .count()
         };
+        // Force inline target — seed path may pick up a user sidebar preference.
+        crate::appearance::cache::set_render_mermaid_target("inline");
         // off → plain code block, no extra row.
         crate::appearance::cache::set_render_mermaid(RenderMermaid::Off);
         let off = AgentMessageBlock::new(MERMAID_MD).output(&ctx(40, false));
@@ -398,6 +408,7 @@ mod tests {
         // continuation line, so it must NOT add a logical (pre-wrap) line —
         // otherwise the hyperlink overlay walk desyncs for the paragraph after
         // the diagram.
+        crate::appearance::cache::set_render_mermaid_target("inline");
         let md = "before\n\n```mermaid\nA-->B\n```\n\n[link](https://example.com) trailing\n";
         crate::appearance::cache::set_render_mermaid(RenderMermaid::Off);
         let off = AgentMessageBlock::new(md).output(&ctx(60, false));
@@ -461,6 +472,7 @@ mod tests {
         /// is lazy, so no path/state is tracked on the row.
         #[test]
         fn diagram_exposes_affordance_carrying_source_and_keeps_source_block() {
+            crate::appearance::cache::set_render_mermaid_target("inline");
             crate::appearance::cache::set_render_mermaid(RenderMermaid::On);
             let block = AgentMessageBlock::new("intro\n\n```mermaid\nA-->B\n```\n\nbye\n");
 
@@ -483,6 +495,7 @@ mod tests {
 
         #[test]
         fn raw_mode_suppresses_affordances_and_shows_source() {
+            crate::appearance::cache::set_render_mermaid_target("inline");
             crate::appearance::cache::set_render_mermaid(RenderMermaid::On);
             let block = AgentMessageBlock::new("```mermaid\nA-->B\n```\n");
 
@@ -498,15 +511,59 @@ mod tests {
 
         #[test]
         fn off_setting_shows_source_with_no_affordances() {
+            crate::appearance::cache::set_render_mermaid_target("inline");
             crate::appearance::cache::set_render_mermaid(RenderMermaid::Off);
             let block = AgentMessageBlock::new("```mermaid\nA-->B\n```\n");
             assert!(block.diagram_affordances(&ctx(60, false)).is_empty());
             assert!(shown_text(&block.output(&ctx(60, false))).contains("A-->B"));
         }
 
+        /// `render_mermaid_target = sidebar` must crop ASCII diagram art out of
+        /// chat (leaving an affordance row) so the diagram appears in the side
+        /// panel instead of inline.
+        #[test]
+        fn sidebar_target_crops_inline_art_and_keeps_affordance() {
+            // Isolate thread-local appearance cache from other parallel tests.
+            std::thread::spawn(|| {
+                crate::appearance::cache::set_render_mermaid(RenderMermaid::On);
+                crate::appearance::cache::set_render_mermaid_target("inline");
+                let block = AgentMessageBlock::new(
+                    "intro\n\n```mermaid\nflowchart TD\n  Start --> End\n```\n\nbye\n",
+                );
+                let inline_out = block.output(&ctx(60, false));
+                let inline_lines = inline_out.lines.len();
+                let inline_affs = block.diagram_affordances(&ctx(60, false));
+                assert_eq!(inline_affs.len(), 1);
+
+                crate::appearance::cache::set_render_mermaid_target("sidebar");
+                let side_out = block.output(&ctx(60, false));
+                let side_affs = block.diagram_affordances(&ctx(60, false));
+                assert_eq!(side_affs.len(), 1, "sidebar still exposes Open Sidebar row");
+                assert!(
+                    side_out.lines.len() < inline_lines,
+                    "sidebar must crop diagram body: inline={} sidebar={}",
+                    inline_lines,
+                    side_out.lines.len(),
+                );
+                // Affordance blank row is non-selectable and still aligned.
+                assert!(matches!(
+                    side_out.lines[side_affs[0].row_offset as usize].selectable,
+                    Selectable::None
+                ));
+                // No inline PNG placements when sidebar-only.
+                assert!(
+                    block.inline_media_placements(&ctx(60, false)).is_empty(),
+                    "sidebar-only must not place inline PNGs",
+                );
+            })
+            .join()
+            .unwrap();
+        }
+
         #[test]
         fn copy_over_diagram_yields_fence_body() {
             use crate::scrollback::block::RenderBlock;
+            crate::appearance::cache::set_render_mermaid_target("inline");
             crate::appearance::cache::set_render_mermaid(RenderMermaid::On);
             // Drive the real whole-block copy path (`copy_visible_text_in_state`
             // → `plain_text_from_output`) rather than re-implementing the
@@ -527,6 +584,7 @@ mod tests {
         /// carries that diagram's own source.
         #[test]
         fn two_diagrams_each_anchor_at_their_own_row() {
+            crate::appearance::cache::set_render_mermaid_target("inline");
             crate::appearance::cache::set_render_mermaid(RenderMermaid::On);
             let md = "intro line\n\n```mermaid\nAAA-->BBB\n```\n\nmid line\n\n```mermaid\nCCC-->DDD\n```\n\nbye line\n";
             let block = AgentMessageBlock::new(md);

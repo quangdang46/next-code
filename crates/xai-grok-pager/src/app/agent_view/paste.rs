@@ -461,6 +461,7 @@ pub(super) mod paste_key_tests {
                 next_queue_id: 0,
                 yolo_mode: false,
                 auto_mode: false,
+                accept_edits_mode: false,
                 prompt_history: Vec::new(),
                 prompt_history_loading: false,
                 loading_replay: false,
@@ -1219,6 +1220,7 @@ pub(super) mod paste_key_tests {
                 : None, id : None, },
             ],
                 multi_select: Some(false),
+                header: None,
                 id: None,
             };
         let mut state = crate::views::question_view::QuestionViewState::new(

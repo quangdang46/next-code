@@ -415,6 +415,8 @@ pub enum Action {
     KillBgTask(String),
     /// Kill (cancel) a subagent by subagent_id.
     KillSubagent(String),
+    /// Stop a swarm teammate via daemon `CommStop` (`x.ai/swarm/stop`).
+    StopSwarmMember(String),
     CancelScheduledTask(String),
     /// Demote the currently running execute tool to a background task.
     DemoteToBackground,
@@ -438,6 +440,11 @@ pub enum Action {
     CycleMode,
     /// Toggle YOLO mode (auto-approve all permissions). Ctrl+O.
     ToggleYolo,
+    /// Alt+T: toggle reasoning effort (None ↔ stash when the model offers
+    /// `none`; otherwise cycle the model's offered effort levels). Claude
+    /// `meta+t` / thinking-toggle muscle memory adapted to Face's multi-level
+    /// `/effort` surface.
+    ToggleThinkingEffort,
     /// Set YOLO (auto-approve / `always-approve`) mode.
     SetYoloMode(bool),
     /// Set the permission mode by canonical kind (`always-approve` /
@@ -602,6 +609,8 @@ pub enum Action {
     SetStatusLineEnabled(bool),
     SetStatusLineMode(bool),
     SetStatusLineModel(bool),
+    SetStatusLineReasoning(bool),
+    SetStatusLineRunState(bool),
     SetStatusLineContext(bool),
     SetStatusLineCwd(bool),
     SetStatusLineGit(bool),
@@ -624,6 +633,8 @@ pub enum Action {
     OpenSettings,
     /// Open Face `/experimental` checklist (toggle experiment flags).
     OpenExperimental,
+    /// Open Face `/diff` review modal (git HEAD + per-turn scrollback edits).
+    OpenDiffModal,
     /// Open the command palette (`/help`). The keybinding path (Ctrl+P) opens it
     /// directly in `handle_agent_action`; this lets a slash command reach the
     /// same modal through dispatch.
@@ -714,6 +725,8 @@ pub enum Action {
     /// to config.toml). `/plan <desc>` uses `EnterPlanMode` instead
     /// because it also starts a turn.
     SetPlanMode(PlanModeKind),
+    /// Open the session `plan.md` in `$EDITOR` (`/plan open`).
+    OpenPlanInEditor,
     /// Enter feedback mode (visual prompt change, not a send).
     EnterFeedbackMode,
     /// Send feedback text collected in feedback mode.
@@ -727,6 +740,9 @@ pub enum Action {
     SaveRememberNoteFromModal,
     /// Send a /btw side question (bypasses queue, works while agent is busy).
     SendBtw(String),
+    /// Cursor-style `/multitask`: spawn parallel background workers from the
+    /// queue / inline prompts, or steer a running worker with `--to`.
+    Multitask(crate::slash::commands::multitask::MultitaskArgs),
     /// Request a session recap ("where was I" summary). `auto` is `true` for
     /// the automatic return-from-away recap, `false` for an explicit `/recap`.
     /// Bypasses the prompt queue (works while the agent is busy).
@@ -994,9 +1010,25 @@ pub enum Action {
         path: std::path::PathBuf,
         /// Reload `/config-agents` list after the editor exits (when set).
         refresh_agents_modal: Option<crate::views::agents_modal::AgentsTab>,
+        /// Reload Face `ActionRegistry` from `keybindings.json` after the editor exits.
+        reload_keybindings: bool,
     },
+    /// Rebuild `ActionRegistry` from defaults + `~/.next-code/keybindings.json`.
+    ReloadKeybindings,
     /// Toggle the expanded goal detail overlay.
     ToggleGoalDetail,
+    /// `/goal` with no args / `status` — show active goal overlay or usage.
+    GoalShow,
+    /// `/goal pause` — pause pursuit (and cancel the in-flight turn if any).
+    GoalPause,
+    /// `/goal resume` — resume a paused goal and continue working.
+    GoalResume,
+    /// `/goal clear` — drop the active goal from Face state.
+    GoalClear,
+    /// `/goal <objective>` — set a new session goal and start a turn.
+    GoalSet {
+        objective: String,
+    },
     Rewind,
     RewindShowPicker,
     RewindPickerSelect(usize),
@@ -1040,6 +1072,8 @@ pub enum PermissionModePersist {
 /// `Default` and `Ask` both project onto `yolo_mode = false` at runtime
 /// but are distinct on disk — `Default` expresses "use the agent's
 /// default" while `Ask` is the explicit "prompt me every time".
+/// `AcceptEdits` auto-allows file edits (DCG) while still prompting for
+/// shell/network — Claude Shift+Tab muscle memory.
 /// `Auto` uses the LLM classifier (not full always-approve).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PermissionModeKind {
@@ -1047,6 +1081,8 @@ pub enum PermissionModeKind {
     Default,
     /// Explicit prompt-every-time. `yolo_mode = false`.
     Ask,
+    /// Auto-allow file edits; still prompt for bash/network. `yolo_mode = false`.
+    AcceptEdits,
     /// LLM classifier for non-fast-path tools. `yolo_mode = false`, `auto_mode = true`.
     Auto,
     /// Auto-approve all tool actions. `yolo_mode = true`.
@@ -1060,6 +1096,7 @@ impl PermissionModeKind {
         match self {
             Self::Default => "default",
             Self::Ask => "ask",
+            Self::AcceptEdits => "accept-edits",
             Self::Auto => "auto",
             Self::AlwaysApprove => "always-approve",
         }
@@ -1077,6 +1114,10 @@ impl PermissionModeKind {
     pub fn is_auto(self) -> bool {
         matches!(self, Self::Auto)
     }
+    /// File-edit auto-allow mode (distinct from always-approve / auto).
+    pub fn is_accept_edits(self) -> bool {
+        matches!(self, Self::AcceptEdits)
+    }
     /// Construct from a canonical string. Returns `None` for unknown
     /// strings. Used by `apply_setting_rollback("permission_mode", _)`
     /// to recover the typed kind from the `SettingValue::Enum(canonical)`
@@ -1085,6 +1126,7 @@ impl PermissionModeKind {
         match s {
             "default" => Some(Self::Default),
             "ask" => Some(Self::Ask),
+            "accept-edits" => Some(Self::AcceptEdits),
             "auto" => Some(Self::Auto),
             "always-approve" => Some(Self::AlwaysApprove),
             _ => None,
@@ -1110,8 +1152,20 @@ mod permission_mode_kind_tests {
         );
     }
     #[test]
+    fn accept_edits_is_distinct_from_always_approve() {
+        let ae = PermissionModeKind::AcceptEdits;
+        assert_eq!(ae.as_canonical(), "accept-edits");
+        assert!(!ae.is_always_approve());
+        assert!(!ae.is_auto());
+        assert!(ae.is_accept_edits());
+        assert_eq!(
+            PermissionModeKind::from_canonical("accept-edits"),
+            Some(PermissionModeKind::AcceptEdits)
+        );
+    }
+    #[test]
     fn permission_mode_choices_include_auto_in_catalog() {
-        for c in ["default", "ask", "auto", "always-approve"] {
+        for c in ["default", "ask", "accept-edits", "auto", "always-approve"] {
             assert!(
                 PermissionModeKind::from_canonical(c).is_some(),
                 "catalog canonical {c} must parse"
@@ -1557,6 +1611,17 @@ pub enum Effect {
         session_id: acp::SessionId,
         subagent_id: String,
     },
+    /// DM a swarm teammate via `x.ai/swarm/dm` (CommMessage / NotifySession).
+    MessageSwarmMember {
+        session_id: acp::SessionId,
+        target_session_id: String,
+        message: String,
+    },
+    /// Stop a swarm teammate via `x.ai/swarm/stop` (CommStop).
+    StopSwarmMember {
+        session_id: acp::SessionId,
+        target_session_id: String,
+    },
     DeleteScheduledTask {
         session_id: acp::SessionId,
         task_id: String,
@@ -1690,6 +1755,32 @@ pub enum Effect {
         id: String,
         expected_version: u64,
         new_text: Option<String>,
+    },
+    /// Persist Face `/goal` via `x.ai/goal/set`.
+    GoalSet {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+        objective: String,
+    },
+    /// Persist Face `/goal pause` via `x.ai/goal/pause`.
+    GoalPause {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+    },
+    /// Persist Face `/goal resume` via `x.ai/goal/resume`.
+    GoalResume {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+    },
+    /// Persist Face `/goal clear` via `x.ai/goal/clear`.
+    GoalClear {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
+    },
+    /// Fetch Face `/goal` status via `x.ai/goal/status`.
+    GoalStatus {
+        agent_id: AgentId,
+        session_id: acp::SessionId,
     },
     /// Set the session mode via ACP `session/set_mode`.
     SetSessionMode {
@@ -1933,6 +2024,11 @@ pub enum Effect {
         question: String,
         /// Correlates minimal responses; fullscreen leaves this unset.
         minimal_request_id: Option<uuid::Uuid>,
+    },
+    /// Spawn one headless multitask worker via `x.ai/multitask/spawn` (CommSpawn).
+    MultitaskSpawn {
+        session_id: acp::SessionId,
+        prompt: String,
     },
     /// Request a session recap via the x.ai/recap ext method. Fire-and-forget:
     /// the recap arrives later as a `SessionRecap` notification.
@@ -2331,6 +2427,17 @@ pub enum TaskResult {
     /// Cancel notification was sent (fire-and-forget).
     /// The real turn end comes via PromptResponse.
     CancelComplete,
+    /// Face `/goal` status ACP response.
+    GoalStatusComplete {
+        agent_id: AgentId,
+        toast: String,
+        open_detail: bool,
+    },
+    /// Face `/goal` mutation ACP failed.
+    GoalMutationFailed {
+        agent_id: AgentId,
+        message: String,
+    },
     /// Response to `x.ai/subagent/cancel`; see [`SubagentKillOutcome`].
     KillSubagentComplete {
         session_id: acp::SessionId,

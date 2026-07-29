@@ -149,6 +149,8 @@ use ratatui::widgets::Widget;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 mod cta;
+mod agent_team;
+mod footer_snag;
 mod input;
 mod interactions;
 mod jump;
@@ -789,6 +791,9 @@ pub struct AgentView {
     /// Multiline input mode: swap Enter (insert newline) and Shift+Enter (send).
     /// Toggled by `Ctrl+M` or `/multiline`. Not persisted across sessions.
     pub multiline_mode: bool,
+    /// Last non-`none` reasoning effort before Alt+T turned thinking off.
+    /// Restored on the next Alt+T when the model menu offers `none`.
+    pub(crate) thinking_effort_stash: Option<xai_grok_shell::sampling::types::ReasoningEffort>,
     /// Vim-mode scrollback keybindings. When `false` (default), bare-letter
     /// and Shift+letter scrollback bindings (j/k, h/l, g/G, y/Y, o/O, r,
     /// x, e/E, L/H, plus the `i` FocusPrompt alt) are suppressed and the
@@ -1042,6 +1047,14 @@ pub struct AgentView {
     pub hit_subagent_close: HitArea,
     pub hit_catalog_close: HitArea,
     pub hit_bg_status: HitArea,
+    /// Prompt-footer SummaryPill (`tasks_pill`) — click opens Tasks hub.
+    pub hit_tasks_pill: HitArea,
+    /// Claude footer keyboard snag (`footerSelection`). `None` = prompt owns arrows.
+    pub footer_snag: Option<footer_snag::FooterSnagItem>,
+    /// Prompt-footer `@agent` pills — `(roster_id, hit)`.
+    pub hit_agent_pills: Vec<(String, HitArea)>,
+    /// Under-prompt agent panel roster strip hits — `(roster_id, rect)`.
+    pub hit_agent_panel_rows: Vec<(String, Rect)>,
     pub hit_goal_status: HitArea,
     pub hit_goal_close: HitArea,
     pub hit_bg_button: HitArea,
@@ -1235,6 +1248,8 @@ pub struct AgentView {
     /// Active question view (from `AskUserQuestion` tool). When `Some`, the
     /// prompt area shows a structured question UI and input is modal.
     pub(crate) question_view: Option<QuestionViewState>,
+    /// Live Best-of-N progress card (scrollback system block + phase).
+    pub(crate) best_of_n: Option<crate::views::best_of_n_view::BestOfNUiState>,
     /// Scrollbar hit area for the question view (set during render).
     pub(crate) hit_question_scrollbar: HitArea,
     /// Hovered question item index (visual highlight only).
@@ -1251,6 +1266,10 @@ pub struct AgentView {
     pub(crate) question_nav_buttons: Vec<(char, Rect)>,
     /// Currently hovered question nav button key (for highlight).
     pub(crate) hovered_question_button: Option<char>,
+    /// Clickable multi-question chip tabs (question index → rect).
+    pub(crate) question_tab_chips: Vec<(usize, Rect)>,
+    /// Currently hovered question chip tab index.
+    pub(crate) hovered_question_tab: Option<usize>,
     /// Y-range of the scrollable options area (set during render).
     /// Scroll events outside this range are ignored.
     pub(crate) question_scroll_region: Option<(u16, u16)>,
@@ -1263,6 +1282,8 @@ pub struct AgentView {
     /// The cycle logic uses `plan_mode_pending.unwrap_or(plan_mode_active)`
     /// so rapid Shift+Tab presses advance correctly without waiting for ACP.
     pub(crate) plan_mode_pending: Option<bool>,
+    /// Mode to restore when leaving plan (Claude-style prePlanMode stash).
+    pub(crate) pre_plan_mode: Option<xai_grok_tools::types::SessionMode>,
     /// Session mode to apply once this agent's ACP session exists. Set when
     /// the agent is spawned from the dashboard with `/plan` active (the
     /// session does not exist yet, so the mode can't be sent immediately).
@@ -1361,6 +1382,14 @@ pub struct AgentView {
     /// Currently open subagent view (child_session_id). When Some, the
     /// scrollback area is replaced by the subagent's framed view.
     pub active_subagent: Option<String>,
+    /// Claude-style under-prompt agent panel selection / team-task strip.
+    pub agent_panel: crate::app::agent_roster::AgentPanelState,
+    /// Swarm members mirrored for the unified roster (ACP / soft bridge).
+    pub swarm_members: HashMap<String, crate::app::agent_roster::SwarmMemberMirror>,
+    /// Soft transcript buffers keyed by swarm member session id.
+    pub swarm_soft_transcripts: HashMap<String, Vec<crate::app::agent_roster::SoftTranscriptLine>>,
+    /// Shared team task strip items (from SwarmPlan ACP updates).
+    pub team_tasks: Vec<crate::app::agent_roster::TeamTaskItem>,
     /// When true, this AgentView is rendering as a subagent (read-only):
     /// - Prompt is hidden
     /// - Cancel turn / demote to bg shortcuts are disabled
@@ -2013,6 +2042,23 @@ pub(super) fn apply_experimental_outcome(
         }
     }
 }
+
+/// Translate diff modal outcome: close on Esc from list.
+pub(super) fn apply_diff_outcome(
+    agent: &mut AgentView,
+    outcome: crate::views::diff_modal::DiffModalOutcome,
+) -> InputOutcome {
+    use crate::views::diff_modal::DiffModalOutcome;
+
+    match outcome {
+        DiffModalOutcome::Changed => InputOutcome::Changed,
+        DiffModalOutcome::Unchanged => InputOutcome::Unchanged,
+        DiffModalOutcome::Close => {
+            agent.active_modal = None;
+            InputOutcome::Changed
+        }
+    }
+}
 /// Whether this key event represents `#` (hash).
 ///
 /// Most terminals report `KeyCode::Char('#')` directly. Under the Kitty
@@ -2076,6 +2122,7 @@ fn resolve_action(action_id: Option<ActionId>) -> Option<InputOutcome> {
         ActionId::FocusScrollback => Action::FocusScrollback,
         ActionId::NextModel => Action::NextModel,
         ActionId::CycleMode => Action::CycleMode,
+        ActionId::ToggleThinkingEffort => Action::ToggleThinkingEffort,
         ActionId::CancelTurn
         | ActionId::Quit
         | ActionId::ExitSession
@@ -2092,6 +2139,11 @@ fn resolve_action(action_id: Option<ActionId>) -> Option<InputOutcome> {
         ActionId::ShortcutsHelp => return None,
         ActionId::OpenSettings => return None,
         ActionId::ToggleTodos
+        | ActionId::ToggleTeamTasks
+        | ActionId::AgentPanelSelectPrev
+        | ActionId::AgentPanelSelectNext
+        | ActionId::TeamTaskSelectPrev
+        | ActionId::TeamTaskSelectNext
         | ActionId::ToggleTasks
         | ActionId::ToggleQueue
         | ActionId::OpenSessions
@@ -2424,6 +2476,7 @@ pub(super) mod test_fixtures {
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,
@@ -2485,6 +2538,7 @@ pub(super) mod test_fixtures {
                 next_queue_id: 0,
                 yolo_mode: false,
                 auto_mode: false,
+                accept_edits_mode: false,
                 prompt_history: Vec::new(),
                 prompt_history_loading: false,
                 loading_replay: false,
@@ -3217,6 +3271,7 @@ pub(crate) fn test_agent_view(session_id: Option<&str>, cwd: std::path::PathBuf)
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,

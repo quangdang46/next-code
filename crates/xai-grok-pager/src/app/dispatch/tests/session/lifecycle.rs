@@ -1466,6 +1466,7 @@ fn translate_local_submit_always_returns_persist_always_for_new_session() {
             })
             .collect(),
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let mut state = QuestionViewState::new(
@@ -1508,6 +1509,7 @@ fn translate_local_submit_never_returns_persist_never_for_new_session() {
             })
             .collect(),
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let mut state = QuestionViewState::new(
@@ -1752,11 +1754,23 @@ fn dispatch_cycle_mode_pre_session_cycles_locally_and_creates_session() {
     let mut app = test_app_with_agent();
     app.agents.get_mut(&AgentId(0)).unwrap().session.session_id = None;
     let effects = dispatch(Action::CycleMode, &mut app);
+    assert_eq!(
+        app.current_ui.permission_mode.as_deref(),
+        Some("accept-edits"),
+        "pre-session Normal → Accept-Edits"
+    );
+    assert!(
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::CreateSession { .. })),
+        "first press must create the session, got {effects:?}"
+    );
+    let effects = dispatch(Action::CycleMode, &mut app);
     let agent = &app.agents[&AgentId(0)];
     assert_eq!(
         agent.plan_mode_pending,
         Some(true),
-        "pre-session Normal → Plan must set optimistic pending"
+        "pre-session Accept-Edits → Plan must set optimistic pending"
     );
     assert_eq!(
         agent.deferred_session_mode,
@@ -1764,10 +1778,10 @@ fn dispatch_cycle_mode_pre_session_cycles_locally_and_creates_session() {
         "Plan must be deferred to SessionCreated"
     );
     assert!(
-        effects
+        !effects
             .iter()
             .any(|e| matches!(e, Effect::CreateSession { .. })),
-        "first press must create the session, got {effects:?}"
+        "no duplicate CreateSession, got {effects:?}"
     );
     let effects = dispatch(Action::CycleMode, &mut app);
     let agent = &app.agents[&AgentId(0)];

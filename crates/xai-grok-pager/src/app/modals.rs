@@ -13,7 +13,8 @@ use ratatui::widgets::Widget;
 
 use super::actions::Action;
 use super::agent_view::{
-    AgentView, active_contexts_for_pane, apply_experimental_outcome, apply_settings_outcome,
+    AgentView, active_contexts_for_pane, apply_diff_outcome, apply_experimental_outcome,
+    apply_settings_outcome,
 };
 use super::app_view::InputOutcome;
 
@@ -376,11 +377,12 @@ impl AgentView {
 
         // MemoryBrowser: route through ModalWindow chrome, then delegate.
         if let ActiveModal::MemoryBrowser { state } = modal {
-            // When the filter input is focused, Esc exits filter mode
-            // instead of closing the modal. Handle before modal chrome.
+            // When the filter input or in-modal editor is focused, Esc exits
+            // that sub-mode instead of closing the modal.
             if matches!(
                 state.mode,
                 crate::views::memory_modal::MemoryModalMode::FilterFocused
+                    | crate::views::memory_modal::MemoryModalMode::Editing
             ) {
                 return crate::views::memory_modal::handle_memory_key(state, key);
             }
@@ -462,6 +464,29 @@ impl AgentView {
             }
         }
 
+        // Session diff review (`/diff`).
+        if let ActiveModal::DiffReview { state } = modal {
+            let chrome_cfg = mw::ModalWindowConfig {
+                title: "",
+                tabs: None,
+                shortcuts: &[],
+                sizing: mw::ModalSizing::default(),
+                fold_info: None,
+            };
+            let chrome_outcome = mw::handle_modal_key(&mut state.window, key, &chrome_cfg);
+            match chrome_outcome {
+                ModalWindowOutcome::CloseRequested => {
+                    self.active_modal = None;
+                    return InputOutcome::Changed;
+                }
+                ModalWindowOutcome::Unhandled => {
+                    let out = crate::views::diff_modal::handle_diff_key(state, key);
+                    return apply_diff_outcome(self, out);
+                }
+                _ => return InputOutcome::Changed,
+            }
+        }
+
         // ResetSettingsConfirm: y/n routing. Handled before generic
         // char-match so Esc/F2/Ctrl+, route to Cancel (not modal close).
         if let Some(ActiveModal::ResetSettingsConfirm { modal, .. }) = self.active_modal.as_ref() {
@@ -513,6 +538,7 @@ impl AgentView {
             | ActiveModal::MemoryBrowser { .. }
             | ActiveModal::Settings { .. }
             | ActiveModal::ExperimentalFeatures { .. }
+            | ActiveModal::DiffReview { .. }
             | ActiveModal::ResetSettingsConfirm { .. }
             | ActiveModal::RememberNoteReview { .. } => unreachable!(),
         }
@@ -1728,6 +1754,29 @@ impl AgentView {
             }
         }
 
+        // Session diff review (`/diff`).
+        if let Some(ActiveModal::DiffReview { state }) = &mut self.active_modal {
+            let outcome =
+                mw::handle_modal_mouse(&mut state.window, mouse.kind, mouse.column, mouse.row);
+            match outcome {
+                ModalWindowOutcome::CloseRequested => {
+                    self.active_modal = None;
+                    return InputOutcome::Changed;
+                }
+                ModalWindowOutcome::Handled => return InputOutcome::Changed,
+                ModalWindowOutcome::Unhandled => {
+                    let out = crate::views::diff_modal::handle_diff_mouse(
+                        state,
+                        mouse.kind,
+                        mouse.column,
+                        mouse.row,
+                    );
+                    return apply_diff_outcome(self, out);
+                }
+                _ => return InputOutcome::Changed,
+            }
+        }
+
         // ResetSettingsConfirm: route mouse events through the
         // modal-window chrome.
         if let Some(ActiveModal::ResetSettingsConfirm { settings_state, .. }) =
@@ -2513,6 +2562,8 @@ impl AgentView {
                 crate::views::experimental_modal::render_experimental_modal(
                     buf, area, state, compact,
                 );
+            } else if let modal::ActiveModal::DiffReview { state } = active_modal {
+                crate::views::diff_modal::render_diff_modal(buf, area, state, compact);
             } else if matches!(
                 active_modal,
                 modal::ActiveModal::ResetSettingsConfirm { .. }

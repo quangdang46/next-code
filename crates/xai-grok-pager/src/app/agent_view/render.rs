@@ -66,9 +66,18 @@ impl AgentView {
     }
     /// Open the fullscreen subagent view for `child_sid`, replaying child
     /// `updates.jsonl` when scrollback only has the injected task prompt.
+    ///
+    /// Enables the child prompt so the user can message the worker (Claude
+    /// agent-panel Enter → type). `SendPrompt` is routed to the child session
+    /// via [`AgentView::current_message_route`].
     pub(crate) fn open_subagent_fullscreen(&mut self, child_sid: String) {
         if self.subagent_views.contains_key(&child_sid) {
             crate::app::subagent::ensure_subagent_child_replayed(self, &child_sid);
+            if let Some(child) = self.subagent_views.get_mut(&child_sid) {
+                // Interactive teammate view: show prompt (Claude message-worker).
+                child.is_subagent_view = false;
+                child.active_pane = AgentPane::Prompt;
+            }
             self.active_subagent = Some(child_sid);
         }
     }
@@ -726,6 +735,7 @@ impl AgentView {
                 bundle_state,
             );
         }
+        // Soft swarm teammate view: keep lead chrome; paint soft buffer in scrollback.
         if let Some(esc) = self.take_subagent_inline_media_clear_escapes() {
             xai_grok_shell::util::with_locked_stderr(|stderr| {
                 let _ = std::io::Write::write_all(stderr, esc.as_bytes());
@@ -1165,6 +1175,10 @@ impl AgentView {
                 .height
                 .saturating_sub(search_reserved_rows);
         }
+        {
+            let panel_h = self.agent_panel_desired_height(6);
+            layout.apply_agent_panel(panel_h);
+        }
         let overlay_blocks_rail_hover = self.jump_state.is_some()
             || self.rewind_state.is_some()
             || self.question_view.is_some()
@@ -1271,6 +1285,10 @@ impl AgentView {
                             .scrollback_content
                             .height
                             .saturating_sub(search_reserved_rows);
+                    }
+                    {
+                        let panel_h = self.agent_panel_desired_height(6);
+                        layout.apply_agent_panel(panel_h);
                     }
                     self.scrollback.prepare_layout(
                         layout.scrollback_content.width,
@@ -1970,6 +1988,61 @@ impl AgentView {
         } else {
             self.hit_side_panel_close.clear();
         }
+        if layout.agent_panel.height > 0 {
+            let rows = self.agent_team_roster();
+            self.agent_panel.clamp_selection(rows.len());
+            let viewing = self.viewing_worker_label();
+            self.hit_agent_panel_rows = crate::views::agent_panel::render(
+                layout.agent_panel,
+                buf,
+                &theme,
+                &rows,
+                &self.agent_panel,
+                &self.team_tasks,
+                viewing.as_deref(),
+            );
+        } else {
+            self.hit_agent_panel_rows.clear();
+        }
+        if let Some(ref sid) = self.agent_panel.soft_view_session.clone() {
+            let label = self
+                .swarm_members
+                .get(sid)
+                .map(|m| m.display_name())
+                .unwrap_or_else(|| sid.clone());
+            let empty: Vec<crate::app::agent_roster::SoftTranscriptLine> = Vec::new();
+            let lines = self
+                .swarm_soft_transcripts
+                .get(sid)
+                .map(|v| v.as_slice())
+                .unwrap_or(empty.as_slice());
+            // Soft teammate view replaces the lead scrollback content area.
+            for y in layout.scrollback_content.y
+                ..layout
+                    .scrollback_content
+                    .y
+                    .saturating_add(layout.scrollback_content.height)
+            {
+                for x in layout.scrollback_content.x
+                    ..layout
+                        .scrollback_content
+                        .x
+                        .saturating_add(layout.scrollback_content.width)
+                {
+                    if let Some(cell) = buf.cell_mut((x, y)) {
+                        cell.set_symbol(" ");
+                        cell.set_style(Style::default().bg(theme.bg_base).fg(theme.text_primary));
+                    }
+                }
+            }
+            crate::views::agent_panel::render_soft_transcript(
+                layout.scrollback_content,
+                buf,
+                &theme,
+                &label,
+                lines,
+            );
+        }
         if let Some(idx) = self.highlighted_link_idx {
             if self.visible_link_map.is_empty() {
                 self.highlighted_link_idx = None;
@@ -2281,6 +2354,13 @@ impl AgentView {
                 bold: false,
             });
         }
+        if self.accept_edits_flag_visible(effective_plan) {
+            mode_flags_vec.push(PromptFlag {
+                text: "accept-edits",
+                color: Some(theme.accent_system),
+                bold: false,
+            });
+        }
         if self.auto_flag_visible(effective_plan) {
             mode_flags_vec.push(PromptFlag {
                 text: "auto",
@@ -2307,9 +2387,33 @@ impl AgentView {
         let usage_warning_text: Option<String> = warning.as_ref().map(|(t, _)| t.clone());
         let usage_warning = usage_warning_text.as_deref();
         let usage_warning_critical = warning.is_some_and(|(_, critical)| critical);
-        let model_label = match self.session.models.reasoning_effort {
-            Some(eff) => format!("{model_id} ({eff})"),
-            None => model_id,
+        let effort_label = self
+            .session
+            .models
+            .reasoning_effort
+            .map(|eff| eff.to_string());
+        // When Reasoning is its own segment, keep Model bare; else embed effort.
+        let model_label = if self
+            .status_line_config
+            .segment_visible(xai_grok_shell::agent::config::StatusLineSegment::Reasoning)
+        {
+            model_id.clone()
+        } else {
+            match effort_label.as_ref() {
+                Some(eff) => format!("{model_id} ({eff})"),
+                None => model_id.clone(),
+            }
+        };
+        let run_state_label = {
+            use crate::app::agent::AgentState;
+            let label = match &self.session.state {
+                AgentState::Idle => "idle",
+                AgentState::TurnRunning => "running",
+                AgentState::TurnCancelling => "cancelling",
+                AgentState::CommandRunning { .. } => "command",
+                AgentState::CommandCancelling { .. } => "cancelling",
+            };
+            Some(label.to_string())
         };
         let cwd_basename = self
             .session
@@ -2321,7 +2425,8 @@ impl AgentView {
             crate::git_info::cwd_git_info_lazy(&self.session.cwd).and_then(|info| info.branch)
         });
         let context_pct = self.context_state.as_ref().map(|c| c.usage_pct);
-        let context_pct_label = context_pct.map(|pct| format!("{pct}%"));
+        // Claude BuiltinStatusLine: "Context N%" (dim label + percent).
+        let context_pct_label = context_pct.map(|pct| format!("Context {pct}%"));
         let status_seg_owned: Vec<(String, bool, Option<ratatui::style::Color>)> = {
             use xai_grok_shell::agent::config::StatusLineSegment;
             let mut out = Vec::new();
@@ -2337,6 +2442,16 @@ impl AgentView {
                     StatusLineSegment::Model => {
                         if !model_label.is_empty() {
                             out.push((model_label.clone(), true, None));
+                        }
+                    }
+                    StatusLineSegment::Reasoning => {
+                        if let Some(eff) = effort_label.as_ref() {
+                            out.push((eff.clone(), false, None));
+                        }
+                    }
+                    StatusLineSegment::RunState => {
+                        if let Some(state) = run_state_label.as_ref() {
+                            out.push((state.clone(), false, None));
                         }
                     }
                     StatusLineSegment::Context => {
@@ -2375,6 +2490,79 @@ impl AgentView {
                     }
                 })
                 .collect();
+        // Claude PromptInputFooterLeftSide hosts BackgroundTaskStatus on the
+        // prompt chrome so bg work stays visible while turn-status shows the
+        // spinner. Build before PromptInfo so the label lives long enough.
+        let tasks_pill_owned = watchers
+            .shows_ambient()
+            .then(|| turn_status::prompt_footer_pill_label(watchers));
+        let tasks_pill = tasks_pill_owned.as_deref();
+        // Claude @agent teammate pills when roster has workers (enterTeammateView).
+        let roster_for_pills = self.agent_team_roster();
+        let viewing_id = self
+            .active_subagent
+            .clone()
+            .or_else(|| self.agent_panel.soft_view_session.clone());
+        let agent_pill_owned: Vec<crate::views::prompt_widget::AgentFooterPill<'_>> =
+            if roster_for_pills.len() > 1 {
+                roster_for_pills
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, row)| {
+                        let color = if row.is_lead {
+                            Some(theme.accent_system)
+                        } else {
+                            let (r, g, b) = [
+                                (110u8, 180u8, 220u8),
+                                (180, 140, 220),
+                                (140, 200, 150),
+                                (220, 170, 110),
+                                (200, 130, 160),
+                                (130, 190, 190),
+                            ][crate::app::agent_roster::color_index_for(
+                                &row.color_key,
+                                6,
+                            )];
+                            Some(ratatui::style::Color::Rgb(r, g, b))
+                        };
+                        let pill_name = if row.is_lead { "main" } else { row.display_name.as_str() };
+                        let panel_selected = self.agent_panel.selecting
+                            && self.agent_panel.selected_row(&roster_for_pills).is_some_and(|r| {
+                                r.id == row.id
+                            });
+                        let snag_selected = matches!(
+                            self.footer_snag,
+                            Some(super::footer_snag::FooterSnagItem::Agent { index }) if index == idx
+                        );
+                        crate::views::prompt_widget::AgentFooterPill {
+                            id: row.id.as_str(),
+                            name: pill_name,
+                            selected: panel_selected || snag_selected,
+                            viewed: viewing_id.as_deref() == Some(row.id.as_str())
+                                || (row.is_lead && viewing_id.is_none()),
+                            idle: matches!(
+                                row.status,
+                                crate::app::agent_roster::RosterStatus::Idle
+                                    | crate::app::agent_roster::RosterStatus::Completed
+                            ),
+                            color,
+                        }
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            };
+        let agent_pills = (!agent_pill_owned.is_empty()).then_some(agent_pill_owned.as_slice());
+        let agent_expand_hint = agent_pills.map(|_| "Shift+↓ expand · ↓ footer");
+        // Propagate hover + keyboard snag onto SummaryPill paint.
+        let tasks_pill_hovered = self.hit_tasks_pill.hovered
+            || matches!(
+                self.footer_snag,
+                Some(super::footer_snag::FooterSnagItem::Tasks)
+            );
+        // Reset footer hit targets; re-filled after prompt.draw when chrome paints.
+        self.hit_tasks_pill.clear();
+        self.hit_agent_pills.clear();
         let info = match &self.prompt_mode {
             PromptMode::Normal => PromptInfo {
                 model_name: &model_label,
@@ -2383,6 +2571,10 @@ impl AgentView {
                 multiline,
                 usage_warning,
                 usage_warning_critical,
+                tasks_pill,
+                tasks_pill_hovered,
+                agent_pills,
+                agent_expand_hint,
             },
             PromptMode::EditingQueued { id, .. } => {
                 let pos = self.session.queue_position(*id).map(|i| i + 1).unwrap_or(1);
@@ -2394,6 +2586,10 @@ impl AgentView {
                     multiline,
                     usage_warning,
                     usage_warning_critical,
+                    tasks_pill,
+                    tasks_pill_hovered,
+                    agent_pills,
+                    agent_expand_hint,
                 }
             }
         };
@@ -2405,6 +2601,10 @@ impl AgentView {
                 multiline: false,
                 usage_warning,
                 usage_warning_critical,
+                tasks_pill,
+                tasks_pill_hovered,
+                agent_pills,
+                agent_expand_hint,
             }
         } else {
             info
@@ -2533,16 +2733,20 @@ impl AgentView {
                 }
             }
             if let Some(ref qv) = self.question_view {
-                let render_result = crate::views::question_view::render_question_view(
+                let render_result = crate::views::question_view::render_question_view_with_hover(
                     buf,
                     question_area,
                     qv,
                     self.hovered_question_item,
+                    self.hovered_question_tab,
                     &theme,
                     prompt_focused,
                 );
                 self.question_scroll_region =
                     Some((render_result.options_start_y, render_result.options_end_y));
+                self.question_tab_chips = render_result.tab_chip_hits;
+            } else {
+                self.question_tab_chips.clear();
             }
             if is_input_mode && inline_prompt_h > 0 {
                 let row_y = question_area.y + question_area.height;
@@ -2865,6 +3069,24 @@ impl AgentView {
             if let Some(escapes) = prompt_result_inner.post_flush_escapes {
                 prompt_post_flush = Some(escapes.into());
             }
+            self.hit_tasks_pill.set(prompt_result_inner.info_hits.tasks_pill);
+            self.hit_agent_pills = prompt_result_inner
+                .info_hits
+                .agent_pills
+                .into_iter()
+                .map(|(id, rect)| {
+                    let mut hit = crate::app::agent_view::HitArea::default();
+                    hit.rect = Some(rect);
+                    // Preserve hover across frames when still over same id.
+                    (id, hit)
+                })
+                .collect();
+            // Re-apply hover for this frame's mouse position if available.
+            let (mx, my) = self.last_mouse_pos;
+            for (_, hit) in &mut self.hit_agent_pills {
+                let _ = hit.update_hover(mx, my);
+            }
+            let _ = self.hit_tasks_pill.update_hover(mx, my);
         }
         if self.prompt.file_search_visible() {
             use crate::views::file_search::dropdown::{MAX_DROPDOWN_ROWS, render_dropdown};

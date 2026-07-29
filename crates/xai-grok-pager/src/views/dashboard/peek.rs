@@ -511,6 +511,10 @@ fn paint_peek_config_badge(
         multiline,
         usage_warning: None,
         usage_warning_critical: false,
+        tasks_pill: None,
+        tasks_pill_hovered: false,
+        agent_pills: None,
+        agent_expand_hint: None,
     };
     // Bottom border row, inside the corners — the same content rect the
     // chat prompt and dispatch box use for their info line.
@@ -520,7 +524,7 @@ fn paint_peek_config_badge(
         width: area.width.saturating_sub(2),
         height: 1,
     };
-    reply.render_info_line(buf, info_rect, &info, theme.bg_base, theme, panel.focused);
+    let _ = reply.render_info_line(buf, info_rect, &info, theme.bg_base, theme, panel.focused);
 }
 
 /// Render the peek panel inline in place of the dispatch input.
@@ -1026,6 +1030,7 @@ pub fn extract_last_response_type(agent: &AgentView) -> String {
             RenderBlock::Btw(_) => return "Btw".to_string(),
             RenderBlock::ContextInfo(_) => return "Context".to_string(),
             RenderBlock::CreditLimit(_) => return "Credit limit".to_string(),
+            RenderBlock::BestOfN(_) => return "Best of N".to_string(),
             // The user's latest input marks the turn boundary — there's
             // no agent response after it yet.
             RenderBlock::UserPrompt(_) => break,
@@ -1154,6 +1159,7 @@ fn block_short_text(block: &crate::scrollback::block::RenderBlock) -> Option<Str
         RenderBlock::Btw(_) => Some("(btw)".to_string()),
         RenderBlock::ContextInfo(_) => Some("(context info)".to_string()),
         RenderBlock::CreditLimit(_) => Some("(credit limit)".to_string()),
+        RenderBlock::BestOfN(_) => Some("(best of n)".to_string()),
         RenderBlock::Stub(_) => None,
     }
 }

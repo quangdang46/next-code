@@ -10,7 +10,8 @@ use std::time::Duration;
 
 use agent_client_protocol as acp;
 use agent_client_protocol::{
-    Client as _, SessionId, ToolCallId, ToolCallStatus, ToolCallUpdate, ToolCallUpdateFields,
+    Agent as _, Client as _, SessionId, ToolCallId, ToolCallStatus, ToolCallUpdate,
+    ToolCallUpdateFields,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -196,6 +197,77 @@ async fn emit_models_update_via(
             std::sync::Arc::from(raw),
         ))
         .await;
+}
+
+/// Forward daemon swarm broadcasts to Face (agent-team panel).
+async fn emit_swarm_ext(
+    gateway: &AcpGatewaySender<acp::AgentSide>,
+    method: &str,
+    payload: serde_json::Value,
+) {
+    let Ok(raw) = serde_json::value::to_raw_value(&payload) else {
+        return;
+    };
+    let _ = gateway
+        .ext_notification(acp::ExtNotification::new(
+            method,
+            std::sync::Arc::from(raw),
+        ))
+        .await;
+}
+
+async fn forward_swarm_server_event(
+    gateway: &AcpGatewaySender<acp::AgentSide>,
+    lead_session_id: &str,
+    event: &ServerEvent,
+) -> bool {
+    match event {
+        ServerEvent::SwarmStatus { members } => {
+            emit_swarm_ext(
+                gateway,
+                "x.ai/swarm/status",
+                serde_json::json!({
+                    "sessionId": lead_session_id,
+                    "members": members,
+                }),
+            )
+            .await;
+            true
+        }
+        ServerEvent::SwarmMemberMessage { swarm_id, message } => {
+            emit_swarm_ext(
+                gateway,
+                "x.ai/swarm/member_message",
+                serde_json::json!({
+                    "sessionId": lead_session_id,
+                    "swarmId": swarm_id,
+                    "message": message,
+                }),
+            )
+            .await;
+            true
+        }
+        ServerEvent::SwarmPlan {
+            swarm_id,
+            version,
+            items,
+            ..
+        } => {
+            emit_swarm_ext(
+                gateway,
+                "x.ai/swarm/plan",
+                serde_json::json!({
+                    "sessionId": lead_session_id,
+                    "swarmId": swarm_id,
+                    "version": version,
+                    "items": items,
+                }),
+            )
+            .await;
+            true
+        }
+        _ => false,
+    }
 }
 
 async fn wait_for_done(session: &DaemonSession, request_id: u64) -> Result<()> {
@@ -665,6 +737,73 @@ impl NextCodeFaceAgent {
             .await;
     }
 
+    async fn emit_goal_update(
+        &self,
+        session_id: &str,
+        update: xai_grok_shell::extensions::notification::SessionUpdate,
+    ) {
+        self.emit_session_recap_update(session_id, update).await;
+    }
+
+    async fn apply_goal_mutation(&self, mutation: crate::cli::face_goal::GoalMutation) {
+        if let Some(emit) = mutation.emit.as_ref() {
+            let update = crate::cli::face_goal::emit_to_update(emit);
+            self.emit_goal_update(&mutation.session_id, update).await;
+        }
+    }
+
+    async fn emit_goal_from_store(&self, session_id: &str, last_event: Option<&str>) {
+        let Ok(Some(goal)) = crate::session_goal::get(session_id) else {
+            return;
+        };
+        let update = crate::cli::face_goal::goal_updated_update(&goal, last_event, None, None);
+        self.emit_goal_update(session_id, update).await;
+    }
+
+    /// After EndTurn: account usage and optionally continue the active session goal.
+    async fn maybe_continue_session_goal(
+        &self,
+        session_id: &str,
+        stop: acp::StopReason,
+        token_delta: u64,
+        elapsed_seconds: u64,
+    ) -> acp::Result<acp::PromptResponse> {
+        if !matches!(stop, acp::StopReason::EndTurn) {
+            return Ok(acp::PromptResponse::new(stop));
+        }
+        match crate::cli::face_goal::decide_continuation(session_id, token_delta, elapsed_seconds)
+        {
+            crate::cli::face_goal::ContinuationDecision::None => {
+                Ok(acp::PromptResponse::new(stop))
+            }
+            crate::cli::face_goal::ContinuationDecision::MaxReached { goal } => {
+                let update = crate::cli::face_goal::goal_updated_update(
+                    &goal,
+                    Some("max_continuations"),
+                    Some("limit"),
+                    Some("Paused: max goal continuations reached"),
+                );
+                self.emit_goal_update(session_id, update).await;
+                Ok(acp::PromptResponse::new(stop))
+            }
+            crate::cli::face_goal::ContinuationDecision::Continue { prompt, goal } => {
+                let update = crate::cli::face_goal::goal_updated_update(
+                    &goal,
+                    Some("goal_continuation"),
+                    None,
+                    None,
+                );
+                self.emit_goal_update(session_id, update).await;
+                // Stay inside the original ACP prompt() until pursuit pauses/completes.
+                let req = acp::PromptRequest::new(
+                    acp::SessionId::new(session_id),
+                    vec![acp::ContentBlock::Text(acp::TextContent::new(prompt))],
+                );
+                self.prompt(req).await
+            }
+        }
+    }
+
     /// Visible Face scrollback notice when provider/model failover changes the active model.
     /// Uses `ModelAutoSwitched` (renders as `SessionEvent::ModelUnavailable`) — not silent
     /// `ModelChanged`, which Face intentionally keeps toast/scrollback-free for followers.
@@ -934,6 +1073,107 @@ impl NextCodeFaceAgent {
         parts.join("\n")
     }
 
+    /// Run Face `!` bash mode: shell locally, emit execute tool with `bash_mode`,
+    /// end turn without a model completion.
+    async fn handle_bash_mode_prompt(
+        &self,
+        session_id: &str,
+        command: &str,
+        working_dir: Option<&std::path::Path>,
+    ) -> acp::PromptResponse {
+        let tool_id = format!("bash-mode-{}", uuid::Uuid::new_v4());
+        let cwd_display = working_dir
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let raw_input = crate::cli::face_bash::bash_mode_raw_input(command);
+        let meta = crate::cli::face_bash::bash_mode_tool_meta();
+
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCall(
+                    acp::ToolCall::new(ToolCallId::new(tool_id.as_str()), command)
+                        .status(ToolCallStatus::Pending)
+                        .kind(acp::ToolKind::Execute)
+                        .raw_input(raw_input.clone())
+                        .meta(Some(meta.clone())),
+                ),
+            ))
+            .await;
+
+        let in_progress = ToolCallUpdateFields::new()
+            .status(ToolCallStatus::InProgress)
+            .title(command.to_string())
+            .kind(acp::ToolKind::Execute)
+            .raw_input(raw_input.clone());
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCallUpdate(
+                    ToolCallUpdate::new(ToolCallId::new(tool_id.as_str()), in_progress)
+                        .meta(Some(meta.clone())),
+                ),
+            ))
+            .await;
+
+        let result = if command.trim().is_empty() {
+            crate::cli::face_bash::BashRunResult {
+                output: String::new(),
+                exit_code: 0,
+                timed_out: false,
+            }
+        } else {
+            crate::cli::face_bash::run_shell_command(
+                command,
+                working_dir,
+                crate::cli::face_bash::BASH_MODE_TIMEOUT,
+            )
+            .await
+        };
+
+        let failed = result.exit_code != 0 || result.timed_out;
+        let status = if failed {
+            ToolCallStatus::Failed
+        } else {
+            ToolCallStatus::Completed
+        };
+        let display_output = if result.output.is_empty() && !failed {
+            "Command completed successfully (no output)".to_string()
+        } else {
+            result.output.clone()
+        };
+        let raw_output = crate::cli::face_bash::bash_mode_raw_output(
+            command,
+            &result.output,
+            result.exit_code,
+            result.timed_out,
+            &cwd_display,
+        );
+        let done_fields = ToolCallUpdateFields::new()
+            .status(status)
+            .title(command.to_string())
+            .kind(acp::ToolKind::Execute)
+            .content(Some(vec![
+                acp::ContentBlock::Text(acp::TextContent::new(display_output)).into(),
+            ]))
+            .raw_input(raw_input)
+            .raw_output(raw_output);
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                SessionId::new(session_id),
+                acp::SessionUpdate::ToolCallUpdate(
+                    ToolCallUpdate::new(ToolCallId::new(tool_id.as_str()), done_fields)
+                        .meta(Some(meta)),
+                ),
+            ))
+            .await;
+
+        acp::PromptResponse::new(acp::StopReason::EndTurn)
+    }
+
     /// Load initial ACP commands (skills) for the `InitializeResponse` meta.
     /// Called once at Face connection time so the welcome prompt slash
     /// completions include skills immediately.
@@ -1104,6 +1344,7 @@ impl NextCodeFaceAgent {
         output: &str,
         error: &Option<String>,
         raw_input: Option<serde_json::Value>,
+        metadata: Option<serde_json::Value>,
     ) {
         let status = if error.is_some() {
             ToolCallStatus::Failed
@@ -1128,13 +1369,24 @@ impl NextCodeFaceAgent {
             "output_delta": null,
             "was_bare_echo": false,
         }));
+        // Prefer ACP Diff content for edit/write/hashline so Face
+        // `extract_edit_hunks` can render +/- scrollback (grok-build path).
+        let mut content: Vec<acp::ToolCallContent> = Vec::new();
+        if error.is_none()
+            && let Some(diff) = crate::cli::face_edit_diff::build_edit_diff_content(
+                name,
+                raw_input.as_ref(),
+                metadata.as_ref(),
+            )
+        {
+            content.push(diff);
+        }
+        content.push(acp::ContentBlock::Text(acp::TextContent::new(output)).into());
         let fields = ToolCallUpdateFields::new()
             .status(status)
             .title(Self::tool_title(name, raw_input.as_ref()))
             .kind(Self::tool_kind(name))
-            .content(Some(vec![
-                acp::ContentBlock::Text(acp::TextContent::new(output)).into(),
-            ]))
+            .content(Some(content))
             .raw_output(raw_output);
         let fields = if let Some(input) = raw_input {
             fields.raw_input(input)
@@ -1778,9 +2030,15 @@ impl NextCodeFaceAgent {
                             session.set_last_model(Some(fallback)).await;
                         }
                     }
-                    // Idle path only keeps the Face model catalog warm; turn
-                    // events stay for prompt/set_model (re-queued above when busy).
-                    _ => {}
+                    // Agent-team panel: live swarm roster / soft transcript / plan.
+                    other => {
+                        let _ = forward_swarm_server_event(
+                            &gateway,
+                            &session.session_id,
+                            &other,
+                        )
+                        .await;
+                    }
                 }
             }
         });
@@ -1795,16 +2053,25 @@ impl NextCodeFaceAgent {
         if name.eq_ignore_ascii_case("memory") {
             return Self::memory_search_title(raw_input);
         }
-        if name.starts_with("Bash") {
+        if name.eq_ignore_ascii_case("bash") || name.starts_with("Bash") {
             "Bash".to_string()
-        } else if name.starts_with("Read")
+        } else if name.eq_ignore_ascii_case("read")
+            || name.eq_ignore_ascii_case("glob")
+            || name.eq_ignore_ascii_case("grep")
+            || name.starts_with("Read")
             || name.starts_with("Glob")
             || name.starts_with("Grep")
         {
             "Read".to_string()
-        } else if name.starts_with("Edit") || name.starts_with("Write") {
+        } else if crate::cli::face_edit_diff::is_face_edit_tool(name)
+            || name.starts_with("Edit")
+            || name.starts_with("Write")
+        {
             "Edit".to_string()
-        } else if name.starts_with("Web") {
+        } else if name.starts_with("Web")
+            || name.eq_ignore_ascii_case("webfetch")
+            || name.eq_ignore_ascii_case("websearch")
+        {
             "Web".to_string()
         } else if name.starts_with("Search") {
             "Search".to_string()
@@ -1836,20 +2103,35 @@ impl NextCodeFaceAgent {
     /// tracker wins (a bare `ToolKind::Search` would become a grep Search
     /// block instead). ACP has no `ToolKind::MemorySearch`.
     fn tool_kind(name: &str) -> acp::ToolKind {
-        if name.starts_with("Bash") {
-            acp::ToolKind::Execute
-        } else if name.starts_with("Read")
+        // Memory stays Other so Face title-based MemorySearch wins.
+        if name.eq_ignore_ascii_case("memory") {
+            return acp::ToolKind::Other;
+        }
+        if crate::cli::face_edit_diff::is_face_edit_tool(name)
+            || name.starts_with("Edit")
+            || name.starts_with("Write")
+        {
+            return acp::ToolKind::Edit;
+        }
+        if name.eq_ignore_ascii_case("bash") || name.starts_with("Bash") {
+            return acp::ToolKind::Execute;
+        }
+        if name.eq_ignore_ascii_case("read")
+            || name.eq_ignore_ascii_case("glob")
+            || name.eq_ignore_ascii_case("grep")
+            || name.starts_with("Read")
             || name.starts_with("Glob")
             || name.starts_with("Grep")
         {
-            acp::ToolKind::Read
-        } else if name.starts_with("Edit") || name.starts_with("Write") {
-            acp::ToolKind::Edit
-        } else if name.starts_with("Web") {
-            acp::ToolKind::Fetch
-        } else {
-            acp::ToolKind::Other
+            return acp::ToolKind::Read;
         }
+        if name.starts_with("Web")
+            || name.eq_ignore_ascii_case("webfetch")
+            || name.eq_ignore_ascii_case("websearch")
+        {
+            return acp::ToolKind::Fetch;
+        }
+        acp::ToolKind::Other
     }
 }
 
@@ -2035,6 +2317,208 @@ impl acp::Agent for NextCodeFaceAgent {
                 }
                 serde_json::json!({ "result": { "ok": true } })
             }
+            "x.ai/swarm/dm" => {
+                let from_session = params
+                    .get("sessionId")
+                    .or_else(|| params.get("fromSessionId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let to_session = params
+                    .get("targetSessionId")
+                    .or_else(|| params.get("toSessionId"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let message = params
+                    .get("message")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                if from_session.is_empty() || to_session.is_empty() || message.is_empty() {
+                    serde_json::json!({
+                        "error": {
+                            "code": "invalid_params",
+                            "message": "sessionId, targetSessionId, and message are required",
+                        }
+                    })
+                } else if let Some(session) = self.sessions.borrow().get(from_session).cloned() {
+                    let id = session.next_id();
+                    // Prefer CommMessage DM (mailbox); fall back to NotifySession.
+                    let req = Request::CommMessage {
+                        id,
+                        from_session: from_session.to_string(),
+                        message: message.to_string(),
+                        to_session: Some(to_session.to_string()),
+                        channel: None,
+                        delivery: None,
+                        wake: Some(true),
+                        tldr: None,
+                    };
+                    match session.send(&req).await {
+                        Ok(()) => serde_json::json!({ "result": { "ok": true, "requestId": id } }),
+                        Err(err) => {
+                            let notify_id = session.next_id();
+                            let notify = Request::NotifySession {
+                                id: notify_id,
+                                session_id: to_session.to_string(),
+                                message: message.to_string(),
+                            };
+                            match session.send(&notify).await {
+                                Ok(()) => serde_json::json!({
+                                    "result": {
+                                        "ok": true,
+                                        "requestId": notify_id,
+                                        "fallback": "notify_session",
+                                    }
+                                }),
+                                Err(notify_err) => serde_json::json!({
+                                    "error": {
+                                        "code": "swarm_dm_failed",
+                                        "message": format!("{err}; notify fallback: {notify_err}"),
+                                    }
+                                }),
+                            }
+                        }
+                    }
+                } else {
+                    serde_json::json!({
+                        "error": {
+                            "code": "session_not_found",
+                            "message": format!("unknown lead session: {from_session}"),
+                        }
+                    })
+                }
+            }
+            "x.ai/multitask/spawn" => {
+                let session_id = params
+                    .get("sessionId")
+                    .or_else(|| params.get("session_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let prompt = params
+                    .get("prompt")
+                    .or_else(|| params.get("initialMessage"))
+                    .or_else(|| params.get("initial_message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .trim();
+                let spawn_mode = params
+                    .get("spawnMode")
+                    .or_else(|| params.get("spawn_mode"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("headless");
+                if session_id.is_empty() || prompt.is_empty() {
+                    serde_json::json!({
+                        "error": {
+                            "code": "invalid_params",
+                            "message": "sessionId and prompt are required",
+                        }
+                    })
+                } else if let Some(session) = self.sessions.borrow().get(session_id).cloned() {
+                    let id = session.next_id();
+                    let req = Request::CommSpawn {
+                        id,
+                        session_id: session_id.to_string(),
+                        working_dir: None,
+                        initial_message: Some(prompt.to_string()),
+                        request_nonce: Some(format!("multitask-{}", uuid::Uuid::new_v4())),
+                        spawn_mode: Some(spawn_mode.to_string()),
+                        model: None,
+                        effort: None,
+                    };
+                    match session.send(&req).await {
+                        Ok(()) => serde_json::json!({
+                            "result": {
+                                "ok": true,
+                                "requestId": id,
+                                "spawnMode": spawn_mode,
+                            }
+                        }),
+                        Err(err) => serde_json::json!({
+                            "error": {
+                                "code": "multitask_spawn_failed",
+                                "message": err.to_string(),
+                            }
+                        }),
+                    }
+                } else {
+                    serde_json::json!({
+                        "error": {
+                            "code": "session_not_found",
+                            "message": format!("unknown lead session: {session_id}"),
+                        }
+                    })
+                }
+            }
+            "x.ai/swarm/stop" => {
+                let session_id = params
+                    .get("sessionId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let target_session = params
+                    .get("targetSessionId")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let force = params
+                    .get("force")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+                if session_id.is_empty() || target_session.is_empty() {
+                    serde_json::json!({
+                        "error": {
+                            "code": "invalid_params",
+                            "message": "sessionId and targetSessionId are required",
+                        }
+                    })
+                } else if let Some(session) = self.sessions.borrow().get(session_id).cloned() {
+                    let id = session.next_id();
+                    let req = Request::CommStop {
+                        id,
+                        session_id: session_id.to_string(),
+                        target_session: target_session.to_string(),
+                        force: Some(force),
+                    };
+                    match session.send(&req).await {
+                        Ok(()) => serde_json::json!({ "result": { "ok": true, "requestId": id } }),
+                        Err(err) => serde_json::json!({
+                            "error": {
+                                "code": "swarm_stop_failed",
+                                "message": err.to_string(),
+                            }
+                        }),
+                    }
+                } else {
+                    serde_json::json!({
+                        "error": {
+                            "code": "session_not_found",
+                            "message": format!("unknown lead session: {session_id}"),
+                        }
+                    })
+                }
+            }
+            "x.ai/goal/set" => {
+                let mutation = crate::cli::face_goal::handle_goal_set(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/pause" => {
+                let mutation = crate::cli::face_goal::handle_goal_pause(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/resume" => {
+                let mutation = crate::cli::face_goal::handle_goal_resume(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/clear" => {
+                let mutation = crate::cli::face_goal::handle_goal_clear(&params);
+                let response = mutation.response.clone();
+                self.apply_goal_mutation(mutation).await;
+                response
+            }
+            "x.ai/goal/status" => crate::cli::face_goal::handle_goal_status(&params),
             other => {
                 if let Some(payload) =
                     crate::cli::face_ext::handle_ext_method(other, &params).await
@@ -2112,6 +2596,21 @@ impl acp::Agent for NextCodeFaceAgent {
                 .data(format!("Session {session_id} already processing a prompt")));
         }
 
+        // Face `!` bash mode: PromptBlockMeta.bash_command → local shell →
+        // execute tool with bash_mode meta. No model turn.
+        if let Some(bash_cmd) = crate::cli::face_bash::bash_command_from_prompt(&args) {
+            let working_dir = session.working_dir.clone();
+            let response = self
+                .handle_bash_mode_prompt(
+                    &session_id,
+                    &bash_cmd,
+                    working_dir.as_deref(),
+                )
+                .await;
+            session.prompt_running.store(false, Ordering::SeqCst);
+            return Ok(response);
+        }
+
         let text = Self::prompt_text(&args);
         let working_dir = session.working_dir.clone();
         let (content, system_reminder) =
@@ -2131,6 +2630,8 @@ impl acp::Agent for NextCodeFaceAgent {
             }
         };
 
+        let mut turn_tokens: u64 = 0;
+        let turn_started = std::time::Instant::now();
         let stop = loop {
             let event = match session.read_event().await {
                 Ok(e) => e,
@@ -2191,9 +2692,18 @@ impl acp::Agent for NextCodeFaceAgent {
                     name,
                     output,
                     error,
+                    metadata,
                 } => {
                     let raw_input = self.accumulated_raw_input(&id);
-                    self.emit_tool_done(&session_id, &id, &name, &output, &error, raw_input)
+                    self.emit_tool_done(
+                        &session_id,
+                        &id,
+                        &name,
+                        &output,
+                        &error,
+                        raw_input,
+                        metadata,
+                    )
                         .await;
                     self.tool_inputs.borrow_mut().remove(&id);
                     // `todo` tool persists via next-code store + BusEvent for TUI;
@@ -2205,6 +2715,16 @@ impl acp::Agent for NextCodeFaceAgent {
                     // Same for memory: refresh float after remember/list/forget.
                     if name.eq_ignore_ascii_case("memory") {
                         self.emit_memory_info(&session_id).await;
+                    }
+                    if name.eq_ignore_ascii_case("create_goal")
+                        || name.eq_ignore_ascii_case("update_goal")
+                    {
+                        let last_event = if name.eq_ignore_ascii_case("create_goal") {
+                            Some("goal_set")
+                        } else {
+                            Some("goal_updated")
+                        };
+                        self.emit_goal_from_store(&session_id, last_event).await;
                     }
                 }
                 ServerEvent::GeneratedImage {
@@ -2242,6 +2762,9 @@ impl acp::Agent for NextCodeFaceAgent {
                     cache_read_input,
                     cache_creation_input,
                 } => {
+                    turn_tokens = turn_tokens
+                        .saturating_add(input)
+                        .saturating_add(output);
                     self.emit_token_usage(
                         &session_id,
                         input,
@@ -2356,6 +2879,66 @@ impl acp::Agent for NextCodeFaceAgent {
                         .await;
                     }
                 }
+                ServerEvent::BestOfNProgress { payload } => {
+                    crate::cli::face_best_of_n::emit_best_of_n_progress(
+                        &self.gateway,
+                        &session_id,
+                        payload,
+                    )
+                    .await;
+                }
+                ServerEvent::BestOfNPickRequest {
+                    request_id,
+                    session_id: pick_session_id,
+                    run_id,
+                    tool_call_id,
+                    recommended_index,
+                    selection_reason,
+                    candidates,
+                } => {
+                    if let Err(err) = crate::cli::face_best_of_n::bridge_best_of_n_pick(
+                        &self.gateway,
+                        session.as_ref(),
+                        request_id,
+                        pick_session_id,
+                        run_id,
+                        tool_call_id,
+                        recommended_index,
+                        selection_reason,
+                        candidates,
+                    )
+                    .await
+                    {
+                        self.emit_text(
+                            &session_id,
+                            format!("Best-of-N pick bridge error: {err}"),
+                        )
+                        .await;
+                    }
+                }
+                ServerEvent::ExitPlanMode {
+                    request_id,
+                    session_id: plan_session_id,
+                    tool_call_id,
+                    plan_content,
+                } => {
+                    if let Err(err) = crate::cli::face_exit_plan::bridge_exit_plan_mode(
+                        &self.gateway,
+                        session.as_ref(),
+                        request_id,
+                        plan_session_id,
+                        tool_call_id,
+                        plan_content,
+                    )
+                    .await
+                    {
+                        self.emit_text(
+                            &session_id,
+                            format!("ExitPlanMode bridge error: {err}"),
+                        )
+                        .await;
+                    }
+                }
                 ServerEvent::Done { id } if id == prompt_id => {
                     // Refresh Plan in case compaction / other paths mutated todos
                     // without a `todo` ToolDone this turn.
@@ -2401,12 +2984,16 @@ impl acp::Agent for NextCodeFaceAgent {
                         break acp::StopReason::EndTurn;
                     }
                 }
-                _ => {}
+                other => {
+                    let _ = forward_swarm_server_event(&self.gateway, &session_id, &other).await;
+                }
             }
         };
 
         session.prompt_running.store(false, Ordering::SeqCst);
-        Ok(acp::PromptResponse::new(stop))
+        let elapsed_seconds = turn_started.elapsed().as_secs().max(1);
+        self.maybe_continue_session_goal(&session_id, stop, turn_tokens, elapsed_seconds)
+            .await
     }
 
     async fn cancel(&self, args: acp::CancelNotification) -> acp::Result<()> {
@@ -2536,6 +3123,107 @@ impl acp::Agent for NextCodeFaceAgent {
         }
         result
     }
+
+    async fn set_session_mode(
+        &self,
+        args: acp::SetSessionModeRequest,
+    ) -> acp::Result<acp::SetSessionModeResponse> {
+        let session_id = args.session_id.to_string();
+        let mode_id = args.mode_id.0.as_ref().to_string();
+        let session = self.sessions.borrow().get(&session_id).cloned();
+        let Some(session) = session else {
+            return Err(
+                acp::Error::invalid_params().data(format!("Unknown session: {session_id}"))
+            );
+        };
+
+        let permission =
+            crate::cli::face_permission_mode::face_mode_to_daemon_permission(&mode_id);
+
+        self.apply_daemon_permission_mode(&session, permission)
+            .await?;
+
+        let _ = self
+            .gateway
+            .session_notification(acp::SessionNotification::new(
+                acp::SessionId::new(session_id),
+                acp::SessionUpdate::CurrentModeUpdate(acp::CurrentModeUpdate::new(
+                    acp::SessionModeId::new(mode_id),
+                )),
+            ))
+            .await;
+
+        Ok(acp::SetSessionModeResponse::new())
+    }
+
+    async fn ext_notification(&self, args: acp::ExtNotification) -> acp::Result<()> {
+        let method = args.method.as_ref();
+        if method != "x.ai/yolo_mode_changed" {
+            return Ok(());
+        }
+
+        let params: serde_json::Value =
+            serde_json::from_str(args.params.get()).unwrap_or(serde_json::Value::Null);
+        let permission_mode = params
+            .get("permission_mode")
+            .and_then(|v| v.as_str());
+        let yolo_mode = params
+            .get("yolo_mode")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let auto_mode = params
+            .get("auto_mode")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+        let permission = crate::cli::face_permission_mode::yolo_notification_to_daemon_permission(
+            permission_mode,
+            yolo_mode,
+            auto_mode,
+        );
+
+        // Face PersistPermissionMode does not include session_id in the
+        // notification body — apply to every live daemon session (typical
+        // next-code Face embed is one active session).
+        let sessions: Vec<Rc<DaemonSession>> =
+            self.sessions.borrow().values().cloned().collect();
+        for session in sessions {
+            if let Err(e) = self.apply_daemon_permission_mode(&session, permission).await {
+                eprintln!(
+                    "[nextcode.face] yolo_mode_changed → SetPermissionMode({permission}) failed: {e}"
+                );
+            }
+        }
+        Ok(())
+    }
+}
+
+impl NextCodeFaceAgent {
+    /// Push `Request::SetPermissionMode` and wait for `Done`.
+    async fn apply_daemon_permission_mode(
+        &self,
+        session: &DaemonSession,
+        permission: &str,
+    ) -> acp::Result<()> {
+        let req_id = session.next_id();
+        session
+            .send(&Request::SetPermissionMode {
+                id: req_id,
+                mode: permission.to_string(),
+            })
+            .await
+            .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+
+        loop {
+            match session.read_event().await {
+                Ok(ServerEvent::Done { id }) if id == req_id => return Ok(()),
+                Ok(ServerEvent::Error { id, message, .. }) if id == req_id => {
+                    return Err(acp::Error::internal_error().data(message));
+                }
+                Ok(_) => continue,
+                Err(e) => return Err(acp::Error::internal_error().data(e.to_string())),
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2613,6 +3301,19 @@ mod tests {
     #[test]
     fn test_tool_kind_edit() {
         assert_eq!(NextCodeFaceAgent::tool_kind("Edit"), acp::ToolKind::Edit);
+        assert_eq!(NextCodeFaceAgent::tool_kind("edit"), acp::ToolKind::Edit);
+        assert_eq!(NextCodeFaceAgent::tool_kind("write"), acp::ToolKind::Edit);
+        assert_eq!(
+            NextCodeFaceAgent::tool_kind("hashline_edit"),
+            acp::ToolKind::Edit
+        );
+    }
+
+    #[test]
+    fn test_tool_title_lowercase_edit_tools() {
+        assert_eq!(NextCodeFaceAgent::tool_title("edit", None), "Edit");
+        assert_eq!(NextCodeFaceAgent::tool_title("hashline_edit", None), "Edit");
+        assert_eq!(NextCodeFaceAgent::tool_title("bash", None), "Bash");
     }
 
     #[test]

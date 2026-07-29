@@ -22,6 +22,10 @@ use super::dashboard::{
     dispatch_dashboard_toggle_grouping, dispatch_dashboard_toggle_pin,
     dispatch_dashboard_toggle_worktree, dispatch_exit_dashboard, dispatch_open_dashboard,
 };
+use super::goal::{
+    dispatch_goal_clear, dispatch_goal_pause, dispatch_goal_resume, dispatch_goal_set,
+    dispatch_goal_show,
+};
 use super::import_claude::{
     dispatch_dismiss_claude_import, dispatch_import_claude, dispatch_import_claude_cancel,
     dispatch_import_claude_confirm,
@@ -29,8 +33,9 @@ use super::import_claude::{
 use super::interject::dispatch_interject;
 use super::jump::{dispatch_jump_dismiss, dispatch_jump_picker_select, dispatch_jump_show_picker};
 use super::modes::{
-    dispatch_cycle_mode, dispatch_enter_plan_mode, dispatch_show_plan, dispatch_toggle_yolo,
-    set_permission_mode, set_plan_mode, set_yolo_mode,
+    dispatch_cycle_mode, dispatch_enter_plan_mode, dispatch_open_plan_in_editor, dispatch_show_plan,
+    dispatch_toggle_thinking_effort, dispatch_toggle_yolo, set_permission_mode, set_plan_mode,
+    set_yolo_mode,
 };
 use super::notes::{
     dispatch_enter_feedback_mode, dispatch_enter_remember_mode,
@@ -92,12 +97,14 @@ use super::settings::setters::{
     set_show_float_usage_limits, set_show_float_workspace_map, set_show_thinking_blocks, set_show_tips,
     set_simple_mode, set_status_line_context, set_status_line_cwd, set_status_line_enabled,
     set_status_line_git, set_status_line_mode, set_status_line_model, set_status_line_order,
+    set_status_line_reasoning, set_status_line_run_state,
     set_theme, set_timeline, set_timestamps, set_vim_mode, set_voice_capture_mode,
     set_voice_stt_language, reset_status_line, toggle_status_line_segment,
 };
 use super::settings::ui::{
     dispatch_confirm_reset_setting, dispatch_open_command_palette, dispatch_open_howto_guides,
-    dispatch_open_connect_picker, dispatch_open_experimental, dispatch_open_model_picker,
+    dispatch_open_connect_picker, dispatch_open_diff_modal, dispatch_open_experimental,
+    dispatch_open_model_picker,
     dispatch_open_reset_confirm, dispatch_open_settings, dispatch_toggle_compact_mode,
     dispatch_toggle_mouse_capture, dispatch_toggle_multiline, dispatch_toggle_timestamps,
     dispatch_toggle_vim_mode,
@@ -118,6 +125,7 @@ use super::transcript::{
 use super::turn::{
     dispatch_cancel_scheduled_task, dispatch_cancel_turn, dispatch_cancel_turn_choice,
     dispatch_demote_to_background, dispatch_kill_bg_task, dispatch_kill_subagent,
+    dispatch_stop_swarm_member,
 };
 use super::voice::{dispatch_enable_voice_mode, dispatch_voice_stop, dispatch_voice_toggle};
 use crate::app::actions::{Action, Effect};
@@ -934,6 +942,9 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::CancelTurnChoice(choice) => dispatch_cancel_turn_choice(app, choice),
         Action::KillBgTask(task_id) => dispatch_kill_bg_task(app, task_id),
         Action::KillSubagent(subagent_id) => dispatch_kill_subagent(app, subagent_id),
+        Action::StopSwarmMember(target_session_id) => {
+            dispatch_stop_swarm_member(app, target_session_id)
+        }
         Action::CancelScheduledTask(task_id) => dispatch_cancel_scheduled_task(app, task_id),
         Action::DemoteToBackground => dispatch_demote_to_background(app),
         Action::RequestBundleStatus => vec![Effect::FetchBundleStatus],
@@ -954,16 +965,19 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::ShowPlan => dispatch_show_plan(app),
         Action::EnterPlanMode { description } => dispatch_enter_plan_mode(app, description),
         Action::SetPlanMode(kind) => set_plan_mode(app, kind),
+        Action::OpenPlanInEditor => dispatch_open_plan_in_editor(app),
         Action::EnterFeedbackMode => dispatch_enter_feedback_mode(app),
         Action::SendFeedback(text) => dispatch_send_feedback(app, text),
         Action::EnterRememberMode => dispatch_enter_remember_mode(app),
         Action::SendRememberNote(text) => dispatch_send_remember_note(app, text),
         Action::SaveRememberNoteFromModal => dispatch_save_remember_note_from_modal(app),
         Action::SendBtw(question) => dispatch_send_btw(app, question),
+        Action::Multitask(args) => super::multitask::dispatch_multitask(app, args),
         Action::SendRecap { auto } => dispatch_send_recap(app, auto),
         Action::ShowPrivacyInfo => dispatch_show_privacy_info(app),
         Action::SetCodingDataSharing { opted_in } => set_coding_data_sharing(app, opted_in),
         Action::ToggleYolo => dispatch_toggle_yolo(app),
+        Action::ToggleThinkingEffort => dispatch_toggle_thinking_effort(app),
         Action::ToggleMultiline => dispatch_toggle_multiline(app),
         Action::ToggleCompactMode => dispatch_toggle_compact_mode(app),
         Action::ToggleVimMode => dispatch_toggle_vim_mode(app),
@@ -1032,6 +1046,8 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::SetStatusLineEnabled(v) => set_status_line_enabled(app, v),
         Action::SetStatusLineMode(v) => set_status_line_mode(app, v),
         Action::SetStatusLineModel(v) => set_status_line_model(app, v),
+        Action::SetStatusLineReasoning(v) => set_status_line_reasoning(app, v),
+        Action::SetStatusLineRunState(v) => set_status_line_run_state(app, v),
         Action::SetStatusLineContext(v) => set_status_line_context(app, v),
         Action::SetStatusLineCwd(v) => set_status_line_cwd(app, v),
         Action::SetStatusLineGit(v) => set_status_line_git(app, v),
@@ -1044,6 +1060,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::PreviewAutoLightTheme(v) => preview_auto_light_theme(app, v),
         Action::OpenSettings => dispatch_open_settings(app),
         Action::OpenExperimental => dispatch_open_experimental(app),
+        Action::OpenDiffModal => dispatch_open_diff_modal(app),
         Action::OpenCommandPalette => dispatch_open_command_palette(app),
         Action::OpenHowtoGuides => dispatch_open_howto_guides(app),
         Action::OpenModelPicker => dispatch_open_model_picker(app),
@@ -1213,16 +1230,28 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         }
         Action::OpenMemoryModal => {
             if let ActiveView::Agent(id) = app.active_view
-                && let Some(agent) = app.agents.get(&id)
-                && let Some(session_id) = agent.session.session_id.clone()
+                && let Some(agent) = app.agents.get_mut(&id)
             {
-                return vec![Effect::SendPrompt {
-                    agent_id: id,
-                    session_id,
-                    text: "/memory".to_string(),
-                    prompt_id: uuid::Uuid::new_v4().to_string(),
-                    skill_token_ranges: Vec::new(),
-                }];
+                let cwd = if agent.session.cwd.as_os_str().is_empty() {
+                    std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."))
+                } else {
+                    agent.session.cwd.clone()
+                };
+                let files = crate::views::memory_typed::collect_memory_catalog(&cwd);
+                let entries = crate::views::memory_modal::build_entries(files);
+                let mut modal_state =
+                    crate::views::memory_modal::MemoryModalState::new(entries);
+                // Preserve prior enable flag if reopening; default on.
+                if let Some(crate::views::modal::ActiveModal::MemoryBrowser { state }) =
+                    agent.active_modal.as_ref()
+                {
+                    modal_state.memory_enabled = state.memory_enabled;
+                    modal_state.fullscreen = state.fullscreen;
+                }
+                agent.active_modal =
+                    Some(crate::views::modal::ActiveModal::MemoryBrowser {
+                        state: Box::new(modal_state),
+                    });
             }
             vec![]
         }
@@ -1230,6 +1259,7 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
         Action::SuspendForEditor {
             path,
             refresh_agents_modal,
+            reload_keybindings,
         } => {
             if let ActiveView::Agent(id) = app.active_view
                 && let Some(agent) = app.agents.get_mut(&id)
@@ -1238,6 +1268,15 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             }
             app.pending_editor_path = Some(path);
             app.pending_agents_modal_refresh = refresh_agents_modal;
+            app.pending_keybindings_reload = reload_keybindings;
+            vec![]
+        }
+        Action::ReloadKeybindings => {
+            let enabled = crate::app::MOUSE_REPORTING_TOGGLE_ENABLED
+                .load(std::sync::atomic::Ordering::Acquire);
+            app.registry = crate::actions::ActionRegistry::reload_with_config(enabled);
+            let display = crate::actions::keybindings_display_path();
+            app.show_toast(&format!("Reloaded keybindings from {display}"));
             vec![]
         }
         Action::OpenDashboard => dispatch_open_dashboard(app),
@@ -1359,6 +1398,11 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
             });
             vec![]
         }
+        Action::GoalShow => dispatch_goal_show(app),
+        Action::GoalPause => dispatch_goal_pause(app),
+        Action::GoalResume => dispatch_goal_resume(app),
+        Action::GoalClear => dispatch_goal_clear(app),
+        Action::GoalSet { objective } => dispatch_goal_set(app, objective),
         Action::Rewind => dispatch_rewind(app),
         Action::RewindShowPicker => dispatch_rewind_show_picker(app),
         Action::RewindPickerSelect(prompt_index) => {

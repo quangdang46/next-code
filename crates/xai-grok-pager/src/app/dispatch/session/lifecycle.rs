@@ -187,6 +187,7 @@ pub(in crate::app::dispatch) fn open_new_session_question(app: &mut AppView) -> 
         id: None,
         options,
         multi_select: Some(false),
+    header: None,
     };
     let agent = app.agents.get_mut(&id).expect("agent present (re-borrow)");
     let stashed = agent.prompt.stash();
@@ -244,6 +245,7 @@ pub(in crate::app::dispatch) fn open_agent_type_mismatch_question(
             },
         ],
         multi_select: Some(false),
+    header: None,
     };
     let agent = app.agents.get_mut(&id).expect("agent present (re-borrow)");
     let stashed = agent.prompt.stash();
@@ -302,6 +304,8 @@ pub(in crate::app::dispatch) fn dispatch_new_session_inner_with_id(
             next_queue_id: 0,
             yolo_mode: app.default_yolo,
             auto_mode: inherit_auto_mode(app),
+            accept_edits_mode: app.current_ui.permission_mode.as_deref()
+                == Some("accept-edits"),
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,
@@ -633,6 +637,8 @@ pub(in crate::app::dispatch) fn dispatch_new_worktree_session(
             next_queue_id: 0,
             yolo_mode: app.default_yolo,
             auto_mode: inherit_auto_mode(app),
+            accept_edits_mode: app.current_ui.permission_mode.as_deref()
+                == Some("accept-edits"),
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,

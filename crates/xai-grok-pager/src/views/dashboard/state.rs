@@ -4687,12 +4687,18 @@ fn dashboard_action_for_id(
         | ActionId::OpenNextLink
         | ActionId::OpenPrevLink
         | ActionId::ToggleTodos
+        | ActionId::ToggleTeamTasks
+        | ActionId::AgentPanelSelectPrev
+        | ActionId::AgentPanelSelectNext
+        | ActionId::TeamTaskSelectPrev
+        | ActionId::TeamTaskSelectNext
         | ActionId::ToggleTasks
         | ActionId::ToggleQueue
         | ActionId::OpenSessions
         | ActionId::OpenExtensions
         | ActionId::SendToBackground
         | ActionId::CycleMode
+        | ActionId::ToggleThinkingEffort
         | ActionId::BashMode
         | ActionId::Rewind
         | ActionId::KillBgTask

@@ -13,6 +13,10 @@ pub fn resolve_display_tool_name(name: &str) -> &str {
         "file_glob" => "ffs glob",
         "file_grep" => "ffs grep",
         "todo_read" | "todo_write" | "todoread" | "todowrite" => "todo",
+        "task_create" => "TaskCreate",
+        "task_get" => "TaskGet",
+        "task_list" => "TaskList",
+        "task_update" => "TaskUpdate",
         other => other,
     }
 }

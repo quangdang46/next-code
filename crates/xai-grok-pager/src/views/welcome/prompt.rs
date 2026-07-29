@@ -82,6 +82,10 @@ mod tests {
             multiline: false,
             usage_warning: None,
             usage_warning_critical: false,
+            tasks_pill: None,
+            tasks_pill_hovered: false,
+            agent_pills: None,
+            agent_expand_hint: None,
         };
 
         let (_, post_flush) = render_prompt(

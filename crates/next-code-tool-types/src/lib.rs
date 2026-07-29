@@ -86,7 +86,9 @@ pub fn resolve_tool_name(name: &str) -> &str {
 
     match name {
         "communicate" => "swarm",
-        "task" | "task_runner" => "subagent",
+        // Claude Code legacy `Task` / runners → unified Agent façade (not the
+        // removed direct `subagent` tool).
+        "task" | "task_runner" | "Task" => "Agent",
         "launch" => "open",
         "shell" => "bash",
         "shell_exec" => "bash",
@@ -106,6 +108,11 @@ pub fn resolve_tool_name(name: &str) -> &str {
         "skill" | "Skill" => "skill_manage",
         "todoread" | "todowrite" | "todo_read" | "todo_write" | "todos" => "todo",
         "ask_user_question" => "AskUserQuestion",
+        // Claude Code Task* graph tools (session-scoped; not team_task_*).
+        "task_create" => "TaskCreate",
+        "task_get" => "TaskGet",
+        "task_list" => "TaskList",
+        "task_update" => "TaskUpdate",
         other => other,
     }
 }
@@ -118,7 +125,9 @@ mod tests {
     fn resolve_tool_name_strips_function_namespace_before_alias_resolution() {
         assert_eq!(resolve_tool_name("functions.bash"), "bash");
         assert_eq!(resolve_tool_name("functions.shell_exec"), "bash");
-        assert_eq!(resolve_tool_name("functions.file_grep"), "agentgrep");
+        assert_eq!(resolve_tool_name("functions.file_grep"), "ffs grep");
+        assert_eq!(resolve_tool_name("functions.Task"), "Agent");
+        assert_eq!(resolve_tool_name("task"), "Agent");
     }
 
     #[test]
@@ -127,5 +136,16 @@ mod tests {
             resolve_tool_name("mcp.functions.bash"),
             "mcp.functions.bash"
         );
+    }
+
+    #[test]
+    fn resolve_tool_name_maps_task_graph_aliases() {
+        assert_eq!(resolve_tool_name("task_create"), "TaskCreate");
+        assert_eq!(resolve_tool_name("task_get"), "TaskGet");
+        assert_eq!(resolve_tool_name("task_list"), "TaskList");
+        assert_eq!(resolve_tool_name("task_update"), "TaskUpdate");
+        assert_eq!(resolve_tool_name("TaskCreate"), "TaskCreate");
+        // `task` remains the Agent/subagent alias — do not steal it.
+        assert_eq!(resolve_tool_name("task"), "subagent");
     }
 }

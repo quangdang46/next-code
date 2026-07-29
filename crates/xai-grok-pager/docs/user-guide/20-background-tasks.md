@@ -67,6 +67,26 @@ Do not confuse the tasks hub with the todo checklist.
 
 ---
 
+## Multitask (Cursor-style parallel workers)
+
+Use `/multitask` when you want **several independent prompts to run at once** as background swarm workers, instead of waiting in the FIFO queue.
+
+### Behaviors
+
+1. **Drain queue** — With prompts already queued behind a running turn, `/multitask` consumes them and starts one headless worker per prompt (capped).
+2. **Inline prompts** — `/multitask fix auth --- add tests` starts two workers. Separate with newlines or a `---` line.
+3. **Lead stays free** — The main session keeps its context clean; each worker only reports a final summary back. Tool spam stays inside the child.
+4. **Steer a running worker** — Select the teammate in the agent-team panel under the prompt and type a follow-up, or use `/multitask --to <worker_session_id> <message>`.
+
+Workers share the workspace by default (same as Cursor multitask without worktrees). Prefer separate worktrees when edits will overlap.
+
+### Related chrome
+
+- Agent-team panel (#91) — roster + soft DM into swarm members
+- `/tasks` + statusline pill (#87) — shell/background task hub (orthogonal to multitask workers)
+
+---
+
 ## The /loop Command
 
 `/loop` runs a prompt on a recurring interval. It is useful for polling tasks, periodic checks, and continuous monitoring.

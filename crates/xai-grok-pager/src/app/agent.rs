@@ -474,13 +474,15 @@ pub struct GoalDisplayState {
     pub elapsed_floor_ms: u64,
 }
 impl GoalDisplayState {
-    /// Minimal state for tests that only need a present goal (e.g. occluder
-    /// gating); field values are representative, not load-bearing.
-    #[cfg(test)]
-    pub(crate) fn test_stub() -> Self {
+    /// Local Face `/goal` session objective (no shell `GoalUpdated` yet).
+    pub(crate) fn from_objective(objective: String) -> Self {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
         Self {
-            goal_id: "g-test".into(),
-            objective: "test goal".into(),
+            goal_id: format!("face-{nanos:x}"),
+            objective,
             status: GoalDisplayStatus::Active,
             phase: GoalDisplayPhase::Executing,
             token_budget: None,
@@ -498,7 +500,7 @@ impl GoalDisplayState {
             live_context_pct: None,
             live_turn_count: None,
             live_tool_call_count: None,
-            last_event: None,
+            last_event: Some("goal_set".into()),
             last_event_detail: None,
             last_event_timestamp: None,
             token_baseline: 0,
@@ -515,6 +517,13 @@ impl GoalDisplayState {
             received_at: std::time::Instant::now(),
             elapsed_floor_ms: 0,
         }
+    }
+
+    /// Minimal state for tests that only need a present goal (e.g. occluder
+    /// gating); field values are representative, not load-bearing.
+    #[cfg(test)]
+    pub(crate) fn test_stub() -> Self {
+        Self::from_objective("test goal".into())
     }
     /// Return real-time token usage by combining the pager's context state
     /// (which updates on every streamed chunk) with the goal baseline and
@@ -627,6 +636,10 @@ pub struct AgentSession {
     /// Kept in sync wherever the pager applies the mode; mutually exclusive with
     /// `yolo_mode` (yolo wins).
     pub(crate) auto_mode: bool,
+    /// Whether Accept-Edits mode is active (file edits auto-allow; shell still
+    /// prompts). Display-only mirror of `ui.permission_mode == "accept-edits"`.
+    /// Cleared under yolo / auto / plan. Read via `is_accept_edits()`.
+    pub(crate) accept_edits_mode: bool,
     /// Prompt history for the current session, fetched from ACP
     /// (`x.ai/prompt_history` scoped via `filter_session_id`). Most-recent-first.
     /// Fetched on session create/load; prompts sent in this session are
@@ -757,6 +770,11 @@ impl AgentSession {
     pub fn is_auto(&self) -> bool {
         self.auto_mode
     }
+    /// Whether Accept-Edits mode is active. Prefer this over direct field
+    /// access. Cleared when yolo or auto is on.
+    pub fn is_accept_edits(&self) -> bool {
+        self.accept_edits_mode
+    }
     /// Test-only setter for `yolo_mode` (the field is private; production toggles
     /// it via the permission-mode facade). Available to sibling crates' test
     /// builds through the test-only helpers.
@@ -768,6 +786,11 @@ impl AgentSession {
     #[cfg(any(test, feature = "test-support"))]
     pub(crate) fn set_auto_mode_for_test(&mut self, on: bool) {
         self.auto_mode = on;
+    }
+    /// Test-only setter for `accept_edits_mode`.
+    #[cfg(any(test, feature = "test-support"))]
+    pub(crate) fn set_accept_edits_mode_for_test(&mut self, on: bool) {
+        self.accept_edits_mode = on;
     }
     /// Process an ACP session update. Returns true if scrollback was modified.
     pub fn handle_update(
@@ -994,6 +1017,7 @@ mod tests {
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,

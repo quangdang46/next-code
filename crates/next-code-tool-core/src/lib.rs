@@ -41,6 +41,32 @@ pub struct AskUserQuestionInputRequest {
     pub response_tx: tokio::sync::oneshot::Sender<Result<Value, String>>,
 }
 
+/// Blocking Best-of-N winner pick (`mode=show`) → Face ACP reverse request.
+///
+/// `candidates` is JSON matching `Vec<BestOfNCandidateUi>`. `response` matches
+/// `BestOfNPickExtResponse`.
+pub struct BestOfNPickInputRequest {
+    pub request_id: String,
+    pub session_id: String,
+    pub run_id: String,
+    pub tool_call_id: String,
+    pub recommended_index: usize,
+    pub selection_reason: String,
+    pub candidates: Value,
+    pub response_tx: tokio::sync::oneshot::Sender<Result<Value, String>>,
+}
+
+/// Blocking ExitPlanMode bridge request (daemon tool → client / Face).
+///
+/// Response JSON matches `ExitPlanModeExtResponse` (or an error string via `Err`).
+pub struct ExitPlanModeInputRequest {
+    pub request_id: String,
+    pub session_id: String,
+    pub tool_call_id: String,
+    pub plan_content: Option<String>,
+    pub response_tx: tokio::sync::oneshot::Sender<Result<Value, String>>,
+}
+
 #[derive(Clone)]
 pub struct ToolContext {
     pub session_id: String,
@@ -50,6 +76,8 @@ pub struct ToolContext {
     pub stdin_request_tx: Option<tokio::sync::mpsc::UnboundedSender<StdinInputRequest>>,
     pub ask_user_question_tx:
         Option<tokio::sync::mpsc::UnboundedSender<AskUserQuestionInputRequest>>,
+    pub best_of_n_pick_tx: Option<tokio::sync::mpsc::UnboundedSender<BestOfNPickInputRequest>>,
+    pub exit_plan_mode_tx: Option<tokio::sync::mpsc::UnboundedSender<ExitPlanModeInputRequest>>,
     pub graceful_shutdown_signal: Option<InterruptSignal>,
     pub background_tool_signal: Option<InterruptSignal>,
     pub execution_mode: ToolExecutionMode,
@@ -79,6 +107,8 @@ impl Default for ToolContext {
             working_dir: None,
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            best_of_n_pick_tx: None,
+            exit_plan_mode_tx: None,
             graceful_shutdown_signal: None,
             background_tool_signal: None,
             execution_mode: ToolExecutionMode::AgentTurn,
@@ -97,6 +127,8 @@ impl ToolContext {
             working_dir: self.working_dir.clone(),
             stdin_request_tx: self.stdin_request_tx.clone(),
             ask_user_question_tx: self.ask_user_question_tx.clone(),
+            best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
+            exit_plan_mode_tx: self.exit_plan_mode_tx.clone(),
             graceful_shutdown_signal: self.graceful_shutdown_signal.clone(),
             background_tool_signal: self.background_tool_signal.clone(),
             execution_mode: self.execution_mode,

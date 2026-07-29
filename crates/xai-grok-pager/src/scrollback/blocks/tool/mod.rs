@@ -448,6 +448,9 @@ impl ToolCallBlock {
             "search_replace" | "edit" | "apply_patch" | "strreplace" => {
                 ToolCallBlock::Edit(EditToolCallBlock::new(summary, Vec::new()))
             }
+            "propose_edit" | "propose_hashline" | "propose_write" => ToolCallBlock::Edit(
+                EditToolCallBlock::new(summary, Vec::new()).with_prefix("Proposed "),
+            ),
             "write" => ToolCallBlock::Edit(
                 EditToolCallBlock::new(summary, Vec::new()).with_prefix("Creating "),
             ),
@@ -718,5 +721,23 @@ mod tests {
             ToolCallBlock::Read(ReadToolCallBlock::new("/x/skills/deploy/SKILL.md")).label_kind(),
             Some(VerbGroupKind::Skill)
         );
+    }
+
+    #[test]
+    fn from_name_propose_tools_use_proposed_prefix() {
+        for name in ["propose_edit", "propose_write", "propose_hashline"] {
+            match ToolCallBlock::from_name(name, "src/a.rs") {
+                ToolCallBlock::Edit(b) => assert_eq!(b.prefix, "Proposed "),
+                other => panic!("expected Edit for {name}, got {other:?}"),
+            }
+        }
+        match ToolCallBlock::from_name("edit", "src/a.rs") {
+            ToolCallBlock::Edit(b) => assert_eq!(b.prefix, "Edit "),
+            other => panic!("expected Edit, got {other:?}"),
+        }
+        match ToolCallBlock::from_name("write", "src/a.rs") {
+            ToolCallBlock::Edit(b) => assert_eq!(b.prefix, "Creating "),
+            other => panic!("expected Creating write, got {other:?}"),
+        }
     }
 }

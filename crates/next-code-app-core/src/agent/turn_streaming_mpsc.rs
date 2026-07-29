@@ -568,6 +568,7 @@ impl Agent {
                             } else {
                                 None
                             },
+                            metadata: None,
                         });
                         sdk_tool_results.insert(tool_use_id, (content, is_error));
                     }
@@ -759,6 +760,8 @@ impl Agent {
                             working_dir: self.working_dir().map(PathBuf::from),
                             stdin_request_tx: self.stdin_request_tx.clone(),
                             ask_user_question_tx: self.ask_user_question_tx.clone(),
+                            best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
+                            exit_plan_mode_tx: self.exit_plan_mode_tx.clone(),
                             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                             background_tool_signal: Some(self.background_tool_signal.clone()),
                             execution_mode: ToolExecutionMode::AgentTurn,
@@ -1152,6 +1155,7 @@ impl Agent {
                         name: tc.name.clone(),
                         output: error_msg.clone(),
                         error: Some(error_msg.clone()),
+                    metadata: None,
                     });
                     self.add_message(
                         Role::User,
@@ -1219,6 +1223,8 @@ impl Agent {
                     working_dir: self.working_dir().map(PathBuf::from),
                     stdin_request_tx: self.stdin_request_tx.clone(),
                     ask_user_question_tx: self.ask_user_question_tx.clone(),
+                    best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
+                    exit_plan_mode_tx: self.exit_plan_mode_tx.clone(),
                     graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
                     background_tool_signal: Some(self.background_tool_signal.clone()),
                     execution_mode: ToolExecutionMode::AgentTurn,
@@ -1363,6 +1369,7 @@ impl Agent {
                                 name: tc.name.clone(),
                                 output: output.output.clone(),
                                 error: None,
+                                metadata: output.metadata.clone(),
                             });
 
                             let side_pane_images =
@@ -1395,6 +1402,7 @@ impl Agent {
                                 name: tc.name.clone(),
                                 output: error_msg.clone(),
                                 error: Some(error_msg.clone()),
+                            metadata: None,
                             });
 
                             self.add_message_with_duration(
@@ -1433,6 +1441,7 @@ impl Agent {
                         } else {
                             None
                         },
+                        metadata: None,
                     });
 
                     self.add_message_with_duration(
@@ -1497,6 +1506,7 @@ impl Agent {
                         name: tc.name.clone(),
                         output: bg_msg.clone(),
                         error: None,
+                    metadata: None,
                     });
 
                     self.add_message_with_duration(

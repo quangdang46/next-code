@@ -150,6 +150,7 @@ fn open_fork_question(app: &mut AppView, directive: Option<String>) -> Vec<Effec
         id: None,
         options,
         multi_select: Some(false),
+    header: None,
     };
     let agent = app.agents.get_mut(&id).expect("agent present (re-borrow)");
     let stashed = agent.prompt.stash();
@@ -396,6 +397,8 @@ fn build_fork_placeholder(
             next_queue_id: 0,
             yolo_mode: app.default_yolo,
             auto_mode: inherit_auto_mode(app),
+            accept_edits_mode: app.current_ui.permission_mode.as_deref()
+                == Some("accept-edits"),
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,

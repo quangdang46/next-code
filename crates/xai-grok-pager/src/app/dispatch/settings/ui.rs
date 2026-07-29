@@ -1,5 +1,7 @@
 //! Settings UI: command palette, settings modal, toggles, resets, and rollback.
 
+use std::path::PathBuf;
+
 use super::setters::{
     pr13_effective_default, set_ask_user_question_timeout_enabled_inner, set_auto_dark_theme_inner,
     set_auto_light_theme_inner, set_auto_update_inner, set_collapsed_edit_blocks_inner,
@@ -9,7 +11,8 @@ use super::setters::{
     set_info_float_inner, set_invert_scroll_inner, set_keep_text_selection_inner,
     set_max_thoughts_width_inner, set_multiline_mode, set_page_flip_on_send_inner,
     set_prompt_suggestions_inner, set_remember_tool_approvals_inner, set_render_mermaid_inner,
-    set_respect_manual_folds_inner, set_side_panel_output_mode_inner, set_screen_mode_inner,
+    set_render_mermaid_target_inner, set_respect_manual_folds_inner,
+    set_side_panel_output_mode_inner, set_screen_mode_inner,
     set_scroll_lines_inner,
     set_scroll_mode_inner, set_scroll_speed_inner, set_show_thinking_blocks_inner,
     set_show_tips_inner, set_simple_mode_inner, set_status_line_bool_inner,
@@ -408,6 +411,33 @@ pub(in crate::app::dispatch) fn dispatch_open_experimental(app: &mut AppView) ->
 
     let state = Box::new(ExperimentalModalState::load_from_config());
     agent.active_modal = Some(ActiveModal::ExperimentalFeatures { state });
+    vec![]
+}
+
+/// Open Face `/diff` review modal (Claude DiffDialog parity).
+pub(in crate::app::dispatch) fn dispatch_open_diff_modal(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::diff_modal::DiffModalState;
+    use crate::views::modal::ActiveModal;
+
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+
+    if matches!(&agent.active_modal, Some(ActiveModal::DiffReview { .. })) {
+        agent.active_modal = None;
+        return vec![];
+    }
+
+    let cwd = if agent.session.cwd.as_os_str().is_empty() {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    } else {
+        agent.session.cwd.clone()
+    };
+    let state = Box::new(DiffModalState::build(&agent.scrollback, &cwd));
+    agent.active_modal = Some(ActiveModal::DiffReview { state });
     vec![]
 }
 
@@ -924,6 +954,8 @@ pub(in crate::app::dispatch) fn action_for_reset(
         ("status_line.enabled", SettingValue::Bool(b)) => Some(Action::SetStatusLineEnabled(*b)),
         ("status_line.mode", SettingValue::Bool(b)) => Some(Action::SetStatusLineMode(*b)),
         ("status_line.model", SettingValue::Bool(b)) => Some(Action::SetStatusLineModel(*b)),
+        ("status_line.reasoning", SettingValue::Bool(b)) => Some(Action::SetStatusLineReasoning(*b)),
+        ("status_line.run_state", SettingValue::Bool(b)) => Some(Action::SetStatusLineRunState(*b)),
         ("status_line.context", SettingValue::Bool(b)) => Some(Action::SetStatusLineContext(*b)),
         ("status_line.cwd", SettingValue::Bool(b)) => Some(Action::SetStatusLineCwd(*b)),
         ("status_line.git", SettingValue::Bool(b)) => Some(Action::SetStatusLineGit(*b)),
@@ -1174,6 +1206,12 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
         ("status_line.model", SettingValue::Bool(b)) => {
             set_status_line_bool_inner(app, |c, v| c.model = v, *b)
         }
+        ("status_line.reasoning", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.reasoning = v, *b)
+        }
+        ("status_line.run_state", SettingValue::Bool(b)) => {
+            set_status_line_bool_inner(app, |c, v| c.run_state = v, *b)
+        }
         ("status_line.context", SettingValue::Bool(b)) => {
             set_status_line_bool_inner(app, |c, v| c.context = v, *b)
         }
@@ -1362,6 +1400,13 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
             if let Some(kind) = crate::appearance::RenderMermaid::from_canonical(s) {
                 set_render_mermaid_inner(kind);
             }
+        }
+        // render_mermaid_target: restore cache + UiConfig mirrors.
+        ("render_mermaid_target", SettingValue::Enum(s)) => {
+            set_render_mermaid_target_inner(
+                app,
+                crate::settings::canonical_render_mermaid_target(Some(s)),
+            );
         }
         // hunk_tracker_mode: restore the in-memory ui mirror.
         ("hunk_tracker_mode", SettingValue::Enum(s)) => {

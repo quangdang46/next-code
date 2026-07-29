@@ -918,6 +918,9 @@ pub(super) fn action_for_enum_commit(key: SettingKey, choice: &'static str) -> O
             "auto" => Some(Action::SetPermissionMode(
                 crate::app::actions::PermissionModeKind::Auto,
             )),
+            "accept-edits" => Some(Action::SetPermissionMode(
+                crate::app::actions::PermissionModeKind::AcceptEdits,
+            )),
             "ask" => Some(Action::SetPermissionMode(
                 crate::app::actions::PermissionModeKind::Ask,
             )),

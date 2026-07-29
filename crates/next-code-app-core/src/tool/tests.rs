@@ -87,14 +87,15 @@ async fn test_discover_tools_not_registered_when_sponsors_disabled() {
 async fn subagent_tool_is_not_registered() {
     let provider: Arc<dyn Provider> = Arc::new(MockProvider);
     let registry = Registry::new(provider).await;
+    let names = registry.tool_names().await;
 
     assert!(
-        !registry
-            .tool_names()
-            .await
-            .iter()
-            .any(|name| name == "subagent"),
-        "the deprecated direct subagent tool must not be exposed; use swarm instead"
+        !names.iter().any(|name| name == "subagent"),
+        "the deprecated direct subagent tool must not be exposed; use swarm/Agent instead"
+    );
+    assert!(
+        names.iter().any(|name| name == "Agent"),
+        "Claude-compatible Agent façade must be registered"
     );
 }
 
@@ -171,11 +172,11 @@ async fn first_party_tool_definitions_include_optional_intent_explicitly() {
 
 #[test]
 fn test_resolve_tool_name_oauth_aliases() {
-    assert_eq!(Registry::resolve_tool_name("file_grep"), "grep");
+    assert_eq!(Registry::resolve_tool_name("file_grep"), "ffs grep");
     assert_eq!(Registry::resolve_tool_name("file_read"), "read");
     assert_eq!(Registry::resolve_tool_name("file_write"), "write");
     assert_eq!(Registry::resolve_tool_name("file_edit"), "edit");
-    assert_eq!(Registry::resolve_tool_name("file_glob"), "glob");
+    assert_eq!(Registry::resolve_tool_name("file_glob"), "ffs glob");
     assert_eq!(Registry::resolve_tool_name("shell_exec"), "bash");
     assert_eq!(Registry::resolve_tool_name("shell"), "bash");
     assert_eq!(Registry::resolve_tool_name("read_file"), "read");
@@ -183,13 +184,18 @@ fn test_resolve_tool_name_oauth_aliases() {
     assert_eq!(Registry::resolve_tool_name("edit_file"), "edit");
     assert_eq!(Registry::resolve_tool_name("hashline_edit"), "edit");
     assert_eq!(Registry::resolve_tool_name("apply_patch"), "edit");
-    assert_eq!(Registry::resolve_tool_name("task_runner"), "subagent");
-    assert_eq!(Registry::resolve_tool_name("task"), "subagent");
+    assert_eq!(Registry::resolve_tool_name("task_runner"), "Agent");
+    assert_eq!(Registry::resolve_tool_name("task"), "Agent");
+    assert_eq!(Registry::resolve_tool_name("Task"), "Agent");
     assert_eq!(Registry::resolve_tool_name("launch"), "open");
     assert_eq!(Registry::resolve_tool_name("todo_read"), "todo");
     assert_eq!(Registry::resolve_tool_name("todo_write"), "todo");
     assert_eq!(Registry::resolve_tool_name("todoread"), "todo");
     assert_eq!(Registry::resolve_tool_name("todowrite"), "todo");
+    assert_eq!(Registry::resolve_tool_name("task_create"), "TaskCreate");
+    assert_eq!(Registry::resolve_tool_name("task_get"), "TaskGet");
+    assert_eq!(Registry::resolve_tool_name("task_list"), "TaskList");
+    assert_eq!(Registry::resolve_tool_name("task_update"), "TaskUpdate");
     assert_eq!(Registry::resolve_tool_name("bash"), "bash");
     assert_eq!(Registry::resolve_tool_name("grep"), "grep");
     assert_eq!(Registry::resolve_tool_name("functions.bash"), "bash");
@@ -209,7 +215,10 @@ async fn test_batch_resolves_function_namespaced_tools() {
         working_dir: Some(std::env::temp_dir()),
         stdin_request_tx: None,
         ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+        background_tool_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
@@ -247,7 +256,10 @@ async fn test_batch_rejects_function_namespaced_batch_recursion() {
         working_dir: Some(std::env::temp_dir()),
         stdin_request_tx: None,
         ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+        background_tool_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
@@ -281,7 +293,10 @@ async fn test_batch_resolves_oauth_names() {
         working_dir: Some(temp_dir),
         stdin_request_tx: None,
         ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+        background_tool_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
@@ -312,7 +327,10 @@ async fn registry_execute_enforces_session_tool_policy_after_alias_resolution() 
         working_dir: Some(temp_dir.clone()),
         stdin_request_tx: None,
         ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+        background_tool_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
@@ -370,7 +388,10 @@ async fn registry_execute_pre_tool_hook_blocks_and_allows() {
         working_dir: Some(std::env::temp_dir()),
         stdin_request_tx: None,
         ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+        background_tool_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
@@ -721,7 +742,10 @@ async fn unknown_tool_error_lists_available_tools_and_suggestions() {
         working_dir: None,
         stdin_request_tx: None,
         ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+        background_tool_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,

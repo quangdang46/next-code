@@ -42,43 +42,77 @@ pub(super) fn dispatch_enter_plan_mode(
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];
     };
-    let Some(agent) = app.agents.get_mut(&id) else {
-        return vec![];
+    let in_plan = {
+        let Some(agent) = app.agents.get(&id) else {
+            return vec![];
+        };
+        agent.plan_mode_pending.unwrap_or(agent.plan_mode_active)
     };
-
-    let in_plan = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
     if in_plan {
-        app.show_toast("Already in plan mode. Use /view-plan to view the current plan.");
-        return vec![];
+        // Claude Code: already in plan → show plan; with a description, steer
+        // the model to write plan.md without re-entering mode.
+        let Some(desc) = description else {
+            return dispatch_show_plan(app);
+        };
+        let Some(agent) = app.agents.get_mut(&id) else {
+            return vec![];
+        };
+        let steered = wrap_plan_mode_prompt(&desc);
+        let skill_token_ranges = agent
+            .prompt
+            .slash_controller
+            .recognized_token_ranges(&steered, &agent.session.models);
+        agent
+            .session
+            .enqueue_prompt_with_skill_tokens(steered, skill_token_ranges);
+        let drain = maybe_drain_queue(agent);
+        note_peek_page_flip(app, id, drain.page_flip_entry);
+        return drain.effects;
     }
 
-    let agent = app.agents.get_mut(&id).unwrap();
-    let Some(session_id) = agent.session.session_id.clone() else {
-        agent.show_toast("No active session");
-        return vec![];
+    let (session_id, should_stash) = {
+        let Some(agent) = app.agents.get_mut(&id) else {
+            return vec![];
+        };
+        let Some(session_id) = agent.session.session_id.clone() else {
+            agent.show_toast("No active session");
+            return vec![];
+        };
+        (session_id, agent.pre_plan_mode.is_none())
     };
 
+    // Stash pre-plan mode (same contract as set_plan_mode).
+    if should_stash {
+        let current = match app.current_ui.permission_mode.as_deref() {
+            Some("ask") => xai_grok_tools::types::SessionMode::Ask,
+            _ => xai_grok_tools::types::SessionMode::Default,
+        };
+        app.agents.get_mut(&id).unwrap().pre_plan_mode = Some(current);
+    }
+
     // Set optimistic pending state (same pattern as dispatch_cycle_mode).
+    let agent = app.agents.get_mut(&id).unwrap();
     agent.plan_mode_pending = Some(true);
     tracing::info!("Plan mode entered via /plan slash command");
+    agent.show_toast(
+        "Plan mode on — explore, write plan.md, then ExitPlanMode for approval.",
+    );
 
     let mode_id = acp::SessionModeId::new("plan");
 
     if let Some(desc) = description {
+        let steered = wrap_plan_mode_prompt(&desc);
         // Enqueue and drain: maybe_drain_queue does all synchronous turn
         // setup (scrollback, start_turn, prompt_id) and returns a SendPrompt.
         // We combine it with the mode switch into a single sequential effect
         // so the mode switch completes before the prompt is sent.
-        // The description is a plain prompt: capture composer-recognized
-        // tokens like the normal submit path (offsets recomputed against
-        // `desc` since the leading `/plan ` was stripped).
         let skill_token_ranges = agent
             .prompt
             .slash_controller
-            .recognized_token_ranges(&desc, &agent.session.models);
+            .recognized_token_ranges(&steered, &agent.session.models);
         agent
             .session
-            .enqueue_prompt_with_skill_tokens(desc, skill_token_ranges);
+            .enqueue_prompt_with_skill_tokens(steered, skill_token_ranges);
         let drain = maybe_drain_queue(agent);
         note_peek_page_flip(app, id, drain.page_flip_entry);
         let mut effects = Vec::with_capacity(1);
@@ -120,6 +154,16 @@ pub(super) fn dispatch_enter_plan_mode(
     }
 }
 
+/// Steer `/plan <desc>` like Claude Code: write plan.md then ExitPlanMode.
+fn wrap_plan_mode_prompt(description: &str) -> String {
+    format!(
+        "[Plan mode] {description}\n\n\
+Explore the codebase as needed, write a clear plan to `plan.md` in the project \
+working directory (or the session plan path), then call ExitPlanMode when ready \
+for user approval. Do not implement until the plan is approved."
+    )
+}
+
 /// Set plan mode (on / off). PAGER-owned + ACP-mediated, per-session.
 ///
 /// Optimistic flow: captures effective state (`pending.or(active)`),
@@ -138,54 +182,114 @@ pub(super) fn set_plan_mode(
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];
     };
+    // Snapshot before agent mut borrow (prePlanMode stash).
+    let ui_perm = app.current_ui.permission_mode.clone();
+
+    enum PlanModeOutcome {
+        Idempotent,
+        Transition {
+            session_id: acp::SessionId,
+            mode_id: acp::SessionModeId,
+            new: bool,
+        },
+    }
+
+    let outcome = {
+        let Some(agent) = app.agents.get_mut(&id) else {
+            return vec![];
+        };
+
+        let Some(session_id) = agent.session.session_id.clone() else {
+            agent.show_toast("No active session");
+            return vec![];
+        };
+
+        // Effective state: prefer optimistic pending over confirmed
+        // active. Mirrors `dispatch_cycle_mode`'s `in_plan` read so
+        // rapid toggles don't double-send.
+        let prev = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
+        let new = kind.to_bool();
+
+        // Idempotent: toast but skip the ACP round-trip — unless we are
+        // turning OFF while pending is already false but plan_mode_active
+        // is still true (approve path: pending=false, active=true).
+        if prev == new && (new || !agent.plan_mode_active) {
+            PlanModeOutcome::Idempotent
+        } else {
+            // Optimistic mutation: pager-side pending flag, then UI feedback,
+            // then effect. The shell's `CurrentModeUpdate` broadcast will
+            // confirm + clear `plan_mode_pending` via `detect_plan_mode_change`.
+            if new {
+                // Stash pre-plan mode on enter (only if not already stashed).
+                if agent.pre_plan_mode.is_none() {
+                    let current = match ui_perm.as_deref() {
+                        Some("ask") => xai_grok_tools::types::SessionMode::Ask,
+                        _ => xai_grok_tools::types::SessionMode::Default,
+                    };
+                    agent.pre_plan_mode = Some(current);
+                }
+            }
+            agent.plan_mode_pending = Some(new);
+
+            // OFF restores prePlanMode when available; otherwise Default.
+            let mode_id = acp::SessionModeId::new(if new {
+                xai_grok_tools::types::SessionMode::Plan.as_id()
+            } else {
+                agent
+                    .pre_plan_mode
+                    .take()
+                    .unwrap_or(xai_grok_tools::types::SessionMode::Default)
+                    .as_id()
+            });
+            PlanModeOutcome::Transition {
+                session_id,
+                mode_id,
+                new,
+            }
+        }
+    };
+
+    match outcome {
+        PlanModeOutcome::Idempotent => {
+            app.show_toast(&plan_mode_toast(kind));
+            vec![]
+        }
+        PlanModeOutcome::Transition {
+            session_id,
+            mode_id,
+            new,
+        } => {
+            refresh_open_settings_modals(app);
+            app.show_toast(&plan_mode_toast(kind));
+            tracing::info!(
+                target: "settings",
+                key = "plan_mode",
+                value = new,
+                "setting changed",
+            );
+            vec![Effect::SetSessionMode {
+                session_id,
+                mode_id,
+            }]
+        }
+    }
+}
+
+/// Open `plan.md` in `$EDITOR` via `SuspendForEditor` plumbing.
+pub(super) fn dispatch_open_plan_in_editor(app: &mut AppView) -> Vec<Effect> {
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
     let Some(agent) = app.agents.get_mut(&id) else {
         return vec![];
     };
-
-    let Some(session_id) = agent.session.session_id.clone() else {
+    let Some(path) = agent.plan_file_path() else {
         agent.show_toast("No active session");
         return vec![];
     };
-
-    // Effective state: prefer optimistic pending over confirmed
-    // active. Mirrors `dispatch_cycle_mode`'s `in_plan` read so
-    // rapid toggles don't double-send.
-    let prev = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
-    let new = kind.to_bool();
-
-    // Idempotent: toast but skip the ACP round-trip.
-    if prev == new {
-        app.show_toast(&plan_mode_toast(kind));
-        return vec![];
-    }
-
-    // Optimistic mutation: pager-side pending flag, then UI feedback,
-    // then effect. The shell's `CurrentModeUpdate` broadcast will
-    // confirm + clear `plan_mode_pending` via `detect_plan_mode_change`.
-    agent.plan_mode_pending = Some(new);
-    refresh_open_settings_modals(app);
-    app.show_toast(&plan_mode_toast(kind));
-
-    tracing::info!(
-        target: "settings",
-        key = "plan_mode",
-        value = new,
-        "setting changed",
-    );
-
-    // OFF targets `SessionMode::Default`, not the user's prior mode.
-    // If the user was in `Ask` (shell-injection only), that preference
-    // is silently dropped. See `PLAN_MODE_CHOICES` in `settings/defs.rs`.
-    let mode_id = acp::SessionModeId::new(if new {
-        xai_grok_tools::types::SessionMode::Plan.as_id()
-    } else {
-        xai_grok_tools::types::SessionMode::Default.as_id()
-    });
-
-    vec![Effect::SetSessionMode {
-        session_id,
-        mode_id,
-    }]
+    agent.active_modal = None;
+    app.pending_editor_path = Some(path);
+    vec![]
 }
 
 /// Format the `Plan mode` toast. Non-destructive in both directions
@@ -262,10 +366,15 @@ pub(super) fn inherit_auto_mode(app: &AppView) -> bool {
 /// "auto" indicator correct regardless of which seam applied the mode.
 pub(super) fn sync_active_auto_flag(app: &mut AppView) {
     let is_auto = app.current_ui.permission_mode.as_deref() == Some("auto");
+    let is_accept_edits =
+        app.current_ui.permission_mode.as_deref() == Some("accept-edits");
     if let ActiveView::Agent(id) = app.active_view
         && let Some(agent) = app.agents.get_mut(&id)
     {
-        agent.session.auto_mode = effective_auto(agent.session.is_yolo(), is_auto);
+        let yolo = agent.session.is_yolo();
+        agent.session.auto_mode = effective_auto(yolo, is_auto);
+        // Accept-edits is display-only and yields to yolo / auto.
+        agent.session.accept_edits_mode = !yolo && !is_auto && is_accept_edits;
     }
     // Keep `/auto` feature-gate visibility in lockstep across slash surfaces.
     app.sync_permission_mode_slash_gate();
@@ -355,6 +464,7 @@ fn capture_prev_permission_canonical(app: &AppView, prev_yolo: bool) -> &'static
         match app.current_ui.permission_mode.as_deref() {
             Some("default") => "default",
             Some("auto") => "auto",
+            Some("accept-edits") => "accept-edits",
             _ => "ask",
         }
     }
@@ -488,6 +598,9 @@ pub(super) fn permission_mode_toast(kind: crate::app::actions::PermissionModeKin
     match kind {
         PermissionModeKind::AlwaysApprove => yolo_toast(true),
         PermissionModeKind::Auto => "\u{2713} Permission mode: Auto (classifier)".to_string(),
+        PermissionModeKind::AcceptEdits => {
+            "\u{2713} Permission mode: Accept edits (file edits auto-run)".to_string()
+        }
         PermissionModeKind::Ask => "\u{2713} Permission mode: Ask".to_string(),
         PermissionModeKind::Default => "\u{2713} Permission mode: Default".to_string(),
     }
@@ -522,6 +635,98 @@ pub(super) fn dispatch_toggle_yolo(app: &mut AppView) -> Vec<Effect> {
     };
     let new = !agent.session.yolo_mode;
     set_yolo_mode(app, new)
+}
+
+/// Alt+T — Claude thinking-toggle muscle memory for Face's multi-level effort.
+///
+/// - Model offers `none`: toggle off (`none`) ↔ previous / default on level.
+/// - Otherwise: cycle the model's offered effort list (Grok menus omit `none`).
+pub(super) fn dispatch_toggle_thinking_effort(app: &mut AppView) -> Vec<Effect> {
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    let Some(model_id) = agent.session.models.current.clone() else {
+        agent.show_toast("No active model");
+        return vec![];
+    };
+    let options = agent.session.models.reasoning_effort_options();
+    let current = agent.session.models.reasoning_effort;
+    let Some((next, toast)) =
+        plan_thinking_effort_toggle(current, &options, &mut agent.thinking_effort_stash)
+    else {
+        agent.show_toast("This model does not support reasoning effort");
+        return vec![];
+    };
+    agent.show_toast(&toast);
+    if current == Some(next) {
+        return vec![];
+    }
+    let Some(session_id) = agent.session.session_id.clone() else {
+        agent.session.deferred_model_switch = Some((model_id, Some(next)));
+        return vec![];
+    };
+    let prev_model_id = agent.session.models.current.clone();
+    agent.session.model_switch_pending = true;
+    vec![Effect::SwitchModel {
+        agent_id: id,
+        session_id,
+        model_id,
+        effort: Some(next),
+        prev_model_id,
+    }]
+}
+
+/// Pure Alt+T planner. `None` means the model has no effort menu.
+pub(crate) fn plan_thinking_effort_toggle(
+    current: Option<xai_grok_shell::sampling::types::ReasoningEffort>,
+    options: &[xai_grok_shell::sampling::types::ReasoningEffortOption],
+    stash: &mut Option<xai_grok_shell::sampling::types::ReasoningEffort>,
+) -> Option<(xai_grok_shell::sampling::types::ReasoningEffort, String)> {
+    use xai_grok_shell::sampling::types::ReasoningEffort;
+
+    if options.is_empty() {
+        return None;
+    }
+    let offers_none = options.iter().any(|o| o.value == ReasoningEffort::None);
+    if offers_none {
+        let is_off = current == Some(ReasoningEffort::None);
+        if is_off {
+            let restore = stash
+                .take()
+                .filter(|e| *e != ReasoningEffort::None)
+                .filter(|e| options.iter().any(|o| o.value == *e))
+                .or_else(|| {
+                    options
+                        .iter()
+                        .find(|o| o.default && o.value != ReasoningEffort::None)
+                        .map(|o| o.value)
+                })
+                .or_else(|| {
+                    options
+                        .iter()
+                        .find(|o| o.value != ReasoningEffort::None)
+                        .map(|o| o.value)
+                })
+                .unwrap_or(ReasoningEffort::High);
+            return Some((restore, format!("Thinking on ({restore})")));
+        }
+        if let Some(c) = current.filter(|e| *e != ReasoningEffort::None) {
+            *stash = Some(c);
+        }
+        return Some((ReasoningEffort::None, "Thinking off".into()));
+    }
+
+    // No `none` in the menu (typical Grok fallback): cycle offered levels.
+    let levels: Vec<_> = options.iter().map(|o| o.value).collect();
+    let next = match current.and_then(|c| levels.iter().position(|&v| v == c)) {
+        Some(idx) => levels[(idx + 1) % levels.len()],
+        // Unknown / unset → land on the first offered level (not wrap from last).
+        None => levels[0],
+    };
+    Some((next, format!("Effort: {next}")))
 }
 
 /// Shift+Tab mode cycle from the agent chat view: the shared cycle body plus
@@ -627,7 +832,11 @@ pub(super) fn active_agent_plan_nudge_state(app: &AppView) -> (bool, bool) {
     }
 }
 
-/// Cycle session mode: Normal → Plan → Always-Approve → Normal.
+/// Cycle session mode: Normal → Accept-Edits → Plan → Auto → Always-Approve → Normal.
+///
+/// Matches Claude Code Shift+Tab order (`default → acceptEdits → plan → auto →
+/// bypassPermissions`), mapped onto Face labels. When the plan-mode nudge is
+/// showing, Normal jumps straight to Plan (one Shift+Tab promise).
 ///
 /// Uses `plan_mode_pending` (optimistic) when available, falling back to
 /// `plan_mode_active` (confirmed by ACP). This prevents double-sends when
@@ -641,35 +850,55 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
     // the live `&mut agent`. This is the same predicate (enabling = true here).
     let yolo_locked = app.yolo_policy_block;
     // Feature gate (default ON): when the auto permission mode is disabled, the
-    // Shift+Tab cycle skips Auto entirely (legacy Normal→Plan→Always-Approve→
+    // Shift+Tab cycle skips Auto entirely (legacy Normal→…→Always-Approve→
     // Normal), so Auto is never reachable from the cycle. Resolved once at
     // startup into `app.auto_mode_gate`.
     let auto_gate = app.auto_mode_gate;
+    let in_accept_edits =
+        app.current_ui.permission_mode.as_deref() == Some("accept-edits");
     let Some(agent) = app.agents.get_mut(&id) else {
         return vec![];
     };
     // Per-session (symmetric with the `in_yolo` reads below), not the global UI
     // mirror, so the cycle and the prompt "auto" indicator agree per agent.
     let in_auto = agent.session.is_auto();
+    let nudge_showing =
+        agent.ephemeral_tip.current_key() == Some(crate::tips::plan_nudge::PLAN_NUDGE_KEY);
     let Some(session_id) = agent.session.session_id.clone() else {
         // No session yet (Shift+Tab forwarded from the welcome screen or a
         // fresh tab): cycle the mode locally and stash the ACP push in
         // `deferred_session_mode` — consumed by the `SessionCreated`
         // handlers, same mechanism as the dashboard's staged plan mode.
-        // Cycle: Normal → Plan → Auto → Always-Approve → Normal (Auto skipped
-        // when always-approve is the only remaining arm under a yolo pin).
+        // Cycle: Normal → Accept-Edits → Plan → Auto → Always-Approve → Normal
+        // (Accept-Edits skipped when plan nudge is showing; Auto skipped when
+        // the auto gate is off).
         // Each arm yields the canonical permission mode to persist (`None`
-        // when it is untouched, i.e. Normal → Plan); see the push below.
+        // when it is untouched, i.e. Accept-Edits/Normal → Plan); see the push below.
         let in_plan = agent.plan_mode_pending.unwrap_or(agent.plan_mode_active);
         let in_yolo = agent.session.is_yolo();
         let persist_canonical: Option<&'static str> = match (in_plan, in_auto, in_yolo) {
-            // Normal → Plan
+            // Normal → Accept-Edits (or Plan when nudge / already on accept-edits)
             (false, false, false) => {
-                agent.plan_mode_pending = Some(true);
-                agent.deferred_session_mode = Some(xai_grok_tools::types::SessionMode::Plan);
-                agent.show_mode_switch_banner("Plan");
-                tracing::info!("Mode cycle (pre-session): Normal → Plan");
-                None
+                if in_accept_edits || nudge_showing {
+                    agent.plan_mode_pending = Some(true);
+                    agent.deferred_session_mode = Some(xai_grok_tools::types::SessionMode::Plan);
+                    app.current_ui.permission_mode = Some("ask".into());
+                    agent.show_mode_switch_banner("Plan");
+                    tracing::info!(
+                        "Mode cycle (pre-session): {} → Plan",
+                        if in_accept_edits {
+                            "Accept-Edits"
+                        } else {
+                            "Normal (nudge)"
+                        }
+                    );
+                    Some("ask")
+                } else {
+                    app.current_ui.permission_mode = Some("accept-edits".into());
+                    agent.show_mode_switch_banner("Accept-Edits");
+                    tracing::info!("Mode cycle (pre-session): Normal → Accept-Edits");
+                    Some("accept-edits")
+                }
             }
             // Plan → Auto (or Plan → Always-Approve when the auto feature is
             // gated off, matching the legacy Normal→Plan→Always-Approve cycle).
@@ -778,16 +1007,46 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
     let in_yolo = agent.session.is_yolo();
 
     match (in_plan, in_auto, in_yolo) {
-        // Normal → Plan
+        // Normal → Accept-Edits, or Accept-Edits/nudge → Plan
         (false, false, false) => {
-            agent.plan_mode_pending = Some(true);
-            agent.show_mode_switch_banner("Plan");
-            refresh_open_settings_modals(app);
-            tracing::info!("Mode cycle: Normal → Plan");
-            vec![Effect::SetSessionMode {
-                session_id,
-                mode_id: acp::SessionModeId::new(xai_grok_tools::types::SessionMode::Plan.as_id()),
-            }]
+            if in_accept_edits || nudge_showing {
+                agent.plan_mode_pending = Some(true);
+                app.current_ui.permission_mode = Some("ask".into());
+                agent.show_mode_switch_banner("Plan");
+                refresh_open_settings_modals(app);
+                tracing::info!(
+                    "Mode cycle: {} → Plan",
+                    if in_accept_edits {
+                        "Accept-Edits"
+                    } else {
+                        "Normal (nudge)"
+                    }
+                );
+                let mut effects = vec![Effect::SetSessionMode {
+                    session_id: session_id.clone(),
+                    mode_id: acp::SessionModeId::new(
+                        xai_grok_tools::types::SessionMode::Plan.as_id(),
+                    ),
+                }];
+                if in_accept_edits {
+                    effects.push(Effect::PersistPermissionMode {
+                        canonical: "ask",
+                        session_id: Some(session_id),
+                        persist: crate::app::actions::PermissionModePersist::BestEffort,
+                    });
+                }
+                effects
+            } else {
+                app.current_ui.permission_mode = Some("accept-edits".into());
+                agent.show_mode_switch_banner("Accept-Edits");
+                refresh_open_settings_modals(app);
+                tracing::info!("Mode cycle: Normal → Accept-Edits");
+                vec![Effect::PersistPermissionMode {
+                    canonical: "accept-edits",
+                    session_id: Some(session_id),
+                    persist: crate::app::actions::PermissionModePersist::BestEffort,
+                }]
+            }
         }
         // Plan → Auto (classifier mode; exit plan, not always-approve).
         // When the auto feature is gated off, Plan → Always-Approve (skip Auto),
@@ -968,5 +1227,118 @@ fn dispatch_cycle_mode_inner(app: &mut AppView) -> Vec<Effect> {
             }
             effects
         }
+    }
+}
+
+#[cfg(test)]
+mod thinking_effort_toggle_tests {
+    use super::plan_thinking_effort_toggle;
+    use xai_grok_shell::sampling::types::{ReasoningEffort, ReasoningEffortOption};
+
+    fn opt(value: ReasoningEffort, default: bool) -> ReasoningEffortOption {
+        ReasoningEffortOption {
+            id: value.as_str().to_string(),
+            value,
+            label: value.to_string(),
+            description: None,
+            default,
+        }
+    }
+
+    #[test]
+    fn empty_options_returns_none() {
+        let mut stash = None;
+        assert!(plan_thinking_effort_toggle(Some(ReasoningEffort::High), &[], &mut stash).is_none());
+    }
+
+    #[test]
+    fn none_menu_toggles_off_and_restores_stash() {
+        let options = vec![
+            opt(ReasoningEffort::None, false),
+            opt(ReasoningEffort::High, true),
+        ];
+        let mut stash = None;
+        let (off, toast_off) = plan_thinking_effort_toggle(
+            Some(ReasoningEffort::High),
+            &options,
+            &mut stash,
+        )
+        .unwrap();
+        assert_eq!(off, ReasoningEffort::None);
+        assert_eq!(toast_off, "Thinking off");
+        assert_eq!(stash, Some(ReasoningEffort::High));
+
+        let (on, toast_on) =
+            plan_thinking_effort_toggle(Some(ReasoningEffort::None), &options, &mut stash).unwrap();
+        assert_eq!(on, ReasoningEffort::High);
+        assert_eq!(toast_on, "Thinking on (high)");
+        assert!(stash.is_none());
+    }
+
+    #[test]
+    fn none_menu_restore_falls_back_to_default_when_stash_empty() {
+        let options = vec![
+            opt(ReasoningEffort::None, false),
+            opt(ReasoningEffort::Low, false),
+            opt(ReasoningEffort::Medium, true),
+        ];
+        let mut stash = None;
+        let (on, _) =
+            plan_thinking_effort_toggle(Some(ReasoningEffort::None), &options, &mut stash).unwrap();
+        assert_eq!(on, ReasoningEffort::Medium);
+    }
+
+    #[test]
+    fn cycle_menu_advances_and_wraps() {
+        let options = vec![
+            opt(ReasoningEffort::Low, false),
+            opt(ReasoningEffort::Medium, true),
+            opt(ReasoningEffort::High, false),
+        ];
+        let mut stash = None;
+        let (a, t) = plan_thinking_effort_toggle(
+            Some(ReasoningEffort::Low),
+            &options,
+            &mut stash,
+        )
+        .unwrap();
+        assert_eq!(a, ReasoningEffort::Medium);
+        assert_eq!(t, "Effort: medium");
+
+        let (b, _) = plan_thinking_effort_toggle(
+            Some(ReasoningEffort::High),
+            &options,
+            &mut stash,
+        )
+        .unwrap();
+        assert_eq!(b, ReasoningEffort::Low);
+
+        let (c, _) = plan_thinking_effort_toggle(None, &options, &mut stash).unwrap();
+        assert_eq!(c, ReasoningEffort::Low);
+        assert!(stash.is_none(), "cycle path must not touch stash");
+    }
+
+    #[test]
+    fn alt_t_and_dagger_bind_toggle_thinking_effort() {
+        use crate::actions::{ActionId, ActionRegistry, When};
+        use crate::key;
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        let reg = ActionRegistry::defaults();
+        let alt_t = key!('t', ALT).to_key_event();
+        assert_eq!(
+            reg.lookup(&alt_t, When::PromptFocused),
+            Some(ActionId::ToggleThinkingEffort)
+        );
+        let dagger = KeyEvent::new(KeyCode::Char('†'), KeyModifiers::NONE);
+        assert_eq!(
+            reg.lookup(&dagger, When::PromptFocused),
+            Some(ActionId::ToggleThinkingEffort)
+        );
+        // Distinct from Ctrl+E expand-all-thinking (display fold).
+        assert_ne!(
+            reg.lookup(&key!('e', CONTROL).to_key_event(), When::ScrollbackFocused),
+            Some(ActionId::ToggleThinkingEffort)
+        );
     }
 }
