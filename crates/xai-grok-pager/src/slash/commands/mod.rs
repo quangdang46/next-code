@@ -43,6 +43,7 @@ pub mod mcps;
 pub mod memory;
 pub mod model;
 pub mod multiline;
+pub mod multitask;
 pub mod new;
 pub mod personas;
 pub mod plan;
@@ -147,6 +148,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(import_claude::ImportClaudeCommand),
         Arc::new(usage::UsageCommand),
         Arc::new(queue::QueueCommand),
+        Arc::new(multitask::MultitaskCommand),
         Arc::new(tasks::TasksCommand),
         Arc::new(release_notes::ReleaseNotesCommand),
         Arc::new(config_agents::ConfigAgentsCommand),
@@ -591,6 +593,14 @@ mod tests {
         assert!(
             reg.get("tasks").is_some(),
             "/tasks should be registered in builtins"
+        );
+    }
+    #[test]
+    fn multitask_registered_in_builtin_commands() {
+        let reg = CommandRegistry::new(builtin_commands());
+        assert!(
+            reg.get("multitask").is_some(),
+            "/multitask should be registered in builtins"
         );
     }
     #[test]

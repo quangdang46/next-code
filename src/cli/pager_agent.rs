@@ -2387,6 +2387,67 @@ impl acp::Agent for NextCodeFaceAgent {
                     })
                 }
             }
+            "x.ai/multitask/spawn" => {
+                let session_id = params
+                    .get("sessionId")
+                    .or_else(|| params.get("session_id"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
+                let prompt = params
+                    .get("prompt")
+                    .or_else(|| params.get("initialMessage"))
+                    .or_else(|| params.get("initial_message"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .trim();
+                let spawn_mode = params
+                    .get("spawnMode")
+                    .or_else(|| params.get("spawn_mode"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("headless");
+                if session_id.is_empty() || prompt.is_empty() {
+                    serde_json::json!({
+                        "error": {
+                            "code": "invalid_params",
+                            "message": "sessionId and prompt are required",
+                        }
+                    })
+                } else if let Some(session) = self.sessions.borrow().get(session_id).cloned() {
+                    let id = session.next_id();
+                    let req = Request::CommSpawn {
+                        id,
+                        session_id: session_id.to_string(),
+                        working_dir: None,
+                        initial_message: Some(prompt.to_string()),
+                        request_nonce: Some(format!("multitask-{}", uuid::Uuid::new_v4())),
+                        spawn_mode: Some(spawn_mode.to_string()),
+                        model: None,
+                        effort: None,
+                    };
+                    match session.send(&req).await {
+                        Ok(()) => serde_json::json!({
+                            "result": {
+                                "ok": true,
+                                "requestId": id,
+                                "spawnMode": spawn_mode,
+                            }
+                        }),
+                        Err(err) => serde_json::json!({
+                            "error": {
+                                "code": "multitask_spawn_failed",
+                                "message": err.to_string(),
+                            }
+                        }),
+                    }
+                } else {
+                    serde_json::json!({
+                        "error": {
+                            "code": "session_not_found",
+                            "message": format!("unknown lead session: {session_id}"),
+                        }
+                    })
+                }
+            }
             "x.ai/swarm/stop" => {
                 let session_id = params
                     .get("sessionId")

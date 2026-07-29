@@ -3609,6 +3609,26 @@ pub(crate) fn execute(
                     }
                 });
         }
+        Effect::MultitaskSpawn { session_id, prompt } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let params = serde_json::json!({
+                    "sessionId": session_id.0.to_string(),
+                    "prompt": prompt,
+                    "spawnMode": "headless",
+                });
+                let req = acp::ExtRequest::new(
+                    "x.ai/multitask/spawn",
+                    serde_json::value::to_raw_value(&params)
+                        .expect("serialize multitask spawn params")
+                        .into(),
+                );
+                if let Err(e) = acp_send(req, &tx).await {
+                    tracing::warn!("Failed to spawn multitask worker: {e}");
+                }
+                TaskResult::CancelComplete
+            });
+        }
         Effect::SendRecap { session_id, auto } => {
             let tx = acp_tx.clone();
             tasks

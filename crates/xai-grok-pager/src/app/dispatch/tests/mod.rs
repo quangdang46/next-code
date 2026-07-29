@@ -6,6 +6,7 @@ mod dashboard;
 mod goal;
 mod jump;
 mod modes;
+mod multitask;
 mod notes;
 mod permissions;
 mod prompt;
