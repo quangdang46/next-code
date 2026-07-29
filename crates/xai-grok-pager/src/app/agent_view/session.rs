@@ -175,6 +175,7 @@ impl AgentView {
             hit_catalog_close: Default::default(),
             hit_bg_status: Default::default(),
             hit_tasks_pill: Default::default(),
+            footer_snag: None,
             hit_agent_pills: Vec::new(),
             hit_agent_panel_rows: Vec::new(),
             hit_goal_status: Default::default(),

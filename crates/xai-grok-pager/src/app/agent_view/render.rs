@@ -2473,7 +2473,8 @@ impl AgentView {
             if roster_for_pills.len() > 1 {
                 roster_for_pills
                     .iter()
-                    .map(|row| {
+                    .enumerate()
+                    .map(|(idx, row)| {
                         let color = if row.is_lead {
                             Some(theme.accent_system)
                         } else {
@@ -2491,13 +2492,18 @@ impl AgentView {
                             Some(ratatui::style::Color::Rgb(r, g, b))
                         };
                         let pill_name = if row.is_lead { "main" } else { row.display_name.as_str() };
+                        let panel_selected = self.agent_panel.selecting
+                            && self.agent_panel.selected_row(&roster_for_pills).is_some_and(|r| {
+                                r.id == row.id
+                            });
+                        let snag_selected = matches!(
+                            self.footer_snag,
+                            Some(super::footer_snag::FooterSnagItem::Agent { index }) if index == idx
+                        );
                         crate::views::prompt_widget::AgentFooterPill {
                             id: row.id.as_str(),
                             name: pill_name,
-                            selected: self.agent_panel.selecting
-                                && self.agent_panel.selected_row(&roster_for_pills).is_some_and(|r| {
-                                    r.id == row.id
-                                }),
+                            selected: panel_selected || snag_selected,
                             viewed: viewing_id.as_deref() == Some(row.id.as_str())
                                 || (row.is_lead && viewing_id.is_none()),
                             idle: matches!(
@@ -2513,9 +2519,13 @@ impl AgentView {
                 Vec::new()
             };
         let agent_pills = (!agent_pill_owned.is_empty()).then_some(agent_pill_owned.as_slice());
-        let agent_expand_hint = agent_pills.map(|_| "Shift+↓ expand");
-        // Propagate hover onto SummaryPill paint.
-        let tasks_pill_hovered = self.hit_tasks_pill.hovered;
+        let agent_expand_hint = agent_pills.map(|_| "Shift+↓ expand · ↓ footer");
+        // Propagate hover + keyboard snag onto SummaryPill paint.
+        let tasks_pill_hovered = self.hit_tasks_pill.hovered
+            || matches!(
+                self.footer_snag,
+                Some(super::footer_snag::FooterSnagItem::Tasks)
+            );
         // Reset footer hit targets; re-filled after prompt.draw when chrome paints.
         self.hit_tasks_pill.clear();
         self.hit_agent_pills.clear();

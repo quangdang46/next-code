@@ -119,6 +119,29 @@ impl AgentView {
             return self.handle_history_search_key(key);
         }
 
+        // ── Footer snag (Claude Footer context) ─────────────────────────
+        // When a footer pill is focused, arrows/Enter/Esc stay here so they
+        // do not edit the composer or submit. Typing clears focus and falls
+        // through.
+        if self.footer_snag_active()
+            && let Some(outcome) = self.handle_footer_snag_key(key)
+        {
+            return outcome;
+        }
+
+        // Empty composer + Down → enter footer snag when pills are visible
+        // (Claude: at bottom of history / idle Down focuses first footer item).
+        if self.prompt_mode == PromptMode::Normal
+            && self.prompt.text().is_empty()
+            && !self.prompt.file_search_visible()
+            && !self.prompt.slash_open()
+            && key!(Down).matches(key)
+            && self.prompt_input_mode == PromptInputMode::Normal
+            && self.footer_snag_enter()
+        {
+            return InputOutcome::Changed;
+        }
+
         // ── File search intercept ───────────────────────────────────────
         // When the @-completion dropdown is visible, the widget handles
         // Tab (accept), Enter (accept), Esc (dismiss), and arrow keys
@@ -975,9 +998,12 @@ impl AgentView {
                     self.populate_prompt_from_history_selection();
                 }
             } else {
-                // Already at the newest (bottom) entry — the position the
-                // panel opens on — so Down backs out of history entirely.
+                // Already at the newest (bottom) entry — Claude then enters
+                // footer snag when pills are visible; otherwise close history.
                 self.close_history_restoring_saved();
+                if self.footer_snag_enter() {
+                    return InputOutcome::Changed;
+                }
             }
             return InputOutcome::Changed;
         }
