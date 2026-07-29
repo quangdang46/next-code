@@ -12,6 +12,7 @@ pub mod diagnostics;
 pub mod diff;
 pub mod docs;
 pub mod export_cmd;
+pub mod external_editor;
 pub mod git_info;
 pub mod headless;
 pub mod hyperlink_route;
