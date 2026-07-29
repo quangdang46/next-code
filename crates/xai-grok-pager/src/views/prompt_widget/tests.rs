@@ -4696,3 +4696,40 @@
         let buf = draw_bordered(11, &title_test_style(Some("my session")));
         assert_eq!(buf_text_at(&buf, 1, 10, 0), "\u{2500}".repeat(9));
     }
+
+    #[test]
+    fn render_info_line_returns_tasks_pill_and_agent_pill_hits() {
+        let pw = PromptWidget::new();
+        let theme = Theme::current();
+        let area = Rect::new(0, 0, 100, 1);
+        let mut buf = Buffer::empty(area);
+        let pills = [AgentFooterPill {
+            id: "worker-1",
+            name: "alice",
+            selected: false,
+            viewed: false,
+            idle: false,
+            color: Some(theme.accent_system),
+        }];
+        let info = PromptInfo {
+            model_name: "model",
+            flags: &[],
+            status_segments: None,
+            multiline: false,
+            usage_warning: None,
+            usage_warning_critical: false,
+            tasks_pill: Some("1 shell"),
+            tasks_pill_hovered: false,
+            agent_pills: Some(&pills),
+            agent_expand_hint: Some("Shift+? expand"),
+        };
+        let hits = pw.render_info_line(&mut buf, area, &info, theme.bg_base, &theme, true);
+        assert!(
+            hits.tasks_pill.is_some_and(|r| r.width > 0 && r.height == 1),
+            "tasks SummaryPill must expose a hit rect: {:?}",
+            hits.tasks_pill
+        );
+        assert_eq!(hits.agent_pills.len(), 1);
+        assert_eq!(hits.agent_pills[0].0, "worker-1");
+        assert!(hits.agent_pills[0].1.width >= 6); // "@alice"
+    }

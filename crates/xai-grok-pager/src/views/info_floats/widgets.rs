@@ -568,6 +568,7 @@ pub fn render_background_lines(info: &BackgroundInfo, width: usize) -> Vec<Line<
         monitors: info.monitors,
         loops: info.loops,
         subagents: info.subagents,
+        workers: 0,
         unread_completed: 0,
     });
     let summary = if pill.starts_with(|c: char| c.is_ascii_digit()) {

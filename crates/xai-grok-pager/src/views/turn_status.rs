@@ -107,6 +107,8 @@ pub struct Watchers {
     /// subagent is a background one — a foreground subagent would keep the
     /// parent in `TurnRunning`.
     pub subagents: usize,
+    /// Active multitask / swarm workers (Cursor-style parallel workers).
+    pub workers: usize,
     /// Finished tasks not yet opened in the hub/detail viewer. Drives the
     /// quiet attention marker on the ambient pill (`· !`).
     pub unread_completed: usize,
@@ -115,7 +117,7 @@ pub struct Watchers {
 impl Watchers {
     /// Total watcher count across all kinds.
     pub fn total(self) -> usize {
-        self.commands + self.monitors + self.loops + self.subagents
+        self.commands + self.monitors + self.loops + self.subagents + self.workers
     }
 
     /// Whether ambient chrome should surface background work.
@@ -130,7 +132,7 @@ impl Watchers {
     /// `get_task_output` wait can resolve on (commands, monitors, subagents;
     /// scheduled `/loop` tasks are timers, not awaitable work).
     pub fn awaitable_work(self) -> usize {
-        self.commands + self.monitors + self.subagents
+        self.commands + self.monitors + self.subagents + self.workers
     }
 }
 
@@ -160,6 +162,7 @@ pub fn pill_label(watchers: Watchers) -> String {
     push_part(watchers.monitors, "monitor", "monitors");
     push_part(watchers.loops, "loop", "loops");
     push_part(watchers.subagents, "subagent", "subagents");
+    push_part(watchers.workers, "worker", "workers");
     if first {
         // Unread-only / attention-only: Claude falls back to mixed "N background tasks".
         let n = watchers.unread_completed.max(1);
@@ -200,6 +203,7 @@ pub fn prompt_footer_pill_label(watchers: Watchers) -> String {
     push_part(watchers.monitors, "monitor", "monitors");
     push_part(watchers.loops, "loop", "loops");
     push_part(watchers.subagents, "subagent", "subagents");
+    push_part(watchers.workers, "worker", "workers");
     if first {
         let n = watchers.unread_completed.max(1);
         let _ = write!(
@@ -1580,6 +1584,25 @@ mod tests {
                 ..Watchers::default()
             }
             .shows_ambient()
+        );
+    }
+
+    #[test]
+    fn pill_label_includes_multitask_workers() {
+        assert_eq!(
+            pill_label(Watchers {
+                workers: 2,
+                ..Watchers::default()
+            }),
+            "2 workers \u{00b7} Ctrl+B"
+        );
+        assert_eq!(
+            prompt_footer_pill_label(Watchers {
+                subagents: 1,
+                workers: 1,
+                ..Watchers::default()
+            }),
+            "1 subagent, 1 worker"
         );
     }
 

@@ -168,6 +168,17 @@ impl AgentView {
         }
     }
 
+    /// Claude `enterTeammateView` / `@pill` click: select roster row by id and enter.
+    pub fn enter_agent_by_id(&mut self, id: &str) -> Option<Action> {
+        let rows = self.agent_team_roster();
+        let Some(idx) = rows.iter().position(|r| r.id == id) else {
+            return None;
+        };
+        self.agent_panel.selecting = true;
+        self.agent_panel.selected_index = idx;
+        self.agent_panel_enter_selected()
+    }
+
     /// Kill the selected worker when possible.
     pub fn agent_panel_kill_selected(&mut self) -> Option<Action> {
         let rows = self.agent_team_roster();

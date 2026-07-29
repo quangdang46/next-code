@@ -499,13 +499,13 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
             hint_key_display: Some("Shift+↑"),
             requires_confirmation: false,
             long_help: Some(
-                "Moves selection in the under-prompt agent panel (lead + workers).\nEnter opens the selected worker transcript; Esc returns to the lead.",
+                "Moves selection in the under-prompt agent panel (lead + workers).\nAlso expands team chrome (Claude shift+↓). Enter opens the selected worker transcript; Esc returns to the lead.",
             ),
         },
         ActionDef {
             id: ActionId::AgentPanelSelectNext,
             label: "next agent",
-            description: "Select next agent in team panel",
+            description: "Select next agent / expand team panel",
             default_key: key!(Down, SHIFT),
             alt_keys: vec![],
             category: Category::Panels,
@@ -514,7 +514,7 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
             hint_key_display: Some("Shift+↓"),
             requires_confirmation: false,
             long_help: Some(
-                "Moves selection in the under-prompt agent panel (lead + workers).\nEnter opens the selected worker transcript; Esc returns to the lead.",
+                "Moves selection in the under-prompt agent panel (lead + workers).\nClaude parity: shift+↓ expands teammate chrome; Enter opens the selected worker; Esc returns to the lead.",
             ),
         },
         ActionDef {

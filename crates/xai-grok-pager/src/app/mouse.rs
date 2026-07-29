@@ -56,6 +56,32 @@ impl AgentView {
                     }
                     return InputOutcome::Changed;
                 }
+                // Claude SummaryPill click → open Tasks hub (PR #87 deferred hit).
+                if self.hit_tasks_pill.contains(mouse.column, mouse.row) {
+                    self.tasks.open_hub();
+                    self.set_active_pane(AgentPane::Tasks, false);
+                    return InputOutcome::Changed;
+                }
+                // Claude @agent pill → enterTeammateView equivalent.
+                if let Some((id, _)) = self
+                    .hit_agent_pills
+                    .iter()
+                    .find(|(_, hit)| hit.contains(mouse.column, mouse.row))
+                {
+                    let id = id.clone();
+                    let _ = self.enter_agent_by_id(&id);
+                    return InputOutcome::Changed;
+                }
+                // Click roster row in under-prompt agent panel.
+                if let Some((id, _)) = self
+                    .hit_agent_panel_rows
+                    .iter()
+                    .find(|(_, rect)| rect.contains((mouse.column, mouse.row).into()))
+                {
+                    let id = id.clone();
+                    let _ = self.enter_agent_by_id(&id);
+                    return InputOutcome::Changed;
+                }
                 if self.hit_goal_status.contains(mouse.column, mouse.row) {
                     if self.goal_state.is_some() {
                         self.show_goal_detail = !self.show_goal_detail;
@@ -1015,6 +1041,10 @@ impl AgentView {
                     .hit_voice_stop_button
                     .update_hover(mouse.column, mouse.row);
                 changed |= self.hit_bg_status.update_hover(mouse.column, mouse.row);
+                changed |= self.hit_tasks_pill.update_hover(mouse.column, mouse.row);
+                for (_, hit) in &mut self.hit_agent_pills {
+                    changed |= hit.update_hover(mouse.column, mouse.row);
+                }
                 changed |= self.hit_goal_status.update_hover(mouse.column, mouse.row);
                 changed |= self.hit_bg_close.update_hover(mouse.column, mouse.row);
                 changed |= self.hit_catalog_close.update_hover(mouse.column, mouse.row);
