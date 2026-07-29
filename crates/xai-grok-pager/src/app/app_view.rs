@@ -3244,6 +3244,18 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
             && key!(Enter).matches(key)
             && key.modifiers.is_empty()
         {
+            // OpenCode parity: non-empty welcome draft must create a session
+            // AND submit in one shot. Capture+clear first so Enter-repeat /
+            // double-press cannot fire a second ActionPair with the same text.
+            let text = ctx.prompt.text().to_string();
+            if !text.trim().is_empty() {
+                ctx.prompt.set_text("");
+                *ctx.prompt_focused = true;
+                return InputOutcome::ActionPair(
+                    Action::NewSession,
+                    Action::SendPrompt(text),
+                );
+            }
             return InputOutcome::Action(Action::NewSession);
         }
         if matches!(ctx.auth_state, AuthState::Done) {
@@ -8488,6 +8500,55 @@ pub(crate) mod tests {
         let outcome = app.handle_input(&key_event(KeyCode::Char('n'), KeyModifiers::NONE));
         assert!(matches!(outcome, InputOutcome::Unchanged));
     }
+    #[test]
+    fn welcome_done_enter_empty_starts_session_only() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Done;
+        app.welcome_prompt_focused = true;
+        let outcome = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(
+            matches!(outcome, InputOutcome::Action(Action::NewSession)),
+            "empty Enter must only NewSession, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn welcome_done_enter_with_text_pairs_new_session_and_send() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Done;
+        app.welcome_prompt_focused = true;
+        app.welcome_prompt.set_text("hello from welcome");
+        let outcome = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        match outcome {
+            InputOutcome::ActionPair(Action::NewSession, Action::SendPrompt(text)) => {
+                assert_eq!(text, "hello from welcome");
+            }
+            other => panic!("expected ActionPair(NewSession, SendPrompt), got {other:?}"),
+        }
+        assert!(
+            app.welcome_prompt.text().is_empty(),
+            "draft must clear immediately so double-Enter cannot re-submit"
+        );
+    }
+
+    #[test]
+    fn welcome_done_double_enter_second_is_empty_new_session_only() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Done;
+        app.welcome_prompt_focused = true;
+        app.welcome_prompt.set_text("once");
+        let first = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(matches!(
+            first,
+            InputOutcome::ActionPair(Action::NewSession, Action::SendPrompt(_))
+        ));
+        let second = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(
+            matches!(second, InputOutcome::Action(Action::NewSession)),
+            "second Enter after clear must not re-pair SendPrompt, got {second:?}"
+        );
+    }
+
     #[test]
     fn welcome_done_n_starts_session() {
         let mut app = test_app();

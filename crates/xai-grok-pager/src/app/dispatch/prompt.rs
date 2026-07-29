@@ -60,6 +60,12 @@ pub(super) fn dispatch_send_prompt(app: &mut AppView, text: String) -> Vec<Effec
         None,
         Some(serde_json::json!({"len": text.len()})),
     );
+    // Welcome has no agent yet — same path as `grok "<prompt>"` / post-login
+    // deferred startup: NewSession then SendPrompt so the text queues until
+    // SessionCreated drains (OpenCode create-then-submit).
+    if matches!(app.active_view, ActiveView::Welcome) {
+        return dispatch_initial_prompt(app, text);
+    }
     dispatch_send_prompt_inner(
         app, text, /* consume_input */ true, /* literal */ false,
         /* is_follow_up */ false,
@@ -815,6 +821,20 @@ pub(super) fn dispatch_send_prompt_inner(
         if !inline_hint_shown {
             maybe_show_send_now_tip(app);
         }
+    }
+
+    // Bash already does this; plain prompts must too. Without it, a NewSession
+    // that left `session_id: None` (project picker / create in flight) enqueues
+    // forever and the user must spam send until something else binds a session.
+    let needs_create = app.agents.get(&id).is_some_and(|agent| {
+        agent.session.session_id.is_none() && agent.session.queue_len() > 0
+    });
+    if needs_create {
+        let create = skip_picker_and_create_session(app, id);
+        if !create.is_empty() {
+            app.show_toast("Connecting…");
+        }
+        effects.extend(create);
     }
 
     let drain = {

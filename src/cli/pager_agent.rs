@@ -1286,6 +1286,60 @@ impl NextCodeFaceAgent {
             || msg.contains("os error 32")
     }
 
+    /// Send `Message` on `session`, reconnecting once on a dead daemon socket
+    /// and retrying so the user does not need to spam send on cold start.
+    /// Returns the live session and the request id used for the successful send.
+    async fn send_prompt_message(
+        &self,
+        session: &Rc<DaemonSession>,
+        session_id: &str,
+        content: &str,
+        system_reminder: Option<&str>,
+    ) -> acp::Result<(Rc<DaemonSession>, u64)> {
+        let prompt_id = session.next_id();
+        match session
+            .send(&Request::Message {
+                id: prompt_id,
+                content: content.to_string(),
+                images: Vec::new(),
+                system_reminder: system_reminder.map(str::to_string),
+            })
+            .await
+        {
+            Ok(()) => Ok((session.clone(), prompt_id)),
+            Err(err) if Self::is_daemon_disconnect(&err) => {
+                session.prompt_running.store(false, Ordering::SeqCst);
+                let live = self
+                    .reconnect_daemon_session(session_id)
+                    .await
+                    .map_err(|re| acp::Error::internal_error().data(re.to_string()))?;
+                self.sessions
+                    .borrow_mut()
+                    .insert(session_id.to_string(), live.clone());
+                if live
+                    .prompt_running
+                    .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                    .is_err()
+                {
+                    return Err(acp::Error::internal_error().data(format!(
+                        "Session {session_id} already processing a prompt after reconnect"
+                    )));
+                }
+                let retry_id = live.next_id();
+                live.send(&Request::Message {
+                    id: retry_id,
+                    content: content.to_string(),
+                    images: Vec::new(),
+                    system_reminder: system_reminder.map(str::to_string),
+                })
+                .await
+                .map_err(|e| acp::Error::internal_error().data(e.to_string()))?;
+                Ok((live, retry_id))
+            }
+            Err(err) => Err(acp::Error::internal_error().data(err.to_string())),
+        }
+    }
+
     /// Re-open the daemon socket and resume `session_id`, updating Face banner.
     async fn reconnect_daemon_session(&self, session_id: &str) -> Result<Rc<DaemonSession>> {
         let detail = "server closed the connection";
@@ -2062,43 +2116,28 @@ impl acp::Agent for NextCodeFaceAgent {
         let working_dir = session.working_dir.clone();
         let (content, system_reminder) =
             Self::expand_skill_invocation(&text, working_dir.as_deref());
-        let mut prompt_id = session.next_id();
-        if let Err(err) = session
-            .send(&Request::Message {
-                id: prompt_id,
-                content,
-                images: Vec::new(),
-                system_reminder,
-            })
+
+        // OpenCode-style: if the daemon socket died between NewSession and the
+        // first send (or mid-idle), reconnect and retry once — do not force the
+        // user to spam Enter / click send.
+        let (session, mut prompt_id) = match self
+            .send_prompt_message(&session, &session_id, &content, system_reminder.as_deref())
             .await
         {
-            if Self::is_daemon_disconnect(&err) {
-                match self.reconnect_daemon_session(&session_id).await {
-                    Ok(live) => {
-                        self.sessions
-                            .borrow_mut()
-                            .insert(session_id.clone(), live);
-                        session.prompt_running.store(false, Ordering::SeqCst);
-                        return Err(acp::Error::internal_error().data(
-                            "Server connection restored. Please resend your message."
-                                .to_string(),
-                        ));
-                    }
-                    Err(re) => {
-                        session.prompt_running.store(false, Ordering::SeqCst);
-                        return Err(acp::Error::internal_error().data(re.to_string()));
-                    }
-                }
+            Ok(pair) => pair,
+            Err(err) => {
+                session.prompt_running.store(false, Ordering::SeqCst);
+                return Err(err);
             }
-            session.prompt_running.store(false, Ordering::SeqCst);
-            return Err(acp::Error::internal_error().data(err.to_string()));
-        }
+        };
 
         let stop = loop {
             let event = match session.read_event().await {
                 Ok(e) => e,
                 Err(err) => {
                     if Self::is_daemon_disconnect(&err) {
+                        // Message may already be in-flight on the daemon; after
+                        // reconnect ask the user to resend rather than duplicate.
                         match self.reconnect_daemon_session(&session_id).await {
                             Ok(live) => {
                                 self.sessions
