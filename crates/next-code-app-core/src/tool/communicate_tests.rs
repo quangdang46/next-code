@@ -1477,13 +1477,29 @@ fn test_ctx(session_id: &str, working_dir: &Path) -> ToolContext {
         stdin_request_tx: None,
         ask_user_question_tx: None,
         best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+            background_tool_signal: None,
+        execution_mode: ToolExecutionMode::Direct,
+        best_of_n_run_id: None,
+        best_of_n_candidate_id: None,
+    }
+}ToolContext {
+        session_id: session_id.to_string(),
+        message_id: "msg-1".to_string(),
+        tool_call_id: "call-1".to_string(),
+        working_dir: Some(working_dir.to_path_buf()),
+        stdin_request_tx: None,
+        ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
+        graceful_shutdown_signal: None,
+            background_tool_signal: None,
         execution_mode: ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
     }
 }
-
 async fn wait_for_member_status(
     client: &mut RawClient,
     requester_session: &str,

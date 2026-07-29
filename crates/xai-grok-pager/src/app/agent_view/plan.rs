@@ -16,17 +16,27 @@ use crossterm::event::KeyModifiers;
 use crossterm::event::{KeyCode, KeyEvent};
 impl AgentView {
     /// Resolve the absolute path to the plan file for this session.
-    fn plan_file_path(&self) -> Option<std::path::PathBuf> {
+    ///
+    /// Prefers an on-disk artifact: Face session `plan.md`, then cwd/`plan.md`,
+    /// then `.next-code/plan.md`. If none exist yet, returns the Face session
+    /// path (Claude-like: a stable place to create the plan).
+    pub(crate) fn plan_file_path(&self) -> Option<std::path::PathBuf> {
         let session_id = self.session.session_id.as_ref()?;
         let cwd_str = self.session.cwd.to_string_lossy().into_owned();
         let encoded_cwd = urlencoding::encode(&cwd_str);
-        Some(
-            xai_grok_shell::util::grok_home::grok_home()
-                .join("sessions")
-                .join(encoded_cwd.as_ref())
-                .join(session_id.0.as_ref())
-                .join("plan.md"),
-        )
+        let session_path = xai_grok_shell::util::grok_home::grok_home()
+            .join("sessions")
+            .join(encoded_cwd.as_ref())
+            .join(session_id.0.as_ref())
+            .join("plan.md");
+        let cwd_path = self.session.cwd.join("plan.md");
+        let next_code_path = self.session.cwd.join(".next-code").join("plan.md");
+        for path in [&session_path, &cwd_path, &next_code_path] {
+            if path.is_file() {
+                return Some(path.clone());
+            }
+        }
+        Some(session_path)
     }
     /// Whether the current line viewer is showing a plan preview.
     pub(super) fn is_plan_viewer(&self) -> bool {
@@ -103,9 +113,31 @@ impl AgentView {
         {
             return Some(content.to_owned());
         }
-        self.plan_file_path()
-            .and_then(|p| std::fs::read_to_string(p).ok())
-            .filter(|s| !s.trim().is_empty())
+        // Prefer Face session plan.md, then cwd/plan.md (daemon EnterPlanMode
+        // guidance), then .next-code/plan.md.
+        let session_id = self.session.session_id.as_ref();
+        let mut candidates = Vec::new();
+        if let Some(session_id) = session_id {
+            let cwd_str = self.session.cwd.to_string_lossy().into_owned();
+            let encoded_cwd = urlencoding::encode(&cwd_str);
+            candidates.push(
+                xai_grok_shell::util::grok_home::grok_home()
+                    .join("sessions")
+                    .join(encoded_cwd.as_ref())
+                    .join(session_id.0.as_ref())
+                    .join("plan.md"),
+            );
+        }
+        candidates.push(self.session.cwd.join("plan.md"));
+        candidates.push(self.session.cwd.join(".next-code").join("plan.md"));
+        for path in candidates {
+            if let Ok(body) = std::fs::read_to_string(&path)
+                && !body.trim().is_empty()
+            {
+                return Some(body);
+            }
+        }
+        None
     }
     /// Open the plan preview when content exists, or when plan approval is
     /// parked with an empty body (so the decision surface always pops).
@@ -201,6 +233,7 @@ impl AgentView {
             None
         };
         pav.send_approved();
+        self.plan_mode_pending = Some(false);
         self.latest_inline_plan_content = None;
         self.plan_next_comment_id = pav.next_comment_id;
         self.prompt.restore(pav.stashed_prompt);
@@ -214,13 +247,17 @@ impl AgentView {
                 action: "build".to_string(),
             });
         }
+        let exit = Action::SetPlanMode(crate::app::actions::PlanModeKind::Off);
         if let Some(text) = review_comments {
-            return InputOutcome::Action(Action::Interject {
-                text,
-                images: vec![],
-            });
+            return InputOutcome::ActionPair(
+                exit,
+                Action::Interject {
+                    text,
+                    images: vec![],
+                },
+            );
         }
-        InputOutcome::Changed
+        InputOutcome::Action(exit)
     }
     pub(crate) fn abandon_plan(&mut self) -> InputOutcome {
         let Some(mut pav) = self.plan_approval_view.take() else {
@@ -241,7 +278,9 @@ impl AgentView {
                 action: "abandon".to_string(),
             });
         }
-        InputOutcome::Changed
+        InputOutcome::Action(Action::SetPlanMode(
+            crate::app::actions::PlanModeKind::Off,
+        ))
     }
     fn send_plan_feedback(&mut self, feedback: Option<String>) -> InputOutcome {
         let Some(mut pav) = self.plan_approval_view.take() else {
@@ -878,5 +917,58 @@ mod plan_chip_tests {
             a_on.handle_scrollback_key(&down, &registry),
             InputOutcome::Action(Action::SelectNext)
         ));
+    }
+}
+
+#[cfg(test)]
+mod plan_approval_exit_tests {
+    use super::*;
+    use crate::views::plan_approval_view::PlanApprovalViewState;
+    use crate::views::prompt_widget::StashedPrompt;
+    use xai_grok_tools::implementations::grok_build::exit_plan_mode::types::ExitPlanModeExtRequest;
+
+    fn make_pav() -> PlanApprovalViewState {
+        let (tx, _rx) = tokio::sync::oneshot::channel();
+        PlanApprovalViewState::new(
+            ExitPlanModeExtRequest {
+                session_id: "s".into(),
+                tool_call_id: "tc".into(),
+                plan_content: Some("# Plan".into()),
+            },
+            StashedPrompt::default(),
+            tx,
+        )
+    }
+
+    #[test]
+    fn approve_plan_sets_pending_false_and_set_plan_mode_off() {
+        let mut agent = test_fixtures::make_agent();
+        agent.plan_mode_active = true;
+        agent.plan_mode_pending = Some(true);
+        agent.plan_approval_view = Some(make_pav());
+        match agent.approve_plan() {
+            InputOutcome::Action(Action::SetPlanMode(kind)) => {
+                assert_eq!(kind, crate::app::actions::PlanModeKind::Off);
+            }
+            other => panic!("expected SetPlanMode(Off), got {other:?}"),
+        }
+        assert_eq!(agent.plan_mode_pending, Some(false));
+        assert!(agent.plan_approval_view.is_none());
+    }
+
+    #[test]
+    fn abandon_plan_sets_pending_false_and_set_plan_mode_off() {
+        let mut agent = test_fixtures::make_agent();
+        agent.plan_mode_active = true;
+        agent.plan_mode_pending = Some(true);
+        agent.plan_approval_view = Some(make_pav());
+        match agent.abandon_plan() {
+            InputOutcome::Action(Action::SetPlanMode(kind)) => {
+                assert_eq!(kind, crate::app::actions::PlanModeKind::Off);
+            }
+            other => panic!("expected SetPlanMode(Off), got {other:?}"),
+        }
+        assert_eq!(agent.plan_mode_pending, Some(false));
+        assert!(agent.plan_approval_view.is_none());
     }
 }

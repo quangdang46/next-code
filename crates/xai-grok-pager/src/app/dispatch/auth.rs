@@ -445,6 +445,10 @@ pub(super) fn handle_auth_complete(
 /// `x.ai/models/update` yet), keep the flag set and return — callers reopen
 /// once models land (`SessionCreated` / models update). Opening early shows
 /// only Popular providers and leaves the status bar on `unknown`.
+///
+/// Likewise keep the flag when still on Welcome: `OpenModelPicker` is a no-op
+/// there, and clearing early would drop the post-connect picker if the catalog
+/// raced ahead of `NewSession` / trust drain.
 pub(crate) fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: &mut Vec<Effect>) {
     if !app.open_model_picker_after_auth {
         return;
@@ -452,8 +456,6 @@ pub(crate) fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: 
     if app.models.is_empty() {
         return;
     }
-    app.open_model_picker_after_auth = false;
-
     // Prefer the shared catalog so the picker is populated when agents still
     // hold a stale/empty session ModelState (cold start / pre-refresh).
     match app.active_view {
@@ -467,9 +469,13 @@ pub(crate) fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: 
                 dashboard.models = app.models.clone();
             }
         }
-        ActiveView::Welcome => {}
+        ActiveView::Welcome => {
+            // Host not ready — leave flag set for SessionCreated / models update.
+            return;
+        }
     }
 
+    app.open_model_picker_after_auth = false;
     app.show_toast("Connected — pick a model");
     effects.extend(dispatch(Action::OpenModelPicker, app));
 }

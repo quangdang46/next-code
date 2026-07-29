@@ -261,6 +261,9 @@ pub struct Agent {
     /// Channel for Best-of-N `mode=show` pick → Face ACP reverse request
     pub(crate) best_of_n_pick_tx:
         Option<tokio::sync::mpsc::UnboundedSender<crate::tool::BestOfNPickInputRequest>>,
+    /// Channel for ExitPlanMode tool → Face ACP reverse request
+    exit_plan_mode_tx:
+        Option<tokio::sync::mpsc::UnboundedSender<crate::tool::ExitPlanModeInputRequest>>,
     /// Canonical reducer-backed view of runtime provider/model selection.
     provider_runtime_state: ProviderRuntimeState,
     /// Hook registry for dispatching lifecycle hooks.
@@ -380,6 +383,7 @@ impl Agent {
             stdin_request_tx: None,
             ask_user_question_tx: None,
             best_of_n_pick_tx: None,
+            exit_plan_mode_tx: None,
             provider_runtime_state: ProviderRuntimeState::observed(initial_provider_model),
             hook_registry: HookRegistry::default(),
             dispatch_config: DispatchConfig::default(),

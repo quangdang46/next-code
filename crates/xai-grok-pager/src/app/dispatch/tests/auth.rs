@@ -751,6 +751,33 @@ fn nextcode_connect_defers_model_picker_until_catalog_ready() {
     assert!(app.agents[&AgentId(0)].active_modal.is_some());
 }
 
+/// Catalog may land while still on Welcome (NotifyAuth / models update races
+/// ahead of NewSession). Must not clear the flag — OpenModelPicker is a no-op
+/// on Welcome and would permanently skip the post-connect picker.
+#[test]
+fn nextcode_connect_defers_model_picker_while_on_welcome() {
+    let mut app = test_app();
+    app.open_model_picker_after_auth = true;
+    app.active_view = ActiveView::Welcome;
+    let model_id = acp::ModelId::new(std::sync::Arc::from("grok-4"));
+    app.models.available.insert(
+        model_id.clone(),
+        acp::ModelInfo::new(model_id.clone(), "grok-4"),
+    );
+    app.models.current = Some(model_id);
+
+    let mut effects = Vec::new();
+    crate::app::dispatch::maybe_open_model_picker_after_connect(&mut app, &mut effects);
+    assert!(
+        app.open_model_picker_after_auth,
+        "flag must stay set until Agent/Dashboard can host the picker"
+    );
+    assert!(
+        effects.is_empty(),
+        "must not emit OpenModelPicker while on Welcome"
+    );
+}
+
 /// Plain mid-session `/login` must not open the model picker (re-auth only).
 #[test]
 fn mid_session_login_does_not_open_model_picker() {

@@ -14,13 +14,29 @@ fn make_ctx(stdin_tx: Option<mpsc::UnboundedSender<StdinInputRequest>>) -> ToolC
         stdin_request_tx: stdin_tx,
         ask_user_question_tx: None,
         best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: None,
+            background_tool_signal: None,
+        execution_mode: crate::tool::ToolExecutionMode::Direct,
+        best_of_n_run_id: None,
+        best_of_n_candidate_id: None,
+    }
+}ToolContext {
+        session_id: "test-session".to_string(),
+        message_id: "test-msg".to_string(),
+        tool_call_id: "test-call".to_string(),
+        working_dir: Some(std::path::PathBuf::from("/tmp")),
+        stdin_request_tx: stdin_tx,
+        ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
+        graceful_shutdown_signal: None,
+            background_tool_signal: None,
         execution_mode: crate::tool::ToolExecutionMode::Direct,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
     }
 }
-
 fn make_agent_ctx(signal: next_code_agent_runtime::InterruptSignal) -> ToolContext {
     ToolContext {
         session_id: "test-session".to_string(),
@@ -30,12 +46,29 @@ fn make_agent_ctx(signal: next_code_agent_runtime::InterruptSignal) -> ToolConte
         stdin_request_tx: None,
         ask_user_question_tx: None,
         best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
         graceful_shutdown_signal: Some(signal),
+            background_tool_signal: None,
         execution_mode: crate::tool::ToolExecutionMode::AgentTurn,
         best_of_n_run_id: None,
         best_of_n_candidate_id: None,
     }
-}
+}ToolContext {
+        session_id: "test-session".to_string(),
+        message_id: "test-msg".to_string(),
+        tool_call_id: "test-call-agent".to_string(),
+        working_dir: Some(std::path::PathBuf::from("/tmp")),
+        stdin_request_tx: None,
+        ask_user_question_tx: None,
+        best_of_n_pick_tx: None,
+        exit_plan_mode_tx: None,
+        graceful_shutdown_signal: Some(signal),
+            background_tool_signal: None,
+        execution_mode: crate::tool::ToolExecutionMode::AgentTurn,
+        best_of_n_run_id: None,
+        best_of_n_candidate_id: None,
+    }
+    }
 
 #[tokio::test]
 async fn test_basic_command_no_stdin() {
