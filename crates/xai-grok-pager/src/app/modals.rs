@@ -376,11 +376,12 @@ impl AgentView {
 
         // MemoryBrowser: route through ModalWindow chrome, then delegate.
         if let ActiveModal::MemoryBrowser { state } = modal {
-            // When the filter input is focused, Esc exits filter mode
-            // instead of closing the modal. Handle before modal chrome.
+            // When the filter input or in-modal editor is focused, Esc exits
+            // that sub-mode instead of closing the modal.
             if matches!(
                 state.mode,
                 crate::views::memory_modal::MemoryModalMode::FilterFocused
+                    | crate::views::memory_modal::MemoryModalMode::Editing
             ) {
                 return crate::views::memory_modal::handle_memory_key(state, key);
             }

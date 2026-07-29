@@ -9,7 +9,8 @@ use super::setters::{
     set_info_float_inner, set_invert_scroll_inner, set_keep_text_selection_inner,
     set_max_thoughts_width_inner, set_multiline_mode, set_page_flip_on_send_inner,
     set_prompt_suggestions_inner, set_remember_tool_approvals_inner, set_render_mermaid_inner,
-    set_respect_manual_folds_inner, set_side_panel_output_mode_inner, set_screen_mode_inner,
+    set_render_mermaid_target_inner, set_respect_manual_folds_inner,
+    set_side_panel_output_mode_inner, set_screen_mode_inner,
     set_scroll_lines_inner,
     set_scroll_mode_inner, set_scroll_speed_inner, set_show_thinking_blocks_inner,
     set_show_tips_inner, set_simple_mode_inner, set_status_line_bool_inner,
@@ -1362,6 +1363,13 @@ pub(in crate::app::dispatch) fn apply_setting_rollback(
             if let Some(kind) = crate::appearance::RenderMermaid::from_canonical(s) {
                 set_render_mermaid_inner(kind);
             }
+        }
+        // render_mermaid_target: restore cache + UiConfig mirrors.
+        ("render_mermaid_target", SettingValue::Enum(s)) => {
+            set_render_mermaid_target_inner(
+                app,
+                crate::settings::canonical_render_mermaid_target(Some(s)),
+            );
         }
         // hunk_tracker_mode: restore the in-memory ui mirror.
         ("hunk_tracker_mode", SettingValue::Enum(s)) => {

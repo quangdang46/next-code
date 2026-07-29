@@ -151,19 +151,22 @@ pub async fn run_best_of_n_with_progress(
         BestOfNProgressPayload {
             run_id: run_id.to_string(),
             phase: BestOfNPhase::Generating,
-            message: format!("Generating {total} candidates…"),
+            message: next_code_best_of_n::progress_preview(
+                BestOfNPhase::Generating,
+                0,
+                total,
+                0,
+                None,
+            ),
             completed: 0,
             total,
             candidates: (0..total)
-                .map(|i| BestOfNCandidateUi {
-                    index: i,
-                    candidate_id: CandidateId::new(i).to_string(),
-                    label: strategies[i].label.clone(),
-                    status: "running".to_string(),
-                    file_count: 0,
-                    files: Vec::new(),
-                    error: None,
-                    recommended: false,
+                .map(|i| {
+                    BestOfNCandidateUi::pending(
+                        i,
+                        CandidateId::new(i).to_string(),
+                        strategies[i].label.clone(),
+                    )
                 })
                 .collect(),
             recommended_index: None,
@@ -253,19 +256,20 @@ pub async fn run_best_of_n_with_progress(
                 });
             }
         }
+        let failed = candidates
+            .iter()
+            .filter(|c| c.status == CandidateStatus::Failed)
+            .count();
         let ui_rows = candidates
             .iter()
             .enumerate()
             .map(|(idx, c)| BestOfNCandidateUi::from_candidate(idx, c, false))
-            .chain((candidates.len()..total).map(|idx| BestOfNCandidateUi {
-                index: idx,
-                candidate_id: CandidateId::new(idx).to_string(),
-                label: strategies[idx].label.clone(),
-                status: "running".to_string(),
-                file_count: 0,
-                files: Vec::new(),
-                error: None,
-                recommended: false,
+            .chain((candidates.len()..total).map(|idx| {
+                BestOfNCandidateUi::pending(
+                    idx,
+                    CandidateId::new(idx).to_string(),
+                    strategies[idx].label.clone(),
+                )
             }))
             .collect();
         emit_bon_progress(
@@ -273,7 +277,13 @@ pub async fn run_best_of_n_with_progress(
             BestOfNProgressPayload {
                 run_id: run_id.to_string(),
                 phase: BestOfNPhase::CandidateDone,
-                message: format!("Candidate {}/{} complete…", i + 1, total),
+                message: next_code_best_of_n::progress_preview(
+                    BestOfNPhase::CandidateDone,
+                    i + 1,
+                    total,
+                    failed,
+                    None,
+                ),
                 completed: i + 1,
                 total,
                 candidates: ui_rows,
@@ -288,7 +298,13 @@ pub async fn run_best_of_n_with_progress(
         BestOfNProgressPayload {
             run_id: run_id.to_string(),
             phase: BestOfNPhase::Selecting,
-            message: "Selecting best candidate…".to_string(),
+            message: next_code_best_of_n::progress_preview(
+                BestOfNPhase::Selecting,
+                total,
+                total,
+                0,
+                None,
+            ),
             completed: total,
             total,
             candidates: candidates
@@ -316,9 +332,12 @@ pub async fn run_best_of_n_with_progress(
             BestOfNProgressPayload {
                 run_id: run_id.to_string(),
                 phase: BestOfNPhase::AwaitingPick,
-                message: format!(
-                    "Recommended #{} — pick a winner or cancel",
-                    selection.winner_index
+                message: next_code_best_of_n::progress_preview(
+                    BestOfNPhase::AwaitingPick,
+                    total,
+                    total,
+                    0,
+                    Some(selection.reason.as_str()),
                 ),
                 completed: total,
                 total,
@@ -346,7 +365,13 @@ pub async fn run_best_of_n_with_progress(
                     BestOfNProgressPayload {
                         run_id: run_id.to_string(),
                         phase: BestOfNPhase::Cancelled,
-                        message: "Best-of-N cancelled — no files applied.".to_string(),
+                        message: next_code_best_of_n::progress_preview(
+                            BestOfNPhase::Cancelled,
+                            total,
+                            total,
+                            0,
+                            None,
+                        ),
                         completed: total,
                         total,
                         candidates: ui_candidates,
@@ -383,7 +408,13 @@ pub async fn run_best_of_n_with_progress(
         BestOfNProgressPayload {
             run_id: run_id.to_string(),
             phase: BestOfNPhase::Applying,
-            message: format!("Applying candidate #{winner_index}…"),
+            message: next_code_best_of_n::progress_preview(
+                BestOfNPhase::Applying,
+                total,
+                total,
+                0,
+                None,
+            ),
             completed: total,
             total,
             candidates: ui_candidates.clone(),
@@ -402,7 +433,13 @@ pub async fn run_best_of_n_with_progress(
         BestOfNProgressPayload {
             run_id: run_id.to_string(),
             phase: BestOfNPhase::Done,
-            message: "Best-of-N done.".to_string(),
+            message: next_code_best_of_n::progress_preview(
+                BestOfNPhase::Done,
+                total,
+                total,
+                0,
+                Some(selection.reason.as_str()),
+            ),
             completed: total,
             total,
             candidates: ui_candidates,

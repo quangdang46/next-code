@@ -184,16 +184,19 @@ impl AgentView {
                 screen_rect: rect,
                 source,
             } = aff;
-            // Kick terminal-tier render for inline paint (no-op without graphics).
-            self.ensure_mermaid_inline(source.clone());
-            // Kick sidebar render when target is sidebar or both.
             let target = crate::appearance::cache::load_render_mermaid_target();
-            if target == "sidebar" || target == "both" {
+            let sidebar_only = target == "sidebar";
+            // Kick terminal-tier render for inline paint (no-op without graphics).
+            // Sidebar-only skips this — the diagram lives in the side panel.
+            if !sidebar_only {
+                self.ensure_mermaid_inline(source.clone());
+            }
+            // Kick sidebar render when target is sidebar or both.
+            if sidebar_only || target == "both" {
                 self.request_mermaid_sidebar_render(source.clone());
             }
-            // Sidebar-only: paint simplified affordance row with [Sidebar] button
+            // Sidebar-only: paint simplified affordance row with [Open Sidebar]
             // instead of the regular [Open Image] / [Copy Image Path] / [Copy Source].
-            let sidebar_only = target == "sidebar";
             let row = if sidebar_only {
                 crate::scrollback::blocks::mermaid_content::affordance_row_sidebar()
             } else {
