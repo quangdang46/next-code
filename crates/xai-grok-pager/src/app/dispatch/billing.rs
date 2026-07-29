@@ -197,6 +197,7 @@ pub(super) fn open_credit_limit_upsell(
             },
         ],
         multi_select: Some(false),
+        header: None,
         id: None,
     };
 
@@ -308,6 +309,7 @@ fn open_supergrok_upsell(
         question: heading.into(),
         options,
         multi_select: Some(false),
+        header: None,
         id: None,
     };
 

@@ -5421,6 +5421,7 @@ fn dashboard_question_answer_sends_and_clears() {
         question: "Which DB?".to_string(),
         options: vec![opt("Redis"), opt("Postgres")],
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let (tx, mut rx) = tokio::sync::oneshot::channel();
@@ -5470,12 +5471,14 @@ fn dashboard_question_answer_walks_multiple_questions() {
         question: "Which DB?".to_string(),
         options: vec![opt("Redis"), opt("Postgres")],
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let q2 = Question {
         question: "Which cache?".to_string(),
         options: vec![opt("LRU"), opt("LFU")],
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     let (tx, mut rx) = tokio::sync::oneshot::channel();

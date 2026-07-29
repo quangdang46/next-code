@@ -568,6 +568,21 @@ impl AgentView {
     /// cursor and toggle/select. Everything else is consumed (modal-ish).
     pub(super) fn handle_question_mouse(&mut self, mouse: &MouseEvent) -> InputOutcome {
         if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+            let clicked_tab = self
+                .question_tab_chips
+                .iter()
+                .find(|(_, rect)| rect.contains((mouse.column, mouse.row).into()))
+                .map(|(idx, _)| *idx);
+            if let Some(tab_idx) = clicked_tab {
+                self.last_question_click = None;
+                self.swap_question_freeform();
+                if let Some(ref mut qv) = self.question_view {
+                    qv.goto_question(tab_idx);
+                }
+                self.load_question_freeform();
+                self.ensure_question_cursor_visible();
+                return InputOutcome::Changed;
+            }
             for &(key_ch, rect) in &self.question_nav_buttons {
                 if rect.contains((mouse.column, mouse.row).into()) {
                     if let Some(ref mut qv) = self.question_view
@@ -615,10 +630,17 @@ impl AgentView {
                     .iter()
                     .find(|(_, rect)| rect.contains((mouse.column, mouse.row).into()))
                     .map(|(ch, _)| *ch);
-                let changed =
-                    item != self.hovered_question_item || btn != self.hovered_question_button;
+                let tab = self
+                    .question_tab_chips
+                    .iter()
+                    .find(|(_, rect)| rect.contains((mouse.column, mouse.row).into()))
+                    .map(|(idx, _)| *idx);
+                let changed = item != self.hovered_question_item
+                    || btn != self.hovered_question_button
+                    || tab != self.hovered_question_tab;
                 self.hovered_question_item = item;
                 self.hovered_question_button = btn;
+                self.hovered_question_tab = tab;
                 if changed {
                     InputOutcome::Changed
                 } else {
@@ -1635,6 +1657,7 @@ mod question_no_freeform_tests {
                 opt("Upgrade to SuperGrok Heavy", "Highest usage limits"),
             ],
             multi_select: Some(false),
+            header: None,
             id: None,
         }
     }
