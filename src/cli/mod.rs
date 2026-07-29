@@ -13,6 +13,7 @@ pub mod face_bash;
 pub mod face_best_of_n;
 pub mod face_context_viz;
 pub mod face_ext;
+pub mod face_goal;
 pub mod face_permission;
 pub mod face_plugins;
 pub mod face_welcome_status;

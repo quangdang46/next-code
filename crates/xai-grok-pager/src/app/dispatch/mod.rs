@@ -18,6 +18,7 @@ mod cta;
 mod ctx;
 mod dashboard;
 mod dashboard_telemetry;
+mod goal;
 mod import_claude;
 mod interject;
 mod jump;
