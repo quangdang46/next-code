@@ -79,6 +79,7 @@ pub mod soft_interrupt_store;
 pub mod sponsors;
 pub mod stdin_detect;
 pub mod storage;
+pub mod task_graph;
 pub mod telegram;
 pub mod terminal_launch;
 pub mod todo;
