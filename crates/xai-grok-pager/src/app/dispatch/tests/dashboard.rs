@@ -1430,9 +1430,10 @@ fn dashboard_peek_cycle_mode_cycles_peeked_agent() {
     assert_eq!(app.agents.get(&AgentId(0)).unwrap().plan_mode_pending, None);
     assert!(!app.agents.get(&AgentId(0)).unwrap().session.yolo_mode);
 
-    let _ = dispatch(Action::DashboardPeekCycleMode, &mut app);
+    let _ = dispatch(Action::DashboardPeekCycleMode, &mut app); // → Accept-Edits
+    let _ = dispatch(Action::DashboardPeekCycleMode, &mut app); // → Plan
 
-    // Normal → Plan: the PEEKED agent enters plan mode.
+    // Accept-Edits → Plan: the PEEKED agent enters plan mode.
     assert_eq!(
         app.agents.get(&AgentId(0)).unwrap().plan_mode_pending,
         Some(true),
@@ -1466,6 +1467,7 @@ fn dashboard_peek_cycle_does_not_retire_the_nudge() {
         ));
     }
     // The peeked agent has a plan nudge on screen (shown before the cycle).
+    // With nudge showing, Normal jumps straight to Plan (one-key promise).
     let _ = app.agents.get_mut(&AgentId(0)).unwrap().ephemeral_tip.show(
         crate::tips::plan_nudge::plan_nudge_tip(),
         &mut std::collections::HashMap::new(),

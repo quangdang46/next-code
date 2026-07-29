@@ -51,6 +51,14 @@ impl AgentView {
     pub(super) fn auto_flag_visible(&self, effective_plan: bool) -> bool {
         self.session.is_auto() && !self.session.is_yolo() && !effective_plan
     }
+    /// Whether the prompt "accept-edits" flag should render.
+    /// Yields to plan, always-approve, and auto (classifier).
+    pub(super) fn accept_edits_flag_visible(&self, effective_plan: bool) -> bool {
+        self.session.is_accept_edits()
+            && !self.session.is_yolo()
+            && !self.session.is_auto()
+            && !effective_plan
+    }
     /// Whether plan content is available for preview.
     fn plan_preview_available(&self) -> bool {
         self.plan_body_for_preview().is_some()
@@ -715,6 +723,7 @@ mod plan_chip_tests {
                 next_queue_id: 0,
                 yolo_mode: false,
                 auto_mode: false,
+                accept_edits_mode: false,
                 prompt_history: Vec::new(),
                 prompt_history_loading: false,
                 loading_replay: false,

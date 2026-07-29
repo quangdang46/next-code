@@ -2352,6 +2352,13 @@ impl AgentView {
                 bold: false,
             });
         }
+        if self.accept_edits_flag_visible(effective_plan) {
+            mode_flags_vec.push(PromptFlag {
+                text: "accept-edits",
+                color: Some(theme.accent_system),
+                bold: false,
+            });
+        }
         if self.auto_flag_visible(effective_plan) {
             mode_flags_vec.push(PromptFlag {
                 text: "auto",

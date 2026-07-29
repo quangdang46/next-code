@@ -1529,6 +1529,7 @@ fn set_simple_mode_propagates_to_every_agent() {
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,
@@ -2799,14 +2800,15 @@ fn dispatch_cycle_mode_refreshes_open_modal_snapshot() {
         !state.pager_snapshot.plan_mode_active,
         "snapshot at open should be false (agent default)",
     );
-    let _ = dispatch(Action::CycleMode, &mut app);
+    let _ = dispatch(Action::CycleMode, &mut app); // Normal → Accept-Edits
+    let _ = dispatch(Action::CycleMode, &mut app); // Accept-Edits → Plan
     let agent = app.agents.get(&AgentId(0)).unwrap();
     let Some(ActiveModal::Settings { state }) = &agent.active_modal else {
         panic!("Settings modal must remain open across CycleMode")
     };
     assert!(
         state.pager_snapshot.plan_mode_active,
-        "snapshot must be refreshed to true after CycleMode (Normal → Plan) — \
+        "snapshot must be refreshed to true after CycleMode (Accept-Edits → Plan) — \
              without refresh_open_settings_modals the indicator would stay stale",
     );
     let cur_value =
