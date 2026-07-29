@@ -154,10 +154,15 @@ impl Agent {
             result.keyword_prompt
         };
 
-        // When best-of-N is enabled in config, inject a short reminder even without $bestofn.
+        // When best-of-N is enabled in config AND experiment is active, inject a short reminder.
         let best_of_n_prompt = {
-            let bon = &crate::config::config().best_of_n;
-            if bon.enabled() {
+            let cfg = crate::config::config();
+            let bon = &cfg.best_of_n;
+            let experiment_on = cfg
+                .experiments
+                .materialize()
+                .check(next_code_experiment_flags::ExperimentFlag::BestOfN);
+            if bon.enabled() && experiment_on {
                 Some(format!(
                     "# Best-of-N editing is ON (mode={}, count={})\n\
                      For non-trivial multi-approach edits: best_of_n_edit → propose_* drafts → best_of_n_apply.\n\

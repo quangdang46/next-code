@@ -1,9 +1,9 @@
 # Plan — Face AskUserQuestion multi-question / multi-select parity
 
 **Date:** 2026-07-24  
-**Branch:** `docs/ask-user-multiquestion-plan`  
-**Status:** LOOK done — temporary PLAN only (no UI implementation in this PR)  
-**Related:** [PLAN-20260722-face-ask-user-question-wire.md](./PLAN-20260722-face-ask-user-question-wire.md) (wire landed via PR #76/#77); this plan is **UX + schema parity**, not re-wiring ACP.
+**Branch:** `pr-face-ask-user-multiquestion`  
+**Status:** Implemented — Phase A (schema/`header`/`multiSelect`) + Phase B (chip tab bar)  
+**Related:** [PLAN-20260722-face-ask-user-question-wire.md](./PLAN-20260722-face-ask-user-question-wire.md) (wire landed via PR #76/#77); docs plan was PR #83.
 
 ---
 
@@ -183,4 +183,11 @@
 
 ## Status
 
-Docs-only PR. Reply **go ahead Phase A** (or A+B) to implement.
+**Implemented (Phase A + B).** Phase C remains smoke-only verification.
+
+Smoke checklist:
+- [x] Schema exposes `header`, `multiSelect`, 1–4 questions, 2–4 options
+- [x] Wire deserializes Claude-shaped payloads (`header` + `multiSelect`)
+- [x] Multi-question chip tab bar renders with answered `[x]` / unanswered `[ ]`
+- [x] Chip click + ←/→ switch tabs; radio + checkbox mix preserved
+- [ ] Live Face smoke with model-emitted multi-question payload (manual)

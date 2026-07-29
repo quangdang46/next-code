@@ -234,6 +234,7 @@ pub(super) fn dispatch_login(app: &mut AppView) -> Vec<Effect> {
     let request_seq = app.next_auth_request_seq;
     app.next_auth_request_seq += 1;
     app.auth_code_input.reset();
+    app.auth_input_at = None;
     // Auth UI replaces the welcome prompt; clear focus so leftover state from
     // a prior welcome visit cannot steal loopback token keystrokes.
     app.welcome_prompt_focused = false;
@@ -419,6 +420,17 @@ pub(super) fn handle_auth_complete(
         if app.session_startup_allowed() {
             effects.extend(drain_startup_actions(app));
         }
+        // Fresh auth with no deferred startup action (resume / worktree /
+        // initial-prompt): auto-create a new session so the user lands in
+        // the prompt instead of a blank/black welcome screen. Mirrors the
+        // minimal-mode fallback in `event_loop.rs::run`.
+        if !app.is_zdr_blocked()
+            && app.has_access()
+            && matches!(app.active_view, ActiveView::Welcome)
+            && app.deferred_startup.is_empty()
+        {
+            effects.extend(super::dispatch(Action::NewSession, app));
+        }
         maybe_open_model_picker_after_connect(app, &mut effects);
         return effects;
     }
@@ -428,30 +440,42 @@ pub(super) fn handle_auth_complete(
 /// After `/connect` auth succeeds, open the Select-model ArgPicker (OpenCode
 /// `dialog.replace(DialogModel)` parity). No-op when the flag is unset
 /// (plain `/login` / 401 re-auth) or when the active view cannot host a picker.
-fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: &mut Vec<Effect>) {
+///
+/// When the model catalog is still empty (daemon has not pushed History /
+/// `x.ai/models/update` yet), keep the flag set and return — callers reopen
+/// once models land (`SessionCreated` / models update). Opening early shows
+/// only Popular providers and leaves the status bar on `unknown`.
+///
+/// Likewise keep the flag when still on Welcome: `OpenModelPicker` is a no-op
+/// there, and clearing early would drop the post-connect picker if the catalog
+/// raced ahead of `NewSession` / trust drain.
+pub(crate) fn maybe_open_model_picker_after_connect(app: &mut AppView, effects: &mut Vec<Effect>) {
     if !app.open_model_picker_after_auth {
         return;
     }
-    app.open_model_picker_after_auth = false;
-
+    if app.models.is_empty() {
+        return;
+    }
     // Prefer the shared catalog so the picker is populated when agents still
     // hold a stale/empty session ModelState (cold start / pre-refresh).
-    if !app.models.is_empty() {
-        match app.active_view {
-            ActiveView::Agent(id) => {
-                if let Some(agent) = app.agents.get_mut(&id) {
-                    agent.session.models = app.models.clone();
-                }
+    match app.active_view {
+        ActiveView::Agent(id) => {
+            if let Some(agent) = app.agents.get_mut(&id) {
+                agent.session.models = app.models.clone();
             }
-            ActiveView::AgentDashboard => {
-                if let Some(dashboard) = app.dashboard.as_mut() {
-                    dashboard.models = app.models.clone();
-                }
+        }
+        ActiveView::AgentDashboard => {
+            if let Some(dashboard) = app.dashboard.as_mut() {
+                dashboard.models = app.models.clone();
             }
-            ActiveView::Welcome => {}
+        }
+        ActiveView::Welcome => {
+            // Host not ready — leave flag set for SessionCreated / models update.
+            return;
         }
     }
 
+    app.open_model_picker_after_auth = false;
     app.show_toast("Connected — pick a model");
     effects.extend(dispatch(Action::OpenModelPicker, app));
 }

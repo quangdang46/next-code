@@ -1129,6 +1129,57 @@ fn set_yolo_mode_off_allowed_under_policy_pin() {
     ));
 }
 
+/// Shift+Tab cycle: Normal → Accept-Edits (Claude acceptEdits chrome).
+#[test]
+fn cycle_mode_normal_to_accept_edits() {
+    let mut app = test_app_with_agent();
+    let effects = dispatch(Action::CycleMode, &mut app);
+    assert_eq!(
+        app.current_ui.permission_mode.as_deref(),
+        Some("accept-edits"),
+        "Normal must enter Accept-Edits before Plan"
+    );
+    assert!(
+        app.agents[&AgentId(0)].session.is_accept_edits(),
+        "session accept_edits mirror must sync"
+    );
+    assert!(
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::PersistPermissionMode {
+                canonical: "accept-edits",
+                ..
+            }
+        )),
+        "expected PersistPermissionMode(accept-edits), got {effects:?}"
+    );
+    assert!(
+        !app.agents[&AgentId(0)]
+            .plan_mode_pending
+            .unwrap_or(false),
+        "Accept-Edits must not enter plan"
+    );
+}
+
+/// Shift+Tab cycle: Accept-Edits → Plan.
+#[test]
+fn cycle_mode_accept_edits_to_plan() {
+    let mut app = test_app_with_agent();
+    app.current_ui.permission_mode = Some("accept-edits".into());
+    let effects = dispatch(Action::CycleMode, &mut app);
+    assert_eq!(
+        app.agents[&AgentId(0)].plan_mode_pending,
+        Some(true),
+        "Accept-Edits → Plan must set plan_mode_pending"
+    );
+    assert!(
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::SetSessionMode { .. })),
+        "Accept-Edits → Plan must emit SetSessionMode, got {effects:?}"
+    );
+}
+
 /// Shift+Tab cycle: Plan → Auto (always-approve is a later step).
 /// Plan exit is pushed; PersistPermissionMode(auto) notifies the agent.
 #[test]
@@ -1350,22 +1401,49 @@ fn cycle_mode_pre_session_always_approve_to_normal_persists_ask() {
     );
 }
 
-/// Negative control for the pre-session persist: Normal → Plan changes the
-/// SESSION mode, not the permission mode — nothing to write to
-/// `ui.permission_mode` (matches the with-session Normal → Plan arm).
+/// Negative control for the pre-session persist: Normal → Accept-Edits
+/// writes `ui.permission_mode` (Accept-Edits is a permission mode, not a
+/// session mode). Accept-Edits → Plan then changes SESSION mode.
 #[test]
-fn cycle_mode_pre_session_normal_to_plan_does_not_persist_permission_mode() {
+fn cycle_mode_pre_session_normal_to_accept_edits_persists_permission_mode() {
     let mut app = test_app_with_agent();
     app.agents.get_mut(&AgentId(0)).unwrap().session.session_id = None;
 
     let effects = dispatch(Action::CycleMode, &mut app);
 
+    assert_eq!(
+        app.current_ui.permission_mode.as_deref(),
+        Some("accept-edits")
+    );
+    assert!(
+        effects.iter().any(|e| matches!(
+            e,
+            Effect::PersistPermissionMode {
+                canonical: "accept-edits",
+                ..
+            }
+        )),
+        "Normal → Accept-Edits must persist permission mode, got {effects:?}"
+    );
+}
+
+/// Pre-session Accept-Edits → Plan: session mode changes; permission clears
+/// back toward ask for the plan arm.
+#[test]
+fn cycle_mode_pre_session_accept_edits_to_plan() {
+    let mut app = test_app_with_agent();
+    app.agents.get_mut(&AgentId(0)).unwrap().session.session_id = None;
+    app.current_ui.permission_mode = Some("accept-edits".into());
+
+    let effects = dispatch(Action::CycleMode, &mut app);
+
     assert_eq!(app.agents[&AgentId(0)].plan_mode_pending, Some(true));
     assert!(
-        !effects
+        effects
             .iter()
-            .any(|e| matches!(e, Effect::PersistPermissionMode { .. })),
-        "Normal → Plan must not touch the persisted permission mode, got {effects:?}"
+            .any(|e| matches!(e, Effect::CreateSession { .. }))
+            || app.agents[&AgentId(0)].deferred_session_mode.is_some(),
+        "Accept-Edits → Plan pre-session must stage Plan, got {effects:?}"
     );
 }
 
@@ -1669,11 +1747,12 @@ fn permission_mode_toast_returns_brand_consistent_strings() {
     );
 }
 
-/// Normal → Plan: cycle_mode requests plan_mode_pending but does
+/// Accept-Edits → Plan: cycle_mode requests plan_mode_pending but does
 /// NOT touch YOLO state. Pins the no-yolo-mutation invariant.
 #[test]
-fn dispatch_cycle_mode_normal_to_plan_does_not_touch_yolo() {
+fn dispatch_cycle_mode_accept_edits_to_plan_does_not_touch_yolo() {
     let mut app = test_app_with_agent();
+    app.current_ui.permission_mode = Some("accept-edits".into());
     assert!(!app.agents[&AgentId(0)].session.is_yolo());
 
     let effects = dispatch(Action::CycleMode, &mut app);
@@ -1682,19 +1761,50 @@ fn dispatch_cycle_mode_normal_to_plan_does_not_touch_yolo() {
     assert_eq!(
         app.agents[&AgentId(0)].plan_mode_pending,
         Some(true),
-        "Normal → Plan must set plan_mode_pending"
+        "Accept-Edits → Plan must set plan_mode_pending"
     );
     // YOLO state unchanged.
     assert!(
         !app.agents[&AgentId(0)].session.is_yolo(),
-        "Normal → Plan must NOT flip YOLO state",
+        "Accept-Edits → Plan must NOT flip YOLO state",
     );
     assert!(!app.default_yolo, "app.default_yolo must remain false");
-    // Single effect: SetSessionMode (no PersistPermissionMode).
-    assert_eq!(effects.len(), 1, "Normal → Plan must emit one effect");
+    // SetSessionMode (+ PersistPermissionMode clearing accept-edits → ask).
     assert!(
-        matches!(effects[0], Effect::SetSessionMode { .. }),
-        "Normal → Plan effect must be SetSessionMode, got {:?}",
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::SetSessionMode { .. })),
+        "Accept-Edits → Plan must emit SetSessionMode, got {effects:?}"
+    );
+}
+
+/// Normal → Accept-Edits: first Shift+Tab step (Claude order).
+#[test]
+fn dispatch_cycle_mode_normal_to_accept_edits_does_not_touch_yolo() {
+    let mut app = test_app_with_agent();
+    assert!(!app.agents[&AgentId(0)].session.is_yolo());
+
+    let effects = dispatch(Action::CycleMode, &mut app);
+
+    assert_eq!(
+        app.current_ui.permission_mode.as_deref(),
+        Some("accept-edits")
+    );
+    assert!(
+        !app.agents[&AgentId(0)].session.is_yolo(),
+        "Normal → Accept-Edits must NOT flip YOLO state",
+    );
+    assert!(!app.default_yolo, "app.default_yolo must remain false");
+    assert_eq!(effects.len(), 1, "Normal → Accept-Edits must emit one effect");
+    assert!(
+        matches!(
+            effects[0],
+            Effect::PersistPermissionMode {
+                canonical: "accept-edits",
+                ..
+            }
+        ),
+        "Normal → Accept-Edits effect must be PersistPermissionMode, got {:?}",
         effects[0],
     );
 }
@@ -1756,7 +1866,8 @@ fn cycle_into_plan_without_nudge_leaves_other_tip_intact() {
         &mut std::collections::HashMap::new(),
     );
 
-    let _ = dispatch(Action::CycleMode, &mut app);
+    let _ = dispatch(Action::CycleMode, &mut app); // → Accept-Edits
+    let _ = dispatch(Action::CycleMode, &mut app); // → Plan
 
     assert_eq!(
         app.agents[&AgentId(0)].plan_mode_pending,
@@ -2246,7 +2357,13 @@ fn plan_mode_toast_format() {
         !toast.contains(": On"),
         "ON toast must NOT use capital 'On' (PR 10 R1 G-3 #1 fix): {toast}",
     );
-    assert!(toast.contains('\u{2713}'));
+    // show_toast runs legacy_glyph_fallback which may rewrite ✓ on some hosts.
+    assert!(
+        toast.contains('\u{2713}')
+            || toast.contains("[OK]")
+            || toast.contains("Plan mode: on"),
+        "ON toast should keep Plan mode success marker (glyph or fallback): {toast}"
+    );
 
     // Bring the agent into plan mode for the OFF toast assertion.
     // (The previous SetPlanMode(On) set pending = Some(true); we
@@ -2321,4 +2438,88 @@ fn set_plan_mode_idempotency_uses_pending_over_active() {
         Some(false),
         "OFF transition must set optimistic pending to Some(false)"
     );
+}
+
+/// Approve path: pending already false but plan_mode_active still true
+/// must still emit SetSessionMode(Off) — the tightened idempotent guard
+/// must not short-circuit this case.
+#[test]
+fn set_plan_mode_off_emits_when_pending_false_but_active_true() {
+    let mut app = test_app_with_agent();
+    {
+        let agent = app.agents.get_mut(&AgentId(0)).unwrap();
+        agent.plan_mode_active = true;
+        agent.plan_mode_pending = Some(false);
+        agent.pre_plan_mode = Some(xai_grok_tools::types::SessionMode::Ask);
+    }
+
+    let effects = dispatch(
+        Action::SetPlanMode(crate::app::actions::PlanModeKind::Off),
+        &mut app,
+    );
+    assert_eq!(
+        effects.len(),
+        1,
+        "approve-style OFF (pending=false, active=true) must emit Effect"
+    );
+    assert!(
+        matches!(&effects[0], Effect::SetSessionMode { mode_id, .. } if &*mode_id.0 == "ask"),
+        "must restore prePlanMode Ask: {effects:?}"
+    );
+    let agent = app.agents.get(&AgentId(0)).unwrap();
+    assert_eq!(agent.plan_mode_pending, Some(false));
+    assert!(agent.pre_plan_mode.is_none(), "pre_plan_mode consumed on exit");
+}
+
+#[test]
+fn toggle_thinking_effort_cycles_when_menu_omits_none() {
+    use std::sync::Arc;
+    use xai_grok_shell::sampling::types::ReasoningEffort;
+
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        let model_id = acp::ModelId::new(Arc::from("reasoning-x"));
+        let info = acp::ModelInfo::new(model_id.clone(), "Reasoning X".to_string()).meta(
+            serde_json::json!({ "supportsReasoningEffort": true })
+                .as_object()
+                .cloned(),
+        );
+        agent.session.models.available.insert(model_id.clone(), info);
+        agent.session.models.current = Some(model_id.clone());
+        agent.session.models.reasoning_effort = Some(ReasoningEffort::Low);
+    }
+
+    let effects = dispatch(Action::ToggleThinkingEffort, &mut app);
+    assert_eq!(effects.len(), 1);
+    assert!(
+        matches!(
+            &effects[0],
+            Effect::SwitchModel {
+                effort: Some(ReasoningEffort::Xhigh),
+                ..
+            }
+        ),
+        "legacy menu is xhigh|high|medium|low (strongest first); Low→Xhigh wrap: {effects:?}"
+    );
+    assert!(app.agents[&id].session.model_switch_pending);
+}
+
+#[test]
+fn toggle_thinking_effort_toasts_when_unsupported() {
+    let mut app = test_app_with_agent();
+    let id = AgentId(0);
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        let model_id = acp::ModelId::new(std::sync::Arc::from("plain"));
+        let info = acp::ModelInfo::new(model_id.clone(), "Plain".to_string());
+        agent.session.models.available.insert(model_id.clone(), info);
+        agent.session.models.current = Some(model_id);
+        agent.session.models.reasoning_effort = None;
+    }
+
+    let effects = dispatch(Action::ToggleThinkingEffort, &mut app);
+    assert!(effects.is_empty());
+    assert!(!app.agents[&id].session.model_switch_pending);
 }

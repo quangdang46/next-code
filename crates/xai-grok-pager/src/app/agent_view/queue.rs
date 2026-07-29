@@ -408,6 +408,12 @@ impl AgentView {
             .values()
             .filter(|s| s.is_running())
             .count();
+        // Multitask / swarm workers (#126) — surface on footer chrome counts.
+        watchers.workers = self
+            .swarm_members
+            .values()
+            .filter(|m| m.roster_status().is_active())
+            .count();
         watchers.unread_completed = self.tasks.unread_completed_count();
         watchers
     }
@@ -1786,6 +1792,7 @@ mod watcher_tests {
                 monitors: 1,
                 loops: 0,
                 subagents: 0,
+                workers: 0,
                 unread_completed: 0,
             }
         );

@@ -78,15 +78,108 @@ pub struct QuestionOption {
     pub id: Option<String>,
 }
 
+/// Max characters shown on a Face/Claude-style question chip tab.
+pub const QUESTION_HEADER_CHIP_WIDTH: usize = 12;
+
+/// Soft Claude-parity limits (schema documents these; execute may truncate).
+pub const MAX_QUESTIONS: usize = 4;
+pub const MIN_OPTIONS_PER_QUESTION: usize = 2;
+pub const MAX_OPTIONS_PER_QUESTION: usize = 4;
+
 /// A single question with its options.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Question {
     pub question: String,
     pub options: Vec<QuestionOption>,
-    /// Model-facing schema name is snake_case (`multi_select`); also accept ACP `multiSelect`.
+    /// Allow multiple answers. Wire name is `multiSelect` (camelCase); also
+    /// accept snake_case `multi_select` for older payloads.
     #[serde(default, alias = "multi_select")]
     pub multi_select: Option<bool>,
+    /// Short chip/tab label (≤ [`QUESTION_HEADER_CHIP_WIDTH`] chars). Optional
+    /// for backward compatibility; Face falls back to `Q{n}` when missing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
+}
+
+impl Question {
+    /// Chip label for multi-question nav: truncated `header`, or `Q{n}` (1-based).
+    pub fn chip_label(&self, index: usize) -> String {
+        let raw = self
+            .header
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("Q{}", index + 1));
+        truncate_chip_label(&raw, QUESTION_HEADER_CHIP_WIDTH)
+    }
+}
+
+/// Truncate a chip label to `max_chars` on a UTF-8 char boundary.
+pub fn truncate_chip_label(label: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    for (i, ch) in label.chars().enumerate() {
+        if i >= max_chars {
+            break;
+        }
+        out.push(ch);
+    }
+    out
+}
+
+#[cfg(test)]
+mod question_wire_tests {
+    use super::*;
+
+    #[test]
+    fn deserializes_claude_shaped_multiselect_and_header() {
+        let json = r#"{
+            "question": "Which features?",
+            "header": "Features",
+            "options": [
+                {"label": "Auth", "description": "Login"},
+                {"label": "Logging", "description": "Logs"}
+            ],
+            "multiSelect": true
+        }"#;
+        let q: Question = serde_json::from_str(json).unwrap();
+        assert_eq!(q.header.as_deref(), Some("Features"));
+        assert_eq!(q.multi_select, Some(true));
+        assert_eq!(q.chip_label(0), "Features");
+    }
+
+    #[test]
+    fn deserializes_snake_case_multi_select_alias() {
+        let json = r#"{
+            "question": "Pick one?",
+            "options": [
+                {"label": "A", "description": "a"},
+                {"label": "B", "description": "b"}
+            ],
+            "multi_select": true
+        }"#;
+        let q: Question = serde_json::from_str(json).unwrap();
+        assert_eq!(q.multi_select, Some(true));
+        assert!(q.header.is_none());
+        assert_eq!(q.chip_label(2), "Q3");
+    }
+
+    #[test]
+    fn chip_label_truncates_to_twelve() {
+        let q = Question {
+            question: "Long?".into(),
+            options: vec![],
+            multi_select: None,
+            header: Some("AuthenticationMethod".into()),
+            id: None,
+        };
+        assert_eq!(q.chip_label(0), "Authentication");
+        assert_eq!(q.chip_label(0).chars().count(), QUESTION_HEADER_CHIP_WIDTH);
+    }
 }

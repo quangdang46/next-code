@@ -249,6 +249,7 @@ mod tests {
                 })
                 .collect(),
             multi_select: None,
+            header: None,
             id: None,
         }
     }
@@ -400,6 +401,7 @@ mod tests {
                 })
                 .collect(),
             multi_select: None,
+            header: None,
             id: Some(qid.to_string()),
         }
     }

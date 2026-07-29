@@ -4,6 +4,7 @@
 
 mod agent;
 mod bg_task;
+mod best_of_n;
 mod btw;
 mod context_info;
 mod credit_limit;
@@ -22,6 +23,7 @@ pub use bg_task::{BgTaskBlock, BgTaskKind};
 pub use btw::BtwBlock;
 pub use context_info::ContextInfoBlock;
 pub use credit_limit::{CreditLimitBlock, CreditLimitCardAction};
+pub use best_of_n::BestOfNBlock;
 pub use session_event::{SessionEvent, SessionEventBlock, TurnTokenUsage};
 pub use subagent::{SubagentBlock, SubagentBlockKind};
 pub use system::SystemMessageBlock;

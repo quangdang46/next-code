@@ -5,31 +5,55 @@
 use serde::{Deserialize, Serialize};
 
 /// Known statusline segment ids (stable config / Settings / `/statusline` vocabulary).
+///
+/// Codex parity extras: `Reasoning` (effort) and `RunState` (idle/running/…).
+/// Ref: `.tmp/codex/codex-rs/tui/src/bottom_pane/status_line_setup.rs` `StatusLineItem`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum StatusLineSegment {
     Mode,
     Model,
+    /// Reasoning effort alone (`high`, `low`, …). When on, Model drops the
+    /// embedded `(effort)` suffix so the chrome stays scannable.
+    Reasoning,
+    /// Compact turn/run state (`idle` / `running` / `cancelling` / …).
+    RunState,
     Context,
+    /// Exact context usage (e.g. "45k/128k") instead of percentage.
+    ContextRemaining,
     Cwd,
     Git,
+    /// Current session/agent title.
+    ThreadTitle,
+    /// Plan-mode or auto-approve indicator badge.
+    ApprovalMode,
 }
 
 impl StatusLineSegment {
     pub const ALL: &'static [Self] = &[
         Self::Mode,
         Self::Model,
+        Self::Reasoning,
+        Self::RunState,
         Self::Context,
+        Self::ContextRemaining,
         Self::Cwd,
         Self::Git,
+        Self::ThreadTitle,
+        Self::ApprovalMode,
     ];
 
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Mode => "mode",
             Self::Model => "model",
+            Self::Reasoning => "reasoning",
+            Self::RunState => "run-state",
             Self::Context => "context",
+            Self::ContextRemaining => "context_remaining",
             Self::Cwd => "cwd",
             Self::Git => "git",
+            Self::ThreadTitle => "thread_title",
+            Self::ApprovalMode => "approval_mode",
         }
     }
 
@@ -37,8 +61,13 @@ impl StatusLineSegment {
         match raw.trim().to_ascii_lowercase().as_str() {
             "mode" | "permission" | "permissions" => Some(Self::Mode),
             "model" => Some(Self::Model),
+            "reasoning" | "effort" | "thinking" => Some(Self::Reasoning),
+            "run-state" | "run_state" | "status" | "state" => Some(Self::RunState),
             "context" | "context%" | "ctx" => Some(Self::Context),
             "cwd" | "dir" | "directory" | "pwd" => Some(Self::Cwd),
+            "context_remaining" | "ctx_remaining" | "ctx_used" | "used" => Some(Self::ContextRemaining),
+            "thread_title" | "title" | "session" | "session_title" => Some(Self::ThreadTitle),
+            "approval_mode" | "approval" | "plan" | "auto" => Some(Self::ApprovalMode),
             "git" | "branch" => Some(Self::Git),
             _ => None,
         }
@@ -61,9 +90,15 @@ pub struct StatusLineConfig {
     /// Show permission/plan/auto mode flags. `None` → on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<bool>,
-    /// Show model (+ effort) label. `None` → on.
+    /// Show model label. `None` → on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<bool>,
+    /// Show reasoning effort as its own segment. `None` → on (Codex-like).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<bool>,
+    /// Show compact run/turn state. `None` → on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_state: Option<bool>,
     /// Show context usage percent. `None` → on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context: Option<bool>,
@@ -73,6 +108,15 @@ pub struct StatusLineConfig {
     /// Show git branch. `None` → off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<bool>,
+    /// Show exact context usage (e.g. "45k/128k"). `None` → off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_remaining: Option<bool>,
+    /// Show session/agent thread title. `None` → off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thread_title: Option<bool>,
+    /// Show plan-mode or auto-approve indicator. `None` → off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_mode: Option<bool>,
     /// Optional comma-separated reorder (`"model,mode,context"`). Unknown ids ignored.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub order: Option<String>,
@@ -83,9 +127,14 @@ impl StatusLineConfig {
         self.enabled.is_none()
             && self.mode.is_none()
             && self.model.is_none()
+            && self.reasoning.is_none()
+            && self.run_state.is_none()
             && self.context.is_none()
             && self.cwd.is_none()
             && self.git.is_none()
+            && self.context_remaining.is_none()
+            && self.thread_title.is_none()
+            && self.approval_mode.is_none()
             && self.order.is_none()
     }
 
@@ -96,14 +145,23 @@ impl StatusLineConfig {
     pub fn segment_visible(&self, segment: StatusLineSegment) -> bool {
         let default_on = matches!(
             segment,
-            StatusLineSegment::Mode | StatusLineSegment::Model | StatusLineSegment::Context
+            StatusLineSegment::Mode
+                | StatusLineSegment::Model
+                | StatusLineSegment::Reasoning
+                | StatusLineSegment::RunState
+                | StatusLineSegment::Context
         );
         match segment {
             StatusLineSegment::Mode => self.mode.unwrap_or(default_on),
             StatusLineSegment::Model => self.model.unwrap_or(default_on),
+            StatusLineSegment::Reasoning => self.reasoning.unwrap_or(default_on),
+            StatusLineSegment::RunState => self.run_state.unwrap_or(default_on),
             StatusLineSegment::Context => self.context.unwrap_or(default_on),
             StatusLineSegment::Cwd => self.cwd.unwrap_or(default_on),
             StatusLineSegment::Git => self.git.unwrap_or(default_on),
+            StatusLineSegment::ContextRemaining => self.context_remaining.unwrap_or(default_on),
+            StatusLineSegment::ThreadTitle => self.thread_title.unwrap_or(default_on),
+            StatusLineSegment::ApprovalMode => self.approval_mode.unwrap_or(default_on),
         }
     }
 
@@ -111,9 +169,14 @@ impl StatusLineConfig {
         match segment {
             StatusLineSegment::Mode => self.mode = Some(on),
             StatusLineSegment::Model => self.model = Some(on),
+            StatusLineSegment::Reasoning => self.reasoning = Some(on),
+            StatusLineSegment::RunState => self.run_state = Some(on),
             StatusLineSegment::Context => self.context = Some(on),
             StatusLineSegment::Cwd => self.cwd = Some(on),
             StatusLineSegment::Git => self.git = Some(on),
+            StatusLineSegment::ContextRemaining => self.context_remaining = Some(on),
+            StatusLineSegment::ThreadTitle => self.thread_title = Some(on),
+            StatusLineSegment::ApprovalMode => self.approval_mode = Some(on),
         }
     }
 
@@ -212,9 +275,19 @@ impl StatusLineConfig {
 #[derive(Debug, Clone, Default)]
 pub struct StatusLineSnapshot {
     pub model: String,
+    /// Reasoning effort label (`high`, `low`, …) when the model supports it.
+    pub reasoning: Option<String>,
+    /// Compact run/turn state (`idle`, `running`, …).
+    pub run_state: Option<String>,
     pub context_pct: Option<u8>,
+    /// Exact token usage: `(used, total)` for context-remaining segment.
+    pub context_used: Option<(u64, u64)>,
     pub cwd_basename: Option<String>,
     pub git_branch: Option<String>,
+    /// Session/agent display title for thread-title segment.
+    pub thread_title: Option<String>,
+    /// Plan-mode or auto-approve badge label for approval-mode segment.
+    pub approval_mode_label: Option<String>,
     /// Pre-formatted mode flag texts (plan / always-approve / auto / …).
     pub mode_labels: Vec<String>,
 }
@@ -245,12 +318,32 @@ pub fn select_status_line_parts(
             }
             StatusLineSegment::Model => {
                 if !snap.model.is_empty() {
-                    parts.push(StatusLinePart::Model(snap.model.clone()));
+                    // When Reasoning is its own segment, keep Model bare;
+                    // otherwise embed effort for backward-compatible density.
+                    let label = if cfg.segment_visible(StatusLineSegment::Reasoning) {
+                        snap.model.clone()
+                    } else if let Some(eff) = snap.reasoning.as_ref().filter(|s| !s.is_empty()) {
+                        format!("{} ({eff})", snap.model)
+                    } else {
+                        snap.model.clone()
+                    };
+                    parts.push(StatusLinePart::Model(label));
+                }
+            }
+            StatusLineSegment::Reasoning => {
+                if let Some(eff) = snap.reasoning.as_ref().filter(|s| !s.is_empty()) {
+                    parts.push(StatusLinePart::Flag(eff.clone()));
+                }
+            }
+            StatusLineSegment::RunState => {
+                if let Some(state) = snap.run_state.as_ref().filter(|s| !s.is_empty()) {
+                    parts.push(StatusLinePart::Flag(state.clone()));
                 }
             }
             StatusLineSegment::Context => {
                 if let Some(pct) = snap.context_pct {
-                    parts.push(StatusLinePart::Flag(format!("{pct}%")));
+                    // Claude BuiltinStatusLine: "Context N%"
+                    parts.push(StatusLinePart::Flag(format!("Context {pct}%")));
                 }
             }
             StatusLineSegment::Cwd => {
@@ -261,6 +354,28 @@ pub fn select_status_line_parts(
             StatusLineSegment::Git => {
                 if let Some(branch) = snap.git_branch.as_ref().filter(|s| !s.is_empty()) {
                     parts.push(StatusLinePart::Flag(branch.clone()));
+                }
+            }
+            StatusLineSegment::ContextRemaining => {
+                if let Some((used, total)) = snap.context_used {
+                    let used_k = used / 1000;
+                    let total_k = total / 1000;
+                    parts.push(StatusLinePart::Flag(format!("{used_k}k/{total_k}k")));
+                }
+            }
+            StatusLineSegment::ThreadTitle => {
+                if let Some(title) = snap.thread_title.as_ref().filter(|s| !s.is_empty()) {
+                    let display = if title.chars().count() > 22 {
+                        format!("{}…", title.chars().take(20).collect::<String>())
+                    } else {
+                        title.clone()
+                    };
+                    parts.push(StatusLinePart::Flag(display));
+                }
+            }
+            StatusLineSegment::ApprovalMode => {
+                if let Some(label) = snap.approval_mode_label.as_ref().filter(|s| !s.is_empty()) {
+                    parts.push(StatusLinePart::Flag(format!("[{label}]")));
                 }
             }
         }
@@ -291,7 +406,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn defaults_select_mode_model_context() {
+    fn defaults_select_mode_model_reasoning_run_state_context() {
         let cfg = StatusLineConfig::default();
         assert!(cfg.enabled());
         assert_eq!(
@@ -300,6 +415,8 @@ mod tests {
                 StatusLineSegment::Mode,
                 StatusLineSegment::Model,
                 StatusLineSegment::Context,
+                StatusLineSegment::Reasoning,
+                StatusLineSegment::RunState,
             ]
         );
     }
@@ -340,6 +457,8 @@ mod tests {
         let cfg = StatusLineConfig {
             context: Some(false),
             cwd: Some(true),
+            reasoning: Some(false),
+            run_state: Some(false),
             order: Some("model,cwd,mode,context".into()),
             ..Default::default()
         };
@@ -362,6 +481,7 @@ mod tests {
             mode_labels: vec!["always-approve".into()],
             cwd_basename: Some("next-code".into()),
             git_branch: Some("dev".into()),
+            ..Default::default()
         };
         let parts = select_status_line_parts(&cfg, &snap);
         assert_eq!(
@@ -369,12 +489,12 @@ mod tests {
             vec![
                 StatusLinePart::Flag("always-approve".into()),
                 StatusLinePart::Model("grok-4".into()),
-                StatusLinePart::Flag("35%".into()),
+                StatusLinePart::Flag("Context 35%".into()),
             ]
         );
         let (model, flags) = split_prompt_info_parts(&parts);
         assert_eq!(model, "grok-4");
-        assert_eq!(flags, vec!["always-approve", "35%"]);
+        assert_eq!(flags, vec!["always-approve", "Context 35%"]);
     }
 
     #[test]
@@ -391,6 +511,7 @@ mod tests {
             cwd_basename: None,
             git_branch: Some("main".into()),
             mode_labels: vec!["plan".into()],
+            ..Default::default()
         };
         let parts = select_status_line_parts(&cfg, &snap);
         assert_eq!(

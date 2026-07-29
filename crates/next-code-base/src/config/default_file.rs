@@ -210,6 +210,7 @@ update_channel = "stable"
 # with Stage::Experimental { name, menu_description, announcement }.
 # [experiments]
 # js_plugins = true
+# best_of_n = true  # experimental: spawn N parallel candidates, select best edit
 
 [websearch]
 # Preferred websearch engine: "duckduckgo", "bing", or "searxng".
@@ -243,8 +244,9 @@ bing_market = "en-US"
 profile = "full"
 # Explicit allow-list. When non-empty, only these tools are exposed.
 # enabled = ["bash", "read", "write", "edit", "ls"]
-# Privacy-sensitive or stub tools such as gmail and lsp are disabled by default.
-# To expose every tool including default-disabled tools, use: enabled = ["*"]
+# Privacy-sensitive tools such as gmail may be disabled when unwanted.
+# LSP is real (local language servers); hide it if you do not want the model to use it.
+# To expose every tool, use: enabled = ["*"]
 # Hide selected tools after applying the profile/allow-list.
 # disabled = ["browser", "gmail", "lsp", "swarm"]
 # Disable all built-in tools unless enabled is set.

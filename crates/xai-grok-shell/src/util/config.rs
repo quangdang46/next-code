@@ -1044,10 +1044,31 @@ pub async fn set_default_model(v: impl serde::Serialize) -> anyhow::Result<()> {
 
 /// Persist `[provider].default_model` and optionally `[provider].default_provider`
 /// in one toml_edit write (preserves `[ui]` and other sibling tables).
+/// Strip `cmc/<family>/` prefix from model IDs returned by the ACP model catalog.
+///
+/// The daemon's model catalog returns keys in `cmc/<provider_family>/<model_slug>`
+/// format (e.g. `cmc/deepseek/deepseek-v4-flash`).  OpenAI-compatible profiles
+/// like OpenCode Go expect bare model slugs — persisting the full catalog key
+/// causes 400/401 on cold-start because the API doesn't recognise the prefix.
+/// This normaliser strips everything before and including the first two path
+/// segments when they start with `cmc/`.
+fn normalize_cmc_model(model: &str) -> &str {
+    // cmc/<family>/<slug>  →  <slug>
+    // cmc/<slug>           →  unchanged (not enough segments)
+    // anything else        →  unchanged
+    if let Some(rest) = model.strip_prefix("cmc/") {
+        if let Some(slash) = rest.find('/') {
+            return &rest[slash + 1..]; // skip "cmc/<family>/"
+        }
+    }
+    model
+}
+
 pub async fn set_default_model_and_provider(
     model: String,
     provider: Option<String>,
 ) -> anyhow::Result<()> {
+    let model = normalize_cmc_model(&model).to_string();
     tokio::task::spawn_blocking(move || {
         xai_grok_config::set_provider_defaults(Some(model.as_str()), provider.as_deref())
             .map_err(anyhow::Error::from)
@@ -1221,6 +1242,7 @@ pub enum PermissionMode {
     Ask,
     AlwaysApprove,
     Auto,
+    AcceptEdits,
     Default,
 }
 
@@ -1230,6 +1252,9 @@ impl PermissionMode {
     }
     pub fn is_auto(self) -> bool {
         matches!(self, Self::Auto)
+    }
+    pub fn is_accept_edits(self) -> bool {
+        matches!(self, Self::AcceptEdits)
     }
 }
 
@@ -1283,6 +1308,7 @@ pub fn clamped_display_permission_mode(mode: PermissionMode) -> &'static str {
         match mode {
             PermissionMode::Ask => "ask",
             PermissionMode::Default => "default",
+            PermissionMode::AcceptEdits => "accept-edits",
             PermissionMode::AlwaysApprove => "always-approve",
             PermissionMode::Auto => "auto",
         }
@@ -1293,6 +1319,7 @@ pub fn parse_permission_mode_canonical(s: &str) -> PermissionMode {
     match s.trim().to_ascii_lowercase().as_str() {
         "always-approve" | "yolo" | "bypasspermissions" => PermissionMode::AlwaysApprove,
         "auto" => PermissionMode::Auto,
+        "accept-edits" | "acceptedits" => PermissionMode::AcceptEdits,
         "default" => PermissionMode::Default,
         _ => PermissionMode::Ask,
     }

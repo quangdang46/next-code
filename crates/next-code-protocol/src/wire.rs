@@ -373,6 +373,19 @@ pub enum Request {
         error: Option<String>,
     },
 
+    /// Reply to a blocking ExitPlanMode reverse request (Face ACP outcome JSON).
+    #[serde(rename = "exit_plan_mode_response")]
+    ExitPlanModeResponse {
+        id: u64,
+        /// Matches the request_id from ExitPlanMode
+        request_id: String,
+        /// `ExitPlanModeExtResponse` JSON, or null + error
+        response: serde_json::Value,
+        /// When set, the bridge failed before producing a typed response
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+
     /// Reply to a blocking tool-approval permission prompt (Face ACP outcome).
     /// Distinct from AskUserQuestion and StdinResponse.
     #[serde(rename = "permission_response")]
@@ -386,6 +399,18 @@ pub enum Request {
         tool_name: String,
         #[serde(default)]
         allow_once_code: String,
+    },
+
+    /// Reply to a blocking Best-of-N winner pick (`mode=show`).
+    #[serde(rename = "best_of_n_pick_response")]
+    BestOfNPickResponse {
+        id: u64,
+        /// Matches the request_id from BestOfNPickRequest
+        request_id: String,
+        /// `BestOfNPickExtResponse` JSON, or null + error
+        response: serde_json::Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
     },
 
     // === Agent-to-agent communication ===
@@ -808,6 +833,9 @@ pub enum ServerEvent {
         output: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>,
+        /// Optional structured tool metadata (e.g. Face edit Diff old/new text).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        metadata: Option<serde_json::Value>,
     },
 
     /// Rendered images produced during the live turn, including image-bearing
@@ -1494,6 +1522,16 @@ pub enum ServerEvent {
         mode: String,
     },
 
+    /// ExitPlanMode tool needs Face ACP `x.ai/exit_plan_mode` reverse request.
+    #[serde(rename = "exit_plan_mode")]
+    ExitPlanMode {
+        request_id: String,
+        session_id: String,
+        tool_call_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        plan_content: Option<String>,
+    },
+
     /// Tool execution needs user approval (Face ACP `session/request_permission`).
     /// Distinct from AskUserQuestion (`question_view`) and StdinRequest.
     #[serde(rename = "permission_request")]
@@ -1511,5 +1549,26 @@ pub enum ServerEvent {
         /// Best-effort tool call id for ACP ToolCallUpdate (may be empty).
         #[serde(default)]
         tool_call_id: String,
+    },
+
+    /// Best-of-N run progress (candidate cards / status strip).
+    /// Face renders via `x.ai/best_of_n/progress` session notification.
+    #[serde(rename = "best_of_n_progress")]
+    BestOfNProgress {
+        /// `BestOfNProgressPayload` JSON
+        payload: serde_json::Value,
+    },
+
+    /// Best-of-N `mode=show` winner picker (Face ACP `x.ai/best_of_n/pick`).
+    #[serde(rename = "best_of_n_pick_request")]
+    BestOfNPickRequest {
+        request_id: String,
+        session_id: String,
+        run_id: String,
+        tool_call_id: String,
+        recommended_index: usize,
+        selection_reason: String,
+        /// `Vec<BestOfNCandidateUi>` JSON
+        candidates: serde_json::Value,
     },
 }

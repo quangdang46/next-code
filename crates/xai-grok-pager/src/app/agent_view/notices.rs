@@ -317,14 +317,18 @@ impl AgentView {
     /// Returns true if the transient toast was removed (needs redraw so a
     /// sticky banner can reappear).
     pub fn tick_toast(&mut self) -> bool {
+        let mut redraw = false;
         if let Some((_, ref mut remaining)) = self.toast {
             if *remaining == 0 {
                 self.toast = None;
-                return true;
+                redraw = true;
+            } else {
+                *remaining = remaining.saturating_sub(1);
             }
-            *remaining = remaining.saturating_sub(1);
         }
-        false
+        // Also tick the persistent toast stack (auto-dismiss expired toasts).
+        redraw |= tick_toast_stack(self);
+        redraw
     }
 
     /// Tick the extensions modal's transient result notice. Returns true if it
@@ -358,6 +362,55 @@ impl AgentView {
             }
         }
     }
+
+    // -- Toast stack ---------------------------------------------------------
+
+    /// Push a message onto the persistent toast stack with an [`Info`] level.
+    ///
+    /// Toasts auto-expire based on their level's default TTL. The stack
+    /// renders the newest messages, dropping oldest at capacity.
+    ///
+    /// [`Info`]: crate::views::toast::ToastLevel::Info
+    pub fn show_toast_stack(&mut self, msg: &str) {
+        use crate::views::toast::ToastLevel;
+        let msg = crate::glyphs::legacy_glyph_fallback(msg).into_owned();
+        self.toast_stack.push(msg, ToastLevel::Info);
+    }
+
+    /// Push a message onto the persistent toast stack with a specific level.
+    pub fn push_toast_stack(&mut self, msg: &str, level: crate::views::toast::ToastLevel) {
+        let msg = crate::glyphs::legacy_glyph_fallback(msg).into_owned();
+        self.toast_stack.push(msg, level);
+    }
+
+    /// Tick the toast stack: remove expired messages and return whether any
+    /// were removed (needs redraw).
+    pub(crate) fn tick_toast_stack(&mut self) -> bool {
+        self.toast_stack.tick(Instant::now())
+    }
+}
+
+// -- Persistent toast stack (multi-entry, level-based) -------------------
+
+/// Push a message onto the persistent toast stack with an Info level.
+/// Toasts auto-expire based on their level's default TTL.
+pub fn show_toast_stack(agent: &mut AgentView, msg: &str) {
+    use crate::views::toast::ToastLevel;
+    let msg = crate::glyphs::legacy_glyph_fallback(msg).into_owned();
+    agent.toast_stack.push(msg, ToastLevel::Info);
+}
+
+/// Push a message with an explicit level.
+pub fn push_toast_stack(agent: &mut AgentView, msg: &str, level: crate::views::toast::ToastLevel) {
+    let msg_fixed = crate::glyphs::legacy_glyph_fallback(msg).into_owned();
+    agent.toast_stack.push(msg_fixed, level);
+}
+
+/// Remove expired toasts. Returns `true` if any were removed (caller
+/// should schedule a redraw).
+pub fn tick_toast_stack(agent: &mut AgentView) -> bool {
+    let now = std::time::Instant::now();
+    agent.toast_stack.tick(now)
 }
 
 #[cfg(test)]

@@ -658,12 +658,21 @@ fn auth_complete_preserves_show_resolved_model_when_absent() {
 }
 
 /// OpenCode parity: successful `/connect` (NextCodeConnect) opens the
-/// Select-model ArgPicker after AuthComplete restores the agent view.
+/// Select-model ArgPicker after AuthComplete restores the agent view —
+/// but only once the model catalog is non-empty (empty → Popular providers
+/// only, which looks "disconnected").
 #[test]
 fn nextcode_connect_opens_model_picker_after_auth() {
     use crate::views::modal::ActiveModal;
 
     let mut app = test_app_with_agent();
+    // Seed a catalog so AuthComplete can open the real model list (not Popular).
+    let model_id = acp::ModelId::new(std::sync::Arc::from("test-model"));
+    app.models.available.insert(
+        model_id.clone(),
+        acp::ModelInfo::new(model_id.clone(), "test-model"),
+    );
+    app.models.current = Some(model_id);
     dispatch(
         Action::NextCodeConnect {
             provider: "openai".into(),
@@ -697,6 +706,76 @@ fn nextcode_connect_opens_model_picker_after_auth() {
         }
         _ => panic!("expected ArgPicker model modal after connect"),
     }
+}
+
+/// When AuthComplete fires before the daemon catalog arrives, keep the
+/// post-connect flag and do not flash Popular-providers.
+#[test]
+fn nextcode_connect_defers_model_picker_until_catalog_ready() {
+    let mut app = test_app_with_agent();
+    assert!(app.models.is_empty());
+    dispatch(
+        Action::NextCodeConnect {
+            provider: "xai".into(),
+        },
+        &mut app,
+    );
+    let seq = super::authenticating_seq(&app);
+    dispatch(
+        Action::TaskComplete(TaskResult::AuthComplete {
+            request_seq: seq,
+            meta: None,
+        }),
+        &mut app,
+    );
+    assert_eq!(app.active_view, ActiveView::Agent(AgentId(0)));
+    assert!(
+        app.open_model_picker_after_auth,
+        "flag must stay set while catalog is empty"
+    );
+    assert!(
+        app.agents[&AgentId(0)].active_modal.is_none(),
+        "must not open Popular-providers picker with empty catalog"
+    );
+
+    // Catalog lands (SessionCreated / models/update path).
+    let model_id = acp::ModelId::new(std::sync::Arc::from("grok-4"));
+    app.models.available.insert(
+        model_id.clone(),
+        acp::ModelInfo::new(model_id.clone(), "grok-4"),
+    );
+    app.models.current = Some(model_id);
+    let mut effects = Vec::new();
+    crate::app::dispatch::maybe_open_model_picker_after_connect(&mut app, &mut effects);
+    assert!(!app.open_model_picker_after_auth);
+    assert!(app.agents[&AgentId(0)].active_modal.is_some());
+}
+
+/// Catalog may land while still on Welcome (NotifyAuth / models update races
+/// ahead of NewSession). Must not clear the flag — OpenModelPicker is a no-op
+/// on Welcome and would permanently skip the post-connect picker.
+#[test]
+fn nextcode_connect_defers_model_picker_while_on_welcome() {
+    let mut app = test_app();
+    app.open_model_picker_after_auth = true;
+    app.active_view = ActiveView::Welcome;
+    let model_id = acp::ModelId::new(std::sync::Arc::from("grok-4"));
+    app.models.available.insert(
+        model_id.clone(),
+        acp::ModelInfo::new(model_id.clone(), "grok-4"),
+    );
+    app.models.current = Some(model_id);
+
+    let mut effects = Vec::new();
+    crate::app::dispatch::maybe_open_model_picker_after_connect(&mut app, &mut effects);
+    assert!(
+        app.open_model_picker_after_auth,
+        "flag must stay set until Agent/Dashboard can host the picker"
+    );
+    assert!(
+        effects.is_empty(),
+        "must not emit OpenModelPicker while on Welcome"
+    );
 }
 
 /// Plain mid-session `/login` must not open the model picker (re-auth only).

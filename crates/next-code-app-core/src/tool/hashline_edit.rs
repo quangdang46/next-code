@@ -286,6 +286,8 @@ async fn execute_one_section(
     } else {
         apply_patch_with_snapshot(&file_path, &path, &content, &patch, &edits).await?
     };
+    // Keep LF copy for Face Diff metadata (avoid CRLF noise in hunks).
+    let new_text_lf = new_text.clone();
 
     let ch = xxhash64(&content);
     let nd = edits.is_empty() || new_text == content || new_text == format!("{content}\n");
@@ -380,7 +382,19 @@ async fn execute_one_section(
         )
     };
 
-    Ok(ToolOutput::new(summary).with_title(final_display))
+    let mut out = ToolOutput::new(summary).with_title(final_display.clone());
+    // Face scrollback Edit block needs old/new text (hashline input is a
+    // patch, not classic old_string/new_string).
+    if !edits.is_empty()
+        && content.len().saturating_add(new_text_lf.len()) <= 512_000
+    {
+        out = out.with_metadata(serde_json::json!({
+            "file_path": final_display,
+            "old_text": content,
+            "new_text": new_text_lf,
+        }));
+    }
+    Ok(out)
 }
 
 async fn execute_remove(

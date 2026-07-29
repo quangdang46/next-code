@@ -1,12 +1,16 @@
 //! `/memory` browser modal -- view-state, rendering, and input handling.
 //!
 //! A centered popup with ModalWindow chrome, horizontally split into a
-//! searchable file list (left, ~40%) and a read-only content preview
-//! pane (right, ~60%). File list shows all memory files grouped by source
-//! (Global, Workspace, Sessions) with session logs in reverse chronological
-//! order. Selecting a file loads its content into the preview pane.
+//! searchable file list (left, ~40%) and a content preview / editor pane
+//! (right, ~60%). File list shows all memory files grouped by typed section
+//! (Notepad tiers, Claude memdir types, Global / Workspace / Sessions).
+//! Selecting a file loads its content into the preview pane.
 //!
-//! Layout collapses to single-pane (list only) on narrow terminals (< 80 cols).
+//! Enter / `e` opens an **in-modal** TextArea editor (save with Ctrl+S).
+//! `o` opens `$EDITOR` / `$VISUAL` via SuspendForEditor (Claude parity).
+//!
+//! Layout collapses to single-pane (list only) on narrow terminals (< 80 cols);
+//! while editing on a narrow terminal the editor takes the full content area.
 //!
 //! `/` enters filter mode (type to search, Escape to exit).
 //! `x` deletes with double-press confirmation (session logs only).
@@ -33,6 +37,8 @@ use crate::theme::Theme;
 use crate::views::modal_window::{
     self, ModalContentArea, ModalSizing, ModalWindowConfig, ModalWindowState, Shortcut,
 };
+use ratatui::widgets::StatefulWidgetRef;
+use xai_ratatui_textarea::{TextArea, TextAreaState};
 
 const SPLIT_MIN_WIDTH: u16 = 80;
 const LIST_WIDTH_RATIO: f64 = 0.40;
@@ -59,9 +65,30 @@ pub enum MemoryModalMode {
     ConfirmingDelete {
         idx: usize,
     },
+    /// In-modal TextArea editor (avoids `$EDITOR` alt-screen black flash).
+    Editing,
 }
 
-#[derive(Debug, Clone)]
+/// In-modal file editor state (`TextArea` is not `Clone`).
+pub struct MemoryFileEdit {
+    pub path: PathBuf,
+    pub original: String,
+    pub textarea: TextArea,
+    pub textarea_state: TextAreaState,
+    /// Last rendered textarea rect (cursor / future mouse hit-test).
+    pub last_text_area: Option<Rect>,
+}
+
+impl std::fmt::Debug for MemoryFileEdit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MemoryFileEdit")
+            .field("path", &self.path)
+            .field("original_len", &self.original.len())
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug)]
 pub struct MemoryModalState {
     pub window: ModalWindowState,
     pub entries: Vec<MemoryFileEntry>,
@@ -84,6 +111,10 @@ pub struct MemoryModalState {
     preview_area: Rect,
     list_scrollbar_area: Option<Rect>,
     preview_scrollbar_area: Option<Rect>,
+    /// Active in-modal edit (Some iff `mode == Editing`).
+    pub file_edit: Option<MemoryFileEdit>,
+    /// Transient status shown in the edit footer (save ok / error).
+    pub edit_status: Option<String>,
 }
 
 impl MemoryModalState {
@@ -106,10 +137,103 @@ impl MemoryModalState {
             preview_area: Rect::default(),
             list_scrollbar_area: None,
             preview_scrollbar_area: None,
+            file_edit: None,
+            edit_status: None,
         };
         state.advance_past_headers();
         state.load_preview();
         state
+    }
+
+    /// Enter in-modal edit for the selected file (create-if-missing).
+    pub fn begin_edit(&mut self) -> bool {
+        let Some(entry) = self.selected_entry().filter(|e| !e.is_header) else {
+            return false;
+        };
+        let path = entry.path.clone();
+        if let Err(err) = crate::views::memory_typed::ensure_memory_file(&path) {
+            tracing::warn!(error = %err, path = %path.display(), "memory ensure failed");
+            self.edit_status = Some(format!("Cannot open: {err}"));
+            return false;
+        }
+        let content = match std::fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(err) => {
+                self.edit_status = Some(format!("Read failed: {err}"));
+                return false;
+            }
+        };
+        let mut textarea = TextArea::new();
+        textarea.set_text(&content);
+        textarea.set_cursor(content.len());
+        self.file_edit = Some(MemoryFileEdit {
+            path,
+            original: content,
+            textarea,
+            textarea_state: TextAreaState::default(),
+            last_text_area: None,
+        });
+        self.mode = MemoryModalMode::Editing;
+        self.edit_status = None;
+        true
+    }
+
+    /// Persist the in-modal buffer and refresh the read-only preview.
+    pub fn save_edit(&mut self) -> bool {
+        let Some(edit) = self.file_edit.as_ref() else {
+            return false;
+        };
+        let text = edit.textarea.text().to_string();
+        let path = edit.path.clone();
+        match std::fs::write(&path, &text) {
+            Ok(()) => {
+                if let Some(edit) = self.file_edit.as_mut() {
+                    edit.original = text.clone();
+                }
+                self.preview_markdown = Some(MarkdownContent::new(text));
+                self.preview_scroll = 0;
+                self.edit_status = Some("Saved".to_string());
+                // Refresh list meta for this path if present.
+                if let Some(entry) = self.entries.iter_mut().find(|e| e.path == path) {
+                    let (size, modified) = match std::fs::metadata(&path) {
+                        Ok(meta) => {
+                            let modified = meta.modified().ok().and_then(|t| {
+                                t.duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                    .ok()
+                                    .map(|d| d.as_secs())
+                            });
+                            (meta.len(), modified)
+                        }
+                        Err(_) => (0, None),
+                    };
+                    let now_secs = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    entry.meta_display =
+                        format!("{} · {}", format_size(size), format_modified(modified, now_secs));
+                }
+                true
+            }
+            Err(err) => {
+                self.edit_status = Some(format!("Save failed: {err}"));
+                false
+            }
+        }
+    }
+
+    /// Leave edit mode (discards unsaved buffer).
+    pub fn exit_edit(&mut self) {
+        self.file_edit = None;
+        self.mode = MemoryModalMode::Browse;
+        self.edit_status = None;
+        self.load_preview();
+    }
+
+    pub fn edit_is_dirty(&self) -> bool {
+        self.file_edit
+            .as_ref()
+            .is_some_and(|e| e.textarea.text() != e.original)
     }
 
     pub fn filtered_indices(&self) -> &[usize] {
@@ -300,6 +424,7 @@ fn compute_filtered(entries: &[MemoryFileEntry], query: &str) -> Vec<usize> {
             section_has_match = false;
         } else if entry.label.to_lowercase().contains(&needle)
             || entry.source.to_lowercase().contains(&needle)
+            || entry.meta_display.to_lowercase().contains(&needle)
         {
             if let Some(h) = pending_header.take() {
                 result.push(h);
@@ -325,48 +450,67 @@ pub fn build_entries(
         .map(|d| d.as_secs())
         .unwrap_or(0);
 
-    let mut global = Vec::new();
-    let mut workspace = Vec::new();
-    let mut session = Vec::new();
+    // Bucket by Claude-style typed section (notepad + memdir types + scope fallback).
+    let mut buckets: Vec<(String, Vec<MemoryFileEntry>)> = Vec::new();
 
     for f in files {
-        let label = file_label(&f.path);
+        let label = if f.source == "notepad" {
+            match f.memory_type.as_deref() {
+                Some("priority") => "priority.md".to_string(),
+                Some("working") => "working.md".to_string(),
+                Some("manual") => "manual.md".to_string(),
+                _ => file_label(&f.path),
+            }
+        } else {
+            file_label(&f.path)
+        };
         let size = format_size(f.size_bytes);
         let modified = format_modified(f.modified_epoch_secs, now_secs);
-        let meta_display = format!("{size} \u{00B7} {modified}");
-        let bucket = match f.source.as_str() {
-            "global" => &mut global,
-            "workspace" => &mut workspace,
-            _ => &mut session,
-        };
-        bucket.push(MemoryFileEntry {
+        let type_tag = f
+            .memory_type
+            .as_deref()
+            .filter(|_| f.source != "notepad")
+            .map(|t| format!(" · {t}"))
+            .unwrap_or_default();
+        let meta_display = format!("{size} \u{00B7} {modified}{type_tag}");
+        let section = crate::views::memory_typed::typed_section_label(&f).to_string();
+        let entry = MemoryFileEntry {
             label,
             meta_display,
             path: f.path.into(),
             source: f.source,
             is_header: false,
-        });
+        };
+        if let Some((_, items)) = buckets.iter_mut().find(|(l, _)| *l == section) {
+            items.push(entry);
+        } else {
+            buckets.push((section, vec![entry]));
+        }
     }
 
-    // Session logs: reverse chronological (newest first).
-    session.reverse();
+    buckets.sort_by_key(|(label, _)| crate::views::memory_typed::typed_section_ord(label));
+
+    // Sessions: reverse chronological within the section (newest first).
+    for (label, items) in &mut buckets {
+        if label == "Sessions" {
+            items.reverse();
+        }
+    }
 
     let mut entries = Vec::new();
-    let mut push_section = |label: &str, items: Vec<MemoryFileEntry>| {
-        if !items.is_empty() {
-            entries.push(MemoryFileEntry {
-                path: PathBuf::new(),
-                source: String::new(),
-                meta_display: String::new(),
-                label: label.to_string(),
-                is_header: true,
-            });
-            entries.extend(items);
+    for (label, items) in buckets {
+        if items.is_empty() {
+            continue;
         }
-    };
-    push_section("Global", global);
-    push_section("Workspace", workspace);
-    push_section("Sessions", session);
+        entries.push(MemoryFileEntry {
+            path: PathBuf::new(),
+            source: String::new(),
+            meta_display: String::new(),
+            label,
+            is_header: true,
+        });
+        entries.extend(items);
+    }
     entries
 }
 
@@ -377,10 +521,31 @@ pub fn render_memory_modal(
     compact: bool,
 ) {
     let theme = Theme::current();
-    let shortcuts = build_shortcuts(&state.mode, state.memory_enabled, state.fullscreen);
+    let shortcuts = build_shortcuts(
+        &state.mode,
+        state.memory_enabled,
+        state.fullscreen,
+        state.edit_is_dirty(),
+        state.edit_status.as_deref(),
+    );
+
+    let title = if matches!(state.mode, MemoryModalMode::Editing) {
+        state
+            .file_edit
+            .as_ref()
+            .map(|e| {
+                e.path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| "Memory".to_string())
+            })
+            .unwrap_or_else(|| "Memory".to_string())
+    } else {
+        "Memory".to_string()
+    };
 
     let modal_config = ModalWindowConfig {
-        title: "Memory",
+        title: title.as_str(),
         tabs: None,
         shortcuts: &shortcuts,
         sizing: if state.fullscreen {
@@ -458,7 +623,11 @@ pub fn render_memory_modal(
                 height: content_area.height,
             };
             state.preview_area = preview_area;
-            render_preview(buf, preview_area, state, &theme);
+            if matches!(state.mode, MemoryModalMode::Editing) {
+                render_editor(buf, preview_area, state, &theme);
+            } else {
+                render_preview(buf, preview_area, state, &theme);
+            }
         } else {
             state.preview_area = Rect::default();
             state.preview_scrollbar_area = None;
@@ -466,6 +635,11 @@ pub fn render_memory_modal(
     } else {
         state.preview_area = Rect::default();
         state.preview_scrollbar_area = None;
+        // Narrow layout: edit uses the full content area (list hidden while editing).
+        if matches!(state.mode, MemoryModalMode::Editing) {
+            state.preview_area = content_area;
+            render_editor(buf, content_area, state, &theme);
+        }
     }
 }
 
@@ -709,6 +883,53 @@ fn render_preview(buf: &mut Buffer, area: Rect, state: &mut MemoryModalState, th
     );
 }
 
+fn render_editor(buf: &mut Buffer, area: Rect, state: &mut MemoryModalState, theme: &Theme) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+    buf.set_style(area, Style::default().bg(theme.bg_base));
+
+    let status_h: u16 = 1;
+    let editor_h = area.height.saturating_sub(status_h).max(1);
+    let editor_area = Rect {
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: editor_h,
+    };
+    let status_y = area.y + editor_h;
+    let status_override = state.edit_status.clone();
+
+    let Some(edit) = state.file_edit.as_mut() else {
+        let msg = "No file open for edit";
+        buf.set_span(
+            area.x,
+            area.y,
+            &Span::styled(msg, Style::default().fg(theme.gray_dim).bg(theme.bg_base)),
+            area.width,
+        );
+        return;
+    };
+
+    (&edit.textarea).render_ref(editor_area, buf, &mut edit.textarea_state);
+    edit.last_text_area = Some(editor_area);
+
+    let dirty = edit.textarea.text() != edit.original;
+    let status = status_override.unwrap_or_else(|| {
+        if dirty {
+            "modified — ^S save · Esc cancel".to_string()
+        } else {
+            "^S save · Esc back".to_string()
+        }
+    });
+    let status_style = if dirty {
+        Style::default().fg(theme.accent_user).bg(theme.bg_base)
+    } else {
+        Style::default().fg(theme.gray_dim).bg(theme.bg_base)
+    };
+    buf.set_span(area.x, status_y, &Span::styled(status, status_style), area.width);
+}
+
 pub fn handle_memory_key(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
     if key.kind == KeyEventKind::Release {
         return InputOutcome::Unchanged;
@@ -735,12 +956,21 @@ pub fn handle_memory_key(state: &mut MemoryModalState, key: &KeyEvent) -> InputO
 
     match state.mode {
         MemoryModalMode::ConfirmingDelete { .. } => unreachable!("handled above"),
+        MemoryModalMode::Editing => handle_editing(state, key),
         MemoryModalMode::FilterFocused => handle_filter_focused(state, key),
         MemoryModalMode::Browse => handle_browse(state, key),
     }
 }
 
 pub fn handle_memory_paste(state: &mut MemoryModalState, text: &str) -> InputOutcome {
+    if state.mode == MemoryModalMode::Editing {
+        if let Some(edit) = state.file_edit.as_mut() {
+            edit.textarea.insert_str(text);
+            state.edit_status = None;
+            return InputOutcome::Changed;
+        }
+        return InputOutcome::Unchanged;
+    }
     if state.mode != MemoryModalMode::FilterFocused {
         return InputOutcome::Unchanged;
     }
@@ -902,6 +1132,24 @@ pub fn handle_memory_mouse(
     }
 }
 
+/// Keys while the in-modal editor is focused.
+fn handle_editing(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
+    if key.code == KeyCode::Char('s') && key.modifiers.contains(KeyModifiers::CONTROL) {
+        state.save_edit();
+        return InputOutcome::Changed;
+    }
+    if key.code == KeyCode::Esc && key.modifiers.is_empty() {
+        state.exit_edit();
+        return InputOutcome::Changed;
+    }
+    if let Some(edit) = state.file_edit.as_mut() {
+        edit.textarea.input(*key);
+        state.edit_status = None;
+        return InputOutcome::Changed;
+    }
+    InputOutcome::Unchanged
+}
+
 /// Keys while the filter input is focused: all chars go to the filter,
 /// only Escape exits filter mode. Arrow keys still navigate the list.
 fn handle_filter_focused(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
@@ -995,6 +1243,32 @@ fn handle_browse(state: &mut MemoryModalState, key: &KeyEvent) -> InputOutcome {
             }
             InputOutcome::Unchanged
         }
+        // Enter / `e` → in-modal TextArea editor (no TUI suspend / black screen).
+        // `o` → Claude-style `$EDITOR` / `$VISUAL` handoff.
+        KeyCode::Enter | KeyCode::Char('e') if key.modifiers.is_empty() => {
+            if state.begin_edit() {
+                InputOutcome::Changed
+            } else {
+                InputOutcome::Unchanged
+            }
+        }
+        KeyCode::Char('o') if key.modifiers.is_empty() => {
+            if let Some(entry) = state.selected_entry()
+                && !entry.is_header
+            {
+                let path = entry.path.clone();
+                if let Err(err) = crate::views::memory_typed::ensure_memory_file(&path) {
+                    tracing::warn!(error = %err, path = %path.display(), "memory ensure failed");
+                    return InputOutcome::Unchanged;
+                }
+                return InputOutcome::Action(Action::SuspendForEditor {
+                    path,
+                    refresh_agents_modal: None,
+                    reload_keybindings: false,
+                });
+            }
+            InputOutcome::Unchanged
+        }
         KeyCode::Char('t') if key.modifiers.is_empty() => {
             let cmd = if state.memory_enabled {
                 "/memory off"
@@ -1029,6 +1303,8 @@ fn build_shortcuts(
     mode: &MemoryModalMode,
     memory_enabled: bool,
     fullscreen: bool,
+    edit_dirty: bool,
+    edit_status: Option<&str>,
 ) -> Vec<Shortcut<'static>> {
     match mode {
         MemoryModalMode::Browse => {
@@ -1040,6 +1316,16 @@ fn build_shortcuts(
             let mut shortcuts = vec![
                 Shortcut {
                     label: "\u{2191}/\u{2193} nav",
+                    clickable: false,
+                    id: 0,
+                },
+                Shortcut {
+                    label: "Enter edit",
+                    clickable: false,
+                    id: 0,
+                },
+                Shortcut {
+                    label: "o $EDITOR",
                     clickable: false,
                     id: 0,
                 },
@@ -1107,6 +1393,21 @@ fn build_shortcuts(
                 id: 0,
             },
         ],
+        MemoryModalMode::Editing => {
+            let _ = (edit_dirty, edit_status);
+            vec![
+                Shortcut {
+                    label: "^S save",
+                    clickable: false,
+                    id: 0,
+                },
+                Shortcut {
+                    label: "Esc back",
+                    clickable: false,
+                    id: 0,
+                },
+            ]
+        }
     }
 }
 
@@ -1214,18 +1515,21 @@ mod tests {
                 source: "global".into(),
                 size_bytes: 100,
                 modified_epoch_secs: Some(1_700_000_000),
+                memory_type: None,
             },
             MemoryFileInfo {
                 path: "/workspace/MEMORY.md".into(),
                 source: "workspace".into(),
                 size_bytes: 200,
                 modified_epoch_secs: Some(1_700_000_000),
+                memory_type: None,
             },
             MemoryFileInfo {
                 path: "/sessions/log1.md".into(),
                 source: "session".into(),
                 size_bytes: 50,
                 modified_epoch_secs: None,
+                memory_type: None,
             },
         ];
 
@@ -1238,6 +1542,112 @@ mod tests {
         assert_eq!(entries[2].label, "Workspace");
         assert!(entries[4].is_header);
         assert_eq!(entries[4].label, "Sessions");
+    }
+
+    #[test]
+    fn build_entries_groups_typed_and_notepad() {
+        use xai_grok_shell::extensions::notification::MemoryFileInfo;
+
+        let files = vec![
+            MemoryFileInfo {
+                path: "/proj/.next-code/notepad/priority.md".into(),
+                source: "notepad".into(),
+                size_bytes: 10,
+                modified_epoch_secs: None,
+                memory_type: Some("priority".into()),
+            },
+            MemoryFileInfo {
+                path: "/proj/.next-code/memory/tip.md".into(),
+                source: "workspace".into(),
+                size_bytes: 20,
+                modified_epoch_secs: None,
+                memory_type: Some("feedback".into()),
+            },
+        ];
+        let entries = build_entries(files);
+        assert!(entries.iter().any(|e| e.is_header && e.label == "Notepad · Priority"));
+        assert!(entries.iter().any(|e| e.is_header && e.label == "Type · Feedback"));
+    }
+
+    #[test]
+    fn enter_opens_in_modal_editor_for_selected_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("MEMORY.md");
+        std::fs::write(&path, "hello").unwrap();
+        let entries = vec![
+            MemoryFileEntry {
+                path: PathBuf::new(),
+                source: String::new(),
+                label: "Global".into(),
+                meta_display: String::new(),
+                is_header: true,
+            },
+            MemoryFileEntry {
+                path: path.clone(),
+                source: "global".into(),
+                label: "MEMORY.md".into(),
+                meta_display: "5B".into(),
+                is_header: false,
+            },
+        ];
+        let mut state = MemoryModalState::new(entries);
+        let key = crossterm::event::KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE);
+        let outcome = handle_memory_key(&mut state, &key);
+        assert!(matches!(outcome, InputOutcome::Changed));
+        assert_eq!(state.mode, MemoryModalMode::Editing);
+        let edit = state.file_edit.as_ref().expect("file_edit");
+        assert_eq!(edit.path, path);
+        assert_eq!(edit.textarea.text(), "hello");
+
+        // Type and save.
+        let outcome = handle_memory_key(
+            &mut state,
+            &KeyEvent::new(KeyCode::Char('!'), KeyModifiers::NONE),
+        );
+        assert!(matches!(outcome, InputOutcome::Changed));
+        assert!(state.edit_is_dirty());
+        let outcome = handle_memory_key(
+            &mut state,
+            &KeyEvent::new(KeyCode::Char('s'), KeyModifiers::CONTROL),
+        );
+        assert!(matches!(outcome, InputOutcome::Changed));
+        assert!(!state.edit_is_dirty());
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "hello!");
+        assert_eq!(state.edit_status.as_deref(), Some("Saved"));
+    }
+
+    #[test]
+    fn o_opens_external_editor_for_selected_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("MEMORY.md");
+        std::fs::write(&path, "hello").unwrap();
+        let entries = vec![
+            MemoryFileEntry {
+                path: PathBuf::new(),
+                source: String::new(),
+                label: "Global".into(),
+                meta_display: String::new(),
+                is_header: true,
+            },
+            MemoryFileEntry {
+                path: path.clone(),
+                source: "global".into(),
+                label: "MEMORY.md".into(),
+                meta_display: "5B".into(),
+                is_header: false,
+            },
+        ];
+        let mut state = MemoryModalState::new(entries);
+        let key = crossterm::event::KeyEvent::new(KeyCode::Char('o'), KeyModifiers::NONE);
+        let outcome = handle_memory_key(&mut state, &key);
+        match outcome {
+            InputOutcome::Action(Action::SuspendForEditor {
+                path: opened,
+                refresh_agents_modal: None,
+                reload_keybindings: false,
+            }) => assert_eq!(opened, path),
+            other => panic!("expected SuspendForEditor, got {other:?}"),
+        }
     }
 
     #[test]
@@ -1322,7 +1732,7 @@ mod tests {
     #[test]
     fn browse_footer_advertises_i_search_under_vim() {
         crate::appearance::cache::set_vim_mode(true);
-        let vim = build_shortcuts(&MemoryModalMode::Browse, true, false);
+        let vim = build_shortcuts(&MemoryModalMode::Browse, true, false, false, None);
         assert!(
             vim.iter().any(|s| s.label == "i search"),
             "vim-mode Browse footer must advertise `i search`"

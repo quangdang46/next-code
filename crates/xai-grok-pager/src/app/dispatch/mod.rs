@@ -18,10 +18,12 @@ mod cta;
 mod ctx;
 mod dashboard;
 mod dashboard_telemetry;
+mod goal;
 mod import_claude;
 mod interject;
 mod jump;
 mod modes;
+mod multitask;
 mod notes;
 mod permissions;
 mod prompt;
@@ -47,6 +49,7 @@ pub(super) use queue::{
     note_peek_page_flip, shim_renders_own_user_block,
 };
 pub(in crate::app) use rewind::{find_user_prompt_entry_for_shell_index, shell_prompt_index_at};
+pub(crate) use auth::maybe_open_model_picker_after_connect;
 pub(crate) use router::dispatch;
 pub(crate) use settings::ui::refresh_open_settings_modals;
 pub(crate) use status::commit_minimal_update_notice;

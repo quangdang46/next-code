@@ -2,6 +2,7 @@
 //!
 //! `/plan` enters plan mode. `/plan <description>` enters plan mode and starts
 //! a turn with the description after the mode switch completes.
+//! `/plan open` suspends the TUI and opens `plan.md` in `$EDITOR`.
 //!
 //! Use `/view-plan` to open the current saved plan preview.
 
@@ -31,7 +32,7 @@ impl SlashCommand for PlanCommand {
     }
 
     fn usage(&self) -> &str {
-        "/plan [description]"
+        "/plan [open|description]"
     }
 
     fn takes_args(&self) -> bool {
@@ -39,13 +40,20 @@ impl SlashCommand for PlanCommand {
     }
 
     fn arg_placeholder(&self) -> Option<&str> {
-        Some("[description]")
+        Some("[open|description]")
     }
 
-    fn run(&self, _ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
+    fn run(&self, ctx: &mut CommandExecCtx, args: &str) -> CommandResult {
         let trimmed = args.trim();
         if trimmed.is_empty() {
+            // Claude Code: `/plan` while already in plan shows the current plan.
+            if ctx.pager_state.plan_mode_active {
+                return CommandResult::Action(Action::ShowPlan);
+            }
             return CommandResult::Action(Action::SetPlanMode(PlanModeKind::On));
+        }
+        if trimmed.eq_ignore_ascii_case("open") {
+            return CommandResult::Action(Action::OpenPlanInEditor);
         }
         CommandResult::Action(Action::EnterPlanMode {
             description: Some(trimmed.to_string()),
@@ -111,18 +119,16 @@ mod tests {
         }
     }
 
-    /// `/plan` (no args, already in plan mode) → idempotent `SetPlanMode(On)`.
+    /// `/plan` (no args, already in plan mode) → `ShowPlan` (Claude Code).
     #[test]
-    fn no_args_already_in_plan_dispatches_set_plan_mode_on() {
+    fn no_args_already_in_plan_dispatches_show_plan() {
         let cmd = PlanCommand;
         let models = ModelState::default();
         let bundle = BundleState::default();
         let mut ctx = make_ctx_active_plan_mode(&models, &bundle);
         match cmd.run(&mut ctx, "") {
-            CommandResult::Action(Action::SetPlanMode(kind)) => {
-                assert_eq!(kind, PlanModeKind::On);
-            }
-            other => panic!("expected Action::SetPlanMode, got {other:?}"),
+            CommandResult::Action(Action::ShowPlan) => {}
+            other => panic!("expected Action::ShowPlan, got {other:?}"),
         }
     }
 
@@ -138,6 +144,23 @@ mod tests {
                 assert_eq!(kind, PlanModeKind::On);
             }
             other => panic!("expected SetPlanMode for whitespace-only arg, got {other:?}"),
+        }
+    }
+
+    /// `/plan open` → `OpenPlanInEditor`.
+    #[test]
+    fn open_arg_dispatches_open_plan_in_editor() {
+        let cmd = PlanCommand;
+        let models = ModelState::default();
+        let bundle = BundleState::default();
+        let mut ctx = make_ctx_active_plan_mode(&models, &bundle);
+        match cmd.run(&mut ctx, "open") {
+            CommandResult::Action(Action::OpenPlanInEditor) => {}
+            other => panic!("expected Action::OpenPlanInEditor, got {other:?}"),
+        }
+        match cmd.run(&mut ctx, "OPEN") {
+            CommandResult::Action(Action::OpenPlanInEditor) => {}
+            other => panic!("expected Action::OpenPlanInEditor for OPEN, got {other:?}"),
         }
     }
 

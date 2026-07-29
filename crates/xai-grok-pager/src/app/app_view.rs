@@ -796,6 +796,8 @@ pub struct AppView {
     pub pending_editor_path: Option<std::path::PathBuf>,
     /// After `$EDITOR` exits, refresh the agents modal tab list if still open.
     pub pending_agents_modal_refresh: Option<crate::views::agents_modal::AgentsTab>,
+    /// After `$EDITOR` exits, reload Face keybindings from disk.
+    pub pending_keybindings_reload: bool,
     /// Path to open in `$PAGER` (default `less`) after the current event cycle.
     /// Set by `Action::OpenTranscriptPager` (`/transcript`); consumed by the
     /// event loop which suspends the inline TUI, spawns the pager, then restores
@@ -1295,6 +1297,7 @@ impl AppView {
             pending_effects: Vec::new(),
             pending_editor_path: None,
             pending_agents_modal_refresh: None,
+            pending_keybindings_reload: false,
             pending_pager_path: None,
             pending_pager_ansi: false,
             minimal_state: crate::minimal_api::MinimalState::default(),
@@ -3244,6 +3247,18 @@ fn handle_welcome_input(ev: &Event, ctx: &mut WelcomeInputCtx<'_>) -> InputOutco
             && key!(Enter).matches(key)
             && key.modifiers.is_empty()
         {
+            // OpenCode parity: non-empty welcome draft must create a session
+            // AND submit in one shot. Capture+clear first so Enter-repeat /
+            // double-press cannot fire a second ActionPair with the same text.
+            let text = ctx.prompt.text().to_string();
+            if !text.trim().is_empty() {
+                ctx.prompt.set_text("");
+                *ctx.prompt_focused = true;
+                return InputOutcome::ActionPair(
+                    Action::NewSession,
+                    Action::SendPrompt(text),
+                );
+            }
             return InputOutcome::Action(Action::NewSession);
         }
         if matches!(ctx.auth_state, AuthState::Done) {
@@ -4846,6 +4861,7 @@ impl AppView {
             for child_view in agent.subagent_views.values_mut() {
                 needs_redraw |= child_view.scrollback.tick();
                 needs_redraw |= child_view.tick_toast();
+                needs_redraw |= child_view.tick_toast_stack();
                 needs_redraw |= child_view.tick_ephemeral_tip();
                 needs_redraw |= child_view.tick_mode_banner();
                 needs_redraw |= child_view.tick_selection_highlight();
@@ -4884,6 +4900,7 @@ impl AppView {
             needs_redraw |= agent.prompt.history_search.poll();
             needs_redraw |= agent.poll_scrollback_search();
             needs_redraw |= agent.tick_toast();
+            needs_redraw |= agent.tick_toast_stack();
             needs_redraw |= agent.tick_extensions_result_notice();
             needs_redraw |= agent.tick_ephemeral_tip();
             needs_redraw |= agent.tick_mode_banner();
@@ -5157,6 +5174,7 @@ impl AppView {
                     || agent.scrollback_search.is_some()
                     || agent.line_viewer.is_some()
                     || agent.toast.is_some()
+                    || !agent.toast_stack.is_empty()
                     || agent
                         .extensions_modal
                         .as_ref()
@@ -5177,6 +5195,7 @@ impl AppView {
                     || !agent.permission_queue.is_empty()
                     || agent.subagent_views.iter().any(|(sid, child)| {
                         child.toast.is_some()
+                            || !child.toast_stack.is_empty()
                             || child.ephemeral_tip_needs_tick()
                             || child.mode_switch_banner.is_some()
                             || child.has_drag_autoscroll()
@@ -5520,6 +5539,7 @@ pub(crate) mod tests {
             pending_effects: Vec::new(),
             pending_editor_path: None,
             pending_agents_modal_refresh: None,
+            pending_keybindings_reload: false,
             pending_pager_path: None,
             pending_pager_ansi: false,
             minimal_state: crate::minimal_api::MinimalState::default(),
@@ -5572,6 +5592,7 @@ pub(crate) mod tests {
                 next_queue_id: 0,
                 yolo_mode: false,
                 auto_mode: false,
+                accept_edits_mode: false,
                 prompt_history: Vec::new(),
                 prompt_history_loading: false,
                 loading_replay: false,
@@ -5764,6 +5785,7 @@ pub(crate) mod tests {
             next_queue_id: 0,
             yolo_mode: false,
             auto_mode: false,
+            accept_edits_mode: false,
             prompt_history: Vec::new(),
             prompt_history_loading: false,
             loading_replay: false,
@@ -8489,6 +8511,55 @@ pub(crate) mod tests {
         assert!(matches!(outcome, InputOutcome::Unchanged));
     }
     #[test]
+    fn welcome_done_enter_empty_starts_session_only() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Done;
+        app.welcome_prompt_focused = true;
+        let outcome = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(
+            matches!(outcome, InputOutcome::Action(Action::NewSession)),
+            "empty Enter must only NewSession, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn welcome_done_enter_with_text_pairs_new_session_and_send() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Done;
+        app.welcome_prompt_focused = true;
+        app.welcome_prompt.set_text("hello from welcome");
+        let outcome = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        match outcome {
+            InputOutcome::ActionPair(Action::NewSession, Action::SendPrompt(text)) => {
+                assert_eq!(text, "hello from welcome");
+            }
+            other => panic!("expected ActionPair(NewSession, SendPrompt), got {other:?}"),
+        }
+        assert!(
+            app.welcome_prompt.text().is_empty(),
+            "draft must clear immediately so double-Enter cannot re-submit"
+        );
+    }
+
+    #[test]
+    fn welcome_done_double_enter_second_is_empty_new_session_only() {
+        let mut app = test_app();
+        app.auth_state = AuthState::Done;
+        app.welcome_prompt_focused = true;
+        app.welcome_prompt.set_text("once");
+        let first = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(matches!(
+            first,
+            InputOutcome::ActionPair(Action::NewSession, Action::SendPrompt(_))
+        ));
+        let second = app.handle_input(&key_event(KeyCode::Enter, KeyModifiers::NONE));
+        assert!(
+            matches!(second, InputOutcome::Action(Action::NewSession)),
+            "second Enter after clear must not re-pair SendPrompt, got {second:?}"
+        );
+    }
+
+    #[test]
     fn welcome_done_n_starts_session() {
         let mut app = test_app();
         app.auth_state = AuthState::Done;
@@ -10219,6 +10290,7 @@ pub(crate) mod tests {
                     id: None,
                 }],
                 multi_select: None,
+                header: None,
                 id: None,
             })
             .collect();

@@ -486,6 +486,102 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
                 "Steps the session mode: Normal -> Plan -> Always-Approve -> Normal.\nPlan keeps the agent planning first and writes no files; Always-Approve runs every tool call without asking.\nCtrl+O toggles auto-approve directly.",
             ),
         },
+        ActionDef {
+            id: ActionId::ToggleThinkingEffort,
+            label: "thinking",
+            description: "Toggle reasoning effort (Alt+T)",
+            // Claude: meta+t / alt+t. Apple Terminal Option+T often arrives as †
+            // with no Alt modifier — bind that glyph so muscle memory still works.
+            default_key: key!('t', ALT),
+            alt_keys: vec![key!('†')],
+            category: Category::Input,
+            context: When::PromptFocused,
+            hint_priority: None,
+            hint_key_display: Some("Alt+T"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Toggles reasoning effort for the current model (Claude Alt+T / thinking-toggle parity).\nWhen the model offers `none`, switches between off and the previous level; otherwise cycles the model's offered effort list.\nUse /effort to pick a specific level.",
+            ),
+        },
+    // ── Agent team panel (Claude-style) ─────────────────────────────
+        ActionDef {
+            id: ActionId::AgentPanelSelectPrev,
+            label: "prev agent",
+            description: "Select previous agent in team panel",
+            default_key: key!(Up, SHIFT),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: Some(40),
+            hint_key_display: Some("Shift+↑"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Moves selection in the under-prompt agent panel (lead + workers).\nAlso expands team chrome (Claude shift+↓). Enter opens the selected worker transcript; Esc returns to the lead.",
+            ),
+        },
+        ActionDef {
+            id: ActionId::AgentPanelSelectNext,
+            label: "next agent",
+            description: "Select next agent / expand team panel",
+            default_key: key!(Down, SHIFT),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: Some(41),
+            hint_key_display: Some("Shift+↓"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Moves selection in the under-prompt agent panel (lead + workers).\nClaude parity: shift+↓ expands teammate chrome; Enter opens the selected worker; Esc returns to the lead.",
+            ),
+        },
+        ActionDef {
+            id: ActionId::TeamTaskSelectPrev,
+            label: "prev team task",
+            description: "Select previous shared team task",
+            default_key: key!(Left, SHIFT),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: Some(43),
+            hint_key_display: Some("Shift+←"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Moves selection in the shared team task strip (Ctrl+Shift+T).\nShift+Enter claims the selected pending task.",
+            ),
+        },
+        ActionDef {
+            id: ActionId::TeamTaskSelectNext,
+            label: "next team task",
+            description: "Select next shared team task",
+            default_key: key!(Right, SHIFT),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: Some(44),
+            hint_key_display: Some("Shift+→"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Moves selection in the shared team task strip (Ctrl+Shift+T).\nShift+Enter claims the selected pending task.",
+            ),
+        },
+        // Enter / x are handled locally in agent_view/input.rs only while
+        // the panel is selecting — registering bare Enter/x at AgentScreen
+        // would steal prompt submit and typing.
+        ActionDef {
+            id: ActionId::ToggleTeamTasks,
+            label: "team tasks",
+            description: "Toggle shared team task strip",
+            default_key: key!('t', CONTROL | SHIFT),
+            alt_keys: vec![],
+            category: Category::Panels,
+            context: When::AgentScreen,
+            hint_priority: Some(42),
+            hint_key_display: Some("Ctrl+Shift+T"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Shows or hides the shared team task strip (pending / in progress / completed).\nClaude Code uses Ctrl+T for this; Face keeps Ctrl+T for the per-agent todo pane.",
+            ),
+        },
         // ── Panes (agent-level — toggle side panes) ─────────────────
         ActionDef {
             id: ActionId::ToggleTodos,
@@ -819,6 +915,24 @@ pub fn default_actions(mouse_reporting_toggle_enabled: bool) -> Vec<ActionDef> {
             hint_key_display: None,
             requires_confirmation: false,
             long_help: None,
+        },
+        // Which-key overlay — compact binding preview distinct from the full
+        // ShortcutsHelp modal. Bound to Ctrl+K (Ctrl+O is ToggleYolo, Ctrl+L
+        // is Extensions/Interject). Ctrl+K is currently unbound everywhere.
+        ActionDef {
+            id: ActionId::WhichKey,
+            label: "which-key",
+            description: "Show key binding overview (which-key)",
+            default_key: key!('k', CONTROL),
+            alt_keys: vec![],
+            category: Category::GettingStarted,
+            context: When::AgentScreen,
+            hint_priority: None,
+            hint_key_display: Some("Ctrl+K"),
+            requires_confirmation: false,
+            long_help: Some(
+                "Shows a compact overlay of active key bindings grouped by category.\nUse Left/Right to switch groups, Up/Down to scroll, Esc or Ctrl+K to close.\nOpenCode-style which-key for discovering bindings without leaving the current view.",
+            ),
         },
     ];
 

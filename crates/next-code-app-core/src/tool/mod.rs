@@ -1,4 +1,5 @@
 pub mod ambient;
+mod agent;
 mod apply_patch;
 mod ask_user_question;
 mod bash;
@@ -14,6 +15,8 @@ mod conversation_search;
 mod dcp_compress;
 mod debug_socket;
 mod edit;
+mod enter_plan_mode;
+mod exit_plan_mode;
 mod ffs_engine_tools;
 mod ffs_glob;
 mod ffs_grep;
@@ -24,6 +27,7 @@ mod ffs_symbol;
 mod gmail;
 
 mod goal;
+mod session_goal_tools;
 mod hashline_edit;
 mod hashline_loop_guard;
 pub mod hashline_block_resolver;
@@ -50,6 +54,7 @@ mod session_search;
 pub(crate) mod session_search_index;
 mod side_panel;
 mod skill;
+mod task_management;
 mod team;
 mod todo;
 mod webfetch;
@@ -77,7 +82,8 @@ use tokio::sync::RwLock;
 
 pub(crate) use next_code_tool_core::intent_schema_property;
 pub use next_code_tool_core::{
-    AskUserQuestionInputRequest, StdinInputRequest, Tool, ToolContext, ToolExecutionMode,
+    AskUserQuestionInputRequest, BestOfNPickInputRequest, ExitPlanModeInputRequest,
+    StdinInputRequest, Tool, ToolContext, ToolExecutionMode,
 };
 pub use next_code_tool_types::{ToolImage, ToolOutput};
 pub(crate) use session_search::spawn_recent_index_warmup;
@@ -198,6 +204,7 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "notepad_read_working"
             | "notepad_read_manual"
             | "notepad_stats"
+            | "get_goal"
             | "beads_list"
             | "memory"
             | "lsp"
@@ -205,6 +212,8 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "skill_manage"
             | "team_status"
             | "team_task_list"
+            | "TaskGet"
+            | "TaskList"
     ) {
         return ToolTier::Read;
     }
@@ -224,6 +233,10 @@ fn tool_name_to_tier(name: &str) -> ToolTier {
             | "notepad_write_working"
             | "notepad_write_manual"
             | "notepad_prune"
+            | "TaskCreate"
+            | "TaskUpdate"
+            | "create_goal"
+            | "update_goal"
     ) {
         return ToolTier::Write;
     }
@@ -466,11 +479,48 @@ impl Registry {
             Self::insert_tool_timed(&mut m, &mut timings, "invalid", invalid::InvalidTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "lsp", lsp::LspTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "todo", todo::TodoTool::new);
+            // Claude-style session task graph (coexists with todo + team_task_*).
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskCreate",
+                task_management::TaskCreateTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskGet",
+                task_management::TaskGetTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskList",
+                task_management::TaskListTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "TaskUpdate",
+                task_management::TaskUpdateTool::new,
+            );
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
                 "AskUserQuestion",
                 ask_user_question::AskUserQuestionTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "EnterPlanMode",
+                enter_plan_mode::EnterPlanModeTool::new,
+            );
+            Self::insert_tool_timed(
+                &mut m,
+                &mut timings,
+                "ExitPlanMode",
+                exit_plan_mode::ExitPlanModeTool::new,
             );
             Self::insert_tool_timed(&mut m, &mut timings, "bg", bg::BgTool::new);
             Self::insert_tool_timed(
@@ -479,6 +529,8 @@ impl Registry {
                 "swarm",
                 communicate::CommunicateTool::new,
             );
+            // Claude-compatible Agent façade over swarm spawn/DM (+ worktree isolation).
+            Self::insert_tool_timed(&mut m, &mut timings, "Agent", agent::AgentTool::new);
             Self::insert_tool_timed(
                 &mut m,
                 &mut timings,
@@ -491,6 +543,26 @@ impl Registry {
                 "initiative",
                 goal::InitiativeTool::new,
             );
+            if crate::config::config().goal.enabled {
+                Self::insert_tool_timed(
+                    &mut m,
+                    &mut timings,
+                    "create_goal",
+                    session_goal_tools::CreateGoalTool::new,
+                );
+                Self::insert_tool_timed(
+                    &mut m,
+                    &mut timings,
+                    "update_goal",
+                    session_goal_tools::UpdateGoalTool::new,
+                );
+                Self::insert_tool_timed(
+                    &mut m,
+                    &mut timings,
+                    "get_goal",
+                    session_goal_tools::GetGoalTool::new,
+                );
+            }
             Self::insert_tool_timed(&mut m, &mut timings, "gmail", gmail::GmailTool::new);
             Self::insert_tool_timed(&mut m, &mut timings, "memory", memory::MemoryTool::new);
             // Single model-facing `edit` tool; backend selected by tools.edit_mode

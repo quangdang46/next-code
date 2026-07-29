@@ -91,9 +91,10 @@ const THEME_CHOICES: &[EnumChoice] = &[
 // it lives on its own `plan_mode` setting.
 // ---------------------------------------------------------------------------
 
-// Choice order: safe → classifier → unsafe (Default → Ask → Auto → Always approve).
+// Choice order: safe → edits-free → classifier → unsafe
+// (Default → Ask → Accept edits → Auto → Always approve).
 // "Always approve" at the end creates a speed bump against
-// accidental selection.
+// accidental selection. Accept edits mirrors Claude `acceptEdits`.
 const PERMISSION_MODE_CHOICES: &[EnumChoice] = &[
     // "default" = agent's default behavior. Same as "ask" at runtime;
     // distinct on disk and in the modal indicator.
@@ -106,6 +107,11 @@ const PERMISSION_MODE_CHOICES: &[EnumChoice] = &[
         canonical: "ask",
         display: "Ask",
         description: "Prompt for permission before tool actions.",
+    },
+    EnumChoice {
+        canonical: "accept-edits",
+        display: "Accept edits",
+        description: "Auto-allow file edits; still prompt for shell, network, and other tools.",
     },
     EnumChoice {
         canonical: "auto",
@@ -558,6 +564,8 @@ const STATUS_LINE_CHILDREN: &[&str] = &[
     "status_line.enabled",
     "status_line.mode",
     "status_line.model",
+    "status_line.reasoning",
+    "status_line.run_state",
     "status_line.context",
     "status_line.cwd",
     "status_line.git",
@@ -744,6 +752,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
                 "keys",
                 "keybindings",
                 "scroll",
+                "/keybindings",
             ],
             kind: SettingKind::Bool {
                 default: ui_default.vim_mode.unwrap_or(false),
@@ -1313,8 +1322,30 @@ pub fn default_settings() -> Vec<SettingMeta> {
             category: SettingCategory::Appearance,
             owner: SettingOwner::Shared,
             label: "Model",
-            description: "Show the current model (and effort) label.",
-            keywords: &["status", "model", "effort"],
+            description: "Show the current model label (effort moves to Reasoning when that segment is on).",
+            keywords: &["status", "model"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "status_line.reasoning",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Reasoning",
+            description: "Show reasoning effort as its own statusline segment (Codex parity).",
+            keywords: &["status", "reasoning", "effort", "thinking"],
+            kind: SettingKind::Bool { default: true },
+            restart_required: false,
+            hidden_in_minimal: false,
+        },
+        SettingMeta {
+            key: "status_line.run_state",
+            category: SettingCategory::Appearance,
+            owner: SettingOwner::Shared,
+            label: "Run state",
+            description: "Show compact turn/run state (idle / running / cancelling).",
+            keywords: &["status", "run", "state", "idle", "running"],
             kind: SettingKind::Bool { default: true },
             restart_required: false,
             hidden_in_minimal: false,
@@ -1357,7 +1388,7 @@ pub fn default_settings() -> Vec<SettingMeta> {
             category: SettingCategory::Appearance,
             owner: SettingOwner::Shared,
             label: "Order",
-            description: "Comma-separated segment order (mode,model,context,cwd,git).",
+            description: "Comma-separated segment order (mode,model,reasoning,run-state,context,cwd,git).",
             keywords: &["status", "order", "reorder", "sequence"],
             kind: SettingKind::String {
                 default: "mode,model,context",

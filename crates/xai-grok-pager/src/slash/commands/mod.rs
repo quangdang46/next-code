@@ -16,6 +16,7 @@ pub mod context;
 pub mod copy;
 pub mod dashboard;
 pub mod debug;
+pub mod diff;
 pub mod docs;
 pub mod effort;
 pub mod effort_levels;
@@ -27,6 +28,7 @@ pub mod feedback;
 pub mod find;
 pub mod fork;
 pub mod gboom;
+pub mod goal;
 pub mod help;
 pub mod history;
 pub mod home;
@@ -34,12 +36,15 @@ pub mod imagine;
 pub mod imagine_video;
 pub mod import_claude;
 pub mod jump;
+pub mod keybindings;
 pub mod login;
 pub mod logout;
 pub mod loop_cmd;
 pub mod mcps;
+pub mod memory;
 pub mod model;
 pub mod multiline;
+pub mod multitask;
 pub mod new;
 pub mod personas;
 pub mod plan;
@@ -56,8 +61,9 @@ pub mod screen_mode_switch;
 pub mod scroll_debug;
 pub mod session_info;
 pub mod settings_cmd;
-pub mod statusline;
 pub mod share;
+pub mod stash;
+pub mod statusline;
 pub mod tasks;
 pub mod terminal_setup;
 pub mod theme;
@@ -86,6 +92,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(fork::ForkCommand),
         Arc::new(compact::CompactCommand),
         Arc::new(copy::CopyCommand),
+        Arc::new(diff::DiffCommand),
         Arc::new(find::FindCommand),
         Arc::new(history::HistoryCommand),
         Arc::new(export::ExportCommand),
@@ -101,6 +108,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(multiline::MultilineCommand),
         Arc::new(compact_mode::CompactModeCommand),
         Arc::new(vim_mode::VimModeCommand),
+        Arc::new(keybindings::KeybindingsCommand),
         Arc::new(plugin::HooksCommand),
         Arc::new(plugin::PluginsCommand),
         Arc::new(plugin::MarketplaceCommand),
@@ -114,11 +122,13 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(feedback::FeedbackCommand),
         Arc::new(announcements::AnnouncementsCommand),
         Arc::new(remember::RememberCommand),
+        Arc::new(memory::MemoryCommand),
         Arc::new(plan::PlanCommand),
         Arc::new(view_plan::ViewPlanCommand),
         Arc::new(resume::ResumeCommand),
         Arc::new(mcps::McpsCommand),
         Arc::new(btw::BtwCommand),
+        Arc::new(goal::GoalCommand),
         Arc::new(recap::RecapCommand),
         
         Arc::new(terminal_setup::TerminalSetupCommand),
@@ -131,6 +141,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(toggle_mouse_reporting::ToggleMouseReportingCommand),
         Arc::new(settings_cmd::SettingsCommand),
         Arc::new(experimental::ExperimentalCommand),
+        Arc::new(stash::StashCommand),
         Arc::new(statusline::StatuslineCommand),
         Arc::new(privacy::PrivacyCommand),
         Arc::new(rewind::RewindCommand),
@@ -141,6 +152,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(import_claude::ImportClaudeCommand),
         Arc::new(usage::UsageCommand),
         Arc::new(queue::QueueCommand),
+        Arc::new(multitask::MultitaskCommand),
         Arc::new(tasks::TasksCommand),
         Arc::new(release_notes::ReleaseNotesCommand),
         Arc::new(config_agents::ConfigAgentsCommand),
@@ -216,6 +228,16 @@ mod tests {
             "/vim-mode should be registered"
         );
         assert!(reg.get("find").is_some(), "/find should be registered");
+        assert!(
+            reg.get("memory").is_some(),
+            "/memory should be registered"
+        );
+    }
+
+    #[test]
+    fn diff_registered_in_builtin_commands() {
+        let reg = CommandRegistry::new(builtin_commands());
+        assert!(reg.get("diff").is_some(), "/diff should be registered");
     }
     #[test]
     fn loop_command_declares_scheduler_tool_requirement() {
@@ -581,6 +603,14 @@ mod tests {
         assert!(
             reg.get("tasks").is_some(),
             "/tasks should be registered in builtins"
+        );
+    }
+    #[test]
+    fn multitask_registered_in_builtin_commands() {
+        let reg = CommandRegistry::new(builtin_commands());
+        assert!(
+            reg.get("multitask").is_some(),
+            "/multitask should be registered in builtins"
         );
     }
     #[test]

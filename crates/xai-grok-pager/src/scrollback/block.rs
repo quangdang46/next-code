@@ -13,7 +13,7 @@ use crate::prompt_images::{InlineMediaInfo, ScrollbackImageRef, ScrollbackVideoR
 
 use super::blocks::mermaid_content::DiagramAffordance;
 use super::blocks::{
-    AgentMessageBlock, BgTaskBlock, BtwBlock, ContextInfoBlock, CreditLimitBlock,
+    AgentMessageBlock, BestOfNBlock, BgTaskBlock, BtwBlock, ContextInfoBlock, CreditLimitBlock,
     EditToolCallBlock, ExecuteToolCallBlock, LineRange, ListDirToolCallBlock, OtherToolCallBlock,
     ReadToolCallBlock, SearchFileMatch, SearchToolCallBlock, SessionEvent, SessionEventBlock,
     SubagentBlock, SubagentBlockKind, SystemMessageBlock, ThinkingBlock, ToolCallBlock,
@@ -389,6 +389,8 @@ pub enum RenderBlock {
     ContextInfo(ContextInfoBlock),
     /// Credit-limit card for max-tier users (red accent, single action).
     CreditLimit(CreditLimitBlock),
+    /// Best-of-N candidate cards (codebuff-style masonry grid).
+    BestOfN(BestOfNBlock),
 }
 
 /// Delegate a method call to the inner block variant.
@@ -407,6 +409,7 @@ macro_rules! delegate_block {
             RenderBlock::Btw(b) => b.$method($($arg),*),
             RenderBlock::ContextInfo(b) => b.$method($($arg),*),
             RenderBlock::CreditLimit(b) => b.$method($($arg),*),
+            RenderBlock::BestOfN(b) => b.$method($($arg),*),
         }
     };
 }
@@ -1023,6 +1026,7 @@ impl RenderBlock {
             | RenderBlock::ContextInfo(_)
             | RenderBlock::CreditLimit(_) => None,
             RenderBlock::Btw(_) => Some(theme.accent_plan),
+            RenderBlock::BestOfN(_) => Some(theme.accent_plan),
             RenderBlock::Stub(block) => Some(block.accent_color),
         }
     }
@@ -1168,6 +1172,7 @@ impl RenderBlock {
             RenderBlock::CreditLimit(b) => {
                 join_searchable([Some(b.heading.clone()), Some(b.url.clone())])
             }
+            RenderBlock::BestOfN(_) => None,
             RenderBlock::ToolCall(tc) => tc.searchable_text(),
         }
     }

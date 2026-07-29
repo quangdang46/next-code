@@ -88,18 +88,34 @@ pub(in crate::app::dispatch) fn set_render_mermaid(
     }]
 }
 
+/// State-only mutation for `render_mermaid_target`: update the process-wide
+/// appearance cache (render-path source of truth) and the in-memory `UiConfig`
+/// mirror. Disk write goes through `PersistSetting`.
+pub(super) fn set_render_mermaid_target_inner(app: &mut AppView, canonical: &'static str) {
+    crate::appearance::cache::set_render_mermaid_target(canonical);
+    app.current_ui.render_mermaid_target = Some(canonical.to_string());
+}
+
 /// Where rendered Mermaid diagrams appear: inline / sidebar / both.
 /// Persisted to `[ui].render_mermaid_target`.
+///
+/// SHELL-OWNED: same pattern as `render_mermaid` — cache is the render-path
+/// source of truth; modal commits update it optimistically.
 pub(in crate::app::dispatch) fn set_render_mermaid_target(
     app: &mut AppView,
     value: String,
 ) -> Vec<Effect> {
     let canonical = crate::settings::canonical_render_mermaid_target(Some(&value));
-    let prev = crate::settings::canonical_render_mermaid_target(app.current_ui.render_mermaid_target.as_deref());
+    let prev = crate::appearance::cache::load_render_mermaid_target();
     if prev == canonical {
+        // Keep UiConfig mirror aligned even if cache already matches (e.g. after
+        // a restart where current_ui was stale relative to the seeded cache).
+        if app.current_ui.render_mermaid_target.as_deref() != Some(canonical) {
+            app.current_ui.render_mermaid_target = Some(canonical.to_string());
+        }
         return vec![];
     }
-    app.current_ui.render_mermaid_target = Some(canonical.to_string());
+    set_render_mermaid_target_inner(app, canonical);
     refresh_open_settings_modals(app);
     tracing::info!(
         target: "settings",
@@ -1374,9 +1390,14 @@ macro_rules! define_status_line_bool_setter {
 define_status_line_bool_setter!(set_status_line_enabled, "status_line.enabled", "Status line", enabled, true);
 define_status_line_bool_setter!(set_status_line_mode, "status_line.mode", "Status mode", mode, true);
 define_status_line_bool_setter!(set_status_line_model, "status_line.model", "Status model", model, true);
+define_status_line_bool_setter!(set_status_line_reasoning, "status_line.reasoning", "Status reasoning", reasoning, true);
+define_status_line_bool_setter!(set_status_line_run_state, "status_line.run_state", "Status run state", run_state, true);
 define_status_line_bool_setter!(set_status_line_context, "status_line.context", "Status context %", context, true);
 define_status_line_bool_setter!(set_status_line_cwd, "status_line.cwd", "Status directory", cwd, false);
 define_status_line_bool_setter!(set_status_line_git, "status_line.git", "Status git", git, false);
+define_status_line_bool_setter!(set_status_line_context_remaining, "status_line.context_remaining", "Status context remaining", context_remaining, false);
+define_status_line_bool_setter!(set_status_line_thread_title, "status_line.thread_title", "Status thread title", thread_title, false);
+define_status_line_bool_setter!(set_status_line_approval_mode, "status_line.approval_mode", "Status approval mode", approval_mode, false);
 
 pub(super) fn set_status_line_order_inner(app: &mut AppView, raw: &str) {
     use xai_grok_shell::agent::config::StatusLineConfig;
@@ -1433,9 +1454,24 @@ pub(in crate::app::dispatch) fn toggle_status_line_segment(
     match segment {
         xai_grok_shell::agent::config::StatusLineSegment::Mode => set_status_line_mode(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Model => set_status_line_model(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::Reasoning => {
+            set_status_line_reasoning(app, on)
+        }
+        xai_grok_shell::agent::config::StatusLineSegment::RunState => {
+            set_status_line_run_state(app, on)
+        }
         xai_grok_shell::agent::config::StatusLineSegment::Context => set_status_line_context(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Cwd => set_status_line_cwd(app, on),
         xai_grok_shell::agent::config::StatusLineSegment::Git => set_status_line_git(app, on),
+        xai_grok_shell::agent::config::StatusLineSegment::ContextRemaining => {
+            set_status_line_context_remaining(app, on)
+        }
+        xai_grok_shell::agent::config::StatusLineSegment::ThreadTitle => {
+            set_status_line_thread_title(app, on)
+        }
+        xai_grok_shell::agent::config::StatusLineSegment::ApprovalMode => {
+            set_status_line_approval_mode(app, on)
+        }
     }
 }
 

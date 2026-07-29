@@ -218,6 +218,77 @@ pub fn is_shift_tab(key: &KeyEvent) -> bool {
     shift_tab_keys().iter().any(|k| k.matches(key))
 }
 
+/// Parse a user keybinding string (`ctrl+g`, `shift+tab`, `enter`, …)
+/// into a [`KeyShortcut`].
+///
+/// Accepts the same modifier vocabulary as legacy next-code keybinds
+/// (`ctrl`/`control`, `alt`/`option`/`meta`, `cmd`/`super`, `shift`).
+pub fn parse_shortcut_str(raw: &str) -> Option<KeyShortcut> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        return None;
+    }
+    let lower = raw.to_ascii_lowercase();
+    let parts: Vec<&str> = lower
+        .split('+')
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    let mut modifiers = KeyModifiers::NONE;
+    let mut key_part: Option<&str> = None;
+    for part in parts {
+        match part {
+            "ctrl" | "control" => modifiers |= KeyModifiers::CONTROL,
+            "alt" | "option" | "meta" => modifiers |= KeyModifiers::ALT,
+            "cmd" | "command" | "super" | "win" | "windows" => {
+                modifiers |= KeyModifiers::SUPER;
+            }
+            "shift" => modifiers |= KeyModifiers::SHIFT,
+            other => key_part = Some(other),
+        }
+    }
+    let key = key_part?;
+    let code = match key {
+        "tab" => KeyCode::Tab,
+        "backtab" | "shift-tab" | "shifttab" => {
+            modifiers |= KeyModifiers::SHIFT;
+            KeyCode::Tab
+        }
+        "enter" | "return" => KeyCode::Enter,
+        "esc" | "escape" => KeyCode::Esc,
+        "space" => KeyCode::Char(' '),
+        "left" => KeyCode::Left,
+        "right" => KeyCode::Right,
+        "up" => KeyCode::Up,
+        "down" => KeyCode::Down,
+        "pageup" | "pgup" => KeyCode::PageUp,
+        "pagedown" | "pgdn" | "pgdown" => KeyCode::PageDown,
+        "home" => KeyCode::Home,
+        "end" => KeyCode::End,
+        "insert" => KeyCode::Insert,
+        "delete" | "del" => KeyCode::Delete,
+        "backspace" | "bsp" => KeyCode::Backspace,
+        other => {
+            if let Some(n) = other.strip_prefix('f').and_then(|s| s.parse::<u8>().ok()) {
+                if (1..=24).contains(&n) {
+                    KeyCode::F(n)
+                } else {
+                    return None;
+                }
+            } else if other.len() == 1 {
+                KeyCode::Char(other.chars().next()?)
+            } else {
+                return None;
+            }
+        }
+    };
+    Some(KeyShortcut::new(code, modifiers))
+}
+
 pub fn is_text_input_key(key: &KeyEvent) -> bool {
     matches!(key.code, KeyCode::Char(_))
         && (key.modifiers.is_empty()

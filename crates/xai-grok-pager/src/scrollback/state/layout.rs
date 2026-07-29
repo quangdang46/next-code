@@ -273,7 +273,7 @@ impl ScrollbackState {
 
         let sticky = self.current_sticky_layout(cache, &visible_range);
         let row_in_area = screen_row - scrollback_area.y;
-        let header_rows = sticky.header_screen_rows();
+        let header_rows = self.sticky_header_h(&sticky);
 
         if row_in_area < header_rows {
             // In the header zone — check if we hit a pushed or pinned prompt
@@ -366,7 +366,7 @@ impl ScrollbackState {
         };
 
         // Clip to below the sticky header
-        let header_rows = sticky.header_screen_rows();
+        let header_rows = self.sticky_header_h(&sticky);
         let content_top = scrollback_area.y + header_rows;
         if screen_y + visible_height <= content_top {
             return None; // Entirely behind header
@@ -1604,6 +1604,14 @@ impl ScrollbackState {
 
         let sticky =
             compute_sticky_layout(self.scroll_offset, self.viewport_height, &relative_prompts);
+        let sticky = if self.appearance.scrollback.display.sticky_chrome
+            && self.appearance.scrollback.display.sticky_headers
+            && !self.appearance.prompt.compact
+        {
+            crate::scrollback::sticky::to_chrome_layout(&sticky)
+        } else {
+            sticky
+        };
 
         if sticky.has_header() {
             Some(sticky)

@@ -70,6 +70,15 @@ impl Agent {
             return Ok(None);
         }
 
+        // Experiment gate: BestOfN only activates when user opts in via /experiment.
+        if !crate::config::config()
+            .experiments
+            .materialize()
+            .check(next_code_experiment_flags::ExperimentFlag::BestOfN)
+        {
+            return Ok(None);
+        }
+
         // Avoid recursion: child agents already have best_of_n context set.
         if self.best_of_n_run_id.is_some() {
             return Ok(None);
@@ -87,11 +96,9 @@ impl Agent {
             .iter()
             .any(|m| m.workflow == next_code_keywords::WorkflowKind::BestOfN && !m.is_expired());
 
-        // Only auto-run when user explicitly invoked $bestofn / sticky mode, or
-        // when mode is auto and the message looks like an edit request.
-        let should_run = keyword_triggered
-            || sticky
-            || (cfg.mode.is_auto() && looks_like_edit_request(user_message));
+        // Only trigger when user explicitly invoked $bestofn / sticky mode.
+        // No automatic heuristic — requires explicit keyword.
+        let should_run = keyword_triggered || sticky;
 
         if !should_run {
             return Ok(None);
@@ -104,45 +111,11 @@ impl Agent {
             cfg.mode.as_str()
         ));
 
-        // show mode: still run auto-select for now, but label the result so the
-        // user knows interactive picker is not implemented yet.
-        let show_note = if matches!(cfg.mode, next_code_best_of_n::BestOfNMode::Show) {
-            "\n(Note: mode=show picker UI is not implemented yet; auto-applied best candidate.)\n"
-        } else {
-            ""
-        };
-
+        // show mode: Face picker selects winner (or cancel); auto is silent apply.
         match crate::agent::best_of_n_orchestrator::run_best_of_n(self, user_message, &[]).await {
-            Ok(result) => {
-                let winner = result
-                    .candidates
-                    .get(result.winner_index)
-                    .map(|c| c.strategy.label.as_str())
-                    .unwrap_or("unknown");
-                let files = if result.files_applied.is_empty() {
-                    "  (none)".to_string()
-                } else {
-                    result
-                        .files_applied
-                        .iter()
-                        .map(|f| format!("  - {f}"))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                };
-                Ok(Some(format!(
-                    "BEST-OF-N MODE ENABLED!\n\
-                     {show_note}\
-                     Candidates: {}\n\
-                     Winner: #{} ({})\n\
-                     Reason: {}\n\
-                     Files applied:\n{}",
-                    result.candidates.len(),
-                    result.winner_index,
-                    winner,
-                    result.selection_reason,
-                    files,
-                )))
-            }
+            Ok(result) => Ok(Some(
+                crate::agent::best_of_n_orchestrator::format_run_summary(&result),
+            )),
             Err(e) => {
                 crate::logging::warn(&format!("[best-of-n] auto-run failed: {e}"));
                 // Fall through to normal turn on failure.
@@ -161,6 +134,16 @@ impl Agent {
         if !cfg.enabled() || self.best_of_n_run_id.is_some() {
             return Ok(None);
         }
+
+        // Experiment gate: BestOfN only activates when user opts in via /experiment.
+        if !crate::config::config()
+            .experiments
+            .materialize()
+            .check(next_code_experiment_flags::ExperimentFlag::BestOfN)
+        {
+            return Ok(None);
+        }
+
         let detections = next_code_keywords::detect_keywords(user_message);
         let triggered = detections
             .iter()
@@ -172,7 +155,8 @@ impl Agent {
             .iter()
             .any(|m| m.workflow == next_code_keywords::WorkflowKind::BestOfN && !m.is_expired());
 
-        if !triggered && !sticky && !(cfg.mode.is_auto() && looks_like_edit_request(user_message)) {
+        // Only trigger on explicit keyword / sticky — no auto heuristic.
+        if !triggered && !sticky {
             return Ok(None);
         }
 
@@ -185,30 +169,9 @@ impl Agent {
         )
         .await
         {
-            Ok(r) => {
-                let winner = r
-                    .candidates
-                    .get(r.winner_index)
-                    .map(|c| c.strategy.label.as_str())
-                    .unwrap_or("?");
-                let files = if r.files_applied.is_empty() {
-                    "  (none)".to_string()
-                } else {
-                    r.files_applied
-                        .iter()
-                        .map(|f| format!("  - {f}"))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                };
-                Ok(Some(format!(
-                    "BEST-OF-N MODE ENABLED!\nCandidates: {}\nWinner: #{} ({})\nReason: {}\nFiles:\n{}",
-                    r.candidates.len(),
-                    r.winner_index,
-                    winner,
-                    r.selection_reason,
-                    files,
-                )))
-            }
+            Ok(r) => Ok(Some(
+                crate::agent::best_of_n_orchestrator::format_run_summary(&r),
+            )),
             Err(e) => {
                 crate::logging::warn(&format!("[best-of-n] auto-run streaming failed: {e}"));
                 Ok(None)
@@ -731,6 +694,22 @@ impl Agent {
         self.ask_user_question_tx = Some(tx);
     }
 
+    /// Set the Best-of-N pick channel for Face ACP reverse requests (`mode=show`).
+    pub fn set_best_of_n_pick_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::BestOfNPickInputRequest>,
+    ) {
+        self.best_of_n_pick_tx = Some(tx);
+    }
+
+    /// Set the ExitPlanMode channel for Face ACP reverse requests.
+    pub fn set_exit_plan_mode_tx(
+        &mut self,
+        tx: tokio::sync::mpsc::UnboundedSender<crate::tool::ExitPlanModeInputRequest>,
+    ) {
+        self.exit_plan_mode_tx = Some(tx);
+    }
+
     pub(super) async fn tool_definitions(&mut self) -> Vec<ToolDefinition> {
         if self.session.is_canary {
             self.registry.register_selfdev_tools().await;
@@ -873,6 +852,8 @@ impl Agent {
             working_dir: self.working_dir().map(PathBuf::from),
             stdin_request_tx: self.stdin_request_tx.clone(),
             ask_user_question_tx: self.ask_user_question_tx.clone(),
+            best_of_n_pick_tx: self.best_of_n_pick_tx.clone(),
+            exit_plan_mode_tx: self.exit_plan_mode_tx.clone(),
             graceful_shutdown_signal: Some(self.graceful_shutdown.clone()),
             background_tool_signal: Some(self.background_tool_signal.clone()),
             execution_mode: ToolExecutionMode::Direct,
@@ -945,6 +926,25 @@ impl Agent {
         if self.disabled_tools.contains(name) {
             return Err(anyhow::anyhow!("Tool '{}' is disabled", name));
         }
+
+        // Plan mode: allow write-shaped tools only when the target basename is plan.md.
+        let plan_mode = crate::dcg_bridge::session_mode(&self.session.id)
+            .unwrap_or_else(crate::dcg_bridge::current_mode)
+            == crate::dcg_bridge::Mode::Plan;
+        if plan_mode
+            && is_write_shaped_tool(name)
+            && tool_input_targets_plan_md(input)
+        {
+            return Ok(());
+        }
+
+        // Shell tools own command-aware gating inside BashTool (Stage 2).
+        // Skipping the tool-name gate here avoids a double prompt and prevents
+        // "approve bash once" from auto-allowing later `rm` / Remove-Item.
+        if is_shell_tool(name) {
+            return Ok(());
+        }
+
         // Delegate to dcg_bridge for permission mode evaluation.
         // Uses classify_for_session so that per-session overrides (e.g. a
         // subagent spawned with an explicit mode) are honored; falls back to
@@ -961,6 +961,13 @@ impl Agent {
                     alternatives,
                     ..
                 } => {
+                    let reason = if plan_mode && is_write_shaped_tool(name) {
+                        format!(
+                            "{reason}. In plan mode only writes to plan.md are allowed."
+                        )
+                    } else {
+                        reason
+                    };
                     let msg = if alternatives.is_empty() {
                         format!(
                             "Tool '{}' blocked: {}. Current mode: {:?}",
@@ -1461,34 +1468,86 @@ impl Agent {
     }
 }
 
-/// Heuristic: does this user message look like an edit/implement request?
-/// Used only when best-of-N mode is already `auto` and the user did not
-/// explicitly type `$bestofn` — keeps auto-trigger from firing on pure Q&A.
-fn looks_like_edit_request(msg: &str) -> bool {
-    let lower = msg.to_ascii_lowercase();
-    // Explicit keyword always handled elsewhere; skip pure cancels.
-    if lower.contains("cancelnext") || lower.contains("stopnext") {
-        return false;
-    }
-    const VERBS: &[&str] = &[
-        "fix",
-        "implement",
-        "refactor",
-        "rewrite",
-        "change",
-        "update",
-        "add ",
-        "remove ",
-        "delete ",
-        "edit ",
-        "patch",
-        "migrate",
-        "rename",
-        "extract",
-        "sửa",
-        "thêm",
-        "xóa",
-        "viết",
-    ];
-    VERBS.iter().any(|v| lower.contains(v))
+
+/// Write-shaped tools that Plan mode normally blocks.
+pub(crate) fn is_shell_tool(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "bash" | "shell" | "run_terminal_cmd" | "execute_command"
+    )
 }
+
+pub(crate) fn is_write_shaped_tool(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "write"
+            | "edit"
+            | "multiedit"
+            | "apply_patch"
+            | "hashline_edit"
+            | "propose_write"
+            | "propose_edit"
+            | "propose_hashline_edit"
+            | "notebookedit"
+            | "notebook_edit"
+    )
+}
+
+/// True when tool input targets a path whose basename is `plan.md`.
+pub(crate) fn tool_input_targets_plan_md(input: Option<&serde_json::Value>) -> bool {
+    let Some(input) = input else {
+        return false;
+    };
+    for key in ["path", "file_path", "filePath", "file"] {
+        if let Some(p) = input.get(key).and_then(|v| v.as_str())
+            && path_basename_is_plan_md(p)
+        {
+            return true;
+        }
+    }
+    if let Some(arr) = input.get("paths").and_then(|v| v.as_array()) {
+        return arr
+            .iter()
+            .filter_map(|v| v.as_str())
+            .any(path_basename_is_plan_md);
+    }
+    false
+}
+
+fn path_basename_is_plan_md(path: &str) -> bool {
+    std::path::Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.eq_ignore_ascii_case("plan.md"))
+}
+
+#[cfg(test)]
+mod plan_mode_write_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn write_shaped_detection() {
+        assert!(is_write_shaped_tool("write"));
+        assert!(is_write_shaped_tool("Edit"));
+        assert!(is_write_shaped_tool("multiedit"));
+        assert!(!is_write_shaped_tool("read"));
+        assert!(!is_write_shaped_tool("ExitPlanMode"));
+    }
+
+    #[test]
+    fn plan_md_path_detection() {
+        assert!(tool_input_targets_plan_md(Some(&json!({ "path": "plan.md" }))));
+        assert!(tool_input_targets_plan_md(Some(
+            &json!({ "file_path": "/tmp/sessions/abc/plan.md" })
+        )));
+        assert!(tool_input_targets_plan_md(Some(
+            &json!({ "paths": ["src/main.rs", "plan.md"] })
+        )));
+        assert!(!tool_input_targets_plan_md(Some(
+            &json!({ "path": "src/main.rs" })
+        )));
+        assert!(!tool_input_targets_plan_md(None));
+    }
+}
+

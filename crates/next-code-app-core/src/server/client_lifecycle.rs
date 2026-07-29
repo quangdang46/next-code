@@ -1,8 +1,10 @@
 use super::client_actions::{
     AgentTaskContext, NotifySessionContext, handle_agent_task, handle_ask_user_question_response,
-    handle_compact, handle_input_shell, handle_notify_session, handle_permission_response,
-    handle_rename_session, handle_run_subagent, handle_set_feature, handle_set_subagent_model,
-    handle_split, handle_stdin_response, handle_transfer, handle_trigger_memory_extraction,
+    handle_best_of_n_pick_response, handle_compact, handle_exit_plan_mode_response,
+    handle_input_shell, handle_notify_session,
+    handle_permission_response, handle_rename_session, handle_run_subagent, handle_set_feature,
+    handle_set_subagent_model, handle_split, handle_stdin_response, handle_transfer,
+    handle_trigger_memory_extraction,
 };
 use super::client_comm::{
     handle_comm_channel_members, handle_comm_list, handle_comm_list_channels, handle_comm_message,
@@ -637,6 +639,22 @@ pub(super) async fn handle_client(
             >,
         >,
     > = Arc::new(Mutex::new(HashMap::new()));
+    let best_of_n_pick_responses: Arc<
+        Mutex<
+            HashMap<
+                String,
+                tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+            >,
+        >,
+    > = Arc::new(Mutex::new(HashMap::new()));
+    let exit_plan_mode_responses: Arc<
+        Mutex<
+            HashMap<
+                String,
+                tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>,
+            >,
+        >,
+    > = Arc::new(Mutex::new(HashMap::new()));
 
     // Subscribe to bus events so we can forward ModelsUpdated to this client
     // (e.g. when Copilot finishes async init after the initial History was sent)
@@ -693,6 +711,63 @@ pub(super) async fn handle_client(
                     tool_call_id: req.tool_call_id,
                     questions: req.questions,
                     mode: req.mode,
+                });
+            }
+        })
+    };
+
+    // Best-of-N mode=show pick → Face ACP reverse request.
+    let (bon_pick_tx, mut bon_pick_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::tool::BestOfNPickInputRequest>();
+    {
+        let mut agent_guard = agent.lock().await;
+        agent_guard.set_best_of_n_pick_tx(bon_pick_tx);
+    }
+    let _best_of_n_pick_forwarder = {
+        let client_event_tx = client_event_tx.clone();
+        let best_of_n_pick_responses = best_of_n_pick_responses.clone();
+        tokio::spawn(async move {
+            while let Some(req) = bon_pick_rx.recv().await {
+                let request_id = req.request_id.clone();
+                best_of_n_pick_responses
+                    .lock()
+                    .await
+                    .insert(request_id.clone(), req.response_tx);
+                let _ = client_event_tx.send(ServerEvent::BestOfNPickRequest {
+                    request_id,
+                    session_id: req.session_id,
+                    run_id: req.run_id,
+                    tool_call_id: req.tool_call_id,
+                    recommended_index: req.recommended_index,
+                    selection_reason: req.selection_reason,
+                    candidates: req.candidates,
+                });
+            }
+        })
+    };
+
+    // ExitPlanMode → Face ACP reverse request.
+    let (exit_plan_req_tx, mut exit_plan_req_rx) =
+        tokio::sync::mpsc::unbounded_channel::<crate::tool::ExitPlanModeInputRequest>();
+    {
+        let mut agent_guard = agent.lock().await;
+        agent_guard.set_exit_plan_mode_tx(exit_plan_req_tx);
+    }
+    let _exit_plan_mode_forwarder = {
+        let client_event_tx = client_event_tx.clone();
+        let exit_plan_mode_responses = exit_plan_mode_responses.clone();
+        tokio::spawn(async move {
+            while let Some(req) = exit_plan_req_rx.recv().await {
+                let request_id = req.request_id.clone();
+                exit_plan_mode_responses
+                    .lock()
+                    .await
+                    .insert(request_id.clone(), req.response_tx);
+                let _ = client_event_tx.send(ServerEvent::ExitPlanMode {
+                    request_id,
+                    session_id: req.session_id,
+                    tool_call_id: req.tool_call_id,
+                    plan_content: req.plan_content,
                 });
             }
         })
@@ -1975,6 +2050,40 @@ pub(super) async fn handle_client(
                 .await;
             }
 
+            Request::BestOfNPickResponse {
+                id,
+                request_id,
+                response,
+                error,
+            } => {
+                handle_best_of_n_pick_response(
+                    id,
+                    request_id,
+                    response,
+                    error,
+                    &best_of_n_pick_responses,
+                    &client_event_tx,
+                )
+                .await;
+            }
+
+            Request::ExitPlanModeResponse {
+                id,
+                request_id,
+                response,
+                error,
+            } => {
+                handle_exit_plan_mode_response(
+                    id,
+                    request_id,
+                    response,
+                    error,
+                    &exit_plan_mode_responses,
+                    &client_event_tx,
+                )
+                .await;
+            }
+
             Request::PermissionResponse {
                 id,
                 request_id,
@@ -2780,7 +2889,20 @@ pub(super) async fn handle_client(
             Request::ClientDebugCommand { id, .. } => {
                 handle_client_debug_command(id, &client_event_tx).await;
             }
-            Request::SetPermissionMode { .. } => {}
+            Request::SetPermissionMode { id, mode } => {
+                if let Some(dcg_mode) = crate::dcg_bridge::parse_permission_mode_str(&mode) {
+                    let session_id = {
+                        let agent_guard = agent.lock().await;
+                        agent_guard.session_id().to_string()
+                    };
+                    crate::dcg_bridge::apply_session_permission_mode(&session_id, dcg_mode);
+                } else {
+                    crate::logging::warn(&format!(
+                        "SetPermissionMode: unknown mode '{mode}', ignoring"
+                    ));
+                }
+                let _ = client_event_tx.send(ServerEvent::Done { id });
+            }
             Request::ClientDebugResponse { id, output } => {
                 handle_client_debug_response(id, output, &client_debug_response_tx);
             }

@@ -2,6 +2,64 @@
 
 use super::*;
 
+/// Welcome create-then-submit: one Enter with text must NewSession + queue
+/// the prompt with exactly one CreateSession (OpenCode prompt-submit race fix).
+#[test]
+fn welcome_typed_enter_creates_session_and_queues_prompt() {
+    let mut app = test_app();
+    assert!(matches!(app.active_view, ActiveView::Welcome));
+
+    // Mirrors ActionPair(NewSession, SendPrompt(text)) from welcome Enter.
+    let effects = dispatch_initial_prompt(&mut app, "hello from welcome".into());
+
+    let creates: Vec<_> = effects
+        .iter()
+        .filter(|e| matches!(e, Effect::CreateSession { .. }))
+        .collect();
+    assert_eq!(
+        creates.len(),
+        1,
+        "single Enter must emit exactly one CreateSession, got {effects:?}"
+    );
+    let id = AgentId(0);
+    assert!(
+        matches!(app.active_view, ActiveView::Agent(_)),
+        "must leave Welcome after NewSession"
+    );
+    assert_eq!(app.agents[&id].session.queue_len(), 1);
+    assert_eq!(
+        app.agents[&id].session.pending_prompts[0].text,
+        "hello from welcome"
+    );
+}
+
+/// Plain SendPrompt with no bound session must kick CreateSession (bash parity).
+#[test]
+fn plain_send_prompt_without_session_emits_create_session() {
+    let mut app = test_app_with_agent();
+    app.mark_project_picker_done();
+    let id = AgentId(0);
+    {
+        let agent = app.agents.get_mut(&id).unwrap();
+        agent.session.session_id = None;
+        agent.mcp_init_progress = None;
+    }
+
+    let effects = dispatch(Action::SendPrompt("bind me".into()), &mut app);
+    assert!(
+        effects
+            .iter()
+            .any(|e| matches!(e, Effect::CreateSession { .. })),
+        "unbound plain prompt must emit CreateSession, got {effects:?}"
+    );
+    assert_eq!(app.agents[&id].session.queue_len(), 1);
+    assert_eq!(app.agents[&id].session.pending_prompts[0].text, "bind me");
+    assert!(
+        read_toast(&app).contains("Connecting"),
+        "must surface Connecting… while create is in flight"
+    );
+}
+
 /// Sending a prompt is a submit: it retires the active ephemeral tip.
 #[test]
 fn send_prompt_clears_active_ephemeral_tip() {
@@ -2226,6 +2284,7 @@ fn submit_question_answers_cancel_clears_local_modal_and_restores_prompt() {
             })
             .collect(),
         multi_select: Some(false),
+        header: None,
         id: None,
     };
     app.agents.get_mut(&id).unwrap().question_view = Some(

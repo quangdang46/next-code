@@ -1398,6 +1398,197 @@ pub(crate) fn execute(
                     TaskResult::CancelComplete
                 });
         }
+        Effect::GoalSet { agent_id, session_id, objective } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let request = acp::ExtRequest::new(
+                    "x.ai/goal/set",
+                    serde_json::value::to_raw_value(&serde_json::json!({
+                        "sessionId": session_id.0.to_string(),
+                        "objective": objective,
+                    }))
+                    .expect("serialize goal/set")
+                    .into(),
+                );
+                match acp_send(request, &tx).await {
+                    Ok(resp) => {
+                        let v: serde_json::Value =
+                            serde_json::from_str(resp.0.get()).unwrap_or_default();
+                        if let Some(err) = v.get("error") {
+                            let message = err
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .unwrap_or("goal set failed")
+                                .to_string();
+                            TaskResult::GoalMutationFailed { agent_id, message }
+                        } else {
+                            TaskResult::CancelComplete
+                        }
+                    }
+                    Err(e) => TaskResult::GoalMutationFailed {
+                        agent_id,
+                        message: sanitize_user_error(&format!("couldn't set goal: {e}")),
+                    },
+                }
+            });
+        }
+        Effect::GoalPause { agent_id, session_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let request = acp::ExtRequest::new(
+                    "x.ai/goal/pause",
+                    serde_json::value::to_raw_value(&serde_json::json!({
+                        "sessionId": session_id.0.to_string(),
+                    }))
+                    .expect("serialize goal/pause")
+                    .into(),
+                );
+                match acp_send(request, &tx).await {
+                    Ok(resp) => {
+                        let v: serde_json::Value =
+                            serde_json::from_str(resp.0.get()).unwrap_or_default();
+                        if let Some(err) = v.get("error") {
+                            let message = err
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .unwrap_or("goal pause failed")
+                                .to_string();
+                            TaskResult::GoalMutationFailed { agent_id, message }
+                        } else {
+                            TaskResult::CancelComplete
+                        }
+                    }
+                    Err(e) => TaskResult::GoalMutationFailed {
+                        agent_id,
+                        message: sanitize_user_error(&format!("couldn't pause goal: {e}")),
+                    },
+                }
+            });
+        }
+        Effect::GoalResume { agent_id, session_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let request = acp::ExtRequest::new(
+                    "x.ai/goal/resume",
+                    serde_json::value::to_raw_value(&serde_json::json!({
+                        "sessionId": session_id.0.to_string(),
+                    }))
+                    .expect("serialize goal/resume")
+                    .into(),
+                );
+                match acp_send(request, &tx).await {
+                    Ok(resp) => {
+                        let v: serde_json::Value =
+                            serde_json::from_str(resp.0.get()).unwrap_or_default();
+                        if let Some(err) = v.get("error") {
+                            let message = err
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .unwrap_or("goal resume failed")
+                                .to_string();
+                            TaskResult::GoalMutationFailed { agent_id, message }
+                        } else {
+                            TaskResult::CancelComplete
+                        }
+                    }
+                    Err(e) => TaskResult::GoalMutationFailed {
+                        agent_id,
+                        message: sanitize_user_error(&format!("couldn't resume goal: {e}")),
+                    },
+                }
+            });
+        }
+        Effect::GoalClear { agent_id, session_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let request = acp::ExtRequest::new(
+                    "x.ai/goal/clear",
+                    serde_json::value::to_raw_value(&serde_json::json!({
+                        "sessionId": session_id.0.to_string(),
+                    }))
+                    .expect("serialize goal/clear")
+                    .into(),
+                );
+                match acp_send(request, &tx).await {
+                    Ok(resp) => {
+                        let v: serde_json::Value =
+                            serde_json::from_str(resp.0.get()).unwrap_or_default();
+                        if let Some(err) = v.get("error") {
+                            let message = err
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .unwrap_or("goal clear failed")
+                                .to_string();
+                            TaskResult::GoalMutationFailed { agent_id, message }
+                        } else {
+                            TaskResult::CancelComplete
+                        }
+                    }
+                    Err(e) => TaskResult::GoalMutationFailed {
+                        agent_id,
+                        message: sanitize_user_error(&format!("couldn't clear goal: {e}")),
+                    },
+                }
+            });
+        }
+        Effect::GoalStatus { agent_id, session_id } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let request = acp::ExtRequest::new(
+                    "x.ai/goal/status",
+                    serde_json::value::to_raw_value(&serde_json::json!({
+                        "sessionId": session_id.0.to_string(),
+                    }))
+                    .expect("serialize goal/status")
+                    .into(),
+                );
+                match acp_send(request, &tx).await {
+                    Ok(resp) => {
+                        let v: serde_json::Value =
+                            serde_json::from_str(resp.0.get()).unwrap_or_default();
+                        if let Some(err) = v.get("error") {
+                            let message = err
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .unwrap_or("goal status failed")
+                                .to_string();
+                            return TaskResult::GoalMutationFailed { agent_id, message };
+                        }
+                        let goal = v
+                            .pointer("/result/goal")
+                            .filter(|g| g.is_object());
+                        match goal {
+                            Some(g) => {
+                                let objective = g
+                                    .get("objective")
+                                    .and_then(|o| o.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                let status = g
+                                    .get("status")
+                                    .and_then(|s| s.as_str())
+                                    .unwrap_or("active");
+                                TaskResult::GoalStatusComplete {
+                                    agent_id,
+                                    toast: format!("Goal ({status}): {objective}"),
+                                    open_detail: true,
+                                }
+                            }
+                            None => TaskResult::GoalStatusComplete {
+                                agent_id,
+                                toast: "No active goal. Set one with `/goal <objective>`."
+                                    .to_string(),
+                                open_detail: false,
+                            },
+                        }
+                    }
+                    Err(e) => TaskResult::GoalMutationFailed {
+                        agent_id,
+                        message: sanitize_user_error(&format!("couldn't fetch goal status: {e}")),
+                    },
+                }
+            });
+        }
         Effect::SetSessionMode { session_id, mode_id } => {
             let tx = acp_tx.clone();
             tasks
@@ -1588,6 +1779,53 @@ pub(crate) fn execute(
                         outcome,
                     }
                 });
+        }
+        Effect::MessageSwarmMember {
+            session_id,
+            target_session_id,
+            message,
+        } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let params = serde_json::json!({
+                    "sessionId": session_id.0.to_string(),
+                    "targetSessionId": target_session_id,
+                    "message": message,
+                });
+                let req = acp::ExtRequest::new(
+                    "x.ai/swarm/dm",
+                    serde_json::value::to_raw_value(&params)
+                        .expect("serialize swarm dm params")
+                        .into(),
+                );
+                if let Err(e) = acp_send(req, &tx).await {
+                    tracing::warn!("Failed to DM swarm member: {e}");
+                }
+                TaskResult::CancelComplete
+            });
+        }
+        Effect::StopSwarmMember {
+            session_id,
+            target_session_id,
+        } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let params = serde_json::json!({
+                    "sessionId": session_id.0.to_string(),
+                    "targetSessionId": target_session_id,
+                    "force": true,
+                });
+                let req = acp::ExtRequest::new(
+                    "x.ai/swarm/stop",
+                    serde_json::value::to_raw_value(&params)
+                        .expect("serialize swarm stop params")
+                        .into(),
+                );
+                if let Err(e) = acp_send(req, &tx).await {
+                    tracing::warn!("Failed to stop swarm member: {e}");
+                }
+                TaskResult::CancelComplete
+            });
         }
         Effect::DeleteScheduledTask { session_id, task_id } => {
             let tx = acp_tx.clone();
@@ -3370,6 +3608,26 @@ pub(crate) fn execute(
                         }
                     }
                 });
+        }
+        Effect::MultitaskSpawn { session_id, prompt } => {
+            let tx = acp_tx.clone();
+            tasks.spawn(async move {
+                let params = serde_json::json!({
+                    "sessionId": session_id.0.to_string(),
+                    "prompt": prompt,
+                    "spawnMode": "headless",
+                });
+                let req = acp::ExtRequest::new(
+                    "x.ai/multitask/spawn",
+                    serde_json::value::to_raw_value(&params)
+                        .expect("serialize multitask spawn params")
+                        .into(),
+                );
+                if let Err(e) = acp_send(req, &tx).await {
+                    tracing::warn!("Failed to spawn multitask worker: {e}");
+                }
+                TaskResult::CancelComplete
+            });
         }
         Effect::SendRecap { session_id, auto } => {
             let tx = acp_tx.clone();

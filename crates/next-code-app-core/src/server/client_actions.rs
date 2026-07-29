@@ -265,15 +265,22 @@ pub(super) fn handle_run_subagent(
     tokio::spawn(async move {
         let description = derive_subagent_description(&prompt);
         let tool_call_id = crate::id::new_id("call");
-        let tool_name = "subagent".to_string();
-        let tool_input = serde_json::json!({
+        // Direct `subagent` tool was removed; route through the Claude-compatible
+        // Agent façade (swarm spawn / DM resume) so /subagent + Face multitask keep working.
+        let tool_name = "Agent".to_string();
+        let mut tool_input = serde_json::json!({
             "description": description,
             "prompt": prompt,
             "subagent_type": subagent_type,
-            "model": model,
-            "session_id": session_id,
-            "command": "/subagent",
+            "run_in_background": true,
         });
+        if let Some(model) = model.filter(|m| !m.trim().is_empty()) {
+            tool_input["model"] = serde_json::Value::String(model);
+        }
+        if let Some(resume) = session_id.filter(|s| !s.trim().is_empty()) {
+            // Continue / steer an existing worker via Agent resume → swarm DM.
+            tool_input["resume"] = serde_json::Value::String(resume);
+        }
 
         let message_id = {
             let mut agent_guard = agent.lock().await;
@@ -322,6 +329,8 @@ pub(super) fn handle_run_subagent(
             working_dir,
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            best_of_n_pick_tx: None,
+            exit_plan_mode_tx: None,
             graceful_shutdown_signal: None,
             background_tool_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
@@ -349,6 +358,7 @@ pub(super) fn handle_run_subagent(
                     name: tool_name,
                     output: output_text,
                     error: None,
+                    metadata: output.metadata.clone(),
                 });
                 let persist = {
                     let mut agent_guard = agent.lock().await;
@@ -371,6 +381,7 @@ pub(super) fn handle_run_subagent(
                     name: tool_name,
                     output: error_msg.clone(),
                     error: Some(error_msg.clone()),
+                metadata: None,
                 });
                 let persist = {
                     let mut agent_guard = agent.lock().await;
@@ -1095,6 +1106,46 @@ pub(super) async fn handle_ask_user_question_response(
     client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
 ) {
     if let Some(tx) = ask_responses.lock().await.remove(&request_id) {
+        let payload = match error {
+            Some(err) => Err(err),
+            None => Ok(response),
+        };
+        let _ = tx.send(payload);
+    }
+    let _ = client_event_tx.send(ServerEvent::Done { id });
+}
+
+pub(super) async fn handle_best_of_n_pick_response(
+    id: u64,
+    request_id: String,
+    response: serde_json::Value,
+    error: Option<String>,
+    bon_responses: &Arc<
+        Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>>>,
+    >,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+) {
+    if let Some(tx) = bon_responses.lock().await.remove(&request_id) {
+        let payload = match error {
+            Some(err) => Err(err),
+            None => Ok(response),
+        };
+        let _ = tx.send(payload);
+    }
+    let _ = client_event_tx.send(ServerEvent::Done { id });
+}
+
+pub(super) async fn handle_exit_plan_mode_response(
+    id: u64,
+    request_id: String,
+    response: serde_json::Value,
+    error: Option<String>,
+    exit_responses: &Arc<
+        Mutex<HashMap<String, tokio::sync::oneshot::Sender<Result<serde_json::Value, String>>>>,
+    >,
+    client_event_tx: &mpsc::UnboundedSender<ServerEvent>,
+) {
+    if let Some(tx) = exit_responses.lock().await.remove(&request_id) {
         let payload = match error {
             Some(err) => Err(err),
             None => Ok(response),

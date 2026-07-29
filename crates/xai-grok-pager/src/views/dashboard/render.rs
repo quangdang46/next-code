@@ -2858,6 +2858,10 @@ fn paint_dispatch_config_badge(
         multiline: state.multiline_mode,
         usage_warning: None,
         usage_warning_critical: false,
+        tasks_pill: None,
+        tasks_pill_hovered: false,
+        agent_pills: None,
+        agent_expand_hint: None,
     };
     // Bottom border row, inside the corners — the same content rect the chat
     // prompt uses for its info line.
@@ -2867,7 +2871,7 @@ fn paint_dispatch_config_badge(
         width: area.width.saturating_sub(2),
         height: 1,
     };
-    state
+    let _ = state
         .dispatch
         .render_info_line(buf, info_rect, &info, theme.bg_base, theme, input_focused);
 }

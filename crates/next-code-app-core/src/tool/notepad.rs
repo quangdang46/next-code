@@ -377,6 +377,8 @@ mod tests {
             working_dir: Some(dir.to_path_buf()),
             stdin_request_tx: None,
             ask_user_question_tx: None,
+            best_of_n_pick_tx: None,
+            exit_plan_mode_tx: None,
             graceful_shutdown_signal: None,
             background_tool_signal: None,
             execution_mode: crate::tool::ToolExecutionMode::Direct,
@@ -384,7 +386,6 @@ mod tests {
             best_of_n_candidate_id: None,
         }
     }
-
     #[tokio::test]
     async fn test_read_priority_tool_empty() {
         let (dir, _np) = temp_notepad();

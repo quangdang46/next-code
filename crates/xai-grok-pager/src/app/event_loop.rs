@@ -244,10 +244,14 @@ fn park_input_reader(
 /// the request pending and retries it later.
 fn suspend_for_child(
     screen_mode: crate::app::ScreenMode,
-    terminal: &mut PagerTerminal,
+    _terminal: &mut PagerTerminal,
     input_paused: &std::sync::atomic::AtomicBool,
     reader_parked: &std::sync::atomic::AtomicBool,
     input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<TimedInputEvent>,
+    // Terminal editors need the main buffer; GUI editors must keep the
+    // alternate screen so Face does not flash/stick on a black main screen
+    // (Claude `promptEditor.ts` `useAlternateScreen = !isGuiEditor`).
+    leave_alt_screen: bool,
     run_child: impl FnOnce(),
 ) -> std::io::Result<Option<(u16, u16)>> {
     use std::sync::atomic::Ordering;
@@ -282,7 +286,8 @@ fn suspend_for_child(
         .is_minimal()
         .then(|| crossterm::cursor::position().ok())
         .flatten();
-    if screen_mode.is_fullscreen() {
+    let leave_alt = leave_alt_screen && screen_mode.is_fullscreen();
+    if leave_alt {
         xai_grok_shell::util::with_locked_stderr(|stderr| {
             let _ = crossterm::execute!(stderr, crossterm::terminal::LeaveAlternateScreen);
         });
@@ -290,7 +295,7 @@ fn suspend_for_child(
     let _ = crossterm::terminal::disable_raw_mode();
     run_child();
     let _ = crossterm::terminal::enable_raw_mode();
-    if screen_mode.is_fullscreen() {
+    if leave_alt {
         xai_grok_shell::util::with_locked_stderr(|stderr| {
             let _ = crossterm::execute!(stderr, crossterm::terminal::EnterAlternateScreen);
         });
@@ -563,20 +568,27 @@ fn run_pending_suspends(
     }
     *suspend_retry_after = None;
 
-    // $EDITOR suspend: leave alt screen, disable raw mode, spawn
-    // editor, wait for exit, then restore.
+    // $EDITOR suspend: park input, optionally leave alt screen (terminal
+    // editors only), spawn editor with Claude-parity wait/shell handling,
+    // wait for exit, then restore.
     if let Some(path) = app.pending_editor_path.take() {
-        let editor = std::env::var("VISUAL")
-            .or_else(|_| std::env::var("EDITOR"))
-            .unwrap_or_else(|_| "vi".to_string());
+        let editor = crate::external_editor::resolve_editor();
+        let leave_alt = !crate::external_editor::is_gui_editor(&editor);
         let moved_cursor = match suspend_for_child(
             app.screen_mode,
             terminal,
             input_paused,
             reader_parked,
             input_rx,
+            leave_alt,
             || {
-                let _ = std::process::Command::new(&editor).arg(&path).status();
+                if let Err(err) = crate::external_editor::spawn_editor_blocking(&path) {
+                    tracing::warn!(
+                        error = %err,
+                        path = %path.display(),
+                        "external editor spawn failed"
+                    );
+                }
             },
         ) {
             Ok(moved_cursor) => moved_cursor,
@@ -602,6 +614,14 @@ fn run_pending_suspends(
         {
             modal.refresh_after_editor(tab);
         }
+        if app.pending_keybindings_reload {
+            app.pending_keybindings_reload = false;
+            let enabled = crate::app::MOUSE_REPORTING_TOGGLE_ENABLED
+                .load(std::sync::atomic::Ordering::Acquire);
+            app.registry = crate::actions::ActionRegistry::reload_with_config(enabled);
+            let display = crate::actions::keybindings_display_path();
+            app.show_toast(&format!("Reloaded keybindings from {display}"));
+        }
         // The child owned the screen; re-anchor if it printed inline, and
         // repaint the full viewport rather than diffing against a screen
         // state we can no longer vouch for.
@@ -625,6 +645,7 @@ fn run_pending_suspends(
             input_paused,
             reader_parked,
             input_rx,
+            /* leave_alt_screen */ true,
             || {
                 // $PAGER may carry flags (e.g. "less -R"); split on
                 // whitespace so program + args are both honored.
@@ -1306,7 +1327,7 @@ pub(crate) async fn run(
         effective_config.as_ref(),
         &app.current_ui,
     );
-    app.registry = crate::actions::ActionRegistry::defaults_with_config(mouse_toggle.value);
+    app.registry = crate::actions::ActionRegistry::with_user_keybindings(mouse_toggle.value);
     // Cache the resolved flag so the `/toggle-mouse-reporting` slash command can
     // gate its visibility/execution without re-reading config on every keystroke.
     crate::app::MOUSE_REPORTING_TOGGLE_ENABLED
@@ -2944,6 +2965,50 @@ fn normalize_input_event(timed: TimedInputEvent) -> RoutedInputEvent {
 /// [`CsiFragmentFilter`](super::csi_filter::CsiFragmentFilter) before
 /// processing to fix paste on terminals without bracketed paste (e.g.
 /// Windows PowerShell) and filter leaked CSI fragments (SGR mouse and focus reports).
+fn apply_deferred_welcome_forward(app: &mut AppView, ev: &Event) {
+    use crossterm::event::{KeyCode, KeyEventKind};
+    use crate::views::prompt_widget::PromptEvent;
+
+    app.welcome_prompt_focused = true;
+    match ev {
+        Event::Key(key) if key.kind != KeyEventKind::Release => {
+            // Shift-Tab / other non-text forwards must not invent draft text.
+            if crate::input::key::is_shift_tab(key) {
+                return;
+            }
+            if matches!(key.code, KeyCode::Char(_))
+                && !(crate::input::key::is_text_input_key(key)
+                    || (matches!(key.code, KeyCode::Char('v'))
+                        && crate::input::key::is_paste_key(key)))
+            {
+                return;
+            }
+            match app.welcome_prompt.handle_key(key) {
+                PromptEvent::Edited => {
+                    let draft = app.welcome_prompt.text().to_string();
+                    if draft.is_empty() {
+                        app.deferred_startup.prompt = None;
+                    } else {
+                        app.deferred_startup.prompt = Some(draft);
+                    }
+                }
+                PromptEvent::Ignored => {}
+            }
+        }
+        Event::Paste(text) => {
+            let stripped = text.trim_end_matches(['\r', '\n']);
+            if stripped.is_empty() {
+                return;
+            }
+            let mut draft = app.welcome_prompt.text().to_string();
+            draft.push_str(stripped);
+            app.welcome_prompt.set_text(&draft);
+            app.deferred_startup.prompt = Some(draft);
+        }
+        _ => {}
+    }
+}
+
 async fn drain_and_process(
     first: TimedInputEvent,
     input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<TimedInputEvent>,
@@ -3145,22 +3210,36 @@ async fn drain_and_process(
                 // Dispatch the action (e.g. create session), then re-process
                 // the same event through the now-active view so the input
                 // (character, paste) lands in the session's prompt.
+                let was_welcome = matches!(app.active_view, ActiveView::Welcome);
                 let effs = dispatch::dispatch(action, app);
                 if process_effects(effs, tasks, app, progress_tx) {
                     return true;
                 }
-                if let InputOutcome::Action(follow_up) = app.handle_input_at_with_paste_provenance(
-                    ev,
-                    routed.arrived_at,
-                    routed.paste_provenance,
-                ) {
+                if was_welcome && matches!(app.active_view, ActiveView::Welcome) {
+                    // NewSession was deferred (auth/trust gate). Re-forward would
+                    // only emit ActionThenForward again and drop the keystroke —
+                    // stash into the welcome prompt + deferred_startup.prompt so
+                    // drain_startup_actions can NewSession+SendPrompt later.
+                    apply_deferred_welcome_forward(app, ev);
+                    needs_draw = true;
+                    had_non_resize_change = true;
+                } else if let InputOutcome::Action(follow_up) =
+                    app.handle_input_at_with_paste_provenance(
+                        ev,
+                        routed.arrived_at,
+                        routed.paste_provenance,
+                    )
+                {
                     let effs = dispatch::dispatch(follow_up, app);
                     if process_effects(effs, tasks, app, progress_tx) {
                         return true;
                     }
+                    needs_draw = true;
+                    had_non_resize_change = true;
+                } else {
+                    needs_draw = true;
+                    had_non_resize_change = true;
                 }
-                needs_draw = true;
-                had_non_resize_change = true;
             }
             InputOutcome::ActionPair(first, second) => {
                 // Dispatch both in order; first must fully resolve
@@ -3602,6 +3681,33 @@ fn process_effects(
 mod tests {
     use super::*;
     use crossterm::event::{KeyEvent, KeyEventState};
+
+    // ── apply_deferred_welcome_forward ───────────────────────────────────
+
+    #[test]
+    fn deferred_new_session_keystroke_stashed_into_welcome_prompt() {
+        use crate::app::app_view::{ActiveView, AuthState, TrustState};
+        use crossterm::event::{KeyCode, KeyModifiers};
+
+        let mut app = crate::app::app_view::tests::test_app();
+        app.active_view = ActiveView::Welcome;
+        app.auth_state = AuthState::Pending { error: None };
+        app.trust_state = TrustState::Done;
+        assert!(app.welcome_prompt.text().is_empty());
+        assert!(app.deferred_startup.prompt.is_none());
+
+        let ev = Event::Key(KeyEvent {
+            code: KeyCode::Char('h'),
+            modifiers: KeyModifiers::NONE,
+            kind: KeyEventKind::Press,
+            state: KeyEventState::NONE,
+        });
+        apply_deferred_welcome_forward(&mut app, &ev);
+
+        assert!(app.welcome_prompt_focused);
+        assert_eq!(app.welcome_prompt.text(), "h");
+        assert_eq!(app.deferred_startup.prompt.as_deref(), Some("h"));
+    }
 
     // ── is_voice_chord ───────────────────────────────────────────────────
 
