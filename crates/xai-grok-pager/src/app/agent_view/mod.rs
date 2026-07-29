@@ -150,6 +150,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 mod cta;
 mod agent_team;
+mod footer_snag;
 mod input;
 mod interactions;
 mod jump;
@@ -1048,6 +1049,8 @@ pub struct AgentView {
     pub hit_bg_status: HitArea,
     /// Prompt-footer SummaryPill (`tasks_pill`) — click opens Tasks hub.
     pub hit_tasks_pill: HitArea,
+    /// Claude footer keyboard snag (`footerSelection`). `None` = prompt owns arrows.
+    pub footer_snag: Option<footer_snag::FooterSnagItem>,
     /// Prompt-footer `@agent` pills — `(roster_id, hit)`.
     pub hit_agent_pills: Vec<(String, HitArea)>,
     /// Under-prompt agent panel roster strip hits — `(roster_id, rect)`.
