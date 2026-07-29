@@ -487,6 +487,39 @@ impl AgentView {
             }
         }
 
+        // Stash browser (`/stash`).
+        if let ActiveModal::StashBrowser { state } = modal {
+            let chrome_cfg = mw::ModalWindowConfig {
+                title: "",
+                tabs: None,
+                shortcuts: &[],
+                sizing: mw::ModalSizing::default(),
+                fold_info: None,
+            };
+            let chrome_outcome = mw::handle_modal_key(&mut state.window, key, &chrome_cfg);
+            match chrome_outcome {
+                ModalWindowOutcome::CloseRequested => {
+                    if state.state.query().is_empty() {
+                        self.active_modal = None;
+                    } else {
+                        state.state.set_query("");
+                        state.state.selected = 0;
+                    }
+                    return InputOutcome::Changed;
+                }
+                ModalWindowOutcome::Unhandled => {
+                    let outcome = crate::views::stash_modal::handle_key(
+                        key,
+                        &mut state.state,
+                        state.entries.len(),
+                        &mut state.pending_delete,
+                    );
+                    return self.handle_stash_outcome(outcome);
+                }
+                _ => return InputOutcome::Changed,
+            }
+        }
+
         // ResetSettingsConfirm: y/n routing. Handled before generic
         // char-match so Esc/F2/Ctrl+, route to Cancel (not modal close).
         if let Some(ActiveModal::ResetSettingsConfirm { modal, .. }) = self.active_modal.as_ref() {
@@ -540,7 +573,8 @@ impl AgentView {
             | ActiveModal::ExperimentalFeatures { .. }
             | ActiveModal::DiffReview { .. }
             | ActiveModal::ResetSettingsConfirm { .. }
-            | ActiveModal::RememberNoteReview { .. } => unreachable!(),
+            | ActiveModal::RememberNoteReview { .. }
+            | ActiveModal::StashBrowser { .. } => unreachable!(),
         }
     }
 
@@ -557,6 +591,7 @@ impl AgentView {
                 ActiveModal::CommandPalette { .. }
                     | ActiveModal::ArgPicker { .. }
                     | ActiveModal::SessionPicker { .. }
+                    | ActiveModal::StashBrowser { .. }
             )
         ) {
             return self.handle_palette_or_arg_input(&event);
@@ -1519,6 +1554,79 @@ impl AgentView {
             InputOutcome::Changed
         }
     }
+
+    /// Handle a stash modal outcome (restore, delete, close, etc.).
+    fn handle_stash_outcome(&mut self, outcome: crate::views::stash_modal::StashOutcome) -> InputOutcome {
+        use crate::views::stash_modal::StashOutcome as SO;
+        match outcome {
+            SO::Restore(picker_idx) => {
+                let entry_idx = self
+                    .active_modal
+                    .as_ref()
+                    .and_then(|m| {
+                        if let crate::views::modal::ActiveModal::StashBrowser { state } = m {
+                            state.entries.get(picker_idx).map(|e| e.index)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(picker_idx);
+
+                let mut stash = crate::views::stash::PromptStash::load();
+                if let Some(entry) = stash.remove(entry_idx) {
+                    stash.flush();
+                    self.prompt.set_text(&entry.input);
+                    let len = self.prompt.textarea.text().len();
+                    self.prompt.textarea.set_cursor(len);
+                }
+                self.active_modal = None;
+                InputOutcome::Changed
+            }
+            SO::Delete(picker_idx) => {
+                let entry_idx = self
+                    .active_modal
+                    .as_ref()
+                    .and_then(|m| {
+                        if let crate::views::modal::ActiveModal::StashBrowser { state } = m {
+                            state.entries.get(picker_idx).map(|e| e.index)
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(picker_idx);
+                let mut stash = crate::views::stash::PromptStash::load();
+                stash.remove(entry_idx);
+                stash.flush();
+
+                let modal_entries: Vec<crate::views::stash_modal::StashEntry> = stash
+                    .list()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, entry)| {
+                        let preview = entry.preview();
+                        let line_count = entry.line_count() as u16;
+                        crate::views::stash_modal::StashEntry {
+                            preview,
+                            full_text: entry.input.clone(),
+                            line_count,
+                            index: i,
+                        }
+                    })
+                    .collect();
+                self.active_modal = Some(crate::views::modal::ActiveModal::StashBrowser {
+                    state: crate::views::stash_modal::StashModalState::new(modal_entries),
+                });
+                InputOutcome::Changed
+            }
+            SO::Close => {
+                self.active_modal = None;
+                InputOutcome::Changed
+            }
+            SO::Changed => InputOutcome::Changed,
+            SO::Unchanged => InputOutcome::Unchanged,
+        }
+    }
+
     /// Handle mouse events while a modal is active.
     ///
     /// Click on a button → same as pressing that key.
@@ -1543,6 +1651,7 @@ impl AgentView {
                     | ActiveModal::DocViewer { .. }
                     | ActiveModal::ShortcutsHelp { .. }
                     | ActiveModal::RememberNoteReview { .. }
+                    | ActiveModal::StashBrowser { .. }
             )
         ) {
             // Extract window for handle_modal_mouse.
@@ -1554,6 +1663,7 @@ impl AgentView {
                 Some(ActiveModal::DocViewer { window, .. }) => window,
                 Some(ActiveModal::ShortcutsHelp { window, .. }) => window,
                 Some(ActiveModal::RememberNoteReview { window, .. }) => window,
+                Some(ActiveModal::StashBrowser { state, .. }) => &mut state.window,
                 _ => unreachable!(),
             };
             let outcome = mw::handle_modal_mouse(window, mouse.kind, mouse.column, mouse.row);
@@ -1673,6 +1783,15 @@ impl AgentView {
                             ShortcutsHelpOutcome::Changed => InputOutcome::Changed,
                             ShortcutsHelpOutcome::Unchanged => InputOutcome::Unchanged,
                         };
+                    }
+                    // StashBrowser: delegate to stash mouse handler.
+                    if let Some(ActiveModal::StashBrowser { state }) = self.active_modal.as_mut() {
+                        let outcome = crate::views::stash_modal::handle_mouse(
+                            mouse,
+                            &mut state.state,
+                            state.entries.len(),
+                        );
+                        return self.handle_stash_outcome(outcome);
                     }
                     let ev = crossterm::event::Event::Mouse(*mouse);
                     return self.handle_palette_or_arg_input(&ev);
@@ -2557,6 +2676,17 @@ impl AgentView {
                     settings_state,
                     compact,
                     None,
+                );
+            } else if let modal::ActiveModal::StashBrowser { state } = active_modal {
+                crate::views::stash_modal::render_modal(
+                    buf,
+                    area,
+                    &mut state.state,
+                    &mut state.window,
+                    &state.entries,
+                    state.pending_delete.is_some(),
+                    &theme,
+                    compact,
                 );
             } else if let modal::ActiveModal::ExperimentalFeatures { state } = active_modal {
                 crate::views::experimental_modal::render_experimental_modal(

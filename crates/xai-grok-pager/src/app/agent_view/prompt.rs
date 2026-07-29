@@ -762,6 +762,26 @@ impl AgentView {
                     if let Some(eff) = self.notify_plugin_cta_text_changed() {
                         self.pending_effects.push(eff);
                     }
+                    // ── Auto-stash ───────────────────────────────────────────
+                    // While a turn is running, any non-empty prompt text is
+                    // stashed to the persistent stash so the user doesn't lose
+                    // their draft. Only stashes when the text differs from the
+                    // most recently stashed entry to avoid filling the stash
+                    // with duplicates on every keystroke.
+                    if self.session.state.is_turn_running() {
+                        let text = self.prompt.text().trim().to_string();
+                        if !text.is_empty()
+                            && self.prompt_stash.list().first().map_or(true, |e| e.input != text)
+                        {
+                            let entry = crate::views::stash::StashEntry::new(
+                                text,
+                                Vec::new(),
+                                None,
+                            );
+                            self.prompt_stash.push(entry);
+                            self.unread_stash_count += 1;
+                        }
+                    }
                     if let Some(action) = self.take_prompt_tip_signal() {
                         return InputOutcome::Action(action);
                     }

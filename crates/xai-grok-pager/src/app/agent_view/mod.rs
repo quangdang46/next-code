@@ -1573,6 +1573,11 @@ pub struct AgentView {
         agent_client_protocol::SessionUpdate,
         crate::acp::meta::NotificationMeta,
     )>,
+    /// The multi-entry persistent prompt stash. Auto-stashed when the user
+    /// types while a turn is running; browsable via `/stash`.
+    pub prompt_stash: crate::views::stash::PromptStash,
+    /// The number of auto-stashed entries since the last turn ended.
+    pub unread_stash_count: usize,
 }
 /// Cap on [`AgentView::self_originated_prompt_ids`]. Only recent ids matter (a
 /// stale post-rewind chunk arrives right after its turn ends), so a small

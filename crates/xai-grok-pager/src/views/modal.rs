@@ -310,6 +310,11 @@ pub enum ActiveModal {
         /// Preserved settings state, restored by both choice branches.
         settings_state: Box<crate::views::settings_modal::SettingsModalState>,
     },
+    /// Stash browser: browse, search, restore, and delete stashed prompt drafts.
+    /// Opened by `/stash`.
+    StashBrowser {
+        state: crate::views::stash_modal::StashModalState,
+    },
     /// Modal preview for a `#` remember note. Shows the raw text immediately;
     /// the LLM-enhanced version arrives asynchronously and can be toggled with Tab.
     RememberNoteReview {
@@ -625,7 +630,8 @@ impl ActiveModal {
             | ActiveModal::Settings { .. }
             | ActiveModal::ExperimentalFeatures { .. }
             | ActiveModal::DiffReview { .. }
-            | ActiveModal::RememberNoteReview { .. } => vec![],
+            | ActiveModal::RememberNoteReview { .. }
+            | ActiveModal::StashBrowser { .. } => vec![],
         }
     }
     pub fn message(&self, drain_blocked: bool) -> &str {
@@ -659,6 +665,7 @@ impl ActiveModal {
             ActiveModal::DiffReview { .. } => "Diff",
             ActiveModal::ResetSettingsConfirm { .. } => "Reset setting?",
             ActiveModal::RememberNoteReview { .. } => "Memory Note",
+            ActiveModal::StashBrowser { .. } => "Stash",
         }
     }
 }

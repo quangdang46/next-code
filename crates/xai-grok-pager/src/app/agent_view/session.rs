@@ -329,6 +329,8 @@ impl AgentView {
             follow_up_pending: HashMap::new(),
             follow_up_pending_order: VecDeque::new(),
             pending_adoption_updates: Vec::new(),
+            prompt_stash: crate::views::stash::PromptStash::load(),
+            unread_stash_count: 0,
         };
         let mode = if crate::appearance::cache::load_simple_mode() {
             InputMode::Simple
@@ -349,6 +351,21 @@ impl AgentView {
         self.turn_paused_duration = std::time::Duration::ZERO;
         self.turn_token_usage = None;
         self.last_active_at = Some(Instant::now());
+
+        // Auto-restore the most recent stash entry if the prompt is empty.
+        if self.unread_stash_count > 0 && self.prompt.text().trim().is_empty() {
+            if let Some(entry) = self.prompt_stash.list().first() {
+                self.prompt.set_text(&entry.input);
+                let len = self.prompt.textarea.text().len();
+                self.prompt.textarea.set_cursor(len);
+            }
+            self.unread_stash_count = 0;
+        }
+
+        // Flush stash to disk so entries survive a crash.
+        if self.unread_stash_count > 0 {
+            self.prompt_stash.flush();
+        }
     }
 
     /// Snapshot and clear the in-flight next-code token sample for the footer.

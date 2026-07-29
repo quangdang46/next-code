@@ -61,8 +61,9 @@ pub mod screen_mode_switch;
 pub mod scroll_debug;
 pub mod session_info;
 pub mod settings_cmd;
-pub mod statusline;
 pub mod share;
+pub mod stash;
+pub mod statusline;
 pub mod tasks;
 pub mod terminal_setup;
 pub mod theme;
@@ -140,6 +141,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(toggle_mouse_reporting::ToggleMouseReportingCommand),
         Arc::new(settings_cmd::SettingsCommand),
         Arc::new(experimental::ExperimentalCommand),
+        Arc::new(stash::StashCommand),
         Arc::new(statusline::StatuslineCommand),
         Arc::new(privacy::PrivacyCommand),
         Arc::new(rewind::RewindCommand),

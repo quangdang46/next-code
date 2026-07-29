@@ -714,6 +714,9 @@ pub enum Action {
     /// tasks as a system block (`/tasks`). The surface minimal mode uses in
     /// place of the `TasksPane`.
     ShowTasks,
+    /// Open the stash dialog to browse and restore previously stashed prompt
+    /// drafts (`/stash`).
+    ShowStash,
     /// Show the current plan: preview popover if exists, toast if not.
     ShowPlan,
     /// Enter plan mode. If a description is provided, also start a turn
