@@ -1,5 +1,7 @@
 //! Settings UI: command palette, settings modal, toggles, resets, and rollback.
 
+use std::path::PathBuf;
+
 use super::setters::{
     pr13_effective_default, set_ask_user_question_timeout_enabled_inner, set_auto_dark_theme_inner,
     set_auto_light_theme_inner, set_auto_update_inner, set_collapsed_edit_blocks_inner,
@@ -409,6 +411,33 @@ pub(in crate::app::dispatch) fn dispatch_open_experimental(app: &mut AppView) ->
 
     let state = Box::new(ExperimentalModalState::load_from_config());
     agent.active_modal = Some(ActiveModal::ExperimentalFeatures { state });
+    vec![]
+}
+
+/// Open Face `/diff` review modal (Claude DiffDialog parity).
+pub(in crate::app::dispatch) fn dispatch_open_diff_modal(app: &mut AppView) -> Vec<Effect> {
+    use crate::views::diff_modal::DiffModalState;
+    use crate::views::modal::ActiveModal;
+
+    let ActiveView::Agent(id) = app.active_view else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+
+    if matches!(&agent.active_modal, Some(ActiveModal::DiffReview { .. })) {
+        agent.active_modal = None;
+        return vec![];
+    }
+
+    let cwd = if agent.session.cwd.as_os_str().is_empty() {
+        std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."))
+    } else {
+        agent.session.cwd.clone()
+    };
+    let state = Box::new(DiffModalState::build(&agent.scrollback, &cwd));
+    agent.active_modal = Some(ActiveModal::DiffReview { state });
     vec![]
 }
 

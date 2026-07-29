@@ -12,6 +12,7 @@ pub mod credit_bar;
 pub mod info_floats;
 pub mod dashboard;
 pub mod debug_style;
+pub mod diff_modal;
 pub mod extensions_modal;
 pub mod experimental_modal;
 pub mod file_search;

@@ -16,6 +16,7 @@ pub mod context;
 pub mod copy;
 pub mod dashboard;
 pub mod debug;
+pub mod diff;
 pub mod docs;
 pub mod effort;
 pub mod effort_levels;
@@ -90,6 +91,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(fork::ForkCommand),
         Arc::new(compact::CompactCommand),
         Arc::new(copy::CopyCommand),
+        Arc::new(diff::DiffCommand),
         Arc::new(find::FindCommand),
         Arc::new(history::HistoryCommand),
         Arc::new(export::ExportCommand),
@@ -228,6 +230,12 @@ mod tests {
             reg.get("memory").is_some(),
             "/memory should be registered"
         );
+    }
+
+    #[test]
+    fn diff_registered_in_builtin_commands() {
+        let reg = CommandRegistry::new(builtin_commands());
+        assert!(reg.get("diff").is_some(), "/diff should be registered");
     }
     #[test]
     fn loop_command_declares_scheduler_tool_requirement() {

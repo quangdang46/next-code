@@ -2036,6 +2036,23 @@ pub(super) fn apply_experimental_outcome(
         }
     }
 }
+
+/// Translate diff modal outcome: close on Esc from list.
+pub(super) fn apply_diff_outcome(
+    agent: &mut AgentView,
+    outcome: crate::views::diff_modal::DiffModalOutcome,
+) -> InputOutcome {
+    use crate::views::diff_modal::DiffModalOutcome;
+
+    match outcome {
+        DiffModalOutcome::Changed => InputOutcome::Changed,
+        DiffModalOutcome::Unchanged => InputOutcome::Unchanged,
+        DiffModalOutcome::Close => {
+            agent.active_modal = None;
+            InputOutcome::Changed
+        }
+    }
+}
 /// Whether this key event represents `#` (hash).
 ///
 /// Most terminals report `KeyCode::Char('#')` directly. Under the Kitty
