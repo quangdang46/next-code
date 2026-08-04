@@ -616,6 +616,7 @@
         use crate::app::agent_view::test_fixtures::{count_parked, simulate_wait_all};
 
         let mut app = make_app_with_agent("sess-park");
+        seed_task_tool_background(&mut app, "child-1");
         {
             let agent = app.agents.get_mut(&AgentId(0)).unwrap();
             agent.session.state = AgentState::TurnRunning;

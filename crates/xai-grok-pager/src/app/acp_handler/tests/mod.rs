@@ -1203,6 +1203,20 @@ pub(super) fn make_ext_session_notification_with_method(
     })
 }
 use crate::scrollback::blocks::SubagentBlockKind;
+/// Seed the root agent's tracker with the `task_tool_background` entry a real
+/// Task-variant tool call would have created. The phantom-spawn guard in
+/// `session_notification.rs` only inserts a SubagentSpawned whose `subagent_id`
+/// was seeded this way, so every dispatch-level spawn test must call this
+/// first (matching production: the Task tool call precedes the spawn).
+pub(super) fn seed_task_tool_background(app: &mut AppView, subagent_id: &str) {
+    app.agents
+        .get_mut(&AgentId(0))
+        .expect("seed_task_tool_background needs AgentId(0)")
+        .session
+        .tracker
+        .task_tool_background
+        .insert(subagent_id.to_string(), false);
+}
 pub(super) fn test_subagent_spawned(
     parent_sid: &str,
     child_sid: &str,
@@ -1320,6 +1334,7 @@ pub(super) fn run_subagent_lifecycle_via_method(
     child_sid: &str,
 ) -> (SubagentSpawnSnapshot, SubagentFinishSnapshot) {
     let mut app = make_app_with_agent("sess-parent");
+    seed_task_tool_background(&mut app, child_sid);
     let _ = handle(
         make_ext_session_notification_with_method(
             "sess-parent",
@@ -1462,6 +1477,7 @@ pub(super) fn spawn_subagent_with_optional_updates(
     if let Some(content) = updates {
         write_child_updates_jsonl(replay_disk_test_home(), child_sid, content);
     }
+    seed_task_tool_background(app, child_sid);
     let _ = handle(
         make_ext_session_notification_with_method(
             "sess-parent",
@@ -2017,3 +2033,4 @@ mod background_tasks;
 mod models;
 mod mcp;
 mod git_head;
+mod swarm;

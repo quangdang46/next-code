@@ -127,7 +127,18 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
         _ => {}
     }
     let is_api_key_auth = app.is_api_key_auth;
-    let matched = match find_session_match(app, &session_notif.session_id) {
+    // Subagent-lifecycle updates (SubagentSpawned / SubagentProgress /
+    // SubagentFinished, plus TaskBackgrounded / TaskCompleted dispatched above)
+    // require an exact Root/Child match: the pass-3 race fallback would
+    // otherwise route one to the active still-unbound agent and mint an
+    // eternal `finished:false` orphan under the wrong owner.
+    let allow_race_fallback = !matches!(
+        session_notif.update,
+        XaiSessionUpdate::SubagentSpawned { .. }
+            | XaiSessionUpdate::SubagentProgress { .. }
+            | XaiSessionUpdate::SubagentFinished { .. }
+    );
+    let matched = match find_session_match(app, &session_notif.session_id, allow_race_fallback) {
         Some(m) => m,
         None => {
             tracing::debug!(
@@ -290,16 +301,36 @@ pub(super) fn handle_session_notification(notif: &acp::ExtNotification, app: &mu
             parent_prompt_id,
             ..
         } => {
-            tracing::info!(
-                child_session_id = % child_session_id, subagent_type = % subagent_type,
-                "Subagent spawned"
-            );
+            // Phantom-spawn guard: a SubagentSpawned is only trusted when the
+            // root session actually saw the Task-tool call that spawned it —
+            // `task_tool_background` is seeded with the real `task_id` when a
+            // Task-variant tool call runs (see tracker.rs). Without that prior
+            // call the row would be a phantom: no child session, no task, an
+            // eternal finished:false orphan. Replayed spawns (session/load
+            // history) are also dropped here — history only replays the spawn
+            // notification, never the Task tool call that preceded it.
+            if !agent
+                .session
+                .tracker
+                .task_tool_background
+                .contains_key(&subagent_id)
+            {
+                tracing::warn!(
+                    child_session_id = % child_session_id, subagent_id = % subagent_id,
+                    "phantom subagent suppressed — no prior Task tool call on this root session"
+                );
+                return false;
+            }
             let is_background = agent
                 .session
                 .tracker
                 .task_tool_background
                 .remove(&subagent_id)
                 .unwrap_or(false);
+            tracing::info!(
+                child_session_id = % child_session_id, subagent_type = % subagent_type,
+                "Subagent spawned"
+            );
             let persona_display = persona.clone();
             let role_display = role.clone();
             let model_display = model.clone();

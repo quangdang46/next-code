@@ -10,6 +10,9 @@
             .unwrap()
             .session
             .loading_replay = true;
+        // The replayed spawn passes the phantom gate because the historical
+        // Task-tool call seeded the tracker (a real spawn preceded it).
+        seed_task_tool_background(&mut app, "sa-1");
 
         let spawned = subagent_ext_replay(
             "sess-1",
@@ -63,6 +66,7 @@
             .unwrap()
             .session
             .loading_replay = true;
+        seed_task_tool_background(&mut app, "sa-1");
 
         let spawned = subagent_ext_replay(
             "sess-1",
@@ -118,6 +122,7 @@
             .unwrap()
             .session
             .loading_replay = true;
+        seed_task_tool_background(&mut app, "sa-1");
 
         let spawned = subagent_ext_replay(
             "sess-1",
@@ -164,6 +169,7 @@
     fn ext_session_update_replay_handles_subagent_spawned_and_finished() {
         let mut app = make_app_with_agent("sess-parent");
         let child_sid = "child-sess-replay";
+        seed_task_tool_background(&mut app, child_sid);
 
         let affected = handle(
             make_ext_session_notification_with_method(
@@ -250,6 +256,7 @@
     fn subagent_activity_label_stamps_info_and_clears_on_finish() {
         let mut app = make_app_with_agent("sess-parent");
         let child_sid = "child-activity";
+        seed_task_tool_background(&mut app, child_sid);
         let _ = handle(
             make_ext_session_notification(
                 "sess-parent",
@@ -722,6 +729,7 @@
         switch_active_to(&mut app, AgentId(1));
 
         let child_sid = "child-inactive";
+        seed_task_tool_background(&mut app, child_sid);
         let affected = handle(
             make_ext_session_notification_with_method(
                 "sess-A",
@@ -781,6 +789,9 @@
     #[test]
     fn ext_session_update_unknown_session_subagent_spawned_no_op() {
         let mut app = make_app_with_agent("sess-A");
+        // Seed so the drop is exercised by session routing, not the
+        // phantom-spawn gate (which must also drop it — covered separately).
+        seed_task_tool_background(&mut app, "child-unknown");
         let affected = handle(
             make_ext_session_notification_with_method(
                 "sess-unknown",
@@ -799,6 +810,72 @@
         assert!(
             agent.scrollback.is_empty(),
             "SubagentSpawned for unknown session must not push scrollback"
+        );
+    }
+
+    /// Phantom-spawn guard (live): a SubagentSpawned whose `subagent_id` was
+    /// NOT seeded by a real Task-tool call on this root session must be dropped
+    /// entirely — no `subagent_sessions` row, no `subagent_views` child, no
+    /// parent-scrollback `SubagentBlock`. This is the phantom row that would
+    /// otherwise persist as an eternal `finished:false` orphan.
+    #[test]
+    fn live_subagent_spawned_without_prior_task_tool_is_dropped() {
+        let mut app = make_app_with_agent("sess-parent");
+        let child_sid = "child-phantom";
+        // Deliberately no seed_task_tool_background — the spawn was NOT
+        // preceded by a Task tool call.
+
+        let affected = handle(
+            make_ext_session_notification("sess-parent", test_subagent_spawned("sess-parent", child_sid)),
+            &mut app,
+        );
+        assert!(
+            !affected,
+            "phantom spawn must be dropped (no affected/redraw)"
+        );
+        let agent = app.agents.get(&AgentId(0)).unwrap();
+        assert!(
+            agent.subagent_sessions.is_empty(),
+            "phantom spawn must not register subagent_sessions"
+        );
+        assert!(
+            agent.subagent_views.is_empty(),
+            "phantom spawn must not create subagent_views"
+        );
+        assert!(
+            agent.scrollback.is_empty(),
+            "phantom spawn must not push a SubagentBlock"
+        );
+    }
+
+    /// The phantom gate is keyed on `subagent_id` (the seeded Task tool id), not
+    /// on `child_session_id`: a seeded spawn still inserts even when the ids
+    /// differ, while an unseeded one is dropped even if it reuses a known child
+    /// session id.
+    #[test]
+    fn live_subagent_spawned_with_prior_task_tool_is_inserted() {
+        let mut app = make_app_with_agent("sess-parent");
+        let child_sid = "child-real";
+        seed_task_tool_background(&mut app, child_sid);
+
+        let affected = handle(
+            make_ext_session_notification("sess-parent", test_subagent_spawned("sess-parent", child_sid)),
+            &mut app,
+        );
+        assert!(affected, "seeded spawn must be applied (redraw)");
+        let agent = app.agents.get(&AgentId(0)).unwrap();
+        assert!(
+            agent.subagent_sessions.contains_key(child_sid),
+            "seeded spawn must register subagent_sessions"
+        );
+        assert!(
+            agent.subagent_views.contains_key(child_sid),
+            "seeded spawn must create subagent_views"
+        );
+        assert_eq!(
+            agent.scrollback.len(),
+            1,
+            "seeded spawn must push exactly one SubagentBlock"
         );
     }
 

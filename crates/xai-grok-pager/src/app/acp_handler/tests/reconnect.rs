@@ -853,18 +853,16 @@
         );
     }
 
-    /// Characterization (leader-relaunch orphan rows): a reconnect reload whose
-    /// replay contains `SubagentSpawned` with NO `SubagentFinished` (the
-    /// subagent died with the old leader, or is still running on the surviving
-    /// one) leaves the row `finished == false` after the success swap — the
-    /// window finalize force-idles only the ROOT transcript, nothing resolves
-    /// or expires subagent rows. Pager-side child tracking itself stays
-    /// functional: a live child update delivered after the swap still renders
-    /// into the child view, so a post-reconnect freeze would be leader route
-    /// loss (see the `leader::server` child-route backfill tests), not pager
-    /// state.
+    /// Phantom-spawn guard on the reconnect replay path: a replayed
+    /// `SubagentSpawned` was NOT preceded by a real Task-tool call on this root
+    /// session — history only replays the spawn notification, never the tool
+    /// call that seeded `task_tool_background` — so the phantom gate drops it
+    /// entirely. No `subagent_sessions` row, no `subagent_views` child, no
+    /// parent-scrollback `SubagentBlock`: a reconnect replay can no longer mint
+    /// an eternal `finished:false` orphan row. The reconnect window still
+    /// finalizes (only the root transcript is swapped).
     #[test]
-    fn reload_replayed_spawn_without_finished_keeps_unresolved_running_row() {
+    fn reload_replayed_spawn_without_task_tool_call_is_dropped() {
         let mut app = make_app_with_agent("sess-sub");
         let id = AgentId(0);
         {
@@ -875,7 +873,8 @@
             agent.begin_session_reload(1);
         }
 
-        // Replayed spawn, no finish (mirrors a mid-subagent reconnect replay).
+        // Replayed spawn with no prior Task tool call (mirrors a mid-subagent
+        // reconnect replay): the phantom gate must drop it.
         let payload = SessionNotification {
             session_id: acp::SessionId::new("sess-sub"),
             update: test_subagent_spawned("sess-sub", "child-sub"),
@@ -885,36 +884,35 @@
             "x.ai/session_notification",
             serde_json::value::to_raw_value(&payload).unwrap().into(),
         );
-        assert!(handle_ext_notification(&notif, &mut app));
+        assert!(
+            !handle_ext_notification(&notif, &mut app),
+            "phantom replayed spawn must be dropped (no affected/redraw)"
+        );
 
         let agent = app.agents.get_mut(&id).unwrap();
         assert!(agent.finish_session_reload(1, true));
         assert!(matches!(agent.session.state, AgentState::Idle));
 
-        let info = agent
-            .subagent_sessions
-            .get("child-sub")
-            .expect("replayed spawn registers the subagent row");
         assert!(
-            !info.finished,
-            "no Finished in the replay → the row stays running indefinitely \
-             (current behavior: nothing resolves it after the swap)"
+            agent.subagent_sessions.is_empty(),
+            "phantom replayed spawn must not register a subagent row"
         );
         assert!(
-            agent.subagent_views.contains_key("child-sub"),
-            "the child view exists and is tracked"
+            agent.subagent_views.is_empty(),
+            "phantom replayed spawn must not create a child view"
         );
 
-        // A live child delta after the swap still renders into the child view:
-        // pager-side routing is intact when the leader delivers it.
-        let child_len_before = app.agents[&id].subagent_views["child-sub"].scrollback.len();
+        // A live child delta after the swap routes nowhere (no child view was
+        // minted) and must be dropped rather than crashing.
+        let scrollback_len = agent.scrollback.len();
         let _ = handle(
             make_agent_chunk_with_event("child-sub", "child live text", "p-child", None),
             &mut app,
         );
-        assert!(
-            app.agents[&id].subagent_views["child-sub"].scrollback.len() > child_len_before,
-            "a delivered live child update must render into the child view"
+        assert_eq!(
+            app.agents[&id].scrollback.len(),
+            scrollback_len,
+            "a child-session delta with no child view must be dropped"
         );
     }
 

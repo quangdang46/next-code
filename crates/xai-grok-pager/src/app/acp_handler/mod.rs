@@ -146,7 +146,15 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
             // Wait-state bookkeeping after the agent borrow ends (parked marker).
             let mut wait_state_agent: Option<AgentId> = None;
 
-            let affected = match find_session_match(app, &notif.request.session_id) {
+            let affected = match find_session_match(
+                app,
+                &notif.request.session_id,
+                // Chunk/tool updates may race ahead of the root `session_id`
+                // binding; subagent-lifecycle updates (routed to the Child arm)
+                // must require an exact match so the fallback can't mint an
+                // orphan subagent row under the active unbound agent.
+                true,
+            ) {
                 Some(SessionMatch::Root(id)) => {
                     let is_active = is_matched_agent_active(app, id);
                     wait_state_agent = Some(id);
@@ -587,6 +595,26 @@ pub(crate) fn handle(msg: AcpClientMessage, app: &mut AppView) -> bool {
 /// Dispatches on method string:
 /// - `x.ai/session_notification` / `x.ai/session/update` → per-agent session updates
 fn handle_ext_notification(notif: &acp::ExtNotification, app: &mut AppView) -> bool {
+    // DIAG (subagent phantom): log every ext notification + subagent/swarm state
+    // to a file so we can see what populates "subagent" UI on a message send.
+    if std::env::var_os("NEXT_CODE_SUBAGENT_DIAG").is_some() {
+        use std::io::Write;
+        let line = format!(
+            "ext_notif method={} session_id={:?} subagent_sessions={:?} subagent_views={:?} swarm_members={:?}\n",
+            notif.method.as_ref(),
+            app.agents.iter().map(|(id, a)| (id, a.session.session_id.as_ref().map(|s| s.0.as_ref()))).collect::<Vec<_>>(),
+            app.agents.iter().map(|(id, a)| (id, a.subagent_sessions.keys().map(|k| k.as_str()).collect::<Vec<_>>())).collect::<Vec<_>>(),
+            app.agents.iter().map(|(id, a)| (id, a.subagent_views.keys().map(|k| k.as_str()).collect::<Vec<_>>())).collect::<Vec<_>>(),
+            app.agents.iter().map(|(id, a)| (id, a.swarm_members.keys().map(|k| k.as_str()).collect::<Vec<_>>())).collect::<Vec<_>>(),
+        );
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(std::env::temp_dir().join("nextcode-subagent-diag.log"))
+        {
+            let _ = f.write_all(line.as_bytes());
+        }
+    }
     match notif.method.as_ref() {
         "x.ai/session_notification" | "x.ai/session/update" => {
             handle_session_notification(notif, app)
@@ -637,7 +665,7 @@ fn handle_next_code_connection_status(notif: &acp::ExtNotification, app: &mut Ap
         return false;
     };
     let sid = acp::SessionId::new(session_id.to_string());
-    let Some(matched) = find_session_match(app, &sid) else {
+    let Some(matched) = find_session_match(app, &sid, true) else {
         return false;
     };
     let parent_id = matched.agent_id();
@@ -730,7 +758,7 @@ fn handle_next_code_memory_info(notif: &acp::ExtNotification, app: &mut AppView)
     }
 
     let sid = acp::SessionId::new(session_id.to_string());
-    let Some(matched) = find_session_match(app, &sid) else {
+    let Some(matched) = find_session_match(app, &sid, true) else {
         return false;
     };
     let parent_id = matched.agent_id();
@@ -793,7 +821,7 @@ fn handle_next_code_git_status(notif: &acp::ExtNotification, app: &mut AppView) 
     };
 
     let sid = acp::SessionId::new(session_id.to_string());
-    let Some(matched) = find_session_match(app, &sid) else {
+    let Some(matched) = find_session_match(app, &sid, true) else {
         return false;
     };
     let parent_id = matched.agent_id();
@@ -834,7 +862,7 @@ fn handle_next_code_provider_name(notif: &acp::ExtNotification, app: &mut AppVie
     };
 
     let sid = acp::SessionId::new(session_id.to_string());
-    let Some(matched) = find_session_match(app, &sid) else {
+    let Some(matched) = find_session_match(app, &sid, true) else {
         return false;
     };
     let parent_id = matched.agent_id();
@@ -871,7 +899,7 @@ fn handle_next_code_token_usage(notif: &acp::ExtNotification, app: &mut AppView)
     let cache_creation = parsed.get("cacheCreationInput").and_then(|v| v.as_u64());
 
     let sid = acp::SessionId::new(session_id.to_string());
-    let Some(matched) = find_session_match(app, &sid) else {
+    let Some(matched) = find_session_match(app, &sid, true) else {
         return false;
     };
     let parent_id = matched.agent_id();
@@ -947,7 +975,7 @@ fn handle_interjection(notif: &acp::ExtNotification, app: &mut AppView) -> bool 
     let interjection_id = parsed.get("interjectionId").and_then(|v| v.as_str());
 
     let sid = acp::SessionId::new(session_id.to_string());
-    let Some(SessionMatch::Root(id)) = find_session_match(app, &sid) else {
+    let Some(SessionMatch::Root(id)) = find_session_match(app, &sid, true) else {
         return false;
     };
     let is_active = is_matched_agent_active(app, id);
