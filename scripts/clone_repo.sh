@@ -44,7 +44,6 @@ clone https://github.com/aaif-goose/goose.git
 clone https://github.com/stakpak/agent.git
 clone https://github.com/vinhnx/VTCode.git
 clone https://github.com/autohandai/code-cli.git
-clone https://github.com/JetBrains/junie.git
 clone https://github.com/femto/minion-code.git
 clone https://github.com/mistralai/mistral-vibe.git
 clone https://github.com/Kilo-Org/kilocode.git

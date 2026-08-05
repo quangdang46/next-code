@@ -34,7 +34,6 @@ call :clone https://github.com/aaif-goose/goose.git
 call :clone https://github.com/stakpak/agent.git
 call :clone https://github.com/vinhnx/VTCode.git
 call :clone https://github.com/autohandai/code-cli.git
-call :clone https://github.com/JetBrains/junie.git
 call :clone https://github.com/femto/minion-code.git
 call :clone https://github.com/mistralai/mistral-vibe.git
 call :clone https://github.com/Kilo-Org/kilocode.git
